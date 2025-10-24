@@ -20,7 +20,7 @@ import numpy as np
 import pennylane as qml
 
 from catalyst import qjit
-from catalyst.passes import to_ppr, commute_ppr, ppm_compilation
+from catalyst.passes import to_ppr, commute_ppr, merge_ppr_ppm, ppr_to_ppm, ppm_compilation
 
 
 def test_single_qubit_pauli_rotations():
@@ -191,7 +191,7 @@ test_clifford_t_ppr_ppm_combined()
 
 
 def test_commute_ppr():
-    """Test commute-ppr pass: H and S gates should be commuted to the back after T gate."""
+    """Test commute-ppr pass: PauliRot and S gates should be commuted to the back after T gate."""
     dev = qml.device("catalyst.ftqc", wires=1)
     
     pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
@@ -203,15 +203,87 @@ def test_commute_ppr():
     def circuit():
         qml.PauliRot(np.pi / 2, "Z", wires=0)  # Clifford gate
         qml.S(wires=0)                         # Clifford gate
-        qml.T(wires=0)                         # Non-Clifford gate. Should commute to the front.
+        qml.T(wires=0)                         # Non-Clifford gate
         return
 
     # CHECK: qec.ppr ["Z"](8)
-    # CHECK: qec.ppr ["Z"](4)    
-    # CHECK: qec.ppr ["Z"](4)    
+    # CHECK: qec.ppr ["Z"](4)
+    # CHECK: qec.ppr ["Z"](4)
     print(circuit.mlir_opt)
 
 test_commute_ppr()
 
 
+def test_merge_ppr_ppm():
+    """Test merge-ppr-ppm pass: Clifford PauliRot should be merged into PauliMeasure."""
+    dev = qml.device("catalyst.ftqc", wires=1)
+    
+    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
+    @qjit(pipelines=pipeline, target="mlir")
+    @merge_ppr_ppm
+    @to_ppr
+    @qml.qnode(device=dev)
+    def circuit():
+        qml.PauliRot(np.pi / 2, "Z", wires=0)
+        qml.pauli_measure("X", wires=0)
+        return
+
+    # CHECK: qec.ppm ["Y"]
+    print(circuit.mlir_opt)
+
+test_merge_ppr_ppm()
+
+
+def test_ppr_to_ppm():
+    """Test ppr_to_ppm pass: PauliRot should be decomposed into PPM."""
+    dev = qml.device("catalyst.ftqc", wires=1)
+    
+    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipeline, target="mlir")
+    @merge_ppr_ppm
+    @ppr_to_ppm
+    @to_ppr
+    @qml.qnode(device=dev)
+    def circuit():
+        qml.PauliRot(np.pi / 2, "X", wires=0)
+        qml.PauliRot(np.pi / 4, "Y", wires=0)
+        return
+
+    # CHECK: qec.ppm ["X", "Y"](-1)
+    # CHECK: qec.ppm ["X"]
+    # CHECK: qec.ppm ["Y", "Z"](-1)
+    print(circuit.mlir_opt)
+
+test_ppr_to_ppm()
+
+
+def test_ppm_compilation():
+    """Test ppm_compilation pass: PauliRot should be decomposed into PPM."""
+    dev = qml.device("catalyst.ftqc", wires=1)
+    
+    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipeline, keep_intermediate=2, target="mlir")
+    @ppm_compilation
+    @qml.qnode(device=dev)
+    def circuit():
+        qml.Hadamard(wires=0)
+        qml.PauliRot(np.pi / 2, "X", wires=0)
+        qml.PauliRot(np.pi / 4, "Y", wires=0)
+        qml.T(wires=0)
+        qml.pauli_measure("X", wires=0)
+        return
+
+    # CHECK: qec.ppm ["X", "Z"]
+    # CHECK: qec.select.ppm
+    # CHECK: qec.ppr ["X"](2)
+    # CHECK: qec.fabricate  magic
+    # CHECK: qec.ppm ["Y", "Z"]
+    # CHECK: qec.select.ppm
+    # CHECK: qec.ppr ["Y"](2)
+    # CHECK: qec.ppm ["Z"]
+    print(circuit.mlir_opt)
+
+test_ppm_compilation()
