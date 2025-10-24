@@ -31,6 +31,9 @@ using llvm::SmallVector;
 using llvm::StringRef;
 using namespace mlir;
 using catalyst::quantum::CustomOp;
+using catalyst::quantum::ExtractOp;
+using catalyst::quantum::InsertOp;
+using catalyst::quantum::QubitType;
 
 namespace catalyst {
 namespace quantum {
@@ -100,12 +103,86 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
 
     mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
     {
-        // 1. Match
-        if (op.getGateName() !=
-            "RZ") { // *** Make sure this is the correct name you want to match ***
+        // 1. Match RZ
+        if (op.getGateName() != "RZ") {
             return rewriter.notifyMatchFailure(op, "op is not 'RZ'");
         }
         LLVM_DEBUG(llvm::dbgs() << "Matching op: " << op << "\n");
+
+        // *** Find Qubit operand and trace it back to its ExtractOp ***
+        mlir::Value qbitOperand; // This will be the RZ op's qubit operand
+        SmallVector<mlir::Value> paramOperands;
+
+        for (mlir::Value operand : op->getOperands()) {
+            if (mlir::isa<catalyst::quantum::QubitType>(operand.getType())) {
+                qbitOperand = operand;
+            }
+            else {
+                paramOperands.push_back(operand);
+            }
+        }
+
+        if (!qbitOperand) {
+            return rewriter.notifyMatchFailure(op, "RZ op has no qubit operand");
+        }
+        if (op->getNumResults() != 1 ||
+            !mlir::isa<catalyst::quantum::QubitType>(op->getResult(0).getType())) {
+            return rewriter.notifyMatchFailure(op, "RZ op does not return a single qubit");
+        }
+
+        // --- Start Trace-back Loop ---
+        catalyst::quantum::ExtractOp extractOp;
+        mlir::Value currentQubit = qbitOperand;
+
+        while (true) {
+            // Try to get the defining op as an ExtractOp
+            extractOp = currentQubit.getDefiningOp<ExtractOp>();
+            if (extractOp) {
+                // Success! We found the source ExtractOp.
+                LLVM_DEBUG(llvm::dbgs() << "Found source ExtractOp: " << extractOp << "\n");
+                break;
+            }
+            auto definingOp = currentQubit.getDefiningOp();
+            if (!definingOp) {
+                return rewriter.notifyMatchFailure(
+                    op, "Qubit operand does not trace back to an ExtractOp (reached top)");
+            }
+            if (auto customOp = dyn_cast<CustomOp>(definingOp)) {
+                if (customOp->getNumResults() != 1 ||
+                    !mlir::isa<catalyst::quantum::QubitType>(customOp.getResult(0).getType())) {
+                    break;
+                }
+                mlir::Value nextQubit = nullptr;
+                for (mlir::Value opnd : customOp.getOperands()) {
+                    if (mlir::isa<catalyst::quantum::QubitType>(opnd.getType())) {
+                        if (nextQubit) {
+                            nextQubit = nullptr; 
+                            break;
+                        }
+                        nextQubit = opnd;
+                    }
+                }
+                if (nextQubit) {
+                    LLVM_DEBUG(llvm::dbgs()
+                               << "Looking through op: " << *definingOp << "\n");
+                    currentQubit = nextQubit;
+                    continue; 
+                }
+            }
+            break;
+        }
+        // --- End Trace-back Loop ---
+
+        if (!extractOp) {
+            return rewriter.notifyMatchFailure(
+                op, "Qubit operand does not trace back to an ExtractOp");
+        }
+
+        // Get the register, index, and types we'll need
+        mlir::Value qregOperand = extractOp.getQreg(); // The *original* qreg
+        mlir::Value qbitIndex = extractOp.getIdx();
+        mlir::Type qregType = qregOperand.getType();
+        mlir::Type qbitType = qbitOperand.getType();
 
         mlir::ModuleOp module = op->getParentOfType<mlir::ModuleOp>();
         mlir::Location loc = op.getLoc();
@@ -115,33 +192,54 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
         // 2. Declare runtime functions
         mlir::func::FuncOp getGatesFunc = getOrDeclareGetGatesFunc(module, rewriter);
         mlir::func::FuncOp freeMemrefFunc =
-            getOrDeclareFreeMemrefFunc(module, rewriter); // *** Declare free func ***
+            getOrDeclareFreeMemrefFunc(module, rewriter); 
 
         // 3. Call some_func to get memref
         auto callGetGatesOp =
             rewriter.create<mlir::func::CallOp>(loc, getGatesFunc, mlir::ValueRange{});
         mlir::Value unrankedMemref =
-            callGetGatesOp.getResult(0); // This is the value holding the allocated memory info
+            callGetGatesOp.getResult(0); 
 
-        // 4. Cast and load first element
+        // 4. Cast, get size, and create loop bounds
         mlir::Type indexType = rewriter.getIndexType();
         mlir::Type rankedType = mlir::MemRefType::get({mlir::ShapedType::kDynamic}, indexType);
         mlir::Value rankedMemref =
             rewriter.create<mlir::memref::CastOp>(loc, rankedType, unrankedMemref);
+        
         mlir::Value c0 = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
-        mlir::Value firstGateIndex =
-            rewriter.create<mlir::memref::LoadOp>(loc, rankedMemref, mlir::ValueRange{c0});
+        mlir::Value c1 = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
+        mlir::Value memrefSize = rewriter.create<mlir::memref::DimOp>(loc, rankedMemref, c0);
 
-        // 5. Create the switch operation
+
+        // 5. Insert the qubit operand (from "S") into the register
+        // This register state will be the initial value for the loop.
+        mlir::Value regBeforeLoop = rewriter.create<InsertOp>(
+            loc, qregType, qregOperand, qbitIndex, /*idx_attr=*/nullptr, qbitOperand);
+
+        // 6. Create the scf.for loop
+        // The loop iterates from 0 to memrefSize, carrying the qreg
+        auto forOp = rewriter.create<mlir::scf::ForOp>(loc, c0, memrefSize, c1, 
+                                                       ValueRange{regBeforeLoop});
+        
+        // Get the loop's induction variable and current qreg
+        mlir::OpBuilder::InsertionGuard loopGuard(rewriter);
+        rewriter.setInsertionPointToStart(forOp.getBody());
+        mlir::Value iv = forOp.getInductionVar();
+        mlir::Value currentLoopReg = forOp.getRegionIterArg(0);
+
+        // 7. Load the gate index *inside* the loop
+        mlir::Value currentGateIndex =
+            rewriter.create<mlir::memref::LoadOp>(loc, rankedMemref, ValueRange{iv});
+
+        // 8. Create the switch operation *inside* the loop
         SmallVector<int64_t> caseValues = {0, 1, 2, 3};
         mlir::DenseI64ArrayAttr caseValuesAttr = rewriter.getDenseI64ArrayAttr(caseValues);
         auto switchOp = rewriter.create<mlir::scf::IndexSwitchOp>(
-            loc, op->getResultTypes(), firstGateIndex, caseValuesAttr, caseValues.size());
+            loc, mlir::TypeRange{qregType}, // Switch returns qreg
+            currentGateIndex, caseValuesAttr, caseValues.size());
 
-        // 6. Populate switch cases
+        // 9. Populate switch cases
         SmallVector<StringRef> gateNames = {"Hadamard", "PauliX", "PauliY", "PauliZ"};
-        assert(switchOp.getNumRegions() == gateNames.size() + 1 && "Mismatch regions");
-
         mlir::NamedAttrList copiedAttrs;
         for (const mlir::NamedAttribute &attr : op->getAttrs()) {
             if (attr.getName() != "gate_name") {
@@ -151,51 +249,80 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
 
         for (unsigned i = 0; i < gateNames.size(); ++i) {
             Region &caseRegion = switchOp.getCaseRegions()[i];
-            if (caseRegion.empty()) {
-                caseRegion.push_back(new Block());
-            }
+            caseRegion.push_back(new Block());
             rewriter.setInsertionPointToStart(&caseRegion.front());
+
+            // Extract qbit from the *current* loop register
+            mlir::Value qbitToOperateOn = rewriter.create<ExtractOp>(
+                loc, qbitType, currentLoopReg, qbitIndex, /*idx_attr=*/nullptr);
+
+            SmallVector<mlir::Value> newOperands = paramOperands;
+            newOperands.push_back(qbitToOperateOn);
 
             mlir::NamedAttrList newAttrs = copiedAttrs;
             newAttrs.append(
                 rewriter.getNamedAttr("gate_name", rewriter.getStringAttr(gateNames[i])));
-            auto newOp = rewriter.create<CustomOp>(loc, op->getResultTypes(), op->getOperands(),
+            auto newOp = rewriter.create<CustomOp>(loc, op->getResultTypes(), newOperands,
                                                    newAttrs.getAttrs());
-            rewriter.create<mlir::scf::YieldOp>(loc, newOp->getResults());
+            mlir::Value resultQbit = newOp.getResult(0);
+
+            // Insert result qbit back into the *current* loop register
+            mlir::Value resultQreg = rewriter.create<InsertOp>(
+                loc, qregType, currentLoopReg, qbitIndex, /*idx_attr=*/nullptr, resultQbit);
+
+            rewriter.create<mlir::scf::YieldOp>(loc, resultQreg);
         }
 
-        // 7. Populate Default Case
+        // 10. Populate Default Case
         Region &defaultRegion = switchOp.getDefaultRegion();
-        if (defaultRegion.empty()) {
-            defaultRegion.push_back(new Block());
-        }
+        defaultRegion.push_back(new Block());
         rewriter.setInsertionPointToStart(&defaultRegion.front());
-        if (!op->getResultTypes().empty()) {
-            mlir::NamedAttrList defaultAttrs = copiedAttrs;
-            defaultAttrs.append(
-                rewriter.getNamedAttr("gate_name", rewriter.getStringAttr("Identity")));
-            auto defaultOp = rewriter.create<CustomOp>(loc, op->getResultTypes(), op->getOperands(),
-                                                       defaultAttrs.getAttrs());
-            rewriter.create<mlir::scf::YieldOp>(loc, defaultOp->getResults());
-        }
-        else {
-            rewriter.create<mlir::scf::YieldOp>(loc);
-        }
 
-        // 8. *** Call free_memref ***
-        // Place the call *after* the switch, as the memref value ('unrankedMemref')
-        // itself (or derived values like 'rankedMemref') is no longer needed after the load.
-        rewriter.setInsertionPointAfter(switchOp); // Ensure insertion point is correct
-        rewriter.create<mlir::func::CallOp>(
+        // Extract qbit from the *current* loop register
+        mlir::Value defaultQbitToOperateOn = rewriter.create<ExtractOp>(
+            loc, qbitType, currentLoopReg, qbitIndex, /*idx_attr=*/nullptr);
+
+        SmallVector<mlir::Value> defaultOperands = paramOperands;
+        defaultOperands.push_back(defaultQbitToOperateOn);
+
+        mlir::NamedAttrList defaultAttrs = copiedAttrs;
+        defaultAttrs.append(
+            rewriter.getNamedAttr("gate_name", rewriter.getStringAttr("Identity")));
+        auto defaultOp =
+            rewriter.create<CustomOp>(loc, op->getResultTypes(), defaultOperands,
+                                       defaultAttrs.getAttrs());
+        mlir::Value defaultResultQbit = defaultOp.getResult(0);
+
+        // Insert result qbit back into the *current* loop register
+        mlir::Value defaultResultQreg = rewriter.create<InsertOp>(
+            loc, qregType, currentLoopReg, qbitIndex, /*idx_attr=*/nullptr, defaultResultQbit);
+
+        rewriter.create<mlir::scf::YieldOp>(loc, defaultResultQreg);
+
+
+        // 11. Yield the result of the switch op from the for loop
+        rewriter.setInsertionPointAfter(switchOp);
+        rewriter.create<mlir::scf::YieldOp>(loc, switchOp.getResults());
+
+
+        // 12. Call free_memref *after* the loop
+        rewriter.setInsertionPointAfter(forOp); 
+        auto freeCall = rewriter.create<mlir::func::CallOp>(
             loc, freeMemrefFunc,
-            mlir::ValueRange{unrankedMemref}); // Pass the value from callGetGatesOp
+            mlir::ValueRange{unrankedMemref}); 
 
-        // 9. Clean up original op
-        rewriter.replaceAllUsesWith(op->getResults(), switchOp.getResults());
+        // 13. Extract final qbit from loop's result qreg
+        rewriter.setInsertionPointAfter(freeCall);
+        mlir::Value finalReg = forOp.getResult(0); // Get the result from the for loop
+        mlir::Value finalQbitResult = rewriter.create<ExtractOp>(
+            loc, qbitType, finalReg, qbitIndex, /*idx_attr=*/nullptr);
+
+        // 14. Clean up original op
+        rewriter.replaceAllUsesWith(op->getResults(), finalQbitResult);
         rewriter.eraseOp(op);
 
         LLVM_DEBUG(
-            llvm::dbgs() << "Replaced op with switch structure and added free_memref call.\n");
+            llvm::dbgs() << "Replaced op with scf.for loop and added free_memref call.\n");
         return success();
     }
 };

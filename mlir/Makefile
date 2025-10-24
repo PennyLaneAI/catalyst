@@ -13,7 +13,7 @@ ENZYME_BUILD_DIR ?= $(MK_DIR)/Enzyme/build
 RT_BUILD_DIR ?= $(MK_DIR)/../runtime/build
 ENABLE_ASAN ?= OFF
 STRICT_WARNINGS ?= ON
-BUILD_TYPE ?= Release
+BUILD_TYPE ?= RelWithDebInfo
 LLVM_EXTERNAL_LIT ?= $(LLVM_BUILD_DIR)/bin/llvm-lit
 
 ifeq ($(shell uname), Darwin)
