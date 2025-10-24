@@ -938,6 +938,7 @@ class TestDynamicOneShotIntegration:
     @pytest.mark.parametrize("diff_method", ["auto", "fd"])
     @pytest.mark.xfail(
         reason="jvp with dynamic one-shot is not yet supported.",
+        run=False,
     )
     def test_mcm_method_with_jvp(self, backend, diff_method):
         """Test that the dynamic_one_shot works with jvp."""
@@ -973,6 +974,7 @@ class TestDynamicOneShotIntegration:
     @pytest.mark.parametrize("diff_method", ["auto", "fd"])
     @pytest.mark.xfail(
         reason="vjp with dynamic one-shot is not yet supported.",
+        run=False,
     )
     def test_mcm_method_with_vjp(self, backend, diff_method):
         """Test that the dynamic_one_shot works with vjp."""
