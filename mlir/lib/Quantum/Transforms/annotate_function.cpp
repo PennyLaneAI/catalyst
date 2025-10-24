@@ -179,7 +179,6 @@ namespace catalyst {
 namespace quantum {
 
 #define GEN_PASS_DEF_ANNOTATEFUNCTIONPASS
-#define GEN_PASS_DECLS_ANNOTATEFUNCTIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct AnnotateFunctionPassVerified
