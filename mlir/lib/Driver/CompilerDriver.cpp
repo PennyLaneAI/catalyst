@@ -67,7 +67,6 @@
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientInterfaces.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
-#include "Gradient/Transforms/Passes.h"
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
