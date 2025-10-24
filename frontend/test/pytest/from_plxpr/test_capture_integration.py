@@ -538,10 +538,10 @@ class TestCapture:
                 def inner(j):
                     qml.ControlledPhaseShift(jnp.pi / 2 ** (n - j + 1), [i, j])
 
-                inner()
+                inner()  # pylint: disable=no-value-for-parameter
 
-            init()
-            qft()
+            init()  # pylint: disable=no-value-for-parameter
+            qft()  # pylint: disable=no-value-for-parameter
 
             # Expected output: |100...>
             return qml.state()

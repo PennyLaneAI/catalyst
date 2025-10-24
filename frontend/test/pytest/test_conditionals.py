@@ -504,7 +504,7 @@ class TestCond:
                 return True
 
             r = cond_fn()
-            assert r.dtype is jnp.dtype("int")
+            assert r.dtype is jnp.dtype("int")  # pylint: disable=no-member
             return r
 
         assert 0 == circuit()
