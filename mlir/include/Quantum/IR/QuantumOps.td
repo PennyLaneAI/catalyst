@@ -741,15 +741,15 @@ def AdjointOp : Region_Op<"adjoint", [QuantumRegion, SingleBlockImplicitTerminat
     let regions = (region SizedRegion<1>:$region);
 
     let arguments = (ins
-        QuregType:$qreg
+        Variadic<QuregType>:$qreg
     );
 
     let results = (outs
-        QuregType:$out_qreg
+        Variadic<QuregType>:$out_qreg
     );
 
     let assemblyFormat = [{
-        `(` $qreg `)` attr-dict `:` type(operands) $region
+        `(` $qreg `)` attr-dict `:` type(operands) `->` type(results) $region
     }];
 
     let hasVerifier = 1;
