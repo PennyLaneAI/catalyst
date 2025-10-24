@@ -56,9 +56,10 @@ mlir::func::FuncOp getOrDeclareGetGatesFunc(mlir::ModuleOp module, mlir::Pattern
         return func;
     }
 
-    auto rankedMemRefType = mlir::MemRefType::get({mlir::ShapedType::kDynamic}, 
-                                                 rewriter.getIndexType());
-    auto funcType = rewriter.getFunctionType({}, {rankedMemRefType});
+    auto f64Type = rewriter.getF64Type(); // <-- Argument type
+    auto rankedMemRefType =
+        mlir::MemRefType::get({mlir::ShapedType::kDynamic}, rewriter.getIndexType());
+    auto funcType = rewriter.getFunctionType({f64Type}, {rankedMemRefType});
 
     mlir::OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(module.getBody());
@@ -114,7 +115,6 @@ mlir::func::FuncOp getOrDeclareGetVal2Func(mlir::ModuleOp module, mlir::PatternR
     return func;
 }
 
-
 /**
  * @brief Gets or declares the external runtime function `free_memref_0`.
  * MLIR signature: func.func @free_memref_0(memref<?xindex>) -> ()
@@ -129,14 +129,14 @@ mlir::func::FuncOp getOrDeclareFreeMemrefFunc(mlir::ModuleOp module,
         return func;
     }
 
-    auto rankedMemRefType = mlir::MemRefType::get({mlir::ShapedType::kDynamic}, 
-                                                 rewriter.getIndexType());
+    auto rankedMemRefType =
+        mlir::MemRefType::get({mlir::ShapedType::kDynamic}, rewriter.getIndexType());
     auto funcType = rewriter.getFunctionType({rankedMemRefType}, {});
 
     mlir::OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(module.getBody());
     func = rewriter.create<mlir::func::FuncOp>(module.getLoc(), funcName, funcType);
-    func.setPrivate(); 
+    func.setPrivate();
 
     return func;
 }
@@ -155,7 +155,7 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
         LLVM_DEBUG(llvm::dbgs() << "Matching op: " << op << "\n");
 
         // *** Find Qubit operand and trace it back to its ExtractOp ***
-        mlir::Value qbitOperand; 
+        mlir::Value qbitOperand;
         SmallVector<mlir::Value> paramOperands;
 
         for (mlir::Value operand : op->getOperands()) {
@@ -165,6 +165,13 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
             else {
                 paramOperands.push_back(operand);
             }
+        }
+        if (paramOperands.size() != 1) {
+            return rewriter.notifyMatchFailure(op, "RZ op must have exactly one parameter");
+        }
+        mlir::Value rzParam = paramOperands[0];
+        if (!mlir::isa<mlir::Float64Type>(rzParam.getType())) {
+            return rewriter.notifyMatchFailure(op, "RZ parameter is not f64");
         }
 
         if (!qbitOperand) {
@@ -199,17 +206,16 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
                 for (mlir::Value opnd : customOp.getOperands()) {
                     if (mlir::isa<catalyst::quantum::QubitType>(opnd.getType())) {
                         if (nextQubit) {
-                            nextQubit = nullptr; 
+                            nextQubit = nullptr;
                             break;
                         }
                         nextQubit = opnd;
                     }
                 }
                 if (nextQubit) {
-                    LLVM_DEBUG(llvm::dbgs()
-                               << "Looking through op: " << *definingOp << "\n");
+                    LLVM_DEBUG(llvm::dbgs() << "Looking through op: " << *definingOp << "\n");
                     currentQubit = nextQubit;
-                    continue; 
+                    continue;
                 }
             }
             break;
@@ -217,12 +223,12 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
         // --- End Trace-back Loop ---
 
         if (!extractOp) {
-            return rewriter.notifyMatchFailure(
-                op, "Qubit operand does not trace back to an ExtractOp");
+            return rewriter.notifyMatchFailure(op,
+                                               "Qubit operand does not trace back to an ExtractOp");
         }
 
         // Get the register, index, and types we'll need
-        mlir::Value qregOperand = extractOp.getQreg(); 
+        mlir::Value qregOperand = extractOp.getQreg();
         mlir::Value qbitIndex = extractOp.getIdx();
         mlir::Type qregType = qregOperand.getType();
         mlir::Type qbitType = qbitOperand.getType();
@@ -235,21 +241,19 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
         mlir::func::FuncOp getGatesFunc = getOrDeclareGetGatesFunc(module, rewriter);
         mlir::func::FuncOp getVal1Func = getOrDeclareGetVal1Func(module, rewriter);
         mlir::func::FuncOp getVal2Func = getOrDeclareGetVal2Func(module, rewriter);
-        mlir::func::FuncOp freeMemrefFunc =
-            getOrDeclareFreeMemrefFunc(module, rewriter); 
+        mlir::func::FuncOp freeMemrefFunc = getOrDeclareFreeMemrefFunc(module, rewriter);
 
         // 3. Call runtime functions
-        auto callGetGatesOp =
-            rewriter.create<mlir::func::CallOp>(loc, getGatesFunc, mlir::ValueRange{});
+        auto callGetGatesOp = rewriter.create<mlir::func::CallOp>(
+            loc, getGatesFunc, mlir::ValueRange{rzParam}); // <-- CHANGED
         auto callGetVal1Op =
             rewriter.create<mlir::func::CallOp>(loc, getVal1Func, mlir::ValueRange{});
         auto callGetVal2Op =
             rewriter.create<mlir::func::CallOp>(loc, getVal2Func, mlir::ValueRange{});
 
-        
         mlir::Value rankedMemref = callGetGatesOp.getResult(0);
-        mlir::Value doubleVal1 = callGetVal1Op.getResult(0); 
-        mlir::Value doubleVal2 = callGetVal2Op.getResult(0); 
+        mlir::Value doubleVal1 = callGetVal1Op.getResult(0);
+        mlir::Value doubleVal2 = callGetVal2Op.getResult(0);
         (void)doubleVal1; // Explicitly mark as unused
         (void)doubleVal2; // Explicitly mark as unused
 
@@ -258,15 +262,14 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
         mlir::Value c1 = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
         mlir::Value memrefSize = rewriter.create<mlir::memref::DimOp>(loc, rankedMemref, c0);
 
-
         // 5. Insert the qubit operand
-        mlir::Value regBeforeLoop = rewriter.create<InsertOp>(
-            loc, qregType, qregOperand, qbitIndex, /*idx_attr=*/nullptr, qbitOperand);
+        mlir::Value regBeforeLoop = rewriter.create<InsertOp>(loc, qregType, qregOperand, qbitIndex,
+                                                              /*idx_attr=*/nullptr, qbitOperand);
 
         // 6. Create the scf.for loop
-        auto forOp = rewriter.create<mlir::scf::ForOp>(loc, c0, memrefSize, c1, 
-                                                       ValueRange{regBeforeLoop});
-        
+        auto forOp =
+            rewriter.create<mlir::scf::ForOp>(loc, c0, memrefSize, c1, ValueRange{regBeforeLoop});
+
         mlir::OpBuilder::InsertionGuard loopGuard(rewriter);
         rewriter.setInsertionPointToStart(forOp.getBody());
         mlir::Value iv = forOp.getInductionVar();
@@ -280,8 +283,7 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
         SmallVector<int64_t> caseValues = {0, 1, 2, 3};
         mlir::DenseI64ArrayAttr caseValuesAttr = rewriter.getDenseI64ArrayAttr(caseValues);
         auto switchOp = rewriter.create<mlir::scf::IndexSwitchOp>(
-            loc, mlir::TypeRange{qregType},
-            currentGateIndex, caseValuesAttr, caseValues.size());
+            loc, mlir::TypeRange{qregType}, currentGateIndex, caseValuesAttr, caseValues.size());
 
         // 9. Populate switch cases
         SmallVector<StringRef> gateNames = {"Hadamard", "PauliX", "PauliY", "PauliZ"};
@@ -328,11 +330,9 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
         defaultOperands.push_back(defaultQbitToOperateOn);
 
         mlir::NamedAttrList defaultAttrs = copiedAttrs;
-        defaultAttrs.append(
-            rewriter.getNamedAttr("gate_name", rewriter.getStringAttr("Identity")));
-        auto defaultOp =
-            rewriter.create<CustomOp>(loc, op->getResultTypes(), defaultOperands,
-                                       defaultAttrs.getAttrs());
+        defaultAttrs.append(rewriter.getNamedAttr("gate_name", rewriter.getStringAttr("Identity")));
+        auto defaultOp = rewriter.create<CustomOp>(loc, op->getResultTypes(), defaultOperands,
+                                                   defaultAttrs.getAttrs());
         mlir::Value defaultResultQbit = defaultOp.getResult(0);
 
         mlir::Value defaultResultQreg = rewriter.create<InsertOp>(
@@ -340,30 +340,26 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
 
         rewriter.create<mlir::scf::YieldOp>(loc, defaultResultQreg);
 
-
         // 11. Yield the result of the switch op from the for loop
         rewriter.setInsertionPointAfter(switchOp);
         rewriter.create<mlir::scf::YieldOp>(loc, switchOp.getResults());
 
-
         // 12. Call free_memref_0 *after* the loop
-        rewriter.setInsertionPointAfter(forOp); 
-        auto freeCall = rewriter.create<mlir::func::CallOp>(
-            loc, freeMemrefFunc,
-            mlir::ValueRange{rankedMemref}); 
+        rewriter.setInsertionPointAfter(forOp);
+        auto freeCall = rewriter.create<mlir::func::CallOp>(loc, freeMemrefFunc,
+                                                            mlir::ValueRange{rankedMemref});
 
         // 13. Extract final qbit from loop's result qreg
         rewriter.setInsertionPointAfter(freeCall);
         mlir::Value finalReg = forOp.getResult(0);
-        mlir::Value finalQbitResult = rewriter.create<ExtractOp>(
-            loc, qbitType, finalReg, qbitIndex, /*idx_attr=*/nullptr);
+        mlir::Value finalQbitResult =
+            rewriter.create<ExtractOp>(loc, qbitType, finalReg, qbitIndex, /*idx_attr=*/nullptr);
 
         // 14. Clean up original op
         rewriter.replaceAllUsesWith(op->getResults(), finalQbitResult);
         rewriter.eraseOp(op);
 
-        LLVM_DEBUG(
-            llvm::dbgs() << "Replaced op with scf.for loop and added free_memref call.\n");
+        LLVM_DEBUG(llvm::dbgs() << "Replaced op with scf.for loop and added free_memref call.\n");
         return success();
     }
 };

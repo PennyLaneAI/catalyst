@@ -330,7 +330,7 @@ if system_platform == "Linux":
             "frontend/catalyst/utils/libcustom_calls.cpp",
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels.cpp",
             "frontend/catalyst/utils/jax_cpu_lapack_kernels/lapack_kernels_using_lapack.cpp",
-            #"runtime/lib/test-func.cpp",
+            # "runtime/lib/test-func.cpp",
         ],
         extra_compile_args=["-std=c++20"],
         define_macros=Py_LIMITED_API_macros,
