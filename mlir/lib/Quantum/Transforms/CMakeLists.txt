@@ -16,6 +16,7 @@ file(GLOB SRC
     MergeRotationsPatterns.cpp
     decompose_lowering.cpp
     DecomposeLoweringPatterns.cpp
+    rs_decomposition.cpp
     DisentangleSWAP.cpp
     DisentangleCNOT.cpp
     ions_decompositions.cpp

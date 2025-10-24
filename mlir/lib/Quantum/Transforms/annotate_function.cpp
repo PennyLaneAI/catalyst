@@ -119,6 +119,10 @@ std::optional<FunctionOpInterface> getCallee(CallGraphNode::Edge edge, CallGraph
 
 bool anyCalleeIsAnnotated(FunctionOpInterface op, const char *attr, CallGraph &cg)
 {
+    if (op.isExternal()) {
+        return false;
+    }
+
     Region &region = op->getRegion(0);
     CallGraphNode *node = cg.lookupNode(&region);
     assert(node && "An incorrect region was used to look up a node in the callgraph.");
