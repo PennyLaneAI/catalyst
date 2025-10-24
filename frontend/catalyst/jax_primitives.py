@@ -693,11 +693,8 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
 # pylint: disable=too-many-arguments
 def _capture_grad_lowering(ctx, *args, argnums, jaxpr, n_consts, method, h, fn, scalar_out):
     mlir_ctx = ctx.module_context.context
-    if h:
-        f64 = ir.F64Type.get(mlir_ctx)
-        finiteDiffParam = ir.FloatAttr.get(f64, h)
-    else:
-        finiteDiffParam = None
+    f64 = ir.F64Type.get(mlir_ctx)
+    finiteDiffParam = ir.FloatAttr.get(f64, h)
 
     new_argnums = [num + n_consts for num in argnums]
     argnum_numpy = np.array(new_argnums)
