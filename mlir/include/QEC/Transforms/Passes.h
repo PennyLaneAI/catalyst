@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mlir/Pass/Pass.h"
 
 #include "QEC/Transforms/PassesEnums.h.inc" // for DecomposeMethod

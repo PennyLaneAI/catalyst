@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mlir/Pass/Pass.h"
 
 namespace catalyst {
