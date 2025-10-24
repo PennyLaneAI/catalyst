@@ -659,6 +659,11 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 {
     using timer = catalyst::utils::Timer;
 
+    OpPrintingFlags opPrintingFlags{};
+    if (options.useNameLocAsPrefix) {
+        opPrintingFlags.printNameLocAsPrefix();
+    }
+
     MLIRContext ctx(registry);
     ctx.printOpOnDiagnostic(true);
     ctx.printStackTraceOnDiagnostic(options.verbosity >= Verbosity::Debug);
@@ -736,7 +741,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
         output.outIR.clear();
         if (options.keepIntermediate) {
-            outIRStream << *mlirModule;
+            mlirModule->print(outIRStream, opPrintingFlags);
         }
         optTiming.stop();
     }
@@ -853,7 +858,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         // already handled
     }
     else if (output.outputFilename == "-" && mlirModule) {
-        outfile->os() << *mlirModule;
+        mlirModule->print(outfile->os(), opPrintingFlags);
         outfile->keep();
     }
 
@@ -942,6 +947,9 @@ int QuantumDriverMainFromCL(int argc, char **argv)
         "keep-intermediate", cl::desc("Keep intermediate files"), cl::init(false),
         cl::callback([&](const bool &) { SaveAfterEach.setValue(SaveTemps::AfterPipeline); }),
         cl::cat(CatalystCat));
+    cl::opt<bool> UseNameLocAsPrefix("use-nameloc-as-prefix",
+                                     cl::desc("Use name location as prefix"), cl::init(false),
+                                     cl::cat(CatalystCat));
     cl::opt<bool> AsyncQNodes("async-qnodes", cl::desc("Enable asynchronous QNodes"),
                               cl::init(false), cl::cat(CatalystCat));
     cl::opt<bool> Verbose("verbose", cl::desc("Set verbose"), cl::init(false),
@@ -1012,6 +1020,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                             .diagnosticStream = errStream,
                             .keepIntermediate = SaveAfterEach,
                             .dumpModuleScope = DumpModuleScope,
+                            .useNameLocAsPrefix = UseNameLocAsPrefix,
                             .asyncQnodes = AsyncQNodes,
                             .verbosity = Verbose ? Verbosity::All : Verbosity::Urgent,
                             .pipelinesCfg = parsePipelines(CatalystPipeline),

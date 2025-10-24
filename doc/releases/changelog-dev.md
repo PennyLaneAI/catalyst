@@ -4,6 +4,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* A new option ``use_nameloc`` has been added to :func:`~.qjit` that embeds variable names
+  from Python into the compiler IR, which can make it easier to read when debugging programs.
+  [(#2054)](https://github.com/PennyLaneAI/catalyst/pull/2054)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
@@ -19,9 +23,6 @@
 
 * Split `from_plxpr.py` into two files.
   [(#2142)](https://github.com/PennyLaneAI/catalyst/pull/2142)
-* Refactor Catalyst pass registering so that it's no longer necessary to manually add new
-  passes at `registerAllCatalystPasses`. 
-  [(#1684)](https://github.com/PennyLaneAI/catalyst/pull/1684)
 
 <h3>Documentation 📝</h3>
 
@@ -33,5 +34,5 @@
 This release contains contributions from (in alphabetical order):
 
 Christina Lee,
-Paul Haochen Wang,
-Roberto Turrado Camblor.
+Roberto Turrado,
+Paul Haochen Wang.

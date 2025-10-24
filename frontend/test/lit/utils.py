@@ -37,3 +37,8 @@ def print_jaxpr(f, *args, **kwargs):
 def print_mlir(f, *args, **kwargs):
     """Print mlir code of a function"""
     return print_attr(f, "mlir", *args, **kwargs)
+
+
+def print_mlir_opt(f, *args, **kwargs):
+    """Print mlir code of a function"""
+    return print_attr(f, "mlir_opt", *args, **kwargs)
