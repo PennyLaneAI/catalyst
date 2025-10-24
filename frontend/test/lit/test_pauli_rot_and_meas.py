@@ -287,3 +287,37 @@ def test_ppm_compilation():
     print(circuit.mlir_opt)
 
 test_ppm_compilation()
+
+
+
+def test_with_capture_enabled():
+    """Test ppm_compilation pass: PauliRot should be decomposed into PPM."""
+    from pennylane.ftqc.catalyst_pass_aliases import commute_ppr, to_ppr
+    
+    qml.capture.enable()
+
+    dev = qml.device("catalyst.ftqc", wires=1)
+    
+    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipeline, target="mlir")
+    @commute_ppr
+    @to_ppr
+    @qml.qnode(device=dev)
+    def circuit():
+        qml.Hadamard(wires=0)
+        qml.PauliRot(np.pi / 2, "X", wires=0)
+        qml.PauliRot(np.pi / 4, "Y", wires=0)
+        qml.T(wires=0)
+        qml.pauli_measure("X", wires=0)
+        return
+
+    # CHECK: qec.ppr ["X"](-8)
+    # CHECK: qec.ppr ["Y"](-8)
+    # CHECK: qec.ppr ["Z"](4)
+    # CHECK: qec.ppr ["X"](4)
+    # CHECK: qec.ppr ["Z"](4)
+    # CHECK: qec.ppr ["X"](4)
+    print(circuit.mlir_opt)
+
+test_with_capture_enabled()
