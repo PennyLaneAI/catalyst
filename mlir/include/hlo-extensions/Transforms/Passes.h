@@ -17,11 +17,11 @@
 #include "mlir/Pass/Pass.h"
 
 namespace catalyst {
-namespace hlo {
+namespace hlo_extensions {
 
 #define GEN_PASS_DECL
 #define GEN_PASS_REGISTRATION
 #include "hlo-extensions/Transforms/Passes.h.inc"
 
-} // namespace hlo
+} // namespace hlo_extensions
 } // namespace catalyst

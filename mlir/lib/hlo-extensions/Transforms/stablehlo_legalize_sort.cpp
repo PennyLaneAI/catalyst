@@ -561,7 +561,7 @@ struct SortOpPattern : public OpRewritePattern<SortOp> {
 } // namespace
 
 namespace catalyst {
-namespace hlo {
+namespace hlo_extensions {
 
 #define GEN_PASS_DEF_STABLEHLOLEGALIZESORTPASS
 #include "hlo-extensions/Transforms/Passes.h.inc"
@@ -587,5 +587,5 @@ struct StablehloLegalizeSortPass
     }
 };
 
-} // namespace hlo
+} // namespace hlo_extensions
 } // namespace catalyst

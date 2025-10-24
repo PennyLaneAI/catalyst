@@ -19,11 +19,11 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace catalyst {
-namespace hlo {
+namespace hlo_extensions {
 
 void populateScatterPatterns(mlir::RewritePatternSet &);
 
 void populateHloCustomCallPatterns(mlir::RewritePatternSet &);
 
-} // namespace hlo
+} // namespace hlo_extensions
 } // namespace catalyst

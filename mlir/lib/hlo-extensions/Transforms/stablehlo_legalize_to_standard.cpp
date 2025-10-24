@@ -222,7 +222,7 @@ class ConvertIotaOp : public OpRewritePattern<stablehlo::IotaOp> {
 } // namespace
 
 namespace catalyst {
-namespace hlo {
+namespace hlo_extensions {
 
 #define GEN_PASS_DEF_STABLEHLOLEGALIZETOSTANDARDPASS
 #include "hlo-extensions/Transforms/Passes.h.inc"
@@ -251,5 +251,5 @@ struct StablehloLegalizeToStandardPass
     }
 };
 
-} // namespace hlo
+} // namespace hlo_extensions
 } // namespace catalyst

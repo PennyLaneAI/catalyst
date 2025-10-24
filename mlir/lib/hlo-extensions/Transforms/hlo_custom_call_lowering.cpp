@@ -32,7 +32,7 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace catalyst {
-namespace hlo {
+namespace hlo_extensions {
 
 #define GEN_PASS_DEF_HLOCUSTOMCALLLOWERINGPASS
 #include "hlo-extensions/Transforms/Passes.h.inc"
@@ -53,5 +53,5 @@ struct HloCustomCallLoweringPass : impl::HloCustomCallLoweringPassBase<HloCustom
     }
 };
 
-} // namespace hlo
+} // namespace hlo_extensions
 } // namespace catalyst

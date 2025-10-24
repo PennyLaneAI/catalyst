@@ -277,7 +277,7 @@ struct CaseOpPattern : public OpConversionPattern<stablehlo::CaseOp> {
 } // namespace
 
 namespace catalyst {
-namespace hlo {
+namespace hlo_extensions {
 
 #define GEN_PASS_DEF_STABLEHLOLEGALIZECONTROLFLOWPASS
 #include "hlo-extensions/Transforms/Passes.h.inc"
@@ -303,5 +303,5 @@ struct StablehloLegalizeControlFlowPass
     }
 };
 
-} // namespace hlo
+} // namespace hlo_extensions
 } // namespace catalyst

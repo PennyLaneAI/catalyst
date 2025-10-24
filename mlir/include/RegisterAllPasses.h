@@ -30,7 +30,7 @@ inline void registerAllPasses()
 {
     registerCatalystPasses();
     gradient::registerGradientPasses();
-    hlo::registerStablehloPasses();
+    hlo_extensions::registerStablehloPasses();
     ion::registerIonPasses();
     mbqc::registerMBQCPasses();
     mitigation::registerMitigationPasses();

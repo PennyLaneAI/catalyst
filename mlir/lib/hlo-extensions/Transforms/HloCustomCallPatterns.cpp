@@ -25,7 +25,7 @@
 using namespace mlir;
 
 namespace catalyst {
-namespace hlo {
+namespace hlo_extensions {
 
 struct HloCustomCallOpRewritePattern : public mlir::OpRewritePattern<stablehlo::CustomCallOp> {
     using mlir::OpRewritePattern<stablehlo::CustomCallOp>::OpRewritePattern;
@@ -143,5 +143,5 @@ void populateHloCustomCallPatterns(RewritePatternSet &patterns)
     patterns.add<HloCustomCallOpRewritePattern>(patterns.getContext());
 }
 
-} // namespace hlo
+} // namespace hlo_extensions
 } // namespace catalyst

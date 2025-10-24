@@ -33,7 +33,7 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace catalyst {
-namespace hlo {
+namespace hlo_extensions {
 
 #define GEN_PASS_DEF_SCATTERLOWERINGPASS
 #include "hlo-extensions/Transforms/Passes.h.inc"
@@ -54,5 +54,5 @@ struct ScatterLoweringPass : impl::ScatterLoweringPassBase<ScatterLoweringPass> 
     }
 };
 
-} // namespace hlo
+} // namespace hlo_extensions
 } // namespace catalyst
