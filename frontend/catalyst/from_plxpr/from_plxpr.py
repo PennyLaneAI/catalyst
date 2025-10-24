@@ -138,7 +138,7 @@ class WorkflowInterpreter(PlxprInterpreter):
     """An interpreter that converts a qnode primitive from a plxpr variant to a catalyst jaxpr variant."""
 
     def __init__(self):
-        self._pass_pipeline = []
+        self._pass_pipeline = qml.transforms.core.TransformProgram()
         self.init_qreg = None
 
         # Compiler options for the new decomposition system
@@ -231,23 +231,22 @@ def handle_qnode(
 
 
 # The map below describes the parity between PL transforms and Catalyst passes.
-# PL transforms having a Catalyst pass counterpart will have a name as value,
-# otherwise their value will be None. The second value indicates if the transform
+# The value indicates if the transform
 # requires decomposition to be supported by Catalyst.
 transforms_to_passes = {
-    pl_cancel_inverses: ("remove-chained-self-inverse", False),
-    pl_commute_controlled: (None, False),
-    pl_decompose: (None, False),
-    pl_map_wires: (None, False),
-    pl_merge_amplitude_embedding: (None, True),
-    pl_merge_rotations: ("merge-rotations", False),
-    pl_single_qubit_fusion: (None, False),
-    pl_unitary_to_rot: (None, False),
+    pl_cancel_inverses: False,
+    pl_commute_controlled: False,
+    pl_decompose: False,
+    pl_map_wires: False,
+    pl_merge_amplitude_embedding: True,
+    pl_merge_rotations: False,
+    pl_single_qubit_fusion: False,
+    pl_unitary_to_rot: False,
 }
 
 
 # pylint: disable-next=redefined-outer-name
-def register_transform(pl_transform, pass_name, decomposition):
+def register_transform(pl_transform, decomposition):
     """Register pennylane transforms and their conversion to Catalyst transforms"""
 
     # pylint: disable=too-many-arguments
@@ -260,9 +259,8 @@ def register_transform(pl_transform, pass_name, decomposition):
         inner_jaxpr,
         targs_slice,
         tkwargs,
-        catalyst_pass_name=pass_name,
         requires_decomposition=decomposition,
-        pl_plxpr_transform=pl_transform._plxpr_transform,
+        transform=pl_transform,
     ):
         """Handle the conversion from plxpr to Catalyst jaxpr for a
         PL transform."""
@@ -273,8 +271,8 @@ def register_transform(pl_transform, pass_name, decomposition):
         # If the transform is a decomposition transform
         # and the graph-based decomposition is enabled
         if (
-            hasattr(pl_plxpr_transform, "__name__")
-            and pl_plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
+            hasattr(transform._plxpr_transform, "__name__")
+            and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
             and qml.decomposition.enabled_graph()
         ):
             if not self.requires_decompose_lowering:
@@ -315,7 +313,7 @@ def register_transform(pl_transform, pass_name, decomposition):
             # return self.eval(final_jaxpr.jaxpr, consts, *non_const_args)
             return self.eval(inner_jaxpr, consts, *non_const_args)
 
-        if catalyst_pass_name is None:
+        if transform.pass_name is None:
             # Use PL's ExpandTransformsInterpreter to expand this and any embedded
             # transform according to PL rules. It works by overriding the primitive
             # registration, making all embedded transforms follow the PL rules
@@ -324,7 +322,7 @@ def register_transform(pl_transform, pass_name, decomposition):
                 return ExpandTransformsInterpreter().eval(inner_jaxpr, consts, *args)
 
             unravelled_jaxpr = jax.make_jaxpr(wrapper)(*non_const_args)
-            final_jaxpr = pl_plxpr_transform(
+            final_jaxpr = transform._plxpr_transform(
                 unravelled_jaxpr.jaxpr, unravelled_jaxpr.consts, targs, tkwargs, *non_const_args
             )
 
@@ -336,7 +334,8 @@ def register_transform(pl_transform, pass_name, decomposition):
             return self.eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
 
         # Apply the corresponding Catalyst pass counterpart
-        self._pass_pipeline.insert(0, Pass(catalyst_pass_name))
+        container = qml.transforms.core.TransformContainer(transform, args=targs, kwargs=tkwargs)
+        self._pass_pipeline.insert_front(container)
         return self.eval(inner_jaxpr, consts, *non_const_args)
 
 
@@ -344,8 +343,8 @@ def register_transform(pl_transform, pass_name, decomposition):
 # across the map above and generates a custom handler for each transform.
 # In order to ensure early binding, we pass the PL plxpr transform and the
 # Catalyst pass as arguments whose default values are set by the loop.
-for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
-    register_transform(pl_transform, pass_name, decomposition)
+for pl_transform, decomposition in transforms_to_passes.items():
+    register_transform(pl_transform, decomposition)
 
 
 # pylint: disable=too-many-positional-arguments

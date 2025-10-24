@@ -308,6 +308,13 @@ class NestedModule:
         self.ctx.module_context = self.old_module_context
 
 
+def _lowered_options(kwargs):
+    lowered_options = {}
+    for option, value in kwargs.items():
+        mlir_option = str(option).replace("_", "-")
+        lowered_options[mlir_option] = get_mlir_attribute_from_pyval(value)
+    return lowered_options
+
 def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipeline):
     """Generate a transform module embedded in the current module and schedule
     the transformations in pipeline"""
@@ -350,11 +357,16 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
         with ir.InsertionPoint(bb_named_sequence):
             target = bb_named_sequence.arguments[0]
             for _pass in pipeline:
-                options = _pass.get_options()
+                if isinstance(_pass, qml.transforms.core.TransformContainer):
+                    options = _lowered_options(_pass.kwargs)
+                    name = _pass.pass_name
+                else:
+                    options = _pass.get_options()
+                    name = _pass.name
                 apply_registered_pass_op = ApplyRegisteredPassOp(
                     result=transform_mod_type,
                     target=target,
-                    pass_name=_pass.name,
+                    pass_name=name,
                     options=options,
                     dynamic_options={},
                 )
