@@ -1260,7 +1260,7 @@ def test_different_shapes():
     @pure_callback
     def fun_bwd_callback(cot) -> jnp.array([1.0, 1.0]):
         nonlocal f_vjp
-        return f_vjp(cot)
+        return f_vjp(cot)  # pylint: disable=not-callable
 
     @fun_callback.bwd
     def fun_bwd(_res, cot):
@@ -1303,7 +1303,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions():
     @pure_callback
     def matrix_multiply_vjp(cotangents) -> A:
         nonlocal f_vjp
-        retval = f_vjp(cotangents)
+        retval = f_vjp(cotangents)  # pylint: disable=not-callable
         return retval
 
     @pure_callback
@@ -1355,7 +1355,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions2():
     def matrix_multiply_vjp(cotangents) -> A:
         nonlocal f_vjp
         nonlocal A, B
-        retval = f_vjp(cotangents)
+        retval = f_vjp(cotangents)  # pylint: disable=not-callable
         return retval[0]
 
     @pure_callback
@@ -1409,7 +1409,7 @@ def test_multiply_two_matrices_to_get_something_with_different_dimensions3():
     def matrix_multiply_vjp(cotangents) -> (A, B):
         nonlocal f_vjp
         nonlocal A, B
-        retval = f_vjp(cotangents)
+        retval = f_vjp(cotangents)  # pylint: disable=not-callable
         return retval
 
     @pure_callback
