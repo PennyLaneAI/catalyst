@@ -4,6 +4,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* A new option ``use_nameloc`` has been added to :func:`~.qjit` that embeds variable names
+  from Python into the compiler IR, which can make it easier to read when debugging programs.
+  [(#2054)](https://github.com/PennyLaneAI/catalyst/pull/2054)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
@@ -30,4 +34,5 @@
 This release contains contributions from (in alphabetical order):
 
 Christina Lee,
+Roberto Turrado,
 Paul Haochen Wang.
