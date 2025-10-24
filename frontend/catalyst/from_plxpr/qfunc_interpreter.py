@@ -629,6 +629,12 @@ def handle_adjoint_transform(
     n_consts,
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the adjoint primitive"""
+
+    if any(is_dynamically_allocated_wire(arg) for arg in plxpr_invals):
+        raise NotImplementedError(
+            "Dynamically allocated wires cannot be used in quantum adjoints yet."
+        )
+
     assert jaxpr is not None
     consts = plxpr_invals[:n_consts]
     args = plxpr_invals[n_consts:]

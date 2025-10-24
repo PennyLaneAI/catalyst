@@ -518,5 +518,24 @@ def test_terminal_MP_dynamic_wires(backend):
             return qml.probs(q)
 
 
+@pytest.mark.usefixtures("use_capture")
+def test_unsupported_adjoint(backend):
+    """
+    Test that an error is raised when a dynamically allocated wire is passed into a adjoint.
+    """
+
+    with pytest.raises(
+        NotImplementedError,
+        match="Dynamically allocated wires cannot be used in quantum adjoints yet.",
+    ):
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit():
+            with qml.allocate(1) as q:
+                qml.adjoint(qml.X)(q[0])
+            return qml.probs(wires=[0, 1])
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
