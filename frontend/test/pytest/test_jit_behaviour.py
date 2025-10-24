@@ -845,18 +845,18 @@ class TestTracingQJITAnnotatedFunctions:
             return qml.expval(qml.PauliZ(0))
 
         @qjit
-        def workflow1(phi: float):
+        def workflow(phi: float):
             g = grad(circuit)
             return g(phi)
 
-        mlir_v1 = workflow1.mlir
+        mlir_v1 = workflow.mlir
 
         @qjit
-        def workflow2(phi: float):
+        def workflow(phi: float):  # pylint: disable=function-redefined
             g = grad(qjit(circuit))
             return g(phi)
 
-        mlir_v2 = workflow2.mlir
+        mlir_v2 = workflow.mlir
 
         assert mlir_v1 == mlir_v2
 
