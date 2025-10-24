@@ -4,6 +4,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Dynamically allocated wires can now be passed into control flow and subroutines.
+  [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
