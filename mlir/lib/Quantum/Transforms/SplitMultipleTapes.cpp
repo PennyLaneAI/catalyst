@@ -18,13 +18,11 @@
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallSet.h"
-#include "llvm/Support/Debug.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Types.h"
@@ -38,6 +36,8 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace catalyst {
+namespace quantum {
+
 #define GEN_PASS_DEF_SPLITMULTIPLETAPESPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
@@ -328,9 +328,5 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
     } // runOnOperation()
 };
 
-std::unique_ptr<Pass> createSplitMultipleTapesPass()
-{
-    return std::make_unique<SplitMultipleTapesPass>();
-}
-
+} // namespace quantum
 } // namespace catalyst

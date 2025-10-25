@@ -52,23 +52,10 @@ limitations under the License.
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/transforms/Passes.h"
 
-#include "hlo-extensions/Passes.h"
-
 using namespace mlir;
 using namespace stablehlo;
-using namespace catalyst;
-
-namespace catalyst {
-
-#define GEN_PASS_DEF_STABLEHLOLEGALIZETOSTANDARDPASS
-#define GEN_PASS_DECL_STABLEHLOLEGALIZETOSTANDARDPASS
-#include "hlo-extensions/Passes.h.inc"
-#include "hlo-extensions/generated_stablehlo_legalize_to_standard.cpp.inc"
-
-} // namespace catalyst
 
 namespace {
-
 class CompareIConvert : public OpRewritePattern<stablehlo::CompareOp> {
   public:
     using OpRewritePattern::OpRewritePattern;
@@ -232,6 +219,15 @@ class ConvertIotaOp : public OpRewritePattern<stablehlo::IotaOp> {
     }
 };
 
+} // namespace
+
+namespace catalyst {
+namespace hlo_extensions {
+
+#define GEN_PASS_DEF_STABLEHLOLEGALIZETOSTANDARDPASS
+#include "hlo-extensions/Transforms/Passes.h.inc"
+#include "hlo-extensions/Transforms/generated_stablehlo_legalize_to_standard.cpp.inc"
+
 void populateStablehloToStdPatterns(RewritePatternSet *patterns, mlir::MLIRContext *ctx)
 {
     populateWithGenerated(*patterns);
@@ -239,7 +235,7 @@ void populateStablehloToStdPatterns(RewritePatternSet *patterns, mlir::MLIRConte
 }
 
 struct StablehloLegalizeToStandardPass
-    : public catalyst::impl::StablehloLegalizeToStandardPassBase<StablehloLegalizeToStandardPass> {
+    : public impl::StablehloLegalizeToStandardPassBase<StablehloLegalizeToStandardPass> {
     void getDependentDialects(DialectRegistry &registry) const override
     {
         registry.insert<arith::ArithDialect, math::MathDialect, func::FuncDialect>();
@@ -254,9 +250,6 @@ struct StablehloLegalizeToStandardPass
             return signalPassFailure();
     }
 };
-} // end anonymous namespace
 
-std::unique_ptr<Pass> catalyst::createStablehloLegalizeToStdPass()
-{
-    return std::make_unique<StablehloLegalizeToStandardPass>();
-}
+} // namespace hlo_extensions
+} // namespace catalyst

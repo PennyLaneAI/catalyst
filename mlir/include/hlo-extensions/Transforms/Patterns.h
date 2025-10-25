@@ -14,14 +14,16 @@
 
 #pragma once
 
-#include <memory>
-
-#include "mlir/Pass/Pass.h"
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 namespace catalyst {
-std::unique_ptr<mlir::Pass> createHloCustomCallLoweringPass();
-std::unique_ptr<mlir::Pass> createScatterLoweringPass();
-std::unique_ptr<mlir::Pass> createStablehloLegalizeSortPass();
-std::unique_ptr<mlir::Pass> createStablehloLegalizeToStdPass();
-std::unique_ptr<mlir::Pass> createStablehloLegalizeControlFlowPass();
+namespace hlo_extensions {
+
+void populateScatterPatterns(mlir::RewritePatternSet &);
+
+void populateHloCustomCallPatterns(mlir::RewritePatternSet &);
+
+} // namespace hlo_extensions
 } // namespace catalyst

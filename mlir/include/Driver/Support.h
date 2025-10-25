@@ -17,8 +17,9 @@
 #include <filesystem>
 #include <string>
 
-#include "mlir/Support/LogicalResult.h"
 #include "llvm/Support/raw_ostream.h"
+
+#include "mlir/Support/LogicalResult.h"
 
 #include "CompilerDriver.h"
 

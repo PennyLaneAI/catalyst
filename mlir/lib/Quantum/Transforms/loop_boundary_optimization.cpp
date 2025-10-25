@@ -14,6 +14,8 @@
 
 #define DEBUG_TYPE "loop-boundary"
 
+#include "llvm/Support/Debug.h"
+
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
@@ -22,7 +24,6 @@
 #include "mlir/Interfaces/LoopLikeInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/Support/Debug.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -36,7 +37,6 @@ namespace catalyst {
 namespace quantum {
 
 #define GEN_PASS_DEF_LOOPBOUNDARYOPTIMIZATIONPASS
-#define GEN_PASS_DECL_LOOPBOUNDARYOPTIMIZATIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct LoopBoundaryOptimizationPass
@@ -60,10 +60,4 @@ struct LoopBoundaryOptimizationPass
 };
 
 } // namespace quantum
-
-std::unique_ptr<Pass> createLoopBoundaryOptimizationPass()
-{
-    return std::make_unique<quantum::LoopBoundaryOptimizationPass>();
-}
-
 } // namespace catalyst

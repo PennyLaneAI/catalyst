@@ -14,10 +14,11 @@
 
 #pragma once
 
-#include "mlir/IR/DialectRegistry.h"
-#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Module.h"
+
+#include "mlir/IR/DialectRegistry.h"
+#include "mlir/Support/LogicalResult.h"
 
 #include "CompilerDriver.h"
 
