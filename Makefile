@@ -117,6 +117,7 @@ frontend:
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
+	$(PYTHON) ./bin/patch_jax_installation.py
 	rm -r frontend/pennylane_catalyst.egg-info
 
 .PHONY: mlir llvm stablehlo enzyme dialects runtime oqc
@@ -134,7 +135,7 @@ enzyme:
 
 dialects:
 	$(MAKE) -C mlir dialects
-	
+
 .PHONY: dialect-docs
 dialect-docs:
 	$(MAKE) -C mlir dialect-docs
