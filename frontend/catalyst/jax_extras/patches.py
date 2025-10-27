@@ -350,8 +350,8 @@ def patch_primitives():
         pe.DynamicJaxprTrace.make_eqn = patched_make_eqn
 
         # pylint: disable=import-outside-toplevel
-        import jax._src.lax.lax as lax
-        import jax._src.core as core
+        from jax._src import core
+        from jax._src.lax import lax
 
         def patched_dyn_shape_staging_rule(trace, source_info, prim, out_aval, *args, **params):
             eqn, out_tracer = trace.make_eqn(
