@@ -40,7 +40,7 @@ ifeq ($(ENABLE_ASAN), ON)
 ASAN_COMMAND = $(ASAN_FLAGS)
 endif
 
-BUILD_TARGETS := rt_capi rtd_null_qubit
+BUILD_TARGETS := rt_capi rtd_null_qubit rtd_rsdecomp
 TEST_TARGETS := runner_tests_qir_runtime runner_tests_mbqc_runtime
 
 ifeq ($(ENABLE_OPENQASM), ON)
