@@ -1489,12 +1489,22 @@ def _pauli_measure_lowering(
 
     pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
 
-    return PPMeasurementOp(
+    result_type = ir.IntegerType.get_signless(1)
+    
+    ppm_results = PPMeasurementOp(
         out_qubits=[q.type for q in qubits],
-        mres=ir.IntegerType.get_signless(1, ctx),
+        mres=result_type,
         pauli_product=pauli_word,
         in_qubits=qubits,
     ).results
+    
+    result = ppm_results[0]
+    out_qubits = ppm_results[1:]
+    
+    result_from_elements_op = ir.RankedTensorType.get((), result.type)
+    from_elements_op = FromElementsOp(result_from_elements_op, result)
+
+    return (from_elements_op.results[0],) + tuple(out_qubits)
 
 
 #
