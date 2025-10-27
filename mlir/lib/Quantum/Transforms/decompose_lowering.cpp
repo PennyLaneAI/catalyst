@@ -204,10 +204,4 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
 };
 
 } // namespace quantum
-
-std::unique_ptr<Pass> createDecomposeLoweringPass()
-{
-    return std::make_unique<quantum::DecomposeLoweringPass>();
-}
-
 } // namespace catalyst

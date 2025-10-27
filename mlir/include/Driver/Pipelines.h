@@ -33,6 +33,7 @@ void registerBufferizationPipeline();
 void registerLLVMDialectLoweringPipeline();
 void registerDefaultCatalystPipeline();
 void registerAllCatalystPipelines();
+
 class Pipeline {
   public:
     using PipelineFunc = void (*)(mlir::OpPassManager &);
