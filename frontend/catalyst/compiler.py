@@ -306,7 +306,7 @@ def _quantum_opt(*args, stdin=None):
     return _catalyst(("--tool", "opt"), *args, stdin=stdin)
 
 
-def canonicalize(*args, stdin=None):
+def canonicalize(*args, stdin=None, options: Optional[CompileOptions] = None):
     """Run opt with canonicalization
 
     echo ${stdin} | catalyst --tool=opt \
@@ -316,7 +316,11 @@ def canonicalize(*args, stdin=None):
 
     Returns stdout string
     """
-    return _quantum_opt(("--pass-pipeline", "builtin.module(canonicalize)"), *args, stdin=stdin)
+    opts = ["--pass-pipeline", "builtin.module(canonicalize)"]
+    if options and options.use_nameloc:
+        opts.append("--use-nameloc-as-prefix")
+
+    return _quantum_opt(*opts, *args, stdin=stdin)
 
 
 def _options_to_cli_flags(options):
@@ -348,6 +352,9 @@ def _options_to_cli_flags(options):
     if options.keep_intermediate >= KeepIntermediateLevel.PASS:
         extra_args += ["--save-ir-after-each=pass"]
         extra_args += ["--dump-module-scope"]
+
+    if options.use_nameloc:
+        extra_args += ["--use-nameloc-as-prefix"]
 
     if options.verbose:
         extra_args += ["--verbose"]
