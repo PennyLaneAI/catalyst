@@ -160,7 +160,7 @@ that tablegen will build in the namespace ``impl``.
 The function that determines what your pass actually does is the ``void runOnOperation()``.
 Currently, all this pass does is print out ``"Hello world!\n"``.
 Note that the ``GEN_PASS_DECL_...PASS`` macro definitions are used to enable additional declarations,
-such as `pass options`, and thus may not always be needed.
+such as pass options, and thus may not always be needed.
 
 (A sidenote on printing messages in MLIR: there are two major printing options in LLVM.
 The `more standard one <https://llvm.org/docs/ProgrammersManual.html#the-llvm-debug-macro-and-debug-option>`_ is ``dbgs()``,
