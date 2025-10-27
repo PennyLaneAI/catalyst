@@ -169,14 +169,13 @@ class LinkerDriver:
             f"-l{lapack_lib_name}",  # required for custom_calls lib
             "-lcustom_calls",
             "-lmlir_async_runtime",
+            "-lrtd_rsdecomp"
         ]
 
         # If OQD runtime capi is built, link to it as well
         # TODO: This is not ideal and should be replaced when the compiler is device aware
         if os.path.isfile(os.path.join(rt_lib_path, "librt_OQD_capi" + file_extension)):
             default_flags.append("-lrt_OQD_capi")
-
-        default_flags.append("/home/ubuntu/work/rs-decomp/testing/test-func.o")
 
         return default_flags
 
