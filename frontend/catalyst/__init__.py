@@ -39,6 +39,7 @@ if _jaxlib.__version__ != _jaxlib_version:
 
 from catalyst._configuration import INSTALLED
 from catalyst._version import __version__
+from catalyst.jax_extras.patches import mock_attributes
 
 try:
     if INSTALLED:
@@ -71,7 +72,17 @@ if not INSTALLED:
 sys.modules["mlir_quantum.ir"] = __import__("jaxlib.mlir.ir").mlir.ir
 sys.modules["mlir_quantum._mlir_libs"] = __import__("jaxlib.mlir._mlir_libs").mlir._mlir_libs
 
+# Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
+# Catalyst's MLIR version and the MLIR version used by JAX. The current JAX version has not
+# yet updated to the latest MLIR, causing compatibility issues. This workaround will be removed
+# once JAX updates to a compatible MLIR version
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
+
+_ods_cext.globals = mock_attributes(
+    _ods_cext.globals, {"register_traceback_file_exclusion": lambda x: None}
+)
+
+# pylint: disable=ungrouped-imports
 from catalyst.jax_extras.patches import patch_primitives
 from catalyst.jax_extras.patches import mock_attribute
 

@@ -404,6 +404,8 @@ def _process_terminal_measurements(mcm_method, cpy_tape, out, snapshots, shot_ve
     """Process measurements when there are no mid-circuit measurements."""
     assert mcm_method == "one-shot"
 
+    # flatten the outs structure
+    out, _ = tree_flatten(out)
     new_out = []
     idx = 0
 
@@ -454,7 +456,9 @@ def _process_terminal_measurements(mcm_method, cpy_tape, out, snapshots, shot_ve
     return (snapshots, tuple(new_out)) if snapshots else tuple(new_out)
 
 
-def _validate_one_shot_measurements(mcm_config, tape: qml.tape.QuantumTape, qnode) -> None:
+def _validate_one_shot_measurements(
+    mcm_config, tape: qml.tape.QuantumTape, user_specified_mcm_method, shot_vector, wires
+) -> None:
     """Validate measurements for one-shot mode.
 
     Args:
@@ -467,13 +471,11 @@ def _validate_one_shot_measurements(mcm_config, tape: qml.tape.QuantumTape, qnod
         NotImplementedError: If measurement configuration is not supported
     """
     mcm_method = mcm_config.mcm_method
-    user_specified_mcm_method = qnode.execute_kwargs["mcm_method"]
     assert mcm_method == "one-shot"
 
     # Check if using shot vector with non-SampleMP measurements
-    shot_vector = qnode._shots.shot_vector if qnode._shots else []
     has_shot_vector = len(shot_vector) > 1 or any(copies > 1 for _, copies in shot_vector)
-    has_wires = qnode.device.wires is not None and not is_dynamic_wires(qnode.device.wires)
+    has_wires = wires is not None and not is_dynamic_wires(wires)
 
     # Raise an error if there are no mid-circuit measurements, it will fallback to
     # single-branch-statistics
@@ -556,7 +558,6 @@ def dynamic_one_shot(qnode, **kwargs):
     """
 
     cpy_tape = None
-    aux_tapes = None
     mcm_config = kwargs.pop("mcm_config", None)
 
     def transform_to_single_shot(qnode):
@@ -565,15 +566,20 @@ def dynamic_one_shot(qnode, **kwargs):
                 "dynamic_one_shot is only supported with finite shots."
             )
 
+        user_specified_mcm_method = qnode.execute_kwargs["mcm_method"]
+        shot_vector = qnode._shots.shot_vector if qnode._shots else []
+        wires = qnode.device.wires
+
         @qml.transform
         def dynamic_one_shot_partial(
             tape: qml.tape.QuantumTape,
         ) -> tuple[Sequence[qml.tape.QuantumTape], Callable]:
             nonlocal cpy_tape
             cpy_tape = tape
-            nonlocal aux_tapes
 
-            _validate_one_shot_measurements(mcm_config, tape, qnode)
+            _validate_one_shot_measurements(
+                mcm_config, tape, user_specified_mcm_method, shot_vector, wires
+            )
 
             if tape.batch_size is not None:
                 raise ValueError("mcm_method='one-shot' is not compatible with broadcasting")

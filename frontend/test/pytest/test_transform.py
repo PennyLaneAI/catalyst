@@ -1103,7 +1103,7 @@ class TestTransformValidity:
 
             return program, config
 
-        # Simulate a Qrack-like device that requires meassurement process transforms.
+        # Simulate a Qrack-like device that requires measurement process transforms.
         # Qnode transforms raise this error anyway so we cannot use them directly.
         original_preprocess = QJITDevice.preprocess
         monkeypatch.setattr(QJITDevice, "preprocess", inject_device_transforms)

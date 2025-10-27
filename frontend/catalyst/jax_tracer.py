@@ -217,15 +217,6 @@ class Function:
         AssertionError: Invalid function type.
     """
 
-    CACHE = {}
-
-    def __new__(cls, fn):
-        if cached_instance := cls.CACHE.get(fn):
-            return cached_instance
-        new_instance = super().__new__(cls)
-        cls.CACHE[fn] = new_instance
-        return new_instance
-
     @debug_logger_init
     def __init__(self, fn):
         self.fn = fn
@@ -696,12 +687,13 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs, debug_in
 
 
 @debug_logger
-def lower_jaxpr_to_mlir(jaxpr, func_name):
+def lower_jaxpr_to_mlir(jaxpr, func_name, arg_names):
     """Lower a JAXPR to MLIR.
 
     Args:
         ClosedJaxpr: the JAXPR to lower to MLIR
         func_name: a name to use for the MLIR function
+        arg_names: list of parameter names for the MLIR function
 
     Returns:
         ir.Module: the MLIR module coontaining the JAX program
@@ -711,7 +703,7 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
     MemrefCallable.clearcache()
 
     with transient_jax_config({"jax_dynamic_shapes": True}):
-        mlir_module, ctx = jaxpr_to_mlir(func_name, jaxpr)
+        mlir_module, ctx = jaxpr_to_mlir(jaxpr, func_name, arg_names)
 
     return mlir_module, ctx
 
@@ -928,7 +920,9 @@ def trace_quantum_operations(
 
 @debug_logger
 def trace_observables(
-    obs: Operator, qrp: QRegPromise, m_wires: Optional[qml.wires.Wires]
+    obs: Optional[Operator],
+    qrp: QRegPromise,
+    m_wires: Optional[qml.wires.Wires],
 ) -> Tuple[List[DynamicJaxprTracer], Optional[int]]:
     """Trace observables.
 
@@ -1031,7 +1025,7 @@ def pauli_word_to_tensor_obs(obs, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
     return tensorobs_p.bind(*nested_obs)
 
 
-# pylint: disable=too-many-statements,too-many-branches
+# pylint: disable=too-many-statements,too-many-branches, too-many-positional-arguments
 @debug_logger
 def trace_quantum_measurements(
     shots_obj,
@@ -1039,6 +1033,7 @@ def trace_quantum_measurements(
     qrp: QRegPromise,
     outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
     out_tree: PyTreeDef,
+    mcm_config: qml.devices.MCMConfig,
 ) -> Tuple[List[DynamicJaxprTracer], PyTreeDef]:
     """Trace quantum measurements. Accept a list of QNode ouptputs and its Pytree-shape. Process
     the quantum measurement outputs, leave other outputs as-is.
@@ -1083,6 +1078,16 @@ def trace_quantum_measurements(
             nqubits = d_wires if nqubits is None else nqubits
 
             using_compbasis = obs_tracers.primitive == compbasis_p
+
+            if (
+                mcm_config.mcm_method == "single-branch-statistics"
+                and output.mv is not None
+                and type(output) in [ExpectationMP, VarianceMP, ProbabilityMP, CountsMP]
+            ):
+                raise NotImplementedError(
+                    "single-branch-statistics does not support measurement processes "
+                    "(expval, var, probs, counts) on mid circuit measurements."
+                )
 
             if isinstance(output, qml.measurements.SampleMP):
 
@@ -1288,15 +1293,13 @@ def apply_transforms(
             raise CompileError(msg)
         tracing_mode = TracingMode.TRANSFORM
     elif len(qnode_program) or have_measurements_changed(tape, tapes[0]):
-        # TODO: Ideally we should allow qnode transforms that don't modify the measurements to
-        # operate in the permissive tracing mode, but that currently leads to a small number of
-        # test failures due to the different result format produced in trace_quantum_function.
-        only_with_dynamic_one_shot = all(
-            "dynamic_one_shot_partial" in str(getattr(qnode, "transform", ""))
+        with_measurement_from_counts_or_samples = any(
+            "measurements_from_counts" in (transform_str := str(getattr(qnode, "transform", "")))
+            or "measurements_from_samples" in transform_str
             for qnode in qnode_program
         )
 
-        if has_classical_outputs(flat_results) and not only_with_dynamic_one_shot:
+        if has_classical_outputs(flat_results) and with_measurement_from_counts_or_samples:
             msg = (
                 "Transforming MeasurementProcesses is unsupported with non-MeasurementProcess "
                 "QNode outputs. The selected device, options, or applied QNode transforms, may be "
@@ -1653,7 +1656,9 @@ def _trace_quantum_step(
                 tape, device, qreg_in, ctx, trace, mcm_config, snapshot_results
             )
             shots = qnode._shots  # pylint: disable=protected-access
-            meas, meas_trees = trace_quantum_measurements(shots, device, qrp_out, output, trees)
+            meas, meas_trees = trace_quantum_measurements(
+                shots, device, qrp_out, output, trees, mcm_config
+            )
             qreg_out = qrp_out.actualize()
 
             # Get the measurement results

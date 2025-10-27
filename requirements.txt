@@ -19,7 +19,7 @@ ninja
 black
 clang-format~=20.1
 clang-tidy~=20.1
-pylint
+pylint==3.3.9
 isort
 
 # testing

@@ -1313,6 +1313,48 @@ class TestCapture:
 
         assert jnp.allclose(circuit(1.5, 2.5, 3.5), capture_result)
 
+    def test_transform_graph_decompose_workflow(self, backend):
+        """Test the integration for a circuit with a 'decompose' graph transform."""
+
+        # Capture enabled
+
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
+
+        @qjit(target="mlir")
+        @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
+        @qml.qnode(qml.device(backend, wires=2))
+        def captured_circuit(x: float, y: float, z: float):
+            m = qml.measure(0)
+
+            @qml.cond(m)
+            def cond_fn():
+                qml.Rot(x, y, z, 0)
+
+            cond_fn()
+            return qml.expval(qml.PauliZ(0))
+
+        capture_result = captured_circuit(1.5, 2.5, 3.5)
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
+
+        # Capture disabled
+        @qjit
+        @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(x: float, y: float, z: float):
+            m = catalyst.measure(0)
+
+            @catalyst.cond(m)
+            def cond_fn():
+                qml.Rot(x, y, z, 0)
+
+            cond_fn()
+            return qml.expval(qml.PauliZ(0))
+
+        assert jnp.allclose(circuit(1.5, 2.5, 3.5), capture_result)
+
     def test_transform_map_wires_workflow(self, backend):
         """Test the integration for a circuit with a 'map_wires' transform."""
 
@@ -1613,6 +1655,58 @@ class TestControlFlow:
         assert qml.math.allclose(ind, 3)
         expected = 1.0 + jnp.cos(0) + jnp.cos(1) + jnp.cos(2)
         assert qml.math.allclose(res, expected)
+
+    # pylint: disable=unused-argument
+    def test_for_loop_consts(self):
+        """This tests for kinda a weird edge case bug where the consts where getting
+        reordered when translating the inner jaxpr."""
+
+        qml.capture.enable()
+
+        @qml.qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit(x, n):
+            @qml.for_loop(3)
+            def outer(i):
+
+                @qml.for_loop(n)
+                def inner(j):
+                    qml.RY(x, wires=j)
+
+                inner()
+
+            outer()
+
+            # Expected output: |100...>
+            return [qml.expval(qml.PauliZ(i)) for i in range(3)]
+
+        res1, res2, res3 = circuit(0.2, 2)
+
+        assert qml.math.allclose(res1, jnp.cos(0.2 * 3))
+        assert qml.math.allclose(res2, jnp.cos(0.2 * 3))
+        assert qml.math.allclose(res3, 1)
+
+    # pylint: disable=unused-argument
+    def test_for_loop_consts_outside_qnode(self):
+        """Similar test as above for weird edge case, but not using a qnode."""
+
+        qml.capture.enable()
+
+        @qml.qjit
+        def f(x, n):
+            @qml.for_loop(3)
+            def outer(i, a):
+
+                @qml.for_loop(n)
+                def inner(j, b):
+                    return b + x
+
+                return inner(a)
+
+            return outer(0.0)
+
+        res = f(0.2, 2)
+        assert qml.math.allclose(res, 0.2 * 2 * 3)
 
 
 def test_adjoint_transform_integration():

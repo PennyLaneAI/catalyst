@@ -4,8 +4,8 @@ extend-exclude = '''
 (
   frontend/catalyst/python_bindings
   | mlir/llvm-project
-  | mlir/mlir-hlo
   | mlir/Enzyme
+  | mlir/stablehlo
   | build
   | env
   | demos
@@ -26,8 +26,8 @@ skip = [
 ]
 extend_skip_glob = [
   "mlir/llvm-project/*",
-  "mlir/mlir-hlo/*",
   "mlir/Enzyme/*",
+  "mlir/stablehlo/*",
   "mlir/build/*",
   "runtime/build/*",
   ".git/*",
