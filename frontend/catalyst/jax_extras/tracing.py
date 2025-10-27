@@ -196,9 +196,9 @@ def stable_toposort(end_nodes: list) -> list:
 
 
 def sort_eqns(
-    eqns: List[JaxprEqn|Callable[[], JaxprEqn]],
+    eqns: List[JaxprEqn | Callable[[], JaxprEqn]],
     forced_order_primitives: Set[JaxprPrimitive],
-) -> List[JaxprEqn|Callable[[], JaxprEqn]]:
+) -> List[JaxprEqn | Callable[[], JaxprEqn]]:
     """Topologically sort TracingEqns in a unsorted list of equations, based on their
     input/output variables and additional criterias."""
 
