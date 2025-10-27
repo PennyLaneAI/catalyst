@@ -102,13 +102,25 @@ def parse_dep_versions():
     return results
 
 
-def is_git_commit_hash(version_string):
-    """Check if a version string is a git commit hash (40 character hex string)."""
+def is_git_reference(version_string):
+    """Check if a version string is a git reference (commit hash, branch, or tag).
+
+    Returns True if the version string appears to be a git reference rather than
+    a semantic version number. This includes:
+    - 40-character hex strings (commit hashes)
+    - Non-semantic version strings (branch names, tag names)
+    """
     if version_string is None:
         return False
-    return len(version_string) == 40 and all(
-        c in "0123456789abcdef" for c in version_string.lower()
-    )
+
+    # Check if it's a commit hash (40 char hex)
+    if len(version_string) == 40 and all(c in "0123456789abcdef" for c in version_string.lower()):
+        return True
+
+    # Check if it doesn't look like a semantic version (e.g., "main", "dev", "v0.1.0-rc1")
+    # Semantic versions start with digits like "0.4.28" or "1.2.3"
+    semantic_version_pattern = re.compile(r"^\d+\.\d+\.\d+")
+    return not semantic_version_pattern.match(version_string)
 
 
 dep_versions = parse_dep_versions()
@@ -119,14 +131,14 @@ lq_version = dep_versions.get("lightning")
 pl_min_release = "0.43.0"
 lq_min_release = pl_min_release
 
-# Handle PennyLane version - support both release versions and git commit hashes
+# Handle PennyLane version - support both release versions and git references
 if pl_version is not None:
-    if is_git_commit_hash(pl_version):
-        # For git commits, install from git source
+    if is_git_reference(pl_version):
+        # For git references (commits, branches, tags), install from git source
         pennylane_dep = f"pennylane @ git+https://github.com/PennyLaneAI/pennylane.git@{pl_version}"
         print("=" * 80)
-        print("WARNING: PennyLane is being installed from a git commit.")
-        print(f"Commit: {pl_version}")
+        print("WARNING: PennyLane is being installed from a git reference.")
+        print(f"Reference: {pl_version}")
         print("=" * 80)
     else:
         # For release versions, use standard version specifier
@@ -136,15 +148,15 @@ if pl_version is not None:
 else:
     pennylane_dep = f"pennylane>={pl_min_release}"
 
-# Handle Lightning version - support both release versions and git commit hashes
+# Handle Lightning version - support both release versions and git references
 if lq_version is not None:
-    if is_git_commit_hash(lq_version):
-        # For git commits, install from git source
+    if is_git_reference(lq_version):
+        # For git references (commits, branches, tags), install from git source
         lightning_dep = f"pennylane-lightning @ git+https://github.com/PennyLaneAI/pennylane-lightning.git@{lq_version}"
         kokkos_dep = ""  # Kokkos not available from git
         print("=" * 80)
-        print("WARNING: PennyLane-Lightning is being installed from a git commit.")
-        print(f"Commit: {lq_version}")
+        print("WARNING: PennyLane-Lightning is being installed from a git reference.")
+        print(f"Reference: {lq_version}")
         print("Note: pennylane-lightning-kokkos is not available when installing from git.")
         print("=" * 80)
     else:
@@ -155,19 +167,20 @@ else:
     lightning_dep = f"pennylane-lightning>={lq_min_release}"
     kokkos_dep = ""
 
-# Handle JAX version - support both release versions and git commit hashes
+# Handle JAX version - support both release versions and git references
 if jax_version is not None:
-    if is_git_commit_hash(jax_version):
-        # For git commits, only specify jax from git source
+    if is_git_reference(jax_version):
+        # For git references (commits, branches, tags), only specify jax from git source
         # Note: When installing from git, jaxlib must be installed separately
         jax_dep = f"jax @ git+https://github.com/google/jax.git@{jax_version}"
         # Don't add jaxlib to requirements when using git - it needs to be installed separately
         jaxlib_dep = None
         print("=" * 80)
-        print("WARNING: JAX is being installed from a git commit.")
+        print("WARNING: JAX is being installed from a git reference.")
+        print(f"Reference: {jax_version}")
         print("You may need to install a compatible jaxlib version separately:")
         print("  pip install jaxlib==...")
-        print("Or build jaxlib from the same commit if needed.")
+        print("Or build jaxlib from the same reference if needed.")
         print("=" * 80)
     else:
         # For release versions, use standard version specifier
