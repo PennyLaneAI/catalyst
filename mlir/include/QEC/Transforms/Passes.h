@@ -28,6 +28,7 @@ std::unique_ptr<mlir::Pass> createCliffordTToPPRPass();
 std::unique_ptr<mlir::Pass> createMergePPRIntoPPMPass();
 std::unique_ptr<mlir::Pass> createDecomposeNonCliffordPPRPass();
 std::unique_ptr<mlir::Pass> createDecomposeCliffordPPRPass();
+std::unique_ptr<mlir::Pass> createPPRToPPMPass();
 std::unique_ptr<mlir::Pass> createPPMCompilationPass();
 std::unique_ptr<mlir::Pass> createCountPPMSpecsPass();
 std::unique_ptr<mlir::Pass> createPartitionLayersPass();

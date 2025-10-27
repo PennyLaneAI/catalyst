@@ -81,20 +81,10 @@ struct PPMCompilationPass : public impl::PPMCompilationPassBase<PPMCompilationPa
             }
         }
 
-        // Phase 4: Decompose non-Clifford PPRs into PPMs
+        // Phase 4: Decompose PPRs into PPMs
         {
             RewritePatternSet patterns(ctx);
             populateDecomposeNonCliffordPPRPatterns(patterns, decomposeMethod, avoidYMeasure);
-
-            if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
-                return signalPassFailure();
-            }
-        }
-
-        // Phase 5: Decompose Clifford PPRs into PPMs
-        {
-            RewritePatternSet patterns(ctx);
-            populateDecomposeCliffordPPRPatterns(patterns, avoidYMeasure);
 
             if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
                 return signalPassFailure();
