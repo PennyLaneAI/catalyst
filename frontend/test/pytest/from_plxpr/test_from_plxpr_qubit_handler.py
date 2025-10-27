@@ -239,7 +239,7 @@ class TestQubitValues:
         assert qubit_handler[0] is new_qubit
         with take_current_trace() as trace:
             # Check that an extract primitive is added
-            last_eqn = trace.frame.eqns[-1]
+            last_eqn = trace.frame.tracing_eqns[-1]
             if callable(last_eqn):
                 last_eqn = last_eqn()
             assert last_eqn.primitive is qextract_p
@@ -279,7 +279,7 @@ class TestQubitValues:
 
         # Also check with actual jaxpr variables
         with take_current_trace() as trace:
-            last_eqn = trace.frame.eqns[-1]
+            last_eqn = trace.frame.tracing_eqns[-1]
             if callable(last_eqn):
                 last_eqn = last_eqn()
             gate_out_qubits = last_eqn.outvars
@@ -324,7 +324,7 @@ class TestQubitValues:
 
         # Also check with actual jaxpr variables
         with take_current_trace() as trace:
-            last_eqn = trace.frame.eqns[-1]
+            last_eqn = trace.frame.tracing_eqns[-1]
             if callable(last_eqn):
                 last_eqn = last_eqn()
             gate_out_qubits = last_eqn.outvars

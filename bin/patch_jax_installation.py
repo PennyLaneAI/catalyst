@@ -1,3 +1,5 @@
+"""Patch JAX installation to fix compatibility issues with Catalyst."""
+
 import importlib
 import os
 import re
@@ -10,62 +12,9 @@ def find_package_root(package_name):
     return os.path.dirname(package.__file__)
 
 
-pennylane_root = find_package_root("pennylane")
 jax_root = find_package_root("jax")
 
 patch_setup = {
-    # "pennylane_jax07_0": {
-    #     "file_path": pennylane_root + "/workflow/_capture_qnode.py",
-    #     "pattern": r"DynamicJaxprTracer\(jaxpr_trace, o\)",
-    #     "replacement": "DynamicJaxprTracer(jaxpr_trace, o, None)",
-    # },
-    # "pennylane_jax07_1": {
-    #     "file_path": pennylane_root + "/workflow/_capture_qnode.py",
-    #     "pattern": (
-    #         r"out_tracers = \[pe\.DynamicJaxprTracer\("
-    #         r"jaxpr_trace, o, None\) for o in new_shapes\]\s+"
-    #         r"eqn = jax\.core\.new_jaxpr_eqn\(\s+"
-    #         r"invars,\s+"
-    #         r"\[jaxpr_trace\.makevar\(o\) "
-    #         r"for o in out_tracers\],\s+"
-    #         r"qnode_prim,\s+"
-    #         r"params,\s+"
-    #         r"jax\.core\.no_effects,\s+"
-    #         r"source_info=source_info,?\s+"
-    #         r"\)\s+"
-    #         r"jaxpr_trace\.frame\.add_eqn\(eqn\)\s+"
-    #         r"return out_tracers"
-    #     ),
-    #     "replacement": (
-    #         "eqn, out_tracers = jaxpr_trace.make_eqn("
-    #         "tracers, new_shapes, qnode_prim, params, [], source_info)\n"
-    #         "    jaxpr_trace.frame.add_eqn(eqn)\n"
-    #         "    return out_tracers"
-    #     ),
-    # },
-    # "pennylane_jax07_2": {
-    #     "file_path": pennylane_root + "/capture/dynamic_shapes.py",
-    #     "pattern": (
-    #         r"invars = \[jaxpr_trace\.getvar\(x\) "
-    #         r"for x in tracers\]\s+"
-    #         r"eqn = jax\.core\.new_jaxpr_eqn\(\s+"
-    #         r"invars,\s+"
-    #         r"returned_vars,\s+"
-    #         r"primitive,\s+"
-    #         r"params,\s+"
-    #         r"jax\.core\.no_effects,\s+"
-    #         r"\)\s+"
-    #         r"jaxpr_trace\.frame\.add_eqn\(eqn\)\s+"
-    #         r"return out_tracers"
-    #     ),
-    #     "replacement": (
-    #         "out_avals = [t.aval for t in out_tracers]\n"
-    #         "        eqn, out_tracers = jaxpr_trace.make_eqn("
-    #         "tracers, out_avals, primitive, params, [], source_info)\n"
-    #         "        jaxpr_trace.frame.add_eqn(eqn)\n"
-    #         "        return out_tracers"
-    #     ),
-    # },
     "jax_07_0": {
         "file_path": jax_root + "/_src/pjit.py",
         "pattern": r"arg\.var",

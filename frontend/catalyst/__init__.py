@@ -17,11 +17,7 @@ This package contains the Catalyst Python interface.
 
 # pylint: disable=wrong-import-position
 
-import importlib
-import re
-import glob
 import sys
-import types
 from os.path import dirname
 
 import jaxlib as _jaxlib

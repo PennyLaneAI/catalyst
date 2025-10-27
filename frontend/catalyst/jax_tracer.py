@@ -528,20 +528,13 @@ class HybridOp(Operator):
         """
         assert self.binder is not None, "HybridOp should set a binder"
 
-        # JAX 0.7 FIX: For measure_p, pass pre-created tracers to the staging rule
-        from catalyst.jax_primitives import measure_p
-
-        if self.binder == measure_p.bind:
-            kwargs["_catalyst_init_tracers"] = out_expanded_tracers
-
         # Here, we are binding any of the possible hybrid ops.
         # which includes: for_loop, while_loop, cond, measure.
         # This will place an equation at the very end of the current list of equations.
         out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
 
         trace = EvaluationContext.get_current_trace()
-        # JAX 0.7: Need to call the lambda to get the actual TracingEqn
-        eqn = _get_eqn_from_tracing_eqn(trace.frame.eqns[-1])
+        eqn = _get_eqn_from_tracing_eqn(trace.frame.tracing_eqns[-1])
         frame = trace.frame
 
         assert len(eqn.outvars[:-1]) == len(
@@ -551,17 +544,15 @@ class HybridOp(Operator):
         jaxpr_variables = cached_vars.get(frame, set())
         if not jaxpr_variables:
             # We get all variables in the current frame
-            # JAX 0.7: Need to call each lambda to get actual TracingEqns
             outvars = itertools.chain.from_iterable(
-                [_get_eqn_from_tracing_eqn(e).outvars for e in frame.eqns]
+                [_get_eqn_from_tracing_eqn(e).outvars for e in frame.tracing_eqns]
             )
             jaxpr_variables = set(outvars)
             jaxpr_variables.update(frame.invars)
             jaxpr_variables.update(frame.constvar_to_val.keys())
             cached_vars[frame] = jaxpr_variables
 
-        # JAX 0.7: Need to call the lambda to get the actual TracingEqn
-        last_eqn = _get_eqn_from_tracing_eqn(frame.eqns[-1])
+        last_eqn = _get_eqn_from_tracing_eqn(frame.tracing_eqns[-1])
         for outvar in last_eqn.outvars:
             # With the exception of the output variables from the current equation.
             jaxpr_variables.discard(outvar)
@@ -570,12 +561,6 @@ class HybridOp(Operator):
             # We look for what were the previous output tracers.
             # If they haven't changed, then we leave them unchanged.
             if t.val in jaxpr_variables:
-                continue
-
-            from catalyst.jax_primitives import measure_p
-
-            if self.binder == measure_p.bind:
-                # For measure, the outvars are already correct from the staging rule
                 continue
 
             # For other hybrid ops, use the original logic

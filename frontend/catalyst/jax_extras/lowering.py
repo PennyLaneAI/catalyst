@@ -160,13 +160,15 @@ def custom_lower_jaxpr_to_module(
         while worklist:
             op = worklist.pop()
             func_name = str(op.name)
+            is_entry_point = func_name.startswith('"jit_')
+
+            if is_entry_point:
+                # Keep entry point functions public
+                op.attributes["sym_visibility"] = ir.StringAttr.get("public")
+                continue
             if isinstance(op, FuncOp):
-                if func_name.startswith('"jit_'):
-                    # Keep entry point functions public
-                    op.attributes["sym_visibility"] = ir.StringAttr.get("public")
-                else:
-                    # Set non-entry functions to internal linkage
-                    op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
+                # Set non-entry functions to internal linkage
+                op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
             if isinstance(op, ModuleOp):
                 worklist += [*op.body.operations]
 

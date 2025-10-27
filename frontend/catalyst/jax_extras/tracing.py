@@ -218,7 +218,7 @@ def sort_eqns(
         def __lt__(self, other):
             return self.id < other.id
 
-    # JAX 0.7: eqns might be lambda functions that return TracingEqn or weakrefs
+    # JAX 0.7+: eqns might be lambda functions that return TracingEqn or weakrefs
     # We need to preserve the mapping from actual_eqn to the original callable
     actual_eqns = []
     eqn_to_callable = {}  # Maps actual TracingEqn to its original callable/wrapper
