@@ -17,7 +17,7 @@ This module provides access to compilation tools for experimental fault-tolerant
 (FTQC) workloads in Catalyst.
 """
 
-from .pipelines import mbqc_pipeline
 from .ftqc_device import FTQCDevice
+from .pipelines import mbqc_pipeline
 
 __all__ = ("mbqc_pipeline",)

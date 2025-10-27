@@ -38,10 +38,10 @@ from pennylane.measurements import (
     CountsMP,
     ExpectationMP,
     MeasurementProcess,
+    PauliMeasure,
     ProbabilityMP,
     StateMP,
     VarianceMP,
-    PauliMeasure,
 )
 from pennylane.operation import Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
@@ -90,8 +90,8 @@ from catalyst.jax_primitives import (
     hermitian_p,
     namedobs_p,
     num_qubits_p,
-    pauli_rot_p,
     pauli_measure_p,
+    pauli_rot_p,
     probs_p,
     qalloc_p,
     qdealloc_p,

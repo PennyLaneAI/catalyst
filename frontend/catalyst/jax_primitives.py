@@ -69,7 +69,7 @@ from mlir_quantum.dialects.gradient import (
 )
 from mlir_quantum.dialects.mbqc import MeasureInBasisOp
 from mlir_quantum.dialects.mitigation import ZneOp
-from mlir_quantum.dialects.qec import PPRotationOp, PPMeasurementOp
+from mlir_quantum.dialects.qec import PPMeasurementOp, PPRotationOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,
     AllocOp,
@@ -1490,17 +1490,17 @@ def _pauli_measure_lowering(
     pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
 
     result_type = ir.IntegerType.get_signless(1)
-    
+
     ppm_results = PPMeasurementOp(
         out_qubits=[q.type for q in qubits],
         mres=result_type,
         pauli_product=pauli_word,
         in_qubits=qubits,
     ).results
-    
+
     result = ppm_results[0]
     out_qubits = ppm_results[1:]
-    
+
     result_from_elements_op = ir.RankedTensorType.get((), result.type)
     from_elements_op = FromElementsOp(result_from_elements_op, result)
 

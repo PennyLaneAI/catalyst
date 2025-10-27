@@ -23,7 +23,10 @@ from catalyst.compiler import get_lib_path
 
 class FTQCDevice(Device):
     """This dummy FTQC device allows to usage PPM/PPR passes using
-    Catalyst."""
+    Catalyst. This is a temporary device to allow for converting the PauliRot and
+    PauliMeasure operations from PennyLane frontend directly to the PPR and PPM
+    operations in the QEC dialect.
+    """
 
     config_filepath = get_lib_path("ftqc_runtime", "FTQC_LIB_DIR") + "/ftqc.toml"
 
