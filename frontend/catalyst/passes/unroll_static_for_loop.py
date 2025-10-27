@@ -48,23 +48,25 @@ def get_parent_of_type(op: Operation, kind: Type[T]) -> T | None:
     return op
 
 
-def print_mlir(op, msg=""):
-    printer = Printer()
-    print("-"*100)
-    print(f"// Start {msg}")
-    if isinstance(op, Region):
-        printer.print_region(op)
-    elif isinstance(op, Block):
-        printer.print_block(op)
-    elif isinstance(op, Operation):
-        printer.print_op(op)
-    print(f"\n// End {msg}")
-    print("-"*100)
+def print_mlir(op, msg="", should_print: bool = True):
+    if should_print:
+        printer = Printer()
+        print("-"*100)
+        print(f"// Start {msg}")
+        if isinstance(op, Region):
+            printer.print_region(op)
+        elif isinstance(op, Block):
+            printer.print_block(op)
+        elif isinstance(op, Operation):
+            printer.print_op(op)
+        print(f"\n// End {msg}")
+        print("-"*100)
 
-def print_ssa_values(values, msg="SSA Values"):
-    print(f"// {msg}")
-    for val in values:
-        print(f"  - {val}")
+def print_ssa_values(values, msg="SSA Values", should_print:bool = True):
+    if should_print:
+        print(f"// {msg}")
+        for val in values:
+            print(f"  - {val}")
 
 ##############################################################################
 # xDSL Transform If Operator Partitioning
@@ -78,47 +80,134 @@ class IfOperatorPartitioningPass(RewritePattern):
 
         self.original_func_op = op
         # self.duplicate_if_op(op, rewriter)
-        self.split_if_op(op, rewriter)
+        # self.split_if_op(op, rewriter)
+        # print("%"*120)
+        # print("%"*120)
+        # print("%"*120)
+        self.split_nested_if_ops(op, rewriter)
+        print("%"*120)
+        print("%"*120)
+        print("%"*120)
+        # self.flatten_if_ops(op, rewriter)
 
 
     def __init__(self):
         self.module: builtin.ModuleOp = None
         self.original_func_op: func.FuncOp = None
 
-    def split_if_op(self, op: func.FuncOp, rewriter: PatternRewriter) -> None:
-        # Find scf.IfOp
+
+    def flatten_if_ops(self, op: func.FuncOp, rewriter: PatternRewriter) -> None:
+        number_if_op = 0
+
+
+        op_walk = op.walk()
+        for current_op in op_walk:
+            if isinstance(current_op, scf.IfOp):
+                number_if_op += 1
+
+        print(f"If_op: {number_if_op}")
+
+    def looking_for_nested_if_ops(self, op: scf.IfOp) -> bool:
+        for inner_op in op.true_region.ops:
+            if isinstance(inner_op, scf.IfOp):
+                return True
+        for inner_op in op.false_region.ops:
+            if isinstance(inner_op, scf.IfOp):
+                return True
+        return False
+
+
+    def split_nested_if_ops(self, op: func.FuncOp, rewriter: PatternRewriter, go_deeper: bool = False) -> None:
+
+
+        # print_mlir(op, "Processing scf.IfOp:")
+        if go_deeper and isinstance(op, scf.IfOp):
+
+            # print_mlir(op, "Processing scf.IfOp with go_deeper=True:")
+            # Process true region
+            true_region = op.true_region
+            for inner_op in true_region.ops:
+                if isinstance(inner_op, scf.IfOp):
+                    have_nested_if_ops = self.looking_for_nested_if_ops(inner_op)
+
+                    print(f"have_nested_if_ops on True: {have_nested_if_ops}")
+
+                    if have_nested_if_ops:
+                        self.split_nested_if_ops(inner_op, rewriter, go_deeper=True)
+                        self.split_if_op(inner_op, rewriter)
+                    if not have_nested_if_ops:
+                        self.split_if_op(inner_op, rewriter)
+
+            # Process false region
+            false_region = op.false_region
+            for inner_op in false_region.ops:
+                if isinstance(inner_op, scf.IfOp):
+                    have_nested_if_ops = self.looking_for_nested_if_ops(inner_op)
+
+                    print(f"have_nested_if_ops on False: {have_nested_if_ops}")
+
+                    if have_nested_if_ops:
+                        self.split_nested_if_ops(inner_op, rewriter, go_deeper=True)
+                        self.split_if_op(inner_op, rewriter)
+                    if not have_nested_if_ops:
+                        self.split_if_op(inner_op, rewriter)
+            return
 
         op_walk = op.walk()
         for current_op in op_walk:
             if isinstance(current_op, scf.IfOp):
 
-                print_mlir(current_op, "Processing scf.IfOp:")
+                have_nested_if_ops = self.looking_for_nested_if_ops(current_op)
+
+                print(f"have_nested_if_ops: {have_nested_if_ops}")
+
+                if have_nested_if_ops:
+                    self.split_nested_if_ops(current_op, rewriter, go_deeper=True)
+                    self.split_if_op(current_op, rewriter)
+
+                if not have_nested_if_ops:
+                    self.split_if_op(current_op, rewriter)
+
+
+
+    def split_if_op(self, op: func.FuncOp, rewriter: PatternRewriter) -> None:
+        # Find scf.IfOp
+
+        # print_mlir(op, "Processing scf.IfOp:")
+
+        print_mid_step = False
+
+        op_walk = op.walk()
+        for current_op in op_walk:
+            if isinstance(current_op, scf.IfOp):
+
+                print_mlir(current_op, "Processing scf.IfOp:", print_mid_step)
 
                 # Analyze missing values for the IfOp
                 missing_values = self.analyze_missing_values_for_ops([current_op])
-                print_ssa_values(missing_values, "Missing values for IfOp:")
+                print_ssa_values(missing_values, "Missing values for IfOp:", print_mid_step)
 
                 # Get outputs required by operations after the IfOp
                 required_outputs = self.analyze_required_outputs(
                     [current_op], current_op.next_op
                 )
-                print_ssa_values(required_outputs, "Required outputs after IfOp:")
+                print_ssa_values(required_outputs, "Required outputs after IfOp:", print_mid_step)
 
                 # Get quantum register from missing values
                 qreg_if_op = [mv for mv in missing_values if isinstance(mv.type, quantum.QuregType)]
-                print_ssa_values(qreg_if_op, "Quantum register for IfOp:")
+                print_ssa_values(qreg_if_op, "Quantum register for IfOp:", print_mid_step)
 
                 return_vals_if_op = [ro for ro in required_outputs if ro in current_op.results]
-                print_ssa_values(return_vals_if_op, "Return values for IfOp:")
+                print_ssa_values(return_vals_if_op, "Return values for IfOp:", print_mid_step)
 
                 # True and False regions
                 true_region = current_op.true_region
                 false_region = current_op.false_region
 
-                print_mlir(true_region, "True Region:")
-                print("Block Args True Region:", true_region.blocks[0].arg_types)
-                print_mlir(false_region, "False Region:")
-                print("Block Args False Region:", false_region.blocks[0].arg_types)
+                print_mlir(true_region, "True Region:", print_mid_step)
+                # print("Block Args True Region:", true_region.blocks[0].arg_types)
+                print_mlir(false_region, "False Region:", print_mid_step)
+                # print("Block Args False Region:", false_region.blocks[0].arg_types)
 
 
                 # --------------------------------------------------------------------------
@@ -139,7 +228,7 @@ class IfOperatorPartitioningPass(RewritePattern):
                     attr_dict=attr_dict
                 )
 
-                print_mlir(new_if_op_4_true, "New IfOp for True Branch:")
+                print_mlir(new_if_op_4_true, "New IfOp for True Branch:", print_mid_step)
 
                 # --------------------------------------------------------------------------
                 # New partitioning logic for False region
@@ -166,21 +255,23 @@ class IfOperatorPartitioningPass(RewritePattern):
                     conditional=not_op.result,
                     attr_dict=attr_dict
                 )
-                print_mlir(new_if_op_4_false, "New IfOp for False Branch:")
+                print_mlir(new_if_op_4_false, "New IfOp for False Branch:", print_mid_step)
 
                 # --------------------------------------------------------------------------
 
-                print_mlir(op, "Function after IfOp Partitioning:")
+                print_mlir(op, "Function after IfOp Partitioning:", print_mid_step)
 
                 original_if_op_results = current_op.results[0]
                 original_if_op_results.replace_by(qreg_if_op[0])
 
                 list_op_if = [curr_op for curr_op in current_op.walk()]
                 # Remove the ops in the original IfOp
-                for op in list_op_if[::-1]:
-                    print_mlir(op, "Erasing original IfOp ops:")
-                    op.detach()
-                    op.erase()
+                for if_op in list_op_if[::-1]:
+                    # print_mlir(op, "Erasing original IfOp ops:")
+                    if_op.detach()
+                    if_op.erase()
+
+                print_mlir(op, "Function after remove original If", print_mid_step)
 
 
     def create_if_op_partition(self,
@@ -193,7 +284,14 @@ class IfOperatorPartitioningPass(RewritePattern):
                                attr_dict: dict[str, builtin.Attribute] = None
                                ) -> scf.IfOp:
 
-        true_ops = list(chain(*[op.walk() for op in if_region.blocks]))
+
+        block = if_region.blocks
+
+        # for b in block:
+        #     print_mlir(b, "If Region Block to be cloned:")
+
+        # true_ops = list(chain(*[op.walk() for op in if_region.blocks]))
+        true_ops = [op for op in if_region.blocks[0].ops]
 
         new_true_block = Block()
 
@@ -202,7 +300,7 @@ class IfOperatorPartitioningPass(RewritePattern):
             new_true_block,
             value_mapper
         )
-        print_mlir(new_true_block, "Cloned True Block after cloning ops:")
+        # print_mlir(new_true_block, "Cloned True Block after cloning ops:")
 
 
         # --------------------------------------------------------------------------
@@ -245,7 +343,6 @@ class IfOperatorPartitioningPass(RewritePattern):
         previous_IfOp.results[0].replace_by_if(new_if_op_4_true.results[0], lambda use: use.operation not in new_if_op_4_true_ops)
 
         return new_if_op_4_true
-
 
 
     def duplicate_if_op(self, op: func.FuncOp, rewriter: PatternRewriter) -> None:
@@ -531,42 +628,95 @@ class UnrollStaticLoopTTPass(ModulePass):
 
 if __name__ == "__main__":
 
+
     qml.capture.enable()
 
-    @qml.qjit(keep_intermediate=False, pass_plugins=[getXDSLPluginAbsolutePath()], autograph=False)
+
+
+    @qml.qjit(keep_intermediate=False, pass_plugins=[getXDSLPluginAbsolutePath()], autograph=True)
     @IfOpPartitionTTPass
-    @qml.qnode(qml.device("lightning.qubit", wires=4))
-    def captured_circuit_1(x: float, y: float):
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def captured_circuit_1(x: float, y: float, z: int):
         # Create a superposition state with different probabilities
 
         qml.H(0)
 
-        index =  1
-
-        def ansatz_true(y: float):
-            # qml.measure(index)
-            # qml.X(0)
-            # qml.measure(index)
-
-            # qml.ctrl(qml.RX(y,0),1)
+        def ansatz_true():
             qml.H(1)
-            qml.H(2)
 
-        def ansatz_false(y: float):
-            # qml.measure(index)
-            # qml.Y(0)
-            # qml.measure(index)
-            # qml.RY(y,0)
-            qml.H(1)
+            def nested_ansatz_true():
+                qml.H(2)
+
+            def nested_ansatz_false():
+                qml.Y(1)
+
+            qml.cond(x > 2.4,
+                     nested_ansatz_true,
+                     nested_ansatz_false)()
+
+        def ansatz_false():
             qml.Y(0)
 
-        qml.cond(x > 1.4, ansatz_true, ansatz_false)(y)
-        # qml.cond(x > 1.4, ansatz_true)(y)
+        qml.cond(x > 1.4,
+                 ansatz_true,
+                 ansatz_false)()
 
-        # qml.RX(y, 0)
-        qml.S(2)
+        # qml.S(2)
 
         return qml.state()
+
+    print(captured_circuit_1(2.5, 0.3, 1))
+
+
+        # qml.H(0)
+
+        # index =  1 + z
+
+        # def ansatz_true():
+        #     qml.H(1)
+
+        #     index_lvl_1 = 1 + index
+
+        #     def nested_ansatz_true():
+
+        #         index_lvl_2 = index_lvl_1 + 1
+
+        #         qml.X(index_lvl_2)
+
+        #     def nested_ansatz_false():
+
+        #         index_lvl_2 = index_lvl_1 - 1
+
+        #         qml.X(index_lvl_2)
+
+        #         def nested_nested_ansatz_true():
+        #             qml.Y(4)
+        #         def nested_nested_ansatz_false():
+        #             qml.Y(3)
+
+        #         qml.cond(x > 3.4,
+        #                  nested_nested_ansatz_true,
+        #                  nested_nested_ansatz_false)()
+
+        #     qml.H(index_lvl_1)
+
+        #     qml.cond(x > 2.4,
+        #              nested_ansatz_true,
+        #              nested_ansatz_false)()
+
+        # def ansatz_false():
+        #     qml.H(1)
+
+        # qml.cond(x > 1.4,
+        #          ansatz_true,
+        #          ansatz_false)()
+        # # qml.cond(x > 1.4, ansatz_true)(y)
+
+
+        # # qml.RX(y, 0)
+        # qml.S(2)
+
+        # return qml.state()
         # return qml.expval(qml.PauliZ(0))
 
-    print(captured_circuit_1(1.5, 0.3))
+    # print(captured_circuit_1(1.5, 0.3, 1))
