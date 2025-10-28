@@ -23,6 +23,7 @@ from jax.core import ShapedArray
 
 import catalyst
 from catalyst import qjit
+from catalyst.from_plxpr import register_transform
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
@@ -1047,6 +1048,34 @@ class TestCapture:
             return qml.expval(qml.Z(0))
 
         assert jnp.allclose(circuit(0.1), capture_result)
+
+    def test_pass_with_args(self, backend):
+        """Test the integration for a circuit with a pass that takes in options."""
+
+        # Capture enabled
+
+        qml.capture.enable()
+
+        @qml.transform
+        def my_pass(tape):
+            """A dummy qml.transform."""
+            pass
+
+        register_transform(my_pass, "my-pass", False)
+
+        @qjit(target="mlir")
+        @partial(my_pass, my_option="my_option_value", my_other_option=False)
+        @qml.qnode(qml.device(backend, wires=1))
+        def captured_circuit():
+            return qml.expval(qml.PauliZ(0))
+
+        assert 'transform.apply_registered_pass "my-pass"' in captured_circuit.mlir
+        assert (
+            'with options = {"my-option" = "my_option_value", "my-other-option" = false}'
+            in captured_circuit.mlir
+        )
+
+        qml.capture.disable()
 
     def test_transform_cancel_inverses_workflow(self, backend):
         """Test the integration for a circuit with a 'cancel_inverses' transform."""
