@@ -261,8 +261,7 @@ def patch_primitives():
     try:
         # Patch make_eqn to handle both single aval and list of avals
         # pylint: disable=import-outside-toplevel
-        from jax._src import source_info_util
-        from jax._src import config
+        from jax._src import config, source_info_util
         from jax._src.core import JaxprEqnContext, Var
         from jax._src.interpreters.partial_eval import (
             DynamicJaxprTracer,
