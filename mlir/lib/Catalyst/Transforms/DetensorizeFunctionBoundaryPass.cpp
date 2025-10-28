@@ -210,6 +210,7 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
 } // namespace
 
 namespace catalyst {
+
 #define GEN_PASS_DEF_DETENSORIZEFUNCTIONBOUNDARYPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
@@ -230,10 +231,5 @@ struct DetensorizeFunctionBoundaryPass
         }
     }
 };
-
-std::unique_ptr<Pass> createDetensorizeFunctionBoundaryPass()
-{
-    return std::make_unique<DetensorizeFunctionBoundaryPass>();
-}
 
 } // namespace catalyst

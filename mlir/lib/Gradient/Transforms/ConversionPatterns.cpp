@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iostream"
-#include "llvm/Support/raw_ostream.h"
-
 #include <deque>
+#include <iostream>
 #include <string>
 #include <vector>
+
+#include "llvm/Support/raw_ostream.h"
 
 #include "mlir/Conversion/LLVMCommon/MemRefBuilder.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
