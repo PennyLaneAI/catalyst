@@ -14,29 +14,12 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mlir/Pass/Pass.h"
 
 namespace catalyst {
 
-std::unique_ptr<mlir::Pass> createAddExceptionHandlingPass();
-std::unique_ptr<mlir::Pass> createApplyTransformSequencePass();
-std::unique_ptr<mlir::Pass> createArrayListToMemRefPass();
-std::unique_ptr<mlir::Pass> createBufferDeallocationPass();
-std::unique_ptr<mlir::Pass> createCatalystBufferizationPass();
-std::unique_ptr<mlir::Pass> createCatalystConversionPass();
-std::unique_ptr<mlir::Pass> createDetensorizeFunctionBoundaryPass();
-std::unique_ptr<mlir::Pass> createDetensorizeSCFPass();
-std::unique_ptr<mlir::Pass> createDisableAssertionPass();
-std::unique_ptr<mlir::Pass> createGEPInboundsPass();
-std::unique_ptr<mlir::Pass> createInlineNestedModulePass();
-std::unique_ptr<mlir::Pass> createMemrefCopyToLinalgCopyPass();
-std::unique_ptr<mlir::Pass> createMemrefToLLVMWithTBAAPass();
-std::unique_ptr<mlir::Pass> createQnodeToAsyncLoweringPass();
-std::unique_ptr<mlir::Pass> createRegisterInactiveCallbackPass();
-std::unique_ptr<mlir::Pass> createSplitMultipleTapesPass();
-
-void registerAllCatalystPasses();
+#define GEN_PASS_DECL
+#define GEN_PASS_REGISTRATION
+#include "Catalyst/Transforms/Passes.h.inc"
 
 } // namespace catalyst
