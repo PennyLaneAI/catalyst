@@ -866,15 +866,18 @@ class TestProperties:
 
     @pytest.mark.parametrize("value", (True, False))
     def test_is_hermitian(self, value):
-        """Test `is_hermitian` property mirrors that of the base."""
+        """Test `is_verified_hermitian` property mirrors that of the base."""
 
         # pylint: disable=too-few-public-methods
         class DummyOp(qml.operation.Operator):
             num_wires = 1
-            is_hermitian = value
+            
+            @property
+            def is_verified_hermitian(self):
+                return value
 
         op = adjoint(DummyOp(0))
-        assert op.is_hermitian == value
+        assert op.is_verified_hermitian == value
 
     def test_batching_properties(self):
         """Test the batching properties and methods."""
