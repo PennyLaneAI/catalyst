@@ -801,16 +801,19 @@ class TestControlledProperties:
 
     @pytest.mark.parametrize("value", (True, False))
     def test_is_hermitian(self, value):
-        """Test that `catalyst.ctrl` defers `is_hermitian` to base operator."""
+        """Test that `catalyst.ctrl` defers `is_verified_hermitian` to base operator."""
 
         class DummyOp(Operator):
             """DummyOp"""
 
             num_wires = 1
-            is_hermitian = value
+
+            @property
+            def is_verified_hermitian(self):
+                return value
 
         op = C_ctrl(DummyOp(1), 0)
-        assert op.is_hermitian is value
+        assert op.is_verified_hermitian is value
 
     def test_map_wires(self):
         """Test that we can get and set private wires."""
