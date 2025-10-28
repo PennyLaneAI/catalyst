@@ -55,6 +55,61 @@ from .qubit_handler import (
 )
 
 
+def _tuple_to_slice(t):
+    """Convert a tuple representation of a slice back to a slice object.
+
+    JAX converts slice objects to tuples for hashability in jaxpr parameters.
+    This function converts them back to slice objects for use with indexing.
+
+    Args:
+        t: Either a slice object (returned as-is) or a tuple (start, stop, step)
+
+    Returns:
+        slice: A slice object
+    """
+    if isinstance(t, slice):
+        return t
+    if isinstance(t, tuple) and len(t) == 3:
+        return slice(*t)
+    return t
+
+
+def _tuple_to_dict(t):
+    """Convert a tuple representation of a dict back to a dict object.
+
+    JAX converts dict objects to tuples for hashability in jaxpr parameters.
+    This function converts them back to dict objects for use, recursively
+    handling nested dicts. It also converts tuple values back to lists where appropriate.
+
+    Args:
+        t: Either a dict object (returned as-is) or a tuple of (key, value) pairs
+
+    Returns:
+        dict: A dict object
+    """
+    if isinstance(t, dict):
+        # Recursively convert nested dicts
+        return {k: _tuple_to_dict(v) for k, v in t.items()}
+    if isinstance(t, tuple):
+        # Check if this is a dict-like tuple (sequence of 2-tuples)
+        if all(isinstance(item, tuple) and len(item) == 2 for item in t):
+            # Convert tuple of pairs to dict, recursively handling nested values
+            result = {}
+            for key, value in t:
+                # Recursively handle nested structures
+                if isinstance(value, tuple):
+                    # Check if it's a dict-like tuple
+                    if all(isinstance(item, tuple) and len(item) == 2 for item in value):
+                        result[key] = _tuple_to_dict(value)
+                    else:
+                        # It's a list-like tuple, convert to list
+                        result[key] = list(value)
+                else:
+                    result[key] = value
+            return result
+    return t
+
+
 def _get_device_kwargs(device) -> dict:
     """Calulcate the params for a device equation."""
     info = extract_backend_info(device)
@@ -266,9 +321,10 @@ def register_transform(pl_transform, pass_name, decomposition):
     ):
         """Handle the conversion from plxpr to Catalyst jaxpr for a
         PL transform."""
-        consts = args[consts_slice]
-        non_const_args = args[args_slice]
-        targs = args[targs_slice]
+        consts = args[_tuple_to_slice(consts_slice)]
+        non_const_args = args[_tuple_to_slice(args_slice)]
+        targs = args[_tuple_to_slice(targs_slice)]
+        tkwargs = _tuple_to_dict(tkwargs)
 
         # If the transform is a decomposition transform
         # and the graph-based decomposition is enabled
