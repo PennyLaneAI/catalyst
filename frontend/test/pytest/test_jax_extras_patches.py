@@ -15,6 +15,7 @@
 
 from catalyst.jax_extras.patches import mock_attributes
 
+
 # pylint: disable=missing-class-docstring,missing-function-docstring
 class TestMockAttributes:
     """Test the mock_attributes function and MockAttributeWrapper class."""
