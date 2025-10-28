@@ -15,10 +15,10 @@
 #define DEBUG_TYPE "ppr-to-ppm"
 
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "QEC/IR/QECDialect.h"
-#include "QEC/Transforms/Passes.h"
 #include "QEC/Transforms/Patterns.h"
 
 using namespace llvm;
@@ -28,8 +28,8 @@ using namespace catalyst::qec;
 
 namespace catalyst {
 namespace qec {
-#define GEN_PASS_DEF_PPRTOPPMPASS
 #define GEN_PASS_DECL_PPRTOPPMPASS
+#define GEN_PASS_DEF_PPRTOPPMPASS
 #include "QEC/Transforms/Passes.h.inc"
 
 struct PPRToPPMPass : public impl::PPRToPPMPassBase<PPRToPPMPass> {
@@ -63,7 +63,4 @@ struct PPRToPPMPass : public impl::PPRToPPMPassBase<PPRToPPMPass> {
 };
 
 } // namespace qec
-
-std::unique_ptr<Pass> createPPRToPPMPass() { return std::make_unique<PPRToPPMPass>(); }
-
 } // namespace catalyst

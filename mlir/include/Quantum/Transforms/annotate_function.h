@@ -14,11 +14,9 @@
 #pragma once
 
 namespace catalyst {
-
 namespace quantum {
 
 static constexpr const char *hasInvalidGradientOp = "catalyst.invalidGradientOperation";
 
-}
-
+} // namespace quantum
 } // namespace catalyst

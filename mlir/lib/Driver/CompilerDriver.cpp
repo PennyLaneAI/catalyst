@@ -24,19 +24,6 @@
 #include <string_view>
 #include <unordered_map>
 
-#include "stablehlo/dialect/Register.h"
-#include "stablehlo/integrations/c/StablehloPasses.h"
-#include "stablehlo/transforms/Passes.h"
-#include "stablehlo/transforms/optimization/Passes.h"
-
-#include "mlir/IR/DialectRegistry.h"
-#include "mlir/InitAllDialects.h"
-#include "mlir/InitAllExtensions.h"
-#include "mlir/InitAllPasses.h"
-#include "mlir/Parser/Parser.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Support/FileUtilities.h"
-#include "mlir/Target/LLVMIR/Export.h"
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -57,9 +44,22 @@
 #include "llvm/Transforms/Coroutines/CoroSplit.h"
 #include "llvm/Transforms/IPO/GlobalDCE.h"
 
+#include "mlir/IR/DialectRegistry.h"
+#include "mlir/InitAllDialects.h"
+#include "mlir/InitAllExtensions.h"
+#include "mlir/InitAllPasses.h"
+#include "mlir/Parser/Parser.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Support/FileUtilities.h"
+#include "mlir/Target/LLVMIR/Export.h"
+
+#include "stablehlo/dialect/Register.h"
+#include "stablehlo/integrations/c/StablehloPasses.h"
+#include "stablehlo/transforms/Passes.h"
+#include "stablehlo/transforms/optimization/Passes.h"
+
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
-#include "Catalyst/Transforms/Passes.h"
 #include "Driver/CatalystLLVMTarget.h"
 #include "Driver/CompilerDriver.h"
 #include "Driver/Pipelines.h"
@@ -67,15 +67,13 @@
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientInterfaces.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
-#include "Gradient/Transforms/Passes.h"
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
-#include "Mitigation/Transforms/Passes.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
-#include "Quantum/Transforms/Passes.h"
+#include "RegisterAllPasses.h"
 
 #include "Enzyme.h"
 #include "Timer.hpp"
@@ -661,6 +659,11 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 {
     using timer = catalyst::utils::Timer;
 
+    OpPrintingFlags opPrintingFlags{};
+    if (options.useNameLocAsPrefix) {
+        opPrintingFlags.printNameLocAsPrefix();
+    }
+
     MLIRContext ctx(registry);
     ctx.printOpOnDiagnostic(true);
     ctx.printStackTraceOnDiagnostic(options.verbosity >= Verbosity::Debug);
@@ -738,7 +741,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
         output.outIR.clear();
         if (options.keepIntermediate) {
-            outIRStream << *mlirModule;
+            mlirModule->print(outIRStream, opPrintingFlags);
         }
         optTiming.stop();
     }
@@ -855,7 +858,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         // already handled
     }
     else if (output.outputFilename == "-" && mlirModule) {
-        outfile->os() << *mlirModule;
+        mlirModule->print(outfile->os(), opPrintingFlags);
         outfile->keep();
     }
 
@@ -944,6 +947,9 @@ int QuantumDriverMainFromCL(int argc, char **argv)
         "keep-intermediate", cl::desc("Keep intermediate files"), cl::init(false),
         cl::callback([&](const bool &) { SaveAfterEach.setValue(SaveTemps::AfterPipeline); }),
         cl::cat(CatalystCat));
+    cl::opt<bool> UseNameLocAsPrefix("use-nameloc-as-prefix",
+                                     cl::desc("Use name location as prefix"), cl::init(false),
+                                     cl::cat(CatalystCat));
     cl::opt<bool> AsyncQNodes("async-qnodes", cl::desc("Enable asynchronous QNodes"),
                               cl::init(false), cl::cat(CatalystCat));
     cl::opt<bool> Verbose("verbose", cl::desc("Set verbose"), cl::init(false),
@@ -971,8 +977,8 @@ int QuantumDriverMainFromCL(int argc, char **argv)
 
     // Create dialect registry
     DialectRegistry registry;
-    registerAllPasses();
-    registerAllCatalystPasses();
+    mlir::registerAllPasses();
+    catalyst::registerAllPasses();
     registerAllCatalystPipelines();
     mlirRegisterAllStablehloPasses();
     mlir::stablehlo::registerOptimizationPasses();
@@ -1014,6 +1020,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                             .diagnosticStream = errStream,
                             .keepIntermediate = SaveAfterEach,
                             .dumpModuleScope = DumpModuleScope,
+                            .useNameLocAsPrefix = UseNameLocAsPrefix,
                             .asyncQnodes = AsyncQNodes,
                             .verbosity = Verbose ? Verbosity::All : Verbosity::Urgent,
                             .pipelinesCfg = parsePipelines(CatalystPipeline),

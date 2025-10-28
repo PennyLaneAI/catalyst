@@ -75,8 +75,6 @@ def CliffordTToPPRPass : Pass<"to-ppr"> {
     let summary = "Convert quantum dialects to the QEC dialect.";
 
     let dependentDialects = [ "catalyst::qec::QECDialect" ];
-
-    let constructor = "catalyst::createLowerToQECPass()";
 }
 
 def CommutePPRPass : Pass<"commute-ppr"> {
@@ -85,8 +83,6 @@ def CommutePPRPass : Pass<"commute-ppr"> {
     let dependentDialects = [ "catalyst::qec::QECDialect" ];
 
     let options = [MaxPauliSizeOption];
-
-    let constructor = "catalyst::createCommutePPRPass()";
 }
 
 def MergePPRIntoPPMPass : Pass<"merge-ppr-ppm"> {
@@ -95,16 +91,12 @@ def MergePPRIntoPPMPass : Pass<"merge-ppr-ppm"> {
     let dependentDialects = [ "catalyst::qec::QECDialect" ];
 
     let options = [MaxPauliSizeOption];
-
-    let constructor = "catalyst::createMergePPRIntoPPMPass()";
 }
 
 def DecomposeNonCliffordPPRPass : Pass<"decompose-non-clifford-ppr"> {
     let summary = "Decompose non-Clifford PPRotation operations to set of Pauli Product Measurement operations.";
     
     let dependentDialects = [ "catalyst::qec::QECDialect", "scf::SCFDialect" ];
-
-    let constructor = "catalyst::createDecomposeNonCliffordPPRPass()";
 
     let options = [DecomposeMethodOption, AvoidYMeasureOption];
 }
@@ -115,16 +107,12 @@ def DecomposeCliffordPPRPass : Pass<"decompose-clifford-ppr"> {
     let dependentDialects = [ "catalyst::qec::QECDialect" ];
 
     let options = [AvoidYMeasureOption];
-
-    let constructor = "catalyst::createDecomposeCliffordPPRPass()";
 }
 
 def PPRToPPMPass : Pass<"ppr-to-ppm"> {
     let summary = "Convert CliffordT operations to Pauli Product Measurement operations.";
     
     let dependentDialects = [ "catalyst::qec::QECDialect" ];
-
-    let constructor = "catalyst::createPPRToPPMPass()";
 
     let options = [DecomposeMethodOption, AvoidYMeasureOption];
 }
@@ -134,33 +122,23 @@ def PPMCompilationPass : Pass<"ppm-compilation"> {
     
     let dependentDialects = [ "catalyst::qec::QECDialect" ];
 
-    let constructor = "catalyst::createPPMCompilationPass()";
-
     let options = [MaxPauliSizeOption, DecomposeMethodOption, AvoidYMeasureOption];
 }
 
 def CountPPMSpecsPass : Pass<"ppm-specs"> {
     let summary = "Count specs in Pauli Product Measurement operations.";
-    
-    let constructor = "catalyst::createCountPPMSpecsPass()";
 }
 
 def PartitionLayersPass : Pass<"partition-layers"> {
     let summary = "Partition layers of Pauli Product Measurement operations.";
-    
-    let constructor = "catalyst::createPartitionLayersPass()";
 }
 
 def TLayerReductionPass : Pass<"reduce-t-depth"> {
     let summary = "Reduce T layers to PPR operations.";
-    
-    let constructor = "catalyst::createTLayerReductionPass()";
 }
 
 def PPRToMBQCPass : Pass<"ppr-to-mbqc"> {
     let summary = "Convert PPR/PPM operations to MBQC operations.";
-
-    let constructor = "catalyst::createPPRToMBQCPass()";
 }
 
 #endif // QEC_PASSES
