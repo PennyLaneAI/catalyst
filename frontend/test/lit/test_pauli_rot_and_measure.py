@@ -18,11 +18,16 @@
 
 import numpy as np
 import pennylane as qml
+from pennylane.ftqc.catalyst_pass_aliases import (
+    commute_ppr,
+    merge_ppr_ppm,
+    ppm_compilation,
+    ppr_to_ppm,
+    to_ppr,
+)
 
-from pennylane.ftqc.catalyst_pass_aliases import commute_ppr, merge_ppr_ppm, ppm_compilation, ppr_to_ppm, to_ppr
-
-from catalyst import qjit, measure
 import catalyst.passes as catalyst_passes
+from catalyst import measure, qjit
 
 
 def test_single_qubit_pauli_rotations():
