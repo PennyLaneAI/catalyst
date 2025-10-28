@@ -1387,60 +1387,6 @@ def _measure_abstract_eval(qubit, postselect: int = None):
     return core.ShapedArray((), bool), qubit
 
 
-def measure_staging_rule(
-    jaxpr_trace, _src, qubit, postselect: int = None, _catalyst_init_tracers=None
-):
-    """
-    Custom staging rule for measure_p to ensure that pre-created tracers
-    from new_inner_tracer are properly used.
-
-    This is necessary in JAX 0.7 where the binding process creates new tracers,
-    but we need to use the tracers that were created during classical tracing
-    (in the measure() function via new_inner_tracer).
-
-    Args:
-        jaxpr_trace: The current DynamicJaxprTrace
-        _src: Source info
-        qubit: The qubit tracer to measure
-        postselect: Optional postselection value
-        _catalyst_init_tracers: Pre-created tracers from classical tracing (Catalyst-specific)
-                               Note: This only contains the boolean measurement result,
-                               not the qubit output
-    """
-    from catalyst.jax_extras.tracing import new_inner_tracer
-
-    # Define output shapes
-    out_shapes = (core.ShapedArray((), bool), qubit.aval)
-
-    # Input tracers
-    in_tracers = [qubit]
-
-    # Parameters (exclude _catalyst_init_tracers as it's not a primitive parameter)
-    params = {"postselect": postselect}
-
-    # JAX 0.7 FIX: measure_p has 2 outputs (bool, qubit), but _catalyst_init_tracers
-    # only contains 1 (the bool result). We need to create the qubit tracer and combine them
-    if _catalyst_init_tracers is not None and len(_catalyst_init_tracers) > 0:
-        # Create a tracer for the qubit output
-        qubit_out_tracer = new_inner_tracer(jaxpr_trace, qubit.aval)
-        # Combine: pre-created bool tracer + newly created qubit tracer
-        init_tracers = [_catalyst_init_tracers[0], qubit_out_tracer]
-
-        eqn, out_tracers = jaxpr_trace.make_eqn(
-            in_tracers, out_shapes, measure_p, params, [], None, out_tracers=init_tracers
-        )
-    else:
-        # Fallback to default behavior
-        eqn, out_tracers = jaxpr_trace.make_eqn(in_tracers, out_shapes, measure_p, params, [], None)
-
-    jaxpr_trace.frame.add_eqn(eqn)
-
-    return out_tracers
-
-
-pe.custom_staging_rules[measure_p] = measure_staging_rule
-
-
 @measure_p.def_impl
 def _measure_def_impl(ctx, qubit, postselect: int = None):  # pragma: no cover
     raise NotImplementedError()

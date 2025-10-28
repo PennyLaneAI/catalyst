@@ -52,12 +52,13 @@ logger.addHandler(logging.NullHandler())
 
 
 @debug_logger
-def jaxpr_to_mlir(func_name, jaxpr):
+def jaxpr_to_mlir(jaxpr, func_name, arg_names):
     """Lower a Jaxpr into an MLIR module.
 
     Args:
-        func_name(str): function name
         jaxpr(Jaxpr): Jaxpr code to lower
+        func_name(str): function name
+        arg_names(list[str]): list of argument names
 
     Returns:
         module: the MLIR module corresponding to ``func``
@@ -78,6 +79,7 @@ def jaxpr_to_mlir(func_name, jaxpr):
             effects=effects,
             platform="cpu",
             axis_context=axis_context,
+            arg_names=arg_names,
         )
 
     return module, context
@@ -93,6 +95,7 @@ def custom_lower_jaxpr_to_module(
     platform: str,
     axis_context: AxisContext,
     replicated_args=None,
+    arg_names=None,
     arg_shardings=None,
     result_shardings=None,
 ):
@@ -155,6 +158,7 @@ def custom_lower_jaxpr_to_module(
             in_avals=in_avals,
             main_function=False,
             replicated_args=replicated_args,
+            arg_names=arg_names,
             arg_shardings=arg_shardings,
             result_shardings=result_shardings,
         )
@@ -164,13 +168,15 @@ def custom_lower_jaxpr_to_module(
         while worklist:
             op = worklist.pop()
             func_name = str(op.name)
+            is_entry_point = func_name.startswith('"jit_')
+
+            if is_entry_point:
+                # Keep entry point functions public
+                op.attributes["sym_visibility"] = ir.StringAttr.get("public")
+                continue
             if isinstance(op, FuncOp):
-                if func_name.startswith('"jit_'):
-                    # Keep entry point functions public
-                    op.attributes["sym_visibility"] = ir.StringAttr.get("public")
-                else:
-                    # Set non-entry functions to internal linkage
-                    op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
+                # Set non-entry functions to internal linkage
+                op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
             if isinstance(op, ModuleOp):
                 worklist += [*op.body.operations]
 

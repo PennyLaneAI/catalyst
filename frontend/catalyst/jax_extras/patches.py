@@ -44,8 +44,14 @@ __all__ = (
 )
 
 
-def mock_attribute(obj, mock_attribute_name, mock_attribute_value):
-    """Mock the attribute of an object by returning a wrapper."""
+def mock_attributes(obj, attrs: dict[str, any]):
+    """Mock the attribute of an object by returning a wrapper.
+
+    Args:
+        obj: The object to mock the attributes of.
+        attrs: A dictionary of attributes to mock.
+            Example: {"attribute_name": attribute_value}
+    """
 
     class MockAttributeWrapper:
         """Wrapper to mock the attribute of an object."""
@@ -54,8 +60,8 @@ def mock_attribute(obj, mock_attribute_name, mock_attribute_value):
             self.original = original
 
         def __getattr__(self, name):
-            if name == mock_attribute_name:
-                return mock_attribute_value
+            if name in attrs:
+                return attrs[name]
             return getattr(self.original, name)
 
     return MockAttributeWrapper(obj)
@@ -66,9 +72,6 @@ def _drop_unused_vars2(
 ):  # pylint: disable=unused-argument
     """
     A patch to not drop unused vars during classical tracing of control flow.
-
-    This function matches the JAX 0.7 signature but doesn't actually drop any vars.
-    Returns the constvars and constvals unchanged (except converting constvals to list).
     """
     return constvars, list(constvals)
 
@@ -233,95 +236,40 @@ gather2_p = standard_primitive(
 )
 
 
-# TODO: Remove this patch when JAX/PennyLane are updated to use the new JAX 0.7+ API.
-# pylint: disable=protected-access
+# pylint: disable=protected-access, too-many-statements
 def patch_primitives():
-    """Patch PennyLane/JAX primitives to make them compatible with JAX 0.7+.
+    """Patch PennyLane/JAX primitives to make them compatible with JAX 0.7+."""
 
-    JAX 0.7+ requires all primitive parameters to be hashable, but PennyLane
-    passes **lists** for some parameters like control_values, jaxpr_branches, etc.
-    This patch wraps the bind method to convert lists to tuples to make them hashable.
-    """
-
-    def make_hashable(value):
-        """Recursively convert lists to tuples to make them hashable."""
-        if isinstance(value, list):
-            return tuple(make_hashable(item) for item in value)
-        return value
+    from jax._src.interpreters import partial_eval as pe  # pylint: disable=import-outside-toplevel
 
     try:
-        from pennylane.capture.primitives import ctrl_transform_prim
-        from pennylane.capture.primitives import cond_prim
-        from pennylane.ops.op_math.controlled import Controlled
-        from jax._src.interpreters import partial_eval as pe
-
-        original_ctrl_bind = ctrl_transform_prim.bind
-        original_cond_bind = cond_prim.bind
-        original_controlled_bind = Controlled._primitive.bind
         original_drop_unused_vars = pe._drop_unused_vars
 
-        def patched_ctrl_bind(*args, **kwargs):
-            # Convert control_values from list to tuple if present
-            if "control_values" in kwargs:
-                kwargs["control_values"] = make_hashable(kwargs["control_values"])
-            return original_ctrl_bind(*args, **kwargs)
-
-        def patched_cond_bind(*args, **kwargs):
-            # Convert list parameters to tuples
-            if "jaxpr_branches" in kwargs:
-                kwargs["jaxpr_branches"] = make_hashable(kwargs["jaxpr_branches"])
-            if "consts_slices" in kwargs:
-                kwargs["consts_slices"] = make_hashable(kwargs["consts_slices"])
-            return original_cond_bind(*args, **kwargs)
-
-        def patched_controlled_bind(*args, **kwargs):
-            # Convert control_values from list to tuple if present
-            if "control_values" in kwargs:
-                kwargs["control_values"] = make_hashable(kwargs["control_values"])
-            return original_controlled_bind(*args, **kwargs)
-
+        # ClosedJaxpr requires constvals to be a list
         def patched_drop_unused_vars(
             constvars, constvals, eqns=None, outvars=None
         ):  # pylint: disable=unused-argument
             constvars, constvals = original_drop_unused_vars(constvars, constvals, eqns, outvars)
             return constvars, list(constvals)
 
-        # Replace the bind method
-        ctrl_transform_prim.bind = patched_ctrl_bind
-        cond_prim.bind = patched_cond_bind
-        Controlled._primitive.bind = patched_controlled_bind
         pe._drop_unused_vars = patched_drop_unused_vars
 
-    except ImportError:
-        pass
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        print(f"Error patching primitives: {e}")
 
     # patch DynamicJaxprTrace members: makevar and getvar
     try:
-        from jax._src.interpreters import partial_eval as pe
-
-        def patched_makevar(self, tracer):
-            assert tracer.val is None, "a jaxpr variable must be created only once per tracer"
-            tracer.val = self.frame.newvar(tracer.aval)
-            return tracer.val
-
-        def patched_getvar(self, tracer):  # pylint: disable=unused-argument
-            if var := tracer.val:
-                return var
-            raise jax.core.escaped_tracer_error(tracer)
-
-        pe.DynamicJaxprTrace.makevar = patched_makevar
-        pe.DynamicJaxprTrace.getvar = patched_getvar
-
         # Patch make_eqn to handle both single aval and list of avals
-        # original_make_eqn = pe.DynamicJaxprTrace.make_eqn
-
-        import jax._src.source_info_util as source_info_util
-        from jax._src.core import JaxprEqnContext, Var
-        from jax._src.interpreters.partial_eval import DynamicJaxprTracer
-        from jax._src.interpreters.partial_eval import TracingEqn
-        from jax._src.interpreters.partial_eval import compute_on
+        # pylint: disable=import-outside-toplevel
+        from jax._src import source_info_util
         from jax._src import config
-        from jax._src.interpreters.partial_eval import xla_metadata_lib
+        from jax._src.core import JaxprEqnContext, Var
+        from jax._src.interpreters.partial_eval import (
+            DynamicJaxprTracer,
+            TracingEqn,
+            compute_on,
+            xla_metadata_lib,
+        )
 
         def internal_make_eqn(
             self,
@@ -349,7 +297,7 @@ def patch_primitives():
                 eqn = TracingEqn(in_tracers, outvars, primitive, params, effects, source_info, ctx)
                 return eqn, out_tracers
             else:
-                outvars = list(map(lambda aval: self.frame.newvar(aval), out_avals))
+                outvars = list(map(self.frame.newvar, out_avals))
                 if config.enable_checks.value:
                     assert all(isinstance(x, DynamicJaxprTracer) for x in in_tracers)
                     assert all(isinstance(v, Var) for v in outvars)
@@ -403,17 +351,9 @@ def patch_primitives():
 
         pe.DynamicJaxprTrace.make_eqn = patched_make_eqn
 
-        # Patch eqns property
-        def patched_eqns_getter(self):
-            return self.tracing_eqns
-
-        def patched_eqns_setter(self, value):
-            self.tracing_eqns = value
-
-        pe.JaxprStackFrame.eqns = property(patched_eqns_getter, patched_eqns_setter)
-
-        import jax._src.lax.lax as lax
-        import jax._src.core as core
+        # pylint: disable=import-outside-toplevel
+        from jax._src import core
+        from jax._src.lax import lax
 
         def patched_dyn_shape_staging_rule(trace, source_info, prim, out_aval, *args, **params):
             eqn, out_tracer = trace.make_eqn(

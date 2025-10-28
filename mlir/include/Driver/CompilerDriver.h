@@ -63,6 +63,8 @@ struct CompilerOptions {
     SaveTemps keepIntermediate;
     /// If true, the compiler will dump the module scope when saving intermediate files.
     bool dumpModuleScope;
+    /// Print SSA IDs using their name location, if provided, as prefix.
+    bool useNameLocAsPrefix;
     /// If true, the llvm.coroutine will be lowered.
     bool asyncQnodes;
     /// Sets the verbosity level to use when printing messages.
@@ -114,7 +116,8 @@ mlir::LogicalResult QuantumDriverMain(const catalyst::driver::CompilerOptions &o
 int QuantumDriverMainFromCL(int argc, char **argv);
 int QuantumDriverMainFromArgs(const std::string &source, const std::string &workspace,
                               const std::string &moduleName, bool keepIntermediate,
-                              bool asyncQNodes, bool verbose, bool lowerToLLVM,
+                              bool useNamelocAsPrefix, bool asyncQNodes, bool verbose,
+                              bool lowerToLLVM,
                               const std::vector<catalyst::driver::Pipeline> &passPipelines,
                               const std::string &checkpointStage,
                               catalyst::driver::CompilerOutput &output);
