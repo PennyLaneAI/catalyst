@@ -1049,7 +1049,7 @@ class TestCapture:
 
         assert jnp.allclose(circuit(0.1), capture_result)
 
-    def test_pass_with_args(self, backend):
+    def test_pass_with_options(self, backend):
         """Test the integration for a circuit with a pass that takes in options."""
 
         # Capture enabled
@@ -1057,9 +1057,9 @@ class TestCapture:
         qml.capture.enable()
 
         @qml.transform
-        def my_pass(tape):
+        def my_pass(_tape):
             """A dummy qml.transform."""
-            pass
+            return
 
         register_transform(my_pass, "my-pass", False)
 
