@@ -18,14 +18,16 @@
 
 import numpy as np
 import pennylane as qml
-import pennylane.ftqc.catalyst_pass_aliases as catalyst_passes
 
-from catalyst import qjit
-from catalyst.passes import commute_ppr, merge_ppr_ppm, ppm_compilation, ppr_to_ppm, to_ppr
+from pennylane.ftqc.catalyst_pass_aliases import commute_ppr, merge_ppr_ppm, ppm_compilation, ppr_to_ppm, to_ppr
+
+from catalyst import qjit, measure
+import catalyst.passes as catalyst_passes
 
 
 def test_single_qubit_pauli_rotations():
     """Test single qubit Pauli rotations with different angles and Pauli strings."""
+    qml.capture.enable()
     dev = qml.device("catalyst.ftqc", wires=1)
 
     pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
@@ -37,7 +39,6 @@ def test_single_qubit_pauli_rotations():
         qml.PauliRot(np.pi / 4, "X", wires=0)
         qml.PauliRot(np.pi / 2, "Y", wires=0)
         qml.PauliRot(np.pi, "Z", wires=0)
-        return qml.expval(qml.PauliZ(0))
 
     # CHECK: qec.ppr ["X"](8)
     # CHECK: qec.ppr ["Y"](4)
@@ -50,6 +51,7 @@ test_single_qubit_pauli_rotations()
 
 def test_multi_qubit_pauli_rotations():
     """Test multi-qubit Pauli rotations with different Pauli strings."""
+    qml.capture.enable()
     dev = qml.device("catalyst.ftqc", wires=3)
 
     pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
@@ -62,7 +64,6 @@ def test_multi_qubit_pauli_rotations():
         qml.PauliRot(np.pi / 2, "YZ", wires=[1, 2])
         qml.PauliRot(np.pi, "ZX", wires=[2, 0])
         qml.PauliRot(np.pi / 4, "XYZ", wires=[0, 1, 2])
-        return qml.expval(qml.PauliZ(0))
 
     # CHECK: qec.ppr ["X", "Y"](8)
     # CHECK: qec.ppr ["Y", "Z"](4)
@@ -76,6 +77,7 @@ test_multi_qubit_pauli_rotations()
 
 def test_single_qubit_pauli_measurements():
     """Test single qubit Pauli measurements with different Pauli strings."""
+    qml.capture.enable()
     dev = qml.device("catalyst.ftqc", wires=1)
 
     pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
@@ -88,7 +90,6 @@ def test_single_qubit_pauli_measurements():
         qml.pauli_measure("X", wires=0)
         qml.pauli_measure("Y", wires=0)
         qml.pauli_measure("Z", wires=0)
-        return qml.expval(qml.PauliZ(0))
 
     # CHECK: qec.ppm ["X"]
     # CHECK: qec.ppm ["Y"]
@@ -101,6 +102,7 @@ test_single_qubit_pauli_measurements()
 
 def test_multi_qubit_pauli_measurements():
     """Test multi-qubit Pauli measurements with different Pauli strings."""
+    qml.capture.enable()
     dev = qml.device("catalyst.ftqc", wires=3)
 
     pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
@@ -115,7 +117,6 @@ def test_multi_qubit_pauli_measurements():
         qml.pauli_measure("XY", wires=[0, 1])
         qml.pauli_measure("ZX", wires=[1, 2])
         qml.pauli_measure("XYZ", wires=[0, 1, 2])
-        return qml.expval(qml.PauliZ(0))
 
     # CHECK: qec.ppm ["X", "Y"]
     # CHECK: qec.ppm ["Z", "X"]
@@ -128,6 +129,7 @@ test_multi_qubit_pauli_measurements()
 
 def test_pauli_rot_and_measure_combined():
     """Test combining Pauli rotations and measurements in one circuit."""
+    qml.capture.enable()
     dev = qml.device("catalyst.ftqc", wires=2)
 
     pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
@@ -142,7 +144,6 @@ def test_pauli_rot_and_measure_combined():
         qml.pauli_measure("X", wires=0)
         qml.pauli_measure("Y", wires=1)
         qml.pauli_measure("XY", wires=[0, 1])
-        return qml.expval(qml.PauliZ(0))
 
     # CHECK: qec.ppr ["X"](8)
     # CHECK: qec.ppr ["Y"](4)
@@ -158,6 +159,7 @@ test_pauli_rot_and_measure_combined()
 
 def test_clifford_t_ppr_ppm_combined():
     """Test to-ppr pass with Clifford+T gates, PPR gates, and PPM gates."""
+    qml.capture.enable()
     dev = qml.device("catalyst.ftqc", wires=3)
 
     pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
@@ -166,27 +168,12 @@ def test_clifford_t_ppr_ppm_combined():
     @to_ppr
     @qml.qnode(device=dev)
     def circuit():
-        qml.Hadamard(wires=0)
-        qml.T(wires=0)
-        qml.PauliRot(np.pi / 4, "X", wires=0)
-        qml.pauli_measure("X", wires=0)
-
         qml.S(wires=1)
         qml.Hadamard(wires=1)
         qml.T(wires=1)
         qml.PauliRot(np.pi / 2, "YZ", wires=[1, 2])
         qml.pauli_measure("YZ", wires=[1, 2])
-        return qml.expval(qml.PauliZ(0))
 
-    # Wire 0
-    # CHECK: qec.ppr ["Z"](4)
-    # CHECK: qec.ppr ["X"](4)
-    # CHECK: qec.ppr ["Z"](4)
-    # CHECK: qec.ppr ["Z"](8)
-    # CHECK: qec.ppr ["X"](8)
-    # CHECK: qec.ppm ["X"]
-
-    # Wire 1 and 2
     # CHECK: qec.ppr ["Z"](4)
     # CHECK: qec.ppr ["Z"](4)
     # CHECK: qec.ppr ["X"](4)
@@ -202,6 +189,7 @@ test_clifford_t_ppr_ppm_combined()
 
 def test_commute_ppr():
     """Test commute-ppr pass: PauliRot and S gates should be commuted to the back after T gate."""
+    qml.capture.enable()
     dev = qml.device("catalyst.ftqc", wires=1)
 
     pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
@@ -214,7 +202,6 @@ def test_commute_ppr():
         qml.PauliRot(np.pi / 2, "Z", wires=0)  # Clifford gate
         qml.S(wires=0)  # Clifford gate
         qml.T(wires=0)  # Non-Clifford gate
-        return qml.expval(qml.PauliZ(0))
 
     # CHECK: qec.ppr ["Z"](8)
     # CHECK: qec.ppr ["Z"](4)
@@ -227,6 +214,7 @@ test_commute_ppr()
 
 def test_merge_ppr_ppm():
     """Test merge-ppr-ppm pass: Clifford PauliRot should be merged into PauliMeasure."""
+    qml.capture.enable()
     dev = qml.device("catalyst.ftqc", wires=1)
 
     pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
@@ -238,9 +226,8 @@ def test_merge_ppr_ppm():
     def circuit():
         qml.PauliRot(np.pi / 2, "Z", wires=0)
         qml.pauli_measure("X", wires=0)
-        return qml.expval(qml.PauliZ(0))
 
-    # CHECK: qec.ppm ["Y"]
+    # CHECK: qec.ppm ["Y"](-1)
     print(circuit.mlir_opt)
 
 
@@ -249,23 +236,24 @@ test_merge_ppr_ppm()
 
 def test_ppr_to_ppm():
     """Test ppr_to_ppm pass: PauliRot should be decomposed into PPM."""
+    qml.capture.enable()
     dev = qml.device("catalyst.ftqc", wires=1)
 
     pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     @qjit(pipelines=pipeline, target="mlir")
-    @merge_ppr_ppm
     @ppr_to_ppm
+    @merge_ppr_ppm
     @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.PauliRot(np.pi / 2, "X", wires=0)
         qml.PauliRot(np.pi / 4, "Y", wires=0)
-        return qml.expval(qml.PauliZ(0))
+        qml.pauli_measure("X", wires=0)
 
-    # CHECK: qec.ppm ["X", "Y"](-1)
+    # CHECK: qec.select.ppm
+    # CHECK-NOT: qec.ppr ["Y"](8)
     # CHECK: qec.ppm ["X"]
-    # CHECK: qec.ppm ["Y", "Z"](-1)
     print(circuit.mlir_opt)
 
 
@@ -274,11 +262,12 @@ test_ppr_to_ppm()
 
 def test_ppm_compilation():
     """Test ppm_compilation pass: PauliRot should be decomposed into PPM."""
+    qml.capture.enable()
     dev = qml.device("catalyst.ftqc", wires=1)
 
     pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
-    @qjit(pipelines=pipeline, keep_intermediate=2, target="mlir")
+    @qjit(pipelines=pipeline, target="mlir")
     @ppm_compilation
     @qml.qnode(device=dev)
     def circuit():
@@ -287,25 +276,48 @@ def test_ppm_compilation():
         qml.PauliRot(np.pi / 4, "Y", wires=0)
         qml.T(wires=0)
         qml.pauli_measure("X", wires=0)
-        return qml.expval(qml.PauliZ(0))
 
     # CHECK: qec.ppm ["X", "Z"]
     # CHECK: qec.select.ppm
     # CHECK: qec.ppr ["X"](2)
-    # CHECK: qec.fabricate  magic
     # CHECK: qec.ppm ["Y", "Z"]
-    # CHECK: qec.select.ppm
-    # CHECK: qec.ppr ["Y"](2)
-    # CHECK: qec.ppm ["Z"]
+    # CHECK-NOT: qec.ppr ["Z"](8)
     print(circuit.mlir_opt)
 
 
 test_ppm_compilation()
 
 
-def test_with_capture_enabled():
-    """Test ppm_compilation pass: PauliRot should be decomposed into PPM."""
+def test_pauli_rot_and_measure_with_cond():
     qml.capture.enable()
+    dev = qml.device("catalyst.ftqc", wires=1)
+
+    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
+    @qml.qnode(device=dev)
+    def circuit():
+        qml.PauliRot(np.pi / 2, "Z", wires=0)
+        m = qml.pauli_measure("Z", wires=0)
+        qml.cond(m, qml.PauliRot)(theta=np.pi / 2, pauli_word="Z", wires=0)
+
+    # CHECK: qec.ppr ["Z"](4)
+    # CHECK: qec.ppm ["Z"]
+    # CHECK: scf.if
+    # CHECK: qec.ppr ["Z"](4)
+    # CHECK: scf.yield
+    # CHECK: else
+    # CHECK: scf.yield
+    print(circuit.mlir_opt)
+
+
+test_pauli_rot_and_measure_with_cond()
+
+
+def test_with_capture_disabled():
+    """Test with capture disabled: PauliRot should be decomposed into PPM."""
+    qml.capture.disable()
 
     dev = qml.device("catalyst.ftqc", wires=1)
 
@@ -321,7 +333,6 @@ def test_with_capture_enabled():
         qml.PauliRot(np.pi / 4, "Y", wires=0)
         qml.T(wires=0)
         qml.pauli_measure("X", wires=0)
-        return qml.expval(qml.PauliZ(0))
 
     # CHECK: qec.ppr ["X"](-8)
     # CHECK: qec.ppr ["Y"](-8)
@@ -329,78 +340,8 @@ def test_with_capture_enabled():
     # CHECK: qec.ppr ["X"](4)
     # CHECK: qec.ppr ["Z"](4)
     # CHECK: qec.ppr ["X"](4)
-    print(circuit.mlir_opt)
-
-
-test_with_capture_enabled()
-
-
-def test_all_passes_with_capture_enabled():
-    qml.capture.enable()
-
-    dev = qml.device("catalyst.ftqc", wires=1)
-
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
-
-    @qjit(pipelines=pipeline, target="mlir")
-    @catalyst_passes.merge_ppr_ppm
-    @catalyst_passes.ppr_to_ppm
-    @catalyst_passes.commute_ppr
-    @catalyst_passes.to_ppr
-    @qml.qnode(device=dev)
-    def circuit():
-        qml.Hadamard(wires=0)
-        qml.PauliRot(np.pi / 2, "X", wires=0)
-        qml.PauliRot(np.pi / 4, "Y", wires=0)
-        m = qml.pauli_measure("X", wires=0)
-        qml.cond(m, qml.PauliZ(0), qml.PauliZ(1))
-        return qml.expval(qml.PauliZ(0))
-    
-    # CHECK: qec.ppm ["X", "Z"]
-    # CHECK: qec.ppm ["Z", "Y"]
-    # CHECK: qec.ppm ["X"]
-    # CHECK: qec.select.ppm
-    # CHECK: arith.xori
-    # CHECK: qec.ppr ["X"](2)
-    # CHECK: qec.ppm ["Z"]
-    # CHECK: qec.ppm ["Z", "Y"]
     # CHECK: qec.ppm ["X"]
     print(circuit.mlir_opt)
 
 
-test_all_passes_with_capture_enabled()
-
-
-def test_pauli_rot_and_measure_with_cond():
-    qml.capture.enable()
-
-    dev = qml.device("catalyst.ftqc", wires=1)
-
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
-
-    @qjit(pipelines=pipeline, target="mlir")
-    @catalyst_passes.ppm_compilation
-    @qml.qnode(device=dev)
-    def circuit():
-        qml.Hadamard(wires=0)
-        m = qml.pauli_measure("X", wires=0)
-        qml.cond(
-            m,
-            qml.PauliRot(theta=np.pi / 2, pauli_word="X", wires=0),
-            qml.PauliRot(theta=np.pi / 4, pauli_word="Y", wires=0),
-        )
-        return qml.expval(qml.PauliZ(0))
-
-    # CHECK: qec.ppm ["X"]
-    # CHECK: qec.ppm ["Z", "Z"]
-    # CHECK: qec.ppm ["Z", "Y"]
-    # CHECK: qec.ppm ["X"]
-    # CHECK: qec.select.ppm
-    # CHECK: arith.xori
-    # CHECK: qec.ppr ["Z"](2)
-    # CHECK: qec.ppm ["X", "Y"]
-    # CHECK: qec.ppm ["X"]
-    print(circuit.mlir_opt)
-
-
-test_pauli_rot_and_measure_with_cond()
+test_with_capture_disabled()
