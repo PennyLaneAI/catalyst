@@ -30,8 +30,8 @@ using namespace catalyst::qec;
 namespace catalyst {
 namespace qec {
 
-#define GEN_PASS_DEF_PPMCOMPILATIONPASS
 #define GEN_PASS_DECL_PPMCOMPILATIONPASS
+#define GEN_PASS_DEF_PPMCOMPILATIONPASS
 #include "QEC/Transforms/Passes.h.inc"
 
 struct PPMCompilationPass : public impl::PPMCompilationPassBase<PPMCompilationPass> {
@@ -104,7 +104,4 @@ struct PPMCompilationPass : public impl::PPMCompilationPassBase<PPMCompilationPa
 };
 
 } // namespace qec
-
-std::unique_ptr<Pass> createPPMCompilationPass() { return std::make_unique<PPMCompilationPass>(); }
-
 } // namespace catalyst

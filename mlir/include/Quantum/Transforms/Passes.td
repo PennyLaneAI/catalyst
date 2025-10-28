@@ -31,16 +31,12 @@ def QuantumConversionPass : Pass<"convert-quantum-to-llvm"> {
     ];
 
     let dependentDialects = ["LLVM::LLVMDialect"];
-
-    let constructor = "catalyst::createQuantumConversionPass()";
 }
 
 def EmitCatalystPyInterfacePass : Pass<"emit-catalyst-py-interface"> {
     let summary = "Emit catalyst python's default interface.";
 
     let dependentDialects = ["LLVM::LLVMDialect"];
-
-    let constructor = "catalyst::createEmitCatalystPyInterfacePass()";
 }
 
 def CopyGlobalMemRefPass : Pass<"cp-global-memref"> {
@@ -52,8 +48,6 @@ def CopyGlobalMemRefPass : Pass<"cp-global-memref"> {
         "scf::SCFDialect",
         "LLVM::LLVMDialect"
     ];
-
-    let constructor = "catalyst::createCopyGlobalMemRefPass()";
 }
 
 def AdjointLoweringPass : Pass<"adjoint-lowering"> {
@@ -66,8 +60,6 @@ def AdjointLoweringPass : Pass<"adjoint-lowering"> {
         "complex::ComplexDialect",
         "scf::SCFDialect"
     ];
-
-    let constructor = "catalyst::createAdjointLoweringPass()";
 }
 
 def AnnotateFunctionPass : Pass<"annotate-function"> {
@@ -77,14 +69,10 @@ def AnnotateFunctionPass : Pass<"annotate-function"> {
         "catalyst::CatalystDialect",
         "func::FuncDialect"
     ];
-
-    let constructor = "catalyst::createAnnotateFunctionPass()";
 }
 
 def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let summary = "Given a qnode containing multiple tapes, split each tape into its own function.";
-
-    let constructor = "catalyst::createSplitMultipleTapesPass()";
 }
 
 // ----- Quantum circuit transformation passes begin ----- //
@@ -92,34 +80,25 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
 
 def IonsDecompositionPass : Pass<"ions-decomposition"> {
     let summary = "Decompose the gates to the set {RX, RY, MS}";
-
-    let constructor = "catalyst::createIonsDecompositionPass()";
 }
 
 def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
     let summary = "Perform removal of chained operations that are self inverses.";
-
-    let constructor = "catalyst::createRemoveChainedSelfInversePass()";
 }
 
 def MergeRotationsPass : Pass<"merge-rotations"> {
     let summary = "Perform merging of chained rotation gates about the same axis.";
 
     let dependentDialects = ["math::MathDialect"];
-
-    let constructor = "catalyst::createMergeRotationsPass()";
 }
 
 def DecomposeLoweringPass : Pass<"decompose-lowering"> {
     let summary = "Replace quantum operations with compiled decomposition rules.";
-
-    let constructor = "catalyst::createDecomposeLoweringPass()";
 }
 
 def DisentangleCNOTPass : Pass<"disentangle-CNOT"> {
     let summary = "Replace a CNOT gate with two single qubit gates whenever possible.";
 
-    let constructor = "catalyst::createDisentangleCNOTPass()";
     let options = [
     Option<"EmitFSMStateRemark", "emit-FSM-state-remark",
            "bool", /*default=*/"false",
@@ -130,7 +109,6 @@ def DisentangleCNOTPass : Pass<"disentangle-CNOT"> {
 def DisentangleSWAPPass : Pass<"disentangle-SWAP"> {
     let summary = "Replace a SWAP gate with single qubit gates and a shorter SWAPZ gates whenever possible.";
 
-    let constructor = "catalyst::createDisentangleSWAPPass()";
     let options = [
     Option<"EmitFSMStateRemark", "emit-FSM-state-remark",
            "bool", /*default=*/"false",
@@ -140,8 +118,6 @@ def DisentangleSWAPPass : Pass<"disentangle-SWAP"> {
 
 def LoopBoundaryOptimizationPass : Pass<"loop-boundary"> {
     let summary = "Perform loop boundary optimization to eliminate the redundancy of operations on loop boundary.";
-
-    let constructor = "catalyst::createLoopBoundaryOptimizationPass()";
 }
 // ----- Quantum circuit transformation passes end ----- //
 
