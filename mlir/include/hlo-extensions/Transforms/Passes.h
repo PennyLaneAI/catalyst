@@ -14,14 +14,14 @@
 
 #pragma once
 
-#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Pass/Pass.h"
 
 namespace catalyst {
+namespace hlo_extensions {
 
-void populateScatterPatterns(mlir::RewritePatternSet &);
+#define GEN_PASS_DECL
+#define GEN_PASS_REGISTRATION
+#include "hlo-extensions/Transforms/Passes.h.inc"
 
-void populateHloCustomCallPatterns(mlir::RewritePatternSet &);
-
+} // namespace hlo_extensions
 } // namespace catalyst

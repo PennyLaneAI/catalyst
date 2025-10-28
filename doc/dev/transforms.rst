@@ -14,7 +14,8 @@ below for further information beyond this document.
 
 - `The structure and elements of the MLIR program representation <https://mlir.llvm.org/docs/LangRef/>`_.
 
-- `Understand the relationship of IR objects, and how they can be used to traverse the IR <https://mlir.llvm.org/docs/Tutorials/UnderstandingTheIRStructure/>`_.
+- `Understand the relationship of IR objects, and how they can be used to traverse the IR
+  <https://mlir.llvm.org/docs/Tutorials/UnderstandingTheIRStructure/>`_.
 
 - `Documentation on general MLIR transformations (or "passes") <https://mlir.llvm.org/docs/PassManagement/>`_.
 
@@ -105,19 +106,23 @@ If this is your first time writing an MLIR pass, the boilerplate can be quite ov
 Let's first set up the various boilerplate items required to register and run a new pass. 
 
 We'll create an empty pass in the ``Catalyst`` dialect that just prints out hello world to stdout.
-Note that the ``mlir/include`` and ``mlir/lib`` directories consists of all the available dialects, so if you want to write a new pass in another dialect, it should be added to the subdirectory of that dialect.
+Note that the ``mlir/include`` and ``mlir/lib`` directories consist of all the available dialects,
+so if you want to write a new pass in another dialect, it should be added to the subdirectory of that dialect.
 
-The first thing to do is to create the pass object in the `tablegen <https://mlir.llvm.org/docs/PassManagement/#tablegen-specification>`_ ``mlir/include/Catalyst/Transforms/Passes.td``:
+The first thing to do is to create the pass object in the `tablegen <https://mlir.llvm.org/docs/PassManagement/#tablegen-specification>`_
+``mlir/include/Catalyst/Transforms/Passes.td``:
 
 .. code-block::
 
     def MyHelloWorldPass : Pass<"my-hello-world"> {
         let summary = "An empty pass boilerplate that prints out hello world.";
-
-        let constructor = "catalyst::createMyHelloWorldPass()";
     }
 
-When the dialect is built, this tablegen def will be built to a C++ file ``mlir/build/include/Catalyst/Transforms/Passes.h.inc``, containing the newly defined object called ``MyHelloWorldPassBase``, alongside the various necessary boilerplate methods in the MLIR infrastructure. 
+When the dialect is built, this tablegen def will be built to a C++ file ``mlir/build/include/Catalyst/Transforms/Passes.h.inc``,
+containing the newly defined object called ``MyHelloWorldPassBase``,
+alongside the various necessary boilerplate methods in the MLIR infrastructure.
+For example, a ``registerMyHelloWorldPass()`` call will be added to the ``registerCatalystPasses`` function,
+and a ``createMyHelloWorldPass`` function will be declared and defined to create the pass.
 Tablegen is designed such that we don't have to write all that boilerplate ourselves. 
 
 Now we write the pass itself. Create a new file ``mlir/lib/Catalyst/Transforms/MyHelloWorldPass.cpp`` with the following content:
@@ -126,17 +131,20 @@ Now we write the pass itself. Create a new file ``mlir/lib/Catalyst/Transforms/M
 
     #define DEBUG_TYPE "myhelloworld"
 
-    #include "Catalyst/IR/CatalystDialect.h"
-    #include "mlir/Pass/Pass.h"
     #include "llvm/Support/Debug.h"
+
+    #include "mlir/Pass/Pass.h"
+
+    #include "Catalyst/IR/CatalystDialect.h"
 
     using namespace llvm;
     using namespace mlir;
     using namespace catalyst;
 
     namespace catalyst {
-    #define GEN_PASS_DEF_MYHELLOWORLDPASS
+
     #define GEN_PASS_DECL_MYHELLOWORLDPASS
+    #define GEN_PASS_DEF_MYHELLOWORLDPASS
     #include "Catalyst/Transforms/Passes.h.inc"
 
     struct MyHelloWorldPass : public impl::MyHelloWorldPassBase<MyHelloWorldPass> {
@@ -145,17 +153,22 @@ Now we write the pass itself. Create a new file ``mlir/lib/Catalyst/Transforms/M
         void runOnOperation() override { llvm::errs() << "Hello world!\n"; }
     };
 
-    std::unique_ptr<Pass> createMyHelloWorldPass() { return std::make_unique<MyHelloWorldPass>(); }
-
     } // namespace catalyst
 
-We make the pass object ``MyHelloWorldPass``, which inherits from the base class ``MyHelloWorldPassBase`` that tablegen will build in the namespace ``impl``. 
-The function that determines what your pass actually does is the ``void runOnOperation()``. Currently, all this pass does is print out ``"Hello world!\n"``.
+We make the pass object ``MyHelloWorldPass``, which inherits from the base class ``MyHelloWorldPassBase``
+that tablegen will build in the namespace ``impl``.
+The function that determines what your pass actually does is the ``void runOnOperation()``.
+Currently, all this pass does is print out ``"Hello world!\n"``.
+Note that the ``GEN_PASS_DECL_...PASS`` macro definitions are used to enable additional declarations,
+such as pass options, and thus may not always be needed.
 
-(A sidenote on printing messages in MLIR: there are two major printing options in LLVM. The `more standard one <https://llvm.org/docs/ProgrammersManual.html#the-llvm-debug-macro-and-debug-option>`_ is ``dbgs()``, which only prints when a debug flag is set. 
+(A sidenote on printing messages in MLIR: there are two major printing options in LLVM.
+The `more standard one <https://llvm.org/docs/ProgrammersManual.html#the-llvm-debug-macro-and-debug-option>`_ is ``dbgs()``,
+which only prints when a debug flag is set.
 The other option is the ``errs()`` used here, which will print no matter what.)
 
-This new C++ file needs to be added to the ``mlir/lib/Catalyst/Transforms/CMakeLists.txt`` file (or the CMakeLists.txt of whichever directory that has your new pass file): 
+This new C++ file needs to be added to the ``mlir/lib/Catalyst/Transforms/CMakeLists.txt`` file
+(or the CMakeLists.txt of whichever directory that has your new pass file):
 
 .. code-block::
 
@@ -164,37 +177,16 @@ This new C++ file needs to be added to the ``mlir/lib/Catalyst/Transforms/CMakeL
         MyHelloWorldPass.cpp
     )
 
-After writing the pass, we need to register it in a few places. In ``mlir/include/Catalyst/Transforms/Passes.h``, add the method 
-
-.. code-block:: cpp
-
-    namespace catalyst {
-        ...
-        std::unique_ptr<mlir::Pass> createMyHelloWorldPass();
-        ...
-    }
-
-And in ``mlir/lib/Catalyst/Transforms/RegisterAllPasses.cpp``, register the pass via 
-
-.. code-block:: cpp
-
-    void catalyst::registerAllCatalystPasses()
-    {
-        ...
-        mlir::registerPass(catalyst::createMyHelloWorldPass);
-        ...
-    }
-
-Note that this addition in ``RegisterAllPasses.cpp`` needs to happen in the ``lib/Catalyst/Transforms`` directory, regardless of which dialect your pass belongs to.
-
-Now that we have written our shiny new pass, we can build it by going back to the top-level ``catalyst`` directory and call the command line instruction
+Now that we have written our shiny new pass, we can build it by going back to the top-level ``catalyst`` directory and
+call the command line instruction
 
 .. code-block::
 
     make dialects
 
 The tool to run passes is the executable ``quantum-opt`` at the location ``mlir/build/bin/quantum-opt``.
-Since this is an executable, it needs to be invoked as ``./quantum-opt`` instead of just plain ``quantum-opt`` (if you are in the ``mlir/build/bin`` directory; otherwise supply the full path).
+Since this is an executable, it needs to be invoked as ``./quantum-opt`` instead of just plain ``quantum-opt``
+(if you are in the ``mlir/build/bin`` directory; otherwise supply the full path).
 Alternatively, you can add ``quantum-opt``'s directory to your ``PATH`` by having the following in your ``.zshrc`` or ``.bashrc``:
 
 .. code-block::
@@ -213,7 +205,8 @@ We can inspect by all the available passes by running ``quantum-opt --help``:
         ...
         --my-hello-world                   -   An empty pass boilerplate that prints out hello world.
 
-Here the displayed ``--help`` message will be the ``summary`` we wrote in the tablegen file. The command line option to run our new pass is the template string in the def line in the tablegen file. 
+Here the displayed ``--help`` message will be the ``summary`` we wrote in the tablegen file.
+The command line option to run our new pass is the template string in the def line in the tablegen file.
 
 To run the pass, simply do 
 
