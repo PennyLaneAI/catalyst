@@ -116,8 +116,8 @@ frontend:
 	# Uninstall pennylane before updating Catalyst, since pip will not replace two development
 	# versions of a package with the same version tag (e.g. 0.38-dev0).
 	$(PYTHON) -m pip uninstall -y pennylane
-	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
 	$(PYTHON) -m pip install git+https://github.com/PennyLaneAI/pennylane@bump-jax-to-0.7.0
+	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
 	rm -r frontend/pennylane_catalyst.egg-info
 
 .PHONY: mlir llvm stablehlo enzyme dialects runtime oqc
