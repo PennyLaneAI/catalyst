@@ -59,9 +59,7 @@ def mock_attributes(obj, attrs: dict[str, any]):
             self.original = original
 
         def __getattr__(self, name):
-            if name in attrs:
-                return attrs[name]
-            return getattr(self.original, name)
+            return attrs.get(name, getattr(self.original, name))
 
     return MockAttributeWrapper(obj)
 
