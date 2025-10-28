@@ -369,14 +369,10 @@ def patch_primitives():
     # patch pjit.py
     try:
         # pylint: disable=import-outside-toplevel
-        from jax._src import core
-        from jax._src import config
-        from jax._src import source_info_util
-        from jax._src.sharding_impls import UnspecifiedValue
+        from jax._src import config, core, source_info_util
         from jax._src.interpreters import pxla
-        from jax._src.pjit import _pjit_forwarding, _out_type, jit_p
-        from jax._src.sharding_impls import UNSPECIFIED
-        import jax._src.interpreters.partial_eval as pe
+        from jax._src.pjit import _out_type, _pjit_forwarding, jit_p
+        from jax._src.sharding_impls import UNSPECIFIED, UnspecifiedValue
 
         def patched_pjit_staging_rule(trace, source_info, *args, **params):
             if params["compiler_options_kvs"]:
