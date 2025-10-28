@@ -308,7 +308,7 @@ The following target runs all available test suites with the default execution d
 
   make test
 
-You can also test each module separately by using running the ``test-frontend``,
+You can also test each module separately by running the ``test-frontend``,
 ``test-dialects``, and ``test-runtime`` targets instead.
 Alternately, the ``test-frontend`` target can be broken up into two subsets,
 ``make pytest`` and ``make lit``, where the pytest suite
@@ -445,14 +445,14 @@ Known Issues
 
       In some mac setups, it's possible that certain Catalyst libraries are compiled with a
       different OSX deployment version than what Catalyst uses when compiling a user program.
-      You may see the following *warning* in that case when using Catalyst:
+      In this case, you may see a *warning* like the following when using Catalyst:
 
       .. code-block:: console
 
         ld: warning: building for macOS-15.0, but linking with dylib '@rpath/libcustom_calls.so' which was built for newer version 15.7
 
-      While this warning does not prevent using Catalyst, if you would like to eliminate it set the
-      following variable (adjust value as need to the warning you see):
+      While this warning does not prevent using Catalyst, if you would like to eliminate it, set the
+      following environment variable (adjust the value as needed given the warning you see):
 
       .. code-block:: console
 
