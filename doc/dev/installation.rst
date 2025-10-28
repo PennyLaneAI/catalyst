@@ -310,8 +310,8 @@ The following target runs all available test suites with the default execution d
 
 You can also test each module separately by using running the ``test-frontend``,
 ``test-dialects``, and ``test-runtime`` targets instead.
-Alternately, ``make pytest`` (a subset of ``test-frontend``) and ``make lit`` (a combination of
-subsets from ``test-frontend`` and ``test-dialects``) are also available, where the pytest suite
+Alternately, the ``test-frontend`` target can be broken up into two subsets,
+``make pytest`` and ``make lit``, where the pytest suite
 can be considered the "core" (and most important) test set.
 Jupyter Notebook demos are also testable via ``test-demos``.
 
