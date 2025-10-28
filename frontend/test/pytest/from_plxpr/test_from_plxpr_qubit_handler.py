@@ -45,6 +45,7 @@ from jax.interpreters.partial_eval import DynamicJaxprTrace
 
 from catalyst.from_plxpr.qubit_handler import QubitHandler, QubitIndexRecorder
 from catalyst.jax_primitives import AbstractQbit, AbstractQreg, qalloc_p, qextract_p
+from catalyst.jax_tracer import _get_eqn_from_tracing_eqn
 from catalyst.utils.exceptions import CompileError
 
 
@@ -239,9 +240,7 @@ class TestQubitValues:
         assert qubit_handler[0] is new_qubit
         with take_current_trace() as trace:
             # Check that an extract primitive is added
-            last_eqn = trace.frame.tracing_eqns[-1]
-            if callable(last_eqn):
-                last_eqn = last_eqn()
+            last_eqn = _get_eqn_from_tracing_eqn(trace.frame.tracing_eqns[-1])
             assert last_eqn.primitive is qextract_p
 
             # Check that the extract primitive follows the wire index in the qreg manager
@@ -279,9 +278,7 @@ class TestQubitValues:
 
         # Also check with actual jaxpr variables
         with take_current_trace() as trace:
-            last_eqn = trace.frame.tracing_eqns[-1]
-            if callable(last_eqn):
-                last_eqn = last_eqn()
+            last_eqn = _get_eqn_from_tracing_eqn(trace.frame.tracing_eqns[-1])
             gate_out_qubits = last_eqn.outvars
             assert qubit_handler[0].val == gate_out_qubits[0]
             assert qubit_handler[1].val == gate_out_qubits[1]
@@ -324,9 +321,7 @@ class TestQubitValues:
 
         # Also check with actual jaxpr variables
         with take_current_trace() as trace:
-            last_eqn = trace.frame.tracing_eqns[-1]
-            if callable(last_eqn):
-                last_eqn = last_eqn()
+            last_eqn = _get_eqn_from_tracing_eqn(trace.frame.tracing_eqns[-1])
             gate_out_qubits = last_eqn.outvars
             assert qubit_handler[0].val == gate_out_qubits[0]
             assert qubit_handler[1].val == gate_out_qubits[1]
