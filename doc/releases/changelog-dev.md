@@ -21,9 +21,6 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Update deprecated usage of the `Operator` property `is_hermitian`.
-  [(#2157)](https://github.com/PennyLaneAI/catalyst/pull/2157)
-
 * Refactor Catalyst pass registering so that it's no longer necessary to manually add new
   passes at `registerAllCatalystPasses`.
   [(#1984)](https://github.com/PennyLaneAI/catalyst/pull/1984)
