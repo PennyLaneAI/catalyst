@@ -38,6 +38,7 @@ from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
 from jaxlib.hlo_helpers import shape_dtype_to_ir_type
+from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from jaxlib.mlir.dialects.arith import (
     AddIOp,
     CeilDivSIOp,
@@ -51,54 +52,83 @@ from jaxlib.mlir.dialects.func import FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
-from mlir_quantum.dialects.catalyst import (
-    AssertionOp,
-    CallbackCallOp,
-    CallbackOp,
-    PrintOp,
-)
-from mlir_quantum.dialects.gradient import (
-    CustomGradOp,
-    ForwardOp,
-    GradOp,
-    JVPOp,
-    ReverseOp,
-    ValueAndGradOp,
-    VJPOp,
-)
-from mlir_quantum.dialects.mbqc import MeasureInBasisOp
-from mlir_quantum.dialects.mitigation import ZneOp
-from mlir_quantum.dialects.quantum import (
-    AdjointOp,
-    AllocOp,
-    ComputationalBasisOp,
-    CountsOp,
-    CustomOp,
-    DeallocOp,
-    DeallocQubitOp,
-    DeviceInitOp,
-    DeviceReleaseOp,
-    ExpvalOp,
-    ExtractOp,
-    GlobalPhaseOp,
-    HamiltonianOp,
-    HermitianOp,
-    InsertOp,
-    MeasureOp,
-    MultiRZOp,
-    NamedObsOp,
-    NumQubitsOp,
-    PCPhaseOp,
-    ProbsOp,
-    QubitUnitaryOp,
-    SampleOp,
-    SetBasisStateOp,
-    SetStateOp,
-    StateOp,
-    TensorOp,
-    VarianceOp,
-)
-from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
+
+# Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
+# Catalyst's MLIR version and the MLIR version used by JAX. The current JAX version has not
+# yet updated to the latest MLIR, causing compatibility issues. This workaround will be removed
+# once JAX updates to a compatible MLIR version
+# pylint: disable=ungrouped-imports
+from catalyst.jax_extras.patches import mock_attributes
+from catalyst.utils.patching import Patcher
+
+with Patcher(
+    (
+        _ods_cext,
+        "globals",
+        mock_attributes(
+            # pylint: disable=c-extension-no-member
+            _ods_cext.globals,
+            {"register_traceback_file_exclusion": lambda x: None},
+        ),
+    ),
+):
+    from mlir_quantum.dialects.catalyst import (
+        AssertionOp,
+        CallbackCallOp,
+        CallbackOp,
+        PrintOp,
+    )
+    from mlir_quantum.dialects.gradient import (
+        CustomGradOp,
+        ForwardOp,
+        GradOp,
+        JVPOp,
+        ReverseOp,
+        ValueAndGradOp,
+        VJPOp,
+    )
+    from mlir_quantum.dialects.mbqc import MeasureInBasisOp
+    from mlir_quantum.dialects.mitigation import ZneOp
+    from mlir_quantum.dialects.quantum import (
+        AdjointOp,
+        AllocOp,
+        ComputationalBasisOp,
+        CountsOp,
+        CustomOp,
+        DeallocOp,
+        DeallocQubitOp,
+        DeviceInitOp,
+        DeviceReleaseOp,
+        ExpvalOp,
+        ExtractOp,
+        GlobalPhaseOp,
+        HamiltonianOp,
+        HermitianOp,
+        InsertOp,
+        MeasureOp,
+        MultiRZOp,
+        NamedObsOp,
+        NumQubitsOp,
+        PCPhaseOp,
+        ProbsOp,
+        QubitUnitaryOp,
+        SampleOp,
+        SetBasisStateOp,
+        SetStateOp,
+        StateOp,
+        TensorOp,
+        VarianceOp,
+    )
+    from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
+    from catalyst.jax_primitives_utils import (
+        cache,
+        create_call_op,
+        get_cached,
+        get_call_jaxpr,
+        get_symbolref,
+        lower_callable,
+        lower_jaxpr,
+    )
 
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
@@ -109,19 +139,9 @@ from catalyst.jax_extras import (
     infer_output_type_jaxpr,
     while_loop_expansion_strategy,
 )
-from catalyst.jax_primitives_utils import (
-    cache,
-    create_call_op,
-    get_cached,
-    get_call_jaxpr,
-    get_symbolref,
-    lower_callable,
-    lower_jaxpr,
-)
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
-from catalyst.utils.patching import Patcher
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
 # pylint: disable=unused-argument,too-many-lines,too-many-statements,protected-access
