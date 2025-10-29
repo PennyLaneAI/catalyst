@@ -34,11 +34,12 @@ class FTQCDevice(Device):
     def get_c_interface():
         """Returns a tuple consisting of the device name, and
         the location to the shared object with the C/C++ device implementation.
-        """
-        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
-        lib_path = get_lib_path("ftqc_runtime", "FTQC_LIB_DIR") + "/librtd_ftqc" + system_extension
 
-        return "ftqc", lib_path
+        Note: This is a dummy implementation. The second return value should be a path to the library,
+        but we don't actually have a C++ implementation for this, so we just return the config filepath.
+        """
+
+        return "ftqc", FTQCDevice.config_filepath
 
     def __init__(self, wires, **kwargs):
         super().__init__(wires=wires, **kwargs)
