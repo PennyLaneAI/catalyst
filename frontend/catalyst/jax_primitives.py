@@ -39,6 +39,7 @@ from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
 from jaxlib.hlo_helpers import shape_dtype_to_ir_type
+from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from jaxlib.mlir.dialects.arith import (
     AddIOp,
     CeilDivSIOp,
@@ -59,7 +60,6 @@ from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 # once JAX updates to a compatible MLIR version
 # pylint: disable=ungrouped-imports
 from catalyst.jax_extras.patches import mock_attributes
-from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from catalyst.utils.patching import Patcher
 
 with Patcher(
