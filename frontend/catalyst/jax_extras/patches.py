@@ -40,7 +40,10 @@ __all__ = (
     "_no_clean_up_dead_vars",
     "_gather_shape_rule_dynamic",
     "gather2_p",
-    "patch_primitives",
+    "get_patched_drop_unused_vars",
+    "get_patched_make_eqn",
+    "get_patched_dyn_shape_staging_rule",
+    "get_patched_pjit_staging_rule",
 )
 
 
@@ -236,13 +239,16 @@ gather2_p = standard_primitive(
 )
 
 
-# pylint: disable=protected-access, too-many-statements
-def patch_primitives():
-    """Patch PennyLane/JAX primitives to make them compatible with JAX 0.7+."""
+# pylint: disable=protected-access
+def get_patched_drop_unused_vars():
+    """Get patched _drop_unused_vars for ClosedJaxpr compatibility.
 
-    from jax._src.interpreters import partial_eval as pe  # pylint: disable=import-outside-toplevel
-
+    Returns:
+        Patched function or None if patch fails.
+    """
     try:
+        import jax._src.interpreters.partial_eval as pe  # pylint: disable=import-outside-toplevel
+
         original_drop_unused_vars = pe._drop_unused_vars
 
         # ClosedJaxpr requires constvals to be a list
@@ -252,12 +258,19 @@ def patch_primitives():
             constvars, constvals = original_drop_unused_vars(constvars, constvals, eqns, outvars)
             return constvars, list(constvals)
 
-        pe._drop_unused_vars = patched_drop_unused_vars
+        return patched_drop_unused_vars
 
     except Exception as e:  # pylint: disable=broad-exception-caught
-        print(f"Error patching primitives: {e}")
+        print(f"Error preparing drop_unused_vars patch: {e}")
+        return None
 
-    # patch DynamicJaxprTrace members: makevar and getvar
+
+def get_patched_make_eqn():
+    """Get patched make_eqn for DynamicJaxprTrace to handle single aval and list of avals.
+
+    Returns:
+        Patched function or None if patch fails.
+    """
     try:
         # Patch make_eqn to handle both single aval and list of avals
         # pylint: disable=import-outside-toplevel
@@ -270,45 +283,7 @@ def patch_primitives():
             xla_metadata_lib,
         )
 
-        def internal_make_eqn(
-            self,
-            in_tracers,
-            out_avals,
-            primitive,
-            params,
-            effects,
-            source_info=None,
-            ctx=None,
-            out_tracers=None,
-        ):
-            source_info = source_info or source_info_util.new_source_info()
-            ctx = ctx or JaxprEqnContext(
-                compute_on.current_compute_type(),
-                config.threefry_partitionable.value,
-                xla_metadata_lib.current_xla_metadata(),
-            )
-
-            if out_tracers is not None:
-                outvars = [tracer.val for tracer in out_tracers]
-                if config.enable_checks.value:
-                    assert all(isinstance(x, DynamicJaxprTracer) for x in in_tracers)
-                    assert all(isinstance(v, Var) for v in outvars)
-                eqn = TracingEqn(in_tracers, outvars, primitive, params, effects, source_info, ctx)
-                return eqn, out_tracers
-            else:
-                outvars = list(map(self.frame.newvar, out_avals))
-                if config.enable_checks.value:
-                    assert all(isinstance(x, DynamicJaxprTracer) for x in in_tracers)
-                    assert all(isinstance(v, Var) for v in outvars)
-                eqn = TracingEqn(in_tracers, outvars, primitive, params, effects, source_info, ctx)
-                out_tracers = [
-                    DynamicJaxprTracer(self, aval, v, source_info, eqn)
-                    for aval, v in zip(out_avals, outvars)
-                ]
-                return eqn, out_tracers
-
-        pe.DynamicJaxprTrace.make_eqn_internal = internal_make_eqn
-
+        # pylint: disable=too-many-positional-arguments
         def patched_make_eqn(
             self,
             in_tracers,
@@ -320,39 +295,77 @@ def patch_primitives():
             ctx=None,
             out_tracers=None,
         ):
+            # Helper function (replaces make_eqn_internal)
+            def make_eqn_internal(out_avals_list, out_tracers):
+                source_info_final = source_info or source_info_util.new_source_info()
+                ctx_final = ctx or JaxprEqnContext(
+                    compute_on.current_compute_type(),
+                    config.threefry_partitionable.value,
+                    xla_metadata_lib.current_xla_metadata(),
+                )
+
+                if out_tracers is not None:
+                    outvars = [tracer.val for tracer in out_tracers]
+                    if config.enable_checks.value:
+                        assert all(isinstance(x, DynamicJaxprTracer) for x in in_tracers)
+                        assert all(isinstance(v, Var) for v in outvars)
+                    eqn = TracingEqn(
+                        in_tracers,
+                        outvars,
+                        primitive,
+                        params,
+                        effects,
+                        source_info_final,
+                        ctx_final,
+                    )
+                    return eqn, out_tracers
+                else:
+                    outvars = list(map(self.frame.newvar, out_avals_list))
+                    if config.enable_checks.value:
+                        assert all(isinstance(x, DynamicJaxprTracer) for x in in_tracers)
+                        assert all(isinstance(v, Var) for v in outvars)
+                    eqn = TracingEqn(
+                        in_tracers,
+                        outvars,
+                        primitive,
+                        params,
+                        effects,
+                        source_info_final,
+                        ctx_final,
+                    )
+                    out_tracers_new = [
+                        DynamicJaxprTracer(self, aval, v, source_info_final, eqn)
+                        for aval, v in zip(out_avals_list, outvars)
+                    ]
+                    return eqn, out_tracers_new
+
             # Normalize out_avals to a list if it's a single AbstractValue
             if not isinstance(out_avals, (list, tuple)):
                 # It's a single aval, wrap it in a list
-                out_avals = [out_avals]
-                eqn, out_tracers = self.make_eqn_internal(
-                    in_tracers,
-                    out_avals,
-                    primitive,
-                    params,
-                    effects,
-                    source_info,
-                    ctx,
-                    out_tracers,
-                )
+                out_avals_list = [out_avals]
+                eqn, out_tracers_result = make_eqn_internal(out_avals_list, out_tracers)
                 # Return single tracer instead of list
-                return eqn, out_tracers[0] if len(out_tracers) == 1 else out_tracers
-            else:
-                return self.make_eqn_internal(
-                    in_tracers,
-                    out_avals,
-                    primitive,
-                    params,
-                    effects,
-                    source_info,
-                    ctx,
-                    out_tracers,
+                return eqn, (
+                    out_tracers_result[0] if len(out_tracers_result) == 1 else out_tracers_result
                 )
+            else:
+                return make_eqn_internal(out_avals, out_tracers)
 
-        pe.DynamicJaxprTrace.make_eqn = patched_make_eqn
+        return patched_make_eqn
 
-        # pylint: disable=import-outside-toplevel
-        from jax._src import core
-        from jax._src.lax import lax
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        print(f"Error preparing make_eqn patch: {e}")
+        return None
+
+
+def get_patched_dyn_shape_staging_rule():
+    """Get patched _dyn_shape_staging_rule for dynamic shape handling.
+
+    Returns:
+        Patched function or None if patch fails.
+    """
+    try:
+        from jax._src import core  # pylint: disable=import-outside-toplevel
 
         def patched_dyn_shape_staging_rule(trace, source_info, prim, out_aval, *args, **params):
             eqn, out_tracer = trace.make_eqn(
@@ -361,15 +374,23 @@ def patch_primitives():
             trace.frame.add_eqn(eqn)
             return out_tracer
 
-        lax._dyn_shape_staging_rule = patched_dyn_shape_staging_rule
+        return patched_dyn_shape_staging_rule
 
-    except ImportError:
-        pass
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        print(f"Error preparing dyn_shape_staging_rule patch: {e}")
+        return None
 
-    # patch pjit.py
+
+def get_patched_pjit_staging_rule():
+    """Get patched pjit_staging_rule for pjit compatibility.
+
+    Returns:
+        Patched function or None if patch fails.
+    """
     try:
         # pylint: disable=import-outside-toplevel
         from jax._src import config, core, source_info_util
+        from jax._src.interpreters import partial_eval as pe
         from jax._src.interpreters import pxla
         from jax._src.pjit import _out_type, _pjit_forwarding, jit_p
         from jax._src.sharding_impls import UNSPECIFIED, UnspecifiedValue
@@ -457,10 +478,8 @@ def patch_primitives():
                 )
             return out_tracers
 
-        jax._src.pjit.pjit_staging_rule = (
-            patched_pjit_staging_rule  # pylint: disable=protected-access
-        )
-        pe.custom_staging_rules[jit_p] = patched_pjit_staging_rule
+        return patched_pjit_staging_rule
 
     except Exception as e:  # pylint: disable=broad-exception-caught
-        print(f"Error patching pjit: {e}")
+        print(f"Error preparing pjit patch: {e}")
+        return None

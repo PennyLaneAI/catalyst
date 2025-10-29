@@ -78,17 +78,13 @@ _ods_cext.globals = mock_attributes(
     _ods_cext.globals, {"register_traceback_file_exclusion": lambda x: None}
 )
 
-# pylint: disable=ungrouped-imports
-from catalyst.jax_extras.patches import patch_primitives
-
-patch_primitives()
-
 # Disable JAX's Shardy partitioner for JAX 0.7+ compatibility
 # Shardy adds 'sdy' dialect attributes that Catalyst doesn't support yet
 import jax
 
 jax.config.update("jax_use_shardy_partitioner", False)
 
+# pylint: disable=ungrouped-imports
 from catalyst import debug, logging, passes
 from catalyst.api_extensions import *
 from catalyst.api_extensions import __all__ as _api_extension_list

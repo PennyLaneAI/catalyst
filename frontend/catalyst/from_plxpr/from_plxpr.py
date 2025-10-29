@@ -23,6 +23,7 @@ from typing import Callable
 
 import jax
 import pennylane as qml
+from jax._src.interpreters.partial_eval import DynamicJaxprTrace
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
 from pennylane.capture import PlxprInterpreter, qnode_prim
@@ -39,6 +40,7 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
+from catalyst.jax_extras.patches import get_patched_make_eqn
 from catalyst.jax_primitives import (
     device_init_p,
     device_release_p,
@@ -47,6 +49,7 @@ from catalyst.jax_primitives import (
     quantum_kernel_p,
 )
 from catalyst.passes.pass_api import Pass
+from catalyst.utils.patching import Patcher
 
 from .qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
 from .qubit_handler import (
@@ -186,7 +189,17 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
         in (b,) }
 
     """
-    return jax.make_jaxpr(partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts))
+
+    patched_make_eqn = get_patched_make_eqn()
+    original_fn = partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts)
+
+    def wrapped_fn(*args, **kwargs):
+        with Patcher(
+            (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
+        ):
+            return jax.make_jaxpr(original_fn)(*args, **kwargs)
+
+    return wrapped_fn
 
 
 class WorkflowInterpreter(PlxprInterpreter):
