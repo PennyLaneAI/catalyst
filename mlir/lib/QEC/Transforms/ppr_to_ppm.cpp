@@ -40,24 +40,20 @@ struct PPRToPPMPass : public impl::PPRToPPMPassBase<PPRToPPMPass> {
         auto ctx = &getContext();
         auto module = getOperation();
 
-        // Decompose non-Clifford PPRs into PPMs
-        {
-            RewritePatternSet patterns(ctx);
-            populateDecomposeNonCliffordPPRPatterns(patterns, decomposeMethod, avoidYMeasure);
+        RewritePatternSet non_clifford_patterns(ctx);
+        populateDecomposeNonCliffordPPRPatterns(non_clifford_patterns, decomposeMethod,
+                                                avoidYMeasure);
 
-            if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
-                return signalPassFailure();
-            }
+        if (failed(applyPatternsGreedily(module, std::move(non_clifford_patterns)))) {
+            return signalPassFailure();
         }
 
         // Decompose Clifford PPRs into PPMs
-        {
-            RewritePatternSet patterns(ctx);
-            populateDecomposeCliffordPPRPatterns(patterns, avoidYMeasure);
+        RewritePatternSet clifford_patterns(ctx);
+        populateDecomposeCliffordPPRPatterns(clifford_patterns, avoidYMeasure);
 
-            if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
-                return signalPassFailure();
-            }
+        if (failed(applyPatternsGreedily(module, std::move(clifford_patterns)))) {
+            return signalPassFailure();
         }
     }
 };
