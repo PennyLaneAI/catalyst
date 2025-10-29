@@ -61,6 +61,7 @@ from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 from catalyst.jax_extras.patches import mock_attributes
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from catalyst.utils.patching import Patcher
+
 with Patcher(
     (
         _ods_cext,
