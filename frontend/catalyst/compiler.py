@@ -363,7 +363,7 @@ def _options_to_cli_flags(options):
     if options.async_qnodes:  # pragma: nocover
         extra_args += ["--async-qnodes"]
 
-    extra_args += ["--debug-only='rs-decomposition'"]
+    # extra_args += ["--debug-only='rs-decomposition'"]
     return extra_args
 
 
