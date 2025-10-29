@@ -49,6 +49,7 @@ def test_single_qubit_pauli_rotations():
     # CHECK: qec.ppr ["Y"](4)
     # CHECK: qec.ppr ["Z"](2)
     print(circuit.mlir_opt)
+    qml.capture.disable()
 
 
 test_single_qubit_pauli_rotations()
@@ -75,6 +76,7 @@ def test_multi_qubit_pauli_rotations():
     # CHECK: qec.ppr ["Z", "X"](2)
     # CHECK: qec.ppr ["X", "Y", "Z"](8)
     print(circuit.mlir_opt)
+    qml.capture.disable()
 
 
 test_multi_qubit_pauli_rotations()
@@ -100,6 +102,7 @@ def test_single_qubit_pauli_measurements():
     # CHECK: qec.ppm ["Y"]
     # CHECK: qec.ppm ["Z"]
     print(circuit.mlir_opt)
+    qml.capture.disable()
 
 
 test_single_qubit_pauli_measurements()
@@ -127,6 +130,7 @@ def test_multi_qubit_pauli_measurements():
     # CHECK: qec.ppm ["Z", "X"]
     # CHECK: qec.ppm ["X", "Y", "Z"]
     print(circuit.mlir_opt)
+    qml.capture.disable()
 
 
 test_multi_qubit_pauli_measurements()
@@ -157,6 +161,7 @@ def test_pauli_rot_and_measure_combined():
     # CHECK: qec.ppm ["Y"]
     # CHECK: qec.ppm ["X", "Y"]
     print(circuit.mlir_opt)
+    qml.capture.disable()
 
 
 test_pauli_rot_and_measure_combined()
@@ -187,6 +192,7 @@ def test_clifford_t_ppr_ppm_combined():
     # CHECK: qec.ppr ["Y", "Z"](4)
     # CHECK: qec.ppm ["Y", "Z"]
     print(circuit.mlir_opt)
+    qml.capture.disable()
 
 
 test_clifford_t_ppr_ppm_combined()
@@ -212,6 +218,7 @@ def test_commute_ppr():
     # CHECK: qec.ppr ["Z"](4)
     # CHECK: qec.ppr ["Z"](4)
     print(circuit.mlir_opt)
+    qml.capture.disable()
 
 
 test_commute_ppr()
@@ -234,6 +241,7 @@ def test_merge_ppr_ppm():
 
     # CHECK: qec.ppm ["Y"](-1)
     print(circuit.mlir_opt)
+    qml.capture.disable()
 
 
 test_merge_ppr_ppm()
@@ -260,6 +268,7 @@ def test_ppr_to_ppm():
     # CHECK-NOT: qec.ppr ["Y"](8)
     # CHECK: qec.ppm ["X"]
     print(circuit.mlir_opt)
+    qml.capture.disable()
 
 
 test_ppr_to_ppm()
@@ -288,6 +297,7 @@ def test_ppm_compilation():
     # CHECK: qec.ppm ["Y", "Z"]
     # CHECK-NOT: qec.ppr ["Z"](8)
     print(circuit.mlir_opt)
+    qml.capture.disable()
 
 
 test_ppm_compilation()
@@ -315,6 +325,7 @@ def test_pauli_rot_and_measure_with_cond():
     # CHECK: else
     # CHECK: scf.yield
     print(circuit.mlir_opt)
+    qml.capture.disable()
 
 
 test_pauli_rot_and_measure_with_cond()
@@ -322,8 +333,6 @@ test_pauli_rot_and_measure_with_cond()
 
 def test_with_capture_disabled():
     """Test with capture disabled: PauliRot should be decomposed into PPM."""
-    qml.capture.disable()
-
     dev = qml.device("catalyst.ftqc", wires=1)
 
     pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]

@@ -1389,14 +1389,10 @@ def _unitary_lowering(
 #
 @pauli_rot_p.def_abstract_eval
 def _pauli_rot_abstract_eval(
-    *qubits_or_params, theta=None, pauli_word=None, qubits_len=0, adjoint=False
+    *qubits, theta=None, pauli_word=None, qubits_len=0, adjoint=False
 ):
-    # The signature here is: (using * to denote zero or more)
-    # qubits*, params*
-    qubits = qubits_or_params[:qubits_len]
-    for idx in range(qubits_len):
-        qubit = qubits[idx]
-        assert isinstance(qubit, AbstractQbit)
+    qubits = qubits[:qubits_len]
+    assert all(isinstance(qubit, AbstractQbit) for qubit in qubits)
     return (AbstractQbit(),) * (qubits_len)
 
 
@@ -1407,7 +1403,7 @@ def _pauli_rot_def_impl(*args, **kwargs):  # pragma: no cover
 
 def _pauli_rot_lowering(
     jax_ctx: mlir.LoweringRuleContext,
-    *qubits_or_params: tuple,
+    *qubits: tuple,
     theta=None,
     pauli_word=None,
     qubits_len=0,
@@ -1416,7 +1412,7 @@ def _pauli_rot_lowering(
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    qubits = qubits_or_params[:qubits_len]
+    qubits = qubits[:qubits_len]
 
     for q in qubits:
         assert ir.OpaqueType.isinstance(q.type)
@@ -1454,13 +1450,9 @@ def _pauli_rot_lowering(
 # pauli measure operation
 #
 @pauli_measure_p.def_abstract_eval
-def _pauli_measure_abstract_eval(*qubits_or_params, pauli_word=None, qubits_len=0, adjoint=False):
-    # The signature here is: (using * to denote zero or more)
-    # qubits*, params*
-    qubits = qubits_or_params[:qubits_len]
-    for idx in range(qubits_len):
-        qubit = qubits[idx]
-        assert isinstance(qubit, AbstractQbit)
+def _pauli_measure_abstract_eval(*qubits, pauli_word=None, qubits_len=0, adjoint=False):
+    qubits = qubits[:qubits_len]
+    assert all(isinstance(qubit, AbstractQbit) for qubit in qubits)
     # This corresponds to the measurement value and the qubits after the measurements
     return (core.ShapedArray((), bool),) + (AbstractQbit(),) * (qubits_len)
 
@@ -1472,14 +1464,14 @@ def _pauli_measure_def_impl(*args, **kwargs):  # pragma: no cover
 
 def _pauli_measure_lowering(
     jax_ctx: mlir.LoweringRuleContext,
-    *qubits_or_params: tuple,
+    *qubits: tuple,
     pauli_word=None,
     qubits_len=0,
 ):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    qubits = qubits_or_params[:qubits_len]
+    qubits = qubits[:qubits_len]
     for q in qubits:
         assert ir.OpaqueType.isinstance(q.type)
         assert ir.OpaqueType(q.type).dialect_namespace == "quantum"
@@ -1498,11 +1490,10 @@ def _pauli_measure_lowering(
         in_qubits=qubits,
     ).results
 
-    result = ppm_results[0]
-    out_qubits = ppm_results[1:]
+    result, *out_qubits = ppm_results # First element is the measurement result
 
-    result_from_elements_op = ir.RankedTensorType.get((), result.type)
-    from_elements_op = FromElementsOp(result_from_elements_op, result)
+    result_type = ir.RankedTensorType.get((), result.type)
+    from_elements_op = FromElementsOp(result_type, result)
 
     return (from_elements_op.results[0],) + tuple(out_qubits)
 
