@@ -40,7 +40,7 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
-from catalyst.jax_extras.patches import get_patched_make_eqn
+from catalyst.jax_extras.patches import patched_make_eqn
 from catalyst.jax_primitives import (
     device_init_p,
     device_release_p,
@@ -192,7 +192,6 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
 
     """
 
-    patched_make_eqn = get_patched_make_eqn()
     original_fn = partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts)
 
     def wrapped_fn(*args, **kwargs):
