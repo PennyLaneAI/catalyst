@@ -310,76 +310,45 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
             return qregOut;
         };
 
-        // Case 0: "T"
-        Region &caseRegion0 = switchOp.getCaseRegions()[0];
-        caseRegion0.push_back(new Block());
-        rewriter.setInsertionPointToStart(&caseRegion0.front());
-        mlir::Value qregCase0 = createGateChain(rewriter, {"T"}, currentLoopReg);
-        rewriter.create<mlir::scf::YieldOp>(loc, qregCase0);
+        StringRef gates0[] = {"T"};
+        StringRef gates1[] = {"Hadamard", "T"};
+        StringRef gates2[] = {"S", "Hadamard", "T"};
+        StringRef gates3[] = {"Identity"};
+        StringRef gates4[] = {"PauliX"};
+        StringRef gates5[] = {"PauliY"};
+        StringRef gates6[] = {"PauliZ"};
+        StringRef gates7[] = {"Hadamard"};
+        StringRef gates8[] = {"S"}; // Used for both Case 8 and 9
 
-        // Case 1: "Hadamard" + "T"
-        Region &caseRegion1 = switchOp.getCaseRegions()[1];
-        caseRegion1.push_back(new Block());
-        rewriter.setInsertionPointToStart(&caseRegion1.front());
-        mlir::Value qregCase1 = createGateChain(rewriter, {"Hadamard", "T"}, currentLoopReg);
-        rewriter.create<mlir::scf::YieldOp>(loc, qregCase1);
+        // Map case indices to their gate chain config (gates, isAdjoint)
+        std::vector<std::pair<llvm::ArrayRef<StringRef>, bool>> caseConfigs = {
+            {gates0, /*isAdjoint=*/false}, // Case 0
+            {gates1, /*isAdjoint=*/false}, // Case 1
+            {gates2, /*isAdjoint=*/false}, // Case 2
+            {gates3, /*isAdjoint=*/false}, // Case 3
+            {gates4, /*isAdjoint=*/false}, // Case 4
+            {gates5, /*isAdjoint=*/false}, // Case 5
+            {gates6, /*isAdjoint=*/false}, // Case 6
+            {gates7, /*isAdjoint=*/false}, // Case 7
+            {gates8, /*isAdjoint=*/false}, // Case 8
+            {gates8, /*isAdjoint=*/true},  // Case 9
+        };
 
-        // Case 2: "S" + "Hadamard" + "T"
-        Region &caseRegion2 = switchOp.getCaseRegions()[2];
-        caseRegion2.push_back(new Block());
-        rewriter.setInsertionPointToStart(&caseRegion2.front());
-        mlir::Value qregCase2 = createGateChain(rewriter, {"S", "Hadamard", "T"}, currentLoopReg);
-        rewriter.create<mlir::scf::YieldOp>(loc, qregCase2);
+        // Ensure our config vector matches the number of cases we told the switch op
+        assert(caseConfigs.size() == caseValues.size() &&
+               "Mismatch in case config and case values");
 
-        // Case 3: "Identity"
-        Region &caseRegion3 = switchOp.getCaseRegions()[3];
-        caseRegion3.push_back(new Block());
-        rewriter.setInsertionPointToStart(&caseRegion3.front());
-        mlir::Value qregCase3 = createGateChain(rewriter, {"Identity"}, currentLoopReg);
-        rewriter.create<mlir::scf::YieldOp>(loc, qregCase3);
+        // --- Populate Switch Cases ---
+        for (size_t i = 0; i < caseConfigs.size(); ++i) {
+            const auto &config = caseConfigs[i];
+            Region &caseRegion = switchOp.getCaseRegions()[i];
+            caseRegion.push_back(new Block());
+            rewriter.setInsertionPointToStart(&caseRegion.front());
 
-        // Case 4: "PauliX"
-        Region &caseRegion4 = switchOp.getCaseRegions()[4];
-        caseRegion4.push_back(new Block());
-        rewriter.setInsertionPointToStart(&caseRegion4.front());
-        mlir::Value qregCase4 = createGateChain(rewriter, {"PauliX"}, currentLoopReg);
-        rewriter.create<mlir::scf::YieldOp>(loc, qregCase4);
-
-        // Case 5: "PauliY"
-        Region &caseRegion5 = switchOp.getCaseRegions()[5];
-        caseRegion5.push_back(new Block());
-        rewriter.setInsertionPointToStart(&caseRegion5.front());
-        mlir::Value qregCase5 = createGateChain(rewriter, {"PauliY"}, currentLoopReg);
-        rewriter.create<mlir::scf::YieldOp>(loc, qregCase5);
-
-        // Case 6: "PauliZ"
-        Region &caseRegion6 = switchOp.getCaseRegions()[6];
-        caseRegion6.push_back(new Block());
-        rewriter.setInsertionPointToStart(&caseRegion6.front());
-        mlir::Value qregCase6 = createGateChain(rewriter, {"PauliZ"}, currentLoopReg);
-        rewriter.create<mlir::scf::YieldOp>(loc, qregCase6);
-
-        // Case 7: "Hadamard"
-        Region &caseRegion7 = switchOp.getCaseRegions()[7];
-        caseRegion7.push_back(new Block());
-        rewriter.setInsertionPointToStart(&caseRegion7.front());
-        mlir::Value qregCase7 = createGateChain(rewriter, {"Hadamard"}, currentLoopReg);
-        rewriter.create<mlir::scf::YieldOp>(loc, qregCase7);
-
-        // Case 8: "S"
-        Region &caseRegion8 = switchOp.getCaseRegions()[8];
-        caseRegion8.push_back(new Block());
-        rewriter.setInsertionPointToStart(&caseRegion8.front());
-        mlir::Value qregCase8 = createGateChain(rewriter, {"S"}, currentLoopReg);
-        rewriter.create<mlir::scf::YieldOp>(loc, qregCase8);
-
-        // Case 9: Adjoint<"S">
-        Region &caseRegion9 = switchOp.getCaseRegions()[9];
-        caseRegion9.push_back(new Block());
-        rewriter.setInsertionPointToStart(&caseRegion9.front());
-        mlir::Value qregCase9 =
-            createGateChain(rewriter, {"S"}, currentLoopReg, /*isAdjoint=*/true);
-        rewriter.create<mlir::scf::YieldOp>(loc, qregCase9);
+            mlir::Value qregCase =
+                createGateChain(rewriter, config.first, currentLoopReg, config.second);
+            rewriter.create<mlir::scf::YieldOp>(loc, qregCase);
+        }
 
         // Populate Default Case : Might want to update
         Region &defaultRegion = switchOp.getDefaultRegion();
