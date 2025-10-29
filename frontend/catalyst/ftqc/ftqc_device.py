@@ -33,8 +33,9 @@ class FTQCDevice(Device):
         """Returns a tuple consisting of the device name, and
         the location to the shared object with the C/C++ device implementation.
 
-        Note: This is a dummy implementation. The second return value should be a path to the library,
-        but we don't actually have a C++ implementation for this, so we just return the config filepath.
+        Note: This is a dummy implementation. The second return value should be a 
+        path to the library, but we don't actually have a C++ implementation for 
+        this, so we just return the config filepath.
         """
 
         return "ftqc", FTQCDevice.config_filepath
