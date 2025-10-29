@@ -244,141 +244,123 @@ def get_patched_drop_unused_vars():
     """Get patched _drop_unused_vars for ClosedJaxpr compatibility.
 
     Returns:
-        Patched function or None if patch fails.
+        Patched function.
     """
-    try:
-        import jax._src.interpreters.partial_eval as pe  # pylint: disable=import-outside-toplevel
+    import jax._src.interpreters.partial_eval as pe  # pylint: disable=import-outside-toplevel
 
-        original_drop_unused_vars = pe._drop_unused_vars
+    original_drop_unused_vars = pe._drop_unused_vars
 
-        # ClosedJaxpr requires constvals to be a list
-        def patched_drop_unused_vars(
-            constvars, constvals, eqns=None, outvars=None
-        ):  # pylint: disable=unused-argument
-            constvars, constvals = original_drop_unused_vars(constvars, constvals, eqns, outvars)
-            return constvars, list(constvals)
+    # ClosedJaxpr requires constvals to be a list
+    def patched_drop_unused_vars(
+        constvars, constvals, eqns=None, outvars=None
+    ):  # pylint: disable=unused-argument
+        constvars, constvals = original_drop_unused_vars(constvars, constvals, eqns, outvars)
+        return constvars, list(constvals)
 
-        return patched_drop_unused_vars
-
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        print(f"Error preparing drop_unused_vars patch: {e}")
-        return None
+    return patched_drop_unused_vars
 
 
 def get_patched_make_eqn():
     """Get patched make_eqn for DynamicJaxprTrace to handle single aval and list of avals.
 
     Returns:
-        Patched function or None if patch fails.
+        Patched function.
     """
-    try:
-        # Patch make_eqn to handle both single aval and list of avals
-        # pylint: disable=import-outside-toplevel
-        from jax._src import config, source_info_util
-        from jax._src.core import JaxprEqnContext, Var
-        from jax._src.interpreters.partial_eval import (
-            DynamicJaxprTracer,
-            TracingEqn,
-            compute_on,
-            xla_metadata_lib,
-        )
+    # pylint: disable=import-outside-toplevel
+    from jax._src import config, source_info_util
+    from jax._src.core import JaxprEqnContext, Var
+    from jax._src.interpreters.partial_eval import (
+        DynamicJaxprTracer,
+        TracingEqn,
+        compute_on,
+        xla_metadata_lib,
+    )
 
-        # pylint: disable=too-many-positional-arguments
-        def patched_make_eqn(
-            self,
-            in_tracers,
-            out_avals,
-            primitive,
-            params,
-            effects,
-            source_info=None,
-            ctx=None,
-            out_tracers=None,
-        ):
-            # Helper function (replaces make_eqn_internal)
-            def make_eqn_internal(out_avals_list, out_tracers):
-                source_info_final = source_info or source_info_util.new_source_info()
-                ctx_final = ctx or JaxprEqnContext(
-                    compute_on.current_compute_type(),
-                    config.threefry_partitionable.value,
-                    xla_metadata_lib.current_xla_metadata(),
+    # pylint: disable=too-many-positional-arguments
+    def patched_make_eqn(
+        self,
+        in_tracers,
+        out_avals,
+        primitive,
+        params,
+        effects,
+        source_info=None,
+        ctx=None,
+        out_tracers=None,
+    ):
+        # Helper function (replaces make_eqn_internal)
+        def make_eqn_internal(out_avals_list, out_tracers):
+            source_info_final = source_info or source_info_util.new_source_info()
+            ctx_final = ctx or JaxprEqnContext(
+                compute_on.current_compute_type(),
+                config.threefry_partitionable.value,
+                xla_metadata_lib.current_xla_metadata(),
+            )
+
+            if out_tracers is not None:
+                outvars = [tracer.val for tracer in out_tracers]
+                if config.enable_checks.value:
+                    assert all(isinstance(x, DynamicJaxprTracer) for x in in_tracers)
+                    assert all(isinstance(v, Var) for v in outvars)
+                eqn = TracingEqn(
+                    in_tracers,
+                    outvars,
+                    primitive,
+                    params,
+                    effects,
+                    source_info_final,
+                    ctx_final,
                 )
-
-                if out_tracers is not None:
-                    outvars = [tracer.val for tracer in out_tracers]
-                    if config.enable_checks.value:
-                        assert all(isinstance(x, DynamicJaxprTracer) for x in in_tracers)
-                        assert all(isinstance(v, Var) for v in outvars)
-                    eqn = TracingEqn(
-                        in_tracers,
-                        outvars,
-                        primitive,
-                        params,
-                        effects,
-                        source_info_final,
-                        ctx_final,
-                    )
-                    return eqn, out_tracers
-                else:
-                    outvars = list(map(self.frame.newvar, out_avals_list))
-                    if config.enable_checks.value:
-                        assert all(isinstance(x, DynamicJaxprTracer) for x in in_tracers)
-                        assert all(isinstance(v, Var) for v in outvars)
-                    eqn = TracingEqn(
-                        in_tracers,
-                        outvars,
-                        primitive,
-                        params,
-                        effects,
-                        source_info_final,
-                        ctx_final,
-                    )
-                    out_tracers_new = [
-                        DynamicJaxprTracer(self, aval, v, source_info_final, eqn)
-                        for aval, v in zip(out_avals_list, outvars)
-                    ]
-                    return eqn, out_tracers_new
-
-            # Normalize out_avals to a list if it's a single AbstractValue
-            if not isinstance(out_avals, (list, tuple)):
-                # It's a single aval, wrap it in a list
-                out_avals_list = [out_avals]
-                eqn, out_tracers_result = make_eqn_internal(out_avals_list, out_tracers)
-                # Return single tracer instead of list
-                return eqn, (
-                    out_tracers_result[0] if len(out_tracers_result) == 1 else out_tracers_result
-                )
+                return eqn, out_tracers
             else:
-                return make_eqn_internal(out_avals, out_tracers)
+                outvars = list(map(self.frame.newvar, out_avals_list))
+                if config.enable_checks.value:
+                    assert all(isinstance(x, DynamicJaxprTracer) for x in in_tracers)
+                    assert all(isinstance(v, Var) for v in outvars)
+                eqn = TracingEqn(
+                    in_tracers,
+                    outvars,
+                    primitive,
+                    params,
+                    effects,
+                    source_info_final,
+                    ctx_final,
+                )
+                out_tracers_new = [
+                    DynamicJaxprTracer(self, aval, v, source_info_final, eqn)
+                    for aval, v in zip(out_avals_list, outvars)
+                ]
+                return eqn, out_tracers_new
 
-        return patched_make_eqn
+        # Normalize out_avals to a list if it's a single AbstractValue
+        if not isinstance(out_avals, (list, tuple)):
+            # It's a single aval, wrap it in a list
+            out_avals_list = [out_avals]
+            eqn, out_tracers_result = make_eqn_internal(out_avals_list, out_tracers)
+            # Return single tracer instead of list
+            return eqn, (
+                out_tracers_result[0] if len(out_tracers_result) == 1 else out_tracers_result
+            )
+        else:
+            return make_eqn_internal(out_avals, out_tracers)
 
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        print(f"Error preparing make_eqn patch: {e}")
-        return None
+    return patched_make_eqn
 
 
 def get_patched_dyn_shape_staging_rule():
     """Get patched _dyn_shape_staging_rule for dynamic shape handling.
 
     Returns:
-        Patched function or None if patch fails.
+        Patched function
     """
-    try:
-        from jax._src import core  # pylint: disable=import-outside-toplevel
+    from jax._src import core  # pylint: disable=import-outside-toplevel
 
-        def patched_dyn_shape_staging_rule(trace, source_info, prim, out_aval, *args, **params):
-            eqn, out_tracer = trace.make_eqn(
-                args, out_aval, prim, params, core.no_effects, source_info
-            )
-            trace.frame.add_eqn(eqn)
-            return out_tracer
+    def patched_dyn_shape_staging_rule(trace, source_info, prim, out_aval, *args, **params):
+        eqn, out_tracer = trace.make_eqn(args, out_aval, prim, params, core.no_effects, source_info)
+        trace.frame.add_eqn(eqn)
+        return out_tracer
 
-        return patched_dyn_shape_staging_rule
-
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        print(f"Error preparing dyn_shape_staging_rule patch: {e}")
-        return None
+    return patched_dyn_shape_staging_rule
 
 
 def get_patched_pjit_staging_rule():
@@ -387,99 +369,90 @@ def get_patched_pjit_staging_rule():
     Returns:
         Patched function or None if patch fails.
     """
-    try:
-        # pylint: disable=import-outside-toplevel
-        from jax._src import config, core, source_info_util
-        from jax._src.interpreters import partial_eval as pe
-        from jax._src.interpreters import pxla
-        from jax._src.pjit import _out_type, _pjit_forwarding, jit_p
-        from jax._src.sharding_impls import UNSPECIFIED, UnspecifiedValue
+    # pylint: disable=import-outside-toplevel
+    from jax._src import config, core, source_info_util
+    from jax._src.interpreters import partial_eval as pe
+    from jax._src.interpreters import pxla
+    from jax._src.pjit import _out_type, _pjit_forwarding, jit_p
+    from jax._src.sharding_impls import UNSPECIFIED, UnspecifiedValue
 
-        def patched_pjit_staging_rule(trace, source_info, *args, **params):
-            if params["compiler_options_kvs"]:
-                raise ValueError(
-                    "`compiler_options` can only be passed to top-level `jax.jit`. Got"
-                    f' compiler_options={dict(params["compiler_options_kvs"])} specified on'
-                    f' a nested jit with name: {params["name"]} and source info:'
-                    f" {source_info_util.summarize(source_info)}"
-                )
-            # If we're inlining, no need to compute forwarding information; the inlined
-            # computation will in effect forward things.
-            if (
-                params["inline"]
-                and all(isinstance(i, UnspecifiedValue) for i in params["in_shardings"])
-                and all(isinstance(o, UnspecifiedValue) for o in params["out_shardings"])
-                and all(i is None for i in params["in_layouts"])
-                and all(o is None for o in params["out_layouts"])
-            ):
-                jaxpr = params["jaxpr"]
-                if config.dynamic_shapes.value:
-                    # Inline jaxpr doesn't handle dynamic shapes when inlining. If dynamic
-                    # shapes are enabled, use eval_jaxpr, which uses the tracing machinery,
-                    # but redundantly performs abstract evaluation again.
-                    with core.set_current_trace(trace):
-                        out = core.eval_jaxpr(
-                            jaxpr.jaxpr, jaxpr.consts, *args, propagate_source_info=False
-                        )
-                else:
-                    out = pe.inline_jaxpr_into_trace(
-                        trace, source_info, jaxpr.jaxpr, jaxpr.consts, *args
-                    )
-                return [trace.to_jaxpr_tracer(x, source_info) for x in out]
-
+    def patched_pjit_staging_rule(trace, source_info, *args, **params):
+        if params["compiler_options_kvs"]:
+            raise ValueError(
+                "`compiler_options` can only be passed to top-level `jax.jit`. Got"
+                f' compiler_options={dict(params["compiler_options_kvs"])} specified on'
+                f' a nested jit with name: {params["name"]} and source info:'
+                f" {source_info_util.summarize(source_info)}"
+            )
+        # If we're inlining, no need to compute forwarding information; the inlined
+        # computation will in effect forward things.
+        if (
+            params["inline"]
+            and all(isinstance(i, UnspecifiedValue) for i in params["in_shardings"])
+            and all(isinstance(o, UnspecifiedValue) for o in params["out_shardings"])
+            and all(i is None for i in params["in_layouts"])
+            and all(o is None for o in params["out_layouts"])
+        ):
             jaxpr = params["jaxpr"]
             if config.dynamic_shapes.value:
-                jaxpr, in_fwd, out_shardings, out_layouts = _pjit_forwarding(
-                    jaxpr, params["out_shardings"], params["out_layouts"]
-                )
-                params = dict(
-                    params, jaxpr=jaxpr, out_shardings=out_shardings, out_layouts=out_layouts
-                )
-                outvars = list(map(trace.frame.newvar, _out_type(jaxpr)))
-                out_avals = [v.aval for v in outvars]
-                out_tracers = [
-                    pe.DynamicJaxprTracer(trace, aval, v, source_info)
-                    for aval, v in zip(out_avals, outvars)
-                ]
-                eqn, out_tracers = trace.make_eqn(
-                    args,
-                    out_avals,
-                    jit_p,
-                    params,
-                    jaxpr.effects,
-                    source_info,
-                    out_tracers=out_tracers,
-                )
-                trace.frame.add_eqn(eqn)
-                out_tracers_ = iter(out_tracers)
-                out_tracers = [
-                    args[f] if isinstance(f, int) else next(out_tracers_) for f in in_fwd
-                ]
-                assert next(out_tracers_, None) is None
-            elif any(isinstance(c, core.MutableArray) for c in jaxpr.consts):
-                jaxpr, consts = pxla._move_mutable_consts(jaxpr)
-                consts = [trace.new_const(c, source_info) for c in consts]
-                in_shardings = (*params["in_shardings"],) + (UNSPECIFIED,) * len(consts)
-                in_layouts = (*params["in_layouts"],) + (None,) * len(consts)
-                donated_invars = (*params["donated_invars"],) + (False,) * len(consts)
-                new_params = dict(
-                    params,
-                    jaxpr=jaxpr,
-                    in_shardings=in_shardings,
-                    in_layouts=in_layouts,
-                    donated_invars=donated_invars,
-                )
-                out_tracers = trace.default_process_primitive(
-                    jit_p, (*args, *consts), new_params, source_info=source_info
-                )
+                # Inline jaxpr doesn't handle dynamic shapes when inlining. If dynamic
+                # shapes are enabled, use eval_jaxpr, which uses the tracing machinery,
+                # but redundantly performs abstract evaluation again.
+                with core.set_current_trace(trace):
+                    out = core.eval_jaxpr(
+                        jaxpr.jaxpr, jaxpr.consts, *args, propagate_source_info=False
+                    )
             else:
-                out_tracers = trace.default_process_primitive(
-                    jit_p, args, params, source_info=source_info
+                out = pe.inline_jaxpr_into_trace(
+                    trace, source_info, jaxpr.jaxpr, jaxpr.consts, *args
                 )
-            return out_tracers
+            return [trace.to_jaxpr_tracer(x, source_info) for x in out]
 
-        return patched_pjit_staging_rule
+        jaxpr = params["jaxpr"]
+        if config.dynamic_shapes.value:
+            jaxpr, in_fwd, out_shardings, out_layouts = _pjit_forwarding(
+                jaxpr, params["out_shardings"], params["out_layouts"]
+            )
+            params = dict(params, jaxpr=jaxpr, out_shardings=out_shardings, out_layouts=out_layouts)
+            outvars = list(map(trace.frame.newvar, _out_type(jaxpr)))
+            out_avals = [v.aval for v in outvars]
+            out_tracers = [
+                pe.DynamicJaxprTracer(trace, aval, v, source_info)
+                for aval, v in zip(out_avals, outvars)
+            ]
+            eqn, out_tracers = trace.make_eqn(
+                args,
+                out_avals,
+                jit_p,
+                params,
+                jaxpr.effects,
+                source_info,
+                out_tracers=out_tracers,
+            )
+            trace.frame.add_eqn(eqn)
+            out_tracers_ = iter(out_tracers)
+            out_tracers = [args[f] if isinstance(f, int) else next(out_tracers_) for f in in_fwd]
+            assert next(out_tracers_, None) is None
+        elif any(isinstance(c, core.MutableArray) for c in jaxpr.consts):
+            jaxpr, consts = pxla._move_mutable_consts(jaxpr)
+            consts = [trace.new_const(c, source_info) for c in consts]
+            in_shardings = (*params["in_shardings"],) + (UNSPECIFIED,) * len(consts)
+            in_layouts = (*params["in_layouts"],) + (None,) * len(consts)
+            donated_invars = (*params["donated_invars"],) + (False,) * len(consts)
+            new_params = dict(
+                params,
+                jaxpr=jaxpr,
+                in_shardings=in_shardings,
+                in_layouts=in_layouts,
+                donated_invars=donated_invars,
+            )
+            out_tracers = trace.default_process_primitive(
+                jit_p, (*args, *consts), new_params, source_info=source_info
+            )
+        else:
+            out_tracers = trace.default_process_primitive(
+                jit_p, args, params, source_info=source_info
+            )
+        return out_tracers
 
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        print(f"Error preparing pjit patch: {e}")
-        return None
+    return patched_pjit_staging_rule
