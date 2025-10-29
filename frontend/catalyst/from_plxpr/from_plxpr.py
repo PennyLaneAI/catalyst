@@ -67,8 +67,6 @@ def _tuple_to_slice(t):
     Returns:
         slice: A slice object
     """
-    if isinstance(t, slice):
-        return t
     if isinstance(t, tuple) and len(t) == 3:
         return slice(*t)
     return t
