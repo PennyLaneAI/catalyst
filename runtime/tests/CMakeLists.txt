@@ -132,3 +132,16 @@ target_link_libraries(runner_tests_mbqc_runtime PRIVATE
 )
 
 catch_discover_tests(runner_tests_mbqc_runtime)
+
+# RS Decomposition test suite
+add_executable(runner_tests_rsdecomp_runtime)
+target_sources(runner_tests_rsdecomp_runtime PRIVATE
+    Test_RSDecomp_rings.cpp
+)
+target_link_libraries(runner_tests_rsdecomp_runtime PRIVATE
+    Catch2WithMain
+    catalyst_runtime_testing
+    rt_rsdecomp
+)
+
+catch_discover_tests(runner_tests_rsdecomp_runtime)
