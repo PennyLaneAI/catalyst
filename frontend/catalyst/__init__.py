@@ -36,7 +36,7 @@ if _jaxlib.__version__ != _jaxlib_version:
 
 from catalyst._configuration import INSTALLED
 from catalyst._version import __version__
-from catalyst.jax_extras.patches import mock_attributes
+from catalyst.utils.patching import Patcher
 
 try:
     if INSTALLED:
@@ -75,26 +75,35 @@ sys.modules["mlir_quantum._mlir_libs"] = __import__("jaxlib.mlir._mlir_libs").ml
 # once JAX updates to a compatible MLIR version
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 
-_ods_cext.globals = mock_attributes(
-    _ods_cext.globals, {"register_traceback_file_exclusion": lambda x: None}
-)
-
 # pylint: disable=ungrouped-imports
-from catalyst import debug, logging, passes
-from catalyst.api_extensions import *
-from catalyst.api_extensions import __all__ as _api_extension_list
-from catalyst.autograph import *
-from catalyst.autograph import __all__ as _autograph_functions
-from catalyst.compiler import CompileOptions
-from catalyst.debug.assertion import debug_assert
-from catalyst.jit import QJIT, qjit
-from catalyst.passes.pass_api import pipeline
-from catalyst.utils.exceptions import (
-    AutoGraphError,
-    CompileError,
-    DifferentiableCompileError,
-    PlxprCaptureCFCompatibilityError,
-)
+from catalyst.jax_extras.patches import mock_attributes
+
+with Patcher(
+    (
+        _ods_cext,
+        "globals",
+        mock_attributes(
+            # pylint: disable=c-extension-no-member
+            _ods_cext.globals,
+            {"register_traceback_file_exclusion": lambda x: None},
+        ),
+    ),
+):
+    from catalyst import debug, logging, passes
+    from catalyst.api_extensions import *
+    from catalyst.api_extensions import __all__ as _api_extension_list
+    from catalyst.autograph import *
+    from catalyst.autograph import __all__ as _autograph_functions
+    from catalyst.compiler import CompileOptions
+    from catalyst.debug.assertion import debug_assert
+    from catalyst.jit import QJIT, qjit
+    from catalyst.passes.pass_api import pipeline
+    from catalyst.utils.exceptions import (
+        AutoGraphError,
+        CompileError,
+        DifferentiableCompileError,
+        PlxprCaptureCFCompatibilityError,
+    )
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising
