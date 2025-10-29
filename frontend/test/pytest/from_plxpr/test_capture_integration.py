@@ -1264,11 +1264,9 @@ class TestCapture:
 
         # Catalyst 'cancel_inverses' should have been scheduled as a pass
         # whereas PL 'unitary_to_rot' should have been expanded
-        assert (
-            'transform.apply_registered_pass "remove-chained-self-inverse"'
-            in captured_inverses_unitary.mlir
-        )
-        assert is_unitary_rotated(captured_inverses_unitary.mlir)
+        capture_mlir = captured_inverses_unitary.mlir
+        assert 'transform.apply_registered_pass "remove-chained-self-inverse"' in capture_mlir
+        assert is_unitary_rotated(capture_mlir)
 
         # Case 2: During plxpr interpretation, first comes the PL transform
         # without Catalyst counterpart, second comes the PL transform with it
@@ -1281,12 +1279,10 @@ class TestCapture:
 
         # Both PL transforms should have been expaned and no Catalyst pass should have been
         # scheduled
-        assert (
-            'transform.apply_registered_pass "remove-chained-self-inverse"'
-            not in captured_unitary_inverses.mlir
-        )
-        assert 'quantum.custom "Hadamard"' not in captured_unitary_inverses.mlir
-        assert is_unitary_rotated(captured_unitary_inverses.mlir)
+        capture_mlir = captured_unitary_inverses.mlir
+        assert 'transform.apply_registered_pass "remove-chained-self-inverse"' not in capture_mlir
+        assert 'quantum.custom "Hadamard"' not in capture_mlir
+        assert is_unitary_rotated(capture_mlir)
 
         qml.capture.disable()
 
@@ -1476,11 +1472,12 @@ class TestCapture:
 
         capture_result = captured_circuit()
 
+        capture_mlir = captured_circuit.mlir
         assert is_controlled_pushed_back(
-            captured_circuit.mlir, 'quantum.custom "RX"', 'quantum.custom "CNOT"'
+            capture_mlir, 'quantum.custom "RX"', 'quantum.custom "CNOT"'
         )
         assert is_controlled_pushed_back(
-            captured_circuit.mlir, 'quantum.custom "PauliX"', 'quantum.custom "CRX"'
+            capture_mlir, 'quantum.custom "PauliX"', 'quantum.custom "CRX"'
         )
 
         qml.capture.disable()
