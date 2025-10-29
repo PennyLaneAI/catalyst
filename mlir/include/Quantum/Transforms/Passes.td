@@ -88,8 +88,6 @@ def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
 
 def RSDecompositionPass : Pass<"rs-decomposition"> {
     let summary = "Perform RS decomposition.";
-
-    let constructor = "catalyst::createRSDecompositionPass()";
 }
 
 def MergeRotationsPass : Pass<"merge-rotations"> {

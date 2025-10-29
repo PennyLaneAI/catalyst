@@ -37,7 +37,6 @@
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Passes.h"
 
 using llvm::SmallVector;
 using llvm::StringRef;
@@ -47,8 +46,8 @@ using namespace catalyst::quantum;
 namespace catalyst {
 namespace quantum {
 
-#define GEN_PASS_DEF_RSDECOMPOSITIONPASS
 #define GEN_PASS_DECL_RSDECOMPOSITIONPASS
+#define GEN_PASS_DEF_RSDECOMPOSITIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 // --- Helper Functions to Declare External Runtime Functions ---
@@ -438,10 +437,4 @@ struct RSDecompositionPass : impl::RSDecompositionPassBase<RSDecompositionPass> 
 };
 
 } // namespace quantum
-
-std::unique_ptr<mlir::Pass> createRSDecompositionPass()
-{
-    return std::make_unique<quantum::RSDecompositionPass>();
-}
-
 } // namespace catalyst
