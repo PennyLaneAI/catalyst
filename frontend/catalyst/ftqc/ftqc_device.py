@@ -14,8 +14,6 @@
 
 """This module contains the dummy FTQC device."""
 
-import platform
-
 from pennylane.devices import Device
 
 from catalyst.compiler import get_lib_path
