@@ -70,47 +70,60 @@ def _tuple_to_slice(t):
     Returns:
         slice: A slice object
     """
-    if isinstance(t, slice):
-        return t
     if isinstance(t, tuple) and len(t) == 3:
         return slice(*t)
     return t
 
 
-def _tuple_to_dict(t):
-    """Convert a tuple representation of a dict back to a dict object.
+def _is_dict_like_tuple(t):
+    """Checks if a tuple t is structured like a list of (key, value) pairs."""
+    return isinstance(t, tuple) and all(isinstance(item, tuple) and len(item) == 2 for item in t)
 
-    JAX converts dict objects to tuples for hashability in jaxpr parameters.
-    This function converts them back to dict objects for use, recursively
-    handling nested dicts. It also converts tuple values back to lists where appropriate.
+
+def _tuple_to_dict(t):
+    """
+    Recursively converts JAX-hashable tuple representations back to dicts,
+    and list-like tuples back to lists.
 
     Args:
-        t: Either a dict object (returned as-is) or a tuple of (key, value) pairs
+        t: The item to convert. Can be a dict, a tuple, or a scalar.
 
     Returns:
-        dict: A dict object
+        The converted dict, list, or the original scalar value.
     """
+
+    # ------------------
+    # Base Case (No recursion needed for scalars)
+    # ------------------
+    if not isinstance(t, (dict, tuple, list)):
+        return t
+
+    # ------------------
+    # Recursive Steps
+    # ------------------
+
+    # 1. Handle actual dict objects (recursively process values)
     if isinstance(t, dict):
-        # Recursively convert nested dicts
         return {k: _tuple_to_dict(v) for k, v in t.items()}
+
+    # 2. Handle list objects (recursively process elements)
+    if isinstance(t, list):
+        return [_tuple_to_dict(item) for item in t]
+
+    # 3. Handle tuple objects (The core JAX conversion logic)
     if isinstance(t, tuple):
-        # Check if this is a dict-like tuple (sequence of 2-tuples)
-        if all(isinstance(item, tuple) and len(item) == 2 for item in t):
-            # Convert tuple of pairs to dict, recursively handling nested values
-            result = {}
-            for key, value in t:
-                # Recursively handle nested structures
-                if isinstance(value, tuple):
-                    # Check if it's a dict-like tuple
-                    if all(isinstance(item, tuple) and len(item) == 2 for item in value):
-                        result[key] = _tuple_to_dict(value)
-                    else:
-                        # It's a list-like tuple, convert to list
-                        result[key] = list(value)
-                else:
-                    result[key] = value
-            return result
-    return t
+
+        # A. Dict-like tuple: Convert to dict, then recurse on values
+        if _is_dict_like_tuple(t):
+            # This handles the main (key, value) pair structure
+            return {key: _tuple_to_dict(value) for key, value in t}
+
+        # B. List-like tuple: Convert to list, then recurse on elements
+        else:
+            # This handles tuples used to represent lists
+            return [_tuple_to_dict(item) for item in t]
+
+    return t  # Should only be hit if logic above is incomplete, but included for safety
 
 
 def _get_device_kwargs(device) -> dict:
