@@ -37,6 +37,9 @@
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
   [(#2136)](https://github.com/PennyLaneAI/catalyst/pull/2136)
 
+* Fix `catalyst.qjit` and `catalyst.CompileOptions` docs rendering.
+  [(#2156)](https://github.com/PennyLaneAI/catalyst/pull/2156)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
