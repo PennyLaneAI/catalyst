@@ -77,7 +77,7 @@ you are encoutering issues, please consult the detailed guide
         make all
 
         # Test that everything is built properly
-        make test
+        make pytest
 
    .. group-tab:: macOS
 
@@ -103,7 +103,7 @@ you are encoutering issues, please consult the detailed guide
         make all
 
         # Test that everything is built properly
-        make test
+        make pytest
 
 
 Detailed Building From Source Guide
@@ -308,9 +308,12 @@ The following target runs all available test suites with the default execution d
 
   make test
 
-You can also test each module separately by using running the ``test-frontend``,
-``test-dialects``, and ``test-runtime`` targets instead. Jupyter Notebook demos are also testable
-via ``test-demos``.
+You can also test each module separately by running the ``test-frontend``,
+``test-dialects``, and ``test-runtime`` targets instead.
+Alternately, the ``test-frontend`` target can be broken up into two subsets,
+``make pytest`` and ``make lit``, where the pytest suite
+can be considered the "core" (and most important) test set.
+Jupyter Notebook demos are also testable via ``test-demos``.
 
 Additional Device Backends
 """"""""""""""""""""""""""
@@ -435,6 +438,30 @@ Known Issues
 
       If not, PyTest might try to use the default Python binary: ``/usr/bin/python3``.
       (See user's report `here <https://github.com/PennyLaneAI/catalyst/issues/377>`_)
+
+      .. raw:: html
+
+        <hr>
+
+      In some mac setups, it's possible that certain Catalyst libraries are compiled with a
+      different OSX deployment version than what Catalyst uses when compiling a user program.
+      In this case, you may see a *warning* like the following when using Catalyst:
+
+      .. code-block:: console
+
+        ld: warning: building for macOS-15.0, but linking with dylib '@rpath/libcustom_calls.so' which was built for newer version 15.7
+
+      While this warning does not prevent using Catalyst, if you would like to eliminate it, set the
+      following environment variable (adjust the value as needed given the warning you see):
+
+      .. code-block:: console
+
+        export MACOSX_DEPLOYMENT_TARGET=15.0
+
+      and then run ``make clean && make frontend``.
+
+      Note: Catalyst does not set any deployment targets, this issue likely arises due to differing
+      defaults in different build environments.
 
 Install a Frontend-Only Development Environment from TestPyPI Wheels
 --------------------------------------------------------------------
