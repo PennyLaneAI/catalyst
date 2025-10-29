@@ -105,7 +105,7 @@ def qjit(
         a full of supported devices, please see :doc:`/dev/devices`.
 
     Args:
-        fn (Callable): the quantum or classical function
+        fn (Callable): The quantum or classical function.
         autograph (bool): Experimental support for automatically converting Python control
             flow statements (including ``if`` statements, ``for`` and ``while`` loops) to
             Catalyst-compatible control flow, and more. For more details, see the
@@ -113,12 +113,14 @@ def qjit(
         autograph_include: A list of (sub)modules to be allow-listed for autograph conversion.
         async_qnodes (bool): Experimental support for automatically executing
             QNodes asynchronously, if supported by the device runtime.
-        target (str): the compilation target
+        target (str): The compilation target.
         keep_intermediate (Union[str, int, bool]): Level controlling intermediate file generation.
+
             - ``False`` or ``0`` or ``"none"`` or ``None`` (default): No intermediate file is kept.
             - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
             - ``2`` or ``"pass"``: Intermediate files are saved after each pass.
             If enabled, intermediate representations are available via the following attributes:
+
             - :attr:`~.QJIT.jaxpr`: JAX program representation
             - :attr:`~.QJIT.mlir`: MLIR representation after canonicalization
             - :attr:`~.QJIT.mlir_opt`: MLIR representation after optimization
@@ -133,9 +135,9 @@ def qjit(
             elements of this list are named sequences of MLIR passes to be executed. A ``None``
             value (the default) results in the execution of the default pipeline. This option is
             considered to be used by advanced users for low-level debugging purposes.
-        static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
+        static_argnums(int or Seqence[Int]): An index or a sequence of indices that specifies the
             positions of static arguments.
-        static_argnames(str or Seqence[str]): a string or a sequence of strings that specifies the
+        static_argnames(str or Seqence[str]): A string or a sequence of strings that specifies the
             names of static arguments.
         abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
             An experimental option to specify dynamic tensor shapes.
