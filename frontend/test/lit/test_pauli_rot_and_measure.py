@@ -90,7 +90,6 @@ def test_single_qubit_pauli_measurements():
     @qjit(pipelines=pipeline, target="mlir")
     @qml.qnode(device=dev)
     def circuit():
-        qml.Hadamard(wires=0)
         qml.pauli_measure("X", wires=0)
         qml.pauli_measure("Y", wires=0)
         qml.pauli_measure("Z", wires=0)

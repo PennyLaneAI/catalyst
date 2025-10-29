@@ -2,6 +2,36 @@
 
 <h3>New features since last release</h3>
 
+* Catalyst now supports Pennylane frontend operations `qml.PauliRot` and `qml.pauli_measure` 
+  directly. This allows uses to write circuits in Pennylane consisting of PPR/PPMs, and 
+  use the existing compilation passes in Catalyst specifically for PPR/PPMs, namely `to_ppr`, 
+  `commute_ppr`, `merge_ppr_ppm`, `ppr_to_ppm`, and `ppm_compilation`.
+
+  This is supported with both program capture enabled and disabled. However, there are several
+  caveats. When program capture is disabled, we will not be able to use conditionals (i.e, 
+  `qml.cond`) on the measurement result of `qml.pauli_measure`.
+
+  To support this feature, we introduced a dummy device `catalyst.ftqc`. Users of this new 
+  feature would need to set the `qnode` to use this dummy device. For example, a user can 
+  now write the following circuit and have it compatible with the existing Catalyst PPR/PPM
+  passes.
+
+  ```python
+  dev = qml.device("catalyst.ftqc", wires=1)
+  pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+  
+  @qjit(pipelines=pipeline, target="mlir")
+  @ppm_compilation
+  @qml.qnode(device=dev)
+  def circuit():
+      qml.Hadamard(wires=0)
+      qml.PauliRot(np.pi / 2, "X", wires=0)
+      qml.PauliRot(np.pi / 4, "Y", wires=0)
+      qml.T(wires=0)
+      qml.pauli_measure("X", wires=0)
+  ```
+  [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
+
 <h3>Improvements 🛠</h3>
 
 * A new option ``use_nameloc`` has been added to :func:`~.qjit` that embeds variable names
@@ -40,6 +70,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Jeffrey Kam,
 Christina Lee,
 Roberto Turrado,
 Paul Haochen Wang.
