@@ -1069,10 +1069,11 @@ class TestCapture:
         def captured_circuit():
             return qml.expval(qml.PauliZ(0))
 
-        assert 'transform.apply_registered_pass "my-pass"' in captured_circuit.mlir
+        capture_mlir = captured_circuit.mlir
+        assert 'transform.apply_registered_pass "my-pass"' in capture_mlir
         assert (
             'with options = {"my-option" = "my_option_value", "my-other-option" = false}'
-            in captured_circuit.mlir
+            in capture_mlir
         )
 
         qml.capture.disable()
