@@ -58,22 +58,22 @@ def _to_bool_if_not(arg):
 
 
 @WorkflowInterpreter.register_primitive(plxpr_cond_prim)
-def workflow_cond(self, *plxpr_invals, jaxpr_branches, consts_tuples, args_tuple):
+def workflow_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     """Handle the conversion from plxpr to Catalyst jaxpr for the cond primitive
 
     Args:
-        consts_tuples: List of tuples (start, stop, step) to slice consts for each branch
-        args_tuple: Tuple (start, stop, step) to slice args from plxpr_invals
+        consts_slices: List of tuples (start, stop, step) to slice consts for each branch
+        args_slice: Tuple (start, stop, step) to slice args from plxpr_invals
     """
-    args = plxpr_invals[_tuple_to_slice(args_tuple)]
+    args = plxpr_invals[_tuple_to_slice(args_slice)]
     converted_jaxpr_branches = []
     all_consts = []
 
     # Convert each branch from plxpr to jaxpr
-    for const_tuple, plxpr_branch in zip(consts_tuples, jaxpr_branches):
+    for const_slice, plxpr_branch in zip(consts_slices, jaxpr_branches):
 
         # Store all branches consts in a flat list
-        branch_consts = plxpr_invals[_tuple_to_slice(const_tuple)]
+        branch_consts = plxpr_invals[_tuple_to_slice(const_slice)]
 
         evaluator = partial(copy(self).eval, plxpr_branch, branch_consts)
         new_jaxpr = jax.make_jaxpr(evaluator)(*args)
@@ -94,24 +94,24 @@ def workflow_cond(self, *plxpr_invals, jaxpr_branches, consts_tuples, args_tuple
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_cond_prim)
-def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_tuples, args_tuple):
+def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     """Handle the conversion from plxpr to Catalyst jaxpr for the cond primitive
 
     Args:
-        consts_tuples: List of tuples (start, stop, step) to slice consts for each branch
-        args_tuple: Tuple (start, stop, step) to slice args from plxpr_invals
+        consts_slices: List of tuples (start, stop, step) to slice consts for each branch
+        args_slice: Tuple (start, stop, step) to slice args from plxpr_invals
     """
-    args = plxpr_invals[_tuple_to_slice(args_tuple)]
+    args = plxpr_invals[_tuple_to_slice(args_slice)]
     self.init_qreg.insert_all_dangling_qubits()
     args_plus_qreg = [*args, self.init_qreg.get()]  # Add the qreg to the args
     converted_jaxpr_branches = []
     all_consts = []
 
     # Convert each branch from plxpr to jaxpr
-    for const_tuple, plxpr_branch in zip(consts_tuples, jaxpr_branches):
+    for const_slice, plxpr_branch in zip(consts_slices, jaxpr_branches):
 
         # Store all branches consts in a flat list
-        branch_consts = plxpr_invals[_tuple_to_slice(const_tuple)]
+        branch_consts = plxpr_invals[_tuple_to_slice(const_slice)]
 
         converted_jaxpr_branch = None
         closed_jaxpr = ClosedJaxpr(plxpr_branch, branch_consts)
@@ -151,21 +151,21 @@ def workflow_for_loop(
     step,
     *plxpr_invals,
     jaxpr_body_fn,
-    consts_tuple,
-    args_tuple,
-    abstract_shapes_tuple,
+    consts_slice,
+    args_slice,
+    abstract_shapes_slice,
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the for loop primitive
 
     Args:
-        consts_tuple: Tuple (start, stop, step) to slice consts from plxpr_invals
-        args_tuple: Tuple (start, stop, step) to slice args from plxpr_invals
-        abstract_shapes_tuple: Tuple (start, stop, step) to slice abstract shapes
+        consts_slice: Tuple (start, stop, step) to slice consts from plxpr_invals
+        args_slice: Tuple (start, stop, step) to slice args from plxpr_invals
+        abstract_shapes_slice: Tuple (start, stop, step) to slice abstract shapes
     """
     assert jaxpr_body_fn is not None
-    args = plxpr_invals[_tuple_to_slice(args_tuple)]
+    args = plxpr_invals[_tuple_to_slice(args_slice)]
 
-    consts = plxpr_invals[_tuple_to_slice(consts_tuple)]
+    consts = plxpr_invals[_tuple_to_slice(consts_slice)]
 
     converter = copy(self)
     evaluator = partial(converter.eval, jaxpr_body_fn, consts)
@@ -202,19 +202,19 @@ def handle_for_loop(
     step,
     *plxpr_invals,
     jaxpr_body_fn,
-    consts_tuple,
-    args_tuple,
-    abstract_shapes_tuple,
+    consts_slice,
+    args_slice,
+    abstract_shapes_slice,
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the for loop primitive
 
     Args:
-        consts_tuple: Tuple (start, stop, step) to slice consts from plxpr_invals
-        args_tuple: Tuple (start, stop, step) to slice args from plxpr_invals
-        abstract_shapes_tuple: Tuple (start, stop, step) to slice abstract shapes
+        consts_slice: Tuple (start, stop, step) to slice consts from plxpr_invals
+        args_slice: Tuple (start, stop, step) to slice args from plxpr_invals
+        abstract_shapes_slice: Tuple (start, stop, step) to slice abstract shapes
     """
     assert jaxpr_body_fn is not None
-    args = plxpr_invals[_tuple_to_slice(args_tuple)]
+    args = plxpr_invals[_tuple_to_slice(args_slice)]
 
     # Add the iteration start and the qreg to the args
     self.init_qreg.insert_all_dangling_qubits()
@@ -224,7 +224,7 @@ def handle_for_loop(
         self.init_qreg.get(),
     ]
 
-    consts = plxpr_invals[_tuple_to_slice(consts_tuple)]
+    consts = plxpr_invals[_tuple_to_slice(consts_slice)]
 
     jaxpr = ClosedJaxpr(jaxpr_body_fn, consts)
 
@@ -267,20 +267,20 @@ def workflow_while_loop(
     *plxpr_invals,
     jaxpr_body_fn,
     jaxpr_cond_fn,
-    body_tuple,
-    cond_tuple,
-    args_tuple,
+    body_slice,
+    cond_slice,
+    args_slice,
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the while loop primitive
 
     Args:
-        body_tuple: Tuple (start, stop, step) to slice body consts from plxpr_invals
-        cond_tuple: Tuple (start, stop, step) to slice cond consts from plxpr_invals
-        args_tuple: Tuple (start, stop, step) to slice args from plxpr_invals
+        body_slice: Tuple (start, stop, step) to slice body consts from plxpr_invals
+        cond_slice: Tuple (start, stop, step) to slice cond consts from plxpr_invals
+        args_slice: Tuple (start, stop, step) to slice args from plxpr_invals
     """
-    consts_body = plxpr_invals[_tuple_to_slice(body_tuple)]
-    consts_cond = plxpr_invals[_tuple_to_slice(cond_tuple)]
-    args = plxpr_invals[_tuple_to_slice(args_tuple)]
+    consts_body = plxpr_invals[_tuple_to_slice(body_slice)]
+    consts_cond = plxpr_invals[_tuple_to_slice(cond_slice)]
+    args = plxpr_invals[_tuple_to_slice(args_slice)]
 
     evaluator_body = partial(copy(self).eval, jaxpr_body_fn, consts_body)
     new_body_jaxpr = jax.make_jaxpr(evaluator_body)(*args)
@@ -314,21 +314,21 @@ def handle_while_loop(
     *plxpr_invals,
     jaxpr_body_fn,
     jaxpr_cond_fn,
-    body_tuple,
-    cond_tuple,
-    args_tuple,
+    body_slice,
+    cond_slice,
+    args_slice,
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the while loop primitive
 
     Args:
-        body_tuple: Tuple (start, stop, step) to slice body consts from plxpr_invals
-        cond_tuple: Tuple (start, stop, step) to slice cond consts from plxpr_invals
-        args_tuple: Tuple (start, stop, step) to slice args from plxpr_invals
+        body_slice: Tuple (start, stop, step) to slice body consts from plxpr_invals
+        cond_slice: Tuple (start, stop, step) to slice cond consts from plxpr_invals
+        args_slice: Tuple (start, stop, step) to slice args from plxpr_invals
     """
     self.init_qreg.insert_all_dangling_qubits()
-    consts_body = plxpr_invals[_tuple_to_slice(body_tuple)]
-    consts_cond = plxpr_invals[_tuple_to_slice(cond_tuple)]
-    args = plxpr_invals[_tuple_to_slice(args_tuple)]
+    consts_body = plxpr_invals[_tuple_to_slice(body_slice)]
+    consts_cond = plxpr_invals[_tuple_to_slice(cond_slice)]
+    args = plxpr_invals[_tuple_to_slice(args_slice)]
     args_plus_qreg = [*args, self.init_qreg.get()]  # Add the qreg to the args
 
     jaxpr = ClosedJaxpr(jaxpr_body_fn, consts_body)
