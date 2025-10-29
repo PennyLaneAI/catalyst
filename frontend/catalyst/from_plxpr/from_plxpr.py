@@ -92,25 +92,15 @@ def _tuple_to_dict(t):
         The converted dict, list, or the original scalar value.
     """
 
-    # ------------------
-    # Base Case (No recursion needed for scalars)
-    # ------------------
     if not isinstance(t, (dict, tuple, list)):
         return t
 
-    # ------------------
-    # Recursive Steps
-    # ------------------
-
-    # 1. Handle actual dict objects (recursively process values)
     if isinstance(t, dict):
         return {k: _tuple_to_dict(v) for k, v in t.items()}
 
-    # 2. Handle list objects (recursively process elements)
     if isinstance(t, list):
         return [_tuple_to_dict(item) for item in t]
 
-    # 3. Handle tuple objects (The core JAX conversion logic)
     if isinstance(t, tuple):
 
         # A. Dict-like tuple: Convert to dict, then recurse on values
@@ -120,10 +110,9 @@ def _tuple_to_dict(t):
 
         # B. List-like tuple: Convert to list, then recurse on elements
         else:
-            # This handles tuples used to represent lists
             return [_tuple_to_dict(item) for item in t]
 
-    return t  # Should only be hit if logic above is incomplete, but included for safety
+    return t
 
 
 def _get_device_kwargs(device) -> dict:
