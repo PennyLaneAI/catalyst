@@ -865,16 +865,13 @@ class TestProperties:
         assert op._queue_category is None  # pylint: disable=protected-access
 
     @pytest.mark.parametrize("value", (True, False))
-    def test_is_hermitian(self, value):
+    def test_is_verified_hermitian(self, value):
         """Test `is_verified_hermitian` property mirrors that of the base."""
 
         # pylint: disable=too-few-public-methods
         class DummyOp(qml.operation.Operator):
             num_wires = 1
-
-            @property
-            def is_verified_hermitian(self):
-                return value
+            is_verified_hermitian = value
 
         op = adjoint(DummyOp(0))
         assert op.is_verified_hermitian == value
