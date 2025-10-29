@@ -17,12 +17,12 @@
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystOps.h"
 #include "Gradient/IR/GradientOps.h"
-#include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
 #include "Quantum/Transforms/annotate_function.h"
 
@@ -180,6 +180,7 @@ LogicalResult PropagateAnnotationPattern::matchAndRewrite(FunctionOpInterface op
 } // namespace
 
 namespace catalyst {
+namespace quantum {
 
 #define GEN_PASS_DEF_ANNOTATEFUNCTIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
@@ -215,9 +216,5 @@ struct AnnotateFunctionPass : impl::AnnotateFunctionPassBase<AnnotateFunctionPas
     }
 };
 
-std::unique_ptr<Pass> createAnnotateFunctionPass()
-{
-    return std::make_unique<AnnotateFunctionPass>();
-}
-
+} // namespace quantum
 } // namespace catalyst

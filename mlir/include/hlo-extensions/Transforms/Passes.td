@@ -48,8 +48,6 @@ def ScatterLoweringPass : Pass<"scatter-lowering"> {
         "tensor::TensorDialect",
         "scf::SCFDialect"
     ];
-
-    let constructor = "catalyst::createScatterLoweringPass()";
 }
 
 def HloCustomCallLoweringPass : Pass<"hlo-custom-call-lowering"> {
@@ -60,15 +58,13 @@ def HloCustomCallLoweringPass : Pass<"hlo-custom-call-lowering"> {
         "mlir::func::FuncDialect",
         "catalyst::CatalystDialect",
     ];
-
-    let constructor = "catalyst::createHloCustomCallLoweringPass()";
 }
 
 // -------------------- upstream mhlo passes removed in stablehlo ------------------------ //
 // stablehlo legalize sort pass.
 def StablehloLegalizeSortPass : Pass<"stablehlo-legalize-sort", "func::FuncOp"> {
   let summary = "Legalize from Stablehlo sort to SCF control flow.";
-  let constructor = "createStablehloLegalizeSortPass()";
+
   let dependentDialects = ["arith::ArithDialect",
                            "bufferization::BufferizationDialect",
                            "scf::SCFDialect", "tensor::TensorDialect"];
@@ -77,13 +73,11 @@ def StablehloLegalizeSortPass : Pass<"stablehlo-legalize-sort", "func::FuncOp"> 
 // stablehlo legalize to std pass.
 def StablehloLegalizeToStandardPass : Pass<"stablehlo-legalize-to-std", "func::FuncOp"> {
   let summary = "Legalize from Stablehlo dialect to standard dialect.";
-  let constructor = "createStablehloLegalizeToStdPass()";
 }
 
 // stablehlo legalize to control flow pass.
 def StablehloLegalizeControlFlowPass : Pass<"stablehlo-legalize-control-flow", "func::FuncOp"> {
   let summary = "Legalize from Stablehlo control flow to SCF control flow.";
-  let constructor = "createStablehloLegalizeControlFlowPass()";
   let dependentDialects = ["scf::SCFDialect", "tensor::TensorDialect"];
 }
 

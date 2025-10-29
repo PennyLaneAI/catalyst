@@ -15,26 +15,14 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mlir/Pass/Pass.h"
 
 namespace catalyst {
+namespace quantum {
 
-std::unique_ptr<mlir::Pass> createQuantumBufferizationPass();
-std::unique_ptr<mlir::Pass> createQuantumConversionPass();
-std::unique_ptr<mlir::Pass> createEmitCatalystPyInterfacePass();
-std::unique_ptr<mlir::Pass> createCopyGlobalMemRefPass();
-std::unique_ptr<mlir::Pass> createAdjointLoweringPass();
-std::unique_ptr<mlir::Pass> createRemoveChainedSelfInversePass();
-std::unique_ptr<mlir::Pass> createRSDecompositionPass();
-std::unique_ptr<mlir::Pass> createAnnotateFunctionPass();
-std::unique_ptr<mlir::Pass> createSplitMultipleTapesPass();
-std::unique_ptr<mlir::Pass> createMergeRotationsPass();
-std::unique_ptr<mlir::Pass> createDecomposeLoweringPass();
-std::unique_ptr<mlir::Pass> createDisentangleCNOTPass();
-std::unique_ptr<mlir::Pass> createDisentangleSWAPPass();
-std::unique_ptr<mlir::Pass> createIonsDecompositionPass();
-std::unique_ptr<mlir::Pass> createLoopBoundaryOptimizationPass();
+#define GEN_PASS_DECL
+#define GEN_PASS_REGISTRATION
+#include "Quantum/Transforms/Passes.h.inc"
 
+} // namespace quantum
 } // namespace catalyst

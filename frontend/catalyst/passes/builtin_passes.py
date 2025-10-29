@@ -857,10 +857,10 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
         pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
         @qjit(pipelines=pipeline, target="mlir")
-        @to_ppr
-        @commute_ppr
         @merge_ppr_ppm
         @ppr_to_ppm(decompose_method="auto-corrected")
+        @commute_ppr
+        @to_ppr
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             qml.H(0)
@@ -875,14 +875,15 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
     .. code-block:: mlir
 
         . . .
-        %5 = qec.fabricate  zero : !quantum.bit
-        %6 = qec.fabricate  magic : !quantum.bit
-        %mres, %out_qubits:2 = qec.ppm ["X", "Z"] %1, %6 : !quantum.bit, !quantum.bit
-        %mres_0, %out_qubits_1:2 = qec.ppm ["Z", "Y"](-1) %5, %out_qubits#1 : !quantum.bit, !quantum.bit
-        %mres_2, %out_qubits_3 = qec.ppm ["X"] %out_qubits_1#1 : !quantum.bit
-        %mres_4, %out_qubits_5 = qec.select.ppm(%mres, ["X"], ["Z"]) %out_qubits_1#0 : !quantum.bit
-        %7 = arith.xori %mres_0, %mres_2 : i1
-        %8 = qec.ppr ["X"](2) %out_qubits#0 cond(%7) : !quantum.bit
+        %3 = qec.fabricate  magic : !quantum.bit
+        %mres, %out_qubits:2 = qec.ppm ["X", "Z"] %1, %3 : !quantum.bit, !quantum.bit
+        %mres_0, %out_qubits_1:2 = qec.ppm ["Z", "Y"](-1) %out_qubits#1, %2 : !quantum.bit, !quantum.bit
+        %mres_2, %out_qubits_3 = qec.ppm ["X"] %out_qubits_1#0 : !quantum.bit
+        %mres_4, %out_qubits_5 = qec.select.ppm(%mres, ["X"], ["Z"]) %out_qubits_1#1 : !quantum.bit
+        quantum.dealloc_qb %out_qubits_5 : !quantum.bit
+        quantum.dealloc_qb %out_qubits_3 : !quantum.bit
+        %4 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+        quantum.device_release
         . . .
 
     """

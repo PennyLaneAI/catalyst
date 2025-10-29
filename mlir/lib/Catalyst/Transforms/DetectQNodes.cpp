@@ -15,12 +15,11 @@
 #include "mlir/Analysis/Liveness.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
-
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/Transforms/AsyncUtils.h"
-#include "Catalyst/Transforms/Passes.h"
 #include "Catalyst/Transforms/Patterns.h"
 
 using namespace mlir;
@@ -903,8 +902,8 @@ void insertBranchFromFailToSuccessor(Block *fail, Block *success, PatternRewrite
 
 namespace catalyst {
 
-#define GEN_PASS_DEF_ADDEXCEPTIONHANDLINGPASS
 #define GEN_PASS_DECL_ADDEXCEPTIONHANDLINGPASS
+#define GEN_PASS_DEF_ADDEXCEPTIONHANDLINGPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
 struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptionHandlingPass> {
@@ -966,10 +965,5 @@ struct AddExceptionHandlingPass : impl::AddExceptionHandlingPassBase<AddExceptio
         }
     }
 };
-
-std::unique_ptr<Pass> createAddExceptionHandlingPass()
-{
-    return std::make_unique<AddExceptionHandlingPass>();
-}
 
 } // namespace catalyst
