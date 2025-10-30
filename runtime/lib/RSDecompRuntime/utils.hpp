@@ -1,11 +1,11 @@
 #pragma once
 
+#include <algorithm>
 #include <iostream>
 #include <string>
-#include <algorithm>
 
-template <typename T>
-T math_mod(T a, T n) {
+template <typename T> T math_mod(T a, T n)
+{
     if (n == 0) {
         throw std::invalid_argument("Modulo by zero");
     }
@@ -16,9 +16,8 @@ T math_mod(T a, T n) {
     return r < 0 ? r + n : r;
 }
 
-
-template<typename T>
-inline T floor_div(T a, T b) {
+template <typename T> inline T floor_div(T a, T b)
+{
     if (b == 0) {
         throw std::invalid_argument("Division by zero");
     }
@@ -30,7 +29,8 @@ inline T floor_div(T a, T b) {
     return q;
 }
 
-std::ostream& operator<<(std::ostream& os, __int128_t value) {
+std::ostream &operator<<(std::ostream &os, __int128_t value)
+{
     if (value == 0) {
         os << "0";
         return os;
@@ -45,7 +45,8 @@ std::ostream& operator<<(std::ostream& os, __int128_t value) {
         if (is_negative) {
             digit = -(value % 10);
             value /= 10;
-        } else {
+        }
+        else {
             digit = value % 10;
             value /= 10;
         }
@@ -59,7 +60,8 @@ std::ostream& operator<<(std::ostream& os, __int128_t value) {
     return os;
 }
 
-std::ostream& operator<<(std::ostream& os, unsigned __int128 n) {
+std::ostream &operator<<(std::ostream &os, unsigned __int128 n)
+{
     if (n == 0) {
         os << "0";
         return os;

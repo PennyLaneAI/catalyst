@@ -1,16 +1,16 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
+#include <boost/multiprecision/cpp_int.hpp>
+#include <cmath>
+#include <complex>
 #include <iostream>
+#include <numeric>
+#include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
-#include <cmath>
-#include <numeric>
-#include <complex>
-#include <array>
-#include <stdexcept>
-#include <algorithm>
-#include <optional>
-#include <boost/multiprecision/cpp_int.hpp>
 
 #include "utils.hpp"
 
@@ -26,21 +26,20 @@ class ZSqrtTwo;
 class DyadicMatrix;
 class SO3Matrix;
 
-std::ostream& operator<<(std::ostream& os, __int128 n);
-std::ostream& operator<<(std::ostream& os, unsigned __int128 n);
-std::ostream& operator<<(std::ostream& os, const ZOmega& zomega);
-std::ostream& operator<<(std::ostream& os, const ZSqrtTwo& zsqtwo);
-std::ostream& operator<<(std::ostream& os, const SO3Matrix& matrix);
+std::ostream &operator<<(std::ostream &os, __int128 n);
+std::ostream &operator<<(std::ostream &os, unsigned __int128 n);
+std::ostream &operator<<(std::ostream &os, const ZOmega &zomega);
+std::ostream &operator<<(std::ostream &os, const ZSqrtTwo &zsqtwo);
+std::ostream &operator<<(std::ostream &os, const SO3Matrix &matrix);
 
 DyadicMatrix dyadic_matrix_mul(const DyadicMatrix &m1, const DyadicMatrix &m2);
 SO3Matrix so3_matrix_mul(const SO3Matrix &m1, const SO3Matrix &m2);
 ZOmega zomega_from_sqrt_pair(const ZSqrtTwo &alpha, const ZSqrtTwo &beta, const ZOmega &shift);
 
-class ZSqrtTwo
-{
-public:
+class ZSqrtTwo {
+  public:
     INT_TYPE a, b;
-    
+
     ZSqrtTwo(INT_TYPE a = 0, INT_TYPE b = 0);
 
     ZSqrtTwo operator+(const ZSqrtTwo &other) const;
@@ -61,14 +60,13 @@ public:
     ZOmega to_omega() const;
 };
 
-
-class ZOmega
-{
-public:
+class ZOmega {
+  public:
     INT_TYPE a, b, c, d;
 
-public:
-    ZOmega(INT_TYPE a = 0, INT_TYPE b = 0, INT_TYPE c = 0, INT_TYPE d = 0);
+  public:
+    ZOmega(INT_TYPE a, INT_TYPE b, INT_TYPE c, INT_TYPE d);
+    ZOmega(INT_TYPE a = 0);
 
     ZOmega operator+(const ZOmega &other) const;
     ZOmega operator-() const;
@@ -83,21 +81,20 @@ public:
     bool parity() const;
     ZOmega adj2() const;
     // INT_TYPE abs() const;
-    //MULTI_PREC_INT abs_multiprec() const;
+    // MULTI_PREC_INT abs_multiprec() const;
     MULTI_PREC_INT abs() const;
     ZOmega conj() const;
     ZOmega norm() const;
-    
+
     ZSqrtTwo to_sqrt_two() const;
     // std::pair<ZOmega, int> normalize();
 };
 
-
-class ZOmega_multiprec{
-public:
+class ZOmega_multiprec {
+  public:
     MULTI_PREC_INT a, b, c, d;
 
-    ZOmega_multiprec(MULTI_PREC_INT a = 0, MULTI_PREC_INT b = 0, MULTI_PREC_INT c = 0, MULTI_PREC_INT d = 0);
+    ZOmega_multiprec(MULTI_PREC_INT a, MULTI_PREC_INT b, MULTI_PREC_INT c, MULTI_PREC_INT d);
     ZOmega_multiprec(ZOmega zomega);
 
     ZOmega_multiprec operator*(const ZOmega_multiprec &other) const;
@@ -105,17 +102,16 @@ public:
     ZOmega_multiprec operator-(ZOmega_multiprec other) const;
 };
 
-
-class DyadicMatrix
-{
-public:
+class DyadicMatrix {
+  public:
     ZOmega a, b, c, d;
     INT_TYPE k;
 
     void normalize();
 
-public:
-    DyadicMatrix(const ZOmega &a, const ZOmega &b, const ZOmega &c, const ZOmega &d, INT_TYPE k = 0);
+  public:
+    DyadicMatrix(const ZOmega &a, const ZOmega &b, const ZOmega &c, const ZOmega &d,
+                 INT_TYPE k = 0);
 
     DyadicMatrix operator-() const;
     bool operator==(const DyadicMatrix &other) const;
@@ -125,17 +121,15 @@ public:
     friend DyadicMatrix dyadic_matrix_mul(const DyadicMatrix &m1, const DyadicMatrix &m2);
 };
 
-
-class SO3Matrix
-{
-public:
+class SO3Matrix {
+  public:
     std::array<std::array<ZSqrtTwo, 3>, 3> so3_mat;
     INT_TYPE k;
 
     void normalize();
     void from_dyadic_matrix(const DyadicMatrix &dy_mat);
 
-public:
+  public:
     SO3Matrix(const DyadicMatrix &dy_mat);
     SO3Matrix(const std::array<std::array<ZSqrtTwo, 3>, 3> &mat, int k = 0);
 
@@ -143,7 +137,7 @@ public:
     std::array<std::array<int, 3>, 3> parity_mat() const;
     std::array<int, 3> parity_vec() const;
     std::array<ZSqrtTwo, 9> flatten() const;
-    DyadicMatrix dyadic_matrix();
+    // DyadicMatrix dyadic_matrix();
 
     friend SO3Matrix so3_matrix_mul(const SO3Matrix &m1, const SO3Matrix &m2);
 };

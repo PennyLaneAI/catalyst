@@ -15,8 +15,8 @@
 #include <cstdint>
 #include <cstring>
 #include <iostream>
-#include <vector>
 #include <rings.hpp>
+#include <vector>
 
 /**
  * This is a dummy implementation of the rs decomposition

@@ -20,7 +20,6 @@
 
 #include "rings.cpp"
 
-
 using namespace Catch::Matchers;
 
 TEST_CASE("Test ZSqrtTwo class", "[RSDecomp][Rings]")
@@ -68,7 +67,6 @@ TEST_CASE("Test ZSqrtTwo class", "[RSDecomp][Rings]")
     CHECK(z2.to_omega() == ZOmega(-4, 0, 4, 3));
 }
 
-
 TEST_CASE("Test ZOmega class", "[RSDecomp][Rings]")
 {
     const double tol = 1e-10;
@@ -81,13 +79,17 @@ TEST_CASE("Test ZOmega class", "[RSDecomp][Rings]")
     CHECK(z1.d == 4);
 
     CHECK((z1 + z2) == ZOmega(6, 8, 10, 12));
+    CHECK((z2 + 10) == ZOmega(5, 6, 7, 18));
+
+    CHECK((z2 + 2.0) == ZOmega(5, 6, 7, 10));
     CHECK((z1 - z2) == ZOmega(-4, -4, -4, -4));
     CHECK((z1 * z2) == ZOmega(60, 56, 36, -2));
-    CHECK((z1 * 10) == ZOmega(10, 20, 30, 40));
+    CHECK((z2 * 10) == ZOmega(50, 60, 70, 80));
+    CHECK((z2 * 2.0) == ZOmega(10, 12, 14, 16));
     REQUIRE_THROWS_WITH(z2 / 2, ContainsSubstring("Non-integer division result"));
     CHECK((ZOmega(2, 4, 6, 8) / 2) == z1);
 
-    CHECK((ZOmega(1283, 130, 3092, 3091) % ZOmega(44, 67, 91, 3))== ZOmega(-24, -11, 10, 7));
+    CHECK((ZOmega(1283, 130, 3092, 3091) % ZOmega(44, 67, 91, 3)) == ZOmega(-24, -11, 10, 7));
     CHECK(z1.abs() == 388);
     CHECK(z2.abs() == 14788);
 
@@ -106,11 +108,12 @@ TEST_CASE("Test ZOmega class", "[RSDecomp][Rings]")
     CHECK(z1_conj.to_complex().real() == Catch::Approx(std::conj(z1_complex).real()).margin(tol));
     CHECK(z1_conj.to_complex().imag() == Catch::Approx(std::conj(z1_complex).imag()).margin(tol));
 
-    CHECK(z2.norm().to_complex().real() == Catch::Approx((std::abs(z2.to_complex()) * std::abs(z2.conj().to_complex()))).margin(tol));
+    CHECK(
+        z2.norm().to_complex().real() ==
+        Catch::Approx((std::abs(z2.to_complex()) * std::abs(z2.conj().to_complex()))).margin(tol));
 
-    CHECK((z1 - ZOmega(2, 2, 2, 0)).to_sqrt_two() == ZSqrtTwo(4, 1));    
+    CHECK((z1 - ZOmega(2, 2, 2, 0)).to_sqrt_two() == ZSqrtTwo(4, 1));
 }
-
 
 TEST_CASE("Test DyadicMatrix class", "[RSDecomp][Rings]")
 {
@@ -118,11 +121,43 @@ TEST_CASE("Test DyadicMatrix class", "[RSDecomp][Rings]")
     ZOmega z2 = ZOmega(5, 6, 7, 8);
     DyadicMatrix m1{z1, z2, z1, z2};
 
-    auto x = m1 * 2;
-    auto y = DyadicMatrix(z1 * 2, z2 * 2, z1 * 2, z2 * 2);
-    bool equal = (x == y);
-    CHECK(equal);
     CHECK(m1 * 2 == DyadicMatrix(z1 * 2, z2 * 2, z1 * 2, z2 * 2));
 
+    CHECK(m1.flatten() == std::array<ZOmega, 4>{z1, z2, z1, z2});
 
+    ZOmega z3 = ZOmega(-3, 6, 9, 3);
+    ZOmega z4 = ZOmega(-3, 18, 21, 3);
+    DyadicMatrix m2{z1, z2, z1, z2, 2};
+    DyadicMatrix m3{z3, z4, z3, z4, 4};
+
+    ZOmega exp_z1 = ZOmega(60, 60, 42, 3);
+    ZOmega exp_z2 = ZOmega(168, 132, 66, -33);
+    auto x = dyadic_matrix_mul(m2, m3);
+    auto y = DyadicMatrix{exp_z1, exp_z2, exp_z1, exp_z2, 3};
+    CHECK(x == y);
+    CHECK(dyadic_matrix_mul(m2, m3) == DyadicMatrix{exp_z1, exp_z2, exp_z1, exp_z2, 3});
+}
+
+TEST_CASE("Test SO3Matrix class", "[RSDecomp][Rings]")
+{
+    ZOmega z1 = ZOmega(1, 2, 3, 4);
+    ZOmega z2 = ZOmega(5, 6, 7, 8);
+    DyadicMatrix m1{z1, z2, z1, z2};
+    SO3Matrix so3_mat{m1};
+
+    std::array<int, 3> expected_parity_vec{1, 0, 1};
+    CHECK(so3_mat.parity_vec() == expected_parity_vec);
+
+    std::array<std::array<int, 3>, 3> expected_parity{{{1, 0, 0}, {0, 0, 0}, {1, 0, 0}}};
+    CHECK(so3_mat.parity_mat() == expected_parity);
+
+    auto matmul_res = so3_matrix_mul(so3_mat, so3_mat);
+    auto matmul_expected = SO3Matrix(
+        std::array<std::array<ZSqrtTwo, 3>, 3>{
+            {{ZSqrtTwo(-35, -18), ZSqrtTwo(8, 6), ZSqrtTwo(36, 18)},
+             {ZSqrtTwo(0, 0), ZSqrtTwo(0, 0), ZSqrtTwo(0, 0)},
+             {ZSqrtTwo(-35, -18), ZSqrtTwo(8, 6), ZSqrtTwo(36, 18)}}},
+        -8);
+
+    CHECK(matmul_res == matmul_expected);
 }
