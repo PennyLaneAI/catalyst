@@ -1049,15 +1049,12 @@ class TestCapture:
 
         assert jnp.allclose(circuit(0.1), capture_result)
 
+    @pytest.mark.usefixtures("use_capture")
     def test_pass_with_options(self, backend):
         """Test the integration for a circuit with a pass that takes in options."""
 
-        # Capture enabled
-
-        qml.capture.enable()
-
         @qml.transform
-        def my_pass(_tape):
+        def my_pass(_tape, my_option=None, my_other_option=None):
             """A dummy qml.transform."""
             return
 
@@ -1075,8 +1072,6 @@ class TestCapture:
             'with options = {"my-option" = "my_option_value", "my-other-option" = false}'
             in capture_mlir
         )
-
-        qml.capture.disable()
 
     def test_transform_cancel_inverses_workflow(self, backend):
         """Test the integration for a circuit with a 'cancel_inverses' transform."""
