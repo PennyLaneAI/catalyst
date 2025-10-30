@@ -20,14 +20,12 @@ const std::complex<double> OMEGA = std::complex<double>(M_SQRT1_2, M_SQRT1_2);
 using INT_TYPE = __int128;
 using MULTI_PREC_INT = boost::multiprecision::cpp_int;
 
-class ZOmega;
-class ZOmega_multiprec;
-class ZSqrtTwo;
-class DyadicMatrix;
-class SO3Matrix;
+struct ZOmega;
+struct ZOmega_multiprec;
+struct ZSqrtTwo;
+struct DyadicMatrix;
+struct SO3Matrix;
 
-std::ostream &operator<<(std::ostream &os, __int128 n);
-std::ostream &operator<<(std::ostream &os, unsigned __int128 n);
 std::ostream &operator<<(std::ostream &os, const ZOmega &zomega);
 std::ostream &operator<<(std::ostream &os, const ZSqrtTwo &zsqtwo);
 std::ostream &operator<<(std::ostream &os, const SO3Matrix &matrix);
@@ -36,8 +34,7 @@ DyadicMatrix dyadic_matrix_mul(const DyadicMatrix &m1, const DyadicMatrix &m2);
 SO3Matrix so3_matrix_mul(const SO3Matrix &m1, const SO3Matrix &m2);
 ZOmega zomega_from_sqrt_pair(const ZSqrtTwo &alpha, const ZSqrtTwo &beta, const ZOmega &shift);
 
-class ZSqrtTwo {
-  public:
+struct ZSqrtTwo {
     INT_TYPE a, b;
 
     ZSqrtTwo(INT_TYPE a = 0, INT_TYPE b = 0);
@@ -60,11 +57,9 @@ class ZSqrtTwo {
     ZOmega to_omega() const;
 };
 
-class ZOmega {
-  public:
+struct ZOmega {
     INT_TYPE a, b, c, d;
 
-  public:
     ZOmega(INT_TYPE a, INT_TYPE b, INT_TYPE c, INT_TYPE d);
     ZOmega(INT_TYPE a = 0);
 
@@ -87,11 +82,10 @@ class ZOmega {
     ZOmega norm() const;
 
     ZSqrtTwo to_sqrt_two() const;
-    // std::pair<ZOmega, int> normalize();
+    std::pair<ZOmega, int> normalize();
 };
 
-class ZOmega_multiprec {
-  public:
+struct ZOmega_multiprec {
     MULTI_PREC_INT a, b, c, d;
 
     ZOmega_multiprec(MULTI_PREC_INT a, MULTI_PREC_INT b, MULTI_PREC_INT c, MULTI_PREC_INT d);
@@ -102,14 +96,12 @@ class ZOmega_multiprec {
     ZOmega_multiprec operator-(ZOmega_multiprec other) const;
 };
 
-class DyadicMatrix {
-  public:
+struct DyadicMatrix {
     ZOmega a, b, c, d;
     INT_TYPE k;
 
     void normalize();
 
-  public:
     DyadicMatrix(const ZOmega &a, const ZOmega &b, const ZOmega &c, const ZOmega &d,
                  INT_TYPE k = 0);
 
@@ -121,15 +113,14 @@ class DyadicMatrix {
     friend DyadicMatrix dyadic_matrix_mul(const DyadicMatrix &m1, const DyadicMatrix &m2);
 };
 
-class SO3Matrix {
-  public:
+struct SO3Matrix {
+    DyadicMatrix dyadic_mat{ZOmega(), ZOmega(), ZOmega(), ZOmega(), 0};
     std::array<std::array<ZSqrtTwo, 3>, 3> so3_mat;
     INT_TYPE k;
 
     void normalize();
     void from_dyadic_matrix(const DyadicMatrix &dy_mat);
 
-  public:
     SO3Matrix(const DyadicMatrix &dy_mat);
     SO3Matrix(const std::array<std::array<ZSqrtTwo, 3>, 3> &mat, int k = 0);
 
@@ -137,7 +128,6 @@ class SO3Matrix {
     std::array<std::array<int, 3>, 3> parity_mat() const;
     std::array<int, 3> parity_vec() const;
     std::array<ZSqrtTwo, 9> flatten() const;
-    // DyadicMatrix dyadic_matrix();
 
     friend SO3Matrix so3_matrix_mul(const SO3Matrix &m1, const SO3Matrix &m2);
 };

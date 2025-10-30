@@ -205,19 +205,20 @@ ZSqrtTwo ZOmega::to_sqrt_two() const
     throw std::invalid_argument("Invalid ZOmega for conversion to ZSqrtTwo");
 }
 
-// std::pair<ZOmega, int> ZOmega::normalize() {
-//     int ix = 0;
-//     ZOmega res = *this;
-//     while (((res.a + res.c) % 2) == 0 && ((res.b + res.d) % 2) == 0) {
-//         INT_TYPE a = floor_div(res.b - res.d, (INT_TYPE)2);
-//         INT_TYPE b = floor_div(res.a + res.c, (INT_TYPE)2);
-//         INT_TYPE c = floor_div(res.b + res.d, (INT_TYPE)2);
-//         INT_TYPE d = floor_div(res.c - res.a, (INT_TYPE)2);
-//         res = ZOmega(a, b, c, d);
-//         ix += 1;
-//     }
-//     return {res, ix};
-// }
+std::pair<ZOmega, int> ZOmega::normalize()
+{
+    int ix = 0;
+    ZOmega res = *this;
+    while (((res.a + res.c) % 2) == 0 && ((res.b + res.d) % 2) == 0) {
+        INT_TYPE a = floor_div(res.b - res.d, (INT_TYPE)2);
+        INT_TYPE b = floor_div(res.a + res.c, (INT_TYPE)2);
+        INT_TYPE c = floor_div(res.b + res.d, (INT_TYPE)2);
+        INT_TYPE d = floor_div(res.c - res.a, (INT_TYPE)2);
+        res = ZOmega(a, b, c, d);
+        ix += 1;
+    }
+    return {res, ix};
+}
 
 // --- ZOmega_multiprec Method Implementations ---
 
@@ -311,7 +312,7 @@ DyadicMatrix DyadicMatrix::operator*(const ZOmega &scalar) const
 
 // --- SO3Matrix Method Implementations ---
 
-SO3Matrix::SO3Matrix(const DyadicMatrix &dy_mat)
+SO3Matrix::SO3Matrix(const DyadicMatrix &dy_mat) : dyadic_mat(dy_mat)
 {
     from_dyadic_matrix(dy_mat);
     normalize();
@@ -467,6 +468,7 @@ SO3Matrix so3_matrix_mul(const SO3Matrix &m1, const SO3Matrix &m2)
         }
     }
     SO3Matrix result(result_mat, m1.k + m2.k);
+    result.dyadic_mat = dyadic_matrix_mul(m1.dyadic_mat, m2.dyadic_mat);
     return result;
 }
 

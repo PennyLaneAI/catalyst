@@ -4,7 +4,9 @@
 #include <iostream>
 #include <string>
 
-template <typename T> T math_mod(T a, T n)
+template <typename T> inline T abs_val(T x) { return (x < 0) ? -x : x; }
+
+template <typename T> inline T math_mod(T a, T n)
 {
     if (n == 0) {
         throw std::invalid_argument("Modulo by zero");
@@ -29,7 +31,7 @@ template <typename T> inline T floor_div(T a, T b)
     return q;
 }
 
-std::ostream &operator<<(std::ostream &os, __int128_t value)
+inline std::ostream &operator<<(std::ostream &os, __int128_t value)
 {
     if (value == 0) {
         os << "0";
@@ -60,7 +62,7 @@ std::ostream &operator<<(std::ostream &os, __int128_t value)
     return os;
 }
 
-std::ostream &operator<<(std::ostream &os, unsigned __int128 n)
+inline std::ostream &operator<<(std::ostream &os, unsigned __int128 n)
 {
     if (n == 0) {
         os << "0";
