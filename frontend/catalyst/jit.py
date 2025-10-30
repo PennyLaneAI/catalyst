@@ -26,10 +26,6 @@ import warnings
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from jax._src.interpreters import partial_eval as pe
-from jax._src.interpreters.partial_eval import DynamicJaxprTrace
-from jax._src.lax import lax
-from jax._src.pjit import jit_p
 from jax.api_util import debug_info
 from jax.interpreters import mlir
 from jax.tree_util import tree_flatten, tree_unflatten
@@ -40,13 +36,6 @@ from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvmir, to_mlir_opt
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
-from catalyst.jax_extras.patches import (
-    get_aval2,
-    patched_drop_unused_vars,
-    patched_dyn_shape_staging_rule,
-    patched_make_eqn,
-    patched_pjit_staging_rule,
-)
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.qfunc import QFunc
@@ -66,7 +55,7 @@ from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
-from catalyst.utils.patching import DictPatchWrapper, Patcher
+from catalyst.utils.patching import Patcher
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -738,65 +727,43 @@ class QJIT(CatalystCallable):
 
         dbg = debug_info("qjit_capture", self.user_function, args, kwargs)
 
+        if qml.capture.enabled():
+            return trace_from_pennylane(
+                self.user_function,
+                static_argnums,
+                dynamic_args,
+                abstracted_axes,
+                full_sig,
+                kwargs,
+                debug_info=dbg,
+            )
+
+        def closure(qnode, *args, **kwargs):
+            params = {}
+            params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
+            params["_out_tree_expected"] = []
+            params["_classical_return_indices"] = []
+            params["_num_mcm_expected"] = []
+            default_pass_pipeline = self.compile_options.circuit_transform_pipeline
+            pass_pipeline = params.get("pass_pipeline", default_pass_pipeline)
+            params["pass_pipeline"] = pass_pipeline
+            params["debug_info"] = dbg
+
+            return QFunc.__call__(
+                qnode,
+                *args,
+                **dict(params, **kwargs),
+            )
+
         with Patcher(
-            (pe, "_drop_unused_vars", patched_drop_unused_vars),
-            (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
-            (lax, "_dyn_shape_staging_rule", patched_dyn_shape_staging_rule),
-            (
-                jax._src.pjit,  # pylint: disable=protected-access
-                "pjit_staging_rule",
-                patched_pjit_staging_rule,
-            ),
-            (
-                DictPatchWrapper(pe.custom_staging_rules, jit_p),
-                "value",
-                patched_pjit_staging_rule,
-            ),
+            (qml.QNode, "__call__", closure),
         ):
-            if qml.capture.enabled():
-                with Patcher(
-                    (
-                        jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
-                        "get_aval",
-                        get_aval2,
-                    ),
-                ):
-                    return trace_from_pennylane(
-                        self.user_function,
-                        static_argnums,
-                        dynamic_args,
-                        abstracted_axes,
-                        full_sig,
-                        kwargs,
-                        debug_info=dbg,
-                    )
-
-            def closure(qnode, *args, **kwargs):
-                params = {}
-                params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
-                params["_out_tree_expected"] = []
-                params["_classical_return_indices"] = []
-                params["_num_mcm_expected"] = []
-                default_pass_pipeline = self.compile_options.circuit_transform_pipeline
-                pass_pipeline = params.get("pass_pipeline", default_pass_pipeline)
-                params["pass_pipeline"] = pass_pipeline
-                params["debug_info"] = dbg
-
-                return QFunc.__call__(
-                    qnode,
-                    *args,
-                    **dict(params, **kwargs),
-                )
-
-            with Patcher(
-                (qml.QNode, "__call__", closure),
-            ):
-                # TODO: improve PyTree handling
-                jaxpr, out_type, treedef, plugins = trace_to_jaxpr(
-                    self.user_function, static_argnums, abstracted_axes, full_sig, kwargs, dbg
-                )
-                self.compile_options.pass_plugins.update(plugins)
-                self.compile_options.dialect_plugins.update(plugins)
+            # TODO: improve PyTree handling
+            jaxpr, out_type, treedef, plugins = trace_to_jaxpr(
+                self.user_function, static_argnums, abstracted_axes, full_sig, kwargs, dbg
+            )
+            self.compile_options.pass_plugins.update(plugins)
+            self.compile_options.dialect_plugins.update(plugins)
 
         return jaxpr, out_type, treedef, dynamic_sig
 

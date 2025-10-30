@@ -67,22 +67,7 @@ if not INSTALLED:
 sys.modules["mlir_quantum.ir"] = __import__("jaxlib.mlir.ir").mlir.ir
 sys.modules["mlir_quantum._mlir_libs"] = __import__("jaxlib.mlir._mlir_libs").mlir._mlir_libs
 
-# # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
-# # Catalyst's MLIR version and the MLIR version used by JAX. The current JAX version has not
-# # yet updated to the latest MLIR, causing compatibility issues. This workaround will be removed
-# # once JAX updates to a compatible MLIR version
-# from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 
-# # pylint: disable=ungrouped-imports
-# from catalyst.jax_extras.patches import mock_attributes
-
-# Disable JAX's Shardy partitioner for JAX 0.7+ compatibility
-# Shardy adds 'sdy' dialect attributes that Catalyst doesn't support yet
-import jax
-
-jax.config.update("jax_use_shardy_partitioner", False)
-
-# pylint: disable=ungrouped-imports
 from catalyst import debug, logging, passes
 from catalyst.api_extensions import *
 from catalyst.api_extensions import __all__ as _api_extension_list

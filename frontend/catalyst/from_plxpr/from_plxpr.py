@@ -450,7 +450,37 @@ def trace_from_pennylane(
         Tuple[Any]: the dynamic argument signature
     """
 
-    with transient_jax_config({"jax_dynamic_shapes": True}):
+    # pylint: disable=import-outside-toplevel
+    import jax._src.interpreters.partial_eval as pe
+    from jax._src.lax import lax
+    from jax._src.pjit import jit_p
+
+    from catalyst.jax_extras.patches import (
+        get_aval2,
+        patched_drop_unused_vars,
+        patched_dyn_shape_staging_rule,
+        patched_pjit_staging_rule,
+    )
+    from catalyst.utils.patching import DictPatchWrapper
+
+    with transient_jax_config(
+        {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
+    ), Patcher(
+        (pe, "_drop_unused_vars", patched_drop_unused_vars),
+        (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
+        (lax, "_dyn_shape_staging_rule", patched_dyn_shape_staging_rule),
+        (
+            jax._src.pjit,  # pylint: disable=protected-access
+            "pjit_staging_rule",
+            patched_pjit_staging_rule,
+        ),
+        (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
+        (
+            jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
+            "get_aval",
+            get_aval2,
+        ),
+    ):
 
         make_jaxpr_kwargs = {
             "static_argnums": static_argnums,
