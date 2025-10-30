@@ -53,6 +53,7 @@ from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 
+# TODO: remove after jax v0.7.2 upgrade
 # Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
 # Catalyst's MLIR version and the MLIR version used by JAX. The current JAX version has not
 # yet updated to the latest MLIR, causing compatibility issues. This workaround will be removed
