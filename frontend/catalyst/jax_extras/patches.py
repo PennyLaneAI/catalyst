@@ -20,6 +20,7 @@ from __future__ import annotations
 from functools import partial
 
 import jax
+import jax._src.interpreters.mlir as mlir
 import jax._src.interpreters.partial_eval as pe
 from jax._src import config, core, source_info_util
 from jax._src.core import JaxprEqnContext, Var, abstractify, standard_vma_rule
@@ -55,6 +56,7 @@ __all__ = (
     "patched_make_eqn",
     "patched_dyn_shape_staging_rule",
     "patched_pjit_staging_rule",
+    "patched_multi_broadcast_in_dim",
 )
 
 
@@ -327,6 +329,38 @@ def patched_make_eqn(
         return eqn, (out_tracers_result[0] if len(out_tracers_result) == 1 else out_tracers_result)
     else:
         return make_eqn_internal(out_avals, out_tracers)
+
+
+def patched_multi_broadcast_in_dim(ctx, ops, ops_avals, out_shape, out_sharding=None):
+    """Patched version that uses DShapedArray for dynamic shapes."""
+    out = []
+    for op, op_aval in zip(ops, ops_avals):
+        op_aval_shape = op_aval.shape
+        op_aval_sharding = getattr(op_aval, "sharding", None)
+
+        # Use DShapedArray if shape contains dynamic dimensions
+        if core.is_constant_shape(out_shape):
+            out_aval = core.ShapedArray(out_shape, op_aval.dtype, sharding=out_sharding)
+        else:
+            # DShapedArray doesn't support sharding parameter
+            out_aval = core.DShapedArray(
+                out_shape, op_aval.dtype, weak_type=getattr(op_aval, "weak_type", False)
+            )
+
+        if core.definitely_equal_shape(op_aval_shape, out_shape):
+            if out_sharding is None or op_aval_sharding == out_sharding:
+                out.append(op)
+            else:
+                out.append(mlir.lower_with_sharding_in_types(ctx, op, out_aval))
+        else:
+            assert len(op_aval_shape) <= len(out_shape), (op_aval_shape, out_shape)
+            broadcast_dimensions = list(range(len(out_shape) - len(op_aval_shape), len(out_shape)))
+            b_out = mlir.broadcast_in_dim(
+                ctx, op, out_aval, broadcast_dimensions=broadcast_dimensions
+            )
+            b_out = mlir.lower_with_sharding_in_types(ctx, b_out, out_aval)
+            out.append(b_out)
+    return out
 
 
 def patched_dyn_shape_staging_rule(trace, source_info, prim, out_aval, *args, **params):
