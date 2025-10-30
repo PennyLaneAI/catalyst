@@ -40,8 +40,6 @@ def GatesToPulsesPass : Pass<"gates-to-pulses"> {
         "ion::IonDialect",
         "scf::SCFDialect"
     ];
-
-    let constructor = "catalyst::createGatesToPulsesPass()";
 }
 
 def IonConversionPass : Pass<"convert-ion-to-llvm"> {
@@ -52,8 +50,6 @@ def IonConversionPass : Pass<"convert-ion-to-llvm"> {
        "mlir::LLVM::LLVMDialect",
        "catalyst::quantum::QuantumDialect",
     ];
-
-    let constructor = "catalyst::createIonConversionPass()";
 }
 
 #endif // ION_PASSES

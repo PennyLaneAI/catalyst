@@ -4,6 +4,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* A new option ``use_nameloc`` has been added to :func:`~.qjit` that embeds variable names
+  from Python into the compiler IR, which can make it easier to read when debugging programs.
+  [(#2054)](https://github.com/PennyLaneAI/catalyst/pull/2054)
+
 * Dynamically allocated wires can now be passed into control flow and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
 
@@ -20,6 +24,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Refactor Catalyst pass registering so that it's no longer necessary to manually add new
+  passes at `registerAllCatalystPasses`.
+  [(#1984)](https://github.com/PennyLaneAI/catalyst/pull/1984)
+
 * Split `from_plxpr.py` into two files.
   [(#2142)](https://github.com/PennyLaneAI/catalyst/pull/2142)
 
@@ -28,9 +36,13 @@
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
   [(#2136)](https://github.com/PennyLaneAI/catalyst/pull/2136)
 
+* Fix `catalyst.qjit` and `catalyst.CompileOptions` docs rendering.
+  [(#2156)](https://github.com/PennyLaneAI/catalyst/pull/2156)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Christina Lee,
+Roberto Turrado,
 Paul Haochen Wang.

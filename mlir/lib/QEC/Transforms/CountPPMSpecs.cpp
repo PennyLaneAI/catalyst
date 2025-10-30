@@ -40,7 +40,6 @@ namespace catalyst {
 namespace qec {
 
 #define GEN_PASS_DEF_COUNTPPMSPECSPASS
-#define GEN_PASS_DECL_COUNTPPMSPECSPASS
 #include "QEC/Transforms/Passes.h.inc"
 
 struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass> {
@@ -244,8 +243,4 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
 };
 
 } // namespace qec
-
-/// Create a pass for lowering operations in the `QECDialect`.
-std::unique_ptr<Pass> createCountPPMSpecsPass() { return std::make_unique<CountPPMSpecsPass>(); }
-
 } // namespace catalyst
