@@ -20,9 +20,9 @@ import textwrap
 
 import jax
 from jax._src import core
-from jax._src.interpreters.pxla import _jaxpr_replicas as jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
+from jax._src.interpreters.pxla import _jaxpr_replicas as jaxpr_replicas
 from jax._src.sharding_impls import AxisEnv, ReplicaAxisContext
 from jax.extend.core import ClosedJaxpr
 from jax.interpreters.mlir import (

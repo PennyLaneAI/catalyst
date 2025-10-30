@@ -462,8 +462,8 @@ def trace_from_pennylane(
         get_aval2,
         patched_drop_unused_vars,
         patched_dyn_shape_staging_rule,
-        patched_pjit_staging_rule,
         patched_multi_broadcast_in_dim,
+        patched_pjit_staging_rule,
     )
     from catalyst.utils.patching import DictPatchWrapper
 

@@ -667,8 +667,8 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs, debug_in
         patched_drop_unused_vars,
         patched_dyn_shape_staging_rule,
         patched_make_eqn,
-        patched_pjit_staging_rule,
         patched_multi_broadcast_in_dim,
+        patched_pjit_staging_rule,
     )
     from catalyst.utils.patching import DictPatchWrapper, Patcher
 
