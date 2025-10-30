@@ -321,6 +321,46 @@ def test_pauli_rot_and_measure_with_cond():
 test_pauli_rot_and_measure_with_cond()
 
 
+def test_pauli_rot_with_adjoint_and_capture_disabled():
+    """Test PauliRot with adjoint and capture disabled"""
+    dev = qml.device("catalyst.ftqc", wires=1)
+
+    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipeline, target="mlir")
+    @qml.qnode(device=dev)
+    def circuit():
+        qml.adjoint(qml.PauliRot(np.pi / 2, "Z", wires=0))
+
+    # CHECK: qec.ppr ["Z"](-4)
+    print(circuit.mlir_opt)
+
+
+test_pauli_rot_with_adjoint_and_capture_disabled()
+
+
+def test_plain_lowering_with_capture_disabled():
+    """Test lowering without passes with capture disabled"""
+    dev = qml.device("catalyst.ftqc", wires=1)
+
+    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipeline, target="mlir")
+    @qml.qnode(device=dev)
+    def circuit():
+        qml.PauliRot(np.pi / 2, "X", wires=0)
+        qml.PauliRot(np.pi / 4, "Y", wires=0)
+        qml.pauli_measure("X", wires=0)
+
+    # CHECK: qec.ppr ["X"](4)
+    # CHECK: qec.ppr ["Y"](8)
+    # CHECK: qec.ppm ["X"]
+    print(circuit.mlir_opt)
+
+
+test_plain_lowering_with_capture_disabled()
+
+
 def test_with_capture_disabled():
     """Test with capture disabled"""
     dev = qml.device("catalyst.ftqc", wires=1)
