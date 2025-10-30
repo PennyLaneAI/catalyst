@@ -176,24 +176,24 @@ def handle_qnode(
     )
 
     graph_succeeded = False
-    if self.requires_decompose_lowering:
-        closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
-            inner_jaxpr=closed_jaxpr.jaxpr,
-            consts=closed_jaxpr.consts,
-            tkwargs=self.decompose_tkwargs,
-            ncargs=non_const_args,
-        )
+    # if self.requires_decompose_lowering:
+    #     closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
+    #         inner_jaxpr=closed_jaxpr.jaxpr,
+    #         consts=closed_jaxpr.consts,
+    #         tkwargs=self.decompose_tkwargs,
+    #         ncargs=non_const_args,
+    #     )
 
-        # Fallback to the legacy decomposition if the graph-based decomposition failed
-        if not graph_succeeded:
-            # Remove the decompose-lowering pass from the pipeline
-            self._pass_pipeline = [p for p in self._pass_pipeline if p.name != "decompose-lowering"]
-            closed_jaxpr = _apply_compiler_decompose_to_plxpr(
-                inner_jaxpr=closed_jaxpr.jaxpr,
-                consts=closed_jaxpr.consts,
-                ncargs=non_const_args,
-                tkwargs=self.decompose_tkwargs,
-            )
+    #     # Fallback to the legacy decomposition if the graph-based decomposition failed
+    #     if not graph_succeeded:
+    #         # Remove the decompose-lowering pass from the pipeline
+    #         self._pass_pipeline = [p for p in self._pass_pipeline if p.name != "decompose-lowering"]
+    #         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
+    #             inner_jaxpr=closed_jaxpr.jaxpr,
+    #             consts=closed_jaxpr.consts,
+    #             ncargs=non_const_args,
+    #             tkwargs=self.decompose_tkwargs,
+    #         )
 
     def calling_convention(*args):
         device_init_p.bind(
@@ -441,7 +441,7 @@ def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=Non
     qml.decomposition.disable_graph()
 
     kwargs = (
-        {"gate_set": set(COMPILER_OPS_FOR_DECOMPOSITION.keys()).union(tgateset)}
+        {"gate_set": tgateset}
         if tgateset
         else tkwargs
     )
