@@ -47,7 +47,7 @@ def DecomposeMethodOption : Option<
     /*C++ var name=*/"decomposeMethod",
     /*CLI arg name=*/"decompose-method",
     /*type=*/"::catalyst::qec::DecomposeMethod",
-    /*default=*/"::catalyst::qec::DecomposeMethod::AutoCorrected",
+    /*default=*/"::catalyst::qec::DecomposeMethod::PauliCorrected",
     "Decomposition method to use",
     [{::llvm::cl::values(
         clEnumValN(::catalyst::qec::DecomposeMethod::AutoCorrected,
