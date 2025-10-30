@@ -38,13 +38,12 @@ from pennylane.measurements import (
     CountsMP,
     ExpectationMP,
     MeasurementProcess,
-    PauliMeasure,
     ProbabilityMP,
     StateMP,
     VarianceMP,
 )
 from pennylane.operation import Operation, Operator, Wires
-from pennylane.ops import Adjoint, Controlled, ControlledOp
+from pennylane.ops import Adjoint, Controlled, ControlledOp, PauliMeasure
 from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
 
