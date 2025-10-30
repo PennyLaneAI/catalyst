@@ -12,6 +12,8 @@
   :func:`~.qjit` with program capture enabled.
   [(#2154)](https://github.com/PennyLaneAI/catalyst/pull/2154)
 
+* Pytree inputs can now be used when program capture is enabled.
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>

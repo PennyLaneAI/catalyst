@@ -399,7 +399,7 @@ def trace_from_pennylane(
             fn.static_argnums = static_argnums
 
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-        jaxpr = from_plxpr(plxpr)(*dynamic_args, **kwargs)
+        jaxpr = from_plxpr(plxpr)(*plxpr.in_avals)
 
     return jaxpr, out_type, out_treedef, sig
 
