@@ -143,10 +143,7 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=False):
     kwargs["name"] = name
     kwargs["jaxpr"] = call_jaxpr
     kwargs["effects"] = []
-
-    # Make the visibility of the function main_function=True
-    # to avoid elimination by the compiler
-    kwargs["main_function"] = public
+    kwargs["main_function"] = False
 
     const_args = core.jaxpr_const_args(call_jaxpr.jaxpr)
     const_arg_avals = [core.shaped_abstractify(c) for c in const_args]
@@ -156,6 +153,8 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=False):
     kwargs["num_const_args"] = num_const_args
 
     func_op = mlir.lower_jaxpr_to_fun(**kwargs)
+    if public:
+        func_op.attributes["sym_visibility"] = ir.StringAttr.get("public")
 
     if isinstance(callable_, qml.QNode):
         func_op.attributes["qnode"] = ir.UnitAttr.get()

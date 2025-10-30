@@ -65,19 +65,8 @@ limitations under the License.
 #include "stablehlo/transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 
-#include "hlo-extensions/Passes.h"
-
 using namespace mlir;
 using namespace stablehlo;
-using namespace catalyst;
-
-namespace catalyst {
-
-#define GEN_PASS_DEF_STABLEHLOLEGALIZESORTPASS
-#define GEN_PASS_DECL_STABLEHLOLEGALIZESORTPASS
-#include "hlo-extensions/Passes.h.inc"
-
-} // namespace catalyst
 
 namespace {
 
@@ -569,8 +558,16 @@ struct SortOpPattern : public OpRewritePattern<SortOp> {
     }
 };
 
+} // namespace
+
+namespace catalyst {
+namespace hlo_extensions {
+
+#define GEN_PASS_DEF_STABLEHLOLEGALIZESORTPASS
+#include "hlo-extensions/Transforms/Passes.h.inc"
+
 struct StablehloLegalizeSortPass
-    : public catalyst::impl::StablehloLegalizeSortPassBase<StablehloLegalizeSortPass> {
+    : public impl::StablehloLegalizeSortPassBase<StablehloLegalizeSortPass> {
     // Perform the lowering to MLIR control flow.
     void runOnOperation() override
     {
@@ -590,9 +587,5 @@ struct StablehloLegalizeSortPass
     }
 };
 
-} // namespace
-
-std::unique_ptr<Pass> catalyst::createStablehloLegalizeSortPass()
-{
-    return std::make_unique<StablehloLegalizeSortPass>();
-}
+} // namespace hlo_extensions
+} // namespace catalyst
