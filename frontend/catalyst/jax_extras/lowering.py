@@ -45,7 +45,11 @@ from catalyst.utils.patching import Patcher
 
 __all__ = ("jaxpr_to_mlir", "custom_lower_jaxpr_to_module")
 
-from catalyst.jax_extras.patches import _no_clean_up_dead_vars, get_aval2
+from catalyst.jax_extras.patches import (
+    _no_clean_up_dead_vars,
+    get_aval2,
+    patched_multi_broadcast_in_dim,
+)
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -68,6 +72,7 @@ def jaxpr_to_mlir(jaxpr, func_name, arg_names):
     with Patcher(
         (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
         (jax._src.core, "clean_up_dead_vars", _no_clean_up_dead_vars),
+        (jax._src.interpreters.mlir, "multi_broadcast_in_dim", patched_multi_broadcast_in_dim),
     ):
         nrep = jaxpr_replicas(jaxpr)
         effects = jax_ordered_effects.filter_in(jaxpr.effects)

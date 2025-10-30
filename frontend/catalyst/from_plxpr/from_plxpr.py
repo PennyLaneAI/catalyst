@@ -462,7 +462,6 @@ def trace_from_pennylane(
         get_aval2,
         patched_drop_unused_vars,
         patched_dyn_shape_staging_rule,
-        patched_multi_broadcast_in_dim,
         patched_pjit_staging_rule,
     )
     from catalyst.utils.patching import DictPatchWrapper
@@ -480,11 +479,6 @@ def trace_from_pennylane(
         ),
         (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
         (pe, "get_aval", get_aval2),
-        (
-            jax._src.interpreters.mlir,
-            "multi_broadcast_in_dim",
-            patched_multi_broadcast_in_dim,
-        ),
     ):
 
         make_jaxpr_kwargs = {

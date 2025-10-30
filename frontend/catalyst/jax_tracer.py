@@ -667,7 +667,6 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs, debug_in
         patched_drop_unused_vars,
         patched_dyn_shape_staging_rule,
         patched_make_eqn,
-        patched_multi_broadcast_in_dim,
         patched_pjit_staging_rule,
     )
     from catalyst.utils.patching import DictPatchWrapper, Patcher
@@ -684,11 +683,6 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs, debug_in
             patched_pjit_staging_rule,
         ),
         (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
-        (
-            jax._src.interpreters.mlir,  # pylint: disable=protected-access
-            "multi_broadcast_in_dim",
-            patched_multi_broadcast_in_dim,
-        ),
     ):
         make_jaxpr_kwargs = {
             "static_argnums": static_argnums,
