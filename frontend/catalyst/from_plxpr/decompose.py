@@ -234,8 +234,15 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                         num_params=num_params,
                         requires_copy=num_wires == -1,
                     )
-                else:  # pragma: no cover
-                    raise ValueError(f"Could not capture {op} without the number of wires.")
+                # elif not any(
+                #     keyword in getattr(op.op, "name", "") for keyword in ("Adjoint", "Controlled")
+                # ):  # pragma: no cover
+                    # Note that the graph-decomposition returns abstracted rules
+                    # for Adjoint and Controlled operations, so we skip them here.
+                    # These abstracted rules cannot be captured and lowered.
+                    # We use MLIR AdjointOp and ControlledOp primitives
+                    # to deal with decomposition of symbolic operations at PLxPR.
+                    # raise ValueError(f"Could not capture {op} without the number of wires.")
 
         data, struct = jax.tree_util.tree_flatten(measurement)
         return jax.tree_util.tree_unflatten(struct, data)
