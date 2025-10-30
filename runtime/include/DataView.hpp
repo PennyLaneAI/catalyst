@@ -56,16 +56,15 @@ template <typename T, size_t R> class DataView {
         iterator &operator++()
         {
             int64_t next_axis = -1;
-            int64_t idx;
-            for (int64_t i = R; i > 0; --i) {
-                idx = i - 1;
-                RT_ASSERT(view.sizes[idx] > 0);
-                if (indices[idx]++ < view.sizes[idx] - 1) {
-                    next_axis = idx;
+            for (int64_t axis = R - 1; axis >= 0; axis--) {
+                if (++indices[axis] < view.sizes[axis]) {
+                    next_axis = axis;
                     break;
                 }
-                indices[idx] = 0;
-                loc -= (view.sizes[idx] - 1) * view.strides[idx];
+
+                indices[axis] = 0;
+
+                loc -= view.sizes[axis] == 0 ? 0 : (view.sizes[axis] - 1) * view.strides[axis];
             }
 
             loc = next_axis == -1 ? -1 : loc + view.strides[next_axis];
@@ -73,22 +72,18 @@ template <typename T, size_t R> class DataView {
         }
         iterator operator++(int)
         {
-            auto tmp = *this;
             int64_t next_axis = -1;
-            int64_t idx;
-            for (int64_t i = R; i > 0; --i) {
-                idx = i - 1;
-                RT_ASSERT(view.sizes[idx] > 0);
-                if (indices[idx]++ < view.sizes[idx] - 1) {
-                    next_axis = idx;
+            for (int64_t axis = R - 1; axis > 0; axis--) {
+                if (++indices[axis] < view.sizes[axis]) {
+                    next_axis = axis;
                     break;
                 }
-                indices[idx] = 0;
-                loc -= (view.sizes[idx] - 1) * view.strides[idx];
+                indices[axis] = 0;
+                loc -= view.sizes[axis] == 0 ? 0 : (view.sizes[axis] - 1) * view.strides[axis];
             }
 
             loc = next_axis == -1 ? -1 : loc + view.strides[next_axis];
-            return tmp;
+            return *this;
         }
         bool operator==(const iterator &other) const
         {
@@ -138,7 +133,6 @@ template <typename T, size_t R> class DataView {
 
         size_t loc = offset;
         for (size_t axis = 0; axis < R; axis++) {
-            RT_ASSERT(indices[axis] < sizes[axis]);
             loc += indices[axis] * strides[axis];
         }
         return data_aligned[loc];
