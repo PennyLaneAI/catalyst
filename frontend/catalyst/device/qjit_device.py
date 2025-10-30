@@ -280,11 +280,7 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
     PPR_PPM_OPS = ["PauliRot", "PauliMeasure"]
     for op in PPR_PPM_OPS:
         if op in target_capabilities.operations:
-            qjit_capabilities.operations.update(
-                {
-                    op: target_capabilities.operations.get(op)
-                }
-            )
+            qjit_capabilities.operations.update({op: target_capabilities.operations.get(op)})
 
     # Enable runtime-powered snapshot of quantum state at any particular instance
     qjit_capabilities.operations.update(

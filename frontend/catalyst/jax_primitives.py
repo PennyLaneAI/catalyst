@@ -1388,9 +1388,7 @@ def _unitary_lowering(
 # pauli rot operation
 #
 @pauli_rot_p.def_abstract_eval
-def _pauli_rot_abstract_eval(
-    *qubits, theta=None, pauli_word=None, qubits_len=0, adjoint=False
-):
+def _pauli_rot_abstract_eval(*qubits, theta=None, pauli_word=None, qubits_len=0, adjoint=False):
     qubits = qubits[:qubits_len]
     assert all(isinstance(qubit, AbstractQbit) for qubit in qubits)
     return (AbstractQbit(),) * (qubits_len)
@@ -1490,7 +1488,7 @@ def _pauli_measure_lowering(
         in_qubits=qubits,
     ).results
 
-    result, *out_qubits = ppm_results # First element is the measurement result
+    result, *out_qubits = ppm_results  # First element is the measurement result
 
     result_type = ir.RankedTensorType.get((), result.type)
     from_elements_op = FromElementsOp(result_type, result)
