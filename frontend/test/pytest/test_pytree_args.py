@@ -245,7 +245,7 @@ class TestPyTreesReturnValues:
     def test_return_value_dict(self, backend, tol_stochastic, mcm_method):
         """Test dictionaries."""
 
-        if mcm_method=="one-shot" and qml.capture.enabled():
+        if mcm_method == "one-shot" and qml.capture.enabled():
             pytest.xfail()
 
         @qml.qnode(qml.device(backend, wires=2))
