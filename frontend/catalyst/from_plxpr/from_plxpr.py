@@ -23,7 +23,6 @@ from typing import Callable
 
 import jax
 import pennylane as qml
-from jax._src.interpreters.partial_eval import DynamicJaxprTrace
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
 from pennylane.capture import PlxprInterpreter, qnode_prim
@@ -193,6 +192,9 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
     """
 
     original_fn = partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts)
+
+    # pylint: disable=import-outside-toplevel
+    from jax._src.interpreters.partial_eval import DynamicJaxprTrace
 
     def wrapped_fn(*args, **kwargs):
         with Patcher(
@@ -452,6 +454,7 @@ def trace_from_pennylane(
 
     # pylint: disable=import-outside-toplevel
     import jax._src.interpreters.partial_eval as pe
+    from jax._src.interpreters.partial_eval import DynamicJaxprTrace
     from jax._src.lax import lax
     from jax._src.pjit import jit_p
 
@@ -475,11 +478,7 @@ def trace_from_pennylane(
             patched_pjit_staging_rule,
         ),
         (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
-        (
-            jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
-            "get_aval",
-            get_aval2,
-        ),
+        (pe, "get_aval", get_aval2),
     ):
 
         make_jaxpr_kwargs = {
