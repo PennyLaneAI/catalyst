@@ -284,7 +284,7 @@ def _qubit_unitary_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjo
     return unitary_p.bind(mat, *wires, *ctrl_inputs, qubits_len=qubits_len, ctrl_len=ctrl_len, adjoint=adjoint)
 
 def _gphase_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint):
-    return gphase_p.bind(*invals, ctrl_len=ctrl_len, adjoint=adjoint)
+    return gphase_p.bind(invals[qubits_len], ctrl_len=ctrl_len, adjoint=adjoint)
 
 
 _special_op_bind_call = {
@@ -592,13 +592,14 @@ def handle_adjoint_transform(
         init_qreg.insert_all_dangling_qubits()
         return *retvals, converter.init_qreg.get()
 
-    _, args_tree = tree_flatten((consts, args, [qreg]))
-    converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*consts, *args, qreg).jaxpr
+    converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*args, qreg)
 
-    converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
+    converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch.jaxpr), ())
+    new_consts = converted_jaxpr_branch.consts
+    _, args_tree = tree_flatten((new_consts, args, [qreg]))
     # Perform the binding
     outvals = adjoint_p.bind(
-        *consts,
+        *new_consts,
         *args,
         qreg,
         jaxpr=converted_closed_jaxpr_branch,
