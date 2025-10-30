@@ -13,6 +13,10 @@
   from Python into the compiler IR, which can make it easier to read when debugging programs.
   [(#2054)](https://github.com/PennyLaneAI/catalyst/pull/2054)
 
+* Passes registered under `qml.transform` can now take in options when used with
+  :func:`~.qjit` with program capture enabled.
+  [(#2154)](https://github.com/PennyLaneAI/catalyst/pull/2154)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
