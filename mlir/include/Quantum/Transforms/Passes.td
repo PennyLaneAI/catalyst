@@ -86,6 +86,10 @@ def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
     let summary = "Perform removal of chained operations that are self inverses.";
 }
 
+def RSDecompositionPass : Pass<"rs-decomposition"> {
+    let summary = "Perform RS decomposition.";
+}
+
 def MergeRotationsPass : Pass<"merge-rotations"> {
     let summary = "Perform merging of chained rotation gates about the same axis.";
 
