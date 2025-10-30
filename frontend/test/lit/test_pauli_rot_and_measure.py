@@ -44,9 +44,9 @@ def test_single_qubit_pauli_rotations():
         qml.PauliRot(np.pi / 2, "Y", wires=0)
         qml.PauliRot(np.pi, "Z", wires=0)
 
-    # CHECK: qec.ppr ["X"](8)
-    # CHECK: qec.ppr ["Y"](4)
-    # CHECK: qec.ppr ["Z"](2)
+    # CHECK: [[q0:%.+]] = qec.ppr ["X"](8)
+    # CHECK: [[q1:%.+]] = qec.ppr ["Y"](4) [[q0]]
+    # CHECK: [[q2:%.+]] = qec.ppr ["Z"](2) [[q1]]
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -64,15 +64,15 @@ def test_multi_qubit_pauli_rotations():
     @qjit(pipelines=pipeline, target="mlir")
     @qml.qnode(device=dev)
     def circuit():
-        qml.PauliRot(np.pi / 4, "XY", wires=[0, 1])
+        qml.PauliRot(np.pi / 4, "XYZ", wires=[0, 1, 2])
         qml.PauliRot(np.pi / 2, "YZ", wires=[1, 2])
-        qml.PauliRot(np.pi, "ZX", wires=[2, 0])
+        qml.PauliRot(np.pi, "ZX", wires=[0, 2])
         qml.PauliRot(np.pi / 4, "XYZ", wires=[0, 1, 2])
 
-    # CHECK: qec.ppr ["X", "Y"](8)
-    # CHECK: qec.ppr ["Y", "Z"](4)
-    # CHECK: qec.ppr ["Z", "X"](2)
-    # CHECK: qec.ppr ["X", "Y", "Z"](8)
+    # CHECK: [[q0:%.+]]:3 = qec.ppr ["X", "Y", "Z"](8)
+    # CHECK: [[q1:%.+]]:2 = qec.ppr ["Y", "Z"](4) [[q0]]#1, [[q0]]#2
+    # CHECK: [[q2:%.+]]:2 = qec.ppr ["Z", "X"](2) [[q0]]#0, [[q1]]#1
+    # CHECK: [[q3:%.+]]:3 = qec.ppr ["X", "Y", "Z"](8) [[q2]]#0, [[q1]]#0, [[q2]]#1
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -94,9 +94,9 @@ def test_single_qubit_pauli_measurements():
         qml.pauli_measure("Y", wires=0)
         qml.pauli_measure("Z", wires=0)
 
-    # CHECK: qec.ppm ["X"]
-    # CHECK: qec.ppm ["Y"]
-    # CHECK: qec.ppm ["Z"]
+    # CHECK: [[m0:%.+]], [[q0:%.+]] = qec.ppm ["X"]
+    # CHECK: [[m1:%.+]], [[q1:%.+]] = qec.ppm ["Y"] [[q0]]
+    # CHECK: [[m2:%.+]], [[q2:%.+]] = qec.ppm ["Z"] [[q1]]
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -114,13 +114,13 @@ def test_multi_qubit_pauli_measurements():
     @qjit(pipelines=pipeline, target="mlir")
     @qml.qnode(device=dev)
     def circuit():
-        qml.pauli_measure("XY", wires=[0, 1])
+        qml.pauli_measure("XYZ", wires=[0, 1, 2])
         qml.pauli_measure("ZX", wires=[1, 2])
         qml.pauli_measure("XYZ", wires=[0, 1, 2])
 
-    # CHECK: qec.ppm ["X", "Y"]
-    # CHECK: qec.ppm ["Z", "X"]
-    # CHECK: qec.ppm ["X", "Y", "Z"]
+    # CHECK: [[m0:%.+]], [[q0:%.+]]:3 = qec.ppm ["X", "Y", "Z"]
+    # CHECK: [[m1:%.+]], [[q1:%.+]]:2 = qec.ppm ["Z", "X"] [[q0]]#1, [[q0]]#2
+    # CHECK: [[m2:%.+]], [[q2:%.+]]:3 = qec.ppm ["X", "Y", "Z"] [[q0]]#0, [[q1]]#0, [[q1]]#1
     print(circuit.mlir_opt)
     qml.capture.disable()
 
