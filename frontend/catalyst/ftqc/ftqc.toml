@@ -33,32 +33,14 @@ PauliZ                 = { properties = [ "invertible" ] }
 S                      = { properties = [ "invertible" ] }
 T                      = { properties = [ "invertible" ] }
 
-# Observables supported by the device
+# These are dummy observables and measurement processes.
 [operators.observables]
 
-Identity               = { properties = [ "differentiable" ] }
-PauliX                 = { properties = [ "differentiable" ] }
-PauliY                 = { properties = [ "differentiable" ] }
-PauliZ                 = { properties = [ "differentiable" ] }
-Hadamard               = { properties = [ "differentiable" ] }
-Hermitian              = { properties = [ "differentiable" ] }
-Hamiltonian            = { properties = [ "differentiable" ] }
-SparseHamiltonian      = { properties = [ "differentiable" ] }
-Projector              = { properties = [ "differentiable" ] }
-Sum                    = { properties = [ "differentiable" ] }
-SProd                  = { properties = [ "differentiable" ] }
-Prod                   = { properties = [ "differentiable" ] }
-Exp                    = { properties = [ "differentiable" ] }
-LinearCombination      = { properties = [ "differentiable" ] }
+Identity               = { properties = [] }
 
 [measurement_processes]
 
-ExpectationMP          = {}
-VarianceMP             = {}
-ProbabilityMP          = {}
-StateMP                = { conditions = [ "analytic" ] }
-SampleMP               = { conditions = [ "finiteshots" ] }
-CountsMP               = { conditions = [ "finiteshots" ] }
+SampleMP               = { conditions = [] }
 
 [compilation]
 
