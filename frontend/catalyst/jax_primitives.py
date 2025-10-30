@@ -2388,8 +2388,8 @@ def _adjoint_def_impl(ctx, *args, args_tree, jaxpr):  # pragma: no cover
 
 
 @adjoint_p.def_abstract_eval
-def _adjoint_abstract(*args, args_tree, jaxpr):
-    return jaxpr.out_avals[-1:]
+def _adjoint_abstract(*args, args_tree, jaxpr, num_dynamic_alloced_qregs=0):
+    return jaxpr.out_avals[-(1 + num_dynamic_alloced_qregs) :]
 
 
 def _adjoint_lowering(
@@ -2397,6 +2397,7 @@ def _adjoint_lowering(
     *args: Iterable[ir.Value],
     args_tree: PyTreeDef,
     jaxpr: core.ClosedJaxpr,
+    num_dynamic_alloced_qregs=0,
 ) -> ir.Value:
     """The JAX bind handler performing the Jaxpr -> MLIR adjoint lowering by taking the `jaxpr`
     expression to be lowered and all its already lowered arguments as MLIR value references. The Jax
@@ -2412,11 +2413,11 @@ def _adjoint_lowering(
     consts, cargs, qargs = tree_unflatten(args_tree, args)  # [1]
     _, _, aqargs = tree_unflatten(args_tree, jax_ctx.avals_in)  # [2]
 
-    assert len(qargs) == 1, "We currently expect exactly one quantum register argument"
+    # assert len(qargs) == 1, "We currently expect exactly one quantum register argument"
     output_types = util.flatten(map(mlir.aval_to_ir_types, jax_ctx.avals_out))
-    assert len(output_types) == 1 and output_types[0] == ir.OpaqueType.get(
-        "quantum", "reg", ctx
-    ), f"Expected a single result of quantum.register type, got: {output_types}"
+    # assert len(output_types) == 1 and output_types[0] == ir.OpaqueType.get(
+    #     "quantum", "reg", ctx
+    # ), f"Expected a single result of quantum.register type, got: {output_types}"
 
     # Build an adjoint operation with a single-block region.
     op = AdjointOp(output_types[0], qargs[0])
@@ -2433,7 +2434,7 @@ def _adjoint_lowering(
             dim_var_values=jax_ctx.dim_var_values,
         )
 
-        QYieldOp([out[-1]])
+        QYieldOp(out[-(1 + num_dynamic_alloced_qregs) :])
 
     return op.results
 
