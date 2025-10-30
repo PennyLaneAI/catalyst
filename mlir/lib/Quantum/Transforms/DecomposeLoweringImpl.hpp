@@ -17,6 +17,9 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/ValueRange.h"
 
@@ -75,6 +78,8 @@ class BaseSignatureAnalyzer {
   protected:
     bool isValid = true;
 
+    llvm::SmallVector<mlir::Value, 4> paramsStorage;
+
     // Unified Signature Structure: All parameters, regardless of source (params or theta),
     // are stored in a ValueRange for generalized processing.
     struct Signature {
@@ -96,7 +101,8 @@ class BaseSignatureAnalyzer {
                           mlir::ValueRange inCtrlQubits, mlir::ValueRange inCtrlValues,
                           mlir::ValueRange outQubits, mlir::ValueRange outCtrlQubits,
                           bool enableQregMode)
-        : signature(Signature{.params = params,
+        : paramsStorage(params.begin(), params.end()),
+          signature(Signature{.params = mlir::ValueRange(paramsStorage),
                               .inQubits = inQubits,
                               .inCtrlQubits = inCtrlQubits,
                               .inCtrlValues = inCtrlValues,
@@ -407,7 +413,7 @@ class MultiRZOpSignatureAnalyzer : public BaseSignatureAnalyzer {
 
     MultiRZOpSignatureAnalyzer(MultiRZOp op, bool enableQregMode)
         : BaseSignatureAnalyzer(
-              op, mlir::ValueRange{op.getTheta()}, // Theta becomes a ValueRange of size 1
+              op, mlir::ValueRange(op.getTheta()), // Theta becomes a ValueRange of size 1
               op.getNonCtrlQubitOperands(), op.getCtrlQubitOperands(), op.getCtrlValueOperands(),
               op.getNonCtrlQubitResults(), op.getCtrlQubitResults(), enableQregMode)
     {
