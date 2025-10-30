@@ -44,6 +44,7 @@
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "RegisterAllPasses.h"
+#include "Standalone/StandalonePasses.h"
 
 namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
@@ -56,6 +57,7 @@ int main(int argc, char **argv)
     catalyst::registerAllPasses();
     mlirRegisterAllStablehloPasses();
     mlir::stablehlo::registerOptimizationPasses();
+    mlir::standalone::registerStandaloneSwitchBarFooPass();
 
     mlir::DialectRegistry registry;
     mlir::registerAllDialects(registry);
