@@ -561,6 +561,7 @@ module @circuit_with_multirz {
   func.func public @test_with_multirz() -> tensor<4xf64> {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: func.func public @test_with_multirz() -> tensor<4xf64>
     // CHECK: [[CST_RZ:%.+]] = arith.constant 5.000000e-01 : f64
     // CHECK: [[CST_PI2:%.+]] = arith.constant 1.5707963267948966 : f64
     // CHECK: [[CST_PI:%.+]] = arith.constant 3.1415926535897931 : f64
