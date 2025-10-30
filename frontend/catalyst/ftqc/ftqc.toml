@@ -22,52 +22,21 @@ schema = 3
 #
 [operators.gates]
 
-CNOT                   = { properties = [ "invertible",                 "differentiable" ] }
-CRot                   = { properties = [ "invertible"                                   ] }
-CRX                    = { properties = [ "invertible",                 "differentiable" ] }
-CRY                    = { properties = [ "invertible",                 "differentiable" ] }
-CRZ                    = { properties = [ "invertible",                 "differentiable" ] }
-CY                     = { properties = [ "invertible",                 "differentiable" ] }
-CZ                     = { properties = [ "invertible",                 "differentiable" ] }
-Hadamard               = { properties = [ "invertible", "controllable", "differentiable" ] }
-Identity               = { properties = [ "invertible",                 "differentiable" ] }
-PauliRot               = { properties = [ "invertible", "differentiable" ] }
-PauliMeasure           = { properties = [ "invertible", "differentiable" ] }
-PauliX                 = { properties = [ "invertible", "controllable", "differentiable" ] }
-PauliY                 = { properties = [ "invertible", "controllable", "differentiable" ] }
-PauliZ                 = { properties = [ "invertible", "controllable", "differentiable" ] }
-RX                     = { properties = [ "invertible", "controllable", "differentiable" ] }
-RY                     = { properties = [ "invertible", "controllable", "differentiable" ] }
-RZ                     = { properties = [ "invertible", "controllable", "differentiable" ] }
-S                      = { properties = [ "invertible", "controllable", "differentiable" ] }
-T                      = { properties = [ "invertible", "controllable", "differentiable" ] }
+CNOT                   = { properties = [ "invertible" ] }
+Hadamard               = { properties = [ "invertible" ] }
+Identity               = { properties = [ "invertible" ] }
+PauliRot               = { properties = [ "invertible" ] }
+PauliMeasure           = { properties = [] }
+PauliX                 = { properties = [ "invertible" ] }
+PauliY                 = { properties = [ "invertible" ] }
+PauliZ                 = { properties = [ "invertible" ] }
+S                      = { properties = [ "invertible" ] }
+T                      = { properties = [ "invertible" ] }
 
 # Observables supported by the device
 [operators.observables]
 
-Identity               = { properties = [ "differentiable" ] }
-PauliX                 = { properties = [ "differentiable" ] }
-PauliY                 = { properties = [ "differentiable" ] }
-PauliZ                 = { properties = [ "differentiable" ] }
-Hadamard               = { properties = [ "differentiable" ] }
-Hermitian              = { properties = [ "differentiable" ] }
-Hamiltonian            = { properties = [ "differentiable" ] }
-SparseHamiltonian      = { properties = [ "differentiable" ] }
-Projector              = { properties = [ "differentiable" ] }
-Sum                    = { properties = [ "differentiable" ] }
-SProd                  = { properties = [ "differentiable" ] }
-Prod                   = { properties = [ "differentiable" ] }
-Exp                    = { properties = [ "differentiable" ] }
-LinearCombination      = { properties = [ "differentiable" ] }
-
 [measurement_processes]
-
-ExpectationMP          = {}
-VarianceMP             = {}
-ProbabilityMP          = {}
-StateMP                = { conditions = [ "analytic" ] }
-SampleMP               = { conditions = [ "finiteshots" ] }
-CountsMP               = { conditions = [ "finiteshots" ] }
 
 [compilation]
 
