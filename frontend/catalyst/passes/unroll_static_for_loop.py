@@ -49,6 +49,7 @@ def get_parent_of_type(op: Operation, kind: Type[T]) -> T | None:
 
 
 def print_mlir(op, msg="", should_print: bool = True):
+    should_print = False
     if should_print:
         printer = Printer()
         print("-"*100)
@@ -63,6 +64,7 @@ def print_mlir(op, msg="", should_print: bool = True):
         print("-"*100)
 
 def print_ssa_values(values, msg="SSA Values || ", should_print:bool = True):
+    should_print = False
     if should_print:
         print(f"// {msg}")
         for val in values:
@@ -93,6 +95,7 @@ class IfOperatorPartitioningPass(RewritePattern):
         print("%"*120)
         # self.flatten_if_ops(op, rewriter)
 
+        print_mlir(op, "After flattening deeper IfOps:")
         self.find_deeper_if_ops(op, rewriter)
         print("+"*120)
         print("+"*120)
@@ -101,12 +104,14 @@ class IfOperatorPartitioningPass(RewritePattern):
         self.find_deeper_if_ops(op, rewriter)
 
         # Validate SSA values after flattening
-        self.validate_ssa_values(op)
+        # self.validate_ssa_values(op)
 
 
     def __init__(self):
         self.module: builtin.ModuleOp = None
         self.original_func_op: func.FuncOp = None
+        self.holder_returns : dict[scf.IfOp, scf.IfOp] = {}
+
 
 
 
@@ -193,12 +198,12 @@ class IfOperatorPartitioningPass(RewritePattern):
 
 
                 for d in deeper_if_ops[0:1]:
-                    print_mlir(d, "Deeper IfOp found:")
-                    print_mlir(d.parent_op(), "Parent of Deeper IfOp found:")
+                    # print_mlir(d, "Deeper IfOp found:")
+                    # print_mlir(d.parent_op(), "Parent of Deeper IfOp found:")
 
                     self.flatten_if_ops_deep(d.parent_op(), rewriter)
 
-                print_mlir(main_op, "Main op after flattening deeper IfOps:")
+                # print_mlir(main_op, "Main op after flattening deeper IfOps:")
 
                 print(f"Deeper IfOp depth found: {depth}")
 
@@ -215,159 +220,613 @@ class IfOperatorPartitioningPass(RewritePattern):
 
             print_ssa_values(new_outer_if_op_output, "Outer IfOp outputs before flattening:", print_output)
 
-            print_mlir(outer_if_op, "Outer IfOp before flattening:", print_output)
 
             has_nested_if_ops, nested_if_ops = self.get_nested_if_ops(outer_if_op)
             where_to_insert = outer_if_op
 
-            # for inner_op in nested_if_ops:
-            #     print_mlir(inner_op, "Inner IfOp found before flattening:")
+            self.holder_returns = {}
 
             for inner_op in nested_if_ops:
 
-                print_mlir(inner_op, "Inner op before flattening:", print_output)
+                # if len(inner_op.results) > 1:
+                #     continue
+                print("/"*120)
+                print_mlir(outer_if_op.parent_op(), "Before move_simple_inner_if_op_2_outer_test: Outer IfOp before flattening:", print_output)
 
-                missing_values_outer = self.analyze_missing_values_for_ops([outer_if_op])
-                definition_outer = self.analyze_definitions_for_ops([outer_if_op])
+                where_to_insert, outer_if_op = self.move_simple_inner_if_op_2_outer_test(
+                                                inner_op, outer_if_op, new_outer_if_op_output, new_outer_if_op_output_types, where_to_insert, rewriter,
+                                                )
 
-                missing_values_inner = self.analyze_missing_values_for_ops([inner_op])
-
-                print_ssa_values(missing_values_outer, "Missing values for outer IfOp before flattening inner IfOp:", print_output)
-                print_ssa_values(definition_outer, "Definitions for outer IfOp before flattening inner IfOp:", print_output)
-                print_ssa_values(missing_values_inner, "Missing values for inner IfOp before flattening:", print_output)
-
-                ssa_needed_from_outer = set(missing_values_inner).intersection(set(definition_outer))
-                print_ssa_values(ssa_needed_from_outer, "SSA values needed from outer IfOp before flattening inner IfOp:", print_output)
-
-                for mv in ssa_needed_from_outer:
-                    if not isinstance(mv.type, quantum.QuregType):
-                        new_outer_if_op_output.append(mv)
-                        new_outer_if_op_output_types.append(mv.type)
-
-                print_ssa_values(new_outer_if_op_output, "New outer IfOp outputs after flattening inner IfOp:", print_output)
-                print_ssa_values(new_outer_if_op_output_types, "New outer IfOp output types after flattening inner IfOp:", print_output)
-
-                print_mlir(outer_if_op, "Outer IfOp before flattening inner IfOp:", print_output)
-                # Matching qreg
-                required_outputs = outer_if_op.results
-                print_ssa_values(required_outputs, "Outputs for outer IfOp:", print_output)
-
-                inner_results = inner_op.results
-
-                qreg_if_op_inner = [mv for mv in missing_values_inner if isinstance(mv.type, quantum.QuregType)]
-
-                for result in inner_results:
-                    if isinstance(result.type, quantum.QuregType):
-                        result.replace_by(qreg_if_op_inner[0])
-
-                qreg_if_op_outer = [output for output in outer_if_op.results if isinstance(output.type, quantum.QuregType)]
-
-                assert len(qreg_if_op_outer) == 1, "Expected exactly one quantum register in outer IfOp results."
-
-                print_mlir(outer_if_op, "Outer IfOp before flattening inner IfOp:", print_output)
+            # detach and erase old outer if op
+            for hold_op in self.holder_returns.keys():
+                hold_op.detach()
+                hold_op.erase()
 
 
-                inner_op.detach()
-
-                # Create comprehensive value mapping for all values used in both regions
-                value_mapper = {}
-                value_mapper[qreg_if_op_inner[0]] = qreg_if_op_outer[0]
-
-                # expand the current attr_dict
-                attr_dict = inner_op.attributes.copy()
-                attr_dict.update({"flattened": builtin.StringAttr("true")})
-
-                ###########################################################
-                new_inner_op = self.create_if_op_partition(
-                    rewriter,
-                    inner_op.true_region,
-                    where_to_insert,
-                    value_mapper,
-                    where_to_insert,
-                    conditional=inner_op.cond,  # Use the original condition
-                    attr_dict=attr_dict
-                )
-
-                where_to_insert = new_inner_op
-                inner_op.erase()
-                ################################################################3
-                # ----------------------------------------------------------------
-                # ----------------------------------------------------------------
-                # ----------------------------------------------------------------
-
-                # Create a new outer IfOp that includes the new outputs needed from the inner IfOp
+        print_mlir(main_op,"Main op after creating new outer IfOp:", print_output)
+        # ----------------------------------------------------------------
+        # ----------------------------------------------------------------
+        # ----------------------------------------------------------------
 
 
-                # True block --------------------------
-                return_types = new_outer_if_op_output_types
+    def move_simple_inner_if_op_2_outer_test(self,
+                                        inner_op: scf.IfOp, outer_if_op: scf.IfOp, new_outer_if_op_output: list[SSAValue], new_outer_if_op_output_types: list[Type], where_to_insert: scf.IfOp,
+                                        rewriter: PatternRewriter,
+                                        ) -> None:
+        print_output = True
 
-                true_block = outer_if_op.true_region.detach_block(0)
+        print_mlir(inner_op, "Inner op before flattening:", print_output)
 
-                true_yield_op = [op for op in true_block.ops if isinstance(op, scf.YieldOp)][-1]
+        missing_values_outer = self.analyze_missing_values_for_ops([outer_if_op])
+        definition_outer = self.analyze_definitions_for_ops([outer_if_op])
 
-                print_mlir(true_yield_op, "True Yield Op for outer IfOp", print_output)
+        missing_values_inner = self.analyze_missing_values_for_ops([inner_op])
 
-                new_res = [res for res in true_yield_op.operands] + [missing_values_inner[0]]
+        print_ssa_values(missing_values_outer, "Missing values for outer IfOp before flattening inner IfOp:", print_output)
+        print_ssa_values(definition_outer, "Definitions for outer IfOp before flattening inner IfOp:", print_output)
+        print_ssa_values(missing_values_inner, "Missing values for inner IfOp before flattening:", print_output)
 
-                new_true_yield_op = scf.YieldOp( *new_res )
+        ssa_needed_from_outer = set(missing_values_inner).intersection(set(definition_outer))
+        print_ssa_values(ssa_needed_from_outer, "SSA values needed from outer IfOp before flattening inner IfOp:", print_output)
 
-                rewriter.replace_op(true_yield_op, new_true_yield_op)
+        # select only definition outer
+        missing_values_inner = [mv for mv in missing_values_inner if mv in definition_outer]
+        print_ssa_values(missing_values_outer, "Missing values for outer IfOp before flattening inner IfOp:", print_output)
 
-                print_mlir(new_true_yield_op, "New True Yield Op for outer IfOp", print_output)
+        for mv in ssa_needed_from_outer:
+            if not isinstance(mv.type, quantum.QuregType):
+                new_outer_if_op_output.append(mv)
+                new_outer_if_op_output_types.append(mv.type)
 
-                # False block --------------------------
-                false_block = outer_if_op.false_region.detach_block(0)
-                # false_block = Block()
-                # create a false value
-                false_op = arith.ConstantOp(builtin.IntegerAttr(0, builtin.IntegerType(1)))
+        print_ssa_values(new_outer_if_op_output, "New outer IfOp outputs after flattening inner IfOp:", print_output)
+        print_ssa_values(new_outer_if_op_output_types, "New outer IfOp output types after flattening inner IfOp:", print_output)
 
-                false_yield_op = [op for op in false_block.ops if isinstance(op, scf.YieldOp)][-1]
+        # Matching qreg
+        required_outputs = outer_if_op.results
+        print_ssa_values(required_outputs, "Outputs for outer IfOp:", print_output)
 
-                new_res = [res for res in false_yield_op.operands] + [false_op.result]
+        inner_results = inner_op.results
+        print_ssa_values(inner_results, "Outputs for inner IfOp:", print_output)
 
-                new_false_yield_op = scf.YieldOp( *new_res )
+        # Replace the qreg from the inner IfOp with the immediate outer IfOp qreg
+        # This dont affect the inner IfOp since its qreg is only used in quantum ops inside its regions
+        qreg_if_op_inner = [mv for mv in missing_values_inner if isinstance(mv.type, quantum.QuregType)]
 
-                rewriter.replace_op(false_yield_op, new_false_yield_op)
+        for result in inner_results:
+            if isinstance(result.type, quantum.QuregType):
+                result.replace_by(qreg_if_op_inner[0])
 
-                # add a the top of the block
-                rewriter.insert_op(false_op, InsertPoint.at_start(false_block))
+        qreg_if_op_outer = [output for output in where_to_insert.results if isinstance(output.type, quantum.QuregType)]
 
-                new_outer_if_op = scf.IfOp(
-                    outer_if_op.cond,
-                    return_types,
-                    [true_block],
-                    [false_block],
-                    outer_if_op.attributes.copy()
-                )
+        assert len(qreg_if_op_outer) == 1, "Expected exactly one quantum register in outer IfOp results."
 
-                rewriter.insert_op(new_outer_if_op, InsertPoint.before(outer_if_op))
+        # print_mlir(outer_if_op, "Outer IfOp before flattening inner IfOp:", print_output)
+        # print_mlir(inner_op, "Inner IfOp before flattening inner IfOp:", print_output)
 
-                print_ssa_values(outer_if_op.results,"old outer_if results", print_output)
-                print_ssa_values(new_outer_if_op.results,"new outer_if results", print_output)
-
-                for old_result, new_result in zip(outer_if_op.results, new_outer_if_op.results):
-                    old_result.replace_by(new_result)
-                # outer_if_op.results[0].replace_by(new_outer_if_op.results[0])
-
-                outer_if_op.detach()
-
-                outer_if_op.erase()
-
-                outer_if_op = new_outer_if_op
-
-                # new_inner_op.cond = outer_if_op.results[-1]
-                new_cond = new_inner_op.cond
-                new_cond.replace_by_if(outer_if_op.results[-1], lambda use: use.operation in [new_inner_op])
-
-                print_mlir(main_op,"Main op after creating new outer IfOp:", print_output)
-                # ----------------------------------------------------------------
-                # ----------------------------------------------------------------
-                # ----------------------------------------------------------------
+        # print_mlir(outer_if_op.parent_op(), "Main Op before flattening inner IfOp:", print_output)
 
 
+        # holder_returns = {}
 
-        missing_values = self.analyze_missing_values_for_ops([main_op])
-        print_ssa_values(missing_values, "Missing values for nested IfOp:", print_output)
+        if len(inner_results) == 1 :
+            inner_op.detach()
+        else:
+            # add a new attribute to mark it as flattened
+            inner_op.attributes["old_return"] = builtin.StringAttr("true")
+
+        # Create comprehensive value mapping for all values used in both regions
+        value_mapper = {}
+        value_mapper[qreg_if_op_inner[0]] = qreg_if_op_outer[0]
+
+        # expand the current attr_dict
+        attr_dict = inner_op.attributes.copy()
+        attr_dict.update({"flattened": builtin.StringAttr("true")})
+
+        ###########################################################
+        # new_inner_op = self.create_if_op_partition(
+        #     rewriter,
+        #     inner_op.true_region,
+        #     where_to_insert,
+        #     value_mapper,
+        #     where_to_insert,
+        #     conditional=inner_op.cond,  # Use the original condition
+        #     attr_dict=attr_dict
+        # )
+
+        if_region = inner_op.true_region
+
+        block = if_region.blocks
+
+        true_ops = [op for op in if_region.blocks[0].ops]
+
+        new_true_block = Block()
+
+        self.clone_operations_to_block(
+            true_ops,
+            new_true_block,
+            value_mapper
+        )
+
+        # --------------------------------------------------------------------------
+
+        false_inner_ops = [op for op in inner_op.false_region.blocks[0].ops]
+
+        new_false_block = None
+
+        if len(false_inner_ops) == 1 and isinstance(false_inner_ops[0], scf.YieldOp):
+            # If the false region only contains a yield operation, we can create an empty block
+
+            # Create a new empty block for false region
+            new_false_block = Block()
+
+            # Create a yield operation for false region using the same return types as the original IfOp
+            # yield_false = scf.YieldOp(previous_IfOp.results[0])
+            yield_false = scf.YieldOp(where_to_insert.results[0])
+
+            # Create a new empty block for false region
+            new_false_block.add_op(yield_false)
+
+        else:
+            false_block_inner = inner_op.false_region.detach_block(0)
+            false_ops = [op for op in false_block_inner.ops]
+
+            new_false_block = Block()
+
+            value_mapper = {qreg_if_op_inner[0]: qreg_if_op_outer[0]}
+            self.clone_operations_to_block(
+                false_ops,
+                new_false_block,
+                value_mapper
+            )
+
+
+        new_if_op_attrs = where_to_insert.attributes.copy()
+        # new_if_op_attrs = inner_op.attributes.copy()
+        new_if_op_attrs.update(attr_dict or {})
+        # --------------------------------------------------------------------------
+        # Create new IfOp with cloned regions
+        # scf.IfOp (
+        # cond: SSAValue | Operation,
+        # return_types: Sequence[Attribute],
+        # true_region: Region | Sequence[Block] | Sequence[Operation],
+        # false_region: Region | Sequence[Block] | Sequence[Operation] | None = None,
+        # attr_dict: dict[str, Attribute] | None = None,
+        # )
+
+        # if conditional is None:
+        #     conditional = previous_IfOp.cond
+
+        needs_to_update_conditional = True
+
+        if inner_op.cond.owner.attributes.get("old_return",None) is not None and isinstance(inner_op.cond.owner, scf.IfOp):
+            hold_return = inner_op.cond.owner
+            return_index = list(hold_return.results).index(inner_op.cond)
+            conditional = self.holder_returns[hold_return].results[return_index]
+            needs_to_update_conditional = False
+
+            for res in hold_return.results:
+                if res in missing_values_inner:
+                    remove_index = missing_values_inner.index(res)
+                    missing_values_inner.pop(remove_index)
+
+        else:
+            conditional = inner_op.cond
+
+        new_inner_op = scf.IfOp(
+            conditional,
+            # previous_IfOp.result_types,
+            # where_to_insert.result_types,
+            inner_op.result_types,
+            [new_true_block], # cloned_true_region,
+            [new_false_block], # false_region,
+            new_if_op_attrs
+        )
+        rewriter.insert_op(new_inner_op, InsertPoint.after(where_to_insert))
+
+        new_inner_op_ops = list(chain(*[op.walk() for op in [new_inner_op]]))
+
+        where_to_insert.results[0].replace_by_if(new_inner_op.results[0], lambda use: use.operation not in new_inner_op_ops)
+
+        # print_mlir(inner_op, "Old Inner IfOp after flattening:", print_output)
+        # print_mlir(new_inner_op.parent_op(), "New Inner IfOp after flattening:", print_output)
+
+        where_to_insert = new_inner_op
+        if len(inner_results) == 1 :
+            inner_op.erase()
+        else:
+            self.holder_returns[inner_op] = new_inner_op
+        ################################################################3
+        # ----------------------------------------------------------------
+        # ----------------------------------------------------------------
+        # ----------------------------------------------------------------
+
+        # Create a new outer IfOp that includes the new outputs needed from the inner IfOp
+
+
+        # True block --------------------------
+        # return_types = new_outer_if_op_output_types
+
+        true_block = outer_if_op.true_region.detach_block(0)
+
+        true_yield_op = [op for op in true_block.ops if isinstance(op, scf.YieldOp)][-1]
+
+        print_mlir(true_yield_op, "True Yield Op for outer IfOp", print_output)
+
+        new_res = [res for res in true_yield_op.operands] + [ ssa for ssa in  missing_values_inner if not isinstance(ssa.type, quantum.QuregType) ]
+        return_types = [new_r.type for new_r in new_res]
+
+        new_true_yield_op = scf.YieldOp( *new_res )
+
+        rewriter.replace_op(true_yield_op, new_true_yield_op)
+
+        print_mlir(new_true_yield_op, "New True Yield Op for outer IfOp", print_output)
+
+        # False block --------------------------
+        false_block = outer_if_op.false_region.detach_block(0)
+        # false_block = Block()
+        # create a false value
+
+        false_op_res = []
+
+        if needs_to_update_conditional:
+            false_op = arith.ConstantOp(builtin.IntegerAttr(0, builtin.IntegerType(1)))
+            false_op_res.append(false_op.result)
+            rewriter.insert_op(false_op, InsertPoint.at_start(false_block))
+
+        false_yield_op = [op for op in false_block.ops if isinstance(op, scf.YieldOp)][-1]
+
+        new_res = [res for res in false_yield_op.operands] + false_op_res
+
+        new_false_yield_op = scf.YieldOp( *new_res )
+
+        rewriter.replace_op(false_yield_op, new_false_yield_op)
+
+        # add a the top of the block
+
+        new_outer_if_op = scf.IfOp(
+            outer_if_op.cond,
+            return_types,
+            [true_block],
+            [false_block],
+            outer_if_op.attributes.copy()
+        )
+
+        rewriter.insert_op(new_outer_if_op, InsertPoint.before(outer_if_op))
+
+        print_ssa_values(outer_if_op.results,"old outer_if results", print_output)
+        print_ssa_values(new_outer_if_op.results,"new outer_if results", print_output)
+
+        for old_result, new_result in zip(outer_if_op.results, new_outer_if_op.results):
+            old_result.replace_by(new_result)
+        # outer_if_op.results[0].replace_by(new_outer_if_op.results[0])
+
+        outer_if_op.detach()
+
+        outer_if_op.erase()
+
+        outer_if_op = new_outer_if_op
+
+        # new_inner_op.cond = outer_if_op.results[-1]
+        if needs_to_update_conditional:
+            new_cond = new_inner_op.cond
+            new_cond.replace_by_if(outer_if_op.results[-1], lambda use: use.operation in [new_inner_op])
+
+        return where_to_insert, outer_if_op
+
+
+
+    def move_complex_inner_if_op_2_outer(self,
+                                        inner_op: scf.IfOp, outer_if_op: scf.IfOp, new_outer_if_op_output: list[SSAValue], new_outer_if_op_output_types: list[Type], where_to_insert: scf.IfOp,
+                                        rewriter: PatternRewriter) -> None:
+        print_output = True
+
+        print_mlir(inner_op, "Inner op before flattening:", print_output)
+
+        missing_values_outer = self.analyze_missing_values_for_ops([outer_if_op])
+        definition_outer = self.analyze_definitions_for_ops([outer_if_op])
+
+        missing_values_inner = self.analyze_missing_values_for_ops([inner_op])
+
+        print_ssa_values(missing_values_outer, "Missing values for outer IfOp before flattening inner IfOp:", print_output)
+        print_ssa_values(definition_outer, "Definitions for outer IfOp before flattening inner IfOp:", print_output)
+        print_ssa_values(missing_values_inner, "Missing values for inner IfOp before flattening:", print_output)
+
+        ssa_needed_from_outer = set(missing_values_inner).intersection(set(definition_outer))
+        print_ssa_values(ssa_needed_from_outer, "SSA values needed from outer IfOp before flattening inner IfOp:", print_output)
+
+        for mv in ssa_needed_from_outer:
+            if not isinstance(mv.type, quantum.QuregType):
+                new_outer_if_op_output.append(mv)
+                new_outer_if_op_output_types.append(mv.type)
+
+        print_ssa_values(new_outer_if_op_output, "New outer IfOp outputs after flattening inner IfOp:", print_output)
+        print_ssa_values(new_outer_if_op_output_types, "New outer IfOp output types after flattening inner IfOp:", print_output)
+
+        print_mlir(outer_if_op, "Outer IfOp before flattening inner IfOp:", print_output)
+        # Matching qreg
+        required_outputs = outer_if_op.results
+        print_ssa_values(required_outputs, "Outputs for outer IfOp:", print_output)
+
+        inner_results = inner_op.results
+
+        qreg_if_op_inner = [mv for mv in missing_values_inner if isinstance(mv.type, quantum.QuregType)]
+
+        for result in inner_results:
+            if isinstance(result.type, quantum.QuregType):
+                result.replace_by(qreg_if_op_inner[0])
+
+        qreg_if_op_outer = [output for output in outer_if_op.results if isinstance(output.type, quantum.QuregType)]
+
+        assert len(qreg_if_op_outer) == 1, "Expected exactly one quantum register in outer IfOp results."
+
+        print_mlir(outer_if_op, "Outer IfOp before flattening inner IfOp:", print_output)
+
+        # Trying to upate the yield op to detach the inner if op
+
+        yield_operands_outer_from_inner = []
+        yield_op_outer = None
+
+        remove_new_outer_if_op_output = []
+
+        for res in inner_op.results:
+            if res.first_use is None:
+                continue
+            if isinstance(res.first_use.operation, scf.YieldOp):
+                yield_operands_outer_from_inner.append(res)
+                yield_op_outer = res.first_use.operation
+
+                l_yield_operands = list(yield_op_outer.operands)
+                remove_new_outer_if_op_output.append(l_yield_operands.index(res))
+
+        for remove_item in remove_new_outer_if_op_output:
+            new_outer_if_op_output.pop(remove_item)
+            new_outer_if_op_output_types.pop(remove_item)
+
+        reminder_operands = [op for op in yield_op_outer.operands if op not in yield_operands_outer_from_inner]
+
+        new_yield = scf.YieldOp( *reminder_operands )
+        rewriter.replace_op(yield_op_outer, new_yield)
+
+        print_mlir(outer_if_op, "Outer IfOp before flattening inner IfOp:", print_output)
+        inner_op.detach()
+
+        # Create comprehensive value mapping for all values used in both regions
+        value_mapper = {}
+        value_mapper[qreg_if_op_inner[0]] = qreg_if_op_outer[0]
+
+        # expand the current attr_dict
+        attr_dict = inner_op.attributes.copy()
+        attr_dict.update({"flattened": builtin.StringAttr("true")})
+
+        ###########################################################
+        new_inner_op = self.create_if_op_partition(
+            rewriter,
+            inner_op.true_region,
+            where_to_insert,
+            value_mapper,
+            where_to_insert,
+            conditional=inner_op.cond,  # Use the original condition
+            attr_dict=attr_dict
+        )
+
+        where_to_insert = new_inner_op
+        inner_op.erase()
+        ################################################################3
+        # ----------------------------------------------------------------
+        # ----------------------------------------------------------------
+        # ----------------------------------------------------------------
+
+        # Create a new outer IfOp that includes the new outputs needed from the inner IfOp
+
+        print_mlir(outer_if_op, "Outer IfOp before flattening inner IfOp:", print_output)
+        print_mlir(inner_op, "Outer IfOp before flattening inner IfOp:", print_output)
+
+
+        # True block --------------------------
+        return_types = new_outer_if_op_output_types
+
+        true_block = outer_if_op.true_region.detach_block(0)
+
+        true_yield_op = [op for op in true_block.ops if isinstance(op, scf.YieldOp)][-1]
+
+        print_mlir(true_yield_op, "True Yield Op for outer IfOp", print_output)
+
+        new_res = [res for res in true_yield_op.operands] + [missing_values_inner[0]]
+
+        new_true_yield_op = scf.YieldOp( *new_res )
+
+        rewriter.replace_op(true_yield_op, new_true_yield_op)
+
+        print_mlir(new_true_yield_op, "New True Yield Op for outer IfOp", print_output)
+
+        # False block --------------------------
+        false_block = outer_if_op.false_region.detach_block(0)
+        # false_block = Block()
+        # create a false value
+        false_op = arith.ConstantOp(builtin.IntegerAttr(0, builtin.IntegerType(1)))
+
+        false_yield_op = [op for op in false_block.ops if isinstance(op, scf.YieldOp)][-1]
+
+        new_res = [res for res in false_yield_op.operands] + [false_op.result]
+
+        new_false_yield_op = scf.YieldOp( *new_res )
+
+        rewriter.replace_op(false_yield_op, new_false_yield_op)
+
+        # add a the top of the block
+        rewriter.insert_op(false_op, InsertPoint.at_start(false_block))
+
+        new_outer_if_op = scf.IfOp(
+            outer_if_op.cond,
+            return_types,
+            [true_block],
+            [false_block],
+            outer_if_op.attributes.copy()
+        )
+
+        rewriter.insert_op(new_outer_if_op, InsertPoint.before(outer_if_op))
+
+        print_ssa_values(outer_if_op.results,"old outer_if results", print_output)
+        print_ssa_values(new_outer_if_op.results,"new outer_if results", print_output)
+
+        for old_result, new_result in zip(outer_if_op.results, new_outer_if_op.results):
+            old_result.replace_by(new_result)
+        # outer_if_op.results[0].replace_by(new_outer_if_op.results[0])
+
+        outer_if_op.detach()
+
+        outer_if_op.erase()
+
+        outer_if_op = new_outer_if_op
+
+        # new_inner_op.cond = outer_if_op.results[-1]
+        new_cond = new_inner_op.cond
+        new_cond.replace_by_if(outer_if_op.results[-1], lambda use: use.operation in [new_inner_op])
+
+        return where_to_insert, outer_if_op
+
+
+
+    def move_simple_inner_if_op_2_outer(self,
+                                        inner_op: scf.IfOp, outer_if_op: scf.IfOp, new_outer_if_op_output: list[SSAValue], new_outer_if_op_output_types: list[Type], where_to_insert: scf.IfOp,
+                                        rewriter: PatternRewriter) -> None:
+        print_output = True
+
+        print_mlir(inner_op, "Inner op before flattening:", print_output)
+
+        missing_values_outer = self.analyze_missing_values_for_ops([outer_if_op])
+        definition_outer = self.analyze_definitions_for_ops([outer_if_op])
+
+        missing_values_inner = self.analyze_missing_values_for_ops([inner_op])
+
+        print_ssa_values(missing_values_outer, "Missing values for outer IfOp before flattening inner IfOp:", print_output)
+        print_ssa_values(definition_outer, "Definitions for outer IfOp before flattening inner IfOp:", print_output)
+        print_ssa_values(missing_values_inner, "Missing values for inner IfOp before flattening:", print_output)
+
+        ssa_needed_from_outer = set(missing_values_inner).intersection(set(definition_outer))
+        print_ssa_values(ssa_needed_from_outer, "SSA values needed from outer IfOp before flattening inner IfOp:", print_output)
+
+        for mv in ssa_needed_from_outer:
+            if not isinstance(mv.type, quantum.QuregType):
+                new_outer_if_op_output.append(mv)
+                new_outer_if_op_output_types.append(mv.type)
+
+        print_ssa_values(new_outer_if_op_output, "New outer IfOp outputs after flattening inner IfOp:", print_output)
+        print_ssa_values(new_outer_if_op_output_types, "New outer IfOp output types after flattening inner IfOp:", print_output)
+
+        print_mlir(outer_if_op, "Outer IfOp before flattening inner IfOp:", print_output)
+        # Matching qreg
+        required_outputs = outer_if_op.results
+        print_ssa_values(required_outputs, "Outputs for outer IfOp:", print_output)
+
+        inner_results = inner_op.results
+
+        qreg_if_op_inner = [mv for mv in missing_values_inner if isinstance(mv.type, quantum.QuregType)]
+
+        for result in inner_results:
+            if isinstance(result.type, quantum.QuregType):
+                result.replace_by(qreg_if_op_inner[0])
+
+        qreg_if_op_outer = [output for output in outer_if_op.results if isinstance(output.type, quantum.QuregType)]
+
+        assert len(qreg_if_op_outer) == 1, "Expected exactly one quantum register in outer IfOp results."
+
+        print_mlir(outer_if_op, "Outer IfOp before flattening inner IfOp:", print_output)
+
+
+        inner_op.detach()
+
+        # Create comprehensive value mapping for all values used in both regions
+        value_mapper = {}
+        value_mapper[qreg_if_op_inner[0]] = qreg_if_op_outer[0]
+
+        # expand the current attr_dict
+        attr_dict = inner_op.attributes.copy()
+        attr_dict.update({"flattened": builtin.StringAttr("true")})
+
+        ###########################################################
+        new_inner_op = self.create_if_op_partition(
+            rewriter,
+            inner_op.true_region,
+            where_to_insert,
+            value_mapper,
+            where_to_insert,
+            conditional=inner_op.cond,  # Use the original condition
+            attr_dict=attr_dict
+        )
+
+        where_to_insert = new_inner_op
+        inner_op.erase()
+        ################################################################3
+        # ----------------------------------------------------------------
+        # ----------------------------------------------------------------
+        # ----------------------------------------------------------------
+
+        # Create a new outer IfOp that includes the new outputs needed from the inner IfOp
+
+
+        # True block --------------------------
+        return_types = new_outer_if_op_output_types
+
+        true_block = outer_if_op.true_region.detach_block(0)
+
+        true_yield_op = [op for op in true_block.ops if isinstance(op, scf.YieldOp)][-1]
+
+        print_mlir(true_yield_op, "True Yield Op for outer IfOp", print_output)
+
+        new_res = [res for res in true_yield_op.operands] + [missing_values_inner[0]]
+
+        new_true_yield_op = scf.YieldOp( *new_res )
+
+        rewriter.replace_op(true_yield_op, new_true_yield_op)
+
+        print_mlir(new_true_yield_op, "New True Yield Op for outer IfOp", print_output)
+
+        # False block --------------------------
+        false_block = outer_if_op.false_region.detach_block(0)
+        # false_block = Block()
+        # create a false value
+        false_op = arith.ConstantOp(builtin.IntegerAttr(0, builtin.IntegerType(1)))
+
+        false_yield_op = [op for op in false_block.ops if isinstance(op, scf.YieldOp)][-1]
+
+        new_res = [res for res in false_yield_op.operands] + [false_op.result]
+
+        new_false_yield_op = scf.YieldOp( *new_res )
+
+        rewriter.replace_op(false_yield_op, new_false_yield_op)
+
+        # add a the top of the block
+        rewriter.insert_op(false_op, InsertPoint.at_start(false_block))
+
+        new_outer_if_op = scf.IfOp(
+            outer_if_op.cond,
+            return_types,
+            [true_block],
+            [false_block],
+            outer_if_op.attributes.copy()
+        )
+
+        rewriter.insert_op(new_outer_if_op, InsertPoint.before(outer_if_op))
+
+        print_ssa_values(outer_if_op.results,"old outer_if results", print_output)
+        print_ssa_values(new_outer_if_op.results,"new outer_if results", print_output)
+
+        for old_result, new_result in zip(outer_if_op.results, new_outer_if_op.results):
+            old_result.replace_by(new_result)
+        # outer_if_op.results[0].replace_by(new_outer_if_op.results[0])
+
+        outer_if_op.detach()
+
+        outer_if_op.erase()
+
+        outer_if_op = new_outer_if_op
+
+        # new_inner_op.cond = outer_if_op.results[-1]
+        new_cond = new_inner_op.cond
+        new_cond.replace_by_if(outer_if_op.results[-1], lambda use: use.operation in [new_inner_op])
+
+        return where_to_insert, outer_if_op
 
 
     def flatten_if_ops(self, main_op: func.FuncOp, rewriter: PatternRewriter) -> None:
@@ -783,10 +1242,6 @@ class IfOperatorPartitioningPass(RewritePattern):
 
         block = if_region.blocks
 
-        # for b in block:
-        #     print_mlir(b, "If Region Block to be cloned:")
-
-        # true_ops = list(chain(*[op.walk() for op in if_region.blocks]))
         true_ops = [op for op in if_region.blocks[0].ops]
 
         new_true_block = Block()
@@ -796,8 +1251,6 @@ class IfOperatorPartitioningPass(RewritePattern):
             new_true_block,
             value_mapper
         )
-        # print_mlir(new_true_block, "Cloned True Block after cloning ops:")
-
 
         # --------------------------------------------------------------------------
         # Create a new empty block for false region
@@ -1163,9 +1616,8 @@ if __name__ == "__main__":
     @qml.qjit(keep_intermediate=False, pass_plugins=[getXDSLPluginAbsolutePath()], autograph=True)
     @IfOpPartitionTTPass
     @qml.qnode(qml.device("lightning.qubit", wires=3))
-    def captured_circuit_1(x: float, y: float, z: int):
+    def captured_circuit_1(c1: int, c2: int, c3: int):
         # Create a superposition state with different probabilities
-
         qml.H(0)
         # cond_2 = qml.measure(1)
 
@@ -1174,12 +1626,13 @@ if __name__ == "__main__":
 
             def nested_ansatz_true():
                 qml.Y(0)
+
                 def nested_nested_ansatz_true():
                     qml.H(0)
                 def nested_nested_ansatz_false():
                     qml.T(0)
 
-                cond_3 = x > 3.4
+                cond_3 = c3 == 1
 
                 qml.cond(cond_3,
                          nested_nested_ansatz_true,
@@ -1188,7 +1641,19 @@ if __name__ == "__main__":
             def nested_ansatz_false():
                 qml.Z(0)
 
-            cond_2 = x > 2.4
+                def nested_nested_ansatz_true():
+                    qml.H(0)
+                def nested_nested_ansatz_false():
+                    qml.T(0)
+
+                cond_3 = c3 == 1
+
+                qml.cond(cond_3,
+                         nested_nested_ansatz_true,
+                         nested_nested_ansatz_false)()
+
+
+            cond_2 = c2 == 1
 
             qml.cond(cond_2,
                      nested_ansatz_true,
@@ -1197,8 +1662,7 @@ if __name__ == "__main__":
         def ansatz_false():
             qml.S(0)
 
-        cond_1 = x > 1.4
-        qml.cond(cond_1,
+        qml.cond(c1 == 1,
                  ansatz_true,
                  ansatz_false)()
 
@@ -1206,9 +1670,69 @@ if __name__ == "__main__":
 
         return qml.state()
 
+    print("-"*40)
+    print(captured_circuit_1(1,1,1))
+    print("-"*40)
+    print(captured_circuit_1(1,1,0))
+    print("-"*40)
+    print(captured_circuit_1(1,0,0))
+    print("-"*40)
+    print(captured_circuit_1(1,0,1))
+    print("-"*40)
+    print(captured_circuit_1(0,0,0))
+
+
+    # -----------------------------------------------------------------------
+    # def captured_circuit_1(x: float, y: float, z: int):
+        # Create a superposition state with different probabilities
+    #     qml.H(0)
+    #     # cond_2 = qml.measure(1)
+
+    #     def ansatz_true():
+    #         qml.X(0)
+
+    #         def nested_ansatz_true():
+    #             qml.Y(0)
+
+    #             def nested_nested_ansatz_true():
+    #                 qml.H(0)
+    #             def nested_nested_ansatz_false():
+    #                 qml.T(0)
+
+    #             cond_3 = x > 3.4
+
+    #             qml.cond(cond_3,
+    #                      nested_nested_ansatz_true,
+    #                      nested_nested_ansatz_false)()
+
+    #         def nested_ansatz_false():
+    #             qml.Z(0)
+
+    #         cond_2 = x > 2.4
+
+    #         qml.cond(cond_2,
+    #                  nested_ansatz_true,
+    #                  nested_ansatz_false)()
+
+    #     def ansatz_false():
+    #         qml.S(0)
+
+    #     cond_1 = x > 1.0
+    #     qml.cond(cond_1,
+    #              ansatz_true,
+    #              ansatz_false)()
+
+    #     # qml.S(2)
+
+    #     return qml.state()
+
     # print(captured_circuit_1(0.5, 0.3, 1))
+    # print("-"*40)
     # print(captured_circuit_1(1.5, 0.3, 1))
-    print(captured_circuit_1(3.5, 0.3, 1))
+    # print("-"*40)
+    # print(captured_circuit_1(2.5, 0.3, 1))
+    # print("-"*40)
+    # print(captured_circuit_1(3.5, 0.3, 1))
 
 
         # qml.H(0)
