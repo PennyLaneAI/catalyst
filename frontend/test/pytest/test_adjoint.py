@@ -22,9 +22,11 @@ import pennylane as qml
 import pennylane.numpy as pnp
 import pytest
 from numpy.testing import assert_allclose
+from pennylane import adjoint, cond, for_loop, qjit, while_loop
 from pennylane.ops.op_math.adjoint import Adjoint, AdjointOperation
 
-from catalyst import adjoint, cond, debug, for_loop, measure, qjit, while_loop
+import catalyst
+from catalyst import debug, measure, qjit
 
 # pylint: disable=too-many-lines,missing-class-docstring,missing-function-docstring,too-many-public-methods
 
@@ -50,8 +52,17 @@ class TestCatalyst:
             qml.adjoint(quantum_func)(*args)
             return qml.state()
 
-        assert_allclose(catalyst_workflow(*args), pennylane_workflow(*args))
+        capture_enabled = qml.capture.enabled()
+        qml.capture.disable()
+        try:
+            pl_res = pennylane_workflow(*args)
+        finally:
+            if capture_enabled:
+                qml.capture.enable()
 
+        assert_allclose(catalyst_workflow(*args), pl_res)
+
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_func(self, backend):
         """Ensures that catalyst.adjoint accepts simple Python functions as argument. Makes sure
         that simple quantum gates are adjointed correctly."""
@@ -82,6 +93,7 @@ class TestCatalyst:
         desired = PL_workflow()
         assert_allclose(actual, desired)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     @pytest.mark.parametrize("theta, val", [(jnp.pi, 0), (-100.0, 1)])
     def test_adjoint_op(self, theta, val, backend):
         """Ensures that catalyst.adjoint accepts single PennyLane operators classes as argument."""
@@ -91,19 +103,20 @@ class TestCatalyst:
         @qml.qnode(device)
         def C_workflow(theta, val):
             adjoint(qml.RY)(jnp.pi, val)
-            adjoint(qml.RZ)(theta, wires=val)
+            adjoint(qml.RZ)(theta, val)
             return qml.state()
 
         @qml.qnode(device)
         def PL_workflow(theta, val):
             qml.adjoint(qml.RY)(jnp.pi, val)
-            qml.adjoint(qml.RZ)(theta, wires=val)
+            qml.adjoint(qml.RZ)(theta, val)
             return qml.state()
 
         actual = C_workflow(theta, val)
         desired = PL_workflow(theta, val)
         assert_allclose(actual, desired)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     @pytest.mark.parametrize("theta, val", [(np.pi, 0), (-100.0, 2)])
     def test_adjoint_bound_op(self, theta, val, backend):
         """Ensures that catalyst.adjoint accepts single PennyLane operators objects as argument."""
@@ -129,6 +142,7 @@ class TestCatalyst:
         desired = PL_workflow(theta, val)
         assert_allclose(actual, desired, atol=1e-6, rtol=1e-6)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     @pytest.mark.parametrize("w, p", [(0, 0.5), (0, -100.0), (1, 123.22)])
     def test_adjoint_param_fun(self, w, p, backend):
         """Ensures that catalyst.adjoint accepts parameterized Python functions as arguments."""
@@ -144,14 +158,14 @@ class TestCatalyst:
         @qml.qnode(device)
         def C_workflow(w, theta):
             qml.PauliX(wires=0)
-            adjoint(func)(w, theta, theta2=theta)
+            adjoint(func)(w, theta, theta)
             qml.PauliY(wires=0)
             return qml.state()
 
         @qml.qnode(device)
         def PL_workflow(w, theta):
             qml.PauliX(wires=0)
-            qml.adjoint(func)(w, theta, theta2=theta)
+            qml.adjoint(func)(w, theta, theta)
             qml.PauliY(wires=0)
             return qml.state()
 
@@ -159,6 +173,7 @@ class TestCatalyst:
         desired = PL_workflow(w, p)
         assert_allclose(actual, desired)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_nested_fun(self, backend):
         """Ensures that catalyst.adjoint allows arbitrary nesting."""
 
@@ -186,6 +201,7 @@ class TestCatalyst:
 
         assert_allclose(C_workflow(), PL_workflow())
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_qubitunitary(self, backend):
         """Ensures that catalyst.adjoint supports QubitUnitary oprtations."""
 
@@ -204,6 +220,7 @@ class TestCatalyst:
 
         self.verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=2))
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_qubitunitary_dynamic_variable_loop(self, backend):
         """Ensures that catalyst.adjoint supports QubitUnitary oprtations."""
 
@@ -228,6 +245,7 @@ class TestCatalyst:
 
         self.verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=2), _input)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_multirz(self, backend):
         """Ensures that catalyst.adjoint supports MultiRZ operations."""
 
@@ -275,6 +293,7 @@ class TestCatalyst:
 
             C_workflow()
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_classical_loop(self, backend):
         """Checks that catalyst.adjoint supports purely-classical Control-flows."""
 
@@ -288,6 +307,7 @@ class TestCatalyst:
 
         self.verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=3), 0)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     @pytest.mark.parametrize("pred", [True, False])
     def test_adjoint_cond(self, backend, pred):
         """Tests that the correct gates are applied in reverse in a conditional branch"""
@@ -302,6 +322,7 @@ class TestCatalyst:
         dev = qml.device(backend, wires=1)
         self.verify_catalyst_adjoint_against_pennylane(func, dev, pred, jnp.pi)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_while_loop(self, backend):
         """
         Tests that the correct gates are applied in reverse in a while loop with a statically
@@ -322,6 +343,7 @@ class TestCatalyst:
         dev = qml.device(backend, wires=1)
         self.verify_catalyst_adjoint_against_pennylane(func, dev, 10)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_for_loop(self, backend):
         """Tests the correct application of gates (with dynamic wires)"""
 
@@ -335,6 +357,7 @@ class TestCatalyst:
         dev = qml.device(backend, wires=5)
         self.verify_catalyst_adjoint_against_pennylane(func, dev, 4)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_while_nested(self, backend):
         """Tests the correct handling of nested while loops."""
 
@@ -367,6 +390,7 @@ class TestCatalyst:
             func, dev, 10, jnp.array([2, 4, 3, 5, 1, 7, 4, 6, 9, 10])
         )
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_nested_with_control_flow(self, backend):
         """
         Tests that nested adjoint ops produce correct results in the presence of nested control
@@ -420,6 +444,7 @@ class TestCatalyst:
 
         assert_allclose(catalyst_workflow(jnp.pi), pennylane_workflow(jnp.pi))
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_for_nested(self, backend):
         """
         Tests the adjoint op with nested and interspersed for/while loops that produce classical
@@ -542,6 +567,7 @@ class TestCatalyst:
         # It returns `-1` instead of `0`
         assert circuit() == qml.wires.Wires([0])
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_ctrl_ctrl_subroutine(self, backend):
         """https://github.com/PennyLaneAI/catalyst/issues/589"""
 
@@ -585,7 +611,7 @@ class TestCatalyst:
             qml.RY(x, wires=0)
             qml.Hadamard(0)
 
-        adj_op = adjoint(qfunc)(0.7)
+        adj_op = catalyst.adjoint(qfunc)(0.7)
         decomp = adj_op.decomposition()
 
         assert len(decomp) == 2
@@ -602,7 +628,7 @@ class TestCatalyst:
             qml.CNOT(wires=[1, w])
 
         with pytest.raises(ValueError, match="Eagerly computing the adjoint"):
-            adjoint(qfunc, lazy=False)(0.1, 0)
+            catalyst.adjoint(qfunc, lazy=False)(0.1, 0)
 
 
 #####################################################################################
