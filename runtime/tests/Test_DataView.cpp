@@ -168,13 +168,8 @@ TEST_CASE("DataView Iterator Distance 4 - int, 2", "[DataView]")
 
 TEST_CASE("DataView Iterator Distance 12 - double, 3", "[DataView]")
 {
-    double data_aligned[2][2][3] = {
-        {
-            {3.1, 2.6, 9.5}, {5.4, 2.3, 8.1}
-        },
-        {
-            {9.8, 8.2, 7.2}, {0.7, 9.6, 6.6}
-        }};
+    double data_aligned[2][2][3] = {{{3.1, 2.6, 9.5}, {5.4, 2.3, 8.1}},
+                                    {{9.8, 8.2, 7.2}, {0.7, 9.6, 6.6}}};
     size_t offset = 0;
     size_t sizes[3] = {2, 2, 3};
     size_t strides[3] = {6, 3, 1};
