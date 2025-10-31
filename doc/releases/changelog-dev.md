@@ -27,7 +27,7 @@
   [(#2133)](https://github.com/PennyLaneAI/catalyst/pull/2133)
 
 * Fixes the translation of a workflow with different transforms applied to different qnodes.
-
+  [(#2167)](https://github.com/PennyLaneAI/catalyst/pull/2167)
 
 <h3>Internal changes ⚙️</h3>
 
