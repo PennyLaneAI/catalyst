@@ -72,8 +72,9 @@ template <typename T, size_t R> class DataView {
         }
         iterator operator++(int)
         {
+            auto cached_iter = *this;
             int64_t next_axis = -1;
-            for (int64_t axis = R - 1; axis > 0; axis--) {
+            for (int64_t axis = R - 1; axis >= 0; axis--) {
                 if (++indices[axis] < view.sizes[axis]) {
                     next_axis = axis;
                     break;
@@ -83,7 +84,7 @@ template <typename T, size_t R> class DataView {
             }
 
             loc = next_axis == -1 ? -1 : loc + view.strides[next_axis];
-            return *this;
+            return cached_iter;
         }
         bool operator==(const iterator &other) const
         {
