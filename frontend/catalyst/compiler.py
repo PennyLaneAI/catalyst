@@ -542,13 +542,12 @@ class Compiler:
         if not has_plugin and mlir_module is None:
             return False
         
-        # Check module attribute set during lowering
-        if mlir_module is not None and self.has_xdsl_passes_in_transform_modules(mlir_module):
-            return True
+        has_xdsl_passes = mlir_module is not None and self.has_xdsl_passes_in_transform_modules(mlir_module)
         
-        if not has_plugin:
+        if not has_plugin and not has_xdsl_passes:
             return False
 
+        # Remove the fake plugin path from options before returning
         if xdsl_path in self.options.pass_plugins:
             plugins = self.options.pass_plugins
             self.options.pass_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
