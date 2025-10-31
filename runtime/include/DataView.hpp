@@ -15,6 +15,7 @@
 #pragma once
 
 #include <Exception.hpp>
+#include <vector>
 
 /**
  * A multi-dimensional view for MemRef-like and std::vector<T> types.

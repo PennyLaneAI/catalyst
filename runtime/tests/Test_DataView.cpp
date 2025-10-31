@@ -12,18 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstdio>
+
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
-#include <cstdint>
-#include <cstdio>
-
-#include "ExecutionContext.hpp"
-#include "RuntimeCAPI.h"
 
 #include "DataView.hpp"
-#include "TestUtils.hpp"
-#include "Types.h"
 
 using namespace Catch::Matchers;
 
