@@ -69,4 +69,5 @@ This release contains contributions from (in alphabetical order):
 
 Christina Lee,
 Roberto Turrado,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Hongsheng Zheng.
