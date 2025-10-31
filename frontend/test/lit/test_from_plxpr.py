@@ -421,3 +421,36 @@ def test_pass_decomposition():
 
 
 test_pass_decomposition()
+
+
+def test_two_qnodes_with_different_passes_in_one_workflow():
+    """Two qnodes with different passes in one workflow."""
+
+    dev = qml.device("null.qubit", wires=1)
+
+    qml.capture.enable()
+
+    @qml.qjit(target="mlir")
+    def workflow():
+        @qml.transforms.merge_rotations
+        @qml.qnode(dev)
+        def circuit1():
+            return qml.probs()
+
+        @qml.transforms.cancel_inverses
+        @qml.qnode(dev)
+        def circuit2():
+            return qml.probs()
+
+        return circuit1() + circuit2()
+
+    # CHECK: module @module_circuit1 {
+    # CHECK: transform.apply_registered_pass "merge-rotations"
+    # CHECK: module @module_circuit2 {
+    # CHECK: transform.apply_registered_pass "remove-chained-self-inverse"
+
+    print(workflow.mlir)
+    qml.capture.disable()
+
+
+test_two_qnodes_with_different_passes_in_one_workflow()
