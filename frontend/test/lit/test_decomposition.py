@@ -6,6 +6,7 @@ from copy import deepcopy
 from functools import partial
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 from pennylane.devices.capabilities import OperatorProperties
@@ -873,7 +874,7 @@ def test_qft_decomposition():
     qml.capture.enable()
     qml.decomposition.enable_graph()
 
-    @qml.qjit(target="mlir")
+    @qml.qjit(autograph=True, target="mlir")
     @partial(
         qml.transforms.decompose,
         gate_set={"RX", "RY", "CNOT", "GlobalPhase"},
@@ -1199,3 +1200,34 @@ def test_decompose_lowering_params_ordering():
 
 
 test_decompose_lowering_params_ordering()
+
+def test_decompose_scf():
+    """Test the decompose lowering pass with SCF constructs."""
+
+    qml.capture.enable()
+    qml.decomposition.enable_graph()
+
+    @qml.qjit(autograph=True)
+    @partial(
+        qml.transforms.decompose, gate_set={"Rot"}
+    )
+    @qml.qnode(qml.device("lightning.qubit", wires= 1))
+    def circuit_27(n: int, x: float):
+        # CHECK: %2:2 = scf.for %arg2 = %c0 to %1 step %c1 iter_args(%arg3 = %arg1, %arg4 = %0) -> (tensor<f64>, !quantum.reg)
+        @qml.for_loop(0, n, 1)
+        def loop_rx(i, x):
+            qml.RX(x, wires=0)
+
+            return jnp.sin(x)
+
+        final_x = loop_rx(x)
+
+        return qml.expval(qml.Z(0))
+
+    # CHECK: func.func public @_rx_to_rot(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 1 : i64, target_gate = "RX"}
+    print(circuit_27.mlir)
+
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
+
+test_decompose_scf()
