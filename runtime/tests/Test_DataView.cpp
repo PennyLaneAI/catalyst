@@ -29,7 +29,7 @@ using namespace Catch::Matchers;
 
 using namespace Catalyst::Runtime;
 
-TEST_CASE("Test DataView Pre-Increment Iterator - double, 1")
+TEST_CASE("Test DataView Pre-Increment Iterator - double, 1", "[DataView]")
 {
     double data_aligned[3] = {1.0, 1.1, 1.2};
     size_t offset = 0U;
@@ -45,7 +45,7 @@ TEST_CASE("Test DataView Pre-Increment Iterator - double, 1")
     CHECK(*++view_iter == Catch::Approx(1.2).epsilon(1e-5));
 }
 
-TEST_CASE("Test DataView Pre-Increment Iterator - int, 2")
+TEST_CASE("Test DataView Pre-Increment Iterator - int, 2", "[DataView]")
 {
     int data_aligned[3][3] = {{0, 1, 2}, {3, 4, 5}};
     size_t offset = 0U;
@@ -62,7 +62,7 @@ TEST_CASE("Test DataView Pre-Increment Iterator - int, 2")
     }
 }
 
-TEST_CASE("Test DataView Pre-Increment Iterator - int, 3")
+TEST_CASE("Test DataView Pre-Increment Iterator - int, 3", "[DataView]")
 {
     int data_aligned[18] = {0};
     for (int i = 0; i < 18; i++) {
@@ -71,8 +71,8 @@ TEST_CASE("Test DataView Pre-Increment Iterator - int, 3")
 
     size_t offset = 0U;
     size_t sizes[3] = {3, 2, 3};
-    size_t strides[3] = {6, 2, 1};
-    
+    size_t strides[3] = {6, 3, 1};
+
     DataView<int, 3> view(data_aligned, offset, sizes, strides);
 
     auto view_iter = view.begin();
@@ -83,29 +83,96 @@ TEST_CASE("Test DataView Pre-Increment Iterator - int, 3")
     }
 }
 
-TEST_CASE("DataView Pre-Increment Iterator - int, 2 with zero first axis")
+TEST_CASE("Test DataView Post-Increment Iterator - double, 1", "[DataView]")
 {
-    int* data_aligned = nullptr;
-    size_t offset = 0U;
-    size_t sizes[2] = {0, 10};
-    size_t strides[2] = {1, 1};
+    double data_aligned[3] = {3.2, 4.1, 1.6};
+    size_t offset = 0;
+    size_t sizes[1] = {3};
+    size_t strides[1] = {1};
 
-    DataView<int, 2> view(data_aligned, offset, sizes, strides);
+    DataView<double, 1> view(data_aligned, offset, sizes, strides);
 
     auto view_iter = view.begin();
-    ++view_iter;
+
+    CHECK(*view_iter++ == Catch::Approx(3.2).epsilon(1e-5));
+    CHECK(*view_iter++ == Catch::Approx(4.1).epsilon(1e-5));
+    CHECK(*view_iter == Catch::Approx(1.6).epsilon(1e-5));
 }
 
-TEST_CASE("DataView Pre-Increment Iterator - int, 2 with zero second axis")
+TEST_CASE("Test DataView Post-Increment Iterator - int, 2", "[DataView]")
 {
-    int* data_aligned = nullptr;
+    int data_aligned[3][3] = {{0, 1, 2}, {3, 4, 5}};
     size_t offset = 0U;
-    size_t sizes[2] = {10, 0};
-    size_t strides[2] = {1, 1};
+    size_t sizes[2] = {3, 3};
+    size_t strides[2] = {3, 1};
 
-    DataView<int, 2> view(data_aligned, offset, sizes, strides);
+    DataView<int, 2> view(*data_aligned, offset, sizes, strides);
 
     auto view_iter = view.begin();
 
-    ++view_iter;
+    for (int i = 0; i < 6; i++) {
+        CHECK(*view_iter++ == i);
+    }
+}
+
+TEST_CASE("Test DataView Post-Increment Iterator - int, 3", "[DataView]")
+{
+    int data_aligned[18] = {0};
+    for (int i = 0; i < 18; i++) {
+        data_aligned[i] = i;
+    }
+
+    size_t offset = 0U;
+    size_t sizes[3] = {3, 2, 3};
+    size_t strides[3] = {6, 3, 1};
+
+    DataView<int, 3> view(data_aligned, offset, sizes, strides);
+
+    auto view_iter = view.begin();
+
+    for (int i = 0; i < 18; i++) {
+        CHECK(*view_iter++ == i);
+    }
+}
+
+TEST_CASE("DataView Iterator Distance- 0 first axis", "[DataView]")
+{
+    int *data_aligned = nullptr;
+    size_t offset = 0;
+    size_t sizes[2] = {0, 10};
+    size_t strides[2] = {0, 0};
+
+    DataView<int, 2> view(data_aligned, offset, sizes, strides);
+
+    auto start = view.begin();
+    auto end = view.end();
+
+    CHECK(std::distance(start, end) == 0);
+}
+
+TEST_CASE("DataView Iterator Distance - 0 second axis", "[DataView]")
+{
+    int *data_aligned = nullptr;
+    size_t offset = 0;
+    size_t sizes[2] = {10, 0};
+    size_t strides[2] = {0, 0};
+
+    DataView<int, 2> view(data_aligned, offset, sizes, strides);
+
+    auto start = view.begin();
+    auto end = view.end();
+
+    CHECK(std::distance(start, end) == 0);
+}
+
+TEST_CASE("DataView Size - 0 first axis", "[DataView]")
+{
+    int *data_aligned = nullptr;
+    size_t offset = 0;
+    size_t sizes[2] = {0, 10};
+    size_t strides[2] = {0, 0};
+
+    DataView<int, 2> view(data_aligned, offset, sizes, strides);
+
+    CHECK(view.size() == 0);
 }
