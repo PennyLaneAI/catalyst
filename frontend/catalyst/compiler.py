@@ -480,16 +480,17 @@ class Compiler:
 
     def has_xdsl_passes_in_transform_modules(self, mlir_module):
         """Check if the MLIR module contains xDSL passes in transform dialect.
-        
+
         This checks for the 'uses_xdsl_passes' attribute that is set during
         lowering on transform modules when xDSL passes are added to the transform pipeline.
-        
+
         Args:
             mlir_module: MLIR module to check for xDSL passes
-            
+
         Returns:
             bool: True if xDSL passes detected in any transform module
         """
+
         def has_both_attributes(attrs):
             """Check if attributes dict has both required keys."""
             try:
@@ -504,14 +505,14 @@ class Compiler:
                 return has_transform and has_xdsl
             except (AttributeError, KeyError, TypeError):
                 return False
-        
-        try:            
+
+        try:
             for op in mlir_module.operation.regions[0].blocks[0].operations:
                 try:
                     # Check nested modules (look for transform modules)
-                    if hasattr(op, 'regions') and len(op.regions) > 0:
+                    if hasattr(op, "regions") and len(op.regions) > 0:
                         for nested_op in op.regions[0].blocks[0].operations:
-                            if hasattr(nested_op, 'attributes'):
+                            if hasattr(nested_op, "attributes"):
                                 if has_both_attributes(nested_op.attributes):
                                     return True
                 except (AttributeError, IndexError):
@@ -520,30 +521,34 @@ class Compiler:
         except Exception:  # pylint: disable=broad-except
             # If we can't check the attribute, assume no xDSL passes
             return False
-    
+
     @debug_logger
     def is_using_python_compiler(self, mlir_module=None):
         """Returns true if we need the Python compiler path.
-        
+
         This happens when:
         1. xDSL plugin is explicitly loaded (legacy), OR
         2. Module has xDSL passes in transform modules (detected via attribute)
 
         Will also modify self.options.pass_plugins and self.options.dialect_plugins to remove
         the xdsl plugin.
-        
+
         Args:
             mlir_module: Optional MLIR module to check for xDSL passes attribute
         """
         xdsl_path = pathlib.Path("xdsl-does-not-use-a-real-path")
-        
-        has_plugin = xdsl_path in self.options.pass_plugins or xdsl_path in self.options.dialect_plugins
-        
+
+        has_plugin = (
+            xdsl_path in self.options.pass_plugins or xdsl_path in self.options.dialect_plugins
+        )
+
         if not has_plugin and mlir_module is None:
             return False
-        
-        has_xdsl_passes = mlir_module is not None and self.has_xdsl_passes_in_transform_modules(mlir_module)
-        
+
+        has_xdsl_passes = mlir_module is not None and self.has_xdsl_passes_in_transform_modules(
+            mlir_module
+        )
+
         if not has_plugin and not has_xdsl_passes:
             return False
 

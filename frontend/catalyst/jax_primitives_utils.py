@@ -307,6 +307,7 @@ class NestedModule:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.ctx.module_context = self.old_module_context
 
+
 def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipeline):
     """Generate a transform module embedded in the current module and schedule
     the transformations in pipeline"""
@@ -332,9 +333,9 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
 
     # Insert the transform.named_sequence op into the transformer module
     # Note that InsertionPoint(Block) inserts after the last operation but still inside the block.
-    
+
     # Track if we created any xDSL passes
-    created_xdsl_passes = False
+    uses_xdsl_passes = False
 
     with ir.InsertionPoint(bb_transformer):
         named_sequence_op = NamedSequenceOp(
@@ -362,20 +363,23 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
                     dynamic_options={},
                 )
                 target = apply_registered_pass_op.result
-                
+
                 try:
                     from pennylane.compiler.python_compiler.pass_api import is_xdsl_pass
+
                     if is_xdsl_pass(_pass.name):
-                        created_xdsl_passes = True
-                        apply_registered_pass_op.operation.attributes["xdsl_pass"] = ir.UnitAttr.get() 
+                        uses_xdsl_passes = True
+                        apply_registered_pass_op.operation.attributes["xdsl_pass"] = (
+                            ir.UnitAttr.get()
+                        )
                 except ImportError:
                     # If xDSL pass API is not available, do not set the attribute
                     pass
-                                       
+
             transform_yield_op = YieldOp(operands_=[])  # pylint: disable=unused-variable
-    
+
     # Set an attribute on the transformer module if we created any xDSL pass operations
-    if created_xdsl_passes:
+    if uses_xdsl_passes:
         transformer_module.operation.attributes["uses_xdsl_passes"] = ir.UnitAttr.get()
 
     return named_sequence_op.results
