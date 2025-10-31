@@ -309,6 +309,7 @@ class TestControlled:
 
 
 class TestCatalystOnlyControlled:
+    """Tests for just catalyst's version of control."""
 
     def test_ctrl_invalid_argument(self):
         """Checks that ctrl rejects non-quantum program arguments."""
