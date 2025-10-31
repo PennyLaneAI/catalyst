@@ -20,6 +20,9 @@
 * Pytree inputs can now be used when program capture is enabled.
   [(#2165)](https://github.com/PennyLaneAI/catalyst/pull/2165)
 
+* Dynamically allocated wires can now be passed into control flow and subroutines.
+  [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
@@ -45,10 +48,10 @@
   [(#1984)](https://github.com/PennyLaneAI/catalyst/pull/1984)
 
 * Split `from_plxpr.py` into two files.
-  [(#2142)](https://github.com/PennyLaneAI/catalyst/pull/2142)	
+  [(#2142)](https://github.com/PennyLaneAI/catalyst/pull/2142)
 
 * Re-work `DataView` to avoid an axis of size 0 possibly triggering a segfault via an underflow
-  error, as discovered in 
+  error, as discovered in
   [this comment](https://github.com/PennyLaneAI/catalyst/pull/1598#issuecomment-2779178046).
   [(#1621)](https://github.com/PennyLaneAI/catalyst/pull/2164)
 

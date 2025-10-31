@@ -1199,3 +1199,42 @@ def test_decompose_lowering_params_ordering():
 
 
 test_decompose_lowering_params_ordering()
+
+
+def test_decomposition_rule_with_allocation():
+    """Test decomposition rule with dynamic qubit allocation"""
+
+    qml.capture.enable()
+
+    @decomposition_rule(is_qreg=True)
+    def Hadamard0_with_alloc(wire: WiresLike):
+        with qml.allocate(1) as q:
+            qml.X(q[0])
+            qml.CNOT(wires=[q[0], wire])
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    # CHECK: module @circuit_27
+    def circuit_27():
+        Hadamard0_with_alloc(int)
+        return qml.probs()
+
+    # CHECK: func.func public @Hadamard0_with_alloc(%arg0: !quantum.reg, %arg1: tensor<i64>) -> !quantum.reg
+    # CHECK:  [[dynalloc_qreg:%.+]] = quantum.alloc( 1)
+    # CHECK:  [[dynalloc_bit0:%.+]] = quantum.extract [[dynalloc_qreg]][ 0]
+    # CHECK:  [[xout:%.+]] = quantum.custom "PauliX"() [[dynalloc_bit0]]
+    # CHECK:  [[detensor:%.+]] = tensor.extract %arg1[]
+    # CHECK:  [[glob_bit:%.+]] = quantum.extract %arg0[[[detensor]]]
+    # CHECK:  [[cnot_out:%.+]]:2 = quantum.custom "CNOT"() [[xout]], [[glob_bit]]
+    # CHECK:  [[dynalloc_qreg_inserted:%.+]] = quantum.insert [[dynalloc_qreg]][ 0], [[cnot_out]]#0
+    # CHECK:  quantum.dealloc [[dynalloc_qreg_inserted]] : !quantum.reg
+    # CHECK:  [[detensor:%.+]] = tensor.extract %arg1[]
+    # CHECK:  [[glob_insert:%.+]] = quantum.insert %arg0[[[detensor]]], [[cnot_out]]#1
+    # CHECK:  return [[glob_insert]] : !quantum.reg
+
+    print(circuit_27.mlir)
+
+    qml.capture.disable()
+
+
+test_decomposition_rule_with_allocation()
