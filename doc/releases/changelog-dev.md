@@ -32,7 +32,9 @@
 * Split `from_plxpr.py` into two files.
   [(#2142)](https://github.com/PennyLaneAI/catalyst/pull/2142)	
 
-* Fixes the underflow error when an axis of size 0 is present in a `DataView` object.
+* Re-work `DataView` to avoid an axis of size 0 possibly triggering a segfault via an underflow
+  error, as discovered in 
+  [this comment](https://github.com/PennyLaneAI/catalyst/pull/1598#issuecomment-2779178046).
   [(#1621)](https://github.com/PennyLaneAI/catalyst/pull/2164)
 
 <h3>Documentation 📝</h3>
