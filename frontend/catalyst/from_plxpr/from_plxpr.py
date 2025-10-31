@@ -18,9 +18,9 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 
 
 import warnings
+from copy import copy
 from functools import partial
 from typing import Callable
-from copy import copy
 
 import jax
 import pennylane as qml
@@ -138,7 +138,6 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
 class WorkflowInterpreter(PlxprInterpreter):
     """An interpreter that converts a qnode primitive from a plxpr variant to a catalyst jaxpr variant."""
 
-    # pylint: disable=protected_access
     def __copy__(self):
         new_version = WorkflowInterpreter()
         new_version._pass_pipeline = copy(self._pass_pipeline)
