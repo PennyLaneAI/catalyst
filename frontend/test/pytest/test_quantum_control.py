@@ -30,15 +30,16 @@ import pennylane.numpy as pnp
 import pytest
 from numpy.testing import assert_allclose
 from pennylane import adjoint as PL_adjoint
+from pennylane import cond
 from pennylane import ctrl as PL_ctrl
+from pennylane import for_loop, qjit, while_loop
 from pennylane.operation import DecompositionUndefinedError, Operation, Operator, Wires
 from pennylane.ops.op_math.controlled import Controlled
 from pennylane.tape import QuantumTape
-from pennylane import cond, for_loop, qjit, while_loop
 
 from catalyst import adjoint as C_adjoint
 from catalyst import ctrl as C_ctrl
-from catalyst import  measure
+from catalyst import measure
 from catalyst.api_extensions.quantum_operators import HybridCtrl
 from catalyst.jax_tracer import HybridOpRegion
 
@@ -71,7 +72,6 @@ def verify_catalyst_ctrl_against_pennylane(
             return quantum_func(*args, ctrl_fn=PL_ctrl, adjoint_fn=PL_adjoint)
         else:
             return quantum_func(*args, ctrl_fn=PL_ctrl)
-
 
     capture_enabled = qml.capture.enabled()
     qml.capture.disable()
@@ -266,7 +266,6 @@ class TestControlled:
 
         verify_catalyst_ctrl_against_pennylane(circuit, qml.device(backend, wires=3), 0.1, 0, 1)
 
-
     def test_native_controlled_custom(self):
         """Test native control of a custom operation."""
         dev = qml.device("lightning.qubit", wires=4)
@@ -308,6 +307,7 @@ class TestControlled:
         expected = native_controlled()
         assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
 
+
 class TestCatalystOnlyControlled:
 
     def test_ctrl_invalid_argument(self):
@@ -322,7 +322,6 @@ class TestCatalystOnlyControlled:
                 return qml.state()
 
             workflow()
-
 
     def test_qctrl_raises_on_invalid_input(self, backend):
         """Test the no-measurements exception"""

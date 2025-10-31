@@ -22,8 +22,8 @@ import pennylane as qml
 import pennylane.numpy as pnp
 import pytest
 from numpy.testing import assert_allclose
-from pennylane.ops.op_math.adjoint import Adjoint, AdjointOperation
 from pennylane import adjoint, cond, for_loop, qjit, while_loop
+from pennylane.ops.op_math.adjoint import Adjoint, AdjointOperation
 
 import catalyst
 from catalyst import debug, measure, qjit

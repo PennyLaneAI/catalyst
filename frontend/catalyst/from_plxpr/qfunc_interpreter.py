@@ -276,12 +276,14 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
 
 
-
 def _qubit_unitary_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint):
     wires = invals[:qubits_len]
     mat = invals[qubits_len]
-    ctrl_inputs = invals[qubits_len+1:]
-    return unitary_p.bind(mat, *wires, *ctrl_inputs, qubits_len=qubits_len, ctrl_len=ctrl_len, adjoint=adjoint)
+    ctrl_inputs = invals[qubits_len + 1 :]
+    return unitary_p.bind(
+        mat, *wires, *ctrl_inputs, qubits_len=qubits_len, ctrl_len=ctrl_len, adjoint=adjoint
+    )
+
 
 def _gphase_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint):
     return gphase_p.bind(*invals[qubits_len:], ctrl_len=ctrl_len, adjoint=adjoint)
@@ -594,7 +596,9 @@ def handle_adjoint_transform(
 
     converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*args, qreg)
 
-    converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch.jaxpr), ())
+    converted_closed_jaxpr_branch = ClosedJaxpr(
+        convert_constvars_jaxpr(converted_jaxpr_branch.jaxpr), ()
+    )
     new_consts = converted_jaxpr_branch.consts
     _, args_tree = tree_flatten((new_consts, args, [qreg]))
     # Perform the binding
