@@ -308,6 +308,32 @@ class NestedModule:
         self.ctx.module_context = self.old_module_context
 
 
+def _is_xdsl_pass(pass_name: str) -> bool:
+    """Check if a pass name corresponds to an xDSL/Python implemented pass.
+        
+    Args:
+        pass_name: Name of the pass to check
+        
+    Returns:
+        bool: True if this is an xDSL/Python compiler pass
+    """
+    # Python compiler passes
+    xdsl_pass_names = [
+        # Quantum optimization passes
+        "xdsl-cancel-inverses",
+        "xdsl-merge-rotations",
+        "measurements-from-samples",
+        "diagonalize-final-measurements",
+        "combine-global-phases",
+        # MBQC passes
+        "convert-to-mbqc-formalism",
+        "decompose-graph-state",
+        "null-decompose-graph-state",
+    ]
+    
+    return pass_name in xdsl_pass_names or pass_name.startswith("xdsl-")
+
+
 def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipeline):
     """Generate a transform module embedded in the current module and schedule
     the transformations in pipeline"""
@@ -333,6 +359,10 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
 
     # Insert the transform.named_sequence op into the transformer module
     # Note that InsertionPoint(Block) inserts after the last operation but still inside the block.
+    
+    # Track if we created any xDSL passes
+    created_xdsl_passes = False
+
     with ir.InsertionPoint(bb_transformer):
         named_sequence_op = NamedSequenceOp(
             sym_name="__transform_main",
@@ -359,6 +389,18 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
                     dynamic_options={},
                 )
                 target = apply_registered_pass_op.result
+                
+                # Track if this is an xDSL pass
+                if _is_xdsl_pass(_pass.name):
+                    created_xdsl_passes = True
+                    apply_registered_pass_op.operation.attributes["xdsl_pass"] = ir.UnitAttr.get()
+
+                    
+                    
             transform_yield_op = YieldOp(operands_=[])  # pylint: disable=unused-variable
+    
+    # Set an attribute on the transformer module if we created any xDSL pass operations
+    if created_xdsl_passes:
+        transformer_module.operation.attributes["uses_xdsl_passes"] = ir.UnitAttr.get()
 
     return named_sequence_op.results
