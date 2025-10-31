@@ -18,12 +18,13 @@
 // CHECK: llvm.func @__catalyst__oqd__ParallelProtocol(!llvm.ptr, i64)
 
 // CHECK-LABEL: parallel_protocol_op
-func.func public @parallel_protocol_op(%arg0: f64) -> !quantum.bit {
+func.func public @parallel_protocol_op(%arg0: f64) -> !ion.qubit {
 
     // Get wire number
     // CHECK: {{.+}} = quantum.alloc( 1) : !quantum.reg
     // CHECK: {{.+}} = quantum.extract {{.+}}[ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[wire:%.+]] = builtin.unrealized_conversion_cast {{.+}} : !quantum.bit to !llvm.ptr
+    // CHECK: [[ion_qubit:%.+]] = builtin.unrealized_conversion_cast {{.+}} : !quantum.bit to !ion.qubit
+    // CHECK: [[wire:%.+]] = builtin.unrealized_conversion_cast [[ion_qubit:%.+]] : !ion.qubit to !llvm.ptr
 
     // Pulse 1
     // CHECK: %[[pulse_1:.*]] = llvm.call @__catalyst__oqd__pulse([[wire]]
@@ -69,9 +70,10 @@ func.func public @parallel_protocol_op(%arg0: f64) -> !quantum.bit {
 
     %qreg = quantum.alloc( 1) : !quantum.reg
     %q0 = quantum.extract %qreg[ 0] : !quantum.reg -> !quantum.bit
+    %ion_qubit_0 = builtin.unrealized_conversion_cast %q0 : !quantum.bit to !ion.qubit
 
-    %pp= ion.parallelprotocol(%q0) : !quantum.bit{
-        ^bb0(%arg1: !quantum.bit):
+    %pp= ion.parallelprotocol(%ion_qubit_0) : !ion.qubit{
+        ^bb0(%arg1: !ion.qubit):
           %p1 = ion.pulse(%arg0: f64) %arg1 {
               beam=#ion.beam<
                   transition_index=1,
@@ -93,11 +95,11 @@ func.func public @parallel_protocol_op(%arg0: f64) -> !quantum.bit {
               >,
               phase=0.0
           } : !ion.pulse
-          ion.yield %arg1: !quantum.bit
+          ion.yield %arg1: !ion.qubit
     }
 
-    %pp1= ion.parallelprotocol(%pp) : !quantum.bit{
-        ^bb0(%arg1: !quantum.bit):
+    %pp1= ion.parallelprotocol(%pp) : !ion.qubit{
+        ^bb0(%arg1: !ion.qubit):
           %p1 = ion.pulse(%arg0: f64) %arg1 {
               beam=#ion.beam<
                   transition_index=1,
@@ -119,8 +121,8 @@ func.func public @parallel_protocol_op(%arg0: f64) -> !quantum.bit {
               >,
               phase=0.0
           } : !ion.pulse
-          ion.yield %arg1: !quantum.bit
+          ion.yield %arg1: !ion.qubit
     }
 
-    return %pp1: !quantum.bit
+    return %pp1: !ion.qubit
 }
