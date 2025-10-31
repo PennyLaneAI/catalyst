@@ -113,37 +113,25 @@ class BaseSignatureAnalyzer {
                               .outQubitIndices = {},
                               .outCtrlQubitIndices = {}})
     {
-        if (!enableQregMode || !op)
-            return;
+        initializeQregMode(op, enableQregMode);
+    }
 
-        // input wire indices
-        for (mlir::Value qubit : signature.inQubits) {
-            const QubitIndex index = getExtractIndex(qubit);
-            if (!index) {
-                op->emitError("Cannot get index for input qubit");
-                isValid = false;
-                return;
-            }
-            signature.inWireIndices.emplace_back(index);
-        }
-
-        // input ctrl wire indices
-        for (mlir::Value ctrlQubit : signature.inCtrlQubits) {
-            const QubitIndex index = getExtractIndex(ctrlQubit);
-            if (!index) {
-                op->emitError("Cannot get index for ctrl qubit");
-                isValid = false;
-                return;
-            }
-            signature.inCtrlWireIndices.emplace_back(index);
-        }
-
-        assert((signature.inWireIndices.size() + signature.inCtrlWireIndices.size()) > 0 &&
-               "inWireIndices or inCtrlWireIndices should not be empty");
-
-        // Output qubit indices are the same as input qubit indices
-        signature.outQubitIndices = signature.inWireIndices;
-        signature.outCtrlQubitIndices = signature.inCtrlWireIndices;
+    BaseSignatureAnalyzer(mlir::Operation *op, Value param, mlir::ValueRange inQubits,
+                          mlir::ValueRange inCtrlQubits, mlir::ValueRange inCtrlValues,
+                          mlir::ValueRange outQubits, mlir::ValueRange outCtrlQubits,
+                          bool enableQregMode)
+        : paramsStorage{param}, signature(Signature{.params = mlir::ValueRange(paramsStorage),
+                                                    .inQubits = inQubits,
+                                                    .inCtrlQubits = inCtrlQubits,
+                                                    .inCtrlValues = inCtrlValues,
+                                                    .outQubits = outQubits,
+                                                    .outCtrlQubits = outCtrlQubits,
+                                                    .inWireIndices = {},
+                                                    .inCtrlWireIndices = {},
+                                                    .outQubitIndices = {},
+                                                    .outCtrlQubitIndices = {}})
+    {
+        initializeQregMode(op, enableQregMode);
     }
 
   public:
@@ -356,6 +344,41 @@ class BaseSignatureAnalyzer {
         return values.front();
     }
 
+    void initializeQregMode(mlir::Operation *op, bool enableQregMode)
+    {
+        if (!enableQregMode || !op)
+            return;
+
+        // input wire indices
+        for (mlir::Value qubit : signature.inQubits) {
+            const QubitIndex index = getExtractIndex(qubit);
+            if (!index) {
+                op->emitError("Cannot get index for input qubit");
+                isValid = false;
+                return;
+            }
+            signature.inWireIndices.emplace_back(index);
+        }
+
+        // input ctrl wire indices
+        for (mlir::Value ctrlQubit : signature.inCtrlQubits) {
+            const QubitIndex index = getExtractIndex(ctrlQubit);
+            if (!index) {
+                op->emitError("Cannot get index for ctrl qubit");
+                isValid = false;
+                return;
+            }
+            signature.inCtrlWireIndices.emplace_back(index);
+        }
+
+        assert((signature.inWireIndices.size() + signature.inCtrlWireIndices.size()) > 0 &&
+               "inWireIndices or inCtrlWireIndices should not be empty");
+
+        // Output qubit indices are the same as input qubit indices
+        signature.outQubitIndices = signature.inWireIndices;
+        signature.outCtrlQubitIndices = signature.inCtrlWireIndices;
+    }
+
     QubitIndex getExtractIndex(Value qubit)
     {
         while (qubit) {
@@ -412,10 +435,10 @@ class MultiRZOpSignatureAnalyzer : public BaseSignatureAnalyzer {
     MultiRZOpSignatureAnalyzer() = delete;
 
     MultiRZOpSignatureAnalyzer(MultiRZOp op, bool enableQregMode)
-        : BaseSignatureAnalyzer(
-              op, mlir::ValueRange(op.getTheta()), // Theta becomes a ValueRange of size 1
-              op.getNonCtrlQubitOperands(), op.getCtrlQubitOperands(), op.getCtrlValueOperands(),
-              op.getNonCtrlQubitResults(), op.getCtrlQubitResults(), enableQregMode)
+        : BaseSignatureAnalyzer(op, op.getTheta(), op.getNonCtrlQubitOperands(),
+                                op.getCtrlQubitOperands(), op.getCtrlValueOperands(),
+                                op.getNonCtrlQubitResults(), op.getCtrlQubitResults(),
+                                enableQregMode)
     {
     }
 };
