@@ -307,33 +307,6 @@ class NestedModule:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.ctx.module_context = self.old_module_context
 
-
-def _is_xdsl_pass(pass_name: str) -> bool:
-    """Check if a pass name corresponds to an xDSL/Python implemented pass.
-        
-    Args:
-        pass_name: Name of the pass to check
-        
-    Returns:
-        bool: True if this is an xDSL/Python compiler pass
-    """
-    # Python compiler passes
-    xdsl_pass_names = [
-        # Quantum optimization passes
-        "xdsl-cancel-inverses",
-        "xdsl-merge-rotations",
-        "measurements-from-samples",
-        "diagonalize-final-measurements",
-        "combine-global-phases",
-        # MBQC passes
-        "convert-to-mbqc-formalism",
-        "decompose-graph-state",
-        "null-decompose-graph-state",
-    ]
-    
-    return pass_name in xdsl_pass_names or pass_name.startswith("xdsl-")
-
-
 def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipeline):
     """Generate a transform module embedded in the current module and schedule
     the transformations in pipeline"""
@@ -390,13 +363,15 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
                 )
                 target = apply_registered_pass_op.result
                 
-                # Track if this is an xDSL pass
-                if _is_xdsl_pass(_pass.name):
-                    created_xdsl_passes = True
-                    apply_registered_pass_op.operation.attributes["xdsl_pass"] = ir.UnitAttr.get()
-
-                    
-                    
+                try:
+                    from pennylane.compiler.python_compiler.pass_api import is_xdsl_pass
+                    if is_xdsl_pass(_pass.name):
+                        created_xdsl_passes = True
+                        apply_registered_pass_op.operation.attributes["xdsl_pass"] = ir.UnitAttr.get() 
+                except ImportError:
+                    # If xDSL pass API is not available, do not set the attribute
+                    pass
+                                       
             transform_yield_op = YieldOp(operands_=[])  # pylint: disable=unused-variable
     
     # Set an attribute on the transformer module if we created any xDSL pass operations
