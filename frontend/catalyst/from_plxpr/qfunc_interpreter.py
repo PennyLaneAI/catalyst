@@ -284,7 +284,7 @@ def _qubit_unitary_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjo
     return unitary_p.bind(mat, *wires, *ctrl_inputs, qubits_len=qubits_len, ctrl_len=ctrl_len, adjoint=adjoint)
 
 def _gphase_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint):
-    return gphase_p.bind(invals[qubits_len], ctrl_len=ctrl_len, adjoint=adjoint)
+    return gphase_p.bind(*invals[qubits_len:], ctrl_len=ctrl_len, adjoint=adjoint)
 
 
 _special_op_bind_call = {

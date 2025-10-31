@@ -34,11 +34,11 @@ from pennylane import ctrl as PL_ctrl
 from pennylane.operation import DecompositionUndefinedError, Operation, Operator, Wires
 from pennylane.ops.op_math.controlled import Controlled
 from pennylane.tape import QuantumTape
+from pennylane import cond, for_loop, qjit, while_loop
 
 from catalyst import adjoint as C_adjoint
-from catalyst import cond
 from catalyst import ctrl as C_ctrl
-from catalyst import for_loop, measure, qjit, while_loop
+from catalyst import  measure
 from catalyst.api_extensions.quantum_operators import HybridCtrl
 from catalyst.jax_tracer import HybridOpRegion
 
@@ -54,6 +54,12 @@ def verify_catalyst_ctrl_against_pennylane(
     @qjit
     @qml.qnode(device)
     def catalyst_workflow(*args):
+        if qml.capture.enabled():
+            if with_adjoint_arg:
+                return quantum_func(*args, ctrl_fn=PL_ctrl, adjoint_fn=PL_adjoint)
+            else:
+                return quantum_func(*args, ctrl_fn=PL_ctrl)
+
         if with_adjoint_arg:
             return quantum_func(*args, ctrl_fn=C_ctrl, adjoint_fn=C_adjoint)
         else:
@@ -66,10 +72,20 @@ def verify_catalyst_ctrl_against_pennylane(
         else:
             return quantum_func(*args, ctrl_fn=PL_ctrl)
 
-    assert_allclose(catalyst_workflow(*args), pennylane_workflow(*args), atol=1e-7)
+
+    capture_enabled = qml.capture.enabled()
+    qml.capture.disable()
+    try:
+        compare = pennylane_workflow(*args)
+    finally:
+        if capture_enabled:
+            qml.capture.enable()
+
+    assert_allclose(catalyst_workflow(*args), compare, atol=1e-7)
 
 
-class TestCatalystControlled:
+@pytest.mark.usefixtures("use_both_frontend")
+class TestControlled:
     """Integration tests for Catalyst ctrl functionality."""
 
     def test_qctrl_op_object(self, backend):
@@ -81,19 +97,6 @@ class TestCatalystControlled:
             return qml.state()
 
         verify_catalyst_ctrl_against_pennylane(circuit, qml.device(backend, wires=3), 0.1, 0, 1)
-
-    def test_ctrl_invalid_argument(self):
-        """Checks that ctrl rejects non-quantum program arguments."""
-
-        with pytest.raises(ValueError, match="Expected a callable"):
-
-            @qjit
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
-            def workflow():
-                C_ctrl(0, control=1)(2)
-                return qml.state()
-
-            workflow()
 
     def test_qctrl_op_class(self, backend):
         """Test the quantum control application to a single operation class"""
@@ -134,9 +137,6 @@ class TestCatalystControlled:
             circuit, qml.device(backend, wires=3), 0.1, with_adjoint_arg=True
         )
 
-    @pytest.mark.xfail(
-        reason="adjoint fails on quantum.unitary with 'operand #0 does not dominate this use'"
-    )
     def test_qctrl_adjoint_hybrid(self, backend):
         """Test the quantum control distribution over the group of operations"""
 
@@ -265,6 +265,64 @@ class TestCatalystControlled:
             return qml.state()
 
         verify_catalyst_ctrl_against_pennylane(circuit, qml.device(backend, wires=3), 0.1, 0, 1)
+
+
+    def test_native_controlled_custom(self):
+        """Test native control of a custom operation."""
+        dev = qml.device("lightning.qubit", wires=4)
+
+        @qml.qnode(dev)
+        def native_controlled():
+            qml.ctrl(qml.PauliZ(wires=[0]), control=[1, 2, 3])
+            return qml.state()
+
+        compiled = qjit(native_controlled)
+        assert all(sign in compiled.mlir for sign in ["ctrls", "ctrlvals"])
+        result = compiled()
+        expected = native_controlled()
+        assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
+
+    def test_native_controlled_unitary(self):
+        """Test native control of a custom operation."""
+        dev = qml.device("lightning.qubit", wires=4)
+
+        @qml.qnode(dev)
+        def native_controlled():
+            qml.ctrl(
+                qml.QubitUnitary(
+                    jnp.array(
+                        [
+                            [0.70710678 + 0.0j, 0.70710678 + 0.0j],
+                            [0.70710678 + 0.0j, -0.70710678 + 0.0j],
+                        ],
+                        dtype=jnp.complex128,
+                    ),
+                    wires=[0],
+                ),
+                control=[1, 2, 3],
+            )
+            return qml.state()
+
+        compiled = qjit(native_controlled)
+        result = compiled()
+        expected = native_controlled()
+        assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
+
+class TestCatalystOnlyControlled:
+
+    def test_ctrl_invalid_argument(self):
+        """Checks that ctrl rejects non-quantum program arguments."""
+
+        with pytest.raises(ValueError, match="Expected a callable"):
+
+            @qjit
+            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            def workflow():
+                C_ctrl(0, control=1)(2)
+                return qml.state()
+
+            workflow()
+
 
     def test_qctrl_raises_on_invalid_input(self, backend):
         """Test the no-measurements exception"""
@@ -424,47 +482,6 @@ class TestCatalystControlled:
 
         # It returns `[2, 0, -1]`
         assert circuit(0.1, 0, 2, 2) == qml.wires.Wires([2, 0, 1])
-
-    def test_native_controlled_custom(self):
-        """Test native control of a custom operation."""
-        dev = qml.device("lightning.qubit", wires=4)
-
-        @qml.qnode(dev)
-        def native_controlled():
-            qml.ctrl(qml.PauliZ(wires=[0]), control=[1, 2, 3])
-            return qml.state()
-
-        compiled = qjit(native_controlled)
-        assert all(sign in compiled.mlir for sign in ["ctrls", "ctrlvals"])
-        result = compiled()
-        expected = native_controlled()
-        assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
-
-    def test_native_controlled_unitary(self):
-        """Test native control of a custom operation."""
-        dev = qml.device("lightning.qubit", wires=4)
-
-        @qml.qnode(dev)
-        def native_controlled():
-            qml.ctrl(
-                qml.QubitUnitary(
-                    jnp.array(
-                        [
-                            [0.70710678 + 0.0j, 0.70710678 + 0.0j],
-                            [0.70710678 + 0.0j, -0.70710678 + 0.0j],
-                        ],
-                        dtype=jnp.complex128,
-                    ),
-                    wires=[0],
-                ),
-                control=[1, 2, 3],
-            )
-            return qml.state()
-
-        compiled = qjit(native_controlled)
-        result = compiled()
-        expected = native_controlled()
-        assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
 
     def test_map_wires(self):
         """Test map wires."""
