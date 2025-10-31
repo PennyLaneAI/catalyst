@@ -120,16 +120,17 @@ class BaseSignatureAnalyzer {
                           mlir::ValueRange inCtrlQubits, mlir::ValueRange inCtrlValues,
                           mlir::ValueRange outQubits, mlir::ValueRange outCtrlQubits,
                           bool enableQregMode)
-        : paramsStorage{param}, signature(Signature{.params = mlir::ValueRange(paramsStorage),
-                                                    .inQubits = inQubits,
-                                                    .inCtrlQubits = inCtrlQubits,
-                                                    .inCtrlValues = inCtrlValues,
-                                                    .outQubits = outQubits,
-                                                    .outCtrlQubits = outCtrlQubits,
-                                                    .inWireIndices = {},
-                                                    .inCtrlWireIndices = {},
-                                                    .outQubitIndices = {},
-                                                    .outCtrlQubitIndices = {}})
+        : paramsStorage(mlir::ValueRange(param).begin(), mlir::ValueRange(param).end()),
+          signature(Signature{.params = mlir::ValueRange(paramsStorage),
+                              .inQubits = inQubits,
+                              .inCtrlQubits = inCtrlQubits,
+                              .inCtrlValues = inCtrlValues,
+                              .outQubits = outQubits,
+                              .outCtrlQubits = outCtrlQubits,
+                              .inWireIndices = {},
+                              .inCtrlWireIndices = {},
+                              .outQubitIndices = {},
+                              .outCtrlQubitIndices = {}})
     {
         initializeQregMode(op, enableQregMode);
     }
