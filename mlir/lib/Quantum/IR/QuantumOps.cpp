@@ -155,11 +155,9 @@ LogicalResult ExtractOp::canonicalize(ExtractOp extract, mlir::PatternRewriter &
         bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
         bool staticallyEqual = bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
         bool dynamicallyEqual = bothDynamic && extract.getIdx() == insert.getIdx();
+        // if other users of insert are also `insert` or `extract`, we are good to go
         bool valid = llvm::all_of(insert.getResult().getUsers(), [&](Operation *op) {
-            if (isa<InsertOp>(op) || isa<ExtractOp>(op)) {
-                return true;
-            }
-            return false;
+            return isa<InsertOp>(op) || isa<ExtractOp>(op);
         });
         if ((staticallyEqual || dynamicallyEqual) && valid) {
             rewriter.replaceOp(extract, insert.getQubit());
