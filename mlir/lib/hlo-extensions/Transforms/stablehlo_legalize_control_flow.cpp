@@ -58,19 +58,8 @@ limitations under the License.
 #include "stablehlo/transforms/Passes.h"
 #include "llvm/Support/Casting.h"
 
-#include "hlo-extensions/Passes.h"
-
 using namespace mlir;
 using namespace stablehlo;
-using namespace catalyst;
-
-namespace catalyst {
-
-#define GEN_PASS_DEF_STABLEHLOLEGALIZECONTROLFLOWPASS
-#define GEN_PASS_DECL_STABLEHLOLEGALIZECONTROLFLOWPASS
-#include "hlo-extensions/Passes.h.inc"
-
-} // namespace catalyst
 
 namespace {
 
@@ -285,9 +274,16 @@ struct CaseOpPattern : public OpConversionPattern<stablehlo::CaseOp> {
     }
 };
 
+} // namespace
+
+namespace catalyst {
+namespace hlo_extensions {
+
+#define GEN_PASS_DEF_STABLEHLOLEGALIZECONTROLFLOWPASS
+#include "hlo-extensions/Transforms/Passes.h.inc"
+
 struct StablehloLegalizeControlFlowPass
-    : public catalyst::impl::StablehloLegalizeControlFlowPassBase<
-          StablehloLegalizeControlFlowPass> {
+    : public impl::StablehloLegalizeControlFlowPassBase<StablehloLegalizeControlFlowPass> {
     // Perform the lowering to MLIR control flow.
     void runOnOperation() override
     {
@@ -307,9 +303,5 @@ struct StablehloLegalizeControlFlowPass
     }
 };
 
-} // namespace
-
-std::unique_ptr<Pass> catalyst::createStablehloLegalizeControlFlowPass()
-{
-    return std::make_unique<StablehloLegalizeControlFlowPass>();
-}
+} // namespace hlo_extensions
+} // namespace catalyst

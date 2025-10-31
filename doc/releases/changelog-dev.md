@@ -8,6 +8,10 @@
   from Python into the compiler IR, which can make it easier to read when debugging programs.
   [(#2054)](https://github.com/PennyLaneAI/catalyst/pull/2054)
 
+* Passes registered under `qml.transform` can now take in options when used with
+  :func:`~.qjit` with program capture enabled.
+  [(#2154)](https://github.com/PennyLaneAI/catalyst/pull/2154)
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
@@ -21,6 +25,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Refactor Catalyst pass registering so that it's no longer necessary to manually add new
+  passes at `registerAllCatalystPasses`.
+  [(#1984)](https://github.com/PennyLaneAI/catalyst/pull/1984)
+
 * Split `from_plxpr.py` into two files.
   [(#2142)](https://github.com/PennyLaneAI/catalyst/pull/2142)
 
@@ -28,6 +36,9 @@
 
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
   [(#2136)](https://github.com/PennyLaneAI/catalyst/pull/2136)
+
+* Fix `catalyst.qjit` and `catalyst.CompileOptions` docs rendering.
+  [(#2156)](https://github.com/PennyLaneAI/catalyst/pull/2156)
 
 <h3>Contributors ✍️</h3>
 
