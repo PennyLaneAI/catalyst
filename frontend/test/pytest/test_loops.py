@@ -809,8 +809,7 @@ class TestForLoopOperatorAccess:
 
             return qml.probs()
 
-        assert circuit()[0] == 1
-        assert circuit()[1] == 0
+        assert np.allclose(circuit(), [1, 0])
 
     def test_for_loop_access_classical(self):
         """Test ForLoop operation access in classical context."""
@@ -880,8 +879,7 @@ class TestWhileLoopOperatorAccess:
 
             return qml.probs()
 
-        assert circuit()[0] == 0
-        assert circuit()[1] == 1
+        assert np.allclose(circuit(), [0, 1])
 
     def test_while_loop_access_classical(self):
         """Test WhileLoop operation access in classical context."""
