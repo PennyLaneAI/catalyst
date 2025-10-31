@@ -27,7 +27,17 @@ set(LIBS
     MLIRTestDialect
 )
 
-add_mlir_tool(quantum-opt quantum-opt.cpp DEPENDS ${LIBS} SUPPORT_PLUGINS)
+set(STANDALONE_SOURCE_DIR ${PROJECT_SOURCE_DIR}/standalone)
+set(STANDALONE_BUILD_DIR ${PROJECT_SOURCE_DIR}/standalone/build)
+include_directories(${STANDALONE_SOURCE_DIR}/include)
+include_directories(${STANDALONE_BUILD_DIR}/include)
+
+add_mlir_tool(quantum-opt quantum-opt.cpp
+    ${STANDALONE_SOURCE_DIR}/lib/Standalone/StandaloneDialect.cpp
+    ${STANDALONE_SOURCE_DIR}/lib/Standalone/StandaloneOps.cpp
+    ${STANDALONE_SOURCE_DIR}/lib/Standalone/StandalonePasses.cpp
+    ${STANDALONE_SOURCE_DIR}/lib/Standalone/StandaloneTypes.cpp
+    DEPENDS ${LIBS} SUPPORT_PLUGINS)
 target_link_libraries(quantum-opt PRIVATE ${LIBS})
 llvm_update_compile_flags(quantum-opt)
 mlir_check_all_link_libraries(quantum-opt)
