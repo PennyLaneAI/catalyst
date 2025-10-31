@@ -276,6 +276,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
 
 
+# pylint: disable=unused-argument
 def _qubit_unitary_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint):
     wires = invals[:qubits_len]
     mat = invals[qubits_len]
@@ -285,6 +286,7 @@ def _qubit_unitary_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjo
     )
 
 
+# pylint: disable=unused-argument
 def _gphase_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint):
     return gphase_p.bind(*invals[qubits_len:], ctrl_len=ctrl_len, adjoint=adjoint)
 
