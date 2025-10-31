@@ -23,6 +23,9 @@
   [(#2128)](https://github.com/PennyLaneAI/catalyst/pull/2128)
   [(#2133)](https://github.com/PennyLaneAI/catalyst/pull/2133)
 
+* Fixes the underflow error when an axis of size 0 is present in a `DataView` object.
+  [(#1621)](https://github.com/PennyLaneAI/catalyst/pull/2164)
+
 <h3>Internal changes ⚙️</h3>
 
 * Refactor Catalyst pass registering so that it's no longer necessary to manually add new
@@ -30,7 +33,7 @@
   [(#1984)](https://github.com/PennyLaneAI/catalyst/pull/1984)
 
 * Split `from_plxpr.py` into two files.
-  [(#2142)](https://github.com/PennyLaneAI/catalyst/pull/2142)
+  [(#2142)](https://github.com/PennyLaneAI/catalyst/pull/2142)	
 
 <h3>Documentation 📝</h3>
 
@@ -45,5 +48,6 @@
 This release contains contributions from (in alphabetical order):
 
 Christina Lee,
+River McCubbin,
 Roberto Turrado,
 Paul Haochen Wang.
