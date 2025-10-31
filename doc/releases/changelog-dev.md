@@ -4,6 +4,11 @@
 
 <h3>Improvements 🛠</h3>
 
+* The ``decompose-lowering`` MLIR pass now supports ``qml.MultiRZ``
+  with an arbitrary number of wires. This decomposition is performed
+  at MLIR when both capture and graph-decomposition are enabled.
+  [(#2160)](https://github.com/PennyLaneAI/catalyst/pull/2160)
+
 * A new option ``use_nameloc`` has been added to :func:`~.qjit` that embeds variable names
   from Python into the compiler IR, which can make it easier to read when debugging programs.
   [(#2054)](https://github.com/PennyLaneAI/catalyst/pull/2054)
@@ -21,6 +26,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixes the issue with capturing unutilized abstracted adjoint and controlled rules
+  by the graph in the new decomposition framework.
+  [(#2160)](https://github.com/PennyLaneAI/catalyst/pull/2160)
+
 * Fixes the translation of plxpr control flow for edge cases where the `consts` were being
   reordered.
   [(#2128)](https://github.com/PennyLaneAI/catalyst/pull/2128)
@@ -36,7 +45,12 @@
   [(#1984)](https://github.com/PennyLaneAI/catalyst/pull/1984)
 
 * Split `from_plxpr.py` into two files.
-  [(#2142)](https://github.com/PennyLaneAI/catalyst/pull/2142)
+  [(#2142)](https://github.com/PennyLaneAI/catalyst/pull/2142)	
+
+* Re-work `DataView` to avoid an axis of size 0 possibly triggering a segfault via an underflow
+  error, as discovered in 
+  [this comment](https://github.com/PennyLaneAI/catalyst/pull/1598#issuecomment-2779178046).
+  [(#1621)](https://github.com/PennyLaneAI/catalyst/pull/2164)
 
 <h3>Documentation 📝</h3>
 
@@ -50,6 +64,8 @@
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
 Christina Lee,
+River McCubbin,
 Roberto Turrado,
 Paul Haochen Wang.
