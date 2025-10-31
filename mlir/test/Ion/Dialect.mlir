@@ -14,20 +14,23 @@
 
 // RUN: quantum-opt %s --split-input-file -verify-diagnostics | FileCheck %s
 
-func.func @example_pulse(%arg0: f64) -> !quantum.bit {
+func.func @example_pulse(%arg0: f64) -> !ion.qubit {
     %0 = quantum.alloc( 1) : !quantum.reg
 
     // CHECK: [[q0:%.+]] = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
 
-    // CHECK: [[p1:%.+]] = ion.pulse(%arg0 : f64) [[q0]] {beam = #ion.beam<
+    // CHECK: [[ion_qubit:%.+]] = builtin.unrealized_conversion_cast [[q0]] : !quantum.bit to !ion.qubit
+    %ion_qubit = builtin.unrealized_conversion_cast %1 : !quantum.bit to !ion.qubit
+
+    // CHECK: [[p1:%.+]] = ion.pulse(%arg0 : f64) [[ion_qubit]] {beam = #ion.beam<
     // CHECK-SAME: transition_index = 0 : i64,
     // CHECK-SAME: rabi = 1.010000e+01 : f64,
     // CHECK-SAME: detuning = 1.111000e+01 : f64,
     // CHECK-SAME: polarization = [0, 1],
     // CHECK-SAME: wavevector = [0, 1]>,
     // CHECK-SAME: phase = 0.000000e+00 : f64}
-    %2 = ion.pulse(%arg0: f64) %1 {
+    %2 = ion.pulse(%arg0: f64) %ion_qubit {
         beam=#ion.beam<
             transition_index=0,
             rabi=10.10,
@@ -38,20 +41,23 @@ func.func @example_pulse(%arg0: f64) -> !quantum.bit {
         phase=0.0
     } : !ion.pulse
 
-    // CHECK: return [[q0]] : !quantum.bit
-    return %1: !quantum.bit
+    // CHECK: return [[ion_qubit]] : !ion.qubit
+    return %ion_qubit: !ion.qubit
 }
 
 
-func.func @example_parallel_protocol(%arg0: f64) -> !quantum.bit {
+func.func @example_parallel_protocol(%arg0: f64) -> !ion.qubit {
     %0 = quantum.alloc( 1) : !quantum.reg
 
     // CHECK: [[q0:%.+]] = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
 
-    // CHECK: [[paraproto:%.+]] = ion.parallelprotocol([[q0]]) : !quantum.bit {
-    %2 = ion.parallelprotocol(%1): !quantum.bit {
-        ^bb0(%arg1: !quantum.bit):
+    // CHECK: [[ion_qubit:%.+]] = builtin.unrealized_conversion_cast [[q0]] : !quantum.bit to !ion.qubit
+    %ion_qubit = builtin.unrealized_conversion_cast %1 : !quantum.bit to !ion.qubit
+
+    // CHECK: [[paraproto:%.+]] = ion.parallelprotocol([[ion_qubit]]) : !ion.qubit {
+    %2 = ion.parallelprotocol(%ion_qubit): !ion.qubit {
+        ^bb0(%arg1: !ion.qubit):
         // CHECK: [[p1:%.+]] = ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<
         // CHECK-SAME: transition_index = 1 : i64,
         // CHECK-SAME: rabi = 1.010000e+01 : f64,
@@ -86,26 +92,31 @@ func.func @example_parallel_protocol(%arg0: f64) -> !quantum.bit {
             >,
             phase=0.0
         } : !ion.pulse
-        // CHECK: ion.yield %arg1 : !quantum.bit
-        ion.yield %arg1: !quantum.bit
+        // CHECK: ion.yield %arg1 : !ion.qubit
+        ion.yield %arg1: !ion.qubit
     }
 
-    // CHECK: return [[paraproto]] : !quantum.bit
-    return %2: !quantum.bit
+    // CHECK: return [[paraproto]] : !ion.qubit
+    return %2: !ion.qubit
 }
 
-func.func @example_parallel_protocol_two_qubits(%arg0: f64) -> (!quantum.bit, !quantum.bit) {
-    %0 = quantum.alloc( 1) : !quantum.reg
+func.func @example_parallel_protocol_two_qubits(%arg0: f64) -> (!ion.qubit, !ion.qubit) {
+    %0 = quantum.alloc( 2) : !quantum.reg
 
     // CHECK: [[q0:%.+]] = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[ion_qubit_0:%.+]] = builtin.unrealized_conversion_cast [[q0]] : !quantum.bit to !ion.qubit
+    %ion_qubit_0 = builtin.unrealized_conversion_cast %1 : !quantum.bit to !ion.qubit
 
     // CHECK: [[q1:%.+]] = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit
+    // CHECK: [[ion_qubit_1:%.+]] = builtin.unrealized_conversion_cast [[q1]] : !quantum.bit to !ion.qubit
+    %ion_qubit_1 = builtin.unrealized_conversion_cast %2 : !quantum.bit to !ion.qubit
 
-    // CHECK: [[paraproto:%.+]]{{:2}} = ion.parallelprotocol([[q0]], [[q1]]) : !quantum.bit, !quantum.bit {
-    %3:2 = ion.parallelprotocol(%1, %2): !quantum.bit, !quantum.bit {
-        ^bb0(%arg1: !quantum.bit, %arg2: !quantum.bit):
+
+    // CHECK: [[paraproto:%.+]]{{:2}} = ion.parallelprotocol([[ion_qubit_0]], [[ion_qubit_1]]) : !ion.qubit, !ion.qubit {
+    %3:2 = ion.parallelprotocol(%ion_qubit_0, %ion_qubit_1): !ion.qubit, !ion.qubit {
+        ^bb0(%arg1: !ion.qubit, %arg2: !ion.qubit):
         // CHECK: [[p1:%.+]] = ion.pulse(%arg0 : f64) %arg1 {beam = #ion.beam<
         // CHECK-SAME: transition_index = 2 : i64,
         // CHECK-SAME: rabi = 1.010000e+01 : f64,
@@ -140,12 +151,12 @@ func.func @example_parallel_protocol_two_qubits(%arg0: f64) -> (!quantum.bit, !q
             >,
             phase=0.0
         } : !ion.pulse
-        // CHECK: ion.yield %arg1, %arg2 : !quantum.bit, !quantum.bit
-        ion.yield %arg1, %arg2: !quantum.bit, !quantum.bit
+        // CHECK: ion.yield %arg1, %arg2 : !ion.qubit, !ion.qubit
+        ion.yield %arg1, %arg2: !ion.qubit, !ion.qubit
     }
 
-    // CHECK: return [[paraproto]]#0, [[paraproto]]#1 : !quantum.bit, !quantum.bit
-    return %3#0, %3#1: !quantum.bit, !quantum.bit
+    // CHECK: return [[paraproto]]#0, [[paraproto]]#1 : !ion.qubit, !ion.qubit
+    return %3#0, %3#1: !ion.qubit, !ion.qubit
 }
 
 // No FileCheck here, return success if the MLIR can be parsed
@@ -183,7 +194,7 @@ func.func @example_ion() -> !ion.ion {
             #ion.transition<
                 level_0 = "downstate",
                 level_1 = "upstate",
-                einstein_a=10.10, 
+                einstein_a=10.10,
                 multipole="M1"
             >,
             #ion.transition<

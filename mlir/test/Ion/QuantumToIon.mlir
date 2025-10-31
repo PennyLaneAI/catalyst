@@ -106,7 +106,7 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-SAME:            eigenvector = [1.000000e+00, 0.000000e+00, 0.000000e+00, 1.000000e+00, 0.000000e+00, 0.000000e+00]
     // CHECK-SAME:        >
     // CHECK-SAME:    ]
-    // CHECK-SAME: }  
+    // CHECK-SAME: }
 
     %1 = quantum.alloc( 2) : !quantum.reg
 
@@ -130,8 +130,9 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
     // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
     // CHECK-NEXT: [[timerx1:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
-    // CHECK-NEXT: [[rx1out:%.+]] = ion.parallelprotocol([[qubit0]]) : !quantum.bit {
-    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit):
+    // CHECK-NEXT: [[ionqubit0:%.+]] = builtin.unrealized_conversion_cast [[qubit0]] : !quantum.bit to !ion.qubit
+    // CHECK-NEXT: [[rx1out_ion:%.+]] = ion.parallelprotocol([[ionqubit0]]) : !ion.qubit {
+    // CHECK-NEXT: ^{{.*}}(%arg1: !ion.qubit):
     // CHECK-NEXT: ion.pulse([[timerx1]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -148,8 +149,9 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-SAME:         polarization = [0, 1, 2],
     // CHECK-SAME:         wavevector = [-2, 3, 4]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
-    // CHECK-NEXT:   ion.yield %arg1 : !quantum.bit
+    // CHECK-NEXT:   ion.yield %arg1 : !ion.qubit
     // CHECK-NEXT: }
+    // CHECK-NEXT: [[rx1out:%.+]] = builtin.unrealized_conversion_cast [[rx1out_ion]] : !ion.qubit to !quantum.bit
     %4 = quantum.custom "RX"(%arg0) %2 : !quantum.bit
 
     // CHECK:       [[cst:%.+]] = arith.constant 12.566370614359172 : f64
@@ -167,8 +169,9 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
     // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
     // CHECK-NEXT: [[timery1:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
-    // CHECK-NEXT: [[ry1out:%.+]] = ion.parallelprotocol([[rx1out]]) : !quantum.bit {
-    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit):
+    // CHECK-NEXT: [[rx1out_ion:%.+]] = builtin.unrealized_conversion_cast [[rx1out]] : !quantum.bit to !ion.qubit
+    // CHECK-NEXT: [[ry1out_ion:%.+]] = ion.parallelprotocol([[rx1out_ion]]) : !ion.qubit {
+    // CHECK-NEXT: ^{{.*}}(%arg1: !ion.qubit):
     // CHECK-NEXT: ion.pulse([[timery1]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -185,8 +188,9 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-SAME:         polarization = [0, 1, 2],
     // CHECK-SAME:         wavevector = [-2, 3, 4]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
-    // CHECK-NEXT:   ion.yield %arg1 : !quantum.bit
+    // CHECK-NEXT:   ion.yield %arg1 : !ion.qubit
     // CHECK-NEXT: }
+    // CHECK-NEXT: [[ry1out:%.+]] = builtin.unrealized_conversion_cast [[ry1out_ion]] : !ion.qubit to !quantum.bit
     %5 = quantum.custom "RY"(%arg0) %4 : !quantum.bit
 
     // CHECK:       [[cst:%.+]] = arith.constant 12.566370614359172 : f64
@@ -204,8 +208,9 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
     // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
     // CHECK-NEXT: [[timerx2:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
-    // CHECK-NEXT: [[rx2out:%.+]] = ion.parallelprotocol([[ry1out]]) : !quantum.bit {
-    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit):
+    // CHECK-NEXT: [[ry1out_ion_2:%.+]] = builtin.unrealized_conversion_cast [[ry1out]] : !quantum.bit to !ion.qubit
+    // CHECK-NEXT: [[rx2out_ion:%.+]] = ion.parallelprotocol([[ry1out_ion_2]]) : !ion.qubit {
+    // CHECK-NEXT: ^{{.*}}(%arg1: !ion.qubit):
     // CHECK-NEXT: ion.pulse([[timerx2]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -222,8 +227,9 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-SAME:         polarization = [0, 1, 2],
     // CHECK-SAME:         wavevector = [-2, 3, 4]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
-    // CHECK-NEXT:   ion.yield %arg1 : !quantum.bit
+    // CHECK-NEXT:   ion.yield %arg1 : !ion.qubit
     // CHECK-NEXT: }
+    // CHECK-NEXT: [[rx2out:%.+]] = builtin.unrealized_conversion_cast [[rx2out_ion]] : !ion.qubit to !quantum.bit
     %6 = quantum.custom "RX"(%arg0) %5 : !quantum.bit
 
     // CHECK:       [[cst:%.+]] = arith.constant 12.566370614359172 : f64
@@ -241,8 +247,10 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
     // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
     // CHECK-NEXT: [[timems:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
-    // CHECK-NEXT: [[msout:%.+]] = ion.parallelprotocol([[rx2out]], [[qubit1]]) : !quantum.bit, !quantum.bit {
-    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
+    // CHECK-NEXT: [[rx2out_ion_2:%.+]] = builtin.unrealized_conversion_cast [[rx2out]] : !quantum.bit to !ion.qubit
+    // CHECK-NEXT: [[qubit1_ion:%.+]] = builtin.unrealized_conversion_cast [[qubit1]] : !quantum.bit to !ion.qubit
+    // CHECK-NEXT: [[msout_ion:%.+]]:2 = ion.parallelprotocol([[rx2out_ion_2]], [[qubit1_ion]]) : !ion.qubit, !ion.qubit {
+    // CHECK-NEXT: ^{{.*}}(%arg1: !ion.qubit, %arg2: !ion.qubit):
     // CHECK-NEXT: ion.pulse([[timems]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -291,8 +299,10 @@ func.func @example_ion_two_qubit(%arg0: f64) -> !quantum.bit  attributes {qnode}
     // CHECK-SAME:         polarization = [7, 8, 9],
     // CHECK-SAME:         wavevector = [-9, -10, -11]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
-    // CHECK-NEXT:   ion.yield %arg1, %arg2 : !quantum.bit, !quantum.bit
+    // CHECK-NEXT:   ion.yield %arg1, %arg2 : !ion.qubit, !ion.qubit
     // CHECK-NEXT: }
+    // CHECK-NEXT: [[msout_0:%.+]] = builtin.unrealized_conversion_cast [[msout_ion]]#0 : !ion.qubit to !quantum.bit
+    // CHECK-NEXT: [[msout_1:%.+]] = builtin.unrealized_conversion_cast [[msout_ion]]#1 : !ion.qubit to !quantum.bit
     %7:2 = quantum.custom "MS"(%arg0) %6, %3 : !quantum.bit, !quantum.bit
     return %7#0: !quantum.bit
 }
@@ -330,8 +340,10 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
     // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
     // CHECK-NEXT: [[timems1:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
-    // CHECK-NEXT: [[ms1out:%.+]]:2 = ion.parallelprotocol([[qubit0]], [[qubit1]]) : !quantum.bit, !quantum.bit {
-    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
+    // CHECK-NEXT: [[ionqubit0_ms:%.+]] = builtin.unrealized_conversion_cast [[qubit0]] : !quantum.bit to !ion.qubit
+    // CHECK-NEXT: [[ionqubit1_ms:%.+]] = builtin.unrealized_conversion_cast [[qubit1]] : !quantum.bit to !ion.qubit
+    // CHECK-NEXT: [[ms1out_ion:%.+]]:2 = ion.parallelprotocol([[ionqubit0_ms]], [[ionqubit1_ms]]) : !ion.qubit, !ion.qubit {
+    // CHECK-NEXT: ^{{.*}}(%arg1: !ion.qubit, %arg2: !ion.qubit):
     // CHECK-NEXT: ion.pulse([[timems1]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -380,8 +392,10 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:         polarization = [7, 8, 9],
     // CHECK-SAME:         wavevector = [-9, -10, -11]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
-    // CHECK-NEXT:   ion.yield %arg1, %arg2 : !quantum.bit, !quantum.bit
+    // CHECK-NEXT:   ion.yield %arg1, %arg2 : !ion.qubit, !ion.qubit
     // CHECK-NEXT: }
+    // CHECK-NEXT: [[ms1out_0:%.+]] = builtin.unrealized_conversion_cast [[ms1out_ion]]#0 : !ion.qubit to !quantum.bit
+    // CHECK-NEXT: [[ms1out_1:%.+]] = builtin.unrealized_conversion_cast [[ms1out_ion]]#1 : !ion.qubit to !quantum.bit
     %5:2 = quantum.custom "MS"(%arg0) %2, %3 : !quantum.bit, !quantum.bit
 
     // CHECK:       [[cst:%.+]] = arith.constant 12.566370614359172 : f64
@@ -399,8 +413,10 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
     // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
     // CHECK-NEXT: [[timems2:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
-    // CHECK-NEXT: [[ms2out:%.+]]:2 = ion.parallelprotocol([[ms1out]]#0, [[qubit2]]) : !quantum.bit, !quantum.bit {
-    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
+    // CHECK-NEXT: [[ms1out_0_ion:%.+]] = builtin.unrealized_conversion_cast [[ms1out_0]] : !quantum.bit to !ion.qubit
+    // CHECK-NEXT: [[qubit2_ion:%.+]] = builtin.unrealized_conversion_cast [[qubit2]] : !quantum.bit to !ion.qubit
+    // CHECK-NEXT: [[ms2out_ion:%.+]]:2 = ion.parallelprotocol([[ms1out_0_ion]], [[qubit2_ion]]) : !ion.qubit, !ion.qubit {
+    // CHECK-NEXT: ^{{.*}}(%arg1: !ion.qubit, %arg2: !ion.qubit):
     // CHECK-NEXT: ion.pulse([[timems2]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -449,8 +465,10 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:         polarization = [1, 2, 3],
     // CHECK-SAME:         wavevector = [3, -4, -5]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64}
-    // CHECK-NEXT:   ion.yield %arg1, %arg2 : !quantum.bit, !quantum.bit
+    // CHECK-NEXT:   ion.yield %arg1, %arg2 : !ion.qubit, !ion.qubit
     // CHECK-NEXT: }
+    // CHECK-NEXT: [[ms2out_0:%.+]] = builtin.unrealized_conversion_cast [[ms2out_ion]]#0 : !ion.qubit to !quantum.bit
+    // CHECK-NEXT: [[ms2out_1:%.+]] = builtin.unrealized_conversion_cast [[ms2out_ion]]#1 : !ion.qubit to !quantum.bit
     %6:2 = quantum.custom "MS"(%arg0) %5#0, %4 : !quantum.bit, !quantum.bit
 
     // CHECK:       [[cst:%.+]] = arith.constant 12.566370614359172 : f64
@@ -468,8 +486,10 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-NEXT: [[mult:%.+]] = arith.mulf [[normalized_angle:%.+]], [[cst_2:%.+]] : f64
     // CHECK-NEXT: [[square:%.+]] = arith.mulf [[cst_1:%.+]], [[cst_1:%.+]] : f64
     // CHECK-NEXT: [[timems3:%.+]] = arith.divf [[mult:%.+]], [[square:%.+]] : f64
-    // CHECK-NEXT: [[ms3out:%.+]]:2 = ion.parallelprotocol([[ms1out]]#1, [[ms2out]]#1) : !quantum.bit, !quantum.bit {
-    // CHECK-NEXT: ^{{.*}}(%arg1: !quantum.bit, %arg2: !quantum.bit):
+    // CHECK-NEXT: [[ms1out_1_ion:%.+]] = builtin.unrealized_conversion_cast [[ms1out_1]] : !quantum.bit to !ion.qubit
+    // CHECK-NEXT: [[ms2out_1_ion:%.+]] = builtin.unrealized_conversion_cast [[ms2out_1]] : !quantum.bit to !ion.qubit
+    // CHECK-NEXT: [[ms3out_ion:%.+]]:2 = ion.parallelprotocol([[ms1out_1_ion]], [[ms2out_1_ion]]) : !ion.qubit, !ion.qubit {
+    // CHECK-NEXT: ^{{.*}}(%arg1: !ion.qubit, %arg2: !ion.qubit):
     // CHECK-NEXT: [[p1:%.+]] = ion.pulse([[timems3]] : f64) %arg1 {
     // CHECK-SAME:     beam = #ion.beam<
     // CHECK-SAME:         transition_index = 0 : i64,
@@ -518,8 +538,10 @@ func.func @example_ion_three_qubit(%arg0: f64) -> (!quantum.bit, !quantum.bit, !
     // CHECK-SAME:         polarization = [37, 42, 43],
     // CHECK-SAME:         wavevector = [42, 37, 43]>,
     // CHECK-SAME:     phase = 0.000000e+00 : f64} : !ion.pulse
-    // CHECK-NEXT:   ion.yield %arg1, %arg2 : !quantum.bit, !quantum.bit
+    // CHECK-NEXT:   ion.yield %arg1, %arg2 : !ion.qubit, !ion.qubit
     // CHECK-NEXT: }
+    // CHECK-NEXT: [[ms3out_0:%.+]] = builtin.unrealized_conversion_cast [[ms3out_ion]]#0 : !ion.qubit to !quantum.bit
+    // CHECK-NEXT: [[ms3out_1:%.+]] = builtin.unrealized_conversion_cast [[ms3out_ion]]#1 : !ion.qubit to !quantum.bit
     %7:2 = quantum.custom "MS"(%arg0) %5#1, %6#1 : !quantum.bit, !quantum.bit
     return %6#0, %7#0, %7#1: !quantum.bit, !quantum.bit, !quantum.bit
 }

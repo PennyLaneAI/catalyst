@@ -290,7 +290,7 @@ struct PulseOpPattern : public OpConversionPattern<catalyst::ion::PulseOp> {
 
         auto time = op.getTime();
         auto phase = rewriter.create<LLVM::ConstantOp>(loc, op.getPhase());
-        Type qubitTy = conv->convertType(catalyst::quantum::QubitType::get(ctx));
+        Type qubitTy = conv->convertType(catalyst::ion::QubitType::get(ctx));
         auto inQubit = adaptor.getInQubit();
         auto beamAttr = op.getBeam();
 
