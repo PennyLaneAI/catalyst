@@ -23,6 +23,29 @@
   [(#2128)](https://github.com/PennyLaneAI/catalyst/pull/2128)
   [(#2133)](https://github.com/PennyLaneAI/catalyst/pull/2133)
 
+* Fix canonicalization of eliminating redundant `quantum.insert` and `quantum.extract` pairs.
+  When extracting a qubit immediately after inserting it at the same index, the operations can
+  be cancelled out while properly updating remaining uses of the register.
+  For an example:
+```mlir
+// Before canonicalization
+%1 = quantum.insert %0[%idx], %qubit1 : !quantum.reg, !quantum.bit
+%2 = quantum.extract %1[%idx] : !quantum.reg -> !quantum.bit
+...
+%3 = quantum.insert %1[%i0], %qubit2 : !quantum.reg, !quantum.bit
+%4 = quantum.extract %1[%i1] : !quantum.reg -> !quantum.bit
+// ... use %1
+// ... use %4
+
+// After canonicalization
+// %2 directly uses %qubit1
+// %3 and %4 updated to use %0 instead of %1
+%3 = quantum.insert %0[%i0], %qubit2 : !quantum.reg, !quantum.bit
+%4 = quantum.extract %0[%i1] : !quantum.reg -> !quantum.bit
+// ... use %qubit1
+// ... use %4
+```
+
 <h3>Internal changes ⚙️</h3>
 
 * Refactor Catalyst pass registering so that it's no longer necessary to manually add new
