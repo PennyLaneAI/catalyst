@@ -16,8 +16,8 @@ This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
 # pylint: disable=protected-access
 
-
 import warnings
+from copy import copy
 from functools import partial
 from typing import Callable
 
@@ -27,6 +27,7 @@ from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
+from pennylane.capture.primitives import grad_prim
 from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
 from pennylane.transforms import commute_controlled as pl_commute_controlled
@@ -146,6 +147,15 @@ class WorkflowInterpreter(PlxprInterpreter):
         self.decompose_tkwargs = {}  # target gateset
 
         super().__init__()
+
+
+@WorkflowInterpreter.register_primitive(grad_prim)
+def handle_grad(self, *args, jaxpr, n_consts, **kwargs):
+    """Translate a grad equation."""
+    f = partial(copy(self).eval, jaxpr, args[:n_consts])
+    new_jaxpr = jax.make_jaxpr(f)(*args[n_consts:]).jaxpr
+
+    return grad_prim.bind(*args, jaxpr=new_jaxpr, n_consts=n_consts, **kwargs)
 
 
 # pylint: disable=unused-argument, too-many-arguments
