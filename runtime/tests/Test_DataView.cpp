@@ -130,7 +130,7 @@ TEST_CASE("Test DataView Post-Increment Iterator - int, 3", "[DataView]")
     }
 }
 
-TEST_CASE("DataView Iterator Distance- 0 first axis", "[DataView]")
+TEST_CASE("DataView Iterator Distance 0 - 0 first axis", "[DataView]")
 {
     int *data_aligned = nullptr;
     size_t offset = 0;
@@ -139,13 +139,10 @@ TEST_CASE("DataView Iterator Distance- 0 first axis", "[DataView]")
 
     DataView<int, 2> view(data_aligned, offset, sizes, strides);
 
-    auto start = view.begin();
-    auto end = view.end();
-
-    CHECK(std::distance(start, end) == 0);
+    CHECK(std::distance(view.begin(), view.end()) == 0);
 }
 
-TEST_CASE("DataView Iterator Distance - 0 second axis", "[DataView]")
+TEST_CASE("DataView Iterator Distance 0 - 0 second axis", "[DataView]")
 {
     int *data_aligned = nullptr;
     size_t offset = 0;
@@ -154,10 +151,37 @@ TEST_CASE("DataView Iterator Distance - 0 second axis", "[DataView]")
 
     DataView<int, 2> view(data_aligned, offset, sizes, strides);
 
-    auto start = view.begin();
-    auto end = view.end();
+    CHECK(std::distance(view.begin(), view.end()) == 0);
+}
 
-    CHECK(std::distance(start, end) == 0);
+TEST_CASE("DataView Iterator Distance 4 - int, 2", "[DataView]")
+{
+    int data_aligned[2][2] = {{1, 2}, {3, 4}};
+    size_t offset = 0;
+    size_t sizes[2] = {2, 2};
+    size_t strides[2] = {2, 1};
+
+    DataView<int, 2> view(*data_aligned, offset, sizes, strides);
+
+    CHECK(std::distance(view.begin(), view.end()) == 4);
+}
+
+TEST_CASE("DataView Iterator Distance 12 - double, 3", "[DataView]")
+{
+    double data_aligned[2][2][3] = {
+        {
+            {3.1, 2.6, 9.5}, {5.4, 2.3, 8.1}
+        },
+        {
+            {9.8, 8.2, 7.2}, {0.7, 9.6, 6.6}
+        }};
+    size_t offset = 0;
+    size_t sizes[3] = {2, 2, 3};
+    size_t strides[3] = {6, 3, 1};
+
+    DataView<double, 3> view(**data_aligned, offset, sizes, strides);
+
+    CHECK(std::distance(view.begin(), view.end()) == 12);
 }
 
 TEST_CASE("DataView Size - 0 first axis", "[DataView]")
