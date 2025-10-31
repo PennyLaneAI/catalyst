@@ -139,7 +139,9 @@ template <typename T, size_t R> class DataView {
         return data_aligned[loc];
     }
 
-    iterator begin() { return iterator{*this, static_cast<int64_t>(offset)}; }
+    iterator begin() {
+        return iterator{*this, (*this).size() == 0 ? -1 : static_cast<int64_t>(offset)};
+    }
 
     iterator end() { return iterator{*this, -1}; }
 };
