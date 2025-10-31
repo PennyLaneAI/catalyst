@@ -66,6 +66,14 @@ StringRef getTargetGateName(func::FuncOp func)
     return StringRef{};
 }
 
+uint64_t getNumWires(func::FuncOp func)
+{
+    if (auto num_wires_attr = func->getAttrOfType<IntegerAttr>("num_wires")) {
+        return num_wires_attr.getValue().getZExtValue();
+    }
+    return 0;
+}
+
 } // namespace DecompUtils
 
 /// A module pass that work through a module, register all decomposition functions, and apply the
@@ -94,7 +102,17 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     {
         module.walk([&](func::FuncOp func) {
             if (StringRef targetOp = DecompUtils::getTargetGateName(func); !targetOp.empty()) {
-                decompositionRegistry[targetOp] = func;
+                if (targetOp == "MultiRZ") {
+                    // Create a new target op name with the number of wires
+                    // for MultiRZ, since it has multiple decomposition functions
+                    // based on the number of target qubits
+                    auto newtargetOp =
+                        targetOp + "_" + std::to_string(DecompUtils::getNumWires(func));
+                    decompositionRegistry[newtargetOp.str()] = func;
+                }
+                else {
+                    decompositionRegistry[targetOp] = func;
+                }
             }
             // No need to walk into the function body
             return WalkResult::skip();
