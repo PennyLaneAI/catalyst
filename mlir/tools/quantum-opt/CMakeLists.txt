@@ -7,6 +7,8 @@ set(LIBS
     ${extension_libs}
     ExternalStablehloLib
     MLIROptLib
+    MLIRRegisterAllDialects
+    MLIRRegisterAllPasses
     MLIRCatalyst
     catalyst-transforms
     catalyst-stablehlo-transforms

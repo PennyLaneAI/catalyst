@@ -43,6 +43,29 @@ __all__ = (
 )
 
 
+def mock_attributes(obj, attrs: dict[str, any]):
+    """Mock the attribute of an object by returning a wrapper.
+
+    Args:
+        obj: The object to mock the attributes of.
+        attrs: A dictionary of attributes to mock.
+            Example: {"attribute_name": attribute_value}
+    """
+
+    class MockAttributeWrapper:
+        """Wrapper to mock the attribute of an object."""
+
+        def __init__(self, original):
+            self.original = original
+
+        def __getattr__(self, name):
+            if name in attrs:
+                return attrs[name]
+            return getattr(self.original, name)
+
+    return MockAttributeWrapper(obj)
+
+
 def _drop_unused_vars2(jaxpr, constvals):
     """
     A patch to not drop unused vars during classical tracing of control flow.
