@@ -12,12 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-This module provides access to compilation tools for experimental fault-tolerant quantum-computing
-(FTQC) workloads in Catalyst.
-"""
+"""MLIR Dialect for QEC dialect."""
 
-from .ftqc_device import FTQCDevice
-from .pipelines import mbqc_pipeline
-
-__all__ = ("mbqc_pipeline",)
+# pylint: disable=relative-beyond-top-level
+from ._qec_ops_gen import *  # noqa: F401

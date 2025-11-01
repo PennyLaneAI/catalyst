@@ -69,6 +69,7 @@ from mlir_quantum.dialects.gradient import (
 )
 from mlir_quantum.dialects.mbqc import MeasureInBasisOp
 from mlir_quantum.dialects.mitigation import ZneOp
+from mlir_quantum.dialects.qec import PPMeasurementOp, PPRotationOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,
     AllocOp,
@@ -270,6 +271,10 @@ qinst_p = Primitive("qinst")
 qinst_p.multiple_results = True
 unitary_p = Primitive("unitary")
 unitary_p.multiple_results = True
+pauli_rot_p = Primitive("pauli_rot")
+pauli_rot_p.multiple_results = True
+pauli_measure_p = Primitive("pauli_measure")
+pauli_measure_p.multiple_results = True
 measure_p = Primitive("measure")
 measure_p.multiple_results = True
 compbasis_p = Primitive("compbasis")
@@ -1377,6 +1382,118 @@ def _unitary_lowering(
         in_ctrl_values=ctrl_values_i1,
         adjoint=adjoint,
     ).results
+
+
+#
+# pauli rot operation
+#
+@pauli_rot_p.def_abstract_eval
+def _pauli_rot_abstract_eval(*qubits, theta=None, pauli_word=None, qubits_len=0, adjoint=False):
+    qubits = qubits[:qubits_len]
+    assert all(isinstance(qubit, AbstractQbit) for qubit in qubits)
+    return (AbstractQbit(),) * (qubits_len)
+
+
+@pauli_rot_p.def_impl
+def _pauli_rot_def_impl(*args, **kwargs):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _pauli_rot_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    *qubits: tuple,
+    theta=None,
+    pauli_word=None,
+    qubits_len=0,
+    adjoint=False,
+):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    qubits = qubits[:qubits_len]
+
+    for q in qubits:
+        assert ir.OpaqueType.isinstance(q.type)
+        assert ir.OpaqueType(q.type).dialect_namespace == "quantum"
+        assert ir.OpaqueType(q.type).data == "bit"
+
+    assert theta is not None
+    assert pauli_word is not None
+
+    pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
+
+    i16_type = ir.IntegerType.get_signless(16, ctx)
+    allowed_angles = [np.pi / 4, np.pi / 2, np.pi]
+    allowed_angles += -1 * allowed_angles
+
+    if not any(np.isclose(theta, angle) for angle in allowed_angles):
+        raise ValueError(
+            "The angle supplied to PPR must be a multiple of pi/4, pi/2, or pi (or its negative)."
+        )
+
+    angle = int(np.round(2 * np.pi / theta))
+    if adjoint:
+        angle = -angle
+    rotation_kind = ir.IntegerAttr.get(i16_type, angle)
+
+    return PPRotationOp(
+        out_qubits=[q.type for q in qubits],
+        pauli_product=pauli_word,
+        rotation_kind=rotation_kind,
+        in_qubits=qubits,
+    ).results
+
+
+#
+# pauli measure operation
+#
+@pauli_measure_p.def_abstract_eval
+def _pauli_measure_abstract_eval(*qubits, pauli_word=None, qubits_len=0, adjoint=False):
+    qubits = qubits[:qubits_len]
+    assert all(isinstance(qubit, AbstractQbit) for qubit in qubits)
+    # This corresponds to the measurement value and the qubits after the measurements
+    return (core.ShapedArray((), bool),) + (AbstractQbit(),) * (qubits_len)
+
+
+@pauli_measure_p.def_impl
+def _pauli_measure_def_impl(*args, **kwargs):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _pauli_measure_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    *qubits: tuple,
+    pauli_word=None,
+    qubits_len=0,
+):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    qubits = qubits[:qubits_len]
+    for q in qubits:
+        assert ir.OpaqueType.isinstance(q.type)
+        assert ir.OpaqueType(q.type).dialect_namespace == "quantum"
+        assert ir.OpaqueType(q.type).data == "bit"
+
+    assert pauli_word is not None
+
+    pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
+
+    result_type = ir.IntegerType.get_signless(1)
+
+    ppm_results = PPMeasurementOp(
+        out_qubits=[q.type for q in qubits],
+        mres=result_type,
+        pauli_product=pauli_word,
+        in_qubits=qubits,
+    ).results
+
+    result, *out_qubits = ppm_results  # First element is the measurement result
+
+    result_type = ir.RankedTensorType.get((), result.type)
+    from_elements_op = FromElementsOp(result_type, result)
+
+    return (from_elements_op.results[0],) + tuple(out_qubits)
 
 
 #
@@ -2526,6 +2643,8 @@ CUSTOM_LOWERING_RULES = (
     (num_qubits_p, _num_qubits_lowering),
     (gphase_p, _gphase_lowering),
     (unitary_p, _unitary_lowering),
+    (pauli_rot_p, _pauli_rot_lowering),
+    (pauli_measure_p, _pauli_measure_lowering),
     (measure_p, _measure_lowering),
     (compbasis_p, _compbasis_lowering),
     (namedobs_p, _named_obs_lowering),

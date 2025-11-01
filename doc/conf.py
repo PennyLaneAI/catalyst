@@ -98,6 +98,7 @@ MOCK_MODULES = [
     "mlir_quantum.dialects.catalyst",
     "mlir_quantum.dialects.mbqc",
     "mlir_quantum.dialects.mitigation",
+    "mlir_quantum.dialects.qec",
     "mlir_quantum.dialects._transform_ops_gen",
     "pybind11",
     "cudaq",
