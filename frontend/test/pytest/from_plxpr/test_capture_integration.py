@@ -23,6 +23,7 @@ from jax.core import ShapedArray
 
 import catalyst
 from catalyst import qjit
+from catalyst.from_plxpr import register_transform
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
@@ -1048,6 +1049,30 @@ class TestCapture:
 
         assert jnp.allclose(circuit(0.1), capture_result)
 
+    @pytest.mark.usefixtures("use_capture")
+    def test_pass_with_options(self, backend):
+        """Test the integration for a circuit with a pass that takes in options."""
+
+        @qml.transform
+        def my_pass(_tape, my_option=None, my_other_option=None):  # pylint: disable=unused-argument
+            """A dummy qml.transform."""
+            return
+
+        register_transform(my_pass, "my-pass", False)
+
+        @qjit(target="mlir")
+        @partial(my_pass, my_option="my_option_value", my_other_option=False)
+        @qml.qnode(qml.device(backend, wires=1))
+        def captured_circuit():
+            return qml.expval(qml.PauliZ(0))
+
+        capture_mlir = captured_circuit.mlir
+        assert 'transform.apply_registered_pass "my-pass"' in capture_mlir
+        assert (
+            'with options = {"my-option" = "my_option_value", "my-other-option" = false}'
+            in capture_mlir
+        )
+
     def test_transform_cancel_inverses_workflow(self, backend):
         """Test the integration for a circuit with a 'cancel_inverses' transform."""
 
@@ -1234,11 +1259,9 @@ class TestCapture:
 
         # Catalyst 'cancel_inverses' should have been scheduled as a pass
         # whereas PL 'unitary_to_rot' should have been expanded
-        assert (
-            'transform.apply_registered_pass "remove-chained-self-inverse"'
-            in captured_inverses_unitary.mlir
-        )
-        assert is_unitary_rotated(captured_inverses_unitary.mlir)
+        capture_mlir = captured_inverses_unitary.mlir
+        assert 'transform.apply_registered_pass "remove-chained-self-inverse"' in capture_mlir
+        assert is_unitary_rotated(capture_mlir)
 
         # Case 2: During plxpr interpretation, first comes the PL transform
         # without Catalyst counterpart, second comes the PL transform with it
@@ -1251,12 +1274,10 @@ class TestCapture:
 
         # Both PL transforms should have been expaned and no Catalyst pass should have been
         # scheduled
-        assert (
-            'transform.apply_registered_pass "remove-chained-self-inverse"'
-            not in captured_unitary_inverses.mlir
-        )
-        assert 'quantum.custom "Hadamard"' not in captured_unitary_inverses.mlir
-        assert is_unitary_rotated(captured_unitary_inverses.mlir)
+        capture_mlir = captured_unitary_inverses.mlir
+        assert 'transform.apply_registered_pass "remove-chained-self-inverse"' not in capture_mlir
+        assert 'quantum.custom "Hadamard"' not in capture_mlir
+        assert is_unitary_rotated(capture_mlir)
 
         qml.capture.disable()
 
@@ -1446,11 +1467,12 @@ class TestCapture:
 
         capture_result = captured_circuit()
 
+        capture_mlir = captured_circuit.mlir
         assert is_controlled_pushed_back(
-            captured_circuit.mlir, 'quantum.custom "RX"', 'quantum.custom "CNOT"'
+            capture_mlir, 'quantum.custom "RX"', 'quantum.custom "CNOT"'
         )
         assert is_controlled_pushed_back(
-            captured_circuit.mlir, 'quantum.custom "PauliX"', 'quantum.custom "CRX"'
+            capture_mlir, 'quantum.custom "PauliX"', 'quantum.custom "CRX"'
         )
 
         qml.capture.disable()
