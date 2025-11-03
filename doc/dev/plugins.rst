@@ -29,12 +29,17 @@ If you are interested in using it from the command line interface, you can add t
 * ``--load-dialect-plugin=/path/to/StandalonePlugin.so``
 
 Notice that you will still be able to use the rest of the flags accepted by the command line interface.
-For example, passing ``--help`` will now enable you to see the documentation available for the Standalone pass.
+For example, passing ``--help`` as in
 
 .. code-block:: bash
 
     quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --help
-          --standalone-switch-bar-foo    - Switches the name of a FuncOp named `bar` to `foo` and folds.
+
+will now enable you to see the documentation available for the Standalone pass.
+
+.. code-block:: bash
+
+    --standalone-switch-bar-foo    - Switches the name of a FuncOp named `bar` to `foo` and folds.
 
 Taking into account the description of the pass ``standalone-switch-bar-foo``, let's write the most minimal program that would be transformed by this transformation.
 
