@@ -34,7 +34,6 @@ namespace catalyst {
 namespace qec {
 
 #define GEN_PASS_DEF_TLAYERREDUCTIONPASS
-#define GEN_PASS_DECL_TLAYERREDUCTIONPASS
 #include "QEC/Transforms/Passes.h.inc"
 
 // Check whether `rhsOp` can commute left across every op in `lhsLayer` (same block),
@@ -208,12 +207,6 @@ struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> 
         } while (changed);
     };
 };
+
 } // namespace qec
-
-/// Create a pass for lowering operations in the `QECDialect`.
-std::unique_ptr<Pass> createTLayerReductionPass()
-{
-    return std::make_unique<qec::TLayerReductionPass>();
-}
-
 } // namespace catalyst

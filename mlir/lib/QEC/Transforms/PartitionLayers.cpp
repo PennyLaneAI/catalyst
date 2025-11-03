@@ -27,7 +27,6 @@ namespace catalyst {
 namespace qec {
 
 #define GEN_PASS_DEF_PARTITIONLAYERSPASS
-#define GEN_PASS_DECL_PARTITIONLAYERSPASS
 #include "QEC/Transforms/Passes.h.inc"
 
 void eraseUnusedOps(QECLayer &layer, IRRewriter &writer)
@@ -146,11 +145,6 @@ struct PartitionLayersPass : public impl::PartitionLayersPassBase<PartitionLayer
         constructLayer(currentLayer, writer);
     };
 };
+
 } // namespace qec
-
-std::unique_ptr<Pass> createPartitionLayersPass()
-{
-    return std::make_unique<PartitionLayersPass>();
-}
-
 } // namespace catalyst

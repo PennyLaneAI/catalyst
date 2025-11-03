@@ -24,8 +24,6 @@ def MBQCConversionPass : Pass<"convert-mbqc-to-llvm"> {
        "mlir::LLVM::LLVMDialect",
        "catalyst::quantum::QuantumDialect",
     ];
-
-    let constructor = "catalyst::createMBQCConversionPass()";
 }
 
 #endif // MBQC_PASSES
