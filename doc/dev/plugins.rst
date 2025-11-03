@@ -110,7 +110,7 @@ To be able to parse this dialect, we need to load the dialect which is stored in
 
 .. code-block:: bash
 
-    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --load-dialect-plugin-/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' example.mlir'
+    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --load-dialect-plugin-/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' example.mlir
 
 Now, you can parse the program without the error and run the ``standalone-switch-bar-foo`` pass.
 
