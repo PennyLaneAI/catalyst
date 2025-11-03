@@ -100,7 +100,7 @@ from mlir_quantum.dialects.quantum import (
     VarianceOp,
 )
 from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
-from pennylane.capture.primitives import grad_prim as pl_grad_prim
+from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
@@ -2564,7 +2564,7 @@ CUSTOM_LOWERING_RULES = (
     (while_p, _while_loop_lowering),
     (for_p, _for_loop_lowering),
     (grad_p, _grad_lowering),
-    (pl_grad_prim, _capture_grad_lowering),
+    (pl_jac_prim, _capture_grad_lowering),
     (func_p, _func_lowering),
     (jvp_p, _jvp_lowering),
     (vjp_p, _vjp_lowering),
