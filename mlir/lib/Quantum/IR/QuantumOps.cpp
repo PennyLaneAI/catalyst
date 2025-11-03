@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <llvm/ADT/STLExtras.h>
 #include <optional>
 #include <type_traits>
 
