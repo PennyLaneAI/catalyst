@@ -77,6 +77,7 @@ def lower_jaxpr(ctx, jaxpr, metadata=None, fn=None):
         ctx: LoweringRuleContext
         jaxpr: JAXPR to be lowered
         metadata: additional metadata to distinguish different FuncOps
+        fn (Callable | None): the function the jaxpr corresponds to. Used for naming and caching.
 
     Returns:
         FuncOp
