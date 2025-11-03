@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <llvm/ADT/STLExtras.h>
 #include <optional>
 #include <type_traits>
 
@@ -155,7 +156,10 @@ LogicalResult ExtractOp::canonicalize(ExtractOp extract, mlir::PatternRewriter &
         bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
         bool staticallyEqual = bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
         bool dynamicallyEqual = bothDynamic && extract.getIdx() == insert.getIdx();
-        if (staticallyEqual || dynamicallyEqual) {
+
+        bool inSameBlock = extract->getBlock() == insert->getBlock();
+
+        if ((staticallyEqual || dynamicallyEqual) && inSameBlock) {
             rewriter.replaceOp(extract, insert.getQubit());
             rewriter.replaceOp(insert, insert.getInQreg());
             return success();

@@ -31,7 +31,7 @@ def test_conditional_capture():
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def captured_circuit():
         m = qml.measure(0)
-        # CHECK: [[QREG:%.+]] = quantum.alloc
+        # CHECK: [[QREG:%.+]] = quantum.insert
         # CHECK: [[QREG_3:%.+]] = scf.if
         # CHECK:    [[QREG_2:%.+]] = quantum.insert [[QREG]][ 0]
         # CHECK:    scf.yield [[QREG_2]]
