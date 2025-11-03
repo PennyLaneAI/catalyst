@@ -161,9 +161,10 @@ class WorkflowInterpreter(PlxprInterpreter):
 def handle_grad(self, *args, jaxpr, n_consts, **kwargs):
     """Translate a grad equation."""
     f = partial(copy(self).eval, jaxpr, args[:n_consts])
-    new_jaxpr = jax.make_jaxpr(f)(*args[n_consts:]).jaxpr
+    new_jaxpr = jax.make_jaxpr(f)(*args[n_consts:])
 
-    return pl_jac_prim.bind(*args, jaxpr=new_jaxpr, n_consts=n_consts, **kwargs)
+    new_args = (*new_jaxpr.consts, *args[n_consts:])
+    return pl_jac_prim.bind(*new_args, jaxpr=new_jaxpr.jaxpr, n_consts=len(new_jaxpr.consts), **kwargs)
 
 
 # pylint: disable=unused-argument, too-many-arguments
