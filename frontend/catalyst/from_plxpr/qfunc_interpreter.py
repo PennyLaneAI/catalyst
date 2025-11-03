@@ -158,7 +158,9 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         if any(not qreg.is_qubit_mode() and qreg.expired for qreg in in_qregs + in_ctrl_qregs):
             raise CompileError(f"Deallocated qubits cannot be used, but used in {op.name}.")
 
-        out_qubits = qinst_p.bind(
+        bind_fn = _special_op_bind_call.get(type(op), qinst_p.bind)
+
+        out_qubits = bind_fn(
             *[*in_qubits, *op.data, *in_ctrl_qubits, *control_values],
             op=op.name,
             qubits_len=len(op.wires),
@@ -166,7 +168,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             ctrl_len=len(control_wires),
             adjoint=is_adjoint,
         )
-
         out_non_ctrl_qubits = out_qubits[: len(out_qubits) - len(control_wires)]
         out_ctrl_qubits = out_qubits[-len(control_wires) :]
 
@@ -275,6 +276,27 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         and no **kwargs) and the results is a sequence of values
         """
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
+
+
+# pylint: disable=unused-argument
+def _qubit_unitary_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint):
+    wires = invals[:qubits_len]
+    mat = invals[qubits_len]
+    ctrl_inputs = invals[qubits_len + 1 :]
+    return unitary_p.bind(
+        mat, *wires, *ctrl_inputs, qubits_len=qubits_len, ctrl_len=ctrl_len, adjoint=adjoint
+    )
+
+
+# pylint: disable=unused-argument
+def _gphase_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint):
+    return gphase_p.bind(*invals[qubits_len:], ctrl_len=ctrl_len, adjoint=adjoint)
+
+
+_special_op_bind_call = {
+    qml.QubitUnitary: _qubit_unitary_bind_call,
+    qml.GlobalPhase: _gphase_bind_call,
+}
 
 
 # pylint: disable=unused-argument
@@ -505,22 +527,6 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
     return ()
 
 
-@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.QubitUnitary._primitive)
-def handle_qubit_unitary(self, *invals, n_wires):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the QubitUnitary primitive"""
-    in_qregs, in_qubits = get_in_qubit_values(invals[1:], self.qubit_index_recorder, self.init_qreg)
-    outvals = unitary_p.bind(invals[0], *in_qubits, qubits_len=n_wires, ctrl_len=0, adjoint=False)
-    for in_qreg, w, new_wire in zip(in_qregs, invals[1:], outvals):
-        in_qreg[in_qreg.global_index_to_local_index(w)] = new_wire
-
-
-# pylint: disable=unused-argument
-@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.GlobalPhase._primitive)
-def handle_global_phase(self, phase, *wires, n_wires):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the GlobalPhase primitive"""
-    gphase_p.bind(phase, ctrl_len=0, adjoint=False)
-
-
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.BasisState._primitive)
 def handle_basis_state(self, *invals, n_wires):
     """Handle the conversion from plxpr to Catalyst jaxpr for the BasisState primitive"""
@@ -660,13 +666,16 @@ def handle_adjoint_transform(
         init_qreg.insert_all_dangling_qubits()
         return *retvals, converter.init_qreg.get()
 
-    _, args_tree = tree_flatten((consts, args, [qreg]))
-    converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*consts, *args, qreg).jaxpr
+    converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*args, qreg)
 
-    converted_closed_jaxpr_branch = ClosedJaxpr(convert_constvars_jaxpr(converted_jaxpr_branch), ())
+    converted_closed_jaxpr_branch = ClosedJaxpr(
+        convert_constvars_jaxpr(converted_jaxpr_branch.jaxpr), ()
+    )
+    new_consts = converted_jaxpr_branch.consts
+    _, args_tree = tree_flatten((new_consts, args, [qreg]))
     # Perform the binding
     outvals = adjoint_p.bind(
-        *consts,
+        *new_consts,
         *args,
         qreg,
         jaxpr=converted_closed_jaxpr_branch,

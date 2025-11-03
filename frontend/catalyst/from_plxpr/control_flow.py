@@ -384,10 +384,11 @@ def handle_while_loop(
     jaxpr = ClosedJaxpr(jaxpr_body_fn, consts_body)
 
     f = partial(_calling_convention, self, jaxpr, outer_dynqreg_handlers=dynalloced_qregs)
-    converted_body_jaxpr_branch = jax.make_jaxpr(f)(*args_plus_qreg).jaxpr
+    converted_body_jaxpr_branch = jax.make_jaxpr(f)(*args_plus_qreg)
+    new_consts_body = converted_body_jaxpr_branch.consts
 
     converted_body_closed_jaxpr_branch = ClosedJaxpr(
-        convert_constvars_jaxpr(converted_body_jaxpr_branch), ()
+        convert_constvars_jaxpr(converted_body_jaxpr_branch.jaxpr), ()
     )
 
     # Convert for condition from plxpr to Catalyst jaxpr
@@ -401,24 +402,26 @@ def handle_while_loop(
         _calling_convention, self, jaxpr, outer_dynqreg_handlers=dynalloced_qregs, return_qreg=False
     )
 
-    converted_cond_jaxpr_branch = jax.make_jaxpr(f_remove_qreg)(*args_plus_qreg).jaxpr
+    converted_cond_jaxpr_branch = jax.make_jaxpr(f_remove_qreg)(*args_plus_qreg)
+
     converted_cond_closed_jaxpr_branch = ClosedJaxpr(
-        convert_constvars_jaxpr(converted_cond_jaxpr_branch), ()
+        convert_constvars_jaxpr(converted_cond_jaxpr_branch.jaxpr), ()
     )
 
     # Build Catalyst compatible input values
-    consts_body = tuple(
-        const for const in consts_body if const not in dynalloced_wire_global_indices
+    new_consts_cond = converted_cond_jaxpr_branch.consts
+    new_consts_body = tuple(
+        const for const in new_consts_body if const not in dynalloced_wire_global_indices
     )
-    while_loop_invals = [*consts_cond, *consts_body, *args_plus_qreg]
+    while_loop_invals = [*new_consts_cond, *new_consts_body, *args_plus_qreg]
 
     # Perform the binding
     outvals = while_p.bind(
         *while_loop_invals,
         cond_jaxpr=converted_cond_closed_jaxpr_branch,
         body_jaxpr=converted_body_closed_jaxpr_branch,
-        cond_nconsts=len(consts_cond),
-        body_nconsts=len(consts_body),
+        cond_nconsts=len(new_consts_cond),
+        body_nconsts=len(new_consts_body),
         nimplicit=0,
         preserve_dimensions=True,
     )
