@@ -51,7 +51,7 @@ And you can schedule this pass as any other pass:
 
 .. code-block:: bash
 
-    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' example.mlir'
+    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' example.mlir
 
 .. note::
 
