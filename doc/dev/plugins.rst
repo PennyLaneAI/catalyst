@@ -95,7 +95,7 @@ But if we try to run it, using the same command as shown earlier
 
 .. code-block:: bash
 
-      quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' example.mlir'
+      quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' example.mlir
 
 the compilation will fail with the following message:
 
