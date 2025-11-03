@@ -365,7 +365,9 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
                 target = apply_registered_pass_op.result
 
                 try:
-                    from pennylane.compiler.python_compiler.pass_api import is_xdsl_pass
+                    from pennylane.compiler.python_compiler.pass_api import (  # pylint: disable=import-outside-toplevel
+                        is_xdsl_pass,
+                    )
 
                     if is_xdsl_pass(_pass.name):
                         uses_xdsl_passes = True
