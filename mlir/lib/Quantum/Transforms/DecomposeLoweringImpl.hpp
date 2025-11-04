@@ -120,7 +120,7 @@ class BaseSignatureAnalyzer {
                           mlir::ValueRange inCtrlQubits, mlir::ValueRange inCtrlValues,
                           mlir::ValueRange outQubits, mlir::ValueRange outCtrlQubits,
                           bool enableQregMode)
-        : paramsStorage(mlir::ValueRange(param).begin(), mlir::ValueRange(param).end()),
+        : paramsStorage{param},
           signature(Signature{.params = mlir::ValueRange(paramsStorage),
                               .inQubits = inQubits,
                               .inCtrlQubits = inCtrlQubits,
