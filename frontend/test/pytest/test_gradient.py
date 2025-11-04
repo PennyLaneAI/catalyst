@@ -1800,7 +1800,7 @@ def test_forloop_vmap_worflow_derivation(backend):
             result_i = circuit(transposed_data[i], weights)
             return result_array.at[i].set(result_i)
 
-        return body(transposed_result) # pylint: disable=no-value-for-parameter
+        return body(transposed_result)  # pylint: disable=no-value-for-parameter
 
     cat_res = qjit(
         jacobian(
