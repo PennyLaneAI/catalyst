@@ -147,7 +147,7 @@ class TestControlled:
                     qml.RY(theta, wires=s)
                     return s + 1
 
-                _while_loop(0)
+                _while_loop(0)  # pylint: disable=no-value-for-parameter
 
             ctrl_fn(adjoint_fn(_func), control=[cw], control_values=[True])()
             return qml.state()
@@ -183,14 +183,14 @@ class TestControlled:
                     qml.RY(theta, wires=s)
                     return s + 1
 
-                s = _while_loop(s)
+                s = _while_loop(s)  # pylint: disable=no-value-for-parameter
 
                 @for_loop(0, w2, 1)
                 def _for_loop(i, s):
                     qml.RY(theta, wires=i)
                     return s + 1
 
-                s = _for_loop(s)
+                s = _for_loop(s)  # pylint: disable=no-value-for-parameter
 
                 @cond(True)
                 def _branch():
@@ -474,7 +474,7 @@ class TestCatalystOnlyControlled:
                     qml.RY(theta, wires=i)
                     return s + 1
 
-                s = _for_loop(s)
+                s = _for_loop(s)  # pylint: disable=no-value-for-parameter
                 qml.RZ(s * theta, wires=w1)
 
             qctrl = C_ctrl(_func, control=[cw], control_values=[True])()
