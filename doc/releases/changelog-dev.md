@@ -29,6 +29,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixes an issue where a heap-to-stack allocation conversion pass was causing SIGSEGV issues 
+  during program execution at runtime.
+  [(#2172)](https://github.com/PennyLaneAI/catalyst/pull/2172)
+
 * Fixes the issue with capturing unutilized abstracted adjoint and controlled rules
   by the graph in the new decomposition framework.
   [(#2160)](https://github.com/PennyLaneAI/catalyst/pull/2160)
@@ -99,6 +103,7 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Christina Lee,
 River McCubbin,
+Lee J. O'Riordan,
 Roberto Turrado,
 Paul Haochen Wang,
 Hongsheng Zheng.
