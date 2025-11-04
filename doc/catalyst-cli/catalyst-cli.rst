@@ -105,7 +105,7 @@ Print SSA IDs using their name location, if provided, as prefix. By default, nam
 Name location, or named source location, is a type of source location information that allows attaching a name to a child location.
 
 ``--{passname}``
-"""""""""""""""
+""""""""""""""""
 
 Enable a specific pass. For example, to enable the ``remove-chained-self-inverse`` pass, use
 ``--remove-chained-self-inverse``.
@@ -122,7 +122,7 @@ name. Currently, the following pipelines are available:
 Catalyst CLI tool if no pass option is specified.
 
 ``--catalyst-pipeline=<pipeline1(pass1[;pass2[;...]])[,pipeline2(...)]>``
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 Specify the Catalyst compilation pass pipelines.
 
