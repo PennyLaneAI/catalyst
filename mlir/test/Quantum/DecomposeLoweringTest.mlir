@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --decompose-lowering --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --decompose-lowering --split-input-file -verify-diagnostics %s | tee /dev/stderr | FileCheck %s
 
 module @two_hadamards {
   func.func public @test_two_hadamards() -> tensor<4xf64> {
