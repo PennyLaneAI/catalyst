@@ -294,7 +294,7 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
         "func.func(buffer-loop-hoisting)",
         # TODO: investigate re-adding this after new buffer dealloc pipeline
         #       removed due to high stack memory use in nested structures
-        #"func.func(promote-buffers-to-stack)",
+        # "func.func(promote-buffers-to-stack)",
         # TODO: migrate to new buffer deallocation "buffer-deallocation-pipeline"
         "func.func(buffer-deallocation)",
         "convert-arraylist-to-memref",
