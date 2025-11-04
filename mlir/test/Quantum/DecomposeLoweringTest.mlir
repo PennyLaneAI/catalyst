@@ -559,15 +559,24 @@ module @circuit_with_multirz {
   func.func public @test_with_multirz() -> tensor<4xf64> {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: func.func public @test_with_multirz() -> tensor<4xf64>
+    // CHECK: [[CST_RZ:%.+]] = arith.constant 5.000000e-01 : f64
+    // CHECK: [[CST_PI2:%.+]] = arith.constant 1.5707963267948966 : f64
+    // CHECK: [[CST_PI:%.+]] = arith.constant 3.1415926535897931 : f64
+    // CHECK: [[REG:%.+]] = quantum.alloc( 2) : !quantum.reg
 
+    // CHECK: [[QUBIT1:%.+]] = quantum.custom "RZ"([[CST_RZ]]) {{%.+}} : !quantum.bit
     // CHECK-NOT: quantum.multirz
     %cst = stablehlo.constant dense<5.000000e-01> : tensor<f64>
     %extracted_2 = tensor.extract %cst[] : tensor<f64>
     %out_qubits = quantum.multirz(%extracted_2) %1 : !quantum.bit
 
+    // CHECK: [[QUBIT3:%.+]] = quantum.custom "RZ"([[CST_PI]]) {{%.+}} : !quantum.bit
+    // CHECK: [[QUBIT4:%.+]] = quantum.custom "RY"([[CST_PI2]]) [[QUBIT3]] : !quantum.bit
     // CHECK-NOT: quantum.custom "Hadamard"
     %out_qubits_0 = quantum.custom "Hadamard"() %out_qubits : !quantum.bit
 
+    // CHECK: [[UPDATED_REG:%.+]] = quantum.insert [[REG]][ 0], [[QUBIT4]] : !quantum.reg, !quantum.bit
     %2 = quantum.insert %0[ 0], %out_qubits_0 : !quantum.reg, !quantum.bit
     %3 = quantum.compbasis qreg %2 : !quantum.obs
     %4 = quantum.probs %3 : tensor<4xf64>
