@@ -375,7 +375,7 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
                         apply_registered_pass_op.operation.attributes["xdsl_pass"] = (
                             ir.UnitAttr.get()
                         )
-                except ImportError:
+                except ModuleNotFoundError:
                     # If xDSL pass API is not available, do not set the attribute
                     pass
 
