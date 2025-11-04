@@ -20,6 +20,9 @@
 * Pytree inputs can now be used when program capture is enabled.
   [(#2165)](https://github.com/PennyLaneAI/catalyst/pull/2165)
 
+* `qml.grad` and `qml.jacobian` can now be used with `qjit` when program capture is enabled.
+  [(#2078)](https://github.com/PennyLaneAI/catalyst/pull/2078)
+
 * Dynamically allocated wires can now be passed into control flow and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
 
