@@ -14,7 +14,6 @@ std::pair<std::vector<GateType>, double> ma_normal_form(SO3Matrix &op)
     SO3Matrix so3_op = op;
 
     std::vector<GateType> decomposition;
-    std::vector<bool> rep_bits;
     double g_phase = 0.0;
 
     auto parity_vec = so3_op.parity_vec();
@@ -42,7 +41,6 @@ std::pair<std::vector<GateType>, double> ma_normal_form(SO3Matrix &op)
             // T
             // std::cout << "Overflow investigation 1" << std::endl;
             c = c * ZOmega(0, 0, 1, 0);
-            rep_bits.push_back(0);
         }
         else if (parity_vec == std::array<int, 3>{0, 2, 2}) {
             // HT
@@ -53,7 +51,6 @@ std::pair<std::vector<GateType>, double> ma_normal_form(SO3Matrix &op)
             c = c_temp;
             // std::cout << "Overflow investigation 3" << std::endl;
             k += 1;
-            rep_bits.push_back(0);
         }
         else {
             // SHT
@@ -66,7 +63,6 @@ std::pair<std::vector<GateType>, double> ma_normal_form(SO3Matrix &op)
             a = a_temp;
             c = c_temp;
             k += 1;
-            rep_bits.push_back(1);
         }
         // std::cout << "HERE B" << std::endl;
 
