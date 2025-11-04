@@ -49,12 +49,13 @@ from catalyst.jax_extras import (
     jaxpr_pad_consts,
     new_inner_tracer,
     output_type_to_tracers,
+    switch_expansion_strategy,
     trace_to_jaxpr,
     unzip2,
     while_loop_expansion_strategy,
 )
 from catalyst.jax_extras.patches import _drop_unused_vars2
-from catalyst.jax_primitives import AbstractQreg, cond_p, for_p, while_p
+from catalyst.jax_primitives import AbstractQreg, cond_p, for_p, switch_p, while_p
 from catalyst.jax_tracer import (
     HybridOp,
     HybridOpRegion,
@@ -559,6 +560,24 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
     return _decorator
 
 
+def switch(i, allow_array_resizing=False):
+    """
+    A :func:`~.qjit` compatible switch decorator for PennyLane/Catalyst.
+
+    TODO add examples/explain
+    """
+
+    if qml.capture.enabled():
+        raise PlxprCaptureCFCompatibilityError("switch")
+
+    def _decorator(branch):
+        # TODO maybe deal with array resizing here
+        # base case is selected by default
+        return SwitchCallable(i, [branch])
+
+    return _decorator
+
+
 ## IMPL ##
 class CondCallable:
     """User-facing wrapper providing "else_if" and "otherwise" public methods.
@@ -1020,6 +1039,75 @@ class ForLoopCallable:
             return self._call_during_interpretation(*init_state)
 
 
+class SwitchCallable:
+    """
+    TODO
+
+    Example:
+    >>>
+    """
+
+    def __init__(self, index, branches):
+        self.index = index
+        self.branches = branches
+        self._operation = None
+        self.expansion_strategy = switch_expansion_strategy()
+
+    @property
+    def operation(self):
+        """
+        @property for SwitchCallable.operation
+        """
+        if self._operation is None:
+            raise AttributeError(
+                """
+                The switch() was not called (or has not been called) in a quantum context,
+                and thus has no associated quantum operation.
+                """
+            )
+        return self._operation
+
+    def branch(self):
+        """
+        TODO
+
+        Returns:
+            A callable decorator that wraps this case of the switch and returns self.
+        """
+
+        def decorator(branch_fn):
+            self.branches.append(branch_fn)
+            return self
+
+        return decorator
+
+    def _call_with_quantum_ctx(self):
+        # TODO
+        pass
+
+    def _call_with_classical_ctx(self, *args, **kwargs):
+        # TODO
+        pass
+
+    def _call_during_interpretation(self, *args, **kwargs):
+        if len(self.branches) == 0:  # if no branches
+            raise IndexError("Cannot index zero branches!")
+
+        self.index = jax.lax.clamp(0, self.index, len(self.branches) - 1)
+
+        return self.branches[self.index](*args, **kwargs)
+
+    def __call__(self, *args, **kwargs):
+        mode = EvaluationContext.get_evaluation_mode()
+        if mode == EvaluationMode.QUANTUM_COMPILATION:
+            return self._call_with_quantum_ctx()
+        elif mode == EvaluationMode.CLASSICAL_COMPILATION:
+            return self._call_with_classical_ctx()
+        else:
+            assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
+            return self._call_during_interpretation(*args, **kwargs)
+
+
 class WhileLoopCallable:
     """
     Wrapping while_loop decorator into a class so that the actual "WhileLoop" operation object,
@@ -1363,6 +1451,12 @@ class ForLoop(HybridOp):
             )
         )
         return qrp2
+
+
+class Switch(HybridOp):
+    """TODO"""
+
+    pass
 
 
 class WhileLoop(HybridOp):
