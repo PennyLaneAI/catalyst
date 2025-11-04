@@ -436,7 +436,7 @@ class MultiRZOpSignatureAnalyzer : public BaseSignatureAnalyzer {
     MultiRZOpSignatureAnalyzer() = delete;
 
     MultiRZOpSignatureAnalyzer(MultiRZOp op, bool enableQregMode)
-        : BaseSignatureAnalyzer(op, op.getTheta(), op.getNonCtrlQubitOperands(),
+        : BaseSignatureAnalyzer(op, mlir::ValueRange(op.getTheta()), op.getNonCtrlQubitOperands(),
                                 op.getCtrlQubitOperands(), op.getCtrlValueOperands(),
                                 op.getNonCtrlQubitResults(), op.getCtrlQubitResults(),
                                 enableQregMode)
