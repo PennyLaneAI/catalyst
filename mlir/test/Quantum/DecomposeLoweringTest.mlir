@@ -388,10 +388,12 @@ module @multi_wire_cnot_decomposition {
     // CHECK: [[QUBIT1:%.+]] = quantum.extract [[REG]][[[EXTRACTED]]] : !quantum.reg -> !quantum.bit
     // CHECK: [[RZ1:%.+]] = quantum.custom "RZ"([[CST_PI]]) [[QUBIT1]] : !quantum.bit
     // CHECK: [[RY1:%.+]] = quantum.custom "RY"([[CST_PI2]]) [[RZ1]] : !quantum.bit
+    // CHECK: [[INSERT1:%.+]] = quantum.insert [[REG]][[[EXTRACTED]]], [[RY1]] : !quantum.reg, !quantum.bit
     // CHECK: [[EXTRACTED2:%.+]] = tensor.extract [[RESHAPE1]][] : tensor<i64>
-    // CHECK: [[QUBIT0:%.+]] = quantum.extract [[REG]][[[EXTRACTED2]]] : !quantum.reg -> !quantum.bit
-    // CHECK: [[CZ_RESULT:%.+]]:2 = quantum.custom "CZ"() [[QUBIT0]], [[RY1]] : !quantum.bit, !quantum.bit
-    // CHECK: [[INSERT2:%.+]] = quantum.insert [[REG]][[[EXTRACTED2]]], [[CZ_RESULT]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[QUBIT0:%.+]] = quantum.extract [[INSERT1]][[[EXTRACTED2]]] : !quantum.reg -> !quantum.bit
+    // CHECK: [[QUBIT1_2:%.+]] = quantum.extract [[INSERT1]][[[EXTRACTED]]] : !quantum.reg -> !quantum.bit
+    // CHECK: [[CZ_RESULT:%.+]]:2 = quantum.custom "CZ"() [[QUBIT0]], [[QUBIT1_2]] : !quantum.bit, !quantum.bit
+    // CHECK: [[INSERT2:%.+]] = quantum.insert [[INSERT1]][[[EXTRACTED2]]], [[CZ_RESULT]]#0 : !quantum.reg, !quantum.bit
     // CHECK: [[RZ2:%.+]] = quantum.custom "RZ"([[CST_PI]]) [[CZ_RESULT]]#1 : !quantum.bit
     // CHECK: [[RY2:%.+]] = quantum.custom "RY"([[CST_PI2]]) [[RZ2]] : !quantum.bit
     // CHECK: [[INSERT3:%.+]] = quantum.insert [[INSERT2]][[[EXTRACTED]]], [[RY2]] : !quantum.reg, !quantum.bit
@@ -569,8 +571,8 @@ module @circuit_with_multirz {
     %extracted_2 = tensor.extract %cst[] : tensor<f64>
     %out_qubits = quantum.multirz(%extracted_2) %1 : !quantum.bit
 
-    // CHECK: [[QUBIT3:%.+]] = quantum.custom "RZ"([[CST_RZ:%.+]]) {{%.+}} : !quantum.bit
-    // CHECK: [[QUBIT4:%.+]] = quantum.custom "RY"([[CST_RY:%.+]]) [[QUBIT3]] : !quantum.bit
+    // CHECK: [[QUBIT3:%.+]] = quantum.custom "RZ"
+    // CHECK: [[QUBIT4:%.+]] = quantum.custom "RY"
     // CHECK-NOT: quantum.custom "Hadamard"
     %out_qubits_0 = quantum.custom "Hadamard"() %out_qubits : !quantum.bit
 

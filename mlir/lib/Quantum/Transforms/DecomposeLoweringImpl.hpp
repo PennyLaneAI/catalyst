@@ -78,7 +78,7 @@ class BaseSignatureAnalyzer {
   protected:
     bool isValid = true;
 
-    llvm::SmallVector<mlir::Value> paramsStorage;
+    llvm::SmallVector<mlir::Value, 4> paramsStorage;
 
     // Unified Signature Structure: All parameters, regardless of source (params or theta),
     // are stored in a ValueRange for generalized processing.
@@ -97,20 +97,21 @@ class BaseSignatureAnalyzer {
         llvm::SmallVector<QubitIndex> outCtrlQubitIndices;
     } signature;
 
-    BaseSignatureAnalyzer(mlir::Operation *op, llvm::SmallVector<mlir::Value> params,
-                          mlir::ValueRange inQubits, mlir::ValueRange inCtrlQubits,
-                          mlir::ValueRange inCtrlValues, mlir::ValueRange outQubits,
-                          mlir::ValueRange outCtrlQubits, bool enableQregMode)
-        : paramsStorage(params), signature(Signature{.params = paramsStorage,
-                                                     .inQubits = inQubits,
-                                                     .inCtrlQubits = inCtrlQubits,
-                                                     .inCtrlValues = inCtrlValues,
-                                                     .outQubits = outQubits,
-                                                     .outCtrlQubits = outCtrlQubits,
-                                                     .inWireIndices = {},
-                                                     .inCtrlWireIndices = {},
-                                                     .outQubitIndices = {},
-                                                     .outCtrlQubitIndices = {}})
+    BaseSignatureAnalyzer(mlir::Operation *op, mlir::ValueRange params, mlir::ValueRange inQubits,
+                          mlir::ValueRange inCtrlQubits, mlir::ValueRange inCtrlValues,
+                          mlir::ValueRange outQubits, mlir::ValueRange outCtrlQubits,
+                          bool enableQregMode)
+        : paramsStorage(params.begin(), params.end()),
+          signature(Signature{.params = mlir::ValueRange(paramsStorage),
+                              .inQubits = inQubits,
+                              .inCtrlQubits = inCtrlQubits,
+                              .inCtrlValues = inCtrlValues,
+                              .outQubits = outQubits,
+                              .outCtrlQubits = outCtrlQubits,
+                              .inWireIndices = {},
+                              .inCtrlWireIndices = {},
+                              .outQubitIndices = {},
+                              .outCtrlQubitIndices = {}})
     {
         initializeQregMode(op, enableQregMode);
     }
@@ -435,10 +436,10 @@ class MultiRZOpSignatureAnalyzer : public BaseSignatureAnalyzer {
     MultiRZOpSignatureAnalyzer() = delete;
 
     MultiRZOpSignatureAnalyzer(MultiRZOp op, bool enableQregMode)
-        : BaseSignatureAnalyzer(op, llvm::SmallVector<mlir::Value>{op.getTheta()},
-                                op.getNonCtrlQubitOperands(), op.getCtrlQubitOperands(),
-                                op.getCtrlValueOperands(), op.getNonCtrlQubitResults(),
-                                op.getCtrlQubitResults(), enableQregMode)
+        : BaseSignatureAnalyzer(op, op.getTheta(), op.getNonCtrlQubitOperands(),
+                                op.getCtrlQubitOperands(), op.getCtrlValueOperands(),
+                                op.getNonCtrlQubitResults(), op.getCtrlQubitResults(),
+                                enableQregMode)
     {
     }
 };
