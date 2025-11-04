@@ -20,9 +20,11 @@ from catalyst.api_extensions.callbacks import accelerate, pure_callback
 from catalyst.api_extensions.control_flow import (
     Cond,
     ForLoop,
+    Switch,
     WhileLoop,
     cond,
     for_loop,
+    switch,
     while_loop,
 )
 from catalyst.api_extensions.differentiation import grad, jacobian, jvp, value_and_grad, vjp
@@ -42,6 +44,7 @@ __all__ = (
     "pure_callback",
     "cond",
     "for_loop",
+    "switch",
     "while_loop",
     "ctrl",
     "grad",

@@ -63,6 +63,7 @@ from catalyst.jax_extras.tracing import (
     new_inner_tracer,
     output_type_to_tracers,
     sort_eqns,
+    switch_expansion_strategy,
     trace_to_jaxpr,
     transient_jax_config,
     tree_flatten,
