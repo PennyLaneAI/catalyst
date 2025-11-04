@@ -240,7 +240,7 @@ try:
         if x < 3:
             y = 4
 
-        return y
+        return y  # pylint: disable=possibly-used-before-assignment
 
 except AutoGraphError as e:
     # CHECK:   Some branches did not define a value for variable 'y'
