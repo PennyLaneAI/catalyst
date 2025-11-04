@@ -78,6 +78,7 @@ __all__ = (
     "ExpansionStrategy",
     "for_loop_expansion_strategy",
     "cond_expansion_strategy",
+    "switch_expansion_strategy",
     "while_loop_expansion_strategy",
     "DynamicJaxprTrace",
     "DynamicJaxprTracer",
@@ -602,6 +603,11 @@ def for_loop_expansion_strategy(preserve_dimensions=False):
 
 def cond_expansion_strategy():
     """Arguments and results expansion strategy for conditionals."""
+    return ExpansionStrategy(True, False)
+
+
+def switch_expansion_strategy():
+    """Arguments and results expansion strategy for index-switches."""
     return ExpansionStrategy(True, False)
 
 
