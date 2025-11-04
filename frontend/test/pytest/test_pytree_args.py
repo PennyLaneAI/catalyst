@@ -539,7 +539,7 @@ class TestPyTreesFuncArgs:
                 qml.RX(params[i], wires=i)
                 return ()
 
-            loop()
+            loop()  # pylint: disable=no-value-for-parameter
             return qml.state()
 
         circuit1(1, inp)

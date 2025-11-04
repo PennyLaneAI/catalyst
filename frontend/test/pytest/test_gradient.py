@@ -687,7 +687,7 @@ def test_ps_for_loops(inp, backend):
         def loop_fn(i):
             qml.RX(x * i * 1.5, wires=0)
 
-        loop_fn()
+        loop_fn()  # pylint: disable=no-value-for-parameter
         return qml.expval(qml.PauliY(0))
 
     def f_interpreted(x, y):
@@ -726,7 +726,7 @@ def test_ps_for_loops_entangled(inp, backend):
             qml.RX(x, wires=i)
             qml.CNOT(wires=[0, i])
 
-        loop_fn()
+        loop_fn()  # pylint: disable=no-value-for-parameter
         return qml.expval(qml.PauliY(z))
 
     def f_interpreted(x, y, z):
@@ -773,10 +773,10 @@ def test_ps_qft(inp, backend):
                 qml.RY(x, wires=j)
                 qml.ControlledPhaseShift(jnp.pi / 2 ** (n - j + 1), [i, j])
 
-            inner()
+            inner()  # pylint: disable=no-value-for-parameter
 
-        init()
-        qft()
+        init()  # pylint: disable=no-value-for-parameter
+        qft()  # pylint: disable=no-value-for-parameter
 
         # Expected output: |100...>
         return qml.expval(qml.PauliZ(z))
@@ -1287,7 +1287,7 @@ def test_loop_with_dyn_wires(backend, diff_method):
         def loop(i):
             qml.RY(phi, wires=jnp.mod(i, num_wires))
 
-        loop()
+        loop()  # pylint: disable=no-value-for-parameter
 
         return qml.expval(qml.prod(*[qml.PauliZ(i) for i in range(num_wires)]))
 
@@ -1297,7 +1297,7 @@ def test_loop_with_dyn_wires(backend, diff_method):
         def loop(i):
             qml.RY(phi, wires=i % num_wires)
 
-        loop()
+        loop()  # pylint: disable=no-value-for-parameter
 
         return qml.expval(qml.prod(*[qml.PauliZ(i) for i in range(num_wires)]))
 
@@ -1617,7 +1617,7 @@ def test_vmap_worflow_derivation(backend):
         def data_embedding(i):
             qml.RY(data[i], wires=i)
 
-        data_embedding()
+        data_embedding()  # pylint: disable=no-value-for-parameter
 
         @for_loop(0, n_wires, 1)
         def ansatz(i):
@@ -1626,7 +1626,7 @@ def test_vmap_worflow_derivation(backend):
             qml.RX(weights[i, 2], wires=i)
             qml.CNOT(wires=[i, (i + 1) % n_wires])
 
-        ansatz()
+        ansatz()  # pylint: disable=no-value-for-parameter
 
         return qml.expval(qml.sum(*[qml.PauliZ(i) for i in range(n_wires)]))
 
