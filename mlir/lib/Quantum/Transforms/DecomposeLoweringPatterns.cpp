@@ -111,8 +111,11 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
     {
         StringRef gateName = "MultiRZ";
 
+        llvm::errs() << "Decomposing MultiRZOp: " << gateName << "\n";
+
         // Only decompose the op if it is not in the target gate set
         if (targetGateSet.contains(gateName)) {
+            llvm::errs() << "MultiRZOp is in the target gate set, skipping\n";
             return failure();
         }
 
@@ -122,6 +125,7 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
 
         auto it = decompositionRegistry.find(MRZNameWithQubits.str());
         if (it == decompositionRegistry.end()) {
+            llvm::errs() << "No decomposition function found for " << MRZNameWithQubits.str() << "\n";
             return failure();
         }
 
@@ -149,6 +153,7 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
 
         auto analyzer = MultiRZOpSignatureAnalyzer(op, enableQreg);
         if (!analyzer) {
+            llvm::errs() << "Failed to create MultiRZOpSignatureAnalyzer\n";
             op.emitError("Failed to create MultiRZOpSignatureAnalyzer");
             return failure();
         }
