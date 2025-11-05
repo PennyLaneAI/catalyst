@@ -71,7 +71,10 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
 
         auto enableQreg = isa<quantum::QuregType>(decompFunc.getFunctionType().getInput(0));
         auto analyzer = CustomOpSignatureAnalyzer(op, enableQreg);
-        assert(analyzer && "Analyzer should be valid");
+        if (!analyzer) {
+            op.emitError("Failed to create CustomOpSignatureAnalyzer");
+            return failure();
+        }
 
         auto callOperands = analyzer.prepareCallOperands(decompFunc, rewriter, op.getLoc());
         auto callOp =
@@ -145,7 +148,10 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
         }
 
         auto analyzer = MultiRZOpSignatureAnalyzer(op, enableQreg);
-        assert(analyzer && "Analyzer should be valid");
+        if (!analyzer) {
+            op.emitError("Failed to create MultiRZOpSignatureAnalyzer");
+            return failure();
+        }
 
         auto callOperands = analyzer.prepareCallOperands(decompFunc, rewriter, op.getLoc());
         auto callOp =
