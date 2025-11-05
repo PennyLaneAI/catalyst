@@ -121,9 +121,11 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
         auto test1 = gateName + "_";
         auto test2 = gateName + std::string("_");
         auto test3 = gateName + "_" + llvm::Twine(std::to_string(numQubits));
+        auto x = std::to_string(numQubits);
         llvm::errs() << "test1: " << test1 << "\n";
         llvm::errs() << "test2: " << test2 << "\n";
         llvm::errs() << "test3: " << test3 << "\n";
+        llvm::errs() << "test4: " << gateName + "_" + x << "\n";
         llvm::errs() << "MRZNameWithQubits: " << MRZNameWithQubits << "\n";
         llvm::errs() << "MRZNameWithQubits.str(): " << MRZNameWithQubits.str() << "\n";
         llvm::errs() << "2. gateName: " << gateName << "\n";
