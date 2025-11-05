@@ -102,13 +102,15 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
     {
         module.walk([&](func::FuncOp func) {
             if (StringRef targetOp = DecompUtils::getTargetGateName(func); !targetOp.empty()) {
+                llvm::errs() << "targetOp found: " << targetOp.str() << "\n";
                 if (targetOp == "MultiRZ") {
                     // Create a new target op name with the number of wires
                     // for MultiRZ, since it has multiple decomposition functions
                     // based on the number of target qubits
-                    auto newtargetOp =
-                        targetOp + "_" + std::to_string(DecompUtils::getNumWires(func));
-                    decompositionRegistry[newtargetOp.str()] = func;
+                    std::string newTargetOpStr =
+                        targetOp.str() + "_" + std::to_string(DecompUtils::getNumWires(func));
+                    llvm::errs() << "newTargetOpStr: " << newTargetOpStr << "\n";
+                    decompositionRegistry[newTargetOpStr] = func;
                 }
                 else {
                     decompositionRegistry[targetOp] = func;
