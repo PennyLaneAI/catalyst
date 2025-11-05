@@ -355,10 +355,7 @@ def test_ppr_to_ppm_auto_corrected():
 
         return f()
 
-    assert (
-        'transform.apply_registered_pass "ppr-to-ppm"'
-        in test_ppr_to_ppm_workflow.mlir
-    )
+    assert 'transform.apply_registered_pass "ppr-to-ppm"' in test_ppr_to_ppm_workflow.mlir
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
     assert "quantum.alloc_qb" in optimized_ir
@@ -392,10 +389,7 @@ def test_ppr_to_ppm_inject_magic_state():
 
         return f()
 
-    assert (
-        'transform.apply_registered_pass "ppr-to-ppm"'
-        in test_ppr_to_ppm_workflow.mlir
-    )
+    assert 'transform.apply_registered_pass "ppr-to-ppm"' in test_ppr_to_ppm_workflow.mlir
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
@@ -425,10 +419,7 @@ def test_ppr_to_ppm_pauli_corrected():
 
         return f()
 
-    assert (
-        'transform.apply_registered_pass "ppr-to-ppm"'
-        in test_ppr_to_ppm_workflow.mlir
-    )
+    assert 'transform.apply_registered_pass "ppr-to-ppm"' in test_ppr_to_ppm_workflow.mlir
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
     assert (
