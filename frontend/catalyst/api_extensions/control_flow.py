@@ -560,7 +560,7 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
     return _decorator
 
 
-def switch(i, allow_array_resizing=False):
+def switch(index_var, index=0, allow_array_resizing=False):
     """
     A :func:`~.qjit` compatible switch decorator for PennyLane/Catalyst.
 
@@ -572,8 +572,7 @@ def switch(i, allow_array_resizing=False):
 
     def _decorator(branch):
         # TODO maybe deal with array resizing here
-        # base case is selected by default
-        return SwitchCallable(i, [branch])
+        return SwitchCallable(index_var, [index], [branch])
 
     return _decorator
 
@@ -1047,9 +1046,10 @@ class SwitchCallable:
     >>>
     """
 
-    def __init__(self, index, branches):
+    def __init__(self, index, indices, branches, default_branch=None):
         self.index = index
-        self.branches = branches
+        self.index_to_branch = dict(zip(indices, branches))
+        self.default_branch = default_branch
         self._operation = None
         self.expansion_strategy = switch_expansion_strategy()
 
@@ -1067,16 +1067,30 @@ class SwitchCallable:
             )
         return self._operation
 
-    def branch(self):
+    def branch(self, new_index):
         """
         TODO
 
         Returns:
-            A callable decorator that wraps this case of the switch and returns self.
+            A callable decorator that wraps this case of the switch.
         """
 
-        def decorator(branch_fn):
-            self.branches.append(branch_fn)
+        def decorator(branch):
+            self.index_to_branch[new_index] = branch
+            return self
+
+        return decorator
+
+    def default(self):
+        """
+        TODO
+
+        Returns:
+            A callable decorator that wraps the default case of the switch.
+        """
+
+        def decorator(branch):
+            self.default_branch = branch
             return self
 
         return decorator
@@ -1089,15 +1103,22 @@ class SwitchCallable:
         # TODO
         pass
 
-    def _call_during_interpretation(self, *args, **kwargs):
-        if len(self.branches) == 0:  # if no branches
+    def _call_during_interpretation(self):
+        if len(self.index_to_branch) == 0:  # if no branch
             raise IndexError("Cannot index zero branches!")
 
-        self.index = jax.lax.clamp(0, self.index, len(self.branches) - 1)
-
-        return self.branches[self.index](*args, **kwargs)
+        if self.index in self.index_to_branch.keys():
+            return self.index_to_branch[self.index]()
+        else:
+            return self.default_branch()
 
     def __call__(self, *args, **kwargs):
+        # convert branches to argless functions
+        for i in self.index_to_branch:
+            self.index_to_branch[i] = _make_argless_function(self.index_to_branch[i], args, kwargs)
+
+        self.default_branch = _make_argless_function(self.default_branch, args, kwargs)
+
         mode = EvaluationContext.get_evaluation_mode()
         if mode == EvaluationMode.QUANTUM_COMPILATION:
             return self._call_with_quantum_ctx()
@@ -1105,7 +1126,7 @@ class SwitchCallable:
             return self._call_with_classical_ctx()
         else:
             assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
-            return self._call_during_interpretation(*args, **kwargs)
+            return self._call_during_interpretation()
 
 
 class WhileLoopCallable:
@@ -1606,3 +1627,19 @@ def _aval_to_primitive_type(aval):
         aval = aval.dtype
     assert not isinstance(aval, (list, dict)), f"Unexpected type {aval}"
     return aval
+
+
+def _make_argless_function(fn, args, kwargs):
+    """Wrap a user function into a function without arguments to satisfy the IR representation
+    of conditionals, which always accesses values via closure (besides the predicate)."""
+
+    def argless_fn():
+        # Special case for single gates supplied to cond. We'd would like users to be able to
+        # use this familiar PL pattern, e.g. `qml.cond(p, qml.RY)(0.1, 0)`.
+        if isinstance(fn, type) and issubclass(fn, qml.operation.Operation):
+            fn(*args, **kwargs)
+            return None  # swallow return value to avoid mismatched pytrees across branches
+
+        return fn(*args, **kwargs)
+
+    return argless_fn
