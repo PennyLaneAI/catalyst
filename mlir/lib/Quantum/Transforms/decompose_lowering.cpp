@@ -106,9 +106,10 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
                     // Create a new target op name with the number of wires
                     // for MultiRZ, since it has multiple decomposition functions
                     // based on the number of target qubits
-                    auto newtargetOp =
-                        targetOp + "_" + std::to_string(DecompUtils::getNumWires(func));
-                    decompositionRegistry[newtargetOp.str()] = func;
+                    std::string newTargetOpStr =
+                        targetOp.str() + "_" + std::to_string(DecompUtils::getNumWires(func));
+
+                    decompositionRegistry[newTargetOpStr] = func;
                 }
                 else {
                     decompositionRegistry[targetOp] = func;
