@@ -72,6 +72,7 @@ class TestShotVector:
 
     @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
     def test_shot_vector_with_mixes_shots_and_without_copies(self, mcm_method):
+        # pylint: disable=unsubscriptable-object
         """Test shot-vector with mixes shots and without copies"""
 
         dev = qml.device("lightning.qubit", wires=1)

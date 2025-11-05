@@ -27,6 +27,9 @@ set(LIBS
     ${translation_libs}
     ExternalStablehloLib
     MLIROptLib
+    MLIRRegisterAllDialects
+    MLIRRegisterAllPasses
+    MLIRRegisterAllExtensions
     MLIRCatalyst
     catalyst-transforms
     MLIRQuantum

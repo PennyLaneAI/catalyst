@@ -292,7 +292,9 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
         # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
-        "func.func(promote-buffers-to-stack)",
+        # TODO: investigate re-adding this after new buffer dealloc pipeline
+        #       removed due to high stack memory use in nested structures
+        # "func.func(promote-buffers-to-stack)",
         # TODO: migrate to new buffer deallocation "buffer-deallocation-pipeline"
         "func.func(buffer-deallocation)",
         "convert-arraylist-to-memref",
