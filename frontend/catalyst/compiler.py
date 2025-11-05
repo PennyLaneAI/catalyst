@@ -512,9 +512,8 @@ class Compiler:
                     # Check nested modules (look for transform modules)
                     if hasattr(op, "regions") and len(op.regions) > 0:
                         for nested_op in op.regions[0].blocks[0].operations:
-                            if hasattr(nested_op, "attributes"):
-                                if has_both_attributes(nested_op.attributes):
-                                    return True
+                            if hasattr(nested_op, "attributes") and has_both_attributes(nested_op.attributes):
+                                return True
                 except (AttributeError, IndexError):
                     pass
             return False
