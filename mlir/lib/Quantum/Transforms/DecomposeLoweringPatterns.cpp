@@ -125,7 +125,8 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
 
         auto it = decompositionRegistry.find(MRZNameWithQubits.str());
         if (it == decompositionRegistry.end()) {
-            llvm::errs() << "No decomposition function found for " << MRZNameWithQubits.str() << "\n";
+            llvm::errs() << "No decomposition function found for " << MRZNameWithQubits.str()
+                         << "\n";
             return failure();
         }
 
