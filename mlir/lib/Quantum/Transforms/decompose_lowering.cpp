@@ -115,7 +115,11 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
                     auto r = llvm::Twine(s) + "_" + std::to_string(DecompUtils::getNumWires(func));
                     llvm::errs() << "twine r: " << r << "\n";
 
-                    decompositionRegistry[s.str()] = func;
+                    auto r = llvm::Twine(s) + llvm::Twine("_") +
+                             std::to_string(DecompUtils::getNumWires(func));
+                    llvm::errs() << "twine r2: " << r2 << "\n";
+
+                    decompositionRegistry[r.str()] = func;
                 }
                 else {
                     decompositionRegistry[targetOp] = func;
