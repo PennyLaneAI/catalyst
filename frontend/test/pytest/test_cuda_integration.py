@@ -459,7 +459,7 @@ class TestCudaQ:
         with pytest.raises(CompileError, match="Cannot translate tapes with context"):
             catalyst.third_party.cuda.cudaqjit(wrapper)(1.0)
 
-    def test_samples(self):
+    def test_samples_multiple_wires(self):
         """Samples with more than one wire."""
 
         from catalyst.third_party.cuda import cudaqjit as cjit
