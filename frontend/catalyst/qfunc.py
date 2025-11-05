@@ -43,7 +43,7 @@ from catalyst.jax_extras.tracing import uses_transform
 from catalyst.jax_primitives import quantum_kernel_p
 from catalyst.jax_tracer import Function, trace_quantum_function
 from catalyst.logging import debug_logger
-from catalyst.passes.pass_api import dictionary_to_list_of_passes
+from catalyst.passes.pass_api import dictionary_to_list_of_passes, Pass
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args
 from catalyst.utils.exceptions import CompileError
@@ -283,18 +283,22 @@ class QFunc:
 
         assert isinstance(self, qml.QNode)
 
+        new_transform_program, new_pipeline = _extract_passes(self.transform_program)
+
         # Update the qnode with peephole pipeline
-        pass_pipeline = kwargs.pop("pass_pipeline", [])
+        pass_pipeline = kwargs.pop("pass_pipeline", []) + new_pipeline
         pass_pipeline = dictionary_to_list_of_passes(pass_pipeline)
+        new_qnode = copy(self)
+        new_qnode._transform_program = new_transform_program # pylint: disable=protected-access
 
         # Mid-circuit measurement configuration/execution
-        fn_result = configure_mcm_and_try_one_shot(self, args, kwargs)
+        fn_result = configure_mcm_and_try_one_shot(new_qnode, args, kwargs)
 
         # If the qnode is failed to execute as one-shot, fn_result will be None
         if fn_result is not None:
             return fn_result
 
-        new_device = copy(self.device)
+        new_device = copy(new_qnode.device)
         qjit_device = QJITDevice(new_device)
 
         static_argnums = kwargs.pop("static_argnums", ())
@@ -305,11 +309,11 @@ class QFunc:
 
         def _eval_quantum(*args, **kwargs):
             trace_result = trace_quantum_function(
-                self.func,
+                new_qnode.func,
                 qjit_device,
                 args,
                 kwargs,
-                self,
+                new_qnode,
                 static_argnums,
                 debug_info,
             )
@@ -649,3 +653,14 @@ def dynamic_one_shot(qnode, **kwargs):
         return _finalize_output(out, ctx)
 
     return one_shot_wrapper
+
+
+def _extract_passes(transform_program):
+    tape_transforms = []
+    pass_pipeline = []
+    for t in transform_program:
+        if t.pass_name:
+            pass_pipeline.append(Pass(t.pass_name, *t.args, **t.kwargs))
+        else:
+            tape_transforms.append(t)
+    return qml.transforms.core.TransformProgram(tape_transforms), tuple(pass_pipeline)
