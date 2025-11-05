@@ -123,10 +123,9 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
         auto numQubits = op.getInQubits().size();
         auto MRZNameWithQubits = gateName + "_" + std::to_string(numQubits);
 
-        auto it = decompositionRegistry.find(MRZNameWithQubits.str());
+        auto it = decompositionRegistry.find(MRZNameWithQubits);
         if (it == decompositionRegistry.end()) {
-            llvm::errs() << "No decomposition function found for " << MRZNameWithQubits.str()
-                         << "\n";
+            llvm::errs() << "No decomposition function found for " << MRZNameWithQubits << "\n";
             return failure();
         }
 
