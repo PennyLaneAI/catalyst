@@ -63,6 +63,8 @@ def use_capture():
 def use_both_frontend(request):
     """Runs the test once with capture enabled and once with it disabled."""
     if request.param == "capture":
+        if 'capture_todo' in request.keywords:
+            pytest.xfail("capture todo's do not yet work with program capture.")
         qml.capture.enable()
         try:
             yield
