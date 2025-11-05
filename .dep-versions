@@ -2,9 +2,9 @@
 # To update JAX version alongside compatible dependency tags, run the following script:
 # python3 .github/workflows/set_dep_versions.py {JAX_version}
 jax=0.6.2
-stablehlo=69d6dae46e1c7de36e6e6973654754f05353cba5
-llvm=f8cb7987c64dcffb72414a40560055cb717dbf74
-enzyme=v0.0.186
+stablehlo=0a4440a5c8de45c4f9649bf3eb4913bf3f97da0d
+llvm=113f01aa82d055410f22a9d03b3468fa68600589
+enzyme=v0.0.203
 
 # Always remove custom PL/LQ versions before release.
 
