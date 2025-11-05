@@ -109,7 +109,7 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
 
     LogicalResult matchAndRewrite(MultiRZOp op, PatternRewriter &rewriter) const override
     {
-        StringRef gateName = "MultiRZ";
+        std::string gateName = "MultiRZ";
 
         llvm::errs() << "Decomposing MultiRZOp: " << gateName << "\n";
 
