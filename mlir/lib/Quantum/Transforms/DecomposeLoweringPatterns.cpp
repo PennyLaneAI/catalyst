@@ -117,6 +117,11 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
         auto numQubits = op.getInQubits().size();
         auto MRZNameWithQubits = gateName + "_" + std::to_string(numQubits);
 
+        StringRef _gateName = "MultiRZ";
+        auto _MRZNameWithQubits = _gateName + "_" + std::to_string(numQubits);
+        llvm::errs() << "_MRZNameWithQubits: " << _MRZNameWithQubits << "\n";
+        llvm::errs() << "_gateName: " << _gateName << "\n";
+
         auto it = decompositionRegistry.find(MRZNameWithQubits);
         if (it == decompositionRegistry.end()) {
             return failure();
