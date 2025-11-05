@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <variant>
 #include <assert.h>
+#include <variant>
 
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
