@@ -53,8 +53,8 @@ namespace quantum {
 // --- Helper Functions to Declare External Runtime Functions ---
 
 /**
- * @brief Gets or declares the external runtime function `some_func_0_get_gates`.
- * MLIR signature: func.func @rs_decomposition_0() -> memref<?xindex>
+ * @brief Gets or declares the external runtime function `rs_decomposition`.
+ * MLIR signature: func.func @rs_decomposition(f64, f64) -> memref<?xindex>
  */
 mlir::func::FuncOp getOrDeclareGetGatesFunc(mlir::ModuleOp module, mlir::PatternRewriter &rewriter)
 {
@@ -67,7 +67,8 @@ mlir::func::FuncOp getOrDeclareGetGatesFunc(mlir::ModuleOp module, mlir::Pattern
     auto f64Type = rewriter.getF64Type(); // <-- Argument type
     auto rankedMemRefType =
         mlir::MemRefType::get({mlir::ShapedType::kDynamic}, rewriter.getIndexType());
-    auto funcType = rewriter.getFunctionType({f64Type}, {rankedMemRefType});
+    // Runtime function takes two f64 inputs
+    auto funcType = rewriter.getFunctionType({f64Type, f64Type}, {rankedMemRefType});
 
     mlir::OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(module.getBody());
@@ -77,34 +78,35 @@ mlir::func::FuncOp getOrDeclareGetGatesFunc(mlir::ModuleOp module, mlir::Pattern
     return func;
 }
 
-// /**
-//  * @brief Gets or declares the external runtime function `some_func_0_get_val1`.
-//  * MLIR signature: func.func @some_func_0_get_val1() -> f64
-//  * Will be used for global phase
-//  */
-// mlir::func::FuncOp getOrDeclareGetVal1Func(mlir::ModuleOp module, mlir::PatternRewriter
-// &rewriter)
-// {
-//     const char *funcName = "some_func_get_val1"; // Match C++ name
-//     auto func = module.lookupSymbol<mlir::func::FuncOp>(funcName);
-//     if (func) {
-//         return func;
-//     }
+/**
+ * @brief Gets or declares the external runtime function `rs_decomposition_get_phase`.
+ * MLIR signature: func.func @rs_decomposition_get_phase(f64, f64) -> f64
+ * Will be used for global phase
+ */
+mlir::func::FuncOp getOrDeclareGetPhaseFunc(mlir::ModuleOp module,
+                                            mlir::PatternRewriter &rewriter)
+{
+    const char *funcName = "rs_decomposition_get_phase"; // Match C++ name
+    auto func = module.lookupSymbol<mlir::func::FuncOp>(funcName);
+    if (func) {
+        return func;
+    }
 
-//     auto f64Type = rewriter.getF64Type();
-//     auto funcType = rewriter.getFunctionType({}, {f64Type});
+    auto f64Type = rewriter.getF64Type();
+    // Runtime function takes two f64 inputs
+    auto funcType = rewriter.getFunctionType({f64Type, f64Type}, {f64Type});
 
-//     mlir::OpBuilder::InsertionGuard guard(rewriter);
-//     rewriter.setInsertionPointToStart(module.getBody());
-//     func = rewriter.create<mlir::func::FuncOp>(module.getLoc(), funcName, funcType);
-//     func.setPrivate();
+    mlir::OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPointToStart(module.getBody());
+    func = rewriter.create<mlir::func::FuncOp>(module.getLoc(), funcName, funcType);
+    func.setPrivate();
 
-//     return func;
-// }
+    return func;
+}
 
 /**
- * @brief Gets or declares the external runtime function `free_memref_0`.
- * MLIR signature: func.func @free_memref_0(memref<?xindex>) -> ()
+ * @brief Gets or declares the external runtime function `free_memref`.
+ * MLIR signature: func.func @free_memref(memref<?xindex>) -> ()
  */
 mlir::func::FuncOp getOrDeclareFreeMemrefFunc(mlir::ModuleOp module,
                                               mlir::PatternRewriter &rewriter)
@@ -152,10 +154,12 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
                 paramOperands.push_back(operand);
             }
         }
+        // RZ op has exactly one parameter
         if (paramOperands.size() != 1) {
             return rewriter.notifyMatchFailure(op, "RZ op must have exactly one parameter");
         }
         mlir::Value rzParam = paramOperands[0];
+        // The parameter must be f64
         if (!mlir::isa<mlir::Float64Type>(rzParam.getType())) {
             return rewriter.notifyMatchFailure(op, "RZ parameter is not f64");
         }
@@ -225,18 +229,17 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
 
         // Declare runtime functions
         mlir::func::FuncOp getGatesFunc = getOrDeclareGetGatesFunc(module, rewriter);
-        // mlir::func::FuncOp getVal1Func = getOrDeclareGetVal1Func(module, rewriter);
+        mlir::func::FuncOp getPhaseFunc = getOrDeclareGetPhaseFunc(module, rewriter);
         mlir::func::FuncOp freeMemrefFunc = getOrDeclareFreeMemrefFunc(module, rewriter);
 
-        // Call runtime functions
+        // Call runtime functions, passing the RZ parameter for both arguments
         auto callGetGatesOp = rewriter.create<mlir::func::CallOp>(
-            loc, getGatesFunc, mlir::ValueRange{rzParam}); // <-- Pass RZ parameter
-        // auto callGetVal1Op =
-        //     rewriter.create<mlir::func::CallOp>(loc, getVal1Func, mlir::ValueRange{});
+            loc, getGatesFunc, mlir::ValueRange{rzParam, rzParam});
+        auto callGetPhaseOp = rewriter.create<mlir::func::CallOp>(
+            loc, getPhaseFunc, mlir::ValueRange{rzParam, rzParam});
 
         mlir::Value rankedMemref = callGetGatesOp.getResult(0);
-        // mlir::Value doubleVal1 = callGetVal1Op.getResult(0);
-        // (void)doubleVal1; // Explicitly mark as unused
+        mlir::Value doubleVal1 = callGetPhaseOp.getResult(0);
 
         // Insert the qubit operand
         mlir::Value regBeforeLoop = rewriter.create<InsertOp>(loc, qregType, qregOperand, qbitIndex,
@@ -363,7 +366,7 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
         rewriter.setInsertionPointAfter(switchOp);
         rewriter.create<mlir::scf::YieldOp>(loc, switchOp.getResults());
 
-        // Call free_memref_0 after the loop
+        // Call free_memref after the loop
         rewriter.setInsertionPointAfter(forOp);
         auto freeCall = rewriter.create<mlir::func::CallOp>(loc, freeMemrefFunc,
                                                             mlir::ValueRange{rankedMemref});
@@ -373,6 +376,19 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
         mlir::Value finalReg = forOp.getResult(0);
         mlir::Value finalQbitResult =
             rewriter.create<ExtractOp>(loc, qbitType, finalReg, qbitIndex, /*idx_attr=*/nullptr);
+
+        // Add the GlobalPhaseOp after the final extract
+        rewriter.setInsertionPointAfter(finalQbitResult.getDefiningOp());
+
+        mlir::NamedAttrList gphaseAttrs;
+        // Set operandSegmentSizes: [params, in_ctrl_qubits, in_ctrl_values]
+        gphaseAttrs.append(rewriter.getNamedAttr("operandSegmentSizes",
+                                                 rewriter.getDenseI32ArrayAttr({1, 0, 0})));
+
+        rewriter.create<GlobalPhaseOp>(loc,
+                                       TypeRange{},              // No results
+                                       ValueRange{doubleVal1},   // Operands
+                                       gphaseAttrs.getAttrs()); // Attributes
 
         // Clean up original op
         rewriter.replaceAllUsesWith(op->getResults(), finalQbitResult);

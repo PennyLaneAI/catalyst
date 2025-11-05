@@ -1156,7 +1156,7 @@ def test_abstracted_axis_no_recompilation():
         def loop_block(i):
             qml.RX(x1[i], 0)
 
-        loop_block()
+        loop_block()  # pylint: disable=no-value-for-parameter
         qml.RY(x2, 1)
         return qml.expval(qml.Z(1))
 
