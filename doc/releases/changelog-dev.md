@@ -29,7 +29,7 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* Fixes an issue where a heap-to-stack allocation conversion pass was causing SIGSEGV issues 
+* Fixes an issue where a heap-to-stack allocation conversion pass was causing SIGSEGV issues
   during program execution at runtime.
   [(#2172)](https://github.com/PennyLaneAI/catalyst/pull/2172)
 
@@ -48,31 +48,30 @@
 
 * Fixes the translation of a workflow with different transforms applied to different qnodes.
   [(#2167)](https://github.com/PennyLaneAI/catalyst/pull/2167)
-  
+
 * Fix canonicalization of eliminating redundant `quantum.insert` and `quantum.extract` pairs.
   When extracting a qubit immediately after inserting it at the same index, the operations can
   be cancelled out while properly updating remaining uses of the register.
   [(#2162)](https://github.com/PennyLaneAI/catalyst/pull/2162)
   For an example:
-```mlir
-// Before canonicalization
-%1 = quantum.insert %0[%idx], %qubit1 : !quantum.reg, !quantum.bit
-%2 = quantum.extract %1[%idx] : !quantum.reg -> !quantum.bit
-...
-%3 = quantum.insert %1[%i0], %qubit2 : !quantum.reg, !quantum.bit
-%4 = quantum.extract %1[%i1] : !quantum.reg -> !quantum.bit
-// ... use %1
-// ... use %4
+  ```mlir
+  // Before canonicalization
+  %1 = quantum.insert %0[%idx], %qubit1 : !quantum.reg, !quantum.bit
+  %2 = quantum.extract %1[%idx] : !quantum.reg -> !quantum.bit
+  ...
+  %3 = quantum.insert %1[%i0], %qubit2 : !quantum.reg, !quantum.bit
+  %4 = quantum.extract %1[%i1] : !quantum.reg -> !quantum.bit
+  // ... use %1
+  // ... use %4
 
-// After canonicalization
-// %2 directly uses %qubit1
-// %3 and %4 updated to use %0 instead of %1
-%3 = quantum.insert %0[%i0], %qubit2 : !quantum.reg, !quantum.bit
-%4 = quantum.extract %0[%i1] : !quantum.reg -> !quantum.bit
-// ... use %qubit1
-// ... use %4
-```
-
+  // After canonicalization
+  // %2 directly uses %qubit1
+  // %3 and %4 updated to use %0 instead of %1
+  %3 = quantum.insert %0[%i0], %qubit2 : !quantum.reg, !quantum.bit
+  %4 = quantum.extract %0[%i1] : !quantum.reg -> !quantum.bit
+  // ... use %qubit1
+  // ... use %4
+  ```
 
 <h3>Internal changes ⚙️</h3>
 
@@ -81,12 +80,32 @@
   [(#1984)](https://github.com/PennyLaneAI/catalyst/pull/1984)
 
 * Split `from_plxpr.py` into two files.
-  [(#2142)](https://github.com/PennyLaneAI/catalyst/pull/2142)	
+  [(#2142)](https://github.com/PennyLaneAI/catalyst/pull/2142)
 
 * Re-work `DataView` to avoid an axis of size 0 possibly triggering a segfault via an underflow
-  error, as discovered in 
+  error, as discovered in
   [this comment](https://github.com/PennyLaneAI/catalyst/pull/1598#issuecomment-2779178046).
   [(#1621)](https://github.com/PennyLaneAI/catalyst/pull/2164)
+
+* Decouple the ion dialect from the quantum dialect to support the new RTIO compilation flow.
+  The ion dialect now uses its own `!ion.qubit` type instead of depending on `!quantum.bit`.
+  Conversion between qubits of quantum and ion dialects is handled via unrealized conversion casts.
+  [(#2163)](https://github.com/PennyLaneAI/catalyst/pull/2163)
+
+  For an example, quantum qubits are converted to ion qubits as follows:
+  ```mlir
+  %qreg = quantum.alloc(1) : !quantum.reg
+  %q0 = quantum.extract %qreg[0] : !quantum.reg -> !quantum.bit
+
+  // Convert quantum.bit to ion.qubit
+  %ion_qubit_0 = builtin.unrealized_conversion_cast %q0 : !quantum.bit to !ion.qubit
+
+  // Use in ion dialect operations
+  %pp = ion.parallelprotocol(%ion_qubit_0) : !ion.qubit {
+    ^bb0(%arg1: !ion.qubit):
+      // ... ion operations ...
+  }
+  ```
 
 <h3>Documentation 📝</h3>
 
