@@ -844,7 +844,7 @@ class TestControlFlow:
             def g(i, x):
                 return i + x
 
-            return g(i0)
+            return g(i0)  # pylint: disable=no-value-for-parameter
 
         jaxpr = jax.make_jaxpr(f)(2)
         catalyst_jaxpr = from_plxpr(jaxpr)(2)
