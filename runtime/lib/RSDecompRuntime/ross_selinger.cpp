@@ -33,17 +33,18 @@ struct MemRef1D {
 extern "C" {
 
 // Decomposition body
-MemRef1D rs_decomposition_0(double param)
+MemRef1D rs_decomposition_0(double theta, double epsilon)
 {
-    // std::cout << "Calling rs_decomposition runtime function!\n";
+    std::cout << "Calling rs_decomposition runtime function!\n";
     // This returns a dummy gate sequence for testing
     std::vector<int64_t> gates_data = {0, 2, 4, 6, 8, 1, 3, 5, 7, 9};
     int64_t num_gates = gates_data.size();
     int64_t *heap_data = new int64_t[num_gates];
     memcpy(heap_data, gates_data.data(), num_gates * sizeof(int64_t));
 
-    // std::cout << "param received = " << param << "\n";
-    // std::cout << "heap_data address: " << static_cast<void *>(heap_data) << "\n";
+    std::cout << "theta received = " << theta << "\n";
+    std::cout << "epsilon received = " << epsilon << "\n";
+    std::cout << "heap_data address: " << static_cast<void *>(heap_data) << "\n";
 
     MemRef1D result;
     result.allocated = heap_data;
@@ -55,7 +56,12 @@ MemRef1D rs_decomposition_0(double param)
 }
 
 // Will be used to return global phase
-double some_func_get_val1_0() { return 1.23; }
+double rs_decomposition_get_phase_0(double theta, double epsilon) 
+{
+    std::cout << "phase got theta " << theta << std::endl;
+    std::cout << "phase got epsilon " << epsilon << std::endl;
+    return 1.23;
+ }
 
 // Free memref
 void free_memref_0(int64_t *allocated, int64_t *aligned, int64_t offset, int64_t size,
@@ -67,8 +73,8 @@ void free_memref_0(int64_t *allocated, int64_t *aligned, int64_t offset, int64_t
     (void)size;
     (void)stride;
 
-    // std::cout << "free_memref_0 called\n";
-    // std::cout << "deleting heap_data at: " << static_cast<void *>(allocated) << "\n";
+    std::cout << "free_memref_0 called\n";
+    std::cout << "deleting heap_data at: " << static_cast<void *>(allocated) << "\n";
     delete[] allocated;
 }
 
