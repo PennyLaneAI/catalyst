@@ -109,9 +109,7 @@ struct DecomposeLoweringPass : impl::DecomposeLoweringPassBase<DecomposeLowering
                     std::string newTargetOpStr =
                         targetOp.str() + "_" + std::to_string(DecompUtils::getNumWires(func));
 
-                    auto newtargetOp =
-                        targetOp + "_" + std::to_string(DecompUtils::getNumWires(func));
-                    decompositionRegistry[newtargetOp.str()] = func;
+                    decompositionRegistry[newTargetOpStr] = func;
                 }
                 else {
                     decompositionRegistry[targetOp] = func;
