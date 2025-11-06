@@ -308,6 +308,7 @@ class TestControlled:
         assert_allclose(result, expected, atol=1e-5, rtol=1e-5)
 
 
+@pytest.mark.old_frontend
 class TestCatalystOnlyControlled:
     """Tests for just catalyst's version of control."""
 
@@ -582,6 +583,7 @@ class OpWithDecomposition(Operation):
         ]
 
 
+@pytest.mark.old_frontend
 class TestControlledInit:
     """Test the initialization process and standard properties."""
 
@@ -668,6 +670,7 @@ class TestControlledInit:
             C_ctrl(self.temp_op, control="b", work_wires="b")
 
 
+@pytest.mark.old_frontend
 class TestControlledProperties:
     """Test the properties of the `catalyst.ctrl` symbolic operator."""
 
@@ -844,6 +847,7 @@ class TestControlledProperties:
         assert op.work_wires == Wires(("extra"))
 
 
+@pytest.mark.old_frontend
 class TestControlledMiscMethods:
     """Test miscellaneous minor catalyst.ctrl methods."""
 
@@ -1024,6 +1028,7 @@ class TestControlledMiscMethods:
         assert op7.hash != op1.hash
 
 
+@pytest.mark.old_frontend
 class TestControlledOperationProperties:
     """Test Controlled specific properties."""
 
@@ -1094,6 +1099,7 @@ class TestControlledOperationProperties:
             op.parameter_frequencies
 
 
+@pytest.mark.old_frontend
 class TestControlledSimplify:
     """Test qml.sum simplify method and depth property."""
 
@@ -1138,6 +1144,7 @@ class TestControlledSimplify:
         assert simplified_op.arithmetic_depth == final_op.arithmetic_depth
 
 
+@pytest.mark.old_frontend
 class TestControlledQueuing:
     """Test that `catalyst.ctrl` operators queue and update base metadata."""
 
@@ -1352,6 +1359,7 @@ pauli_x_based_op_decomps = [
 ]
 
 
+@pytest.mark.old_frontend
 class TestDecomposition:
     """Test decomposition of Controlled."""
 
