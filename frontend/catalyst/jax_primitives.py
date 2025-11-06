@@ -729,7 +729,7 @@ def _capture_grad_lowering(ctx, *args, argnums, jaxpr, n_consts, method, h, fn, 
         flat_output_types,
         ir.StringAttr.get(method),
         symbol_ref,
-        mlir.flatten_lowering_ir_args(args),
+        mlir.flatten_ir_values(args),
         diffArgIndices=diffArgIndices,
         finiteDiffParam=finiteDiffParam,
     ).results
