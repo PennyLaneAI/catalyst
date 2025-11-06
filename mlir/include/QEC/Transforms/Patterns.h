@@ -19,7 +19,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "QEC/IR/QECDialect.h"
-#include "QEC/Transforms/Passes.h" // need for DecomposeMethod
+#include "QEC/Transforms/PassesEnums.h.inc" // need for DecomposeMethod
 
 namespace catalyst {
 namespace qec {
@@ -30,6 +30,6 @@ void populateMergePPRIntoPPMPatterns(mlir::RewritePatternSet &, unsigned int max
 void populateDecomposeNonCliffordPPRPatterns(mlir::RewritePatternSet &,
                                              DecomposeMethod decomposeMethod, bool avoidYMeasure);
 void populateDecomposeCliffordPPRPatterns(mlir::RewritePatternSet &, bool avoidYMeasure);
-
+void populatePPRToMBQCPatterns(mlir::RewritePatternSet &);
 } // namespace qec
 } // namespace catalyst

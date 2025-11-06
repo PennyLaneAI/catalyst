@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/Support/FormatVariadic.h"
+
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/Support/FormatVariadic.h"
 
 #include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
@@ -199,6 +200,7 @@ LogicalResult EmitCatalystPyInterfaceTransform::matchAndRewrite(LLVM::LLVMFuncOp
 } // namespace
 
 namespace catalyst {
+namespace quantum {
 
 #define GEN_PASS_DEF_EMITCATALYSTPYINTERFACEPASS
 #include "Quantum/Transforms/Passes.h.inc"
@@ -228,9 +230,5 @@ struct EmitCatalystPyInterfacePass
     }
 };
 
-std::unique_ptr<Pass> createEmitCatalystPyInterfacePass()
-{
-    return std::make_unique<EmitCatalystPyInterfacePass>();
-}
-
+} // namespace quantum
 } // namespace catalyst

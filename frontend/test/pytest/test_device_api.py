@@ -25,13 +25,17 @@ from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 
 def test_qjit_device():
     """Test the qjit device from a device using the new api."""
-    device = NullQubit(wires=10, shots=2032)
+    with pytest.warns(
+        qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
+    ):
+        device = NullQubit(wires=10, shots=2032)
 
-    # Create qjit device
-    device_qjit = QJITDevice(device)
+        # Create qjit device
+        device_qjit = QJITDevice(device)
 
     # Check attributes of the new device
-    assert device_qjit.shots == qml.measurements.Shots(2032)
+    # Since shots are not used in the new API, we expect None
+    assert device_qjit.shots == qml.measurements.Shots(None)
     assert device_qjit.wires == qml.wires.Wires(range(0, 10))
 
     # Check the preprocess of the new device
@@ -39,8 +43,8 @@ def test_qjit_device():
         transform_program, _ = device_qjit.preprocess(ctx)
     assert transform_program
     assert len(transform_program) == 3
-    assert transform_program[-2]._transform.__name__ == "verify_operations"
-    assert transform_program[-1]._transform.__name__ == "validate_measurements"
+    assert transform_program[-2].transform.__name__ == "verify_operations"
+    assert transform_program[-1].transform.__name__ == "validate_measurements"
 
     # TODO: readd when we do not discard device preprocessing
     # t = transform_program[0].transform.__name__
@@ -64,7 +68,7 @@ def test_qjit_device():
 )
 def test_qjit_device_invalid_wires(wires):
     """Test the qjit device from a device using the new api without wires set."""
-    device = NullQubit(shots=2032)
+    device = NullQubit()
     device._wires = wires
 
     with pytest.raises(
@@ -81,11 +85,11 @@ def test_qjit_device_measurements(shots, mocker):
 
     spy = mocker.spy(qjit_device, "get_device_capabilities")
 
-    dev = qml.device("lightning.qubit", wires=2, shots=shots)
+    dev = qml.device("lightning.qubit", wires=2)
     state_measurements = {"StateMP"}
     finite_shot_measurements = {"CountsMP", "SampleMP"}
 
-    dev_capabilities = get_device_capabilities(dev)
+    dev_capabilities = get_device_capabilities(dev, shots)
     expected_measurements = dev_capabilities.measurement_processes
 
     if shots is None:
@@ -97,9 +101,10 @@ def test_qjit_device_measurements(shots, mocker):
         assert finite_shot_measurements.issubset(expected_measurements)
         assert state_measurements.intersection(expected_measurements) == set()
 
-    spy = mocker.spy(qjit_device, "get_qjit_device_capabilities")
+    spy = mocker.spy(qjit_device, "filter_device_capabilities_with_shots")
 
     @qjit
+    @qml.set_shots(shots)
     @qml.qnode(dev)
     def circuit():
         qml.X(0)
@@ -112,9 +117,10 @@ def test_qjit_device_measurements(shots, mocker):
 
 def test_simple_circuit():
     """Test that a circuit with the new device API is compiling to MLIR."""
-    dev = NullQubit(wires=2, shots=2048)
+    dev = NullQubit(wires=2)
 
     @qjit(target="mlir")
+    @qml.set_shots(shots=2048)
     @qml.qnode(device=dev)
     def circuit():
         qml.Hadamard(wires=0)
@@ -133,6 +139,18 @@ def test_track_resources():
     dev = NullQubit(wires=2, track_resources=True)
     assert "track_resources" in QJITDevice.extract_backend_info(dev).kwargs
     assert QJITDevice.extract_backend_info(dev).kwargs["track_resources"] is True
+    assert "resources_filename" not in QJITDevice.extract_backend_info(dev).kwargs
+    assert "compute_depth" not in QJITDevice.extract_backend_info(dev).kwargs
+
+    dev = NullQubit(
+        wires=2, track_resources=True, resources_filename="my_resources.txt", compute_depth=True
+    )
+    assert "track_resources" in QJITDevice.extract_backend_info(dev).kwargs
+    assert QJITDevice.extract_backend_info(dev).kwargs["track_resources"] is True
+    assert "resources_filename" in QJITDevice.extract_backend_info(dev).kwargs
+    assert QJITDevice.extract_backend_info(dev).kwargs["resources_filename"] == "my_resources.txt"
+    assert "compute_depth" in QJITDevice.extract_backend_info(dev).kwargs
+    assert QJITDevice.extract_backend_info(dev).kwargs["compute_depth"] is True
 
 
 if __name__ == "__main__":

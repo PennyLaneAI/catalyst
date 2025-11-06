@@ -18,6 +18,7 @@
 #include <bitset>
 #include <memory>
 #include <numeric>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -39,7 +40,12 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
 
     size_t device_shots;
 
+    std::set<QubitIdType> initial_allocated_QubitIds;
     std::unordered_map<std::string, std::string> device_kwargs;
+
+    std::string qpu_id;
+    inline static const std::unordered_map<std::string, std::string> qpu_map = {
+        {"lucy", "qpu:uk:2:d865b5a184"}, {"toshiko", "qpu:jp:3:673b1ad43c"}};
 
     inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
     {
@@ -57,13 +63,21 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
                            : 0;
+        if (qpu_map.contains(device_kwargs["backend"])) {
+            qpu_id = qpu_map.at(device_kwargs["backend"]);
+        }
+        else {
+            std::cout << "Warning: backend not specified on OQC device, falling back to lucy "
+                         "simulator.\n";
+            qpu_id = qpu_map.at("lucy");
+        }
         builder = std::make_unique<OpenQASM2Builder>();
         runner = std::make_unique<OQCRunner>();
     }
     ~OQCDevice() = default;
 
     auto AllocateQubits(size_t) -> std::vector<QubitIdType> override;
-    void ReleaseAllQubits() override;
+    void ReleaseQubits(const std::vector<QubitIdType> &) override;
     auto GetNumQubits() const -> size_t override;
     void SetDeviceShots(size_t) override;
     auto GetDeviceShots() const -> size_t override;
@@ -80,4 +94,5 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
     // Circuit RT
     [[nodiscard]] auto Circuit() const -> std::string { return builder->toOpenQASM2(); }
 };
+
 } // namespace Catalyst::Runtime::Device

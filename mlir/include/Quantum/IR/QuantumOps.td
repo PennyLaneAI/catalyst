@@ -141,9 +141,7 @@ def NumQubitsOp : Quantum_Op<"num_qubits"> {
 
 class Memory_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits>;
 
-// The operation has no memory effect and is pure, therefore two similar alloc would be removed
-// by a CSE pass. This needs to be changed in the future.
-def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
+def AllocOp : Memory_Op<"alloc"> {
     let summary = "Allocate n qubits into a quantum register.";
     let description = [{
     }];
@@ -160,6 +158,8 @@ def AllocOp : Memory_Op<"alloc", [NoMemoryEffect]> {
     let assemblyFormat = [{
         `(` ($nqubits^):($nqubits_attr)? `)` attr-dict `:` type(results)
     }];
+
+    let hasCanonicalizeMethod = 1;
 }
 
 def AllocQubitOp : Memory_Op<"alloc_qb"> {
@@ -241,6 +241,7 @@ def ExtractOp : Memory_Op<"extract", [NoMemoryEffect]> {
         $qreg `[` ($idx^):($idx_attr)? `]` attr-dict `:` type($qreg) `->` type(results)
     }];
 
+    let hasCanonicalizeMethod = 1;
     let hasVerifier = 1;
     let hasFolder = 1;
 }
@@ -549,7 +550,7 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
             if (!isStatic()) {
                 return staticValues;
             }
-            
+
             for (mlir::Value param : getParams()) {
                 auto constOp = param.getDefiningOp();
                 if (auto floatAttr = constOp->getAttrOfType<mlir::FloatAttr>("value")) {
@@ -560,6 +561,7 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
         }
     }];
     let hasCanonicalizeMethod = 1;
+    let hasVerifier = 1;
 }
 
 def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
@@ -637,9 +639,59 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
             return getODSOperands(getParamOperandIdx());
         }
     }];
-    
+
     let hasCanonicalizeMethod = 1;
 }
+
+def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
+                                           AttrSizedOperandSegments, AttrSizedResultSegments]> {
+    let summary = "Apply a projector-controlled phase gate";
+    let description = [{
+        This gate is built from simpler gates like `PhaseShift` and `PauliX` and acts on a group
+        of wires and takes a rotation angle.
+        It also takes another number, an integer called `dim`, which defines a specific part
+        of the quantum state. The gate then applies a positive phase shift to a portion of the
+        state defined by `dim`. At the same time, it applies a negative phase shift to the rest
+        of the state.
+
+        .. note::
+            This operation is one of the few quantum operations that is not applied via
+            ``quantum.custom``. The reason for this is that it needs to be handled in a special
+            way during the lowering due to its C function being variadic on the number of qubits.
+
+        .. note::
+            `dim` is currently captured as a float number for compatibility with
+            runtime and device integration.
+
+    }];
+
+    let arguments = (ins
+        F64:$theta,
+        F64:$dim,
+        Variadic<QubitType>:$in_qubits,
+        UnitAttr:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        `(` $theta `,` $dim `)` $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getAllParams() {
+            return getODSOperands(getParamOperandIdx());
+        }
+    }];
+
+    let hasCanonicalizeMethod = 1;
+}
+
 
 def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect,
                                                 AttrSizedOperandSegments, AttrSizedResultSegments]> {
@@ -725,7 +777,7 @@ class Observable_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [Pure]>;
 
 def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]> {
-    let summary = "Define a pseudo-obeservable of the computational basis for use in measurements";
+    let summary = "Define a pseudo-observable of the computational basis for use in measurements";
     let description = [{
         The `quantum.compbasis` operation defines a quantum observable to be used by other
         operations such as measurement processes. The specific observable defined here is a
@@ -929,7 +981,7 @@ def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments]> {
 
         Note that the return value type depends on the type of observable provided. Computational
         basis samples are returned as a 2D array of shape (shot number, number of qubits), with all
-        other obversables the output is a 1D array of lenth equal to the shot number.
+        other observables the output is a 1D array of length equal to the shot number.
 
         Example:
 
@@ -951,7 +1003,7 @@ def SampleOp : Measurement_Op<"sample", [AttrSizedOperandSegments]> {
 
             The return value type depends on the type of observable provided. Computational
             basis samples are returned as a 2D array of shape (shot number, number of qubits), with all
-            other obversables the output is a 1D array of lenth equal to the shot number.
+            other observables the output is a 1D array of length equal to the shot number.
 
         .. note::
 

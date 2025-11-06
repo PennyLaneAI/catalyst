@@ -29,7 +29,6 @@ namespace catalyst {
 namespace qec {
 
 #define GEN_PASS_DEF_CLIFFORDTTOPPRPASS
-#define GEN_PASS_DECL_CLIFFORDTTOPPRPASS
 #include "QEC/Transforms/Passes.h.inc"
 
 struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {
@@ -40,12 +39,11 @@ struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {
         auto ctx = &getContext();
         ConversionTarget target(*ctx);
 
-        target.addIllegalDialect<quantum::QuantumDialect>();
+        // Convert MeasureOp and CustomOp
+        target.addIllegalOp<quantum::MeasureOp>();
+        target.addIllegalOp<quantum::CustomOp>();
 
-        target.addLegalOp<quantum::InitializeOp, quantum::FinalizeOp>();
-        target.addLegalOp<quantum::DeviceInitOp, quantum::DeviceReleaseOp>();
-        target.addLegalOp<quantum::AllocOp, quantum::DeallocOp>();
-        target.addLegalOp<quantum::InsertOp, quantum::ExtractOp>();
+        // Conversion target is QECDialect
         target.addLegalDialect<qec::QECDialect>();
 
         RewritePatternSet patterns(ctx);
@@ -58,11 +56,4 @@ struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {
 };
 
 } // namespace qec
-
-/// Create a pass for lowering operations in the `QECDialect`.
-std::unique_ptr<mlir::Pass> createCliffordTToPPRPass()
-{
-    return std::make_unique<qec::CliffordTToPPRPass>();
-}
-
 } // namespace catalyst

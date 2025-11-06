@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -28,17 +29,25 @@ namespace Catalyst::Runtime::Device {
  */
 struct OQCRunner {
 
-    [[nodiscard]] auto Counts(const std::string &circuit, const std::string &device, size_t shots,
+    [[nodiscard]] auto Counts(const std::string &circuit, const std::string &qpu_id, size_t shots,
                               size_t num_qubits, const std::string &kwargs = "") const
         -> std::vector<size_t>
     {
-        DynamicLibraryLoader libLoader(OQC_PY);
+        DynamicLibraryLoader libLoader(OQC_PY, RTLD_LAZY | RTLD_GLOBAL);
 
-        using countsImpl_t =
-            std::vector<size_t> (*)(const char *, const char *, size_t, const char *);
+        using countsImpl_t = int (*)(const char *, const char *, size_t, size_t, const char *,
+                                     void *, char *, size_t);
         auto countsImpl = libLoader.getSymbol<countsImpl_t>("counts");
 
-        return countsImpl(circuit.c_str(), device.c_str(), shots, kwargs.c_str());
+        std::vector<size_t> results;
+        char error_msg[256] = {0};
+
+        int result_code = countsImpl(circuit.c_str(), qpu_id.c_str(), shots, num_qubits,
+                                     kwargs.c_str(), &results, error_msg, sizeof(error_msg));
+
+        RT_FAIL_IF(result_code, error_msg);
+
+        return results;
     }
 };
 

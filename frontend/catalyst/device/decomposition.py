@@ -16,6 +16,7 @@
 This module contains the decomposition functions to pre-process tapes for
 compilation & execution on devices.
 """
+
 import copy
 import logging
 from functools import partial
@@ -79,10 +80,8 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     if op.name in getattr(capabilities, "to_matrix_ops", {}):
         return _decompose_to_matrix(op)
 
-    if op.has_matrix and isinstance(op, qml.ops.Controlled):
-
-        # If the device supports unitary matrices, apply the fallback.
-        if "QubitUnitary" in capabilities.operations:
+    if isinstance(op, qml.ops.Controlled) and not op.has_decomposition:
+        if op.has_matrix and "QubitUnitary" in capabilities.operations:
             return _decompose_to_matrix(op)
 
     return op.decomposition()
@@ -348,7 +347,7 @@ def measurements_from_samples(tape, device_wires):
         results_processed = []
         for m in tape.measurements:
             if isinstance(m, (ExpectationMP, VarianceMP, ProbabilityMP, SampleMP)):
-                if len(tape.shots.shot_vector) > 1:
+                if tape.shots.has_partitioned_shots:
                     res = tuple(m.process_samples(s, measured_wires) for s in samples)
                 else:
                     res = m.process_samples(samples, measured_wires)

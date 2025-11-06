@@ -19,7 +19,6 @@ with control flow, including conditionals, for loops, and while loops.
 
 # pylint: disable=too-many-lines
 
-import inspect
 from functools import partial
 from typing import Any, Callable, List
 
@@ -60,14 +59,12 @@ from catalyst.jax_tracer import (
     HybridOp,
     HybridOpRegion,
     QRegPromise,
+    _promote_jaxpr_types,
     trace_function,
     trace_quantum_operations,
     unify_convert_result_types,
 )
-from catalyst.tracing.contexts import (
-    EvaluationContext,
-    EvaluationMode,
-)
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 from catalyst.utils.patching import Patcher
 
@@ -102,9 +99,6 @@ def cond(pred: DynamicJaxprTracer):
 
     Returns:
         A callable decorator that wraps the first 'if' branch of the conditional.
-
-    Raises:
-        AssertionError: Branch functions cannot have arguments.
 
     **Example**
 
@@ -162,7 +156,8 @@ def cond(pred: DynamicJaxprTracer):
 
     The conditional function is permitted to also return values.
     Any value that is supported by JAX JIT compilation is supported as a return
-    type.
+    type. If provided, return types need to be identical or at least promotable across both
+    branches.
 
     .. code-block:: python
 
@@ -182,12 +177,16 @@ def cond(pred: DynamicJaxprTracer):
         :title: Usage details
         :href: usage-details
 
-        There are various constraints and restrictions that should be kept in mind
+        There are some constraints and restrictions that should be kept in mind
         when working with conditionals in Catalyst.
 
-        The return values of all branches of :func:`~.cond` must be the same type.
-        Returning different types, or ommitting a return value in one branch (e.g.,
+        The return values of all branches of :func:`~.cond` must be the same shape.
+        Returning different shapes, or ommitting a return value in one branch (e.g.,
         returning ``None``) but not in others will result in an error.
+
+        However, the return values of all branches of :func:`~.cond` can be different data types.
+        In this case, the return types will automatically be promoted to the next common larger
+        type.
 
         >>> @qjit
         ... def f(x: float):
@@ -196,20 +195,7 @@ def cond(pred: DynamicJaxprTracer):
         ...         return x ** 2  # float
         ...     @cond_fn.otherwise
         ...     def else_branch():
-        ...         return 6  # int
-        ...     return cond_fn()
-        TypeError: Conditional requires consistent return types across all branches, got:
-        - Branch at index 0: [ShapedArray(float64[], weak_type=True)]
-        - Branch at index 1: [ShapedArray(int64[], weak_type=True)]
-        Please specify an else branch if none was specified.
-        >>> @qjit
-        ... def f(x: float):
-        ...     @cond(x > 1.5)
-        ...     def cond_fn():
-        ...         return x ** 2  # float
-        ...     @cond_fn.otherwise
-        ...     def else_branch():
-        ...         return 6.  # float
+        ...         return 6  # int (promotable to float)
         ...     return cond_fn()
         >>> f(1.5)
         Array(6., dtype=float64)
@@ -224,10 +210,9 @@ def cond(pred: DynamicJaxprTracer):
         ...     def cond_fn():
         ...         return x ** 2
         ...     return cond_fn()
-        TypeError: Conditional requires consistent return types across all branches, got:
-        - Branch at index 0: [ShapedArray(float64[], weak_type=True)]
-        - Branch at index 1: []
-        Please specify an else branch if none was specified.
+        TypeError: Conditional requires a consistent return structure across all branches! Got
+        PyTreeDef(None) and PyTreeDef(*). Please specify an else branch if PyTreeDef(None) was
+        specified.
 
         >>> @qjit
         ... def f(x: float):
@@ -267,17 +252,6 @@ def cond(pred: DynamicJaxprTracer):
         raise PlxprCaptureCFCompatibilityError("cond")
 
     def _decorator(true_fn: Callable):
-
-        if len(inspect.signature(true_fn).parameters):
-            if isinstance(true_fn, type) and issubclass(true_fn, qml.operation.Operation):
-                # Special treatment if conditional function body is a single pennylane gate
-                # The qml.operation.Operation base class represents things that
-                # can reasonably be considered as a gate,
-                # e.g. qml.Hadamard, qml.RX, etc.
-                return CondCallableSingleGateHandler(pred, true_fn)
-            else:
-                raise TypeError("Conditional 'True' function is not allowed to have any arguments")
-
         return CondCallable(pred, true_fn)
 
     return _decorator
@@ -587,14 +561,14 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
 
 ## IMPL ##
 class CondCallable:
-    """User-facing wrapper provoding "else_if" and "otherwise" public methods.
+    """User-facing wrapper providing "else_if" and "otherwise" public methods.
     Some code in this class has been adapted from the cond implementation in the JAX project at
     https://github.com/google/jax/blob/jax-v0.4.1/jax/_src/lax/control_flow/conditionals.py
     released under the Apache License, Version 2.0, with the following copyright notice:
 
     Copyright 2021 The JAX Authors.
 
-    Also provides access to the underlying "Cond" operation object.
+    Also provides access to the underlying "Cond" pennylane.Operation object.
 
     **Example**
 
@@ -641,18 +615,9 @@ class CondCallable:
     def __init__(self, pred, true_fn):
         self.preds = [self._convert_predicate_to_bool(pred)]
         self.branch_fns = [true_fn]
-        self.otherwise_fn = lambda: None
+        self.otherwise_fn = lambda *args, **kwargs: None
         self._operation = None
         self.expansion_strategy = cond_expansion_strategy()
-
-    def set_otherwise_fn(self, otherwise_fn):  # pylint:disable=missing-function-docstring
-        self.otherwise_fn = otherwise_fn
-
-    def add_pred(self, _pred):  # pylint:disable=missing-function-docstring
-        self.preds.append(self._convert_predicate_to_bool(_pred))
-
-    def add_branch_fn(self, _branch_fn):  # pylint:disable=missing-function-docstring
-        self.branch_fns.append(_branch_fn)
 
     @property
     def operation(self):
@@ -682,10 +647,6 @@ class CondCallable:
         """
 
         def decorator(branch_fn):
-            if len(inspect.signature(branch_fn).parameters):
-                raise TypeError(
-                    "Conditional 'else if' function is not allowed to have any arguments"
-                )
             self.preds.append(self._convert_predicate_to_bool(pred))
             self.branch_fns.append(branch_fn)
             return self
@@ -701,8 +662,6 @@ class CondCallable:
         Returns:
             self
         """
-        if len(inspect.signature(otherwise_fn).parameters):
-            raise TypeError("Conditional 'False' function is not allowed to have any arguments")
         self.otherwise_fn = otherwise_fn
         return self
 
@@ -774,18 +733,16 @@ class CondCallable:
         out_tree = out_sigs[-1].out_tree()
         all_consts = [s.out_consts() for s in out_sigs]
         out_types = [s.out_type() for s in out_sigs]
-        # FIXME: We want to perform the result unificaiton here:
-        # all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
-        # all_noimplouts = [s.num_implicit_outputs() for s in out_sigs]
-        # _, out_type, _, all_consts = unify_convert_result_types(
-        #     all_jaxprs, all_consts, all_noimplouts
-        # )
-        # Unfortunately, we can not do this beacuse some tracers (specifically, the results of
-        # ``qml.measure``) might not have their source Jaxpr equation yet. Thus, we delay the
-        # unification until the quantum tracing is done. The consequence of that: we have to guess
-        # the output type now and if we fail to do so, we might face MLIR type error down the
-        # pipeline.
+
+        # Select the output type of the one with the promoted dtype among all branches
         out_type = out_types[-1]
+        branch_avals = [[aval for aval, _ in branch_out_type] for branch_out_type in out_types]
+        promoted_dtypes = _promote_jaxpr_types(branch_avals)
+
+        out_type = [
+            (aval.update(dtype=dtype), expl)
+            for dtype, (aval, expl) in zip(promoted_dtypes, out_type)
+        ]
 
         # Create output tracers in the outer tracing context
         out_expanded_classical_tracers = output_type_to_tracers(
@@ -843,7 +800,26 @@ class CondCallable:
                 return branch_fn()
         return self.otherwise_fn()
 
-    def __call__(self):
+    @staticmethod
+    def _make_argless_function(fn, args, kwargs):
+        """Wrap a user function into a function without arguments to satisfy the IR representation
+        of conditionals, which always accesses values via closure (besides the predicate)."""
+
+        def argless_fn():
+            # Special case for single gates supplied to cond. We'd would like users to be able to
+            # use this familiar PL pattern, e.g. `qml.cond(p, qml.RY)(0.1, 0)`.
+            if isinstance(fn, type) and issubclass(fn, qml.operation.Operation):
+                fn(*args, **kwargs)
+                return None  # swallow return value to avoid mismatched pytrees across branches
+
+            return fn(*args, **kwargs)
+
+        return argless_fn
+
+    def __call__(self, *args, **kwargs):
+        self.branch_fns = [self._make_argless_function(fn, args, kwargs) for fn in self.branch_fns]
+        self.otherwise_fn = self._make_argless_function(self.otherwise_fn, args, kwargs)
+
         mode = EvaluationContext.get_evaluation_mode()
         if mode == EvaluationMode.QUANTUM_COMPILATION:
             return self._call_with_quantum_ctx()
@@ -852,78 +828,6 @@ class CondCallable:
         else:
             assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
             return self._call_during_interpretation()
-
-
-class CondCallableSingleGateHandler(CondCallable):
-    """
-    Special CondCallable when the conditional body function is a single pennylane gate.
-
-    A usual pennylane conditional call for a gate looks like
-    `qml.cond(x == 42, qml.RX)(theta, wires=0)`
-
-    Since gates are guaranteed to take in arguments (at the very least the wire argument),
-    the usual CondCallable class, which expects the conditional body function to have no arguments,
-    cannot be used.
-    This class inherits from base CondCallable, but wraps the gate in a function with no arguments,
-    and sends that function to CondCallable.
-    This allows us to perform the conditional branch gate function with arguments.
-    """
-
-    def __init__(self, pred, true_fn):  # pylint:disable=super-init-not-called
-        self.sgh_preds = [pred]
-        self.sgh_branch_fns = [true_fn]
-        self.sgh_otherwise_fn = None
-
-    def __call__(self, *args, **kwargs):
-        def argless_true_fn():
-            self.sgh_branch_fns[0](*args, **kwargs)
-
-        super().__init__(self.sgh_preds[0], argless_true_fn)
-
-        if self.sgh_otherwise_fn is not None:
-
-            def argless_otherwise_fn():
-                self.sgh_otherwise_fn(*args, **kwargs)
-
-            super().set_otherwise_fn(argless_otherwise_fn)
-
-        for i in range(1, len(self.sgh_branch_fns)):
-
-            def argless_elseif_fn(i=i):  # i=i to work around late binding
-                self.sgh_branch_fns[i](*args, **kwargs)
-
-            super().add_pred(self.sgh_preds[i])
-            super().add_branch_fn(argless_elseif_fn)
-
-        return super().__call__()
-
-    def else_if(self, _pred):
-        """
-        Override the "can't have arguments" check in the original CondCallable's `else_if`
-        """
-
-        def decorator(branch_fn):
-            if isinstance(branch_fn, type) and issubclass(branch_fn, qml.operation.Operation):
-                self.sgh_preds.append(_pred)
-                self.sgh_branch_fns.append(branch_fn)
-                return self
-            else:  # pylint:disable=line-too-long
-                raise TypeError(
-                    "Conditional 'else if' function can have arguments only if it is a PennyLane gate."
-                )
-
-        return decorator
-
-    def otherwise(self, otherwise_fn):
-        """
-        Override the "can't have arguments" check in the original CondCallable's `otherwise`
-        """
-        if isinstance(otherwise_fn, type) and issubclass(otherwise_fn, qml.operation.Operation):
-            self.sgh_otherwise_fn = otherwise_fn
-        else:
-            raise TypeError(
-                "Conditional 'False' function can have arguments only if it is a PennyLane gate."
-            )
 
 
 class ForLoopCallable:
@@ -1563,14 +1467,20 @@ def _assert_cond_result_structure(trees: List[PyTreeDef]):
         if tree != expected_tree:
             raise TypeError(
                 "Conditional requires a consistent return structure across all branches! "
-                f"Got {tree} and {expected_tree}."
+                f"Got {tree} and {expected_tree}. Please specify an else branch if PyTreeDef(None) "
+                "was specified."
             )
 
 
 def _assert_cond_result_types(signatures: List[List[AbstractValue]]):
     """Ensure a consistent type signature across branch results."""
     num_results = len(signatures[0])
-    assert all(len(sig) == num_results for sig in signatures), "mismatch: number or results"
+
+    if not all(len(sig) == num_results for sig in signatures):
+        raise TypeError(
+            "Conditional requires a consistent number of results across all branches! It might "
+            "happen when some of the branch returns dynamic shape and some return constant shape."
+        )
 
     for i in range(num_results):
         aval_slice = [avals[i] for avals in signatures]

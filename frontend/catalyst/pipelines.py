@@ -75,38 +75,41 @@ class CompileOptions:
     """Generic compilation options, for which reasonable default values exist.
 
     Args:
-        verbose (Optional[bool]): flag indicating whether to enable verbose output.
-            Default is ``False``
-        logfile (Optional[TextIOWrapper]): the logfile to write output to.
-            Default is ``sys.stderr``
+        verbose (Optional[bool]): Flag indicating whether to enable verbose output.
+            Default is ``False``.
+        logfile (Optional[TextIOWrapper]): The logfile to write output to.
+            Default is ``sys.stderr``.
         keep_intermediate (Optional[Union[str, int, bool]]): Level controlling intermediate file
-        generation.
+            generation.
+
             - ``False`` or ``0`` or ``"none"`` (default): No intermediate files are kept.
             - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
             - ``2`` or ``"pass"``: Intermediate files are saved after each pass.
+        use_nameloc (Optional[bool]): If ``True``, add function parameter names to the IR as name
+            locations.
         pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples. The first entry of the
             tuple corresponds to the name of a pipeline. The second entry of the tuple corresponds
             to a list of MLIR passes.
-        autograph (Optional[bool]): flag indicating whether experimental autograph support is to
+        autograph (Optional[bool]): Flag indicating whether experimental autograph support is to
             be enabled.
         autograph_include (Optional[Iterable[str]]): A list of (sub)modules to be allow-listed
-        for autograph conversion.
-        async_qnodes (Optional[bool]): flag indicating whether experimental asynchronous execution
+            for autograph conversion.
+        async_qnodes (Optional[bool]): Flag indicating whether experimental asynchronous execution
             of QNodes support is to be enabled.
-        lower_to_llvm (Optional[bool]): flag indicating whether to attempt the LLVM lowering after
+        lower_to_llvm (Optional[bool]): Flag indicating whether to attempt the LLVM lowering after
             the main compilation pipeline is complete. Default is ``True``.
-        static_argnums (Optional[Union[int, Iterable[int]]]): indices of static arguments.
+        static_argnums (Optional[Union[int, Iterable[int]]]): Indices of static arguments.
             Default is ``None``.
-        static_argnames (Optional[Union[str, Iterable[str]]]): names of static arguments.
+        static_argnames (Optional[Union[str, Iterable[str]]]): Names of static arguments.
             Default is ``None``.
-        abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
-        disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
+        abstracted_axes (Optional[Any]): Store the abstracted_axes value. Default is ``None``.
+        disable_assertions (Optional[bool]): Disable all assertions. Default is ``False``.
         seed (Optional[int]) : the seed for random operations in a qjit call.
-            Default is None.
+            Default is ``None``.
         circuit_transform_pipeline (Optional[dict[str, dict[str, str]]]):
             A dictionary that specifies the quantum circuit transformation pass pipeline order,
             and optionally arguments for each pass in the pipeline.
-            Default is None.
+            Default is ``None``.
         pass_plugins (Optional[Iterable[Path]]): List of paths to pass plugins.
         dialect_plugins (Optional[Iterable[Path]]): List of paths to dialect plugins.
     """
@@ -115,6 +118,7 @@ class CompileOptions:
     logfile: Optional[TextIOWrapper] = sys.stderr
     target: Optional[str] = "binary"
     keep_intermediate: Optional[Union[str, int, bool, KeepIntermediateLevel]] = False
+    use_nameloc: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
     autograph_include: Optional[Iterable[str]] = ()
@@ -226,13 +230,13 @@ def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes to lower StableHLO to upstream MLIR dialects."""
     hlo_lowering = [
         "canonicalize",
-        "func.func(chlo-legalize-to-hlo)",
-        "stablehlo-legalize-to-hlo",
-        "func.func(mhlo-legalize-control-flow)",
-        "func.func(hlo-legalize-to-linalg)",
-        "func.func(mhlo-legalize-to-std)",
-        "func.func(mhlo-legalize-sort)",
-        "convert-to-signless",
+        "func.func(chlo-legalize-to-stablehlo)",
+        "func.func(stablehlo-legalize-control-flow)",
+        "func.func(stablehlo-aggressive-simplification)",
+        "stablehlo-legalize-to-linalg",
+        "func.func(stablehlo-legalize-to-std)",
+        "func.func(stablehlo-legalize-sort)",
+        "stablehlo-convert-to-signless",
         "canonicalize",
         "scatter-lowering",
         "hlo-custom-call-lowering",
@@ -288,7 +292,9 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
         # introduced during gradient-bufferize of callbacks
         "func.func(buffer-hoisting)",
         "func.func(buffer-loop-hoisting)",
-        "func.func(promote-buffers-to-stack)",
+        # TODO: investigate re-adding this after new buffer dealloc pipeline
+        #       removed due to high stack memory use in nested structures
+        # "func.func(promote-buffers-to-stack)",
         # TODO: migrate to new buffer deallocation "buffer-deallocation-pipeline"
         "func.func(buffer-deallocation)",
         "convert-arraylist-to-memref",

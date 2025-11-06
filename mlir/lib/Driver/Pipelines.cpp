@@ -12,58 +12,83 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Driver/Pipelines.h"
+#include <memory>
+
+#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
+#include "mlir/Conversion/BufferizationToMemRef/BufferizationToMemRef.h"
+#include "mlir/Conversion/ComplexToLLVM/ComplexToLLVM.h"
+#include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
+#include "mlir/Conversion/IndexToLLVM/IndexToLLVM.h"
+#include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
+#include "mlir/Conversion/MathToLibm/MathToLibm.h"
+#include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
+#include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
+#include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
+#include "mlir/Conversion/TensorToLinalg/TensorToLinalgPass.h"
+#include "mlir/Dialect/Arith/Transforms/Passes.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Bufferization/Transforms/Passes.h"
+#include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
+#include "stablehlo/conversions/linalg/transforms/Passes.h"
+#include "stablehlo/transforms/Passes.h"
+#include "stablehlo/transforms/optimization/Passes.h"
+
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Passes.h"
+#include "Driver/Pipelines.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Mitigation/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
-#include "mhlo/transforms/passes.h"
-#include "mlir-hlo/Passes.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/InitAllDialects.h"
-#include "mlir/InitAllPasses.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Transforms/Passes.h"
+#include "hlo-extensions/Transforms/Passes.h"
 
 using namespace mlir;
+
 namespace catalyst {
 namespace driver {
 
 void createEnforceRuntimeInvariantsPipeline(OpPassManager &pm)
 {
-    pm.addPass(catalyst::createSplitMultipleTapesPass());
+    pm.addPass(catalyst::quantum::createSplitMultipleTapesPass());
     pm.addNestedPass<ModuleOp>(catalyst::createApplyTransformSequencePass());
     pm.addPass(catalyst::createInlineNestedModulePass());
 }
 void createHloLoweringPipeline(OpPassManager &pm)
 {
     pm.addPass(mlir::createCanonicalizerPass());
-    pm.addNestedPass<mlir::func::FuncOp>(mhlo::createChloLegalizeToHloPass());
-    pm.addPass(mlir::mhlo::createStablehloLegalizeToHloPass());
-    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createMhloLegalizeControlFlowPass());
-    pm.addNestedPass<mlir::func::FuncOp>(mhlo::createLegalizeHloToLinalgPass());
-    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createMhloLegalizeToStdPass());
-    pm.addNestedPass<mlir::func::FuncOp>(catalyst::createMhloLegalizeSortPass());
-    pm.addPass(mlir::mhlo::createConvertToSignlessPass());
+    pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createChloLegalizeToStablehloPass());
+    pm.addNestedPass<mlir::func::FuncOp>(
+        catalyst::hlo_extensions::createStablehloLegalizeControlFlowPass());
+    stablehlo::StablehloAggressiveSimplificationPassOptions ASoptions;
+    pm.addNestedPass<mlir::func::FuncOp>(
+        stablehlo::createStablehloAggressiveSimplificationPass(ASoptions));
+    pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createStablehloLegalizeToLinalgPass());
+    pm.addNestedPass<mlir::func::FuncOp>(
+        catalyst::hlo_extensions::createStablehloLegalizeToStandardPass());
+    pm.addNestedPass<mlir::func::FuncOp>(
+        catalyst::hlo_extensions::createStablehloLegalizeSortPass());
+    pm.addPass(stablehlo::createStablehloConvertToSignlessPass());
     pm.addPass(mlir::createCanonicalizerPass());
-    pm.addPass(catalyst::createScatterLoweringPass());
-    pm.addPass(catalyst::createHloCustomCallLoweringPass());
+    pm.addPass(catalyst::hlo_extensions::createScatterLoweringPass());
+    pm.addPass(catalyst::hlo_extensions::createHloCustomCallLoweringPass());
     pm.addPass(mlir::createCSEPass());
-    mlir::LinalgDetensorizePassOptions options;
-    options.aggressiveMode = true;
-    pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgDetensorizePass(options));
+    mlir::LinalgDetensorizePassOptions LDoptions;
+    LDoptions.aggressiveMode = true;
+    pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgDetensorizePass(LDoptions));
     pm.addPass(catalyst::createDetensorizeSCFPass());
     pm.addPass(mlir::createCanonicalizerPass());
 }
 void createQuantumCompilationPipeline(OpPassManager &pm)
 {
-    pm.addPass(catalyst::createAnnotateFunctionPass());
-    pm.addPass(catalyst::createMitigationLoweringPass());
-    pm.addPass(catalyst::createGradientLoweringPass());
-    pm.addPass(catalyst::createAdjointLoweringPass());
+    pm.addPass(catalyst::quantum::createAnnotateFunctionPass());
+    pm.addPass(catalyst::mitigation::createMitigationLoweringPass());
+    pm.addPass(catalyst::gradient::createGradientLoweringPass());
+    pm.addPass(catalyst::quantum::createAdjointLoweringPass());
     pm.addPass(catalyst::createDisableAssertionPass());
 }
 void createBufferizationPipeline(OpPassManager &pm)
@@ -71,7 +96,7 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addPass(mlir::createInlinerPass());
     pm.addPass(mlir::createConvertTensorToLinalgPass());
     pm.addPass(mlir::createConvertElementwiseToLinalgPass());
-    pm.addPass(catalyst::createGradientPreprocessingPass());
+    pm.addPass(catalyst::gradient::createGradientPreprocessingPass());
     pm.addPass(mlir::bufferization::createEmptyTensorEliminationPass());
     ///////////
     mlir::bufferization::OneShotBufferizePassOptions options;
@@ -83,7 +108,7 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addPass(mlir::bufferization::createOneShotBufferizePass(options));
     //////////////
     pm.addPass(mlir::createCanonicalizerPass());
-    pm.addPass(catalyst::createGradientPostprocessingPass());
+    pm.addPass(catalyst::gradient::createGradientPostprocessingPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferHoistingPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createBufferLoopHoistingPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::bufferization::createPromoteBuffersToStackPass());
@@ -92,12 +117,12 @@ void createBufferizationPipeline(OpPassManager &pm)
     pm.addPass(catalyst::createArrayListToMemRefPass());
     pm.addPass(mlir::createConvertBufferizationToMemRefPass());
     pm.addPass(mlir::createCanonicalizerPass());
-    pm.addPass(catalyst::createCopyGlobalMemRefPass());
+    pm.addPass(catalyst::quantum::createCopyGlobalMemRefPass());
 }
 void createLLVMDialectLoweringPipeline(OpPassManager &pm)
 {
     pm.addPass(mlir::memref::createExpandReallocPass());
-    pm.addPass(catalyst::createGradientConversionPass());
+    pm.addPass(catalyst::gradient::createGradientConversionPass());
     pm.addPass(catalyst::createMemrefCopyToLinalgCopyPass());
     pm.addNestedPass<mlir::func::FuncOp>(mlir::createConvertLinalgToLoopsPass());
     pm.addPass(mlir::createSCFToControlFlowPass());
@@ -115,9 +140,9 @@ void createLLVMDialectLoweringPipeline(OpPassManager &pm)
     pm.addPass(mlir::createFinalizeMemRefToLLVMConversionPass(options));
     pm.addPass(mlir::createConvertIndexToLLVMPass());
     pm.addPass(catalyst::createCatalystConversionPass());
-    pm.addPass(catalyst::createQuantumConversionPass());
+    pm.addPass(catalyst::quantum::createQuantumConversionPass());
     pm.addPass(catalyst::createAddExceptionHandlingPass());
-    pm.addPass(catalyst::createEmitCatalystPyInterfacePass());
+    pm.addPass(catalyst::quantum::createEmitCatalystPyInterfacePass());
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(mlir::createReconcileUnrealizedCastsPass());
     pm.addPass(catalyst::createGEPInboundsPass());

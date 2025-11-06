@@ -30,8 +30,8 @@ using namespace catalyst::qec;
 namespace catalyst {
 namespace qec {
 
-#define GEN_PASS_DEF_PPMCOMPILATIONPASS
 #define GEN_PASS_DECL_PPMCOMPILATIONPASS
+#define GEN_PASS_DEF_PPMCOMPILATIONPASS
 #include "QEC/Transforms/Passes.h.inc"
 
 struct PPMCompilationPass : public impl::PPMCompilationPassBase<PPMCompilationPass> {
@@ -45,11 +45,12 @@ struct PPMCompilationPass : public impl::PPMCompilationPassBase<PPMCompilationPa
         // Phase 1: Convert Clifford+T to PPR representation
         {
             ConversionTarget target(*ctx);
-            target.addIllegalDialect<quantum::QuantumDialect>();
-            target.addLegalOp<quantum::InitializeOp, quantum::FinalizeOp>();
-            target.addLegalOp<quantum::DeviceInitOp, quantum::DeviceReleaseOp>();
-            target.addLegalOp<quantum::AllocOp, quantum::DeallocOp>();
-            target.addLegalOp<quantum::InsertOp, quantum::ExtractOp>();
+
+            // Convert MeasureOp and CustomOp to PPR
+            target.addIllegalOp<quantum::MeasureOp>();
+            target.addIllegalOp<quantum::CustomOp>();
+
+            // Conversion target is QECDialect
             target.addLegalDialect<qec::QECDialect>();
 
             RewritePatternSet patterns(ctx);
@@ -103,7 +104,4 @@ struct PPMCompilationPass : public impl::PPMCompilationPassBase<PPMCompilationPa
 };
 
 } // namespace qec
-
-std::unique_ptr<Pass> createPPMCompilationPass() { return std::make_unique<PPMCompilationPass>(); }
-
 } // namespace catalyst

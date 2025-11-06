@@ -210,9 +210,4 @@ struct ApplyTransformSequencePass
     }
 };
 
-std::unique_ptr<Pass> createApplyTransformSequencePass()
-{
-    return std::make_unique<ApplyTransformSequencePass>();
-}
-
 } // namespace catalyst

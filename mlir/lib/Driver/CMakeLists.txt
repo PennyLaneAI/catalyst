@@ -25,7 +25,11 @@ set(LIBS
     ${conversion_libs}
     ${extension_libs}
     ${translation_libs}
+    ExternalStablehloLib
     MLIROptLib
+    MLIRRegisterAllDialects
+    MLIRRegisterAllPasses
+    MLIRRegisterAllExtensions
     MLIRCatalyst
     catalyst-transforms
     MLIRQuantum
@@ -40,10 +44,7 @@ set(LIBS
     mitigation-transforms
     MLIRIon
     ion-transforms
-    MhloRegisterDialects
-    StablehloRegister
     MLIRCatalystTest
-    ${ALL_MHLO_PASSES}
     ${ENZYME_LIB}
 )
 

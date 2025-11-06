@@ -31,7 +31,6 @@ using namespace catalyst::ion;
 namespace catalyst {
 namespace ion {
 
-#define GEN_PASS_DECL_IONCONVERSIONPASS
 #define GEN_PASS_DEF_IONCONVERSIONPASS
 #include "Ion/Transforms/Passes.h.inc"
 
@@ -40,13 +39,13 @@ struct IonTypeConverter : public LLVMTypeConverter {
     {
         addConversion([&](IonType type) { return convertIonType(type); });
         addConversion([&](PulseType type) { return convertPulseType(type); });
-        addConversion([&](catalyst::quantum::QubitType type) { return convertQubitType(type); });
+        addConversion([&](QubitType type) { return convertIonQubitType(type); });
     }
 
   private:
     Type convertIonType(Type mlirType) { return LLVM::LLVMPointerType::get(&getContext()); }
     Type convertPulseType(Type mlirType) { return LLVM::LLVMPointerType::get(&getContext()); }
-    Type convertQubitType(Type mlirType) { return LLVM::LLVMPointerType::get(&getContext()); }
+    Type convertIonQubitType(Type mlirType) { return LLVM::LLVMPointerType::get(&getContext()); }
 };
 
 struct IonConversionPass : impl::IonConversionPassBase<IonConversionPass> {
@@ -62,7 +61,6 @@ struct IonConversionPass : impl::IonConversionPassBase<IonConversionPass> {
 
         LLVMConversionTarget target(*context);
         target.addIllegalDialect<catalyst::ion::IonDialect>();
-        target.addLegalDialect<catalyst::quantum::QuantumDialect>();
         target.addLegalDialect<mlir::func::FuncDialect>();
         target.addLegalDialect<arith::ArithDialect>();
         target.addLegalDialect<scf::SCFDialect>();
@@ -74,10 +72,4 @@ struct IonConversionPass : impl::IonConversionPassBase<IonConversionPass> {
 };
 
 } // namespace ion
-
-std::unique_ptr<Pass> createIonConversionPass()
-{
-    return std::make_unique<ion::IonConversionPass>();
-}
-
 } // namespace catalyst

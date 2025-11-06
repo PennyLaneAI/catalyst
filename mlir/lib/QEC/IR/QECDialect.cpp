@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/ADT/TypeSwitch.h" // needed for enums
+#include "llvm/Support/LogicalResult.h"
+
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
-#include "llvm/ADT/TypeSwitch.h" // needed for enums
-#include <llvm/Support/LogicalResult.h>
-#include <mlir/IR/OperationSupport.h>
+#include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/Region.h"
 
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
@@ -80,7 +82,13 @@ void QECDialect::initialize()
 
 LogicalResult PPRotationOp::verify()
 {
-    if (getInQubits().size() != getPauliProduct().size()) {
+    size_t numPauliProduct = getPauliProduct().size();
+
+    if (numPauliProduct == 0) {
+        return emitOpError("Pauli string must be non-empty");
+    }
+
+    if (numPauliProduct != getInQubits().size()) {
         return emitOpError("Number of qubits must match number of pauli operators");
     }
     return mlir::success();
@@ -121,6 +129,29 @@ LogicalResult FabricateOp::verify()
         return emitOpError("Logical state should not be fabricated, use `PrepareStateOp` instead.");
     }
     return mlir::success();
+}
+
+void LayerOp::build(OpBuilder &builder, OperationState &result, ValueRange inValues,
+                    ValueRange outValues, BodyBuilderFn bodyBuilder)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    Location loc = result.location;
+
+    // Set the operands of the layer op
+    result.addOperands(inValues);
+
+    // Set the result types of the layer op
+    result.addTypes(outValues.getTypes());
+
+    // Create the body region of the layer op
+    Region *bodyRegion = result.addRegion();
+    Block *bodyBlock = builder.createBlock(bodyRegion);
+    for (Value v : inValues) {
+        bodyBlock->addArgument(v.getType(), v.getLoc());
+    }
+
+    builder.setInsertionPointToStart(bodyBlock);
+    bodyBuilder(builder, loc, bodyBlock->getArguments(), outValues);
 }
 
 ParseResult LayerOp::parse(OpAsmParser &parser, OperationState &result)

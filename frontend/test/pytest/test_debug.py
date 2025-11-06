@@ -25,12 +25,7 @@ from pennylane import for_loop
 
 from catalyst import debug, qjit, value_and_grad
 from catalyst.compiler import _options_to_cli_flags, to_llvmir, to_mlir_opt
-from catalyst.debug import (
-    compile_executable,
-    get_cmain,
-    get_compilation_stage,
-    replace_ir,
-)
+from catalyst.debug import compile_executable, get_cmain, get_compilation_stage, replace_ir
 from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
 
@@ -137,7 +132,7 @@ class TestDebugPrint:
             def loop(i):
                 debug.print(i)
 
-            loop()
+            loop()  # pylint: disable=no-value-for-parameter
 
         out, err = capfd.readouterr()
         assert err == ""
@@ -559,6 +554,13 @@ class TestOptionsToCliFlags:
         assert ("--load-dialect-plugin", path) in flags
         assert isinstance(options.dialect_plugins, set)
 
+    def test_option_use_nameloc(self):
+        """Test use name location option"""
+
+        options = CompileOptions(use_nameloc=True)
+        flags = _options_to_cli_flags(options)
+        assert "--use-nameloc-as-prefix" in flags
+
     def test_option_not_lower_to_llvm(self):
         """Test not lower to llvm"""
         options = CompileOptions(lower_to_llvm=False)
@@ -592,7 +594,7 @@ class TestOptionsToCliFlags:
         module {
             func.func @foo() {
                 %c = stablehlo.constant dense<0> : tensor<i64>
-                return 
+                return
             }
         }
         """

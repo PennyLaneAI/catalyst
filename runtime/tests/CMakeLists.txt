@@ -54,7 +54,9 @@ endif()
 
 add_executable(runner_tests_qir_runtime)
 target_sources(runner_tests_qir_runtime PRIVATE
+    Test_DataView.cpp
     Test_NullQubit.cpp
+    Test_ResourceTracker.cpp
 )
 
 # For tests we do require libpython in order to embed a Python interpreter.

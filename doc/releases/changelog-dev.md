@@ -1,4 +1,4 @@
-# Release 0.13.0 (development release)
+# Release 0.14.0 (development release)
 
 <h3>New features since last release</h3>
 
@@ -12,158 +12,129 @@
   ```
   should also dump the IR result for each subpass within NamedSequeceOp
 
-* Added `detensorizefunctionboundary` pass to remove scalar tensors across function boundaries and enabled `symbol-dce` pass to remove dead functions, reducing the number of instructions for compilation.
-  [(#1904)](https://github.com/PennyLaneAI/catalyst/pull/1904)
+* The ``decompose-lowering`` MLIR pass now supports ``qml.MultiRZ``
+  with an arbitrary number of wires. This decomposition is performed
+  at MLIR when both capture and graph-decomposition are enabled.
+  [(#2160)](https://github.com/PennyLaneAI/catalyst/pull/2160)
 
-* Workflows `for_loop`, `while_loop` and `cond` now error out if `qml.capture` is enabled.
-  [(#1945)](https://github.com/PennyLaneAI/catalyst/pull/1945)
+* A new option ``use_nameloc`` has been added to :func:`~.qjit` that embeds variable names
+  from Python into the compiler IR, which can make it easier to read when debugging programs.
+  [(#2054)](https://github.com/PennyLaneAI/catalyst/pull/2054)
 
-*  Displays Catalyst version in `quantum-opt --version` output.
-  [(#1922)](https://github.com/PennyLaneAI/catalyst/pull/1922)
+* Passes registered under `qml.transform` can now take in options when used with
+  :func:`~.qjit` with program capture enabled.
+  [(#2154)](https://github.com/PennyLaneAI/catalyst/pull/2154)
 
-* Snakecased keyword arguments to :func:`catalyst.passes.apply_pass()` are now correctly parsed
-  to kebab-case pass options [(#1954)](https://github.com/PennyLaneAI/catalyst/pull/1954).
-  For example:
+* Pytree inputs can now be used when program capture is enabled.
+  [(#2165)](https://github.com/PennyLaneAI/catalyst/pull/2165)
 
-  ```python
-  @qjit(target="mlir")
-  @catalyst.passes.apply_pass("some-pass", "an-option", maxValue=1, multi_word_option=1)
-  @qml.qnode(qml.device("null.qubit", wires=1))
-  def example():
-      return qml.state()
-  ```
-
-  which looks like the following line in the MLIR:
-
-  ```pycon
-  %0 = transform.apply_registered_pass "some-pass" with options = {"an-option" = true, "maxValue" = 1 : i64, "multi-word-option" = 1 : i64}
-  ```
+* `qml.grad` and `qml.jacobian` can now be used with `qjit` when program capture is enabled.
+  [(#2078)](https://github.com/PennyLaneAI/catalyst/pull/2078)
 
 <h3>Breaking changes 💔</h3>
-
-* The JAX version used by Catalyst is updated to 0.6.2.
-  [(#1897)](https://github.com/PennyLaneAI/catalyst/pull/1897)
-
-* The version of LLVM, mlir-hlo, and Enzyme used by Catalyst has been updated.
-  [(#1916)](https://github.com/PennyLaneAI/catalyst/pull/1916)
-
-  The LLVM version has been updated to
-  [commit f8cb798](https://github.com/llvm/llvm-project/tree/f8cb7987c64dcffb72414a40560055cb717dbf74).
-  The mlir-hlo version has been updated to
-  [commit 1dd2e71](https://github.com/tensorflow/mlir-hlo/tree/1dd2e71331014ae0373f6bf900ce6be393357190).
-  The Enzyme version has been updated to
-  [v0.0.186](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.186).
 
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
 
-* Fix errors in AutoGraph transformed functions when `qml.prod` is used together with other operator
-  transforms (e.g. `qml.adjoint`).
-  [(#1910)](https://github.com/PennyLaneAI/catalyst/pull/1910)
+* Fixes an issue where a heap-to-stack allocation conversion pass was causing SIGSEGV issues
+  during program execution at runtime.
+  [(#2172)](https://github.com/PennyLaneAI/catalyst/pull/2172)
 
-* A bug in the `NullQubit::ReleaseQubit()` method that prevented the deallocation of individual
-  qubits on the `"null.qubit"` device has been fixed.
-  [(#1926)](https://github.com/PennyLaneAI/catalyst/pull/1926)
+* Fixes the issue with capturing unutilized abstracted adjoint and controlled rules
+  by the graph in the new decomposition framework.
+  [(#2160)](https://github.com/PennyLaneAI/catalyst/pull/2160)
+
+* Fixes the translation of plxpr control flow for edge cases where the `consts` were being
+  reordered.
+  [(#2128)](https://github.com/PennyLaneAI/catalyst/pull/2128)
+  [(#2133)](https://github.com/PennyLaneAI/catalyst/pull/2133)
+
+* Fixes the translation of `QubitUnitary` and `GlobalPhase` ops
+  when they are modified by adjoint or control.
+  [(##2158)](https://github.com/PennyLaneAI/catalyst/pull/2158)
+
+* Fixes the translation of a workflow with different transforms applied to different qnodes.
+  [(#2167)](https://github.com/PennyLaneAI/catalyst/pull/2167)
+
+* Fix canonicalization of eliminating redundant `quantum.insert` and `quantum.extract` pairs.
+  When extracting a qubit immediately after inserting it at the same index, the operations can
+  be cancelled out while properly updating remaining uses of the register.
+  [(#2162)](https://github.com/PennyLaneAI/catalyst/pull/2162)
+  For an example:
+  ```mlir
+  // Before canonicalization
+  %1 = quantum.insert %0[%idx], %qubit1 : !quantum.reg, !quantum.bit
+  %2 = quantum.extract %1[%idx] : !quantum.reg -> !quantum.bit
+  ...
+  %3 = quantum.insert %1[%i0], %qubit2 : !quantum.reg, !quantum.bit
+  %4 = quantum.extract %1[%i1] : !quantum.reg -> !quantum.bit
+  // ... use %1
+  // ... use %4
+
+  // After canonicalization
+  // %2 directly uses %qubit1
+  // %3 and %4 updated to use %0 instead of %1
+  %3 = quantum.insert %0[%i0], %qubit2 : !quantum.reg, !quantum.bit
+  %4 = quantum.extract %0[%i1] : !quantum.reg -> !quantum.bit
+  // ... use %qubit1
+  // ... use %4
+  ```
 
 <h3>Internal changes ⚙️</h3>
 
-* Updates use of `qml.transforms.dynamic_one_shot.parse_native_mid_circuit_measurements` to improved signature.
-  [(#1953)](https://github.com/PennyLaneAI/catalyst/pull/1953)
+* Refactor Catalyst pass registering so that it's no longer necessary to manually add new
+  passes at `registerAllCatalystPasses`.
+  [(#1984)](https://github.com/PennyLaneAI/catalyst/pull/1984)
 
-* When capture is enabled, `qjit(autograph=True)` will use capture autograph instead of catalyst autograph.
-  [(#1960)](https://github.com/PennyLaneAI/catalyst/pull/1960)
+* Split `from_plxpr.py` into two files.
+  [(#2142)](https://github.com/PennyLaneAI/catalyst/pull/2142)
 
-* QJitDevice helper `extract_backend_info` removed its redundant `capabilities` argument.
-  [(#1956)](https://github.com/PennyLaneAI/catalyst/pull/1956)
+* Re-work `DataView` to avoid an axis of size 0 possibly triggering a segfault via an underflow
+  error, as discovered in
+  [this comment](https://github.com/PennyLaneAI/catalyst/pull/1598#issuecomment-2779178046).
+  [(#1621)](https://github.com/PennyLaneAI/catalyst/pull/2164)
 
-* Raise warning when subroutines are used without capture enabled.
-  [(#1930)](https://github.com/PennyLaneAI/catalyst/pull/1930)
+* Decouple the ion dialect from the quantum dialect to support the new RTIO compilation flow.
+  The ion dialect now uses its own `!ion.qubit` type instead of depending on `!quantum.bit`.
+  Conversion between qubits of quantum and ion dialects is handled via unrealized conversion casts.
+  [(#2163)](https://github.com/PennyLaneAI/catalyst/pull/2163)
 
-* Update imports for noise transforms from `pennylane.transforms` to `pennylane.noise`.
-  [(#1918)](https://github.com/PennyLaneAI/catalyst/pull/1918)
+  For an example, quantum qubits are converted to ion qubits as follows:
+  ```mlir
+  %qreg = quantum.alloc(1) : !quantum.reg
+  %q0 = quantum.extract %qreg[0] : !quantum.reg -> !quantum.bit
 
-* Improve error message for quantum subroutines when used outside a quantum context.
-  [(#1932)](https://github.com/PennyLaneAI/catalyst/pull/1932)
+  // Convert quantum.bit to ion.qubit
+  %ion_qubit_0 = builtin.unrealized_conversion_cast %q0 : !quantum.bit to !ion.qubit
 
-* `from_plxpr` now supports adjoint and ctrl operations and transforms, operator
-  arithemtic observables, `Hermitian` observables, `for_loop` outside qnodes,
-  and `while_loop` outside QNode's.
-  [(#1844)](https://github.com/PennyLaneAI/catalyst/pull/1844)
-  [(#1850)](https://github.com/PennyLaneAI/catalyst/pull/1850)
-  [(#1903)](https://github.com/PennyLaneAI/catalyst/pull/1903)
-  [(#1896)](https://github.com/PennyLaneAI/catalyst/pull/1896)
-  [(#1889)](https://github.com/PennyLaneAI/catalyst/pull/1889)
-
-* The `qec.layer` and `qec.yield` operations have been added to the QEC dialect to represent a group
-  of QEC operations. The main use case is to analyze the depth of a circuit.
-  Also, this is a preliminary step towards supporting parallel execution of QEC layers.
-  [(#1917)](https://github.com/PennyLaneAI/catalyst/pull/1917)
-
-* Conversion patterns for the single-qubit `quantum.alloc_qb` and `quantum.dealloc_qb` operations
-  have been added for lowering to the LLVM dialect. These conversion patterns allow for execution of
-  programs containing these operations.
-  [(#1920)](https://github.com/PennyLaneAI/catalyst/pull/1920)
-
-* The default compilation pipeline is now available as `catalyst.pipelines.default_pipeline()`. The
-  function `catalyst.pipelines.get_stages()` has also been removed as it was not used and duplicated
-  the `CompileOptions.get_stages()` method.
-  [(#1941)](https://github.com/PennyLaneAI/catalyst/pull/1941)
-
-* Utility functions for modifying an existing compilation pipeline have been added to the
-  `catalyst.pipelines` module.
-  [(#1941)](https://github.com/PennyLaneAI/catalyst/pull/1941)
-
-  These functions provide a simple interface to insert passes and stages into a compilation
-  pipeline. The available functions are `insert_pass_after`, `insert_pass_before`,
-  `insert_stage_after`, and `insert_stage_before`. For example,
-
-  ```pycon
-  >>> from catalyst.pipelines import insert_pass_after
-  >>> pipeline = ["pass1", "pass2"]
-  >>> insert_pass_after(pipeline, "new_pass", ref_pass="pass1")
-  >>> pipeline
-  ['pass1', 'new_pass', 'pass2']
+  // Use in ion dialect operations
+  %pp = ion.parallelprotocol(%ion_qubit_0) : !ion.qubit {
+    ^bb0(%arg1: !ion.qubit):
+      // ... ion operations ...
+  }
   ```
-
-* A new built-in compilation pipeline for experimental MBQC workloads has been added, available as
-  `catalyst.ftqc.mbqc_pipeline()`.
-  [(#1942)](https://github.com/PennyLaneAI/catalyst/pull/1942)
-
-  The output of this function can be used directly as input to the `pipelines` argument of
-  :func:`~.qjit`, for example,
-
-  ```python
-  from catalyst.ftqc import mbqc_pipeline
-
-  @qjit(pipelines=mbqc_pipeline())
-  @qml.qnode(dev)
-  def workload():
-      ...
-  ```
-
-* The `mbqc.graph_state_prep` operation has been added to the MBQC dialect. This operation prepares
-  a graph state with arbitrary qubit connectivity, specified by an input adjacency-matrix operand,
-  for use in MBQC workloads.
-  [(#1965)](https://github.com/PennyLaneAI/catalyst/pull/1965)
-
-* `catalyst.accelerate`, `catalyst.debug.callback`, and `catalyst.pure_callback`, `catalyst.debug.print`, and `catalyst.debug.print_memref` now work when capture is enabled.
-  [(#1902)](https://github.com/PennyLaneAI/catalyst/pull/1902)
-
-* The merge rotation pass in Catalyst (:func:`~.passes.merge_rotations`) now also considers
-  `qml.Rot` and `qml.CRot`.
-  [(#1955)](https://github.com/PennyLaneAI/catalyst/pull/1955)
 
 <h3>Documentation 📝</h3>
+
+* A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
+  [(#2136)](https://github.com/PennyLaneAI/catalyst/pull/2136)
+
+* Fix `catalyst.qjit` and `catalyst.CompileOptions` docs rendering.
+  [(#2156)](https://github.com/PennyLaneAI/catalyst/pull/2156)
+
+* Update `MLIR Plugins` documentation stating that plugins require adding passes via
+  `--pass-pipeline`.
+  [(#2168)](https://github.com/PennyLaneAI/catalyst/pull/2168)
 
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
 
-Joey Carter,
-Sengthai Heng,
-David Ittah,
+Ali Asadi,
 Christina Lee,
-Andrija Paurevic,
+River McCubbin,
+Lee J. O'Riordan,
 Roberto Turrado,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Hongsheng Zheng.

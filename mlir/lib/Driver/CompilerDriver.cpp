@@ -24,17 +24,6 @@
 #include <string_view>
 #include <unordered_map>
 
-#include "mhlo/IR/register.h"
-#include "mhlo/transforms/passes.h"
-#include "mlir/IR/DialectRegistry.h"
-#include "mlir/InitAllDialects.h"
-#include "mlir/InitAllExtensions.h"
-#include "mlir/InitAllPasses.h"
-#include "mlir/Parser/Parser.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Support/FileUtilities.h"
-#include "mlir/Target/LLVMIR/Export.h"
-#include "stablehlo/dialect/Register.h"
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -55,9 +44,22 @@
 #include "llvm/Transforms/Coroutines/CoroSplit.h"
 #include "llvm/Transforms/IPO/GlobalDCE.h"
 
+#include "mlir/IR/DialectRegistry.h"
+#include "mlir/InitAllDialects.h"
+#include "mlir/InitAllExtensions.h"
+#include "mlir/InitAllPasses.h"
+#include "mlir/Parser/Parser.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Support/FileUtilities.h"
+#include "mlir/Target/LLVMIR/Export.h"
+
+#include "stablehlo/dialect/Register.h"
+#include "stablehlo/integrations/c/StablehloPasses.h"
+#include "stablehlo/transforms/Passes.h"
+#include "stablehlo/transforms/optimization/Passes.h"
+
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
-#include "Catalyst/Transforms/Passes.h"
 #include "Driver/CatalystLLVMTarget.h"
 #include "Driver/CompilerDriver.h"
 #include "Driver/Pipelines.h"
@@ -65,15 +67,13 @@
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientInterfaces.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
-#include "Gradient/Transforms/Passes.h"
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
-#include "Mitigation/Transforms/Passes.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
-#include "Quantum/Transforms/Passes.h"
+#include "RegisterAllPasses.h"
 
 #include "Enzyme.h"
 #include "Timer.hpp"
@@ -294,7 +294,6 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     registerAllExtensions(registry);
 
     // HLO
-    mhlo::registerAllMhloDialects(registry);
     stablehlo::registerAllDialects(registry);
 
     // Catalyst
@@ -504,7 +503,15 @@ LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options
         if (options.keepIntermediate >= SaveTemps::AfterPass) {
             std::string tmp;
             llvm::raw_string_ostream s{tmp};
-            s << *op;
+            if (options.dumpModuleScope) {
+                mlir::ModuleOp mod = isa<mlir::ModuleOp>(op)
+                                         ? cast<mlir::ModuleOp>(op)
+                                         : op->getParentOfType<mlir::ModuleOp>();
+                s << mod;
+            }
+            else {
+                s << *op;
+            }
             std::string fileName = pipelineName.str();
             if (auto funcOp = dyn_cast<mlir::func::FuncOp>(op)) {
                 fileName += std::string("_") + funcOp.getName().str();
@@ -652,6 +659,11 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 {
     using timer = catalyst::utils::Timer;
 
+    OpPrintingFlags opPrintingFlags{};
+    if (options.useNameLocAsPrefix) {
+        opPrintingFlags.printNameLocAsPrefix();
+    }
+
     MLIRContext ctx(registry);
     ctx.printOpOnDiagnostic(true);
     ctx.printStackTraceOnDiagnostic(options.verbosity >= Verbosity::Debug);
@@ -729,7 +741,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
         output.outIR.clear();
         if (options.keepIntermediate) {
-            outIRStream << *mlirModule;
+            mlirModule->print(outIRStream, opPrintingFlags);
         }
         optTiming.stop();
     }
@@ -846,7 +858,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         // already handled
     }
     else if (output.outputFilename == "-" && mlirModule) {
-        outfile->os() << *mlirModule;
+        mlirModule->print(outfile->os(), opPrintingFlags);
         outfile->keep();
     }
 
@@ -935,6 +947,9 @@ int QuantumDriverMainFromCL(int argc, char **argv)
         "keep-intermediate", cl::desc("Keep intermediate files"), cl::init(false),
         cl::callback([&](const bool &) { SaveAfterEach.setValue(SaveTemps::AfterPipeline); }),
         cl::cat(CatalystCat));
+    cl::opt<bool> UseNameLocAsPrefix("use-nameloc-as-prefix",
+                                     cl::desc("Use name location as prefix"), cl::init(false),
+                                     cl::cat(CatalystCat));
     cl::opt<bool> AsyncQNodes("async-qnodes", cl::desc("Enable asynchronous QNodes"),
                               cl::init(false), cl::cat(CatalystCat));
     cl::opt<bool> Verbose("verbose", cl::desc("Set verbose"), cl::init(false),
@@ -956,13 +971,17 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     cl::opt<bool> DumpPassPipeline("dump-catalyst-pipeline",
                                    cl::desc("Print the pipeline that will be run"), cl::init(false),
                                    cl::cat(CatalystCat));
+    cl::opt<bool> DumpModuleScope("dump-module-scope",
+                                  cl::desc("Print the whole module in intermediate files"),
+                                  cl::init(true), cl::cat(CatalystCat));
 
     // Create dialect registry
     DialectRegistry registry;
-    registerAllPasses();
-    registerAllCatalystPasses();
+    mlir::registerAllPasses();
+    catalyst::registerAllPasses();
     registerAllCatalystPipelines();
-    mhlo::registerAllMhloPasses();
+    mlirRegisterAllStablehloPasses();
+    mlir::stablehlo::registerOptimizationPasses();
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);
 
@@ -1000,6 +1019,8 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                             .moduleName = ModuleName,
                             .diagnosticStream = errStream,
                             .keepIntermediate = SaveAfterEach,
+                            .dumpModuleScope = DumpModuleScope,
+                            .useNameLocAsPrefix = UseNameLocAsPrefix,
                             .asyncQnodes = AsyncQNodes,
                             .verbosity = Verbose ? Verbosity::All : Verbosity::Urgent,
                             .pipelinesCfg = parsePipelines(CatalystPipeline),

@@ -16,13 +16,7 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import (
-    AutoGraphError,
-    autograph_source,
-    disable_autograph,
-    qjit,
-    run_autograph,
-)
+from catalyst import AutoGraphError, autograph_source, disable_autograph, qjit, run_autograph
 from catalyst.utils.dummy import dummy_func
 
 
@@ -246,7 +240,7 @@ try:
         if x < 3:
             y = 4
 
-        return y
+        return y  # pylint: disable=possibly-used-before-assignment
 
 except AutoGraphError as e:
     # CHECK:   Some branches did not define a value for variable 'y'

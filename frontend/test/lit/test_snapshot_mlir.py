@@ -47,7 +47,7 @@ def single_qubit_circuit():
     # CHECK: [[snapshot2:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
     qml.Snapshot()  # |->
 
-    qml.PhaseShift(np.pi / 2, wires=0)
+    qml.PhaseShift(np.pi / 2, wires=0)  # pylint: disable=no-member
 
     # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
     # CHECK: [[snapshot3:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
@@ -59,7 +59,7 @@ def single_qubit_circuit():
     # CHECK: [[snapshot4:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
     qml.Snapshot()  # |+i>
 
-    qml.PhaseShift(-np.pi / 2, wires=0)
+    qml.PhaseShift(-np.pi / 2, wires=0)  # pylint: disable=no-member
 
     # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
     # CHECK: [[snapshot5:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
@@ -76,7 +76,8 @@ print(single_qubit_circuit.mlir)
 
 # CHECK-LABEL: public @jit_two_qubit_circuit
 @qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2, shots=5))
+@qml.set_shots(5)
+@qml.qnode(qml.device("lightning.qubit", wires=2), mcm_method="single-branch-statistics")
 def two_qubit_circuit():
     """Test MLIR output of qml.Snapshot on two qubits with shots"""
 

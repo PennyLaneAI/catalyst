@@ -23,12 +23,35 @@ from jax._src.lib.mlir import ir
 from jax.interpreters import mlir
 from jaxlib.mlir.dialects.builtin import ModuleOp
 from jaxlib.mlir.dialects.func import CallOp
-from mlir_quantum.dialects._transform_ops_gen import (
-    ApplyRegisteredPassOp,
-    NamedSequenceOp,
-    YieldOp,
-)
+from mlir_quantum.dialects._transform_ops_gen import ApplyRegisteredPassOp, NamedSequenceOp, YieldOp
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
+
+from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
+
+
+def _only_single_expval(call_jaxpr: core.ClosedJaxpr) -> bool:
+    found_expval = False
+    for eqn in call_jaxpr.eqns:
+        name = eqn.primitive.name
+        if name in {"probs", "counts", "sample"}:
+            return False
+        elif name == "expval":
+            if found_expval:
+                return False
+            found_expval = True
+    return True
+
+
+def _calculate_diff_method(qn: qml.QNode, call_jaxpr: core.ClosedJaxpr):
+    diff_method = str(qn.diff_method)
+    if diff_method != "best":
+        return diff_method
+
+    device_name = getattr(getattr(qn, "device", None), "name", None)
+
+    if device_name and "lightning" in device_name and _only_single_expval(call_jaxpr):
+        return "adjoint"
+    return "parameter-shift"
 
 
 def get_call_jaxpr(jaxpr):
@@ -47,18 +70,36 @@ def get_call_equation(jaxpr):
     raise AssertionError("No call_jaxpr found in the JAXPR.")
 
 
-def lower_jaxpr(ctx, jaxpr, context=None):
-    """Lowers a call primitive jaxpr, may be either func_p or quantum_kernel_p"""
-    equation = get_call_equation(jaxpr)
-    call_jaxpr = equation.params["call_jaxpr"]
-    callable_ = equation.params.get("fn")
-    if callable_ is None:
-        callable_ = equation.params.get("qnode")
-    pipeline = equation.params.get("pipeline")
-    return lower_callable(ctx, callable_, call_jaxpr, pipeline=pipeline, context=context)
+def lower_jaxpr(ctx, jaxpr, metadata=None, fn=None):
+    """Lowers a call primitive jaxpr, may be either func_p or quantum_kernel_p
+
+    Args:
+        ctx: LoweringRuleContext
+        jaxpr: JAXPR to be lowered
+        metadata: additional metadata to distinguish different FuncOps
+        fn (Callable | None): the function the jaxpr corresponds to. Used for naming and caching.
+
+    Returns:
+        FuncOp
+    """
+
+    if fn is None or isinstance(fn, qml.QNode):
+        equation = get_call_equation(jaxpr)
+        call_jaxpr = equation.params["call_jaxpr"]
+        pipeline = equation.params.get("pipeline")
+        callable_ = equation.params.get("fn")
+        if callable_ is None:
+            callable_ = equation.params.get("qnode", None)
+    else:
+        call_jaxpr = jaxpr
+        pipeline = ()
+        callable_ = fn
+
+    return lower_callable(ctx, callable_, call_jaxpr, pipeline=pipeline, metadata=metadata)
 
 
-def lower_callable(ctx, callable_, call_jaxpr, pipeline=None, context=None):
+# pylint: disable=too-many-arguments, too-many-positional-arguments
+def lower_callable(ctx, callable_, call_jaxpr, pipeline=(), metadata=None, public=False):
     """Lowers _callable to MLIR.
 
     If callable_ is a qnode, then we will first create a module, then
@@ -70,62 +111,103 @@ def lower_callable(ctx, callable_, call_jaxpr, pipeline=None, context=None):
       ctx: LoweringRuleContext
       callable_: python function
       call_jaxpr: jaxpr representing callable_
+      public: whether the visibility should be marked public
+
     Returns:
       FuncOp
     """
     if pipeline is None:
         pipeline = tuple()
 
-    if not isinstance(callable_, qml.QNode):
-        return get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline, context=context)
+    if isinstance(callable_, qml.QNode):
+        return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline, metadata=metadata)
+    return get_or_create_funcop(
+        ctx, callable_, call_jaxpr, pipeline, metadata=metadata, public=public
+    )
 
-    return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline, context=context)
 
+# pylint: disable=too-many-arguments, too-many-positional-arguments
+def get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline, metadata=None, public=False):
+    """Get funcOp from cache, or create it from scratch
 
-def get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline, context=None):
-    """Get funcOp from cache, or create it from scratch"""
-    if context is None:
-        context = tuple()
-    key = (callable_, *context, *pipeline)
-    if func_op := get_cached(ctx, key):
-        return func_op
-    func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr)
+    Args:
+        ctx: LoweringRuleContext
+        callable_: python function
+        call_jaxpr: jaxpr representing callable_
+        metadata: additional metadata to distinguish different FuncOps
+        public: whether the visibility should be marked public
+
+    Returns:
+        FuncOp
+    """
+    if metadata is None:
+        metadata = tuple()
+    key = (callable_, *metadata, *pipeline)
+    if callable_ is not None:
+        if func_op := get_cached(ctx, key):
+            return func_op
+    func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=public)
     cache(ctx, key, func_op)
     return func_op
 
 
-def lower_callable_to_funcop(ctx, callable_, call_jaxpr):
-    """Lower callable to either a FuncOp"""
+def lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=False):
+    """Lower callable to either a FuncOp
+
+    Args:
+        ctx: LoweringRuleContext
+        callable_: python function
+        call_jaxpr: jaxpr representing callable_
+        public: whether the visibility should be marked public
+
+    Returns:
+        FuncOp
+    """
     if isinstance(call_jaxpr, core.Jaxpr):
         call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
 
     kwargs = {}
     kwargs["ctx"] = ctx.module_context
-    if not isinstance(callable_, functools.partial):
-        name = callable_.__name__
-    else:
+    if isinstance(callable_, functools.partial):
         name = callable_.func.__name__ + ".partial"
+    else:
+        name = callable_.__name__
+
     kwargs["name"] = name
     kwargs["jaxpr"] = call_jaxpr
     kwargs["effects"] = []
     kwargs["name_stack"] = ctx.name_stack
+
+    # Make the visibility of the function public=True
+    # to avoid elimination by the compiler
+    kwargs["public"] = public
+
     func_op = mlir.lower_jaxpr_to_fun(**kwargs)
 
     if isinstance(callable_, qml.QNode):
         func_op.attributes["qnode"] = ir.UnitAttr.get()
-        # "best", the default option in PennyLane, chooses backprop on the device
-        # if supported and parameter-shift otherwise. Emulating the same behaviour
-        # would require generating code to query the device.
-        # For simplicity, Catalyst instead defaults to parameter-shift.
-        diff_method = (
-            "parameter-shift" if callable_.diff_method == "best" else str(callable_.diff_method)
-        )
+
+        diff_method = _calculate_diff_method(callable_, call_jaxpr)
+
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
+
+        # Register the decomposition gatesets to the QNode FuncOp
+        # This will set a queue of gatesets that enables support for multiple
+        # levels of decomposition in the MLIR decomposition pass
+        if gateset := getattr(callable_, "decompose_gatesets", []):
+            func_op.attributes["decompose_gatesets"] = get_mlir_attribute_from_pyval(gateset)
+
+    # Extract the target gate and number of wires from decomposition rules
+    # and set them as attributes on the FuncOp for use in the MLIR decomposition pass
+    if target_gate := getattr(callable_, "target_gate", None):
+        func_op.attributes["target_gate"] = get_mlir_attribute_from_pyval(target_gate)
+    if num_wires := getattr(callable_, "num_wires", None):
+        func_op.attributes["num_wires"] = get_mlir_attribute_from_pyval(num_wires)
 
     return func_op
 
 
-def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline, context):
+def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline, metadata):
     """A wrapper around lower_qnode_to_funcop that will cache the FuncOp.
 
     Args:
@@ -135,9 +217,11 @@ def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline, context):
     Returns:
       FuncOp
     """
-    if context is None:
-        context = tuple()
-    key = (callable_, *context, *pipeline)
+    if metadata is None:
+        metadata = tuple()
+    if callable_.static_argnums:
+        return lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipeline)
+    key = (callable_, *metadata, *pipeline)
     if func_op := get_cached(ctx, key):
         return func_op
     func_op = lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipeline)

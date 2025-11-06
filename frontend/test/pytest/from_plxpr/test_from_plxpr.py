@@ -15,6 +15,10 @@
 This module tests the from_plxpr conversion function.
 """
 
+# pylint: disable=too-many-lines
+
+from functools import partial
+
 import jax
 import numpy as np
 import pennylane as qml
@@ -113,26 +117,25 @@ def compare_eqns(eqn1, eqn2):
         assert ov1.aval == ov2.aval
 
 
+@pytest.mark.usefixtures("use_capture")
 class TestErrors:
     """Test that errors are raised in unsupported situations."""
 
     def test_measuring_eigvals_not_supported(self):
         """Test that a NotImplementedError is raised for converting a measurement
         specified via eigvals and wires."""
+        dev = qml.device("lightning.qubit", wires=2)
 
-        dev = qml.device("lightning.qubit", wires=2, shots=50)
-
+        @qml.set_shots(50)
         @qml.qnode(dev)
         def circuit():
             return qml.measurements.SampleMP(
                 wires=qml.wires.Wires((0, 1)), eigvals=np.array([-1.0, -1.0, 1.0, 1.0])
             )
 
-        qml.capture.enable()
         jaxpr = jax.make_jaxpr(circuit)()
         with pytest.raises(NotImplementedError, match="does not yet support measurements with"):
             from_plxpr(jaxpr)()
-        qml.capture.disable()
 
     def test_measuring_measurement_values(self):
         """Test that measuring a MeasurementValue raises a NotImplementedError."""
@@ -145,12 +148,10 @@ class TestErrors:
                 obs=2
             )  # classical value like will be used for mcms
 
-        qml.capture.enable()
         jaxpr = jax.make_jaxpr(circuit)()
 
         with pytest.raises(NotImplementedError, match=r"not yet supported"):
             from_plxpr(jaxpr)()
-        qml.capture.disable()
 
     def test_unsupported_measurement(self):
         """Test that a NotImplementedError is raised if a measurement
@@ -162,12 +163,25 @@ class TestErrors:
         def circuit():
             return qml.vn_entropy(wires=0)
 
-        qml.capture.enable()
         jaxpr = jax.make_jaxpr(circuit)()
 
         with pytest.raises(NotImplementedError, match="not yet supported"):
             from_plxpr(jaxpr)()
-        qml.capture.disable()
+
+    def test_no_shot_vectors(self):
+        """Test that a NotImplementedError is raised with shot vectors."""
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.set_shots((10, 10, 20))
+        @qml.qnode(dev)
+        def c():
+            return qml.sample(wires=0)
+
+        jaxpr = jax.make_jaxpr(c)()
+
+        with pytest.raises(NotImplementedError, match="not yet supported"):
+            from_plxpr(jaxpr)()
 
 
 class TestCatalystCompareJaxpr:
@@ -364,9 +378,10 @@ class TestCatalystCompareJaxpr:
     def test_sample(self):
         """Test comparison and execution of a jaxpr returning samples."""
 
-        dev = qml.device("lightning.qubit", wires=2, shots=50)
+        dev = qml.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev)
+        @qml.set_shots(50)
+        @qml.qnode(dev, mcm_method="single-branch-statistics")
         def circuit():
             qml.X(0)
             return qml.sample()
@@ -393,19 +408,21 @@ class TestCatalystCompareJaxpr:
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
-    @pytest.mark.xfail(reason="CountsMP returns a dictionary, which is not compatible with capture")
-    def test_counts(self):
-        """Test comparison and execution of a jaxpr returning counts."""
+    @pytest.mark.xfail(reason="from_plxpr does not support dynamic shot transform now")
+    def test_sample_one_shot(self):
+        """Test comparison and execution of a jaxpr returning samples."""
 
-        dev = qml.device("lightning.qubit", wires=2, shots=50)
+        dev = qml.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev)
+        @qml.set_shots(50)
+        @qml.qnode(dev, mcm_method="one-shot")
         def circuit():
             qml.X(0)
-            return qml.counts()
+            return qml.sample()
 
         qml.capture.enable()
         plxpr = jax.make_jaxpr(circuit)()
+
         converted = from_plxpr(plxpr)()
         qml.capture.disable()
 
@@ -420,8 +437,42 @@ class TestCatalystCompareJaxpr:
         qjit_obj = qjit(circuit)
         qjit_obj()
         catalxpr = qjit_obj.jaxpr
+        call_jaxpr_pl = get_call_jaxpr(converted)
+        call_jaxpr_c = get_call_jaxpr(catalxpr)
+
+        compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
+
+    def test_counts(self):
+        """Test comparison and execution of a jaxpr returning counts."""
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.set_shots(50)
+        @qml.qnode(dev)
+        def circuit():
+            qml.X(0)
+            return qml.counts()
+
+        qml.capture.enable()
+        plxpr = jax.make_jaxpr(circuit)()
+        converted = from_plxpr(plxpr)()
+        qml.capture.disable()
+
+        assert converted.eqns[0].primitive == catalyst.jax_primitives.quantum_kernel_p
+        assert converted.eqns[0].params["qnode"] is circuit
+
+        catalyst_res = catalyst_execute_jaxpr(converted)()
+        assert len(catalyst_res) == 2
+        expected_keys = np.array([0, 1, 2, 3])
+        expected_values = np.array([0, 0, 50, 0])
+        assert qml.math.allclose(catalyst_res[0], expected_keys)
+        assert qml.math.allclose(catalyst_res[1], expected_values)
+
+        qjit_obj = qjit(circuit)
+        qjit_obj()
+        catalxpr = qjit_obj.jaxpr
         call_jaxpr_pl = converted.eqns[0].params["call_jaxpr"]
-        call_jaxpr_c = catalxpr.eqns[1].params["call_jaxpr"]
+        call_jaxpr_c = catalxpr.eqns[0].params["call_jaxpr"]
 
         compare_call_jaxprs(call_jaxpr_pl, call_jaxpr_c)
 
@@ -537,14 +588,15 @@ class TestCatalystCompareJaxpr:
     def test_dynamic_shots(self):
         """Test that shots can be specified on qnode call."""
 
-        dev = qml.device("lightning.qubit", wires=2, shots=50)
+        dev = qml.device("lightning.qubit", wires=2)
 
+        @qml.set_shots(50)
         @qml.qnode(dev)
         def circuit():
             return qml.sample(wires=0)
 
         def f():
-            return circuit(shots=100)
+            return qml.set_shots(circuit, shots=100)()
 
         qml.capture.enable()
         jaxpr = jax.make_jaxpr(f)()
@@ -565,7 +617,7 @@ class TestAdjointCtrl:
         """Test the conversion of a simple adjoint op."""
         qml.capture.enable()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
         def c():
             op = qml.S(0)
             for _ in range(num_adjoints):
@@ -593,7 +645,7 @@ class TestAdjointCtrl:
 
         qml.capture.enable()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
         def c(x, wire3):
             op = qml.RX(x, 0)
             if inner_adjoint:
@@ -630,7 +682,7 @@ class TestAdjointCtrl:
 
         qml.capture.enable()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=3), autograph=False)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
         def c():
             if as_qfunc:
                 qml.ctrl(qml.ctrl(qml.S, 1), 2, control_values=[False])(0)
@@ -669,7 +721,7 @@ class TestAdjointCtrl:
             if with_return:
                 return op
 
-        @qml.qnode(qml.device("lightning.qubit", wires=2), autograph=False)
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
         def c(x):
             qml.X(0)
             qml.adjoint(f)(x)
@@ -711,7 +763,7 @@ class TestAdjointCtrl:
 
         qml.capture.enable()
 
-        @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
         def c(wire):
             qml.CNOT((0, wire))
             if as_qfunc:
@@ -751,7 +803,7 @@ class TestAdjointCtrl:
         def g(i):
             qml.X(i)
 
-        @qml.qnode(qml.device("lightning.qubit", wires=4), autograph=False)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
         def c():
             qml.ctrl(g, [4, 5])()
             return qml.state()
@@ -792,7 +844,7 @@ class TestControlFlow:
             def g(i, x):
                 return i + x
 
-            return g(i0)
+            return g(i0)  # pylint: disable=no-value-for-parameter
 
         jaxpr = jax.make_jaxpr(f)(2)
         catalyst_jaxpr = from_plxpr(jaxpr)(2)
@@ -915,6 +967,131 @@ class TestHybridPrograms:
         expected = -np.sin(0.5) + np.cos(1.2)
 
         assert qml.math.allclose(results, expected)
+
+
+class TestGraphDecomposition:
+    """Test the new graph-based decomposition integration with from_plxpr."""
+
+    def test_with_multiple_decomps_transforms(self):
+        """Test that a circuit with multiple decompositions and transforms can be converted."""
+
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
+
+        @qml.qjit(target="mlir")
+        @partial(
+            qml.transforms.decompose,
+            gate_set={"RX", "RY"},
+        )
+        @partial(
+            qml.transforms.decompose,
+            gate_set={"NOT", "GlobalPhase"},
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=0))
+        def circuit(x):
+            qml.GlobalPhase(x)
+            return qml.expval(qml.PauliX(0))
+
+        with pytest.raises(
+            NotImplementedError, match="Multiple decomposition transforms are not yet supported."
+        ):
+            circuit(0.2)
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
+
+        assert qml.decomposition.enabled_graph() is False
+
+    def test_decompose_fallback_warnings(self):
+        """Test the fallback to legacy decomposition system with warnings."""
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
+
+        @qml.qjit
+        @partial(qml.transforms.decompose, gate_set={qml.GlobalPhase})
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x):
+            qml.Hadamard(x)
+            return qml.state()
+
+        with pytest.warns(
+            UserWarning,
+            match="The graph-based decomposition system is unable to find a decomposition"
+            " for {'Hadamard'} to the target gate set {'GlobalPhase'}.",
+        ):
+            circuit(0)
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
+
+    def test_decompose_with_custom(self):
+        """Test the conversion of a circuit with a custom decomposition."""
+
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
+
+        @qml.register_resources({qml.H: 2, qml.CZ: 1})
+        def my_cnot(wires):
+            qml.H(wires=wires[1])
+            qml.CZ(wires=wires)
+            qml.H(wires=wires[1])
+
+        @qml.qjit
+        @partial(
+            qml.transforms.decompose,
+            gate_set={"H", "CZ", "GlobalPhase"},
+            alt_decomps={qml.CNOT: [my_cnot]},
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit():
+            qml.H(0)
+            qml.CNOT(wires=[0, 1])
+            return qml.state()
+
+        expected = np.array([1, 0, 0, 1]) / np.sqrt(2)
+        assert qml.math.allclose(circuit(), expected)
+
+        expected_resources = {"CZ": 1, "Hadamard": 3}
+        resources = qml.specs(circuit, level="device")()["resources"]
+        assert resources.gate_types == expected_resources
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
+
+    def test_multirz(self):
+        """Test that multirz decomposition works with from_plxpr."""
+
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
+
+        @partial(
+            qml.transforms.decompose,
+            gate_set={"X", "Y", "Z", "S", "H", "CNOT", "RZ", "Rot", "GlobalPhase"},
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def circuit():
+            qml.Hadamard(0)
+            qml.ctrl(qml.MultiRZ(0.345, wires=[1, 2]), control=0)
+            qml.adjoint(qml.MultiRZ(0.25, wires=[1, 2]))
+            qml.MultiRZ(0.5, wires=[0, 1])
+            qml.MultiRZ(0.5, wires=[0])
+            qml.MultiRZ(0.5, wires=[0, 1, 3])
+            return qml.expval(qml.X(0))
+
+        without_qjit = circuit()
+        with_qjit = qml.qjit(circuit)
+
+        assert qml.math.allclose(without_qjit, with_qjit())
+
+        # TODO: Remove this static dict when capture & graph enabled support
+        # resource counting with qml.specs via from_plxpr conversion.
+        expected_resources = {"GlobalPhase": 14, "RZ": 20, "CNOT": 22, "Hadamard": 5}
+
+        resources = qml.specs(with_qjit, level="device")()["resources"]
+        assert resources.gate_types == expected_resources
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
 
 
 if __name__ == "__main__":

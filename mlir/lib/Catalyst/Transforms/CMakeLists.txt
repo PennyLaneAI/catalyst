@@ -14,17 +14,12 @@ file(GLOB SRC
     DisableAssertionPatterns.cpp
     GEPInboundsPass.cpp
     GEPInboundsPatterns.cpp
-    hlo_custom_call_lowering.cpp
-    HloCustomCallPatterns.cpp
     InlineNestedModules.cpp
     MemrefCopyToLinalgCopyPass.cpp
     MemrefCopyToLinalgCopyPatterns.cpp
     qnode_to_async_lowering.cpp
     QnodeToAsyncPatterns.cpp
-    RegisterAllPasses.cpp
     RegisterInactiveCallbackPass.cpp
-    scatter_lowering.cpp
-    ScatterPatterns.cpp
     SplitMultipleTapes.cpp
     TBAAPatterns.cpp
     TBAATagsPass.cpp
@@ -40,7 +35,6 @@ set(LIBS
 set(DEPENDS
     MLIRCatalystPassIncGen
 )
-
 add_mlir_library(${LIBRARY_NAME} STATIC ${SRC} LINK_LIBS PRIVATE ${LIBS} DEPENDS ${DEPENDS})
 target_compile_features(${LIBRARY_NAME} PUBLIC cxx_std_20)
 target_include_directories(${LIBRARY_NAME} PUBLIC
