@@ -511,7 +511,7 @@ class Compiler:
             regions = getattr(op, "regions", [])
             if not regions:
                 return False
-            
+
             try:
                 for nested_op in regions[0].blocks[0].operations:
                     attrs = getattr(nested_op, "attributes", None)
