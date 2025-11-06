@@ -20,9 +20,9 @@ import textwrap
 
 import jax
 from jax._src import core
-from jax._src.interpreters.pxla import _jaxpr_replicas as jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
+from jax._src.interpreters.pxla import _jaxpr_replicas as jaxpr_replicas
 from jax._src.sharding_impls import AxisEnv, ReplicaAxisContext
 from jax.extend.core import ClosedJaxpr
 from jax.interpreters.mlir import (
@@ -45,19 +45,24 @@ from catalyst.utils.patching import Patcher
 
 __all__ = ("jaxpr_to_mlir", "custom_lower_jaxpr_to_module")
 
-from catalyst.jax_extras.patches import _no_clean_up_dead_vars, get_aval2
+from catalyst.jax_extras.patches import (
+    _no_clean_up_dead_vars,
+    get_aval2,
+    patched_multi_broadcast_in_dim,
+)
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
 @debug_logger
-def jaxpr_to_mlir(func_name, jaxpr):
+def jaxpr_to_mlir(jaxpr, func_name, arg_names):
     """Lower a Jaxpr into an MLIR module.
 
     Args:
-        func_name(str): function name
         jaxpr(Jaxpr): Jaxpr code to lower
+        func_name(str): function name
+        arg_names(list[str]): list of argument names
 
     Returns:
         module: the MLIR module corresponding to ``func``
@@ -67,6 +72,7 @@ def jaxpr_to_mlir(func_name, jaxpr):
     with Patcher(
         (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
         (jax._src.core, "clean_up_dead_vars", _no_clean_up_dead_vars),
+        (jax._src.interpreters.mlir, "multi_broadcast_in_dim", patched_multi_broadcast_in_dim),
     ):
         nrep = jaxpr_replicas(jaxpr)
         effects = jax_ordered_effects.filter_in(jaxpr.effects)
@@ -78,6 +84,7 @@ def jaxpr_to_mlir(func_name, jaxpr):
             effects=effects,
             platform="cpu",
             axis_context=axis_context,
+            arg_names=arg_names,
         )
 
     return module, context
@@ -93,6 +100,7 @@ def custom_lower_jaxpr_to_module(
     platform: str,
     axis_context: AxisContext,
     replicated_args=None,
+    arg_names=None,
     arg_shardings=None,
     result_shardings=None,
 ):
@@ -155,6 +163,7 @@ def custom_lower_jaxpr_to_module(
             in_avals=in_avals,
             main_function=False,
             replicated_args=replicated_args,
+            arg_names=arg_names,
             arg_shardings=arg_shardings,
             result_shardings=result_shardings,
         )
@@ -164,13 +173,15 @@ def custom_lower_jaxpr_to_module(
         while worklist:
             op = worklist.pop()
             func_name = str(op.name)
+            is_entry_point = func_name.startswith('"jit_')
+
+            if is_entry_point:
+                # Keep entry point functions public
+                op.attributes["sym_visibility"] = ir.StringAttr.get("public")
+                continue
             if isinstance(op, FuncOp):
-                if func_name.startswith('"jit_'):
-                    # Keep entry point functions public
-                    op.attributes["sym_visibility"] = ir.StringAttr.get("public")
-                else:
-                    # Set non-entry functions to internal linkage
-                    op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
+                # Set non-entry functions to internal linkage
+                op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
             if isinstance(op, ModuleOp):
                 worklist += [*op.body.operations]
 

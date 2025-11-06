@@ -217,15 +217,6 @@ class Function:
         AssertionError: Invalid function type.
     """
 
-    CACHE = {}
-
-    def __new__(cls, fn):
-        if cached_instance := cls.CACHE.get(fn):
-            return cached_instance
-        new_instance = super().__new__(cls)
-        cls.CACHE[fn] = new_instance
-        return new_instance
-
     @debug_logger_init
     def __init__(self, fn):
         self.fn = fn
@@ -537,20 +528,13 @@ class HybridOp(Operator):
         """
         assert self.binder is not None, "HybridOp should set a binder"
 
-        # JAX 0.7 FIX: For measure_p, pass pre-created tracers to the staging rule
-        from catalyst.jax_primitives import measure_p
-
-        if self.binder == measure_p.bind:
-            kwargs["_catalyst_init_tracers"] = out_expanded_tracers
-
         # Here, we are binding any of the possible hybrid ops.
         # which includes: for_loop, while_loop, cond, measure.
         # This will place an equation at the very end of the current list of equations.
         out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
 
         trace = EvaluationContext.get_current_trace()
-        # JAX 0.7: Need to call the lambda to get the actual TracingEqn
-        eqn = _get_eqn_from_tracing_eqn(trace.frame.eqns[-1])
+        eqn = _get_eqn_from_tracing_eqn(trace.frame.tracing_eqns[-1])
         frame = trace.frame
 
         assert len(eqn.outvars[:-1]) == len(
@@ -560,17 +544,15 @@ class HybridOp(Operator):
         jaxpr_variables = cached_vars.get(frame, set())
         if not jaxpr_variables:
             # We get all variables in the current frame
-            # JAX 0.7: Need to call each lambda to get actual TracingEqns
             outvars = itertools.chain.from_iterable(
-                [_get_eqn_from_tracing_eqn(e).outvars for e in frame.eqns]
+                [_get_eqn_from_tracing_eqn(e).outvars for e in frame.tracing_eqns]
             )
             jaxpr_variables = set(outvars)
             jaxpr_variables.update(frame.invars)
             jaxpr_variables.update(frame.constvar_to_val.keys())
             cached_vars[frame] = jaxpr_variables
 
-        # JAX 0.7: Need to call the lambda to get the actual TracingEqn
-        last_eqn = _get_eqn_from_tracing_eqn(frame.eqns[-1])
+        last_eqn = _get_eqn_from_tracing_eqn(frame.tracing_eqns[-1])
         for outvar in last_eqn.outvars:
             # With the exception of the output variables from the current equation.
             jaxpr_variables.discard(outvar)
@@ -579,12 +561,6 @@ class HybridOp(Operator):
             # We look for what were the previous output tracers.
             # If they haven't changed, then we leave them unchanged.
             if t.val in jaxpr_variables:
-                continue
-
-            from catalyst.jax_primitives import measure_p
-
-            if self.binder == measure_p.bind:
-                # For measure, the outvars are already correct from the staging rule
                 continue
 
             # For other hybrid ops, use the original logic
@@ -682,7 +658,32 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs, debug_in
         PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
     """
 
-    with transient_jax_config({"jax_dynamic_shapes": True}):
+    # pylint: disable=import-outside-toplevel
+    import jax._src.interpreters.partial_eval as pe
+    from jax._src.lax import lax
+    from jax._src.pjit import jit_p
+
+    from catalyst.jax_extras.patches import (
+        patched_drop_unused_vars,
+        patched_dyn_shape_staging_rule,
+        patched_make_eqn,
+        patched_pjit_staging_rule,
+    )
+    from catalyst.utils.patching import DictPatchWrapper, Patcher
+
+    with transient_jax_config(
+        {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
+    ), Patcher(
+        (pe, "_drop_unused_vars", patched_drop_unused_vars),
+        (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
+        (lax, "_dyn_shape_staging_rule", patched_dyn_shape_staging_rule),
+        (
+            jax._src.pjit,  # pylint: disable=protected-access
+            "pjit_staging_rule",
+            patched_pjit_staging_rule,
+        ),
+        (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
+    ):
         make_jaxpr_kwargs = {
             "static_argnums": static_argnums,
             "abstracted_axes": abstracted_axes,
@@ -696,12 +697,13 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs, debug_in
 
 
 @debug_logger
-def lower_jaxpr_to_mlir(jaxpr, func_name):
+def lower_jaxpr_to_mlir(jaxpr, func_name, arg_names):
     """Lower a JAXPR to MLIR.
 
     Args:
         ClosedJaxpr: the JAXPR to lower to MLIR
         func_name: a name to use for the MLIR function
+        arg_names: list of parameter names for the MLIR function
 
     Returns:
         ir.Module: the MLIR module coontaining the JAX program
@@ -710,8 +712,8 @@ def lower_jaxpr_to_mlir(jaxpr, func_name):
 
     MemrefCallable.clearcache()
 
-    with transient_jax_config({"jax_dynamic_shapes": True}):
-        mlir_module, ctx = jaxpr_to_mlir(func_name, jaxpr)
+    with transient_jax_config({"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}):
+        mlir_module, ctx = jaxpr_to_mlir(jaxpr, func_name, arg_names)
 
     return mlir_module, ctx
 
@@ -928,7 +930,9 @@ def trace_quantum_operations(
 
 @debug_logger
 def trace_observables(
-    obs: Operator, qrp: QRegPromise, m_wires: Optional[qml.wires.Wires]
+    obs: Optional[Operator],
+    qrp: QRegPromise,
+    m_wires: Optional[qml.wires.Wires],
 ) -> Tuple[List[DynamicJaxprTracer], Optional[int]]:
     """Trace observables.
 
@@ -1031,7 +1035,7 @@ def pauli_word_to_tensor_obs(obs, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
     return tensorobs_p.bind(*nested_obs)
 
 
-# pylint: disable=too-many-statements,too-many-branches
+# pylint: disable=too-many-statements,too-many-branches, too-many-positional-arguments
 @debug_logger
 def trace_quantum_measurements(
     shots_obj,
@@ -1039,6 +1043,7 @@ def trace_quantum_measurements(
     qrp: QRegPromise,
     outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
     out_tree: PyTreeDef,
+    mcm_config: qml.devices.MCMConfig,
 ) -> Tuple[List[DynamicJaxprTracer], PyTreeDef]:
     """Trace quantum measurements. Accept a list of QNode ouptputs and its Pytree-shape. Process
     the quantum measurement outputs, leave other outputs as-is.
@@ -1083,6 +1088,16 @@ def trace_quantum_measurements(
             nqubits = d_wires if nqubits is None else nqubits
 
             using_compbasis = obs_tracers.primitive == compbasis_p
+
+            if (
+                mcm_config.mcm_method == "single-branch-statistics"
+                and output.mv is not None
+                and type(output) in [ExpectationMP, VarianceMP, ProbabilityMP, CountsMP]
+            ):
+                raise NotImplementedError(
+                    "single-branch-statistics does not support measurement processes "
+                    "(expval, var, probs, counts) on mid circuit measurements."
+                )
 
             if isinstance(output, qml.measurements.SampleMP):
 
@@ -1288,15 +1303,13 @@ def apply_transforms(
             raise CompileError(msg)
         tracing_mode = TracingMode.TRANSFORM
     elif len(qnode_program) or have_measurements_changed(tape, tapes[0]):
-        # TODO: Ideally we should allow qnode transforms that don't modify the measurements to
-        # operate in the permissive tracing mode, but that currently leads to a small number of
-        # test failures due to the different result format produced in trace_quantum_function.
-        only_with_dynamic_one_shot = all(
-            "dynamic_one_shot_partial" in str(getattr(qnode, "transform", ""))
+        with_measurement_from_counts_or_samples = any(
+            "measurements_from_counts" in (transform_str := str(getattr(qnode, "transform", "")))
+            or "measurements_from_samples" in transform_str
             for qnode in qnode_program
         )
 
-        if has_classical_outputs(flat_results) and not only_with_dynamic_one_shot:
+        if has_classical_outputs(flat_results) and with_measurement_from_counts_or_samples:
             msg = (
                 "Transforming MeasurementProcesses is unsupported with non-MeasurementProcess "
                 "QNode outputs. The selected device, options, or applied QNode transforms, may be "
@@ -1653,7 +1666,9 @@ def _trace_quantum_step(
                 tape, device, qreg_in, ctx, trace, mcm_config, snapshot_results
             )
             shots = qnode._shots  # pylint: disable=protected-access
-            meas, meas_trees = trace_quantum_measurements(shots, device, qrp_out, output, trees)
+            meas, meas_trees = trace_quantum_measurements(
+                shots, device, qrp_out, output, trees, mcm_config
+            )
             qreg_out = qrp_out.actualize()
 
             # Get the measurement results

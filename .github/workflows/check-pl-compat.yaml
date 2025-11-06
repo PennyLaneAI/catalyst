@@ -39,7 +39,13 @@ jobs:
         git checkout $(git tag | sort -V | tail -1)
     - if: ${{ inputs.catalyst == 'release-candidate' }}
       run: |
+        # For rc, we install all packages from TestPyPI.
+        # The purpose of checkout here is to locate the commit where the previous rc Catalyst
+        # was built and uploaded to TestPyPI, so that the tests are the compatible ones
+        # to be run with the latest rc/rc/rc packges on TestPyPI.
+        # This would be the last autobump-and-upload commit made on the rc branch.
         git checkout v0.13.0-rc
+        git checkout "$(git log -1 --author="ringo-but-quantum" --pretty=format:%H)"
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -47,7 +53,7 @@ jobs:
         python-version: ${{ needs.constants.outputs.primary_python_version }}
 
     - name: Install deps
-      if: ${{ inputs.catalyst != 'stable' }}
+      if: ${{ inputs.catalyst == 'latest' }}
       run: |
         sudo apt-get update
         sudo apt-get install -y ccache libasan6 lld
@@ -61,46 +67,46 @@ jobs:
 
     - name: Get Catalyst Build Dependencies (latest)
       uses: actions/cache/restore@v4
-      if: ${{ inputs.catalyst != 'stable' }}
+      if: ${{ inputs.catalyst == 'latest' }}
       with:
         path: mlir/llvm-project
         key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
     - uses: actions/cache/restore@v4
-      if: ${{ inputs.catalyst != 'stable' }}
+      if: ${{ inputs.catalyst == 'latest' }}
       with:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-gcc
         fail-on-cache-miss: True
     - uses: actions/cache/restore@v4
-      if: ${{ inputs.catalyst != 'stable' }}
+      if: ${{ inputs.catalyst == 'latest' }}
       with:
         path: mlir/stablehlo
         key: stablehlo-${{ needs.constants.outputs.stablehlo_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
     - uses: actions/cache/restore@v4
-      if: ${{ inputs.catalyst != 'stable' }}
+      if: ${{ inputs.catalyst == 'latest' }}
       with:
         path: stablehlo-build
         key: ${{ runner.os }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-ci-build-gcc
         fail-on-cache-miss: True
     - uses: actions/cache/restore@v4
-      if: ${{ inputs.catalyst != 'stable' }}
+      if: ${{ inputs.catalyst == 'latest' }}
       with:
         path:  mlir/Enzyme
         key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
     - uses: actions/cache@v4
-      if: ${{ inputs.catalyst != 'stable' }}
+      if: ${{ inputs.catalyst == 'latest' }}
       with:
         path: enzyme-build
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-ci-build-gcc
         fail-on-cache-miss: True
     - uses: actions/cache/restore@v4
-      if: ${{ inputs.catalyst != 'stable' }}
+      if: ${{ inputs.catalyst == 'latest' }}
       with:
         path: .ccache
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
@@ -111,8 +117,8 @@ jobs:
       run: |
         pip install pennylane-catalyst
 
-    - name: Install Catalyst (latest/release-candidate)
-      if: ${{ inputs.catalyst != 'stable' }}
+    - name: Install Catalyst (latest)
+      if: ${{ inputs.catalyst == 'latest' }}
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
         C_COMPILER=$(which gcc }}) \
@@ -125,6 +131,15 @@ jobs:
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         ENABLE_OPENQASM=ON \
         make catalyst
+
+    - name: Install Catalyst (release-candidate)
+      if: ${{ inputs.catalyst == 'release-candidate' }}
+      run: |
+        # This is the first for the three rc installs
+        # Thus this one shouldn't have no-deps: it needs to pull in all PL dependencies
+        jax_version=$(grep jax .dep-versions | awk -F '=' '{ print $2 }')
+        pip install jax==$jax_version
+        pip install --pre -U --index-url https://test.pypi.org/simple/ pennylane-catalyst'<=0.13.0'
 
     - name: Install PennyLane-Lightning (stable)
       if: ${{ inputs.lightning == 'stable' }}
@@ -166,7 +181,7 @@ jobs:
         pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane'<=0.43.0'
 
     - name: Add Frontend Dependencies to PATH
-      if: ${{ inputs.catalyst != 'stable' }}
+      if: ${{ inputs.catalyst == 'latest' }}
       run: |
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV

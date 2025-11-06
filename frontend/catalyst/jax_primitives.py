@@ -38,6 +38,7 @@ from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
 from jaxlib.hlo_helpers import shape_dtype_to_ir_type
+from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from jaxlib.mlir.dialects.arith import (
     AddIOp,
     CeilDivSIOp,
@@ -51,54 +52,86 @@ from jaxlib.mlir.dialects.func import FunctionType
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
-from mlir_quantum.dialects.catalyst import (
-    AssertionOp,
-    CallbackCallOp,
-    CallbackOp,
-    PrintOp,
-)
-from mlir_quantum.dialects.gradient import (
-    CustomGradOp,
-    ForwardOp,
-    GradOp,
-    JVPOp,
-    ReverseOp,
-    ValueAndGradOp,
-    VJPOp,
-)
-from mlir_quantum.dialects.mbqc import MeasureInBasisOp
-from mlir_quantum.dialects.mitigation import ZneOp
-from mlir_quantum.dialects.quantum import (
-    AdjointOp,
-    AllocOp,
-    ComputationalBasisOp,
-    CountsOp,
-    CustomOp,
-    DeallocOp,
-    DeallocQubitOp,
-    DeviceInitOp,
-    DeviceReleaseOp,
-    ExpvalOp,
-    ExtractOp,
-    GlobalPhaseOp,
-    HamiltonianOp,
-    HermitianOp,
-    InsertOp,
-    MeasureOp,
-    MultiRZOp,
-    NamedObsOp,
-    NumQubitsOp,
-    PCPhaseOp,
-    ProbsOp,
-    QubitUnitaryOp,
-    SampleOp,
-    SetBasisStateOp,
-    SetStateOp,
-    StateOp,
-    TensorOp,
-    VarianceOp,
-)
-from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
+
+# TODO: remove after jax v0.7.2 upgrade
+# Mock _ods_cext.globals.register_traceback_file_exclusion due to API conflicts between
+# Catalyst's MLIR version and the MLIR version used by JAX. The current JAX version has not
+# yet updated to the latest MLIR, causing compatibility issues. This workaround will be removed
+# once JAX updates to a compatible MLIR version
+# pylint: disable=ungrouped-imports
+from catalyst.jax_extras.patches import mock_attributes
+from catalyst.utils.patching import Patcher
+
+with Patcher(
+    (
+        _ods_cext,
+        "globals",
+        mock_attributes(
+            # pylint: disable=c-extension-no-member
+            _ods_cext.globals,
+            {"register_traceback_file_exclusion": lambda x: None},
+        ),
+    ),
+):
+    from mlir_quantum.dialects.catalyst import (
+        AssertionOp,
+        CallbackCallOp,
+        CallbackOp,
+        PrintOp,
+    )
+    from mlir_quantum.dialects.gradient import (
+        CustomGradOp,
+        ForwardOp,
+        GradOp,
+        JVPOp,
+        ReverseOp,
+        ValueAndGradOp,
+        VJPOp,
+    )
+    from mlir_quantum.dialects.mbqc import MeasureInBasisOp
+    from mlir_quantum.dialects.mitigation import ZneOp
+    from mlir_quantum.dialects.quantum import (
+        AdjointOp,
+        AllocOp,
+        ComputationalBasisOp,
+        CountsOp,
+        CustomOp,
+        DeallocOp,
+        DeallocQubitOp,
+        DeviceInitOp,
+        DeviceReleaseOp,
+        ExpvalOp,
+        ExtractOp,
+        GlobalPhaseOp,
+        HamiltonianOp,
+        HermitianOp,
+        InsertOp,
+        MeasureOp,
+        MultiRZOp,
+        NamedObsOp,
+        NumQubitsOp,
+        PCPhaseOp,
+        ProbsOp,
+        QubitUnitaryOp,
+        SampleOp,
+        SetBasisStateOp,
+        SetStateOp,
+        StateOp,
+        TensorOp,
+        VarianceOp,
+    )
+    from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
+    from catalyst.jax_primitives_utils import (
+        cache,
+        create_call_op,
+        get_cached,
+        get_call_jaxpr,
+        get_symbolref,
+        lower_callable,
+        lower_jaxpr,
+    )
+
+from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
@@ -109,19 +142,9 @@ from catalyst.jax_extras import (
     infer_output_type_jaxpr,
     while_loop_expansion_strategy,
 )
-from catalyst.jax_primitives_utils import (
-    cache,
-    create_call_op,
-    get_cached,
-    get_call_jaxpr,
-    get_symbolref,
-    lower_callable,
-    lower_jaxpr,
-)
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
-from catalyst.utils.patching import Patcher
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
 # pylint: disable=unused-argument,too-many-lines,too-many-statements,protected-access
@@ -643,9 +666,12 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     consts = []
     offset = len(args) - len(jaxpr.consts)
     for i, jax_array_or_tracer in enumerate(jaxpr.consts):
-        if not isinstance(
-            jax_array_or_tracer, jax._src.interpreters.partial_eval.DynamicJaxprTracer
-        ):
+        if isinstance(jax_array_or_tracer, jax._src.interpreters.partial_eval.DynamicJaxprTracer):
+            # There are some cases where this value cannot be converted into
+            # a jax.numpy.array.
+            # in that case we get it from the arguments.
+            consts.append(args[offset + i])
+        else:
             # ``ir.DenseElementsAttr.get()`` constructs a dense elements attribute from an array of
             # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to
             # cast such constants to numpy array types.
@@ -655,11 +681,6 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
             attr = ir.DenseElementsAttr.get(nparray, type=const_type)
             constval = StableHLOConstantOp(attr).results
             consts.append(constval)
-        else:
-            # There are some cases where this value cannot be converted into
-            # a jax.numpy.array.
-            # in that case we get it from the arguments.
-            consts.append(args[offset + i])
 
     method, h, argnums = grad_params.method, grad_params.h, grad_params.expanded_argnums
     mlir_ctx = ctx.module_context.context
@@ -672,7 +693,6 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     argnum_numpy = np.array(new_argnums)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
     func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums))
-
     symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
@@ -686,6 +706,30 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         ir.StringAttr.get(method),
         symbol_ref,
         mlir.flatten_ir_values(args_and_consts),
+        diffArgIndices=diffArgIndices,
+        finiteDiffParam=finiteDiffParam,
+    ).results
+
+
+# pylint: disable=too-many-arguments
+def _capture_grad_lowering(ctx, *args, argnums, jaxpr, n_consts, method, h, fn, scalar_out):
+    mlir_ctx = ctx.module_context.context
+    f64 = ir.F64Type.get(mlir_ctx)
+    finiteDiffParam = ir.FloatAttr.get(f64, h)
+
+    new_argnums = [num + n_consts for num in argnums]
+    argnum_numpy = np.array(new_argnums)
+    diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *new_argnums), fn=fn)
+    symbol_ref = get_symbolref(ctx, func_op)
+    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
+    flat_output_types = util.flatten(output_types)
+
+    return GradOp(
+        flat_output_types,
+        ir.StringAttr.get(method),
+        symbol_ref,
+        mlir.flatten_lowering_ir_args(args),
         diffArgIndices=diffArgIndices,
         finiteDiffParam=finiteDiffParam,
     ).results
@@ -1385,60 +1429,6 @@ def _unitary_lowering(
 def _measure_abstract_eval(qubit, postselect: int = None):
     assert isinstance(qubit, AbstractQbit)
     return core.ShapedArray((), bool), qubit
-
-
-def measure_staging_rule(
-    jaxpr_trace, _src, qubit, postselect: int = None, _catalyst_init_tracers=None
-):
-    """
-    Custom staging rule for measure_p to ensure that pre-created tracers
-    from new_inner_tracer are properly used.
-
-    This is necessary in JAX 0.7 where the binding process creates new tracers,
-    but we need to use the tracers that were created during classical tracing
-    (in the measure() function via new_inner_tracer).
-
-    Args:
-        jaxpr_trace: The current DynamicJaxprTrace
-        _src: Source info
-        qubit: The qubit tracer to measure
-        postselect: Optional postselection value
-        _catalyst_init_tracers: Pre-created tracers from classical tracing (Catalyst-specific)
-                               Note: This only contains the boolean measurement result,
-                               not the qubit output
-    """
-    from catalyst.jax_extras.tracing import new_inner_tracer
-
-    # Define output shapes
-    out_shapes = (core.ShapedArray((), bool), qubit.aval)
-
-    # Input tracers
-    in_tracers = [qubit]
-
-    # Parameters (exclude _catalyst_init_tracers as it's not a primitive parameter)
-    params = {"postselect": postselect}
-
-    # JAX 0.7 FIX: measure_p has 2 outputs (bool, qubit), but _catalyst_init_tracers
-    # only contains 1 (the bool result). We need to create the qubit tracer and combine them
-    if _catalyst_init_tracers is not None and len(_catalyst_init_tracers) > 0:
-        # Create a tracer for the qubit output
-        qubit_out_tracer = new_inner_tracer(jaxpr_trace, qubit.aval)
-        # Combine: pre-created bool tracer + newly created qubit tracer
-        init_tracers = [_catalyst_init_tracers[0], qubit_out_tracer]
-
-        eqn, out_tracers = jaxpr_trace.make_eqn(
-            in_tracers, out_shapes, measure_p, params, [], None, out_tracers=init_tracers
-        )
-    else:
-        # Fallback to default behavior
-        eqn, out_tracers = jaxpr_trace.make_eqn(in_tracers, out_shapes, measure_p, params, [], None)
-
-    jaxpr_trace.frame.add_eqn(eqn)
-
-    return out_tracers
-
-
-pe.custom_staging_rules[measure_p] = measure_staging_rule
 
 
 @measure_p.def_impl
@@ -2591,6 +2581,7 @@ CUSTOM_LOWERING_RULES = (
     (while_p, _while_loop_lowering),
     (for_p, _for_loop_lowering),
     (grad_p, _grad_lowering),
+    (pl_jac_prim, _capture_grad_lowering),
     (func_p, _func_lowering),
     (jvp_p, _jvp_lowering),
     (vjp_p, _vjp_lowering),

@@ -95,7 +95,6 @@ COMPILER_OPS_FOR_DECOMPOSITION: dict[str, tuple[int, int]] = {
 }
 
 
-# pylint: disable=too-few-public-methods
 class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
     """Interpreter for getting the decomposition graph solution
     from a jaxpr when program capture is enabled.
@@ -130,7 +129,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
         gate_set=None,
         fixed_decomps=None,
         alt_decomps=None,
-    ):  # pylint: disable=too-many-arguments
+    ):
 
         if not qml.decomposition.enabled_graph():  # pragma: no cover
             raise TypeError(
@@ -235,7 +234,14 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                         num_params=num_params,
                         requires_copy=num_wires == -1,
                     )
-                else:  # pragma: no cover
+                elif not any(
+                    keyword in getattr(op.op, "name", "") for keyword in ("Adjoint", "Controlled")
+                ):  # pragma: no cover
+                    # Note that the graph-decomposition returns abstracted rules
+                    # for Adjoint and Controlled operations, so we skip them here.
+                    # These abstracted rules cannot be captured and lowered.
+                    # We use MLIR AdjointOp and ControlledOp primitives
+                    # to deal with decomposition of symbolic operations at PLxPR.
                     raise ValueError(f"Could not capture {op} without the number of wires.")
 
         data, struct = jax.tree_util.tree_flatten(measurement)
@@ -325,7 +331,7 @@ def _create_decomposition_rule(
         # Include number of wires in the function name to avoid name clashes
         # when the same rule is compiled multiple times with different number of wires
         # (e.g., MultiRZ, GlobalPhase)
-        func_cp.__name__ += f"_wires_{num_wires}"  # pylint: disable=protected-access
+        func_cp.__name__ += f"_wires_{num_wires}"
 
     # Note that we shouldn't pass args as kwargs to decomposition_rule
     # JAX doesn't like it and it may fail to preserve the order of args.
@@ -404,7 +410,6 @@ def _solve_decomposition_graph(operations, gate_set, fixed_decomps, alt_decomps)
     return decomp_graph_solution
 
 
-# pylint: disable=protected-access
 def make_def_copy(func):
     """Create a copy of a Python definition to avoid mutating the original.
 

@@ -718,7 +718,7 @@ class TestConditionals:
             if True:
                 res = m(wires=0)
 
-            return res
+            return res  # pylint: disable=possibly-used-before-assignment
 
         err_type = qml.exceptions.AutoGraphError if qml.capture.enabled() else AutoGraphError
 
