@@ -83,8 +83,18 @@ class IfOperatorPartitioningPass(RewritePattern):
         """Partition the if operation into separate branches for each operator."""
 
         self.original_func_op = op
+        # Detect mcm inside If statement
+        flat_if = self.detect_mcm_in_if_ops(op)
+
+        if not flat_if:
+            return
+
+        print(f"FDX: Should flat: {flat_if}")
+
         # Split IfOps into only true branches
         self.split_nested_if_ops(op, rewriter)
+
+        print_mlir(op, "After splitting IfOps:")
 
         # Flatten nested IfOps
         self.flatten_nested_IfOps(op, rewriter)
@@ -95,21 +105,56 @@ class IfOperatorPartitioningPass(RewritePattern):
         self.original_func_op: func.FuncOp = None
         self.holder_returns : dict[scf.IfOp, scf.IfOp] = {}
 
+    def detect_mcm_in_if_ops(self, op: func.FuncOp) -> bool:
+        """Detect if there are measurement-controlled operations inside IfOps."""
+        op_walk = op.walk()
+        for current_op in op_walk:
+            if isinstance(current_op, scf.IfOp):
+                # Check if there are measurement-controlled operations inside this IfOp
+                for inner_op in current_op.true_region.ops:
+                    if isinstance(inner_op, quantum.MeasureOp):
+                        return True
+                for inner_op in current_op.false_region.ops:
+                    if isinstance(inner_op, quantum.MeasureOp):
+                        return True
+        return False
 
     def flatten_nested_IfOps(self, main_op: func.FuncOp, rewriter: PatternRewriter) -> None:
         """Flatten nested scf.IfOps into a single level scf.IfOp."""
+
+        print("FDX : Flattening nested IfOps...")
 
         # Check for deepest nested IfOps
         nested_IfOp = self.get_deepest_nested_ifs(main_op)
 
         depth = nested_IfOp[0][1] if nested_IfOp else 0
+        target_if_op = nested_IfOp[0][0] if nested_IfOp else None
 
-        # Recursively flatten deeper IfOps first
+        print(f"FDX :   IfOp depth: {depth}")
+
+        print_mlir(target_if_op, "Target IfOp to flatten:")
+        print_mlir(target_if_op.parent_op(), "Target IfOp to flatten:")
+
         if depth > 1:
-            self.find_deeper_if_ops(main_op, rewriter)
+            self.find_deeper_if_ops_2(target_if_op.parent_op(), rewriter)
             self.flatten_nested_IfOps(main_op, rewriter)
         else:
             return
+
+        nested_IfOp = self.get_deepest_nested_ifs(main_op)
+
+        depth = nested_IfOp[0][1] if nested_IfOp else 0
+        target_if_op = nested_IfOp[0][0] if nested_IfOp else None
+
+        print(f"FDX :   IfOp depth: {depth}")
+
+
+        # Recursively flatten deeper IfOps first
+        # if depth > 1:
+        #     self.find_deeper_if_ops(target_if_op, rewriter)
+        #     self.flatten_nested_IfOps(target_if_op, rewriter)
+        # else:
+        #     return
 
     def get_deepest_nested_ifs(self, parent_if_op: scf.IfOp) -> IfOpWithDepth:
         """Finds the scf.if operation(s) nested at the maximum depth inside the parent_if_op."""
@@ -117,11 +162,43 @@ class IfOperatorPartitioningPass(RewritePattern):
         # We initialize the search list.
         deepest_ops_with_depth: List[IfOpWithDepth] = [(None, 0)]
 
+        print("FDX: Getting deepest nested IfOps...")
+
         # Start the recursion. We look *inside* the regions of the parent_if_op.
         self._find_deepest_if_recursive(parent_if_op, 0, deepest_ops_with_depth)
 
         # Extract only the IfOp objects from the list of (IfOp, depth) tuples.
         return deepest_ops_with_depth
+
+    def find_deeper_if_ops_2(self, main_op: scf.IfOp, rewriter: PatternRewriter) -> None:
+        """Find and flatten deeper nested if ops within the main_op."""
+        # Find the deeper nested  if op
+
+        self.flatten_if_ops_deep(main_op, rewriter)
+
+        # op_walk = main_op.body.blocks[0].ops
+        # deeper_with_depth = self.get_deepest_nested_ifs(main_op)
+
+        # print("FDX : Finding deeper IfOps...")
+
+        # # Walk through the operations without going deeper
+        # for current_op in op_walk:
+        #     if isinstance(current_op, scf.IfOp):
+
+        #         deeper_with_depth = self.get_deepest_nested_ifs(current_op)
+        #         # deeper_with_depth returns a list of tuples (IfOp, depth)
+
+        #         if deeper_with_depth[0][0] is None:
+        #             break
+
+        #         deeper_if_ops = [op for op, d in deeper_with_depth]
+
+        #         for d in deeper_if_ops[0:1]:
+        #             self.flatten_if_ops_deep(d.parent_op(), rewriter)
+
+
+        # deeper_with_depth = self.get_deepest_nested_ifs(main_op)
+
 
     def find_deeper_if_ops(self, main_op: func.FuncOp, rewriter: PatternRewriter) -> None:
         """Find and flatten deeper nested if ops within the main_op."""
@@ -129,10 +206,11 @@ class IfOperatorPartitioningPass(RewritePattern):
         op_walk = main_op.body.blocks[0].ops
         deeper_with_depth = self.get_deepest_nested_ifs(main_op)
 
+        print("FDX : Finding deeper IfOps...")
+
         # Walk through the operations without going deeper
         for current_op in op_walk:
             if isinstance(current_op, scf.IfOp):
-
 
                 deeper_with_depth = self.get_deepest_nested_ifs(current_op)
                 # deeper_with_depth returns a list of tuples (IfOp, depth)
@@ -153,15 +231,26 @@ class IfOperatorPartitioningPass(RewritePattern):
         Helper function to recursively traverse the IR, tracking the max depth
         of scf.If operations found so far.
         """
-
         # Iterate over all nested regions (then_region, else_region, etc.)
         for region in op.regions:
+            print("-"*20)
+            print(f"FDX: Traversing region")
             for block in region.blocks:
+                print(f"FDX:     Traversing block")
                 for child_op in block.ops:
 
                     new_depth = current_depth
 
                     if isinstance(child_op, scf.IfOp):
+                        # the if should have the attribute  contain_mcm = "true"
+
+                        contain_mcm = "contain_mcm" in child_op.attributes
+
+                        print(f"FDX:         contain_mcm {contain_mcm}")
+
+                        if not contain_mcm:
+                            continue
+
                         # Found an IfOp, increase the depth for the ops *inside* its regions.
                         # This IfOp itself is at 'current_depth + 1'.
                         new_depth = current_depth + 1
@@ -181,6 +270,7 @@ class IfOperatorPartitioningPass(RewritePattern):
 
                     # Recursively search inside this child op (regardless of its type)
                     # We pass the potentially *increased* new_depth.
+                        print("-"*20)
                     self._find_deepest_if_recursive(child_op, new_depth, max_depth_ops)
 
 
@@ -212,12 +302,14 @@ class IfOperatorPartitioningPass(RewritePattern):
                 hold_op.erase()
 
 
-
     def move_simple_inner_if_op_2_outer(self,
                                         inner_op: scf.IfOp, outer_if_op: scf.IfOp, new_outer_if_op_output: list[SSAValue], new_outer_if_op_output_types: list[Type], where_to_insert: scf.IfOp,
                                         rewriter: PatternRewriter,
                                         ) -> None:
         """Move simple inner IfOp after the outer IfOp."""
+
+        # print_mlir(outer_if_op,"Outer If")
+        # print_mlir(inner_op,"Inner If")
 
         definition_outer = self.analyze_definitions_for_ops([outer_if_op])
         missing_values_inner = self.analyze_missing_values_for_ops([inner_op])
@@ -487,6 +579,7 @@ class IfOperatorPartitioningPass(RewritePattern):
         # Initial call to split nested IfOps in the function
         op_walk = op.walk()
         for current_op in op_walk:
+            # if isinstance(current_op, scf.IfOp) and self.detect_mcm_in_if_ops(current_op):
             if isinstance(current_op, scf.IfOp):
 
                 have_nested_if_ops = self.looking_for_nested_if_ops(current_op)
@@ -535,7 +628,10 @@ class IfOperatorPartitioningPass(RewritePattern):
 
                 value_mapper = {}
 
-                attr_dict = {"partition": builtin.StringAttr("true_branch")}
+                attr_dict = {
+                                "contain_mcm": builtin.StringAttr("true"),
+                                "partition": builtin.StringAttr("true_branch"),
+                            }
 
                 new_if_op_4_true = self.create_if_op_partition(
                     rewriter,
@@ -563,6 +659,11 @@ class IfOperatorPartitioningPass(RewritePattern):
                 #--------------------------------------------------------------------------
 
                 value_mapper = {qreg_if_op[0]: new_if_op_4_true.results[0]}
+
+                attr_dict = {
+                            "contain_mcm": builtin.StringAttr("true"),
+                            "partition": builtin.StringAttr("false_branch"),
+                             }
 
                 _ = self.create_if_op_partition(
                     rewriter,
@@ -930,104 +1031,69 @@ if __name__ == "__main__":
         qml.H(0)
         cond_2 = qml.measure(1)
 
-        # def ansatz_true():
-        #     qml.X(0)
+        def ansatz_true():
+            qml.RX(1.1,0)
 
-        #     def nested_ansatz_true():
-        #         qml.Y(0)
+        def ansatz_false():
+            qml.Z(0)
 
-        #         # def nested_nested_ansatz_true():
-        #         #     qml.H(0)
+        qml.cond(c1 == 1,
+                 ansatz_true,
+                 ansatz_false)()
 
-        #         #     def nested_nested_nested_ansatz_true():
-        #         #         qml.RX(0.5, 0)
+        def ansatz_1_true():
+            qml.RX(1.1,0)
 
+            def ansatz_nested_true():
+                cond_2 = qml.measure(1)
+                qml.RX(1.1, 0)
 
-        #         #         def nested_nested_nested_ansatz_true():
-        #         #             qml.RZ(0.5, 0)
+            def ansatz_nested_false():
+                qml.Z(0)
 
-        #         #         def nested_nested_nested_ansatz_false():
-        #         #             qml.RZ(0.5, 0)
+            qml.cond(c2 == 1,
+                     ansatz_nested_true,
+                     ansatz_nested_false)()
 
-        #         #         cond_4 = c4 == 1
-        #         #         qml.cond(cond_4,
-        #         #                 nested_nested_nested_ansatz_true,
-        #         #                 nested_nested_nested_ansatz_false)()
+        def ansatz_1_false():
+            # cond_2 = qml.measure(1)
+            qml.Z(0)
 
+        qml.cond(c2 == 1,
+                 ansatz_1_true,
+                 ansatz_1_false)()
 
+        def ansatz_2_true():
+            qml.RX(1.1,0)
 
+            def ansatz_nested_true():
+                cond_2 = qml.measure(1)
+                qml.RX(1.1, 0)
 
-        #         #     def nested_nested_nested_ansatz_false():
-        #         #         qml.RY(0.5, 0)
-
-        #         #     cond_4 = c3 == 1
-        #         #     qml.cond(cond_4,
-        #         #              nested_nested_nested_ansatz_true,
-        #         #              nested_nested_nested_ansatz_false)()
-
-        #         # def nested_nested_ansatz_false():
-        #         #     qml.T(0)
-
-        #         # cond_3 = c3 == 1
-
-        #         # qml.cond(cond_3,
-        #         #          nested_nested_ansatz_true,
-        #         #          nested_nested_ansatz_false)()
-
-        #     def nested_ansatz_false():
-        #         qml.Z(0)
-
-        #         def nested_nested_ansatz_true():
-        #             qml.RZ(0.33,0)
-        #         def nested_nested_ansatz_false():
-        #             qml.RZ(0.99,0)
-
-        #         cond_3 = c3 == 1
-
-        #         qml.cond(cond_3,
-        #                  nested_nested_ansatz_true,
-        #                  nested_nested_ansatz_false)()
+                def ansatz_nested_nested_true():
+                    qml.RX(1.1,0)
+                def ansatz_nested_nested_false():
+                    qml.Z(0)
+                qml.cond(c3 == 1,
+                         ansatz_nested_nested_true,
+                         ansatz_nested_nested_false)()
 
 
-        #     cond_2 = c2 == 1
+            def ansatz_nested_false():
+                qml.Z(0)
 
-        #     qml.cond(cond_2,
-        #              nested_ansatz_true,
-        #              nested_ansatz_false)()
+            qml.cond(c2 == 1,
+                     ansatz_nested_true,
+                     ansatz_nested_false)()
 
+        def ansatz_2_false():
+            # cond_2 = qml.measure(1)
+            qml.Z(0)
 
-        #     def nested_nested_ansatz_true():
-        #         qml.RZ(0.33,0)
-        #     def nested_nested_ansatz_false():
-        #         qml.RZ(0.99,0)
+        qml.cond(c2 == 1,
+                 ansatz_2_true,
+                 ansatz_2_false)()
 
-        #     cond_3 = c3 == 1
-
-        #     qml.cond(cond_3,
-        #                 nested_nested_ansatz_true,
-        #                 nested_nested_ansatz_false)()
-
-
-        #     def nested_nested_ansatz_true():
-        #         qml.RZ(0.33,0)
-        #     def nested_nested_ansatz_false():
-        #         qml.RZ(0.99,0)
-
-        #     cond_3 = c4 == 1
-
-        #     qml.cond(cond_3,
-        #                 nested_nested_ansatz_true,
-        #                 nested_nested_ansatz_false)()
-
-
-        #     # qml.SWAP([0,1])
-
-        # def ansatz_false():
-        #     qml.S(0)
-
-        # qml.cond(c1 == 1,
-        #          ansatz_true,
-        #          ansatz_false)()
 
         qml.S(2)
 
@@ -1046,21 +1112,22 @@ if __name__ == "__main__":
         return captured_circuit_1(c1, c2, c3, c4)
 
 
-    permutations = [(1,1,1,1),
-                    (1,1,1,0),
-                    (1,1,0,1),
-                    (1,1,0,0),
-                    (1,0,1,1),
-                    (1,0,0,1),
-                    (0,1,1,1),
-                    (0,1,0,1),
-                    (0,0,1,1),
-                    (0,1,1,0),
-                    (0,0,1,0),
-                    (0,0,0,1),
-                    (1,0,0,0),
-                    (1,0,1,0),
-                    (0,0,0,0)
+    permutations = [
+                    (1,1,1,1),
+                    # (1,1,1,0),
+                    # (1,1,0,1),
+                    # (1,1,0,0),
+                    # (1,0,1,1),
+                    # (1,0,0,1),
+                    # (0,1,1,1),
+                    # (0,1,0,1),
+                    # (0,0,1,1),
+                    # (0,1,1,0),
+                    # (0,0,1,0),
+                    # (0,0,0,1),
+                    # (1,0,0,0),
+                    # (1,0,1,0),
+                    # (0,0,0,0)
                     ]
     for perm in permutations:
         captured_result = holder_function(perm[0], perm[1], perm[2], perm[3])
