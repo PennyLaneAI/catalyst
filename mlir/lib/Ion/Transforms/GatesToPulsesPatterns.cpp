@@ -44,6 +44,66 @@ enum LevelTransition {
 };
 
 /**
+ * @brief Converts a range of quantum.bit to ion.qubit
+ *
+ *        This function creates an `UnrealizedConversionCastOp` for each quantum.bit to ion.qubit.
+ *
+ * @param rewriter MLIR PatternRewriter
+ * @param loc      MLIR Location
+ * @param qubits   Range of quantum.bit values
+ * @return std::optional<SmallVector<Value>> Optional range of ion.qubit values
+ */
+std::optional<SmallVector<Value>> convertQuantumBitsToIonQubits(mlir::PatternRewriter &rewriter,
+                                                                mlir::Location &loc,
+                                                                mlir::ValueRange qubits)
+{
+    MLIRContext *ctx = rewriter.getContext();
+    SmallVector<Value> ionQubits;
+    for (Value qubit : qubits) {
+        if (!isa<quantum::QubitType>(qubit.getType())) {
+            qubit.getDefiningOp()->emitError()
+                << "Expected a quantum.bit value, but got " << qubit.getType();
+            return std::nullopt;
+        }
+        auto ionQubitType = ion::QubitType::get(ctx);
+        Value ionQubit =
+            rewriter.create<UnrealizedConversionCastOp>(loc, ionQubitType, qubit).getResult(0);
+        ionQubits.push_back(ionQubit);
+    }
+    return ionQubits;
+}
+
+/**
+ * @brief Converts a range of ion.qubit to quantum.bit
+ *
+ *        This function creates an `UnrealizedConversionCastOp` for each ion.qubit to quantum.bit.
+ *
+ * @param rewriter MLIR PatternRewriter
+ * @param loc      MLIR Location
+ * @param ionQubits Range of ion.qubit values
+ * @return std::optional<SmallVector<Value>> Optional range of quantum.bit values
+ */
+std::optional<SmallVector<Value>> convertIonQubitsToQuantumBits(mlir::PatternRewriter &rewriter,
+                                                                mlir::Location &loc,
+                                                                mlir::ValueRange ionQubits)
+{
+    MLIRContext *ctx = rewriter.getContext();
+    SmallVector<Value> qubits;
+    for (Value ionQubit : ionQubits) {
+        if (!isa<ion::QubitType>(ionQubit.getType())) {
+            ionQubit.getDefiningOp()->emitError()
+                << "Expected an ion.qubit value, but got " << ionQubit.getType();
+            return std::nullopt;
+        }
+        auto qubitType = quantum::QubitType::get(ctx);
+        Value qubit =
+            rewriter.create<UnrealizedConversionCastOp>(loc, qubitType, ionQubit).getResult(0);
+        qubits.push_back(qubit);
+    }
+    return qubits;
+}
+
+/**
  * @brief Walk back the qubit SSA until we reach an ExtractOp that has an idxAttr set, or until we
  *        reach the root of the SSA.
  *
@@ -236,8 +296,14 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
         auto angle = op.getParams().front();
         auto time = computePulseDuration(rewriter, loc, angle, beam.rabi, beam.detuning);
 
+        // Convert quantum.bit to ion.qubit
+        auto ionQubits = convertQuantumBitsToIonQubits(rewriter, loc, qubits);
+        if (!ionQubits.has_value()) {
+            return failure();
+        }
+
         auto ppOp = rewriter.create<ion::ParallelProtocolOp>(
-            loc, qubits, [&](OpBuilder &builder, Location loc, ValueRange qubits) {
+            loc, ionQubits.value(), [&](OpBuilder &builder, Location loc, ValueRange qubits) {
                 mlir::FloatAttr phase1Attr = builder.getF64FloatAttr(phase1);
                 mlir::FloatAttr phase2Attr = builder.getF64FloatAttr(phase2);
                 auto qubit = qubits.front();
@@ -246,7 +312,14 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
                 builder.create<ion::PulseOp>(loc, PulseType::get(ctx), time, qubit, beam1toEAttr,
                                              phase2Attr);
             });
-        rewriter.replaceOp(op, ppOp);
+
+        // Convert ion.qubit back to quantum.bit
+        auto qubitResults = convertIonQubitsToQuantumBits(rewriter, loc, ppOp.getResults());
+        if (!qubitResults.has_value()) {
+            return failure();
+        }
+
+        rewriter.replaceOp(op, qubitResults.value());
         return success();
     }
     else {
@@ -327,8 +400,14 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                 return result;
             };
 
+            // Convert quantum.bit to ion.ionqubit
+            auto ionQubits = convertQuantumBitsToIonQubits(rewriter, loc, qubits);
+            if (!ionQubits.has_value()) {
+                return failure();
+            }
+
             auto ppOp = rewriter.create<ion::ParallelProtocolOp>(
-                loc, qubits, [&](OpBuilder &builder, Location loc, ValueRange qubits) {
+                loc, ionQubits.value(), [&](OpBuilder &builder, Location loc, ValueRange qubits) {
                     mlir::FloatAttr phase0Attr = builder.getF64FloatAttr(0.0);
                     auto qubit0 = qubits.front();
                     auto qubit1 = qubits.back();
@@ -470,7 +549,13 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     builder.create<ion::PulseOp>(loc, PulseType::get(ctx), time, qubit1, beam6Attr,
                                                  phase0Attr);
                 });
-            rewriter.replaceOp(op, ppOp);
+
+            // Convert ion.qubit back to quantum.bit
+            auto qubitResults = convertIonQubitsToQuantumBits(rewriter, loc, ppOp.getResults());
+            if (!qubitResults.has_value()) {
+                return failure();
+            }
+            rewriter.replaceOp(op, qubitResults.value());
             return success();
         }
         else {
