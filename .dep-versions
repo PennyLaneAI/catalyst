@@ -12,8 +12,8 @@ enzyme=v0.0.203
 # 'doc/requirements.txt'
 # TODO: uncomment and update to latest version of pennylane
 #       after https://github.com/PennyLaneAI/pennylane/pull/8525 is merged.
-# pennylane=0.44.0.dev17
+# pennylane=0.44.0.dev20
 
 # For a custom LQ/LK version, update the package version here and at
 # 'doc/requirements.txt'
-lightning=0.43.0
+lightning=0.44.0-dev11
