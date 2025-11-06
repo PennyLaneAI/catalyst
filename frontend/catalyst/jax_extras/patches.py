@@ -23,7 +23,7 @@ import jax
 import jax._src.interpreters.mlir as mlir
 import jax._src.interpreters.partial_eval as pe
 from jax._src import config, core, source_info_util
-from jax._src.core import JaxprEqnContext, Var, abstractify, standard_vma_rule, typeof
+from jax._src.core import JaxprEqnContext, Var, abstractify, standard_vma_rule, typeof, set_current_trace
 from jax._src.interpreters import pxla
 from jax._src.interpreters.partial_eval import (
     DynamicJaxprTracer,
@@ -390,7 +390,7 @@ def patched_bind_with_trace(self, trace, args, params):
         return trace.process_primitive(self, args, params)
     else:
         if self.is_high(*in_type, **params) and trace.requires_low:
-            with set_current_trace(trace):
+            with core.set_current_trace(trace):
                 return self.to_lojax(*args, **params)
         return trace.process_primitive(self, args, params)
 
