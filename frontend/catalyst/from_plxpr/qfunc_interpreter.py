@@ -345,7 +345,6 @@ def _subroutine_kernel(
     jaxpr,
     *qregs_plus_args,
     outer_dynqreg_handlers=(),
-    dynalloced_wire_global_indices=(),
     wire_label_arg_to_tracer_arg_index=(),
     wire_to_owner_qreg=(),
 ):
@@ -437,7 +436,6 @@ def handle_subroutine(self, *args, **kwargs):
             self,
             plxpr,
             outer_dynqreg_handlers=dynalloced_qregs,
-            dynalloced_wire_global_indices=dynalloced_wire_global_indices,
             wire_label_arg_to_tracer_arg_index=wire_label_arg_to_tracer_arg_index,
             wire_to_owner_qreg=wire_to_owner_qreg,
         )
