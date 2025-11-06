@@ -267,6 +267,7 @@ transforms_to_passes = {
     pl_unitary_to_rot: (None, False),
 }
 
+
 def register_transform(pl_transform, pass_name, decomposition):
     """Register pennylane transforms and their conversion to Catalyst transforms"""
     transforms_to_passes[pl_transform] = (pass_name, decomposition)
@@ -300,9 +301,7 @@ def handle_transform(
         if not self.requires_decompose_lowering:
             self.requires_decompose_lowering = True
         else:
-            raise NotImplementedError(
-                "Multiple decomposition transforms are not yet supported."
-            )
+            raise NotImplementedError("Multiple decomposition transforms are not yet supported.")
 
         next_eval = copy(self)
         # Update the decompose_gateset to be used by the quantum kernel primitive
@@ -360,7 +359,6 @@ def handle_transform(
     next_eval = copy(self)
     next_eval._pass_pipeline.insert(0, Pass(catalyst_pass_name, *targs, **tkwargs))
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
-
 
 
 # pylint: disable=too-many-positional-arguments
