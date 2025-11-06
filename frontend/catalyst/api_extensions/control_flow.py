@@ -1095,11 +1095,82 @@ class SwitchCallable:
 
         return decorator
 
-    def _call_with_quantum_ctx(self):
-        # TODO
-        pass
+    def _call_with_quantum_ctx(self, *args, **kwargs):
+        cases, branches = map(list, zip(*self.case_to_branch.items()))
+        branches.append(self.default_branch)
 
-    def _call_with_classical_ctx(self, *args, **kwargs):
+        outer_trace = EvaluationContext.get_current_trace()
+        in_classical_tracers = [self.case] + cases
+        regions: List[HybridOpRegion] = []
+
+        in_sigs, out_sigs = [], []
+        # Do the classical tracing of every branch
+        for branch in branches:
+            quantum_tape = QuantumTape()
+
+            # branches are argless
+            wfun, in_sig, out_sig = deduce_signatures(
+                branch,
+                [],
+                {},
+                expansion_strategy=self.expansion_strategy,
+                debug_info=debug_info("switch_quantum_call", branch, [], {}),
+            )
+            assert len(in_sig.in_type) == 0
+            with EvaluationContext.frame_tracing_context(debug_info=wfun.debug_info) as inner_trace:
+                with QueuingManager.stop_recording(), quantum_tape:
+                    with Patcher(
+                        (
+                            jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
+                            "_drop_unused_vars",
+                            _drop_unused_vars2,
+                        ),
+                    ):
+                        res_classical_tracers = [
+                            inner_trace.to_jaxpr_tracer(t, source_info=current_source_info())
+                            for t in wfun.call_wrapped()
+                        ]
+            explicit_return_tys = collapse(out_sig.out_type(), res_classical_tracers)
+            hybridRegion = HybridOpRegion(inner_trace, quantum_tape, [], explicit_return_tys)
+            regions.append(hybridRegion)
+            in_sigs.append(in_sig)
+            out_sigs.append(out_sig)
+        _assert_cond_result_structure([s.out_tree() for s in out_sigs])
+        _assert_cond_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
+        out_tree = out_sigs[-1].out_tree()
+        all_consts = [s.out_consts() for s in out_sigs]
+        out_types = [s.out_type() for s in out_sigs]
+
+        # Select the output type of the one with the promoted dtype among all branches
+        out_type = out_types[-1]
+        branch_avals = [[aval for aval, _ in branch_out_type] for branch_out_type in out_types]
+        promoted_dtypes = _promote_jaxpr_types(branch_avals)
+
+        out_type = [
+            (aval.update(dtype=dtype), expl)
+            for dtype, (aval, expl) in zip(promoted_dtypes, out_type)
+        ]
+
+        # Create output tracers in the outer tracing context
+        out_expanded_classical_tracers = output_type_to_tracers(
+            out_type,
+            sum(all_consts, []),
+            (),
+            maker=lambda aval: new_inner_tracer(outer_trace, aval),
+        )
+
+        out_classical_tracers = collapse(out_type, out_expanded_classical_tracers)
+
+        # Save tracers for futher quantum tracing
+        self._operation = Switch(
+            in_classical_tracers,
+            out_classical_tracers,
+            regions,
+            expansion_strategy=self.expansion_strategy,
+        )
+        return tree_unflatten(out_tree, out_classical_tracers)
+
+    def _call_with_classical_ctx(self):
         # unpack dictionary to parallel lists
         cases, branches = map(list, zip(*self.case_to_branch.items()))
         branches.append(self.default_branch)
@@ -1513,7 +1584,63 @@ class ForLoop(HybridOp):
 class Switch(HybridOp):
     """TODO"""
 
-    pass
+    binder = switch_p.bind
+
+    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
+        jaxprs, consts, num_implicit_outputs = [], [], []
+        op = self
+        for region in op.regions:
+            with EvaluationContext.frame_tracing_context(region.trace):
+                new_qreg = AbstractQreg()
+                qreg_in = _input_type_to_tracers(
+                    partial(region.trace.new_arg, source_info=current_source_info()), [new_qreg]
+                )[0]
+                qreg_out = trace_quantum_operations(
+                    region.quantum_tape, device, qreg_in, ctx, region.trace
+                ).actualize()
+
+                constants = []
+                arg_expanded_classical_tracers = []
+                res_expanded_tracers, _ = expand_results(
+                    constants,
+                    arg_expanded_classical_tracers,
+                    region.res_classical_tracers + [qreg_out],
+                    expansion_strategy=self.expansion_strategy,
+                )
+                jaxpr, out_type, const = trace_to_jaxpr(region.trace, [], res_expanded_tracers)
+
+                jaxprs.append(jaxpr)
+                consts.append(const)
+                num_implicit_outputs.append(len(out_type) - len(region.res_classical_tracers) - 1)
+
+        qreg = qrp.actualize()
+        all_jaxprs, _, _, all_consts = unify_convert_result_types(
+            jaxprs, consts, num_implicit_outputs
+        )
+        branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
+
+        in_expanded_classical_tracers = [
+            *self.in_classical_tracers,
+            *sum(all_consts, []),
+            qreg,
+        ]  # TODO probably here that needs fixing
+
+        out_expanded_classical_tracers = expand_results(
+            [],
+            in_expanded_classical_tracers,
+            self.out_classical_tracers,
+            expansion_strategy=self.expansion_strategy,
+        )[0]
+        qrp2 = QRegPromise(
+            op.bind_overwrite_classical_tracers(
+                trace,
+                in_expanded_tracers=in_expanded_classical_tracers,
+                out_expanded_tracers=out_expanded_classical_tracers,
+                branch_jaxprs=branch_jaxprs,
+                num_implicit_outputs=num_implicit_outputs[0],
+            )
+        )
+        return qrp2
 
 
 class WhileLoop(HybridOp):

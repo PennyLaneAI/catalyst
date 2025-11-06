@@ -2,7 +2,7 @@ import jax
 import pennylane as qml
 import pytest
 
-from catalyst import api_extensions, qjit, switch
+from catalyst import api_extensions, qjit, switch, measure
 from catalyst.api_extensions.control_flow import SwitchCallable
 
 
@@ -32,7 +32,10 @@ class TestInterpreted:
 
         assert SwitchCallable(i, range(3), branches)(x) == branches[i](x)
 
-    @pytest.mark.parametrize("i,x", [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (1, 3), (2, 1), (2, 2), (2, 3), (3, 5), (5, 6)])
+    @pytest.mark.parametrize(
+        "i,x",
+        [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (1, 3), (2, 1), (2, 2), (2, 3), (3, 5), (5, 6)],
+    )
     def test_decorator(self, i, x):
         def foo(i, x):
             @switch(i)
@@ -79,7 +82,6 @@ class TestClassicalCompiled:
 
         assert foo(i) == (i * 2 - 1 if i in [0, 1] else 3)
 
-
     @pytest.mark.parametrize("x", [1, 3, 5, 6, 8, 9, 11, 12])
     def test_chosen_index(self, x):
         @qjit
@@ -124,3 +126,29 @@ class TestClassicalCompiled:
             return my_switch()
 
         assert foo(i) == (i if i in [0, 3, -2] else 10)
+
+
+class TestQuantum:
+    """Test compiled Catalyst switches with quantum operations."""
+
+    @pytest.mark.parametrize("i", [0, 1])
+    def test_x_gate(self, i):
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def foo(j):
+            @switch(j)
+            def my_switch():
+                pass
+
+            @my_switch.default()
+            def branch():
+                qml.X(0)
+
+            my_switch()
+            return measure(wires=0)
+
+        assert foo(i) == bool(i)
+
+
+# TODO test for exceptions
+# TODO ensure test suite is comprehensive but not redundant
