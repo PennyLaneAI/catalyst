@@ -506,17 +506,26 @@ class Compiler:
             except (AttributeError, KeyError, TypeError):
                 return False
 
-        try:
-            for op in mlir_module.operation.regions[0].blocks[0].operations:
-                try:
-                    # Check nested modules (look for transform modules)
-                    if hasattr(op, "regions") and len(op.regions) > 0:
-                        for nested_op in op.regions[0].blocks[0].operations:
-                            if hasattr(nested_op, "attributes") and has_both_attributes(nested_op.attributes):
-                                return True
-                except (AttributeError, IndexError):
-                    pass
+        def check_nested_operations(op):
+            """Check if any nested operation has the required attributes."""
+            regions = getattr(op, "regions", [])
+            if not regions:
+                return False
+            
+            try:
+                for nested_op in regions[0].blocks[0].operations:
+                    attrs = getattr(nested_op, "attributes", None)
+                    if attrs and has_both_attributes(attrs):
+                        return True
+            except (AttributeError, IndexError):
+                pass
             return False
+
+        try:
+            return any(
+                check_nested_operations(op)
+                for op in mlir_module.operation.regions[0].blocks[0].operations
+            )
         except Exception:  # pylint: disable=broad-except
             # If we can't check the attribute, assume no xDSL passes
             return False
