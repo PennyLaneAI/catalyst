@@ -560,7 +560,7 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
     return _decorator
 
 
-def switch(index_var, index=0, allow_array_resizing=False):
+def switch(case_var, case=0, allow_array_resizing=False):
     """
     A :func:`~.qjit` compatible switch decorator for PennyLane/Catalyst.
 
@@ -572,7 +572,7 @@ def switch(index_var, index=0, allow_array_resizing=False):
 
     def _decorator(branch):
         # TODO maybe deal with array resizing here
-        return SwitchCallable(index_var, [index], [branch])
+        return SwitchCallable(case_var, [case], [branch])
 
     return _decorator
 
@@ -1046,9 +1046,9 @@ class SwitchCallable:
     >>>
     """
 
-    def __init__(self, index, indices, branches, default_branch=None):
-        self.index = index
-        self.index_to_branch = dict(zip(indices, branches))
+    def __init__(self, case, cases, branches, default_branch=None):
+        self.case = case
+        self.case_to_branch = dict(zip(cases, branches))
         self.default_branch = default_branch
         self._operation = None
         self.expansion_strategy = switch_expansion_strategy()
@@ -1067,7 +1067,7 @@ class SwitchCallable:
             )
         return self._operation
 
-    def branch(self, new_index):
+    def branch(self, case):
         """
         TODO
 
@@ -1076,7 +1076,7 @@ class SwitchCallable:
         """
 
         def decorator(branch):
-            self.index_to_branch[new_index] = branch
+            self.case_to_branch[case] = branch
             return self
 
         return decorator
@@ -1100,23 +1100,59 @@ class SwitchCallable:
         pass
 
     def _call_with_classical_ctx(self, *args, **kwargs):
-        # TODO
-        pass
+        # unpack dictionary to parallel lists
+        cases, branches = map(list, zip(*self.case_to_branch.items()))
+        branches.append(self.default_branch)
+
+        # wraps trace to allow simple unzipping
+        def _trace(branch_fn):
+            _, in_sig, out_sig = trace_function(
+                branch_fn,
+                *(),
+                expansion_strategy=switch_expansion_strategy(),
+                debug_info=debug_info("switch_classical_call", branch_fn, [], {}),
+            )
+            return in_sig, out_sig
+
+        # trace branches to get output signatures
+        in_sigs, out_sigs = unzip2([_trace(branch) for branch in branches])
+
+        # ensure consistent output structures and types
+        _assert_cond_result_structure([sig.out_tree() for sig in out_sigs])
+        _assert_cond_result_types([[t[0] for t in sig.out_type()] for sig in out_sigs])
+
+        all_jaxprs = [sig.out_initial_jaxpr() for sig in out_sigs]
+        all_consts = [sig.out_consts() for sig in out_sigs]
+        all_num_implicit_outs = [sig.num_implicit_outputs() for sig in out_sigs]
+        all_jaxprs, _, _, all_consts = unify_convert_result_types(
+            all_jaxprs, all_consts, all_num_implicit_outs
+        )
+
+        # after this, all branches have the same signatures
+        branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
+
+        # this calls Dynshape.bind
+        out_tracers = switch_p.bind(
+            *([self.case] + cases + sum(all_consts, [])),
+            branch_jaxprs=branch_jaxprs,
+            num_implicit_outputs=out_sigs[0].num_implicit_outputs(),
+        )
+
+        return tree_unflatten(out_sigs[0].out_tree(), collapse(out_sigs[0].out_type(), out_tracers))
 
     def _call_during_interpretation(self):
-        if len(self.index_to_branch) == 0:  # if no branch
-            raise IndexError("Cannot index zero branches!")
-
-        if self.index in self.index_to_branch.keys():
-            return self.index_to_branch[self.index]()
-        else:
-            return self.default_branch()
+        # dictionary access with default value for miss
+        return self.case_to_branch.get(self.case, self.default_branch)()
 
     def __call__(self, *args, **kwargs):
-        # convert branches to argless functions
-        for i in self.index_to_branch:
-            self.index_to_branch[i] = _make_argless_function(self.index_to_branch[i], args, kwargs)
+        if len(self.case_to_branch) == 0 and self.default_branch == None:
+            raise IndexError("Cannot index zero branches!")
 
+        # convert branches to argless functions
+        for case in self.case_to_branch:
+            self.case_to_branch[case] = _make_argless_function(
+                self.case_to_branch[case], args, kwargs
+            )
         self.default_branch = _make_argless_function(self.default_branch, args, kwargs)
 
         mode = EvaluationContext.get_evaluation_mode()
