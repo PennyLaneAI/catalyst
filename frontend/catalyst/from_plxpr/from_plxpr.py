@@ -294,8 +294,8 @@ def handle_transform(
     # If the transform is a decomposition transform
     # and the graph-based decomposition is enabled
     if (
-        hasattr(transform._plxpr_trnasform, "__name__")
-        and transform._plxpr_trnasform.__name__ == "decompose_plxpr_to_plxpr"
+        hasattr(transform._plxpr_transform, "__name__")
+        and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
         and qml.decomposition.enabled_graph()
     ):
         if not self.requires_decompose_lowering:
