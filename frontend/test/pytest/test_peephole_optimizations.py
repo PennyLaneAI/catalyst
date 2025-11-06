@@ -243,6 +243,23 @@ def test_disentangle_passes():
     assert np.allclose(circuit_with_no_disentangle_passes(), circuit_with_disentangle_passes())
 
 
+def test_pauli_rot_to_ppr():
+
+    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    with pytest.raises(
+        ValueError,
+    ):
+        @qjit(pipelines=pipe, target="mlir")
+        def test_pauli_rot_to_ppr_workflow():
+
+            @qml.qnode(qml.device("catalyst.ftqc", wires=2))
+            def f():
+                qml.PauliRot(np.pi / 12, "X", wires=0)
+
+            return f()
+
+
 def test_convert_clifford_to_ppr():
 
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
