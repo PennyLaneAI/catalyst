@@ -76,6 +76,7 @@
 <h3>Internal changes ⚙️</h3>
 
 * Updates to PennyLane's use of a single transform primitive with a `transform` kwarg.
+  [(#2177)](https://github.com/PennyLaneAI/catalyst/pull/2177)
 
 * Refactor Catalyst pass registering so that it's no longer necessary to manually add new
   passes at `registerAllCatalystPasses`.
