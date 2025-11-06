@@ -250,6 +250,7 @@ def test_pauli_rot_to_ppr():
     with pytest.raises(
         ValueError,
     ):
+
         @qjit(pipelines=pipe, target="mlir")
         def test_pauli_rot_to_ppr_workflow():
 
