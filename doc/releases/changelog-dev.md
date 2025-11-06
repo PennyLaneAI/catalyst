@@ -115,6 +115,10 @@
 * Fix `catalyst.qjit` and `catalyst.CompileOptions` docs rendering.
   [(#2156)](https://github.com/PennyLaneAI/catalyst/pull/2156)
 
+* Update `MLIR Plugins` documentation stating that plugins require adding passes via
+  `--pass-pipeline`.
+  [(#2168)](https://github.com/PennyLaneAI/catalyst/pull/2168)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
