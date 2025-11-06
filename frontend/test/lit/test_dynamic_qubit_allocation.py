@@ -245,25 +245,28 @@ def test_pass_multiple_regs_into_whileloop(N: int):
 print(test_pass_multiple_regs_into_whileloop.mlir)
 
 
+# pylint: disable=line-too-long
 def test_quantum_subroutine():
     """
     Test passing dynamically allocated wires into a quantum subroutine.
     """
 
     @subroutine
-    def flip(w1, w2, theta):
+    def flip(w1, w2, w3, theta):
         qml.X(w1)
-        qml.X(w2)
+        qml.Y(w2)
+        qml.Z(w3)
         qml.ctrl(qml.RX, (w1, w2))(theta, wires=0)
 
     # CHECK:  [[angle:%.+]] = stablehlo.constant dense<1.230000e+00>
+    # CHECK:  [[two:%.+]] = stablehlo.constant dense<2>
     # CHECK:  [[one:%.+]] = stablehlo.constant dense<1>
     # CHECK:  [[zero:%.+]] = stablehlo.constant dense<0>
     # CHECK:  [[global_qreg:%.+]] = quantum.alloc( 1)
     # CHECK:  [[q1:%.+]] = quantum.alloc( 2)
     # CHECK:  [[q2:%.+]] = quantum.alloc( 3)
-    # CHECK:  {{%.+}}:3 = call @flip([[global_qreg]], [[q1]], [[q2]], [[zero]], [[one]], [[angle]])
-    # CHECK-SAME: (!quantum.reg, !quantum.reg, !quantum.reg, tensor<i64>, tensor<i64>, tensor<f64>)
+    # CHECK:  {{%.+}}:3 = call @flip([[global_qreg]], [[q1]], [[q2]], [[zero]], [[one]], [[two]], [[angle]])
+    # CHECK-SAME: (!quantum.reg, !quantum.reg, !quantum.reg, tensor<i64>, tensor<i64>, tensor<i64>, tensor<f64>)
     # CHECK-SAME: -> (!quantum.reg, !quantum.reg, !quantum.reg)
 
     @qjit(target="mlir")
@@ -271,23 +274,29 @@ def test_quantum_subroutine():
     def circuit():
         with qml.allocate(2) as q1:
             with qml.allocate(3) as q2:
-                flip(q1[0], q2[1], 1.23)
+                flip(q1[0], q1[1], q2[2], 1.23)
         return qml.probs(wires=[0])
 
     # CHECK: func.func private @flip(
     # CHECK:   [[zero:%.+]] = tensor.extract %arg3[]
     # CHECK:   [[q1_0:%.+]] = quantum.extract %arg1[[[zero]]]
-    # CHECK:   [[x1_out:%.+]] = quantum.custom "PauliX"() [[q1_0]]
+    # CHECK:   [[x_out:%.+]] = quantum.custom "PauliX"() [[q1_0]]
     # CHECK:   [[one:%.+]] = tensor.extract %arg4[]
-    # CHECK:   [[q2_1:%.+]] = quantum.extract %arg2[[[one]]]
-    # CHECK:   [[x2_out:%.+]] = quantum.custom "PauliX"() [[q2_1]]
+    # CHECK:   [[q1_1:%.+]] = quantum.extract %arg1[[[one]]]
+    # CHECK:   [[y_out:%.+]] = quantum.custom "PauliY"() [[q1_1]]
+    # CHECK:   [[two:%.+]] = tensor.extract %arg5[]
+    # CHECK:   [[q2_2:%.+]] = quantum.extract %arg2[[[two]]]
+    # CHECK:   [[z_out:%.+]] = quantum.custom "PauliZ"() [[q2_2]]
     # CHECK:   [[glob_0:%.+]] = quantum.extract %arg0[ 0]
-    # CHECK:   [[angle:%.+]] = tensor.extract %arg5[]
+    # CHECK:   [[angle:%.+]] = tensor.extract %arg6[]
     # CHECK:   [[rx_out:%.+]], [[rx_ctrl_out:%.+]]:2 = quantum.custom "RX"([[angle]]) [[glob_0]]
-    # CHECK-SAME: ctrls([[x1_out]], [[x2_out]])
+    # CHECK-SAME: ctrls([[x_out]], [[y_out]])
     # CHECK:   [[glob_re:%.+]] = quantum.insert %arg0[ 0], [[rx_out]]
-    # CHECK:   [[q2_re:%.+]] = quantum.insert %arg2[{{%.+}}], [[rx_ctrl_out]]#1
-    # CHECK:   [[q1_re:%.+]] = quantum.insert %arg1[{{%.+}}], [[rx_ctrl_out]]#0
+    # CHECK:   [[q2_re:%.+]] = quantum.insert %arg2[{{%.+}}], [[z_out]]
+    # CHECK:   [[zero:%.+]] = tensor.extract %arg3[]
+    # CHECK:   [[_q1_re:%.+]] = quantum.insert %arg1[[[zero]]], [[rx_ctrl_out]]#0
+    # CHECK:   [[one:%.+]] = tensor.extract %arg4[]
+    # CHECK:   [[q1_re:%.+]] = quantum.insert [[_q1_re]][[[one]]], [[rx_ctrl_out]]#1
     # CHECK:   return [[glob_re]], [[q1_re]], [[q2_re]] : !quantum.reg, !quantum.reg, !quantum.reg
 
     print(circuit.mlir)

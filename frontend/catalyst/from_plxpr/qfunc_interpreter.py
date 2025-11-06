@@ -347,6 +347,7 @@ def _subroutine_kernel(
     outer_dynqreg_handlers=(),
     dynalloced_wire_global_indices=(),
     wire_label_arg_to_tracer_arg_index=(),
+    wire_to_owner_qreg=(),
 ):
     global_qreg, *dynqregs_plus_args = qregs_plus_args
     num_dynamic_alloced_qregs = len(outer_dynqreg_handlers)
@@ -365,8 +366,9 @@ def _subroutine_kernel(
     # add dynamic qregs to recorder
     qreg_map = {}
     dyn_qreg_handlers = []
-    for dyn_qreg, outer_dynqreg_handler, global_wire_index in zip(
-        dynalloced_qregs, outer_dynqreg_handlers, dynalloced_wire_global_indices, strict=True
+    arg_to_qreg = {}
+    for dyn_qreg, outer_dynqreg_handler in zip(
+        dynalloced_qregs, outer_dynqreg_handlers, strict=True
     ):
         dyn_qreg_handler = QubitHandler(dyn_qreg, converter.qubit_index_recorder)
         dyn_qreg_handlers.append(dyn_qreg_handler)
@@ -377,13 +379,16 @@ def _subroutine_kernel(
         dyn_qreg_handler.root_hash = outer_dynqreg_handler.root_hash
 
         # Each qreg argument of the subscope corresponds to a qreg from the outer scope
-        qreg_map[args[wire_label_arg_to_tracer_arg_index[global_wire_index]]] = dyn_qreg_handler
+        qreg_map[outer_dynqreg_handler] = dyn_qreg_handler
+
+    for global_idx, arg_idx in wire_label_arg_to_tracer_arg_index.items():
+        arg_to_qreg[args[arg_idx]] = qreg_map[wire_to_owner_qreg[global_idx]]
 
     # The new interpreter's recorder needs to be updated to include the qreg args
     # of this scope, instead of the outer qregs
     for arg in args:
-        if arg in qreg_map:
-            converter.qubit_index_recorder[arg] = qreg_map[arg]
+        if arg in arg_to_qreg:
+            converter.qubit_index_recorder[arg] = arg_to_qreg[arg]
 
     retvals = converter(jaxpr, *args)
 
@@ -413,6 +418,8 @@ def handle_subroutine(self, *args, **kwargs):
     dynalloced_qregs, dynalloced_wire_global_indices = _get_dynamically_allocated_qregs(
         args, self.qubit_index_recorder, self.init_qreg
     )
+    wire_to_owner_qreg = dict(zip(dynalloced_wire_global_indices, dynalloced_qregs))
+    dynalloced_qregs = list(dict.fromkeys(dynalloced_qregs))  # squash duplicates
 
     # Convert global wire indices into local indices
     new_args = ()
@@ -432,6 +439,7 @@ def handle_subroutine(self, *args, **kwargs):
             outer_dynqreg_handlers=dynalloced_qregs,
             dynalloced_wire_global_indices=dynalloced_wire_global_indices,
             wire_label_arg_to_tracer_arg_index=wire_label_arg_to_tracer_arg_index,
+            wire_to_owner_qreg=wire_to_owner_qreg,
         )
         converted_closed_jaxpr_branch = jax.make_jaxpr(f)(
             self.init_qreg.get(), *[dyn_qreg.get() for dyn_qreg in dynalloced_qregs], *args
