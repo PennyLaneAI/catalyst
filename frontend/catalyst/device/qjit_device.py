@@ -253,6 +253,7 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
                 invertible=True, controllable=True, differentiable=True
             ),
             "ForLoop": OperatorProperties(invertible=True, controllable=True, differentiable=True),
+            "Switch": OperatorProperties(invertible=True, controllable=True, differentiable=True),
         }
     )
 
