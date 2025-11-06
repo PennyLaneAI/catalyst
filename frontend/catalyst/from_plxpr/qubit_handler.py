@@ -436,7 +436,7 @@ def _get_dynamically_allocated_qregs(plxpr_invals, qubit_index_recorder, init_qr
     Get the potential dynamically allocated register values that are visible to a jaxpr.
 
     Note that dynamically allocated wires have their qreg tracer's id as the global wire index
-    so the sub jaxpr takes that id in as a "const", since it is clousure from the target wire
+    so the sub jaxpr takes that id in as a "const", since it is closure from the target wire
     of gates/measurements/...
     We need to remove that const, so we also let this util return these global indices.
     """
