@@ -324,7 +324,7 @@ class TestMidCircuitMeasurement:
         assert spy.call_count == 1
 
     @pytest.mark.xfail(
-        reason="Midcircuit measurements with sampling is unseeded and hence this test is flaky"
+        reason="Midcircuit measurements with sampling is unseeded and hence this test is flaky", strict=False
     )
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
     @pytest.mark.parametrize("mcm_method", [None, "one-shot"])
