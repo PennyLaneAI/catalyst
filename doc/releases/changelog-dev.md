@@ -73,6 +73,13 @@
   // ... use %4
   ```
 
+* (Compiler integrators only) The versions of LLVM/Enzyme/stablehlo used by Catalyst have been
+  updated. Enzyme now targets `v0.0.203` with the build target `EnzymeStatic-22`, and the nanobind
+  requirement for the latest LLVM has been updated to version 2.9.
+  [(#2122)](https://github.com/PennyLaneAI/catalyst/pull/2122)
+  [(#2174)](https://github.com/PennyLaneAI/catalyst/pull/2174)
+  [(#2175)](https://github.com/PennyLaneAI/catalyst/pull/2175)
+
 <h3>Internal changes ⚙️</h3>
 
 * Refactor Catalyst pass registering so that it's no longer necessary to manually add new
