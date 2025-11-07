@@ -23,6 +23,10 @@
 * `qml.grad` and `qml.jacobian` can now be used with `qjit` when program capture is enabled.
   [(#2078)](https://github.com/PennyLaneAI/catalyst/pull/2078)
 
+* xDSL passes are now automatically detected when using the `qjit` decorator. 
+  This removes the need to pass the `pass_plugins` argument to the `qjit` decorator.
+  [(#2169)](https://github.com/PennyLaneAI/catalyst/pull/2169)
+
 * Dynamically allocated wires can now be passed into control flow and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
 
