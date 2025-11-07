@@ -5,6 +5,7 @@ set(LIBS
     ${conversion_libs}
     ExternalStablehloLib
     MLIRLspServerLib
+    MLIRRegisterAllDialects
     MLIRCatalyst
     MLIRQuantum
     MLIRQEC

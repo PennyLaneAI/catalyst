@@ -232,7 +232,7 @@ class TestCatalyst:
                 qml.QubitUnitary(gate_modified, wires=[0, 1])
                 return s + 1
 
-            loop_body(1)
+            loop_body(1)  # pylint: disable=no-value-for-parameter
 
         _input = jnp.array(
             [
@@ -302,7 +302,7 @@ class TestCatalyst:
             def loop(_i, s):
                 return s + 1
 
-            qml.PauliX(wires=loop(w))
+            qml.PauliX(wires=loop(w))  # pylint: disable=no-value-for-parameter
             qml.RX(np.pi / 2, wires=w)
 
         self.verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=3), 0)
@@ -337,7 +337,7 @@ class TestCatalyst:
                 qml.RX(carried, wires=0)
                 return carried * 2
 
-            final = loop_body(1)
+            final = loop_body(1)  # pylint: disable=no-value-for-parameter
             qml.RZ(final, wires=0)
 
         dev = qml.device(backend, wires=1)
@@ -352,7 +352,7 @@ class TestCatalyst:
             def loop_body(i):
                 qml.CNOT(wires=(i, i + 1))
 
-            loop_body()
+            loop_body()  # pylint: disable=no-value-for-parameter
 
         dev = qml.device(backend, wires=5)
         self.verify_catalyst_adjoint_against_pennylane(func, dev, 4)
@@ -379,10 +379,10 @@ class TestCatalyst:
                     cond_fn()
                     return counter + 1
 
-                loop_inner(0)
+                loop_inner(0)  # pylint: disable=no-value-for-parameter
                 return carried + 2
 
-            final = loop_outer(1)
+            final = loop_outer(1)  # pylint: disable=no-value-for-parameter
             qml.MultiRZ(final / 30, wires=(0, 1))
 
         dev = qml.device(backend, wires=2)
@@ -407,11 +407,11 @@ class TestCatalyst:
                     def loop_inner(_):
                         qml.RX(theta, wires=0)
 
-                    loop_inner()
+                    loop_inner()  # pylint: disable=no-value-for-parameter
 
                 adjoint(inner_func)()
 
-            loop_outer()
+            loop_outer()  # pylint: disable=no-value-for-parameter
 
         def pl_quantum_func(theta):
             @for_loop(0, 4, 1)
@@ -423,11 +423,11 @@ class TestCatalyst:
                     def loop_inner(_):
                         qml.RX(theta, wires=0)
 
-                    loop_inner()
+                    loop_inner()  # pylint: disable=no-value-for-parameter
 
                 qml.adjoint(inner_func)()
 
-            loop_outer()
+            loop_outer()  # pylint: disable=no-value-for-parameter
 
         dev = qml.device(backend, wires=1)
 
@@ -461,7 +461,7 @@ class TestCatalyst:
                     qml.RY(theta, wires=0)
                     return ub + jv
 
-                ub = loop_inner(1)
+                ub = loop_inner(1)  # pylint: disable=no-value-for-parameter
 
                 qml.RX(theta / ub, wires=0)
 
@@ -470,11 +470,11 @@ class TestCatalyst:
                     qml.RZ(ub / 5, wires=0)
                     return counter + 1
 
-                final = while_loop_inner(0)
+                final = while_loop_inner(0)  # pylint: disable=no-value-for-parameter
 
                 qml.RX(theta / final, wires=0)
 
-            loop_outer()
+            loop_outer()  # pylint: disable=no-value-for-parameter
 
         dev = qml.device(backend, wires=1)
         self.verify_catalyst_adjoint_against_pennylane(func, dev, jnp.pi)

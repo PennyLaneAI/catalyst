@@ -58,6 +58,10 @@ def PulseType : Ion_Type<"Pulse", "pulse"> {
     let summary = "A type representing a pulse specifications.";
 }
 
+def QubitType : Ion_Type<"Qubit", "qubit"> {
+    let summary = "A value-semantic qubit in ion";
+}
+
 //===----------------------------------------------------------------------===//
 // Ion dialect base operation.
 //===----------------------------------------------------------------------===//

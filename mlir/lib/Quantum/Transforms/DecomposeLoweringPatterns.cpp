@@ -106,7 +106,7 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
 
     LogicalResult matchAndRewrite(MultiRZOp op, PatternRewriter &rewriter) const override
     {
-        StringRef gateName = "MultiRZ";
+        std::string gateName = "MultiRZ";
 
         // Only decompose the op if it is not in the target gate set
         if (targetGateSet.contains(gateName)) {
@@ -117,7 +117,7 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
         auto numQubits = op.getInQubits().size();
         auto MRZNameWithQubits = gateName + "_" + std::to_string(numQubits);
 
-        auto it = decompositionRegistry.find(MRZNameWithQubits.str());
+        auto it = decompositionRegistry.find(MRZNameWithQubits);
         if (it == decompositionRegistry.end()) {
             return failure();
         }
