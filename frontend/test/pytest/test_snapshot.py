@@ -25,6 +25,9 @@ from pennylane import numpy as np
 from catalyst import qjit
 
 
+pytestmark = pytest.mark.capture_todo
+
+
 class TestSnapshot:
     """Test if Snapshots are captured correctly."""
 

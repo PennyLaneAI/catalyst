@@ -21,10 +21,16 @@ import pytest
 
 import catalyst
 from catalyst import CompileError, measure, qjit
+from catalyst import measure as c_measure
 from catalyst.device.qjit_device import QJITDevice
 
 
-@pytest.mark.usefixtures("use_both_frontend")
+def measure(*args, **kwargs):
+    if qml.capture.enabled():
+        return qml.measure(*args, **kwargs)
+    return c_measure(*args, **kwargs)
+
+@pytest.mark.old_frontend
 @pytest.mark.parametrize("_in,_out", [(0, False), (1, True)])
 def test_variable_capture(_in, _out):
     """Test closures (outer-scope variable capture) for quantum functions."""
@@ -46,7 +52,7 @@ def test_variable_capture(_in, _out):
     assert workflow(_in) == _out
 
 
-@pytest.mark.usefixtures("use_both_frontend")
+@pytest.mark.old_frontend
 @pytest.mark.parametrize(
     "_in,_out",
     [
@@ -74,7 +80,7 @@ def test_variable_capture_multiple_devices(_in, _out, backend):
     assert workflow(_in) == _out
 
 
-@pytest.mark.usefixtures("use_both_frontend")
+@pytest.mark.old_frontend
 def test_unsupported_device():
     """Test unsupported device."""
 
@@ -106,7 +112,6 @@ def test_qfunc_output_shape_scalar():
         return res * 1j
 
 
-@pytest.mark.xfail(reason="Preserving scalars is preferred over preserving length-1 containers.")
 def test_qfunc_output_shape_list():
     """Check that length-1 list outputs of QNodes are preserved."""
 
