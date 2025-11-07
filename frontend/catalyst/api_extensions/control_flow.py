@@ -560,18 +560,114 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
     return _decorator
 
 
-def switch(case_var, case=0, allow_array_resizing=False):
+def switch(case_var: int, case: int = 0):
     """
-    A :func:`~.qjit` compatible switch decorator for PennyLane/Catalyst.
+    A :func:`~.qjit` compatible decorator for index-switches in PennyLane/Catalyst.
 
-    TODO add examples/explain
+    This form of control flow is a functional version of an index-switch.
+    This means that each execution path (each branch of the switch) is provided as a separate function.
+    All branches are traced at compile time, but only one will be executed at runtime, depending on the value of `case_var`.
+    The JAX equivalent of this is the ``jax.lax.switch`` function, but this version allows for arbitrary integer valued cases, does not clamp the index, and is optimized to work with quantum programs in PennyLane.
+    This version also supports a default branch that is not present in the JAX implementation.
+
+    Values produced within the scope of the branches can be returned to the outside context, but the return type signature of each branch must be identical.
+    If no default branch is assigned, the first branch provided will be assigned as default.
+    The first branch is assigned case 0 by default, but can be overridden.
+    Refer to the examples below to learn more about this decorator.
+
+    This form of control flow can also be called from the Python interpreter without needing to use :func: `~.qjit`.
+
+    Args:
+        case_var (int): the case of the branch to execute
+        case (int): the case of this branch
+
+    Returns:
+        A callable decorator that wraps the first branch of the switch statement
+
+    **Example**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(i):
+            @switch(i)
+            def my_switch():
+                qml.Z(0)
+
+            @switch.branch(1)
+            def my_branch():
+                qml.X(0)
+
+            my_switch()
+
+            return qml.probs()
+    >>> circuit(0)
+    [1. 0.]
+    >>> circuit(1)
+    [0. 1.]
+
+    A default branch that catches any value not otherwise specified can be set via the ``.default`` method, and the initial case can be specified using the `case` parameter:
+
+    .. code-block:: python
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(i):
+            @switch(i)
+            def my_switch(case=11):
+                qml.Z(0)
+
+            @my_switch.default()
+            def my_default_branch():
+                qml.X(0)
+
+            my_switch()
+
+            return qml.probs(wires=0)
+
+    >>> circuit(11)
+    [1. 0.]
+    >>> circuit(2)
+    [0. 1.]
+
+    Switches can also return values of any JAX JIT compatible types, provided that each branch of the switch, including the default branch, have the same return signature or can be promoted to the same types.
+
+    .. code-block:: python
+
+        @qjit
+        def foo(i):
+            @switch(i)
+            def my_switch():
+                return complex(1, 3)
+
+            @my_switch.branch(6)
+            def my_branch():
+                # this will be type-promoted
+                return 1.4
+
+            @my_switch.default()
+            def my_default_branch():
+                # this will also be type-promoted
+                return 2
+
+            return my_switch() # must invoke the switch
+    >>> foo(6)
+    (1.4+0j)
+    >>> foo(3)
+    (2+0j)
+
+    .. note::
+
+        ``catalyst.switch`` is not supported in program capture mode.
     """
 
     if qml.capture.enabled():
         raise PlxprCaptureCFCompatibilityError("switch")
 
     def _decorator(branch):
-        # TODO maybe deal with array resizing here
         return SwitchCallable(case_var, [case], [branch])
 
     return _decorator
@@ -1040,7 +1136,7 @@ class ForLoopCallable:
 
 class SwitchCallable:
     """
-    TODO
+    User-facing wrapper providing an index-switch interface.
 
     Example:
     >>>
