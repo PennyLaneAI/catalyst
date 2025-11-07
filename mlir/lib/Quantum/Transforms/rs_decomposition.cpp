@@ -83,8 +83,7 @@ mlir::func::FuncOp getOrDeclareGetGatesFunc(mlir::ModuleOp module, mlir::Pattern
  * MLIR signature: func.func @rs_decomposition_get_phase(f64, f64) -> f64
  * Will be used for global phase
  */
-mlir::func::FuncOp getOrDeclareGetPhaseFunc(mlir::ModuleOp module,
-                                            mlir::PatternRewriter &rewriter)
+mlir::func::FuncOp getOrDeclareGetPhaseFunc(mlir::ModuleOp module, mlir::PatternRewriter &rewriter)
 {
     const char *funcName = "rs_decomposition_get_phase"; // Match C++ name
     auto func = module.lookupSymbol<mlir::func::FuncOp>(funcName);
@@ -382,12 +381,11 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
 
         mlir::NamedAttrList gphaseAttrs;
         // Set operandSegmentSizes: [params, in_ctrl_qubits, in_ctrl_values]
-        gphaseAttrs.append(rewriter.getNamedAttr("operandSegmentSizes",
-                                                 rewriter.getDenseI32ArrayAttr({1, 0, 0})));
+        gphaseAttrs.append(
+            rewriter.getNamedAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 0})));
 
-        rewriter.create<GlobalPhaseOp>(loc,
-                                       TypeRange{},              // No results
-                                       ValueRange{doubleVal1},   // Operands
+        rewriter.create<GlobalPhaseOp>(loc, TypeRange{},        // No results
+                                       ValueRange{doubleVal1},  // Operands
                                        gphaseAttrs.getAttrs()); // Attributes
 
         // Clean up original op

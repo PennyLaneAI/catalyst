@@ -1,3 +1,4 @@
+#pragma once
 #include "rings.hpp"
 #include <map>
 // CHECK ALL VALUES in this file
