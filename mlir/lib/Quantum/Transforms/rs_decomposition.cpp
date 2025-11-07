@@ -88,8 +88,7 @@ mlir::func::FuncOp getOrDeclareGetGatesFunc(mlir::ModuleOp module, mlir::Pattern
  * MLIR signature: func.func @rs_decomposition_get_phase(f64, f64) -> f64
  * Will be used for global phase
  */
-mlir::func::FuncOp getOrDeclareGetPhaseFunc(mlir::ModuleOp module,
-                                            mlir::PatternRewriter &rewriter)
+mlir::func::FuncOp getOrDeclareGetPhaseFunc(mlir::ModuleOp module, mlir::PatternRewriter &rewriter)
 {
     // Because of later annotation pass, the C++ runtime function
     // will be matched with `rs_decomposition_get_phase_0` function
@@ -183,10 +182,10 @@ mlir::func::FuncOp getOrDeclareDecompositionFunc(mlir::ModuleOp module,
         rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getF64FloatAttr(epsilon));
 
     // Call runtime functions
-    auto callGetGatesOp = rewriter.create<mlir::func::CallOp>(
-        loc, getGatesFunc, mlir::ValueRange{angle, epsilonVal});
-    auto callGetPhaseOp = rewriter.create<mlir::func::CallOp>(
-        loc, getPhaseFunc, mlir::ValueRange{angle, epsilonVal});
+    auto callGetGatesOp =
+        rewriter.create<mlir::func::CallOp>(loc, getGatesFunc, mlir::ValueRange{angle, epsilonVal});
+    auto callGetPhaseOp =
+        rewriter.create<mlir::func::CallOp>(loc, getPhaseFunc, mlir::ValueRange{angle, epsilonVal});
 
     mlir::Value rankedMemref = callGetGatesOp.getResult(0);
     mlir::Value runtimePhase = callGetPhaseOp.getResult(0);
@@ -239,8 +238,8 @@ mlir::func::FuncOp getOrDeclareDecompositionFunc(mlir::ModuleOp module,
             newAttrs.append(builder.getNamedAttr("resultSegmentSizes", resultSegmentSizes));
 
             // Create the CustomOp.
-            auto newOp = builder.create<CustomOp>(
-                loc, qbitType, mlir::ValueRange{currentQbit}, newAttrs.getAttrs());
+            auto newOp = builder.create<CustomOp>(loc, qbitType, mlir::ValueRange{currentQbit},
+                                                  newAttrs.getAttrs());
             currentQbit = newOp.getResult(0); // Chain the result
         }
 
@@ -320,7 +319,9 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
     double EPSILON;
 
     DecomposeCustomOpPattern(mlir::MLIRContext *context, double epsilon)
-        : mlir::OpRewritePattern<CustomOp>(context), EPSILON(epsilon) {}
+        : mlir::OpRewritePattern<CustomOp>(context), EPSILON(epsilon)
+    {
+    }
 
     mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
     {
@@ -349,7 +350,7 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
         if (paramOperands.size() != 1) {
             return rewriter.notifyMatchFailure(op, "Op must have exactly one parameter");
         }
-        mlir::Value angle = paramOperands[0]; 
+        mlir::Value angle = paramOperands[0];
         if (!mlir::isa<mlir::Float64Type>(angle.getType())) {
             return rewriter.notifyMatchFailure(op, "Op parameter is not f64");
         }
@@ -365,13 +366,13 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
         // find the source ExtractOp for current Qubit
         catalyst::quantum::ExtractOp extractOp = findSourceExtract(qbitOperand);
         if (!extractOp) {
-            return rewriter.notifyMatchFailure(
-                op, "Qubit operand does not trace back to an ExtractOp");
+            return rewriter.notifyMatchFailure(op,
+                                               "Qubit operand does not trace back to an ExtractOp");
         }
 
         // Get the register, index, and types
         mlir::Value qregOperand = extractOp.getQreg();
-        mlir::Value qbitIndex = extractOp.getIdx(); 
+        mlir::Value qbitIndex = extractOp.getIdx();
         mlir::Type qregType = qregOperand.getType();
         mlir::Type qbitType = qbitOperand.getType();
 
@@ -387,13 +388,13 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
         rewriter.setInsertionPoint(op);
 
         // Insert the input qubit back into the register
-        mlir::Value regWithQubit = rewriter.create<InsertOp>(loc, qregType, qregOperand, qbitIndex,
-            nullptr, qbitOperand);
+        mlir::Value regWithQubit =
+            rewriter.create<InsertOp>(loc, qregType, qregOperand, qbitIndex, nullptr, qbitOperand);
 
         // Replace RZ/PhaseShift with decomposition subroutine
         // Get or declare the decomposition function
         mlir::func::FuncOp decompFunc = getOrDeclareDecompositionFunc(module, rewriter, EPSILON);
-            
+
         // Call the decomposition function
         auto callDecompOp = rewriter.create<mlir::func::CallOp>(
             loc, decompFunc, mlir::ValueRange{regWithQubit, qbitIndex, angle});
@@ -418,11 +419,10 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
         }
 
         mlir::NamedAttrList gphaseAttrs;
-        gphaseAttrs.append(rewriter.getNamedAttr("operandSegmentSizes",
-                                                 rewriter.getDenseI32ArrayAttr({1, 0, 0})));
-        rewriter.create<GlobalPhaseOp>(loc,
-                                       TypeRange{},          // No results
-                                       ValueRange{finalPhase}, // Operands
+        gphaseAttrs.append(
+            rewriter.getNamedAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 0})));
+        rewriter.create<GlobalPhaseOp>(loc, TypeRange{},        // No results
+                                       ValueRange{finalPhase},  // Operands
                                        gphaseAttrs.getAttrs()); // Attributes
 
         // Clean up original op
@@ -434,7 +434,7 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
         return success();
     }
 
-private:
+  private:
     /**
      * @brief Traces a qubit value backward to find its source ExtractOp.
      *
@@ -467,7 +467,7 @@ private:
             mlir::Value nextQubit = nullptr;
             for (mlir::Value opnd : customOp.getOperands()) {
                 if (mlir::isa<catalyst::quantum::QubitType>(opnd.getType())) {
-                    if (nextQubit) { // Found a second qubit operand
+                    if (nextQubit) {    // Found a second qubit operand
                         return nullptr; // Not a single-qubit-in op
                     }
                     nextQubit = opnd;

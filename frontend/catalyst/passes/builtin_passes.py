@@ -535,12 +535,13 @@ def ions_decomposition(qnode):  # pragma: nocover
     return PassPipelineWrapper(qnode, "ions-decomposition")
 
 
-def rs_decomposition(qnode, *, epsilon = 1e-4):
+def rs_decomposition(qnode, *, epsilon=1e-4):
     if qnode is None:
         return functools.partial(rs_decomposition, epsilon=epsilon)
 
     rs_decomposition_pass = {"rs_decomposition": {"epsilon": epsilon}}
     return PassPipelineWrapper(qnode, rs_decomposition_pass)
+
 
 def to_ppr(qnode):
     R"""
