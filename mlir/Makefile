@@ -215,7 +215,7 @@ test:
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects
 
 .PHONY: clean clean-dialects clean-enzyme clean-stablehlo clean-plugin clean-dialect-docs
-clean: clean-dialects clean-llvm clean-stablehlo clean-enzyme clean-plugin
+clean: clean-dialects clean-llvm clean-stablehlo clean-enzyme clean-plugin clean-dialect-docs
 
 clean-dialects:
 	@echo "clean catalyst dialect build files"
