@@ -63,6 +63,14 @@ MemRef1D rs_decomposition_0(double theta, double epsilon)
     return result;
 }
 
+// Will be used to return global phase
+double rs_decomposition_get_phase_0(double theta, double epsilon)
+{
+    std::cout << "phase got theta " << theta << std::endl;
+    std::cout << "phase got epsilon " << epsilon << std::endl;
+    return 1.23;
+}
+
 // Free memref
 void free_memref_0(int64_t *allocated, int64_t *aligned, int64_t offset, int64_t size,
                    int64_t stride)

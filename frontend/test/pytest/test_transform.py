@@ -603,7 +603,6 @@ def test_undo_swaps(backend):
 class TestMitigate:
     """Test error mitigation transforms"""
 
-    @pytest.mark.xfail(reason="PennyLane and QJIT give different values")
     def test_fold_global(self, backend):
         """Test fold_global"""
 
@@ -642,7 +641,6 @@ class TestMitigate:
         _, observed_shape = jax.tree_util.tree_flatten(observed)
         assert expected_shape == observed_shape
 
-    @pytest.mark.xfail(reason="PennyLane and QJIT give different values")
     def test_mitigate_with_zne(self, backend):
         """Test mitigate_with_zne"""
 

@@ -88,6 +88,13 @@ def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
 
 def RSDecompositionPass : Pass<"rs-decomposition"> {
     let summary = "Perform RS decomposition.";
+
+    let options = [Option<
+        "epsilon",
+        "epsilon",
+        "double",
+        default="1e-4",
+        desc="Approximation error tolerance for the RS decomposition.">];
 }
 
 def MergeRotationsPass : Pass<"merge-rotations"> {
