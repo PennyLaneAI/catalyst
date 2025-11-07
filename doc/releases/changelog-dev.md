@@ -79,6 +79,7 @@
   [(#2122)](https://github.com/PennyLaneAI/catalyst/pull/2122)
   [(#2174)](https://github.com/PennyLaneAI/catalyst/pull/2174)
   [(#2175)](https://github.com/PennyLaneAI/catalyst/pull/2175)
+  [(#2181)](https://github.com/PennyLaneAI/catalyst/pull/2181)
 
 <h3>Internal changes ⚙️</h3>
 
