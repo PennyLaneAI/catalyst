@@ -22,6 +22,8 @@ import pytest
 
 from catalyst import qjit
 
+pytestmark = pytest.mark.capture_todo
+
 
 class TestShotVector:
     """Test shot-vector"""
