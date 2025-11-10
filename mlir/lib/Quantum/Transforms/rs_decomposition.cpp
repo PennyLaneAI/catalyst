@@ -264,12 +264,9 @@ mlir::func::FuncOp getOrDeclareDecompositionFunc(mlir::ModuleOp module,
             builder.create<ExtractOp>(loc, qbitType, qregIn, qbitIndex, /*idx_attr=*/nullptr);
 
         // Create the PPRotationOp
-        auto pprOp = builder.create<qec::PPRotationOp>(
-            loc,
-            pauliWord,
-            rotationKind,
-            mlir::ValueRange{currentQbit},
-            /*condition=*/nullptr);
+        auto pprOp = builder.create<qec::PPRotationOp>(loc, pauliWord, rotationKind,
+                                                       mlir::ValueRange{currentQbit},
+                                                       /*condition=*/nullptr);
 
         mlir::Value resultQbit = pprOp.getResult(0);
 
@@ -360,7 +357,8 @@ mlir::func::FuncOp getOrDeclareDecompositionFunc(mlir::ModuleOp module,
     }
     else {
         // --- Populate Clifford+T Switch Cases ---
-        assert(caseConfigs.size() == caseValues.size() && "Mismatch in case config and case values");
+        assert(caseConfigs.size() == caseValues.size() &&
+               "Mismatch in case config and case values");
         for (size_t i = 0; i < caseConfigs.size(); ++i) {
             const auto &config = caseConfigs[i];
             Region &caseRegion = switchOp.getCaseRegions()[i];
@@ -519,8 +517,8 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
         rewriter.replaceAllUsesWith(op->getResults(), finalQbitResult);
         rewriter.eraseOp(op);
 
-        LLVM_DEBUG(llvm::dbgs() << "Replaced " << gateName
-                                << " op with call to @" << decompFunc.getSymName() << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "Replaced " << gateName << " op with call to @"
+                                << decompFunc.getSymName() << "\n");
         return success();
     }
 
