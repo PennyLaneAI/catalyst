@@ -127,11 +127,11 @@ class TestInterpreted:
         assert circuit(6, 5) == 10
         assert circuit(-1, 2) == 2
 
-    def test_missing_parameter(self):
+    def test_no_case_parameter(self):
         """Test that a switch raises an exception when called without the case argument."""
 
         def circuit(i):
-            @switch()
+            @switch()  # pylint: disable=no-value-for-parameter
             def my_switch():
                 return 0
 
@@ -145,7 +145,7 @@ class TestInterpreted:
             def my_switch():
                 return 0
 
-            @my_switch.branch()
+            @my_switch.branch()  # pylint: disable=no-value-for-parameter
             def my_branch():
                 return 1
 
@@ -353,7 +353,7 @@ class TestClassicalCompiled:
 
         @qjit
         def circuit(i):
-            @switch()
+            @switch()  # pylint: disable=no-value-for-parameter
             def my_switch():
                 return 0
 
@@ -372,7 +372,7 @@ class TestClassicalCompiled:
             def my_switch():
                 return 0
 
-            @my_switch.branch()
+            @my_switch.branch()  # pylint: disable=no-value-for-parameter
             def my_branch():
                 return 2
 
@@ -601,7 +601,7 @@ class TestQuantum:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(i):
-            @switch()
+            @switch()  # pylint: disable=no-value-for-parameter
             def my_switch():
                 qml.X(0)
                 return 0
@@ -623,7 +623,7 @@ class TestQuantum:
                 qml.X(0)
                 return 0
 
-            @my_switch.branch()
+            @my_switch.branch()  # pylint: disable=no-value-for-parameter
             def my_branch():
                 qml.Y(0)
                 return 2
