@@ -384,7 +384,7 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
 
                     if is_xdsl_pass(_pass.name):
                         uses_xdsl_passes = True
-                        apply_registered_pass_op.operation.attributes["xdsl_pass"] = (
+                        apply_registered_pass_op.operation.attributes["catalyst.xdsl_pass"] = (
                             ir.UnitAttr.get()
                         )
                 except ModuleNotFoundError:
