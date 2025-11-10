@@ -13,14 +13,15 @@
 # limitations under the License.
 
 from math import pi
+import pytest
 
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
-import pytest
 
 import catalyst
 from catalyst import qjit, switch
+from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
 
 class TestInterpreted:
@@ -127,7 +128,7 @@ class TestInterpreted:
         assert circuit(-1, 2) == 2
 
     def test_no_case_parameter(self):
-        """Test that a switch raises an error when called without the case argument."""
+        """Test that a switch raises an exception when called without the case argument."""
 
         def circuit(i):
             @switch()
@@ -152,6 +153,21 @@ class TestInterpreted:
 
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
             bar(0)
+
+    def test_fails_capture(self, backend):
+        if not qml.capture.enabled():
+            pytest.skip("capture only test")
+
+        qml.capture.enable()
+
+        with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
+
+            @switch(0)
+            def my_switch():
+                return 0
+
+        error_msg = str(exc_info.value)
+        assert "not supported" in error_msg
 
 
 class TestClassicalCompiled:
@@ -336,6 +352,21 @@ class TestClassicalCompiled:
 
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
             bar(0)
+
+    def test_fails_capture(self, backend):
+        if not qml.capture.enabled():
+            pytest.skip("capture only test")
+
+        qml.capture.enable()
+
+        with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
+
+            @switch(0)
+            def my_switch():
+                return 0
+
+        error_msg = str(exc_info.value)
+        assert "not supported" in error_msg
 
 
 class TestQuantum:
@@ -554,7 +585,7 @@ class TestQuantum:
 
         qml.capture.enable()
 
-        with pytest.raises(TypeError) as exc_info:
+        with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
             @switch(0)
             def my_switch():
