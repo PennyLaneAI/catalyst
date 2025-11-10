@@ -2,6 +2,9 @@
 
 <h3>New features since last release</h3>
 
+* Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
+  [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
+
 <h3>Improvements 🛠</h3>
 
 * The ``decompose-lowering`` MLIR pass now supports ``qml.MultiRZ``
