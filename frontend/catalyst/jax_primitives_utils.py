@@ -395,6 +395,6 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
 
     # Set an attribute on the transformer module if we created any xDSL pass operations
     if uses_xdsl_passes:
-        transformer_module.operation.attributes["uses_xdsl_passes"] = ir.UnitAttr.get()
+        transformer_module.operation.attributes["catalyst.uses_xdsl_passes"] = ir.UnitAttr.get()
 
     return named_sequence_op.results

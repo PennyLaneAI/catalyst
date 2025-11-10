@@ -482,7 +482,7 @@ class Compiler:
     def has_xdsl_passes_in_transform_modules(self, mlir_module):
         """Check if the MLIR module contains xDSL passes in transform dialect.
 
-        This checks for the 'uses_xdsl_passes' attribute that is set during
+        This checks for the 'catalyst.uses_xdsl_passes' attribute that is set during
         lowering on transform modules when xDSL passes are added to the transform pipeline.
 
         Args:
@@ -500,8 +500,8 @@ class Compiler:
                     or "transform.with_named_sequence" in getattr(attrs, "keys", lambda: [])()
                 )
                 has_xdsl = (
-                    "uses_xdsl_passes" in attrs
-                    or "uses_xdsl_passes" in getattr(attrs, "keys", lambda: [])()
+                    "catalyst.uses_xdsl_passes" in attrs
+                    or "catalyst.uses_xdsl_passes" in getattr(attrs, "keys", lambda: [])()
                 )
                 return has_transform and has_xdsl
             except (AttributeError, KeyError, TypeError):
