@@ -350,9 +350,10 @@ def _options_to_cli_flags(options):
     if options.keep_intermediate:
         extra_args += ["--keep-intermediate"]
 
-    if options.keep_intermediate >= KeepIntermediateLevel.PASS:
-        extra_args += ["--save-ir-after-each=pass"]
-        extra_args += ["--dump-module-scope"]
+    if options.keep_intermediate >= KeepIntermediateLevel.CHANGED:
+        level = "pass" if options.keep_intermediate >= KeepIntermediateLevel.PASS else "changed"
+        extra_args += [f"--save-ir-after-each={level}", "--dump-module-scope"]
+
 
     if options.use_nameloc:
         extra_args += ["--use-nameloc-as-prefix"]
