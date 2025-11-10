@@ -14,6 +14,10 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+"""
+This file tests that the xDSL passes are detected and applied correctly.
+"""
+
 import pennylane as qml
 from pennylane.compiler.python_compiler.transforms import merge_rotations_pass
 
