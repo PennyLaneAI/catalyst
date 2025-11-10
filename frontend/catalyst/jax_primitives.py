@@ -2102,13 +2102,6 @@ def _switch_lowering(
     branch_args_plus_consts = index_and_cases_and_branch_args_plus_consts[len(branch_jaxprs) :]
     flat_args_plus_consts = mlir.flatten_lowering_ir_args(branch_args_plus_consts)
 
-    def _cast_to_index(p):
-        p = TensorExtractOp(
-            ir.RankedTensorType(p.type).element_type, p, []
-        ).result  # tensor<i64> -> i64
-        p = IndexCastOp(ir.IndexType.get(), p).result  # i64 -> index
-        return p
-
     index = _cast_to_index(index)
 
     # enumerate branches so that branch indices and "cases" line up properly
@@ -2324,13 +2317,6 @@ def _for_loop_lowering(
     assert result_types == [
         mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out
     ], f"\n{result_types=} doesn't match \n{jax_ctx.avals_out=}"
-
-    def _cast_to_index(p):
-        p = TensorExtractOp(
-            ir.RankedTensorType(p.type).element_type, p, []
-        ).result  # tensor<i64> -> i64
-        p = IndexCastOp(ir.IndexType.get(), p).result  # i64 -> index
-        return p
 
     lower_bound, upper_bound, step = map(_cast_to_index, (lower_bound, upper_bound, step))
 
@@ -2548,6 +2534,14 @@ def safe_cast_to_f64(value, op, kind="parameter"):
         value = StableHLOConvertOp(targetTensorType, value).result
 
     return value
+
+
+def _cast_to_index(p):
+    p = TensorExtractOp(
+        ir.RankedTensorType(p.type).element_type, p, []
+    ).result  # tensor<i64> -> i64
+    p = IndexCastOp(ir.IndexType.get(), p).result  # i64 -> index
+    return p
 
 
 def extract_scalar(value, op, kind="parameter"):
