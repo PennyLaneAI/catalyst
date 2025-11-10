@@ -46,7 +46,8 @@ class KeepIntermediateLevel(enum.IntEnum):
 
     NONE = 0  # No intermediate files are kept.
     PIPELINE = 1  # Intermediate files are saved after each pipeline.
-    PASS = 2  # Intermediate files are saved after each pass.
+    CHANGED = 2  # Intermediate files are saved after each pass (only if changed).
+    PASS = 3  # Intermediate files are saved after each pass, even if unchanged.
 
 
 def _parse_keep_intermediate(
@@ -54,18 +55,20 @@ def _parse_keep_intermediate(
 ) -> KeepIntermediateLevel:
     """Parse the keep_intermediate value into a KeepIntermediateLevel enum."""
     match level:
-        case 0 | 1 | 2:
+        case 0 | 1 | 2 | 3:
             return KeepIntermediateLevel(level)
         case "none" | None:
             return KeepIntermediateLevel.NONE
         case "pipeline":
             return KeepIntermediateLevel.PIPELINE
+        case "changed":
+            return KeepIntermediateLevel.CHANGED
         case "pass":
             return KeepIntermediateLevel.PASS
         case _:
             raise ValueError(
                 f"Invalid value for keep_intermediate: {level}. "
-                "Valid values are True, False, 0, 1, 2, 'none', 'pipeline', 'pass'."
+                "Valid values are True, False, 0, 1, 2, 3, 'none', 'pipeline', 'changed', 'pass'."
             )
 
 
@@ -84,7 +87,8 @@ class CompileOptions:
 
             - ``False`` or ``0`` or ``"none"`` (default): No intermediate files are kept.
             - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
-            - ``2`` or ``"pass"``: Intermediate files are saved after each pass.
+            - ``2`` or ``"changed"``: Intermediate files are saved after each pass (only if changed).
+            - ``3`` or ``"pass"``: Intermediate files are saved after each pass, even if unchanged.
         use_nameloc (Optional[bool]): If ``True``, add function parameter names to the IR as name
             locations.
         pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples. The first entry of the
