@@ -21,11 +21,18 @@ import pytest
 
 import catalyst
 from catalyst import qjit, switch
+from catalyst.api_extensions.control_flow import SwitchCallable
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
 
 class TestInterpreted:
     """Test that Catalyst switches can be used with the python interpreter."""
+
+    def test_no_branch(self):
+        """Test that an exception is raised when a switch is created with no branches."""
+
+        with pytest.raises(ValueError, match="switch requires at least 1 branch"):
+            SwitchCallable(0, [], [])()
 
     def test_1_branch(self):
         """
@@ -174,6 +181,21 @@ class TestInterpreted:
 
         error_msg = str(exc_info.value)
         assert "not supported" in error_msg
+
+    def test_missing_operation(self):
+        """Test switch operation access in an interpreted context."""
+
+        def circuit(i):
+            @switch(i)
+            def my_switch():
+                return 0
+
+            my_switch()
+
+            with pytest.raises(
+                AttributeError, match="and thus has no associated quantum operation."
+            ):
+                my_switch.operation
 
 
 class TestClassicalCompiled:
@@ -403,6 +425,28 @@ class TestClassicalCompiled:
 
         error_msg = str(exc_info.value)
         assert "not supported" in error_msg
+
+    def test_missing_operation(self):
+        """Test switch operation access in classical context."""
+
+        @qjit
+        def circuit(i):
+            @switch(i)
+            def my_switch():
+                return 2
+
+            @my_switch.branch(2)
+            def my_branch():
+                return 4
+
+            my_switch()
+
+            with pytest.raises(
+                AttributeError, match="and this has no associated quantum operation."
+            ):
+                my_switch.operation
+
+            return my_switch()
 
 
 class TestQuantum:
