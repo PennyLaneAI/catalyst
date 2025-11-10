@@ -571,6 +571,50 @@ class Compiler:
 
         return True
 
+    def _create_pass_save_callback(self, workspace):
+        """Create a callback function to save IR after each pass.
+        
+        Args:
+            workspace: The workspace directory path
+            
+        Returns:
+            Callable or None: The callback function if intermediate saving is enabled, None otherwise
+        """
+        if not (workspace and self.options.keep_intermediate >= KeepIntermediateLevel.CHANGED):
+            return None
+            
+        # pylint: disable-next=import-outside-toplevel
+        from xdsl.printer import Printer
+
+        user_transform_dir = os.path.join(str(workspace), "0_UserTransformPass")
+        os.makedirs(user_transform_dir, exist_ok=True)
+        
+        pass_counter = 1
+
+        def save_pass_ir(previous_pass, module, _next_pass=None, **_kwargs):
+            """Callback to save IR after each pass in python_compiler."""
+            nonlocal pass_counter
+            # Only save after a pass has run (when previous_pass is not None)
+            if previous_pass is None:
+                return
+                
+            pass_name = (
+                previous_pass.name
+                if hasattr(previous_pass, "name")
+                else str(previous_pass)
+            )
+            buffer = io.StringIO()
+            Printer(stream=buffer, print_generic_format=False).print_op(module)
+            ir_file = os.path.join(
+                user_transform_dir,
+                f"{pass_counter}_{pass_name}.mlir",
+            )
+            with open(ir_file, "w", encoding="utf-8") as f:
+                f.write(buffer.getvalue())
+            pass_counter += 1
+
+        return save_pass_ir
+
     @debug_logger
     def run(self, mlir_module, *args, **kwargs):
         """Compile an MLIR module to a shared object.
@@ -586,6 +630,17 @@ class Compiler:
         Returns:
             (str): filename of shared object
         """
+        workspace = args[0] if args else kwargs.get("workspace")
+        module_name = str(mlir_module.operation.attributes["sym_name"]).replace('"', "")
+        ir = mlir_module.operation.get_asm(
+            binary=False, print_generic_op_form=True, assume_verified=True
+        )
+        
+        # Save intermediate IR before any compiler transformation is applied
+        if workspace and self.options.keep_intermediate:
+            initial_ir_file = os.path.join(str(workspace), f"0_{module_name}.mlir")
+            with open(initial_ir_file, "w", encoding="utf-8") as f:
+                f.write(ir)
 
         if self.is_using_python_compiler(mlir_module):
             # We keep this module here to keep xDSL requirement optional
@@ -593,14 +648,13 @@ class Compiler:
             # pylint: disable-next=import-outside-toplevel
             from pennylane.compiler.python_compiler import Compiler as PythonCompiler
 
+            callback = self._create_pass_save_callback(workspace)
             compiler = PythonCompiler()
-            mlir_module = compiler.run(mlir_module)
+            ir = compiler.run(ir, callback=callback)
 
         return self.run_from_ir(
-            mlir_module.operation.get_asm(
-                binary=False, print_generic_op_form=False, assume_verified=True
-            ),
-            str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
+            ir,
+            module_name,
             *args,
             **kwargs,
         )
