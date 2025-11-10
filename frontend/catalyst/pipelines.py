@@ -196,7 +196,7 @@ class CompileOptions:
         """Returns all stages in order for compilation"""
         # Dictionaries in python are ordered
         stages = {}
-        stages["EnforceRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(self)
+        stages["UserTransformPass"] = get_user_transform_stage(self)
         stages["HLOLoweringPass"] = get_hlo_lowering_stage(self)
         stages["QuantumCompilationPass"] = get_quantum_compilation_stage(self)
         stages["BufferizationPass"] = get_bufferization_stage(self)
@@ -204,9 +204,10 @@ class CompileOptions:
         return list(stages.items())
 
 
-def get_enforce_runtime_invariants_stage(_options: CompileOptions) -> List[str]:
-    """Returns the list of passes in the enforce runtime invariant stage."""
-    enforce_runtime_invariants = [
+def get_user_transform_stage(_options: CompileOptions) -> List[str]:
+    """Returns the list of passes in the user transform stage."""
+
+    user_transform_passes = [
         # We want the invariant that transforms that generate multiple
         # tapes will generate multiple qnodes. One for each tape.
         # Split multiple tapes enforces that invariant.
@@ -223,7 +224,7 @@ def get_enforce_runtime_invariants_stage(_options: CompileOptions) -> List[str]:
         # this into something else.
         "inline-nested-module",
     ]
-    return enforce_runtime_invariants
+    return user_transform_passes
 
 
 def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:

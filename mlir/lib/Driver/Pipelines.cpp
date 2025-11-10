@@ -52,7 +52,7 @@ using namespace mlir;
 namespace catalyst {
 namespace driver {
 
-void createEnforceRuntimeInvariantsPipeline(OpPassManager &pm)
+void createUserTransformPipeline(OpPassManager &pm)
 {
     pm.addPass(catalyst::quantum::createSplitMultipleTapesPass());
     pm.addNestedPass<ModuleOp>(catalyst::createApplyTransformSequencePass());
@@ -151,18 +151,18 @@ void createLLVMDialectLoweringPipeline(OpPassManager &pm)
 
 void createDefaultCatalystPipeline(OpPassManager &pm)
 {
-    createEnforceRuntimeInvariantsPipeline(pm);
+    createUserTransformPipeline(pm);
     createHloLoweringPipeline(pm);
     createQuantumCompilationPipeline(pm);
     createBufferizationPipeline(pm);
     createLLVMDialectLoweringPipeline(pm);
 }
 
-void registerEnforceRuntimeInvariantsPipeline()
+void registerUserTransformPipeline()
 {
-    PassPipelineRegistration<>("enforce-runtime-invariants-pipeline",
-                               "Register enforce runtime invariants pipeline as a pass.",
-                               createEnforceRuntimeInvariantsPipeline);
+    PassPipelineRegistration<>("user-transform-pipeline",
+                               "Register user transform pipeline (tape splitting, user transforms, module inlining).",
+                               createUserTransformPipeline);
 }
 void registerHloLoweringPipeline()
 {
@@ -197,7 +197,7 @@ void registerDefaultCatalystPipeline()
 
 void registerAllCatalystPipelines()
 {
-    registerEnforceRuntimeInvariantsPipeline();
+    registerUserTransformPipeline();
     registerHloLoweringPipeline();
     registerQuantumCompilationPipeline();
     registerBufferizationPipeline();
@@ -209,13 +209,13 @@ std::vector<Pipeline> getDefaultPipeline()
 {
     using PipelineFunc = void (*)(mlir::OpPassManager &);
     std::vector<PipelineFunc> pipelineFuncs = {
-        &createEnforceRuntimeInvariantsPipeline, &createHloLoweringPipeline,
+        &createUserTransformPipeline, &createHloLoweringPipeline,
         &createQuantumCompilationPipeline, &createBufferizationPipeline,
         &createLLVMDialectLoweringPipeline};
 
     llvm::SmallVector<std::string> defaultPipelineNames = {
-        "enforce-runtime-invariants-pipeline", "hlo-lowering-pipeline",
-        "quantum-compilation-pipeline", "bufferization-pipeline", "llvm-dialect-lowering-pipeline"};
+        "UserTransformPass", "HLOLoweringPass",
+        "QuantumCompilationPass", "BufferizationPass", "MLIRToLLVMDialect"};
 
     std::vector<Pipeline> defaultPipelines(defaultPipelineNames.size());
     for (size_t i = 0; i < defaultPipelineNames.size(); ++i) {
