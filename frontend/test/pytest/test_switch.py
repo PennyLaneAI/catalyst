@@ -13,11 +13,11 @@
 # limitations under the License.
 
 from math import pi
-import pytest
 
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
+import pytest
 
 import catalyst
 from catalyst import qjit, switch
@@ -67,16 +67,16 @@ class TestInterpreted:
 
         def circuit(i, x):
             @switch(i)
-            def my_switch(x):
-                return -x
+            def my_switch(y):
+                return -y
 
             @my_switch.branch(1)
-            def my_branch(x):
+            def my_branch(y):
                 return 0
 
             @my_switch.branch(2)
-            def my_branch_2(x):
-                return x
+            def my_branch_2(y):
+                return y
 
             return my_switch(x)
 
@@ -109,16 +109,16 @@ class TestInterpreted:
 
         def circuit(i, x):
             @switch(i, case=3)
-            def my_switch(x):
-                return x
+            def my_switch(y):
+                return y
 
             @my_switch.branch(11)
-            def branch_11(x):
-                return x**2
+            def branch_11(y):
+                return y**2
 
             @my_switch.branch(6)
-            def branch_6(x):
-                return 2 * x
+            def branch_6(y):
+                return 2 * y
 
             return my_switch(x)
 
@@ -140,7 +140,7 @@ class TestInterpreted:
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
             circuit(0)
 
-        def bar(i):
+        def circuit_2(i):
             @switch(i)
             def my_switch():
                 return 0
@@ -152,9 +152,10 @@ class TestInterpreted:
             return my_switch()
 
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
-            bar(0)
+            circuit_2(0)
 
-    def test_fails_capture(self, backend):
+    def test_fails_capture(self):
+        """Test that a switch raises an exception with program capture enabled."""
         if not qml.capture.enabled():
             pytest.skip("capture only test")
 
@@ -162,9 +163,14 @@ class TestInterpreted:
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @switch(0)
-            def my_switch():
-                return 0
+            def circuit(i):
+                @switch(i)
+                def my_switch():
+                    return 0
+
+                return my_switch()
+
+            circuit(0)
 
         error_msg = str(exc_info.value)
         assert "not supported" in error_msg
@@ -216,35 +222,39 @@ class TestClassicalCompiled:
         assert circuit(8) == 3
 
     def test_branch_args(self):
+        """Test that branches can accept arguments."""
+
         def circuit(i, x, kw=None):
             @switch(i)
-            def my_switch(x, kw=None):
-                return x * kw
+            def my_switch(y, kwarg=None):
+                return y * kwarg
 
             @my_switch.branch(2)
-            def my_branch(x, kw=None):
-                return 2 * kw
+            def my_branch(y, kwarg=None):
+                return 2 * kwarg
 
             @my_switch.default()
-            def my_default(x, kw=None):
-                return x - kw
+            def my_default(y, kwarg=None):
+                return y - kwarg
 
-            return my_switch(x, kw=kw)
+            return my_switch(x, kwarg=kw)
 
         assert circuit(0, 3, kw=12) == 36
         assert circuit(2, 9, kw=4) == 8
         assert circuit(4, 11, kw=4) == 7
 
     def test_chosen_initial_index(self):
+        """Test that an initial case can be chosen."""
+
         @qjit
         def circuit(i, x):
             @switch(i, case=1)
-            def my_switch(x):
-                return 3 * x + 1
+            def my_switch(y):
+                return 3 * y + 1
 
             @my_switch.default()
-            def branch_1(x):
-                return x // 2
+            def branch_1(y):
+                return y // 2
 
             return my_switch(x)
 
@@ -255,7 +265,9 @@ class TestClassicalCompiled:
         assert circuit(0, 6) == 3
         assert circuit(0, 8) == 4
 
-    def test_non_sequential_indices(self):
+    def test_non_sequential_cases(self):
+        """Test that cases need not be sequential."""
+
         @qjit
         def circuit(i):
             @switch(i)
@@ -284,6 +296,8 @@ class TestClassicalCompiled:
         assert circuit(3) == 3
 
     def test_return_type_promotion(self):
+        """Test that return types are correctly promoted when applicable."""
+
         @qjit
         def circuit(i):
             @switch(i)
@@ -303,6 +317,8 @@ class TestClassicalCompiled:
         assert circuit(0).dtype is jnp.dtype("complex128")
 
     def test_inconsistent_output_types(self):
+        """Test that an exception is raised when incompatible return types are present."""
+
         @qjit
         def circuit(i):
             @switch(i)
@@ -323,6 +339,8 @@ class TestClassicalCompiled:
             circuit(0)
 
     def test_missing_parameter(self):
+        """Test that an exception is raised when parameters are missing."""
+
         @qjit
         def circuit(i):
             @switch()
@@ -339,7 +357,7 @@ class TestClassicalCompiled:
             circuit(0)
 
         @qjit
-        def bar(i):
+        def circuit_2(i):
             @switch(1)
             def my_switch():
                 return 0
@@ -351,9 +369,10 @@ class TestClassicalCompiled:
             return my_switch()
 
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
-            bar(0)
+            circuit_2(0)
 
     def test_fails_capture(self, backend):
+        """Test that an exception is raised when program capture is enabled."""
         if not qml.capture.enabled():
             pytest.skip("capture only test")
 
@@ -361,9 +380,16 @@ class TestClassicalCompiled:
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @switch(0)
-            def my_switch():
-                return 0
+            @qjit
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(i):
+                @switch(i)
+                def my_switch():
+                    qml.X(0)
+
+                return my_switch()
+
+            circuit()
 
         error_msg = str(exc_info.value)
         assert "not supported" in error_msg
@@ -418,6 +444,8 @@ class TestQuantum:
         assert np.allclose(circuit(2), [0, 1])
 
     def test_branch_args(self, backend):
+        """Test that branches can accept arguments."""
+
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(i, angle, wire=None):
@@ -441,7 +469,9 @@ class TestQuantum:
         assert np.allclose(circuit(2, pi / 4, wire=1), [0.85355339, 0.14644661, 0, 0])
         assert np.allclose(circuit(4, 3 * pi / 4, wire=1), [1, 0, 0, 0])
 
-    def test_chosen_initial_index(self, backend):
+    def test_chosen_initial_case(self, backend):
+        """Test that an initial case can be chosen."""
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(i):
@@ -460,7 +490,9 @@ class TestQuantum:
         assert np.allclose(circuit(0), [0, 1])
         assert np.allclose(circuit(3), [0.5, 0.5])
 
-    def test_non_sequential_indices(self, backend):
+    def test_non_sequential_cases(self, backend):
+        """Test that cases need not be sequential."""
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(i):
@@ -490,6 +522,8 @@ class TestQuantum:
         assert np.allclose(circuit(9), [0, 1])
 
     def test_return_type_promotion(self, backend):
+        """Test that return types are correctly promoted when applicable."""
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(i):
@@ -520,6 +554,8 @@ class TestQuantum:
         assert res[0] == complex(1, 2.2) and np.allclose(res[1], [0.85355339, 0.14644661])
 
     def test_inconsistent_output_types(self, backend):
+        """Test that an exception is raised when incompatible return types are present."""
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(i):
@@ -544,6 +580,8 @@ class TestQuantum:
             circuit(0)
 
     def test_missing_parameter(self, backend):
+        """Test that an exception is raised when parameters are missing."""
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(i):
@@ -563,7 +601,7 @@ class TestQuantum:
             circuit(0)
 
         @qjit
-        def bar(i):
+        def circuit_2(i):
             @switch(1)
             def my_switch():
                 qml.X(0)
@@ -577,9 +615,10 @@ class TestQuantum:
             return my_switch()
 
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
-            bar(0)
+            circuit_2(0)
 
     def test_fails_capture(self, backend):
+        """Test that an exception is raised when program capture is enabled."""
         if not qml.capture.enabled():
             pytest.skip("capture only test")
 
@@ -587,9 +626,16 @@ class TestQuantum:
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @switch(0)
-            def my_switch():
-                return 0
+            @qjit
+            @qml.qnode(backend, wires=1)
+            def circuit(i):
+                @switch(i)
+                def my_switch():
+                    return 0
+
+                return my_switch()
+
+            circuit(0)
 
         error_msg = str(exc_info.value)
         assert "not supported" in error_msg
