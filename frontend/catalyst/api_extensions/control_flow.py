@@ -1136,10 +1136,37 @@ class ForLoopCallable:
 
 class SwitchCallable:
     """
-    User-facing wrapper providing an index-switch interface.
+    User-facing wrapper for the switch decorator that provides decorators `branch` and `default` for expanding the switch.
 
-    Example:
-    >>>
+    **Example**
+
+    .. code-block:: python
+
+        @qjit
+        @qnode("lightning.qubit", wires=1)
+        def circuit(i):
+            @switch(i)
+            def my_switch():
+                qml.RX(0, wires=0)
+
+            @my_switch.branch(2)
+            def my_branch():
+                qml.RX(pi, wires=0)
+
+            @my_switch.default()
+            def my_default():
+                qml.H(0)
+
+            my_switch()
+
+            return qml.probs()
+
+        >>> circuit(0)
+        [1. 0.]
+        >>> circuit(2)
+        [0. 1.]
+        >>> circuit(5)
+        [0.5 0.5]
     """
 
     def __init__(self, case, cases, branches, default_branch=None):
@@ -1168,8 +1195,10 @@ class SwitchCallable:
 
     def branch(self, case):
         """
-        TODO
+        Branch to be run if the switches case is equivalent to the case provided here.
 
+        Args:
+            case (int): the case index of this branch.
         Returns:
             A callable decorator that wraps this case of the switch.
         """
@@ -1182,7 +1211,7 @@ class SwitchCallable:
 
     def default(self):
         """
-        TODO
+        Branch to be run if no other branches match the switch case.
 
         Returns:
             A callable decorator that wraps the default case of the switch.
