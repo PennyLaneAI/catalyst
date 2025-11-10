@@ -314,7 +314,17 @@ class TestClassicalCompiled:
 
             return my_switch()
 
-        assert circuit(0).dtype is jnp.dtype("complex128")
+        res = circuit(0)
+        assert res.dtype is jnp.dtype("complex128")
+        assert res == 1
+
+        res = circuit(3)
+        assert res.dtype is jnp.dtype("complex128")
+        assert res == 1.2
+
+        res = circuit(5)
+        assert res.dtype is jnp.dtype("complex128")
+        assert res == complex(1, 2.2)
 
     def test_inconsistent_output_types(self):
         """Test that an exception is raised when incompatible return types are present."""
@@ -545,13 +555,19 @@ class TestQuantum:
             return [my_switch(), qml.probs()]
 
         res = circuit(0)
-        assert res[0] == 1 and np.allclose(res[1], [0, 1])
+        assert res[0].dtype is jnp.dtype("complex128")
+        assert res[0] == 1
+        assert np.allclose(res[1], [0, 1])
 
         res = circuit(3)
-        assert res[0] == 1.2 and np.allclose(res[1], [0.5, 0.5])
+        assert res[0].dtype is jnp.dtype("complex128")
+        assert res[0] == 1.2
+        assert np.allclose(res[1], [0.5, 0.5])
 
         res = circuit(1)
-        assert res[0] == complex(1, 2.2) and np.allclose(res[1], [0.85355339, 0.14644661])
+        assert res[0].dtype is jnp.dtype("complex128")
+        assert res[0] == complex(1, 2.2)
+        assert np.allclose(res[1], [0.85355339, 0.14644661])
 
     def test_inconsistent_output_types(self, backend):
         """Test that an exception is raised when incompatible return types are present."""
