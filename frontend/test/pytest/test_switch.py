@@ -161,12 +161,11 @@ class TestInterpreted:
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
             circuit_2(0)
 
+    @pytest.mark.usefixtures("use_capture")
     def test_fails_capture(self):
         """Test that a switch raises an exception with program capture enabled."""
         if not qml.capture.enabled():
             pytest.skip("capture only test")
-
-        qml.capture.enable()
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
@@ -403,12 +402,11 @@ class TestClassicalCompiled:
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
             circuit_2(0)
 
+    @pytest.mark.usefixtures("use_capture")
     def test_fails_capture(self, backend):
         """Test that an exception is raised when program capture is enabled."""
         if not qml.capture.enabled():
             pytest.skip("capture only test")
-
-        qml.capture.enable()
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
@@ -677,17 +675,16 @@ class TestQuantum:
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
             circuit_2(0)
 
+    @pytest.mark.usefixtures("use_capture")
     def test_fails_capture(self, backend):
         """Test that an exception is raised when program capture is enabled."""
         if not qml.capture.enabled():
             pytest.skip("capture only test")
 
-        qml.capture.enable()
-
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
             @qjit
-            @qml.qnode(backend, wires=1)
+            @qml.qnode(qml.device(backend, wires=1))
             def circuit(i):
                 @switch(i)
                 def my_switch():
