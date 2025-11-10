@@ -16,6 +16,7 @@ MLIR/LLVM representations.
 """
 import glob
 import importlib
+import io
 import logging
 import os
 import pathlib
