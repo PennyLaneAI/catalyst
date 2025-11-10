@@ -1162,7 +1162,7 @@ class SwitchCallable:
     """
 
     def __init__(self, case, cases, branches, default_branch=None):
-        if len(branches) < 1 and default_branch == None:
+        if len(branches) == 0 and default_branch == None:
             raise ValueError("switch requires at least 1 branch")
 
         self.case = case
@@ -1336,9 +1336,6 @@ class SwitchCallable:
         return self.case_to_branch.get(self.case, self.default_branch)()
 
     def __call__(self, *args, **kwargs):
-        if len(self.case_to_branch) == 0 and self.default_branch == None:
-            raise IndexError("Cannot index zero branches!")
-
         # convert branches to argless functions
         for case in self.case_to_branch:
             self.case_to_branch[case] = _make_argless_function(
