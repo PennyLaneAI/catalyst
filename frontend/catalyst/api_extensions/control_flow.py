@@ -661,6 +661,7 @@ def switch(case_var: int, case: int = 0):
     .. note::
 
         ``catalyst.switch`` is not supported in program capture mode.
+        ``catalyst.switch`` also does not support autograph (``qjit(autograph=True)``).
     """
 
     if qml.capture.enabled():
