@@ -439,6 +439,15 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
      * @brief Traces a qubit value backward to find its source ExtractOp.
      *
      */
+  private:
+    /**
+     * @brief Traces a qubit value backward to find its source ExtractOp.
+     *
+     * This function recursively traces a qubit value back through a chain of
+     * unitary CustomOps until it finds the quantum.extract op that it
+     * originated from. It assumes that for any CustomOp, the N-th qubit
+     * operand maps to the N-th qubit result.
+     */
     catalyst::quantum::ExtractOp findSourceExtract(mlir::Value qbit) const
     {
         if (!qbit) {
@@ -457,31 +466,49 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
             return nullptr; // Reached top (e.g., block argument)
         }
 
-        // Recursive case: Look through CustomOp
+        // Recursive case: Look through CustomOp (which includes CNOT, T, H, etc.)
         if (auto customOp = dyn_cast<CustomOp>(definingOp)) {
-            if (customOp->getNumResults() != 1 ||
-                !mlir::isa<catalyst::quantum::QubitType>(customOp->getResult(0).getType())) {
-                return nullptr; // Not a single-qubit-out op
+            // We need to find the index of our `qbit` in the results list.
+            auto opResult = mlir::dyn_cast<mlir::OpResult>(qbit);
+            if (!opResult) {
+                // This should not happen if qbit is the result of an op.
+                return nullptr;
             }
 
-            mlir::Value nextQubit = nullptr;
-            for (mlir::Value opnd : customOp.getOperands()) {
-                if (mlir::isa<catalyst::quantum::QubitType>(opnd.getType())) {
-                    if (nextQubit) {    // Found a second qubit operand
-                        return nullptr; // Not a single-qubit-in op
-                    }
-                    nextQubit = opnd;
-                }
+            // Get the index of the result we are tracing.
+            unsigned resultIndex = opResult.getResultNumber();
+
+            // Get all qubit operands and results.
+            std::vector<mlir::Value> qubitOperands = customOp.getQubitOperands();
+            std::vector<mlir::OpResult> qubitResults = customOp.getQubitResults();
+
+            // For unitary ops, the N-th qubit input maps to the N-th qubit output.
+            if (qubitOperands.size() != qubitResults.size()) {
+                LLVM_DEBUG(llvm::dbgs() << "Op has mismatched qubit operands/results size: "
+                                        << *definingOp << "\n");
+                return nullptr; // Not a simple unitary mapping
             }
+
+            if (resultIndex >= qubitOperands.size()) {
+                // The result index is out of bounds of the qubit operands.
+                LLVM_DEBUG(llvm::dbgs()
+                           << "Result index is out of bounds for op: " << *definingOp << "\n");
+                return nullptr;
+            }
+
+            // Get the corresponding qubit operand
+            mlir::Value nextQubit = qubitOperands[resultIndex];
 
             if (nextQubit) {
-                LLVM_DEBUG(llvm::dbgs() << "Looking through op: " << *definingOp << "\n");
+                LLVM_DEBUG(llvm::dbgs() << "Looking through op: " << *definingOp << " (Result "
+                                        << resultIndex << " -> Operand " << resultIndex << ")\n");
                 // Recurse
                 return findSourceExtract(nextQubit);
             }
         }
 
         // Default case: Hit an op we don't look through
+        LLVM_DEBUG(llvm::dbgs() << "Stopping trace at op: " << *definingOp << "\n");
         return nullptr;
     }
 };
