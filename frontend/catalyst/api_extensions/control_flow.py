@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Xanadu Quantum Technologies Inc.
+# Copyright 2022-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -563,18 +563,22 @@ def switch(case_var: int, case: int = 0):
     """
     A :func:`~.qjit` compatible decorator for index-switches in PennyLane/Catalyst.
 
-    This form of control flow is a functional version of an index-switch.
-    This means that each execution path (each branch of the switch) is provided as a separate function.
-    All branches are traced at compile time, but only one will be executed at runtime, depending on the value of `case_var`.
-    The JAX equivalent of this is the ``jax.lax.switch`` function, but this version allows for arbitrary integer valued cases, does not clamp the index, and is optimized to work with quantum programs in PennyLane.
-    This version also supports a default branch that is not present in the JAX implementation.
+    This form of control flow is a functional version of an index-switch.  This means that each
+    execution path (each branch of the switch) is provided as a separate function.  All branches are
+    traced at compile time, but only one will be executed at runtime, depending on the value of
+    `case_var`.  The JAX equivalent of this is the ``jax.lax.switch`` function, but this version
+    allows for arbitrary integer valued cases, does not clamp the index, and is optimized to work
+    with quantum programs in PennyLane.  This version also supports a default branch that is not
+    present in the JAX implementation.
 
-    Values produced within the scope of the branches can be returned to the outside context, but the return type signature of each branch must be identical.
+    Values produced within the scope of the branches can be returned to the outside context, but
+    the return type signature of each branch must be identical.
     If no default branch is assigned, the first branch provided will be assigned as default.
     The first branch is assigned case 0 by default, but can be overridden.
     Refer to the examples below to learn more about this decorator.
 
-    This form of control flow can also be called from the Python interpreter without needing to use :func: `~.qjit`.
+    This form of control flow can also be called from the Python interpreter without needing to use
+    :func: `~.qjit`.
 
     Args:
         case_var (int): the case of the branch to execute
@@ -608,7 +612,8 @@ def switch(case_var: int, case: int = 0):
     >>> circuit(1)
     [0. 1.]
 
-    A default branch that catches any value not otherwise specified can be set via the ``.default`` method, and the initial case can be specified using the `case` parameter:
+    A default branch that catches any value not otherwise specified can be set via the ``.default``
+    method, and the initial case can be specified using the `case` parameter
 
     .. code-block:: python
 
@@ -632,7 +637,9 @@ def switch(case_var: int, case: int = 0):
     >>> circuit(2)
     [0. 1.]
 
-    Switches can also return values of any JAX JIT compatible types, provided that each branch of the switch, including the default branch, have the same return signature or can be promoted to the same types.
+    Switches can also return values of any JAX JIT compatible types, provided that each branch of
+    the switch, including the default branch, have the same return signature or can be promoted to
+    the same types.
 
     .. code-block:: python
 
@@ -1136,7 +1143,8 @@ class ForLoopCallable:
 
 class SwitchCallable:
     """
-    User-facing wrapper for the switch decorator that provides decorators `branch` and `default` for expanding the switch.
+    User-facing wrapper for the switch decorator that provides decorators `branch` and `default` for
+    expanding a switch.
 
     **Example**
 
@@ -1223,7 +1231,7 @@ class SwitchCallable:
 
         return decorator
 
-    def _call_with_quantum_ctx(self, *args, **kwargs):
+    def _call_with_quantum_ctx(self):
         cases, branches = map(list, zip(*self.case_to_branch.items()))
         branches.append(self.default_branch)
 
@@ -1314,7 +1322,7 @@ class SwitchCallable:
             return in_sig, out_sig
 
         # trace branches to get output signatures
-        in_sigs, out_sigs = unzip2([_trace(branch) for branch in branches])
+        _, out_sigs = unzip2([_trace(branch) for branch in branches])
 
         # ensure consistent output structures and types
         _assert_consistent_result_structure([sig.out_tree() for sig in out_sigs])

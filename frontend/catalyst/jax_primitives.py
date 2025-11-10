@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2022-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -2094,11 +2094,10 @@ def _switch_lowering(
     branch_jaxprs: List[core.ClosedJaxpr],
     num_implicit_outputs: int,
 ):
-    # lowers control_flow.switch to mlir.IndexSwitchOp and returns the result of evaluating that operation
     result_types = [mlir.aval_to_ir_types(outvar)[0] for outvar in branch_jaxprs[0].out_avals]
 
     index = index_and_cases_and_branch_args_plus_consts[0]
-    # NOTE this indexing is not a mistake, the last branch is default and does not have a case
+    # the last branch is default and does not have a case
     cases = index_and_cases_and_branch_args_plus_consts[1 : len(branch_jaxprs)]
     branch_args_plus_consts = index_and_cases_and_branch_args_plus_consts[len(branch_jaxprs) :]
     flat_args_plus_consts = mlir.flatten_lowering_ir_args(branch_args_plus_consts)
@@ -2117,8 +2116,6 @@ def _switch_lowering(
         [case.owner.attributes["value"].get_splat_value().value for case in cases]
     )
 
-    # prepare scf switch
-    # NOTE: reduce number of case regions, last branch will be taken as default
     scf_switch_op = IndexSwitchOp(result_types, index, cases, len(branch_jaxprs) - 1)
 
     # construct switch branches
@@ -2139,7 +2136,7 @@ def _switch_lowering(
             YieldOp(out)
 
     with ir.InsertionPoint(scf_switch_op.defaultRegion.blocks.append()):
-        branch_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend(f"default branch"))
+        branch_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend("default branch"))
         branch_jaxpr = branch_jaxprs[-1]
         (out, _) = mlir.jaxpr_subcomp(
             branch_ctx.module_context,

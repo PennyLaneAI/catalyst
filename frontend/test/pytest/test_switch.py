@@ -1,11 +1,23 @@
-import jax
-import jax.numpy as jnp
-import pennylane as qml
-import pytest
+# Copyright 2022-2025 Xanadu Quantum Technologies Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from math import pi
 
+import jax.numpy as jnp
 import numpy as np
+import pennylane as qml
+import pytest
 
 import catalyst
 from catalyst import qjit, switch
@@ -15,22 +27,24 @@ class TestInterpreted:
     """Test that Catalyst switches can be used with the python interpreter."""
 
     def test_1_branch(self):
-        """Test that a switch can be used with a single branch, which is used as the default branch."""
+        """
+        Test that a switch can be used with a single branch, which is used as the default branch.
+        """
 
-        def foo(i):
+        def circuit(i):
             @switch(i)
             def my_switch():
                 return 42
 
             return my_switch()
 
-        assert foo(0) == 42
-        assert foo(1) == 42
+        assert circuit(0) == 42
+        assert circuit(1) == 42
 
     def test_default_branch(self):
         """Test that manually assigning a default branch catches all unassigned cases."""
 
-        def foo(i):
+        def circuit(i):
             @switch(i)
             def my_switch():
                 return "first"
@@ -41,16 +55,16 @@ class TestInterpreted:
 
             return my_switch()
 
-        assert foo(-4) == "default"
-        assert foo(-1) == "default"
-        assert foo(0) == "first"
-        assert foo(1) == "default"
-        assert foo(12) == "default"
+        assert circuit(-4) == "default"
+        assert circuit(-1) == "default"
+        assert circuit(0) == "first"
+        assert circuit(1) == "default"
+        assert circuit(12) == "default"
 
     def test_branch_args(self):
         """Test that switch branches can be called with arguments."""
 
-        def foo(i, x):
+        def circuit(i, x):
             @switch(i)
             def my_switch(x):
                 return -x
@@ -60,22 +74,22 @@ class TestInterpreted:
                 return 0
 
             @my_switch.branch(2)
-            def my_branch(x):
+            def my_branch_2(x):
                 return x
 
             return my_switch(x)
 
-        assert foo(0, 1) == -1
-        assert foo(0, 1.3) == -1.3
-        assert foo(1, 1) == 0
-        assert foo(1, complex(1, 2)) == 0
-        assert foo(2, 1) == 1
-        assert foo(2, 19 / 2) == 19 / 2
+        assert circuit(0, 1) == -1
+        assert circuit(0, 1.3) == -1.3
+        assert circuit(1, 1) == 0
+        assert circuit(1, complex(1, 2)) == 0
+        assert circuit(2, 1) == 1
+        assert circuit(2, 19 / 2) == 19 / 2
 
     def test_chosen_index(self):
         """Test that the initial branch of a switch can be assigned a case."""
 
-        def foo(i):
+        def circuit(i):
             @switch(i, case=12)
             def my_switch():
                 return "main"
@@ -86,13 +100,13 @@ class TestInterpreted:
 
             return my_switch()
 
-        assert foo(12) == "main"
-        assert foo(0) == "default"
+        assert circuit(12) == "main"
+        assert circuit(0) == "default"
 
     def test_non_sequential_indices(self):
         """Test that a switch can be created with non-sequential indices."""
 
-        def foo(i, x):
+        def circuit(i, x):
             @switch(i, case=3)
             def my_switch(x):
                 return x
@@ -107,15 +121,15 @@ class TestInterpreted:
 
             return my_switch(x)
 
-        assert foo(3, 2) == 2
-        assert foo(11, 4) == 16
-        assert foo(6, 5) == 10
-        assert foo(-1, 2) == 2
+        assert circuit(3, 2) == 2
+        assert circuit(11, 4) == 16
+        assert circuit(6, 5) == 10
+        assert circuit(-1, 2) == 2
 
     def test_no_case_parameter(self):
         """Test that a switch raises an error when called without the case argument."""
 
-        def foo(i):
+        def circuit(i):
             @switch()
             def my_switch():
                 return 0
@@ -123,7 +137,7 @@ class TestInterpreted:
             return my_switch()
 
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
-            foo(0)
+            circuit(0)
 
         def bar(i):
             @switch(i)
@@ -144,24 +158,26 @@ class TestClassicalCompiled:
     """Test classical compiled Catalyst switches."""
 
     def test_1_branch(self):
-        """Test that a switch can be used with a single branch, which is used as the default branch."""
+        """
+        Test that a switch can be used with a single branch, which is used as the default branch.
+        """
 
         @qjit
-        def foo(i):
+        def circuit(i):
             @switch(i)
             def my_switch():
                 return 12
 
             return my_switch()
 
-        assert foo(0) == 12
-        assert foo(3) == 12
+        assert circuit(0) == 12
+        assert circuit(3) == 12
 
     def test_default_branch(self):
         """Test that the default branch catches all unassigned cases."""
 
         @qjit
-        def foo(i):
+        def circuit(i):
             @switch(i)
             def my_switch():
                 return -1
@@ -176,15 +192,15 @@ class TestClassicalCompiled:
 
             return my_switch()
 
-        assert foo(-4) == 3
-        assert foo(-1) == 3
-        assert foo(0) == -1
-        assert foo(1) == 1
-        assert foo(2) == 3
-        assert foo(8) == 3
+        assert circuit(-4) == 3
+        assert circuit(-1) == 3
+        assert circuit(0) == -1
+        assert circuit(1) == 1
+        assert circuit(2) == 3
+        assert circuit(8) == 3
 
     def test_branch_args(self):
-        def foo(i, x, kw=None):
+        def circuit(i, x, kw=None):
             @switch(i)
             def my_switch(x, kw=None):
                 return x * kw
@@ -199,13 +215,13 @@ class TestClassicalCompiled:
 
             return my_switch(x, kw=kw)
 
-        assert foo(0, 3, kw=12) == 36
-        assert foo(2, 9, kw=4) == 8
-        assert foo(4, 11, kw=4) == 7
+        assert circuit(0, 3, kw=12) == 36
+        assert circuit(2, 9, kw=4) == 8
+        assert circuit(4, 11, kw=4) == 7
 
     def test_chosen_initial_index(self):
         @qjit
-        def foo(i, x):
+        def circuit(i, x):
             @switch(i, case=1)
             def my_switch(x):
                 return 3 * x + 1
@@ -216,16 +232,16 @@ class TestClassicalCompiled:
 
             return my_switch(x)
 
-        assert foo(1, 1) == 4
-        assert foo(1, 3) == 10
-        assert foo(1, 5) == 16
-        assert foo(1, 9) == 28
-        assert foo(0, 6) == 3
-        assert foo(0, 8) == 4
+        assert circuit(1, 1) == 4
+        assert circuit(1, 3) == 10
+        assert circuit(1, 5) == 16
+        assert circuit(1, 9) == 28
+        assert circuit(0, 6) == 3
+        assert circuit(0, 8) == 4
 
     def test_non_sequential_indices(self):
         @qjit
-        def foo(i):
+        def circuit(i):
             @switch(i)
             def my_switch():
                 return 0
@@ -244,16 +260,16 @@ class TestClassicalCompiled:
 
             return my_switch()
 
-        assert foo(-2) == -2
-        assert foo(-1) == 10
-        assert foo(0) == 0
-        assert foo(1) == 10
-        assert foo(2) == 10
-        assert foo(3) == 3
+        assert circuit(-2) == -2
+        assert circuit(-1) == 10
+        assert circuit(0) == 0
+        assert circuit(1) == 10
+        assert circuit(2) == 10
+        assert circuit(3) == 3
 
     def test_return_type_promotion(self):
         @qjit
-        def foo(i):
+        def circuit(i):
             @switch(i)
             def my_switch():
                 return 1
@@ -268,11 +284,11 @@ class TestClassicalCompiled:
 
             return my_switch()
 
-        assert foo(0).dtype is jnp.dtype("complex128")
+        assert circuit(0).dtype is jnp.dtype("complex128")
 
     def test_inconsistent_output_types(self):
         @qjit
-        def foo(i):
+        def circuit(i):
             @switch(i)
             def my_switch():
                 return "hello"
@@ -288,11 +304,11 @@ class TestClassicalCompiled:
             return my_switch()
 
         with pytest.raises(TypeError):
-            foo(0)
+            circuit(0)
 
     def test_missing_parameter(self):
         @qjit
-        def foo(i):
+        def circuit(i):
             @switch()
             def my_switch():
                 return 0
@@ -304,7 +320,7 @@ class TestClassicalCompiled:
             return my_switch()
 
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
-            foo(0)
+            circuit(0)
 
         @qjit
         def bar(i):
@@ -326,7 +342,9 @@ class TestQuantum:
     """Test compiled Catalyst switches with quantum operations."""
 
     def test_1_branch(self, backend):
-        """Test that a switch can be used with a single branch, which is used as the default branch."""
+        """
+        Test that a switch can be used with a single branch, which is used as the default branch.
+        """
 
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
@@ -339,8 +357,8 @@ class TestQuantum:
 
             return catalyst.measure(wires=0)
 
-        assert circuit(0) == True
-        assert circuit(3) == True
+        assert circuit(0)
+        assert circuit(3)
 
     def test_default_branch(self, backend):
         """Test that the default branch catches all unassigned cases."""
@@ -529,3 +547,18 @@ class TestQuantum:
 
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
             bar(0)
+
+    def test_fails_capture(self, backend):
+        if not qml.capture.enabled():
+            pytest.skip("capture only test")
+
+        qml.capture.enable()
+
+        with pytest.raises(TypeError) as exc_info:
+
+            @switch(0)
+            def my_switch():
+                return 0
+
+        error_msg = str(exc_info.value)
+        assert "not supported" in error_msg

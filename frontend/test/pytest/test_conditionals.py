@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2022-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -212,8 +212,8 @@ class TestCond:
             cond_fn()
             return measure(wires=0)
 
-        assert circuit(3) == False
-        assert circuit(6) == True
+        assert not circuit(3)
+        assert circuit(6)
 
     def test_branch_return_pytree_mismatch(self):
         """Test that an exception is raised when the true branch returns a value without an else
