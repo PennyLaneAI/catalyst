@@ -20,8 +20,8 @@ import pennylane as qml
 import pytest
 
 import catalyst
-from catalyst import qjit, switch
-from catalyst.api_extensions.control_flow import SwitchCallable
+from catalyst import qjit
+from catalyst.api_extensions.control_flow import Switch, SwitchCallable, switch
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
 
@@ -194,7 +194,11 @@ class TestInterpreted:
             with pytest.raises(
                 AttributeError, match="and thus has no associated quantum operation."
             ):
-                my_switch.operation
+                assert isinstance(my_switch.operation, Switch)
+
+            return my_switch()
+
+        assert circuit(0) == 0
 
 
 class TestClassicalCompiled:
@@ -440,11 +444,14 @@ class TestClassicalCompiled:
             my_switch()
 
             with pytest.raises(
-                AttributeError, match="and this has no associated quantum operation."
+                AttributeError, match="and thus has no associated quantum operation."
             ):
-                my_switch.operation
+                assert isinstance(my_switch.operation, Switch)
 
             return my_switch()
+
+        assert circuit(0) == 2
+        assert circuit(2) == 4
 
 
 class TestQuantum:
@@ -696,3 +703,27 @@ class TestQuantum:
 
         error_msg = str(exc_info.value)
         assert "not supported" in error_msg
+
+    def test_operation_access(self, backend):
+        """Test that switch operations can be accessed in a quantum context."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(i):
+            @switch(i)
+            def my_switch():
+                qml.X(0)
+
+            @my_switch.default()
+            def my_default():
+                qml.H(0)
+
+            my_switch()
+
+            if not qml.capture.enabled():
+                assert isinstance(my_switch.operation, Switch)
+
+            return qml.probs()
+
+        assert np.allclose(circuit(0), [0, 1])
+        assert np.allclose(circuit(1), [0.5, 0.5])
