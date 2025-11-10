@@ -94,7 +94,13 @@ def RSDecompositionPass : Pass<"rs-decomposition"> {
         "epsilon",
         "double",
         default="1e-4",
-        desc="Approximation error tolerance for the RS decomposition.">];
+        desc="Approximation error tolerance for the RS decomposition.">, 
+        Option<
+        "pprBasis",
+        "ppr-basis",
+        "bool",
+        default="false",
+        desc="Whether to decompose into the PPR basis set {X_pi/8, Z_pi/8} instead of the standard Clifford+T basis set.">,];
 }
 
 def MergeRotationsPass : Pass<"merge-rotations"> {
