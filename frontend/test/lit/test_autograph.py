@@ -224,7 +224,7 @@ try:
         return y
 
 except TypeError as e:
-    # CHECK:   Conditional requires a consistent return structure across all branches
+    # CHECK:   Control flow requires a consistent return structure across all branches
     print(e)
 
 # -----

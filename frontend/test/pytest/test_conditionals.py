@@ -236,7 +236,7 @@ class TestCond:
 
         with pytest.raises(
             TypeError,
-            match="Conditional requires a consistent return structure across all branches",
+            match="Control flow requires a consistent return structure across all branches",
         ):
             qjit(circuit)
 
@@ -260,7 +260,7 @@ class TestCond:
         else:
             with pytest.raises(
                 TypeError,
-                match="Conditional requires a consistent return structure across all branches",
+                match="Control flow requires a consistent return structure across all branches",
             ):
                 qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
@@ -286,7 +286,7 @@ class TestCond:
             ):
                 qjit(circuit)
         else:
-            m = "Conditional requires a consistent array shape per result across all branches"
+            m = "Control flow requires a consistent array shape per result across all branches"
             with pytest.raises(
                 TypeError,
                 match=m,
@@ -315,7 +315,7 @@ class TestCond:
             ):
                 qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
         else:
-            m = "Conditional requires a consistent array shape per result across all branches"
+            m = "Control flow requires a consistent array shape per result across all branches"
             with pytest.raises(
                 TypeError,
                 match=m,
@@ -481,7 +481,7 @@ class TestCond:
         else:
             with pytest.raises(
                 TypeError,
-                match="Conditional requires a consistent number of results across all branches",
+                match="Control flow requires a consistent number of results across all branches",
             ):
                 f(True, 3)
 
@@ -531,7 +531,7 @@ class TestCond:
         else:
             with pytest.raises(
                 TypeError,
-                match="Conditional requires a consistent return structure across all branches",
+                match="Control flow requires a consistent return structure across all branches",
             ):
                 qjit(circuit)
 
@@ -588,7 +588,7 @@ class TestCond:
             with pytest.raises(ValueError, match="false branch must be provided"):
                 qjit(f)
         else:
-            with pytest.raises(TypeError, match="Please specify an else branch"):
+            with pytest.raises(TypeError, match="requires a consistent return structure"):
                 qjit(f)
 
         def g(x: int):

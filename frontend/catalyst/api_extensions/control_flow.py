@@ -211,9 +211,8 @@ def cond(pred: DynamicJaxprTracer):
         ...     def cond_fn():
         ...         return x ** 2
         ...     return cond_fn()
-        TypeError: Conditional requires a consistent return structure across all branches! Got
-        PyTreeDef(None) and PyTreeDef(*). Please specify an else branch if PyTreeDef(None) was
-        specified.
+        TypeError: Control flow requires a consistent return structure across all branches! Got
+        PyTreeDef(None) and PyTreeDef(*).
 
         >>> @qjit
         ... def f(x: float):
@@ -842,8 +841,8 @@ class CondCallable:
             regions.append(hybridRegion)
             in_sigs.append(in_sig)
             out_sigs.append(out_sig)
-        _assert_cond_result_structure([s.out_tree() for s in out_sigs])
-        _assert_cond_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
+        _assert_consistent_result_structure([s.out_tree() for s in out_sigs])
+        _assert_consistent_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
         out_tree = out_sigs[-1].out_tree()
         all_consts = [s.out_consts() for s in out_sigs]
         out_types = [s.out_type() for s in out_sigs]
@@ -890,8 +889,8 @@ class CondCallable:
             return in_sig, out_sig
 
         _, out_sigs = unzip2(_trace(fun) for fun in (*self.branch_fns, self.otherwise_fn))
-        _assert_cond_result_structure([s.out_tree() for s in out_sigs])
-        _assert_cond_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
+        _assert_consistent_result_structure([s.out_tree() for s in out_sigs])
+        _assert_consistent_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
         all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
         all_consts = [s.out_consts() for s in out_sigs]
         all_noimplouts = [s.num_implicit_outputs() for s in out_sigs]
@@ -1263,8 +1262,8 @@ class SwitchCallable:
             regions.append(hybridRegion)
             in_sigs.append(in_sig)
             out_sigs.append(out_sig)
-        _assert_cond_result_structure([s.out_tree() for s in out_sigs])
-        _assert_cond_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
+        _assert_consistent_result_structure([s.out_tree() for s in out_sigs])
+        _assert_consistent_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
         out_tree = out_sigs[-1].out_tree()
         all_consts = [s.out_consts() for s in out_sigs]
         out_types = [s.out_type() for s in out_sigs]
@@ -1317,8 +1316,8 @@ class SwitchCallable:
         in_sigs, out_sigs = unzip2([_trace(branch) for branch in branches])
 
         # ensure consistent output structures and types
-        _assert_cond_result_structure([sig.out_tree() for sig in out_sigs])
-        _assert_cond_result_types([[t[0] for t in sig.out_type()] for sig in out_sigs])
+        _assert_consistent_result_structure([sig.out_tree() for sig in out_sigs])
+        _assert_consistent_result_types([[t[0] for t in sig.out_type()] for sig in out_sigs])
 
         all_jaxprs = [sig.out_initial_jaxpr() for sig in out_sigs]
         all_consts = [sig.out_consts() for sig in out_sigs]
@@ -1866,26 +1865,25 @@ class WhileLoop(HybridOp):
 
 
 ## PRIVATE ##
-def _assert_cond_result_structure(trees: List[PyTreeDef]):
+def _assert_consistent_result_structure(trees: List[PyTreeDef]):
     """Ensure a consistent container structure across branch results."""
     expected_tree = trees[0]
     for tree in trees[1:]:
         if tree != expected_tree:
             raise TypeError(
-                "Conditional requires a consistent return structure across all branches! "
-                f"Got {tree} and {expected_tree}. Please specify an else branch if PyTreeDef(None) "
-                "was specified."
+                "Control flow requires a consistent return structure across all branches! "
+                f"Got {tree} and {expected_tree}."
             )
 
 
-def _assert_cond_result_types(signatures: List[List[AbstractValue]]):
+def _assert_consistent_result_types(signatures: List[List[AbstractValue]]):
     """Ensure a consistent type signature across branch results."""
     num_results = len(signatures[0])
 
     if not all(len(sig) == num_results for sig in signatures):
         raise TypeError(
-            "Conditional requires a consistent number of results across all branches! It might "
-            "happen when some of the branch returns dynamic shape and some return constant shape."
+            "Control flow requires a consistent number of results across all branches! This can "
+            "happen when some branches return dynamic shapes and some return constant shapes."
         )
 
     for i in range(num_results):
@@ -1895,8 +1893,8 @@ def _assert_cond_result_types(signatures: List[List[AbstractValue]]):
         for shape in slice_shapes:
             if shape != expected_shape:
                 raise TypeError(
-                    "Conditional requires a consistent array shape per result across all branches! "
-                    f"Got {shape} for result #{i} but expected {expected_shape}."
+                    "Control flow requires a consistent array shape per result across all branches!"
+                    f" Got {shape} for result #{i} but expected {expected_shape}."
                 )
 
 
