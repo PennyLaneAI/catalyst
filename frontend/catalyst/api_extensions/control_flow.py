@@ -921,25 +921,9 @@ class CondCallable:
                 return branch_fn()
         return self.otherwise_fn()
 
-    @staticmethod
-    def _make_argless_function(fn, args, kwargs):
-        """Wrap a user function into a function without arguments to satisfy the IR representation
-        of conditionals, which always accesses values via closure (besides the predicate)."""
-
-        def argless_fn():
-            # Special case for single gates supplied to cond. We'd would like users to be able to
-            # use this familiar PL pattern, e.g. `qml.cond(p, qml.RY)(0.1, 0)`.
-            if isinstance(fn, type) and issubclass(fn, qml.operation.Operation):
-                fn(*args, **kwargs)
-                return None  # swallow return value to avoid mismatched pytrees across branches
-
-            return fn(*args, **kwargs)
-
-        return argless_fn
-
     def __call__(self, *args, **kwargs):
-        self.branch_fns = [self._make_argless_function(fn, args, kwargs) for fn in self.branch_fns]
-        self.otherwise_fn = self._make_argless_function(self.otherwise_fn, args, kwargs)
+        self.branch_fns = [_make_argless_function(fn, args, kwargs) for fn in self.branch_fns]
+        self.otherwise_fn = _make_argless_function(self.otherwise_fn, args, kwargs)
 
         mode = EvaluationContext.get_evaluation_mode()
         if mode == EvaluationMode.QUANTUM_COMPILATION:
@@ -1932,7 +1916,7 @@ def _make_argless_function(fn, args, kwargs):
     of conditionals, which always accesses values via closure (besides the predicate)."""
 
     def argless_fn():
-        # Special case for single gates supplied to cond. We'd would like users to be able to
+        # Special case for single gates. We would like users to be able to
         # use this familiar PL pattern, e.g. `qml.cond(p, qml.RY)(0.1, 0)`.
         if isinstance(fn, type) and issubclass(fn, qml.operation.Operation):
             fn(*args, **kwargs)
