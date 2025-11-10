@@ -97,64 +97,64 @@ inline ZOmega gcd(ZOmega elem1, ZOmega elem2) {
 /**
  * @brief Deterministic Miller-Rabin primality test for 64-bit integers.
  */
-// inline bool primality_test(INT_TYPE n) {
-//     static std::map<INT_TYPE, bool> cache;
-//     if (auto it = cache.find(n); it != cache.end()) {
-//         return it->second;
-//     }
-
-//     if (n < 2 || n == 4) return cache[n] = false;
-//     if (n < 4) return cache[n] = true;
-
-//     const std::vector<INT_TYPE> small_primes = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97};
-//     for (INT_TYPE p : small_primes) {
-//         if (n == p) return cache[n] = true;
-//         if (n % p == 0) return cache[n] = false;
-//     }
-
-//     INT_TYPE d = n - 1;
-//     int s = 0;
-//     while (d % 2 == 0) {
-//         d /= 2;
-//         s++;
-//     }
-    
-//     const std::vector<INT_TYPE> bases = {2, 325, 9375, 28178, 450775, 9780504, 1795265022};
-//     for (INT_TYPE base : bases) {
-//         if (base >= n) continue; 
-        
-//         INT_TYPE x = mod_pow(base, d, n);
-//         if (x == 1 || x == n - 1) continue;
-
-//         bool is_composite = true;
-//         for (int r = 1; r < s; ++r) {
-//             x = mod_mul(x, x, n);
-//             if (x == n - 1) {
-//                 is_composite = false;
-//                 break;
-//             }
-//         }
-//         if (is_composite) return cache[n] = false;
-//     }
-
-//     return cache[n] = true;
-// }
-
-
 inline bool primality_test(INT_TYPE n) {
-    // std::cout << "Performing primality test for n: " << n << std::endl;
-
     static std::map<INT_TYPE, bool> cache;
     if (auto it = cache.find(n); it != cache.end()) {
         return it->second;
     }
-   if (boost::multiprecision::miller_rabin_test(n, 25)) {
-        return cache[n] = true;
+
+    if (n < 2 || n == 4) return cache[n] = false;
+    if (n < 4) return cache[n] = true;
+
+    const std::vector<INT_TYPE> small_primes = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97};
+    for (INT_TYPE p : small_primes) {
+        if (n == p) return cache[n] = true;
+        if (n % p == 0) return cache[n] = false;
     }
-    else {
-        return cache[n] = false;
+
+    INT_TYPE d = n - 1;
+    int s = 0;
+    while (d % 2 == 0) {
+        d /= 2;
+        s++;
     }
+    
+    const std::vector<INT_TYPE> bases = {2, 325, 9375, 28178, 450775, 9780504, 1795265022};
+    for (INT_TYPE base : bases) {
+        if (base >= n) continue; 
+        
+        INT_TYPE x = mod_pow(base, d, n);
+        if (x == 1 || x == n - 1) continue;
+
+        bool is_composite = true;
+        for (int r = 1; r < s; ++r) {
+            x = mod_mul(x, x, n);
+            if (x == n - 1) {
+                is_composite = false;
+                break;
+            }
+        }
+        if (is_composite) return cache[n] = false;
+    }
+
+    return cache[n] = true;
 }
+
+
+// inline bool primality_test(INT_TYPE n) {
+//     // std::cout << "Performing primality test for n: " << n << std::endl;
+
+//     static std::map<INT_TYPE, bool> cache;
+//     if (auto it = cache.find(n); it != cache.end()) {
+//         return it->second;
+//     }
+//    if (boost::multiprecision::miller_rabin_test(n, 25)) {
+//         return cache[n] = true;
+//     }
+//     else {
+//         return cache[n] = false;
+//     }
+// }
 
 
 /**

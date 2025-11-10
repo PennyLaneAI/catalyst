@@ -20,7 +20,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iostream>
-#include <map> // <<< ADDED: Include for std::map
+#include <map> 
 #include <vector>
 
 #define MAX_FACTORING_TRIALS 1000
@@ -214,11 +214,17 @@ std::pair<std::vector<CliffordData::GateType>, double> eval_ross_algorithm(doubl
         for (const auto &[u_sol, k_val] : u_solutions) {
             // std::cout << "Testing potential solution with k=" << k_val << std::endl << "u_sol: "
             // << u_sol << std::endl;
+            static INT_TYPE solution_count = 0;
+            solution_count += 1;
             auto xi = ZSqrtTwo(std::pow(2, k_val)) - u_sol.norm().to_sqrt_two();
             auto t_sol = NormSolver::solve_diophantine(xi, MAX_FACTORING_TRIALS);
 
             if (t_sol) {
                 // std::cout << "Found t solution: " << *t_sol << std::endl;
+                static INT_TYPE found_solution_count = 0;
+                found_solution_count += 1;
+                std::cout << "Total solutions tried: " << solution_count << ", found solutions: "
+                          << found_solution_count << std::endl;
                 u = u_sol * scale;
                 t = *t_sol * scale;
                 k = k_val;
@@ -236,12 +242,4 @@ std::pair<std::vector<CliffordData::GateType>, double> eval_ross_algorithm(doubl
     ross_cache[key] = normal_form_result;
 
     return normal_form_result;
-}
-
-// Will be used to return global phase
-double rs_decomposition_get_phase_0(double theta, double epsilon)
-{
-    std::cout << "phase got theta " << theta << std::endl;
-    std::cout << "phase got epsilon " << epsilon << std::endl;
-    return 1.23;
 }
