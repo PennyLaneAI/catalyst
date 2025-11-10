@@ -399,7 +399,7 @@ class TestClassicalCompiled:
 
                 return my_switch()
 
-            circuit()
+            circuit(0)
 
         error_msg = str(exc_info.value)
         assert "not supported" in error_msg
