@@ -127,7 +127,7 @@ class TestInterpreted:
         assert circuit(6, 5) == 10
         assert circuit(-1, 2) == 2
 
-    def test_no_case_parameter(self):
+    def test_missing_parameter(self):
         """Test that a switch raises an exception when called without the case argument."""
 
         def circuit(i):
