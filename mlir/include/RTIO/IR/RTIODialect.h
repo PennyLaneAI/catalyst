@@ -22,4 +22,3 @@
 
 #define GET_TYPEDEF_CLASSES
 #include "RTIO/IR/RTIOOpsTypes.h.inc"
-
