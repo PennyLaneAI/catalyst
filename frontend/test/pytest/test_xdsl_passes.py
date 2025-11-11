@@ -1,0 +1,137 @@
+# Copyright 2025 Xanadu Quantum Technologies Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Unit tests for xDSL pass-related functionality in the Compiler class.
+"""
+
+import os
+import pathlib
+import tempfile
+from unittest.mock import Mock
+
+import pytest
+
+from catalyst.compiler import CompileOptions, Compiler
+from catalyst.pipelines import KeepIntermediateLevel
+from catalyst.utils.filesystem import Directory
+
+# pylint: disable=protected-access
+
+
+class TestHasXDSLPassesInTransformModules:
+    """Test the has_xdsl_passes_in_transform_modules method and its exception handling."""
+
+    @staticmethod
+    def _create_mock_module(attrs):
+        """Helper to create a mock module with nested operations."""
+        nested_op = Mock()
+        nested_op.attributes = attrs
+        op = Mock()
+        op.regions = [Mock()]
+        op.regions[0].blocks = [Mock()]
+        op.regions[0].blocks[0].operations = [nested_op]
+        module = Mock()
+        module.operation.regions = [Mock()]
+        module.operation.regions[0].blocks = [Mock()]
+        module.operation.regions[0].blocks[0].operations = [op]
+        return module
+
+    @pytest.mark.parametrize("exception", [AttributeError, KeyError, TypeError])
+    def test_exception_handling(self, exception):
+        """Test that exceptions are handled correctly."""
+        class MockAttrs:
+            def __contains__(self, key):
+                raise exception("Error")
+            def keys(self):
+                raise exception("Error")
+        
+        compiler = Compiler()
+        module = self._create_mock_module(MockAttrs())
+        assert compiler.has_xdsl_passes_in_transform_modules(module) is False
+
+
+class TestCreatePassSaveCallback:
+    """Test the _create_pass_save_callback method."""
+
+    def test_save_callback_workspace_none(self):
+        """Test that callback returns None when workspace is None."""
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED)
+        compiler = Compiler(options=options)
+        
+        callback = compiler._create_pass_save_callback(None)
+        assert callback is None
+
+    def test_save_callback_keep_intermediate_pipeline(self):
+        """Test that callback returns None when keep_intermediate is PIPELINE."""
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.PIPELINE)
+        compiler = Compiler(options=options)
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace = Directory(pathlib.Path(tmpdir))
+            callback = compiler._create_pass_save_callback(workspace)
+            assert callback is None
+
+    def test_save_callback_returns_callback(self):
+        """Test that callback is returned when conditions are met."""
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED)
+        compiler = Compiler(options=options)
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace = Directory(pathlib.Path(tmpdir))
+            callback = compiler._create_pass_save_callback(workspace)
+            assert callback is not None
+            assert callable(callback)
+
+    def test_pass_save_callback_saves_ir_correctly(self):
+        """Test that callback saves the IR correctly."""
+        try:
+            from xdsl.dialects.builtin import ModuleOp
+        except ImportError:
+            pytest.skip("xdsl not available")
+        
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED)
+        compiler = Compiler(options=options)
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace = Directory(pathlib.Path(tmpdir))
+            callback = compiler._create_pass_save_callback(workspace)
+            
+            module = ModuleOp([])
+            
+            # Create multiple passes
+            pass1 = Mock()
+            pass1.name = "Pass1"
+            pass2 = Mock()
+            pass2.name = "Pass2"
+            pass3 = Mock()
+            pass3.name = "Pass3"
+            
+            # Call callback multiple times
+            callback(pass1, module)
+            callback(pass2, module)
+            callback(pass3, module)
+            
+            expected_dir = os.path.join(str(workspace), "0_UserTransformPass")
+            assert os.path.exists(expected_dir)
+            assert os.path.isdir(expected_dir)
+            files = sorted(os.listdir(expected_dir))
+            assert len(files) == 3
+            assert files[0] == "1_Pass1.mlir"
+            assert files[1] == "2_Pass2.mlir"
+            assert files[2] == "3_Pass3.mlir"
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])
+
