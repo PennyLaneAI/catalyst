@@ -77,6 +77,7 @@ PLACEHOLDER_PATTERN = "@@@"
 
 
 def main():
+    """Main entry point to program."""
     try:
         args = parse_args()
 
@@ -169,13 +170,13 @@ def get_catalyst_project_root() -> pathlib.PurePath:
         )
         return path
 
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as exc:
         # This error occurs if the command fails (e.g., not a git repo)
-        raise RuntimeError(f"Not a git repository")
+        raise RuntimeError("Not a git repository") from exc
 
-    except FileNotFoundError:
+    except FileNotFoundError as exc:
         # This error occurs if git is not installed or not in PATH
-        raise RuntimeError("'git' command not found.")
+        raise RuntimeError("'git' command not found") from exc
 
 
 def create_dialect_files(
@@ -257,7 +258,7 @@ def _rename_dialect_files(
     path: str | pathlib.PurePath, dialect_name: str, old_pattern: str = PLACEHOLDER_DIALECT_NAME
 ):
     """TODO"""
-    for dirpath, dirnames, filenames in os.walk(path):
+    for dirpath, _, filenames in os.walk(path):
         for filename in filenames:
             if old_pattern in filename:
 
@@ -269,15 +270,18 @@ def _rename_dialect_files(
                 # Safety check: make sure the new file name doesn't already exist
                 if new_path.exists():
                     print(
-                        f"Warning: Attempting to rename file to '{new_path}', but it already exists; skipping."
+                        f"Warning: Attempting to rename file to '{new_path}', "
+                        f"but it already exists; skipping."
                     )
                 else:
                     try:
                         # Rename the file
                         old_path.rename(new_path)
 
-                    except OSError:
-                        raise RuntimeError(f"could not rename file '{old_path}' to '{new_path}'")
+                    except OSError as exc:
+                        raise RuntimeError(
+                            f"could not rename file '{old_path}' to '{new_path}'"
+                        ) from exc
 
 
 def _check_dialect_not_already_exists(catalyst_project_root: pathlib.PurePath, dialect_name: str):
@@ -314,16 +318,14 @@ def _run_sed_command(path: str | pathlib.PurePath, search_pattern: str, replace_
 
     find_command = ["find", path, "-type", "f", "-print0"]
 
-    pipe = subprocess.Popen(find_command, stdout=subprocess.PIPE, text=True)
-
-    sed_command = ["xargs", "-0", "sed", "-i", f"s/{search_pattern}/{replace_str}/g"]
-    subprocess.run(
-        sed_command,
-        stdin=pipe.stdout,
-        text=True,
-    )
-
-    pipe.stdout.close()
+    with subprocess.Popen(find_command, stdout=subprocess.PIPE, text=True) as pipe:
+        sed_command = ["xargs", "-0", "sed", "-i", f"s/{search_pattern}/{replace_str}/g"]
+        subprocess.run(
+            sed_command,
+            stdin=pipe.stdout,  # Pipe previous output to this one
+            text=True,  # Decode as text (UTF-8)
+            check=True,  # Raise an error if the command fails
+        )
 
 
 def _placeholder_str(pattern: str) -> str:
