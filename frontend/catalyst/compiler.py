@@ -632,24 +632,25 @@ class Compiler:
         Returns:
             (str): filename of shared object
         """
+        using_python_compiler = self.is_using_python_compiler(mlir_module)
         workspace = args[0] if args else kwargs.get("workspace")
         module_name = str(mlir_module.operation.attributes["sym_name"]).replace('"', "")
         ir = mlir_module.operation.get_asm(
-            binary=False, print_generic_op_form=True, assume_verified=True
+            binary=False, print_generic_op_form=using_python_compiler, assume_verified=True
         )
         
         # Save intermediate IR before any compiler transformation is applied
         if workspace and self.options.keep_intermediate:
             initial_ir_file = os.path.join(str(workspace), f"0_{module_name}.mlir")
             with open(initial_ir_file, "w", encoding="utf-8") as f:
-                f.write(ir)
+                # We need to canonicalize the IR to get the pretty format
+                f.write(canonicalize(stdin=ir, options=self.options))
 
-        if self.is_using_python_compiler(mlir_module):
+        if using_python_compiler:
             # We keep this module here to keep xDSL requirement optional
             # Only move this is it has been decided that xDSL is no longer optional.
             # pylint: disable-next=import-outside-toplevel
             from pennylane.compiler.python_compiler import Compiler as PythonCompiler
-
             callback = self._create_pass_save_callback(workspace)
             compiler = PythonCompiler()
             ir = compiler.run(ir, callback=callback)
