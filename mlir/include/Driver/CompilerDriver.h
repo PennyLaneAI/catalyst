@@ -36,7 +36,7 @@ namespace driver {
 // low-level messages, we might want to hide these.
 enum class Verbosity { Silent = 0, Urgent = 1, Debug = 2, All = 3 };
 
-enum SaveTemps { None, AfterPipeline, AfterPass };
+enum SaveTemps { None, AfterPipeline, AfterPassChanged, AfterPass };
 
 enum Action { OPT, Translate, LLC, All };
 
