@@ -51,12 +51,14 @@ class TestHasXDSLPassesInTransformModules:
     @pytest.mark.parametrize("exception", [AttributeError, KeyError, TypeError])
     def test_exception_handling(self, exception):
         """Test that exceptions are handled correctly."""
+
         class MockAttrs:
             def __contains__(self, key):
                 raise exception("Error")
+
             def keys(self):
                 raise exception("Error")
-        
+
         compiler = Compiler()
         module = self._create_mock_module(MockAttrs())
         assert compiler.has_xdsl_passes_in_transform_modules(module) is False
@@ -69,7 +71,7 @@ class TestCreatePassSaveCallback:
         """Test that callback returns None when workspace is None."""
         options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED)
         compiler = Compiler(options=options)
-        
+
         callback = compiler._create_pass_save_callback(None)
         assert callback is None
 
@@ -77,7 +79,7 @@ class TestCreatePassSaveCallback:
         """Test that callback returns None when keep_intermediate is PIPELINE."""
         options = CompileOptions(keep_intermediate=KeepIntermediateLevel.PIPELINE)
         compiler = Compiler(options=options)
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Directory(pathlib.Path(tmpdir))
             callback = compiler._create_pass_save_callback(workspace)
@@ -87,7 +89,7 @@ class TestCreatePassSaveCallback:
         """Test that callback is returned when conditions are met."""
         options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED)
         compiler = Compiler(options=options)
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Directory(pathlib.Path(tmpdir))
             callback = compiler._create_pass_save_callback(workspace)
@@ -100,16 +102,16 @@ class TestCreatePassSaveCallback:
             from xdsl.dialects.builtin import ModuleOp
         except ImportError:
             pytest.skip("xdsl not available")
-        
+
         options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED)
         compiler = Compiler(options=options)
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Directory(pathlib.Path(tmpdir))
             callback = compiler._create_pass_save_callback(workspace)
-            
+
             module = ModuleOp([])
-            
+
             # Create multiple passes
             pass1 = Mock()
             pass1.name = "Pass1"
@@ -117,12 +119,12 @@ class TestCreatePassSaveCallback:
             pass2.name = "Pass2"
             pass3 = Mock()
             pass3.name = "Pass3"
-            
+
             # Call callback multiple times
             callback(pass1, module)
             callback(pass2, module)
             callback(pass3, module)
-            
+
             expected_dir = os.path.join(str(workspace), "0_UserTransformPass")
             assert os.path.exists(expected_dir)
             assert os.path.isdir(expected_dir)
@@ -132,6 +134,6 @@ class TestCreatePassSaveCallback:
             assert files[1] == "2_Pass2.mlir"
             assert files[2] == "3_Pass3.mlir"
 
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
-
