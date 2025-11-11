@@ -118,7 +118,8 @@ def qjit(
 
             - ``False`` or ``0`` or ``"none"`` or ``None`` (default): No intermediate file is kept.
             - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
-            - ``2`` or ``"pass"``: Intermediate files are saved after each pass.
+            - ``2`` or ``"changed"``: Intermediate files are saved after each pass (only if changed).
+            - ``3`` or ``"pass"``: Intermediate files are saved after each pass, even if unchanged.
             If enabled, intermediate representations are available via the following attributes:
 
             - :attr:`~.QJIT.jaxpr`: JAX program representation
