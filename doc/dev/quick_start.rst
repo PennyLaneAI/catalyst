@@ -330,6 +330,7 @@ the compilation of arbitrarily parametrized circuits.
     :nosignatures:
 
     ~catalyst.cond
+    -catalyst.switch
     ~catalyst.for_loop
     ~catalyst.while_loop
 
@@ -375,6 +376,38 @@ decorator.
 .. warning::
 
     The conditional functions can only return JAX compatible data types.
+
+Similarly to :func:`.cond`, :func:`.switch` is a functional index-switch for Catalyst, similar to Python's ``match`` statement.
+Each branch of a switch statement is provided as a separate function.
+Each function is traced at compile time, but only the branch corresponding to the given case will be executed at runtime.
+The JAX equivalent is the ``jax.lax.switch`` function, but this version has a relaxed set of constraints and is optimized to work with quantum programs in PennyLane.
+
+Note that :func:`.switch` can also be used outside of :func:`.qjit` for better interoperability with PennyLane.
+
+Values produced inside the scope of a switch can be returned to the outside context, but the return type signature of each branch must be identical.
+Refer to the example below to learn more about the syntax of this decorator.
+
+.. code-block:: python
+
+    def circuit(i):
+        # provide an indexing variable to the switch
+        @switch(i, case=12) # optionally specify a case for the inital branch
+        def my_switch():
+            return 12
+
+        @my_switch.branch(4) # optionally specify additional cases/branches
+        def my_branch():
+            return 4
+
+        @my_switch.default() # optionally specify a default branch
+        def my_default_branch():
+            return 0
+
+        return my_switch() # must invoke the switch
+
+.. warning::
+
+    Switches are not currently compatible with program capture, or autograph.
 
 Loops
 -----
