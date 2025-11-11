@@ -41,6 +41,21 @@
 
 <h3>Breaking changes 💔</h3>
 
+* (Compiler integrators only) The versions of LLVM/Enzyme/stablehlo used by Catalyst have been
+  updated. Enzyme now targets `v0.0.203` with the build target `EnzymeStatic-22`, and the nanobind
+  requirement for the latest LLVM has been updated to version 2.9.
+  [(#2122)](https://github.com/PennyLaneAI/catalyst/pull/2122)
+  [(#2174)](https://github.com/PennyLaneAI/catalyst/pull/2174)
+  [(#2175)](https://github.com/PennyLaneAI/catalyst/pull/2175)
+  [(#2181)](https://github.com/PennyLaneAI/catalyst/pull/2181)
+
+  - The LLVM version has been updated to
+  [commit 113f01a](https://github.com/llvm/llvm-project/tree/113f01aa82d055410f22a9d03b3468fa68600589).
+  - The stablehlo version has been updated to
+  [commit 0a4440a](https://github.com/openxla/stablehlo/commit/0a4440a5c8de45c4f9649bf3eb4913bf3f97da0d).
+  - The Enzyme version has been updated to
+  [v0.0.203](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.203).
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
