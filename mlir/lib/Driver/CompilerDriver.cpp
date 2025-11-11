@@ -289,7 +289,7 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
         llvm::raw_string_ostream s{tmp};
         s << *operation;
         if (this->options.keepIntermediate) {
-            dumpToFile(this->options, this->output.nextPassDumpFilename(pass->getName().str() + "_FAILED"), tmp);
+            dumpToFile(this->options, this->output.nextPipelineSummaryFilename(pass->getName().str() + "_FAILED"), tmp);
         }
         
         // Clean up fingerprint if present

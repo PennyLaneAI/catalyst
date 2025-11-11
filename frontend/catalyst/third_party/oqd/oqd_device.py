@@ -47,7 +47,7 @@ def OQDDevicePipeline(device, qubit, gate):
         (
             "device-agnostic-pipeline",
             [
-                "enforce-runtime-invariants-pipeline",
+                "user-transform-pipeline",
                 "hlo-lowering-pipeline",
                 "quantum-compilation-pipeline",
                 "bufferization-pipeline",

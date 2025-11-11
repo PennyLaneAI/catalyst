@@ -114,7 +114,7 @@ class TestCompilerOptions:
         options = CompileOptions(keep_intermediate=input_value)
         assert options.keep_intermediate == expected_level
 
-    @pytest.mark.parametrize("invalid_input", [4, -1, "invalid_string", 3.0, []])
+    @pytest.mark.parametrize("invalid_input", [4, -1, "invalid_string", 4.0, []])
     def test_keep_intermediate_invalid_inputs(self, invalid_input):
         """Test that invalid inputs for keep_intermediate raise appropriate errors."""
         with pytest.raises(ValueError, match="Invalid value for keep_intermediate:"):
@@ -369,7 +369,7 @@ class TestCompilerState:
         assert "Failed to lower MLIR module" in e.value.args[0]
         assert "While processing 'TestPass' pass " in e.value.args[0]
         assert stack_trace_pattern not in e.value.args[0]
-        assert isfile(os.path.join(str(compiled.workspace), "2_TestPass_FAILED.mlir"))
+        assert isfile(os.path.join(str(compiled.workspace), "2_AfterTestPass_FAILED.mlir"))
         compiled.workspace.cleanup()
 
         with pytest.raises(CompileError) as e:
