@@ -21,8 +21,10 @@ import pathlib
 import tempfile
 from unittest.mock import Mock
 
+import pennylane as qml
 import pytest
 
+from catalyst import qjit
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.pipelines import KeepIntermediateLevel
 from catalyst.utils.filesystem import Directory
@@ -96,6 +98,23 @@ class TestCreatePassSaveCallback:
             assert callback is not None
             assert callable(callback)
 
+    def test_pass_save_callback_skips_when_previous_pass_none(self):
+        """Test that callback skips saving when previous_pass is None."""
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED)
+        compiler = Compiler(options=options)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace = Directory(pathlib.Path(tmpdir))
+            callback = compiler._create_pass_save_callback(workspace)
+
+            mock_module = Mock()
+            callback(None, mock_module)
+
+            expected_dir = os.path.join(str(workspace), "0_UserTransformPass")
+            assert os.path.exists(expected_dir)
+            files = os.listdir(expected_dir)
+            assert len(files) == 0
+
     def test_pass_save_callback_saves_ir_correctly(self):
         """Test that callback saves the IR correctly."""
         try:
@@ -135,5 +154,36 @@ class TestCreatePassSaveCallback:
             assert files[2] == "3_Pass3.mlir"
 
 
-if __name__ == "__main__":
-    pytest.main(["-x", __file__])
+class TestXDSLPassesIntegration:
+    """Test the xDSL passes integration."""
+
+    @pytest.mark.usefixtures("use_capture")
+    def test_xdsl_passes_integration(self):
+        """Test the xDSL passes integration."""
+        from pennylane.compiler.python_compiler.transforms import merge_rotations_pass
+
+        @qjit(keep_intermediate="changed", verbose=True)
+        def workflow():
+            @merge_rotations_pass
+            @qml.transforms.cancel_inverses
+            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            def f(x):
+                qml.RX(x, 0)
+                qml.RX(1.6, 0)
+                qml.Hadamard(1)
+                qml.Hadamard(1)
+                return qml.expval(qml.Z(0))
+
+            return f(1.5)
+
+        workflow()
+        workspace_path = str(workflow.workspace)
+        assert os.path.exists(
+            os.path.join(
+                workspace_path, "0_UserTransformPass", "1_remove-chained-self-inverse.mlir"
+            )
+        )
+        assert os.path.exists(
+            os.path.join(workspace_path, "0_UserTransformPass", "2_xdsl-merge-rotations.mlir")
+        )
+        workflow.workspace.cleanup()
