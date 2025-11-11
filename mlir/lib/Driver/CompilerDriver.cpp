@@ -289,7 +289,7 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
         llvm::raw_string_ostream s{tmp};
         s << *operation;
         if (this->options.keepIntermediate) {
-            dumpToFile(this->options, this->output.nextPipelineDumpFilename(pass->getName().str() + "_FAILED"), tmp);
+            dumpToFile(this->options, this->output.nextPassDumpFilename(pass->getName().str() + "_FAILED"), tmp);
         }
         
         // Clean up fingerprint if present
@@ -319,7 +319,7 @@ private:
         if (auto funcOp = dyn_cast<mlir::func::FuncOp>(op)) {
             fileName += std::string("_") + funcOp.getName().str();
         }
-        dumpToFile(this->options, this->output.nextPipelineDumpFilename(fileName), tmp);
+        dumpToFile(this->options, this->output.nextPassDumpFilename(fileName), tmp);
     }
 };
 
@@ -427,7 +427,7 @@ LogicalResult runCoroLLVMPasses(const CompilerOptions &options,
         std::string tmp;
         llvm::raw_string_ostream rawStringOstream{tmp};
         llvmModule->print(rawStringOstream, nullptr);
-        auto outFile = output.nextPipelineDumpFilename("CoroOpt", ".ll");
+        auto outFile = output.nextPipelineSummaryFilename("CoroOpt", ".ll");
         dumpToFile(options, outFile, tmp);
     }
 
@@ -479,7 +479,7 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
         std::string tmp;
         llvm::raw_string_ostream rawStringOstream{tmp};
         llvmModule->print(rawStringOstream, nullptr);
-        auto outFile = output.nextPipelineDumpFilename("O2Opt", ".ll");
+        auto outFile = output.nextPipelineSummaryFilename("O2Opt", ".ll");
         dumpToFile(options, outFile, tmp);
     }
 
@@ -527,7 +527,7 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
         std::string tmp;
         llvm::raw_string_ostream rawStringOstream{tmp};
         llvmModule->print(rawStringOstream, nullptr);
-        auto outFile = output.nextPipelineDumpFilename("Enzyme", ".ll");
+        auto outFile = output.nextPipelineSummaryFilename("Enzyme", ".ll");
         dumpToFile(options, outFile, tmp);
     }
 
@@ -593,6 +593,9 @@ LogicalResult runPipeline(PassManager &pm, const CompilerOptions &options, Compi
     if (!shouldRunStage(options, output, pipeline.getName()) || pipeline.getPasses().size() == 0) {
         return success();
     }
+    
+    output.setStage(pipeline.getName());
+    
     if (failed(configurePipeline(pm, options, pipeline, clHasManualPipeline))) {
         llvm::errs() << "Failed to run pipeline: " << pipeline.getName() << "\n";
         return failure();
@@ -605,7 +608,7 @@ LogicalResult runPipeline(PassManager &pm, const CompilerOptions &options, Compi
         std::string tmp;
         llvm::raw_string_ostream s{tmp};
         s << moduleOp;
-        dumpToFile(options, output.nextPipelineDumpFilename(pipeline.getName(), ".mlir"), tmp);
+        dumpToFile(options, output.nextPipelineSummaryFilename(pipeline.getName(), ".mlir"), tmp);
     }
     return success();
 }
@@ -614,14 +617,6 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                           CompilerOutput &output, TimingScope &timing)
 
 {
-    if (options.keepIntermediate && (options.checkpointStage.empty() || output.isCheckpointFound)) {
-        std::string tmp;
-        llvm::raw_string_ostream s{tmp};
-        s << moduleOp;
-        dumpToFile(options, output.nextPipelineDumpFilename(options.moduleName.str(), ".mlir"),
-                   tmp);
-    }
-
     catalyst::utils::Timer timer{};
 
     auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
@@ -788,7 +783,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             std::string tmp;
             llvm::raw_string_ostream rawStringOstream{tmp};
             llvmModule->print(rawStringOstream, nullptr);
-            auto outFile = output.nextPipelineDumpFilename("llvm_ir", ".ll");
+            auto outFile = output.nextPipelineSummaryFilename("llvm_ir", ".ll");
             dumpToFile(options, outFile, tmp);
         }
         output.outIR.clear();
