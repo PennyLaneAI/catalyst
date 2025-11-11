@@ -50,8 +50,8 @@
 #include "mlir/InitAllPasses.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassInstrumentation.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Target/LLVMIR/Export.h"
 
@@ -230,7 +230,7 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
     const CompilerOptions &options;
     CompilerOutput &output;
     catalyst::utils::Timer &timer;
-    
+
     // Store fingerprints before each pass to detect changes
     DenseMap<Pass *, std::optional<OperationFingerPrint>> beforePassFingerprints;
 
@@ -258,24 +258,26 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
             this->timer.dump(pipelineName.str(), /*add_endl */ false);
             catalyst::utils::LinesCount::Operation(operation);
         }
-        
+
         bool shouldDump = false;
-        
+
         if (this->options.keepIntermediate == SaveTemps::AfterPass) {
             shouldDump = true;
-        } else if (this->options.keepIntermediate == SaveTemps::AfterPassChanged) {
+        }
+        else if (this->options.keepIntermediate == SaveTemps::AfterPassChanged) {
             // If change detection is enabled, only dump if IR is changed
             auto it = this->beforePassFingerprints.find(pass);
             if (it != this->beforePassFingerprints.end() && it->second.has_value()) {
                 OperationFingerPrint afterFingerprint(operation);
                 shouldDump = (afterFingerprint != it->second.value());
                 this->beforePassFingerprints.erase(it);
-            } else {
+            }
+            else {
                 // Fingerprint not found: default to dumping to be safe
                 shouldDump = true;
             }
         }
-        
+
         if (shouldDump) {
             this->dumpIRAfterPass(pass, operation);
         }
@@ -284,21 +286,24 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
     void runAfterPassFailed(Pass *pass, Operation *operation) override
     {
         // Always dump on failure for debugging
-        this->options.diagnosticStream << "While processing '" << pass->getName().str() << "' pass ";
+        this->options.diagnosticStream << "While processing '" << pass->getName().str()
+                                       << "' pass ";
         std::string tmp;
         llvm::raw_string_ostream s{tmp};
         s << *operation;
         if (this->options.keepIntermediate) {
-            dumpToFile(this->options, this->output.nextPipelineSummaryFilename(pass->getName().str() + "_FAILED"), tmp);
+            dumpToFile(this->options,
+                       this->output.nextPipelineSummaryFilename(pass->getName().str() + "_FAILED"),
+                       tmp);
         }
-        
+
         // Clean up fingerprint if present
         if (this->options.keepIntermediate == SaveTemps::AfterPassChanged) {
             this->beforePassFingerprints.erase(pass);
         }
     }
 
-private:
+  private:
     void dumpIRAfterPass(Pass *pass, Operation *op)
     {
         auto pipelineName = pass->getName();
@@ -307,9 +312,8 @@ private:
         std::string tmp;
         llvm::raw_string_ostream s{tmp};
         if (this->options.dumpModuleScope) {
-            mlir::ModuleOp mod = isa<mlir::ModuleOp>(op)
-                                     ? cast<mlir::ModuleOp>(op)
-                                     : op->getParentOfType<mlir::ModuleOp>();
+            mlir::ModuleOp mod = isa<mlir::ModuleOp>(op) ? cast<mlir::ModuleOp>(op)
+                                                         : op->getParentOfType<mlir::ModuleOp>();
             s << mod;
         }
         else {
@@ -562,9 +566,9 @@ LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options
     if (failed(config.setupPassPipeline(pm)))
         return failure();
     pm.enableTiming(timing);
-    pm.addInstrumentation(std::unique_ptr<PassInstrumentation>(new CatalystPassInstrumentation(
-        options, output, timer)));
-    
+    pm.addInstrumentation(std::unique_ptr<PassInstrumentation>(
+        new CatalystPassInstrumentation(options, output, timer)));
+
     return success();
 }
 
@@ -593,9 +597,9 @@ LogicalResult runPipeline(PassManager &pm, const CompilerOptions &options, Compi
     if (!shouldRunStage(options, output, pipeline.getName()) || pipeline.getPasses().size() == 0) {
         return success();
     }
-    
+
     output.setStage(pipeline.getName());
-    
+
     if (failed(configurePipeline(pm, options, pipeline, clHasManualPipeline))) {
         llvm::errs() << "Failed to run pipeline: " << pipeline.getName() << "\n";
         return failure();
@@ -959,8 +963,10 @@ int QuantumDriverMainFromCL(int argc, char **argv)
 
     cl::opt<enum SaveTemps> SaveAfterEach(
         "save-ir-after-each", cl::desc("Keep intermediate files after each pass or pipeline"),
-        cl::values(clEnumValN(SaveTemps::AfterPassChanged, "changed", "Save IR after each pass (only if changed)")),
-        cl::values(clEnumValN(SaveTemps::AfterPass, "pass", "Save IR after each pass (even if unchanged)")),
+        cl::values(clEnumValN(SaveTemps::AfterPassChanged, "changed",
+                              "Save IR after each pass (only if changed)")),
+        cl::values(clEnumValN(SaveTemps::AfterPass, "pass",
+                              "Save IR after each pass (even if unchanged)")),
         cl::values(clEnumValN(SaveTemps::AfterPipeline, "pipeline", "Save IR after each pipeline")),
         cl::init(SaveTemps::None), cl::cat(CatalystCat));
     cl::opt<bool> KeepIntermediate(

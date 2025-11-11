@@ -94,33 +94,34 @@ struct CompilerOutput {
     std::string outIR;
     std::string diagnosticMessages;
     PipelineOutputs pipelineOutputs;
-    size_t globalPipelineCounter = 0;      // Counter for root-level pipeline summary files
-    size_t passCounter = 0;                 // Counter for passes within a pipeline folder
-    std::string currentStage = ".";         // Current compilation stage subdirectory
+    size_t globalPipelineCounter = 0; // Counter for root-level pipeline summary files
+    size_t passCounter = 0;           // Counter for passes within a pipeline folder
+    std::string currentStage = ".";   // Current compilation stage subdirectory
     /// if the compiler reach the pass specified by startAfterPass.
     bool isCheckpointFound;
 
     // Gets the next pass dump file name within a pipeline folder
     std::string nextPassDumpFilename(std::string pipelineName, std::string ext = ".mlir")
     {
-        return std::filesystem::path(currentStage) / 
+        return std::filesystem::path(currentStage) /
                std::filesystem::path(std::to_string(this->passCounter++) + "_" + pipelineName)
                    .replace_extension(ext);
     };
-    
+
     // Gets the root-level pipeline summary file name
     std::string nextPipelineSummaryFilename(std::string pipelineName, std::string ext = ".mlir")
     {
-        return std::filesystem::path(std::to_string(this->globalPipelineCounter) + "_After" + pipelineName)
-                   .replace_extension(ext);
+        return std::filesystem::path(std::to_string(this->globalPipelineCounter) + "_After" +
+                                     pipelineName)
+            .replace_extension(ext);
     };
-    
+
     // Set the current compilation stage for organizing output files
-    void setStage(const std::string& stageName) 
+    void setStage(const std::string &stageName)
     {
-        ++globalPipelineCounter; 
+        ++globalPipelineCounter;
         currentStage = std::to_string(globalPipelineCounter) + "_" + stageName;
-        passCounter = 1;  
+        passCounter = 1;
     }
 };
 

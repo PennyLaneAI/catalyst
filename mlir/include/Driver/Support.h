@@ -33,13 +33,13 @@ void dumpToFile(const CompilerOptions &options, mlir::StringRef fileName, const 
     std::error_code errCode;
     path fullPath = path(options.workspace.str()) / path(fileName.str());
     std::string outFileName = fullPath.string();
-    
+
     // Create parent directories if they don't exist
     path parentDir = fullPath.parent_path();
     if (!std::filesystem::exists(parentDir)) {
         std::filesystem::create_directories(parentDir, errCode);
         if (errCode) {
-            CO_MSG(options, Verbosity::Urgent, 
+            CO_MSG(options, Verbosity::Urgent,
                    "Unable to create directory: " << errCode.message() << "\n");
             return;
         }

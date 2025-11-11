@@ -354,7 +354,6 @@ def _options_to_cli_flags(options):
         level = "pass" if options.keep_intermediate >= KeepIntermediateLevel.PASS else "changed"
         extra_args += [f"--save-ir-after-each={level}", "--dump-module-scope"]
 
-
     if options.use_nameloc:
         extra_args += ["--use-nameloc-as-prefix"]
 
@@ -575,22 +574,22 @@ class Compiler:
 
     def _create_pass_save_callback(self, workspace):
         """Create a callback function to save IR after each pass.
-        
+
         Args:
             workspace: The workspace directory path
-            
+
         Returns:
             Callable or None: The callback function if intermediate saving is enabled, None otherwise
         """
         if not (workspace and self.options.keep_intermediate >= KeepIntermediateLevel.CHANGED):
             return None
-            
+
         # pylint: disable-next=import-outside-toplevel
         from xdsl.printer import Printer
 
         user_transform_dir = os.path.join(str(workspace), "0_UserTransformPass")
         os.makedirs(user_transform_dir, exist_ok=True)
-        
+
         pass_counter = 1
 
         def save_pass_ir(previous_pass, module, _next_pass=None, **_kwargs):
@@ -599,12 +598,8 @@ class Compiler:
             # Only save after a pass has run (when previous_pass is not None)
             if previous_pass is None:
                 return
-                
-            pass_name = (
-                previous_pass.name
-                if hasattr(previous_pass, "name")
-                else str(previous_pass)
-            )
+
+            pass_name = previous_pass.name if hasattr(previous_pass, "name") else str(previous_pass)
             buffer = io.StringIO()
             Printer(stream=buffer, print_generic_format=False).print_op(module)
             ir_file = os.path.join(
@@ -638,7 +633,7 @@ class Compiler:
         ir = mlir_module.operation.get_asm(
             binary=False, print_generic_op_form=using_python_compiler, assume_verified=True
         )
-        
+
         # Save intermediate IR before any compiler transformation is applied
         if workspace and self.options.keep_intermediate:
             initial_ir_file = os.path.join(str(workspace), f"0_{module_name}.mlir")
@@ -651,6 +646,7 @@ class Compiler:
             # Only move this is it has been decided that xDSL is no longer optional.
             # pylint: disable-next=import-outside-toplevel
             from pennylane.compiler.python_compiler import Compiler as PythonCompiler
+
             callback = self._create_pass_save_callback(workspace)
             compiler = PythonCompiler()
             ir = compiler.run(ir, callback=callback)

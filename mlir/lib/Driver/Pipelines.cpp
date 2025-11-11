@@ -160,9 +160,10 @@ void createDefaultCatalystPipeline(OpPassManager &pm)
 
 void registerUserTransformPipeline()
 {
-    PassPipelineRegistration<>("user-transform-pipeline",
-                               "Register user transform pipeline (tape splitting, user transforms, module inlining).",
-                               createUserTransformPipeline);
+    PassPipelineRegistration<>(
+        "user-transform-pipeline",
+        "Register user transform pipeline (tape splitting, user transforms, module inlining).",
+        createUserTransformPipeline);
 }
 void registerHloLoweringPipeline()
 {
@@ -209,13 +210,12 @@ std::vector<Pipeline> getDefaultPipeline()
 {
     using PipelineFunc = void (*)(mlir::OpPassManager &);
     std::vector<PipelineFunc> pipelineFuncs = {
-        &createUserTransformPipeline, &createHloLoweringPipeline,
-        &createQuantumCompilationPipeline, &createBufferizationPipeline,
-        &createLLVMDialectLoweringPipeline};
+        &createUserTransformPipeline, &createHloLoweringPipeline, &createQuantumCompilationPipeline,
+        &createBufferizationPipeline, &createLLVMDialectLoweringPipeline};
 
     llvm::SmallVector<std::string> defaultPipelineNames = {
-        "UserTransformPass", "HLOLoweringPass",
-        "QuantumCompilationPass", "BufferizationPass", "MLIRToLLVMDialect"};
+        "UserTransformPass", "HLOLoweringPass", "QuantumCompilationPass", "BufferizationPass",
+        "MLIRToLLVMDialect"};
 
     std::vector<Pipeline> defaultPipelines(defaultPipelineNames.size());
     for (size_t i = 0; i < defaultPipelineNames.size(); ++i) {
