@@ -1467,12 +1467,11 @@ def _pauli_rot_lowering(
     pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
 
     i16_type = ir.IntegerType.get_signless(16, ctx)
-    allowed_angles = [np.pi / 4, np.pi / 2, np.pi]
-    allowed_angles += -1 * allowed_angles
+    allowed_angles = [np.pi / 4, np.pi / 2, np.pi, -np.pi / 4, -np.pi / 2, -np.pi]
 
     if not any(np.isclose(theta, angle) for angle in allowed_angles):
         raise ValueError(
-            "The angle supplied to PPR must be a multiple of pi/4, pi/2, or pi (or its negative)."
+            "The angle supplied to PPR must be pi/4, pi/2, or pi (or its negative)."
         )
 
     angle = int(np.round(2 * np.pi / theta))
