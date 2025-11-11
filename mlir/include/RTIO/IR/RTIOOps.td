@@ -90,7 +90,7 @@ def RTIOPulseOp : RTIO_Op<"pulse"> {
 
         Parameters:
         - channel: Target output channel
-        - duration: Pulse duration in machine units (mu)
+        - duration: Pulse duration in seconds (f64)
         - frequency: frequency in Hz
         - phase: Phase in radians
         - wait: Optional events to wait for before starting this pulse (for sequencing)
@@ -100,9 +100,9 @@ def RTIOPulseOp : RTIO_Op<"pulse"> {
 
         Example:
         ```mlir
-        %dur = arith.constant ... : i64
-        %freq = arith.constant ... : f64
-        %phase = arith.constant ... : f64
+        %dur = arith.constant 1.66e-07 : f64
+        %freq = arith.constant 1.266e10 : f64
+        %phase = arith.constant 0.0 : f64
 
         %event0 = rtio.pulse %ch0 duration(%dur) frequency(%freq) phase(%phase)
             : !rtio.channel<"dds", 0> -> !rtio.event
@@ -118,7 +118,7 @@ def RTIOPulseOp : RTIO_Op<"pulse"> {
 
     let arguments = (ins
         RTIOChannelType:$channel,
-        I64:$duration,
+        F64:$duration,
         F64:$frequency,
         F64:$phase,
         Optional<RTIOEventType>:$wait

@@ -54,7 +54,7 @@ func.func @qubit_to_channel_good(%qubit: !ion.qubit) {
 // Event-Based Operations //
 ////////////////////////////
 
-func.func @pulse_basic(%dur: i64, %freq: f64, %phase: f64) {
+func.func @pulse_basic(%dur: f64, %freq: f64, %phase: f64) {
     %ch0 = rtio.channel : !rtio.channel<"dds", 0>
 
     %event = rtio.pulse %ch0 duration(%dur) frequency(%freq) phase(%phase)
@@ -65,7 +65,7 @@ func.func @pulse_basic(%dur: i64, %freq: f64, %phase: f64) {
 
 // -----
 
-func.func @pulse_with_wait(%dur: i64, %freq: f64, %phase: f64) {
+func.func @pulse_with_wait(%dur: f64, %freq: f64, %phase: f64) {
     %ch0 = rtio.channel : !rtio.channel<"dds", 0>
 
     %event0 = rtio.pulse %ch0 duration(%dur) frequency(%freq) phase(%phase)
@@ -80,7 +80,7 @@ func.func @pulse_with_wait(%dur: i64, %freq: f64, %phase: f64) {
 
 // -----
 
-func.func @sync_basic(%dur: i64, %freq: f64, %phase: f64) {
+func.func @sync_basic(%dur: f64, %freq: f64, %phase: f64) {
     %ch0 = rtio.channel : !rtio.channel<"dds", 0>
     %ch1 = rtio.channel : !rtio.channel<"dds", 1>
     %ch2 = rtio.channel : !rtio.channel<"dds", 2>
