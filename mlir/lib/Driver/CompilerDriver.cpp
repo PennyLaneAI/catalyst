@@ -428,6 +428,7 @@ LogicalResult runCoroLLVMPasses(const CompilerOptions &options,
     CoroPM.run(*llvmModule.get(), MAM);
 
     if (options.keepIntermediate) {
+        output.setStage("CoroOpt");
         std::string tmp;
         llvm::raw_string_ostream rawStringOstream{tmp};
         llvmModule->print(rawStringOstream, nullptr);
@@ -480,6 +481,7 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
     MPM.run(*llvmModule.get(), MAM);
 
     if (options.keepIntermediate) {
+        output.setStage("O2Opt");
         std::string tmp;
         llvm::raw_string_ostream rawStringOstream{tmp};
         llvmModule->print(rawStringOstream, nullptr);
@@ -528,6 +530,7 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
     MPM.run(*llvmModule.get(), MAM);
 
     if (options.keepIntermediate) {
+        output.setStage("Enzyme");
         std::string tmp;
         llvm::raw_string_ostream rawStringOstream{tmp};
         llvmModule->print(rawStringOstream, nullptr);
@@ -784,6 +787,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         catalyst::utils::LinesCount::Module(*llvmModule);
 
         if (options.keepIntermediate) {
+            output.setStage("llvm_ir");
             std::string tmp;
             llvm::raw_string_ostream rawStringOstream{tmp};
             llvmModule->print(rawStringOstream, nullptr);
