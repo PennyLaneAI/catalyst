@@ -251,32 +251,32 @@ gather2_p = standard_primitive(
     vma_rule=partial(standard_vma_rule, "gather"),
 )
 
-import numpy as np
+# import numpy as np
+
+# def patched_literal_int(_cls, value: int, _dtype: np.dtype):
+#     return int.__new__(int, value)
 
 
-def patched_literal_int(_cls, value: int, _dtype: np.dtype):
-    return int.__new__(int, value)
+# def patched_literal_float(_cls, value: float, _dtype: np.dtype):
+#     return float.__new__(float, value)
 
 
-def patched_literal_float(_cls, value: float, _dtype: np.dtype):
-    return float.__new__(float, value)
+# def patched_literal_complex(_cls, value: complex, _dtype: np.dtype):
+#     return complex.__new__(complex, value)
 
 
-def patched_literal_complex(_cls, value: complex, _dtype: np.dtype):
-    return complex.__new__(complex, value)
+# def patched_literal_array(
+#     _cls, val: np.ndarray, weak_type: bool = False
+# ):  # pylint: disable=unused-argument
+#     arr = np.asarray(val)
+#     return arr.view(np.ndarray)
 
 
-def patched_literal_array(
-    _cls, val: np.ndarray, weak_type: bool = False
-):  # pylint: disable=unused-argument
-    arr = np.asarray(val)
-    return arr.view(np.ndarray)
+# jax._src.literals.LiteralInt.__new__ = patched_literal_int
+# jax._src.literals.LiteralFloat.__new__ = patched_literal_float
+# jax._src.literals.LiteralComplex.__new__ = patched_literal_complex
+# jax._src.literals.LiteralArray.__new__ = patched_literal_array
 
-
-jax._src.literals.LiteralInt.__new__ = patched_literal_int
-jax._src.literals.LiteralFloat.__new__ = patched_literal_float
-jax._src.literals.LiteralComplex.__new__ = patched_literal_complex
-jax._src.literals.LiteralArray.__new__ = patched_literal_array
 # pylint: disable=protected-access
 original_drop_unused_vars = pe._drop_unused_vars
 
