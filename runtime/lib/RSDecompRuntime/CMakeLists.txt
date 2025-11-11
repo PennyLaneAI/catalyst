@@ -6,6 +6,7 @@ add_library(rt_rsdecomp SHARED ross_selinger.cpp)
 target_include_directories(rt_rsdecomp
     PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include
 )
 
 set_property(TARGET rt_rsdecomp PROPERTY POSITION_INDEPENDENT_CODE ON)

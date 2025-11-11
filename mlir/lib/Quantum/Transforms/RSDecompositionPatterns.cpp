@@ -67,16 +67,31 @@ mlir::func::FuncOp getOrDeclareFunc(mlir::ModuleOp module, mlir::PatternRewriter
 }
 
 /**
- * @brief Gets or declares the external runtime function `rs_decomposition`.
+ * @brief Gets or declares the external runtime function `rs_decomposition_get_size`.
+ */
+mlir::func::FuncOp getOrDeclareGetSizeFunc(mlir::ModuleOp module, mlir::PatternRewriter &rewriter)
+{
+    const char *funcName = "rs_decomposition_get_size";
+    auto f64Type = rewriter.getF64Type();
+    auto i1Type = rewriter.getI1Type();
+    auto indexType = rewriter.getIndexType();
+    auto funcType = rewriter.getFunctionType({f64Type, f64Type, i1Type}, {indexType});
+
+    return getOrDeclareFunc(module, rewriter, funcName, funcType);
+}
+
+/**
+ * @brief Gets or declares the external runtime function `rs_decomposition_get_gates`.
  */
 mlir::func::FuncOp getOrDeclareGetGatesFunc(mlir::ModuleOp module, mlir::PatternRewriter &rewriter)
 {
-    const char *funcName = "rs_decomposition";
+    const char *funcName = "rs_decomposition_get_gates";
     auto f64Type = rewriter.getF64Type();
     auto i1Type = rewriter.getI1Type();
     auto rankedMemRefType =
         mlir::MemRefType::get({mlir::ShapedType::kDynamic}, rewriter.getIndexType());
-    auto funcType = rewriter.getFunctionType({f64Type, f64Type, i1Type}, {rankedMemRefType});
+    // Signature: (memref<* x index>, f64, f64, i1) -> ()
+    auto funcType = rewriter.getFunctionType({rankedMemRefType, f64Type, f64Type, i1Type}, {});
 
     return getOrDeclareFunc(module, rewriter, funcName, funcType);
 }
@@ -90,20 +105,6 @@ mlir::func::FuncOp getOrDeclareGetPhaseFunc(mlir::ModuleOp module, mlir::Pattern
     auto f64Type = rewriter.getF64Type();
     auto i1Type = rewriter.getI1Type();
     auto funcType = rewriter.getFunctionType({f64Type, f64Type, i1Type}, {f64Type});
-
-    return getOrDeclareFunc(module, rewriter, funcName, funcType);
-}
-
-/**
- * @brief Gets or declares the external runtime function `free_memref`.
- */
-mlir::func::FuncOp getOrDeclareFreeMemrefFunc(mlir::ModuleOp module,
-                                              mlir::PatternRewriter &rewriter)
-{
-    const char *funcName = "free_memref";
-    auto rankedMemRefType =
-        mlir::MemRefType::get({mlir::ShapedType::kDynamic}, rewriter.getIndexType());
-    auto funcType = rewriter.getFunctionType({rankedMemRefType}, {});
 
     return getOrDeclareFunc(module, rewriter, funcName, funcType);
 }
@@ -296,9 +297,9 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     mlir::Value angle = entryBlock->getArgument(2);
 
     // Declare runtime functions
+    mlir::func::FuncOp getSizeFunc = getOrDeclareGetSizeFunc(module, rewriter);
     mlir::func::FuncOp getGatesFunc = getOrDeclareGetGatesFunc(module, rewriter);
     mlir::func::FuncOp getPhaseFunc = getOrDeclareGetPhaseFunc(module, rewriter);
-    mlir::func::FuncOp freeMemrefFunc = getOrDeclareFreeMemrefFunc(module, rewriter);
 
     mlir::Value epsilonVal =
         rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getF64FloatAttr(epsilon));
@@ -306,18 +307,30 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
         rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getBoolAttr(pprBasis));
 
     // Call runtime functions
-    auto callGetGatesOp = rewriter.create<mlir::func::CallOp>(
-        loc, getGatesFunc, mlir::ValueRange{angle, epsilonVal, pprBasisVal});
+    // Get required memref size for returning result
+    auto callGetSizeOp = rewriter.create<mlir::func::CallOp>(
+        loc, getSizeFunc, mlir::ValueRange{angle, epsilonVal, pprBasisVal});
+    mlir::Value num_gates = callGetSizeOp.getResult(0);
+
+    // Alloca memref
+    auto gatesMemRefType =
+        mlir::MemRefType::get({mlir::ShapedType::kDynamic}, rewriter.getIndexType());
+    mlir::Value gatesMemref =
+        rewriter.create<mlir::memref::AllocaOp>(loc, gatesMemRefType, ValueRange{num_gates});
+
+    // Compute gate sequence into the allocated memref
+    rewriter.create<mlir::func::CallOp>(
+        loc, getGatesFunc, mlir::ValueRange{gatesMemref, angle, epsilonVal, pprBasisVal});
+
+    // Get phase
     auto callGetPhaseOp = rewriter.create<mlir::func::CallOp>(
         loc, getPhaseFunc, mlir::ValueRange{angle, epsilonVal, pprBasisVal});
-
-    mlir::Value rankedMemref = callGetGatesOp.getResult(0);
     mlir::Value runtimePhase = callGetPhaseOp.getResult(0);
 
     // Create the scf.for loop over gate sequence indices
     mlir::Value c0 = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
     mlir::Value c1 = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
-    mlir::Value memrefSize = rewriter.create<mlir::memref::DimOp>(loc, rankedMemref, c0);
+    mlir::Value memrefSize = num_gates;
     auto forOp = rewriter.create<mlir::scf::ForOp>(loc, c0, memrefSize, c1, ValueRange{qregIn});
 
     mlir::OpBuilder::InsertionGuard loopGuard(rewriter);
@@ -327,7 +340,7 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
 
     // Load the gate index inside the loop
     mlir::Value currentGateIndex =
-        rewriter.create<mlir::memref::LoadOp>(loc, rankedMemref, ValueRange{iv});
+        rewriter.create<mlir::memref::LoadOp>(loc, gatesMemref, ValueRange{iv});
 
     // --- Define cases based on pprBasis ---
     SmallVector<int64_t> caseValues;
@@ -358,9 +371,6 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     // --- Back in function body, after the loop ---
     rewriter.setInsertionPointAfter(forOp);
     mlir::Value finalReg = forOp.getResult(0);
-
-    // Call free_memref
-    rewriter.create<mlir::func::CallOp>(loc, freeMemrefFunc, mlir::ValueRange{rankedMemref});
 
     // Return the final register and the computed runtime phase
     rewriter.create<mlir::func::ReturnOp>(loc, mlir::ValueRange{finalReg, runtimePhase});
