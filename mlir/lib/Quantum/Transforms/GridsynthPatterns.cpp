@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "rs-decomposition-patterns"
+#define DEBUG_TYPE "gridsynth-patterns"
 
 #include <memory>
 #include <vector>
@@ -627,7 +627,7 @@ namespace catalyst {
 namespace quantum {
 
 // This is the public function defined in Quantum/Transforms/Patterns.h
-void populateRSDecompositionPatterns(RewritePatternSet &patterns, double epsilon, bool pprBasis)
+void populateGridsynthPatterns(RewritePatternSet &patterns, double epsilon, bool pprBasis)
 {
     patterns.add<DecomposeCustomOpPattern>(patterns.getContext(), epsilon, pprBasis);
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "rs-decomposition"
+#define DEBUG_TYPE "gridsynth"
 
 #include "llvm/Support/Debug.h"
 
@@ -29,21 +29,21 @@ using namespace catalyst::quantum;
 namespace catalyst {
 namespace quantum {
 
-#define GEN_PASS_DECL_RSDECOMPOSITIONPASS
-#define GEN_PASS_DEF_RSDECOMPOSITIONPASS
+#define GEN_PASS_DECL_GRIDSYNTHPASS
+#define GEN_PASS_DEF_GRIDSYNTHPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct RSDecompositionPass : impl::RSDecompositionPassBase<RSDecompositionPass> {
-    using RSDecompositionPassBase::RSDecompositionPassBase;
+struct GridsynthPass : impl::GridsynthPassBase<GridsynthPass> {
+    using GridsynthPassBase::GridsynthPassBase;
 
     void runOnOperation() final
     {
-        LLVM_DEBUG(llvm::dbgs() << "Running RSDecompositionPass\n");
+        LLVM_DEBUG(llvm::dbgs() << "Running GridsynthPass\n");
         mlir::Operation *module = getOperation();
         mlir::MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
 
-        populateRSDecompositionPatterns(patterns, epsilon, pprBasis);
+        populateGridsynthPatterns(patterns, epsilon, pprBasis);
 
         if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
             signalPassFailure();
