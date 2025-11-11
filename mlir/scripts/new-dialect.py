@@ -97,6 +97,8 @@ def main():
     except KeyboardInterrupt:
         return 1
 
+    return 0
+
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments"""
@@ -146,13 +148,13 @@ def _docstring(docstring: str):
 def get_catalyst_project_root() -> pathlib.PurePath:
     """Get the absolute path to the root directory of the git repository.
 
-    Returns the path as a ``pathlib.Path`` object. Returns None if the current directory is not in a
-    git repository.
+    Returns the path as a ``pathlib.Path`` object. Raises a Runtime error if not currently in a git
+    repository or if git is not installed.
     """
     try:
         # Run the git command to get the top-level directory
         result = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
+            ["/usr/bin/env", "git", "rev-parse", "--show-toplevel"],
             capture_output=True,  # Capture stdout and stderr
             text=True,  # Decode as text (UTF-8)
             check=True,  # Raise an error if the command fails
@@ -182,10 +184,12 @@ def get_catalyst_project_root() -> pathlib.PurePath:
 def create_dialect_files(
     dialect_name: str, project_root: pathlib.PurePath, args: argparse.Namespace
 ):
-    """TODO
+    """Create the dialect files for the new dialect by copying over the template files to Catalyst.
 
     Args:
-        args (argparse.Namespace): _description_
+        dialect_name (str): The name of the dialect in CamelCase, e.g. 'MyDialect'.
+        project_root (pathlib.PurePath): Catalyst project root directory.
+        args (argparse.Namespace): Additional command-line arguments.
     """
     _check_dialect_not_already_exists(project_root, dialect_name)
 
@@ -225,7 +229,18 @@ def rename_dialect_from_template(
     names: dict[str, str],
     args: argparse.Namespace,
 ):
-    """TODO"""
+    """Rename the placeholder text in the new dialect files according to the new dialect name.
+
+    This function also updates the year in the copyright notices to the current year.
+
+    Args:
+        dialect_name (str): The name of the dialect in CamelCase, e.g. 'MyDialect'.
+        project_root (pathlib.PurePath): Catalyst project root directory.
+        names (dict[str, str]): Dictionary containing dialect names in various forms, e.g. in
+            CamelCase for most uses, in snake_case for namespaces, CAPS_SNAKE_CASE for include
+            guards, and kebab-case for library names.
+        args (argparse.Namespace): Additional command-line arguments.
+    """
 
     dialect_inc_dir = project_root / "mlir" / "include" / dialect_name
     dialect_lib_dir = project_root / "mlir" / "lib" / dialect_name
@@ -257,7 +272,7 @@ def rename_dialect_from_template(
 def _rename_dialect_files(
     path: str | pathlib.PurePath, dialect_name: str, old_pattern: str = PLACEHOLDER_DIALECT_NAME
 ):
-    """TODO"""
+    """Rename template dialect files found under `path` according to the new dialect name."""
     for dirpath, _, filenames in os.walk(path):
         for filename in filenames:
             if old_pattern in filename:
@@ -280,7 +295,7 @@ def _rename_dialect_files(
 
                     except OSError as exc:
                         raise RuntimeError(
-                            f"could not rename file '{old_path}' to '{new_path}'"
+                            f"Could not rename file '{old_path}' to '{new_path}'"
                         ) from exc
 
 
@@ -312,7 +327,9 @@ def _get_templates_path() -> pathlib.PurePath:
 
 
 def _run_sed_command(path: str | pathlib.PurePath, search_pattern: str, replace_str: str):
-    """TODO"""
+    """Run the sed command in a subprocess that replaces `search_pattern` with `replace_str` in all
+    files contained under `path`.
+    """
     if isinstance(path, pathlib.PurePath):
         path = str(path)
 
@@ -329,10 +346,18 @@ def _run_sed_command(path: str | pathlib.PurePath, search_pattern: str, replace_
 
 
 def _placeholder_str(pattern: str) -> str:
+    """Helper function that returns the placeholder text for the given `pattern` as it appears in
+    the template files.
+
+    Example:
+    >>> _placeholder_str("NewDialect")
+    '@@@NewDialect@@@'
+    """
     return f"{PLACEHOLDER_PATTERN}{pattern}{PLACEHOLDER_PATTERN}"
 
 
 def _get_current_year() -> str:
+    """Returns the current year as a string."""
     return str(datetime.datetime.now().year)
 
 
@@ -356,7 +381,7 @@ def _to_kebab_case(name: str) -> str:
     """
     Convert a CamelCase string (e.g., 'MyNewType') to kebab-case (e.g., 'my-new-type').
 
-    This version correctly handles acronyms. e.g., "SomeHTTPData" -> "some_http_data"
+    This version correctly handles acronyms. e.g., "SomeHTTPData" -> "some-http-data"
     """
     # 1. Find lowercase/digit followed by uppercase: 'myNew' -> 'my_New'
     s1 = re.sub(r"([a-z0-9])([A-Z])", r"\1-\2", name)
@@ -369,11 +394,12 @@ def _to_kebab_case(name: str) -> str:
 
 
 def final_check_and_info_message(project_root: pathlib.PurePath, args: argparse.Namespace):
-    """_summary_
+    """Perform final validation on the newly created dialect files and print info message with
+    summary and further instructions.
 
     Args:
-        project_root (pathlib.PurePath): _description_
-        args (argparse.Namespace): _description_
+        project_root (pathlib.PurePath): Catalyst project root directory.
+        args (argparse.Namespace): Additional command-line arguments.
     """
     dialect_inc_dir = project_root / "mlir" / "include" / args.name
     dialect_lib_dir = project_root / "mlir" / "lib" / args.name
