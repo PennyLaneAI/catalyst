@@ -432,26 +432,69 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
         }
 
         // find the source ExtractOp for current Qubit
+        // find the source ExtractOp for current Qubit
         catalyst::quantum::ExtractOp extractOp = findSourceExtract(qbitOperand);
         if (!extractOp) {
+            LLVM_DEBUG(llvm::dbgs()
+                       << "Failed to find source ExtractOp for: " << qbitOperand << "\n");
             return rewriter.notifyMatchFailure(op,
                                                "Qubit operand does not trace back to an ExtractOp");
         }
+        LLVM_DEBUG(llvm::dbgs() << "Found source ExtractOp: " << extractOp << "\n");
 
         // Get the register, index, and types
         mlir::Value qregOperand = extractOp.getQreg();
-        mlir::Value qbitIndex = extractOp.getIdx();
+        if (!qregOperand) {
+            return rewriter.notifyMatchFailure(op, "Source ExtractOp has a null qreg");
+        }
+        LLVM_DEBUG(llvm::dbgs() << "Found source qreg: " << qregOperand << "\n");
+
+        mlir::Value qbitIndex; // This must be an i64 Value
+
+        // We set the insertion point at the ExtractOp to insert a new
+        // constant index if needed.
+        mlir::OpBuilder::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPoint(extractOp);
+
+        if (extractOp.getIdx()) {
+            // Case 1: Dynamic index (e.g., %idx)
+            qbitIndex = extractOp.getIdx();
+            LLVM_DEBUG(llvm::dbgs() << "Found dynamic index: " << qbitIndex << "\n");
+        }
+        else if (extractOp.getIdxAttr()) {
+            // Case 2: Static index (e.g., [ 0])
+            // We need to create a constant op for this index.
+            int64_t staticIndex = *extractOp.getIdxAttr();
+            LLVM_DEBUG(llvm::dbgs() << "Found static index attr: " << staticIndex << "\n");
+            qbitIndex = rewriter.create<mlir::arith::ConstantOp>(
+                extractOp.getLoc(), rewriter.getI64IntegerAttr(staticIndex));
+            LLVM_DEBUG(llvm::dbgs() << "Created new constant index op: " << qbitIndex << "\n");
+        }
+        else {
+            return rewriter.notifyMatchFailure(
+                op, "Source ExtractOp has neither dynamic nor static index");
+        }
+
         mlir::Type qregType = qregOperand.getType();
         mlir::Type qbitType = qbitOperand.getType();
 
         // Verify the qbitIndex is i64
-        if (!mlir::isa<mlir::IntegerType>(qbitIndex.getType()) ||
-            mlir::cast<mlir::IntegerType>(qbitIndex.getType()).getWidth() != 64) {
+        mlir::Type indexType = qbitIndex.getType();
+        if (!indexType) {
+            // This check is almost certainly redundant, but good to have
+            return rewriter.notifyMatchFailure(op, "Source index has a null type");
+        }
+        if (!mlir::isa<mlir::IntegerType>(indexType) ||
+            mlir::cast<mlir::IntegerType>(indexType).getWidth() != 64) {
             return rewriter.notifyMatchFailure(
                 op, "Traced ExtractOp index is not i64. This shouldn't happen.");
         }
+        LLVM_DEBUG(llvm::dbgs() << "Index type is i64, proceeding.\n");
 
         mlir::ModuleOp module = op->getParentOfType<mlir::ModuleOp>();
+        if (!module) {
+            return rewriter.notifyMatchFailure(op, "op is not contained within a ModuleOp");
+        }
         mlir::Location loc = op.getLoc();
         rewriter.setInsertionPoint(op);
 
