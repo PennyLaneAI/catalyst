@@ -15,11 +15,7 @@
 #ifndef PAULI_FRAME_OPS
 #define PAULI_FRAME_OPS
 
-include "mlir/IR/AttrTypeBase.td"
-include "mlir/IR/EnumAttr.td"
-
 include "Quantum/IR/QuantumDialect.td"
-
 include "PauliFrame/IR/PauliFrameDialect.td"
 
 //===----------------------------------------------------------------------===//
@@ -41,10 +37,34 @@ include "PauliFrame/IR/PauliFrameDialect.td"
 // PauliFrame dialect operations.
 //===----------------------------------------------------------------------===//
 
-def SetRecordOp : PauliFrame_Op<"set_record"> {
-    let summary = "Set the Pauli record of the target qubit(s)";
+def InitOp : PauliFrame_Op<"init"> {
+    let summary = "Initialize the Pauli record of the target qubit(s) to I";
     let description = [{
-        Set the Pauli record of the target qubit(s).
+        Initialize the Pauli record of the target qubit(s) to I. If multiple target qubits are given
+        as input, the Pauli record is initialized to I for all the given qubits.
+    }];
+
+    let arguments = (ins
+        Variadic<QubitType>:$in_qubits
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits
+    );
+
+    let assemblyFormat = [{
+        $in_qubits attr-dict `:` type(results)
+    }];
+
+    let hasVerifier = 1;
+}
+
+def UpdateOp : PauliFrame_Op<"update"> {
+    let summary = "Update the Pauli record of the target qubit(s)";
+    let description = [{
+        Update the Pauli record of the target qubit(s) given the new Pauli record. The Pauli record
+        is encoded by its X- and Z-parity bits. If multiple target qubits are given as input, the
+        new Pauli record is used to update the Pauli records of all the given qubits.
     }];
 
     let arguments = (ins
@@ -64,10 +84,11 @@ def SetRecordOp : PauliFrame_Op<"set_record"> {
     let hasVerifier = 1;
 }
 
-def ReadRecordOp : PauliFrame_Op<"read_record"> {
+def ReadOp : PauliFrame_Op<"read"> {
     let summary = "Read the Pauli record of the target qubit";
     let description = [{
-        Read the Pauli record of the target qubit.
+        Read the Pauli record of the target qubit. The returned Pauli record is encoded as X- and
+        Z-parity bits.
     }];
 
     let arguments = (ins
@@ -88,7 +109,7 @@ def ReadRecordOp : PauliFrame_Op<"read_record"> {
 def CorrectMeasurementOp : PauliFrame_Op<"correct_measurement"> {
     let summary = "Correct the measurement result given the Pauli record";
     let description = [{
-        Correct the measurement result given the Pauli record.
+        Correct the measurement result given the Pauli record as encoded by its X- and Z-parity bits.
     }];
 
     let arguments = (ins
@@ -106,10 +127,13 @@ def CorrectMeasurementOp : PauliFrame_Op<"correct_measurement"> {
     }];
 }
 
-def FlushRecordOp : PauliFrame_Op<"flush_record"> {
+def FlushOp : PauliFrame_Op<"flush"> {
     let summary = "Flush the Pauli record(s) of the target qubit(s)";
     let description = [{
-        Flush the Pauli record(s) of the target qubit(s).
+        Flush the Pauli record(s) of the target qubit(s). *Flushing* the Pauli record of a qubit
+        refers to physically applying the Pauli gates stored in the record on that qubit and then
+        resetting its record to I (X=0, Z=0). If multiple target qubits are given as input, the
+        Pauli record is flushed on all the given qubits.
     }];
 
     let arguments = (ins
@@ -122,6 +146,35 @@ def FlushRecordOp : PauliFrame_Op<"flush_record"> {
 
     let assemblyFormat = [{
         $in_qubits attr-dict `:` type(results)
+    }];
+
+    let hasVerifier = 1;
+}
+
+def SetOp : PauliFrame_Op<"set"> {
+    let summary = "Set the Pauli record of the target qubit(s)";
+    let description = [{
+        Set the Pauli record of the target qubit(s). The Pauli record is encoded by its X- and
+        Z-parity bits. If multiple target qubits are given as input, the same Pauli record is
+        applied to all the given qubits.
+
+        Note that the `pauli_frame.set` operations is generally not needed in the Pauli frame
+        tracking framework as only the `pauli_frame.init` and `pauli_frame.update` operations should
+        be used to modify the Pauli record of the target qubit(s). It is included for completeness.
+    }];
+
+    let arguments = (ins
+        Variadic<QubitType>:$in_qubits,
+        I1:$x_parity,
+        I1:$z_parity
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits
+    );
+
+    let assemblyFormat = [{
+        `[` $x_parity `,` $z_parity `]` $in_qubits attr-dict `:` type(results)
     }];
 
     let hasVerifier = 1;

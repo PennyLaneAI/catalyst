@@ -31,7 +31,7 @@ using namespace catalyst::pauli_frame;
 // PauliFrame op verifiers.
 //===----------------------------------------------------------------------===//
 
-LogicalResult SetRecordOp::verify()
+LogicalResult InitOp::verify()
 {
     if (getInQubits().size() == 0) {
         return emitOpError("expected to have at least one qubit");
@@ -42,7 +42,29 @@ LogicalResult SetRecordOp::verify()
     return success();
 }
 
-LogicalResult FlushRecordOp::verify()
+LogicalResult UpdateOp::verify()
+{
+    if (getInQubits().size() == 0) {
+        return emitOpError("expected to have at least one qubit");
+    }
+    if (getInQubits().size() != getOutQubits().size()) {
+        return emitOpError("expected to consume and return the same number of qubits");
+    }
+    return success();
+}
+
+LogicalResult FlushOp::verify()
+{
+    if (getInQubits().size() == 0) {
+        return emitOpError("expected to have at least one qubit");
+    }
+    if (getInQubits().size() != getOutQubits().size()) {
+        return emitOpError("expected to consume and return the same number of qubits");
+    }
+    return success();
+}
+
+LogicalResult SetOp::verify()
 {
     if (getInQubits().size() == 0) {
         return emitOpError("expected to have at least one qubit");

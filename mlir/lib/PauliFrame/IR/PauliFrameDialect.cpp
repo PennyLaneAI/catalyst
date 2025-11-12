@@ -13,8 +13,6 @@
 // limitations under the License.
 
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
-#include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
 
 #include "PauliFrame/IR/PauliFrameDialect.h"
 #include "PauliFrame/IR/PauliFrameOps.h"
