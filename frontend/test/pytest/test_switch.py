@@ -162,7 +162,7 @@ class TestInterpreted:
             circuit(0)
 
         def circuit_2(i):
-            @switch(i)
+            @switch(i)  # pylint: disable=no-value-for-parameter
             def my_switch():
                 return 0
 
@@ -432,7 +432,7 @@ class TestClassicalCompiled:
             circuit(0)
 
         def circuit_2(i):
-            @switch(i)
+            @switch(i)  # pylint: disable=no-value-for-parameter
             def my_switch():
                 return 0
 
@@ -447,7 +447,7 @@ class TestClassicalCompiled:
 
         @qjit
         def circuit_3(i):
-            @switch(1)
+            @switch(i, 0)
             def my_switch():
                 return 0
 
@@ -751,7 +751,7 @@ class TestQuantum:
 
         @qjit
         def circuit_3(i):
-            @switch(1)
+            @switch(i, 0)
             def my_switch():
                 qml.X(0)
                 return 0
