@@ -1470,9 +1470,7 @@ def _pauli_rot_lowering(
     allowed_angles = [np.pi / 4, np.pi / 2, np.pi, -np.pi / 4, -np.pi / 2, -np.pi]
 
     if not any(np.isclose(theta, angle) for angle in allowed_angles):
-        raise ValueError(
-            "The angle supplied to PPR must be pi/4, pi/2, or pi (or its negative)."
-        )
+        raise ValueError("The angle supplied to PPR must be pi/4, pi/2, or pi (or its negative).")
 
     angle = int(np.round(2 * np.pi / theta))
     if adjoint:
