@@ -362,7 +362,6 @@ def patched_multi_broadcast_in_dim(ctx, ops, ops_avals, out_shape, out_sharding=
     out = []
     for op, op_aval in zip(ops, ops_avals):
         op_aval_shape = op_aval.shape
-        op_aval_sharding = getattr(op_aval, "sharding", None)
 
         # Use DShapedArray if shape contains dynamic dimensions
         if core.is_constant_shape(out_shape):
@@ -374,10 +373,7 @@ def patched_multi_broadcast_in_dim(ctx, ops, ops_avals, out_shape, out_sharding=
             )
 
         if core.definitely_equal_shape(op_aval_shape, out_shape):
-            if out_sharding is None or op_aval_sharding == out_sharding:
-                out.append(op)
-            else:
-                out.append(mlir.lower_with_sharding_in_types(ctx, op, out_aval))
+            out.append(op)
         else:
             assert len(op_aval_shape) <= len(out_shape), (op_aval_shape, out_shape)
             broadcast_dimensions = list(range(len(out_shape) - len(op_aval_shape), len(out_shape)))
