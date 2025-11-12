@@ -380,7 +380,7 @@ def to_mlir_opt(
 ):
     """echo ${input} | catalyst --tool=opt *args *opts -"""
     if stdin is None:
-        return
+        return None
     # Check if we need to use Python compiler for xDSL passes
     if using_python_compiler:
         # Use Python compiler path for xDSL passes
