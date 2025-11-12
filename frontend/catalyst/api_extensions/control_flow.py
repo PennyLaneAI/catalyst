@@ -612,7 +612,7 @@ def switch(case_var: int, case: int = 0):
     >>> circuit(1)
     [0. 1.]
 
-    A default branch that catches any value not otherwise specified can be set via the ``.default``
+    A default branch that catches any value not otherwise specified can be set via the ``default``
     method, and the initial case can be specified using the `case` parameter
 
     .. code-block:: python
