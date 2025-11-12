@@ -8,6 +8,7 @@ rings.cpp)
 target_include_directories(rt_rsdecomp
     PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include
 )
 target_link_libraries(rt_rsdecomp PUBLIC Boost::headers)
 

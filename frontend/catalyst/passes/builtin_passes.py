@@ -535,12 +535,12 @@ def ions_decomposition(qnode):  # pragma: nocover
     return PassPipelineWrapper(qnode, "ions-decomposition")
 
 
-def rs_decomposition(qnode, *, epsilon=1e-4):
+def gridsynth(qnode, *, epsilon=1e-4, ppr_basis=False):
     if qnode is None:
-        return functools.partial(rs_decomposition, epsilon=epsilon)
+        return functools.partial(gridsynth, epsilon=epsilon, ppr_basis=ppr_basis)
 
-    rs_decomposition_pass = {"rs_decomposition": {"epsilon": epsilon}}
-    return PassPipelineWrapper(qnode, rs_decomposition_pass)
+    gridsynth_pass = {"gridsynth": {"epsilon": epsilon, "ppr_basis": ppr_basis}}
+    return PassPipelineWrapper(qnode, gridsynth_pass)
 
 
 def to_ppr(qnode):
