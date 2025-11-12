@@ -377,11 +377,12 @@ decorator.
 
     The conditional functions can only return JAX compatible data types.
 
-Similarly to :func:`.cond`, :func:`.switch` is a functional index-switch for Catalyst, similar to Python's ``match`` statement, i.e. each branch of a switch statement is provided as a separate function.
-Each function is traced at compile time, but only the branch corresponding to the given case will be executed at runtime.
-The JAX function ``jax.lax.switch`` is similar, but this version has a relaxed set of constraints and is optimized to work with quantum programs in PennyLane.
+:func:`~.switch` is a functional index-switch for Catalyst, meaning that each branch of the switch is provided as a separate function.
+It carries some similarities to Python's ``match`` statement, but must be cased by integer values.
+It is also similar to the ``jax.lax.switch`` function, but :func:`~.switch` has a relaxed set of constraints, and is optimized for use with quantum programs in PennyLane.
+When used with :func:`~.qjit` each function is traced at compile time, but only the branch corresponding to the given case will be executed at runtime.
 
-Note that :func:`.switch` can also be used outside of :func:`.qjit` for better interoperability with PennyLane.
+Note that :func:`~.switch` can also be used outside of :func:`~.qjit` for better interoperability with PennyLane.
 
 Values produced inside the scope of a switch can be returned to the outside context, but the return type signature of each branch must be identical.
 Refer to the example below to learn more about the syntax of this decorator.
