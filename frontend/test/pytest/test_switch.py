@@ -28,32 +28,32 @@ from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 class TestInterpreted:
     """Test that Catalyst switches can be used with the python interpreter."""
 
-    def test_no_branch(self):
-        """Test that an exception is raised when a switch is created with no branches."""
+    def test_no_branches(self):
+        """Test that an exception is raised when no branches are provided."""
 
-        with pytest.raises(ValueError, match="switch requires at least 1 branch"):
+        with pytest.raises(ValueError, match="Switch requires at least 1 branch."):
             SwitchCallable(0, [], [])()
 
     def test_1_branch(self):
-        """
-        Test that a switch can be used with a single branch, which is used as the default branch.
-        """
+        """Test that an exception is raised when no default branch is provided"""
 
-        def circuit(i):
-            @switch(i)
-            def my_switch():
-                return 42
+        with pytest.raises(ValueError, match="Switch requires a default branch."):
 
-            return my_switch()
+            def circuit(i):
+                @switch(i, 0)
+                def my_switch():
+                    return 42
 
-        assert circuit(0) == 42
-        assert circuit(1) == 42
+                return my_switch()
+
+            assert circuit(0) == 42
+            assert circuit(1) == 42
 
     def test_default_branch(self):
         """Test that manually assigning a default branch catches all unassigned cases."""
 
         def circuit(i):
-            @switch(i)
+            @switch(i, 0)
             def my_switch():
                 return "first"
 
@@ -73,7 +73,7 @@ class TestInterpreted:
         """Test that switch branches can be called with arguments."""
 
         def circuit(i, x):
-            @switch(i)
+            @switch(i, 0)
             def my_switch(y):
                 return -y
 
@@ -85,6 +85,10 @@ class TestInterpreted:
             def my_branch_2(y):
                 return y
 
+            @my_switch.default()
+            def my_default(y):
+                return 1
+
             return my_switch(x)
 
         assert circuit(0, 1) == -1
@@ -93,6 +97,8 @@ class TestInterpreted:
         assert circuit(1, complex(1, 2)) == 0
         assert circuit(2, 1) == 1
         assert circuit(2, 19 / 2) == 19 / 2
+        assert circuit(3, 15) == 1
+        assert circuit(3, -4) == 1
 
     def test_chosen_index(self):
         """Test that the initial branch of a switch can be assigned a case."""
@@ -115,7 +121,7 @@ class TestInterpreted:
         """Test that a switch can be created with non-sequential indices."""
 
         def circuit(i, x):
-            @switch(i, case=3)
+            @switch(i, 3)
             def my_switch(y):
                 return y
 
@@ -127,24 +133,32 @@ class TestInterpreted:
             def branch_6(y):
                 return 2 * y
 
+            @my_switch.default()
+            def my_default(y):
+                return 0
+
             return my_switch(x)
 
         assert circuit(3, 2) == 2
         assert circuit(11, 4) == 16
         assert circuit(6, 5) == 10
-        assert circuit(-1, 2) == 2
+        assert circuit(-1, 2) == 0
 
-    def test_no_case_parameter(self):
-        """Test that a switch raises an exception when called without the case argument."""
+    def test_missing_parameter(self):
+        """Test that an exception is raised when parameters are missing."""
 
         def circuit(i):
             @switch()  # pylint: disable=no-value-for-parameter
             def my_switch():
                 return 0
 
+            @my_switch.default()
+            def my_default():
+                return 1
+
             return my_switch()
 
-        with pytest.raises(TypeError, match="missing 1 required positional argument"):
+        with pytest.raises(TypeError, match="missing 2 required positional arguments"):
             circuit(0)
 
         def circuit_2(i):
@@ -152,14 +166,32 @@ class TestInterpreted:
             def my_switch():
                 return 0
 
-            @my_switch.branch()  # pylint: disable=no-value-for-parameter
-            def my_branch():
+            @my_switch.default()
+            def my_default():
                 return 1
 
             return my_switch()
 
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
             circuit_2(0)
+
+        def circuit_3(i):
+            @switch(i, 0)
+            def my_switch():
+                return 0
+
+            @my_switch.branch()  # pylint: disable=no-value-for-parameter
+            def my_branch():
+                return 1
+
+            @my_switch.default()
+            def my_default():
+                return -1
+
+            return my_switch()
+
+        with pytest.raises(TypeError, match="missing 1 required positional argument"):
+            circuit_3(0)
 
     @pytest.mark.usefixtures("use_capture")
     def test_fails_capture(self):
@@ -170,9 +202,13 @@ class TestInterpreted:
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
             def circuit(i):
-                @switch(i)
+                @switch(i, 0)
                 def my_switch():
                     return 0
+
+                @my_switch.default()
+                def my_default():
+                    return 1
 
                 return my_switch()
 
@@ -185,9 +221,13 @@ class TestInterpreted:
         """Test switch operation access in an interpreted context."""
 
         def circuit(i):
-            @switch(i)
+            @switch(i, 0)
             def my_switch():
                 return 0
+
+            @my_switch.default()
+            def my_default():
+                return 1
 
             my_switch()
 
@@ -205,27 +245,27 @@ class TestClassicalCompiled:
     """Test classical compiled Catalyst switches."""
 
     def test_1_branch(self):
-        """
-        Test that a switch can be used with a single branch, which is used as the default branch.
-        """
+        """Test that an exception is raised when no default branch is provided."""
 
-        @qjit
-        def circuit(i):
-            @switch(i)
-            def my_switch():
-                return 12
+        with pytest.raises(ValueError, match="Switch requires a default branch."):
 
-            return my_switch()
+            @qjit
+            def circuit(i):
+                @switch(i, 0)
+                def my_switch():
+                    return 12
 
-        assert circuit(0) == 12
-        assert circuit(3) == 12
+                return my_switch()
+
+            assert circuit(0) == 12
+            assert circuit(3) == 12
 
     def test_default_branch(self):
         """Test that the default branch catches all unassigned cases."""
 
         @qjit
         def circuit(i):
-            @switch(i)
+            @switch(i, 0)
             def my_switch():
                 return -1
 
@@ -250,7 +290,7 @@ class TestClassicalCompiled:
         """Test that branches can accept arguments."""
 
         def circuit(i, x, kw=None):
-            @switch(i)
+            @switch(i, 0)
             def my_switch(y, kwarg=None):
                 return y * kwarg
 
@@ -295,7 +335,7 @@ class TestClassicalCompiled:
 
         @qjit
         def circuit(i):
-            @switch(i)
+            @switch(i, 0)
             def my_switch():
                 return 0
 
@@ -325,7 +365,7 @@ class TestClassicalCompiled:
 
         @qjit
         def circuit(i):
-            @switch(i)
+            @switch(i, 0)
             def my_switch():
                 return 1
 
@@ -356,7 +396,7 @@ class TestClassicalCompiled:
 
         @qjit
         def circuit(i):
-            @switch(i)
+            @switch(i, 0)
             def my_switch():
                 return "hello"
 
@@ -388,11 +428,25 @@ class TestClassicalCompiled:
 
             return my_switch()
 
-        with pytest.raises(TypeError, match="missing 1 required positional argument"):
+        with pytest.raises(TypeError, match="missing 2 required positional arguments"):
             circuit(0)
 
-        @qjit
         def circuit_2(i):
+            @switch(i)
+            def my_switch():
+                return 0
+
+            @my_switch.default()
+            def my_default():
+                return 1
+
+            return my_switch()
+
+        with pytest.raises(TypeError, match="missing 1 required positional argument"):
+            circuit_2(0)
+
+        @qjit
+        def circuit_3(i):
             @switch(1)
             def my_switch():
                 return 0
@@ -401,10 +455,14 @@ class TestClassicalCompiled:
             def my_branch():
                 return 2
 
+            @my_switch.default()
+            def my_default():
+                return 1
+
             return my_switch()
 
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
-            circuit_2(0)
+            circuit_3(0)
 
     @pytest.mark.usefixtures("use_capture")
     def test_fails_capture(self, backend):
@@ -417,9 +475,13 @@ class TestClassicalCompiled:
             @qjit
             @qml.qnode(qml.device(backend, wires=1))
             def circuit(i):
-                @switch(i)
+                @switch(i, 0)
                 def my_switch():
                     qml.X(0)
+
+                @my_switch.default()
+                def my_default():
+                    return
 
                 return my_switch()
 
@@ -433,13 +495,17 @@ class TestClassicalCompiled:
 
         @qjit
         def circuit(i):
-            @switch(i)
+            @switch(i, 0)
             def my_switch():
                 return 2
 
             @my_switch.branch(2)
             def my_branch():
                 return 4
+
+            @my_switch.default()
+            def my_default():
+                return 1
 
             my_switch()
 
@@ -458,23 +524,23 @@ class TestQuantum:
     """Test compiled Catalyst switches with quantum operations."""
 
     def test_1_branch(self, backend):
-        """
-        Test that a switch can be used with a single branch, which is used as the default branch.
-        """
+        """Test that an exception is raised when no default branch is provided."""
 
-        @qjit
-        @qml.qnode(qml.device(backend, wires=1))
-        def circuit(i):
-            @switch(i)
-            def my_switch():
-                qml.X(0)
+        with pytest.raises(ValueError, match="Switch requires a default branch."):
 
-            my_switch()
+            @qjit
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit(i):
+                @switch(i, 0)
+                def my_switch():
+                    qml.X(0)
 
-            return catalyst.measure(wires=0)
+                my_switch()
 
-        assert circuit(0)
-        assert circuit(3)
+                return catalyst.measure(wires=0)
+
+            assert circuit(0)
+            assert circuit(3)
 
     def test_default_branch(self, backend):
         """Test that the default branch catches all unassigned cases."""
@@ -482,7 +548,7 @@ class TestQuantum:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(i):
-            @switch(i)
+            @switch(i, 0)
             def my_switch():
                 qml.RX(pi / 2, wires=0)
 
@@ -508,7 +574,7 @@ class TestQuantum:
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(i, angle, wire=None):
-            @switch(i)
+            @switch(i, 0)
             def my_switch(angle, wire=None):
                 qml.RX(angle, wires=wire)
 
@@ -555,7 +621,7 @@ class TestQuantum:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(i):
-            @switch(i)
+            @switch(i, 0)
             def my_switch():
                 qml.RX(0, wires=0)
 
@@ -586,7 +652,7 @@ class TestQuantum:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(i):
-            @switch(i)
+            @switch(i, 0)
             def my_switch():
                 qml.X(0)
                 return 1
@@ -624,7 +690,7 @@ class TestQuantum:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(i):
-            @switch(i)
+            @switch(i, 0)
             def my_switch():
                 qml.X(0)
                 return "hello"
@@ -662,11 +728,29 @@ class TestQuantum:
 
             return my_switch()
 
-        with pytest.raises(TypeError, match="missing 1 required positional argument"):
+        with pytest.raises(TypeError, match="missing 2 required positional arguments"):
             circuit(0)
 
         @qjit
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit_2(i):
+            @switch(i)  # pylint: disable=no-value-for-parameter
+            def my_switch():
+                qml.H(0)
+                return 0
+
+            @my_switch.default()
+            def my_default():
+                qml.X(0)
+                return 1
+
+            return my_switch()
+
+        with pytest.raises(TypeError, match="missing 1 required positional argument"):
+            circuit_2(0)
+
+        @qjit
+        def circuit_3(i):
             @switch(1)
             def my_switch():
                 qml.X(0)
@@ -680,7 +764,7 @@ class TestQuantum:
             return my_switch()
 
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
-            circuit_2(0)
+            circuit_3(0)
 
     @pytest.mark.usefixtures("use_capture")
     def test_fails_capture(self, backend):
@@ -693,7 +777,7 @@ class TestQuantum:
             @qjit
             @qml.qnode(qml.device(backend, wires=1))
             def circuit(i):
-                @switch(i)
+                @switch(i, 0)
                 def my_switch():
                     return 0
 
@@ -710,7 +794,7 @@ class TestQuantum:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(i):
-            @switch(i)
+            @switch(i, 0)
             def my_switch():
                 qml.X(0)
 

@@ -390,8 +390,7 @@ Refer to the example below to learn more about the syntax of this decorator.
 .. code-block:: python
 
     def circuit(i):
-        # provide an indexing variable to the switch
-        @switch(i, case=12) # optionally specify a case for the inital branch
+        @switch(i, 12) # create a switch on variable i, and a branch on case 12
         def my_switch():
             return 12
 
@@ -399,7 +398,7 @@ Refer to the example below to learn more about the syntax of this decorator.
         def my_branch():
             return 4
 
-        @my_switch.default() # optionally specify a default branch
+        @my_switch.default() # specify a default branch
         def my_default_branch():
             return 0
 

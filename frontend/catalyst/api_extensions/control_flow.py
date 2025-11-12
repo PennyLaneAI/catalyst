@@ -559,7 +559,7 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
     return _decorator
 
 
-def switch(case_var: int, case: int = 0):
+def switch(case_var: int, case: int):
     """
     A :func:`~.qjit` compatible decorator for index-switches in PennyLane/Catalyst.
 
@@ -567,25 +567,24 @@ def switch(case_var: int, case: int = 0):
     execution path (each branch of the switch) is provided as a separate function.  All branches are
     traced at compile time, but only one will be executed at runtime, depending on the value of
     `case_var`.  The JAX equivalent of this is the ``jax.lax.switch`` function, but this version
-    allows for arbitrary integer valued cases, does not clamp the index, and is optimized to work
-    with quantum programs in PennyLane.  This version also supports a default branch that is not
-    present in the JAX implementation.
+    allows for arbitrary integer valued cases, does not clamp the index to allow a default case,
+    and is optimized to work with quantum programs in PennyLane.
 
     Values produced within the scope of the branches can be returned to the outside context, but
-    the return type signature of each branch must be identical.
-    If no default branch is assigned, the first branch provided will be assigned as default.
-    The first branch is assigned case 0 by default, but can be overridden.
-    Refer to the examples below to learn more about this decorator.
+    the return type signature of each branch must be identical. Similar to :func:`~.cond`, we
+    require a default branch unless no values are returned. Refer to the examples below to learn
+    more about this decorator.
 
     This form of control flow can also be called from the Python interpreter without needing to use
-    :func:`~.qjit`.
+    :func:`~.qjit`. In this case, the functions will be interpreted normally - return types do not
+    need to match across branches, and return types will not be promoted to match other branches.
 
     Args:
-        case_var (int): the case of the branch to execute
-        case (int): the case of this branch
+        case_var (int): the case of the branch to be executed.
+        case (int): the case of this branch.
 
     Returns:
-        A callable decorator that wraps the first branch of the switch statement
+        A callable decorator that wraps the first branch of the switch statement.
 
     **Example**
 
@@ -596,50 +595,32 @@ def switch(case_var: int, case: int = 0):
         @qjit
         @qml.qnode(dev)
         def circuit(i):
-            @switch(i)
+            @switch(i, 0) # create a switch on variable i, with a branch with on case 0
             def my_switch():
                 qml.Z(0)
 
-            @switch.branch(1)
-            def my_branch():
+            @my_switch.branch(2) # add a branch on case 2
+            def my_brancH():
+                qml.H(0)
+
+            @switch.default() # add a default branch for all other cases
+            def my_default():
                 qml.X(0)
 
-            my_switch()
+            my_switch() # must invoke the switch
 
             return qml.probs()
+
     >>> circuit(0)
     [1. 0.]
-    >>> circuit(1)
-    [0. 1.]
-
-    A default branch that catches any value not otherwise specified can be set via the ``default``
-    method, and the initial case can be specified using the `case` parameter:
-
-    .. code-block:: python
-
-        @qjit
-        @qml.qnode(dev)
-        def circuit(i):
-            @switch(i)
-            def my_switch(case=11):
-                qml.Z(0)
-
-            @my_switch.default()
-            def my_default_branch():
-                qml.X(0)
-
-            my_switch()
-
-            return qml.probs(wires=0)
-
-    >>> circuit(11)
-    [1. 0.]
     >>> circuit(2)
+    [0.5 0.5]
+    >>> circuit(4)
     [0. 1.]
 
-    Switches can also return values of any JAX JIT compatible types, provided that each branch of
-    the switch, including the default branch, have the same return signature or can be promoted to
-    the same types.
+    Switch functions can also return values of any JAX JIT compatible types, provided that each
+    branch of the switch, including the default branch, have the same return signature or can be
+    promoted to the same types.
 
     .. code-block:: python
 
@@ -660,6 +641,7 @@ def switch(case_var: int, case: int = 0):
                 return 2
 
             return my_switch() # must invoke the switch
+
     >>> foo(6)
     (1.4+0j)
     >>> foo(3)
@@ -668,7 +650,9 @@ def switch(case_var: int, case: int = 0):
     .. note::
 
         ``catalyst.switch`` is not supported with PennyLane program capture enabled.
-        There is also currently no support for automatic conversion of native Python ``match`` statements to the ``catalyst.switch`` operation when using :func:`~.qjit` with AutoGraph enabled.
+        There is also currently no support for automatic conversion of native Python ``match``
+        statements to the ``catalyst.switch`` operation when using :func:`~.qjit` with AutoGraph
+        enabled.
     """
 
     if qml.capture.enabled():
@@ -1137,15 +1121,15 @@ class SwitchCallable:
         @qjit
         @qnode("lightning.qubit", wires=1)
         def circuit(i):
-            @switch(i)
+            @switch(i, 0) # create a switch on variable i, and a branch with case 0
             def my_switch():
                 qml.RX(0, wires=0)
 
-            @my_switch.branch(2)
+            @my_switch.branch(2) # create a branch with case 2
             def my_branch():
                 qml.RX(pi, wires=0)
 
-            @my_switch.default()
+            @my_switch.default() # create a default branch
             def my_default():
                 qml.H(0)
 
@@ -1163,11 +1147,11 @@ class SwitchCallable:
 
     def __init__(self, case, cases, branches, default_branch=None):
         if len(branches) == 0 and default_branch == None:
-            raise ValueError("switch requires at least 1 branch")
+            raise ValueError("Switch requires at least 1 branch.")
 
         self.case = case
         self.case_to_branch = dict(zip(cases, branches))
-        self.default_branch = default_branch if default_branch else branches[0]
+        self.default_branch = default_branch
         self._operation = None
         self.expansion_strategy = switch_expansion_strategy()
 
@@ -1187,10 +1171,11 @@ class SwitchCallable:
 
     def branch(self, case):
         """
-        Branch to be run if the switches case is equivalent to the case provided here.
+        Branch to be run if the switch's case is equivalent to the case provided here.
 
         Args:
             case (int): the case index of this branch.
+
         Returns:
             A callable decorator that wraps this case of the switch.
         """
@@ -1322,7 +1307,6 @@ class SwitchCallable:
         # after this, all branches have the same signatures
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
 
-        # this calls Dynshape.bind
         out_tracers = switch_p.bind(
             *([self.case] + cases + sum(all_consts, [])),
             branch_jaxprs=branch_jaxprs,
@@ -1336,11 +1320,15 @@ class SwitchCallable:
         return self.case_to_branch.get(self.case, self.default_branch)()
 
     def __call__(self, *args, **kwargs):
+        if self.default_branch == None:
+            raise ValueError("Switch requires a default branch.")
+
         # convert branches to argless functions
         for case in self.case_to_branch:
             self.case_to_branch[case] = _make_argless_function(
                 self.case_to_branch[case], args, kwargs
             )
+
         self.default_branch = _make_argless_function(self.default_branch, args, kwargs)
 
         mode = EvaluationContext.get_evaluation_mode()
@@ -1699,7 +1687,7 @@ class ForLoop(HybridOp):
 
 
 class Switch(HybridOp):
-    """TODO"""
+    """PennyLane's switch operation"""
 
     binder = switch_p.bind
 
@@ -1740,7 +1728,7 @@ class Switch(HybridOp):
             *self.in_classical_tracers,
             *sum(all_consts, []),
             qreg,
-        ]  # TODO probably here that needs fixing
+        ]
 
         out_expanded_classical_tracers = expand_results(
             [],
