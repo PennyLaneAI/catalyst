@@ -64,7 +64,7 @@ class TestInterpreted:
                 return "default"
 
             @my_switch.branch(0)
-            def my_default():
+            def my_branch():
                 return "branch"
 
             return my_switch()
@@ -123,7 +123,7 @@ class TestInterpreted:
                 return 2 * y
 
             @my_switch.branch(9)
-            def my_default(y):
+            def my_branch_9(y):
                 return y
 
             return my_switch(x)
@@ -494,7 +494,7 @@ class TestQuantum:
                 qml.RY(angle, wires=wire)
 
             @my_switch.branch(0)
-            def my_default(angle, wire=None):
+            def my_branch2(angle, wire=None):
                 qml.RZ(angle, wires=wire)
 
             my_switch(angle, wire=wire)
@@ -611,7 +611,7 @@ class TestQuantum:
                 qml.X(0)
                 return 0
 
-            @my_switch.default
+            @my_switch.branch(0)
             def my_branch():
                 qml.Y(0)
                 return 2
