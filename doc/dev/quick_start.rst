@@ -377,10 +377,9 @@ decorator.
 
     The conditional functions can only return JAX compatible data types.
 
-Similarly to :func:`.cond`, :func:`.switch` is a functional index-switch for Catalyst, similar to Python's ``match`` statement.
-Each branch of a switch statement is provided as a separate function.
+Similarly to :func:`.cond`, :func:`.switch` is a functional index-switch for Catalyst, similar to Python's ``match`` statement, i.e. each branch of a switch statement is provided as a separate function.
 Each function is traced at compile time, but only the branch corresponding to the given case will be executed at runtime.
-The JAX equivalent is the ``jax.lax.switch`` function, but this version has a relaxed set of constraints and is optimized to work with quantum programs in PennyLane.
+The JAX function ``jax.lax.switch`` is similar, but this version has a relaxed set of constraints and is optimized to work with quantum programs in PennyLane.
 
 Note that :func:`.switch` can also be used outside of :func:`.qjit` for better interoperability with PennyLane.
 
@@ -390,17 +389,19 @@ Refer to the example below to learn more about the syntax of this decorator.
 .. code-block:: python
 
     def circuit(i):
-        @switch(i, 12) # create a switch on variable i, and a branch on case 12
-        def my_switch():
+        @switch(i) # create a switch on variable i
+        def my_switch(): # this is the default branch
             return 12
 
-        @my_switch.branch(4) # optionally specify additional cases/branches
+        @my_switch.branch(4) # optionally specify a branch on case i = 4
         def my_branch():
             return 4
 
-        @my_switch.default() # specify a default branch
+        @my_switch.branch(2) # optionally specify a branch on case i = 2
         def my_default_branch():
             return 0
+
+        # ... optionally specify branches on other cases
 
         return my_switch() # must invoke the switch
 

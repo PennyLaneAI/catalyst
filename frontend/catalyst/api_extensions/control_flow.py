@@ -559,7 +559,7 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
     return _decorator
 
 
-def switch(case_var: int, case: int):
+def switch(index_var: int):
     """
     A :func:`~.qjit` compatible decorator for index-switches in PennyLane/Catalyst.
 
@@ -567,24 +567,23 @@ def switch(case_var: int, case: int):
     execution path (each branch of the switch) is provided as a separate function.  All branches are
     traced at compile time, but only one will be executed at runtime, depending on the value of
     `case_var`.  The JAX equivalent of this is the ``jax.lax.switch`` function, but this version
-    allows for arbitrary integer valued cases, does not clamp the index to allow a default case,
+    allows for arbitrary integer valued cases, does not clamp the index, allows a default case,
     and is optimized to work with quantum programs in PennyLane.
 
     Values produced within the scope of the branches can be returned to the outside context, but
-    the return type signature of each branch must be identical. Similar to :func:`~.cond`, we
-    require a default branch unless no values are returned. Refer to the examples below to learn
-    more about this decorator.
+    the return type signature of each branch (including the default) must be identical. The default
+    branch is provided when the switch is declared, and individual cases can be specified afterwards
+    using the :func:`~.switch.branch` method.
 
     This form of control flow can also be called from the Python interpreter without needing to use
     :func:`~.qjit`. In this case, the functions will be interpreted normally - return types do not
     need to match across branches, and return types will not be promoted to match other branches.
 
     Args:
-        case_var (int): the case of the branch to be executed.
-        case (int): the case of this branch.
+        index_var (int): the case of the branch to be executed.
 
     Returns:
-        A callable decorator that wraps the first branch of the switch statement.
+        A callable decorator that wraps the default branch of the switch statement.
 
     **Example**
 
@@ -595,28 +594,28 @@ def switch(case_var: int, case: int):
         @qjit
         @qml.qnode(dev)
         def circuit(i):
-            @switch(i, 0) # create a switch on variable i, with a branch with on case 0
-            def my_switch():
+            @switch(i) # create a switch indexed on variable i
+            def my_switch(): # this is the default branch
                 qml.Z(0)
 
-            @my_switch.branch(2) # add a branch on case 2
-            def my_brancH():
+            @my_switch.branch(3) # add a branch on case i = 3
+            def my_branch():
                 qml.H(0)
 
-            @switch.default() # add a default branch for all other cases
-            def my_default():
+            @switch.branch(0) # add a branch on case i = 0
+            def my_branch2():
                 qml.X(0)
 
             my_switch() # must invoke the switch
 
             return qml.probs()
 
-    >>> circuit(0)
-    [1. 0.]
-    >>> circuit(2)
-    [0.5 0.5]
-    >>> circuit(4)
+    >>> circuit(0) # case 0
     [0. 1.]
+    >>> circuit(3) # case 3
+    [0.5 0.5]
+    >>> circuit(4) # default
+    [1. 0.]
 
     Switch functions can also return values of any JAX JIT compatible types, provided that each
     branch of the switch, including the default branch, have the same return signature or can be
@@ -630,22 +629,24 @@ def switch(case_var: int, case: int):
             def my_switch():
                 return complex(1, 3)
 
-            @my_switch.branch(6)
+            @my_switch.branch(2)
             def my_branch():
                 # this will be type-promoted
                 return 1.4
 
-            @my_switch.default()
+            @my_switch.branch(3)
             def my_default_branch():
                 # this will also be type-promoted
                 return 2
 
             return my_switch() # must invoke the switch
 
-    >>> foo(6)
+    >>> foo(2) # promotes float to complex
     (1.4+0j)
-    >>> foo(3)
+    >>> foo(3) # promotes int to complex
     (2+0j)
+    >>> foo(1) # no promotion for the highest type
+    (1+3j)
 
     .. note::
 
@@ -659,7 +660,7 @@ def switch(case_var: int, case: int):
         raise PlxprCaptureCFCompatibilityError("switch")
 
     def _decorator(branch):
-        return SwitchCallable(case_var, [case], [branch])
+        return SwitchCallable(index_var, branch)
 
     return _decorator
 
@@ -1111,8 +1112,8 @@ class ForLoopCallable:
 
 class SwitchCallable:
     """
-    User-facing wrapper for the switch decorator that provides decorators `branch` and `default` for
-    expanding a switch.
+    User-facing wrapper for the switch decorator that provides the `branch` decorator for expanding
+    a switch.
 
     **Example**
 
@@ -1121,16 +1122,16 @@ class SwitchCallable:
         @qjit
         @qnode("lightning.qubit", wires=1)
         def circuit(i):
-            @switch(i, 0) # create a switch on variable i, and a branch with case 0
-            def my_switch():
+            @switch(i) # create a switch on variable i
+            def my_switch(): # default case
                 qml.RX(0, wires=0)
 
-            @my_switch.branch(2) # create a branch with case 2
+            @my_switch.branch(2) # create a branch on case i = 2
             def my_branch():
                 qml.RX(pi, wires=0)
 
-            @my_switch.default() # create a default branch
-            def my_default():
+            @my_switch.branch(0) # create a branch on case i = 0
+            def my_branch2():
                 qml.H(0)
 
             my_switch()
@@ -1138,16 +1139,16 @@ class SwitchCallable:
             return qml.probs()
 
         >>> circuit(0)
-        [1. 0.]
+        [0.5 0.5]
         >>> circuit(2)
         [0. 1.]
         >>> circuit(5)
-        [0.5 0.5]
+        [1. 0.]
     """
 
-    def __init__(self, case, cases, branches, default_branch=None):
-        if len(branches) == 0 and default_branch == None:
-            raise ValueError("Switch requires at least 1 branch.")
+    def __init__(self, case, default_branch, cases=[], branches=[]):
+        if default_branch == None:
+            raise ValueError("Switch requires a default branch.")
 
         self.case = case
         self.case_to_branch = dict(zip(cases, branches))
@@ -1162,10 +1163,8 @@ class SwitchCallable:
         """
         if self._operation is None:
             raise AttributeError(
-                """
-                The switch() was not called (or has not been called) in a quantum context,
-                and thus has no associated quantum operation.
-                """
+                "The switch() was not called (or has not been called) in a quantum"
+                " context, and thus has no associated quantum operation."
             )
         return self._operation
 
@@ -1186,22 +1185,12 @@ class SwitchCallable:
 
         return decorator
 
-    def default(self):
-        """
-        Branch to be run if no other branches match the switch case.
-
-        Returns:
-            A callable decorator that wraps the default case of the switch.
-        """
-
-        def decorator(branch):
-            self.default_branch = branch
-            return self
-
-        return decorator
-
     def _call_with_quantum_ctx(self):
-        cases, branches = map(list, zip(*self.case_to_branch.items()))
+        cases, branches = (
+            map(list, zip(*self.case_to_branch.items()))
+            if len(self.case_to_branch) != 0
+            else ([], [])
+        )
         branches.append(self.default_branch)
 
         outer_trace = EvaluationContext.get_current_trace()
@@ -1277,7 +1266,11 @@ class SwitchCallable:
 
     def _call_with_classical_ctx(self):
         # unpack dictionary to parallel lists
-        cases, branches = map(list, zip(*self.case_to_branch.items()))
+        cases, branches = (
+            map(list, zip(*self.case_to_branch.items()))
+            if len(self.case_to_branch) != 0
+            else ([], [])
+        )
         branches.append(self.default_branch)
 
         # wraps trace to allow simple unzipping
@@ -1320,9 +1313,6 @@ class SwitchCallable:
         return self.case_to_branch.get(self.case, self.default_branch)()
 
     def __call__(self, *args, **kwargs):
-        if self.default_branch == None:
-            raise ValueError("Switch requires a default branch.")
-
         # convert branches to argless functions
         for case in self.case_to_branch:
             self.case_to_branch[case] = _make_argless_function(
