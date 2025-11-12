@@ -14,6 +14,7 @@ file(GLOB SRC
     decompose_clifford_ppr.cpp
     DecomposeCliffordPPR.cpp
     PPRDecomposeUtils.cpp
+    ppr_to_ppm.cpp
     ppm_compilation.cpp
     PartitionLayers.cpp
     TLayerReduction.cpp

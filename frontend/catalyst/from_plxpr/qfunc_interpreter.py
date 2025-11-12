@@ -17,6 +17,7 @@ Sets up the PLxPRToQuantumJaxprInterpreter for converting plxpr to catalyst jaxp
 # pylint: disable=protected-access
 import textwrap
 from copy import copy
+from functools import partial
 
 import jax
 import jax.numpy as jnp
@@ -69,6 +70,7 @@ from catalyst.utils.exceptions import CompileError
 from .qubit_handler import (
     QubitHandler,
     QubitIndexRecorder,
+    _get_dynamically_allocated_qregs,
     get_in_qubit_values,
     is_dynamically_allocated_wire,
 )
@@ -341,21 +343,72 @@ def interpret_counts(self, *wires, all_outcomes):
     return keys, vals
 
 
+def _subroutine_kernel(
+    interpreter,
+    jaxpr,
+    *qregs_plus_args,
+    outer_dynqreg_handlers=(),
+    wire_label_arg_to_tracer_arg_index=(),
+    wire_to_owner_qreg=(),
+):
+    global_qreg, *dynqregs_plus_args = qregs_plus_args
+    num_dynamic_alloced_qregs = len(outer_dynqreg_handlers)
+    dynalloced_qregs, args = (
+        dynqregs_plus_args[:num_dynamic_alloced_qregs],
+        dynqregs_plus_args[num_dynamic_alloced_qregs:],
+    )
+
+    # Launch a new interpreter for the body region
+    # A new interpreter's root qreg value needs a new recorder
+    converter = copy(interpreter)
+    converter.qubit_index_recorder = QubitIndexRecorder()
+    init_qreg = QubitHandler(global_qreg, converter.qubit_index_recorder)
+    converter.init_qreg = init_qreg
+
+    # add dynamic qregs to recorder
+    qreg_map = {}
+    dyn_qreg_handlers = []
+    arg_to_qreg = {}
+    for dyn_qreg, outer_dynqreg_handler in zip(
+        dynalloced_qregs, outer_dynqreg_handlers, strict=True
+    ):
+        dyn_qreg_handler = QubitHandler(dyn_qreg, converter.qubit_index_recorder)
+        dyn_qreg_handlers.append(dyn_qreg_handler)
+
+        # plxpr global wire index does not change across scopes
+        # So scope arg dynamic qregs need to have the same root hash as their corresponding
+        # qreg tracers outside
+        dyn_qreg_handler.root_hash = outer_dynqreg_handler.root_hash
+
+        # Each qreg argument of the subscope corresponds to a qreg from the outer scope
+        qreg_map[outer_dynqreg_handler] = dyn_qreg_handler
+
+    for global_idx, arg_idx in wire_label_arg_to_tracer_arg_index.items():
+        arg_to_qreg[args[arg_idx]] = qreg_map[wire_to_owner_qreg[global_idx]]
+
+    # The new interpreter's recorder needs to be updated to include the qreg args
+    # of this scope, instead of the outer qregs
+    for arg in args:
+        if arg in arg_to_qreg:
+            converter.qubit_index_recorder[arg] = arg_to_qreg[arg]
+
+    retvals = converter(jaxpr, *args)
+
+    init_qreg.insert_all_dangling_qubits()
+
+    # Return all registers
+    for dyn_qreg_handler in reversed(dyn_qreg_handlers):
+        dyn_qreg_handler.insert_all_dangling_qubits()
+        retvals.insert(0, dyn_qreg_handler.get())
+
+    return converter.init_qreg.get(), *retvals
+
+
 @PLxPRToQuantumJaxprInterpreter.register_primitive(quantum_subroutine_p)
 def handle_subroutine(self, *args, **kwargs):
     """
     Transform the subroutine from PLxPR into JAXPR with quantum primitives.
     """
-
-    if any(is_dynamically_allocated_wire(arg) for arg in args):
-        raise NotImplementedError(
-            textwrap.dedent(
-                """
-            Dynamically allocated wires in a parent scope cannot be used in a child
-            scope yet. Please consider dynamical allocation inside the child scope.
-            """
-            )
-        )
 
     backup = dict(self.init_qreg)
     self.init_qreg.insert_all_dangling_qubits()
@@ -364,20 +417,34 @@ def handle_subroutine(self, *args, **kwargs):
     plxpr = kwargs["jaxpr"]
     transformed = self.subroutine_cache.get(plxpr)
 
-    def wrapper(qreg, *args):
-        # Launch a new interpreter for the new subroutine region
-        # A new interpreter's root qreg value needs a new recorder
-        converter = copy(self)
-        converter.qubit_index_recorder = QubitIndexRecorder()
-        init_qreg = QubitHandler(qreg, converter.qubit_index_recorder)
-        converter.init_qreg = init_qreg
+    dynalloced_qregs, dynalloced_wire_global_indices = _get_dynamically_allocated_qregs(
+        args, self.qubit_index_recorder, self.init_qreg
+    )
+    wire_to_owner_qreg = dict(zip(dynalloced_wire_global_indices, dynalloced_qregs))
+    dynalloced_qregs = list(dict.fromkeys(dynalloced_qregs))  # squash duplicates
 
-        retvals = converter(plxpr, *args)
-        converter.init_qreg.insert_all_dangling_qubits()
-        return converter.init_qreg.get(), *retvals
+    # Convert global wire indices into local indices
+    new_args = ()
+    wire_label_arg_to_tracer_arg_index = {}
+    for i, arg in enumerate(args):
+        if arg in dynalloced_wire_global_indices:
+            wire_label_arg_to_tracer_arg_index[arg] = i
+            new_args += (self.qubit_index_recorder[arg].global_index_to_local_index(arg),)
+        else:
+            new_args += (arg,)
 
     if not transformed:
-        converted_closed_jaxpr_branch = jax.make_jaxpr(wrapper)(self.init_qreg.get(), *args)
+        f = partial(
+            _subroutine_kernel,
+            self,
+            plxpr,
+            outer_dynqreg_handlers=dynalloced_qregs,
+            wire_label_arg_to_tracer_arg_index=wire_label_arg_to_tracer_arg_index,
+            wire_to_owner_qreg=wire_to_owner_qreg,
+        )
+        converted_closed_jaxpr_branch = jax.make_jaxpr(f)(
+            self.init_qreg.get(), *[dyn_qreg.get() for dyn_qreg in dynalloced_qregs], *args
+        )
         self.subroutine_cache[plxpr] = converted_closed_jaxpr_branch
     else:
         converted_closed_jaxpr_branch = transformed
@@ -386,12 +453,13 @@ def handle_subroutine(self, *args, **kwargs):
     # is just pjit_p with a different name.
     vals_out = quantum_subroutine_p.bind(
         self.init_qreg.get(),
-        *args,
+        *[dyn_qreg.get() for dyn_qreg in dynalloced_qregs],
+        *new_args,
         jaxpr=converted_closed_jaxpr_branch,
-        in_shardings=(UNSPECIFIED, *kwargs["in_shardings"]),
-        out_shardings=(UNSPECIFIED, *kwargs["out_shardings"]),
-        in_layouts=(None, *kwargs["in_layouts"]),
-        out_layouts=(None, *kwargs["out_layouts"]),
+        in_shardings=(*(UNSPECIFIED,) * (len(dynalloced_qregs) + 1), *kwargs["in_shardings"]),
+        out_shardings=(*(UNSPECIFIED,) * (len(dynalloced_qregs) + 1), *kwargs["out_shardings"]),
+        in_layouts=(*(None,) * (len(dynalloced_qregs) + 1), *kwargs["in_layouts"]),
+        out_layouts=(*(None,) * (len(dynalloced_qregs) + 1), *kwargs["out_layouts"]),
         donated_invars=kwargs["donated_invars"],
         ctx_mesh=kwargs["ctx_mesh"],
         name=kwargs["name"],
@@ -401,7 +469,9 @@ def handle_subroutine(self, *args, **kwargs):
     )
 
     self.init_qreg.set(vals_out[0])
-    vals_out = vals_out[1:]
+    for i, dyn_qreg in enumerate(dynalloced_qregs):
+        dyn_qreg.set(vals_out[i + 1])
+    vals_out = vals_out[len(dynalloced_qregs) + 1 :]
 
     for orig_wire in backup.keys():
         self.init_qreg.extract(orig_wire)
@@ -600,6 +670,12 @@ def handle_adjoint_transform(
     n_consts,
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the adjoint primitive"""
+
+    if any(is_dynamically_allocated_wire(arg) for arg in plxpr_invals):
+        raise NotImplementedError(
+            "Dynamically allocated wires cannot be used in quantum adjoints yet."
+        )
+
     assert jaxpr is not None
     consts = plxpr_invals[:n_consts]
     args = plxpr_invals[n_consts:]
