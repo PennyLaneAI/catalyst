@@ -578,7 +578,7 @@ def switch(case_var: int, case: int = 0):
     Refer to the examples below to learn more about this decorator.
 
     This form of control flow can also be called from the Python interpreter without needing to use
-    :func: `~.qjit`.
+    :func:`~.qjit`.
 
     Args:
         case_var (int): the case of the branch to execute
