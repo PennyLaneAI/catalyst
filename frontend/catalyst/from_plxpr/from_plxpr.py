@@ -335,7 +335,7 @@ def handle_transform(
         # return self.eval(final_jaxpr.jaxpr, consts, *non_const_args)
         return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
-    catalyst_pass_name = transforms_to_passes[transform][0]
+    catalyst_pass_name = transforms_to_passes.get(transform, (None,))[0]
     if catalyst_pass_name is None:
         # Use PL's ExpandTransformsInterpreter to expand this and any embedded
         # transform according to PL rules. It works by overriding the primitive
