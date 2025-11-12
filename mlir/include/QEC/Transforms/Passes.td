@@ -109,6 +109,14 @@ def DecomposeCliffordPPRPass : Pass<"decompose-clifford-ppr"> {
     let options = [AvoidYMeasureOption];
 }
 
+def PPRToPPMPass : Pass<"ppr-to-ppm"> {
+    let summary = "Convert CliffordT operations to Pauli Product Measurement operations.";
+
+    let dependentDialects = [ "catalyst::qec::QECDialect" ];
+
+    let options = [DecomposeMethodOption, AvoidYMeasureOption];
+}
+
 def PPMCompilationPass : Pass<"ppm-compilation"> {
     let summary = "Convert CliffordT operations to Pauli Product Measurement operations.";
     
