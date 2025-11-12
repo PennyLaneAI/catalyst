@@ -407,7 +407,7 @@ Refer to the example below to learn more about the syntax of this decorator.
 
 .. warning::
 
-    Switches are not currently compatible with program capture, or autograph.
+    Switch functions are not currently compatible with program capture or autograph.
 
 Loops
 -----
