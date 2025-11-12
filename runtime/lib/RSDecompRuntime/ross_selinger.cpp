@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "clifford-data.hpp"
 #include "grid_problems.hpp"
 #include "norm_solver.hpp"
-#include "clifford-data.hpp"
 #include "normal_forms.hpp"
 #include "rings.hpp"
 #include <cstdint>
 #include <cstring>
 #include <iostream>
-#include <map> 
+#include <map>
 #include <vector>
 
 #include "DataView.hpp"
@@ -255,8 +255,8 @@ std::pair<std::vector<CliffordData::GateType>, double> eval_ross_algorithm(doubl
                 // std::cout << "Found t solution: " << *t_sol << std::endl;
                 static INT_TYPE found_solution_count = 0;
                 found_solution_count += 1;
-                std::cout << "Total solutions tried: " << solution_count << ", found solutions: "
-                          << found_solution_count << std::endl;
+                std::cout << "Total solutions tried: " << solution_count
+                          << ", found solutions: " << found_solution_count << std::endl;
                 u = u_sol * scale;
                 t = *t_sol * scale;
                 k = k_val;
