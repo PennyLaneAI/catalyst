@@ -133,6 +133,10 @@
   }
   ```
 
+* A new `PauliFrame` dialect has been added. This dialect includes a set of abstractions and
+  operations for interacting with an external Pauli frame tracking library.
+  [(#2188)](https://github.com/PennyLaneAI/catalyst/pull/2188)
+
 <h3>Documentation 📝</h3>
 
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
@@ -150,6 +154,7 @@
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+Joey Carter,
 Christina Lee,
 River McCubbin,
 Lee J. O'Riordan,
