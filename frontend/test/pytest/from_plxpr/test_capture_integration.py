@@ -288,7 +288,6 @@ class TestCapture:
 
         assert jnp.allclose(capture_result, circuit(init_state))
 
-    @pytest.mark.xfail(reason="Adjoint not supported.")
     @pytest.mark.parametrize("theta, val", [(jnp.pi, 0), (-100.0, 1)])
     def test_adjoint(self, backend, theta, val):
         """Test the integration for a circuit with adjoint."""
@@ -319,7 +318,6 @@ class TestCapture:
 
         assert jnp.allclose(capture_result, circuit(theta, val))
 
-    @pytest.mark.xfail(reason="Ctrl not supported.")
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_ctrl(self, backend, theta):
         """Test the integration for a circuit with control."""
