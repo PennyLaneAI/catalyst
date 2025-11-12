@@ -667,7 +667,7 @@ def switch(case_var: int, case: int = 0):
 
     .. note::
 
-        ``catalyst.switch`` is not supported in program capture mode.
+        ``catalyst.switch`` is not supported with PennyLane program capture enabled.
         There is also currently no support for automatic conversion of native Python ``match`` statements to the ``catalyst.switch`` operation when using :func:`~.qjit` with AutoGraph enabled.
     """
 
