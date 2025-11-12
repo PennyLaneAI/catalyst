@@ -330,7 +330,7 @@ the compilation of arbitrarily parametrized circuits.
     :nosignatures:
 
     ~catalyst.cond
-    -catalyst.switch
+    ~catalyst.switch
     ~catalyst.for_loop
     ~catalyst.while_loop
 
