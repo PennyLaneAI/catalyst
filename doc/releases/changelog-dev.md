@@ -132,6 +132,10 @@
       // ... ion operations ...
   }
   ```
+  
+  * Added support for `ppr-to-ppm` as an individual MLIR pass and python binding 
+  for the qec dialect.
+  [(#2189)](https://github.com/PennyLaneAI/catalyst/pull/2189)
 
 * A new `PauliFrame` dialect has been added. This dialect includes a set of abstractions and
   operations for interacting with an external Pauli frame tracking library.
@@ -155,6 +159,7 @@ This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
 Joey Carter,
+Jeffrey Kam,
 Christina Lee,
 River McCubbin,
 Lee J. O'Riordan,
