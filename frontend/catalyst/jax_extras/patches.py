@@ -336,7 +336,6 @@ def patched_multi_broadcast_in_dim(ctx, ops, ops_avals, out_shape, out_sharding=
     out = []
     for op, op_aval in zip(ops, ops_avals):
         op_aval_shape = op_aval.shape
-        op_aval_sharding = getattr(op_aval, "sharding", None)
 
         # Use DShapedArray if shape contains dynamic dimensions
         if core.is_constant_shape(out_shape):
