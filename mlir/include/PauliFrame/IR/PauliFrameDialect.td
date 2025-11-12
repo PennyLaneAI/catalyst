@@ -50,7 +50,8 @@ def PauliFrame_Dialect : Dialect {
     ];
 
     /// Use the default type printing/parsing hooks, otherwise we would have to explicitly define them.
-    let useDefaultAttributePrinterParser = 1;
+    /// Uncomment the line below if defining attributes for the PauliFrame dialect
+    // let useDefaultAttributePrinterParser = 1;
 
     /// Uncomment the line below if defining types for the PauliFrame dialect
     // let useDefaultTypePrinterParser = 1;

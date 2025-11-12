@@ -60,26 +60,28 @@ def SetRecordOp : PauliFrame_Op<"set_record"> {
     let assemblyFormat = [{
         `[` $x_parity `,` $z_parity `]` $in_qubits attr-dict `:` type(results)
     }];
+
+    let hasVerifier = 1;
 }
 
 def ReadRecordOp : PauliFrame_Op<"read_record"> {
-    let summary = "Read the Pauli record of the target qubit(s)";
+    let summary = "Read the Pauli record of the target qubit";
     let description = [{
-        Read the Pauli record of the target qubit(s).
+        Read the Pauli record of the target qubit.
     }];
 
     let arguments = (ins
-        Variadic<QubitType>:$in_qubits
+        QubitType:$in_qubit
     );
 
     let results = (outs
         I1:$x_parity,
         I1:$z_parity,
-        Variadic<QubitType>:$out_qubits
+        QubitType:$out_qubit
     );
 
     let assemblyFormat = [{
-        $in_qubits attr-dict `:` type(results)
+        $in_qubit attr-dict `:` type(results)
     }];
 }
 
@@ -121,6 +123,8 @@ def FlushRecordOp : PauliFrame_Op<"flush_record"> {
     let assemblyFormat = [{
         $in_qubits attr-dict `:` type(results)
     }];
+
+    let hasVerifier = 1;
 }
 
 #endif // PAULI_FRAME_OPS

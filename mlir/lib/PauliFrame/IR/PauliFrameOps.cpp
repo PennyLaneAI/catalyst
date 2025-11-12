@@ -26,3 +26,29 @@ using namespace catalyst::pauli_frame;
 
 #define GET_OP_CLASSES
 #include "PauliFrame/IR/PauliFrameOps.cpp.inc"
+
+//===----------------------------------------------------------------------===//
+// PauliFrame op verifiers.
+//===----------------------------------------------------------------------===//
+
+LogicalResult SetRecordOp::verify()
+{
+    if (getInQubits().size() == 0) {
+        return emitOpError("expected to have at least one qubit");
+    }
+    if (getInQubits().size() != getOutQubits().size()) {
+        return emitOpError("expected to consume and return the same number of qubits");
+    }
+    return success();
+}
+
+LogicalResult FlushRecordOp::verify()
+{
+    if (getInQubits().size() == 0) {
+        return emitOpError("expected to have at least one qubit");
+    }
+    if (getInQubits().size() != getOutQubits().size()) {
+        return emitOpError("expected to consume and return the same number of qubits");
+    }
+    return success();
+}
