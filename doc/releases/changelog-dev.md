@@ -135,6 +135,10 @@
       // ... ion operations ...
   }
   ```
+  
+  * Added support for `ppr-to-ppm` as an individual MLIR pass and python binding 
+  for the qec dialect.
+  [(#2189)](https://github.com/PennyLaneAI/catalyst/pull/2189)
 
 <h3>Documentation 📝</h3>
 
@@ -153,6 +157,7 @@
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+Jeffrey Kam,
 Christina Lee,
 River McCubbin,
 Lee J. O'Riordan,

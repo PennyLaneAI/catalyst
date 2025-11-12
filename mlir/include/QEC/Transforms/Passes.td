@@ -47,7 +47,7 @@ def DecomposeMethodOption : Option<
     /*C++ var name=*/"decomposeMethod",
     /*CLI arg name=*/"decompose-method",
     /*type=*/"::catalyst::qec::DecomposeMethod",
-    /*default=*/"::catalyst::qec::DecomposeMethod::AutoCorrected",
+    /*default=*/"::catalyst::qec::DecomposeMethod::PauliCorrected",
     "Decomposition method to use",
     [{::llvm::cl::values(
         clEnumValN(::catalyst::qec::DecomposeMethod::AutoCorrected,
@@ -107,6 +107,14 @@ def DecomposeCliffordPPRPass : Pass<"decompose-clifford-ppr"> {
     let dependentDialects = [ "catalyst::qec::QECDialect" ];
 
     let options = [AvoidYMeasureOption];
+}
+
+def PPRToPPMPass : Pass<"ppr-to-ppm"> {
+    let summary = "Convert CliffordT operations to Pauli Product Measurement operations.";
+
+    let dependentDialects = [ "catalyst::qec::QECDialect" ];
+
+    let options = [DecomposeMethodOption, AvoidYMeasureOption];
 }
 
 def PPMCompilationPass : Pass<"ppm-compilation"> {
