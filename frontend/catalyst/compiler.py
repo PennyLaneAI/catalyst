@@ -572,8 +572,8 @@ class Compiler:
 
         return True
 
-    def _create_pass_save_callback(self, workspace):
-        """Create a callback function to save IR after each pass.
+    def _create_xdsl_pass_save_callback(self, workspace):
+        """Create a callback function to save IR after each xdsl pass.
 
         Args:
             workspace: The workspace directory path
@@ -647,7 +647,7 @@ class Compiler:
             # pylint: disable-next=import-outside-toplevel
             from pennylane.compiler.python_compiler import Compiler as PythonCompiler
 
-            callback = self._create_pass_save_callback(workspace)
+            callback = self._create_xdsl_pass_save_callback(workspace)
             compiler = PythonCompiler()
             ir = compiler.run(ir, callback=callback)
 

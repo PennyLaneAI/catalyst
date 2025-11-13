@@ -67,14 +67,14 @@ class TestHasXDSLPassesInTransformModules:
 
 
 class TestCreatePassSaveCallback:
-    """Test the _create_pass_save_callback method."""
+    """Test the _create_xdsl_pass_save_callback method."""
 
     def test_save_callback_workspace_none(self):
         """Test that callback returns None when workspace is None."""
         options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED)
         compiler = Compiler(options=options)
 
-        callback = compiler._create_pass_save_callback(None)
+        callback = compiler._create_xdsl_pass_save_callback(None)
         assert callback is None
 
     def test_save_callback_keep_intermediate_pipeline(self):
@@ -84,7 +84,7 @@ class TestCreatePassSaveCallback:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Directory(pathlib.Path(tmpdir))
-            callback = compiler._create_pass_save_callback(workspace)
+            callback = compiler._create_xdsl_pass_save_callback(workspace)
             assert callback is None
 
     def test_save_callback_returns_callback(self):
@@ -94,7 +94,7 @@ class TestCreatePassSaveCallback:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Directory(pathlib.Path(tmpdir))
-            callback = compiler._create_pass_save_callback(workspace)
+            callback = compiler._create_xdsl_pass_save_callback(workspace)
             assert callback is not None
             assert callable(callback)
 
@@ -105,7 +105,7 @@ class TestCreatePassSaveCallback:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Directory(pathlib.Path(tmpdir))
-            callback = compiler._create_pass_save_callback(workspace)
+            callback = compiler._create_xdsl_pass_save_callback(workspace)
 
             mock_module = Mock()
             callback(None, mock_module)
@@ -127,7 +127,7 @@ class TestCreatePassSaveCallback:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Directory(pathlib.Path(tmpdir))
-            callback = compiler._create_pass_save_callback(workspace)
+            callback = compiler._create_xdsl_pass_save_callback(workspace)
 
             module = ModuleOp([])
 
