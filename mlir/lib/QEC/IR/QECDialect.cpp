@@ -138,17 +138,13 @@ LogicalResult PPRotationOp::canonicalize(PPRotationOp op, PatternRewriter &rewri
 {
     auto pauliProduct = op.getPauliProduct();
 
-    LLVM_DEBUG(llvm::dbgs() << "Pauli Product" << pauliProduct << "\n");
-    return op.emitOpError("canonicalize not implemented");
-    for (auto pauli : pauliProduct) {
+    bool allIdentity = llvm::all_of(pauliProduct, [](mlir::Attribute attr) {
+        auto pauliStr = llvm::cast<mlir::StringAttr>(attr);
+        return pauliStr.getValue() == "I";
+    });
 
-        llvm::dbgs() << "Pauli Product" << pauli << "\n";
-        if (auto pauliStr = llvm::cast<mlir::StringAttr>(pauli)) {
-            if (pauliStr.getValue() == "I") {
-            }
-            else {
-            }
-        }
+    if (allIdentity) {
+        rewriter.replaceOp(op, op.getInQubits());
     }
     return mlir::success();
 }
