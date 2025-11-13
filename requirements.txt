@@ -6,8 +6,8 @@ pip>=22.3
 # Do not allow NumPy 2.0.0 due to a bug with their C API that blocks the usage of the Stable ABI;
 # this bug was fixed in 2.0.1 (https://github.com/numpy/numpy/pull/26995)
 numpy!=2.0.0
-# llvm requires nanobind 2.4 or higher
-nanobind>=2.4
+# llvm requires nanobind 2.9 or higher
+nanobind>=2.9
 pybind11>=2.12.0
 PyYAML
 
@@ -16,11 +16,11 @@ cmake>=3.26
 ninja
 
 # formatting/linting
-black
+black==25.9.0
 clang-format~=20.1
 clang-tidy~=20.1
-pylint==3.3.9
-isort
+pylint~=4.0.0
+isort~=7.0.0
 
 # testing
 flaky
@@ -35,3 +35,4 @@ nbmake
 pennylane-lightning-kokkos
 amazon-braket-pennylane-plugin>1.27.1
 xdsl
+xdsl-jax @ git+https://github.com/xdslproject/xdsl-jax.git@main

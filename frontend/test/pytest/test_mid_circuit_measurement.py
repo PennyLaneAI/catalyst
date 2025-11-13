@@ -324,7 +324,8 @@ class TestMidCircuitMeasurement:
         assert spy.call_count == 1
 
     @pytest.mark.xfail(
-        reason="Midcircuit measurements with sampling is unseeded and hence this test is flaky"
+        reason="Midcircuit measurements with sampling is unseeded and hence this test is flaky",
+        strict=False,
     )
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
     @pytest.mark.parametrize("mcm_method", [None, "one-shot"])
@@ -845,7 +846,7 @@ class TestDynamicOneShotIntegration:
                 return 43
 
         result = circuit()
-        assert result.shape == (10,)
+        assert result.shape == (10,)  # pylint: disable=no-member
 
     def test_dynamic_one_shot_with_classical_return_values(self):
         """Test classical return values with one-shot"""
@@ -938,6 +939,7 @@ class TestDynamicOneShotIntegration:
     @pytest.mark.parametrize("diff_method", ["auto", "fd"])
     @pytest.mark.xfail(
         reason="jvp with dynamic one-shot is not yet supported.",
+        run=False,
     )
     def test_mcm_method_with_jvp(self, backend, diff_method):
         """Test that the dynamic_one_shot works with jvp."""
@@ -956,12 +958,12 @@ class TestDynamicOneShotIntegration:
         @qjit
         def C_workflow():
             f = qml.set_shots(qml.QNode(circuit_rx, device=dev, mcm_method="one-shot"), shots=5)
-            return C_jvp(f, x, t, method=diff_method, argnum=list(range(len(x))))
+            return C_jvp(f, x, t, method=diff_method, argnums=list(range(len(x))))
 
         @qjit
         def J_workflow():
             f = qml.set_shots(qml.QNode(circuit_rx, device=dev), shots=5)
-            return C_jvp(f, x, t, method=diff_method, argnum=list(range(len(x))))
+            return C_jvp(f, x, t, method=diff_method, argnums=list(range(len(x))))
 
         r1 = C_workflow()
         r2 = J_workflow()
@@ -973,8 +975,9 @@ class TestDynamicOneShotIntegration:
     @pytest.mark.parametrize("diff_method", ["auto", "fd"])
     @pytest.mark.xfail(
         reason="vjp with dynamic one-shot is not yet supported.",
+        run=False,
     )
-    def test_mcm_method_with_jvp(self, backend, diff_method):
+    def test_mcm_method_with_vjp(self, backend, diff_method):
         """Test that the dynamic_one_shot works with vjp."""
         dev = qml.device(backend, wires=1)
 
@@ -992,12 +995,12 @@ class TestDynamicOneShotIntegration:
         @qjit
         def C_workflow():
             f = qml.set_shots(qml.QNode(circuit_rx, device=dev, mcm_method="one-shot"), shots=5)
-            return C_vjp(f, x, ct, method=diff_method, argnum=list(range(len(x))))
+            return C_vjp(f, x, ct, method=diff_method, argnums=list(range(len(x))))
 
         @qjit
         def J_workflow():
             f = qml.set_shots(qml.QNode(circuit_rx, device=dev), shots=5)
-            return C_vjp(f, x, ct, method=diff_method, argnum=list(range(len(x))))
+            return C_vjp(f, x, ct, method=diff_method, argnums=list(range(len(x))))
 
         r1 = C_workflow()
         r2 = J_workflow()

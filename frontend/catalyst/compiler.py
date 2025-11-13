@@ -375,8 +375,19 @@ def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
     return _catalyst(*opts, *args, stdin=stdin)
 
 
-def to_mlir_opt(*args, stdin=None, options: Optional[CompileOptions] = None):
+def to_mlir_opt(
+    *args, stdin=None, options: Optional[CompileOptions] = None, using_python_compiler=False
+):
     """echo ${input} | catalyst --tool=opt *args *opts -"""
+    # Check if we need to use Python compiler for xDSL passes
+    if using_python_compiler:
+        # Use Python compiler path for xDSL passes
+        # pylint: disable-next=import-outside-toplevel
+        from pennylane.compiler.python_compiler import Compiler as PythonCompiler
+
+        compiler = PythonCompiler()
+        stdin = compiler.run(stdin, callback=None)
+
     # These are the options that may affect compilation
     if not options:
         return _quantum_opt(*args, stdin=stdin)
@@ -478,19 +489,89 @@ class Compiler:
 
         return output_object_name, out_IR
 
+    def has_xdsl_passes_in_transform_modules(self, mlir_module):
+        """Check if the MLIR module contains xDSL passes in transform dialect.
+
+        This checks for the 'catalyst.uses_xdsl_passes' attribute that is set during
+        lowering on transform modules when xDSL passes are added to the transform pipeline.
+
+        Args:
+            mlir_module: MLIR module to check for xDSL passes
+
+        Returns:
+            bool: True if xDSL passes detected in any transform module
+        """
+
+        def has_both_attributes(attrs):
+            """Check if attributes dict has both required keys."""
+            try:
+                has_transform = (
+                    "transform.with_named_sequence" in attrs
+                    or "transform.with_named_sequence" in getattr(attrs, "keys", lambda: [])()
+                )
+                has_xdsl = (
+                    "catalyst.uses_xdsl_passes" in attrs
+                    or "catalyst.uses_xdsl_passes" in getattr(attrs, "keys", lambda: [])()
+                )
+                return has_transform and has_xdsl
+            except (AttributeError, KeyError, TypeError):
+                return False
+
+        def check_nested_operations(op):
+            """Check if any nested operation has the required attributes."""
+            regions = getattr(op, "regions", [])
+            if not regions:
+                return False
+
+            try:
+                for nested_op in regions[0].blocks[0].operations:
+                    attrs = getattr(nested_op, "attributes", None)
+                    if attrs and has_both_attributes(attrs):
+                        return True
+            except (AttributeError, IndexError):
+                pass
+            return False
+
+        try:
+            return any(
+                check_nested_operations(op)
+                for op in mlir_module.operation.regions[0].blocks[0].operations
+            )
+        except Exception:  # pylint: disable=broad-except
+            # If we can't check the attribute, assume no xDSL passes
+            return False
+
     @debug_logger
-    def is_using_python_compiler(self):
-        """Returns true if we detect that there is an xdsl plugin in use.
+    def is_using_python_compiler(self, mlir_module=None):
+        """Returns true if we need the Python compiler path.
+
+        This happens when:
+        1. xDSL plugin is explicitly loaded (legacy), OR
+        2. Module has xDSL passes in transform modules (detected via attribute)
 
         Will also modify self.options.pass_plugins and self.options.dialect_plugins to remove
         the xdsl plugin.
+
+        Args:
+            mlir_module: Optional MLIR module to check for xDSL passes attribute
         """
         xdsl_path = pathlib.Path("xdsl-does-not-use-a-real-path")
-        if not (
+
+        has_plugin = (
             xdsl_path in self.options.pass_plugins or xdsl_path in self.options.dialect_plugins
-        ):
+        )
+
+        if not has_plugin and mlir_module is None:
             return False
 
+        has_xdsl_passes = mlir_module is not None and self.has_xdsl_passes_in_transform_modules(
+            mlir_module
+        )
+
+        if not has_plugin and not has_xdsl_passes:
+            return False
+
+        # Remove the fake plugin path from options before returning
         if xdsl_path in self.options.pass_plugins:
             plugins = self.options.pass_plugins
             self.options.pass_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
@@ -517,7 +598,7 @@ class Compiler:
             (str): filename of shared object
         """
 
-        if self.is_using_python_compiler():
+        if self.is_using_python_compiler(mlir_module):
             # We keep this module here to keep xDSL requirement optional
             # Only move this is it has been decided that xDSL is no longer optional.
             # pylint: disable-next=import-outside-toplevel

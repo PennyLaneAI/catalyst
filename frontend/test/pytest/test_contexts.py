@@ -269,7 +269,7 @@ def test_complex_dialect(backend):
 
     @qjit
     def workflow():
-        x = circuit()[0]
+        x = circuit()[0]  # pylint: disable=unsubscriptable-object
         return jnp.sum(x).real
 
     assert workflow() == 1.0

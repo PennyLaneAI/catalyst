@@ -18,22 +18,28 @@ and in the ``catalyst/mlir/standalone/build/lib`` folder, you will find the ``St
 The ``StandalonePlugin.so`` file is a simple plugin that has its own dialect (called Standalone dialect) and a single transformation that transforms symbol names from ``bar`` to ``foo``.
 It is intended to show how one would build an MLIR plugin, rather than showing all the features to build a usable MLIR plugin.
 
-You can use the ``StandalonePlugin.so`` plugin
+You can use the ``StandalonePlugin.so`` plugin to transform a quantum program
 
-* with either ``quantum-opt`` or ``catalyst``,
-* load it from Python and transform a quantum program.
+* with either ``quantum-opt`` or ``catalyst``, or
+* by loading it from a Python program.
 
-For example, if you are interested in using it from the command line interface, you can use the following flags to load the standalone plugin:
+If you are interested in using it from the command line interface, you can add the following flags to load the Standalone plugin:
 
 * ``--load-pass-plugin=/path/to/StandalonePlugin.so``
 * ``--load-dialect-plugin=/path/to/StandalonePlugin.so``
 
-This allows all normal flags to work.
-For example using ``quantum-opt --help`` while loading your pass plugin will enable you to see the documentation available for the standalone pass.
+Notice that you will still be able to use the rest of the flags accepted by the command line interface.
+For example, passing ``--help`` as in
 
-.. code-block::
+.. code-block:: bash
 
-    --standalone-switch-bar-foo		-   Switches the name of a FuncOp named `bar` to `foo` and folds.
+    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --help
+
+will now enable you to see the documentation available for the Standalone pass.
+
+.. code-block:: bash
+
+    --standalone-switch-bar-foo    - Switches the name of a FuncOp named `bar` to `foo` and folds.
 
 Taking into account the description of the pass ``standalone-switch-bar-foo``, let's write the most minimal program that would be transformed by this transformation.
 
@@ -46,13 +52,17 @@ Taking into account the description of the pass ``standalone-switch-bar-foo``, l
       }
     }
 
-And you can schedule this pass as any other pass 
+And you can schedule this pass as any other pass:
 
-.. code-block::
+.. code-block:: bash
 
-    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' example.mlir'
+    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' example.mlir
 
-And you have your transformed program
+.. note::
+
+    Current implementation of MLIR plugins only supports using the `--pass-pipeline` option for specifying passes.
+
+And you have your transformed program:
 
 .. code-block:: mlir
 
@@ -88,9 +98,9 @@ We can write a program that contains operations in the standalone dialect:
 
 But if we try to run it, using the same command as shown earlier 
 
-.. code-block::
+.. code-block:: bash
 
-      quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' example.mlir'
+      quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' example.mlir
 
 the compilation will fail with the following message:
 
@@ -101,11 +111,11 @@ the compilation will fail with the following message:
          ^
     a.mlir:4:10: note: Registered dialects: acc, affine, amdgpu, amx, arith, arm_neon, arm_sme, arm_sve, async, bufferization, builtin, catalyst, cf, chlo, complex, dlti, emitc, func, gpu, gradient, index, irdl, linalg, llvm, math, memref, mesh, mhlo, mitigation, ml_program, mpi, nvgpu, nvvm, omp, pdl, pdl_interp, polynomial, quant, quantum, rocdl, scf, shape, sparse_tensor, spirv, stablehlo, tensor, test, tosa, transform, ub, vector, vhlo, x86vector, xegpu ; for more info on dialect registration see https://mlir.llvm.org/getting_started/Faq/#registered-loaded-dependent-whats-up-with-dialects-management
 
-To be able to parse this dialect, we need to load the dialect which is stored in the same file
+To be able to parse this dialect, we need to load the dialect which is stored in the same file:
 
-.. code-block::
+.. code-block:: bash
 
-    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --load-dialect-plugin-/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' example.mlir'
+    quantum-opt --load-pass-plugin=/path/to/StandalonePlugin.so --load-dialect-plugin-/path/to/StandalonePlugin.so --pass-pipeline='builtin.module(standalone-switch-bar-foo)' example.mlir
 
 Now, you can parse the program without the error and run the ``standalone-switch-bar-foo`` pass.
 

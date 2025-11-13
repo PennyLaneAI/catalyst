@@ -22,13 +22,15 @@ import numpy as np
 import pennylane as qml
 import pytest
 from jax._src.tree_util import tree_flatten
+from pennylane import adjoint, cond, for_loop, grad, qjit
 
-from catalyst import adjoint, cond, for_loop, grad, measure, qjit
+from catalyst import measure
 
 
 class TestPyTreesReturnValues:
     """Test QJIT workflows with different return value data-types."""
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_return_value_float(self, backend):
         """Test constant."""
 
@@ -41,9 +43,12 @@ class TestPyTreesReturnValues:
         jitted_fn = qjit(circuit1)
 
         params = [0.4, 0.8]
-        expected = 0.64170937
+        expected = jnp.cos(params[0]) * jnp.cos(params[1])
         result = jitted_fn(params)
         assert jnp.allclose(result, expected)
+
+    def test_return_value_mcm(self, backend):
+        """Test that a qnode can return a scalar mcm."""
 
         @qml.qnode(qml.device(backend, wires=2))
         def circuit2():
@@ -166,6 +171,7 @@ class TestPyTreesReturnValues:
         assert result[0] == 4.0
         assert result[1] == 6.0
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_return_value_hybrid(self, backend):
         """Test tuples."""
 
@@ -238,6 +244,9 @@ class TestPyTreesReturnValues:
     @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
     def test_return_value_dict(self, backend, tol_stochastic, mcm_method):
         """Test dictionaries."""
+
+        if mcm_method == "one-shot" and qml.capture.enabled():
+            pytest.xfail()
 
         @qml.qnode(qml.device(backend, wires=2))
         def circuit1(params):
@@ -438,6 +447,7 @@ class TestPyTreesFuncArgs:
         }
         result = jitted_fn(params)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_args_workflow(self, backend):
         """Test arguments with workflows."""
 
@@ -527,6 +537,7 @@ class TestPyTreesFuncArgs:
         assert np.allclose(result_flatten, result_flatten_expected)
         assert tree == tree_expected
 
+    @pytest.mark.usefixtures("use_both_frontend")
     @pytest.mark.parametrize("inp", [(np.array([0.2, 0.5])), (jnp.array([0.2, 0.5]))])
     def test_args_control_flow(self, backend, inp):
         """Test arguments with control-flows operations."""
@@ -539,7 +550,7 @@ class TestPyTreesFuncArgs:
                 qml.RX(params[i], wires=i)
                 return ()
 
-            loop()
+            loop()  # pylint: disable=no-value-for-parameter
             return qml.state()
 
         circuit1(1, inp)
@@ -574,6 +585,7 @@ class TestPyTreesFuncArgs:
         result = circuit({"wire": 1})
         assert jnp.allclose(result, True)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_dev_wires_have_pytree(self, backend):
         """Device wires are pytree-compatible."""
 
@@ -592,6 +604,7 @@ class TestPyTreesFuncArgs:
         test_function()
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestAuxiliaryData:
     """Test PyTrees with Auxiliary data."""
 
