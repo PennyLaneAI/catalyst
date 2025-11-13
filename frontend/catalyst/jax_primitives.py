@@ -1464,13 +1464,16 @@ def _pauli_rot_lowering(
     assert theta is not None
     assert pauli_word is not None
 
+    if not all(p in ["I", "X", "Y", "Z"] for p in pauli_word):
+        raise ValueError("Only Pauli words consisting of 'I', 'X', 'Y', and 'Z' are allowed.")
+
     pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
 
     i16_type = ir.IntegerType.get_signless(16, ctx)
     allowed_angles = [np.pi / 4, np.pi / 2, np.pi, -np.pi / 4, -np.pi / 2, -np.pi]
 
     if not any(np.isclose(theta, angle) for angle in allowed_angles):
-        raise ValueError("The angle supplied to PPR must be pi/4, pi/2, or pi (or its negative).")
+        raise ValueError("The theta supplied to PPR must be pi/4, pi/2, or pi (or its negative).")
 
     angle = int(np.round(2 * np.pi / theta))
     if adjoint:
@@ -1517,6 +1520,9 @@ def _pauli_measure_lowering(
         assert ir.OpaqueType(q.type).data == "bit"
 
     assert pauli_word is not None
+
+    if not all(p in ["I", "X", "Y", "Z"] for p in pauli_word):
+        raise ValueError("Only Pauli words consisting of 'I', 'X', 'Y', and 'Z' are allowed.")
 
     pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
 
