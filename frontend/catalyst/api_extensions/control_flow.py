@@ -1325,7 +1325,7 @@ class SwitchCallable:
         out_tracers = switch_p.bind(
             *([self.case] + cases + sum(all_consts, [])),
             branch_jaxprs=branch_jaxprs,
-            num_implicit_outputs=out_sigs[0].num_implicit_outputs(),
+            nimplicit_outputs=out_sigs[0].num_implicit_outputs(),
         )
 
         return tree_unflatten(out_sigs[0].out_tree(), collapse(out_sigs[0].out_type(), out_tracers))
@@ -1575,55 +1575,7 @@ class Cond(HybridOp):
     binder = cond_p.bind
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        jaxprs, consts, nimplouts = [], [], []
-        op = self
-        for region in op.regions:
-            with EvaluationContext.frame_tracing_context(region.trace):
-                new_qreg = AbstractQreg()
-                qreg_in = _input_type_to_tracers(
-                    partial(region.trace.new_arg, source_info=current_source_info()), [new_qreg]
-                )[0]
-                qreg_out = trace_quantum_operations(
-                    region.quantum_tape, device, qreg_in, ctx, region.trace
-                ).actualize()
-
-                constants = []
-                arg_expanded_classical_tracers = []
-                res_expanded_tracers, _ = expand_results(
-                    constants,
-                    arg_expanded_classical_tracers,
-                    region.res_classical_tracers + [qreg_out],
-                    expansion_strategy=self.expansion_strategy,
-                )
-                jaxpr, out_type, const = trace_to_jaxpr(region.trace, [], res_expanded_tracers)
-
-                jaxprs.append(jaxpr)
-                consts.append(const)
-                nimplouts.append(len(out_type) - len(region.res_classical_tracers) - 1)
-
-        qreg = qrp.actualize()
-        all_jaxprs, _, _, all_consts = unify_convert_result_types(jaxprs, consts, nimplouts)
-        branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
-
-        in_expanded_classical_tracers = [*self.in_classical_tracers, *sum(all_consts, []), qreg]
-
-        out_expanded_classical_tracers = expand_results(
-            [],
-            in_expanded_classical_tracers,
-            self.out_classical_tracers,
-            expansion_strategy=self.expansion_strategy,
-        )[0]
-
-        qrp2 = QRegPromise(
-            op.bind_overwrite_classical_tracers(
-                trace,
-                in_expanded_tracers=in_expanded_classical_tracers,
-                out_expanded_tracers=out_expanded_classical_tracers,
-                branch_jaxprs=branch_jaxprs,
-                nimplicit_outputs=nimplouts[0],
-            )
-        )
-        return qrp2
+        return trace_quantum_branches(self, ctx, device, trace, qrp)
 
 
 class ForLoop(HybridOp):
@@ -1704,60 +1656,7 @@ class Switch(HybridOp):
     binder = switch_p.bind
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        jaxprs, consts, num_implicit_outputs = [], [], []
-        op = self
-        for region in op.regions:
-            with EvaluationContext.frame_tracing_context(region.trace):
-                new_qreg = AbstractQreg()
-                qreg_in = _input_type_to_tracers(
-                    partial(region.trace.new_arg, source_info=current_source_info()), [new_qreg]
-                )[0]
-                qreg_out = trace_quantum_operations(
-                    region.quantum_tape, device, qreg_in, ctx, region.trace
-                ).actualize()
-
-                constants = []
-                arg_expanded_classical_tracers = []
-                res_expanded_tracers, _ = expand_results(
-                    constants,
-                    arg_expanded_classical_tracers,
-                    region.res_classical_tracers + [qreg_out],
-                    expansion_strategy=self.expansion_strategy,
-                )
-                jaxpr, out_type, const = trace_to_jaxpr(region.trace, [], res_expanded_tracers)
-
-                jaxprs.append(jaxpr)
-                consts.append(const)
-                num_implicit_outputs.append(len(out_type) - len(region.res_classical_tracers) - 1)
-
-        qreg = qrp.actualize()
-        all_jaxprs, _, _, all_consts = unify_convert_result_types(
-            jaxprs, consts, num_implicit_outputs
-        )
-        branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
-
-        in_expanded_classical_tracers = [
-            *self.in_classical_tracers,
-            *sum(all_consts, []),
-            qreg,
-        ]
-
-        out_expanded_classical_tracers = expand_results(
-            [],
-            in_expanded_classical_tracers,
-            self.out_classical_tracers,
-            expansion_strategy=self.expansion_strategy,
-        )[0]
-        qrp2 = QRegPromise(
-            op.bind_overwrite_classical_tracers(
-                trace,
-                in_expanded_tracers=in_expanded_classical_tracers,
-                out_expanded_tracers=out_expanded_classical_tracers,
-                branch_jaxprs=branch_jaxprs,
-                num_implicit_outputs=num_implicit_outputs[0],
-            )
-        )
-        return qrp2
+        return trace_quantum_branches(self, ctx, device, trace, qrp)
 
 
 class WhileLoop(HybridOp):
@@ -1922,3 +1821,58 @@ def _make_argless_function(fn, args, kwargs):
         return fn(*args, **kwargs)
 
     return argless_fn
+
+
+def trace_quantum_branches(op, ctx, device, trace, qrp) -> QRegPromise:
+    jaxprs, consts, nimplicit_outputs = [], [], []
+    op = op
+    for region in op.regions:
+        with EvaluationContext.frame_tracing_context(region.trace):
+            new_qreg = AbstractQreg()
+            qreg_in = _input_type_to_tracers(
+                partial(region.trace.new_arg, source_info=current_source_info()), [new_qreg]
+            )[0]
+            qreg_out = trace_quantum_operations(
+                region.quantum_tape, device, qreg_in, ctx, region.trace
+            ).actualize()
+
+            constants = []
+            arg_expanded_classical_tracers = []
+            res_expanded_tracers, _ = expand_results(
+                constants,
+                arg_expanded_classical_tracers,
+                region.res_classical_tracers + [qreg_out],
+                expansion_strategy=op.expansion_strategy,
+            )
+            jaxpr, out_type, const = trace_to_jaxpr(region.trace, [], res_expanded_tracers)
+
+            jaxprs.append(jaxpr)
+            consts.append(const)
+            nimplicit_outputs.append(len(out_type) - len(region.res_classical_tracers) - 1)
+
+    qreg = qrp.actualize()
+    all_jaxprs, _, _, all_consts = unify_convert_result_types(jaxprs, consts, nimplicit_outputs)
+    branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
+
+    in_expanded_classical_tracers = [
+        *op.in_classical_tracers,
+        *sum(all_consts, []),
+        qreg,
+    ]
+
+    out_expanded_classical_tracers = expand_results(
+        [],
+        in_expanded_classical_tracers,
+        op.out_classical_tracers,
+        expansion_strategy=op.expansion_strategy,
+    )[0]
+    qrp2 = QRegPromise(
+        op.bind_overwrite_classical_tracers(
+            trace,
+            in_expanded_tracers=in_expanded_classical_tracers,
+            out_expanded_tracers=out_expanded_classical_tracers,
+            branch_jaxprs=branch_jaxprs,
+            nimplicit_outputs=nimplicit_outputs[0],
+        )
+    )
+    return qrp2

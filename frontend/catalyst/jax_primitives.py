@@ -2071,11 +2071,11 @@ def _cond_lowering(
 # Index Switch
 #
 @switch_p.def_abstract_eval
-def _switch_p_abstract_eval(*args, branch_jaxprs, num_implicit_outputs: int, **kwargs):
+def _switch_p_abstract_eval(*args, branch_jaxprs, nimplicit_outputs: int, **kwargs):
     out_type = infer_output_type_jaxpr(
         [()] + branch_jaxprs[0].jaxpr.invars,
         [],
-        branch_jaxprs[0].jaxpr.outvars[num_implicit_outputs:],
+        branch_jaxprs[0].jaxpr.outvars[nimplicit_outputs:],
         expansion_strategy=switch_expansion_strategy(),
         num_implicit_inputs=None,
     )
@@ -2092,7 +2092,7 @@ def _switch_lowering(
     jax_ctx,
     *index_and_cases_and_branch_args_plus_consts: tuple,
     branch_jaxprs: List[core.ClosedJaxpr],
-    num_implicit_outputs: int,
+    nimplicit_outputs: int,
 ):
     result_types = [mlir.aval_to_ir_types(outvar)[0] for outvar in branch_jaxprs[0].out_avals]
 
