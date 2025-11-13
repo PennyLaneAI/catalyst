@@ -1825,7 +1825,6 @@ def _make_argless_function(fn, args, kwargs):
 
 def trace_quantum_branches(op, ctx, device, trace, qrp) -> QRegPromise:
     jaxprs, consts, nimplicit_outputs = [], [], []
-    op = op
     for region in op.regions:
         with EvaluationContext.frame_tracing_context(region.trace):
             new_qreg = AbstractQreg()
