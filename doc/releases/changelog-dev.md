@@ -144,6 +144,10 @@
   for the qec dialect.
   [(#2189)](https://github.com/PennyLaneAI/catalyst/pull/2189)
 
+  * Added a canonicalization pass for `qec.ppr` to remove any PPRs consisting only
+  of identities.
+  [(#2192)](https://github.com/PennyLaneAI/catalyst/pull/2192)
+
 <h3>Documentation 📝</h3>
 
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
