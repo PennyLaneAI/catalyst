@@ -131,6 +131,11 @@ LogicalResult FabricateOp::verify()
     return mlir::success();
 }
 
+LogicalResult PPRotationOp::canonicalize(PPRotationOp op, PatternRewriter &rewriter)
+{
+    return mlir::success();
+}
+
 void LayerOp::build(OpBuilder &builder, OperationState &result, ValueRange inValues,
                     ValueRange outValues, BodyBuilderFn bodyBuilder)
 {
