@@ -4,6 +4,14 @@
 
 <h3>Improvements 🛠</h3>
 
+* Allow to apply instrumentation to each pass within NamedSequenceOp.
+  [(#1978)](https://github.com/PennyLaneAI/catalyst/pull/1978)
+  For example:
+  ```
+  quantum-opt ... --apply-transform-sequence --mlir-print-ir-after-all
+  ```
+  should also dump the IR result for each subpass within NamedSequeceOp
+
 * The ``decompose-lowering`` MLIR pass now supports ``qml.MultiRZ``
   with an arbitrary number of wires. This decomposition is performed
   at MLIR when both capture and graph-decomposition are enabled.
