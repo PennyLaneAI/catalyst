@@ -181,7 +181,6 @@ def test_classical_tracing_binary_ops(op):
     assert_array_and_dtype_equal(f(shape), op(jnp.ones(shape, dtype), jnp.ones(shape, dtype)))
 
 
-@pytest.mark.xfail(reason="A bug in Jax/dynamic API")
 def test_classical_tracing_binary_ops_3D():
     """Test that tensor primitives work with basic binary operations on 3D arrays"""
     # TODO: Merge with the binary operations test after fixing
@@ -198,7 +197,6 @@ def test_classical_tracing_binary_ops_3D():
     assert_array_and_dtype_equal(f(shape), op(jnp.ones(shape, dtype), jnp.ones(shape, dtype)))
 
 
-@pytest.mark.xfail(reason="A Jax check at _src/lax/slicing.py:1520")
 @pytest.mark.parametrize("shape,idx", [((1, 2, 3), (0, 1, 2)), ((3,), (2,))])
 def test_access_dynamic_array_static_index(shape, idx):
     """Test accessing dynamic array elements using static indices"""
@@ -214,7 +212,6 @@ def test_access_dynamic_array_static_index(shape, idx):
     assert "gather" in f.mlir
 
 
-@pytest.mark.xfail(reason="A Jax check at _src/lax/slicing.py:1520")
 @pytest.mark.parametrize("shape,idx", [((1, 2, 3), (0, 1, -2)), ((3,), (2,))])
 def test_access_dynamic_array_dynamic_index(shape, idx):
     """Test accessing dynamic array elements using dynamic indices"""
@@ -1156,7 +1153,7 @@ def test_abstracted_axis_no_recompilation():
         def loop_block(i):
             qml.RX(x1[i], 0)
 
-        loop_block()
+        loop_block()  # pylint: disable=no-value-for-parameter
         qml.RY(x2, 1)
         return qml.expval(qml.Z(1))
 
