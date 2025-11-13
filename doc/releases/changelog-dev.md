@@ -58,6 +58,10 @@
   [(#2169)](https://github.com/PennyLaneAI/catalyst/pull/2169)
   [(#2183)](https://github.com/PennyLaneAI/catalyst/pull/2183)
 
+* The ``mlir_opt`` property now correctly handles xDSL passes by automatically
+  detecting when the Python compiler is being used and routing through it appropriately.
+  [(#2190)](https://github.com/PennyLaneAI/catalyst/pull/2190)
+
 * Dynamically allocated wires can now be passed into control flow and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
 
@@ -127,6 +131,9 @@
   ```
 
 <h3>Internal changes ⚙️</h3>
+
+* Updates to PennyLane's use of a single transform primitive with a `transform` kwarg.
+  [(#2177)](https://github.com/PennyLaneAI/catalyst/pull/2177)
 
 * The pytest tests are now run with `strict=True` by default.
   [(#2180)](https://github.com/PennyLaneAI/catalyst/pull/2180)
