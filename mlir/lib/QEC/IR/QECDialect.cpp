@@ -23,6 +23,9 @@
 
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
+#include "llvm/Support/Debug.h"
+
+#define DEBUG_TYPE "qec"
 
 using namespace mlir;
 using namespace catalyst::qec;
@@ -133,6 +136,20 @@ LogicalResult FabricateOp::verify()
 
 LogicalResult PPRotationOp::canonicalize(PPRotationOp op, PatternRewriter &rewriter)
 {
+    auto pauliProduct = op.getPauliProduct();
+
+    LLVM_DEBUG(llvm::dbgs() << "Pauli Product" << pauliProduct << "\n");
+    return op.emitOpError("canonicalize not implemented");
+    for (auto pauli : pauliProduct) {
+
+        llvm::dbgs() << "Pauli Product" << pauli << "\n";
+        if (auto pauliStr = llvm::cast<mlir::StringAttr>(pauli)) {
+            if (pauliStr.getValue() == "I") {
+            }
+            else {
+            }
+        }
+    }
     return mlir::success();
 }
 
