@@ -327,6 +327,7 @@ def _lowered_options(kwargs):
         lowered_options[mlir_option] = get_mlir_attribute_from_pyval(value)
     return lowered_options
 
+
 def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipeline):
     """Generate a transform module embedded in the current module and schedule
     the transformations in pipeline"""
@@ -394,7 +395,7 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
                         is_xdsl_pass,
                     )
 
-                    if is_xdsl_pass(_pass.name):
+                    if is_xdsl_pass(name):
                         uses_xdsl_passes = True
                         apply_registered_pass_op.operation.attributes["catalyst.xdsl_pass"] = (
                             ir.UnitAttr.get()

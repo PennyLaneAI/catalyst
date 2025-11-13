@@ -43,7 +43,7 @@ from catalyst.jax_extras.tracing import uses_transform
 from catalyst.jax_primitives import quantum_kernel_p
 from catalyst.jax_tracer import Function, trace_quantum_function
 from catalyst.logging import debug_logger
-from catalyst.passes.pass_api import dictionary_to_list_of_passes, Pass
+from catalyst.passes.pass_api import Pass, dictionary_to_list_of_passes
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args
 from catalyst.utils.exceptions import CompileError
@@ -284,12 +284,12 @@ class QFunc:
         assert isinstance(self, qml.QNode)
 
         new_transform_program, new_pipeline = _extract_passes(self.transform_program)
-
         # Update the qnode with peephole pipeline
-        pass_pipeline = kwargs.pop("pass_pipeline", []) + new_pipeline
+        old_pipeline = kwargs.pop("pass_pipeline", ()) or ()
+        pass_pipeline = old_pipeline + new_pipeline
         pass_pipeline = dictionary_to_list_of_passes(pass_pipeline)
         new_qnode = copy(self)
-        new_qnode._transform_program = new_transform_program # pylint: disable=protected-access
+        new_qnode._transform_program = new_transform_program  # pylint: disable=protected-access
 
         # Mid-circuit measurement configuration/execution
         fn_result = configure_mcm_and_try_one_shot(new_qnode, args, kwargs)
@@ -656,11 +656,19 @@ def dynamic_one_shot(qnode, **kwargs):
 
 
 def _extract_passes(transform_program):
+    """Extract transforms with pass names from the end of the TransformProgram."""
     tape_transforms = []
     pass_pipeline = []
-    for t in transform_program:
-        if t.pass_name:
-            pass_pipeline.append(Pass(t.pass_name, *t.args, **t.kwargs))
-        else:
-            tape_transforms.append(t)
+    i = len(transform_program)
+    for t in reversed(transform_program):
+        if t.pass_name is None:
+            break
+        i -= 1
+    pass_pipeline = transform_program[i:]
+    tape_transforms = transform_program[:i]
+    for t in tape_transforms:
+        if t.transform is None:
+            raise ValueError(
+                f"{t} without a tape definition occurs before tape transform {tape_transforms[-1]}."
+            )
     return qml.transforms.core.TransformProgram(tape_transforms), tuple(pass_pipeline)
