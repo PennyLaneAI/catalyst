@@ -142,8 +142,9 @@ LogicalResult PPRotationOp::canonicalize(PPRotationOp op, PatternRewriter &rewri
 
     if (allIdentity) {
         rewriter.replaceOp(op, op.getInQubits());
+        return mlir::success();
     }
-    return mlir::success();
+    return mlir::failure();
 }
 
 void LayerOp::build(OpBuilder &builder, OperationState &result, ValueRange inValues,
