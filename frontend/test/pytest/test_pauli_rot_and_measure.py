@@ -99,3 +99,24 @@ def test_pauli_rot_to_ppr_pauli_word_error():
             return f()
 
     qml.capture.disable()
+
+
+def test_pauli_measure_to_ppr_pauli_word_error():
+    """Test that unsupported pauli words raises `ValueError`."""
+    qml.capture.enable()
+    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    with pytest.raises(
+        ValueError,
+    ):
+
+        @qjit(pipelines=pipe, target="mlir")
+        def test_pauli_measure_to_ppr_pauli_word_error_workflow():
+
+            @qml.qnode(qml.device("catalyst.ftqc", wires=1))
+            def f():
+                qml.pauli_measure("A", wires=0)
+
+            return f()
+
+    qml.capture.disable()
