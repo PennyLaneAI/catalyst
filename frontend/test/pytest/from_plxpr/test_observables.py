@@ -71,18 +71,21 @@ def test_sprod():
     catalyst_xpr = from_plxpr(jaxpr)()
 
     qfunc = catalyst_xpr.eqns[0].params["call_jaxpr"]
-    assert qfunc.eqns[3].primitive == namedobs_p
-    assert qfunc.eqns[3].params == {"kind": "PauliZ"}
+    assert qfunc.eqns[3].primitive == qextract_p
+    assert qfunc.eqns[3].invars[1].val == 0
 
-    # 4 is broadcast_in_dim
-    assert qfunc.eqns[4].params["shape"] == (1,)
+    assert qfunc.eqns[4].primitive == namedobs_p
+    assert qfunc.eqns[4].params == {"kind": "PauliZ"}
 
-    assert qfunc.eqns[5].primitive == hamiltonian_p
-    assert qfunc.eqns[5].invars[0] == qfunc.eqns[4].outvars[0]
-    assert qfunc.eqns[5].invars[1] == qfunc.eqns[3].outvars[0]
+    # 5 is broadcast_in_dim
+    assert qfunc.eqns[5].params["shape"] == (1,)
 
-    assert qfunc.eqns[6].primitive == expval_p
+    assert qfunc.eqns[6].primitive == hamiltonian_p
     assert qfunc.eqns[6].invars[0] == qfunc.eqns[5].outvars[0]
+    assert qfunc.eqns[6].invars[1] == qfunc.eqns[4].outvars[0]
+
+    assert qfunc.eqns[7].primitive == expval_p
+    assert qfunc.eqns[7].invars[0] == qfunc.eqns[6].outvars[0]
 
 
 def test_prod():
@@ -143,28 +146,31 @@ def test_sum(as_linear_combination):
     catalyst_xpr = from_plxpr(jaxpr)()
     qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
 
-    assert qfunc_xpr.eqns[2].primitive == qextract_p
-    assert qfunc_xpr.eqns[2].invars[1].val == 0
+    # For non-linear combination case: dot_general and convert_element_type operations are generated
+    offset = 0 if as_linear_combination else 2
 
-    assert qfunc_xpr.eqns[3].primitive == namedobs_p
-    assert qfunc_xpr.eqns[3].params == {"kind": "PauliX"}
+    assert qfunc_xpr.eqns[8 + offset].primitive == qextract_p
+    assert qfunc_xpr.eqns[8 + offset].invars[1].val == 0
 
-    assert qfunc_xpr.eqns[4].primitive == qextract_p
-    assert qfunc_xpr.eqns[4].invars[1].val == 1
+    assert qfunc_xpr.eqns[9 + offset].primitive == namedobs_p
+    assert qfunc_xpr.eqns[9 + offset].params == {"kind": "PauliX"}
 
-    assert qfunc_xpr.eqns[5].primitive == namedobs_p
-    assert qfunc_xpr.eqns[5].params == {"kind": "PauliY"}
+    assert qfunc_xpr.eqns[10 + offset].primitive == qextract_p
+    assert qfunc_xpr.eqns[10 + offset].invars[1].val == 1
 
-    assert qfunc_xpr.eqns[6].primitive == qextract_p
-    assert qfunc_xpr.eqns[6].invars[1].val == 2
+    assert qfunc_xpr.eqns[11 + offset].primitive == namedobs_p
+    assert qfunc_xpr.eqns[11 + offset].params == {"kind": "PauliY"}
 
-    assert qfunc_xpr.eqns[7].primitive == namedobs_p
-    assert qfunc_xpr.eqns[7].params == {"kind": "PauliZ"}
+    assert qfunc_xpr.eqns[12 + offset].primitive == qextract_p
+    assert qfunc_xpr.eqns[12 + offset].invars[1].val == 2
 
-    # 8-11 broadcasting and concatenation
-    assert qfunc_xpr.eqns[12].primitive == hamiltonian_p
-    assert qfunc_xpr.eqns[12].invars[1:] == [
-        qfunc_xpr.eqns[3].outvars[0],
-        qfunc_xpr.eqns[5].outvars[0],
-        qfunc_xpr.eqns[7].outvars[0],
+    assert qfunc_xpr.eqns[13 + offset].primitive == namedobs_p
+    assert qfunc_xpr.eqns[13 + offset].params == {"kind": "PauliZ"}
+
+    # 14-17 broadcasting and concatenation
+    assert qfunc_xpr.eqns[18 + offset].primitive == hamiltonian_p
+    assert qfunc_xpr.eqns[18 + offset].invars[1:] == [
+        qfunc_xpr.eqns[9 + offset].outvars[0],
+        qfunc_xpr.eqns[11 + offset].outvars[0],
+        qfunc_xpr.eqns[13 + offset].outvars[0],
     ]

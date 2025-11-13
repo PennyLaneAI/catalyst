@@ -23,7 +23,7 @@ import jax
 import jax._src.interpreters.mlir as mlir
 import jax._src.interpreters.partial_eval as pe
 from jax._src import config, core, source_info_util
-from jax._src.core import JaxprEqnContext, Var, abstractify, standard_vma_rule
+from jax._src.core import JaxprEqnContext, Var, abstractify, standard_vma_rule, typeof
 from jax._src.interpreters import pxla
 from jax._src.interpreters.partial_eval import (
     DynamicJaxprTracer,
@@ -251,6 +251,32 @@ gather2_p = standard_primitive(
     vma_rule=partial(standard_vma_rule, "gather"),
 )
 
+# import numpy as np
+
+# def patched_literal_int(_cls, value: int, _dtype: np.dtype):
+#     return int.__new__(int, value)
+
+
+# def patched_literal_float(_cls, value: float, _dtype: np.dtype):
+#     return float.__new__(float, value)
+
+
+# def patched_literal_complex(_cls, value: complex, _dtype: np.dtype):
+#     return complex.__new__(complex, value)
+
+
+# def patched_literal_array(
+#     _cls, val: np.ndarray, weak_type: bool = False
+# ):  # pylint: disable=unused-argument
+#     arr = np.asarray(val)
+#     return arr.view(np.ndarray)
+
+
+# jax._src.literals.LiteralInt.__new__ = patched_literal_int
+# jax._src.literals.LiteralFloat.__new__ = patched_literal_float
+# jax._src.literals.LiteralComplex.__new__ = patched_literal_complex
+# jax._src.literals.LiteralArray.__new__ = patched_literal_array
+
 # pylint: disable=protected-access
 original_drop_unused_vars = pe._drop_unused_vars
 
@@ -357,6 +383,21 @@ def patched_multi_broadcast_in_dim(ctx, ops, ops_avals, out_shape, out_sharding=
             b_out = mlir.lower_with_sharding_in_types(ctx, b_out, out_aval)
             out.append(b_out)
     return out
+
+
+def patched_bind_with_trace(self, trace, args, params):
+    try:
+        in_type = list(map(typeof, args))
+    except Exception:  # pylint: disable=broad-exception-caught
+        return trace.process_primitive(self, args, params)
+    else:
+        if self.is_high(*in_type, **params) and trace.requires_low:
+            with core.set_current_trace(trace):
+                return self.to_lojax(*args, **params)
+        return trace.process_primitive(self, args, params)
+
+
+core.Primitive.bind_with_trace = patched_bind_with_trace
 
 
 def patched_dyn_shape_staging_rule(trace, source_info, prim, out_aval, *args, **params):

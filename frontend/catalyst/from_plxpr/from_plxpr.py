@@ -358,9 +358,10 @@ def handle_transform(
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for a
     PL transform."""
-    consts = args[consts_slice]
-    non_const_args = args[args_slice]
-    targs = args[targs_slice]
+    consts = args[_tuple_to_slice(consts_slice)]
+    non_const_args = args[_tuple_to_slice(args_slice)]
+    targs = args[_tuple_to_slice(targs_slice)]
+    tkwargs = _tuple_to_dict(tkwargs)
 
     # If the transform is a decomposition transform
     # and the graph-based decomposition is enabled
@@ -371,10 +372,6 @@ def handle_transform(
     ):
         """Handle the conversion from plxpr to Catalyst jaxpr for a
         PL transform."""
-        consts = args[_tuple_to_slice(consts_slice)]
-        non_const_args = args[_tuple_to_slice(args_slice)]
-        targs = args[_tuple_to_slice(targs_slice)]
-        tkwargs = _tuple_to_dict(tkwargs)
         if not self.requires_decompose_lowering:
             self.requires_decompose_lowering = True
         else:
