@@ -29,6 +29,7 @@
       qml.PauliRot(np.pi / 4, "Y", wires=0)
       qml.T(wires=0)
       qml.pauli_measure("X", wires=0)
+print(circuit.mlir_opt)
   ```
   [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
 
