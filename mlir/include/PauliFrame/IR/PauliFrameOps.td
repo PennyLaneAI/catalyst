@@ -59,6 +59,25 @@ def InitOp : PauliFrame_Op<"init"> {
     let hasVerifier = 1;
 }
 
+def InitQregOp : PauliFrame_Op<"init_qreg"> {
+    let summary = "Initialize the Pauli records of the target qubits in the quantum register to I";
+    let description = [{
+        Initialize the Pauli records of the target qubits in the quantum register to I.
+    }];
+
+    let arguments = (ins
+        QuregType:$in_qreg
+    );
+
+    let results = (outs
+        QuregType:$out_qreg
+    );
+
+    let assemblyFormat = [{
+        $in_qreg attr-dict `:` type(results)
+    }];
+}
+
 def UpdateOp : PauliFrame_Op<"update"> {
     let summary = "Update the Pauli record of the target qubit(s)";
     let description = [{

@@ -28,6 +28,13 @@ func.func @test_pauli_frame_init_multi_qubit(%q00 : !quantum.bit, %q10 : !quantu
 
 // -----
 
+func.func @test_pauli_frame_init_qreg(%qreg : !quantum.reg) {
+    %out_qreg = pauli_frame.init_qreg %qreg : !quantum.reg
+    func.return
+}
+
+// -----
+
 func.func @test_pauli_frame_update_single_qubit(%q0 : !quantum.bit) {
     %0 = arith.constant 0 : i1
     %1 = arith.constant 1 : i1
