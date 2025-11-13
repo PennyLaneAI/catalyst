@@ -23,7 +23,30 @@
 * `qml.grad` and `qml.jacobian` can now be used with `qjit` when program capture is enabled.
   [(#2078)](https://github.com/PennyLaneAI/catalyst/pull/2078)
 
+* xDSL passes are now automatically detected when using the `qjit` decorator. 
+  This removes the need to pass the `pass_plugins` argument to the `qjit` decorator.
+  [(#2169)](https://github.com/PennyLaneAI/catalyst/pull/2169)
+  [(#2183)](https://github.com/PennyLaneAI/catalyst/pull/2183)
+
+* Dynamically allocated wires can now be passed into control flow and subroutines.
+  [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
+
 <h3>Breaking changes 💔</h3>
+
+* (Compiler integrators only) The versions of LLVM/Enzyme/stablehlo used by Catalyst have been
+  updated. Enzyme now targets `v0.0.203` with the build target `EnzymeStatic-22`, and the nanobind
+  requirement for the latest LLVM has been updated to version 2.9.
+  [(#2122)](https://github.com/PennyLaneAI/catalyst/pull/2122)
+  [(#2174)](https://github.com/PennyLaneAI/catalyst/pull/2174)
+  [(#2175)](https://github.com/PennyLaneAI/catalyst/pull/2175)
+  [(#2181)](https://github.com/PennyLaneAI/catalyst/pull/2181)
+
+  - The LLVM version has been updated to
+  [commit 113f01a](https://github.com/llvm/llvm-project/tree/113f01aa82d055410f22a9d03b3468fa68600589).
+  - The stablehlo version has been updated to
+  [commit 0a4440a](https://github.com/openxla/stablehlo/commit/0a4440a5c8de45c4f9649bf3eb4913bf3f97da0d).
+  - The Enzyme version has been updated to
+  [v0.0.203](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.203).
 
 <h3>Deprecations 👋</h3>
 
@@ -75,6 +98,12 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Updates to PennyLane's use of a single transform primitive with a `transform` kwarg.
+  [(#2177)](https://github.com/PennyLaneAI/catalyst/pull/2177)
+
+* The pytest tests are now run with `strict=True` by default.
+  [(#2180)](https://github.com/PennyLaneAI/catalyst/pull/2180)
+
 * Refactor Catalyst pass registering so that it's no longer necessary to manually add new
   passes at `registerAllCatalystPasses`.
   [(#1984)](https://github.com/PennyLaneAI/catalyst/pull/1984)
@@ -106,6 +135,10 @@
       // ... ion operations ...
   }
   ```
+  
+  * Added support for `ppr-to-ppm` as an individual MLIR pass and python binding 
+  for the qec dialect.
+  [(#2189)](https://github.com/PennyLaneAI/catalyst/pull/2189)
 
 <h3>Documentation 📝</h3>
 
@@ -124,6 +157,7 @@
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+Jeffrey Kam,
 Christina Lee,
 River McCubbin,
 Lee J. O'Riordan,

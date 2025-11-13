@@ -101,7 +101,6 @@ def test_qfunc_output_shape_scalar():
         return res * 1j
 
 
-@pytest.mark.xfail(reason="Preserving scalars is preferred over preserving length-1 containers.")
 def test_qfunc_output_shape_list():
     """Check that length-1 list outputs of QNodes are preserved."""
 

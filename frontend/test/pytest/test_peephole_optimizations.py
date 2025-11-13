@@ -355,16 +355,9 @@ def test_ppr_to_ppm_auto_corrected():
 
         return f()
 
-    assert (
-        'transform.apply_registered_pass "decompose-non-clifford-ppr"'
-        in test_ppr_to_ppm_workflow.mlir
-    )
-    assert (
-        'transform.apply_registered_pass "decompose-clifford-ppr"' in test_ppr_to_ppm_workflow.mlir
-    )
+    assert 'transform.apply_registered_pass "ppr-to-ppm"' in test_ppr_to_ppm_workflow.mlir
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
-    assert 'transform.apply_registered_pass "decompose-non-clifford-ppr"' not in optimized_ir
-    assert 'transform.apply_registered_pass "decompose-clifford-ppr"' not in optimized_ir
+    assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
     assert "quantum.alloc_qb" in optimized_ir
     assert "qec.fabricate  magic" in optimized_ir
     assert "qec.select.ppm" in optimized_ir
@@ -396,16 +389,9 @@ def test_ppr_to_ppm_inject_magic_state():
 
         return f()
 
-    assert (
-        'transform.apply_registered_pass "decompose-non-clifford-ppr"'
-        in test_ppr_to_ppm_workflow.mlir
-    )
-    assert (
-        'transform.apply_registered_pass "decompose-clifford-ppr"' in test_ppr_to_ppm_workflow.mlir
-    )
+    assert 'transform.apply_registered_pass "ppr-to-ppm"' in test_ppr_to_ppm_workflow.mlir
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
-    assert 'transform.apply_registered_pass "decompose-non-clifford-ppr"' not in optimized_ir
-    assert 'transform.apply_registered_pass "decompose-clifford-ppr"' not in optimized_ir
+    assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
     ppm_specs_output = ppm_specs(test_ppr_to_ppm_workflow)
     assert ppm_specs_output["f_0"]["num_of_ppm"] == 20
@@ -433,16 +419,9 @@ def test_ppr_to_ppm_pauli_corrected():
 
         return f()
 
-    assert (
-        'transform.apply_registered_pass "decompose-non-clifford-ppr"'
-        in test_ppr_to_ppm_workflow.mlir
-    )
-    assert (
-        'transform.apply_registered_pass "decompose-clifford-ppr"' in test_ppr_to_ppm_workflow.mlir
-    )
+    assert 'transform.apply_registered_pass "ppr-to-ppm"' in test_ppr_to_ppm_workflow.mlir
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
-    assert 'transform.apply_registered_pass "decompose-non-clifford-ppr"' not in optimized_ir
-    assert 'transform.apply_registered_pass "decompose-clifford-ppr"' not in optimized_ir
+    assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
     assert (
         "qec.select.ppm" in optimized_ir
     )  # Make sure we use the select PPM to implement the reactive measurement
