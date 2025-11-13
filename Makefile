@@ -118,7 +118,7 @@ frontend:
 	$(PYTHON) -m pip uninstall -y pennylane
 	$(PYTHON) -m pip install -e . --extra-index-url https://test.pypi.org/simple $(PIP_VERBOSE_FLAG)
     # TODO: remove after https://github.com/PennyLaneAI/pennylane/pull/8525 is merged.
-	$(PYTHON) -m pip install git+https://github.com/PennyLaneAI/pennylane@bump-jax-to-0.7.0
+	$(PYTHON) -m pip install git+https://github.com/PennyLaneAI/pennylane@nump-jax-0.7.1
 	rm -r frontend/pennylane_catalyst.egg-info
 
 .PHONY: mlir llvm stablehlo enzyme dialects runtime oqc
