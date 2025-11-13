@@ -14,17 +14,17 @@
 
 // RUN: quantum-opt --split-input-file -verify-diagnostics --canonicalize %s | FileCheck %s
 
-func.func @test_ppr_canonicalize_single_identity(%q1 : !quantum.bit, %q2 : !quantum.bit) {
+func.func @test_ppr_canonicalize_single_identity(%q1 : !quantum.bit, %q2 : !quantum.bit) -> (!quantum.bit, !quantum.bit) {
     %0 = qec.ppr ["I"](4) %q1 : !quantum.bit
     %1 = qec.ppr ["I"](4) %q2 : !quantum.bit
-    return
+    return %0, %1 : !quantum.bit, !quantum.bit
     // CHECK-NOT: qec.ppr ["I"](4)
 }
 
 // -----
 
-func.func @test_ppr_canonicalize_multiple_identity(%q1 : !quantum.bit, %q2 : !quantum.bit, %q3 : !quantum.bit) {
+func.func @test_ppr_canonicalize_multiple_identity(%q1 : !quantum.bit, %q2 : !quantum.bit, %q3 : !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
     %out_qubits:3 = qec.ppr ["I", "I", "I"](4) %q1, %q2, %q3: !quantum.bit, !quantum.bit, !quantum.bit
-    return
+    return %out_qubits#0, %out_qubits#1, %out_qubits#2 : !quantum.bit, !quantum.bit, !quantum.bit
     // CHECK-NOT: qec.ppr ["I", "I", "I"](4)
 }
