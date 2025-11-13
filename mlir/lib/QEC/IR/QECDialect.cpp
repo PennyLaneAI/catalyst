@@ -23,9 +23,6 @@
 
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
-#include "llvm/Support/Debug.h"
-
-#define DEBUG_TYPE "qec"
 
 using namespace mlir;
 using namespace catalyst::qec;
