@@ -1248,10 +1248,8 @@ def test_decompose_scf():
     qml.decomposition.enable_graph()
 
     @qml.qjit(target="mlir", autograph=True)
-    @partial(
-        qml.transforms.decompose, gate_set={"Rot"}
-    )
-    @qml.qnode(qml.device("lightning.qubit", wires= 1))
+    @partial(qml.transforms.decompose, gate_set={"Rot"})
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
     def circuit_27(n: int, x: float):
         # CHECK: %2:2 = scf.for %arg2 = %c0 to %1 step %c1 iter_args(%arg3 = %arg1, %arg4 = %0) -> (tensor<f64>, !quantum.reg)
         @qml.for_loop(0, n, 1)
@@ -1269,5 +1267,6 @@ def test_decompose_scf():
 
     qml.decomposition.disable_graph()
     qml.capture.disable()
+
 
 test_decompose_scf()

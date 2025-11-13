@@ -4,6 +4,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* The new graph-based decomposition feamework has `AutoGraph` feature parity with PennyLane.
+  [(#2161)](https://github.com/PennyLaneAI/catalyst/pull/2161)
+
 * The ``decompose-lowering`` MLIR pass now supports ``qml.MultiRZ``
   with an arbitrary number of wires. This decomposition is performed
   at MLIR when both capture and graph-decomposition are enabled.
