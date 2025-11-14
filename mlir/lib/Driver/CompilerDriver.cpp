@@ -791,7 +791,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             std::string tmp;
             llvm::raw_string_ostream rawStringOstream{tmp};
             llvmModule->print(rawStringOstream, nullptr);
-            auto outFile = output.nextPipelineSummaryFilename("llvm_ir", ".ll");
+            auto outFile = output.nextPipelineSummaryFilename("llvm_ir", ".ll", false);
             dumpToFile(options, outFile, tmp);
         }
         output.outIR.clear();

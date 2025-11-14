@@ -109,9 +109,11 @@ struct CompilerOutput {
     };
 
     // Gets the root-level pipeline summary file name
-    std::string nextPipelineSummaryFilename(std::string pipelineName, std::string ext = ".mlir")
+    std::string nextPipelineSummaryFilename(std::string pipelineName, std::string ext = ".mlir",
+                                            bool includeAfter = true)
     {
-        return std::filesystem::path(std::to_string(this->globalPipelineCounter) + "_After" +
+        std::string prefix = includeAfter ? "_After" : "_";
+        return std::filesystem::path(std::to_string(this->globalPipelineCounter) + prefix +
                                      pipelineName)
             .replace_extension(ext);
     };
