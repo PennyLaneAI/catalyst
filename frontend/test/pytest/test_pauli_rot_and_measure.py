@@ -29,7 +29,7 @@ def test_pauli_rot_to_ppr():
     @qjit(pipelines=pipe, target="mlir")
     def test_pauli_rot_to_ppr_workflow():
 
-        @qml.qnode(qml.device("catalyst.ftqc", wires=1))
+        @qml.qnode(qml.device("null.qubit", wires=1))
         def f():
             qml.PauliRot(np.pi / 4, "X", wires=0)
 
@@ -48,7 +48,7 @@ def test_pauli_measure_to_ppr():
     @qjit(pipelines=pipe, target="mlir")
     def test_pauli_measure_to_ppr_workflow():
 
-        @qml.qnode(qml.device("catalyst.ftqc", wires=1))
+        @qml.qnode(qml.device("null.qubit", wires=1))
         def f():
             qml.pauli_measure("X", wires=0)
 
@@ -71,7 +71,7 @@ def test_pauli_rot_to_ppr_angle_error():
         @qjit(pipelines=pipe, target="mlir")
         def test_pauli_rot_to_ppr_angle_error_workflow():
 
-            @qml.qnode(qml.device("catalyst.ftqc", wires=1))
+            @qml.qnode(qml.device("null.qubit", wires=1))
             def f():
                 qml.PauliRot(np.pi / 12, "X", wires=0)
 
@@ -92,7 +92,7 @@ def test_pauli_rot_to_ppr_pauli_word_error():
         @qjit(pipelines=pipe, target="mlir")
         def test_pauli_rot_to_ppr_pauli_word_error_workflow():
 
-            @qml.qnode(qml.device("catalyst.ftqc", wires=1))
+            @qml.qnode(qml.device("null.qubit", wires=1))
             def f():
                 qml.PauliRot(np.pi / 4, "A", wires=0)
 
@@ -113,7 +113,7 @@ def test_pauli_measure_to_ppr_pauli_word_error():
         @qjit(pipelines=pipe, target="mlir")
         def test_pauli_measure_to_ppr_pauli_word_error_workflow():
 
-            @qml.qnode(qml.device("catalyst.ftqc", wires=1))
+            @qml.qnode(qml.device("null.qubit", wires=1))
             def f():
                 qml.pauli_measure("A", wires=0)
 

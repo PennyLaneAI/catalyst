@@ -43,7 +43,7 @@ from pennylane.measurements import (
     VarianceMP,
 )
 from pennylane.operation import Operation, Operator, Wires
-from pennylane.ops import Adjoint, Controlled, ControlledOp, PauliMeasure
+from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
 from pennylane.transforms.core import TransformProgram
 
@@ -89,8 +89,6 @@ from catalyst.jax_primitives import (
     hermitian_p,
     namedobs_p,
     num_qubits_p,
-    pauli_measure_p,
-    pauli_rot_p,
     probs_p,
     qalloc_p,
     qdealloc_p,
@@ -721,53 +719,6 @@ def trace_basis_state(op, qrp):
     qrp.insert(op.wires, qubits2)
 
 
-def trace_pauli_rot(op, qrp, adjoint):
-    """Trace qml.PauliRot
-
-    Args:
-        op: PauliRot op being traced
-        qrp: QRegPromise object holding the JAX tracer representing the quantum register's state
-        adjoint: Whether the operation is adjoint
-
-    Postcondition:
-        qrp is updated to hold the output qubits from qml.PauliRot
-    """
-    assert isinstance(op, qml.PauliRot), "qml.PauliRot expected"
-
-    qubits = qrp.extract(op.wires)
-    qubits2 = pauli_rot_p.bind(
-        *qubits,
-        theta=op.parameters[0],
-        pauli_word=op.hyperparameters["pauli_word"],
-        qubits_len=len(qubits),
-        adjoint=adjoint,
-    )
-    qrp.insert(op.wires, qubits2[: len(qubits)])
-
-
-def trace_pauli_measure(op, qrp):
-    """Trace PauliMeasure
-
-    Args:
-        op: PauliMeasure op being traced
-        qrp: QRegPromise object holding the JAX tracer representing the quantum register's state
-
-    Postcondition:
-        qrp is updated to hold the output qubits from PauliMeasure
-    """
-    assert isinstance(op, PauliMeasure), "PauliMeasure expected"
-
-    qubits = qrp.extract(op.wires)
-    results = pauli_measure_p.bind(
-        *qubits,
-        pauli_word=op.hyperparameters["pauli_word"],
-        qubits_len=len(qubits),
-    )
-    # First element is the measurement result
-    out_qubits = results[1 : 1 + len(qubits)]
-    qrp.insert(op.wires, out_qubits)
-
-
 def trace_snapshot_op(
     op: Operation,
     device: QubitDevice,
@@ -880,10 +831,6 @@ def trace_quantum_operations(
             trace_basis_state(op, qrp)
         elif isinstance(op, qml.Snapshot):
             trace_snapshot_op(op, device, qrp, out_snapshot_tracer)
-        elif isinstance(op, qml.PauliRot):
-            trace_pauli_rot(op, qrp, adjoint)
-        elif isinstance(op, PauliMeasure):
-            trace_pauli_measure(op, qrp)
         else:
             qubits = qrp.extract(op.wires)
             controlled_qubits = qrp.extract(controlled_wires)
