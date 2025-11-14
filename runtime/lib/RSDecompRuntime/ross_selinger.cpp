@@ -147,16 +147,15 @@ std::pair<std::vector<CliffordData::GateType>, double> eval_ross_algorithm(doubl
     using CacheValue = std::pair<std::vector<CliffordData::GateType>, double>;
 
     // <<< ADDED: Declare the thread-local static cache
-    static std::map<CacheKey, CacheValue> ross_cache;
+    static lru_cache<CacheKey, CacheValue, 10000> ross_cache;
 
     // <<< ADDED: Create the key for the current call
     CacheKey key = {angle, epsilon};
 
     // <<< ADDED: Check if the result is already in the cache
-    auto it = ross_cache.find(key);
-    if (it != ross_cache.end()) {
+     if (auto val_opt = ross_cache.get(key); val_opt) {
         // Found it! Return the cached value immediately.
-        return it->second;
+        return *val_opt;
     }
 
     // <<< ORIGINAL CODE: (If not in cache, proceed with computation)
@@ -271,7 +270,7 @@ std::pair<std::vector<CliffordData::GateType>, double> eval_ross_algorithm(doubl
     auto normal_form_result = normal_forms::ma_normal_form(so3_mat);
 
     // <<< ADDED: Store the newly computed result in the cache
-    ross_cache[key] = normal_form_result;
+    ross_cache.put(key, normal_form_result);
 
     return normal_form_result;
 }

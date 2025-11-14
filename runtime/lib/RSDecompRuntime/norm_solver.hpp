@@ -15,6 +15,7 @@
 // arithmetic operators (*, /, %), methods (adj2, conj, norm_squared, sqrt, to_omega),
 // and comparison operators (e.g., operator!=).
 #include "rings.hpp"
+#include "utils.hpp"
 
 namespace NormSolver {
 
@@ -101,23 +102,31 @@ inline ZOmega gcd(ZOmega elem1, ZOmega elem2)
  */
 inline bool primality_test(INT_TYPE n)
 {
-    static std::map<INT_TYPE, bool> cache;
-    if (auto it = cache.find(n); it != cache.end()) {
-        return it->second;
+    static lru_cache<INT_TYPE, bool, 100000> cache;
+    if (auto val_opt = cache.get(n); val_opt) {
+        return *val_opt; // Return cached value
     }
 
-    if (n < 2 || n == 4)
-        return cache[n] = false;
-    if (n < 4)
-        return cache[n] = true;
+    if (n < 2 || n == 4) {
+        cache.put(n, false);
+        return false;
+    }
+    if (n < 4) {
+        cache.put(n, true);
+        return true;
+    }
 
     const std::vector<INT_TYPE> small_primes = {2,  3,  5,  7,  11, 13, 17, 19, 23, 29, 31, 37, 41,
                                                 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97};
     for (INT_TYPE p : small_primes) {
-        if (n == p)
-            return cache[n] = true;
-        if (n % p == 0)
-            return cache[n] = false;
+        if (n == p) {
+            cache.put(n, true); // 3. Store result
+            return true;
+        }
+        if (n % p == 0) {
+            cache.put(n, false); // 3. Store result
+            return false;
+        }
     }
 
     INT_TYPE d = n - 1;
@@ -144,11 +153,14 @@ inline bool primality_test(INT_TYPE n)
                 break;
             }
         }
-        if (is_composite)
-            return cache[n] = false;
+        if (is_composite) {
+            cache.put(n, false); // 3. Store result
+            return false;
+        }
     }
 
-    return cache[n] = true;
+    cache.put(n, true); // 3. Store final result
+    return true;
 }
 
 // inline bool primality_test(INT_TYPE n) {
