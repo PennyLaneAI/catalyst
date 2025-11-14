@@ -2,22 +2,25 @@
 
 <h3>New features since last release</h3>
 
-* Catalyst now supports Pennylane frontend operations `qml.PauliRot` and `qml.pauli_measure` 
-  directly. This allows uses to write circuits in Pennylane consisting of PPR/PPMs, and 
-  use the existing compilation passes in Catalyst specifically for PPR/PPMs, namely `to_ppr`, 
-  `commute_ppr`, `merge_ppr_ppm`, `ppr_to_ppm`, and `ppm_compilation`.
+* Catalyst can now compile circuits that are directly expressed in terms of Pauli product rotation 
+  (PPR) and Pauli product measurement (PPM) operations: :class:`~.PauliRot` and 
+  :func:`~.pauli_measure`, respectively. This support enables research and development 
+  spurred from `A Game of Surface Codes (arXiv1808.02892) <https://arxiv.org/pdf/1808.02892>`_.
+  [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
 
-  This is supported with both program capture enabled and disabled. However, there are several
-  caveats. When program capture is disabled, we will not be able to use conditionals (i.e, 
-  `qml.cond`) on the measurement result of `qml.pauli_measure`.
-
-  To support this feature, we introduced a dummy device `catalyst.ftqc`. Users of this new 
-  feature would need to set the `qnode` to use this dummy device. For example, a user can 
-  now write the following circuit and have it compatible with the existing Catalyst PPR/PPM
-  passes.
+  With program capture enabled (:func:`pennylane.capture.enable`), :class:`~.PauliRot` and 
+  :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes for PPR-PPM 
+  compilation, which includes :func:`catalyst.passes.to_ppr`, :func:`catalyst.passes.commute_ppr`, 
+  :func:`catalyst.passes.merge_ppr_ppm`, :func:`catalyst.passes.ppr_to_ppm`, and 
+  :func:`catalyst.passes.ppm_compilation`. For example,
 
   ```python
-  dev = qml.device("catalyst.ftqc", wires=1)
+  import pennylane as qml
+  import jax.numpy as jnp
+
+  qml.capture.enable()
+
+  dev = qml.device("null.qubit", wires=1)
   pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
   
   @qjit(pipelines=pipeline, target="mlir")
@@ -25,13 +28,12 @@
   @qml.qnode(device=dev)
   def circuit():
       qml.Hadamard(wires=0)
-      qml.PauliRot(np.pi / 2, "X", wires=0)
-      qml.PauliRot(np.pi / 4, "Y", wires=0)
+      qml.PauliRot(jnp.pi / 2, "X", wires=0)
+      qml.PauliRot(jnp.pi / 4, "Y", wires=0)
       qml.T(wires=0)
-      qml.pauli_measure("X", wires=0)
-print(circuit.mlir_opt)
+      ppm = qml.pauli_measure("X", wires=0)
+      return qml.sample()
   ```
-  [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
 
 <h3>Improvements 🛠</h3>
 
@@ -58,10 +60,6 @@ print(circuit.mlir_opt)
   This removes the need to pass the `pass_plugins` argument to the `qjit` decorator.
   [(#2169)](https://github.com/PennyLaneAI/catalyst/pull/2169)
   [(#2183)](https://github.com/PennyLaneAI/catalyst/pull/2183)
-
-* The ``mlir_opt`` property now correctly handles xDSL passes by automatically
-  detecting when the Python compiler is being used and routing through it appropriately.
-  [(#2190)](https://github.com/PennyLaneAI/catalyst/pull/2190)
 
 * Dynamically allocated wires can now be passed into control flow and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
@@ -132,9 +130,6 @@ print(circuit.mlir_opt)
   ```
 
 <h3>Internal changes ⚙️</h3>
-
-* Updates to PennyLane's use of a single transform primitive with a `transform` kwarg.
-  [(#2177)](https://github.com/PennyLaneAI/catalyst/pull/2177)
 
 * The pytest tests are now run with `strict=True` by default.
   [(#2180)](https://github.com/PennyLaneAI/catalyst/pull/2180)
