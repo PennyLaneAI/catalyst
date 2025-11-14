@@ -1192,7 +1192,7 @@ class SwitchCallable:
             )
         return self._operation
 
-    def branch(self, case):
+    def branch(self, case: int):
         """
         Branch to be run if the switch's case is equivalent to the case provided here.
 
@@ -1203,7 +1203,7 @@ class SwitchCallable:
             A callable decorator that wraps this case of the switch.
         """
 
-        def decorator(branch):
+        def decorator(branch: Callable):
             self.case_to_branch[case] = branch
             return self
 
@@ -1298,7 +1298,7 @@ class SwitchCallable:
         branches.append(self.default_branch)
 
         # wraps trace to allow simple unzipping
-        def _trace(branch_fn):
+        def _trace(branch_fn: Callable):
             _, in_sig, out_sig = trace_function(
                 branch_fn,
                 *(),
