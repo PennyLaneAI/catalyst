@@ -603,7 +603,9 @@ class Compiler:
                 if previous_pass is None:
                     return
 
-                pass_name = previous_pass.name if hasattr(previous_pass, "name") else str(previous_pass)
+                pass_name = (
+                    previous_pass.name if hasattr(previous_pass, "name") else str(previous_pass)
+                )
                 buffer = io.StringIO()
                 Printer(stream=buffer, print_generic_format=False).print_op(module)
                 ir_file = os.path.join(
