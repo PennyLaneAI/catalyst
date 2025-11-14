@@ -4,6 +4,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* ``null.qubit`` no longer skips initial `qml.StatePrep` operations.
+  [(#2195)](https://github.com/PennyLaneAI/catalyst/pull/2195)
+
 * The new graph-based decomposition framework has Autograph feature parity with PennyLane
   when capture enabled. When compiling with `qml.qjit(autograph=True)`, the decomposition rules
   returned by the graph-based framework are now correctly compiled using Autograph.
