@@ -1,4 +1,4 @@
-# Copyright 2024 Xanadu Quantum Technologies Inc.
+# Copyright 2024-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -253,6 +253,7 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
                 invertible=True, controllable=True, differentiable=True
             ),
             "ForLoop": OperatorProperties(invertible=True, controllable=True, differentiable=True),
+            "Switch": OperatorProperties(invertible=True, controllable=True, differentiable=True),
         }
     )
 
