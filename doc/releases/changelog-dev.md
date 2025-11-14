@@ -2,6 +2,7 @@
 
 <h3>New features since last release</h3>
 
+<<<<<<< HEAD
 * Catalyst can now compile circuits that are directly expressed in terms of Pauli product rotation 
   (PPR) and Pauli product measurement (PPM) operations: :class:`~.PauliRot` and 
   :func:`~.pauli_measure`, respectively. This support enables research and development 
@@ -34,8 +35,18 @@
       ppm = qml.pauli_measure("X", wires=0)
       return qml.sample()
   ```
+=======
+* Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
+  [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
+>>>>>>> 86d2cb115b7d87b964cefef3982e6727136e1831
 
 <h3>Improvements 🛠</h3>
+
+* The new graph-based decomposition framework has Autograph feature parity with PennyLane
+  when capture enabled. When compiling with `qml.qjit(autograph=True)`, the decomposition rules
+  returned by the graph-based framework are now correctly compiled using Autograph.
+  This ensures compatibility and deeper optimization for dynamically generated rules.
+  [(#2161)](https://github.com/PennyLaneAI/catalyst/pull/2161)
 
 * The ``decompose-lowering`` MLIR pass now supports ``qml.MultiRZ``
   with an arbitrary number of wires. This decomposition is performed
@@ -169,6 +180,10 @@
   * Added support for `ppr-to-ppm` as an individual MLIR pass and python binding 
   for the qec dialect.
   [(#2189)](https://github.com/PennyLaneAI/catalyst/pull/2189)
+
+  * Added a canonicalization pattern for `qec.ppr` to remove any PPRs consisting only
+  of identities.
+  [(#2192)](https://github.com/PennyLaneAI/catalyst/pull/2192)
 
 <h3>Documentation 📝</h3>
 
