@@ -138,7 +138,7 @@ enzyme:
 		-DCMAKE_CXX_VISIBILITY_PRESET=$(SYMBOL_VISIBILITY) \
 		-DCMAKE_POLICY_DEFAULT_CMP0116=NEW
 
-	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-21
+	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-22
 
 .PHONY: plugin
 plugin:
@@ -215,7 +215,7 @@ test:
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects
 
 .PHONY: clean clean-dialects clean-enzyme clean-stablehlo clean-plugin clean-dialect-docs
-clean: clean-dialects clean-llvm clean-stablehlo clean-enzyme clean-plugin
+clean: clean-dialects clean-llvm clean-stablehlo clean-enzyme clean-plugin clean-dialect-docs
 
 clean-dialects:
 	@echo "clean catalyst dialect build files"

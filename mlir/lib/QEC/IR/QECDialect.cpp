@@ -131,6 +131,22 @@ LogicalResult FabricateOp::verify()
     return mlir::success();
 }
 
+LogicalResult PPRotationOp::canonicalize(PPRotationOp op, PatternRewriter &rewriter)
+{
+    auto pauliProduct = op.getPauliProduct();
+
+    bool allIdentity = llvm::all_of(pauliProduct, [](mlir::Attribute attr) {
+        auto pauliStr = llvm::cast<mlir::StringAttr>(attr);
+        return pauliStr.getValue() == "I";
+    });
+
+    if (allIdentity) {
+        rewriter.replaceOp(op, op.getInQubits());
+        return mlir::success();
+    }
+    return mlir::failure();
+}
+
 void LayerOp::build(OpBuilder &builder, OperationState &result, ValueRange inValues,
                     ValueRange outValues, BodyBuilderFn bodyBuilder)
 {

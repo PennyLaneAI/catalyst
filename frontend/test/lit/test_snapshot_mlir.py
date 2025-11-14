@@ -47,7 +47,7 @@ def single_qubit_circuit():
     # CHECK: [[snapshot2:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
     qml.Snapshot()  # |->
 
-    qml.PhaseShift(np.pi / 2, wires=0)
+    qml.PhaseShift(np.pi / 2, wires=0)  # pylint: disable=no-member
 
     # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
     # CHECK: [[snapshot3:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
@@ -59,7 +59,7 @@ def single_qubit_circuit():
     # CHECK: [[snapshot4:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>
     qml.Snapshot()  # |+i>
 
-    qml.PhaseShift(-np.pi / 2, wires=0)
+    qml.PhaseShift(-np.pi / 2, wires=0)  # pylint: disable=no-member
 
     # CHECK: [[compbasis:%.+]] = quantum.compbasis qreg {{%.+}} : !quantum.obs
     # CHECK: [[snapshot5:%.+]] = quantum.state [[compbasis]] : tensor<2xcomplex<f64>>

@@ -322,6 +322,8 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {
 
     let hasVerifier = 1;
 
+    let hasCanonicalizeMethod = 1;
+
     code extraBaseClassDeclaration = [{
         bool hasPiOverTwoRotation(){
             int16_t rotationKind = static_cast<int16_t>(getRotationKind());
