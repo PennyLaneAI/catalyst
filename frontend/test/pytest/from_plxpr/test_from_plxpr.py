@@ -1094,7 +1094,7 @@ class TestGraphDecomposition:
         qml.capture.disable()
 
     def test_autograph(self):
-        """Test the decompose lowering pass with autograph in the program and rule."""
+        """Test the decompose lowering pass with autograph."""
 
         qml.capture.enable()
         qml.decomposition.enable_graph()

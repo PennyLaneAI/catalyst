@@ -4,7 +4,10 @@
 
 <h3>Improvements 🛠</h3>
 
-* The new graph-based decomposition framework has `AutoGraph` parity with PennyLane when capture enabled.
+* The new graph-based decomposition framework has Autograph feature parity with PennyLane
+  when capture enabled. When compiling with `qml.qjit(autograph=True)`, the decomposition rules
+  returned by the graph-based framework are now correctly compiled using Autograph.
+  This ensures compatibility and deeper optimization for dynamically generated rules.
   [(#2161)](https://github.com/PennyLaneAI/catalyst/pull/2161)
 
 * The ``decompose-lowering`` MLIR pass now supports ``qml.MultiRZ``

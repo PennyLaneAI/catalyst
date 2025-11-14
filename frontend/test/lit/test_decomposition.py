@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2022-2025 Xanadu Quantum Technologies Inc.
 import os
 import pathlib
 import platform
@@ -6,7 +6,6 @@ from copy import deepcopy
 from functools import partial
 
 import jax
-import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 from pennylane.devices.capabilities import OperatorProperties
@@ -1292,7 +1291,7 @@ def test_decompose_autograph_multi_blocks():
         for i in range(len(wires) - 1, 0, -1):
             qml.CNOT(wires=(wires[i], wires[i - 1]))
 
-    @qml.qjit(keep_intermediate=True, autograph=True)
+    @qml.qjit(target="mlir", autograph=True)
     @partial(
         qml.transforms.decompose,
         gate_set={"RZ", "CNOT"},

@@ -253,7 +253,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
         return jax.tree_util.tree_unflatten(struct, data)
 
 
-# pylint: disable=too-many-positional-args
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 def _create_decomposition_rule(
     func: Callable,
     op_name: str,
