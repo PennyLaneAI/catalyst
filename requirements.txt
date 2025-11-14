@@ -35,4 +35,4 @@ nbmake
 pennylane-lightning-kokkos
 amazon-braket-pennylane-plugin>1.27.1
 xdsl
-xdsl-jax @ git+https://github.com/xdslproject/xdsl-jax.git@main
+xdsl-jax

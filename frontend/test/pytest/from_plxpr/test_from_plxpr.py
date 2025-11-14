@@ -1093,6 +1093,48 @@ class TestGraphDecomposition:
         qml.decomposition.disable_graph()
         qml.capture.disable()
 
+    def test_autograph(self):
+        """Test the decompose lowering pass with autograph."""
+
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
+
+        def _multi_rz_decomposition_resources(num_wires):
+            """Resources required for MultiRZ decomposition."""
+            return {qml.RZ: 1, qml.CNOT: 2 * (num_wires - 1)}
+
+        @qml.register_resources(_multi_rz_decomposition_resources)
+        def _multi_rz_decomposition(theta, wires, **__):
+            """Decomposition of MultiRZ using CNOTs and RZs."""
+            for i in range(len(wires) - 1):
+                qml.CNOT(wires=(wires[i], wires[i + 1]))
+            qml.RZ(theta, wires=wires[0])
+            for i in range(len(wires) - 1, 0, -1):
+                qml.CNOT(wires=(wires[i], wires[i - 1]))
+
+        @qml.qnode(qml.device("lightning.qubit", wires=5))
+        def circuit():
+            qml.MultiRZ(0.5, wires=[0, 1, 2, 3, 4])
+            qml.MultiRZ(0.5, wires=[0, 1, 4])
+            return qml.expval(qml.Z(0))
+
+        without_qjit = qml.transforms.decompose(circuit, gate_set={"RZ", "CNOT"})
+        with_qjit = qml.qjit(
+            qml.transforms.decompose(circuit, gate_set={"RZ", "CNOT"}), autograph=True
+        )
+
+        assert qml.math.allclose(without_qjit(), with_qjit())
+
+        # TODO: Remove this static dict when capture & graph enabled support
+        # resource counting with qml.specs via from_plxpr conversion.
+        expected_resources = {"RZ": 2, "CNOT": 12}
+
+        resources = qml.specs(with_qjit, level="device")()["resources"]
+        assert resources.gate_types == expected_resources
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

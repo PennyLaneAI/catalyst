@@ -377,8 +377,19 @@ def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
     return _catalyst(*opts, *args, stdin=stdin)
 
 
-def to_mlir_opt(*args, stdin=None, options: Optional[CompileOptions] = None):
+def to_mlir_opt(
+    *args, stdin=None, options: Optional[CompileOptions] = None, using_python_compiler=False
+):
     """echo ${input} | catalyst --tool=opt *args *opts -"""
+    # Check if we need to use Python compiler for xDSL passes
+    if using_python_compiler:
+        # Use Python compiler path for xDSL passes
+        # pylint: disable-next=import-outside-toplevel
+        from pennylane.compiler.python_compiler import Compiler as PythonCompiler
+
+        compiler = PythonCompiler()
+        stdin = compiler.run(stdin, callback=None)
+
     # These are the options that may affect compilation
     if not options:
         return _quantum_opt(*args, stdin=stdin)
@@ -483,7 +494,7 @@ class Compiler:
     def has_xdsl_passes_in_transform_modules(self, mlir_module):
         """Check if the MLIR module contains xDSL passes in transform dialect.
 
-        This checks for the 'uses_xdsl_passes' attribute that is set during
+        This checks for the 'catalyst.uses_xdsl_passes' attribute that is set during
         lowering on transform modules when xDSL passes are added to the transform pipeline.
 
         Args:
@@ -501,8 +512,8 @@ class Compiler:
                     or "transform.with_named_sequence" in getattr(attrs, "keys", lambda: [])()
                 )
                 has_xdsl = (
-                    "uses_xdsl_passes" in attrs
-                    or "uses_xdsl_passes" in getattr(attrs, "keys", lambda: [])()
+                    "catalyst.uses_xdsl_passes" in attrs
+                    or "catalyst.uses_xdsl_passes" in getattr(attrs, "keys", lambda: [])()
                 )
                 return has_transform and has_xdsl
             except (AttributeError, KeyError, TypeError):
