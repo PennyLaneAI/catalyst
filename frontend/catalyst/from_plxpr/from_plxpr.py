@@ -279,7 +279,7 @@ def register_transform(pl_transform, pass_name, decomposition):
     transforms_to_passes[pl_transform] = (pass_name, decomposition)
 
 
-def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, targs, tkwargs):
+def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs):
     if not self.requires_decompose_lowering:
         self.requires_decompose_lowering = True
     else:
@@ -303,7 +303,7 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, targs
 
     # Add the decompose-lowering pass to the start of the pipeline
     t = qml.transform(pass_name="decompose-lowering")
-    pass_container = qml.transforms.core.TransformContainer(t, args=targs, kwargs=tkwargs)
+    pass_container = qml.transforms.core.TransformContainer(t)
     next_eval._pass_pipeline.insert(0, pass_container)
 
     # We still need to construct and solve the graph based on
@@ -346,7 +346,7 @@ def handle_transform(
         and qml.decomposition.enabled_graph()
     ):
         return _handle_decompose_transform(
-            self, inner_jaxpr, consts, non_const_args, targs, tkwargs
+            self, inner_jaxpr, consts, non_const_args, tkwargs
         )
 
     catalyst_pass_name = transform.pass_name
@@ -373,7 +373,8 @@ def handle_transform(
 
     # Apply the corresponding Catalyst pass counterpart
     next_eval = copy(self)
-    bound_pass = qml.transforms.core.TransformContainer(transform, args=targs, kwargs=tkwargs)
+    t = qml.transform(pass_name=catalyst_pass_name)
+    bound_pass = qml.transforms.core.TransformContainer(t, args=targs, kwargs=tkwargs)
     next_eval._pass_pipeline.insert(0, bound_pass)
     return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
