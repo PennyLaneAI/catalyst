@@ -1168,12 +1168,14 @@ class SwitchCallable:
         [1. 0.]
     """
 
-    def __init__(self, case, default_branch, cases=[], branches=[]):
+    def __init__(
+        self, case: int, default_branch: Callable, cases: list = None, branches: list = None
+    ):
         if default_branch == None:
             raise ValueError("Switch requires a default branch.")
 
         self.case = case
-        self.case_to_branch = dict(zip(cases, branches))
+        self.case_to_branch = dict(zip(cases, branches)) if cases and branches else {}
         self.default_branch = default_branch
         self._operation = None
         self.expansion_strategy = switch_expansion_strategy()
