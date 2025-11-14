@@ -901,7 +901,7 @@ class TestDefaultAvailableIR:
         assert g.mlir_opt
         assert "__catalyst__qis" in g.mlir_opt
 
-    @pytest.mark.usefixtures("use_capture")
+    @pytest.mark.usefixtures("use_capture", "requires_xdsl")
     def test_mlir_opt_using_xdsl_passes(self, backend):
         """Test mlir opt using xDSL passes."""
         # pylint: disable-next=import-outside-toplevel
