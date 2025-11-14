@@ -3,7 +3,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Boost REQUIRED)
 
 add_library(rt_rsdecomp SHARED ross_selinger.cpp
-rings.cpp)
+rings.cpp clifford-data.cpp)
 
 target_include_directories(rt_rsdecomp
     PUBLIC

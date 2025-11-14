@@ -147,7 +147,7 @@ std::pair<std::vector<CliffordData::GateType>, double> eval_ross_algorithm(doubl
     using CacheValue = std::pair<std::vector<CliffordData::GateType>, double>;
 
     // <<< ADDED: Declare the thread-local static cache
-    thread_local static std::map<CacheKey, CacheValue> ross_cache;
+    static std::map<CacheKey, CacheValue> ross_cache;
 
     // <<< ADDED: Create the key for the current call
     CacheKey key = {angle, epsilon};
