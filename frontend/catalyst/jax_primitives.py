@@ -1446,6 +1446,7 @@ def _pauli_rot_def_impl(*args, **kwargs):  # pragma: no cover
     raise NotImplementedError()
 
 
+# pylint: disable=unused-argument
 def _pauli_rot_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *qubits: tuple,
@@ -1454,6 +1455,7 @@ def _pauli_rot_lowering(
     qubits_len=0,
     adjoint=False,
 ):
+    # Adjoint is currently not supported for PauliRot
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -1479,8 +1481,6 @@ def _pauli_rot_lowering(
         raise ValueError("The theta supplied to PauliRot must be ±pi/4, ±pi/2, or ±pi.")
 
     angle = int(np.round(2 * np.pi / theta))
-    if adjoint:
-        angle = -angle
     rotation_kind = ir.IntegerAttr.get(i16_type, angle)
 
     return PPRotationOp(
