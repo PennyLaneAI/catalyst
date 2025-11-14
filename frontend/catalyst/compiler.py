@@ -590,27 +590,31 @@ class Compiler:
         user_transform_dir = os.path.join(str(workspace), "0_UserTransformPass")
         os.makedirs(user_transform_dir, exist_ok=True)
 
-        pass_counter = 1
-
-        def save_pass_ir(previous_pass, module, _next_pass=None, **_kwargs):
+        class SavePassIRCallback:
             """Callback to save IR after each pass in python_compiler."""
-            nonlocal pass_counter
-            # Only save after a pass has run (when previous_pass is not None)
-            if previous_pass is None:
-                return
 
-            pass_name = previous_pass.name if hasattr(previous_pass, "name") else str(previous_pass)
-            buffer = io.StringIO()
-            Printer(stream=buffer, print_generic_format=False).print_op(module)
-            ir_file = os.path.join(
-                user_transform_dir,
-                f"{pass_counter}_{pass_name}.mlir",
-            )
-            with open(ir_file, "w", encoding="utf-8") as f:
-                f.write(buffer.getvalue())
-            pass_counter += 1
+            def __init__(self, transform_dir):
+                self.transform_dir = transform_dir
+                self.counter = 1
 
-        return save_pass_ir
+            def __call__(self, previous_pass, module, _next_pass=None, **_kwargs):
+                """Save IR after each pass."""
+                # Only save after a pass has run (when previous_pass is not None)
+                if previous_pass is None:
+                    return
+
+                pass_name = previous_pass.name if hasattr(previous_pass, "name") else str(previous_pass)
+                buffer = io.StringIO()
+                Printer(stream=buffer, print_generic_format=False).print_op(module)
+                ir_file = os.path.join(
+                    self.transform_dir,
+                    f"{self.counter}_{pass_name}.mlir",
+                )
+                with open(ir_file, "w", encoding="utf-8") as f:
+                    f.write(buffer.getvalue())
+                self.counter += 1
+
+        return SavePassIRCallback(user_transform_dir)
 
     @debug_logger
     def run(self, mlir_module, *args, **kwargs):
