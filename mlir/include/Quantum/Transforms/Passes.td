@@ -86,6 +86,23 @@ def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
     let summary = "Perform removal of chained operations that are self inverses.";
 }
 
+def GridsynthPass : Pass<"gridsynth"> {
+    let summary = "Perform Ross-Selinger/Gridsynth decomposition.";
+
+    let options = [Option<
+        "epsilon",
+        "epsilon",
+        "double",
+        default="1e-4",
+        desc="Approximation error tolerance for the RS decomposition.">, 
+        Option<
+        "pprBasis",
+        "ppr-basis",
+        "bool",
+        default="false",
+        desc="Whether to decompose into the PPR basis set instead of the standard Clifford+T basis set.">,];
+}
+
 def MergeRotationsPass : Pass<"merge-rotations"> {
     let summary = "Perform merging of chained rotation gates about the same axis.";
 
