@@ -4,6 +4,12 @@
 
 <h3>Improvements 🛠</h3>
 
+* The new graph-based decomposition framework has Autograph feature parity with PennyLane
+  when capture enabled. When compiling with `qml.qjit(autograph=True)`, the decomposition rules
+  returned by the graph-based framework are now correctly compiled using Autograph.
+  This ensures compatibility and deeper optimization for dynamically generated rules.
+  [(#2161)](https://github.com/PennyLaneAI/catalyst/pull/2161)
+
 * The ``decompose-lowering`` MLIR pass now supports ``qml.MultiRZ``
   with an arbitrary number of wires. This decomposition is performed
   at MLIR when both capture and graph-decomposition are enabled.
@@ -27,6 +33,10 @@
   This removes the need to pass the `pass_plugins` argument to the `qjit` decorator.
   [(#2169)](https://github.com/PennyLaneAI/catalyst/pull/2169)
   [(#2183)](https://github.com/PennyLaneAI/catalyst/pull/2183)
+
+* The ``mlir_opt`` property now correctly handles xDSL passes by automatically
+  detecting when the Python compiler is being used and routing through it appropriately.
+  [(#2190)](https://github.com/PennyLaneAI/catalyst/pull/2190)
 
 * Dynamically allocated wires can now be passed into control flow and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
@@ -139,6 +149,10 @@
   * Added support for `ppr-to-ppm` as an individual MLIR pass and python binding 
   for the qec dialect.
   [(#2189)](https://github.com/PennyLaneAI/catalyst/pull/2189)
+
+  * Added a canonicalization pattern for `qec.ppr` to remove any PPRs consisting only
+  of identities.
+  [(#2192)](https://github.com/PennyLaneAI/catalyst/pull/2192)
 
 <h3>Documentation 📝</h3>
 
