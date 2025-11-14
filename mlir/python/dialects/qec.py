@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Version information.
-Version number (major.minor.patch[-label])
-"""
+"""MLIR Dialect for QEC dialect."""
 
-__version__ = "0.14.0-dev30"
+# pylint: disable=relative-beyond-top-level
+from ._qec_ops_gen import *  # noqa: F401
