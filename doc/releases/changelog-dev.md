@@ -2,7 +2,9 @@
 
 <h3>New features since last release</h3>
 
-<<<<<<< HEAD
+* Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
+  [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
+
 * Catalyst can now compile circuits that are directly expressed in terms of Pauli product rotation 
   (PPR) and Pauli product measurement (PPM) operations: :class:`~.PauliRot` and 
   :func:`~.pauli_measure`, respectively. This support enables research and development 
@@ -35,10 +37,6 @@
       ppm = qml.pauli_measure("X", wires=0)
       return qml.sample()
   ```
-=======
-* Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
-  [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
->>>>>>> 86d2cb115b7d87b964cefef3982e6727136e1831
 
 <h3>Improvements 🛠</h3>
 
