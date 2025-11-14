@@ -19,7 +19,6 @@ file(GLOB SRC
     PartitionLayers.cpp
     TLayerReduction.cpp
     ppr_to_mbqc.cpp
-    ppr_to_ppm.cpp
     PPRToMBQC.cpp
 )
 
