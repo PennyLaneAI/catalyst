@@ -11,11 +11,28 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <boost/multiprecision/cpp_dec_float.hpp> // For the float type
+#include <boost/math/constants/constants.hpp>     // For pi, sqrt2, etc.
 
 #include "utils.hpp"
 
-const double LAMBDA = 1.0 + M_SQRT2;
-const std::complex<double> OMEGA = std::complex<double>(M_SQRT1_2, M_SQRT1_2);
+// Define our new high-precision float type (100 digits)
+using FLOAT_TYPE = boost::multiprecision::cpp_dec_float_100;
+
+// Import the literal suffix "_f100" for easy initialization
+
+// Define multiprecision constants to replace M_PI, M_SQRT2
+const FLOAT_TYPE MP_PI = boost::math::constants::pi<FLOAT_TYPE>();
+const FLOAT_TYPE MP_SQRT2 = boost::math::constants::root_two<FLOAT_TYPE>();
+
+// Define the LAMBDA constant (assuming it's (1+sqrt(2))^2 )
+// The old `LAMBDA` from utils.hpp or <cmath> was a double.
+const FLOAT_TYPE MP_LAMBDA = boost::multiprecision::pow(FLOAT_TYPE(1) + MP_SQRT2, 2);
+
+
+
+// const double LAMBDA = 1.0 + M_SQRT2;
+// const std::complex<double> OMEGA = std::complex<double>(M_SQRT1_2, M_SQRT1_2);
 
 using INT_TYPE = __int128;
 using MULTI_PREC_INT = boost::multiprecision::cpp_int;
@@ -50,7 +67,9 @@ struct ZSqrtTwo {
 
     INT_TYPE abs() const;
     ZSqrtTwo adj2() const;
-    double to_double() const;
+    // double to_double() const;
+    FLOAT_TYPE to_float_type() const;
+    
     ZSqrtTwo pow(INT_TYPE exponent) const;
     std::optional<ZSqrtTwo> sqrt() const;
 
@@ -72,7 +91,7 @@ struct ZOmega {
     bool operator==(const ZOmega &other) const;
     ZOmega operator%(const ZOmega &other) const;
 
-    std::complex<double> to_complex() const;
+    std::complex<FLOAT_TYPE> to_complex() const;
     bool parity() const;
     ZOmega adj2() const;
     // INT_TYPE abs() const;

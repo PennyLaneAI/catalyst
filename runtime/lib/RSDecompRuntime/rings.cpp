@@ -4,6 +4,7 @@
 #include <iostream>
 #include <numeric>
 
+using namespace boost::multiprecision::literals;
 // --- ZSqrtTwo Method Implementations ---
 
 ZSqrtTwo::ZSqrtTwo(INT_TYPE a, INT_TYPE b) : a(a), b(b) {}
@@ -44,10 +45,16 @@ INT_TYPE ZSqrtTwo::abs() const { return a * a - 2 * b * b; }
 
 ZSqrtTwo ZSqrtTwo::adj2() const { return ZSqrtTwo(a, -b); }
 
-double ZSqrtTwo::to_double() const
-{
-    return static_cast<double>(a) + static_cast<double>(b) * M_SQRT2;
+// double ZSqrtTwo::to_double() const
+// {
+//     return static_cast<double>(a) + static_cast<double>(b) * M_SQRT2;
+// }
+
+FLOAT_TYPE ZSqrtTwo::to_float_type() const {
+    // Use FLOAT_TYPE and the multiprecision constant MP_SQRT2
+    return FLOAT_TYPE(a) + FLOAT_TYPE(b) / MP_SQRT2;
 }
+
 
 ZSqrtTwo ZSqrtTwo::pow(INT_TYPE exponent) const
 {
@@ -149,11 +156,14 @@ bool ZOmega::operator==(const ZOmega &other) const
     return a == other.a && b == other.b && c == other.c && d == other.d;
 }
 
-std::complex<double> ZOmega::to_complex() const
+std::complex<FLOAT_TYPE> ZOmega::to_complex() const
 {
-    return std::complex<double>(static_cast<double>(a) * std::pow(OMEGA, 3) +
-                                static_cast<double>(b) * std::pow(OMEGA, 2) +
-                                static_cast<double>(c) * OMEGA + static_cast<double>(d));
+    FLOAT_TYPE INV_SQRT2 = MP_SQRT2 / FLOAT_TYPE(2);
+
+    FLOAT_TYPE x = FLOAT_TYPE(d) + (FLOAT_TYPE(b) - FLOAT_TYPE(a)) * INV_SQRT2;
+    FLOAT_TYPE y = FLOAT_TYPE(b) + (FLOAT_TYPE(b) + FLOAT_TYPE(a)) * INV_SQRT2;
+    
+    return std::complex<FLOAT_TYPE>(x, y);
 }
 
 bool ZOmega::parity() const { return (a + c) % 2 != 0; }

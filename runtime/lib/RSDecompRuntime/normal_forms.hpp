@@ -84,8 +84,8 @@ std::pair<std::vector<GateType>, double> ma_normal_form(SO3Matrix &op)
     }
 
     auto su2mat = so3_op.dyadic_mat;
-    auto g_angle =
-        -std::arg(su2mat.a.to_complex() / a.to_complex() * std::pow(M_SQRT2, k - su2mat.k));
+    double g_angle = -static_cast<double>(std::arg(su2mat.a.to_complex() / a.to_complex()));
+    g_angle -= M_PI_4 * (k - su2mat.k);
     g_phase = g_angle / M_PI - g_phase;
 
     return {decomposition, g_phase};

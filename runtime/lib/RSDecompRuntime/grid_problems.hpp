@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ellipse.hpp"
+#include "ellipse.hpp" // This now includes FLOAT_TYPE, MP_constants
 #include <algorithm>
 #include <cmath>
 #include <complex>
@@ -14,24 +14,33 @@
 #include <utility>
 #include <vector>
 
+// FIX 1: Add the literal namespace to the global scope, after includes
+using namespace boost::multiprecision::literals;
+
 namespace GridProblem {
 
-using bbox = std::array<double, 4>;
+// CONVERTED: use FLOAT_TYPE
+using bbox = std::array<FLOAT_TYPE, 4>;
 
 inline int bbox_grid_points(const bbox &bbox)
 {
-    const double d_ = std::log2(ZSqrtTwo(1, 1).to_double());
+    // CONVERTED: Use FLOAT_TYPE and ZSqrtTwo::to_float_type()
+    const FLOAT_TYPE d_ = boost::multiprecision::log2(ZSqrtTwo(1, 1).to_float_type());
     ZSqrtTwo l1(1, 1);
     ZSqrtTwo l2(-1, 1);
-    double d1 = bbox[1] - bbox[0];
-    double d2 = bbox[3] - bbox[2];
+    FLOAT_TYPE d1 = bbox[1] - bbox[0];
+    FLOAT_TYPE d2 = bbox[3] - bbox[2];
 
-    int k1 = static_cast<int>(std::floor(std::log2(d1) / d_ + 1.0));
-    int k2 = static_cast<int>(std::floor(std::log2(d2) / d_ + 1.0));
+    // CONVERTED: Use boost::multiprecision::floor and convert
+    int k1 = static_cast<int>(boost::multiprecision::floor(boost::multiprecision::log2(d1) / d_ + 1)
+                                .convert_to<long long>());
+    int k2 = static_cast<int>(boost::multiprecision::floor(boost::multiprecision::log2(d2) / d_ + 1)
+                                .convert_to<long long>());
 
-    double current_x0 = bbox[0], current_x1 = bbox[1], current_y0 = bbox[2], current_y1 = bbox[3];
+    FLOAT_TYPE current_x0 = bbox[0], current_x1 = bbox[1], current_y0 = bbox[2],
+               current_y1 = bbox[3];
 
-    if (std::abs(k1) > std::abs(k2)) {
+    if (std::abs(k1) > std::abs(k2)) { // std::abs on int is fine
         std::swap(k1, k2);
         current_x0 = bbox[2];
         current_x1 = bbox[3];
@@ -39,22 +48,24 @@ inline int bbox_grid_points(const bbox &bbox)
         current_y1 = bbox[1];
     }
 
-    double x_scale = (k1 < 0 ? l1 : l2).pow(std::abs(k1)).to_double();
-    double y_scale = std::pow(-1.0, k1) * (k1 < 0 ? l2 : l1).pow(std::abs(k1)).to_double();
+    // CONVERTED: Use to_float_type() and boost::multiprecision::pow
+    FLOAT_TYPE x_scale = (k1 < 0 ? l1 : l2).pow(std::abs(k1)).to_float_type();
+    FLOAT_TYPE y_scale = boost::multiprecision::pow(FLOAT_TYPE(-1), static_cast<long long>(k1)) *
+                         (k1 < 0 ? l2 : l1).pow(std::abs(k1)).to_float_type();
 
-    double x0_scaled = x_scale * current_x0;
-    double x1_scaled = x_scale * current_x1;
-    double y0_scaled = std::min(y_scale * current_y0, y_scale * current_y1);
-    double y1_scaled = std::max(y_scale * current_y0, y_scale * current_y1);
+    FLOAT_TYPE x0_scaled = x_scale * current_x0;
+    FLOAT_TYPE x1_scaled = x_scale * current_x1;
+    FLOAT_TYPE y0_scaled = boost::multiprecision::min(y_scale * current_y0, y_scale * current_y1);
+    FLOAT_TYPE y1_scaled = boost::multiprecision::max(y_scale * current_y0, y_scale * current_y1);
 
-    if (x1_scaled - x0_scaled < 1.0 - M_SQRT2) {
+    if (x1_scaled - x0_scaled < 1 - MP_SQRT2) {
         throw std::runtime_error("Value should be larger than 1 - sqrt(2) for bbox");
     }
 
-    double lower_bound_b = (x0_scaled - y1_scaled) / (2.0 * M_SQRT2);
-    double upper_bound_b = (x1_scaled - y0_scaled) / (2.0 * M_SQRT2);
+    FLOAT_TYPE lower_bound_b = (x0_scaled - y1_scaled) / (2 * MP_SQRT2);
+    FLOAT_TYPE upper_bound_b = (x1_scaled - y0_scaled) / (2 * MP_SQRT2);
 
-    return 1 + static_cast<int>(upper_bound_b - lower_bound_b);
+    return 1 + static_cast<int>((upper_bound_b - lower_bound_b).convert_to<long long>());
 }
 
 class one_dim_problem_solution_iterator {
@@ -64,7 +75,8 @@ class one_dim_problem_solution_iterator {
     long b_min;     // The minimum 'b' to check
 
     // --- Scaled problem parameters (calculated once in constructor) ---
-    double x0_scaled, x1_scaled, y0_scaled, y1_scaled;
+    // CONVERTED: double -> FLOAT_TYPE
+    FLOAT_TYPE x0_scaled, x1_scaled, y0_scaled, y1_scaled;
     int k1;
     bool f_adj2;
     ZSqrtTwo s_scale;
@@ -77,21 +89,25 @@ class one_dim_problem_solution_iterator {
         // It searches for the next valid solution starting from b_current.
         for (long b = b_current; b >= b_min; --b) {
             // Use the constraints x0 <= a + b * sqrt(2) <= x1 to obtain the bounds on a.
-            double lower_bound_a = x0_scaled - b * M_SQRT2;
-            double upper_bound_a = x1_scaled - b * M_SQRT2;
+            // CONVERTED: Use FLOAT_TYPE and multiprecision constants
+            FLOAT_TYPE lower_bound_a = x0_scaled - b * MP_SQRT2;
+            FLOAT_TYPE upper_bound_a = x1_scaled - b * MP_SQRT2;
 
-            if (upper_bound_a - lower_bound_a >= 1.0) {
+            if (upper_bound_a - lower_bound_a >= 1) {
                 throw std::runtime_error("Scaled interval width for 'a' should be less than one.");
             }
 
             // Check if the interval [lower_bound_a, upper_bound_a] contains exactly one integer.
-            if (std::ceil(lower_bound_a) == std::floor(upper_bound_a)) {
-                long a = static_cast<long>(std::ceil(lower_bound_a));
+            // CONVERTED: Use boost::multiprecision::ceil/floor
+            if (boost::multiprecision::ceil(lower_bound_a) ==
+                boost::multiprecision::floor(upper_bound_a)) {
+                long a = static_cast<long>(
+                    boost::multiprecision::ceil(lower_bound_a).convert_to<long long>());
 
                 // Check if the solution satisfies both bounds on x and y.
-                if ((x0_scaled + y0_scaled <= 2.0 * a) && (2.0 * a <= x1_scaled + y1_scaled)) {
-                    double alpha = a + b * M_SQRT2;
-                    double beta = a - b * M_SQRT2;
+                if ((x0_scaled + y0_scaled <= 2 * a) && (2 * a <= x1_scaled + y1_scaled)) {
+                    FLOAT_TYPE alpha = a + b * MP_SQRT2;
+                    FLOAT_TYPE beta = a - b * MP_SQRT2;
 
                     // Final check that the solutions are within the desired bounds.
                     if (x0_scaled <= alpha && alpha <= x1_scaled && y0_scaled <= beta &&
@@ -130,19 +146,26 @@ class one_dim_problem_solution_iterator {
     one_dim_problem_solution_iterator() : is_done(true) {}
 
     // Main constructor that sets up the problem
-    one_dim_problem_solution_iterator(double x0, double x1, double y0, double y1)
+    // CONVERTED: Constructor parameters to FLOAT_TYPE
+    one_dim_problem_solution_iterator(FLOAT_TYPE x0, FLOAT_TYPE x1, FLOAT_TYPE y0, FLOAT_TYPE y1)
     {
         ZSqrtTwo l1(1, 1);                           // 1 + sqrt(2)
         ZSqrtTwo l2(-1, 1);                          // -1 + sqrt(2)
-        const double d_ = std::log2(l1.to_double()); // log2(1 + sqrt(2))
+        // CONVERTED: Use to_float_type()
+        const FLOAT_TYPE d_ = boost::multiprecision::log2(l1.to_float_type()); // log2(1 + sqrt(2))
 
-        double d1 = x1 - x0;
-        double d2 = y1 - y0;
+        FLOAT_TYPE d1 = x1 - x0;
+        FLOAT_TYPE d2 = y1 - y0;
 
         f_adj2 = false; // Flag to apply sqrt(2) conjugation at the end.
 
-        int local_k1 = static_cast<int>(std::floor(std::log2(d1) / d_ + 1.0));
-        int local_k2 = static_cast<int>(std::floor(std::log2(d2) / d_ + 1.0));
+        // CONVERTED: Use boost::multiprecision::floor and convert
+        int local_k1 = static_cast<int>(
+            boost::multiprecision::floor(boost::multiprecision::log2(d1) / d_ + 1)
+                .convert_to<long long>());
+        int local_k2 = static_cast<int>(
+            boost::multiprecision::floor(boost::multiprecision::log2(d2) / d_ + 1)
+                .convert_to<long long>());
 
         k1 = local_k1;
         int k2 = local_k2;
@@ -157,30 +180,34 @@ class one_dim_problem_solution_iterator {
 
         // Turn the problem into a scaled grid problem
         s_scale = l1.pow(std::abs(k1));
-        double x_scale = (k1 < 0 ? l1 : l2).pow(std::abs(k1)).to_double();
-        double y_scale = (k1 < 0 ? l2 : l1).pow(std::abs(k1)).to_double();
-        y_scale *= std::pow(-1, k1);
+        // CONVERTED: Use to_float_type() and boost::multiprecision::pow
+        FLOAT_TYPE x_scale = (k1 < 0 ? l1 : l2).pow(std::abs(k1)).to_float_type();
+        FLOAT_TYPE y_scale = (k1 < 0 ? l2 : l1).pow(std::abs(k1)).to_float_type();
+        y_scale *= boost::multiprecision::pow(FLOAT_TYPE(-1),static_cast<long long>(k1));
 
         x0_scaled = x_scale * x0;
         x1_scaled = x_scale * x1;
 
-        double y_temp0 = y_scale * y0;
-        double y_temp1 = y_scale * y1;
-        y0_scaled = std::min(y_temp0, y_temp1);
-        y1_scaled = std::max(y_temp0, y_temp1);
+        FLOAT_TYPE y_temp0 = y_scale * y0;
+        FLOAT_TYPE y_temp1 = y_scale * y1;
+        y0_scaled = boost::multiprecision::min(y_temp0, y_temp1);
+        y1_scaled = boost::multiprecision::max(y_temp0, y_temp1);
 
-        if (x1_scaled - x0_scaled < 1.0 - M_SQRT2) {
+        if (x1_scaled - x0_scaled < 1 - MP_SQRT2) {
             throw std::runtime_error("Scaled interval width should be larger than 1 - sqrt(2).");
         }
 
         // --- SETUP is complete. Now initialize the iteration state ---
 
         // Calculate the search bounds for 'b'
-        double lower_bound_b = (x0_scaled - y1_scaled) / (2.0 * M_SQRT2);
-        double upper_bound_b = (x1_scaled - y0_scaled) / (2.0 * M_SQRT2);
+        // CONVERTED: Use FLOAT_TYPE and constants
+        FLOAT_TYPE lower_bound_b = (x0_scaled - y1_scaled) / (2 * MP_SQRT2);
+        FLOAT_TYPE upper_bound_b = (x1_scaled - y0_scaled) / (2 * MP_SQRT2);
 
-        b_current = static_cast<long>(std::floor(upper_bound_b));
-        b_min = static_cast<long>(std::ceil(lower_bound_b));
+        b_current = static_cast<long>(
+            boost::multiprecision::floor(upper_bound_b).convert_to<long long>());
+        b_min =
+            static_cast<long>(boost::multiprecision::ceil(lower_bound_b).convert_to<long long>());
 
         if (b_current < b_min) {
             is_done = true;
@@ -272,8 +299,9 @@ class upright_problem_solution_iterator {
             if (!inner_iter) {
                 const ZSqrtTwo &beta = **outer_iter;
                 try {
-                    auto xp1 = state.e1.x_points(beta.to_double());
-                    auto xp2 = state.e2.x_points(beta.adj2().to_double());
+                    // CONVERTED: Use to_float_type()
+                    auto xp1 = state.e1.x_points(beta.to_float_type());
+                    auto xp2 = state.e2.x_points(beta.adj2().to_float_type());
                     if (xp1.second > xp1.first && xp2.second > xp2.first) {
                         inner_iter.emplace(xp1.first, xp1.second, xp2.first, xp2.second);
                     }
@@ -306,8 +334,9 @@ class upright_problem_solution_iterator {
             if (!inner_iter) {
                 const ZSqrtTwo &alpha = **outer_iter;
                 try {
-                    auto yp1 = state.e1.y_points(alpha.to_double());
-                    auto yp2 = state.e2.y_points(alpha.adj2().to_double());
+                    // CONVERTED: Use to_float_type()
+                    auto yp1 = state.e1.y_points(alpha.to_float_type());
+                    auto yp2 = state.e2.y_points(alpha.adj2().to_float_type());
                     if (yp1.second > yp1.first && yp2.second > yp2.first) {
                         inner_iter.emplace(yp1.first, yp1.second, yp2.first, yp2.second);
                     }
@@ -374,8 +403,9 @@ class upright_problem_solution_iterator {
         : state(state_in), shift(shift_in)
     {
 
-        double Ax0 = bbox1[0], Ax1 = bbox1[1], Ay0 = bbox1[2], Ay1 = bbox1[3];
-        double Bx0 = bbox2[0], Bx1 = bbox2[1], By0 = bbox2[2], By1 = bbox2[3];
+        // CONVERTED: All are FLOAT_TYPE from bbox
+        FLOAT_TYPE Ax0 = bbox1[0], Ax1 = bbox1[1], Ay0 = bbox1[2], Ay1 = bbox1[3];
+        FLOAT_TYPE Bx0 = bbox2[0], Bx1 = bbox2[1], By0 = bbox2[2], By1 = bbox2[3];
 
         if (is_beta_first) {
             mode = Mode::BETA_FIRST;
@@ -460,8 +490,9 @@ class two_dim_problem_solution_iterator {
                 ++(*current_upright_iter);
 
                 // This is the crucial final check from the Python code
-                std::complex<double> sol1 = potential_solution.to_complex();
-                std::complex<double> sol2 = potential_solution.adj2().to_complex();
+                // CONVERTED: Use complex<FLOAT_TYPE>
+                std::complex<FLOAT_TYPE> sol1 = potential_solution.to_complex();
+                std::complex<FLOAT_TYPE> sol2 = potential_solution.adj2().to_complex();
 
                 // const Ellipse& e1_check = is_on_first_coset ? original_state.e1 :
                 // shifted_state.e1; const Ellipse& e2_check = is_on_first_coset ? original_state.e2
@@ -524,15 +555,17 @@ class two_dim_problem_solution_iterator {
 
     // Default constructor for the "end" iterator
     two_dim_problem_solution_iterator()
-        : original_state(Ellipse({1, 0, 1}), Ellipse({1, 0, 1})),
-          shifted_state(Ellipse({1, 0, 1}), Ellipse({1, 0, 1})), is_done(true)
+        : original_state(Ellipse(), Ellipse()),
+          shifted_state(Ellipse(), Ellipse()), is_done(true)
     {
     }
 
     // Main constructor that sets up the problem
     two_dim_problem_solution_iterator(const EllipseState &state, int num_points = 1000)
         : original_state(state),
-          shifted_state(state.e1.offset(-1.0 / M_SQRT2), state.e2.offset(1.0 / M_SQRT2)),
+          // CONVERTED: Use FLOAT_TYPE and multiprecision constant
+          shifted_state(state.e1.offset(FLOAT_TYPE(-1) / MP_SQRT2),
+                        state.e2.offset(FLOAT_TYPE(1) / MP_SQRT2)),
           is_on_first_coset(true), num_points(num_points)
     {
 
@@ -603,12 +636,13 @@ class GridIterator {
 
   private:
     // --- Parameters (from Python __init__) ---
-    double theta;
-    double epsilon;
+    // CONVERTED: double -> FLOAT_TYPE
+    FLOAT_TYPE theta;
+    FLOAT_TYPE epsilon;
     int max_trials;
-    std::pair<double, double> zval; // (cos(theta), sin(theta))
+    std::pair<FLOAT_TYPE, FLOAT_TYPE> zval; // (cos(theta), sin(theta))
     int kmin;
-    double target;
+    FLOAT_TYPE target;
 
     // --- State for Iteration (from Python __iter__) ---
     value_type current_solution;
@@ -617,8 +651,8 @@ class GridIterator {
     // Main loop state
     int k;
     int i_;
-    double e_;
-    double t_;
+    FLOAT_TYPE e_;
+    FLOAT_TYPE t_;
     Ellipse e1;
     const Ellipse e2; // This is constant: Ellipse((1, 0, 1), (0, 0))
     GridOp grid_op;   // Result of skew_grid_op()
@@ -653,13 +687,15 @@ class GridIterator {
                     const ZOmega &sol = guess_solutions[guess_idx];
                     guess_idx++; // Advance for next time
 
-                    std::complex<double> complx_sol = sol.to_complex();
-                    double dot_prod =
+                    // CONVERTED: Use complex<FLOAT_TYPE> and to_float_type
+                    std::complex<FLOAT_TYPE> complx_sol = sol.to_complex();
+                    FLOAT_TYPE dot_prod =
                         zval.first * complx_sol.real() + zval.second * complx_sol.imag();
 
-                    double norm_zsqrt_two = std::abs(sol.norm().to_sqrt_two().to_double());
+                    FLOAT_TYPE norm_zsqrt_two =
+                        boost::multiprecision::abs(sol.norm().to_sqrt_two().to_float_type());
 
-                    if (norm_zsqrt_two <= 1.0) {
+                    if (norm_zsqrt_two <= 1) {
                         if (dot_prod >= target) {
                             current_solution = {sol, 0};
                             return; // Found a solution, exit
@@ -684,24 +720,27 @@ class GridIterator {
 
                         auto [scaled_sol, kf] = (grid_op * solution).normalize();
 
-                        std::complex<double> complx_sol = scaled_sol.to_complex();
-                        double sol_real = complx_sol.real();
-                        double sol_imag = complx_sol.imag();
+                        // CONVERTED: All float logic
+                        std::complex<FLOAT_TYPE> complx_sol = scaled_sol.to_complex();
+                        FLOAT_TYPE sol_real = complx_sol.real();
+                        FLOAT_TYPE sol_imag = complx_sol.imag();
 
                         int k_ = k - kf;
-                        double k_div_2 = static_cast<double>(k_ / 2);
-                        double k_mod_2 = static_cast<double>(k_ % 2);
-                        double denominator = std::pow(2.0, k_div_2) * std::pow(M_SQRT2, k_mod_2);
+                        FLOAT_TYPE k_div_2 = FLOAT_TYPE(k_ / 2);
+                        FLOAT_TYPE k_mod_2 = FLOAT_TYPE(k_ % 2);
+                        FLOAT_TYPE denominator =
+                            boost::multiprecision::pow(FLOAT_TYPE(2), k_div_2) *
+                            boost::multiprecision::pow(MP_SQRT2, k_mod_2);
 
-                        double dot_prod =
+                        FLOAT_TYPE dot_prod =
                             (zval.first * sol_real + zval.second * sol_imag) / denominator;
 
-                        double norm_zsqrt_two =
-                            std::abs(scaled_sol.norm().to_sqrt_two().to_double());
+                        FLOAT_TYPE norm_zsqrt_two = boost::multiprecision::abs(
+                            scaled_sol.norm().to_sqrt_two().to_float_type());
                         // std::cout << "Testing solution: idx = " << main_loop_idx << ", potential
                         // solution = " << solution << std::endl;
 
-                        if (norm_zsqrt_two <= std::pow(2.0, k_)) {
+                        if (norm_zsqrt_two <= boost::multiprecision::pow(FLOAT_TYPE(2), k_)) {
                             if (dot_prod >= target) {
                                 // std::cout << "Found solution!!" << std::endl;
                                 current_solution = {scaled_sol, k_};
@@ -721,7 +760,7 @@ class GridIterator {
                     if (main_loop_idx == i_) {
                         k = std::max(kmin, k + 1);
                         e_ = epsilon;
-                        t_ = t_ / 10.0;
+                        t_ = t_ / 10;
                         auto [en_, _] = Ellipse::from_region(theta, e_, kmin).normalize();
                         grid_op = EllipseState(en_, e2).skew_grid_op();
                     }
@@ -748,8 +787,9 @@ class GridIterator {
 
                 // 3. Create the inner iterator for the *current* main_loop_idx (your code 2c)
                 try {
-                    double radius = std::pow(2.0, -k);
-                    Ellipse e2_({radius, 0.0, radius}, {0.0, 0.0});
+                    // CONVERTED: All float logic
+                    FLOAT_TYPE radius = boost::multiprecision::pow(FLOAT_TYPE(2), -k);
+                    Ellipse e2_({radius, 0, radius}, {0, 0});
                     EllipseState state = EllipseState(e1, e2_).apply_grid_op(grid_op);
 
                     two_dim_iter.emplace(
@@ -792,8 +832,8 @@ class GridIterator {
      * @brief Default constructor. Creates an "end" iterator.
      */
     GridIterator()
-        : iter_state(IterState::DONE), e1({1.0, 0.0, 1.0}, {0.0, 0.0}),
-          e2({1.0, 0.0, 1.0}, {0.0, 0.0})
+        : iter_state(IterState::DONE), e1(Ellipse()),
+          e2(Ellipse())
     {
     }
 
@@ -804,19 +844,24 @@ class GridIterator {
      * @param epsilon The epsilon of the grid problem.
      * @param max_trials The maximum number of iterations.
      */
-    GridIterator(double theta_in, double epsilon_in, int max_trials_in = 20)
+    // CONVERTED: Constructor parameters to FLOAT_TYPE
+    GridIterator(FLOAT_TYPE theta_in, FLOAT_TYPE epsilon_in, int max_trials_in = 20)
         : theta(theta_in), epsilon(epsilon_in), max_trials(max_trials_in),
-          zval(std::cos(theta), std::sin(theta)),
-          kmin(static_cast<int>(3.0 * std::log2(1.0 / epsilon) / 2.0)),
-          target(1.0 - epsilon * epsilon / 2.0), iter_state(IterState::GUESSING),
-          e1({1.0, 0.0, 1.0}, {0.0, 0.0}),
-          e2({1.0, 0.0, 1.0}, {0.0, 0.0}) // Ellipse((1, 0, 1), (0, 0))
+          // CONVERTED: All float logic
+          zval(boost::multiprecision::cos(theta), boost::multiprecision::sin(theta)),
+          kmin(static_cast<int>(
+              boost::multiprecision::floor(3 * boost::multiprecision::log2(1 / epsilon) / 2)
+                  .convert_to<long long>())),
+          target(1 - boost::multiprecision::pow(epsilon, 2) / 2),
+          iter_state(IterState::GUESSING), e1(Ellipse()),
+          e2(Ellipse()) // Ellipse((1, 0, 1), (0, 0))
     {
         // --- Warm start (from Python __iter__) ---
         k = std::min(kmin, 14);
         i_ = 6;
-        e_ = std::max(epsilon, 1e-3);
-        t_ = std::min(target, 0.9999995);
+        // FIX 2: Use literals instead of FLOAT_TYPE("...")
+        e_ = boost::multiprecision::max(epsilon, FLOAT_TYPE("1e-3"));
+        t_ = boost::multiprecision::min(target, FLOAT_TYPE("0.9999995"));
 
         // Assumes Ellipse::from_region and Ellipse::normalize exist
         e1 = Ellipse::from_region(theta, e_, k);

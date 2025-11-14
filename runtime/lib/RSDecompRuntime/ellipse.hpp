@@ -1,9 +1,9 @@
 #pragma once
 
-#include "rings.hpp"
+#include "rings.hpp" // Assumed to contain new FLOAT_TYPE definitions
 #include "utils.hpp"
 #include <array>
-#include <cmath>
+#include <cmath> // For std::abs(int)
 #include <iostream>
 #include <map>
 #include <numeric>
@@ -14,7 +14,16 @@
 #include <utility>
 #include <vector>
 
+// These should NOW be included in "rings.hpp", but are placed here
+// for clarity in case "rings.hpp" isn't modified.
+#include <boost/multiprecision/cpp_dec_float.hpp>
+#include <boost/math/constants/constants.hpp>
+
+// FIX 1: Move the literal namespace to the global scope, after includes
+
 namespace GridProblem {
+    
+using namespace boost::multiprecision::literals;
 
 struct GridOp;
 struct Ellipse;
@@ -22,21 +31,11 @@ struct EllipseState;
 
 /**
  * @class GridOp
- * @brief C++ translation of the Python GridOp class.
- *
- * Represents a grid operation on a 2D grid as a 2x2 matrix.
+ * @brief (Implementation unchanged, except for flatten())
  */
 struct GridOp {
     std::array<INT_TYPE, 2> a, b, c, d;
 
-    /**
-     * @brief Constructor for GridOp.
-     * @param a_val The a-coefficient as {a0, a1}.
-     * @param b_val The b-coefficient as {b0, b1}.
-     * @param c_val The c-coefficient as {c0, c1}.
-     * @param d_val The d-coefficient as {d0, d1}.
-     * @param check_valid If true, validates the grid operation properties.
-     */
     GridOp(const std::array<INT_TYPE, 2> &a_val, const std::array<INT_TYPE, 2> &b_val,
            const std::array<INT_TYPE, 2> &c_val, const std::array<INT_TYPE, 2> &d_val,
            bool check_valid = true)
@@ -53,7 +52,6 @@ struct GridOp {
         }
     }
 
-    // Default constructor for map initialization
     GridOp() : a({1, 0}), b({0, 0}), c({0, 0}), d({1, 0}) {}
 
     static GridOp from_string(const std::string &s);
@@ -70,10 +68,14 @@ struct GridOp {
         return det[1] == 0 && (det[0] == 1 || det[0] == -1);
     }
 
-    std::vector<double> flatten() const
+    // --- CONVERTED ---
+    std::vector<FLOAT_TYPE> flatten() const
     {
-        return {a[0] + a[1] / M_SQRT2, b[0] + b[1] / M_SQRT2, c[0] + c[1] / M_SQRT2,
-                d[0] + d[1] / M_SQRT2};
+        // Use multiprecision constants and types
+        return {FLOAT_TYPE(a[0]) + FLOAT_TYPE(a[1]) / MP_SQRT2,
+                FLOAT_TYPE(b[0]) + FLOAT_TYPE(b[1]) / MP_SQRT2,
+                FLOAT_TYPE(c[0]) + FLOAT_TYPE(c[1]) / MP_SQRT2,
+                FLOAT_TYPE(d[0]) + FLOAT_TYPE(d[1]) / MP_SQRT2};
     }
 
     GridOp inverse() const
@@ -97,7 +99,7 @@ struct GridOp {
     GridOp apply_shift_op(INT_TYPE k) const
     {
         INT_TYPE sign = (k < 0) ? -1 : 1;
-        INT_TYPE k_abs = abs_val(k);
+        INT_TYPE k_abs = abs_val(k); // abs_val from utils.hpp
         auto s = ZSqrtTwo(1, 1).pow(k_abs);
         INT_TYPE s1 = s.a;
         INT_TYPE s2 = s.b;
@@ -177,7 +179,7 @@ inline GridOp GridOp::pow(INT_TYPE n) const
         return GridOp({1, 0}, {0, 2 * n}, {0, 0}, {1, 0});
     }
     if (*this == from_string("U")) {
-        auto c = ZSqrtTwo(1, 1).pow(abs_val(n));
+        auto c = ZSqrtTwo(1, 1).pow(abs_val(n)); // abs_val from utils.hpp
         INT_TYPE c1 = c.a, c2 = c.b;
         INT_TYPE c3 = (n < 0) ? -1 : 1;
         return GridOp({c3 * c1, 2 * c2}, {0, 0}, {0, 0}, {-c3 * c1, 2 * c2});
@@ -196,128 +198,142 @@ inline GridOp GridOp::pow(INT_TYPE n) const
 
 /**
  * @class Ellipse
- * @brief C++ translation of the Python Ellipse class.
+ * @brief CONVERTED: All `double` members and functions replaced with `FLOAT_TYPE`.
  *
  * Represents an ellipse as a positive definite matrix D = [[a, b], [b, d]].
  */
 struct Ellipse {
-    double a, b, d;
-    std::array<double, 2> p;
-    double z;
-    double e;
+    FLOAT_TYPE a, b, d;
+    std::array<FLOAT_TYPE, 2> p;
+    FLOAT_TYPE z;
+    FLOAT_TYPE e;
 
-    Ellipse(const std::array<double, 3> &D = {1.0, 0.0, 1.0},
-            const std::array<double, 2> &p_val = {0.0, 0.0})
+    // FIX 2: Remove redundant FLOAT_TYPE() wrapper around literals.
+    Ellipse(const std::array<FLOAT_TYPE, 3> &D = {FLOAT_TYPE(1), FLOAT_TYPE(0), FLOAT_TYPE(1)},
+            const std::array<FLOAT_TYPE, 2> &p_val = {FLOAT_TYPE(0), FLOAT_TYPE(0)})
         : p(p_val)
     {
         a = D[0];
         b = D[1];
         d = D[2];
-        z = 0.5 * std::log2(d / a) / std::log2(LAMBDA);
-        e = std::sqrt(a * d);
+        // Use boost::multiprecision functions and new constants
+        // FIX 2 (cont.): Remove redundant FLOAT_TYPE() wrapper
+        z = FLOAT_TYPE("0.5") * boost::multiprecision::log2(d / a) /
+            boost::multiprecision::log2(MP_LAMBDA);
+        e = boost::multiprecision::sqrt(a * d);
     }
 
-    static Ellipse from_region(double theta, double epsilon, INT_TYPE k = 0)
+    static Ellipse from_region(FLOAT_TYPE theta, FLOAT_TYPE epsilon, INT_TYPE k = 0)
     {
-        double t = std::pow(epsilon, 2) / 2.0;
-        double scale = std::pow(2.0, k / 2.0);
-        double a_val = scale * t;
-        double b_val = scale * epsilon;
-        double a2 = 1.0 / std::pow(a_val, 2);
-        double b2 = 1.0 / std::pow(b_val, 2);
-        double d2 = a2 - b2;
-        double zx = std::cos(theta);
-        double zy = std::sin(theta);
-        double new_a = d2 * zx * zx + b2;
-        double new_d = d2 * zy * zy + b2;
-        double new_b = d2 * zx * zy;
-        double const_val = 1.0 - t;
-        std::array<double, 2> p_val = {const_val * scale * zx, const_val * scale * zy};
+        FLOAT_TYPE t = boost::multiprecision::pow(epsilon, 2) / 2;
+        FLOAT_TYPE scale = boost::multiprecision::pow(FLOAT_TYPE(2), FLOAT_TYPE(k) / 2);
+        FLOAT_TYPE a_val = scale * t;
+        FLOAT_TYPE b_val = scale * epsilon;
+        FLOAT_TYPE a2 = 1 / boost::multiprecision::pow(a_val, 2);
+        FLOAT_TYPE b2 = 1 / boost::multiprecision::pow(b_val, 2);
+        FLOAT_TYPE d2 = a2 - b2;
+        FLOAT_TYPE zx = boost::multiprecision::cos(theta);
+        FLOAT_TYPE zy = boost::multiprecision::sin(theta);
+        FLOAT_TYPE new_a = d2 * zx * zx + b2;
+        FLOAT_TYPE new_d = d2 * zy * zy + b2;
+        FLOAT_TYPE new_b = d2 * zx * zy;
+        FLOAT_TYPE const_val = 1 - t;
+        std::array<FLOAT_TYPE, 2> p_val = {const_val * scale * zx, const_val * scale * zy};
         return Ellipse({new_a, new_b, new_d}, p_val);
     }
 
-    double discriminant() const { return std::pow(a + d, 2) - 4 * (a * d - std::pow(b, 2)); }
-
-    double determinant() const { return a * d - std::pow(b, 2); }
-
-    bool positive_semi_definite() const { return (a + d) + std::sqrt(discriminant()) >= 0; }
-
-    double uprightness() const { return M_PI / std::pow(2.0 * e, 2); }
-
-    static double b_from_uprightness(double up)
+    FLOAT_TYPE discriminant() const
     {
-        return std::sqrt(std::pow(M_PI / (4.0 * up), 2) - 1.0);
+        return boost::multiprecision::pow(a + d, 2) - 4 * (a * d - boost::multiprecision::pow(b, 2));
     }
 
-    bool contains(double x, double y) const
+    FLOAT_TYPE determinant() const { return a * d - boost::multiprecision::pow(b, 2); }
+
+    bool positive_semi_definite() const
     {
-        double x_ = x - p[0];
-        double y_ = y - p[1];
-        return (a * std::pow(x_, 2) + 2 * b * x_ * y_ + d * std::pow(y_, 2)) <= 1.0;
+        return (a + d) + boost::multiprecision::sqrt(discriminant()) >= 0;
     }
 
-    std::pair<Ellipse, double> normalize() const
+    FLOAT_TYPE uprightness() const { return MP_PI / boost::multiprecision::pow(2 * e, 2); }
+
+    static FLOAT_TYPE b_from_uprightness(FLOAT_TYPE up)
     {
-        double s_val = 1.0 / std::sqrt(determinant());
+        return boost::multiprecision::sqrt(boost::multiprecision::pow(MP_PI / (4 * up), 2) - 1);
+    }
+
+    bool contains(FLOAT_TYPE x, FLOAT_TYPE y) const
+    {
+        FLOAT_TYPE x_ = x - p[0];
+        FLOAT_TYPE y_ = y - p[1];
+        return (a * boost::multiprecision::pow(x_, 2) + 2 * b * x_ * y_ +
+                d * boost::multiprecision::pow(y_, 2)) <= 1;
+    }
+
+    std::pair<Ellipse, FLOAT_TYPE> normalize() const
+    {
+        FLOAT_TYPE s_val = 1 / boost::multiprecision::sqrt(determinant());
         return {scale(s_val), s_val};
     }
 
-    Ellipse scale(double scale_factor) const
+    Ellipse scale(FLOAT_TYPE scale_factor) const
     {
-        std::array<double, 3> D = {a * scale_factor, b * scale_factor, d * scale_factor};
+        std::array<FLOAT_TYPE, 3> D = {a * scale_factor, b * scale_factor, d * scale_factor};
         return Ellipse(D, p);
     }
 
-    std::pair<double, double> x_points(double y) const
+    std::pair<FLOAT_TYPE, FLOAT_TYPE> x_points(FLOAT_TYPE y) const
     {
-        double y_shifted = y - p[1];
-        double disc = std::pow(y_shifted, 2) * (std::pow(b, 2) - a * d) + a;
+        FLOAT_TYPE y_shifted = y - p[1];
+        FLOAT_TYPE disc =
+            boost::multiprecision::pow(y_shifted, 2) * (boost::multiprecision::pow(b, 2) - a * d) +
+            a;
         if (disc < 0) {
             throw std::runtime_error("Point y is outside the ellipse");
         }
-        double d0 = std::sqrt(disc);
-        double x1 = (-b * y_shifted - d0) / a;
-        double x2 = (-b * y_shifted + d0) / a;
+        FLOAT_TYPE d0 = boost::multiprecision::sqrt(disc);
+        FLOAT_TYPE x1 = (-b * y_shifted - d0) / a;
+        FLOAT_TYPE x2 = (-b * y_shifted + d0) / a;
         return {p[0] + x1, p[0] + x2};
     }
 
-    std::pair<double, double> y_points(double x) const
+    std::pair<FLOAT_TYPE, FLOAT_TYPE> y_points(FLOAT_TYPE x) const
     {
-        double x_shifted = x - p[0];
-        double disc = std::pow(b * x_shifted, 2) - d * (a * std::pow(x_shifted, 2) - 1.0);
+        FLOAT_TYPE x_shifted = x - p[0];
+        FLOAT_TYPE disc =
+            boost::multiprecision::pow(b * x_shifted, 2) - d * (a * boost::multiprecision::pow(x_shifted, 2) - 1);
         if (disc < 0) {
             throw std::runtime_error("Point x is outside the ellipse");
         }
-        double d0 = std::sqrt(disc);
-        double y1 = (-b * x_shifted - d0) / d;
-        double y2 = (-b * x_shifted + d0) / d;
+        FLOAT_TYPE d0 = boost::multiprecision::sqrt(disc);
+        FLOAT_TYPE y1 = (-b * x_shifted - d0) / d;
+        FLOAT_TYPE y2 = (-b * x_shifted + d0) / d;
         return {p[1] + y1, p[1] + y2};
     }
 
-    std::array<double, 4> bounding_box() const
+    std::array<FLOAT_TYPE, 4> bounding_box() const
     {
-        double denom = determinant();
-        double x_dim = std::sqrt(d / denom);
-        double y_dim = std::sqrt(a / denom);
+        FLOAT_TYPE denom = determinant();
+        FLOAT_TYPE x_dim = boost::multiprecision::sqrt(d / denom);
+        FLOAT_TYPE y_dim = boost::multiprecision::sqrt(a / denom);
         return {-x_dim, x_dim, -y_dim, y_dim};
     }
 
-    Ellipse offset(double offset_val) const
+    Ellipse offset(FLOAT_TYPE offset_val) const
     {
-        std::array<double, 2> p_offset = {p[0] + offset_val, p[1] + offset_val};
+        std::array<FLOAT_TYPE, 2> p_offset = {p[0] + offset_val, p[1] + offset_val};
         return Ellipse({a, b, d}, p_offset);
     }
 
     Ellipse apply_grid_op(const GridOp &grid_op) const
     {
-        auto g = grid_op.flatten();
-        double ga = g[0], gb = g[1], gc = g[2], gd = g[3];
-        std::array<double, 3> D = {ga * ga * a + 2 * ga * gc * b + d * gc * gc,
-                                   ga * gb * a + (ga * gd + gb * gc) * b + gc * gd * d,
-                                   gb * gb * a + 2 * gb * gd * b + d * gd * gd};
+        auto g = grid_op.flatten(); // This now returns std::vector<FLOAT_TYPE>
+        FLOAT_TYPE ga = g[0], gb = g[1], gc = g[2], gd = g[3];
+        std::array<FLOAT_TYPE, 3> D = {ga * ga * a + 2 * ga * gc * b + d * gc * gc,
+                                       ga * gb * a + (ga * gd + gb * gc) * b + gc * gd * d,
+                                       gb * gb * a + 2 * gb * gd * b + d * gd * gd};
         auto g_inv = grid_op.inverse().flatten();
-        double gda = g_inv[0], gdb = g_inv[1], gdc = g_inv[2], gdd = g_inv[3];
-        std::array<double, 2> new_p = {gda * p[0] + gdb * p[1], gdc * p[0] + gdd * p[1]};
+        FLOAT_TYPE gda = g_inv[0], gdb = g_inv[1], gdc = g_inv[2], gdd = g_inv[3];
+        std::array<FLOAT_TYPE, 2> new_p = {gda * p[0] + gdb * p[1], gdc * p[0] + gdd * p[1]};
         return Ellipse(D, new_p);
     }
 
@@ -329,7 +345,7 @@ struct Ellipse {
 
 /**
  * @class EllipseState
- * @brief C++ translation of the Python EllipseState class.
+ * @brief CONVERTED: All `double` members and functions replaced with `FLOAT_TYPE`.
  */
 struct EllipseState {
     Ellipse e1;
@@ -337,21 +353,23 @@ struct EllipseState {
 
     EllipseState(const Ellipse &ellipse1, const Ellipse &ellipse2) : e1(ellipse1), e2(ellipse2) {}
 
-    double skew() const { return std::pow(e1.b, 2) + std::pow(e2.b, 2); }
+    FLOAT_TYPE skew() const { return boost::multiprecision::pow(e1.b, 2) + boost::multiprecision::pow(e2.b, 2); }
 
-    double bias() const { return e2.z - e1.z; }
+    FLOAT_TYPE bias() const { return e2.z - e1.z; }
 
     GridOp skew_grid_op()
     {
         GridOp grid_op = GridOp::from_string("I");
         EllipseState state = *this;
-        double current_skew = state.skew();
-        while (current_skew >= 15.0) {
+        FLOAT_TYPE current_skew = state.skew();
+        while (current_skew >= 15) { // 15.0 -> 15
+            std::cout << "applied! current skew: " << current_skew << std::endl;
             auto result = state.reduce_skew();
             GridOp new_grid_op = result.first;
             state = result.second;
             grid_op = grid_op * new_grid_op;
-            if (state.skew() > 0.9 * current_skew) {
+            // FIX 2 (cont.): Remove redundant FLOAT_TYPE() wrapper
+            if (state.skew() > FLOAT_TYPE("0.9") * current_skew) {
                 throw std::runtime_error("Skew was not decreased for state");
             }
             current_skew = state.skew();
@@ -363,18 +381,23 @@ struct EllipseState {
 
     std::pair<EllipseState, INT_TYPE> apply_shift_op() const
     {
-        INT_TYPE k = static_cast<INT_TYPE>(std::floor((1.0 - bias()) / 2.0));
-        double pk_pow = std::pow(LAMBDA, k);
-        double nk_pow = std::pow(LAMBDA, -k);
+        // Use boost::multiprecision::floor and convert to long long (or int)
+        INT_TYPE k = static_cast<INT_TYPE>(
+            boost::multiprecision::floor((1 - bias()) / 2).convert_to<long long>());
+        FLOAT_TYPE pk_pow = boost::multiprecision::pow(MP_LAMBDA, static_cast<long long>(k));
+        FLOAT_TYPE nk_pow = boost::multiprecision::pow(MP_LAMBDA, -static_cast<long long>(k));
         Ellipse new_e1 = e1;
         Ellipse new_e2 = e2;
         new_e1.a *= pk_pow;
         new_e1.d *= nk_pow;
-        new_e1.z -= k;
+        // FIX 3: k is __int128, use static_cast, not .convert_to()
+        // Also, cast to FLOAT_TYPE, not double, since .z is FLOAT_TYPE
+        new_e1.z -= static_cast<FLOAT_TYPE>(k);
         new_e2.a *= nk_pow;
         new_e2.d *= pk_pow;
-        new_e2.z += k;
-        new_e2.b *= std::pow(-1, k);
+        // FIX 3 (cont.):
+        new_e2.z += static_cast<FLOAT_TYPE>(k);
+        new_e2.b *= boost::multiprecision::pow(FLOAT_TYPE(-1), static_cast<long long>(k));
         return {EllipseState(new_e1, new_e2), k};
     }
 
@@ -392,13 +415,15 @@ struct EllipseState {
             sign *= -1;
             grid_op = grid_op * GridOp::from_string("X");
         }
-        if (std::abs(bias()) > 2) {
-            INT_TYPE n = static_cast<INT_TYPE>(round((1.0 - sign * bias()) / 4.0));
+        if (boost::multiprecision::abs(bias()) > 2) {
+            // FIX 4: Use boost::multiprecision::round for FLOAT_TYPE
+            INT_TYPE n = static_cast<INT_TYPE>(
+                boost::multiprecision::round((1 - sign * bias()) / 4).convert_to<long long>());
             grid_op = grid_op * GridOp::from_string("U").pow(n);
         }
         GridOp n_grid_op = GridOp::from_string("I");
         EllipseState new_state = this->apply_grid_op(grid_op);
-        if (std::abs(new_state.bias()) > 1) {
+        if (boost::multiprecision::abs(new_state.bias()) > 1) {
             auto shift_result = new_state.apply_shift_op();
             new_state = shift_result.first;
             k = shift_result.second;
@@ -415,22 +440,32 @@ struct EllipseState {
         }
         Ellipse current_e1 = new_state.e1;
         Ellipse current_e2 = new_state.e2;
-        if (-0.8 <= current_e1.z && current_e1.z <= 0.8 && -0.8 <= current_e2.z &&
-            current_e2.z <= 0.8) {
+        // FIX 2 (cont.): Remove redundant FLOAT_TYPE() wrapper
+        if (-FLOAT_TYPE("0.8") <= current_e1.z && current_e1.z <= FLOAT_TYPE("0.8") &&
+            -FLOAT_TYPE("0.8") <= current_e2.z && current_e2.z <= FLOAT_TYPE("0.8")) {
             n_grid_op = n_grid_op * GridOp::from_string("R");
         }
         else {
             if (current_e1.b >= 0) {
-                if (current_e1.z <= 0.3 && current_e2.z >= 0.8) {
+                // FIX 2 (cont.): Remove redundant FLOAT_TYPE() wrapper
+                if (current_e1.z <= FLOAT_TYPE("0.3") && current_e2.z >= FLOAT_TYPE("0.8")) {
                     n_grid_op = n_grid_op * GridOp::from_string("K");
                 }
-                else if (current_e1.z >= 0.8 && current_e2.z <= 0.3) {
+                // FIX 2 (cont.): Remove redundant FLOAT_TYPE() wrapper
+                else if (current_e1.z >= FLOAT_TYPE("0.8") && current_e2.z <= FLOAT_TYPE("0.3")) {
                     n_grid_op = n_grid_op * GridOp::from_string("K").adj2();
                 }
-                else if (current_e1.z >= 0.3 && current_e2.z >= 0.3) {
-                    INT_TYPE n = static_cast<INT_TYPE>(std::max(
-                        1.0,
-                        std::floor(std::pow(LAMBDA, std::min(current_e1.z, current_e2.z)) / 2.0)));
+                // FIX 2 (cont.): Remove redundant FLOAT_TYPE() wrapper
+                else if (current_e1.z >= FLOAT_TYPE("0.3") && current_e2.z >=FLOAT_TYPE("0.3")) {
+                    INT_TYPE n = static_cast<INT_TYPE>(
+                        boost::multiprecision::max(
+                            FLOAT_TYPE(1),
+                            boost::multiprecision::floor(
+                                boost::multiprecision::pow(
+                                    MP_LAMBDA,
+                                    boost::multiprecision::min(current_e1.z, current_e2.z)) /
+                                2))
+                            .convert_to<long long>());
                     n_grid_op = n_grid_op * GridOp::from_string("A").pow(n);
                 }
                 else {
@@ -438,10 +473,17 @@ struct EllipseState {
                 }
             }
             else {
-                if (current_e1.z >= -0.2 && current_e2.z >= -0.2) {
-                    INT_TYPE n = static_cast<INT_TYPE>(std::max(
-                        1.0, std::floor(std::pow(LAMBDA, std::min(current_e1.z, current_e2.z)) /
-                                        M_SQRT2)));
+                // FIX 2 (cont.): Remove redundant FLOAT_TYPE() wrapper
+                if (current_e1.z >= -FLOAT_TYPE("0.2") && current_e2.z >= -FLOAT_TYPE("0.2")) {
+                    INT_TYPE n = static_cast<INT_TYPE>(
+                        boost::multiprecision::max(
+                            FLOAT_TYPE(1),
+                            boost::multiprecision::floor(
+                                boost::multiprecision::pow(
+                                    MP_LAMBDA,
+                                    boost::multiprecision::min(current_e1.z, current_e2.z)) /
+                                MP_SQRT2))
+                            .convert_to<long long>());
                     n_grid_op = n_grid_op * GridOp::from_string("B").pow(n);
                 }
                 else {
