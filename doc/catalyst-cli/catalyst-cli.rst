@@ -113,7 +113,7 @@ Enable a specific pass. For example, to enable the ``remove-chained-self-inverse
 Catalyst's main ``mlir`` stage is split up into a sequence of pass pipelines that can also be run
 individually via this option. In that case, the name of the pipeline is substituted for the pass
 name. Currently, the following pipelines are available:
-``enforce-runtime-invariants-pipeline``,
+``user-transform-pipeline``,
 ``hlo-lowering-pipeline``,
 ``quantum-compilation-pipeline``,
 ``bufferization-pipeline``,
