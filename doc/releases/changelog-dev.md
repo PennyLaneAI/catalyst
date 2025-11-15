@@ -5,6 +5,39 @@
 * Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
   [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
 
+* Catalyst can now compile circuits that are directly expressed in terms of Pauli product rotation 
+  (PPR) and Pauli product measurement (PPM) operations: :class:`~.PauliRot` and 
+  :func:`~.pauli_measure`, respectively. This support enables research and development 
+  spurred from `A Game of Surface Codes (arXiv1808.02892) <https://arxiv.org/pdf/1808.02892>`_.
+  [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
+
+  With program capture enabled (:func:`pennylane.capture.enable`), :class:`~.PauliRot` and 
+  :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes for PPR-PPM 
+  compilation, which includes :func:`catalyst.passes.to_ppr`, :func:`catalyst.passes.commute_ppr`, 
+  :func:`catalyst.passes.merge_ppr_ppm`, :func:`catalyst.passes.ppr_to_ppm`, and 
+  :func:`catalyst.passes.ppm_compilation`. For example,
+
+  ```python
+  import pennylane as qml
+  import jax.numpy as jnp
+
+  qml.capture.enable()
+
+  dev = qml.device("null.qubit", wires=1)
+  pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+  
+  @qjit(pipelines=pipeline, target="mlir")
+  @ppm_compilation
+  @qml.qnode(device=dev)
+  def circuit():
+      qml.Hadamard(wires=0)
+      qml.PauliRot(jnp.pi / 2, "X", wires=0)
+      qml.PauliRot(jnp.pi / 4, "Y", wires=0)
+      qml.T(wires=0)
+      ppm = qml.pauli_measure("X", wires=0)
+      return qml.sample()
+  ```
+
 <h3>Improvements 🛠</h3>
 
 * The new graph-based decomposition framework has Autograph feature parity with PennyLane
@@ -36,10 +69,6 @@
   This removes the need to pass the `pass_plugins` argument to the `qjit` decorator.
   [(#2169)](https://github.com/PennyLaneAI/catalyst/pull/2169)
   [(#2183)](https://github.com/PennyLaneAI/catalyst/pull/2183)
-
-* The ``mlir_opt`` property now correctly handles xDSL passes by automatically
-  detecting when the Python compiler is being used and routing through it appropriately.
-  [(#2190)](https://github.com/PennyLaneAI/catalyst/pull/2190)
 
 * Dynamically allocated wires can now be passed into control flow and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
@@ -110,9 +139,6 @@
   ```
 
 <h3>Internal changes ⚙️</h3>
-
-* Updates to PennyLane's use of a single transform primitive with a `transform` kwarg.
-  [(#2177)](https://github.com/PennyLaneAI/catalyst/pull/2177)
 
 * The pytest tests are now run with `strict=True` by default.
   [(#2180)](https://github.com/PennyLaneAI/catalyst/pull/2180)
