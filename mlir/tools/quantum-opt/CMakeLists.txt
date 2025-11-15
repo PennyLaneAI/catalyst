@@ -24,6 +24,7 @@ set(LIBS
     mitigation-transforms
     MLIRIon
     ion-transforms
+    MLIRRTIO
     MLIRCatalystTest
     MLIRCatalystUtils
     MLIRTestDialect

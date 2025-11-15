@@ -43,6 +43,7 @@
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
+#include "RTIO/IR/RTIODialect.h"
 #include "RegisterAllPasses.h"
 
 namespace test {
@@ -69,6 +70,7 @@ int main(int argc, char **argv)
     registry.insert<catalyst::mbqc::MBQCDialect>();
     registry.insert<catalyst::mitigation::MitigationDialect>();
     registry.insert<catalyst::ion::IonDialect>();
+    registry.insert<catalyst::rtio::RTIODialect>();
     registry.insert<mlir::stablehlo::StablehloDialect>();
 
     catalyst::registerBufferizableOpInterfaceExternalModels(registry);
