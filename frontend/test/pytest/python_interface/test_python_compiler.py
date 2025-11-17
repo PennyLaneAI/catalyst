@@ -383,12 +383,14 @@ class TestCallbackIntegration:
 
         @compiler_transform
         @dataclass(frozen=True)
-        class _(passes.ModulePass):
+        class NonePass(passes.ModulePass):
             """Dummy pass for testing."""
 
             name = "none-pass"
 
-            def apply(self, _ctx: Context, _module: builtin.ModuleOp) -> None: ...
+            def apply(self, _ctx: Context, _module: builtin.ModuleOp) -> None:
+                """Apply the pass. Do nothing; the test if for callbacks."""
+                return
 
         def print_between_passes(*_, pass_level=0):
             """Print between passes callback."""
