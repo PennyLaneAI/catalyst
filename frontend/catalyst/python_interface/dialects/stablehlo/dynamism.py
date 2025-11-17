@@ -90,14 +90,28 @@ class DynamicBroadcastInDimOp(IRDLOperation):
     # pylint: disable=too-many-branches
     def verify_(self):
         """Verify the operation."""
-        # Operand and result must be tensors
         operand_ty = self.operand_types[0]
         result_ty = self.result_types[0]
+        bcast_dims = tuple(self.broadcast_dimensions.get_values())  # pylint: disable=no-member
+
+        # Operand and result must be tensors
         assert isinstance(operand_ty, TensorType) and isinstance(result_ty, TensorType)
 
-        # dynamic_broadcast_in_dim_c2: broadcast_dimensions size == operand rank
-        bcast_dims = tuple(self.broadcast_dimensions.get_values())  # pylint: disable=no-member
+        # dynamic_broadcast_in_dim_c4: broadcast_dimensions should not have duplicates
+        if len(set(bcast_dims)) != len(bcast_dims):
+            raise VerifyException("broadcast_dimensions should not have duplicates")
+
+        self._verify_rank_constraints(bcast_dims, operand_ty, result_ty)
+        self._verify_per_dimension_bounds(bcast_dims, operand_ty, result_ty)
+        self._verify_expansion_hints(operand_ty)
+
+    def _verify_rank_constraints(self, bcast_dims, operand_ty, result_ty):
+        """Verify then operand and result tensors against the rank constraints."""
+
         operand_rank = operand_ty.get_num_dims()
+        result_rank = result_ty.get_num_dims()
+
+        # dynamic_broadcast_in_dim_c2: broadcast_dimensions size == operand rank
         if len(bcast_dims) != operand_rank:
             raise VerifyException(
                 "broadcast_dimensions size ("
@@ -108,7 +122,6 @@ class DynamicBroadcastInDimOp(IRDLOperation):
             )
 
         # dynamic_broadcast_in_dim_c3: result rank >= operand rank
-        result_rank = result_ty.get_num_dims()
         if result_rank < operand_rank:
             raise VerifyException(
                 "result rank ("
@@ -117,30 +130,6 @@ class DynamicBroadcastInDimOp(IRDLOperation):
                 f"{operand_rank}"
                 ")"
             )
-
-        # dynamic_broadcast_in_dim_c4: broadcast_dimensions should not have duplicates
-        if len(set(bcast_dims)) != len(bcast_dims):
-            raise VerifyException("broadcast_dimensions should not have duplicates")
-
-        # dynamic_broadcast_in_dim_c5: bounds and per-dimension compatibility
-        operand_shape = operand_ty.get_shape()
-        result_shape = result_ty.get_shape()
-        for i, dim_index in enumerate(bcast_dims):
-            if dim_index < 0 or dim_index >= result_rank:
-                raise VerifyException(
-                    "broadcast_dimensions contains invalid value "
-                    f"{dim_index} for result with rank {result_rank}"
-                )
-            op_dim = operand_shape[i]
-            res_dim = result_shape[dim_index]
-            # If operand dim is static and not size-1, require compatibility with result dim
-            if op_dim not in (-1, 1):
-                if res_dim not in (-1, op_dim):
-                    raise VerifyException(
-                        "size of operand dimension "
-                        f"{i} ({op_dim}) is not compatible with size of result dimension "
-                        f"{dim_index} ({res_dim})"
-                    )
 
         # dynamic_broadcast_in_dim_c7: output_dimensions shape compatible with result rank
         out_dims_ty = self.output_dimensions.type  # pylint: disable=no-member
@@ -159,7 +148,34 @@ class DynamicBroadcastInDimOp(IRDLOperation):
                 ")"
             )
 
+    def _verify_per_dimension_bounds(self, bcast_dims, operand_ty, result_ty):
+        # dynamic_broadcast_in_dim_c5: bounds and per-dimension compatibility
+        operand_shape = operand_ty.get_shape()
+        result_shape = result_ty.get_shape()
+        result_rank = result_ty.get_num_dims()
+
+        for i, dim_index in enumerate(bcast_dims):
+            if dim_index < 0 or dim_index >= result_rank:
+                raise VerifyException(
+                    "broadcast_dimensions contains invalid value "
+                    f"{dim_index} for result with rank {result_rank}"
+                )
+            op_dim = operand_shape[i]
+            res_dim = result_shape[dim_index]
+            # If operand dim is static and not size-1, require compatibility with result dim
+            if op_dim not in (-1, 1):
+                if res_dim not in (-1, op_dim):
+                    raise VerifyException(
+                        "size of operand dimension "
+                        f"{i} ({op_dim}) is not compatible with size of result dimension "
+                        f"{dim_index} ({res_dim})"
+                    )
+
+    def _verify_expansion_hints(self, operand_ty):
+        """Verify the operation's expansion hints."""
         # dynamic_broadcast_in_dim_c8: no duplicate expansion hints across both lists
+        operand_rank = operand_ty.get_num_dims()
+
         hints = []
         if self.known_expanding_dimensions is not None:
             hints.extend(self.known_expanding_dimensions.get_values())  # pylint: disable=no-member

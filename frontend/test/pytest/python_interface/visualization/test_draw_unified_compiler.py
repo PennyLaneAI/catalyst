@@ -78,7 +78,7 @@ class Testdraw:
             ),
             (2, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
             (None, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
-            (50, "0: ──RX──RZ─┤  State1: ──RY─────┤  State2: ──RZ─────┤  State"),
+            (50, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
         ],
     )
     def test_multiple_levels_xdsl(self, transforms_circuit, level, qjit, expected):

@@ -84,15 +84,21 @@ class ReduceOp(IRDLOperation):
         input_types = [op.type for op in self.inputs]
         init_types = [op.type for op in self.init_values]
 
-        # reduce_c1/c4/c5/i3: verify inputs and infer shape compatibility
-        dims_attr = self.dimensions
-        dims = tuple(dims_attr.get_values()) if dims_attr is not None else tuple()
+        self._verify_input_and_init_types(input_types, init_types)
+        self._verify_reducer_region(input_types)
+
+    def _verify_input_and_init_types(self, input_types, init_types):
+        """Verify the types of the inputs and init values."""
 
         # Basic structural checks mirroring verifyReduceOpInputsAndInferShape
         if len(input_types) == 0:
             raise VerifyException("expected at least 1 input for reduce")
         if len(input_types) != len(init_types):
             raise VerifyException("number of inputs must match number of init_values")
+
+        # reduce_c1/c4/c5/i3: verify inputs and infer shape compatibility
+        dims_attr = self.dimensions
+        dims = tuple(dims_attr.get_values()) if dims_attr is not None else tuple()
 
         # All inputs must have equal rank; dimensions must be within rank and unique
         # and not empty.
@@ -118,6 +124,9 @@ class ReduceOp(IRDLOperation):
             iv_elem = iv.get_element_type()
             if it_elem != iv_elem:
                 raise VerifyException("input and init_value must have the same element type")
+
+    def _verify_reducer_region(self, input_types):
+        """Verify the operation's reducer region."""
 
         # reduce_c2/c6: verify reducer region shape
         # Expect block with arity 2 * number of inputs, with matching tensor element types
