@@ -2027,11 +2027,11 @@ def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_s
 # cond
 #
 @cond_p.def_abstract_eval
-def _cond_abstract_eval(*args, branch_jaxprs, nimplicit_outputs: int, **kwargs):
+def _cond_abstract_eval(*args, branch_jaxprs, num_implicit_outputs: int, **kwargs):
     out_type = infer_output_type_jaxpr(
         [()] + branch_jaxprs[0].jaxpr.invars,
         [],
-        branch_jaxprs[0].jaxpr.outvars[nimplicit_outputs:],
+        branch_jaxprs[0].jaxpr.outvars[num_implicit_outputs:],
         expansion_strategy=cond_expansion_strategy(),
         num_implicit_inputs=None,
     )
@@ -2047,7 +2047,7 @@ def _cond_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *preds_and_branch_args_plus_consts: tuple,
     branch_jaxprs: List[core.ClosedJaxpr],
-    nimplicit_outputs: int,
+    num_implicit_outputs: int,
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
     num_preds = len(branch_jaxprs) - 1
@@ -2115,11 +2115,11 @@ def _cond_lowering(
 # Index Switch
 #
 @switch_p.def_abstract_eval
-def _switch_p_abstract_eval(*args, branch_jaxprs, nimplicit_outputs: int, **kwargs):
+def _switch_p_abstract_eval(*args, branch_jaxprs, num_implicit_outputs: int, **kwargs):
     out_type = infer_output_type_jaxpr(
         [()] + branch_jaxprs[0].jaxpr.invars,
         [],
-        branch_jaxprs[0].jaxpr.outvars[nimplicit_outputs:],
+        branch_jaxprs[0].jaxpr.outvars[num_implicit_outputs:],
         expansion_strategy=switch_expansion_strategy(),
         num_implicit_inputs=None,
     )
@@ -2136,7 +2136,7 @@ def _switch_lowering(
     jax_ctx,
     *index_and_cases_and_branch_args_plus_consts: tuple,
     branch_jaxprs: List[core.ClosedJaxpr],
-    nimplicit_outputs: int,
+    num_implicit_outputs: int,
 ):
     result_types = [mlir.aval_to_ir_types(outvar)[0] for outvar in branch_jaxprs[0].out_avals]
 
@@ -2195,14 +2195,20 @@ def _switch_lowering(
 #
 @while_p.def_abstract_eval
 def _while_loop_abstract_eval(
-    *in_type, body_jaxpr, nimplicit, preserve_dimensions, cond_nconsts, body_nconsts, **kwargs
+    *in_type,
+    body_jaxpr,
+    num_implicit_inputs,
+    preserve_dimensions,
+    cond_nconsts,
+    body_nconsts,
+    **kwargs,
 ):
     _assert_jaxpr_without_constants(body_jaxpr)
     all_nconsts = cond_nconsts + body_nconsts
     return infer_output_type_jaxpr(
         body_jaxpr.jaxpr.invars[:all_nconsts],
         body_jaxpr.jaxpr.invars[all_nconsts:],
-        body_jaxpr.jaxpr.outvars[nimplicit:],
+        body_jaxpr.jaxpr.outvars[num_implicit_inputs:],
         expansion_strategy=while_loop_expansion_strategy(preserve_dimensions),
     )
 
@@ -2215,7 +2221,7 @@ def _while_loop_def_impl(
     body_jaxpr,
     cond_nconsts,
     body_nconsts,
-    nimplicit,
+    num_implicit_inputs,
     preserve_dimensions,
 ):  # pragma: no cover
     raise NotImplementedError()
@@ -2228,7 +2234,7 @@ def _while_loop_lowering(
     body_jaxpr: core.ClosedJaxpr,
     cond_nconsts: int,
     body_nconsts: int,
-    nimplicit: int,
+    num_implicit_inputs: int,
     preserve_dimensions: bool,
 ):
     loop_carry_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
@@ -2302,16 +2308,16 @@ def _while_loop_lowering(
 #
 @for_p.def_abstract_eval
 def _for_loop_abstract_eval(
-    *args, body_jaxpr, nimplicit, preserve_dimensions, body_nconsts, **kwargs
+    *args, body_jaxpr, num_implicit_inputs, preserve_dimensions, body_nconsts, **kwargs
 ):
     _assert_jaxpr_without_constants(body_jaxpr)
 
     return infer_output_type_jaxpr(
         body_jaxpr.jaxpr.invars[:body_nconsts],
         body_jaxpr.jaxpr.invars[body_nconsts:],
-        body_jaxpr.jaxpr.outvars[nimplicit:],
+        body_jaxpr.jaxpr.outvars[num_implicit_inputs:],
         expansion_strategy=for_loop_expansion_strategy(preserve_dimensions),
-        num_implicit_inputs=nimplicit,
+        num_implicit_inputs=num_implicit_inputs,
     )
 
 
@@ -2324,7 +2330,7 @@ def _for_loop_def_impl(
     step,
     *iter_args_plus_consts,
     body_jaxpr,
-    nimplicit=0,
+    num_implicit_inputs=0,
     body_nconsts,
     preserve_dimensions,
 ):  # pragma: no cover
@@ -2338,22 +2344,22 @@ def _for_loop_lowering(
     body_jaxpr: core.ClosedJaxpr,
     body_nconsts: int,
     apply_reverse_transform: bool,
-    nimplicit: int,
+    num_implicit_inputs: int,
     preserve_dimensions,
 ):
     body_consts = iter_args_plus_consts[:body_nconsts]
-    body_implicits = iter_args_plus_consts[body_nconsts : body_nconsts + nimplicit]
-    lower_bound = iter_args_plus_consts[body_nconsts + nimplicit + 0]
-    upper_bound = iter_args_plus_consts[body_nconsts + nimplicit + 1]
-    step = iter_args_plus_consts[body_nconsts + nimplicit + 2]
-    loop_index = iter_args_plus_consts[body_nconsts + nimplicit + 3]
-    loop_args = [*body_implicits, *iter_args_plus_consts[body_nconsts + nimplicit + 4 :]]
+    body_implicits = iter_args_plus_consts[body_nconsts : body_nconsts + num_implicit_inputs]
+    lower_bound = iter_args_plus_consts[body_nconsts + num_implicit_inputs + 0]
+    upper_bound = iter_args_plus_consts[body_nconsts + num_implicit_inputs + 1]
+    step = iter_args_plus_consts[body_nconsts + num_implicit_inputs + 2]
+    loop_index = iter_args_plus_consts[body_nconsts + num_implicit_inputs + 3]
+    loop_args = [*body_implicits, *iter_args_plus_consts[body_nconsts + num_implicit_inputs + 4 :]]
 
     loop_index_type = ir.RankedTensorType(loop_index.type).element_type
 
     all_param_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
     assert [lower_bound.type, upper_bound.type, step.type] == all_param_types_plus_consts[
-        body_nconsts + nimplicit : body_nconsts + nimplicit + 3
+        body_nconsts + num_implicit_inputs : body_nconsts + num_implicit_inputs + 3
     ]
     assert [val.type for val in body_consts] == all_param_types_plus_consts[:body_nconsts]
 
@@ -2407,8 +2413,8 @@ def _for_loop_lowering(
         # Re-order arguments in accordance with jax dynamic API convensions
         consts = body_consts
         loop_iter = body_args[0]
-        implicit_args = body_args[1 : nimplicit + 1]
-        explicit_args = body_args[nimplicit + 1 :]
+        implicit_args = body_args[1 : num_implicit_inputs + 1]
+        explicit_args = body_args[num_implicit_inputs + 1 :]
         loop_params = (*consts, *implicit_args, loop_iter, *explicit_args)
 
         # Recursively generate the mlir for the loop body

@@ -43,7 +43,7 @@ class TestLoopToJaxpr:
                       i:bool[] = lt g 10:i64[]
                     in (i,) }
                   cond_nconsts=0
-                  nimplicit=0
+                  num_implicit_inputs=0
                   preserve_dimensions=True
                 ] 0:i64[] a
               in (b, c) }
@@ -72,7 +72,7 @@ class TestLoopToJaxpr:
                       h:i64[] = add f 1:i64[]
                     in (h, g) }
                   body_nconsts=0
-                  nimplicit=0
+                  num_implicit_inputs=0
                   preserve_dimensions=True
                 ] 0:i64[] b 1:i64[] 0:i64[] 0:i64[] a
               in (c, d) }
