@@ -466,8 +466,6 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y libasan6 make
-        # Install graphviz for testing the mlir-op-graph integration
-        sudo apt-get install -y graphviz
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         # cuda-quantum is added manually here.
@@ -475,6 +473,8 @@ jobs:
         # macOS requirements.txt
         python3 -m pip install cuda-quantum==0.6.0
         python3 -m pip install oqc-qcaas-client
+        # Install graphviz for testing the mlir-op-graph integration
+        python3 -m pip install graphviz
         make frontend
 
     - name: Get Cached LLVM Build
