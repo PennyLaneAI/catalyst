@@ -52,6 +52,13 @@ declare_mlir_dialect_python_bindings(
   dialects/mbqc.py
   DIALECT_NAME mbqc)
 
+declare_mlir_dialect_python_bindings(
+  ADD_TO_PARENT QuantumPythonSources
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/"
+  TD_FILE dialects/QECOps.td
+  SOURCES
+  dialects/qec.py
+  DIALECT_NAME qec)
 
 ################################################################################
 # Build Python Bindings (without C extension)

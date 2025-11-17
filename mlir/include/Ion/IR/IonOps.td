@@ -25,7 +25,6 @@ include "mlir/IR/BuiltinAttributes.td"
 
 include "Ion/IR/IonDialect.td"
 include "Ion/IR/IonInterfaces.td"
-include "Quantum/IR/QuantumDialect.td"
 
 //===----------------------------------------------------------------------===//
 // Ion dialect enums.
@@ -63,7 +62,7 @@ def LevelAttr : Ion_Attr<"Level", "level"> {
 
 
   let builders = [
-    AttrBuilderWithInferredContext<(ins     
+    AttrBuilderWithInferredContext<(ins
     "mlir::StringAttr":$label,
     "mlir::IntegerAttr":$principal,
     "mlir::FloatAttr":$spin,
