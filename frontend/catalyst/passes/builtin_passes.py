@@ -630,19 +630,18 @@ def to_ppr(qnode):
 
 def commute_ppr(qnode=None, *, max_pauli_size=0):
     R"""
-    Applies a quantum compilation pass that commutes
-    Clifford Pauli product rotation (PPR) gates, :math:`\exp({iP\tfrac{\pi}{4}})`,
-    past non-Clifford PPRs gates, :math:`\exp({iP\tfrac{\pi}{8}})`,
-    where :math:`P` is a Pauli word.
+    A quantum compilation pass that commutes Clifford Pauli product rotation (PPR) gates,
+    :math:`\exp({iP\tfrac{\pi}{4}})`, past non-Clifford PPRs gates,
+    :math:`\exp({iP\tfrac{\pi}{8}})`, where :math:`P` is a Pauli word.
 
-    .. seealso::
-
-        For more information on PPRs, check out
-        the `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
+    For more information on PPRs, check out the
+    `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
 
     .. note::
 
-        The ``commute_ppr`` compilation pass requires that :func:`~.passes.to_ppr` be applied first.
+        The circuits that generated from this pass are currently only not executable in any backend.
+        This pass is only for analysis and potential future execution when a suitable backend is
+        available.
 
     Args:
         fn (QNode): QNode to apply the pass to.
@@ -653,52 +652,67 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
 
     **Example**
 
-    The ``commute_ppr`` pass must be used in conjunction with :func:`~.passes.to_ppr`
-    to first convert gates into PPRs. In this example, the Clifford+T gates in the
-    circuit will be converted into PPRs first, then the Clifford PPRs will be
-    commuted past the non-Clifford PPR.
+    For clear and inspectable results, use ``commute_ppr`` with PennyLane's program capture enabled,
+    :func:`pennylane.capture.enable`, and by calling it from the PennyLane frontend instead of with
+    ``catalyst.passes.commute_ppr``.
+
+    In the following example, the Clifford+T gates in the circuit will be converted into PPRs first
+    with :func:`~.passes.to_ppr`, then the Clifford PPRs (``H`` and ``CNOT``) will be commuted past
+    the non-Clifford PPR (``T``):
 
     .. code-block:: python
 
         import pennylane as qml
-        from catalyst import qjit, measure
 
-        ppm_passes = [("PPM", ["to-ppr", "commute-ppr"])]
+        qml.capture.enable()
 
-        @qjit(pipelines=ppm_passes, keep_intermediate=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=1))
+        pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+        @qml.qjit(pipelines=pipeline, target="mlir")
+        @qml.transforms.commute_ppr(max_pauli_size=2)
+        @qml.transforms.to_ppr
+        @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             qml.H(0)
+            qml.CNOT([0, 1])
             qml.T(0)
-            return measure(0)
+            return qml.expval(qml.Z(0))
 
-        print(circuit.mlir_opt)
+    >>> print(qml.specs(circuit, level="device")()['resources'])
+    num_wires: 2
+    num_gates: 7
+    depth: None
+    shots: Shots(total=None)
+    gate_types:
+    {'PPR-pi/8-w1': 1, 'PPR-pi/4-w1': 5, 'PPR-pi/4-w2': 1}
+    gate_sizes:
+    {1: 6, 2: 1}
 
-    Example MLIR Representation:
+    In the above output, ``PPR-X-Y`` denotes the type of PPR present in the circuit, where ``X`` is
+    the angle and ``Y`` is the PPR weight.
 
-    .. code-block:: mlir
+    Optionally, the resulting MLIR can be inspected, as well:
 
-        . . .
-        %2 = qec.ppr ["X"](8) %1 : !quantum.bit
-        %3 = qec.ppr ["Z"](4) %2 : !quantum.bit
-        %4 = qec.ppr ["X"](4) %3 : !quantum.bit
-        %5 = qec.ppr ["Z"](4) %4 : !quantum.bit
-        %mres, %out_qubits = qec.ppm ["Z"] %5 : !quantum.bit
-        . . .
+    >>> print(circuit.mlir_opt)
+    . . .
+    %2 = qec.ppr ["X"](8) %1 : !quantum.bit
+    %3 = qec.ppr ["Z"](4) %2 : !quantum.bit
+    %4 = qec.ppr ["X"](4) %3 : !quantum.bit
+    %5 = qec.ppr ["Z"](4) %4 : !quantum.bit
+    %mres, %out_qubits = qec.ppm ["Z"] %5 : !quantum.bit
+    . . .
 
-    If a commutation resulted in a PPR acting on more than
-    ``max_pauli_size`` qubits (here, ``max_pauli_size = 2``), that commutation would be skipped.
+    If a commutation resulted in a PPR acting on more than ``max_pauli_size`` qubits (here,
+    ``max_pauli_size = 2``), that commutation would be skipped.
 
     .. code-block:: python
 
-        from catalyst.passes import to_ppr, commute_ppr
-
         pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
-        @qjit(pipelines=pips, target="mlir")
-        @to_ppr
-        @commute_ppr(max_pauli_size=2)
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        @qml.qjit(pipelines=pips, target="mlir")
+        @qml.transforms.commute_ppr(max_pauli_size=2)
+        @qml.transforms.to_ppr
+        @qml.qnode(qml.device("null.qubit", wires=3))
         def circuit():
             qml.H(0)
             qml.CNOT([1, 2])
@@ -706,7 +720,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
             qml.CNOT([0, 2])
             for i in range(3):
                 qml.T(i)
-            return measure(0), measure(1), measure(2)
+            return qml.expval(qml.Z(0))
 
         print(circuit.mlir_opt)
 
