@@ -34,7 +34,6 @@ def RTIO_Dialect : Dialect {
 
         // TODO: Do we need the separate Timeline IR for artiq family?
         2. Timeline IR (low-level): Stateful operations with implicit time cursor
-        ```
     }];
 
     let name = "rtio";
