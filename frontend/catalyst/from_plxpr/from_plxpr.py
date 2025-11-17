@@ -48,7 +48,6 @@ from catalyst.jax_primitives import (
     qdealloc_p,
     quantum_kernel_p,
 )
-from catalyst.passes.pass_api import Pass
 
 from .qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
 from .qubit_handler import (
@@ -215,7 +214,9 @@ def handle_qnode(
         # Fallback to the legacy decomposition if the graph-based decomposition failed
         if not graph_succeeded:
             # Remove the decompose-lowering pass from the pipeline
-            self._pass_pipeline = [p for p in self._pass_pipeline if p.name != "decompose-lowering"]
+            self._pass_pipeline = [
+                p for p in self._pass_pipeline if p.pass_name != "decompose-lowering"
+            ]
             closed_jaxpr = _apply_compiler_decompose_to_plxpr(
                 inner_jaxpr=closed_jaxpr.jaxpr,
                 consts=closed_jaxpr.consts,
@@ -345,9 +346,7 @@ def handle_transform(
         and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
         and qml.decomposition.enabled_graph()
     ):
-        return _handle_decompose_transform(
-            self, inner_jaxpr, consts, non_const_args, tkwargs
-        )
+        return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs)
 
     catalyst_pass_name = transform.pass_name
     if catalyst_pass_name is None:
