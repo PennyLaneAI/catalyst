@@ -714,8 +714,8 @@ class TestConditionals:
 
         m = qml.measure if qml.capture.enabled() else measure
 
-        def circuit():
-            if True:
+        def circuit(pred: bool):
+            if pred:
                 res = m(wires=0)
 
             return res  # pylint: disable=possibly-used-before-assignment
