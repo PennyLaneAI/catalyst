@@ -80,7 +80,7 @@ def RTIOChannelType : RTIO_Type<"Channel", "channel"> {
         // Simple DDS, channel TBD
         !rtio.channel<"dds", ?>
 
-        // DDS for one two qualifiers 0 and "t0", channel TBD
+        // DDS channel with two qualifiers 0 and "t0", channel ID TBD
         !rtio.channel<"dds", [0, "transition_0"], ?>
 
         // DDS on hardware channel 0
