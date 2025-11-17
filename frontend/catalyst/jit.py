@@ -601,7 +601,7 @@ class QJIT(CatalystCallable):
 
             return self.user_function(*args, **kwargs)
 
-        requires_promotion = self.jit_compile(args, **kwargs)
+        requires_promotion = self.jit_compile(args, kwargs)
 
         # If we receive tracers as input, dispatch to the JAX integration.
         if any(isinstance(arg, jax.core.Tracer) for arg in tree_flatten(args)[0]):
@@ -646,17 +646,18 @@ class QJIT(CatalystCallable):
         return to_llvmir(stdin=_mlir, options=self.compile_options)
 
     @debug_logger
-    def jit_compile(self, args, **kwargs):
+    def jit_compile(self, args, kwargs):
         """Compile Python function on invocation using the provided arguments.
 
         Args:
             args (Iterable): arguments to use for program capture
+            kwargs (Iterable): keyword arguments to use for program capture
 
         Returns:
             bool: whether the provided arguments will require promotion to be used with the compiled
                   function
         """
-        cached_fn, requires_promotion = self.fn_cache.lookup(args)
+        cached_fn, requires_promotion = self.fn_cache.lookup(args, kwargs)
 
         if cached_fn is None:
             if self.user_sig and not self.compile_options.static_argnums:
@@ -672,7 +673,7 @@ class QJIT(CatalystCallable):
             if self.compiled_function and self.compiled_function.shared_object:
                 self.compiled_function.shared_object.close()
 
-            self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
+            self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, kwargs)
 
             self.mlir_module = self.generate_ir()
             self.compiled_function, _ = self.compile()
@@ -710,7 +711,7 @@ class QJIT(CatalystCallable):
 
     @instrument(size_from=0)
     @debug_logger
-    def capture(self, args, **kwargs):
+    def capture(self, args, kwargs):
         """Capture the JAX program representation (JAXPR) of the wrapped function.
 
         Args:
