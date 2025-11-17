@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <llvm/ADT/iterator_range.h>
-#include <llvm/Support/Casting.h>
-#include <mlir/IR/Operation.h>
 #define DEBUG_TYPE "commute-ppr"
 
 #include "mlir/Analysis/TopologicalSortUtils.h"
