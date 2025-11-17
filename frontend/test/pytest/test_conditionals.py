@@ -1112,7 +1112,7 @@ class TestCondPredicateConversion:
                 y = 0
 
             return y
-        
+
         out = workflow(0.5)
         assert qml.math.allclose(out, 0.25)
 
