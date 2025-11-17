@@ -908,9 +908,9 @@ class CondCallable:
         _assert_consistent_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
         all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
         all_consts = [s.out_consts() for s in out_sigs]
-        all_num_implicit_outs = [s.num_implicit_outputs() for s in out_sigs]
+        all_num_implicit_outputs = [s.num_implicit_outputs() for s in out_sigs]
         all_jaxprs, _, _, all_consts = unify_convert_result_types(
-            all_jaxprs, all_consts, all_num_implicit_outs
+            all_jaxprs, all_consts, all_num_implicit_outputs
         )
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
         # Output types from all the branches are unified by now, we use the first branch for
@@ -1316,9 +1316,9 @@ class SwitchCallable:
 
         all_jaxprs = [sig.out_initial_jaxpr() for sig in out_sigs]
         all_consts = [sig.out_consts() for sig in out_sigs]
-        all_num_implicit_outs = [sig.num_implicit_outputs() for sig in out_sigs]
+        all_num_implicit_outputs = [sig.num_implicit_outputs() for sig in out_sigs]
         all_jaxprs, _, _, all_consts = unify_convert_result_types(
-            all_jaxprs, all_consts, all_num_implicit_outs
+            all_jaxprs, all_consts, all_num_implicit_outputs
         )
 
         # after this, all branches have the same signatures
