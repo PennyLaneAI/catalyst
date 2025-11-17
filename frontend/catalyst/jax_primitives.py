@@ -38,7 +38,6 @@ from jax.experimental.pjit import pjit_p
 from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
-from jaxlib.hlo_helpers import shape_dtype_to_ir_type
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from jaxlib.mlir.dialects.arith import (
     AddIOp,
@@ -685,7 +684,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
             # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to
             # cast such constants to numpy array types.
             const = jax_array_or_tracer
-            const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
+            const_type = ir.RankedTensorType.get(const.shape, mlir.dtype_to_ir_type(const.dtype))
             nparray = np.asarray(const)
             attr = ir.DenseElementsAttr.get(nparray, type=const_type)
             constval = StableHLOConstantOp(attr).results
@@ -778,7 +777,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
             # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to
             # cast such constants to numpy array types.
             const = jax_array_or_tracer
-            const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
+            const_type = ir.RankedTensorType.get(const.shape, mlir.dtype_to_ir_type(const.dtype))
             nparray = np.asarray(const)
             attr = ir.DenseElementsAttr.get(nparray, type=const_type)
             constval = StableHLOConstantOp(attr).results
@@ -969,7 +968,7 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
 
     constants = []
     for const in jaxpr.consts:
-        const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
+        const_type = ir.RankedTensorType.get(const.shape, mlir.dtype_to_ir_type(const.dtype))
         nparray = np.asarray(const)
         if const.dtype == bool:
             nparray = np.packbits(nparray, bitorder="little")
