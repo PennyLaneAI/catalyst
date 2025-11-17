@@ -111,6 +111,8 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Replaces the deprecated `shape_dtype_to_ir_type` function with the `RankedTensorType.get` method.
+  [(#2159)](https://github.com/PennyLaneAI/catalyst/pull/2159)
 * Updates to PennyLane's use of a single transform primitive with a `transform` kwarg.
   [(#2177)](https://github.com/PennyLaneAI/catalyst/pull/2177)
 
@@ -176,6 +178,7 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Jeffrey Kam,
 Christina Lee,
+Mehrdad Malekmohammadi,
 River McCubbin,
 Lee J. O'Riordan,
 Roberto Turrado,
