@@ -106,10 +106,10 @@
   // ... use %4
   ```
 
-  * Fixes `commute_ppr` and `merge_ppr_ppm` incorrectly moving nullary operations.
-    This also improves the compilation time by reducing the sort function,
-    given the operations that need to be sorted.
-    [(#2199)](https://github.com/PennyLaneAI/catalyst/pull/2199)
+  * Fixes :func:`~.passes.commute_ppr` and :func:`~.passes.merge_ppr_ppm` incorrectly
+    moving nullary operations. This also improves the compilation time by reducing
+    the sort function, given the operations that need to be sorted.
+    [(#2200)](https://github.com/PennyLaneAI/catalyst/pull/2200)
 
 <h3>Internal changes ⚙️</h3>
 
