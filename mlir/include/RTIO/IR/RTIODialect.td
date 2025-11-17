@@ -94,8 +94,8 @@ def RTIOChannelType : RTIO_Type<"Channel", "channel"> {
         // After channel resolution: Resolved to hardware channel 1
         !rtio.channel<"dds", [0], 1>
 
-        // Note: The qualifiers are used provided addtional information to the channel type.
-        // And it will used to distinguish different channels with the same kind.
+        // Note: The qualifiers are used to provide additional information to the channel type.
+        // And they will be used to distinguish different channels with the same kind.
         ```
     }];
 
