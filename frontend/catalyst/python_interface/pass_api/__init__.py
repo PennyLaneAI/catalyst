@@ -19,8 +19,8 @@ from .apply_transform_sequence import (
     is_xdsl_pass,
     register_pass,
 )
-from .transform_interpreter import TransformFunctionsExt, TransformInterpreterPass
 from .compiler_transform import PassDispatcher, compiler_transform
+from .transform_interpreter import TransformFunctionsExt, TransformInterpreterPass
 
 __all__ = [
     "ApplyTransformSequence",

@@ -18,7 +18,6 @@ from .parser import QuantumParser
 from .pass_api import compiler_transform
 from .visualization import QMLCollector
 
-
 __all__ = [
     "Compiler",
     "compiler_transform",

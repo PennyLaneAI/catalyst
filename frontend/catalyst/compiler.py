@@ -376,14 +376,14 @@ def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
 
 
 def to_mlir_opt(
-    *args, stdin=None, options: Optional[CompileOptions] = None, using_python_compiler=False
+    *args, stdin=None, options: Optional[CompileOptions] = None, using_unified_compiler=False
 ):
     """echo ${input} | catalyst --tool=opt *args *opts -"""
     # Check if we need to use Python compiler for xDSL passes
-    if using_python_compiler:
+    if using_unified_compiler:
         # Use Python compiler path for xDSL passes
         # pylint: disable-next=import-outside-toplevel
-        from pennylane.compiler.python_compiler import Compiler as PythonCompiler
+        from catalyst.python_interface import Compiler as PythonCompiler
 
         compiler = PythonCompiler()
         stdin = compiler.run(stdin, callback=None)

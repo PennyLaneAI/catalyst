@@ -14,7 +14,7 @@
 
 """This module contains additional utilities and functionality not available upstream in xDSL."""
 
-from .constraints import MemRefConstraint, TensorConstraint, NestedTupleOfConstraint
+from .constraints import MemRefConstraint, NestedTupleOfConstraint, TensorConstraint
 from .traits import (
     AllMatchSameOperatorTrait,
     Elementwise,

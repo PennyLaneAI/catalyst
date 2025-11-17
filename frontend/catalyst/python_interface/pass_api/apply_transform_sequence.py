@@ -16,11 +16,10 @@
 
 from dataclasses import dataclass
 
+from pennylane.typing import Callable
 from xdsl.context import Context
 from xdsl.dialects import builtin
 from xdsl.passes import ModulePass, PassPipeline
-
-from pennylane.typing import Callable
 
 from .transform_interpreter import TransformInterpreterPass
 

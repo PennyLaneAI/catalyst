@@ -15,10 +15,10 @@
 
 from collections.abc import Callable
 
-from catalyst.from_plxpr import register_transform
+from pennylane.transforms.core.transform_dispatcher import TransformDispatcher
 from xdsl.passes import ModulePass
 
-from pennylane.transforms.core.transform_dispatcher import TransformDispatcher
+from catalyst.from_plxpr import register_transform
 
 from .apply_transform_sequence import register_pass
 

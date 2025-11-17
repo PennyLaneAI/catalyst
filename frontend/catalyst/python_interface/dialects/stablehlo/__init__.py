@@ -19,54 +19,19 @@ This package contains organized elementwise operations and other StableHLO-relat
 functionality.
 """
 
-# Import all elementwise operations explicitly
-from .elementwise_unary import (
-    ConvertOp,
-    CosineOp,
-    ExponentialMinusOneOp,
-    ExponentialOp,
-    FloorOp,
-    ImagOp,
-    IsFiniteOp,
-    LogOp,
-    LogPlusOneOp,
-    LogisticOp,
-    NegateOp,
-    RealOp,
-    RoundNearestAfzOp,
-    RoundNearestEvenOp,
-    RsqrtOp,
-    SignOp,
-    SineOp,
-    SqrtOp,
-    TanOp,
-    TanhOp,
+from .attributes import (
+    CustomCallApiVersion,
+    CustomCallApiVersionAttr,
+    GatherDimensionNumbers,
+    OutputOperandAlias,
+    ResultAccuracyModeAttr,
+    ScatterDimensionNumbers,
 )
-
-from .elementwise_binary import (
-    ComplexOp,
-    DivideOp,
-    MaximumOp,
-    MinimumOp,
-    PowerOp,
-    RemainderOp,
-)
-
-from .elementwise_other import (
-    ClampOp,
-    CompareOp,
-    ConstantOp,
-    MapOp,
-    ReducePrecisionOp,
-    SelectOp,
-)
-
 from .control_flow import (
     IfOp,
-    WhileOp,
     OptimizationBarrierOp,
+    WhileOp,
 )
-
 from .data_movement import (
     BroadcastInDimOp,
     ConcatenateOp,
@@ -77,29 +42,57 @@ from .data_movement import (
     SliceOp,
 )
 
+# Import the main StableHLO dialect
+from .dialect import StableHLO
 from .dynamism import (
     DynamicBroadcastInDimOp,
 )
-
-from .reduction import (
-    ReduceOp,
+from .elementwise_binary import (
+    ComplexOp,
+    DivideOp,
+    MaximumOp,
+    MinimumOp,
+    PowerOp,
+    RemainderOp,
+)
+from .elementwise_other import (
+    ClampOp,
+    CompareOp,
+    ConstantOp,
+    MapOp,
+    ReducePrecisionOp,
+    SelectOp,
 )
 
+# Import all elementwise operations explicitly
+from .elementwise_unary import (
+    ConvertOp,
+    CosineOp,
+    ExponentialMinusOneOp,
+    ExponentialOp,
+    FloorOp,
+    ImagOp,
+    IsFiniteOp,
+    LogisticOp,
+    LogOp,
+    LogPlusOneOp,
+    NegateOp,
+    RealOp,
+    RoundNearestAfzOp,
+    RoundNearestEvenOp,
+    RsqrtOp,
+    SignOp,
+    SineOp,
+    SqrtOp,
+    TanhOp,
+    TanOp,
+)
 from .extensibility import (
     CustomCallOp,
 )
-
-from .attributes import (
-    GatherDimensionNumbers,
-    ResultAccuracyModeAttr,
-    ScatterDimensionNumbers,
-    CustomCallApiVersion,
-    CustomCallApiVersionAttr,
-    OutputOperandAlias,
+from .reduction import (
+    ReduceOp,
 )
-
-# Import the main StableHLO dialect
-from .dialect import StableHLO
 
 # Export all operations and the dialect for external use
 __all__ = [

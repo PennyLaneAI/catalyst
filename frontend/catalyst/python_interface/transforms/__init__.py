@@ -14,31 +14,29 @@
 """PennyLane-xDSL transformations API."""
 
 from .mbqc import (
-    convert_to_mbqc_formalism_pass,
     ConvertToMBQCFormalismPass,
-    decompose_graph_state_pass,
     DecomposeGraphStatePass,
-    outline_state_evolution_pass,
-    OutlineStateEvolutionPass,
-    null_decompose_graph_state_pass,
     NullDecomposeGraphStatePass,
+    OutlineStateEvolutionPass,
+    convert_to_mbqc_formalism_pass,
+    decompose_graph_state_pass,
+    null_decompose_graph_state_pass,
+    outline_state_evolution_pass,
 )
-
 from .quantum import (
-    combine_global_phases_pass,
     CombineGlobalPhasesPass,
-    diagonalize_final_measurements_pass,
     DiagonalizeFinalMeasurementsPass,
-    iterative_cancel_inverses_pass,
     IterativeCancelInversesPass,
-    measurements_from_samples_pass,
     MeasurementsFromSamplesPass,
-    merge_rotations_pass,
     MergeRotationsPass,
-    split_non_commuting_pass,
     SplitNonCommutingPass,
+    combine_global_phases_pass,
+    diagonalize_final_measurements_pass,
+    iterative_cancel_inverses_pass,
+    measurements_from_samples_pass,
+    merge_rotations_pass,
+    split_non_commuting_pass,
 )
-
 
 __all__ = [
     # Quantum
