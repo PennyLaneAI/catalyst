@@ -285,7 +285,7 @@ class QFunc:
 
         new_transform_program, new_pipeline = _extract_passes(self.transform_program)
         # Update the qnode with peephole pipeline
-        old_pipeline = kwargs.pop("pass_pipeline")
+        old_pipeline = kwargs.pop("pass_pipeline", None)
         processed_old_pipeline = tuple(dictionary_to_list_of_passes(old_pipeline))
         pass_pipeline = processed_old_pipeline + new_pipeline
         new_qnode = copy(self)
