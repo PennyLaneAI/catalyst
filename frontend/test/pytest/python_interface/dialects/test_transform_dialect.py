@@ -117,6 +117,7 @@ def test_integration_for_transform_interpreter(capsys):
         custom_print: str | None = None
 
         def apply(self, _ctx: Context, _module: builtin.ModuleOp) -> None:
+            """Apply the pass."""
             if self.custom_print:
                 print(self.custom_print)
             else:

@@ -82,6 +82,7 @@ def test_compiler():
     @mlir_module
     @jax.jit
     def identity(x):
+        """Identity function"""
         return x
 
     input_module = identity(1)
@@ -387,6 +388,7 @@ class TestCallbackIntegration:
             def apply(self, _ctx: Context, _module: builtin.ModuleOp) -> None: ...
 
         def print_between_passes(*_, pass_level=0):
+            """Print between passes callback."""
             if pass_level == 0:
                 return
             print("hello world")
@@ -481,6 +483,7 @@ class TestCallbackIntegration:
         """Test that the callback is integrated into the pass pipeline with the Compiler.run() method"""
 
         def print_between_passes(_, module, __, pass_level=0):
+            """Callback to print something between passes."""
             if pass_level == 0:
                 return
             print("=== Between Pass ===")

@@ -153,6 +153,7 @@ class ContainerConstraint(AttrConstraint, ABC):
         return {self.expected_type}
 
     def verify(self, attr: Attribute, constraint_context: ConstraintContext) -> None:
+        """Verify that the attribute meets the constraint."""
         if not isinstance(attr, self.expected_type):
             raise VerifyException(f"{attr} should be of type {self.expected_type.__name__}.")
         constr = self.expected_type.constr(element_type=self.element_type, shape=self.shape)
@@ -160,7 +161,11 @@ class ContainerConstraint(AttrConstraint, ABC):
 
     def mapping_type_vars(
         self, type_var_mapping: dict[TypeVar, AttrConstraint]
-    ) -> "ContainerConstraint":
+    ) -> "ContainerConstraint":  # pylint: disable=unused-argument
+        """
+        A helper function to make type vars used in attribute definitions concrete when
+        creating constraints for new attributes or operations.
+        """
         return self
 
 
@@ -226,6 +231,6 @@ class NestedTupleOfConstraint(AttrConstraint[TupleType]):
     def mapping_type_vars(
         self,
         type_var_mapping: Mapping[TypeVar, AttrConstraint | IntConstraint],
-    ) -> AttrConstraint:
+    ) -> AttrConstraint:  # pylint: disable=unused-argument
         """Map type variables to constraints."""
         return self
