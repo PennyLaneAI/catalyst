@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <llvm/ADT/iterator_range.h>
+#include <llvm/Support/Casting.h>
+#include <mlir/IR/Operation.h>
 #define DEBUG_TYPE "commute-ppr"
 
 #include "mlir/Analysis/TopologicalSortUtils.h"
@@ -136,6 +139,12 @@ void moveCliffordPastNonClifford(const PauliStringWrapper &lhsPauli,
     }
 
     rewriter.replaceOp(rhs, rhs.getInQubits());
+
+    auto startItr = lhs->getIterator();
+    auto endItr = std::next(nonCliffordOp->getIterator());
+    llvm::iterator_range<Block::iterator> itr = llvm::make_range(startItr, endItr);
+
+    sortTopologically(nonCliffordOp->getBlock(), itr);
 }
 
 struct CommutePPR : public OpRewritePattern<PPRotationOp> {
@@ -156,7 +165,6 @@ struct CommutePPR : public OpRewritePattern<PPRotationOp> {
             // Handle commuting case
             if (normCliffordPPR.commutes(normNonCliffordPPR)) {
                 moveCliffordPastNonClifford(normCliffordPPR, normNonCliffordPPR, nullptr, rewriter);
-                sortTopologically(op->getBlock());
                 return success();
             }
 
@@ -171,7 +179,6 @@ struct CommutePPR : public OpRewritePattern<PPRotationOp> {
 
             moveCliffordPastNonClifford(normCliffordPPR, normNonCliffordPPR, &commutedResult,
                                         rewriter);
-            sortTopologically(op->getBlock());
             return success();
         });
     }

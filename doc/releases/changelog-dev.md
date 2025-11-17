@@ -106,6 +106,11 @@
   // ... use %4
   ```
 
+  * Fixes `commute_ppr` and `merge_ppr_ppm` incorrectly moving nullary operations.
+    This also improves the compilation time by reducing the sort function,
+    given the operations that need to be sorted.
+    [(#2199)](https://github.com/PennyLaneAI/catalyst/pull/2199)
+
 <h3>Internal changes ⚙️</h3>
 
 * Updates to PennyLane's use of a single transform primitive with a `transform` kwarg.
