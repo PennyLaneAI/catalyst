@@ -59,8 +59,8 @@ def RTIOQubitToChannelOp : RTIO_Op<"qubit_to_channel"> {
     let summary = "Map a qubit to an RTIO channel";
     let description = [{
         It's a temporary operation that will be lowered to a static `rtio.channel` operation during
-        the channel resolution stage. The purpose of this operation is to allow the qubit from a
-        from a high-level dialect to be mapped to an `!rtio.channel`.
+        the channel resolution stage. The purpose of this operation is to allow a qubit from a
+        high-level dialect to be mapped to an `!rtio.channel`.
 
         Example:
         ```mlir
