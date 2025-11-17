@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "remove-chained-self-inverse"
+#define DEBUG_TYPE "cancel-inverses"
 
 #include <memory>
 #include <vector>
@@ -40,19 +40,19 @@ using namespace catalyst::quantum;
 namespace catalyst {
 namespace quantum {
 
-#define GEN_PASS_DEF_REMOVECHAINEDSELFINVERSEPASS
+#define GEN_PASS_DEF_CANCELINVERSESPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct RemoveChainedSelfInversePass
-    : impl::RemoveChainedSelfInversePassBase<RemoveChainedSelfInversePass> {
-    using RemoveChainedSelfInversePassBase::RemoveChainedSelfInversePassBase;
+struct CancelInversesPass
+    : impl::CancelInversesPassBase<CancelInversesPass> {
+    using CancelInversesPassBase::CancelInversesPassBase;
 
     void runOnOperation() final
     {
-        LLVM_DEBUG(dbgs() << "remove chained self inverse pass"
+        LLVM_DEBUG(dbgs() << "cancel inverses"
                           << "\n");
 
-        // Run cse pass before running remove-chained-self-inverse,
+        // Run cse pass before running cancel-inverses,
         // to aid identifying equivalent SSA values when verifying
         // the gates have the same params
         MLIRContext *ctx = &getContext();
@@ -66,7 +66,7 @@ struct RemoveChainedSelfInversePass
 
         RewritePatternSet patterns(&getContext());
         populateLoopBoundaryPatterns(patterns, 2);
-        populateSelfInversePatterns(patterns);
+        populateCancelInversesPatterns(patterns);
 
         if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
             return signalPassFailure();
