@@ -62,6 +62,7 @@ class HelloWorldPass(passes.ModulePass):
     name = "hello-world"
 
     def apply(self, _ctx: Context, _module: builtin.ModuleOp) -> None:
+        """Apply the pass."""
         print("hello world")
 
 
@@ -386,6 +387,8 @@ class TestCallbackIntegration:
             name = "none-pass"
 
             def apply(self, _ctx: Context, _module: builtin.ModuleOp) -> None: ...
+
+            """Dummy apply pass."""
 
         def print_between_passes(*_, pass_level=0):
             """Print between passes callback."""

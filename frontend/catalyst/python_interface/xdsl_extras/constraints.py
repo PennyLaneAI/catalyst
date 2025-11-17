@@ -159,9 +159,10 @@ class ContainerConstraint(AttrConstraint, ABC):
         constr = self.expected_type.constr(element_type=self.element_type, shape=self.shape)
         constr.verify(attr, constraint_context)
 
+    # pylint: disable=unused-argument
     def mapping_type_vars(
         self, type_var_mapping: dict[TypeVar, AttrConstraint]
-    ) -> "ContainerConstraint":  # pylint: disable=unused-argument
+    ) -> "ContainerConstraint":
         """
         A helper function to make type vars used in attribute definitions concrete when
         creating constraints for new attributes or operations.
@@ -228,9 +229,10 @@ class NestedTupleOfConstraint(AttrConstraint[TupleType]):
             if not matched:
                 raise VerifyException(f"tuple leaf {i} failed all allowed constraints: {leaf}")
 
+    # pylint: disable=unused-argument
     def mapping_type_vars(
         self,
         type_var_mapping: Mapping[TypeVar, AttrConstraint | IntConstraint],
-    ) -> AttrConstraint:  # pylint: disable=unused-argument
+    ) -> AttrConstraint:
         """Map type variables to constraints."""
         return self
