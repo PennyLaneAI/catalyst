@@ -1116,7 +1116,6 @@ class TestCondPredicateConversion:
         out = workflow(0.5)
         assert qml.math.allclose(out, 0.25)
 
-
     def test_array_conversion_failed(self):
         """Test failure at converting array to bool using Autograph."""
 
