@@ -1,4 +1,4 @@
-# Copyright 2024 Xanadu Quantum Technologies Inc.
+# Copyright 2024-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -77,6 +77,7 @@ __all__ = (
     "ExpansionStrategy",
     "for_loop_expansion_strategy",
     "cond_expansion_strategy",
+    "switch_expansion_strategy",
     "while_loop_expansion_strategy",
     "DynamicJaxprTrace",
     "DynamicJaxprTracer",
@@ -635,6 +636,11 @@ def for_loop_expansion_strategy(preserve_dimensions=False):
 
 def cond_expansion_strategy():
     """Arguments and results expansion strategy for conditionals."""
+    return ExpansionStrategy(True, False)
+
+
+def switch_expansion_strategy():
+    """Arguments and results expansion strategy for index-switches."""
     return ExpansionStrategy(True, False)
 
 
