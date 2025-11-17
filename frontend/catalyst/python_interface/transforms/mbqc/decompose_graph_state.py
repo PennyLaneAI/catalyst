@@ -46,12 +46,11 @@ class DecomposeGraphStatePass(passes.ModulePass):
 
     name = "decompose-graph-state"
 
-    # pylint: disable=no-self-use
-    def apply(self, _ctx: context.Context, module: builtin.ModuleOp) -> None:
+    def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the decompose-graph-state pass."""
 
         walker = pattern_rewriter.PatternRewriteWalker(DecomposeGraphStatePattern())
-        walker.rewrite_module(module)
+        walker.rewrite_module(op)
 
 
 decompose_graph_state_pass = compiler_transform(DecomposeGraphStatePass)
@@ -145,12 +144,11 @@ class NullDecomposeGraphStatePass(passes.ModulePass):
 
     name = "null-decompose-graph-state"
 
-    # pylint: disable=no-self-use
-    def apply(self, _ctx: context.Context, module: builtin.ModuleOp) -> None:
+    def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the null-decompose-graph-state pass."""
 
         walker = pattern_rewriter.PatternRewriteWalker(NullDecomposeGraphStatePattern())
-        walker.rewrite_module(module)
+        walker.rewrite_module(op)
 
 
 null_decompose_graph_state_pass = compiler_transform(NullDecomposeGraphStatePass)

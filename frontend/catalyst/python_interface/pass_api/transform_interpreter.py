@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=line-too-long
 """Custom Transform Dialect Interpreter Pass
 
 Differs from xDSL's upstream implementation by allowing passes
@@ -43,7 +44,6 @@ from catalyst.compiler import _quantum_opt
 from catalyst.python_interface.dialects.transform import ApplyRegisteredPassOp
 
 
-# pylint: disable=too-few-public-methods
 @register_impls
 class TransformFunctionsExt(TransformFunctions):
     """

@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pylint: disable=too-few-public-methods
-
 """
 Dynamism operations for the StableHLO dialect.
 """
@@ -108,7 +106,8 @@ class CustomCallOp(IRDLOperation):
         # Layout constraints for either both operands & results or none should be specified.
         if (self.operand_layouts is None) != (self.result_layouts is None):
             raise VerifyException(
-                "Layout attributes should be specified for either both operands and results or none."
+                "Layout attributes should be specified for either both operands and results "
+                "or none."
             )
 
         assert self.operand_layouts is not None and self.result_layouts is not None
@@ -148,7 +147,8 @@ class CustomCallOp(IRDLOperation):
                 rank = ty.get_num_dims()
                 if rank != len(dims) or sorted(dims) != list(range(rank)):
                     raise VerifyException(
-                        f"incorrect layout {dims} for type {ty}, layout must be a permutation of [0, {rank})"
+                        f"incorrect layout {dims} for type {ty}, layout must be a permutation "
+                        f"of [0, {rank})"
                     )
 
         # Operand types

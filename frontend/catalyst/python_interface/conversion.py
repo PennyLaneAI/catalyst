@@ -19,9 +19,9 @@ from functools import wraps
 from typing import TypeAlias
 
 from jax._src.lib import _jax
-from jaxlib.mlir.dialects import stablehlo as jstablehlo  # pylint: disable=no-name-in-module
-from jaxlib.mlir.ir import Context as jContext  # pylint: disable=no-name-in-module
-from jaxlib.mlir.ir import Module as jModule  # pylint: disable=no-name-in-module
+from jaxlib.mlir.dialects import stablehlo as jstablehlo
+from jaxlib.mlir.ir import Context as jContext
+from jaxlib.mlir.ir import Module as jModule
 from xdsl.context import Context as xContext
 from xdsl.dialects import builtin as xbuiltin
 from xdsl.dialects import func as xfunc

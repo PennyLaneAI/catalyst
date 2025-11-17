@@ -25,8 +25,9 @@ Known Limitations
   * Usage patterns that are not yet supported with program capture are also not supported in the
     compilation pass. For example, operator arithmetic is not currently supported, such as
     qml.expval(qml.Y(0) @ qml.X(1)).
-  * qml.counts() is not supported since the return type/shape is different in PennyLane and Catalyst.
-    See https://docs.pennylane.ai/projects/catalyst/en/stable/dev/quick_start.html#measurements
+  * qml.counts() is not supported since the return type/shape is different in PennyLane and
+    Catalyst. See
+    https://docs.pennylane.ai/projects/catalyst/en/stable/dev/quick_start.html#measurements
     for more information.
 """
 
@@ -56,10 +57,9 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
 
     name = "measurements-from-samples"
 
-    # pylint: disable=no-self-use
-    def apply(self, _ctx: context.Context, module: builtin.ModuleOp) -> None:
+    def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the measurements-from-samples pass."""
-        shots = _get_static_shots_value_from_first_device_op(module)
+        shots = _get_static_shots_value_from_first_device_op(op)
 
         greedy_applier = pattern_rewriter.GreedyRewritePatternApplier(
             [
@@ -70,7 +70,7 @@ class MeasurementsFromSamplesPass(passes.ModulePass):
             ]
         )
         walker = pattern_rewriter.PatternRewriteWalker(greedy_applier, apply_recursively=False)
-        walker.rewrite_module(module)
+        walker.rewrite_module(op)
 
 
 measurements_from_samples_pass = compiler_transform(MeasurementsFromSamplesPass)
@@ -296,7 +296,8 @@ class MeasurementsFromSamplesPattern(RewritePattern):
             value (int): The integer value.
             insert_point (InsertPoint): The insertion point for the constant op.
             rewriter (PatternRewriter): The xDSL pattern rewriter.
-            value_type (int, optional): The integer value type (i.e. number of bits). Defaults to 64.
+            value_type (int, optional): The integer value type (i.e. number of bits).
+                Defaults to 64.
 
         Returns:
             arith.ConstantOp: The created constant op.
@@ -424,7 +425,8 @@ class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
             return_types=[builtin.TensorType(builtin.Float64Type(), shape=())],
         )
 
-        # The op to replace is not the expval/var op itself, but the tensor.from_elements op that follows
+        # The op to replace is not the expval/var op itself, but the tensor.from_elements
+        # op that follows
         op_to_replace = list(matched_op.results[0].uses)[0].operation
         assert isinstance(
             op_to_replace, tensor.FromElementsOp

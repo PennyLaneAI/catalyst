@@ -28,7 +28,7 @@ from xdsl.parser import Parser as xParser
 from catalyst.python_interface.dialects import MBQC, QEC, Catalyst, Quantum, StableHLO, Transform
 
 
-class QuantumParser(xParser):  # pylint: disable=abstract-method,too-few-public-methods
+class QuantumParser(xParser):  # pylint: disable=abstract-method
     """A subclass of ``xdsl.parser.Parser`` that automatically loads relevant dialects
     into the input context.
 
@@ -54,6 +54,7 @@ class QuantumParser(xParser):  # pylint: disable=abstract-method,too-few-public-
         QEC,
     )
 
+    # pylint: disable=redefined-builtin
     def __init__(
         self,
         ctx: xContext,

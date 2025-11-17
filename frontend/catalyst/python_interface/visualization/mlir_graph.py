@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-This file contains the implementation of the MLIR graph generation for the Unified Compiler framework.
+This file contains the implementation of the MLIR graph generation for the Unified
+Compiler framework.
 """
 from __future__ import annotations
 
@@ -87,8 +88,9 @@ def generate_mlir_graph(qnode: QNode) -> Callable:
     Generate an MLIR graph for the given QNode and saves it to a file.
 
     This function uses the callback mechanism of the unified compiler framework to generate
-    the MLIR graph in between compilation passes. The provided QNode is assumed to be decorated with xDSL compilation passes.
-    The ``qjit`` decorator is used to recompile the QNode with the passes and the provided arguments.
+    the MLIR graph in between compilation passes. The provided QNode is assumed to be decorated
+    with xDSL compilation passes. The ``qjit`` decorator is used to recompile the QNode with the
+    passes and the provided arguments.
 
     If no passes are applied, the original QNode is visualized.
 

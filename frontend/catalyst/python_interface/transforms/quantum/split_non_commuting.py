@@ -12,16 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=line-too-long
 """This file contains a limited prototype of the split_non_commuting pass.
 
 Known Limitations
 -----------------
 
-  * Only single-term observables with no coefficients are supported - there is no support for CompositeOp or SymbolicOp observables
+  * Only single-term observables with no coefficients are supported - there is no support
+    for CompositeOp or SymbolicOp observables
   * Only the Expval measurement process is supported
-  * There is no option to specify a grouping strategy (this will be more relevant once CompositeOp support is added)
-  * Hence, only the "wires" grouping strategy is implemented, not taking into account observable-commutation logic yet.
-  * There is no efficient handling of duplicate observables - a circuit that returns multiple measurements on the same observable will split into multiple executions (this will be more relevant once CompositeOp support is added)
+  * There is no option to specify a grouping strategy (this will be more relevant once
+    CompositeOp support is added)
+  * Hence, only the "wires" grouping strategy is implemented, not taking into account
+    observable-commutation logic yet.
+  * There is no efficient handling of duplicate observables - a circuit that returns
+    multiple measurements on the same observable will split into multiple executions
+    (this will be more relevant once CompositeOp support is added)
 
 Example:
 ------------------
@@ -103,12 +109,12 @@ class SplitNonCommutingPass(passes.ModulePass):
 
     name = "split-non-commuting"
 
-    def apply(self, _ctx: context.Context, module: builtin.ModuleOp) -> None:
+    def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the split non-commuting pass to all QNode functions in the module."""
-        for op in module.ops:
-            if isinstance(op, func.FuncOp) and "qnode" in op.attributes:
-                rewriter = pattern_rewriter.PatternRewriter(op)
-                SplitNonCommutingPattern().match_and_rewrite(op, rewriter)
+        for op_ in op.ops:
+            if isinstance(op_, func.FuncOp) and "qnode" in op_.attributes:
+                rewriter = pattern_rewriter.PatternRewriter(op_)
+                SplitNonCommutingPattern().match_and_rewrite(op_, rewriter)
 
 
 split_non_commuting_pass = compiler_transform(SplitNonCommutingPass)
@@ -467,7 +473,9 @@ class SplitNonCommutingPattern(pattern_rewriter.RewritePattern):
         return_op = func.ReturnOp(*final_return_values)
         original_block.add_op(return_op)
 
-    def match_and_rewrite(self, func_op: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter):
+    def match_and_rewrite(
+        self, func_op: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter, /
+    ):
         """Split a quantum function into multiple functions using wire-based grouping.
 
         Creates one duplicate function per group, where each duplicate function contains

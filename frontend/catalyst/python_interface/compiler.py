@@ -18,8 +18,8 @@ import io
 
 from jax._src.interpreters import mlir
 from jaxlib.mlir.dialects import stablehlo
-from jaxlib.mlir.ir import Context as jaxContext  # pylint: disable=no-name-in-module
-from jaxlib.mlir.ir import Module as jaxModule  # pylint: disable=no-name-in-module
+from jaxlib.mlir.ir import Context as jaxContext
+from jaxlib.mlir.ir import Module as jaxModule
 from pennylane.typing import Callable
 from xdsl.context import Context as xContext
 from xdsl.dialects.builtin import ModuleOp

@@ -158,8 +158,8 @@ def resolve_constant_params(ssa: SSAValue) -> float | int:
         case "stablehlo.reshape":
             res_type = op.result_types[0]
             shape = res_type.get_shape()
-            type = res_type.get_element_type()
-            return jax.numpy.array(shape, dtype=int if isinstance(type, IntegerType) else float)
+            type_ = res_type.get_element_type()
+            return jax.numpy.array(shape, dtype=int if isinstance(type_, IntegerType) else float)
 
         case _:
             raise NotImplementedError(f"Cannot resolve parameters for operation: {op}")

@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pylint: disable=too-few-public-methods
-
 """
 Dynamism operations for the StableHLO dialect.
 """
@@ -147,7 +145,8 @@ class DynamicBroadcastInDimOp(IRDLOperation):
         # dynamic_broadcast_in_dim_c7: output_dimensions shape compatible with result rank
         out_dims_ty = self.output_dimensions.type  # pylint: disable=no-member
         assert isinstance(out_dims_ty, TensorType)
-        # Must be rank-1 tensor (enforced by type constraint), and length must match result rank when statically known
+        # Must be rank-1 tensor (enforced by type constraint), and length must match result
+        # rank when statically known
         out_shape = out_dims_ty.get_shape()
         if len(out_shape) != 1:
             raise VerifyException("output_dimensions must be a 1D tensor")

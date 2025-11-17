@@ -70,8 +70,8 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
     name = "convert-to-mbqc-formalism"
 
     def _prep_graph_state(self, gate_name: str):
-        """Add a graph state prep operation into the subroutine for each gate and extract and return auxiliary qubits
-        in the graph state.
+        """Add a graph state prep operation into the subroutine for each gate and extract and
+        return auxiliary qubits in the graph state.
 
         Args:
             gate_name[str]: Name of gate operation.
@@ -115,6 +115,7 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
         qubit: QubitType,
     ):
         """Add an arbitrary basis measure related operations to the subroutine.
+
         Args:
             const_angle_op (arith.ConstantOp) : The angle of measurement basis.
             qubit (QubitType) : The target qubit to be measured.
@@ -135,12 +136,15 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
         angle: SSAValue[builtin.Float64Type],
         plane: str,
         qubit: QubitType,
-    ):  # pylint: disable=too-many-arguments, too-many-positional-arguments
+    ):
         """
-        Add a conditional arbitrary basis measurement operation based on a previous measurement result.
+        Add a conditional arbitrary basis measurement operation based on a previous measurement
+        result.
+
         Args:
             meas_parity (builtin.IntegerType) : A parity of previous measurements.
-            angle (SSAValue[builtin.Float64Type]) : An angle SSAValue from a parametric gate operation.
+            angle (SSAValue[builtin.Float64Type]) : An angle SSAValue from a parametric gate
+                operation.
             plane (str): Plane of the measurement basis.
             qubit (QubitType) : The target qubit to be measured.
 
@@ -314,10 +318,12 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
         additional_const_one: bool = False,
     ):
         """Add parity check related operations to the subroutine.
+
         Args:
             mres (list[builtin.IntegerType]): A list of the mid-measurement results.
-            additional_const_one (bool) : Whether we need to add an additional const one to get the
-                parity or not. Defaults to False.
+            additional_const_one (bool) : Whether we need to add an additional const one to
+                get the parity or not. Defaults to False.
+
         Returns:
             The result of parity check.
         """
@@ -341,8 +347,9 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
         parity_res: OpResult,
         gate_name: str,
         qubit: QubitType,
-    ):  # pylint: disable=too-many-arguments, too-many-positional-arguments
+    ):
         """Add a byproduct op related operations to the subroutine.
+
         Args:
             parity_res (OpResult) : Parity check result.
             gate_name (str) : The name of the gate to be corrected.
@@ -368,6 +375,7 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
         qubit: QubitType,
     ):
         """Add correction ops of a Hadamard gate to the subroutine.
+
         Args:
             mres (list[builtin.IntegerType]): A list of the mid-measurement results.
             qubit (QubitType) : An auxiliary result qubit.
@@ -393,6 +401,7 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
         qubit: QubitType,
     ):
         """Add correction ops of a S gate to the subroutine.
+
         Args:
             mres (list[builtin.IntegerType]): A list of the mid-measurement results.
             qubit (QubitType) : An auxiliary result qubit.
@@ -417,6 +426,7 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
         qubit: QubitType,
     ):
         """Add correction ops of a RotXZX or RZ gate to the subroutine.
+
         Args:
             mres (list[builtin.IntegerType]): A list of the mid-measurement results.
             qubit (QubitType) : An auxiliary result qubit.
@@ -440,9 +450,11 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
         qubits: list[QubitType],
     ):
         """Add correction ops of a CNOT gate to the subroutine.
+
         Args:
             mres (list[builtin.IntegerType]): A list of the mid-measurement results.
             qubits (list[QubitType]) : A list of auxiliary result qubits.
+
         Returns:
             The result auxiliary qubits.
         """
@@ -465,6 +477,7 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
         self, gate_name: str, graph_qubit_dict, params: None | list[builtin.Float64Type] = None
     ):
         """Add measurement ops to the subroutine.
+
         Args:
             gate_name (str): Gate name.
             graph_qubit_dict (list[builtin.IntegerType]): A list of the mid-measurement results.
@@ -487,7 +500,8 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
                 return self._cnot_measurements(graph_qubit_dict)
             case _:
                 raise ValueError(
-                    f"{gate_name} is not supported in the MBQC formalism. Please decompose it into the MBQC gate set."
+                    f"{gate_name} is not supported in the MBQC formalism. Please decompose it "
+                    "into the MBQC gate set."
                 )
 
     def _insert_byprod_corrections(
@@ -518,7 +532,8 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
                 return self._cnot_corrections(mres, qubits)
             case _:
                 raise ValueError(
-                    f"{gate_name} is not supported in the MBQC formalism. Please decompose it into the MBQC gate set."
+                    f"{gate_name} is not supported in the MBQC formalism. Please decompose it "
+                    "into the MBQC gate set."
                 )
 
     def _create_single_qubit_gate_subroutine(self, gate_name: str):
@@ -576,8 +591,10 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
             func.ReturnOp(graph_qubit_dict[5])
 
         region = Region([block])
+        # pylint: disable=line-too-long
         # Note that visibility is set as private to ensure the subroutines that are
-        # not called (dead code) can be eliminated as the ["symbol-dce"](https://github.com/PennyLaneAI/catalyst/blob/372c376eb821e830da778fdc8af423eeb487eab6/frontend/catalyst/pipelines.py#L248)_
+        # not called (dead code) can be eliminated as the
+        # ["symbol-dce"](https://github.com/PennyLaneAI/catalyst/blob/372c376eb821e830da778fdc8af423eeb487eab6/frontend/catalyst/pipelines.py#L248)_
         # pass was added to the pipeline.
         funcOp = func.FuncOp(
             gate_name.lower() + "_in_mbqc",
@@ -634,8 +651,10 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
             )
 
         region = Region([block])
+        # pylint: disable=line-too-long
         # Note that visibility is set as private to ensure the subroutines that are
-        # not called (dead code) can be eliminated as the ["symbol-dce"](https://github.com/PennyLaneAI/catalyst/blob/372c376eb821e830da778fdc8af423eeb487eab6/frontend/catalyst/pipelines.py#L248)_
+        # not called (dead code) can be eliminated as the
+        # ["symbol-dce"](https://github.com/PennyLaneAI/catalyst/blob/372c376eb821e830da778fdc8af423eeb487eab6/frontend/catalyst/pipelines.py#L248)_
         # pass was added to the pipeline.
         funcOp = func.FuncOp(
             gate_name.lower() + "_in_mbqc",
@@ -647,32 +666,30 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
         funcOp.attributes["mbqc_transform"] = builtin.NoneAttr()
         return funcOp
 
-    # pylint: disable=no-self-use
-    def apply(self, _ctx: context.Context, module: builtin.ModuleOp) -> None:
+    def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the convert-to-mbqc-formalism pass."""
+        # pylint: disable=line-too-long
         # Insert subroutines for all gates in the MBQC gate set to the module.
-        # Note that the visibility of those subroutines are set as private, which ensure
-        # the ["symbol-dce"](https://github.com/PennyLaneAI/catalyst/blob/372c376eb821e830da778fdc8af423eeb487eab6/frontend/catalyst/pipelines.py#L248)_
+        # Note that the visibility of those subroutines are set as private, which ensure the
+        # ["symbol-dce"](https://github.com/PennyLaneAI/catalyst/blob/372c376eb821e830da778fdc8af423eeb487eab6/frontend/catalyst/pipelines.py#L248)_
         # pass could eliminate the unreferenced subroutines.
         subroutine_dict = {}
 
         for gate_name in _MBQC_ONE_QUBIT_GATES:
             funcOp = self._create_single_qubit_gate_subroutine(gate_name)
-            module.regions[0].blocks.first.add_op(funcOp)
+            op.regions[0].blocks.first.add_op(funcOp)
             subroutine_dict[gate_name] = funcOp
 
         cnot_funcOp = self._create_cnot_gate_subroutine()
-        module.regions[0].blocks.first.add_op(cnot_funcOp)
+        op.regions[0].blocks.first.add_op(cnot_funcOp)
         subroutine_dict["CNOT"] = cnot_funcOp
 
         pattern_rewriter.PatternRewriteWalker(
             pattern_rewriter.GreedyRewritePatternApplier(
-                [
-                    ConvertToMBQCFormalismPattern(subroutine_dict),
-                ]
+                [ConvertToMBQCFormalismPattern(subroutine_dict)]
             ),
             apply_recursively=False,
-        ).rewrite_module(module)
+        ).rewrite_module(op)
 
 
 convert_to_mbqc_formalism_pass = compiler_transform(ConvertToMBQCFormalismPass)
@@ -680,18 +697,18 @@ convert_to_mbqc_formalism_pass = compiler_transform(ConvertToMBQCFormalismPass)
 
 class ConvertToMBQCFormalismPattern(
     pattern_rewriter.RewritePattern
-):  # pylint: disable=too-few-public-methods,no-self-use
+):  # pylint: disable=too-few-public-methods
     """RewritePattern for converting to the MBQC formalism."""
 
     def __init__(self, subroutines_dict):
         self.subroutine_dict = subroutines_dict
 
-    # pylint: disable=no-self-use
     @pattern_rewriter.op_type_rewrite_pattern
     def match_and_rewrite(
         self,
         root: func.FuncOp | IfOp | WhileOp | ForOp | IndexSwitchOp,
         rewriter: pattern_rewriter.PatternRewriter,
+        /,
     ):
         """Match and rewrite for converting to the MBQC formalism."""
 

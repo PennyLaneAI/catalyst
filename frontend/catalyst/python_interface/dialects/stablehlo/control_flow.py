@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pylint: disable=too-few-public-methods
-
 """
 Control flow operations for the StableHLO dialect.
 """
@@ -84,6 +82,7 @@ class IfOp(IRDLOperation):
     # TODO: Add custom assembly format
 
 
+# pylint: disable=line-too-long
 @irdl_op_definition
 class WhileOp(IRDLOperation):
     """
@@ -125,6 +124,7 @@ class WhileOp(IRDLOperation):
     )
 
 
+# pylint: disable=line-too-long
 @irdl_op_definition
 class OptimizationBarrierOp(IRDLOperation):
     """

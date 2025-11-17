@@ -51,7 +51,8 @@ def get_graph_state_edges(gate_name: str) -> list[tuple[int, int]]:
     """
     Return a list of edges information in the graph state of a gate.
 
-    -  The connectivity of the target qubits in the register and auxiliary qubits for a single-qubit gate is:
+    - The connectivity of the target qubits in the register and auxiliary qubits for a
+      single-qubit gate is:
 
         tgt --  0  --  1  --  2  --  3
 
@@ -63,10 +64,12 @@ def get_graph_state_edges(gate_name: str) -> list[tuple[int, int]]:
         (2, 3),
         ]
 
-        Wire 1 in the above isn't the target wire described in the Fig.2 of [`arXiv:quant-ph/0301052 <https://arxiv.org/abs/quant-ph/0301052>`_],
+        Wire 1 in the above isn't the target wire described in the Fig.2 of
+        `arXiv:quant-ph/0301052 <https://arxiv.org/abs/quant-ph/0301052>`_],
         1 in the above maps to 3 in the figure.
 
-    - The connectivity of the ctrl/target qubits in the register and auxiliary qubits for a CNOT gate is:
+    - The connectivity of the ctrl/target qubits in the register and auxiliary qubits for a
+      CNOT gate is:
 
         ctl --  0  --  1  --  2  --  3  --  4  -- 5
                             |
@@ -91,9 +94,10 @@ def get_graph_state_edges(gate_name: str) -> list[tuple[int, int]]:
             (11, 12),
         ]
 
-        This graph is labelled based on the rows and columns of the adjacent matrix, but maps on to the graph described in
-        the Fig.2 of [`arXiv:quant-ph/0301052 <https://arxiv.org/abs/quant-ph/0301052>`_], where wire 1 is the control and
-        wire 9 is the target.
+        This graph is labelled based on the rows and columns of the adjacent matrix, but maps on
+        to the graph described in the Fig.2 of
+        [`arXiv:quant-ph/0301052 <https://arxiv.org/abs/quant-ph/0301052>`_], where wire 1 is the
+        control and wire 9 is the target.
 
         Args:
             gate_name (str): The name of a gate.
@@ -214,10 +218,10 @@ def edge_iter(adj_matrix: DenselyPackedAdjMatrix) -> Generator[tuple[int, int], 
 def _adj_matrix_generation_helper(
     num_vertices: int, edges_in_adj_matrix: list[tuple[int, int]]
 ) -> list:
-    """Helper function to generate an adjacency matrix to represent the connectivity of auxiliary qubits in
-    a graph state for a gate operation with the number of vertices and edges information.
-    Note that the adjacency matrix here means the lower triangular part of the full adjacency matrix.
-    It can be represented as below and `x` marks here denotes the matrix diagonal.
+    """Helper function to generate an adjacency matrix to represent the connectivity of auxiliary
+    qubits in a graph state for a gate operation with the number of vertices and edges information.
+    Note that the adjacency matrix here means the lower triangular part of the full adjacency
+    matrix. It can be represented as below and `x` marks here denotes the matrix diagonal.
     x
     + x
     + + x

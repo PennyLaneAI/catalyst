@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pylint: disable=too-few-public-methods
-
 """
 Dynamism operations for the StableHLO dialect.
 """
@@ -122,7 +120,8 @@ class ReduceOp(IRDLOperation):
                 raise VerifyException("input and init_value must have the same element type")
 
         # reduce_c2/c6: verify reducer region shape
-        # Expect block with arity 2 * number of inputs, with matching tensor element types and 0D tensors
+        # Expect block with arity 2 * number of inputs, with matching tensor element types
+        # and 0D tensors
         if len(self.body.blocks) != 1:
             raise VerifyException("reducer must have a single block")
         block = self.body.blocks[0]

@@ -236,5 +236,6 @@ class AllMatchSameOperatorTrait(OpTrait):
         if any(res != first for res in results[1:]):
             results_str = ", ".join(str(r) for r in results)
             raise VerifyException(
-                f"all of {{{names_str}}} must have the same {self.summary}: got {self.summary}s {results_str}"
+                f"all of {{{names_str}}} must have the same {self.summary}: got "
+                f"{self.summary}s {results_str}"
             )

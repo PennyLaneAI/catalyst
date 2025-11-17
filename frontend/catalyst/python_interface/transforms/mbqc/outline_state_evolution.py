@@ -17,11 +17,14 @@
 Known limitations
 -----------------
 
-    *   If the current pass is applied multiple times, the transform will fail as it would redefined the `state_evolution` func. This is
-        caused by the way we define the terminal_boundary_op. Each time the pass is applied to the IR, it would insert a new
-        terminal_boundary_op into the IR. TODOs: Instead of inserting a new `terminal_boundary_op` op to the IR when applying the pass, it
-        would be better to: 1. define a quantum.terminator op before this pass and use it as a delineation of quantum gate operation;
-        2. move the `simplify_io` to a separate pass.
+    *   If the current pass is applied multiple times, the transform will fail as it would redefined
+        the `state_evolution` func. This is caused by the way we define the terminal_boundary_op.
+        Each time the pass is applied to the IR, it would insert a new terminal_boundary_op into the
+        IR. TODOs: Instead of inserting a new `terminal_boundary_op` op to the IR when applying the
+        pass, it would be better to:
+            1.  define a quantum.terminator op before this pass and use it as a delineation of
+                quantum gate operation;
+            2.  move the `simplify_io` to a separate pass.
 """
 
 from dataclasses import dataclass
@@ -42,13 +45,12 @@ class OutlineStateEvolutionPass(passes.ModulePass):
 
     name = "outline-state-evolution"
 
-    # pylint: disable=no-self-use
-    def apply(self, _ctx: context.Context, module: builtin.ModuleOp) -> None:
+    def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the outline-state-evolution pass."""
-        for op in module.ops:
-            if isinstance(op, func.FuncOp) and "qnode" in op.attributes:
-                rewriter = pattern_rewriter.PatternRewriter(op)
-                OutlineStateEvolutionPattern().match_and_rewrite(op, rewriter)
+        for op_ in op.ops:
+            if isinstance(op_, func.FuncOp) and "qnode" in op_.attributes:
+                rewriter = pattern_rewriter.PatternRewriter(op_)
+                OutlineStateEvolutionPattern().match_and_rewrite(op_, rewriter)
 
 
 outline_state_evolution_pass = compiler_transform(OutlineStateEvolutionPass)
@@ -64,7 +66,8 @@ class OutlineStateEvolutionPattern(pattern_rewriter.RewritePattern):
             pass
         if op is None:
             raise RuntimeError(
-                "The given qnode func is not nested within a builtin.module. Please ensure the qnode func is defined in a builtin.module."
+                "The given qnode func is not nested within a builtin.module. Please ensure the "
+                "qnode func is defined in a builtin.module."
             )
         return op
 
@@ -83,8 +86,9 @@ class OutlineStateEvolutionPattern(pattern_rewriter.RewritePattern):
         # State evolution function region
         self.state_evolution_func: func.FuncOp = None
 
-    # pylint: disable=too-many-arguments
-    def match_and_rewrite(self, func_op: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter):
+    def match_and_rewrite(
+        self, func_op: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter, /
+    ):
         """Transform a quantum function (qnode) to outline state evolution regions.
         This implementation assumes that there is only one `quantum.alloc` operation in
         the func operations with a "qnode" attribute and all quantum operations are between
@@ -109,13 +113,13 @@ class OutlineStateEvolutionPattern(pattern_rewriter.RewritePattern):
         # in the qnode func.
         self._finalize_transformation()
 
-    # pylint: disable=no-else-return
     def _get_qubit_idx(self, op: Operation) -> int | None:
         """Get the index of qubit that an ExtractOp op extracts."""
         if getattr(op, "idx", None):
             return op.idx
         return getattr(op, "idx_attr", None)
 
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
     def _set_up_terminal_boundary_op(
         self,
         current_reg: quantum.QuregType,
@@ -159,7 +163,7 @@ class OutlineStateEvolutionPattern(pattern_rewriter.RewritePattern):
             del qubit_to_reg_idx[qb]
         return current_reg, prev_qreg, terminal_boundary_op
 
-    # pylint: disable=cell-var-from-loop, too-many-branches
+    # pylint: disable=too-many-branches
     def _simplify_quantum_io(
         self, func_op: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter
     ) -> func.FuncOp:
@@ -285,12 +289,15 @@ class OutlineStateEvolutionPattern(pattern_rewriter.RewritePattern):
         )
         rewriter.insert_op(state_evolution_func, InsertPoint.at_end(self.module.body.block))
 
-        # TODOs: how to define the `value_mapper` arg is not stated in the xdl.core module [here](https://github.com/xdslproject/xdsl/blob/e1301e0204bcf6ea5ed433e7da00bee57d07e695/xdsl/ir/core.py#L1429)_.
-        # It looks like storing ssa value to be cloned would maintain the dependency relationship required to build the new DAG for the new ops.
+        # pylint: disable=line-too-long
+        # TODOs: how to define the `value_mapper` arg is not stated in the xdl.core module
+        # [here](https://github.com/xdslproject/xdsl/blob/e1301e0204bcf6ea5ed433e7da00bee57d07e695/xdsl/ir/core.py#L1429)_.
+        # It looks like storing ssa value to be cloned would maintain the dependency
+        # relationship required to build the new DAG for the new ops.
         block = state_evolution_func.regions[0].block
         value_mapper = {}  # only args ssavlue is required
-        for input, block_arg in zip(ordered_inputs, block.args):
-            value_mapper[input] = block_arg
+        for input_, block_arg in zip(ordered_inputs, block.args):
+            value_mapper[input_] = block_arg
 
         self._clone_operations_to_block(ops_to_clone, block, value_mapper)
         self._add_return_statement(block, ordered_outputs, value_mapper)

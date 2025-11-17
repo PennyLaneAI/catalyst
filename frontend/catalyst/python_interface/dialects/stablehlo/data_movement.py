@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pylint: disable=too-few-public-methods
-
 """
 Data movement operations for the StableHLO dialect.
 """
@@ -53,6 +51,7 @@ from .attributes import GatherDimensionNumbers, ScatterDimensionNumbers
 from .types import HLO_AnyIntegerOrIndexTensor, HLO_AnyTensor, HLO_Int, HLO_IntTensor, HLO_Tensor
 
 
+# pylint: disable=line-too-long
 @irdl_op_definition
 class BroadcastInDimOp(IRDLOperation):
     """
@@ -93,7 +92,7 @@ class BroadcastInDimOp(IRDLOperation):
         assert isinstance(o_type, TensorType) and isinstance(r_type, TensorType)
 
         # broadcast_in_dim_c2: broadcast_dimensions size == operand rank
-        dims = tuple(self.broadcast_dimensions.get_values())
+        dims = tuple(self.broadcast_dimensions.get_values())  # pylint: disable=no-member
         operand_rank = o_type.get_num_dims()
         if len(dims) != operand_rank:
             raise VerifyException(
@@ -133,6 +132,7 @@ class BroadcastInDimOp(IRDLOperation):
                     )
 
 
+# pylint: disable=line-too-long
 @irdl_op_definition
 class ConcatenateOp(IRDLOperation):
     """
@@ -205,6 +205,7 @@ class DynamicSliceOp(IRDLOperation):
     )
 
 
+# pylint: disable=line-too-long
 @irdl_op_definition
 class GatherOp(IRDLOperation):
     """

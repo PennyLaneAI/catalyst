@@ -58,8 +58,6 @@ QubitSSAValue: TypeAlias = SSAValue[QubitType]
 class MeasurementPlaneEnum(StrEnum):
     """Enum containing supported measurement-plane attributes"""
 
-    # pylint: disable=too-few-public-methods
-
     XY = "XY"
     YZ = "YZ"
     ZX = "ZX"
@@ -69,16 +67,12 @@ class MeasurementPlaneEnum(StrEnum):
 class MeasurementPlaneAttr(EnumAttribute[MeasurementPlaneEnum], SpacedOpaqueSyntaxAttribute):
     """Planes in the Bloch sphere representation with support for arbitrary-basis measurements"""
 
-    # pylint: disable=too-few-public-methods
-
     name = "mbqc.measurement_plane"
 
 
 @irdl_op_definition
 class MeasureInBasisOp(IRDLOperation):
     """A parametric single-qubit projective measurement in an arbitrary basis."""
-
-    # pylint: disable=too-few-public-methods
 
     name = "mbqc.measure_in_basis"
 
@@ -124,15 +118,13 @@ class MeasureInBasisOp(IRDLOperation):
         if self.postselect is None:
             return
 
-        if self.postselect.value.data not in [0, 1]:
+        if self.postselect.value.data not in [0, 1]:  # pylint: disable=no-member
             raise VerifyException("'postselect' must be 0 or 1.")
 
 
 @irdl_op_definition
 class GraphStatePrepOp(IRDLOperation):
     """Allocate resources for a new graph state."""
-
-    # pylint: disable=too-few-public-methods
 
     name = "mbqc.graph_state_prep"
 

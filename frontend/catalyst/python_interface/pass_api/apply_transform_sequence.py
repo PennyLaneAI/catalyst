@@ -59,7 +59,7 @@ class ApplyTransformSequence(ModulePass):
     name = "apply-transform-sequence"
     callback: Callable[[ModulePass, builtin.ModuleOp, ModulePass], None] | None = None
 
-    def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:  # pylint: disable=no-self-use
+    def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         """Applies the transformation"""
         nested_modules = []
         for region in op.regions:

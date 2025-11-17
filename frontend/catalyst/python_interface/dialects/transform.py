@@ -40,8 +40,6 @@ be contributed upstream.
 """
 
 from xdsl.dialects.builtin import Dialect
-
-# pylint: disable=too-few-public-methods
 from xdsl.dialects.transform import ApplyRegisteredPassOp as xApplyRegisteredPassOp
 from xdsl.dialects.transform import (
     DictionaryAttr,
@@ -59,6 +57,7 @@ from xdsl.ir import Attribute, SSAValue
 from xdsl.irdl import IRDLOperation, ParsePropInAttrDict
 
 
+# pylint: disable=line-too-long
 @irdl_op_definition
 class ApplyRegisteredPassOp(IRDLOperation):
     """

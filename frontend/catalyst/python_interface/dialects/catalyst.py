@@ -14,14 +14,12 @@
 """
 This file contains the Catalyst dialect for the Python compiler.
 
-This file was originally ported automatically by xDSL (using the ``xdsl-tblgen`` tool) and modified manually
-to support the unified compiler.
+This file was originally ported automatically by xDSL (using the ``xdsl-tblgen`` tool)
+and modified manually to support the unified compiler.
 
 The catalyst dialect serves as a standard library for the Catalyst compiler.
 It contains data structures that support core compiler functionality.
 """
-
-# pylint: disable=too-few-public-methods
 
 from typing import ClassVar
 

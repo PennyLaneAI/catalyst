@@ -57,9 +57,8 @@ class IterativeCancelInversesPattern(
 ):  # pylint: disable=too-few-public-methods
     """RewritePattern for iteratively cancelling consecutive self-inverse gates."""
 
-    # pylint: disable=no-self-use
     @pattern_rewriter.op_type_rewrite_pattern
-    def match_and_rewrite(self, funcOp: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter):
+    def match_and_rewrite(self, funcOp: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter, /):
         """Implementation of rewriting FuncOps that may contain operations corresponding to
         self-inverse gates."""
         for op in funcOp.body.walk():
@@ -91,12 +90,11 @@ class IterativeCancelInversesPass(passes.ModulePass):
 
     name = "xdsl-cancel-inverses"
 
-    # pylint: disable=no-self-use
-    def apply(self, _ctx: context.Context, module: builtin.ModuleOp) -> None:
+    def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the iterative cancel inverses pass."""
         pattern_rewriter.PatternRewriteWalker(
             pattern_rewriter.GreedyRewritePatternApplier([IterativeCancelInversesPattern()])
-        ).rewrite_module(module)
+        ).rewrite_module(op)
 
 
 iterative_cancel_inverses_pass = compiler_transform(IterativeCancelInversesPass)

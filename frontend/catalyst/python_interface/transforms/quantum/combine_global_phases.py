@@ -32,10 +32,12 @@ class CombineGlobalPhasesPattern(
     """RewritePattern for combining all :class:`~pennylane.GlobalPhase` gates within the same region
     at the last global phase gate."""
 
-    # pylint: disable=no-self-use
     @pattern_rewriter.op_type_rewrite_pattern
     def match_and_rewrite(
-        self, root: func.FuncOp | IfOp | ForOp | WhileOp, rewriter: pattern_rewriter.PatternRewriter
+        self,
+        root: func.FuncOp | IfOp | ForOp | WhileOp,
+        rewriter: pattern_rewriter.PatternRewriter,
+        /,
     ):  # pylint: disable=cell-var-from-loop
         """Match and rewrite for the combine-global-phases pattern acting on functions or
         control-flow blocks containing GlobalPhase operations.
@@ -74,13 +76,12 @@ class CombineGlobalPhasesPass(passes.ModulePass):
 
     name = "combine-global-phases"
 
-    # pylint: disable=no-self-use
-    def apply(self, _ctx: context.Context, module: builtin.ModuleOp) -> None:
+    def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the combine-global-phases pass."""
         pattern_rewriter.PatternRewriteWalker(
             CombineGlobalPhasesPattern(),
             apply_recursively=False,
-        ).rewrite_module(module)
+        ).rewrite_module(op)
 
 
 combine_global_phases_pass = compiler_transform(CombineGlobalPhasesPass)

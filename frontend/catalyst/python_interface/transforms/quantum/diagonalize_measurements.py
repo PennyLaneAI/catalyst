@@ -17,15 +17,17 @@ written using xDSL.
 
 Known Limitations
 -----------------
-  * Only observables PauliX, PauliY, PauliZ, Hadamard and Identity are currently supported when using this transform (but
-    these are also the only observables currently supported in the Quantum dialect as NamedObservable).
-  * Unlike the current tape-based implementation of the transform, it doesn't allow for diagonalization of a subset
-    of observables.
-  * Unlike the current tape-based implementation of the transform, conversion to measurements based on eigvals
-  and wires (rather than the PauliZ observable) is not currently supported.
-  * Unlike the tape-based implementation, this pass will NOT raise an error if given a circuit that is invalid because
-    it contains non-commuting measurements. It should be assumed that this transform results in incorrect outputs unless
-    split_non_commuting is applied to break non-commuting measurements into separate tapes.
+  * Only observables PauliX, PauliY, PauliZ, Hadamard and Identity are currently supported when
+    using this transform (but these are also the only observables currently supported in the
+    Quantum dialect as NamedObservable).
+  * Unlike the current tape-based implementation of the transform, it doesn't allow for
+    diagonalization of a subset of observables.
+  * Unlike the current tape-based implementation of the transform, conversion to measurements
+    based on eigvals and wires (rather than the PauliZ observable) is not currently supported.
+  * Unlike the tape-based implementation, this pass will NOT raise an error if given a circuit
+    that is invalid because it contains non-commuting measurements. It should be assumed that
+    this transform results in incorrect outputs unless split_non_commuting is applied to break
+    non-commuting measurements into separate tapes.
 """
 
 from dataclasses import dataclass
@@ -78,9 +80,10 @@ class DiagonalizeFinalMeasurementsPattern(
 ):  # pylint: disable=too-few-public-methods
     """RewritePattern for diagonalizing final measurements."""
 
-    # pylint: disable=no-self-use
     @pattern_rewriter.op_type_rewrite_pattern
-    def match_and_rewrite(self, observable: NamedObsOp, rewriter: pattern_rewriter.PatternRewriter):
+    def match_and_rewrite(
+        self, observable: NamedObsOp, rewriter: pattern_rewriter.PatternRewriter, /
+    ):
         """Replace non-diagonalized observables with their diagonalizing gates and PauliZ."""
 
         if _diagonalize(observable):
@@ -126,7 +129,8 @@ class DiagonalizeFinalMeasurementsPattern(
 
             if num_observables > 1:
                 raise RuntimeError(
-                    "Each wire can only have one set of diagonalizing gates applied, but the circuit contains multiple observables with the same wire."
+                    "Each wire can only have one set of diagonalizing gates applied, but the "
+                    "circuit contains multiple observables with the same wire."
                 )
 
             observable.qubit.replace_by_if(qubit, lambda use: use in uses_to_change)
@@ -147,11 +151,10 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
 
     name = "diagonalize-final-measurements"
 
-    # pylint: disable= no-self-use
-    def apply(self, _ctx: context.Context, module: builtin.ModuleOp) -> None:
+    def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the diagonalize final measurements pass."""
         pattern_rewriter.PatternRewriteWalker(DiagonalizeFinalMeasurementsPattern()).rewrite_module(
-            module
+            op
         )
 
 

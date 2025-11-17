@@ -20,7 +20,7 @@ This module provides attribute definitions based on the StableHLO specification
 attributes for StableHLO operations.
 """
 
-# pylint: disable=too-few-public-methods
+# pylint: disable=line-too-long
 
 from collections.abc import Sequence
 
