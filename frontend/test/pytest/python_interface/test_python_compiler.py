@@ -381,6 +381,7 @@ class TestCallbackIntegration:
     def test_callback_integration(self, capsys):
         """Test that the callback mechanism works with the transform interpreter"""
 
+        # pylint: disable=unused-variable
         @compiler_transform
         @dataclass(frozen=True)
         class NonePass(passes.ModulePass):
