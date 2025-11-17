@@ -82,7 +82,7 @@ def RTIOQubitToChannelOp : RTIO_Op<"qubit_to_channel"> {
 }
 
 def RTIOPulseOp : RTIO_Op<"pulse"> {
-    let summary = "Generate a event-based pulse on a channel";
+    let summary = "Generate an event-based pulse on a channel";
     let description = [{
         Generate a pulse on the channel. Returns an `!rtio.event` handle that can be used with
         `rtio.sync` to wait for completion or to be used by other pulse operations with the `wait`
