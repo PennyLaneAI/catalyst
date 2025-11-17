@@ -285,9 +285,9 @@ class QFunc:
 
         new_transform_program, new_pipeline = _extract_passes(self.transform_program)
         # Update the qnode with peephole pipeline
-        old_pipeline = tuple(kwargs.pop("pass_pipeline", ()) or ())
-        pass_pipeline = old_pipeline + new_pipeline
-        pass_pipeline = dictionary_to_list_of_passes(pass_pipeline)
+        old_pipeline = kwargs.pop("pass_pipeline")
+        processed_old_pipeline = tuple(dictionary_to_list_of_passes(old_pipeline))
+        pass_pipeline = processed_old_pipeline + new_pipeline
         new_qnode = copy(self)
         new_qnode._transform_program = new_transform_program  # pylint: disable=protected-access
 
