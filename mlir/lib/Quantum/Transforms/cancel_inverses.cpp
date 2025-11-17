@@ -43,8 +43,7 @@ namespace quantum {
 #define GEN_PASS_DEF_CANCELINVERSESPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct CancelInversesPass
-    : impl::CancelInversesPassBase<CancelInversesPass> {
+struct CancelInversesPass : impl::CancelInversesPassBase<CancelInversesPass> {
     using CancelInversesPassBase::CancelInversesPassBase;
 
     void runOnOperation() final
