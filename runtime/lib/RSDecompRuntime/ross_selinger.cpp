@@ -27,7 +27,6 @@
 
 #define MAX_FACTORING_TRIALS 1000
 
-
 bool is_odd_multiple_of_pi_8(double angle)
 {
     const double pi_over_8 = M_PI / 8.0;
@@ -48,28 +47,17 @@ std::pair<std::vector<CliffordData::GateType>, double> eval_ross_algorithm(doubl
                                                                            double epsilon)
 {
 
-    // <<< ADDED: Define cache key and value types for clarity
     using CacheKey = std::pair<double, double>;
-    // <<< MODIFIED: Using std::vector instead of std::__1::vector
     using CacheValue = std::pair<std::vector<CliffordData::GateType>, double>;
-
-    // <<< ADDED: Declare the thread-local static cache
     static lru_cache<CacheKey, CacheValue, 10000> ross_cache;
 
-    // <<< ADDED: Create the key for the current call
     CacheKey key = {angle, epsilon};
 
-    // <<< ADDED: Check if the result is already in the cache
-     if (auto val_opt = ross_cache.get(key); val_opt) {
-        // Found it! Return the cached value immediately.
+    if (auto val_opt = ross_cache.get(key); val_opt) {
         return *val_opt;
     }
 
-    // <<< ORIGINAL CODE: (If not in cache, proceed with computation)
     double shift = 0.0;
-    // Note: The original 'angle = -angle / 2.0;' was here.
-    // This is problematic, as the original 'angle' is part of the cache key.
-    // We should use a new variable for the modified angle.
     double modified_angle = -angle / 2.0;
     ZOmega scale(0, 0, 0, 1);
     int max_search_trials = 10000;
@@ -80,10 +68,7 @@ std::pair<std::vector<CliffordData::GateType>, double> eval_ross_algorithm(doubl
     int k = 0;
 
     DyadicMatrix dyd_mat(0, 0, 0, 0);
-    // <<< MODIFIED: Use 'modified_angle' instead of 'angle' from here on
     if (is_odd_multiple_of_pi_8(modified_angle)) {
-
-        // <<< MODIFIED: Use 'modified_angle'
         int coeff = ((multiple_of_pi_8(modified_angle) % 16) + 16) % 16;
         std::map<int, std::tuple<int, int, ZOmega, ZOmega>> precomputed_map = {
             {1, {1, 7, ZOmega(0, 1, 0, 0), ZOmega(0, 1, 0, 0)}},
@@ -107,10 +92,8 @@ std::pair<std::vector<CliffordData::GateType>, double> eval_ross_algorithm(doubl
         }
     }
     else {
-        // <<< MODIFIED: Use 'modified_angle'
         double theta = modified_angle;
         int sign = 1;
-        // std::fmod matches Python's % for positive divisors
         theta = std::fmod(theta, M_PI * 4.0);
         if (theta < 0.0) {
             theta += M_PI * 4.0;
@@ -142,27 +125,20 @@ std::pair<std::vector<CliffordData::GateType>, double> eval_ross_algorithm(doubl
             scale = ZOmega(0, 0, 0, 1); // ZOmega(d=1)
         }
 
-        // <<< MODIFIED: Use 'modified_angle'
         GridProblem::GridIterator u_solutions(modified_angle + shift, epsilon, max_search_trials);
 
-        // <<< MODIFIED: Use 'modified_angle' for the debug print
-        std::cout << "angle: " << modified_angle << ", shift: " << shift << ", epsilon: " << epsilon
-                  << std::endl;
+        // std::cout << "angle: " << modified_angle << ", shift: " << shift << ", epsilon: " << epsilon
+        //           << std::endl;
 
         for (const auto &[u_sol, k_val] : u_solutions) {
             // std::cout << "Testing potential solution with k=" << k_val << std::endl << "u_sol: "
             // << u_sol << std::endl;
-            static INT_TYPE solution_count = 0;
-            solution_count += 1;
             auto xi = ZSqrtTwo(std::pow(2, k_val)) - u_sol.norm().to_sqrt_two();
             auto t_sol = NormSolver::solve_diophantine(xi, MAX_FACTORING_TRIALS);
 
             if (t_sol) {
-                // std::cout << "Found t solution: " << *t_sol << std::endl;
-                static INT_TYPE found_solution_count = 0;
-                found_solution_count += 1;
-                std::cout << "Total solutions tried: " << solution_count
-                          << ", found solutions: " << found_solution_count << std::endl;
+                // std::cout << "Found solution t_sol = " << *t_sol
+                //           << std::endl;
                 u = u_sol * scale;
                 t = *t_sol * scale;
                 k = k_val;
@@ -173,15 +149,12 @@ std::pair<std::vector<CliffordData::GateType>, double> eval_ross_algorithm(doubl
         dyd_mat = DyadicMatrix(u, -t.conj(), t, u.conj(), k);
     }
     SO3Matrix so3_mat(dyd_mat);
-    // std::cout << "before/after"<< std::endl;
     auto normal_form_result = normal_forms::ma_normal_form(so3_mat);
 
-    // <<< ADDED: Store the newly computed result in the cache
     ross_cache.put(key, normal_form_result);
 
     return normal_form_result;
 }
-
 
 /**
  * This is a dummy implementation of the rs decomposition
@@ -189,14 +162,13 @@ std::pair<std::vector<CliffordData::GateType>, double> eval_ross_algorithm(doubl
 extern "C" {
 int64_t rs_decomposition_get_size_0(double theta, double epsilon, bool ppr_basis)
 {
-    // eval_ross_algorithm doesn't use ppr_basis, so we can ignore it.
-    (void)ppr_basis;
+    if (ppr_basis) {
+        assert(false && "Simulating PPR basis not yet supported.");
+    }
 
-    // Call the algorithm. This will compute or, more likely, pull from its internal cache.
     auto result = eval_ross_algorithm(theta, epsilon);
-    const auto &gates_vector = result.first; // This is std::vector<CliffordData::GateType>
+    const auto &gates_vector = result.first; 
 
-    // Return the size of the gate sequence.
     return static_cast<int64_t>(gates_vector.size());
 }
 
@@ -211,16 +183,19 @@ int64_t rs_decomposition_get_size_0(double theta, double epsilon, bool ppr_basis
  *
  * @param data_allocated Pointer to allocated data
  * @param data_aligned Pointer to aligned data
- *... (omitted parameters for brevity)
+ * @param offset Offset
+ * @param size0 Size of the first dimension
+ * @param stride0 Stride of the first dimension
+ * @param theta Angle
+ * @param epsilon Error
+ * @param ppr_basis Whether to use PPR basis
  */
 void rs_decomposition_get_gates_0([[maybe_unused]] int64_t *data_allocated, int64_t *data_aligned,
                                   size_t offset, size_t size0, size_t stride0, double theta,
                                   double epsilon, bool ppr_basis)
 {
-    // eval_ross_algorithm doesn't use ppr_basis, so we can ignore it.
     (void)ppr_basis;
 
-    // Call the algorithm. This should be a cache hit if get_size was called first.
     auto result = eval_ross_algorithm(theta, epsilon);
     const auto &gates_data = result.first; // std::vector<CliffordData::GateType>
 
@@ -234,8 +209,8 @@ void rs_decomposition_get_gates_0([[maybe_unused]] int64_t *data_allocated, int6
     // Ensure the MLIR-allocated buffer is at least as large as the data we're writing
     if (static_cast<size_t>(gates_view.size()) < gates_data.size()) {
         std::cerr << "Error: memref allocated for rs_decomposition is too small."
-                  << " (Allocated: " << gates_view.size()
-                  << ", Needed: " << gates_data.size() << ")" << std::endl;
+                  << " (Allocated: " << gates_view.size() << ", Needed: " << gates_data.size()
+                  << ")" << std::endl;
         return;
     }
 
@@ -256,17 +231,10 @@ void rs_decomposition_get_gates_0([[maybe_unused]] int64_t *data_allocated, int6
  */
 double rs_decomposition_get_phase_0(double theta, double epsilon, bool ppr_basis)
 {
-    // eval_ross_algorithm doesn't use ppr_basis, so we can ignore it.
     (void)ppr_basis;
 
-    // Call the algorithm. This should also be a cache hit.
     auto result = eval_ross_algorithm(theta, epsilon);
     double phase = result.second;
-
-    // std::cout << "Calling rs_decomposition_get_phase runtime function!\n";
-    // std::cout << "phase got ppr_basis " << ppr_basis << std::endl;
-    // std::cout << "phase got theta " << theta << std::endl;
-    // std::cout << "phase got epsilon " << epsilon << std::endl;
 
     return phase;
 }

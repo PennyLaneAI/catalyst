@@ -2,11 +2,11 @@
 
 #include <algorithm>
 #include <iostream>
-#include <string>
 #include <list>
 #include <map>
 #include <optional>
 #include <stdexcept>
+#include <string>
 
 template <typename T> inline T abs_val(T x) { return (x < 0) ? -x : x; }
 
@@ -82,11 +82,10 @@ inline std::ostream &operator<<(std::ostream &os, unsigned __int128 n)
     return os;
 }
 
-template <typename Key, typename Value, size_t MaxSize>
-class lru_cache {
+template <typename Key, typename Value, size_t MaxSize> class lru_cache {
     static_assert(MaxSize > 0, "LRU cache MaxSize must be greater than 0");
 
-public:
+  public:
     using list_pair_t = std::pair<Key, Value>;
     using list_iterator_t = typename std::list<list_pair_t>::iterator;
     using map_t = std::map<Key, list_iterator_t>;
@@ -156,7 +155,7 @@ public:
         cache_list.clear();
     }
 
-private:
+  private:
     std::list<list_pair_t> cache_list;
     map_t cache_map;
 };
