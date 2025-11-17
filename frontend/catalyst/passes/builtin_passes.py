@@ -537,22 +537,20 @@ def ions_decomposition(qnode):  # pragma: nocover
 
 def to_ppr(qnode):
     R"""
-    Specify that the MLIR compiler pass for converting
-    clifford+T gates into Pauli Product Rotation (PPR) gates will be applied.
+    A quantum compilation pass that converts Clifford+T gates into Pauli Product Rotation (PPR)
+    gates.
 
-    Clifford gates are defined as :math:`\exp({iP\tfrac{\pi}{4}})`,
-    where :math:`P` is a Pauli word. Non-Clifford gates are defined
-    as :math:`\exp({iP\tfrac{\pi}{8}})`.
+    Clifford gates are defined as :math:`\exp({iP\tfrac{\pi}{4}})`, where :math:`P` is a Pauli word.
+    Non-Clifford gates are defined as :math:`\exp({iP\tfrac{\pi}{8}})`.
 
-    For more information on the PPM compilation pass,
-    check out the `compilation hub <https://pennylane.ai/compilation/pauli-product-measurement>`__.
+    For more information on the PPM compilation pass, check out the
+    `compilation hub <https://pennylane.ai/compilation/pauli-product-measurement>`__.
 
     .. note::
 
-        The circuits that generated from this pass are currently
-        only not executable in any backend. This pass is only for analysis
-        and potential future execution when a suitable backend is available.
-
+        The circuits that generated from this pass are currently only not executable in any backend.
+        This pass is only for analysis and potential future execution when a suitable backend is
+        available.
 
     The full list of supported gates and operations are
     ``qml.H``,
@@ -574,43 +572,58 @@ def to_ppr(qnode):
 
     **Example**
 
-    In this example the Clifford+T gates will be converted into PPRs.
+    For clear and inspectable results, use ``to_ppr`` with PennyLane's program capture enabled,
+    :func:`pennylane.capture.enable`, and by calling it from the PennyLane frontend instead of with
+    ``catalyst.passes.to_ppr``:
 
     .. code-block:: python
 
         import pennylane as qml
-        from catalyst import qjit, measure
 
-        ppm_passes = [("PPM", ["to-ppr"])]
+        qml.capture.enable()
 
-        @qjit(pipelines=ppm_passes, keep_intermediate=True, target="mlir")
+        pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+        @qml.qjit(pipelines=pipeline, target="mlir")
+        @qml.transforms.to_ppr
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             qml.H(0)
             qml.CNOT([0, 1])
             qml.T(0)
-            return measure(1)
+            return qml.expval(qml.Z(0))
 
-        print(circuit.mlir_opt)
+    In this example the Clifford+T gates will be converted into PPRs:
 
-    Example MLIR Representation:
+    >>> print(qml.specs(circuit, level="device")()['resources'])
+    num_wires: 2
+    num_gates: 7
+    depth: None
+    shots: Shots(total=None)
+    gate_types:
+    {'PPR-pi/4-w1': 5, 'PPR-pi/4-w2': 1, 'PPR-pi/8-w1': 1}
+    gate_sizes:
+    {1: 6, 2: 1}
 
-    .. code-block:: mlir
+    In the above output, ``PPR-X-Y`` denotes the type of PPR present in the circuit, where ``X`` is
+    the angle and ``Y`` is the PPR weight.
 
-        . . .
-        %2 = qec.ppr ["Z"](4) %1 : !quantum.bit
-        %3 = qec.ppr ["X"](4) %2 : !quantum.bit
-        %4 = qec.ppr ["Z"](4) %3 : !quantum.bit
-        %c_3 = stablehlo.constant dense<1> : tensor<i64>
-        %extracted_4 = tensor.extract %c_3[] : tensor<i64>
-        %5 = quantum.extract %0[%extracted_4] : !quantum.reg -> !quantum.bit
-        %6:2 = qec.ppr ["Z", "X"](4) %4, %5 : !quantum.bit, !quantum.bit
-        %7 = qec.ppr ["Z"](-4) %6#0 : !quantum.bit
-        %8 = qec.ppr ["X"](-4) %6#1 : !quantum.bit
-        %9 = qec.ppr ["Z"](8) %7 : !quantum.bit
-        %mres, %out_qubits = qec.ppm ["Z"] %8 : !quantum.bit
-        . . .
+    Optionally, the resulting MLIR can be inspected, as well:
 
+    >>> print(circuit.mlir_opt)
+    . . .
+    %2 = qec.ppr ["Z"](4) %1 : !quantum.bit
+    %3 = qec.ppr ["X"](4) %2 : !quantum.bit
+    %4 = qec.ppr ["Z"](4) %3 : !quantum.bit
+    %c_3 = stablehlo.constant dense<1> : tensor<i64>
+    %extracted_4 = tensor.extract %c_3[] : tensor<i64>
+    %5 = quantum.extract %0[%extracted_4] : !quantum.reg -> !quantum.bit
+    %6:2 = qec.ppr ["Z", "X"](4) %4, %5 : !quantum.bit, !quantum.bit
+    %7 = qec.ppr ["Z"](-4) %6#0 : !quantum.bit
+    %8 = qec.ppr ["X"](-4) %6#1 : !quantum.bit
+    %9 = qec.ppr ["Z"](8) %7 : !quantum.bit
+    %mres, %out_qubits = qec.ppm ["Z"] %8 : !quantum.bit
+    . . .
     """
     return PassPipelineWrapper(qnode, "to-ppr")
 
