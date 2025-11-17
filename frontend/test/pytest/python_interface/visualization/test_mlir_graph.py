@@ -17,15 +17,11 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.external
-
-pytest.importorskip("xdsl")
-pytest.importorskip("catalyst")
-
+# pylint: disable=wrong-import-position
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 import pennylane as qml
 
-# pylint: disable=wrong-import-position
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface.transforms import (
     iterative_cancel_inverses_pass,
@@ -53,13 +49,13 @@ def assert_files(tmp_path: Path, expected: set[str]):
     assert files == expected, f"Expected {expected}, got {files}"
 
 
-@pytest.mark.usefixtures("enable_disable_plxpr")
+@pytest.mark.usefixtures("use_capture")
 class TestMLIRGraph:
-    "Test the MLIR graph generation"
+    """Test the MLIR graph generation"""
 
     @pytest.mark.parametrize("qjit", [True, False])
     def test_no_transforms(self, tmp_path: Path, qjit: bool):
-        "Test the MLIR graph is still generated when no transforms are applied"
+        """Test the MLIR graph is still generated when no transforms are applied"""
 
         @qml.qnode(qml.device("lightning.qubit", wires=3))
         def _():
@@ -77,7 +73,7 @@ class TestMLIRGraph:
 
     @pytest.mark.parametrize("qjit", [True, False])
     def test_xdsl_transforms_no_args(self, tmp_path: Path, qjit: bool):
-        "Test the MLIR graph generation with no arguments to the QNode with and without qjit"
+        """Test the MLIR graph generation with no arguments to the QNode with and without qjit"""
 
         @merge_rotations_pass
         @iterative_cancel_inverses_pass
@@ -104,7 +100,7 @@ class TestMLIRGraph:
 
     @pytest.mark.parametrize("qjit", [True, False])
     def test_xdsl_transforms_args(self, tmp_path: Path, qjit: bool):
-        "Test the MLIR graph generation with arguments to the QNode for xDSL transforms"
+        """Test the MLIR graph generation with arguments to the QNode for xDSL transforms"""
 
         @merge_rotations_pass
         @iterative_cancel_inverses_pass
@@ -129,7 +125,7 @@ class TestMLIRGraph:
 
     @pytest.mark.parametrize("qjit", [True, False])
     def test_catalyst_transforms_args(self, tmp_path: Path, qjit: bool):
-        "Test the MLIR graph generation with arguments to the QNode for catalyst transforms"
+        """Test the MLIR graph generation with arguments to the QNode for catalyst transforms"""
 
         @qml.transforms.merge_rotations
         @qml.transforms.cancel_inverses
@@ -154,7 +150,8 @@ class TestMLIRGraph:
 
     @pytest.mark.parametrize("qjit", [True, False])
     def test_catalyst_xdsl_transforms_args(self, tmp_path: Path, qjit: bool):
-        "Test the MLIR graph generation with arguments to the QNode for catalyst and xDSL transforms"
+        """Test the MLIR graph generation with arguments to the QNode for catalyst and xDSL
+        transforms"""
 
         @qml.transforms.merge_rotations
         @iterative_cancel_inverses_pass
@@ -178,7 +175,7 @@ class TestMLIRGraph:
         )
 
     def test_cond(self, tmp_path: Path):
-        "Test the MLIR graph generation for a conditional"
+        """Test the MLIR graph generation for a conditional"""
 
         @merge_rotations_pass
         @qml.qnode(qml.device("lightning.qubit", wires=3))
@@ -210,7 +207,7 @@ class TestMLIRGraph:
         )
 
     def test_cond_with_mcm(self, tmp_path: Path):
-        "Test the MLIR graph generation for a conditional with MCM"
+        """Test the MLIR graph generation for a conditional with MCM"""
 
         def true_fn(arg):
             qml.RX(arg, 0)
@@ -239,7 +236,7 @@ class TestMLIRGraph:
         )
 
     def test_for_loop(self, tmp_path: Path):
-        "Test the MLIR graph generation for a for loop"
+        """Test the MLIR graph generation for a for loop"""
 
         @merge_rotations_pass
         @qml.qnode(qml.device("lightning.qubit", wires=3))
@@ -263,7 +260,7 @@ class TestMLIRGraph:
         )
 
     def test_while_loop(self, tmp_path: Path):
-        "Test the MLIR graph generation for a while loop"
+        """Test the MLIR graph generation for a while loop"""
 
         @merge_rotations_pass
         @qml.qnode(qml.device("lightning.qubit", wires=3))

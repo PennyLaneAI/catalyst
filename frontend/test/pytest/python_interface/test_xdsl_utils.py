@@ -16,10 +16,9 @@
 
 import pytest
 
-pytestmark = pytest.mark.external
-xdsl = pytest.importorskip("xdsl")
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
-# pylint: disable=wrong-import-position
+# pylint: disable=wrong-import-position,line-too-long
 from xdsl.dialects import arith, builtin, tensor, test
 
 from catalyst.python_interface.dialects.stablehlo import ConstantOp as hloConstantOp

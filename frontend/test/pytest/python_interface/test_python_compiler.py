@@ -16,24 +16,22 @@
 
 from dataclasses import dataclass
 
-# pylint: disable=wrong-import-position
+# pylint: disable=wrong-import-position,line-too-long
 import pytest
 
-pytestmark = pytest.mark.catalyst
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
-catalyst = pytest.importorskip("catalyst")
-jax = pytest.importorskip("jax")
-jaxlib = pytest.importorskip("jaxlib")
-xdsl = pytest.importorskip("xdsl")
-
+import jax
 import pennylane as qml
+from jaxlib.mlir.ir import Module as jModule
 from pennylane.capture import enabled as capture_enabled
 from xdsl import passes
 from xdsl.context import Context
 from xdsl.dialects import builtin
 from xdsl.interpreters import Interpreter
+from xdsl.passes import PassPipeline
 
-from catalyst import CompileError
+from catalyst import CompileError, qjit
 from catalyst.passes import apply_pass
 from catalyst.passes import cancel_inverses as catalyst_cancel_inverses
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
@@ -88,7 +86,7 @@ def test_compiler():
 
     input_module = identity(1)
     retval = Compiler.run(input_module)
-    assert isinstance(retval, jaxlib.mlir.ir.Module)
+    assert isinstance(retval, jModule)
     assert str(retval) == str(input_module)
 
 
@@ -139,7 +137,7 @@ def test_generic_catalyst_program():
         """
 
     retval = Compiler.run(program())
-    assert isinstance(retval, jaxlib.mlir.ir.Module)
+    assert isinstance(retval, jModule)
 
 
 def test_generic_catalyst_program_as_string():
@@ -250,11 +248,11 @@ def test_integration_for_transform_interpreter(capsys):
         }
         """
 
-    ctx = xdsl.context.Context()
+    ctx = Context()
     ctx.load_dialect(builtin.Builtin)
     ctx.load_dialect(transform.Transform)
 
-    pipeline = xdsl.passes.PassPipeline((ApplyTransformSequence(),))
+    pipeline = PassPipeline((ApplyTransformSequence(),))
     pipeline.apply(ctx, program())
     captured = capsys.readouterr()
     assert captured.out.strip() == "hello world"
@@ -263,14 +261,14 @@ def test_integration_for_transform_interpreter(capsys):
 class TestCatalystIntegration:
     """Tests for integration of the Python compiler with Catalyst"""
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_integration_catalyst_no_passes_with_capture(self):
         """Test that the xDSL plugin can be used even when no passes are applied
         when capture is enabled."""
 
         assert capture_enabled()
 
-        @catalyst.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f(x):
             qml.RX(x, 0)
@@ -285,7 +283,7 @@ class TestCatalystIntegration:
 
         assert not capture_enabled()
 
-        @catalyst.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f(x):
             qml.RX(x, 0)
@@ -294,14 +292,14 @@ class TestCatalystIntegration:
         out = f(1.5)
         assert jax.numpy.allclose(out, jax.numpy.cos(1.5))
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_integration_catalyst_xdsl_pass_with_capture(self, capsys):
         """Test that a pass is run via the transform interpreter when using with a
         qjit workflow and capture is enabled."""
 
         assert capture_enabled()
 
-        @catalyst.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
         @hello_world_pass
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f(x):
@@ -319,7 +317,7 @@ class TestCatalystIntegration:
 
         assert not capture_enabled()
 
-        @catalyst.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
         @apply_pass("hello-world")
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f(x):
@@ -331,14 +329,14 @@ class TestCatalystIntegration:
         captured = capsys.readouterr()
         assert captured.out.strip() == "hello world"
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_integration_catalyst_mixed_passes_with_capture(self, capsys):
         """Test that both Catalyst and Python compiler passes can be used with qjit
         when capture is enabled."""
 
         assert capture_enabled()
 
-        @catalyst.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
         @hello_world_pass
         @qml.transforms.cancel_inverses
         @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -359,7 +357,7 @@ class TestCatalystIntegration:
 
         assert not capture_enabled()
 
-        @catalyst.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
         @apply_pass("hello-world")
         @catalyst_cancel_inverses
         @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -408,9 +406,7 @@ class TestCallbackIntegration:
 
         ctx = Context()
         ctx.load_dialect(builtin.Builtin)
-        pipeline = xdsl.passes.PassPipeline(
-            (ApplyTransformSequence(callback=print_between_passes),)
-        )
+        pipeline = PassPipeline((ApplyTransformSequence(callback=print_between_passes),))
         pipeline.apply(ctx, program())
         captured = capsys.readouterr()
         assert captured.out.strip() == "hello world"
@@ -418,7 +414,6 @@ class TestCallbackIntegration:
     def test_callback_prints_module_after_each_pass(self, capsys):
         """Test that the callback prints the module after each pass"""
 
-        # pylint: disable=redefined-outer-name
         def print_between_passes(_, module, __, pass_level=0):
             if pass_level == 0:
                 return
@@ -460,9 +455,7 @@ class TestCallbackIntegration:
 
         ctx = Context()
         ctx.load_dialect(builtin.Builtin)
-        pipeline = xdsl.passes.PassPipeline(
-            (ApplyTransformSequence(callback=print_between_passes),)
-        )
+        pipeline = PassPipeline((ApplyTransformSequence(callback=print_between_passes),))
         pipeline.apply(ctx, program_2_passes())
 
         out = capsys.readouterr().out
@@ -483,11 +476,10 @@ class TestCallbackIntegration:
 
         assert printed_modules[0] != printed_modules[1], "IR should differ between passes"
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_callback_run_integration(self, capsys):
         """Test that the callback is integrated into the pass pipeline with the Compiler.run() method"""
 
-        # pylint: disable=redefined-outer-name
         def print_between_passes(_, module, __, pass_level=0):
             if pass_level == 0:
                 return

@@ -17,11 +17,7 @@
 import pytest
 
 # pylint: disable=wrong-import-position
-
-xdsl = pytest.importorskip("xdsl")
-filecheck = pytest.importorskip("filecheck")
-
-pytestmark = pytest.mark.external
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 from catalyst.python_interface.dialects import QEC
 

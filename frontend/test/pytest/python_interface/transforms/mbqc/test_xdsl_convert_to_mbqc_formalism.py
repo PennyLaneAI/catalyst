@@ -14,15 +14,12 @@
 """Unit test module for the convert to MBQC formalism transform"""
 import pytest
 
-pytestmark = pytest.mark.external
-
-xdsl = pytest.importorskip("xdsl")
-catalyst = pytest.importorskip("catalyst")
+# pylint: disable=wrong-import-position,line-too-long
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 import pennylane as qml
 from pennylane.ftqc import RotXZX
 
-# pylint: disable=wrong-import-position
 from catalyst.ftqc import mbqc_pipeline
 from catalyst.python_interface.transforms import (
     ConvertToMBQCFormalismPass,
@@ -377,7 +374,7 @@ class TestConvertToMBQCFormalismPass:
         pipeline = (ConvertToMBQCFormalismPass(),)
         run_filecheck(program, pipeline)
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_gates_in_mbqc_gate_set_lowering(self, run_filecheck_qjit):
         """Test that the convert_to_mbqc_formalism_pass works correctly with qjit and unrolled loops."""
         dev = qml.device("null.qubit", wires=1000)
@@ -421,7 +418,7 @@ class TestConvertToMBQCFormalismPass:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_gates_in_mbqc_gate_set_lowering_for(self, run_filecheck_qjit):
         """Test that the convert_to_mbqc_formalism_pass works correctly with qjit and for-loop structure."""
         dev = qml.device("null.qubit", wires=1000)
@@ -461,13 +458,13 @@ class TestConvertToMBQCFormalismPass:
             # CHECK: quantum.custom "PauliX"()
             # CHECK: quantum.custom "PauliZ"()
             # CHECK: quantum.dealloc_qb
-            loop_for()
+            loop_for()  # pylint: disable=no-value-for-parameter
             qml.CNOT(wires=[0, 1])
             return qml.expval(qml.Z(wires=0))
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_gates_in_mbqc_gate_set_lowering_graph_state_decomp(self, run_filecheck_qjit):
         """Test that the convert_to_mbqc_formalism_pass works correctly with qjit and for-loop structure."""
         dev = qml.device("null.qubit", wires=1000)
@@ -508,7 +505,7 @@ class TestConvertToMBQCFormalismPass:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_gates_in_mbqc_gate_set_lowering_while(self, run_filecheck_qjit):
         """Test that the convert_to_mbqc_formalism_pass works correctly with qjit and while-loop structure."""
         dev = qml.device("null.qubit", wires=1000)
@@ -548,7 +545,7 @@ class TestConvertToMBQCFormalismPass:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_gates_in_mbqc_gate_set_e2e(self):
         """Test that the convert_to_mbqc_formalism_pass end to end on null.qubit."""
         dev = qml.device("null.qubit", wires=1000)

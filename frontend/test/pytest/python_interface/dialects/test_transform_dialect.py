@@ -18,18 +18,15 @@ from dataclasses import dataclass
 
 import pytest
 
-# pylint: disable=wrong-import-position
-
-xdsl = pytest.importorskip("xdsl")
-filecheck = pytest.importorskip("filecheck")
-
-pytestmark = pytest.mark.external
+# pylint: disable=wrong-import-position,line-too-long
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 from xdsl import passes
 from xdsl.context import Context
 from xdsl.dialects import builtin
 from xdsl.dialects.builtin import DictionaryAttr, IntegerAttr, i64
 from xdsl.dialects.transform import AnyOpType
+from xdsl.passes import PassPipeline
 from xdsl.utils.exceptions import VerifyException
 from xdsl.utils.test_value import create_ssa_value
 
@@ -138,12 +135,12 @@ def test_integration_for_transform_interpreter(capsys):
         }
         """
 
-    ctx = xdsl.context.Context()
+    ctx = Context()
     ctx.load_dialect(builtin.Builtin)
     ctx.load_dialect(transform.Transform)
 
     mod = program()
-    pipeline = xdsl.passes.PassPipeline((ApplyTransformSequence(),))
+    pipeline = PassPipeline((ApplyTransformSequence(),))
     pipeline.apply(ctx, mod)
 
     assert "Hello from custom option!" in capsys.readouterr().out

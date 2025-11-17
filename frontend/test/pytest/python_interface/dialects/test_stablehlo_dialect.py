@@ -13,15 +13,10 @@
 # limitations under the License.
 
 """Unit test module for pennylane/compiler/python_compiler/dialects/stablehlo.py."""
-
+# pylint: disable=line-too-long
 import pytest
 
-# pylint: disable=wrong-import-position
-
-xdsl = pytest.importorskip("xdsl")
-filecheck = pytest.importorskip("filecheck")
-
-pytestmark = pytest.mark.external
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 
 def test_all_unary_operations(run_filecheck):

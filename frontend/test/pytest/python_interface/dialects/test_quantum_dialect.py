@@ -17,11 +17,7 @@
 import pytest
 
 # pylint: disable=wrong-import-position
-
-xdsl = pytest.importorskip("xdsl")
-filecheck = pytest.importorskip("filecheck")
-
-pytestmark = pytest.mark.external
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 from xdsl.dialects.builtin import (
     I32,
@@ -205,6 +201,7 @@ def test_only_existing_operations_are_expected():
 
 @pytest.mark.parametrize("op", all_ops)
 def test_operation_construction(op):
+    """Test the constructors of operations in the Quantum dialect."""
     kwargs = expected_ops_init_kwargs[op.__name__]
     _ = op(**kwargs)
 

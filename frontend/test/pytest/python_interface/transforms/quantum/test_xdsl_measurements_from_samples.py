@@ -14,17 +14,15 @@
 
 """Unit and integration tests for the Python compiler `measurements_from_samples` transform."""
 
-# pylint: disable=wrong-import-position
+# pylint: disable=wrong-import-position,line-too-long
 
 from functools import partial
 
 import numpy as np
 import pytest
 
-pytestmark = pytest.mark.external
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
-xdsl = pytest.importorskip("xdsl")
-catalyst = pytest.importorskip("catalyst")
 import pennylane as qml
 
 from catalyst.passes import xdsl_plugin
@@ -430,7 +428,7 @@ class TestMeasurementsFromSamplesPass:
         run_filecheck(program, pipeline)
 
 
-@pytest.mark.usefixtures("enable_disable_plxpr")
+@pytest.mark.usefixtures("use_capture")
 class TestMeasurementsFromSamplesIntegration:
     """Tests of the execution of simple workloads with the xDSL-based MeasurementsFromSamplesPass
     transform.
@@ -853,8 +851,10 @@ class TestMeasurementsFromSamplesIntegration:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_integrate_with_decompose(self):
+        """Test that the measurements_from_samples pass works correctly when used in combination
+        with the decompose pass."""
         dev = qml.device("null.qubit", wires=4)
 
         @qml.qjit(target="mlir", pass_plugins=[xdsl_plugin.getXDSLPluginAbsolutePath()])

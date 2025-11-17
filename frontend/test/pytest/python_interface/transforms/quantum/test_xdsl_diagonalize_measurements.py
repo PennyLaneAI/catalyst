@@ -19,14 +19,11 @@
 import numpy as np
 import pytest
 
-pytestmark = pytest.mark.external
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
-xdsl = pytest.importorskip("xdsl")
-
-catalyst = pytest.importorskip("catalyst")
 import pennylane as qml
 
-from catalyst.passes import xdsl_plugin
+from catalyst.passes import apply_pass, xdsl_plugin
 from catalyst.python_interface.transforms import (
     DiagonalizeFinalMeasurementsPass,
     diagonalize_final_measurements_pass,
@@ -311,7 +308,7 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
     """Integration tests going through plxpr (program capture enabled)"""
 
     # pylint: disable=unnecessary-lambda
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     @pytest.mark.parametrize(
         "mp, obs, expected_res",
         [
@@ -350,7 +347,7 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
 
         assert np.allclose(expected_res(angle), circuit_compiled(angle))
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_with_composite_observables(self):
         """Test the transform works for an observable built using operator arithmetic
         (sprod, prod, sum)"""
@@ -383,7 +380,7 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_with_multiple_measurements(self):
         """Test that the transform runs and returns the expected results for
         a circuit with multiple measurements"""
@@ -413,7 +410,7 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_overlapping_observables_raises_error(self):
         """Test the case where multiple overlapping (commuting) observables exist in
         the same circuit (an error is raised - split_non_commuting should have been applied)."""
@@ -433,7 +430,7 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
             _ = circuit(1.23)
 
     @pytest.mark.xfail(reason="for now, assume split_non_commuting is always applied")
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_non_commuting_observables_raise_error(self):
         """Check that an error is raised if we try to diagonalize a circuit that contains
         non-commuting observables."""
@@ -489,9 +486,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         ), "Sanity check failed, is expected_res correct?"
 
         circuit_compiled = qml.qjit(
-            catalyst.passes.apply_pass("catalyst_xdsl_plugin.diagonalize-final-measurements")(
-                circuit_ref
-            ),
+            apply_pass("catalyst_xdsl_plugin.diagonalize-final-measurements")(circuit_ref),
         )
 
         np.allclose(expected_res(angle), circuit_compiled(angle))
@@ -523,9 +518,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         ), "Sanity check failed, is expected_res correct?"
 
         circuit_compiled = qml.qjit(
-            catalyst.passes.apply_pass("catalyst_xdsl_plugin.diagonalize-final-measurements")(
-                circuit_ref
-            ),
+            apply_pass("catalyst_xdsl_plugin.diagonalize-final-measurements")(circuit_ref),
         )
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
@@ -553,9 +546,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         ), "Sanity check failed, is expected_res correct?"
 
         circuit_compiled = qml.qjit(
-            catalyst.passes.apply_pass("catalyst_xdsl_plugin.diagonalize-final-measurements")(
-                circuit_ref
-            ),
+            apply_pass("catalyst_xdsl_plugin.diagonalize-final-measurements")(circuit_ref),
         )
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
@@ -567,7 +558,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         dev = qml.device("lightning.qubit", wires=2)
 
         @qml.qjit()
-        @catalyst.passes.apply_pass("catalyst_xdsl_plugin.diagonalize-final-measurements")
+        @apply_pass("catalyst_xdsl_plugin.diagonalize-final-measurements")
         @qml.qnode(dev)
         def circuit(x):
             qml.RX(x, 0)
@@ -585,7 +576,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         dev = qml.device("lightning.qubit", wires=1)
 
         @qml.qjit()
-        @catalyst.passes.apply_pass("catalyst_xdsl_plugin.diagonalize-final-measurements")
+        @apply_pass("catalyst_xdsl_plugin.diagonalize-final-measurements")
         @qml.qnode(dev)
         def circuit(x):
             qml.RX(x, 0)

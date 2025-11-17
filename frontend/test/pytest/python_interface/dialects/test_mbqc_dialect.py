@@ -14,16 +14,15 @@
 
 """Unit test module for pennylane/compiler/python_compiler/dialects/mbqc.py."""
 
+
 import pytest
 
-# pylint: disable=wrong-import-position
+# pylint: disable=wrong-import-position,line-too-long
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
-xdsl = pytest.importorskip("xdsl")
-filecheck = pytest.importorskip("filecheck")
-
-pytestmark = pytest.mark.external
-
+from xdsl.context import Context
 from xdsl.dialects import arith, builtin, test
+from xdsl.parser import Parser
 from xdsl.utils.exceptions import VerifyException
 
 from catalyst.python_interface.dialects import Quantum, mbqc
@@ -115,14 +114,14 @@ class TestMeasureInBasisOp:
         %mres, %out_qubit = mbqc.measure_in_basis [{plane}, %angle] %qubit {postselect} : i1, !quantum.bit
         """
 
-        ctx = xdsl.context.Context()
+        ctx = Context()
 
         ctx.load_dialect(builtin.Builtin)
         ctx.load_dialect(test.Test)
         ctx.load_dialect(Quantum)
         ctx.load_dialect(mbqc.MBQC)
 
-        module = xdsl.parser.Parser(ctx, program).parse_module()
+        module = Parser(ctx, program).parse_module()
 
         measure_in_basis_op: mbqc.MeasureInBasisOp = module.ops.last
         assert isinstance(measure_in_basis_op, mbqc.MeasureInBasisOp)
@@ -146,14 +145,14 @@ class TestMeasureInBasisOp:
         %mres, %out_qubit = mbqc.measure_in_basis [XY, %angle] %qubit postselect {postselect} : i1, !quantum.bit
         """
 
-        ctx = xdsl.context.Context()
+        ctx = Context()
 
         ctx.load_dialect(builtin.Builtin)
         ctx.load_dialect(test.Test)
         ctx.load_dialect(Quantum)
         ctx.load_dialect(mbqc.MBQC)
 
-        module = xdsl.parser.Parser(ctx, program).parse_module()
+        module = Parser(ctx, program).parse_module()
 
         measure_in_basis_op: mbqc.MeasureInBasisOp = module.ops.last
         assert isinstance(measure_in_basis_op, mbqc.MeasureInBasisOp)

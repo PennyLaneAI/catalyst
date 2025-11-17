@@ -14,15 +14,12 @@
 """Unit test module for the outline state evolution transform"""
 import pytest
 
-pytestmark = pytest.mark.external
-
-xdsl = pytest.importorskip("xdsl")
-catalyst = pytest.importorskip("catalyst")
+# pylint: disable=wrong-import-position
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 import pennylane as qml
 from pennylane.ftqc import RotXZX
 
-# pylint: disable=wrong-import-position
 from catalyst.ftqc import mbqc_pipeline
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface.transforms import (
@@ -144,9 +141,10 @@ class TestOutlineStateEvolutionPass:
         pipeline = (OutlineStateEvolutionPass(),)
         run_filecheck(program, pipeline)
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_outline_state_evolution_no_error(self):
-        """Test outline_state_evolution_pass does not raise error for circuit with classical operations only."""
+        """Test outline_state_evolution_pass does not raise error for circuit with classical
+        operations only."""
 
         @qml.qjit(
             target="mlir",
@@ -158,10 +156,12 @@ class TestOutlineStateEvolutionPass:
 
         circuit(1, 4)
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_outline_state_evolution_no_terminal_op_error(self):
-        """Test outline_state_evolution_pass raises error when no terminal_boundary_op is found in circuit with quantum operation."""
-        # TODOs: we can resolve this issue if the boundary op is inserted when the program is captured.
+        """Test outline_state_evolution_pass raises error when no terminal_boundary_op is found in
+        circuit with quantum operation."""
+        # TODOs: we can resolve this issue if the boundary op is inserted when
+        # the program is captured.
         dev = qml.device("null.qubit", wires=10)
 
         @qml.qjit(
@@ -178,7 +178,7 @@ class TestOutlineStateEvolutionPass:
         ):
             circuit()
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_outline_state_evolution_pass_only(self, run_filecheck_qjit):
         """Test the outline_state_evolution_pass only."""
         dev = qml.device("lightning.qubit", wires=1000)
@@ -216,9 +216,10 @@ class TestOutlineStateEvolutionPass:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_outline_state_evolution_pass_with_convert_to_mbqc_formalism(self, run_filecheck_qjit):
-        """Test if the outline_state_evolution_pass works with the convert-to-mbqc-formalism pass on lightning.qubit."""
+        """Test if the outline_state_evolution_pass works with the convert-to-mbqc-formalism pass
+        on lightning.qubit."""
         dev = qml.device("lightning.qubit", wires=1000)
 
         @qml.qjit(
@@ -265,9 +266,10 @@ class TestOutlineStateEvolutionPass:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_outline_state_evolution_pass_with_mbqc_pipeline(self, run_filecheck_qjit):
-        """Test if the outline_state_evolution_pass works with all mbqc transform pipeline on null.qubit."""
+        """Test if the outline_state_evolution_pass works with all mbqc transform pipeline on
+        null.qubit."""
         dev = qml.device("null.qubit", wires=1000)
 
         @qml.qjit(
@@ -314,9 +316,10 @@ class TestOutlineStateEvolutionPass:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_outline_state_evolution_pass_with_mbqc_pipeline_run_on_nullqubit(self):
-        """Test if a circuit can be transfored with the outline_state_evolution_pass and all mbqc transform pipeline can be executed on null.qubit."""
+        """Test if a circuit can be transfored with the outline_state_evolution_pass and all mbqc
+        transform pipeline can be executed on null.qubit."""
         dev = qml.device("null.qubit", wires=1000)
 
         @qml.qjit(
@@ -343,9 +346,10 @@ class TestOutlineStateEvolutionPass:
         res = circuit()
         assert res == 1.0
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_lightning_execution_with_structure(self):
-        """Test that the outline_state_evolution_pass on lightning.qubit for a circuit with program structure is executable and returns results as expected."""
+        """Test that the outline_state_evolution_pass on lightning.qubit for a circuit with program
+        structure is executable and returns results as expected."""
         dev = qml.device("lightning.qubit", wires=10)
 
         @qml.for_loop(0, 10, 1)
@@ -369,7 +373,7 @@ class TestOutlineStateEvolutionPass:
         @outline_state_evolution_pass
         @qml.qnode(dev)
         def circuit():
-            for_fn()
+            for_fn()  # pylint: disable=no-value-for-parameter
             while_fn(0)
             qml.CNOT(wires=[0, 1])
             return qml.expval(qml.prod(qml.X(0), qml.Z(1)))
@@ -381,7 +385,7 @@ class TestOutlineStateEvolutionPass:
         )
         @qml.qnode(dev)
         def circuit_ref():
-            for_fn()
+            for_fn()  # pylint: disable=no-value-for-parameter
             while_fn(0)
             qml.CNOT(wires=[0, 1])
             return qml.expval(qml.prod(qml.X(0), qml.Z(1)))

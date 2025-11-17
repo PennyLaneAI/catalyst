@@ -17,10 +17,7 @@
 
 import pytest
 
-pytestmark = pytest.mark.external
-
-pytest.importorskip("xdsl")
-pytest.importorskip("catalyst")
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 from pennylane.exceptions import CompileError
 

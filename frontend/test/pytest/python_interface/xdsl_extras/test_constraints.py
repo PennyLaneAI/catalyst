@@ -16,9 +16,7 @@
 
 import pytest
 
-pytestmark = pytest.mark.external
-
-pytest.importorskip("xdsl")
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 # pylint: disable=wrong-import-position
 from xdsl.context import Context
@@ -54,8 +52,6 @@ def my_dialect_fixture():
     class Float64MemrefOp(IRDLOperation):
         """A test op with float memref types"""
 
-        # pylint: disable=too-few-public-methods
-
         name = "my_dialect.memref_float64"
         in_value = operand_def(MemRefConstraint(element_type=builtin.Float64Type()))
         out_value = result_def(MemRefConstraint(element_type=builtin.Float64Type()))
@@ -63,8 +59,6 @@ def my_dialect_fixture():
     @irdl_op_definition
     class Float64TensorOp(IRDLOperation):
         """A test op with float tensor types"""
-
-        # pylint: disable=too-few-public-methods
 
         name = "my_dialect.tensor_float64"
         in_value = operand_def(TensorConstraint(element_type=builtin.Float64Type()))
@@ -74,8 +68,6 @@ def my_dialect_fixture():
     class Rank1MemrefOp(IRDLOperation):
         """A test op with rank-1 memref types"""
 
-        # pylint: disable=too-few-public-methods
-
         name = "my_dialect.memref_rank1"
         in_value = operand_def(MemRefConstraint(rank=1))
         out_value = result_def(MemRefConstraint(rank=1))
@@ -83,8 +75,6 @@ def my_dialect_fixture():
     @irdl_op_definition
     class Rank1TensorOp(IRDLOperation):
         """A test op with rank-1 tensor types"""
-
-        # pylint: disable=too-few-public-methods
 
         name = "my_dialect.tensor_rank1"
         in_value = operand_def(TensorConstraint(rank=1))
@@ -94,8 +84,6 @@ def my_dialect_fixture():
     class Rank2Or4MemrefOp(IRDLOperation):
         """A test op with rank-2 or -4 memref types"""
 
-        # pylint: disable=too-few-public-methods
-
         name = "my_dialect.memref_rank24"
         in_value = operand_def(MemRefConstraint(rank=(2, 4)))
         out_value = result_def(MemRefConstraint(rank=(2, 4)))
@@ -103,8 +91,6 @@ def my_dialect_fixture():
     @irdl_op_definition
     class Rank2Or4TensorOp(IRDLOperation):
         """A test op with rank-2 or -4 tensor types"""
-
-        # pylint: disable=too-few-public-methods
 
         name = "my_dialect.tensor_rank24"
         in_value = operand_def(TensorConstraint(rank=(2, 4)))
@@ -114,8 +100,6 @@ def my_dialect_fixture():
     class Shape123MemrefOp(IRDLOperation):
         """A test op with shape-(1, 2, 3) memref types"""
 
-        # pylint: disable=too-few-public-methods
-
         name = "my_dialect.memref_shape123"
         in_value = operand_def(MemRefConstraint(shape=(1, 2, 3)))
         out_value = result_def(MemRefConstraint(shape=(1, 2, 3)))
@@ -123,8 +107,6 @@ def my_dialect_fixture():
     @irdl_op_definition
     class Shape123TensorOp(IRDLOperation):
         """A test op with shape-(1, 2, 3) tensor types"""
-
-        # pylint: disable=too-few-public-methods
 
         name = "my_dialect.tensor_shape123"
         in_value = operand_def(TensorConstraint(shape=(1, 2, 3)))
@@ -218,7 +200,8 @@ class TestMemRefConstraint:
         constraint.verify(attr, None)
 
     def test_memref_element_type_constraint_verify_valid(self):
-        """Test that verifying an attribute with a valid element type does not raise an exception."""
+        """Test that verifying an attribute with a valid element type does not raise an
+        exception."""
         constraint = MemRefConstraint(element_type=builtin.i32)
         attr = builtin.MemRefType(builtin.i32, [1])
 
@@ -393,7 +376,8 @@ class TestTensorConstraint:
         constraint.verify(attr, None)
 
     def test_tensor_element_type_constraint_verify_valid(self):
-        """Test that verifying an attribute with a valid element type does not raise an exception."""
+        """Test that verifying an attribute with a valid element type does not raise an
+        exception."""
         constraint = TensorConstraint(element_type=builtin.i32)
         attr = builtin.TensorType(builtin.i32, [1])
 

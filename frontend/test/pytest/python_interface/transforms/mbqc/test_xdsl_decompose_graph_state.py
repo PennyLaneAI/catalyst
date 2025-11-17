@@ -21,13 +21,11 @@ FileCheck notation hint:
     each use.
 """
 
-# pylint: disable=wrong-import-position
+# pylint: disable=wrong-import-position,line-too-long
 
 import pytest
 
-pytestmark = pytest.mark.external
-
-xdsl = pytest.importorskip("xdsl")
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 from catalyst.python_interface.transforms import (
     DecomposeGraphStatePass,

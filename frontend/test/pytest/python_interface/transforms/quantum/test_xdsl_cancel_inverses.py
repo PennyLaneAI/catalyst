@@ -15,14 +15,11 @@
 
 import pytest
 
-pytestmark = pytest.mark.external
-
-pytest.importorskip("xdsl")
-pytest.importorskip("catalyst")
+# pylint: disable=wrong-import-position
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 import pennylane as qml
 
-# pylint: disable=wrong-import-position
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface.transforms import (
     IterativeCancelInversesPass,
@@ -188,8 +185,7 @@ class TestIterativeCancelInversesPass:
         run_filecheck(program, pipeline)
 
 
-# pylint: disable=too-few-public-methods
-@pytest.mark.usefixtures("enable_disable_plxpr")
+@pytest.mark.usefixtures("use_capture")
 class TestIterativeCancelInversesIntegration:
     """Integration tests for the IterativeCancelInversesPass."""
 

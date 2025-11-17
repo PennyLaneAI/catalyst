@@ -14,14 +14,11 @@
 """Unit test module for the merge rotations transform"""
 import pytest
 
-pytestmark = pytest.mark.external
-
-pytest.importorskip("xdsl")
-pytest.importorskip("catalyst")
+# pylint: disable=wrong-import-position,line-too-long
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 import pennylane as qml
 
-# pylint: disable=wrong-import-position
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface.transforms import MergeRotationsPass, merge_rotations_pass
 
@@ -221,7 +218,7 @@ class TestMergeRotationsPass:
 
 
 # pylint: disable=too-few-public-methods
-@pytest.mark.usefixtures("enable_disable_plxpr")
+@pytest.mark.usefixtures("use_capture")
 class TestMergeRotationsIntegration:
     """Integration tests for the MergeRotationsPass."""
 

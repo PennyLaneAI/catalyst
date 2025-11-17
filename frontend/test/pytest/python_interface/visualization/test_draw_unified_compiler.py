@@ -16,24 +16,21 @@
 
 import pytest
 
-pytestmark = pytest.mark.external
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
-pytest.importorskip("xdsl")
-pytest.importorskip("catalyst")
-
-# pylint: disable=wrong-import-position
+# pylint: disable=wrong-import-position,unnecessary-lambda
 import jax
 import pennylane as qml
 
-# pylint: disable=wrong-import-position
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
-from catalyst.python_interface.transforms import iterative_cancel_inverses_pass
+from catalyst.python_interface.transforms import (
+    iterative_cancel_inverses_pass,
+    merge_rotations_pass,
+)
 from catalyst.python_interface.visualization import draw
 
-# pylint: disable=implicit-str-concat, unnecessary-lambda
 
-
-@pytest.mark.usefixtures("enable_disable_plxpr")
+@pytest.mark.usefixtures("use_capture")
 class Testdraw:
     """Unit tests for the draw function in the Python Compiler visualization module."""
 
@@ -79,16 +76,17 @@ class Testdraw:
                 "1: ──RY───────╰X─╰X──H───H─│──│──┤  State\n"
                 "2: ──RZ────────────────────╰X─╰X─┤  State",
             ),
-            (2, "0: ──RX──RZ─┤  State\n" "1: ──RY─────┤  State\n" "2: ──RZ─────┤  State"),
-            (None, "0: ──RX──RZ─┤  State\n" "1: ──RY─────┤  State\n" "2: ──RZ─────┤  State"),
-            (50, "0: ──RX──RZ─┤  State\n" "1: ──RY─────┤  State\n" "2: ──RZ─────┤  State"),
+            (2, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
+            (None, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
+            (50, "0: ──RX──RZ─┤  State1: ──RY─────┤  State2: ──RZ─────┤  State"),
         ],
     )
     def test_multiple_levels_xdsl(self, transforms_circuit, level, qjit, expected):
-        """Test that multiple levels of transformation are applied correctly with xDSL compilation passes."""
+        """Test that multiple levels of transformation are applied correctly with xDSL
+        compilation passes."""
 
         transforms_circuit = iterative_cancel_inverses_pass(
-            qml.compiler.python_compiler.transforms.merge_rotations_pass(transforms_circuit)
+            merge_rotations_pass(transforms_circuit)
         )
 
         if qjit:
@@ -114,13 +112,14 @@ class Testdraw:
                 "1: ──RY───────╰X─╰X──H───H─│──│──┤  State\n"
                 "2: ──RZ────────────────────╰X─╰X─┤  State",
             ),
-            (2, "0: ──RX──RZ─┤  State\n" "1: ──RY─────┤  State\n" "2: ──RZ─────┤  State"),
-            (None, "0: ──RX──RZ─┤  State\n" "1: ──RY─────┤  State\n" "2: ──RZ─────┤  State"),
-            (50, "0: ──RX──RZ─┤  State\n" "1: ──RY─────┤  State\n" "2: ──RZ─────┤  State"),
+            (2, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
+            (None, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
+            (50, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
         ],
     )
     def test_multiple_levels_catalyst(self, transforms_circuit, level, qjit, expected):
-        """Test that multiple levels of transformation are applied correctly with Catalyst compilation passes."""
+        """Test that multiple levels of transformation are applied correctly with Catalyst
+        compilation passes."""
 
         transforms_circuit = qml.transforms.cancel_inverses(
             qml.transforms.merge_rotations(transforms_circuit)
@@ -149,13 +148,14 @@ class Testdraw:
                 "1: ──RY───────╰X─╰X──H───H─│──│──┤  State\n"
                 "2: ──RZ────────────────────╰X─╰X─┤  State",
             ),
-            (2, "0: ──RX──RZ─┤  State\n" "1: ──RY─────┤  State\n" "2: ──RZ─────┤  State"),
-            (None, "0: ──RX──RZ─┤  State\n" "1: ──RY─────┤  State\n" "2: ──RZ─────┤  State"),
-            (50, "0: ──RX──RZ─┤  State\n" "1: ──RY─────┤  State\n" "2: ──RZ─────┤  State"),
+            (2, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
+            (None, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
+            (50, "0: ──RX──RZ─┤  State\n1: ──RY─────┤  State\n2: ──RZ─────┤  State"),
         ],
     )
     def test_multiple_levels_xdsl_catalyst(self, transforms_circuit, level, qjit, expected):
-        """Test that multiple levels of transformation are applied correctly with xDSL and Catalyst compilation passes."""
+        """Test that multiple levels of transformation are applied correctly with xDSL and
+        Catalyst compilation passes."""
 
         transforms_circuit = iterative_cancel_inverses_pass(
             qml.transforms.merge_rotations(transforms_circuit)
@@ -287,7 +287,9 @@ class Testdraw:
                     qml.expval(qml.Y(1) @ qml.Z(2) @ qml.X(0)),
                     qml.expval(qml.Z(2) @ qml.X(0) @ qml.Y(1)),
                 ),
-                "0: ──RX─┤ ╭<X@Y> ╭<Y@Z@X> ╭<Z@X@Y>\n1: ──RY─┤ ╰<X@Y> ├<Y@Z@X> ├<Z@X@Y>\n2: ──RZ─┤        ╰<Y@Z@X> ╰<Z@X@Y>",
+                "0: ──RX─┤ ╭<X@Y> ╭<Y@Z@X> ╭<Z@X@Y>\n"
+                "1: ──RY─┤ ╰<X@Y> ├<Y@Z@X> ├<Z@X@Y>\n"
+                "2: ──RZ─┤        ╰<Y@Z@X> ╰<Z@X@Y>",
             ),
             (
                 lambda: (
@@ -296,7 +298,10 @@ class Testdraw:
                         @ qml.Hamiltonian([0.1, 0.1], [qml.PauliZ(2), qml.PauliZ(3)])
                     )
                 ),
-                "0: ──RX─┤ ╭<(𝓗)@(𝓗)>\n1: ──RY─┤ ├<(𝓗)@(𝓗)>\n2: ──RZ─┤ ├<(𝓗)@(𝓗)>\n3: ─────┤ ╰<(𝓗)@(𝓗)>",
+                "0: ──RX─┤ ╭<(𝓗)@(𝓗)>\n"
+                "1: ──RY─┤ ├<(𝓗)@(𝓗)>\n"
+                "2: ──RZ─┤ ├<(𝓗)@(𝓗)>\n"
+                "3: ─────┤ ╰<(𝓗)@(𝓗)>",
             ),
             (
                 lambda: (qml.var(qml.X(0)), qml.var(qml.Y(1)), qml.var(qml.Z(2))),
@@ -308,7 +313,9 @@ class Testdraw:
                     qml.var(qml.Y(1) @ qml.Z(2) @ qml.X(0)),
                     qml.var(qml.Z(2) @ qml.X(0) @ qml.Y(1)),
                 ),
-                "0: ──RX─┤ ╭Var[X@Y] ╭Var[Y@Z@X] ╭Var[Z@X@Y]\n1: ──RY─┤ ╰Var[X@Y] ├Var[Y@Z@X] ├Var[Z@X@Y]\n2: ──RZ─┤           ╰Var[Y@Z@X] ╰Var[Z@X@Y]",
+                "0: ──RX─┤ ╭Var[X@Y] ╭Var[Y@Z@X] ╭Var[Z@X@Y]\n"
+                "1: ──RY─┤ ╰Var[X@Y] ├Var[Y@Z@X] ├Var[Z@X@Y]\n"
+                "2: ──RZ─┤           ╰Var[Y@Z@X] ╰Var[Z@X@Y]",
             ),
         ],
     )
@@ -340,9 +347,10 @@ class Testdraw:
             qml.GlobalPhase(0.5)
             return qml.state()
 
-        assert (
-            draw(circuit)()
-            == "0: ──H─╭GlobalPhase─┤  State\n1: ──H─├GlobalPhase─┤  State\n2: ──H─╰GlobalPhase─┤  State"
+        assert draw(circuit)() == (
+            "0: ──H─╭GlobalPhase─┤  State\n"
+            "1: ──H─├GlobalPhase─┤  State\n"
+            "2: ──H─╰GlobalPhase─┤  State"
         )
 
     @pytest.mark.parametrize(

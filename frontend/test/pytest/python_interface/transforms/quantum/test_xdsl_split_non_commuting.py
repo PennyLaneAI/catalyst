@@ -14,14 +14,11 @@
 """Unit test module for the split non-commuting transform"""
 import pytest
 
-pytestmark = pytest.mark.external
-
-xdsl = pytest.importorskip("xdsl")
-catalyst = pytest.importorskip("catalyst")
+# pylint: disable=wrong-import-position
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 import pennylane as qml
 
-# pylint: disable=wrong-import-position
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface.transforms import (
     SplitNonCommutingPass,
@@ -220,7 +217,7 @@ class TestSplitNonCommutingPass:
         pipeline = (SplitNonCommutingPass(),)
         run_filecheck(program, pipeline)
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_split_non_commuting_pass_only(self, run_filecheck_qjit):
         """Test the split non-commuting pass only."""
         dev = qml.device("lightning.qubit", wires=5)
@@ -258,9 +255,10 @@ class TestSplitNonCommutingPass:
 
         run_filecheck_qjit(circuit)
 
-    @pytest.mark.usefixtures("enable_disable_plxpr")
+    @pytest.mark.usefixtures("use_capture")
     def test_lightning_execution_with_structure(self):
-        """Test that the split non-commuting pass on lightning.qubit for a circuit with program structure is executable and returns results as expected."""
+        """Test that the split non-commuting pass on lightning.qubit for a circuit with program
+        structure is executable and returns results as expected."""
         dev = qml.device("lightning.qubit", wires=10)
 
         @qml.for_loop(0, 10, 1)
@@ -284,7 +282,7 @@ class TestSplitNonCommutingPass:
         @split_non_commuting_pass
         @qml.qnode(dev)
         def circuit():
-            for_fn()
+            for_fn()  # pylint: disable=no-value-for-parameter
             while_fn(0)
             qml.CNOT(wires=[0, 1])
             return (
@@ -300,7 +298,7 @@ class TestSplitNonCommutingPass:
         )
         @qml.qnode(dev)
         def circuit_ref():
-            for_fn()
+            for_fn()  # pylint: disable=no-value-for-parameter
             while_fn(0)
             qml.CNOT(wires=[0, 1])
             return (

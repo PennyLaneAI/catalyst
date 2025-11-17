@@ -19,9 +19,7 @@ from typing import TypeAlias
 import pytest
 
 # pylint: disable=wrong-import-position
-# pylint: disable=too-few-public-methods
-
-xdsl = pytest.importorskip("xdsl")
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 from xdsl.dialects.builtin import AnyAttr, TensorType, f32, i32, i64
 from xdsl.ir import Attribute
@@ -48,7 +46,7 @@ from catalyst.python_interface.xdsl_extras.traits import (
     SameOperandsElementType,
 )
 
-pytestmark = pytest.mark.external
+pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 AnyTensorType: TypeAlias = TensorType[Attribute]
 
@@ -308,6 +306,8 @@ def test_operator_cannot_compute_raises_verifyexception():
 
     @irdl_op_definition
     class CannotComputeMockOp(IRDLOperation):
+        """Test operation with no traits."""
+
         name = "test.cannot_compute"
         traits = traits_def()
         a = attr_def(AnyAttr())
