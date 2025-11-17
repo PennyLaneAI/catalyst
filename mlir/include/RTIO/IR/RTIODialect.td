@@ -69,7 +69,7 @@ def RTIOChannelType : RTIO_Type<"Channel", "channel"> {
         Syntax:
         ```
         !rtio.channel<KIND, ?>                 // Dynamic: kind only
-        !rtio.channel<KIND, N>                 // Static: kind + channel N
+        !rtio.channel<KIND, N>                 // Static: kind + channel ID
         !rtio.channel<KIND, [QUALIFIERS], ?>   // Dynamic: with qualifiers
         !rtio.channel<KIND, [QUALIFIERS], N>   // Static: with qualifiers + channel N
         ```
