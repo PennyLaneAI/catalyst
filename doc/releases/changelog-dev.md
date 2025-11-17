@@ -109,6 +109,10 @@
   // ... use %4
   ```
 
+* The pass pipeline is correctly registered to the transform named sequence of the
+  one-shot qnode when `one-shot` mcm method is used.
+  [(#2198)](https://github.com/PennyLaneAI/catalyst/pull/2198)
+
 <h3>Internal changes ⚙️</h3>
 
 * Replaces the deprecated `shape_dtype_to_ir_type` function with the `RankedTensorType.get` method.
