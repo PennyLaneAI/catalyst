@@ -1,3 +1,17 @@
+// Copyright 2025 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #pragma once
 
 #include <algorithm>
@@ -11,15 +25,10 @@
 #include <tuple>
 #include <vector>
 
-// Assumes rings.h defines ZSqrtTwo and ZOmega classes with all necessary
-// arithmetic operators (*, /, %), methods (adj2, conj, norm_squared, sqrt, to_omega),
-// and comparison operators (e.g., operator!=).
 #include "rings.hpp"
 #include "utils.hpp"
 
 namespace NormSolver {
-
-// Forward declarations
 INT_TYPE legendre_symbol(INT_TYPE a, INT_TYPE p);
 bool primality_test(INT_TYPE n);
 std::optional<INT_TYPE> sqrt_modulo_p(INT_TYPE n, INT_TYPE p);
@@ -30,15 +39,15 @@ std::optional<std::vector<ZSqrtTwo>> factorize_prime_zsqrt_two(INT_TYPE p);
 std::optional<ZOmega> factorize_prime_zomega(const ZSqrtTwo &x, INT_TYPE p);
 std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trials = 1000);
 
-// --- Helper Functions for Modular Arithmetic ---
-
 /**
- * @brief Performs modular multiplication (a * b) % mod, preventing overflow.
+ * @brief Performs modular multiplication (a * b) % mod
  */
-inline INT_TYPE mod_mul(INT_TYPE a, INT_TYPE b, INT_TYPE mod) { return a * b % mod; }
+inline INT_TYPE mod_mul(INT_TYPE a, INT_TYPE b, INT_TYPE mod) { return (a * b) % mod; }
 
 /**
  * @brief Performs modular exponentiation (base^exp) % mod.
+ *
+ * If using Boost cpp_int, boost powm can be used instead.
  */
 inline INT_TYPE mod_pow(INT_TYPE base, INT_TYPE exp, INT_TYPE mod)
 {
@@ -53,8 +62,6 @@ inline INT_TYPE mod_pow(INT_TYPE base, INT_TYPE exp, INT_TYPE mod)
     return res;
 }
 
-// --- Greatest Common Divisor (GCD) ---
-
 /**
  * @brief Computes GCD for standard integers.
  */
@@ -65,9 +72,6 @@ inline INT_TYPE gcd(INT_TYPE a, INT_TYPE b) { return std::gcd(a, b); }
  */
 inline ZSqrtTwo gcd(ZSqrtTwo elem1, ZSqrtTwo elem2)
 {
-    // std::cout << "Computing GCD of ZSqrtTwo elements" << std::endl;
-    // std::cout << "elem1: " << elem1 << std::endl;
-    // std::cout << "elem2: " << elem2 << std::endl;
     while (elem2 != ZSqrtTwo(0, 0)) {
         ZSqrtTwo temp = elem1 % elem2;
         elem1 = elem2;
@@ -81,9 +85,6 @@ inline ZSqrtTwo gcd(ZSqrtTwo elem1, ZSqrtTwo elem2)
  */
 inline ZOmega gcd(ZOmega elem1, ZOmega elem2)
 {
-    // std::cout << "Computing GCD of ZOmega elements" << std::endl;
-    // std::cout << "elem1: " << elem1 << std::endl;
-    // std::cout << "elem2: " << elem2 << std::endl;
     while (elem2 != ZOmega(0, 0, 0, 0)) {
         ZOmega temp = elem1 % elem2;
         elem1 = elem2;
@@ -95,69 +96,90 @@ inline ZOmega gcd(ZOmega elem1, ZOmega elem2)
 // --- Number Theoretic Algorithms ---
 
 /**
- * @brief Deterministic Miller-Rabin primality test for 64-bit integers.
+ * @brief Deterministic Miller-Rabin primality test for 64-bit integers. NEED TO UPDATE FOR 128
+ * bit/arbitrary
+ */
+// inline bool primality_test(INT_TYPE n)
+// {
+//     static lru_cache<INT_TYPE, bool, 100000> cache;
+//     if (auto val_opt = cache.get(n); val_opt) {
+//         return *val_opt; // Return cached value
+//     }
+
+//     if (n < 2 || n == 4) {
+//         cache.put(n, false);
+//         return false;
+//     }
+//     if (n < 4) {
+//         cache.put(n, true);
+//         return true;
+//     }
+
+//     const std::vector<INT_TYPE> small_primes = {2,  3,  5,  7,  11, 13, 17, 19, 23, 29, 31, 37,
+//     41,
+//                                                 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97};
+//     for (INT_TYPE p : small_primes) {
+//         if (n == p) {
+//             cache.put(n, true);
+//             return true;
+//         }
+//         if (n % p == 0) {
+//             cache.put(n, false);
+//             return false;
+//         }
+//     }
+
+//     INT_TYPE d = n - 1;
+//     int s = 0;
+//     while (d % 2 == 0) {
+//         d /= 2;
+//         s++;
+//     }
+
+//     const std::vector<INT_TYPE> bases = {2, 325, 9375, 28178, 450775, 9780504, 1795265022};
+//     for (INT_TYPE base : bases) {
+//         if (base >= n)
+//             continue;
+
+//         INT_TYPE x = mod_pow(base, d, n);
+//         if (x == 1 || x == n - 1)
+//             continue;
+
+//         bool is_composite = true;
+//         for (int r = 1; r < s; ++r) {
+//             x = mod_mul(x, x, n);
+//             if (x == n - 1) {
+//                 is_composite = false;
+//                 break;
+//             }
+//         }
+//         if (is_composite) {
+//             cache.put(n, false);
+//             return false;
+//         }
+//     }
+
+//     cache.put(n, true);
+//     return true;
+// }
+
+/**
+ * @brief Probabilistic Miller-Rabin primality test.
  */
 inline bool primality_test(INT_TYPE n)
 {
     static lru_cache<INT_TYPE, bool, 100000> cache;
     if (auto val_opt = cache.get(n); val_opt) {
-        return *val_opt; // Return cached value
+        return *val_opt;
     }
-
-    if (n < 2 || n == 4) {
-        cache.put(n, false);
-        return false;
-    }
-    if (n < 4) {
+    if (boost::multiprecision::miller_rabin_test(n, 25)) {
         cache.put(n, true);
         return true;
     }
-
-    const std::vector<INT_TYPE> small_primes = {2,  3,  5,  7,  11, 13, 17, 19, 23, 29, 31, 37, 41,
-                                                43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97};
-    for (INT_TYPE p : small_primes) {
-        if (n == p) {
-            cache.put(n, true); // 3. Store result
-            return true;
-        }
-        if (n % p == 0) {
-            cache.put(n, false); // 3. Store result
-            return false;
-        }
+    else {
+        cache.put(n, false);
+        return false;
     }
-
-    INT_TYPE d = n - 1;
-    int s = 0;
-    while (d % 2 == 0) {
-        d /= 2;
-        s++;
-    }
-
-    const std::vector<INT_TYPE> bases = {2, 325, 9375, 28178, 450775, 9780504, 1795265022};
-    for (INT_TYPE base : bases) {
-        if (base >= n)
-            continue;
-
-        INT_TYPE x = mod_pow(base, d, n);
-        if (x == 1 || x == n - 1)
-            continue;
-
-        bool is_composite = true;
-        for (int r = 1; r < s; ++r) {
-            x = mod_mul(x, x, n);
-            if (x == n - 1) {
-                is_composite = false;
-                break;
-            }
-        }
-        if (is_composite) {
-            cache.put(n, false); // 3. Store result
-            return false;
-        }
-    }
-
-    cache.put(n, true); // 3. Store final result
-    return true;
 }
 
 /**
@@ -244,7 +266,6 @@ inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_tries)
         return *val_opt;
     }
 
-    // FIX 2: Cache the base cases.
     if (n <= 2) {
         cache.put(cache_key, std::nullopt);
         return std::nullopt;
@@ -429,7 +450,6 @@ inline std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trial
 
     ZOmega scale(0, 0, 0, 1); // Represents 1 in Z[omega]
     ZSqrtTwo next_xi = xi;
-
     for (INT_TYPE factor : *factors_opt) {
         auto primes_zsqrt_two_opt = factorize_prime_zsqrt_two(factor);
         if (!primes_zsqrt_two_opt)
@@ -441,19 +461,14 @@ inline std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trial
 
             if ((next_xi.a % next_ab == 0) && (next_xi.b % next_ab == 0)) {
                 next_xi = ZSqrtTwo(next_xi.a / next_ab, next_xi.b / next_ab);
-                // std::cout << "before factorization eta: " << eta.a << " + " << eta.b << "
-                // sqrt(2)" << std::endl; std::cout << "before factorization factor: " << factor <<
-                // std::endl;
                 auto t = factorize_prime_zomega(eta, factor);
-                // std::cout << "after factorization" << std::endl;
                 if (!t)
                     return std::nullopt;
-                // std::cout << "found t factor: " << (*t).a << " + " << (*t).b << " omega^3 + " <<
-                // (*t).c << " omega^2 + " << (*t).d << std::endl;
                 scale = scale * (*t);
             }
         }
     }
+
     ZSqrtTwo s_val = (scale.conj() * scale).to_sqrt_two();
     INT_TYPE s_abs = s_val.abs();
     ZSqrtTwo s_new = xi * s_val.adj2();

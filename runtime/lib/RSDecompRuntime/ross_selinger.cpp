@@ -57,7 +57,6 @@ std::pair<DecompResult, double> eval_ross_algorithm(double angle, double epsilon
     if (auto val_opt = ross_cache.get(key); val_opt) {
         return *val_opt;
     }
-    // std::cout << "Cache miss for angle: " << angle << ", epsilon: " << epsilon << std::endl;
     double shift = 0.0;
     double modified_angle = -angle / 2.0;
     ZOmega scale(0, 0, 0, 1);

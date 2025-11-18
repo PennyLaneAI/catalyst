@@ -142,6 +142,7 @@ target_sources(runner_tests_rsdecomp_runtime PRIVATE
     Test_RSDecomp_grid_problems.cpp
     Test_RSDecomp_normal_forms.cpp
     Test_RSDecomp_norm_solver.cpp
+    Test_RSDecomp_ross_selinger.cpp
 )
 target_link_libraries(runner_tests_rsdecomp_runtime PRIVATE
     Catch2WithMain
