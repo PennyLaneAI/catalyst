@@ -711,7 +711,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
     if qnode is None:
         return functools.partial(commute_ppr, max_pauli_size=max_pauli_size)
 
-    return transform(pass_name="commute_ppr")(qnode, max_pauli_size=max_pauli_size)
+    return transform(pass_name="commute-ppr")(qnode, max_pauli_size=max_pauli_size)
 
 
 def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
@@ -799,7 +799,7 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     if qnode is None:
         return functools.partial(merge_ppr_ppm, max_pauli_size=max_pauli_size)
 
-    return transform(pass_name="merge_ppr_ppm")(qnode, max_pauli_size=max_pauli_size)
+    return transform(pass_name="merge-ppr-ppm")(qnode, max_pauli_size=max_pauli_size)
 
 
 def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measure=False):
@@ -887,7 +887,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
             ppr_to_ppm, decompose_method=decompose_method, avoid_y_measure=avoid_y_measure
         )
 
-    return transform(pass_name="ppr_to_ppm")(qnode, decompose_method=decompose_method, avoid_y_measure=avoid_y_measure)
+    return transform(pass_name="ppr-to-ppm")(qnode, decompose_method=decompose_method, avoid_y_measure=avoid_y_measure)
 
 
 def ppm_compilation(
