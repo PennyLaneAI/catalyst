@@ -14,8 +14,6 @@
 
 """Unit test module for catalyst/device/decomposition.py"""
 
-import os
-import pathlib
 import platform
 
 import numpy as np
