@@ -31,7 +31,6 @@
 #include "Quantum/IR/QuantumOps.h"
 #include "RTIO/IR/RTIODialect.h"
 #include "RTIO/IR/RTIOOps.h"
-#include <mlir/IR/Operation.h>
 
 using namespace mlir;
 using namespace catalyst;
