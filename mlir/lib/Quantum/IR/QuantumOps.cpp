@@ -70,6 +70,48 @@ LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewrite
     return failure();
 }
 
+LogicalResult RXOp::canonicalize(RXOp op, mlir::PatternRewriter &rewriter)
+{
+    if (op.getAdjoint()) {
+        auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), op.getTheta());
+
+        rewriter.replaceOpWithNewOp<RXOp>(
+            op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramNeg,
+            op.getInQubits(), nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+
+        return success();
+    };
+    return failure();
+}
+
+LogicalResult RYOp::canonicalize(RYOp op, mlir::PatternRewriter &rewriter)
+{
+    if (op.getAdjoint()) {
+        auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), op.getTheta());
+
+        rewriter.replaceOpWithNewOp<RYOp>(
+            op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramNeg,
+            op.getInQubits(), nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+
+        return success();
+    };
+    return failure();
+}
+
+LogicalResult RZOp::canonicalize(RZOp op, mlir::PatternRewriter &rewriter)
+{
+    if (op.getAdjoint()) {
+        auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), op.getTheta());
+
+        rewriter.replaceOpWithNewOp<RZOp>(
+            op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramNeg,
+            op.getInQubits(), nullptr, op.getInCtrlQubits(), op.getInCtrlValues());
+
+        return success();
+    };
+    return failure();
+}
+
 LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewriter)
 {
     if (op.getAdjoint()) {
