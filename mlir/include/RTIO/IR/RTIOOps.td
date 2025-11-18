@@ -25,7 +25,7 @@ include "RTIO/IR/RTIODialect.td"
 //===----------------------------------------------------------------------===//
 
 def RTIOChannelOp : RTIO_Op<"channel"> {
-    let summary = "Define a static channel";
+    let summary = "Define a channel";
     let description = [{
         The channel's identity (kind, qualifiers, and channel id) is
         encoded in its result type.
@@ -365,7 +365,7 @@ def RTIOOnOp : RTIO_Op<"on"> {
 
         Example:
         ```mlir
-        rtio.at %t_start : !rtio.time
+        rtio.at %t_start : i64
         rtio.on %ch
         rtio.delay 1000 : i64
         rtio.off %ch
