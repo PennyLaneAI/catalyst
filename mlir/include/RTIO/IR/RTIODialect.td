@@ -76,10 +76,15 @@ def RTIOChannelType : RTIO_Type<"Channel", "channel"> {
         Examples:
         ```mlir
 
-        // Simple DDS, channel TBD
+        // Simple DDS, channel ID TBD (to be resolved during channel resolution)
         !rtio.channel<"dds", ?>
 
-        // DDS channel with two qualifiers 0 and "t0", channel ID TBD
+        // DDS channel with qualifiers:
+        // Qualifiers distinguish different logical channels of the same kind.
+        // Example: ion 0, transition 0 -> will be distinguished from other transitions of
+        //          the same ion. The mapping of the logical channel to the hardware channel will
+        //          be resolved during the lowering pass from given dialect to RTIO dialect.
+        //          User need to specifiy the mapping logic.
         !rtio.channel<"dds", [0, "transition_0"], ?>
 
         // DDS on hardware channel 0
