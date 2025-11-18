@@ -182,10 +182,10 @@ struct ApplyTransformSequencePass
         // We need to extract the transform.named_sequence in the
         // transformer module.
         transform::NamedSequenceOp transformer_main_sequence;
-        transformer->walk([&](Operation *op) {
-            if (op->getName().getStringRef() == "transform.named_sequence") {
-                transformer_main_sequence = cast<transform::NamedSequenceOp>(op);
-            }
+        transformer->walk([&](transform::NamedSequenceOp op) {
+            assert(!transformer_main_sequence &&
+                   "expected only one transform sequence in the transform module");
+            transformer_main_sequence = op;
         });
 
         if (PassInstrumentor *passInstrumentor = getAnalysisManager().getPassInstrumentor()) {
@@ -196,9 +196,8 @@ struct ApplyTransformSequencePass
             }
         }
         else {
-            if (failed(transform::applyTransforms(
-                    payload, cast<transform::TransformOpInterface>(transformer_main_sequence), {},
-                    transform::TransformOptions(), false))) {
+            if (failed(transform::applyTransforms(payload, transformer_main_sequence, {},
+                                                  transform::TransformOptions(), false))) {
                 return signalPassFailure();
             }
         }
