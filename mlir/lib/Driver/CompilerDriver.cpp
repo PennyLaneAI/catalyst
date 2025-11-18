@@ -73,6 +73,7 @@
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
+#include "RTIO/IR/RTIODialect.h"
 #include "RegisterAllPasses.h"
 
 #include "Enzyme.h"
@@ -302,6 +303,7 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     registry.insert<qec::QECDialect>();
     registry.insert<mbqc::MBQCDialect>();
     registry.insert<ion::IonDialect>();
+    registry.insert<rtio::RTIODialect>();
     registry.insert<gradient::GradientDialect>();
     registry.insert<mitigation::MitigationDialect>();
 }
