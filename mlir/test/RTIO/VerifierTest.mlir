@@ -190,3 +190,10 @@ func.func @ttl_off_dds_good() {
     rtio.off %ch : !rtio.channel<"dds", 0>
     return
 }
+
+// -----
+
+func.func @empty_good() {
+    %empty = rtio.empty : !rtio.event
+    return
+}

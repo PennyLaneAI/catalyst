@@ -65,7 +65,7 @@ def RTIOQubitToChannelOp : RTIO_Op<"qubit_to_channel"> {
         Example:
         ```mlir
         // Map ion qubit to dds channel with dynamic channel id
-        %ch = rtio.qubit_to_channel %ion_qubit : !ion.qubit -> !rtio.channel<"dds", ?>
+        %ch = rtio.qubit_tos_channel %ion_qubit : !ion.qubit -> !rtio.channel<"dds", ?>
         ```
 
         During the channel resolution stage, this operation will be replaced by a
@@ -130,6 +130,16 @@ def RTIOPulseOp : RTIO_Op<"pulse"> {
         $channel `duration` `(` $duration `)` `frequency` `(` $frequency `)` `phase` `(` $phase `)`
         (`wait` `(` $wait^ `)`)? attr-dict `:` type($channel) `->` type($event)
     }];
+
+    let extraClassDeclaration = [{
+        void setWait(mlir::Value waitEvent) {
+            if (waitEvent) {
+                getWaitMutable().assign(waitEvent);
+            } else {
+                getWaitMutable().clear();
+            }
+        }
+    }];
 }
 
 def RTIOSyncOp : RTIO_Op<"sync"> {
@@ -159,6 +169,35 @@ def RTIOSyncOp : RTIO_Op<"sync"> {
     let assemblyFormat = "$events attr-dict `:` type($sync_event)";
 
     let hasVerifier = 1;
+}
+
+def RTIOEmptyOp : RTIO_Op<"empty", [Pure]> {
+    let summary = "Create an empty event for sequencing";
+    let description = [{
+        Creates an empty event that can be used for initializing the first event
+        or when you need an event handle without performing any actual hardware operation.
+
+        The empty event acts as a no-op synchronization point that completes immediately,
+        allowing to establish event chains without triggering actions.
+
+        Example:
+        ```mlir
+        // Initialize with empty event for loop
+        %init_event = rtio.empty : !rtio.event
+        %result = scf.for %i = %c0 to %c10 step %c1 iter_args(%event = %init_event) -> (!rtio.event) {
+            // First pulse waits on event from previous iteration (or init_event in first iteration)
+            %e0 = rtio.pulse %ch duration(%dur) frequency(%freq) phase(%phase) wait(%event)
+                : !rtio.channel<"dds", 0> -> !rtio.event
+            %e1 = rtio.pulse %ch duration(%dur) frequency(%freq) phase(%phase) wait(%event)
+                : !rtio.channel<"dds", 0> -> !rtio.event
+            %sync = rtio.sync %e0, %e1 : !rtio.event
+            scf.yield %sync : !rtio.event
+        }
+        ```
+    }];
+
+    let results = (outs RTIOEventType:$event);
+    let assemblyFormat = "attr-dict `:` type($event)";
 }
 
 //===----------------------------------------------------------------------===//
