@@ -115,4 +115,102 @@ const std::map<std::array<int, 3>, ParityTransformInfo> parity_transforms = {
     // "SHT"
     {{2, 0, 2}, {SO3Matrix(SHT_DATA), {SHT}, 1.25}}};
 
+std::vector<PPRGateType> HSTtoPPR(const std::vector<GateType> &input_gates)
+{
+    std::vector<PPRGateType> output_gates;
+    output_gates.reserve(input_gates.size());
+
+    size_t i = 0;
+    while (i < input_gates.size()) {
+        const GateType &current_gate = input_gates[i];
+        if ((current_gate == GateType::HT || current_gate == GateType::SHT) &&
+            (i + 1 < input_gates.size())) {
+            const GateType &next_gate = input_gates[i + 1];
+
+            // Rule: HT, HT -> Z4, Z8
+            if (current_gate == GateType::HT && next_gate == GateType::HT) {
+                output_gates.push_back(PPRGateType::Z4);
+                output_gates.push_back(PPRGateType::Z8);
+                i += 2; // Skip both processed gates
+                continue;
+            }
+
+            // Rule: HT, SHT -> X4, X8, Z8
+            if (current_gate == GateType::HT && next_gate == GateType::SHT) {
+                output_gates.push_back(PPRGateType::X4);
+                output_gates.push_back(PPRGateType::X8);
+                output_gates.push_back(PPRGateType::Z8);
+                i += 2;
+                continue;
+            }
+
+            // Rule: SHT, HT -> Z8, X8, Z8
+            if (current_gate == GateType::SHT && next_gate == GateType::HT) {
+                output_gates.push_back(PPRGateType::Z8);
+                output_gates.push_back(PPRGateType::X8);
+                output_gates.push_back(PPRGateType::Z8);
+                i += 2;
+                continue;
+            }
+
+            // Rule: SHT, SHT -> Z4, X4, X8, Z8
+            if (current_gate == GateType::SHT && next_gate == GateType::SHT) {
+                output_gates.push_back(PPRGateType::Z4);
+                output_gates.push_back(PPRGateType::X4);
+                output_gates.push_back(PPRGateType::X8);
+                output_gates.push_back(PPRGateType::Z8);
+                i += 2;
+                continue;
+            }
+        }
+
+        // If we're here, no pair rule was matched.
+        // We handle the 1-to-1 mappings.
+        switch (current_gate) {
+        case GateType::T:
+            output_gates.push_back(PPRGateType::T);
+            break;
+        case GateType::I:
+            output_gates.push_back(PPRGateType::I);
+            break;
+        case GateType::X:
+            output_gates.push_back(PPRGateType::X);
+            break;
+        case GateType::Y:
+            output_gates.push_back(PPRGateType::Y);
+            break;
+        case GateType::Z:
+            output_gates.push_back(PPRGateType::Z);
+            break;
+        case GateType::H:
+            output_gates.push_back(PPRGateType::H);
+            break;
+        case GateType::S:
+            output_gates.push_back(PPRGateType::S);
+            break;
+        case GateType::Sd:
+            output_gates.push_back(PPRGateType::Sd);
+            break;
+        case GateType::HT: {
+            output_gates.push_back(PPRGateType::H);
+            output_gates.push_back(PPRGateType::T);
+            break;
+        }
+        case GateType::SHT: {
+            output_gates.push_back(PPRGateType::S);
+            output_gates.push_back(PPRGateType::H);
+            output_gates.push_back(PPRGateType::T);
+            break;
+        }
+
+        default:
+            throw std::runtime_error("Unknown GateType encountered.");
+        }
+
+        i += 1; // Skip the single processed gate
+    }
+
+    return output_gates;
+}
+
 } // namespace CliffordData

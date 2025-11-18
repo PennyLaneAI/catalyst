@@ -35,10 +35,7 @@ std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trials = 100
 /**
  * @brief Performs modular multiplication (a * b) % mod, preventing overflow.
  */
-inline INT_TYPE mod_mul(INT_TYPE a, INT_TYPE b, INT_TYPE mod)
-{
-    return static_cast<INT_TYPE>((static_cast<__int128>(a) * b) % mod);
-}
+inline INT_TYPE mod_mul(INT_TYPE a, INT_TYPE b, INT_TYPE mod) { return a * b % mod; }
 
 /**
  * @brief Performs modular exponentiation (base^exp) % mod.
@@ -163,31 +160,21 @@ inline bool primality_test(INT_TYPE n)
     return true;
 }
 
-// inline bool primality_test(INT_TYPE n) {
-//     // std::cout << "Performing primality test for n: " << n << std::endl;
-
-//     static std::map<INT_TYPE, bool> cache;
-//     if (auto it = cache.find(n); it != cache.end()) {
-//         return it->second;
-//     }
-//    if (boost::multiprecision::miller_rabin_test(n, 25)) {
-//         return cache[n] = true;
-//     }
-//     else {
-//         return cache[n] = false;
-//     }
-// }
-
 /**
  * @brief Computes the Legendre symbol (a/p).
  */
 inline INT_TYPE legendre_symbol(INT_TYPE a, INT_TYPE p)
 {
-    static std::map<std::pair<INT_TYPE, INT_TYPE>, INT_TYPE> cache;
-    if (auto it = cache.find({a, p}); it != cache.end()) {
-        return it->second;
+    static lru_cache<std::pair<INT_TYPE, INT_TYPE>, INT_TYPE, 100000> cache;
+    auto key = std::make_pair(a, p);
+
+    if (auto val_opt = cache.get(key); val_opt) {
+        return *val_opt;
     }
-    return cache[{a, p}] = mod_pow(a, (p - 1) / 2, p);
+
+    INT_TYPE result = mod_pow(a, (p - 1) / 2, p);
+    cache.put(key, result);
+    return result;
 }
 
 /**
@@ -249,20 +236,23 @@ inline std::optional<INT_TYPE> sqrt_modulo_p(INT_TYPE n, INT_TYPE p)
  */
 inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_tries)
 {
-    // FIX 1: The cache key must include max_tries.
-    // std::pair is simpler than std::tuple for two items.
-    static std::map<std::pair<INT_TYPE, int>, std::optional<INT_TYPE>> cache;
+    // Use lru_cache instead of std::map
+    static lru_cache<std::pair<INT_TYPE, int>, std::optional<INT_TYPE>, 100000> cache;
     auto cache_key = std::make_pair(n, max_tries);
 
-    if (auto it = cache.find(cache_key); it != cache.end()) {
-        return it->second;
+    if (auto val_opt = cache.get(cache_key); val_opt) {
+        return *val_opt;
     }
 
     // FIX 2: Cache the base cases.
-    if (n <= 2)
-        return cache[cache_key] = std::nullopt;
-    if (n % 2 == 0)
-        return cache[cache_key] = 2;
+    if (n <= 2) {
+        cache.put(cache_key, std::nullopt);
+        return std::nullopt;
+    }
+    if (n % 2 == 0) {
+        cache.put(cache_key, 2);
+        return 2;
+    }
 
     static std::mt19937 gen(std::random_device{}());
 
@@ -302,13 +292,14 @@ inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_tries)
             }
         }
 
-        // FIX 1 (cont.): Use the correct composite key for caching.
-        if (g != 1 && g != n)
-            return cache[cache_key] = g;
+        if (g != 1 && g != n) {
+            cache.put(cache_key, g);
+            return g;
+        }
     }
 
-    // FIX 1 (cont.): Use the correct composite key for caching.
-    return cache[cache_key] = std::nullopt;
+    cache.put(cache_key, std::nullopt);
+    return std::nullopt;
 }
 /**
  * @brief Computes the prime factorization of an integer n.
@@ -316,9 +307,13 @@ inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_tries)
 inline std::optional<std::vector<INT_TYPE>> prime_factorize(INT_TYPE n, int max_trials,
                                                             bool z_sqrt_two)
 {
-    static std::map<std::tuple<INT_TYPE, int, bool>, std::optional<std::vector<INT_TYPE>>> cache;
-    if (auto it = cache.find({n, max_trials, z_sqrt_two}); it != cache.end()) {
-        return it->second;
+    // Use lru_cache instead of std::map
+    static lru_cache<std::tuple<INT_TYPE, int, bool>, std::optional<std::vector<INT_TYPE>>, 100000>
+        cache;
+    auto cache_key = std::make_tuple(n, max_trials, z_sqrt_two);
+
+    if (auto val_opt = cache.get(cache_key); val_opt) {
+        return *val_opt;
     }
 
     std::vector<INT_TYPE> factors;
@@ -334,19 +329,23 @@ inline std::optional<std::vector<INT_TYPE>> prime_factorize(INT_TYPE n, int max_
 
         if (primality_test(p)) {
             if (z_sqrt_two && p % 8 == 7) {
-                return cache[{n, max_trials, z_sqrt_two}] = std::nullopt;
+                cache.put(cache_key, std::nullopt);
+                return std::nullopt;
             }
             factors.push_back(p);
             continue;
         }
 
         auto factor_opt = integer_factorize(p, max_trials);
-        if (!factor_opt)
-            return cache[{n, max_trials, z_sqrt_two}] = std::nullopt;
+        if (!factor_opt) {
+            cache.put(cache_key, std::nullopt);
+            return std::nullopt;
+        }
 
         INT_TYPE factor = *factor_opt;
         if (z_sqrt_two && factor % 7 == 0) {
-            return cache[{n, max_trials, z_sqrt_two}] = std::nullopt;
+            cache.put(cache_key, std::nullopt);
+            return std::nullopt;
         }
 
         stack.push_back(*factor_opt);
@@ -354,7 +353,8 @@ inline std::optional<std::vector<INT_TYPE>> prime_factorize(INT_TYPE n, int max_
     }
 
     std::sort(factors.begin(), factors.end());
-    return cache[{n, max_trials, z_sqrt_two}] = factors;
+    cache.put(cache_key, factors);
+    return factors;
 }
 
 // --- Factorization in Rings ---

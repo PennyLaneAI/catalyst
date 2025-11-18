@@ -4,8 +4,10 @@
 // CHECK ALL VALUES in this file
 namespace CliffordData {
 enum class GateType { T = 0, HT, SHT, I, X, Y, Z, H, S, Sd };
+enum class PPRGateType { T = 0, Z4, Z8, X4, X8, I, X, Y, Z, H, S, Sd };
 
 using enum CliffordData::GateType;
+// using enum CliffordData::PPRGateType;
 
 std::string_view gateTypeToString(GateType type);
 std::ostream &operator<<(std::ostream &os, GateType type);
@@ -33,5 +35,7 @@ const DyadicMatrix SHT_DATA({0, 0, 0, 1}, {0, -1, 0, 0}, {-1, 0, 0, 0}, {0, 0, 1
 // --- Step 2: Use these named variables in your map initialization ---
 
 extern const std::map<std::array<int, 3>, ParityTransformInfo> parity_transforms;
+
+std::vector<PPRGateType> HSTtoPPR(const std::vector<GateType> &vector);
 
 } // namespace CliffordData

@@ -27,7 +27,6 @@ std::pair<std::vector<GateType>, double> ma_normal_form(SO3Matrix &op)
 
         decomposition.insert(decomposition.end(), op_gate.begin(), op_gate.end());
         g_phase += op_phase;
-        // std::cout << "HERE A" << std::endl;
         if (parity_vec == std::array<int, 3>{2, 2, 0}) {
             // T
             c = c * ZOmega(0, 0, 1, 0);
@@ -41,6 +40,7 @@ std::pair<std::vector<GateType>, double> ma_normal_form(SO3Matrix &op)
             k += 1;
         }
         else {
+            // SHT
             ZOmega ic = ZOmega(0, 1, 0, 0) * c;
             auto a_temp = ZOmega(0, 0, -1, 0) * (a + ic);
             auto c_temp = ZOmega(0, -1, 0, 0) * (a - ic);

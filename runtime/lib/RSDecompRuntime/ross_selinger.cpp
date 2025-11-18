@@ -21,6 +21,7 @@
 #include <cstring>
 #include <iostream>
 #include <map>
+#include <variant>
 #include <vector>
 
 #include "DataView.hpp"
@@ -43,20 +44,20 @@ int multiple_of_pi_8(double angle)
     return rounded_multiple;
 }
 
-std::pair<std::vector<CliffordData::GateType>, double> eval_ross_algorithm(double angle,
-                                                                           double epsilon)
+using DecompResult =
+    std::variant<std::vector<CliffordData::GateType>, std::vector<CliffordData::PPRGateType>>;
+std::pair<DecompResult, double> eval_ross_algorithm(double angle, double epsilon, bool ppr_basis)
 {
-
-    using CacheKey = std::pair<double, double>;
-    using CacheValue = std::pair<std::vector<CliffordData::GateType>, double>;
+    using CacheKey = std::tuple<double, double, bool>;
+    using CacheValue = std::pair<DecompResult, double>;
     static lru_cache<CacheKey, CacheValue, 10000> ross_cache;
 
-    CacheKey key = {angle, epsilon};
+    CacheKey key = {angle, epsilon, ppr_basis};
 
     if (auto val_opt = ross_cache.get(key); val_opt) {
         return *val_opt;
     }
-
+    // std::cout << "Cache miss for angle: " << angle << ", epsilon: " << epsilon << std::endl;
     double shift = 0.0;
     double modified_angle = -angle / 2.0;
     ZOmega scale(0, 0, 0, 1);
@@ -127,7 +128,8 @@ std::pair<std::vector<CliffordData::GateType>, double> eval_ross_algorithm(doubl
 
         GridProblem::GridIterator u_solutions(modified_angle + shift, epsilon, max_search_trials);
 
-        // std::cout << "angle: " << modified_angle << ", shift: " << shift << ", epsilon: " << epsilon
+        // std::cout << "angle: " << modified_angle << ", shift: " << shift << ", epsilon: " <<
+        // epsilon
         //           << std::endl;
 
         for (const auto &[u_sol, k_val] : u_solutions) {
@@ -151,9 +153,22 @@ std::pair<std::vector<CliffordData::GateType>, double> eval_ross_algorithm(doubl
     SO3Matrix so3_mat(dyd_mat);
     auto normal_form_result = normal_forms::ma_normal_form(so3_mat);
 
-    ross_cache.put(key, normal_form_result);
+    double phase_result = normal_form_result.second;
 
-    return normal_form_result;
+    CacheValue result_to_cache;
+    if (ppr_basis) {
+        // Convert to PPR basis
+        std::vector<CliffordData::PPRGateType> ppr_gates =
+            CliffordData::HSTtoPPR(normal_form_result.first);
+        result_to_cache = std::make_pair(std::move(ppr_gates), phase_result);
+    }
+    else {
+        // Use the standard Clifford+T basis
+        result_to_cache = std::make_pair(std::move(normal_form_result.first), phase_result);
+    }
+
+    ross_cache.put(key, result_to_cache);
+    return result_to_cache;
 }
 
 /**
@@ -166,10 +181,12 @@ int64_t rs_decomposition_get_size_0(double theta, double epsilon, bool ppr_basis
         assert(false && "Simulating PPR basis not yet supported.");
     }
 
-    auto result = eval_ross_algorithm(theta, epsilon);
-    const auto &gates_vector = result.first; 
+    auto result = eval_ross_algorithm(theta, epsilon, ppr_basis);
+    const auto &gates_vector = result.first;
 
-    return static_cast<int64_t>(gates_vector.size());
+    size_t s = std::visit([](const auto &vec) { return vec.size(); }, gates_vector);
+
+    return static_cast<int64_t>(s);
 }
 
 /**
@@ -196,7 +213,7 @@ void rs_decomposition_get_gates_0([[maybe_unused]] int64_t *data_allocated, int6
 {
     (void)ppr_basis;
 
-    auto result = eval_ross_algorithm(theta, epsilon);
+    auto result = eval_ross_algorithm(theta, epsilon, ppr_basis);
     const auto &gates_data = result.first; // std::vector<CliffordData::GateType>
 
     // Re-construct the sizes and strides arrays for the DataView constructor
@@ -207,18 +224,22 @@ void rs_decomposition_get_gates_0([[maybe_unused]] int64_t *data_allocated, int6
     DataView<int64_t, 1> gates_view(data_aligned, offset, sizes, strides);
 
     // Ensure the MLIR-allocated buffer is at least as large as the data we're writing
-    if (static_cast<size_t>(gates_view.size()) < gates_data.size()) {
-        std::cerr << "Error: memref allocated for rs_decomposition is too small."
-                  << " (Allocated: " << gates_view.size() << ", Needed: " << gates_data.size()
-                  << ")" << std::endl;
-        return;
-    }
 
-    // Fill the memref data buffer
-    for (size_t i = 0; i < gates_data.size(); ++i) {
-        // This is the key part: cast the enum to the memref's integer type
-        gates_view(i) = static_cast<int64_t>(gates_data[i]);
-    }
+    std::visit(
+        [&gates_view](const auto &vec) {
+            size_t s = vec.size();
+            if (static_cast<size_t>(gates_view.size()) < s) {
+                std::cerr << "Error: memref allocated for rs_decomposition is too small."
+                          << " (Allocated: " << gates_view.size() << ", Needed: " << s << ")"
+                          << std::endl;
+                return;
+            }
+
+            for (size_t i = 0; i < s; ++i) {
+                gates_view(i) = static_cast<int64_t>(vec[i]);
+            }
+        },
+        gates_data);
 }
 
 /**
@@ -233,7 +254,7 @@ double rs_decomposition_get_phase_0(double theta, double epsilon, bool ppr_basis
 {
     (void)ppr_basis;
 
-    auto result = eval_ross_algorithm(theta, epsilon);
+    auto result = eval_ross_algorithm(theta, epsilon, ppr_basis);
     double phase = result.second;
 
     return phase;
