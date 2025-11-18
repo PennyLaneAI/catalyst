@@ -17,6 +17,7 @@
 import copy
 import functools
 import json
+from pennylane import transform
 
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.passes.pass_api import PassPipelineWrapper
@@ -136,7 +137,7 @@ def cancel_inverses(qnode):
         %2 = quantum.namedobs %out_qubits[ PauliZ] : !quantum.obs
         %3 = quantum.expval %2 : f64
     """
-    return PassPipelineWrapper(qnode, "remove-chained-self-inverse")
+    return transform(pass_name="remove-chained-self-inverse")(qnode)
 
 
 def disentangle_cnot(qnode):
@@ -225,7 +226,7 @@ def disentangle_cnot(qnode):
         %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
         %out_qubits_0 = quantum.custom "PauliX"() %2 : !quantum.bit
     """
-    return PassPipelineWrapper(qnode, "disentangle-CNOT")
+    return transform(pass_name="disentangle-CNOT")(qnode)
 
 
 def disentangle_swap(qnode):
@@ -325,7 +326,7 @@ def disentangle_swap(qnode):
         %out_qubits_2:2 = quantum.custom "CNOT"() %out_qubits_1, %out_qubits : !quantum.bit, !quantum.bit
         %out_qubits_3:2 = quantum.custom "CNOT"() %out_qubits_2#1, %out_qubits_2#0 : !quantum.bit, !quantum.bit
     """
-    return PassPipelineWrapper(qnode, "disentangle-SWAP")
+    return transform(pass_name="disentangle-SWAP")(qnode)
 
 
 def merge_rotations(qnode):
@@ -391,7 +392,7 @@ def merge_rotations(qnode):
     >>> circuit(0.54)
     Array(0.5965506257017892, dtype=float64)
     """
-    return PassPipelineWrapper(qnode, "merge-rotations")
+    return transform(pass_name="merge-rotations")(qnode)
 
 
 def decompose_lowering(qnode):
@@ -410,7 +411,7 @@ def decompose_lowering(qnode):
         // TODO: add example here
 
     """
-    return PassPipelineWrapper(qnode, "decompose-lowering")  # pragma: no cover
+    return transform(pass_name="decompose-lowering")(qnode)
 
 
 def ions_decomposition(qnode):  # pragma: nocover
@@ -532,7 +533,7 @@ def ions_decomposition(qnode):  # pragma: nocover
         %out_qubits_8 = quantum.custom "RY"(%cst_2) %out_qubits_6#1 : !quantum.bit
         %out_qubits_9 = quantum.custom "RY"(%cst_2) %out_qubits_7 : !quantum.bit
     """
-    return PassPipelineWrapper(qnode, "ions-decomposition")
+    return transform(pass_name="ions-decomposition")(qnode)
 
 
 def to_ppr(qnode):
@@ -612,8 +613,7 @@ def to_ppr(qnode):
         . . .
 
     """
-    return PassPipelineWrapper(qnode, "to-ppr")
-
+    return transform(pass_name="to-ppr")(qnode)
 
 def commute_ppr(qnode=None, *, max_pauli_size=0):
     R"""
@@ -711,8 +711,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
     if qnode is None:
         return functools.partial(commute_ppr, max_pauli_size=max_pauli_size)
 
-    commute_ppr_pass = {"commute_ppr": {"max-pauli-size": max_pauli_size}}
-    return PassPipelineWrapper(qnode, commute_ppr_pass)
+    return transform(pass_name="commute_ppr")(qnode, max_pauli_size=max_pauli_size)
 
 
 def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
@@ -800,8 +799,7 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     if qnode is None:
         return functools.partial(merge_ppr_ppm, max_pauli_size=max_pauli_size)
 
-    merge_ppr_ppm_pass = {"merge_ppr_ppm": {"max-pauli-size": max_pauli_size}}
-    return PassPipelineWrapper(qnode, merge_ppr_ppm_pass)
+    return transform(pass_name="merge_ppr_ppm")(qnode, max_pauli_size=max_pauli_size)
 
 
 def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measure=False):
@@ -883,19 +881,13 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
         . . .
 
     """
-    passes = {
-        "ppr_to_ppm": {
-            "decompose-method": decompose_method,
-            "avoid-y-measure": avoid_y_measure,
-        },
-    }
 
     if qnode is None:
         return functools.partial(
             ppr_to_ppm, decompose_method=decompose_method, avoid_y_measure=avoid_y_measure
         )
 
-    return PassPipelineWrapper(qnode, passes)
+    return transform(pass_name="ppr_to_ppm")(qnode, decompose_method=decompose_method, avoid_y_measure=avoid_y_measure)
 
 
 def ppm_compilation(
@@ -996,13 +988,6 @@ def ppm_compilation(
         . . .
 
     """
-    passes = {
-        "ppm-compilation": {
-            "decompose-method": decompose_method,
-            "avoid-y-measure": avoid_y_measure,
-            "max-pauli-size": max_pauli_size,
-        }
-    }
 
     if qnode is None:
         return functools.partial(
@@ -1012,8 +997,7 @@ def ppm_compilation(
             max_pauli_size=max_pauli_size,
         )
 
-    return PassPipelineWrapper(qnode, passes)
-
+    return transform(pass_name="ppm-compilation")(qnode, decompose_method=decompose_method, avoid_y_measure=avoid_y_measure, max_pauli_size=max_pauli_size)
 
 def ppm_specs(fn):
     R"""
@@ -1082,34 +1066,31 @@ def ppm_specs(fn):
         . . .
 
     """
-
-    if fn.mlir_module is not None:
-        # aot mode
-        new_options = copy.copy(fn.compile_options)
-        if new_options.pipelines is None:
-            raise CompileError("No pipeline found")
-
-        # add ppm-spec pass at the end to existing pipeline
-        _, pass_list = new_options.pipelines[0]  # first pipeline runs the user passes
-        # check if ppm-specs is already in the pass list
-        if "ppm-specs" not in pass_list:  # pragma: nocover
-            pass_list.append("ppm-specs")
-
-        new_options = _options_to_cli_flags(new_options)
-        raw_result = _quantum_opt(*new_options, [], stdin=str(fn.mlir_module))
-
-        try:
-            return json.loads(
-                raw_result[: raw_result.index("module")]
-            )  # remove MLIR starting with substring "module..."
-        except Exception as e:  # pragma: nocover
-            raise CompileError(
-                "Invalid json format encountered in ppm_specs. "
-                f"Expected valid JSON but got {raw_result[: raw_result.index('module')]}"
-            ) from e
-
-    else:
+    if fn.mlir_module is None:
         raise NotImplementedError("PPM passes only support AOT (Ahead-Of-Time) compilation mode.")
+    # aot mode
+    new_options = copy.copy(fn.compile_options)
+    if new_options.pipelines is None:
+        raise CompileError("No pipeline found")
+
+    # add ppm-spec pass at the end to existing pipeline
+    _, pass_list = new_options.pipelines[0]  # first pipeline runs the user passes
+    # check if ppm-specs is already in the pass list
+    if "ppm-specs" not in pass_list:  # pragma: nocover
+        pass_list.append("ppm-specs")
+
+    new_options = _options_to_cli_flags(new_options)
+    raw_result = _quantum_opt(*new_options, [], stdin=str(fn.mlir_module))
+
+    try:
+        return json.loads(
+            raw_result[: raw_result.index("module")]
+        )  # remove MLIR starting with substring "module..."
+    except Exception as e:  # pragma: nocover
+        raise CompileError(
+            "Invalid json format encountered in ppm_specs. "
+            f"Expected valid JSON but got {raw_result[: raw_result.index('module')]}"
+        ) from e
 
 
 def reduce_t_depth(qnode):
@@ -1191,8 +1172,7 @@ def reduce_t_depth(qnode):
         . . .
 
     """
-
-    return PassPipelineWrapper(qnode, "reduce-t-depth")
+    return transform(pass_name="reduce-t-depth")(qnode)
 
 
 def ppr_to_mbqc(qnode):
@@ -1281,4 +1261,4 @@ def ppr_to_mbqc(qnode):
         ...
 
     """
-    return PassPipelineWrapper(qnode, "ppr-to-mbqc")
+    return transform(pass_name="ppr-to-mbqc")(qnode)
