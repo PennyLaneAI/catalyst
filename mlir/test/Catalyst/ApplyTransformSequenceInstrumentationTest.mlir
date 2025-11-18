@@ -1,4 +1,4 @@
-// Copyright 2024 Xanadu Quantum Technologies Inc.
+// Copyright 2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --apply-transform-sequence --split-input-file --verify-diagnostics | FileCheck %s
+// RUN: quantum-opt %s --apply-transform-sequence --mlir-print-ir-after-all  --split-input-file --verify-diagnostics 2>&1 | FileCheck %s
 
-// This file tests that the --apply-transform-sequence:
-// 1. Correctly removes the transformer module from the payload module
-// 2. Correctly applies the transformer module
-// (using -cancel-inverses as the example)
-// 3. Silently passes on modules with no transform program
+// Instrumentation should show individual transform operations as subpasses
+// CHECK: transform_cse
+// CHECK: transform_cancel-inverses
+// CHECK: ApplyTransformSequencePass
 
 module @workflow {
 
   module attributes {transform.with_named_sequence} {
     transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
-      %0 = transform.apply_registered_pass "cancel-inverses" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+      %0 = transform.apply_registered_pass "cse" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+      %1 = transform.apply_registered_pass "cancel-inverses" to %0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
       transform.yield
     }
   }
@@ -38,21 +38,5 @@ module @workflow {
     %out_qubits_1 = quantum.custom "Hadamard"() %out_qubits : !quantum.bit
     return %out_qubits_1 : !quantum.bit
   }
-
-}
-
-// CHECK-LABEL: workflow
-// CHECK-NOT: module attributes {transform.with_named_sequence}
-// CHECK-NOT: transform.named_sequence @__transform_main
-// CHECK-NOT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
-// CHECK-NOT: transform.yield
-
-// CHECK-LABEL: f
-// CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
-
-// -----
-
-// CHECK-LABEL: @empty_workflow
-module @empty_workflow {
 
 }
