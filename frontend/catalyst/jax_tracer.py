@@ -712,7 +712,31 @@ def lower_jaxpr_to_mlir(jaxpr, func_name, arg_names):
 
     MemrefCallable.clearcache()
 
-    with transient_jax_config({"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}):
+    # pylint: disable=import-outside-toplevel
+    import jax._src.interpreters.partial_eval as pe
+    from jax._src.lax import lax
+    from jax._src.pjit import jit_p
+
+    from catalyst.jax_extras.patches import (
+        patched_dyn_shape_staging_rule,
+        patched_make_eqn,
+        patched_pjit_staging_rule,
+    )
+    from catalyst.utils.patching import DictPatchWrapper, Patcher
+
+    # Apply JAX 0.7.0 compatibility patches during MLIR lowering.
+    # These patches are needed because JAX internally calls trace_to_jaxpr_dynamic2
+    # during lowering of nested @jit primitives (like those in jax.scipy.linalg.expm
+    # and jax.scipy.linalg.solve). The patches fix bugs where pjit_staging_rule creates
+    # JaxprEqn instead of TracingEqn, causing AssertionError.
+    with transient_jax_config(
+        {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
+    ), Patcher(
+        (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
+        (lax, "_dyn_shape_staging_rule", patched_dyn_shape_staging_rule),
+        (jax._src.pjit, "pjit_staging_rule", patched_pjit_staging_rule),
+        (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
+    ):
         mlir_module, ctx = jaxpr_to_mlir(jaxpr, func_name, arg_names)
 
     return mlir_module, ctx

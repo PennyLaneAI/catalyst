@@ -62,11 +62,17 @@ from jax.lax import convert_element_type
 from jax.tree_util import PyTreeDef, tree_flatten, tree_structure, tree_unflatten, treedef_is_leaf
 from jaxlib._jax.pytree import PyTreeRegistry
 
-from catalyst.jax_extras.patches import gather2_p, get_aval2
+from catalyst.jax_extras.patches import (
+    gather2_p,
+    get_aval2,
+    patched_dyn_shape_staging_rule,
+    patched_make_eqn,
+    patched_pjit_staging_rule,
+)
 from catalyst.logging import debug_logger
 from catalyst.tracing.type_signatures import verify_static_argnums_type
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.patching import Patcher
+from catalyst.utils.patching import DictPatchWrapper, Patcher
 
 # pylint: disable=protected-access
 
@@ -503,9 +509,19 @@ def make_jaxpr2(
     @wraps(fun)
     def make_jaxpr_f(*args, **kwargs):
         # TODO: re-use `deduce_avals` here.
+        # pylint: disable=import-outside-toplevel
+        import jax._src.interpreters.partial_eval as pe
+        from jax._src.lax import lax
+        from jax._src.pjit import jit_p
+
         with Patcher(
             (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
             (jax._src.lax.slicing, "gather_p", gather2_p),
+            # JAX 0.7.0+ compatibility patches for dynamic shapes
+            (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
+            (lax, "_dyn_shape_staging_rule", patched_dyn_shape_staging_rule),
+            (jax._src.pjit, "pjit_staging_rule", patched_pjit_staging_rule),
+            (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
         ), ExitStack():
             f = wrap_init(fun, debug_info=debug_info)
             if static_argnums:
