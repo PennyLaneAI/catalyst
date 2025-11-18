@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --apply-transform-sequence --mlir-print-ir-after-all  --split-input-file --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-INSTRUMENTATION
+// RUN: quantum-opt %s --apply-transform-sequence --mlir-print-ir-after-all  --split-input-file --verify-diagnostics 2>&1 | FileCheck %s
 
 // Instrumentation should show individual transform operations as subpasses
-// CHECK-INSTRUMENTATION: transform_cse
-// CHECK-INSTRUMENTATION: transform_remove-chained-self-inverse
-// CHECK-INSTRUMENTATION: ApplyTransformSequencePass
+// CHECK: transform_cse
+// CHECK: transform_remove-chained-self-inverse
+// CHECK: ApplyTransformSequencePass
 
 module @workflow {
 
