@@ -7,7 +7,7 @@ Simple tutorial for injecting functions into xDSL modules
     import jax
 
     import pennylane as qml
-    from pennylane.compiler.python_compiler.conversion import inline_module, xdsl_from_qjit, xdsl_module
+    from catalyst.python_interface.conversion import inline_module, xdsl_from_qjit, xdsl_module
 
     from xdsl import context, passes, pattern_rewriter
     from xdsl.dialects import builtin, func

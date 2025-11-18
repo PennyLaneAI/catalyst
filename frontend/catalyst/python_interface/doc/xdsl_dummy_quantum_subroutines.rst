@@ -3,8 +3,8 @@
     from dataclasses import dataclass
 
     import pennylane as qml
-    from pennylane.compiler.python_compiler.conversion import xdsl_from_qjit
-    from pennylane.compiler.python_compiler.dialects.quantum import CustomOp, QubitType
+    from catalyst.python_interface.conversion import xdsl_from_qjit
+    from catalyst.python_interface.dialects.quantum import CustomOp, QubitType
 
     from xdsl import context, passes, pattern_rewriter
     from xdsl.builder import ImplicitBuilder

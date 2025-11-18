@@ -351,7 +351,7 @@ dialect), and check in the body of the method if the op is a
 .. code-block:: python
 
     from xdsl import pattern_rewriter
-    from pennylane.compiler.python_compiler.quantum_dialect import CustomOp
+    from catalyst.python_interface.dialects.quantum import CustomOp
 
     class MyPattern(pattern_rewriter.RewritePattern):
         """Dummy class for example."""
@@ -397,7 +397,7 @@ updates all ``Hadamard``\ s with ``PauliX``\ s:
 
     from xdsl import pattern_rewriter
     from xdsl.dialects import builtin
-    from pennylane.compiler.python_compiler.dialects.quantum import CustomOp
+    from catalyst.python_interface.dialects.quantum import CustomOp
 
     class HToXPattern(pattern_rewriter.RewritePattern):
         """Dummy class for example."""
@@ -441,8 +441,8 @@ replaces all ``Hadamard``\ s with ``PauliX``\ s
 
     from xdsl import passes, pattern_rewriter
     from xdsl.dialects import builtin
-    from pennylane.compiler.python_compiler.dialects.quantum import CustomOp
-    from pennylane.compiler.python_compiler import compiler_transform
+    from catalyst.python_interface.dialects.quantum import CustomOp
+    from catalyst.python_interface import compiler_transform
 
     class HToXPattern(pattern_rewriter.RewritePattern):
         """Dummy class for example."""
@@ -503,7 +503,7 @@ the “PennyLane integration” section below.
   .. code-block:: python
 
       import pennylane as qml
-      from pennylane.compiler.python_compiler.conversion import xdsl_from_qjit
+      from catalyst.python_interface.conversion import xdsl_from_qjit
 
       dev = qml.device("lightning.qubit", wires=3)
 
@@ -985,7 +985,7 @@ currently accessible as
 
 .. code-block:: python
 
-    from pennylane.compiler.python_compiler import compiler_transform
+    from catalyst.python_interface import compiler_transform
 
     class MyPass(xdsl.passes.ModulePass):
         """MyPass that does something"""

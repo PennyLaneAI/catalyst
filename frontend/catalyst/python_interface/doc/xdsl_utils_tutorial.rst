@@ -2,13 +2,13 @@ Python compiler utilities
 =========================
 
 All utilities we care about are in the
-``pennylane.compiler.python_compiler.conversion`` submodule.
+``catalyst.python_interface.conversion`` submodule.
 
 .. code-block:: python
 
     import pennylane as qml
 
-    from pennylane.compiler.python_compiler.conversion import (
+    from catalyst.python_interface.conversion import (
         inline_jit_to_module,
         inline_module,
         xdsl_from_qjit,
