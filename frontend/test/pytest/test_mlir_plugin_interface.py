@@ -101,7 +101,7 @@ def test_xdsl_plugin():
     """Here, we just test that we are able to run."""
 
     @catalyst.qjit
-    @catalyst.passes.apply_pass("catalyst_xdsl_plugin.remove-chained-self-inverse")
+    @catalyst.passes.apply_pass("catalyst_xdsl_plugin.cancel-inverses")
     @qml.qnode(qml.device("null.qubit", wires=1))
     def example():
         return qml.state()
