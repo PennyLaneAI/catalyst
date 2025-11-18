@@ -34,7 +34,6 @@ def RTIO_Dialect : Dialect {
 
         // TODO: Do we need the separate Timeline IR for artiq family?
         2. Timeline IR (low-level): Stateful operations with implicit time cursor
-        ```
     }];
 
     let name = "rtio";
@@ -69,9 +68,9 @@ def RTIOChannelType : RTIO_Type<"Channel", "channel"> {
         Syntax:
         ```
         !rtio.channel<KIND, ?>                 // Dynamic: kind only
-        !rtio.channel<KIND, N>                 // Static: kind + channel N
+        !rtio.channel<KIND, N>                 // Static: kind + channel ID
         !rtio.channel<KIND, [QUALIFIERS], ?>   // Dynamic: with qualifiers
-        !rtio.channel<KIND, [QUALIFIERS], N>   // Static: with qualifiers + channel N
+        !rtio.channel<KIND, [QUALIFIERS], N>   // Static: with qualifiers + channel ID
         ```
 
         Examples:
@@ -80,7 +79,7 @@ def RTIOChannelType : RTIO_Type<"Channel", "channel"> {
         // Simple DDS, channel TBD
         !rtio.channel<"dds", ?>
 
-        // DDS for one two qualifiers 0 and "t0", channel TBD
+        // DDS channel with two qualifiers 0 and "t0", channel ID TBD
         !rtio.channel<"dds", [0, "transition_0"], ?>
 
         // DDS on hardware channel 0
@@ -94,8 +93,8 @@ def RTIOChannelType : RTIO_Type<"Channel", "channel"> {
         // After channel resolution: Resolved to hardware channel 1
         !rtio.channel<"dds", [0], 1>
 
-        // Note: The qualifiers are used provided addtional information to the channel type.
-        // And it will used to distinguish different channels with the same kind.
+        // Note: The qualifiers are used to provide additional information to the channel type.
+        // And they will be used to distinguish different channels with the same kind.
         ```
     }];
 

@@ -59,8 +59,8 @@ def RTIOQubitToChannelOp : RTIO_Op<"qubit_to_channel"> {
     let summary = "Map a qubit to an RTIO channel";
     let description = [{
         It's a temporary operation that will be lowered to a static `rtio.channel` operation during
-        the channel resolution stage. The purpose of this operation is to allow the qubit from a
-        from a high-level dialect to be mapped to an `!rtio.channel`.
+        the channel resolution stage. The purpose of this operation is to allow a qubit from a
+        high-level dialect to be mapped to an `!rtio.channel`.
 
         Example:
         ```mlir
@@ -82,7 +82,7 @@ def RTIOQubitToChannelOp : RTIO_Op<"qubit_to_channel"> {
 }
 
 def RTIOPulseOp : RTIO_Op<"pulse"> {
-    let summary = "Generate a event-based pulse on a channel";
+    let summary = "Generate an event-based pulse on a channel";
     let description = [{
         Generate a pulse on the channel. Returns an `!rtio.event` handle that can be used with
         `rtio.sync` to wait for completion or to be used by other pulse operations with the `wait`
