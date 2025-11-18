@@ -2,6 +2,7 @@ set(LIBRARY_NAME ion-transforms)
 
 file(GLOB SRC
     ion-to-llvm.cpp
+    ion-to-rtio.cpp
     ConversionPatterns.cpp
     gates_to_pulses.cpp
     GatesToPulsesPatterns.cpp
@@ -13,6 +14,7 @@ set(LIBS
     ${dialect_libs}
     ${conversion_libs}
     MLIRIon
+    MLIRRTIO
 )
 
 set(DEPENDS
@@ -36,6 +38,7 @@ target_link_libraries(${LIBRARY_NAME} PRIVATE
 if(CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
 set_source_files_properties(
     ion-to-llvm.cpp
+    ion-to-rtio.cpp
     ConversionPatterns.cpp
     gates_to_pulses.cpp
     GatesToPulsesPatterns.cpp
