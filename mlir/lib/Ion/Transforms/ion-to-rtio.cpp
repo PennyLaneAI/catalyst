@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <queue>
+
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -764,14 +766,14 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
 
             // Create global memref at module level
             builder.setInsertionPointToStart(module.getBody());
-            auto globalOp = memref::GlobalOp::create(
-                builder, allocOp.getLoc(),
-                builder.getStringAttr(globalName), // sym_name
-                builder.getStringAttr("private"),  // sym_visibility
-                TypeAttr::get(memrefType),         // type
-                denseAttr,                         // initial_value
-                builder.getUnitAttr(),             // constant
-                IntegerAttr());                    // alignment
+            auto globalOp =
+                memref::GlobalOp::create(builder, allocOp.getLoc(),
+                                         builder.getStringAttr(globalName), // sym_name
+                                         builder.getStringAttr("private"),  // sym_visibility
+                                         TypeAttr::get(memrefType),         // type
+                                         denseAttr,                         // initial_value
+                                         builder.getUnitAttr(),             // constant
+                                         IntegerAttr());                    // alignment
 
             // Get the global memref in the function
             builder.setInsertionPointAfter(allocOp);
