@@ -2132,7 +2132,7 @@ def _switch_lowering(
     # the last branch is default and does not have a case
     cases = index_and_cases_and_branch_args_plus_consts[1 : len(branch_jaxprs)]
     branch_args_plus_consts = index_and_cases_and_branch_args_plus_consts[len(branch_jaxprs) :]
-    flat_args_plus_consts = mlir.flatten_lowering_ir_args(branch_args_plus_consts)
+    flat_args_plus_consts = mlir.flatten_ir_values(branch_args_plus_consts)
 
     index = _cast_to_index(index)
 
