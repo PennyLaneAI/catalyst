@@ -61,6 +61,10 @@
   - The Enzyme version has been updated to
   [v0.0.203](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.203).
 
+* The pass `remove-chained-self-inverse` has been renamed to `cancel-inverses`, to better
+  conform with the name of the corresponding transform in PennyLane.
+  [(#2201)](https://github.com/PennyLaneAI/catalyst/pull/2201)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
