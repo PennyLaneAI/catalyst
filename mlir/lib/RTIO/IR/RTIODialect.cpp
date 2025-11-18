@@ -111,7 +111,8 @@ static void printChannelTypeBody(AsmPrinter &printer, StringRef kind, ArrayAttr 
                 printer << id;
             }
         }
-    } else {
+    }
+    else {
         if (qualifiers && !qualifiers.empty()) {
             printer << ", ";
         }
