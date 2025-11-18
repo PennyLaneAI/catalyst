@@ -74,6 +74,7 @@ TEST_CASE("Test Resource Tracker Reset", "[resourcetracking]")
     CHECK(tracker.GetFilename() == "");
     CHECK(tracker.GetNumGates() == 0);
     CHECK(tracker.GetMaxWires() == 0);
+    CHECK(tracker.GetTotalAllocations() == 0);
     CHECK(tracker.GetDepth() == 0);
     CHECK(tracker.GetComputeDepth() == false);
 
@@ -89,6 +90,7 @@ TEST_CASE("Test Resource Tracker Reset", "[resourcetracking]")
     CHECK(tracker.GetFilename() == "foo.json");
     CHECK(tracker.GetNumGates() != 0);
     CHECK(tracker.GetMaxWires() != 0);
+    CHECK(tracker.GetTotalAllocations() != 0);
     CHECK(tracker.GetDepth() != 0);
     CHECK(tracker.GetComputeDepth() == true);
 
@@ -97,6 +99,7 @@ TEST_CASE("Test Resource Tracker Reset", "[resourcetracking]")
     // Ensure reset cleans values back to original
     CHECK(tracker.GetNumGates() == 0);
     CHECK(tracker.GetMaxWires() == 0);
+    CHECK(tracker.GetTotalAllocations() == 0);
     CHECK(tracker.GetDepth() == 0);
     // Filename and whether to compute depth should not be reset
     CHECK(tracker.GetFilename() == "foo.json");
@@ -107,21 +110,26 @@ TEST_CASE("Test Resource Tracker Wires", "[resourcetracking]")
 {
     ResourceTracker tracker;
     CHECK(tracker.GetMaxWires() == 0);
+    CHECK(tracker.GetTotalAllocations() == 0);
 
     // Call SetMaxWires with various different values
     tracker.AllocateQubit(0);
     CHECK(tracker.GetMaxWires() == 1);
+    CHECK(tracker.GetTotalAllocations() == 1);
     tracker.ReleaseQubit(0);
     CHECK(tracker.GetMaxWires() == 1);
+    CHECK(tracker.GetTotalAllocations() == 1);
 
     for (size_t i = 1; i <= 4; i++) {
         tracker.AllocateQubit(i);
     }
     CHECK(tracker.GetMaxWires() == 4);
+    CHECK(tracker.GetTotalAllocations() == 5);
     for (size_t i = 5; i <= 9; i++) {
         tracker.AllocateQubit(i);
     }
     CHECK(tracker.GetMaxWires() == 9);
+    CHECK(tracker.GetTotalAllocations() == 10);
 }
 
 TEST_CASE("Test Resource Tracker Gate Types", "[resourcetracking]")
@@ -279,16 +287,19 @@ TEST_CASE("Test Resource Tracker Printing", "[resourcetracking]")
     CHECK(tracker.GetFilename() == "");
     CHECK(tracker.GetNumGates() == 0);
     CHECK(tracker.GetMaxWires() == 0);
+    CHECK(tracker.GetTotalAllocations() == 0);
 
     for (size_t i = 0; i < 4; i++) {
         tracker.AllocateQubit(i);
     }
     CHECK(tracker.GetMaxWires() == 4);
+    CHECK(tracker.GetTotalAllocations() == 4);
 
     ApplyGates(tracker);
 
     CHECK(tracker.GetNumGates() == 10);
     CHECK(tracker.GetMaxWires() == 4);
+    CHECK(tracker.GetTotalAllocations() == 4);
 
     // Capture resources usage
     tracker.PrintResourceUsageToFile(resource_file_w);
@@ -343,22 +354,26 @@ TEST_CASE("Test Resource Tracker WriteOut", "[resourcetracking]")
     CHECK(tracker.GetFilename() == "");
     CHECK(tracker.GetNumGates() == 0);
     CHECK(tracker.GetMaxWires() == 0);
+    CHECK(tracker.GetTotalAllocations() == 0);
 
     for (size_t i = 0; i < 4; i++) {
         tracker.AllocateQubit(i);
     }
     CHECK(tracker.GetMaxWires() == 4);
+    CHECK(tracker.GetTotalAllocations() == 4);
 
     ApplyGates(tracker);
 
     CHECK(tracker.GetNumGates() == 10);
     CHECK(tracker.GetMaxWires() == 4);
+    CHECK(tracker.GetTotalAllocations() == 4);
 
     // Check that writing out the normal way resets
     tracker.WriteOut();
 
     CHECK(tracker.GetNumGates() == 0);
     CHECK(tracker.GetMaxWires() == 0);
+    CHECK(tracker.GetTotalAllocations() == 0);
 
     std::string filename = tracker.GetFilename();
     CHECK(filename != "");
@@ -377,6 +392,9 @@ TEST_CASE("Test Resource Tracker WriteOut", "[resourcetracking]")
 
         // For general data lines, check that the correct number is found
         if (line.find("num_wires") != std::string::npos) {
+            CHECK(line.find("4") != std::string::npos);
+        }
+        if (line.find("total_allocations") != std::string::npos) {
             CHECK(line.find("4") != std::string::npos);
         }
         if (line.find("num_gates") != std::string::npos) {
@@ -400,6 +418,7 @@ TEST_CASE("Test Resource Tracker WriteOut", "[resourcetracking]")
 
     // Ensure all expected fields were present
     CHECK(full_json.find("num_wires") != std::string::npos);
+    CHECK(full_json.find("total_allocations") != std::string::npos);
     CHECK(full_json.find("num_gates") != std::string::npos);
     CHECK(full_json.find("depth") != std::string::npos);
     CHECK(full_json.find("gate_types") != std::string::npos);

@@ -154,6 +154,13 @@ struct ResourceTracker final {
     auto GetMaxWires() -> QubitIdType { return max_num_wires_; }
 
     /**
+     * @brief Returns the total number of qubits allocated since the last time this object was reset
+     *
+     * @return The total number of qubits that have been allocated since the last reset
+     */
+    auto GetTotalAllocations() -> QubitIdType { return total_allocd_wires_; }
+
+    /**
      * @brief Returns the filename where resource tracking information is dumped
      *
      * @return The current filename that will be used for writing resource data
@@ -325,6 +332,7 @@ struct ResourceTracker final {
         resources << "{\n";
         resources << "  \"num_wires\": " << max_num_wires_ << ",\n";
         resources << "  \"num_gates\": " << GetNumGates() << ",\n";
+        resources << "  \"total_allocations\": " << total_allocd_wires_ << ",\n";
         resources << "  \"gate_types\": ";
         pretty_print_dict(gate_types_, 2, resources);
         resources << ",\n";
