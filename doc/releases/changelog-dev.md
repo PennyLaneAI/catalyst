@@ -7,6 +7,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* Resource tracking now supports dynamic qubit allocation
+  [(#2203)](https://github.com/PennyLaneAI/catalyst/pull/2203)
+
 * The new graph-based decomposition framework has Autograph feature parity with PennyLane
   when capture enabled. When compiling with `qml.qjit(autograph=True)`, the decomposition rules
   returned by the graph-based framework are now correctly compiled using Autograph.
