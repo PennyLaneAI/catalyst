@@ -181,27 +181,23 @@ struct ApplyTransformSequencePass
         // a valid transform with the transform dialect
         // We need to extract the transform.named_sequence in the
         // transformer module.
-        Operation *transformer_main_sequence;
-        transformer->walk([&](Operation *op) {
-            if (op->getName().getStringRef() == "transform.named_sequence") {
-                transformer_main_sequence = op;
-            }
+        transform::NamedSequenceOp transformer_main_sequence;
+        transformer->walk([&](transform::NamedSequenceOp op) {
+            assert(!transformer_main_sequence &&
+                   "expected only one transform sequence in the transform module");
+            transformer_main_sequence = op;
         });
 
         if (PassInstrumentor *passInstrumentor = getAnalysisManager().getPassInstrumentor()) {
             // Manually execute the transform sequence with individual subpass tracking
-            if (auto namedSequence =
-                    dyn_cast<transform::NamedSequenceOp>(transformer_main_sequence)) {
-                if (failed(applyTransformsWithSubpassTracking(payload, namedSequence,
-                                                              passInstrumentor))) {
-                    return signalPassFailure();
-                }
+            if (failed(applyTransformsWithSubpassTracking(payload, transformer_main_sequence,
+                                                          passInstrumentor))) {
+                return signalPassFailure();
             }
         }
         else {
-            if (failed(transform::applyTransforms(
-                    payload, cast<transform::TransformOpInterface>(transformer_main_sequence), {},
-                    transform::TransformOptions(), false))) {
+            if (failed(transform::applyTransforms(payload, transformer_main_sequence, {},
+                                                  transform::TransformOptions(), false))) {
                 return signalPassFailure();
             }
         }

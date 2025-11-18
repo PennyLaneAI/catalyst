@@ -28,7 +28,7 @@ from catalyst.utils.exceptions import CompileError
 ## API ##
 def cancel_inverses(qnode):
     """
-    Specify that the ``-removed-chained-self-inverse`` MLIR compiler pass
+    Specify that the ``-cancel-inverses`` MLIR compiler pass
     for cancelling two neighbouring self-inverse
     gates should be applied to the decorated QNode during :func:`~.qjit`
     compilation.
@@ -136,7 +136,7 @@ def cancel_inverses(qnode):
         %2 = quantum.namedobs %out_qubits[ PauliZ] : !quantum.obs
         %3 = quantum.expval %2 : f64
     """
-    return PassPipelineWrapper(qnode, "remove-chained-self-inverse")
+    return PassPipelineWrapper(qnode, "cancel-inverses")
 
 
 def disentangle_cnot(qnode):
@@ -884,11 +884,10 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
 
     """
     passes = {
-        "decompose_non_clifford_ppr": {
+        "ppr_to_ppm": {
             "decompose-method": decompose_method,
             "avoid-y-measure": avoid_y_measure,
         },
-        "decompose_clifford_ppr": {"avoid-y-measure": avoid_y_measure},
     }
 
     if qnode is None:

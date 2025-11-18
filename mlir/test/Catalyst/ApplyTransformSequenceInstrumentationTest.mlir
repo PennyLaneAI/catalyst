@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --apply-transform-sequence --mlir-print-ir-after-all  --split-input-file --verify-diagnostics 2>&1 | FileCheck %s --check-prefix=CHECK-INSTRUMENTATION
+// RUN: quantum-opt %s --apply-transform-sequence --mlir-print-ir-after-all  --split-input-file --verify-diagnostics 2>&1 | FileCheck %s
 
 // Instrumentation should show individual transform operations as subpasses
-// CHECK-INSTRUMENTATION: transform_cse
-// CHECK-INSTRUMENTATION: transform_remove-chained-self-inverse
-// CHECK-INSTRUMENTATION: ApplyTransformSequencePass
+// CHECK: transform_cse
+// CHECK: transform_cancel-inverses
+// CHECK: ApplyTransformSequencePass
 
 module @workflow {
 
   module attributes {transform.with_named_sequence} {
     transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
       %0 = transform.apply_registered_pass "cse" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
-      %1 = transform.apply_registered_pass "remove-chained-self-inverse" to %0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+      %1 = transform.apply_registered_pass "cancel-inverses" to %0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
       transform.yield
     }
   }

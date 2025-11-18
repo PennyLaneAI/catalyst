@@ -2,15 +2,10 @@
 
 <h3>New features since last release</h3>
 
-<h3>Improvements 🛠</h3>
+* Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
+  [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
 
-* Allow to apply instrumentation to each pass within NamedSequenceOp.
-  [(#1978)](https://github.com/PennyLaneAI/catalyst/pull/1978)
-  For example:
-  ```
-  quantum-opt ... --apply-transform-sequence --mlir-print-ir-after-all
-  ```
-  should also dump the IR result for each subpass within NamedSequeceOp
+<h3>Improvements 🛠</h3>
 
 * A new ``"changed"`` option has been added to the ``keep_intermediate`` parameter of 
   :func:`~.qjit`. This option saves intermediate IR files after each pass,
@@ -20,6 +15,15 @@
 * Intermediate IR files are now organized into subdirectories for each compilation stage
   when using ``keep_intermediate="changed"`` or ``keep_intermediate="pass"``.
   [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
+
+* Pass instrumentation can be applied to each pass within the `NamedSequenceOp` transform sequence for a qnode.
+  [(#1978)](https://github.com/PennyLaneAI/catalyst/pull/1978)
+  
+* The new graph-based decomposition framework has Autograph feature parity with PennyLane
+  when capture enabled. When compiling with `qml.qjit(autograph=True)`, the decomposition rules
+  returned by the graph-based framework are now correctly compiled using Autograph.
+  This ensures compatibility and deeper optimization for dynamically generated rules.
+  [(#2161)](https://github.com/PennyLaneAI/catalyst/pull/2161)
 
 * The ``decompose-lowering`` MLIR pass now supports ``qml.MultiRZ``
   with an arbitrary number of wires. This decomposition is performed
@@ -44,6 +48,10 @@
   This removes the need to pass the `pass_plugins` argument to the `qjit` decorator.
   [(#2169)](https://github.com/PennyLaneAI/catalyst/pull/2169)
   [(#2183)](https://github.com/PennyLaneAI/catalyst/pull/2183)
+
+* The ``mlir_opt`` property now correctly handles xDSL passes by automatically
+  detecting when the Python compiler is being used and routing through it appropriately.
+  [(#2190)](https://github.com/PennyLaneAI/catalyst/pull/2190)
 
 * Dynamically allocated wires can now be passed into control flow and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
@@ -70,6 +78,10 @@
   [commit 0a4440a](https://github.com/openxla/stablehlo/commit/0a4440a5c8de45c4f9649bf3eb4913bf3f97da0d).
   - The Enzyme version has been updated to
   [v0.0.203](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.203).
+
+* The pass `remove-chained-self-inverse` has been renamed to `cancel-inverses`, to better
+  conform with the name of the corresponding transform in PennyLane.
+  [(#2201)](https://github.com/PennyLaneAI/catalyst/pull/2201)
 
 <h3>Deprecations 👋</h3>
 
@@ -119,7 +131,17 @@
   // ... use %4
   ```
 
+* The pass pipeline is correctly registered to the transform named sequence of the
+  one-shot qnode when `one-shot` mcm method is used.
+  [(#2198)](https://github.com/PennyLaneAI/catalyst/pull/2198)
+
 <h3>Internal changes ⚙️</h3>
+
+* Replaces the deprecated `shape_dtype_to_ir_type` function with the `RankedTensorType.get` method.
+  [(#2159)](https://github.com/PennyLaneAI/catalyst/pull/2159)
+
+* Updates to PennyLane's use of a single transform primitive with a `transform` kwarg.
+  [(#2177)](https://github.com/PennyLaneAI/catalyst/pull/2177)
 
 * The pytest tests are now run with `strict=True` by default.
   [(#2180)](https://github.com/PennyLaneAI/catalyst/pull/2180)
@@ -155,6 +177,14 @@
       // ... ion operations ...
   }
   ```
+  
+  * Added support for `ppr-to-ppm` as an individual MLIR pass and python binding 
+  for the qec dialect.
+  [(#2189)](https://github.com/PennyLaneAI/catalyst/pull/2189)
+
+  * Added a canonicalization pattern for `qec.ppr` to remove any PPRs consisting only
+  of identities.
+  [(#2192)](https://github.com/PennyLaneAI/catalyst/pull/2192)
 
 <h3>Documentation 📝</h3>
 
@@ -173,7 +203,9 @@
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+Jeffrey Kam,
 Christina Lee,
+Mehrdad Malekmohammadi,
 River McCubbin,
 Lee J. O'Riordan,
 Roberto Turrado,
