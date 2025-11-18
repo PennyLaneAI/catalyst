@@ -19,7 +19,8 @@ This file tests that the xDSL passes are detected and applied correctly.
 """
 
 import pennylane as qml
-from pennylane.compiler.python_compiler.transforms import merge_rotations_pass
+
+from catalyst.python_interface.transforms import merge_rotations_pass
 
 
 def test_mlir_pass_no_attribute():

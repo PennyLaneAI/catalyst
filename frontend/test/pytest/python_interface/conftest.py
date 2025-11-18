@@ -11,12 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Pytest configuration for tests for the pennylane.compiler.python_compiler submodule."""
+"""Pytest configuration for tests for the catalyst.python_interface submodule."""
 
 from inspect import getsource
 from io import StringIO
 
 import pytest
+
+from catalyst.python_interface import Compiler, QuantumParser
+from catalyst.python_interface.conversion import parse_generic_to_xdsl_module
 
 deps_available = True
 
@@ -30,8 +33,6 @@ try:
     from xdsl.passes import PassPipeline
     from xdsl.printer import Printer
 
-    from catalyst.python_interface import Compiler, QuantumParser
-    from catalyst.python_interface.conversion import parse_generic_to_xdsl_module
 except (ImportError, ModuleNotFoundError):
     deps_available = False
 

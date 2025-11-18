@@ -97,12 +97,14 @@ class DynamicBroadcastInDimOp(IRDLOperation):
         # Operand and result must be tensors
         assert isinstance(operand_ty, TensorType) and isinstance(result_ty, TensorType)
 
+        self._verify_rank_constraints(bcast_dims, operand_ty, result_ty)
+
         # dynamic_broadcast_in_dim_c4: broadcast_dimensions should not have duplicates
         if len(set(bcast_dims)) != len(bcast_dims):
             raise VerifyException("broadcast_dimensions should not have duplicates")
 
-        self._verify_rank_constraints(bcast_dims, operand_ty, result_ty)
         self._verify_per_dimension_bounds(bcast_dims, operand_ty, result_ty)
+
         self._verify_expansion_hints(operand_ty)
 
     def _verify_rank_constraints(self, bcast_dims, operand_ty, result_ty):
@@ -149,6 +151,7 @@ class DynamicBroadcastInDimOp(IRDLOperation):
             )
 
     def _verify_per_dimension_bounds(self, bcast_dims, operand_ty, result_ty):
+        """Verify compatibility of operand and result dimensions."""
         # dynamic_broadcast_in_dim_c5: bounds and per-dimension compatibility
         operand_shape = operand_ty.get_shape()
         result_shape = result_ty.get_shape()

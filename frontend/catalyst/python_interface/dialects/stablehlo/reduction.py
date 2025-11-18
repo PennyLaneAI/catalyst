@@ -85,6 +85,7 @@ class ReduceOp(IRDLOperation):
         init_types = [op.type for op in self.init_values]
 
         self._verify_input_and_init_types(input_types, init_types)
+
         self._verify_reducer_region(input_types)
 
     def _verify_input_and_init_types(self, input_types, init_types):
