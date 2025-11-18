@@ -474,7 +474,7 @@ jobs:
         python3 -m pip install cuda-quantum==0.6.0
         python3 -m pip install oqc-qcaas-client
         # Install graphviz for testing the mlir-op-graph integration
-        sudo apt-get install -y graphviz
+        sudo apt-get install -y graphviz && sudo apt-get update
         make frontend
 
     - name: Get Cached LLVM Build
