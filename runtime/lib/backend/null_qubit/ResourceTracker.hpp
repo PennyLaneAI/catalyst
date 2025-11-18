@@ -57,31 +57,34 @@ struct ResourceTracker final {
     void RecordOperation(const std::string &name, const std::vector<QubitIdType> &wires,
                          const std::vector<QubitIdType> &controlled_wires)
     {
-        // Sanity check that wire numbers make sense
-        std::size_t total_wires = wires.size() + controlled_wires.size();
-
         if (compute_depth_) {
-            std::vector<QubitIdType> combined_wires = {};
-            combined_wires.insert(combined_wires.end(), wires.begin(), wires.end());
-            combined_wires.insert(combined_wires.end(), controlled_wires.begin(),
-                                  controlled_wires.end());
-
-            for (const auto &i : combined_wires) {
-                RT_FAIL_IF(
-                    wire_depths_.find(i) == wire_depths_.end(),
-                    ("Wire index " + std::to_string(i) + " is not an allocated wire").c_str());
-            }
-
             std::size_t max_depth = 0;
-            for (const auto &i : combined_wires) {
-                max_depth = std::max(max_depth, wire_depths_[i]);
+            for (const auto &i : wires) {
+                auto curr_depth = wire_depths_.find(i);
+                RT_FAIL_IF(
+                    curr_depth == wire_depths_.end(),
+                    ("Wire index " + std::to_string(i) + " is not an allocated wire").c_str());
+                    max_depth = std::max(max_depth, curr_depth->second);
+                }
+                for (const auto &i : controlled_wires) {
+                    auto curr_depth = wire_depths_.find(i);
+                    RT_FAIL_IF(curr_depth == wire_depths_.end(),
+                    ("Control wire index " + std::to_string(i) + " is not an allocated wire")
+                               .c_str());
+                max_depth = std::max(max_depth, curr_depth->second);
             }
-            // All wires used in this operation must now have their depth set based on this max
+
+            // ALL wires used in this operation must have their depth set, including control wires
             max_depth++;
-            for (const auto &i : combined_wires) {
+            for (const auto &i : wires) {
+                wire_depths_[i] = max_depth;
+            }
+            for (const auto &i : controlled_wires) {
                 wire_depths_[i] = max_depth;
             }
         }
+
+        std::size_t total_wires = wires.size() + controlled_wires.size();
 
         gate_types_[name]++;
         gate_sizes_[total_wires]++;
