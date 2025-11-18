@@ -204,7 +204,7 @@ def apply_pass(pass_name: str, *flags, **valued_options):
     """
 
     def decorator(qnode):
-        return PassPipelineWrapper(qnode, pass_name, *flags, **valued_options)
+        return qml.transform(pass_name=pass_name)(qnode, *flags, **valued_options)
 
     return decorator
 
@@ -244,6 +244,7 @@ def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valu
         raise FileNotFoundError(f"File '{path_to_plugin}' does not exist.")
 
     def decorator(qnode):
+        return qml.transform(pass_name=pass_name)(qnode, *flags, **valued_options)
         return PassPipelineWrapper(qnode, pass_name, *flags, **valued_options)
 
     return decorator
