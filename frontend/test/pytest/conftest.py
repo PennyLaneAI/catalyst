@@ -16,15 +16,11 @@ Pytest configuration file for Catalyst test suite.
 """
 
 import os
-import pathlib
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
 import pennylane as qml
 import pytest
-
-TEST_PATH = os.path.dirname(__file__)
-CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device.toml")
 
 
 @pytest.fixture(scope="function")
