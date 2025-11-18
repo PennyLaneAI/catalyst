@@ -70,3 +70,9 @@ def use_both_frontend(request):
             qml.capture.disable()
     else:
         yield
+
+
+@pytest.fixture(scope="function")
+def requires_xdsl():
+    """Fixture that ensures xdsl is available. It skips the test if xdsl is not installed."""
+    pytest.importorskip("xdsl", reason="xdsl is not installed, skipping test")
