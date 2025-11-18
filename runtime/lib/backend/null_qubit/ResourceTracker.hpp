@@ -64,12 +64,12 @@ struct ResourceTracker final {
                 RT_FAIL_IF(
                     curr_depth == wire_depths_.end(),
                     ("Wire index " + std::to_string(i) + " is not an allocated wire").c_str());
-                    max_depth = std::max(max_depth, curr_depth->second);
-                }
-                for (const auto &i : controlled_wires) {
-                    auto curr_depth = wire_depths_.find(i);
-                    RT_FAIL_IF(curr_depth == wire_depths_.end(),
-                    ("Control wire index " + std::to_string(i) + " is not an allocated wire")
+                max_depth = std::max(max_depth, curr_depth->second);
+            }
+            for (const auto &i : controlled_wires) {
+                auto curr_depth = wire_depths_.find(i);
+                RT_FAIL_IF(curr_depth == wire_depths_.end(),
+                           ("Control wire index " + std::to_string(i) + " is not an allocated wire")
                                .c_str());
                 max_depth = std::max(max_depth, curr_depth->second);
             }
