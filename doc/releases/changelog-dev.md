@@ -174,7 +174,7 @@
 <h3>Internal changes ⚙️</h3>
 
 * Migrated the `pennylane.compiler.python_compiler` submodule from PennyLane to Catalyst.
-  It is now available as `catalyst.python_interface`.
+  It is now accessible as `catalyst.python_interface`.
   [(#2199)](https://github.com/PennyLaneAI/catalyst/pull/2199)
 
 * Replaces the deprecated `shape_dtype_to_ir_type` function with the `RankedTensorType.get` method.
