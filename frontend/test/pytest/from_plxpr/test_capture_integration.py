@@ -1079,9 +1079,8 @@ class TestCapture:
         def my_pass(_tape, my_option=None, my_other_option=None):  # pylint: disable=unused-argument
             """A dummy qml.transform."""
             return
-        
-        my_pass = qml.transform(pass_name="my-pass")
 
+        my_pass = qml.transform(pass_name="my-pass")
 
         @qjit(target="mlir")
         @partial(my_pass, my_option="my_option_value", my_other_option=False)

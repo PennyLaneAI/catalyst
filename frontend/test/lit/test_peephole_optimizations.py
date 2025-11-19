@@ -86,10 +86,12 @@ def test_pipeline_lowering():
 
 test_pipeline_lowering()
 
+
 def test_transform_lowering():
     """
     Basic pipeline lowering on one qnode.
     """
+
     @qjit(keep_intermediate=True)
     @qml.transforms.merge_rotations
     @qml.transforms.cancel_inverses

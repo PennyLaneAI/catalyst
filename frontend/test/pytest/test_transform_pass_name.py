@@ -11,13 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Testing use of transforms with pass name integrating with qnodes.
-"""
-import pytest
+"""Testing use of transforms with pass name integrating with qnodes."""
 from functools import partial
 
 import pennylane as qml
-
+import pytest
 
 
 def test_pass_with_options(backend):
@@ -38,14 +36,15 @@ def test_pass_with_options(backend):
         in capture_mlir
     )
 
+
 def test_pass_before_tape_transform(backend):
     """Test that provided an mlir-only transform prior to a tape transform raises an error."""
 
     my_pass = qml.transform(pass_name="my-pass")
-    
+
     @qml.transform
     def tape_transform(tape):
-        return (tape, ), lambda x: x[0]
+        return (tape,), lambda x: x[0]
 
     @qml.qjit
     @tape_transform
@@ -57,13 +56,14 @@ def test_pass_before_tape_transform(backend):
     with pytest.raises(ValueError, match="without a tape definition occurs before tape transform"):
         f(0.5)
 
+
 def test_pass_after_tape_transform(backend):
     """Test that passes can be applied after tape transforms."""
 
     @qml.transform
     def tape_only_cancel_inverses(tape):
         return qml.transforms.cancel_inverses(tape)
-    
+
     my_pass = qml.transform(pass_name="my-pass")
 
     @qml.qjit(target="mlir")
@@ -74,7 +74,7 @@ def test_pass_after_tape_transform(backend):
         qml.X(0)
         qml.X(0)
         return qml.state()
-    
+
     # check inverses canceled
     assert 'quantum.custom "PauliX"()' not in c.mlir
     assert 'transform.apply_registered_pass "my-pass"' in c.mlir
