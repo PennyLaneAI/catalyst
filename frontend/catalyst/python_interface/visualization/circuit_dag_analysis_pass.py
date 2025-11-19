@@ -22,9 +22,7 @@ from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Region
 
 from catalyst.python_interface.dialects import quantum
-
-if TYPE_CHECKING:
-    from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 
 
 class CircuitDAGAnalysisPass:
