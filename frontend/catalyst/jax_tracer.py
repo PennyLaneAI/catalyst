@@ -674,7 +674,6 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs, debug_in
         {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
     ), Patcher(
         (pe, "_drop_unused_vars", patched_drop_unused_vars),
-        (DynamicJaxprTrace, "make_eqn", patched_make_eqn),  # Fix make_eqn signature change
         (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),  # Fix pjit bug
     ):
         make_jaxpr_kwargs = {
