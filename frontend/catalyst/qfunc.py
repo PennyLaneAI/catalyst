@@ -291,7 +291,8 @@ class QFunc:
         processed_old_pipeline = tuple(dictionary_to_list_of_passes(old_pipeline))
         pass_pipeline = processed_old_pipeline + new_pipeline
         new_qnode = copy(self)
-        new_qnode._transform_program = new_transform_program  # pylint: disable=protected-access
+        # pylint: disable=attribute-defined-outside-init, protected-access
+        new_qnode._transform_program = new_transform_program
 
         # Mid-circuit measurement configuration/execution
         fn_result = configure_mcm_and_try_one_shot(new_qnode, args, kwargs, pass_pipeline)

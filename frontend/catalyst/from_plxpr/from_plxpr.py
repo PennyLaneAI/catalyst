@@ -264,12 +264,10 @@ def handle_qnode(
 # otherwise their value will be None. The second value indicates if the transform
 # requires decomposition to be supported by Catalyst.
 transforms_to_passes = {
-    pl_cancel_inverses: ("cancel-inverses", False),
     pl_commute_controlled: (None, False),
     pl_decompose: (None, False),
     pl_map_wires: (None, False),
     pl_merge_amplitude_embedding: (None, True),
-    pl_merge_rotations: ("merge-rotations", False),
     pl_single_qubit_fusion: (None, False),
     pl_unitary_to_rot: (None, False),
 }
