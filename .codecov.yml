@@ -7,6 +7,3 @@ coverage:
   status:
     project: false
     patch: true
-
-ignore:
-  - "frontend/catalyst/python_interface"
