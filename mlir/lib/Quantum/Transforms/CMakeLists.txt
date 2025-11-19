@@ -9,8 +9,8 @@ file(GLOB SRC
     adjoint_lowering.cpp
     annotate_function.cpp
     AdjointPatterns.cpp
-    ChainedSelfInversePatterns.cpp
-    remove_chained_self_inverse.cpp
+    CancelInversesPatterns.cpp
+    cancel_inverses.cpp
     SplitMultipleTapes.cpp
     merge_rotation.cpp
     MergeRotationsPatterns.cpp

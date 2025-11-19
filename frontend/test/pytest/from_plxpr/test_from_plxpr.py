@@ -1,4 +1,4 @@
-# Copyright 2024 Xanadu Quantum Technologies Inc.
+# Copyright 2024-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -856,7 +856,7 @@ class TestControlFlow:
         assert eqn.primitive == for_p
         assert eqn.params["apply_reverse_transform"] == reverse
         assert eqn.params["body_nconsts"] == 0
-        assert eqn.params["nimplicit"] == 0
+        assert eqn.params["num_implicit_inputs"] == 0
         assert eqn.params["preserve_dimensions"] is True
 
         assert eqn.invars[0].val == start
@@ -886,7 +886,7 @@ class TestControlFlow:
         assert catalyst_xpr.eqns[0].primitive == while_p
         assert catalyst_xpr.eqns[0].params["body_nconsts"] == 1
         assert catalyst_xpr.eqns[0].params["cond_nconsts"] == 1
-        assert catalyst_xpr.eqns[0].params["nimplicit"] == 0
+        assert catalyst_xpr.eqns[0].params["num_implicit_inputs"] == 0
         assert catalyst_xpr.eqns[0].params["preserve_dimensions"] == True
 
         for kind in ["body_jaxpr", "cond_jaxpr"]:

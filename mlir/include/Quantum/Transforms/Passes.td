@@ -82,8 +82,8 @@ def IonsDecompositionPass : Pass<"ions-decomposition"> {
     let summary = "Decompose the gates to the set {RX, RY, MS}";
 }
 
-def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
-    let summary = "Perform removal of chained operations that are self inverses.";
+def CancelInversesPass : Pass<"cancel-inverses"> {
+    let summary = "Perform removal of chained operations that are inverses.";
 }
 
 def GridsynthPass : Pass<"gridsynth"> {

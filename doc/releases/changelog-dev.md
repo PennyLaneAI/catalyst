@@ -7,6 +7,12 @@
 
 <h3>Improvements 🛠</h3>
 
+* Resource tracking now supports dynamic qubit allocation
+  [(#2203)](https://github.com/PennyLaneAI/catalyst/pull/2203)
+
+* Pass instrumentation can be applied to each pass within the `NamedSequenceOp` transform sequence for a qnode.
+  [(#1978)](https://github.com/PennyLaneAI/catalyst/pull/1978)
+  
 * The new graph-based decomposition framework has Autograph feature parity with PennyLane
   when capture enabled. When compiling with `qml.qjit(autograph=True)`, the decomposition rules
   returned by the graph-based framework are now correctly compiled using Autograph.
@@ -61,6 +67,10 @@
   - The Enzyme version has been updated to
   [v0.0.203](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.203).
 
+* The pass `remove-chained-self-inverse` has been renamed to `cancel-inverses`, to better
+  conform with the name of the corresponding transform in PennyLane.
+  [(#2201)](https://github.com/PennyLaneAI/catalyst/pull/2201)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
@@ -109,7 +119,14 @@
   // ... use %4
   ```
 
+* The pass pipeline is correctly registered to the transform named sequence of the
+  one-shot qnode when `one-shot` mcm method is used.
+  [(#2198)](https://github.com/PennyLaneAI/catalyst/pull/2198)
+
 <h3>Internal changes ⚙️</h3>
+
+* Replaces the deprecated `shape_dtype_to_ir_type` function with the `RankedTensorType.get` method.
+  [(#2159)](https://github.com/PennyLaneAI/catalyst/pull/2159)
 
 * Updates to PennyLane's use of a single transform primitive with a `transform` kwarg.
   [(#2177)](https://github.com/PennyLaneAI/catalyst/pull/2177)
@@ -176,8 +193,10 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Jeffrey Kam,
 Christina Lee,
+Mehrdad Malekmohammadi,
 River McCubbin,
 Lee J. O'Riordan,
 Roberto Turrado,
 Paul Haochen Wang,
+Jake Zaia,
 Hongsheng Zheng.

@@ -54,9 +54,9 @@ _Perform loop boundary optimization to eliminate the redundancy of operations on
 
 _Perform merging of chained rotation gates about the same axis._
 
-### `-remove-chained-self-inverse`
+### `-cancel-inverses`
 
-_Perform removal of chained operations that are self inverses._
+_Perform removal of chained operations that are inverses._
 
 ### `-split-multiple-tapes`
 
