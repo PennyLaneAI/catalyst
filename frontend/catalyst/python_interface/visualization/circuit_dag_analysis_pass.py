@@ -40,6 +40,23 @@ class CircuitDAGAnalysisPass:
             op (Any): An xDSL operation.
         """
 
+    # ╔═══════════════════════════════════════════════════════════════╗
+    # ║ CONTROL FLOW HANDLERS: Specialized dispatch for xDSL control  ║
+    # ║                         flow operations (scf dialect).        ║
+    # ╚═══════════════════════════════════════════════════════════════╝
+
+    @visit_op.register
+    def _visit_for_op(self, op: scf.ForOp) -> None:
+        """Handle an xDSL ForOp operation."""
+
+    @visit_op.register
+    def _visit_while_op(self, op: scf.WhileOp) -> None:
+        """Handle an xDSL WhileOp operation."""
+
+    @visit_op.register
+    def _visit_if_op(self, op: scf.IfOp) -> None:
+        """Handle an xDSL WhileOp operation."""
+
     @visit_op.register
     def visit_region(self, region: Region) -> None:
         """Visit an xDSL Region operation."""
