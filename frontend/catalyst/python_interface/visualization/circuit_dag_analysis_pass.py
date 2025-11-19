@@ -26,51 +26,106 @@ from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 
 
 class CircuitDAGAnalysisPass:
+    """A Pass that analyzes an xDSL module and constructs a Directed Acyclic Graph (DAG)
+    using an injected DAGBuilder instance. This is a non-mutating Analysis Pass."""
+
     def __init__(self, dag_builder: DAGBuilder) -> None:
-        """Initialize the analysis pass."""
+        """Initialize the analysis pass by injecting the DAG builder dependency.
+
+        Args:
+            dag_builder (DAGBuilder): The concrete builder instance used for graph construction.
+        """
         self.dag_builder: DAGBuilder = dag_builder
+
+    # =================================
+    # 1. CORE DISPATCH AND ENTRY POINT
+    # =================================
 
     @singledispatchmethod
     def visit_op(self, op: Any) -> None:
-        """Default handler for unknown operation types.
+        """Central dispatch method (Visitor Pattern). Routes the operation 'op'
+        to the specialized handler registered for its type."""
+        pass
 
-        This method is dispatched based on the type of 'op'.
+    def run(self, module: builtin.ModuleOp) -> None:
+        """Applies the analysis pass on the module."""
+        for op in module.ops:
+            self.visit_op(op)
 
-        Args:
-            op (Any): An xDSL operation.
-        """
-
-    # ╔═══════════════════════════════════════════════════════════════╗
-    # ║ CONTROL FLOW HANDLERS: Specialized dispatch for xDSL control  ║
-    # ║                         flow operations (scf dialect).        ║
-    # ╚═══════════════════════════════════════════════════════════════╝
-
-    @visit_op.register
-    def _visit_for_op(self, op: scf.ForOp) -> None:
-        """Handle an xDSL ForOp operation."""
-
-    @visit_op.register
-    def _visit_while_op(self, op: scf.WhileOp) -> None:
-        """Handle an xDSL WhileOp operation."""
-
-    @visit_op.register
-    def _visit_if_op(self, op: scf.IfOp) -> None:
-        """Handle an xDSL WhileOp operation."""
+    # =======================
+    # 2. HIERARCHY TRAVERSAL
+    # =======================
+    # These methods navigate the recursive IR hierarchy (Op -> Region -> Block -> Op).
 
     @visit_op.register
     def visit_region(self, region: Region) -> None:
-        """Visit an xDSL Region operation."""
+        """Visit an xDSL Region operation, delegating traversal to its Blocks."""
         for block in region.blocks:
             self.visit_block(block)
 
     @visit_op.register
     def visit_block(self, block: Block) -> None:
-        """Visit an xDSL Block operation."""
+        """Visit an xDSL Block operation, dispatching handling for each contained Operation."""
         for op in block.ops:
             self.visit_op(op)
 
-    def run(self, module: builtin.ModuleOp) -> None:
-        """Apply the analysis pass on the module."""
+    # ======================================
+    # 3. QUANTUM GATE & STATE PREP HANDLERS
+    # ======================================
+    # Handlers for operations that apply unitary transformations or set-up the quantum state.
 
-        for op in module.ops:
-            self.visit_op(op)
+    @visit_op.register
+    def _visit_unitary_and_state_prep(
+        self,
+        op: (
+            quantum.CustomOp
+            | quantum.GlobalPhaseOp
+            | quantum.QubitUnitaryOp
+            | quantum.MultiRZOp
+            | quantum.SetStateOp
+            | quantum.SetBasisStateOp
+        ),
+    ) -> None:
+        """Generic handler for unitary gates and quantum state preparation operations."""
+        pass
+
+    # =============================================
+    # 4. QUANTUM MEASUREMENT & OBSERVABLE HANDLERS
+    # =============================================
+
+    @visit_op.register
+    def _visit_terminal_state_op(self, op: quantum.StateOp) -> None:
+        """Handler for the terminal StateOp, which retrieves the final state vector."""
+        pass
+
+    @visit_op.register
+    def _visit_statistical_measurement_ops(
+        self,
+        op: quantum.ExpvalOp | quantum.VarianceOp | quantum.ProbsOp | quantum.SampleOp,
+    ) -> None:
+        """Handler for statistical measurement operations (e.g., Expval, Sample)."""
+        pass
+
+    @visit_op.register
+    def _visit_projective_measure_op(self, op: quantum.MeasureOp) -> None:
+        """Handler for the single-qubit projective MeasureOp."""
+        pass
+
+    # =========================
+    # 5. CONTROL FLOW HANDLERS
+    # =========================
+
+    @visit_op.register
+    def _visit_for_op(self, op: scf.ForOp) -> None:
+        """Handle an xDSL ForOp operation (Loop cluster creation)."""
+        pass
+
+    @visit_op.register
+    def _visit_while_op(self, op: scf.WhileOp) -> None:
+        """Handle an xDSL WhileOp operation (Loop cluster creation)."""
+        pass
+
+    @visit_op.register
+    def _visit_if_op(self, op: scf.IfOp) -> None:
+        """Handle an xDSL IfOp operation (Conditional cluster creation)."""
+        pass
