@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <llvm/ADT/STLExtras.h>
 #include <queue>
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -21,6 +22,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -447,6 +449,109 @@ struct PulseToRTIOPattern : public OpConversionPattern<ion::PulseOp> {
     }
 };
 
+/// Resolve the static channel mapping for the rtio.qubit_to_channel operation
+///
+/// It's expecting `qubit_to_channel` has the following def-use chain:
+/// memref.global w/ constants -> memref.get_global -> memref.load -> qubit_to_channel
+///
+/// Example:
+/// ```
+/// %ch = rtio.qubit_to_channel %qubit : !ion.qubit -> !rtio.channel<"dds", ?>
+/// ```
+/// will be converted to:
+/// ```
+/// %ch = rtio.channel "dds" { channel_id = 0 } : !rtio.channel<"dds">
+/// ```
+struct ResolveChannelMappingPattern : public OpRewritePattern<rtio::RTIOQubitToChannelOp> {
+    ResolveChannelMappingPattern(MLIRContext *ctx)
+        : OpRewritePattern<rtio::RTIOQubitToChannelOp>(ctx)
+    {
+    }
+
+    LogicalResult matchAndRewrite(rtio::RTIOQubitToChannelOp op,
+                                  PatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        Value qubit = op.getQubit();
+
+        auto loadOp = qubit.getDefiningOp<memref::LoadOp>();
+        if (!loadOp) {
+            return failure();
+        }
+
+        Value memref = loadOp.getMemRef();
+        auto getGlobalOp = memref.getDefiningOp<memref::GetGlobalOp>();
+        if (!getGlobalOp) {
+            return failure();
+        }
+
+        StringRef globalName = getGlobalOp.getName();
+        ModuleOp module = op->getParentOfType<ModuleOp>();
+        if (!module) {
+            return failure();
+        }
+        auto globalOp = module.lookupSymbol<memref::GlobalOp>(globalName);
+        if (!globalOp) {
+            return failure();
+        }
+
+        auto initialValue = globalOp.getInitialValue();
+        if (!initialValue) {
+            return failure();
+        }
+
+        auto denseAttr = llvm::dyn_cast<DenseIntElementsAttr>(*initialValue);
+        if (!denseAttr) {
+            return failure();
+        }
+
+        ValueRange indices = loadOp.getIndices();
+        if (indices.size() != 1) {
+            return failure();
+        }
+
+        IntegerAttr indexAttr;
+        if (!matchPattern(indices[0], m_Constant<IntegerAttr>(&indexAttr))) {
+            return failure();
+        }
+
+        int64_t index = indexAttr.getInt();
+
+        size_t denseSize = denseAttr.size();
+        if (index < 0 || static_cast<size_t>(index) >= denseSize) {
+            return failure();
+        }
+
+        APInt channelIdValue = denseAttr.getValues<APInt>()[index];
+
+        auto originalChannelType = llvm::dyn_cast<rtio::ChannelType>(op.getChannel().getType());
+        if (!originalChannelType) {
+            return failure();
+        }
+        StringRef kind = originalChannelType.getKind();
+        ArrayAttr qualifiers = originalChannelType.getQualifiers();
+
+        int offset = 0;
+        // If the qualifiers is not empty, get the first qualifier and check if it is 0 or 1
+        if (qualifiers.size() >= 1) {
+            IntegerAttr qualifier0 = llvm::dyn_cast<IntegerAttr>(qualifiers[0]);
+            offset = qualifier0.getInt() == 0 ? 0 : 1;
+        }
+
+        IntegerAttr channelIdAttr = rewriter.getIntegerAttr(rewriter.getIndexType(),
+                                                            channelIdValue.getSExtValue() + offset);
+
+        auto resolvedChannelType =
+            rtio::ChannelType::get(rewriter.getContext(), kind, qualifiers, channelIdAttr);
+
+        Value channel = rewriter.create<rtio::RTIOChannelOp>(loc, resolvedChannelType);
+
+        rewriter.replaceOp(op, channel);
+
+        return success();
+    }
+};
+
 /// Propagates RTIO events from chain of operations to event types.
 ///
 /// Steps:
@@ -568,6 +673,16 @@ LogicalResult CanonicalizeKernelFunction(func::FuncOp funcOp, MLIRContext *ctx)
     for (RegisteredOperationName op : ctx->getRegisteredOperations()) {
         op.getCanonicalizationPatterns(patterns, ctx);
     }
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+        return failure();
+    }
+    return success();
+}
+
+LogicalResult ResolveChannelMapping(func::FuncOp funcOp, MLIRContext *ctx)
+{
+    RewritePatternSet patterns(ctx);
+    patterns.add<ResolveChannelMappingPattern>(ctx);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return failure();
     }
@@ -891,6 +1006,16 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         func::FuncOp newQnodeFunc = createKernelFunction(qnodeFunc, kernelName, builder);
         module.insert(qnodeFunc, newQnodeFunc);
 
+        // drop one of the pulse from the certain protocol
+        // the way we handle the dropped pulse will be updated in the future
+        newQnodeFunc.walk([&](ion::ParallelProtocolOp parallelProtocolOp) {
+            parallelProtocolOp.walk([&](ion::PulseOp pulseOp) {
+                if (pulseOp.getBeamAttr().getTransitionIndex().getInt() == 0) {
+                    pulseOp.erase();
+                }
+            });
+        });
+
         // Construct mapping from qreg alloc and qreg extract to memref
         // In the later conversion, we use the mapping to construct the channel for rtio.pulse
         DenseMap<Value, Value> qregToMemrefMap;
@@ -917,8 +1042,20 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
             return signalPassFailure();
         }
 
-        // TODO: Channel Mapping (qubit N, transition M) -> channel N * NUM_TRANSITIONS + M
+        // Resolve the static channel, the dynamic channel will be remained as `?`
+        if (failed(ResolveChannelMapping(newQnodeFunc, ctx))) {
+            newQnodeFunc->emitError("Failed to resolve channel mapping");
+            return signalPassFailure();
+        }
+
         // TODO: Naive scheduling to generate the simple Timeline RTIO IR
+        // To shorten the `timeline`: `list scheduling`, `graph scheduling`, ... etc. can also be
+        // used to schedule the operations. Here we just linearly mapping the operation based on the
+        // order in the function without caring any latency issues.
+        // if (failed(NaiveScheduling(newQnodeFunc, ctx))) {
+        //     newQnodeFunc->emitError("Failed to schedule");
+        //     return signalPassFailure();
+        // }
 
         // remove body of entry function and add call to kernel function
         auto entryFunc = module.lookupSymbol<func::FuncOp>("jit_circuit");
@@ -931,6 +1068,8 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
             module.emitError("Failed to update entry function");
             return signalPassFailure();
         }
+
+        qnodeFunc->erase();
     }
 };
 

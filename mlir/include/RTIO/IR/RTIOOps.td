@@ -24,7 +24,7 @@ include "RTIO/IR/RTIODialect.td"
 // Event-Based API
 //===----------------------------------------------------------------------===//
 
-def RTIOChannelOp : RTIO_Op<"channel"> {
+def RTIOChannelOp : RTIO_Op<"channel", [Pure]> {
     let summary = "Define a channel";
     let description = [{
         The channel's identity (kind, qualifiers, and channel id) is
@@ -50,12 +50,14 @@ def RTIOChannelOp : RTIO_Op<"channel"> {
     let arguments = (ins);
     let results = (outs RTIOChannelType:$channel);
 
+    let hasCanonicalizeMethod = 1;
+
     let assemblyFormat = [{
         attr-dict `:` type(results)
     }];
 }
 
-def RTIOQubitToChannelOp : RTIO_Op<"qubit_to_channel"> {
+def RTIOQubitToChannelOp : RTIO_Op<"qubit_to_channel", [Pure]> {
     let summary = "Map a qubit to an RTIO channel";
     let description = [{
         It's a temporary operation that will be lowered to a static `rtio.channel` operation during
@@ -75,6 +77,8 @@ def RTIOQubitToChannelOp : RTIO_Op<"qubit_to_channel"> {
 
     let arguments = (ins AnyType:$qubit);
     let results = (outs RTIOChannelType:$channel);
+
+    let hasCanonicalizeMethod = 1;
 
     let assemblyFormat = [{
         $qubit attr-dict `:` type(operands) `->` type(results)
