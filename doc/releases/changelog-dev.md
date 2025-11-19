@@ -7,6 +7,15 @@
 
 <h3>Improvements 🛠</h3>
 
+* A new ``"changed"`` option has been added to the ``keep_intermediate`` parameter of 
+  :func:`~.qjit`. This option saves intermediate IR files after each pass,
+  but only when the IR is actually modified by the pass.
+  [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
+
+* Intermediate IR files are now organized into subdirectories for each compilation stage
+  when using ``keep_intermediate="changed"`` or ``keep_intermediate="pass"``.
+  [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
+
 * Pass instrumentation can be applied to each pass within the `NamedSequenceOp` transform sequence for a qnode.
   [(#1978)](https://github.com/PennyLaneAI/catalyst/pull/1978)
   
@@ -48,6 +57,12 @@
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
 
 <h3>Breaking changes 💔</h3>
+
+* The MLIR pipeline ``enforce-runtime-invariants-pipeline`` has been renamed to
+  ``user-transform-pipeline`` to better reflect its purpose. Users who reference this
+  pipeline name directly (e.g., in custom pipeline configurations) will need to update
+  their code to use the new name.
+  [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
 
 * (Compiler integrators only) The versions of LLVM/Enzyme/stablehlo used by Catalyst have been
   updated. Enzyme now targets `v0.0.203` with the build target `EnzymeStatic-22`, and the nanobind
