@@ -120,7 +120,7 @@ def _is_one_shot_compatible_device(qnode):
     return device_class_name != "OQDDevice"
 
 
-def configure_mcm_and_try_one_shot(qnode, args, kwargs):
+def configure_mcm_and_try_one_shot(qnode, args, kwargs, pass_pipeline=None):
     """Configure mid-circuit measurement settings and handle one-shot execution."""
     dynamic_one_shot_called = getattr(qnode, "_dynamic_one_shot_called", False)
     if not dynamic_one_shot_called:
@@ -170,7 +170,9 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs):
             )
 
             try:
-                return Function(dynamic_one_shot(qnode, mcm_config=mcm_config))(*args, **kwargs)
+                return Function(
+                    dynamic_one_shot(qnode, mcm_config=mcm_config, pass_pipeline=pass_pipeline)
+                )(*args, **kwargs)
             except (TypeError, ValueError, CompileError, NotImplementedError) as e:
                 # If user specified mcm_method, we can't fallback to single-branch-statistics,
                 # reraise the original error
@@ -292,7 +294,7 @@ class QFunc:
         new_qnode._transform_program = new_transform_program  # pylint: disable=protected-access
 
         # Mid-circuit measurement configuration/execution
-        fn_result = configure_mcm_and_try_one_shot(new_qnode, args, kwargs)
+        fn_result = configure_mcm_and_try_one_shot(new_qnode, args, kwargs, pass_pipeline)
 
         # If the qnode is failed to execute as one-shot, fn_result will be None
         if fn_result is not None:
@@ -563,6 +565,7 @@ def dynamic_one_shot(qnode, **kwargs):
 
     cpy_tape = None
     mcm_config = kwargs.pop("mcm_config", None)
+    pass_pipeline = kwargs.pop("pass_pipeline", None)
 
     def transform_to_single_shot(qnode):
         if not qnode._shots:
@@ -606,6 +609,9 @@ def dynamic_one_shot(qnode, **kwargs):
     total_shots = _get_total_shots(qnode)
 
     def one_shot_wrapper(*args, **kwargs):
+        if pass_pipeline is not None:
+            kwargs["pass_pipeline"] = pass_pipeline
+
         def wrap_single_shot_qnode(*_):
             return single_shot_qnode(*args, **kwargs)
 

@@ -28,7 +28,7 @@ namespace quantum {
 
 void populateQIRConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &, bool);
 void populateAdjointPatterns(mlir::RewritePatternSet &);
-void populateSelfInversePatterns(mlir::RewritePatternSet &);
+void populateCancelInversesPatterns(mlir::RewritePatternSet &);
 void populateMergeRotationsPatterns(mlir::RewritePatternSet &);
 void populateIonsDecompositionPatterns(mlir::RewritePatternSet &);
 void populateDecomposeLoweringPatterns(mlir::RewritePatternSet &,

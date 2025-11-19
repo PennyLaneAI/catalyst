@@ -66,11 +66,11 @@ def test_pipeline_lowering():
         qml.Hadamard(wires=[1])
         return qml.expval(qml.PauliY(wires=0))
 
-    # CHECK: pipeline=(remove-chained-self-inverse, merge-rotations)
+    # CHECK: pipeline=(cancel-inverses, merge-rotations)
     print_jaxpr(test_pipeline_lowering_workflow, 1.2)
 
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
     # CHECK-NEXT: transform.yield
     print_mlir(test_pipeline_lowering_workflow, 1.2)
@@ -149,14 +149,14 @@ def test_pipeline_lowering_keep_original():
     # COM: this if for f_pipeline(x)
     # COM: Unfortunately, we don't have a nice repr for qnode
     # CHECK: quantum_kernel
-    # CHECK: pipeline=(remove-chained-self-inverse, merge-rotations)
+    # CHECK: pipeline=(cancel-inverses, merge-rotations)
     print_jaxpr(test_pipeline_lowering_keep_original_workflow, 1.2)
 
     # COM: This is the one that is unchanged
     # CHECK: transform.named_sequence @__transform_main
     # COM: This is the one that is changed
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
     # CHECK-NEXT: transform.yield
     print_mlir(test_pipeline_lowering_keep_original_workflow, 1.2)
@@ -208,16 +208,16 @@ def test_pipeline_lowering_global():
         return g(1.2), h(1.2)
 
     # CHECK: quantum_kernel
-    # CHECK: pipeline=(remove-chained-self-inverse, merge-rotations)
+    # CHECK: pipeline=(cancel-inverses, merge-rotations)
     # CHECK: quantum_kernel
-    # CHECK: pipeline=(remove-chained-self-inverse, merge-rotations)
+    # CHECK: pipeline=(cancel-inverses, merge-rotations)
     print_jaxpr(global_wf)
 
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
     # CHECK-NEXT: transform.yield
     print_mlir(global_wf)
@@ -274,16 +274,16 @@ def test_pipeline_lowering_globloc_override():
         return g(1.2), h(1.2)
 
     # CHECK: quantum_kernel
-    # CHECK: pipeline=(remove-chained-self-inverse, merge-rotations)
+    # CHECK: pipeline=(cancel-inverses, merge-rotations)
     # CHECK: quantum_kernel
     # CHECK: pipeline=(merge-rotations,)
     print_jaxpr(global_wf)
 
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NOT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NOT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
     # CHECK-NEXT: transform.yield
     print_mlir(global_wf)
@@ -332,9 +332,9 @@ def test_chained_pipeline_lowering():
     print(test_chained_pipeline_lowering_workflow.mlir)
 
     # # CHECK: transform.named_sequence @__transform_main
-    # # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
-    # # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # # CHECK-NEXT: transform.yield
 
 
@@ -372,13 +372,13 @@ def test_chained_pipeline_lowering_keep_original():
     # CHECK: transform.named_sequence @__transform_main
     # COM: The qnode after pipeline1
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
     # COM: The qnode after pipeline2
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: transform.yield
     print(test_chained_pipeline_lowering_keep_original_workflow.mlir)
 
@@ -393,7 +393,7 @@ def test_chained_apply_passes():
 
     @qjit
     @apply_pass("merge-rotations")
-    @apply_pass("remove-chained-self-inverse")
+    @apply_pass("cancel-inverses")
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def test_chained_apply_passes_workflow(x: float):
         qml.Hadamard(wires=[1])
@@ -405,7 +405,7 @@ def test_chained_apply_passes():
     print(test_chained_apply_passes_workflow.mlir)
 
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
     # CHECK-NEXT: transform.yield
 
@@ -426,7 +426,7 @@ def test_chained_apply_passes_keep_original():
         qml.Hadamard(wires=[1])
         return qml.expval(qml.PauliY(wires=0))
 
-    f_pass1 = apply_pass("remove-chained-self-inverse")(f)
+    f_pass1 = apply_pass("cancel-inverses")(f)
     f_pass2 = apply_pass("merge-rotations")(f_pass1)
 
     @qjit
@@ -437,10 +437,10 @@ def test_chained_apply_passes_keep_original():
     # CHECK: transform.named_sequence @__transform_main
     # COM: The qnode after pipeline1
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # COM: The qnode after merge_rotations
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
     # CHECK-NEXT: transform.yield
     print(test_chained_apply_passes_keep_original_workflow.mlir)
@@ -468,7 +468,7 @@ def test_chained_peephole_passes():
     print(test_chained_peephole_passes_workflow.mlir)
 
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
     # CHECK-NEXT: transform.yield
 
@@ -500,10 +500,10 @@ def test_chained_peephole_passes_keep_original():
     # CHECK: transform.named_sequence @__transform_main
     # COM: The qnode after cancel_inverses
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # COM: The qnode after merge_rotations
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
     # CHECK-NEXT: transform.yield
     print(test_chained_peephole_passes_keep_original_workflow.mlir)
@@ -560,7 +560,7 @@ def test_pipeline_with_autograph():
         return qml.expval(qml.PauliZ(0))
 
     # CHECK: transform.named_sequence @__transform_main(
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
     # CHECK-NEXT: transform.yield
     print(f.mlir)
@@ -600,7 +600,7 @@ def test_stacked_pass_for_loop_autograph():
 
     @qjit(autograph=True, target="mlir")
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
     # CHECK-NEXT: transform.yield
     @merge_rotations
@@ -660,18 +660,18 @@ def test_cancel_inverses_tracing_and_lowering():
         return _f, _g, _h
 
     # CHECK: quantum_kernel
-    # CHECK: pipeline=(remove-chained-self-inverse,)
+    # CHECK: pipeline=(cancel-inverses,)
     # CHECK: quantum_kernel
-    # CHECK: pipeline=(remove-chained-self-inverse,)
+    # CHECK: pipeline=(cancel-inverses,)
     print_jaxpr(test_cancel_inverses_tracing_and_lowering_workflow, 1.1)
 
     # CHECK: module @test_cancel_inverses_tracing_and_lowering_workflow
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: transform.yield
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
-    # CHECK-NOT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
+    # CHECK-NOT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: transform.yield
     print_mlir(test_cancel_inverses_tracing_and_lowering_workflow, 1.1)
 
@@ -698,12 +698,12 @@ def test_cancel_inverses_tracing_and_lowering_outside_qjit():
         return _f
 
     # CHECK: quantum_kernel
-    # CHECK: pipeline=(remove-chained-self-inverse,)
+    # CHECK: pipeline=(cancel-inverses,)
     print_jaxpr(test_cancel_inverses_tracing_and_lowering_outside_qjit_workflow, 1.1)
 
     # CHECK: module @test_cancel_inverses_tracing_and_lowering_outside_qjit_workflow
     # CHECK: transform.named_sequence @__transform_main
-    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "remove-chained-self-inverse" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
     # CHECK-NEXT: transform.yield
     print_mlir(test_cancel_inverses_tracing_and_lowering_outside_qjit_workflow, 1.1)
 

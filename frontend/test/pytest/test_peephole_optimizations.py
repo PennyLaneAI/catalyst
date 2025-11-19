@@ -202,8 +202,9 @@ def test_chained_passes():
         qml.Hadamard(wires=[1])
         return qml.expval(qml.PauliY(wires=0))
 
-    assert "remove-chained-self-inverse" in test_chained_apply_passes_workflow.mlir
-    assert "merge-rotations" in test_chained_apply_passes_workflow.mlir
+    mlir = test_chained_apply_passes_workflow.mlir
+    assert "cancel-inverses" in mlir
+    assert "merge-rotations" in mlir
 
 def test_chained_transforms():
     """
