@@ -665,7 +665,6 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs, debug_in
 
     from catalyst.jax_extras.patches import (
         patched_drop_unused_vars,
-        patched_dyn_shape_staging_rule,
         patched_make_eqn,
         patched_pjit_staging_rule,
     )
@@ -675,14 +674,8 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs, debug_in
         {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
     ), Patcher(
         (pe, "_drop_unused_vars", patched_drop_unused_vars),
-        (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
-        (lax, "_dyn_shape_staging_rule", patched_dyn_shape_staging_rule),
-        (
-            jax._src.pjit,  # pylint: disable=protected-access
-            "pjit_staging_rule",
-            patched_pjit_staging_rule,
-        ),
-        (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
+        (DynamicJaxprTrace, "make_eqn", patched_make_eqn),  # Fix make_eqn signature change
+        (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),  # Fix pjit bug
     ):
         make_jaxpr_kwargs = {
             "static_argnums": static_argnums,
@@ -725,16 +718,16 @@ def lower_jaxpr_to_mlir(jaxpr, func_name, arg_names):
     from catalyst.utils.patching import DictPatchWrapper, Patcher
 
     # Apply JAX 0.7.0 compatibility patches during MLIR lowering.
-    # These patches are needed because JAX internally calls trace_to_jaxpr_dynamic2
-    # during lowering of nested @jit primitives (like those in jax.scipy.linalg.expm
-    # and jax.scipy.linalg.solve). The patches fix bugs where pjit_staging_rule creates
-    # JaxprEqn instead of TracingEqn, causing AssertionError.
+    # JAX internally calls trace_to_jaxpr_dynamic2 during lowering of nested @jit primitives
+    # (e.g., in jax.scipy.linalg.expm and jax.scipy.linalg.solve), which triggers two bugs:
+    # 1. make_eqn signature changed to include out_tracers parameter
+    # 2. pjit_staging_rule creates JaxprEqn instead of TracingEqn (AssertionError at partial_eval.py:1790)
     with transient_jax_config(
         {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
     ), Patcher(
+        # Fix make_eqn signature change (handles both old/new JAX versions)
         (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
-        (lax, "_dyn_shape_staging_rule", patched_dyn_shape_staging_rule),
-        (jax._src.pjit, "pjit_staging_rule", patched_pjit_staging_rule),
+        # Fix pjit_staging_rule creating wrong equation type
         (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
     ):
         mlir_module, ctx = jaxpr_to_mlir(jaxpr, func_name, arg_names)
