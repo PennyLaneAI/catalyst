@@ -173,6 +173,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* An xDSL `Universe` containing all custom xDSL dialects and passes has been registered as an entry point,
+  allowing usage of PennyLane's dialects and passes with xDSL's command-line tools.
+  [(#____)](https://github.com/PennyLaneAI/catalyst/pull/____)
+
 * Migrated the `pennylane.compiler.python_compiler` submodule from PennyLane to Catalyst.
   It is now accessible as `catalyst.python_interface`.
   [(#2199)](https://github.com/PennyLaneAI/catalyst/pull/2199)
