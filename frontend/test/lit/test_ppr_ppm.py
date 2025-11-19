@@ -389,8 +389,8 @@ def test_reduce_t_depth():
 # CHECK: qec.ppr ["X"](8)
 # CHECK: qec.ppr ["X"](8)
 # CHECK: qec.ppr ["Y", "X"](8)
-# CHECK: qec.ppr ["X"](8)
 # CHECK: qec.ppr ["X", "Y", "X"](8)
+# CHECK: qec.ppr ["X"](8)
 # CHECK: qec.ppr ["X", "X", "Y"](8)
 test_reduce_t_depth()
 
