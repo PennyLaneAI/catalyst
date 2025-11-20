@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline="builtin.module(remove-chained-self-inverse)" --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --pass-pipeline="builtin.module(cancel-inverses)" --split-input-file -verify-diagnostics %s | FileCheck %s
 
 // test chained Hadamard
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> !quantum.bit {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> !quantum.bit {
     // CHECK: quantum.alloc
     // CHECK: quantum.extract
     %0 = quantum.alloc( 1) : !quantum.reg
@@ -30,8 +30,8 @@ func.func @test_chained_self_inverse() -> !quantum.bit {
 // -----
 
 // test chained Hadamard from block arg
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse(%arg: !quantum.bit) -> !quantum.bit {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses(%arg: !quantum.bit) -> !quantum.bit {
     // CHECK-NOT: quantum.custom
     %0 = quantum.custom "Hadamard"() %arg : !quantum.bit
     %1 = quantum.custom "Hadamard"() %0 : !quantum.bit
@@ -41,8 +41,8 @@ func.func @test_chained_self_inverse(%arg: !quantum.bit) -> !quantum.bit {
 // -----
 
 // Test for chained PauliX
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> !quantum.bit {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> !quantum.bit {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     // CHECK-NOT: quantum.custom
@@ -54,8 +54,8 @@ func.func @test_chained_self_inverse() -> !quantum.bit {
 // -----
 
 // Test for chained PauliY
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> !quantum.bit {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> !quantum.bit {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     // CHECK-NOT: quantum.custom
@@ -67,8 +67,8 @@ func.func @test_chained_self_inverse() -> !quantum.bit {
 // -----
 
 // Test for chained PauliZ
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> !quantum.bit {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> !quantum.bit {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     // CHECK-NOT: quantum.custom
@@ -80,8 +80,8 @@ func.func @test_chained_self_inverse() -> !quantum.bit {
 // -----
 
 // Test for chained CNOT
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> (!quantum.bit, !quantum.bit) {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -95,8 +95,8 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
 // -----
 
 // Test for chained CY
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> (!quantum.bit, !quantum.bit) {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -110,8 +110,8 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
 // -----
 
 // Test for chained CZ
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> (!quantum.bit, !quantum.bit) {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -125,8 +125,8 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
 // -----
 
 // Test for chained SWAP
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> (!quantum.bit, !quantum.bit) {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -140,8 +140,8 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
 // -----
 
 // Test for chained Toffoli
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> (!quantum.bit, !quantum.bit, !quantum.bit) {
     %0 = quantum.alloc(3) : !quantum.reg
     %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit
@@ -157,8 +157,8 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.
 // -----
 
 // Test for chained CNOT with wrong order
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> (!quantum.bit, !quantum.bit) {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -173,8 +173,8 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
 // -----
 
 // Test for chained CY with wrong order
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> (!quantum.bit, !quantum.bit) {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -189,8 +189,8 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
 // -----
 
 // Test for chained CZ with wrong order
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> (!quantum.bit, !quantum.bit) {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -205,8 +205,8 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
 // -----
 
 // Test for chained SWAP with wrong order
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> (!quantum.bit, !quantum.bit) {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -221,8 +221,8 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit) {
 // -----
 
 // Test for chained Toffoli with wrong order
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> (!quantum.bit, !quantum.bit, !quantum.bit) {
     %0 = quantum.alloc(3) : !quantum.reg
     %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[1] : !quantum.reg -> !quantum.bit
@@ -238,8 +238,8 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.
 // -----
 
 // test nested self-inverse Gates with different names
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> !quantum.bit {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> !quantum.bit {
     // CHECK: quantum.alloc
     // CHECK: quantum.extract
     %0 = quantum.alloc( 1) : !quantum.reg
@@ -254,8 +254,8 @@ func.func @test_chained_self_inverse() -> !quantum.bit {
 // -----
 
 // test non-consecutive self-inverse Gates are not canceled out
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> !quantum.bit {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> !quantum.bit {
     // CHECK: quantum.alloc
     // CHECK: quantum.extract
     %0 = quantum.alloc( 1) : !quantum.reg
@@ -275,8 +275,8 @@ func.func @test_chained_self_inverse() -> !quantum.bit {
 
 // test quantum.unitary labeled with adjoint attribute
 
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse(%arg0: tensor<2x2xf64>, %arg1: tensor<f64>) -> !quantum.bit {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses(%arg0: tensor<2x2xf64>, %arg1: tensor<f64>) -> !quantum.bit {
     // CHECK: quantum.alloc
     // CHECK: [[IN:%.+]] = quantum.extract
     %0 = quantum.alloc( 1) : !quantum.reg
@@ -298,8 +298,8 @@ func.func @test_chained_self_inverse(%arg0: tensor<2x2xf64>, %arg1: tensor<f64>)
 
 // test quantum.custom labeled with adjoint attribute
 
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse(%arg0: tensor<f64>) -> !quantum.bit {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses(%arg0: tensor<f64>) -> !quantum.bit {
     // CHECK: quantum.alloc
     // CHECK: [[IN:%.+]] = quantum.extract
     %0 = quantum.alloc( 1) : !quantum.reg
@@ -325,8 +325,8 @@ func.func @test_chained_self_inverse(%arg0: tensor<f64>) -> !quantum.bit {
 
 // test quantum.custom labeled both with adjoints
 
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse(%arg0: tensor<f64>) -> !quantum.bit {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses(%arg0: tensor<f64>) -> !quantum.bit {
     // CHECK: quantum.alloc
     // CHECK: [[IN:%.+]] = quantum.extract
     %0 = quantum.alloc( 1) : !quantum.reg
@@ -347,8 +347,8 @@ func.func @test_chained_self_inverse(%arg0: tensor<f64>) -> !quantum.bit {
 
 // test with explicit rotation angles
 
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> !quantum.bit {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> !quantum.bit {
     // CHECK: quantum.alloc
     // CHECK: [[IN:%.+]] = quantum.extract
     %0 = quantum.alloc( 1) : !quantum.reg
@@ -373,8 +373,8 @@ func.func @test_chained_self_inverse() -> !quantum.bit {
 
 // test with unmatched explicit rotation angles
 
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> !quantum.bit {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> !quantum.bit {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
 
@@ -398,8 +398,8 @@ func.func @test_chained_self_inverse() -> !quantum.bit {
 
 // test with matched control wires
 
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
     %true = llvm.mlir.constant (1 : i1) :i1
     %false = llvm.mlir.constant (0 : i1) :i1
     %cst = llvm.mlir.constant (6.000000e-01 : f64) : f64
@@ -431,8 +431,8 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.
 
 // test with unmatched operation wires
 
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
     %true = llvm.mlir.constant (1 : i1) :i1
     %false = llvm.mlir.constant (0 : i1) :i1
     %cst = llvm.mlir.constant (6.000000e-01 : f64) : f64
@@ -464,8 +464,8 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.
 
 // test with unmatched control wires
 
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
     %true = llvm.mlir.constant (1 : i1) :i1
     %false = llvm.mlir.constant (0 : i1) :i1
     %cst = llvm.mlir.constant (6.000000e-01 : f64) : f64
@@ -497,8 +497,8 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.
 
 // test with unmatched control values
 
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
     %true = llvm.mlir.constant (1 : i1) :i1
     %false = llvm.mlir.constant (0 : i1) :i1
     %cst = llvm.mlir.constant (6.000000e-01 : f64) : f64
@@ -530,8 +530,8 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.
 
 // test with params in the wrong order
 
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) {
     %true = llvm.mlir.constant (1 : i1) :i1
     %false = llvm.mlir.constant (0 : i1) :i1
     %cst = llvm.mlir.constant (6.000000e-01 : f64) : f64
@@ -563,8 +563,8 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.
 
 // test quantum.multirz labeled with adjoint attribute
 
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse(%arg0: f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses(%arg0: f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
     // CHECK: quantum.alloc
     // CHECK: [[IN0:%.+]] = quantum.extract
     // CHECK: [[IN1:%.+]] = quantum.extract
@@ -587,8 +587,8 @@ func.func @test_chained_self_inverse(%arg0: f64) -> (!quantum.bit, !quantum.bit,
 
 // test quantum.multirz but wrong wire order
 
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse(%arg0: f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses(%arg0: f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
     // CHECK: quantum.alloc
     // CHECK: [[IN0:%.+]] = quantum.extract
     // CHECK: [[IN1:%.+]] = quantum.extract
@@ -610,8 +610,8 @@ func.func @test_chained_self_inverse(%arg0: f64) -> (!quantum.bit, !quantum.bit,
 
 // test with matched control wires on named Hermitian gate
 
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> (!quantum.bit, !quantum.bit, !quantum.bit) {
     %true = llvm.mlir.constant (1 : i1) :i1
     %false = llvm.mlir.constant (0 : i1) :i1
 
@@ -637,8 +637,8 @@ func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.
 
 // test with unmatched control wires on named Hermitian gate
 
-// CHECK-LABEL: test_chained_self_inverse
-func.func @test_chained_self_inverse() -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+// CHECK-LABEL: test_cancel_inverses
+func.func @test_cancel_inverses() -> (!quantum.bit, !quantum.bit, !quantum.bit) {
     %true = llvm.mlir.constant (1 : i1) :i1
     %false = llvm.mlir.constant (0 : i1) :i1
 

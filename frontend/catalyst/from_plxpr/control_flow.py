@@ -135,7 +135,7 @@ def workflow_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice
     return cond_p.bind(
         *cond_invals,
         branch_jaxprs=jaxpr_pad_consts(converted_jaxpr_branches),
-        nimplicit_outputs=0,
+        num_implicit_outputs=0,
     )
 
 
@@ -192,7 +192,7 @@ def handle_cond(self, *plxpr_invals, jaxpr_branches, consts_slices, args_slice):
     outvals = cond_p.bind(
         *cond_invals,
         branch_jaxprs=jaxpr_pad_consts(converted_jaxpr_branches),
-        nimplicit_outputs=None,
+        num_implicit_outputs=None,
     )
 
     # Output structure:
@@ -252,7 +252,7 @@ def workflow_for_loop(
         body_jaxpr=converted_closed_jaxpr_branch,
         body_nconsts=len(consts),
         apply_reverse_transform=apply_reverse_transform,
-        nimplicit=0,
+        num_implicit_inputs=0,
         preserve_dimensions=True,
     )
 
@@ -325,7 +325,7 @@ def handle_for_loop(
         body_jaxpr=converted_closed_jaxpr_branch,
         body_nconsts=len(new_consts),
         apply_reverse_transform=apply_reverse_transform,
-        nimplicit=0,
+        num_implicit_inputs=0,
         preserve_dimensions=True,
     )
 
@@ -383,7 +383,7 @@ def workflow_while_loop(
         body_jaxpr=converted_body_closed_jaxpr_branch,
         cond_nconsts=len(new_cond_jaxpr.consts),
         body_nconsts=len(new_body_jaxpr.consts),
-        nimplicit=0,
+        num_implicit_inputs=0,
         preserve_dimensions=True,
     )
 
@@ -460,7 +460,7 @@ def handle_while_loop(
         body_jaxpr=converted_body_closed_jaxpr_branch,
         cond_nconsts=len(new_consts_cond),
         body_nconsts=len(new_consts_body),
-        nimplicit=0,
+        num_implicit_inputs=0,
         preserve_dimensions=True,
     )
 
