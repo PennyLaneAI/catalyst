@@ -49,7 +49,7 @@ class PyDotDAGBuilder(DAGBuilder):
         # - graph_type="digraph": Create a directed graph (edges have arrows).
         # - rankdir="TB": Set layout direction from Top to Bottom.
         # - compound="true": Allow edges to connect directly to clusters/subgraphs.
-        # - strict=True": Prevent duplicate edges (e.g., A -> B added twice).
+        # - strict=True: Prevent duplicate edges (e.g., A -> B added twice).
         self.graph: pydot.Dot = pydot.Dot(
             graph_type="digraph", rankdir="TB", compound="true", strict=True
         )
@@ -139,7 +139,7 @@ class PyDotDAGBuilder(DAGBuilder):
 
         Args:
             cluster_id (str): Unique cluster ID to identify this cluster.
-            node_label (str | None): The text to display on the information node on the cluster when rendered.
+            node_label (str | None): The text to display on the information node within the cluster when rendered.
             parent_graph_id (str | None): Optional ID of the cluster this cluster belongs to.
             **cluster_attrs (Any): Any additional styling keyword arguments.
 
