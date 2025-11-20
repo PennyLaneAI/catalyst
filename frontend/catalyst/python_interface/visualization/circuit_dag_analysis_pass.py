@@ -45,7 +45,7 @@ class CircuitDAGAnalysisPass:
     def visit_op(self, op: Any) -> None:
         """Central dispatch method (Visitor Pattern). Routes the operation 'op'
         to the specialized handler registered for its type."""
-        pass
+        raise NotImplementedError(f"Dispatch not registered for operator of type {type(op)}")
 
     def run(self, module: builtin.ModuleOp) -> None:
         """Applies the analysis pass on the module."""
@@ -88,7 +88,7 @@ class CircuitDAGAnalysisPass:
 
     @visit_op.register
     def _visit_state_op(self, op: quantum.StateOp) -> None:
-        """Handler for the terminal StateOp."""
+        """Handler for the terminal state measurement operation."""
         pass
 
     @visit_op.register
@@ -101,7 +101,7 @@ class CircuitDAGAnalysisPass:
 
     @visit_op.register
     def _visit_projective_measure_op(self, op: quantum.MeasureOp) -> None:
-        """Handler for the single-qubit projective MeasureOp."""
+        """Handler for the single-qubit projective measurement operation."""
         pass
 
     # =========================
