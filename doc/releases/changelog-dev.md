@@ -12,7 +12,7 @@
 
 * Pass instrumentation can be applied to each pass within the `NamedSequenceOp` transform sequence for a qnode.
   [(#1978)](https://github.com/PennyLaneAI/catalyst/pull/1978)
-  
+
 * The new graph-based decomposition framework has Autograph feature parity with PennyLane
   when capture enabled. When compiling with `qml.qjit(autograph=True)`, the decomposition rules
   returned by the graph-based framework are now correctly compiled using Autograph.
@@ -129,6 +129,9 @@
   [(#2198)](https://github.com/PennyLaneAI/catalyst/pull/2198)
 
 <h3>Internal changes ⚙️</h3>
+
+* Resource tracking now writes out at device destruction instead of qubit deallocation
+  [(#2219)](https://github.com/PennyLaneAI/catalyst/pull/2219)
 
 * Replaces the deprecated `shape_dtype_to_ir_type` function with the `RankedTensorType.get` method.
   [(#2159)](https://github.com/PennyLaneAI/catalyst/pull/2159)
