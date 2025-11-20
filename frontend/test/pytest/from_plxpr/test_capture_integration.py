@@ -1075,11 +1075,6 @@ class TestCapture:
     def test_pass_with_options(self, backend):
         """Test the integration for a circuit with a pass that takes in options."""
 
-        @qml.transform
-        def my_pass(_tape, my_option=None, my_other_option=None):  # pylint: disable=unused-argument
-            """A dummy qml.transform."""
-            return
-
         my_pass = qml.transform(pass_name="my-pass")
 
         @qjit(target="mlir")
