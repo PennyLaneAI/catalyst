@@ -68,7 +68,7 @@ class DAGBuilder(ABC):
 
         Args:
             cluster_id (str): Unique cluster ID to identify this cluster.
-            node_label (str): The text to display on an information node within the cluster when rendered.
+            node_label (str | None): The text to display on an information node within the cluster when rendered.
             parent_graph_id (str | None): Optional ID of the cluster this cluster belongs to.
             **cluster_attrs (Any): Any additional styling keyword arguments.
 
