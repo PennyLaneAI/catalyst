@@ -15,8 +15,6 @@
 This module tests the from_plxpr conversion function.
 """
 
-# pylint: disable=too-many-lines
-
 import jax
 import numpy as np
 import pennylane as qml

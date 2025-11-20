@@ -15,8 +15,6 @@
 This module tests the decompose transformation.
 """
 
-# pylint: disable=too-many-lines
-
 from functools import partial
 
 import numpy as np
@@ -24,8 +22,6 @@ import pennylane as qml
 import pytest
 from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
-
-from catalyst import qjit
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
