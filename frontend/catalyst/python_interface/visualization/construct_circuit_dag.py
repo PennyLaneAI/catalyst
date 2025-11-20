@@ -42,7 +42,7 @@ class ConstructCircuitDAG:
 
     def _reset(self) -> None:
         """Resets the instance."""
-        self._cluster_stack: list[str | None] = []
+        self._cluster_stack: list[str | None] = [None]
 
     # =================================
     # 1. CORE DISPATCH AND ENTRY POINT
