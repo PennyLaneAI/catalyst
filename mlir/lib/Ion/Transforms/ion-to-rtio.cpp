@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <llvm/ADT/STLExtras.h>
-#include <queue>
-
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -971,6 +968,16 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
 
         entryBuilder.setInsertionPointToEnd(entryBlock);
         entryBuilder.create<func::ReturnOp>(entryFunc.getLoc());
+
+        // Remove other functions
+        // We currently just lower to the kernel function
+        auto module = entryFunc->getParentOfType<ModuleOp>();
+        module.walk([&](func::FuncOp funcOp) {
+            if (funcOp.getName().str() == "teardown" || funcOp.getName().str() == "setup") {
+                funcOp.erase();
+            }
+        });
+
         return success();
     }
 
