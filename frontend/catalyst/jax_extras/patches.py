@@ -285,9 +285,6 @@ def patched_make_eqn(
 
         if out_tracers is not None:
             outvars = [tracer.val for tracer in out_tracers]
-            if config.enable_checks.value:
-                assert all(isinstance(x, DynamicJaxprTracer) for x in in_tracers)
-                assert all(isinstance(v, Var) for v in outvars)
             eqn = TracingEqn(
                 in_tracers,
                 outvars,
@@ -300,9 +297,6 @@ def patched_make_eqn(
             return eqn, out_tracers
         else:
             outvars = list(map(self.frame.newvar, out_avals_list))
-            if config.enable_checks.value:
-                assert all(isinstance(x, DynamicJaxprTracer) for x in in_tracers)
-                assert all(isinstance(v, Var) for v in outvars)
             eqn = TracingEqn(
                 in_tracers,
                 outvars,
@@ -338,13 +332,6 @@ def patched_dyn_shape_staging_rule(trace, source_info, prim, out_aval, *args, **
 
 def patched_pjit_staging_rule(trace, source_info, *args, **params):
     """Patched pjit_staging_rule for pjit compatibility."""
-    if params["compiler_options_kvs"]:
-        raise ValueError(
-            "`compiler_options` can only be passed to top-level `jax.jit`. Got"
-            f' compiler_options={dict(params["compiler_options_kvs"])} specified on'
-            f' a nested jit with name: {params["name"]} and source info:'
-            f" {source_info_util.summarize(source_info)}"
-        )
     # If we're inlining, no need to compute forwarding information; the inlined
     # computation will in effect forward things.
     if (
@@ -390,22 +377,6 @@ def patched_pjit_staging_rule(trace, source_info, *args, **params):
         out_tracers_ = iter(out_tracers)
         out_tracers = [args[f] if isinstance(f, int) else next(out_tracers_) for f in in_fwd]
         assert next(out_tracers_, None) is None
-    elif any(isinstance(c, core.MutableArray) for c in jaxpr.consts):
-        jaxpr, consts = pxla._move_mutable_consts(jaxpr)
-        consts = [trace.new_const(c, source_info) for c in consts]
-        in_shardings = (*params["in_shardings"],) + (UNSPECIFIED,) * len(consts)
-        in_layouts = (*params["in_layouts"],) + (None,) * len(consts)
-        donated_invars = (*params["donated_invars"],) + (False,) * len(consts)
-        new_params = dict(
-            params,
-            jaxpr=jaxpr,
-            in_shardings=in_shardings,
-            in_layouts=in_layouts,
-            donated_invars=donated_invars,
-        )
-        out_tracers = trace.default_process_primitive(
-            jit_p, (*args, *consts), new_params, source_info=source_info
-        )
     else:
         out_tracers = trace.default_process_primitive(jit_p, args, params, source_info=source_info)
     return out_tracers
