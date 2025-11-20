@@ -49,7 +49,7 @@ class PyDotDAGBuilder(DAGBuilder):
         # - graph_type="digraph": Create a directed graph (edges have arrows).
         # - rankdir="TB": Set layout direction from Top to Bottom.
         # - compound="true": Allow edges to connect directly to clusters/subgraphs.
-        # - strict=True": Prevent duplicate edges (e.g., A -> B added twice).
+        # - strict=True: Prevent duplicate edges (e.g., A -> B added twice).
         self.graph: pydot.Dot = pydot.Dot(
             graph_type="digraph", rankdir="TB", compound="true", strict=True
         )
