@@ -376,8 +376,7 @@ def handle_transform(
         and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
         and qml.decomposition.enabled_graph()
     ):
-        """Handle the conversion from plxpr to Catalyst jaxpr for a
-        PL transform."""
+        # Handle the conversion from plxpr to Catalyst jaxpr for a PL transform.
         if not self.requires_decompose_lowering:
             self.requires_decompose_lowering = True
         else:
