@@ -766,33 +766,7 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     ``weight`` is the PPM weight.
 
     If a merging resulted in a PPM acting on more than ``max_pauli_size`` qubits, that merging
-    operation would be skipped. This is illustrated below:
-
-    .. code-block:: python
-
-        @qml.qjit(target="mlir")
-        @partial(qml.transforms.merge_ppr_ppm, max_pauli_size=2)
-        @qml.qnode(qml.device("null.qubit", wires=3))
-        def circuit():
-
-            qml.PauliRot(jnp.pi / 2, pauli_word="ZX", wires=[1, 2])
-            qml.PauliRot(-jnp.pi / 2, pauli_word="Z", wires=1)
-            qml.PauliRot(-jnp.pi / 2, pauli_word="X", wires=2)
-
-            qml.PauliRot(jnp.pi / 2, pauli_word="ZX", wires=[0, 1])
-            qml.PauliRot(-jnp.pi / 2, pauli_word="Z", wires=0)
-            qml.PauliRot(-jnp.pi / 2, pauli_word="X", wires=1)
-
-            qml.PauliRot(jnp.pi / 2, pauli_word="ZX", wires=[0, 2])
-            qml.PauliRot(-jnp.pi / 2, pauli_word="Z", wires=0)
-            qml.PauliRot(-jnp.pi / 2, pauli_word="X", wires=2)
-
-            ppm = qml.pauli_measure(pauli_word="ZZZ", wires=[0, 1, 2])
-
-            return
-
-    >>> print(qml.specs(circuit, level="device")()['resources'])
-    TODO!!
+    operation would be skipped.
     """
     if qnode is None:
         return functools.partial(merge_ppr_ppm, max_pauli_size=max_pauli_size)
