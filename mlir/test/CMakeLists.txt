@@ -27,6 +27,7 @@ set(TEST_SUITES
     MBQC
     cli
     QEC
+    RTIO
     )
 
 
