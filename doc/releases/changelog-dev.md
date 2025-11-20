@@ -7,6 +7,13 @@
 
 <h3>Improvements 🛠</h3>
 
+* Remove the hardcoded list of runtime operations in the frontend.
+  This will allow arbitrary PL gates to be represented without hyperparameters in MLIR.
+  For gates that do not have a QIR representation, a runtime error will be raised at execution.
+  Users can still decompose these gates via `qml.transforms.decompose`
+  when both capture and graph-decomposition are enabled.
+  [(#2215)](https://github.com/PennyLaneAI/catalyst/pull/2215)
+
 * Resource tracking now supports dynamic qubit allocation
   [(#2203)](https://github.com/PennyLaneAI/catalyst/pull/2203)
 
