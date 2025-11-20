@@ -117,15 +117,15 @@ class CircuitDAGAnalysisPass:
 
     @visit_op.register
     def _visit_for_op(self, op: scf.ForOp) -> None:
-        """Handle an xDSL ForOp operation (Loop cluster creation)."""
+        """Handle an xDSL ForOp operation."""
         pass
 
     @visit_op.register
     def _visit_while_op(self, op: scf.WhileOp) -> None:
-        """Handle an xDSL WhileOp operation (Loop cluster creation)."""
+        """Handle an xDSL WhileOp operation."""
         pass
 
     @visit_op.register
     def _visit_if_op(self, op: scf.IfOp) -> None:
-        """Handle an xDSL IfOp operation (Conditional cluster creation)."""
+        """Handle an xDSL IfOp operation."""
         pass
