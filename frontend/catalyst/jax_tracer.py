@@ -140,7 +140,7 @@ def _get_eqn_from_tracing_eqn(eqn_or_callable):
     """Helper function to extract the actual equation from JAX 0.7's TracingEqn wrapper."""
     if callable(eqn_or_callable):
         actual_eqn = eqn_or_callable()
-        if actual_eqn is None:
+        if actual_eqn is None:  # pragma: no cover
             raise RuntimeError("TracingEqn weakref was garbage collected")
         return actual_eqn
     else:
