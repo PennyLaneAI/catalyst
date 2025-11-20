@@ -29,7 +29,6 @@ from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 from pennylane.capture.primitives import transform_prim
-from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
 from pennylane.transforms import commute_controlled as pl_commute_controlled
 from pennylane.transforms import decompose as pl_decompose
@@ -267,7 +266,6 @@ transforms_to_passes = {
     pl_cancel_inverses: ("cancel-inverses", False),
     pl_commute_controlled: (None, False),
     pl_decompose: (None, False),
-    pl_map_wires: (None, False),
     pl_merge_amplitude_embedding: (None, True),
     pl_merge_rotations: ("merge-rotations", False),
     pl_single_qubit_fusion: (None, False),

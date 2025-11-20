@@ -52,6 +52,9 @@
 
 <h3>Breaking changes 💔</h3>
 
+* The plxpr transform `pl_map_wires` has been removed along with its test.
+  [(#2220)](https://github.com/PennyLaneAI/catalyst/pull/2220)
+
 * (Compiler integrators only) The versions of LLVM/Enzyme/stablehlo used by Catalyst have been
   updated. Enzyme now targets `v0.0.203` with the build target `EnzymeStatic-22`, and the nanobind
   requirement for the latest LLVM has been updated to version 2.9.
@@ -118,6 +121,11 @@
   // ... use %qubit1
   // ... use %4
   ```
+
+* Fixes :func:`~.passes.commute_ppr` and :func:`~.passes.merge_ppr_ppm` incorrectly
+  moving nullary operations. This also improves the compilation time by reducing
+  the sort function, by explicitly passing the operations that need to be sorted.
+  [(#2200)](https://github.com/PennyLaneAI/catalyst/pull/2200)
 
 * The pass pipeline is correctly registered to the transform named sequence of the
   one-shot qnode when `one-shot` mcm method is used.
@@ -191,6 +199,8 @@
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+Yushao Chen,
+Sengthai Heng,
 Jeffrey Kam,
 Christina Lee,
 Mehrdad Malekmohammadi,

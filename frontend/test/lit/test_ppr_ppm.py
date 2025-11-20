@@ -83,10 +83,15 @@ def test_commute_ppr():
 
 
 # CHECK-LABEL: public @cir_commute_ppr
-# CHECK: qec.ppr ["X"](8)
-# CHECK: qec.ppr ["Z"](8)
-# CHECK: qec.ppr ["Z"](4)
-# CHECK: qec.ppr ["Z"](4)
+# CHECK: %0 = quantum.alloc( 2)
+# CHECK: %1 = quantum.extract %0[ 0]
+# CHECK: %2 = qec.ppr ["X"](8) %1
+# CHECK: %3 = qec.ppr ["Z"](4) %2
+# CHECK: %4 = qec.ppr ["X"](4) %3
+# CHECK: %5 = qec.ppr ["Z"](4) %4
+# CHECK: %6 = quantum.extract %0[ 1]
+# CHECK: %7 = qec.ppr ["Z"](8) %6
+# CHECK: %8 = qec.ppr ["Z"](4) %7
 test_commute_ppr()
 
 
@@ -384,8 +389,8 @@ def test_reduce_t_depth():
 # CHECK: qec.ppr ["X"](8)
 # CHECK: qec.ppr ["X"](8)
 # CHECK: qec.ppr ["Y", "X"](8)
-# CHECK: qec.ppr ["X"](8)
 # CHECK: qec.ppr ["X", "Y", "X"](8)
+# CHECK: qec.ppr ["X"](8)
 # CHECK: qec.ppr ["X", "X", "Y"](8)
 test_reduce_t_depth()
 
