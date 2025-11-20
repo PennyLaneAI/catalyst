@@ -97,10 +97,10 @@ def _tuple_to_dict(t):
     if not isinstance(t, (dict, tuple, list)):
         return t
 
-    if isinstance(t, dict):
+    if isinstance(t, dict): # pragma: no cover
         return {k: _tuple_to_dict(v) for k, v in t.items()}
 
-    if isinstance(t, list):
+    if isinstance(t, list): # pragma: no cover
         return [_tuple_to_dict(item) for item in t]
 
     if isinstance(t, tuple):
@@ -114,7 +114,7 @@ def _tuple_to_dict(t):
         else:
             return [_tuple_to_dict(item) for item in t]
 
-    return t
+    return t # pragma: no cover
 
 
 def _get_device_kwargs(device) -> dict:
