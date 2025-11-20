@@ -14,11 +14,10 @@
 
 """Contains the ConstructCircuitDAG tool for constructing a DAG from an xDSL module."""
 
-from functools import singledispatchmethod
-from typing import TYPE_CHECKING, Any
+from functools import singledispatch, singledispatchmethod
+from typing import Any
 
-import xdsl
-from xdsl.dialects import builtin, func, scf
+from xdsl.dialects import builtin, scf
 from xdsl.ir import Block, Region
 
 from catalyst.python_interface.dialects import quantum
@@ -37,6 +36,14 @@ class ConstructCircuitDAG:
         """
         self.dag_builder: DAGBuilder = dag_builder
 
+        # Record clusters seen as a stack
+        # beginning with the base graph (None)
+        self._cluster_stack: list[str | None] = [None]
+
+    def _reset(self) -> None:
+        """Resets the instance."""
+        self._cluster_stack: list[str | None] = []
+
     # =================================
     # 1. CORE DISPATCH AND ENTRY POINT
     # =================================
@@ -45,10 +52,14 @@ class ConstructCircuitDAG:
     def visit_op(self, op: Any) -> None:
         """Central dispatch method (Visitor Pattern). Routes the operation 'op'
         to the specialized handler registered for its type."""
-        raise NotImplementedError(f"Dispatch not registered for operator of type {type(op)}")
+        raise NotImplementedError(
+            f"Dispatch not registered for operator of type {type(op)}"
+        )
 
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module."""
+        self._reset()
+
         for op in module.ops:
             self.visit_op(op)
 
@@ -80,7 +91,12 @@ class ConstructCircuitDAG:
         op: quantum.CustomOp,
     ) -> None:
         """Generic handler for unitary gates and quantum state preparation operations."""
-        pass
+
+        # Build node on graph
+        self.dag_builder.add_node(
+            node_id=f"node_{id(op)}",
+            node_label=get_label(op),
+        )
 
     # =============================================
     # 4. QUANTUM MEASUREMENT HANDLERS
@@ -89,7 +105,12 @@ class ConstructCircuitDAG:
     @visit_op.register
     def _visit_state_op(self, op: quantum.StateOp) -> None:
         """Handler for the terminal state measurement operation."""
-        pass
+
+        # Build node on graph
+        self.dag_builder.add_node(
+            node_id=f"node_{id(op)}",
+            node_label=get_label(op),
+        )
 
     @visit_op.register
     def _visit_statistical_measurement_ops(
@@ -97,12 +118,22 @@ class ConstructCircuitDAG:
         op: quantum.ExpvalOp | quantum.VarianceOp | quantum.ProbsOp | quantum.SampleOp,
     ) -> None:
         """Handler for statistical measurement operations."""
-        pass
+
+        # Build node on graph
+        self.dag_builder.add_node(
+            node_id=f"node_{id(op)}",
+            node_label=get_label(op),
+        )
 
     @visit_op.register
     def _visit_projective_measure_op(self, op: quantum.MeasureOp) -> None:
         """Handler for the single-qubit projective measurement operation."""
-        pass
+
+        # Build node on graph
+        self.dag_builder.add_node(
+            node_id=f"node_{id(op)}",
+            node_label=get_label(op),
+        )
 
     # =========================
     # 5. CONTROL FLOW HANDLERS
@@ -122,3 +153,39 @@ class ConstructCircuitDAG:
     def _visit_if_op(self, op: scf.IfOp) -> None:
         """Handle an xDSL IfOp operation."""
         pass
+
+
+@singledispatch
+def get_label(op: Any) -> str:
+    """Gets a human readable label for a given xDSL operation.
+
+    Returns:
+        label (str): The appropriate label for a given xDSL operation. Defaults
+            to the class name.
+    """
+    return type(op).__name__.replace("Op", "")
+
+
+@get_label.register
+def _get_custom_op_label(op: quantum.CustomOp) -> str:
+    return op.gate_name.data
+
+
+@get_label.register
+def _get_state_op_label(op: quantum.StateOp) -> str:
+    return op.name
+
+
+@get_label.register
+def _get_statistical_measurement_op_label(
+    op: quantum.ExpvalOp | quantum.VarianceOp | quantum.ProbsOp | quantum.SampleOp,
+) -> str:
+    # e.g. op -> expval(Z(0))
+    obs = op.obs
+    mp = op.name.split(".")[-1]  # quantum.expval -> expval
+    return f"{mp}({obs})"
+
+
+@get_label.register
+def _get_projective_measurement_op_label(op: quantum.MeasureOp) -> str:
+    return op.name.split(".")[-1]  # quantum.measure -> measure
