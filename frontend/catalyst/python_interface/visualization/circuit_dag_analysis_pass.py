@@ -90,7 +90,7 @@ class CircuitDAGAnalysisPass:
         pass
 
     # =============================================
-    # 4. QUANTUM MEASUREMENT & OBSERVABLE HANDLERS
+    # 4. QUANTUM MEASUREMENT HANDLERS
     # =============================================
 
     @visit_op.register
