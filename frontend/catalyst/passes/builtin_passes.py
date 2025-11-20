@@ -732,61 +732,67 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
 
         qml.capture.enable()
 
-        @qjit(target="mlir")
+        @qml.qjit(target="mlir")
         @partial(qml.transforms.merge_ppr_ppm, max_pauli_size=2)
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
-            qml.H(0)
-            qml.T(0)
-            return measure(0)
+            qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
+            qml.PauliRot(jnp.pi / 2, pauli_word="X", wires=0)
+            qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
 
-        print(circuit.mlir_opt)
+            ppm = qml.pauli_measure(pauli_word="ZX", wires=[0, 1])
 
-    In this example, the Clifford+T gates will be converted into PPRs first,
-    then the Clifford PPRs will be commuted past the non-Clifford PPR,
-    and finally the Clifford PPRs will be absorbed into the Pauli Product Measurements.
+            qml.PauliRot(jnp.pi / 4, pauli_word="Z", wires=0)
 
-    Example MLIR Representation:
+            return
 
-    .. code-block:: mlir
+    In the above example, every PPR (``PauliRot``) and the PPM (``pauli_measure``) can be merged
+    into one PPM that acts on two qubits. For clear and inspectable results, use ``target="mlir"``
+    in the ``qjit`` decorator, ensure that PennyLane's program capture is enabled,
+    :func:`pennylane.capture.enable`, and call ``ppr_to_ppm`` from the PennyLane frontend
+    (``qml.transforms.merge_ppr_ppm``) instead of with ``catalyst.passes.merge_ppr_ppm``.
 
-        . . .
-        %2 = qec.ppr ["X"](8) %1 : !quantum.bit
-        %mres, %out_qubits = qec.ppm ["X"] %2 : !quantum.bit
-        . . .
+    >>> print(qml.specs(circuit, level="device")()['resources'])
+    num_wires: 2
+    num_gates: 1
+    depth: None
+    shots: Shots(total=None)
+    gate_types:
+    {'PPM-w2': 1}
+    gate_sizes:
+    {2: 1}
 
-    If a merging resulted in a PPM acting on more than
-    `max_pauli_size` qubits (here, `max_pauli_size = 2`), that merging would be skipped.
+    In the above output, ``PPM-weight`` denotes the type of PPM present in the circuit, where
+    ``weight`` is the PPM weight.
+
+    If a merging resulted in a PPM acting on more than ``max_pauli_size`` qubits, that merging
+    operation would be skipped. This is illustrated below:
 
     .. code-block:: python
 
-        from catalyst import measure, qjit
-        from catalyst.passes import to_ppr, merge_ppr_ppm
-
-        pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
-
-        @qjit(pipelines=pips, target="mlir")
-        @to_ppr
-        @merge_ppr_ppm(max_pauli_size=2)
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        @qml.qjit(target="mlir")
+        @partial(qml.transforms.merge_ppr_ppm, max_pauli_size=2)
+        @qml.qnode(qml.device("null.qubit", wires=3))
         def circuit():
-            qml.CNOT([1, 2])
-            qml.CNOT([0, 1])
-            qml.CNOT([0, 2])
-            return measure(0), measure(1), measure(2)
 
-        print(circuit.mlir_opt)
+            qml.PauliRot(jnp.pi / 2, pauli_word="ZX", wires=[1, 2])
+            qml.PauliRot(-jnp.pi / 2, pauli_word="Z", wires=1)
+            qml.PauliRot(-jnp.pi / 2, pauli_word="X", wires=2)
 
-    Example MLIR Representation:
+            qml.PauliRot(jnp.pi / 2, pauli_word="ZX", wires=[0, 1])
+            qml.PauliRot(-jnp.pi / 2, pauli_word="Z", wires=0)
+            qml.PauliRot(-jnp.pi / 2, pauli_word="X", wires=1)
 
-    .. code-block:: mlir
+            qml.PauliRot(jnp.pi / 2, pauli_word="ZX", wires=[0, 2])
+            qml.PauliRot(-jnp.pi / 2, pauli_word="Z", wires=0)
+            qml.PauliRot(-jnp.pi / 2, pauli_word="X", wires=2)
 
-        . . .
-        %3:2 = qec.ppr ["Z", "X"](4) %1, %2 : !quantum.bit, !quantum.bit
-        . . .
-        %mres, %out_qubits:2 = qec.ppm ["Y", "Z"](-1) %3#1, %4 : !quantum.bit, !quantum.bit
-        . . .
+            ppm = qml.pauli_measure(pauli_word="ZZZ", wires=[0, 1, 2])
 
+            return
+
+    >>> print(qml.specs(circuit, level="device")()['resources'])
+    TODO!!
     """
     if qnode is None:
         return functools.partial(merge_ppr_ppm, max_pauli_size=max_pauli_size)
@@ -838,7 +844,6 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
 
     The ``ppr_to_ppm`` compilation pass can be applied as a dectorator on a QNode:
 
-
     .. code-block:: python
 
         import pennylane as qml
@@ -863,7 +868,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
             # equivalent to a T gate
             qml.PauliRot(jnp.pi / 4, pauli_word="Z", wires=0)
 
-            return qml.expval(qml.Z(0))
+            return
 
     For clear and inspectable results, use ``target="mlir"`` in the ``qjit`` decorator, ensure that
     PennyLane's program capture is enabled, :func:`pennylane.capture.enable`, and call
@@ -971,7 +976,7 @@ def ppm_compilation(
             qml.H(0)
             qml.CNOT([0, 1])
             qml.T(0)
-            return qml.expval(qml.Z(0))
+            return
 
     For clear and inspectable results, use ``target="mlir"`` in the ``qjit`` decorator, ensure that
     PennyLane's program capture is enabled, :func:`pennylane.capture.enable`, and call
@@ -1020,7 +1025,8 @@ def ppm_compilation(
 
 def ppm_specs(fn):
     R"""
-    This function returns following PPM specs in a dictionary:
+    This function returns following Pauli product rotation (PPR) and Pauli product measurement (PPM)
+    specs in a dictionary:
 
     - Pi/4 PPR (count the number of clifford PPRs)
     - Pi/8 PPR (count the number of non-clifford PPRs)
@@ -1031,7 +1037,10 @@ def ppm_specs(fn):
     - Number of logical qubits
     - Number of PPMs
 
-    PPM specs are returned after the last PPM compilation pass is run.
+    .. note::
+
+        It is recommended to use :func:`pennylane.specs` instead of ``ppm_specs`` to retrieve
+        resource counts of PPR-PPM workflows.
 
     When there is control flow, this function can count the above statistics inside for loops with
     a statically known number of iterations. For all other cases, including dynamically sized for
