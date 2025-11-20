@@ -103,7 +103,7 @@ class CircuitDAGAnalysisPass:
         self,
         op: quantum.ExpvalOp | quantum.VarianceOp | quantum.ProbsOp | quantum.SampleOp,
     ) -> None:
-        """Handler for statistical measurement operations (e.g., Expval, Sample)."""
+        """Handler for statistical measurement operations."""
         pass
 
     @visit_op.register
