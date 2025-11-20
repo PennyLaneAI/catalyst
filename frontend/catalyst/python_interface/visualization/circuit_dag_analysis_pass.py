@@ -77,14 +77,7 @@ class CircuitDAGAnalysisPass:
     @visit_op.register
     def _visit_unitary_and_state_prep(
         self,
-        op: (
-            quantum.CustomOp
-            | quantum.GlobalPhaseOp
-            | quantum.QubitUnitaryOp
-            | quantum.MultiRZOp
-            | quantum.SetStateOp
-            | quantum.SetBasisStateOp
-        ),
+        op: quantum.CustomOp,
     ) -> None:
         """Generic handler for unitary gates and quantum state preparation operations."""
         pass
