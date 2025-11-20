@@ -45,7 +45,7 @@ class DictPatchWrapper:
             object.__setattr__(self, name, value)
         elif name == "value":
             self.dictionary[self.key] = value
-        else:
+        else:  # pragma: no cover
             raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
 
