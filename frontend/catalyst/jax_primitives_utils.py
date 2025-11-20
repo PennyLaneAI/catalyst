@@ -320,8 +320,10 @@ class NestedModule:
         self.ctx.module_context = self.old_module_context
 
 
-def _lowered_options(kwargs):
+def _lowered_options(args, kwargs):
     lowered_options = {}
+    for arg in args:
+        lowered_options[str(arg)] = get_mlir_attribute_from_pyval(True)
     for option, value in kwargs.items():
         mlir_option = str(option).replace("_", "-")
         lowered_options[mlir_option] = get_mlir_attribute_from_pyval(value)
@@ -375,7 +377,7 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
             target = bb_named_sequence.arguments[0]
             for _pass in pipeline:
                 if isinstance(_pass, qml.transforms.core.TransformContainer):
-                    options = _lowered_options(_pass.kwargs)
+                    options = _lowered_options(_pass.args, _pass.kwargs)
                     name = _pass.pass_name
                 else:
                     options = _pass.get_options()

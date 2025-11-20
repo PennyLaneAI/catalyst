@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "chained-self-inverse"
+#define DEBUG_TYPE "cancel-inverses-pattern"
 
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Debug.h"
@@ -150,7 +150,7 @@ struct ChainedUUadjOpRewritePattern : public mlir::OpRewritePattern<OpType> {
 namespace catalyst {
 namespace quantum {
 
-void populateSelfInversePatterns(RewritePatternSet &patterns)
+void populateCancelInversesPatterns(RewritePatternSet &patterns)
 {
     patterns.add<ChainedNamedHermitianOpRewritePattern>(patterns.getContext(), 1);
 

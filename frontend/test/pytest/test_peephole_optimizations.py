@@ -39,7 +39,9 @@ from catalyst.utils.exceptions import CompileError
 ### Test peephole pass decorators preserve functionality of circuits ###
 @pytest.mark.parametrize("theta", [42.42])
 # should be able to get rid of catalyst.passes.cancel_inverses soon, but testing both for now.
-@pytest.mark.parametrize("cancel_inverses_version", (cancel_inverses, qml.transforms.cancel_inverses))
+@pytest.mark.parametrize(
+    "cancel_inverses_version", (cancel_inverses, qml.transforms.cancel_inverses)
+)
 def test_cancel_inverses_functionality(theta, backend, cancel_inverses_version):
 
     def circuit(x):
@@ -59,7 +61,9 @@ def test_cancel_inverses_functionality(theta, backend, cancel_inverses_version):
 
 
 @pytest.mark.parametrize("theta", [42.42])
-@pytest.mark.parametrize("merge_rotations_version", (merge_rotations, qml.transforms.merge_rotations))
+@pytest.mark.parametrize(
+    "merge_rotations_version", (merge_rotations, qml.transforms.merge_rotations)
+)
 def test_merge_rotation_functionality(theta, backend, merge_rotations_version):
 
     def circuit(x):
@@ -202,8 +206,10 @@ def test_chained_passes():
         qml.Hadamard(wires=[1])
         return qml.expval(qml.PauliY(wires=0))
 
-    assert "remove-chained-self-inverse" in test_chained_apply_passes_workflow.mlir
-    assert "merge-rotations" in test_chained_apply_passes_workflow.mlir
+    mlir = test_chained_apply_passes_workflow.mlir
+    assert "cancel-inverses" in mlir
+    assert "merge-rotations" in mlir
+
 
 def test_chained_transforms():
     """
@@ -221,7 +227,7 @@ def test_chained_transforms():
         qml.Hadamard(wires=[1])
         return qml.expval(qml.PauliY(wires=0))
 
-    assert "remove-chained-self-inverse" in test_chained_apply_passes_workflow.mlir
+    assert "cancel-inverses" in test_chained_apply_passes_workflow.mlir
     assert "merge-rotations" in test_chained_apply_passes_workflow.mlir
 
 

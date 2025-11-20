@@ -149,7 +149,11 @@ void moveCliffordPastPPM(const PauliStringWrapper &lhsPauli, const PauliStringWr
 
     rewriter.eraseOp(rhs);
 
-    sortTopologically(lhs->getBlock());
+    auto startItr = lhs->getIterator();
+    auto endItr = std::next(newPPM->getIterator());
+    llvm::iterator_range<Block::iterator> itr = llvm::make_range(startItr, endItr);
+
+    sortTopologically(lhs->getBlock(), itr);
 }
 
 bool shouldRemovePPR(PPRotationOp op)
