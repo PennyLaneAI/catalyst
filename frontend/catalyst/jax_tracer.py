@@ -143,7 +143,7 @@ def _get_eqn_from_tracing_eqn(eqn_or_callable):
         if actual_eqn is None:  # pragma: no cover
             raise RuntimeError("TracingEqn weakref was garbage collected")
         return actual_eqn
-    else:
+    else: # pragma: no cover
         return eqn_or_callable
 
 
