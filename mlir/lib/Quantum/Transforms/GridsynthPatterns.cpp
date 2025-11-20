@@ -14,7 +14,6 @@
 
 #define DEBUG_TYPE "gridsynth-patterns"
 
-#include <memory>
 #include <vector>
 
 #include "llvm/ADT/SmallVector.h"
@@ -22,18 +21,15 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 
-#include "Catalyst/IR/CatalystDialect.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h" // Import pattern declarations
@@ -112,42 +108,46 @@ mlir::func::FuncOp getOrDeclareGetPhaseFunc(mlir::ModuleOp module, mlir::Pattern
 // --- Helper Functions to build switch cases ---
 
 /**
+ * @brief Helper to create a chain of parameter-less single qubit CUSTOM gates.
+ */
+mlir::Value createGateChain(mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::Value qregIn,
+                            mlir::Value qbitIndex, mlir::ArrayRef<StringRef> gateNames,
+                            bool isAdjoint = false)
+{
+    auto qregType = qregIn.getType();
+    auto qbitType = catalyst::quantum::QubitType::get(rewriter.getContext());
+
+    mlir::Value currentQbit = rewriter.create<ExtractOp>(loc, qbitType, qregIn, qbitIndex,
+                                                         /*idx_attr=*/nullptr);
+
+    for (StringRef gateName : gateNames) {
+        mlir::NamedAttrList newAttrs;
+        newAttrs.append(rewriter.getNamedAttr("gate_name", rewriter.getStringAttr(gateName)));
+        newAttrs.append(rewriter.getNamedAttr("operandSegmentSizes",
+                                              rewriter.getDenseI32ArrayAttr({0, 1, 0, 0})));
+        if (isAdjoint) {
+            newAttrs.append(rewriter.getNamedAttr("adjoint", rewriter.getUnitAttr()));
+        }
+        newAttrs.append(
+            rewriter.getNamedAttr("resultSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0})));
+
+        auto newOp = rewriter.create<CustomOp>(loc, qbitType, mlir::ValueRange{currentQbit},
+                                               newAttrs.getAttrs());
+        currentQbit = newOp.getResult(0);
+    }
+
+    mlir::Value qregOut = rewriter.create<InsertOp>(loc, qregType, qregIn, qbitIndex,
+                                                    /*idx_attr=*/nullptr, currentQbit);
+    return qregOut;
+}
+
+/**
  * @brief Populates the scf.index_switch op for the Clifford+T basis.
  */
 void populateCliffordTSwitchCases(mlir::PatternRewriter &rewriter, mlir::Location loc,
                                   mlir::scf::IndexSwitchOp switchOp, mlir::Value qregIn,
                                   mlir::Value qbitIndex)
 {
-    auto qregType = qregIn.getType();
-    auto qbitType = catalyst::quantum::QubitType::get(rewriter.getContext());
-
-    // Helper lambda to create a chain of parameter-less single qubit CUSTOM gates.
-    auto createGateChain = [&](mlir::OpBuilder &builder, mlir::ArrayRef<StringRef> gateNames,
-                               mlir::Value currentLoopReg, bool isAdjoint = false) -> mlir::Value {
-        mlir::Value currentQbit = builder.create<ExtractOp>(loc, qbitType, currentLoopReg,
-                                                            qbitIndex, /*idx_attr=*/nullptr);
-
-        for (StringRef gateName : gateNames) {
-            mlir::NamedAttrList newAttrs;
-            newAttrs.append(builder.getNamedAttr("gate_name", builder.getStringAttr(gateName)));
-            newAttrs.append(builder.getNamedAttr("operandSegmentSizes",
-                                                 builder.getDenseI32ArrayAttr({0, 1, 0, 0})));
-            if (isAdjoint) {
-                newAttrs.append(builder.getNamedAttr("adjoint", builder.getUnitAttr()));
-            }
-            newAttrs.append(
-                builder.getNamedAttr("resultSegmentSizes", builder.getDenseI32ArrayAttr({1, 0})));
-
-            auto newOp = builder.create<CustomOp>(loc, qbitType, mlir::ValueRange{currentQbit},
-                                                  newAttrs.getAttrs());
-            currentQbit = newOp.getResult(0);
-        }
-
-        mlir::Value qregOut = builder.create<InsertOp>(loc, qregType, currentLoopReg, qbitIndex,
-                                                       /*idx_attr=*/nullptr, currentQbit);
-        return qregOut;
-    };
-
     // --- Define cases ---
     static StringRef gates0[] = {"T"};
     static StringRef gates1[] = {"Hadamard", "T"};
@@ -181,7 +181,8 @@ void populateCliffordTSwitchCases(mlir::PatternRewriter &rewriter, mlir::Locatio
         caseRegion.push_back(new Block());
         rewriter.setInsertionPointToStart(&caseRegion.front());
 
-        mlir::Value qregCase = createGateChain(rewriter, config.first, qregIn, config.second);
+        mlir::Value qregCase =
+            createGateChain(rewriter, loc, qregIn, qbitIndex, config.first, config.second);
         rewriter.create<mlir::scf::YieldOp>(loc, qregCase);
     }
 
@@ -190,12 +191,14 @@ void populateCliffordTSwitchCases(mlir::PatternRewriter &rewriter, mlir::Locatio
     defaultRegion.push_back(new Block());
     rewriter.setInsertionPointToStart(&defaultRegion.front());
     static StringRef gatesDefault[] = {"Identity"};
-    mlir::Value qregDefault = createGateChain(rewriter, gatesDefault, qregIn);
+    mlir::Value qregDefault =
+        createGateChain(rewriter, loc, qregIn, qbitIndex, gatesDefault, /*isAdjoint=*/false);
     rewriter.create<mlir::scf::YieldOp>(loc, qregDefault);
 }
 
 /**
  * @brief Populates the scf.index_switch op for the PPR-Basis.
+ * Maps the new enum (I, X2...adjZ8) to PPRotationOps.
  */
 void populatePPRBasisSwitchCases(mlir::PatternRewriter &rewriter, mlir::Location loc,
                                  mlir::scf::IndexSwitchOp switchOp, mlir::Value qregIn,
@@ -204,13 +207,24 @@ void populatePPRBasisSwitchCases(mlir::PatternRewriter &rewriter, mlir::Location
     auto qregType = qregIn.getType();
     auto qbitType = catalyst::quantum::QubitType::get(rewriter.getContext());
 
-    // Helper lambda to create a single PPRotationOp.
+    // Helper to create a single PPRotationOp.
+    // Handles 'adjoint' by negating the rotationKind.
     auto createPPROp = [&](mlir::OpBuilder &builder, mlir::ArrayRef<StringRef> pauliWord,
-                           uint16_t rotationKind, mlir::Value currentLoopReg) -> mlir::Value {
+                           uint16_t rotationKind, bool isAdjoint,
+                           mlir::Value currentLoopReg) -> mlir::Value {
         mlir::Value currentQbit = builder.create<ExtractOp>(loc, qbitType, currentLoopReg,
                                                             qbitIndex, /*idx_attr=*/nullptr);
 
-        auto pprOp = builder.create<catalyst::qec::PPRotationOp>(loc, pauliWord, rotationKind,
+        // Convert rotation kind to signed integer and negate if adjoint
+        int16_t signedRotation = static_cast<int16_t>(rotationKind);
+        if (isAdjoint) {
+            signedRotation = -signedRotation;
+        }
+
+        // We need to cast back to uint16_t for the C++ builder signature,
+        uint16_t finalRotationArg = static_cast<uint16_t>(signedRotation);
+
+        auto pprOp = builder.create<catalyst::qec::PPRotationOp>(loc, pauliWord, finalRotationArg,
                                                                  mlir::ValueRange{currentQbit},
                                                                  /*condition=*/nullptr);
 
@@ -221,43 +235,67 @@ void populatePPRBasisSwitchCases(mlir::PatternRewriter &rewriter, mlir::Location
         return qregOut;
     };
 
-    // --- Define cases ---
+    // Config struct for the new Enum
+    struct PPRConfig {
+        bool isIdentity;
+        ArrayRef<StringRef> pauli;
+        uint16_t n;     // The denominator (2, 4, 8)
+        bool isAdjoint; // True if adjX, adjY, etc.
+    };
+
     static StringRef xPauli[] = {"X"};
+    static StringRef yPauli[] = {"Y"};
     static StringRef zPauli[] = {"Z"};
 
-    // Case 0: "X" 8 (pi/8)
-    Region &caseRegion0 = switchOp.getCaseRegions()[0];
-    caseRegion0.push_back(new Block());
-    rewriter.setInsertionPointToStart(&caseRegion0.front());
-    mlir::Value qregCase0 = createPPROp(rewriter, xPauli, 8, qregIn);
-    rewriter.create<mlir::scf::YieldOp>(loc, qregCase0);
+    // Map indices 0..18 to configs
+    SmallVector<PPRConfig> caseConfigs;
 
-    // Case 1: "X" 4 (pi/4)
-    Region &caseRegion1 = switchOp.getCaseRegions()[1];
-    caseRegion1.push_back(new Block());
-    rewriter.setInsertionPointToStart(&caseRegion1.front());
-    mlir::Value qregCase1 = createPPROp(rewriter, xPauli, 4, qregIn);
-    rewriter.create<mlir::scf::YieldOp>(loc, qregCase1);
+    // Case 0: I
+    caseConfigs.push_back({true, {}, 0, false});
 
-    // Case 2: "Z" 8 (pi/8)
-    Region &caseRegion2 = switchOp.getCaseRegions()[2];
-    caseRegion2.push_back(new Block());
-    rewriter.setInsertionPointToStart(&caseRegion2.front());
-    mlir::Value qregCase2 = createPPROp(rewriter, zPauli, 8, qregIn);
-    rewriter.create<mlir::scf::YieldOp>(loc, qregCase2);
+    // Helper to push X, Y, Z triplets (2, 4, 8) then (adj2, adj4, adj8)
+    auto pushSeries = [&](ArrayRef<StringRef> pauli) {
+        // Normal: 2, 4, 8
+        caseConfigs.push_back({false, pauli, 2, false});
+        caseConfigs.push_back({false, pauli, 4, false});
+        caseConfigs.push_back({false, pauli, 8, false});
+        // Adjoint: 2, 4, 8
+        caseConfigs.push_back({false, pauli, 2, true});
+        caseConfigs.push_back({false, pauli, 4, true});
+        caseConfigs.push_back({false, pauli, 8, true});
+    };
 
-    // Case 3: "Z" 4 (pi/4)
-    Region &caseRegion3 = switchOp.getCaseRegions()[3];
-    caseRegion3.push_back(new Block());
-    rewriter.setInsertionPointToStart(&caseRegion3.front());
-    mlir::Value qregCase3 = createPPROp(rewriter, zPauli, 4, qregIn);
-    rewriter.create<mlir::scf::YieldOp>(loc, qregCase3);
+    pushSeries(xPauli); // Cases 1-6
+    pushSeries(yPauli); // Cases 7-12
+    pushSeries(zPauli); // Cases 13-18
 
-    // Populate Default Case
+    // --- Populate Switch Cases ---
+    assert(caseConfigs.size() == switchOp.getCases().size() &&
+           "Mismatch in case config and case values");
+
+    for (size_t i = 0; i < caseConfigs.size(); ++i) {
+        const auto &config = caseConfigs[i];
+        Region &caseRegion = switchOp.getCaseRegions()[i];
+        caseRegion.push_back(new Block());
+        rewriter.setInsertionPointToStart(&caseRegion.front());
+
+        mlir::Value qregCase;
+        if (config.isIdentity) {
+            // Identity: No-op
+            qregCase = qregIn;
+        }
+        else {
+            // PPR Op (Adjoint logic handled inside helper)
+            qregCase = createPPROp(rewriter, config.pauli, config.n, config.isAdjoint, qregIn);
+        }
+
+        rewriter.create<mlir::scf::YieldOp>(loc, qregCase);
+    }
+
+    // Default Case
     Region &defaultRegion = switchOp.getDefaultRegion();
     defaultRegion.push_back(new Block());
     rewriter.setInsertionPointToStart(&defaultRegion.front());
-    // Default to Identity (do nothing)
     rewriter.create<mlir::scf::YieldOp>(loc, qregIn);
 }
 
@@ -345,9 +383,13 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     // --- Define cases based on pprBasis ---
     SmallVector<int64_t> caseValues;
     if (pprBasis) {
-        caseValues = {0, 1, 2, 3}; // PPR Basis cases
+        // I, X(2,4,8), adjX(2,4,8), Y(2,4,8), adjY(2,4,8), Z(2,4,8), adjZ(2,4,8)
+        caseValues.reserve(19);
+        for (int i = 0; i < 19; ++i)
+            caseValues.push_back(i);
     }
     else {
+        // Corresponds to { T = 0, HT, SHT, I, X, Y, Z, H, S, Sd }
         caseValues = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}; // Standard Clifford+T cases
     }
 
@@ -431,7 +473,6 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
             return rewriter.notifyMatchFailure(op, "Op does not return a single qubit");
         }
 
-        // find the source ExtractOp for current Qubit
         // find the source ExtractOp for current Qubit
         catalyst::quantum::ExtractOp extractOp = findSourceExtract(qbitOperand);
         if (!extractOp) {
@@ -585,8 +626,7 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
                 return nullptr; // Not a simple unitary mapping
             }
 
-            // --- START: Corrected Logic ---
-            // Find the index of our `qbit` in the *qubit results* list.
+            // Find the index of our qubit in the qubit results list.
             int64_t qubitResultIndex = -1;
             for (size_t i = 0; i < qubitResults.size(); ++i) {
                 if (qubitResults[i] == opResult) {
