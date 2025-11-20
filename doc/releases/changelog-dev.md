@@ -53,6 +53,7 @@
 <h3>Breaking changes 💔</h3>
 
 * The plxpr transform `pl_map_wires` has been removed along with its test.
+  [(#2220)](https://github.com/PennyLaneAI/catalyst/pull/2220)
 
 * (Compiler integrators only) The versions of LLVM/Enzyme/stablehlo used by Catalyst have been
   updated. Enzyme now targets `v0.0.203` with the build target `EnzymeStatic-22`, and the nanobind
