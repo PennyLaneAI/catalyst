@@ -176,7 +176,9 @@ def get_label(op: Any) -> str:
 
 @get_label.register
 def _get_custom_op_label(op: quantum.CustomOp) -> str:
-    return op.gate_name.data
+    op_name: str = op.gate_name.data
+    op_wires: str = ""
+    return f"{op_name}({op_wires})"
 
 
 @get_label.register
