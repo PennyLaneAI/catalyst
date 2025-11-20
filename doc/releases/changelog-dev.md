@@ -130,6 +130,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update end-to-end integration tests for the graph-based decomposition in Catalyst.
+  [(#2221)](https://github.com/PennyLaneAI/catalyst/pull/2221)
+
 * Replaces the deprecated `shape_dtype_to_ir_type` function with the `RankedTensorType.get` method.
   [(#2159)](https://github.com/PennyLaneAI/catalyst/pull/2159)
 
