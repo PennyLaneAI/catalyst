@@ -330,7 +330,6 @@ def test_merge_ppr_ppm():
 
         return f()
 
-    print(test_merge_ppr_ppm_workflow.mlir)
     assert 'transform.apply_registered_pass "merge-ppr-ppm"' in test_merge_ppr_ppm_workflow.mlir
     optimized_ir = test_merge_ppr_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "merge-ppr-ppm"' not in optimized_ir
