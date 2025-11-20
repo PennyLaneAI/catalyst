@@ -807,6 +807,12 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
     For more information on PPRs and PPMs, check out
     the `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
 
+    .. note::
+
+        The circuits that generated from this pass are currently not executable on any backend.
+        This pass is only for analysis and potential future execution when a suitable backend is
+        available.
+
     Args:
         qnode (QNode): QNode to apply the pass to.
         decompose_method (str, optional): The method to use for decomposing non-Clifford PPRs.
@@ -916,6 +922,12 @@ def ppm_compilation(
 
     For more information on PPRs and PPMs, check out
     the `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
+
+    .. note::
+
+        The circuits that generated from this pass are currently not executable on any backend.
+        This pass is only for analysis and potential future execution when a suitable backend is
+        available.
 
     Args:
         qnode (QNode, optional): QNode to apply the pass to. If ``None``, returns a decorator.
