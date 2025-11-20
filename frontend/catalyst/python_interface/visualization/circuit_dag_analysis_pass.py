@@ -59,7 +59,7 @@ class CircuitDAGAnalysisPass:
 
     @visit_op.register
     def visit_region(self, region: Region) -> None:
-        """Visit an xDSL Region operation, delegating traversal to its Blocks."""
+        """Visit an xDSL Region operation."""
         for block in region.blocks:
             self.visit_block(block)
 
