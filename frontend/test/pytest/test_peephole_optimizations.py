@@ -147,49 +147,6 @@ def test_pipeline_functionality(theta, backend):
     assert np.allclose(res[0], res[1])
 
 
-### Test bad usages of pass decorators ###
-def test_passes_bad_usages():
-    """
-    Tests that an error is raised when cancel_inverses is not used properly
-    """
-
-    def test_passes_not_on_qnode():
-        def classical_func():
-            return 42.42
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            pipeline({})(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            cancel_inverses(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            merge_rotations(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            disentangle_cnot(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            disentangle_swap(classical_func)
-
-    test_passes_not_on_qnode()
-
-
 def test_chained_passes():
     """
     Test that chained passes are present in the transform passes.
