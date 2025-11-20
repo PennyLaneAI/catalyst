@@ -13,7 +13,7 @@
 # limitations under the License.
 """Jax extras module containing functions related to the Python program tracing"""
 
-# pylint: disable=line-too-long
+# pylint: disable=line-too-long,too-many-lines
 
 from __future__ import annotations
 
@@ -196,6 +196,18 @@ def stable_toposort(end_nodes: list) -> list:
     return sorted_nodes
 
 
+class Box:
+    """Wrapper for TracingEqn keeping track of its id and parents."""
+
+    def __init__(self, boxid: int, e: JaxprEqn):
+        self.id: int = boxid
+        self.e: JaxprEqn = e
+        self.parents: List["Box"] = []  # to be filled later
+
+    def __lt__(self, other):
+        return self.id < other.id
+
+
 def sort_eqns(
     eqns: List[JaxprEqn | Callable[[], JaxprEqn]],
     forced_order_primitives: Set[JaxprPrimitive],
@@ -208,30 +220,15 @@ def sort_eqns(
     # correct values, [3] - add additional equation order restrictions to boxes, [4] - call the
     # topological sorting.
 
-    class Box:
-        """Wrapper for TracingEqn keeping track of its id and parents."""
-
-        def __init__(self, boxid: int, e: JaxprEqn):
-            self.id: int = boxid
-            self.e: JaxprEqn = e
-            self.parents: List["Box"] = []  # to be filled later
-
-        def __lt__(self, other):
-            return self.id < other.id
-
     # JAX 0.7+: eqns might be lambda functions that return TracingEqn or weakrefs
     # We need to preserve the mapping from actual_eqn to the original callable
     actual_eqns = []
     eqn_to_callable = {}  # Maps actual TracingEqn to its original callable/wrapper
     for eqn_or_callable in eqns:
-        if callable(eqn_or_callable):
-            actual_eqn = eqn_or_callable()
-            if actual_eqn is not None:  # weakref might return None if collected
-                actual_eqns.append(actual_eqn)
-                eqn_to_callable[id(actual_eqn)] = eqn_or_callable
-        else:
-            actual_eqns.append(eqn_or_callable)
-            eqn_to_callable[id(eqn_or_callable)] = eqn_or_callable
+        eqn = eqn_or_callable() if callable(eqn_or_callable) else eqn_or_callable
+        if eqn is not None:  # weakref might return None if collected
+            actual_eqns.append(eqn)
+            eqn_to_callable[id(eqn)] = eqn_or_callable
 
     boxes = [Box(i, e) for i, e in enumerate(actual_eqns)]
 
@@ -261,11 +258,7 @@ def sort_eqns(
     # Restore the original callables/wrappers for the sorted equations
     result = []
     for b in sorted_boxes:
-        eqn_id = id(b.e)
-        if eqn_id in eqn_to_callable:
-            result.append(eqn_to_callable[eqn_id])
-        else:
-            result.append(b.e)
+        result.append(eqn_to_callable.get(id(b.e), b.e))
 
     return result  # [4]
 

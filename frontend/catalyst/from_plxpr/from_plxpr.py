@@ -334,7 +334,7 @@ def handle_qnode(
 # otherwise their value will be None. The second value indicates if the transform
 # requires decomposition to be supported by Catalyst.
 transforms_to_passes = {
-    pl_cancel_inverses: ("remove-chained-self-inverse", False),
+    pl_cancel_inverses: ("cancel-inverses", False),
     pl_commute_controlled: (None, False),
     pl_decompose: (None, False),
     pl_map_wires: (None, False),
@@ -376,8 +376,7 @@ def handle_transform(
         and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
         and qml.decomposition.enabled_graph()
     ):
-        """Handle the conversion from plxpr to Catalyst jaxpr for a
-        PL transform."""
+        # Handle the conversion from plxpr to Catalyst jaxpr for a PL transform.
         if not self.requires_decompose_lowering:
             self.requires_decompose_lowering = True
         else:
