@@ -171,7 +171,7 @@ def get_label(op: Any) -> str:
         label (str): The appropriate label for a given xDSL operation. Defaults
             to the class name.
     """
-    return type(op).__name__.replace("Op", "")
+    return type(op).__name__
 
 
 @get_label.register
@@ -180,20 +180,11 @@ def _get_custom_op_label(op: quantum.CustomOp) -> str:
 
 
 @get_label.register
-def _get_state_op_label(op: quantum.StateOp) -> str:
-    return op.name
-
-
-@get_label.register
 def _get_statistical_measurement_op_label(
-    op: quantum.ExpvalOp | quantum.VarianceOp | quantum.ProbsOp | quantum.SampleOp,
+    op: quantum.ExpvalOp | quantum.VarianceOp,
 ) -> str:
-    # e.g. op -> expval(Z(0))
-    obs = op.obs
-    mp = op.name.split(".")[-1]  # quantum.expval -> expval
-    return f"{mp}({obs})"
-
-
-@get_label.register
-def _get_projective_measurement_op_label(op: quantum.MeasureOp) -> str:
-    return op.name.split(".")[-1]  # quantum.measure -> measure
+    # e.g. expval(Z(0)) should be the output
+    mp: str = op.name.split(".")[-1]  # quantum.expval -> expval
+    obs: str = op.obs.owner.properties.get("type").data.value
+    wires: str = ""
+    return f"{mp}({obs}({wires}))"
