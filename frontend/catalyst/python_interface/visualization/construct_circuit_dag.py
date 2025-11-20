@@ -96,6 +96,7 @@ class ConstructCircuitDAG:
         self.dag_builder.add_node(
             node_id=f"node_{id(op)}",
             node_label=get_label(op),
+            parent_graph_id=self._cluster_stack[-1],
         )
 
     # =============================================
@@ -110,6 +111,7 @@ class ConstructCircuitDAG:
         self.dag_builder.add_node(
             node_id=f"node_{id(op)}",
             node_label=get_label(op),
+            parent_graph_id=self._cluster_stack[-1],
         )
 
     @visit_op.register
@@ -123,6 +125,7 @@ class ConstructCircuitDAG:
         self.dag_builder.add_node(
             node_id=f"node_{id(op)}",
             node_label=get_label(op),
+            parent_graph_id=self._cluster_stack[-1],
         )
 
     @visit_op.register
@@ -133,6 +136,7 @@ class ConstructCircuitDAG:
         self.dag_builder.add_node(
             node_id=f"node_{id(op)}",
             node_label=get_label(op),
+            parent_graph_id=self._cluster_stack[-1],
         )
 
     # =========================
