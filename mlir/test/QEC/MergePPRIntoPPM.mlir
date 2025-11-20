@@ -112,8 +112,8 @@ func.func public @commute_ppr_ppm_pi_4_rotation_test_5(%q1: !quantum.bit, %q2: !
 
     // CHECK: [[q1:%.+]]:2 = qec.ppr ["X", "X"](8) %arg0, %arg1
     // CHECK: [[m1:%.+]], [[o1:%.+]]:2 = qec.ppm ["X", "Z"] [[q1]]#0, [[q1]]#1
-    // CHECK: [[f1:%.+]] = tensor.from_elements [[m1]] : tensor<i1>
     // CHECK: [[q2:%.+]]:2 = qec.ppr ["Y", "X"](4) [[o1]]#0, [[o1]]#1
+    // CHECK: [[f1:%.+]] = tensor.from_elements [[m1]] : tensor<i1>
     // CHECK: return [[f1]], [[q2]]#0 : tensor<i1>, !quantum.bit
     %0:2 = qec.ppr ["X", "X"](8) %q1, %q2 : !quantum.bit, !quantum.bit
     %1:2 = qec.ppr ["Y", "X"](4) %0#0, %0#1 : !quantum.bit, !quantum.bit
@@ -244,19 +244,24 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
 
 func.func public @circuit_transformed_0() -> (tensor<i1>, tensor<i1>) {
 
+    // CHECK: quantum.device
     // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
     // CHECK: [[q0:%.+]] = quantum.extract [[qreg]][ 0]
     // CHECK: [[q1:%.+]] = quantum.extract [[qreg]][ 1]
     // CHECK: [[q2:%.+]]:2 = qec.ppr ["X", "Z"](8) [[q0]], [[q1]]
     // CHECK: [[m1:%.+]], [[o1:%.+]]:2 = qec.ppm ["X", "Z"] [[q2]]#0, [[q2]]#1
-    // CHECK: [[f1:%.+]] = tensor.from_elements [[m1]] : tensor<i1>
     // CHECK: [[m2:%.+]], [[o2:%.+]] = qec.ppm ["X"] [[o1]]#0 : !quantum.bit
-    // CHECK: [[f2:%.+]] = tensor.from_elements [[m2]] : tensor<i1>
+    // CHECK: [[f1:%.+]] = tensor.from_elements [[m2]] : tensor<i1>
     // CHECK: [[q3:%.+]] = quantum.insert [[qreg]][ 0], [[o2]]
+    // CHECK: [[f2:%.+]] = tensor.from_elements [[m1]] : tensor<i1>
     // CHECK: [[q4:%.+]] = quantum.insert [[q3]][ 1], [[o1]]#1
     // CHECK: quantum.dealloc [[q4]] : !quantum.reg
-    // CHECK: return [[f2]], [[f1]] : tensor<i1>, tensor<i1>
-    
+    // CHECK: quantum.device_release
+    // CHECK: return [[f1]], [[f2]] : tensor<i1>, tensor<i1>
+
+
+    %c1_i64 = arith.constant 1 : i64
+    quantum.device shots(%c1_i64) ["../runtime/build/lib/librtd_null_qubit.dylib", "NullQubit", ""]
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -274,5 +279,6 @@ func.func public @circuit_transformed_0() -> (tensor<i1>, tensor<i1>) {
     %from_elements_2 = tensor.from_elements %mres_0 : tensor<i1>
     %11 = quantum.insert %9[ 1], %out_qubits_1 : !quantum.reg, !quantum.bit
     quantum.dealloc %11 : !quantum.reg
+    quantum.device_release
     return %from_elements, %from_elements_2 : tensor<i1>, tensor<i1>
 }
