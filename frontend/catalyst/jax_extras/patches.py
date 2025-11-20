@@ -22,8 +22,7 @@ from functools import partial
 import jax
 import jax._src.interpreters.partial_eval as pe
 from jax._src import config, core, source_info_util
-from jax._src.core import JaxprEqnContext, Var, abstractify, standard_vma_rule
-from jax._src.interpreters import pxla
+from jax._src.core import JaxprEqnContext, abstractify, standard_vma_rule
 from jax._src.interpreters.partial_eval import (
     DynamicJaxprTracer,
     TracingEqn,
@@ -42,7 +41,7 @@ from jax._src.lax.slicing import (
     standard_primitive,
 )
 from jax._src.pjit import _out_type, _pjit_forwarding, jit_p
-from jax._src.sharding_impls import UNSPECIFIED, UnspecifiedValue
+from jax._src.sharding_impls import UnspecifiedValue
 from jax.core import AbstractValue, Tracer
 
 __all__ = (
