@@ -938,11 +938,19 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
     sim->MatrixOperation({}, {Qs[0]}, true);
     sim->MatrixOperation({}, {Qs[0]}, true, {Qs[1], Qs[2]});
 
-    // Releasing all qubits should write out all tracked information
     sim->ReleaseQubits(Qs);
 
-    // Open the file of resource data
+    // Check no prior steps actually wrote the resource file
     std::ifstream resource_file_r(RESOURCES_FILENAME);
+    if (resource_file_r.is_open()) {
+        FAIL("Resource file should not exist before releasing qubits");
+        std::remove(RESOURCES_FILENAME.c_str());
+    }
+
+    sim.reset(); // Destroy the device to trigger writing the resource data
+
+    // The destruction of the device should cause the file to be written
+    resource_file_r.open(RESOURCES_FILENAME);
     CHECK(resource_file_r.is_open()); // fail-fast if file failed to create
 
     std::vector<std::string> resource_names = {"PauliX",
