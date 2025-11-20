@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 
 import xdsl
 from xdsl.dialects import builtin, func, scf
-from xdsl.ir import Block, Region
+from xdsl.ir import Block, Operation, Region
 
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
@@ -42,40 +42,46 @@ class ConstructCircuitDAG:
     # =================================
 
     @singledispatchmethod
-    def visit_op(self, op: Any) -> None:
+    def visit(self, op: Any) -> None:
         """Central dispatch method (Visitor Pattern). Routes the operation 'op'
         to the specialized handler registered for its type."""
-        raise NotImplementedError(f"Dispatch not registered for operator of type {type(op)}")
+        pass
 
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module."""
         for op in module.ops:
-            self.visit_op(op)
+            self.visit(op)
 
     # =======================
     # 2. HIERARCHY TRAVERSAL
     # =======================
     # These methods navigate the recursive IR hierarchy (Op -> Region -> Block -> Op).
 
-    @visit_op.register
+    @visit.register
+    def visit_operation(self, operation: Operation) -> None:
+        """Visit an xDSL Operation."""
+        for region in operation.regions:
+            self.visit_region(region)
+
+    @visit.register
     def visit_region(self, region: Region) -> None:
         """Visit an xDSL Region operation."""
         for block in region.blocks:
             self.visit_block(block)
 
-    @visit_op.register
+    @visit.register
     def visit_block(self, block: Block) -> None:
         """Visit an xDSL Block operation, dispatching handling for each contained Operation."""
         for op in block.ops:
-            self.visit_op(op)
+            self.visit(op)
 
     # ======================================
     # 3. QUANTUM GATE & STATE PREP HANDLERS
     # ======================================
     # Handlers for operations that apply unitary transformations or set-up the quantum state.
 
-    @visit_op.register
-    def _visit_unitary_and_state_prep(
+    @visit.register
+    def _unitary_and_state_prep(
         self,
         op: quantum.CustomOp,
     ) -> None:
@@ -86,21 +92,21 @@ class ConstructCircuitDAG:
     # 4. QUANTUM MEASUREMENT HANDLERS
     # =============================================
 
-    @visit_op.register
-    def _visit_state_op(self, op: quantum.StateOp) -> None:
+    @visit.register
+    def _state_op(self, op: quantum.StateOp) -> None:
         """Handler for the terminal state measurement operation."""
         pass
 
-    @visit_op.register
-    def _visit_statistical_measurement_ops(
+    @visit.register
+    def _statistical_measurement_ops(
         self,
         op: quantum.ExpvalOp | quantum.VarianceOp | quantum.ProbsOp | quantum.SampleOp,
     ) -> None:
         """Handler for statistical measurement operations."""
         pass
 
-    @visit_op.register
-    def _visit_projective_measure_op(self, op: quantum.MeasureOp) -> None:
+    @visit.register
+    def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
         """Handler for the single-qubit projective measurement operation."""
         pass
 
@@ -108,17 +114,17 @@ class ConstructCircuitDAG:
     # 5. CONTROL FLOW HANDLERS
     # =========================
 
-    @visit_op.register
-    def _visit_for_op(self, op: scf.ForOp) -> None:
+    @visit.register
+    def _for_op(self, op: scf.ForOp) -> None:
         """Handle an xDSL ForOp operation."""
         pass
 
-    @visit_op.register
-    def _visit_while_op(self, op: scf.WhileOp) -> None:
+    @visit.register
+    def _while_op(self, op: scf.WhileOp) -> None:
         """Handle an xDSL WhileOp operation."""
         pass
 
-    @visit_op.register
-    def _visit_if_op(self, op: scf.IfOp) -> None:
+    @visit.register
+    def _if_op(self, op: scf.IfOp) -> None:
         """Handle an xDSL IfOp operation."""
         pass
