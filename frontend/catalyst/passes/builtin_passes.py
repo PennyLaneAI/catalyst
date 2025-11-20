@@ -643,6 +643,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
 
         import pennylane as qml
         from functools import partial
+        import jax.numpy as jnp
 
         qml.capture.enable()
 
@@ -729,6 +730,7 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
 
         import pennylane as qml
         from functools import partial
+        import jax.numpy as jnp
 
         qml.capture.enable()
 
@@ -822,10 +824,11 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
 
         import pennylane as qml
         from functools import partial
+        import jax.numpy as jnp
 
         qml.capture.enable()
 
-        @qjit(target="mlir")
+        @qml.qjit(target="mlir")
         @partial(ppr_to_ppm, decompose_method="auto-corrected")
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
@@ -943,7 +946,7 @@ def ppm_compilation(
 
         qml.capture.enable()
 
-        @qjit(target="mlir")
+        @qml.qjit(target="mlir")
         @partial(qml.transforms.ppm_compilation, decompose_method="clifford-corrected", max_pauli_size=2)
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
