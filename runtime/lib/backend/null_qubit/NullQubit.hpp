@@ -100,11 +100,12 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      */
     auto AllocateQubit() -> QubitIdType
     {
-        num_qubits_++; // next_id
+        QubitIdType new_qubit = this->qubit_manager.Allocate(num_qubits_);
         if (this->track_resources_) {
-            this->resource_tracker_.SetMaxWires(static_cast<std::size_t>(num_qubits_));
+            this->resource_tracker_.AllocateQubit(new_qubit);
         }
-        return this->qubit_manager.Allocate(num_qubits_);
+        num_qubits_++; // next_id
+        return new_qubit;
     }
 
     /**
@@ -135,6 +136,10 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
         if (num_qubits_) {
             num_qubits_--;
             this->qubit_manager.Release(q);
+        }
+
+        if (this->track_resources_) {
+            this->resource_tracker_.ReleaseQubit(q);
         }
     }
 

@@ -919,7 +919,7 @@ def test_decompose_lowering_with_other_passes():
     # CHECK: module attributes {transform.with_named_sequence} {
     # CHECK-NEXT:   transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
     # CHECK-NEXT:   [[ONE:%.+]] = transform.apply_registered_pass "decompose-lowering" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
-    # CHECK-NEXT:   [[TWO:%.+]] = transform.apply_registered_pass "remove-chained-self-inverse" to [[ONE]] : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+    # CHECK-NEXT:   [[TWO:%.+]] = transform.apply_registered_pass "cancel-inverses" to [[ONE]] : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
     # CHECK-NEXT:   {{%.+}} = transform.apply_registered_pass "merge-rotations" to [[TWO]] : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
     # CHECK-NEXT:   transform.yield
     # CHECK-NEXT:   }
@@ -1003,7 +1003,7 @@ def test_decompose_lowering_with_ordered_passes():
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     # CHECK: module attributes {transform.with_named_sequence} {
     # CHECK-NEXT:     transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
-    # CHECK-NEXT:     [[FIRST:%.+]] = transform.apply_registered_pass "remove-chained-self-inverse" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+    # CHECK-NEXT:     [[FIRST:%.+]] = transform.apply_registered_pass "cancel-inverses" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
     # CHECK-NEXT:     [[SECOND:%.+]] = transform.apply_registered_pass "merge-rotations" to [[FIRST]] : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
     # CHECK-NEXT:     {{%.+}} = transform.apply_registered_pass "decompose-lowering" to [[SECOND]] : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
     # CHECK-NEXT:     transform.yield
