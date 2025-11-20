@@ -94,7 +94,7 @@ class CircuitDAGAnalysisPass:
     # =============================================
 
     @visit_op.register
-    def _visit_terminal_state_op(self, op: quantum.StateOp) -> None:
+    def _visit_state_op(self, op: quantum.StateOp) -> None:
         """Handler for the terminal StateOp, which retrieves the final state vector."""
         pass
 
