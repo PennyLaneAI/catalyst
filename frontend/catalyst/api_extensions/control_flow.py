@@ -908,9 +908,9 @@ class CondCallable:
         _assert_consistent_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
         all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
         all_consts = [s.out_consts() for s in out_sigs]
-        all_noimplouts = [s.num_implicit_outputs() for s in out_sigs]
+        all_num_implicit_outputs = [s.num_implicit_outputs() for s in out_sigs]
         all_jaxprs, _, _, all_consts = unify_convert_result_types(
-            all_jaxprs, all_consts, all_noimplouts
+            all_jaxprs, all_consts, all_num_implicit_outputs
         )
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
         # Output types from all the branches are unified by now, we use the first branch for
@@ -918,7 +918,7 @@ class CondCallable:
         out_tracers = cond_p.bind(
             *(in_classical_tracers + sum(all_consts, [])),
             branch_jaxprs=branch_jaxprs,
-            nimplicit_outputs=out_sigs[0].num_implicit_outputs(),
+            num_implicit_outputs=out_sigs[0].num_implicit_outputs(),
         )
         return tree_unflatten(out_sigs[0].out_tree(), collapse(out_sigs[0].out_type(), out_tracers))
 
@@ -1105,7 +1105,7 @@ class ForLoopCallable:
             body_jaxpr=out_sig.out_jaxpr(),
             body_nconsts=len(out_sig.out_consts()),
             apply_reverse_transform=self.apply_reverse_transform,
-            nimplicit=in_sig.num_implicit_inputs(),
+            num_implicit_inputs=in_sig.num_implicit_inputs(),
             preserve_dimensions=not self.expansion_strategy.input_unshare_variables,
         )
 
@@ -1316,9 +1316,9 @@ class SwitchCallable:
 
         all_jaxprs = [sig.out_initial_jaxpr() for sig in out_sigs]
         all_consts = [sig.out_consts() for sig in out_sigs]
-        all_num_implicit_outs = [sig.num_implicit_outputs() for sig in out_sigs]
+        all_num_implicit_outputs = [sig.num_implicit_outputs() for sig in out_sigs]
         all_jaxprs, _, _, all_consts = unify_convert_result_types(
-            all_jaxprs, all_consts, all_num_implicit_outs
+            all_jaxprs, all_consts, all_num_implicit_outputs
         )
 
         # after this, all branches have the same signatures
@@ -1327,7 +1327,7 @@ class SwitchCallable:
         out_tracers = switch_p.bind(
             *([self.case] + cases + sum(all_consts, [])),
             branch_jaxprs=branch_jaxprs,
-            nimplicit_outputs=out_sigs[0].num_implicit_outputs(),
+            num_implicit_outputs=out_sigs[0].num_implicit_outputs(),
         )
 
         return tree_unflatten(out_sigs[0].out_tree(), collapse(out_sigs[0].out_type(), out_tracers))
@@ -1545,7 +1545,7 @@ class WhileLoopCallable:
             body_jaxpr=out_body_sig.out_jaxpr(),
             cond_nconsts=len(out_cond_sig.out_consts()),
             body_nconsts=len(out_body_sig.out_consts()),
-            nimplicit=in_body_sig.num_implicit_inputs(),
+            num_implicit_inputs=in_body_sig.num_implicit_inputs(),
             preserve_dimensions=not self.expansion_strategy.input_unshare_variables,
         )
         return tree_unflatten(
@@ -1605,7 +1605,7 @@ class ForLoop(HybridOp):
                 arg_tracers, expansion_strategy=expansion_strategy
             )
 
-            nimplicit = len(arg_expanded_tracers) - len(region.arg_classical_tracers) - 1
+            num_implicit_inputs = len(arg_expanded_tracers) - len(region.arg_classical_tracers) - 1
 
             res_classical_tracers = region.res_classical_tracers
             res_tracers = res_classical_tracers + [qreg_out]
@@ -1615,7 +1615,7 @@ class ForLoop(HybridOp):
                 arg_expanded_tracers,
                 res_tracers,
                 expansion_strategy=expansion_strategy,
-                num_implicit_inputs=nimplicit,
+                num_implicit_inputs=num_implicit_inputs,
             )
             jaxpr, _, _ = trace_to_jaxpr(inner_trace, arg_expanded_tracers, res_expanded_tracers)
 
@@ -1634,7 +1634,7 @@ class ForLoop(HybridOp):
             [*operand_expanded_tracers, qreg_tracer],
             self.out_classical_tracers,
             expansion_strategy=expansion_strategy,
-            num_implicit_inputs=nimplicit,
+            num_implicit_inputs=num_implicit_inputs,
         )
 
         qrp2 = QRegPromise(
@@ -1645,7 +1645,7 @@ class ForLoop(HybridOp):
                 body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
                 body_nconsts=len(consts),
                 apply_reverse_transform=self.apply_reverse_transform,
-                nimplicit=nimplicit,
+                num_implicit_inputs=num_implicit_inputs,
                 preserve_dimensions=not expansion_strategy.input_unshare_variables,
             )
         )
@@ -1692,7 +1692,9 @@ class WhileLoop(HybridOp):
                 cond_trace, arg_expanded_classical_tracers, res_expanded_classical_tracers
             )
 
-        nimplicit = len(arg_expanded_classical_tracers) - len(self.regions[0].arg_classical_tracers)
+        num_implicit_inputs = len(arg_expanded_classical_tracers) - len(
+            self.regions[0].arg_classical_tracers
+        )
         body_trace = self.regions[1].trace
         body_tape = self.regions[1].quantum_tape
         with EvaluationContext.frame_tracing_context(body_trace):
@@ -1748,7 +1750,7 @@ class WhileLoop(HybridOp):
                 body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
                 cond_nconsts=len(cond_consts),
                 body_nconsts=len(body_consts),
-                nimplicit=nimplicit,
+                num_implicit_inputs=num_implicit_inputs,
                 preserve_dimensions=not expansion_strategy.input_unshare_variables,
             )
         )
@@ -1826,7 +1828,7 @@ def _make_argless_function(fn, args, kwargs):
 
 
 def trace_quantum_branches(op, ctx, device, trace, qrp) -> QRegPromise:
-    jaxprs, consts, nimplicit_outputs = [], [], []
+    jaxprs, consts, num_implicit_outputs = [], [], []
     for region in op.regions:
         with EvaluationContext.frame_tracing_context(region.trace):
             new_qreg = AbstractQreg()
@@ -1849,10 +1851,10 @@ def trace_quantum_branches(op, ctx, device, trace, qrp) -> QRegPromise:
 
             jaxprs.append(jaxpr)
             consts.append(const)
-            nimplicit_outputs.append(len(out_type) - len(region.res_classical_tracers) - 1)
+            num_implicit_outputs.append(len(out_type) - len(region.res_classical_tracers) - 1)
 
     qreg = qrp.actualize()
-    all_jaxprs, _, _, all_consts = unify_convert_result_types(jaxprs, consts, nimplicit_outputs)
+    all_jaxprs, _, _, all_consts = unify_convert_result_types(jaxprs, consts, num_implicit_outputs)
     branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
 
     in_expanded_classical_tracers = [
@@ -1873,7 +1875,7 @@ def trace_quantum_branches(op, ctx, device, trace, qrp) -> QRegPromise:
             in_expanded_tracers=in_expanded_classical_tracers,
             out_expanded_tracers=out_expanded_classical_tracers,
             branch_jaxprs=branch_jaxprs,
-            nimplicit_outputs=nimplicit_outputs[0],
+            num_implicit_outputs=num_implicit_outputs[0],
         )
     )
     return qrp2

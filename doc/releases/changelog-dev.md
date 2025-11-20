@@ -7,6 +7,19 @@
 
 <h3>Improvements 🛠</h3>
 
+* Remove the hardcoded list of runtime operations in the frontend.
+  This will allow arbitrary PL gates to be represented without hyperparameters in MLIR.
+  For gates that do not have a QIR representation, a runtime error will be raised at execution.
+  Users can still decompose these gates via `qml.transforms.decompose`
+  when both capture and graph-decomposition are enabled.
+  [(#2215)](https://github.com/PennyLaneAI/catalyst/pull/2215)
+
+* Resource tracking now supports dynamic qubit allocation
+  [(#2203)](https://github.com/PennyLaneAI/catalyst/pull/2203)
+
+* Pass instrumentation can be applied to each pass within the `NamedSequenceOp` transform sequence for a qnode.
+  [(#1978)](https://github.com/PennyLaneAI/catalyst/pull/1978)
+  
 * The new graph-based decomposition framework has Autograph feature parity with PennyLane
   when capture enabled. When compiling with `qml.qjit(autograph=True)`, the decomposition rules
   returned by the graph-based framework are now correctly compiled using Autograph.
@@ -61,6 +74,10 @@
   - The Enzyme version has been updated to
   [v0.0.203](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.203).
 
+* The pass `remove-chained-self-inverse` has been renamed to `cancel-inverses`, to better
+  conform with the name of the corresponding transform in PennyLane.
+  [(#2201)](https://github.com/PennyLaneAI/catalyst/pull/2201)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
@@ -108,6 +125,11 @@
   // ... use %qubit1
   // ... use %4
   ```
+
+* Fixes :func:`~.passes.commute_ppr` and :func:`~.passes.merge_ppr_ppm` incorrectly
+  moving nullary operations. This also improves the compilation time by reducing
+  the sort function, by explicitly passing the operations that need to be sorted.
+  [(#2200)](https://github.com/PennyLaneAI/catalyst/pull/2200)
 
 * The pass pipeline is correctly registered to the transform named sequence of the
   one-shot qnode when `one-shot` mcm method is used.
@@ -181,6 +203,7 @@
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+Sengthai Heng,
 Jeffrey Kam,
 Christina Lee,
 Mehrdad Malekmohammadi,
@@ -188,4 +211,5 @@ River McCubbin,
 Lee J. O'Riordan,
 Roberto Turrado,
 Paul Haochen Wang,
+Jake Zaia,
 Hongsheng Zheng.
