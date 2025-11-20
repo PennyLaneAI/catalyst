@@ -943,7 +943,7 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
     // Check no prior steps actually wrote the resource file
     std::ifstream resource_file_r(RESOURCES_FILENAME);
     if (resource_file_r.is_open()) {
-        FAIL("Resource file should not exist before releasing qubits"); // LCOV_EXCL_LINE
+        FAIL("Resource file should not exist before releasing the device"); // LCOV_EXCL_LINE
         std::remove(RESOURCES_FILENAME.c_str());                        // LCOV_EXCL_LINE
     }
 
