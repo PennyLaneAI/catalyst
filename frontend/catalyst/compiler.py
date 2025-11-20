@@ -169,6 +169,7 @@ class LinkerDriver:
             f"-l{lapack_lib_name}",  # required for custom_calls lib
             "-lcustom_calls",
             "-lmlir_async_runtime",
+            "-lrt_rsdecomp",
         ]
 
         # If OQD runtime capi is built, link to it as well
@@ -362,6 +363,7 @@ def _options_to_cli_flags(options):
     if options.async_qnodes:  # pragma: nocover
         extra_args += ["--async-qnodes"]
 
+    # extra_args += ["--debug-only='rs-decomposition'"]
     return extra_args
 
 

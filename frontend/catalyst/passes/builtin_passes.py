@@ -535,6 +535,14 @@ def ions_decomposition(qnode):  # pragma: nocover
     return PassPipelineWrapper(qnode, "ions-decomposition")
 
 
+def gridsynth(qnode, *, epsilon=1e-4, ppr_basis=False):
+    if qnode is None:
+        return functools.partial(gridsynth, epsilon=epsilon, ppr_basis=ppr_basis)
+
+    gridsynth_pass = {"gridsynth": {"epsilon": epsilon, "ppr_basis": ppr_basis}}
+    return PassPipelineWrapper(qnode, gridsynth_pass)
+
+
 def to_ppr(qnode):
     R"""
     Specify that the MLIR compiler pass for converting
