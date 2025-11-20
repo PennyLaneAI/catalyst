@@ -71,9 +71,7 @@ def _tuple_to_slice(t):
     Returns:
         slice: A slice object
     """
-    if isinstance(t, tuple) and len(t) == 3:
-        return slice(*t)
-    return t
+    return slice(*t) if isinstance(t, tuple) else t
 
 
 def _is_dict_like_tuple(t):

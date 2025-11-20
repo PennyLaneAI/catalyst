@@ -17,6 +17,7 @@ Patcher module.
 """
 
 
+# pylint: disable=unreachable
 class DictPatchWrapper:
     """A wrapper to enable dictionary item patching using attribute-like access.
 

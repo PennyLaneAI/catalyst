@@ -226,9 +226,9 @@ def sort_eqns(
     eqn_to_callable = {}  # Maps actual TracingEqn to its original callable/wrapper
     for eqn_or_callable in eqns:
         eqn = eqn_or_callable() if callable(eqn_or_callable) else eqn_or_callable
-        if eqn is not None:  # weakref might return None if collected
-            actual_eqns.append(eqn)
-            eqn_to_callable[id(eqn)] = eqn_or_callable
+        assert eqn is not None
+        actual_eqns.append(eqn)
+        eqn_to_callable[id(eqn)] = eqn_or_callable
 
     boxes = [Box(i, e) for i, e in enumerate(actual_eqns)]
 
