@@ -549,8 +549,8 @@ def to_ppr(qnode):
     .. note::
 
         The circuits that generated from this pass are currently not executable on any backend.
-        This pass is only for analysis and potential future execution when a suitable backend is
-        available.
+        This pass is only for analysis with the ``null.qubit`` device and potential future execution
+        when a suitable backend is available.
 
     The full list of supported gates and operations are
     ``qml.H``,
@@ -622,8 +622,8 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
     .. note::
 
         The circuits that generated from this pass are currently not executable on any backend.
-        This pass is only for analysis and potential future execution when a suitable backend is
-        available.
+        This pass is only for analysis with the ``null.qubit`` device and potential future execution
+        when a suitable backend is available.
 
     Args:
         fn (QNode): QNode to apply the pass to.
@@ -708,8 +708,8 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     .. note::
 
         The circuits that generated from this pass are currently not executable on any backend.
-        This pass is only for analysis and potential future execution when a suitable backend is
-        available.
+        This pass is only for analysis with the ``null.qubit`` device and potential future execution
+        when a suitable backend is available.
 
     Args:
         fn (QNode): QNode to apply the pass to
@@ -810,8 +810,8 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
     .. note::
 
         The circuits that generated from this pass are currently not executable on any backend.
-        This pass is only for analysis and potential future execution when a suitable backend is
-        available.
+        This pass is only for analysis with the ``null.qubit`` device and potential future execution
+        when a suitable backend is available.
 
     Args:
         qnode (QNode): QNode to apply the pass to.
@@ -926,8 +926,8 @@ def ppm_compilation(
     .. note::
 
         The circuits that generated from this pass are currently not executable on any backend.
-        This pass is only for analysis and potential future execution when a suitable backend is
-        available.
+        This pass is only for analysis with the ``null.qubit`` device and potential future execution
+        when a suitable backend is available.
 
     Args:
         qnode (QNode, optional): QNode to apply the pass to. If ``None``, returns a decorator.
@@ -1117,15 +1117,17 @@ def ppm_specs(fn):
 
 def reduce_t_depth(qnode):
     R"""
-    An MLIR compiler pass that reduces the depth and count of non-Clifford PPRs (e.g., ``T`` gates) by
-    commuting PPRs in adjacent layers and merging compatible ones (a layer comprises a set of PPRs
-    that mutually commute). For more details, see the Figure 6 of
+    A quantum compilation pass that reduces the depth and count of non-Clifford Pauli product
+    rotation (PPR, :math:`P(\theta) = \exp(-iP\theta)`) operators (e.g., ``T`` gates) by commuting
+    PPRs in adjacent layers and merging compatible ones (a layer comprises PPRs that mutually
+    commute). For more details, see Figure 6 of
     `A Game of Surface Codes <https://arXiv:1808.02892v3>`_.
 
-    The impact can be measured using ``catalyst.passes.ppm_specs`` to compare the circuit depth
-    before and after applying the pass. The ``ppm_specs`` function provides detailed statistics
-    including ``depth_pi8_ppr`` (non-Clifford PPR depth) and ``pi8_ppr`` (number of non-Clifford
-    PPRs), allowing users to quantify the optimization achieved by the pass.
+    .. note::
+
+        The circuits that generated from this pass are currently not executable on any backend.
+        This pass is only for analysis with the ``null.qubit`` device and potential future execution
+        when a suitable backend is available.
 
     Args:
         qnode (QNode): QNode to apply the pass to.
@@ -1138,9 +1140,10 @@ def reduce_t_depth(qnode):
     In the example below, after performing the :func:`catalyst.passes.to_ppr` and
     :func:`catalyst.passes.merge_ppr_ppm` passes, the circuit contains a depth of four of
     non-Clifford PPRs. Subsequently applying the ``reduce_t_depth`` pass will move PPRs around via
-    commutation, resulting in a circuit with a smaller PPR depth. Specifically, in the circuit
-    below, the Pauli-:math:`X` PPR (:math:`\exp(iX\tfrac{\pi}{8})`) on qubit Q1 will be moved to the
-    first layer, which results in a depth of three non-Clifford PPRs.
+    commutation, resulting in a circuit with a smaller PPR depth.
+
+    Specifically, in the circuit below, the Pauli-:math:`X` PPR (:math:`\exp(iX\tfrac{\pi}{8})`) on
+    qubit Q1 will be moved to the first layer, which results in a depth of three non-Clifford PPRs.
 
     .. code-block:: python
 
@@ -1167,14 +1170,9 @@ def reduce_t_depth(qnode):
                 qml.H(wires=i)
                 qml.T(wires=i)
 
-            return [measure(wires=i) for i in range(n)]
+            return
 
-
-        print(circuit.mlir_opt)
-
-    Example MLIR Representation:
-
-    .. code-block:: mlir
+        >>> print(circuit.mlir_opt)
 
         . . .
         %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -1192,7 +1190,6 @@ def reduce_t_depth(qnode):
         // layer 3
         %9:3 = qec.ppr ["X", "X", "Y"](8) %8#0, %8#1, %8#2:!quantum.bit, !quantum.bit, !quantum.bit
         . . .
-
     """
 
     return PassPipelineWrapper(qnode, "reduce-t-depth")
