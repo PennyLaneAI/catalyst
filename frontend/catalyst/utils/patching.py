@@ -17,7 +17,6 @@ Patcher module.
 """
 
 
-# pylint: disable=unreachable
 class DictPatchWrapper:
     """A wrapper to enable dictionary item patching using attribute-like access.
 
@@ -34,7 +33,7 @@ class DictPatchWrapper:
         self.key = key
 
     def __getattr__(self, name):
-        if name in ("dictionary", "key"):
+        if name in ("dictionary", "key"):  # pragma: no cover
             return object.__getattribute__(self, name)
         if name == "value":
             return self.dictionary[self.key]
