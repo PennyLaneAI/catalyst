@@ -40,13 +40,15 @@ def test_concrete_implementation_works():
         ) -> None:
             return
 
-        def add_edge(self, from_node_id: str, to_node_id: str, **edge_attrs: Any) -> None:
+        def add_edge(
+            self, from_node_id: str, to_node_id: str, **edge_attrs: Any
+        ) -> None:
             return
 
         def add_cluster(
             self,
             cluster_id: str,
-            cluster_label: str,
+            node_label: str | None = None,
             parent_graph_id: str | None = None,
             **cluster_attrs: Any,
         ) -> None:
@@ -62,7 +64,7 @@ def test_concrete_implementation_works():
     # pylint: disable = assignment-from-none
     node = dag_builder.add_node("0", "node0")
     edge = dag_builder.add_edge("0", "1")
-    cluster = dag_builder.add_cluster("0", "cluster0")
+    cluster = dag_builder.add_cluster("0")
     render = dag_builder.to_file("test.png")
     string = dag_builder.to_string()
 

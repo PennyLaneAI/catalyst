@@ -128,7 +128,7 @@ class PyDotDAGBuilder(DAGBuilder):
     def add_cluster(
         self,
         cluster_id: str,
-        cluster_label: str,
+        node_label: str | None = None,
         parent_graph_id: str | None = None,
         **cluster_attrs: Any,
     ) -> None:
@@ -139,7 +139,7 @@ class PyDotDAGBuilder(DAGBuilder):
 
         Args:
             cluster_id (str): Unique cluster ID to identify this cluster.
-            cluster_label (str): The text to display on the cluster when rendered.
+            node_label (str | None): The text to display on the information node on the cluster when rendered.
             parent_graph_id (str | None): Optional ID of the cluster this cluster belongs to.
             **cluster_attrs (Any): Any additional styling keyword arguments.
 
@@ -157,12 +157,12 @@ class PyDotDAGBuilder(DAGBuilder):
         # │ └───────┘ │
         # │           │
         # └───────────┘
-        if cluster_label:
+        if node_label:
             node_id = f"{cluster_id}_info_node"
             rank_subgraph = pydot.Subgraph()
             node = pydot.Node(
                 node_id,
-                label=cluster_label,
+                label=node_label,
                 shape="rectangle",
                 style="dashed",
                 fontname="Helvetica",

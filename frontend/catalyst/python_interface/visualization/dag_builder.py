@@ -57,7 +57,7 @@ class DAGBuilder(ABC):
     def add_cluster(
         self,
         cluster_id: str,
-        cluster_label: str,
+        node_label: str | None = None,
         parent_graph_id: str | None = None,
         **cluster_attrs: Any,
     ) -> None:
@@ -68,7 +68,7 @@ class DAGBuilder(ABC):
 
         Args:
             cluster_id (str): Unique cluster ID to identify this cluster.
-            cluster_label (str): The text to display on the cluster when rendered.
+            node_label (str | None): The text to display on an information node within the cluster when rendered.
             parent_graph_id (str | None): Optional ID of the cluster this cluster belongs to.
             **cluster_attrs (Any): Any additional styling keyword arguments.
 

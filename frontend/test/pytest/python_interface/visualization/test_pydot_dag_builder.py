@@ -73,7 +73,7 @@ class TestAddMethods:
         """Unit test the 'add_cluster' method."""
 
         dag_builder = PyDotDAGBuilder()
-        dag_builder.add_cluster("0", "my_cluster")
+        dag_builder.add_cluster("0")
 
         assert len(dag_builder.graph.get_subgraphs()) == 1
         assert dag_builder.graph.get_subgraphs()[0].get_name() == "cluster_0"
@@ -87,7 +87,7 @@ class TestAddMethods:
         dag_builder.add_node("0", "node0")
 
         # Create cluster
-        dag_builder.add_cluster("c0", "cluster0")
+        dag_builder.add_cluster("c0")
 
         # Create node inside cluster
         dag_builder.add_node("1", "node1", parent_graph_id="c0")
@@ -117,11 +117,11 @@ class TestAddMethods:
 
         # Level 0 (Root): Adds cluster on top of base graph
         dag_builder.add_node("n_root", "node_root")
-        dag_builder.add_cluster("c0", "cluster_outer")
+        dag_builder.add_cluster("c0")
 
         # Level 1 (Inside c0): Add node on outer cluster and create new cluster on top
         dag_builder.add_node("n_outer", "node_outer", parent_graph_id="c0")
-        dag_builder.add_cluster("c1", "cluster_inner", parent_graph_id="c0")
+        dag_builder.add_cluster("c1", parent_graph_id="c0")
 
         # Level 2 (Inside c1): Add node on second cluster
         dag_builder.add_node("n_inner", "node_inner", parent_graph_id="c1")
@@ -168,7 +168,7 @@ class TestAttributes:
         node0 = dag_builder.graph.get_node("0")[0]
         assert node0.get("fontname") == "Times"
 
-        dag_builder.add_cluster("1", "cluster0")
+        dag_builder.add_cluster("1")
         cluster = dag_builder.graph.get_subgraphs()[0]
         assert cluster.get("fontname") == "Times"
 
@@ -222,7 +222,7 @@ class TestAttributes:
             }
         )
 
-        dag_builder.add_cluster("0", "cluster0")
+        dag_builder.add_cluster("0")
         cluster1 = dag_builder.graph.get_subgraph("cluster_0")[0]
 
         # Defaults
@@ -232,7 +232,7 @@ class TestAttributes:
         assert cluster1.get("fontname") == "Helvetica"
 
         dag_builder.add_cluster(
-            "1", "cluster1", style="filled", penwidth=10, fillcolor="red"
+            "1", style="filled", penwidth=10, fillcolor="red"
         )
         cluster2 = dag_builder.graph.get_subgraph("cluster_1")[0]
 
