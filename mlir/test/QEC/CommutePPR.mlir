@@ -160,8 +160,8 @@ func.func @test_anticommute_8(%q : !quantum.reg){
     // -> YY(8) * X1(8) * X0(4)
 
     // CHECK: [[q1_0:%.+]]:2 = qec.ppr ["Y", "Y"](8) %0, %1
-    // CHECK: [[q1_2:%.+]] = qec.ppr ["X"](8) [[q1_0]]#1
     // CHECK: [[q1_1:%.+]] = qec.ppr ["X"](4) [[q1_0]]#0
+    // CHECK: [[q1_2:%.+]] = qec.ppr ["X"](8) [[q1_0]]#1
     %q1 = quantum.extract %q[0] : !quantum.reg -> !quantum.bit
     %0 = qec.ppr ["X"](4) %q1 : !quantum.bit
     %q2 = quantum.extract %q[1] : !quantum.reg -> !quantum.bit
@@ -302,55 +302,62 @@ func.func public @circuit_transformed() {
 // The result is checked layer-by-layer based on the result in the paper.
 func.func public @game_of_surface_code(%q1: !quantum.bit, %q2: !quantum.bit, %q3: !quantum.bit, %q4: !quantum.bit) {
     
-    // %arg0 = q1, %arg1 = q2, %arg2 = q3, %arg3 = q4
+    // %arg0 = Q1, %arg1 = Q2, %arg2 = Q3, %arg3 = Q4
 
-    // Z(8) q1
-    // Y(-8) q4
-    // YX(8) q3, q2
-    // CHECK: %0 = qec.ppr ["Z"](8) %arg0 : !quantum.bit
-    // CHECK-DAG: %1 = qec.ppr ["Y"](-8) %arg3 : !quantum.bit
-    // CHECK-DAG: %2:2 = qec.ppr ["Y", "X"](8) %arg2, %arg1 : !quantum.bit, !quantum.bit
+    // CHECK: quantum.device
 
-    // ZZZY(-8) q3, q2, q4, q1
-    // CHECK: %3:4 = qec.ppr ["Z", "Z", "Y", "Z"](-8) %2#0, %2#1, %1, %0 :
+    // Z(8) Q1
+    // Y(-8) Q4
+    // YX(8) Q3, Q2
+    // CHECK:     [[Q0_0:%.+]] = qec.ppr ["Z"](8) %arg0 : !quantum.bit
+    // CHECK-DAG: [[Q3_0:%.+]] = qec.ppr ["Y"](-8) %arg3 : !quantum.bit
+    // CHECK-DAG: [[Q2_Q1:%.+]]:2 = qec.ppr ["Y", "X"](8) %arg2, %arg1 : !quantum.bit, !quantum.bit
 
-    // X(-4) q4
-    // CNOT(q3, q2) -> ZX(4) q3, q2 * X(-4) q2 * Z(-4) q3
-    // CHECK: %4 = qec.ppr ["X"](-4) %3#2 : !quantum.bit
-    // CHECK: %5:2 = qec.ppr ["Z", "X"](4) %3#0, %3#1 : !quantum.bit, !quantum.bit
-    // CHECK: %6 = qec.ppr ["X"](-4) %5#1 : !quantum.bit
-    // CHECK-DAG: %18 = qec.ppr ["Z"](-4) %5#0 : !quantum.bit
+    // ZZZY(8) Q2, Q1, Q3, Q0
+    // CHECK:     [[Q2_Q1_Q3_Q0:%.+]]:4 = qec.ppr ["Z", "Z", "Y", "Z"](-8) [[Q2_Q1]]#0, [[Q2_Q1]]#1, [[Q3_0]], [[Q0_0]]
 
-    // CNOT(q2, q1)
-    // X(4) q3
-    // CHECK-DAG: %7:2 = qec.ppr ["Z", "X"](4) %6, %3#3 : !quantum.bit, !quantum.bit
-    // CHECK-DAG: %8 = qec.ppr ["Z"](-4) %7#0 : !quantum.bit
-    // CHECK-DAG: %11 = qec.ppr ["X"](-4) %7#1 : !quantum.bit
-    // CHECK-DAG: %19 = qec.ppr ["X"](4) %18 : !quantum.bit
+    // CNOT Q1, Q2 (decompose into 3 PPRs)
+    // X(-4) Q3
+    // CHECK:     [[Q2_Q1:%.+]]:2 = qec.ppr ["Z", "X"](4) [[Q2_Q1_Q3_Q0]]#0, [[Q2_Q1_Q3_Q0]]#1 : !quantum.bit, !quantum.bit
+    // CHECK:     [[Q1:%.+]] = qec.ppr ["X"](-4) [[Q2_Q1]]#1 : !quantum.bit
+    // CHECK-DAG: [[Q2:%.+]] = qec.ppr ["Z"](-4) [[Q2_Q1]]#0 : !quantum.bit
+    // CHECK-DAG: [[Q3:%.+]] = qec.ppr ["X"](-4) [[Q2_Q1_Q3_Q0]]#2 : !quantum.bit
 
-    // CNOT(q4, q1)
-    // CHECK-DAG: %12:2 = qec.ppr ["Z", "X"](4) %4, %11 : !quantum.bit, !quantum.bit
-    // CHECK-DAG: %13 = qec.ppr ["Z"](-4) %12#0 : !quantum.bit
-    // CHECK-DAG: %16 = qec.ppr ["X"](-4) %12#1 : !quantum.bit
+    // CNOT Q1, Q0 (decompose into 3 PPRs)
+    // X(4) Q2
+    // CHECK-DAG: [[Q1_Q0:%.+]]:2 = qec.ppr ["Z", "X"](4) [[Q1]], [[Q2_Q1_Q3_Q0]]#3 : !quantum.bit, !quantum.bit
+    // CHECK-DAG: [[Q1:%.+]] = qec.ppr ["Z"](-4) [[Q1_Q0]]#0 : !quantum.bit
+    // CHECK-DAG: [[Q0:%.+]] = qec.ppr ["X"](-4) [[Q1_Q0]]#1 : !quantum.bit
+    // CHECK-DAG: [[Q2_0:%.+]] = qec.ppr ["X"](4) [[Q2]] : !quantum.bit
 
-    // Z(4) q2
-    // Z(4) q4
-    // CHECK-DAG: %9 = qec.ppr ["Z"](4) %8 : !quantum.bit
-    // CHECK-DAG: %14 = qec.ppr ["Z"](4) %13 : !quantum.bit
+    // CNOT Q3, Q0 (decompose into 3 PPRs)
+    // CHECK-DAG: [[Q3_Q0:%.+]]:2 = qec.ppr ["Z", "X"](4) [[Q3]], [[Q0]] : !quantum.bit, !quantum.bit
+    // CHECK-DAG: [[Q3:%.+]] = qec.ppr ["Z"](-4) [[Q3_Q0]]#0 : !quantum.bit
+    // CHECK-DAG: [[Q0:%.+]] = qec.ppr ["X"](-4) [[Q3_Q0]]#1 : !quantum.bit
 
-    // X(4) q1
-    // X(4) q2
-    // X(4) q3
-    // X(4) q4
-    // CHECK-DAG: %17 = qec.ppr ["X"](-4) %16 : !quantum.bit
-    // CHECK-DAG: %10 = qec.ppr ["X"](4) %9 : !quantum.bit
-    // CHECK-DAG: %20 = qec.ppr ["X"](4) %19 : !quantum.bit
-    // CHECK-DAG: %15 = qec.ppr ["X"](4) %14 : !quantum.bit
+    // Z(4) Q1
+    // Z(4) Q3
+    // CHECK-DAG: [[Q1_0:%.+]] = qec.ppr ["Z"](4) [[Q1]] : !quantum.bit
+    // CHECK-DAG: [[Q3_0:%.+]] = qec.ppr ["Z"](4) [[Q3]] : !quantum.bit
+
+    // X(-4) Q0
+    // X(4) Q1
+    // X(4) Q2
+    // X(4) Q3
+    // CHECK: [[Q0_2:%.+]] = qec.ppr ["X"](-4) [[Q0]] : !quantum.bit
+    // CHECK: [[Q1_2:%.+]] = qec.ppr ["X"](4) [[Q1_0]] : !quantum.bit
+    // CHECK: [[Q2_2:%.+]] = qec.ppr ["X"](4) [[Q2_0]] : !quantum.bit
+    // CHECK: [[Q3_2:%.+]] = qec.ppr ["X"](4) [[Q3_0]] : !quantum.bit
+
+    // CHECK: quantum.device_release
 
     // Because the Pauli size is limited to 3, the two operations below are not commuted.
     // CHECK-MPS: qec.ppr ["Z", "X"](4)
     // CHECK-MPS: qec.ppr ["Y", "Y", "Z"](8)
     // CHECK-MPS-NOT: qec.ppr ["Z", "Z", "Y", "Z"](-8)
+
+    %c1_i64 = arith.constant 1 : i64
+    quantum.device shots(%c1_i64) ["../runtime/build/lib/librtd_null_qubit.dylib", "NullQubit", ""]
 
     %0 = qec.ppr ["Z"](8) %q1 : !quantum.bit // q1
 
@@ -384,6 +391,8 @@ func.func public @game_of_surface_code(%q1: !quantum.bit, %q2: !quantum.bit, %q3
     %12 = qec.ppr ["X"](4) %8 : !quantum.bit    // q2
     %13 = qec.ppr ["X"](4) %9 : !quantum.bit    // q3
     %14 = qec.ppr ["X"](4) %10 : !quantum.bit   // q4
+
+    quantum.device_release
 
     func.return
 }  

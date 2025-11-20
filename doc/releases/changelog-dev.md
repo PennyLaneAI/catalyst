@@ -53,6 +53,9 @@
   working with xDSL. This includes a function that extracts the concrete value of scalar, constant SSA values.
   [(#8514)](https://github.com/PennyLaneAI/pennylane/pull/8514)
 
+* Resource tracking now supports dynamic qubit allocation
+  [(#2203)](https://github.com/PennyLaneAI/catalyst/pull/2203)
+
 * Pass instrumentation can be applied to each pass within the `NamedSequenceOp` transform sequence for a qnode.
   [(#1978)](https://github.com/PennyLaneAI/catalyst/pull/1978)
   
@@ -171,6 +174,11 @@
   // ... use %4
   ```
 
+* Fixes :func:`~.passes.commute_ppr` and :func:`~.passes.merge_ppr_ppm` incorrectly
+  moving nullary operations. This also improves the compilation time by reducing
+  the sort function, by explicitly passing the operations that need to be sorted.
+  [(#2200)](https://github.com/PennyLaneAI/catalyst/pull/2200)
+
 * The pass pipeline is correctly registered to the transform named sequence of the
   one-shot qnode when `one-shot` mcm method is used.
   [(#2198)](https://github.com/PennyLaneAI/catalyst/pull/2198)
@@ -252,6 +260,7 @@
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+Sengthai Heng,
 Jeffrey Kam,
 Christina Lee,
 Mehrdad Malekmohammadi,
@@ -259,4 +268,5 @@ River McCubbin,
 Lee J. O'Riordan,
 Roberto Turrado,
 Paul Haochen Wang,
+Jake Zaia,
 Hongsheng Zheng.
