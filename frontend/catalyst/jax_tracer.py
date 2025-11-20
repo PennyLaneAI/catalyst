@@ -26,9 +26,12 @@ from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import jax
+import jax._src.interpreters.partial_eval as pe
 import jax.numpy as jnp
 import pennylane as qml
+from jax._src.lax import lax
 from jax._src.lax.lax import _extract_tracers_dyn_shape
+from jax._src.pjit import jit_p
 from jax._src.source_info_util import current as current_source_info
 from jax.api_util import debug_info as jdb
 from jax.core import get_aval
@@ -75,6 +78,12 @@ from catalyst.jax_extras import (
     tree_unflatten,
     wrap_init,
 )
+from catalyst.jax_extras.patches import (
+    patched_drop_unused_vars,
+    patched_dyn_shape_staging_rule,
+    patched_make_eqn,
+    patched_pjit_staging_rule,
+)
 from catalyst.jax_extras.tracing import uses_transform
 from catalyst.jax_primitives import (
     AbstractQreg,
@@ -106,6 +115,7 @@ from catalyst.jax_primitives import (
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.patching import DictPatchWrapper, Patcher
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -658,19 +668,6 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs, debug_in
         PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
     """
 
-    # pylint: disable=import-outside-toplevel
-    import jax._src.interpreters.partial_eval as pe
-    from jax._src.lax import lax
-    from jax._src.pjit import jit_p
-
-    from catalyst.jax_extras.patches import (
-        patched_drop_unused_vars,
-        patched_dyn_shape_staging_rule,
-        patched_make_eqn,
-        patched_pjit_staging_rule,
-    )
-    from catalyst.utils.patching import DictPatchWrapper, Patcher
-
     with transient_jax_config(
         {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
     ), Patcher(
@@ -711,17 +708,6 @@ def lower_jaxpr_to_mlir(jaxpr, func_name, arg_names):
     """
 
     MemrefCallable.clearcache()
-
-    # pylint: disable=import-outside-toplevel
-    import jax._src.interpreters.partial_eval as pe
-    from jax._src.lax import lax
-    from jax._src.pjit import jit_p
-
-    from catalyst.jax_extras.patches import (
-        patched_make_eqn,
-        patched_pjit_staging_rule,
-    )
-    from catalyst.utils.patching import DictPatchWrapper, Patcher
 
     # Apply JAX 0.7.0 compatibility patches during MLIR lowering.
     # JAX internally calls trace_to_jaxpr_dynamic2 during lowering of nested @jit primitives
