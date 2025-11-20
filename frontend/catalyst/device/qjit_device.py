@@ -158,12 +158,14 @@ def extract_backend_info(device: qml.devices.QubitDevice) -> BackendInfo:
 
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
 
+
 def union_operations(
     a: Dict[str, OperatorProperties], b: Dict[str, OperatorProperties]
 ) -> Dict[str, OperatorProperties]:
     """Union of two sets of operator properties"""
     return {**a, **b}
     # return {k: a[k] & b[k] for k in (a.keys() & b.keys())}
+
 
 def intersect_operations(
     a: Dict[str, OperatorProperties], b: Dict[str, OperatorProperties]
