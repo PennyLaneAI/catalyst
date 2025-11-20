@@ -185,6 +185,7 @@ def _get_statistical_measurement_op_label(
 ) -> str:
     # e.g. expval(Z(0)) should be the output
     mp: str = op.name.split(".")[-1]  # quantum.expval -> expval
-    obs: str = op.obs.owner.properties.get("type").data.value
+    obs_op = op.obs.owner
+    obs_name: str = obs_op.properties.get("type").data.value
     wires: str = ""
-    return f"{mp}({obs}({wires}))"
+    return f"{mp}({obs_name}({wires}))"
