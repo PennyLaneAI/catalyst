@@ -76,5 +76,6 @@ def test_pass_after_tape_transform(backend):
         return qml.state()
 
     # check inverses canceled
-    assert 'quantum.custom "PauliX"()' not in c.mlir
-    assert 'transform.apply_registered_pass "my-pass"' in c.mlir
+    c_mlir = c.mlir
+    assert 'quantum.custom "PauliX"()' not in c_mlir
+    assert 'transform.apply_registered_pass "my-pass"' in c_mlir
