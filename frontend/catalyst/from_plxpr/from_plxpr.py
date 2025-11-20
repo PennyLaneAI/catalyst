@@ -76,6 +76,7 @@ def _tuple_to_slice(t):
     ), "Please only use _tuple_to_slice on a tuple of length 3!"
     return slice(*t)
 
+
 def _is_dict_like_tuple(t):
     """Checks if a tuple t is structured like a list of (key, value) pairs."""
     return isinstance(t, tuple) and all(isinstance(item, tuple) and len(item) == 2 for item in t)
