@@ -82,7 +82,7 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     ~NullQubit()
     {
         // We always want to gather resources that were used for an *entire* execution end-to-end
-        // A device is guaranteed to live as long as its ExecutionContext, so it's destructor is a
+        // A device is guaranteed to live as long as its ExecutionContext, so its destructor is a
         // safe place to write out resource tracking data
 
         if (this->track_resources_) {
@@ -155,8 +155,9 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     /**
      * @brief Releases qubits and optionally writes resource tracking data
      *
-     * Releases the specified qubits through the qubit manager,
-     * and if resource tracking is enabled, writes the collected resource data to file.
+     * Decrements the qubit counter and releases the specified qubits through the qubit manager
+     *
+     * @param qubits A vector of the qubit IDs of the qubits to release
      */
     void ReleaseQubits(const std::vector<QubitIdType> &qubits)
     {
