@@ -15,12 +15,12 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
-#include <cstdint>
 #include <cstdio>
 
 #include "rings.cpp"
 
 using namespace Catch::Matchers;
+using namespace RSDecomp::Rings;
 
 TEST_CASE("Test ZSqrtTwo class", "[RSDecomp][Rings]")
 {

@@ -21,12 +21,12 @@
 #include "normal_forms.hpp"
 
 using namespace Catch::Matchers;
-using namespace normal_forms;
-using namespace CliffordData;
+using namespace RSDecomp::NormalForms;
+using namespace RSDecomp::CliffordData;
 
 TEST_CASE("Test MA normal form", "[RSDecomp][NormalForms]")
 {
-    std::vector<std::vector<CliffordData::GateType>> cl_list;
+    std::vector<std::vector<GateType>> cl_list;
     for (const auto &key_value_pair : clifford_group_to_SO3) {
         cl_list.push_back(key_value_pair.first);
     }
@@ -52,10 +52,10 @@ TEST_CASE("Test MA normal form", "[RSDecomp][NormalForms]")
     DYNAMIC_SECTION("a = " << a << ", b = " << b_str << ", c = " << c)
     {
         SO3Matrix so3mat({}, 0);
-        std::vector<CliffordData::GateType> expected_sol;
+        std::vector<GateType> expected_sol;
         if (a) {
             so3mat = SO3Matrix(DyadicMatrix({0, 0, 0, 1}, {}, {}, {0, 0, 1, 0}));
-            expected_sol.push_back(CliffordData::GateType::T);
+            expected_sol.push_back(GateType::T);
         }
         else {
             so3mat = SO3Matrix(DyadicMatrix({0, 0, 0, 1}, {}, {}, {0, 0, 0, 1}));
@@ -66,13 +66,13 @@ TEST_CASE("Test MA normal form", "[RSDecomp][NormalForms]")
                 so3mat =
                     so3_matrix_mul(so3mat, SO3Matrix(DyadicMatrix({0, 0, 0, 1}, {0, 0, 1, 0},
                                                                   {0, 1, 0, 0}, {-1, 0, 0, 0}, 1)));
-                expected_sol.push_back(CliffordData::GateType::SHT);
+                expected_sol.push_back(GateType::SHT);
             }
             else {
                 so3mat =
                     so3_matrix_mul(so3mat, SO3Matrix(DyadicMatrix({0, 0, 0, 1}, {0, 0, 1, 0},
                                                                   {0, 0, 0, 1}, {0, 0, -1, 0}, 1)));
-                expected_sol.push_back(CliffordData::GateType::HT);
+                expected_sol.push_back(GateType::HT);
             }
         }
 

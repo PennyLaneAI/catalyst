@@ -22,7 +22,7 @@
 #include "norm_solver.hpp"
 
 using namespace Catch::Matchers;
-using namespace NormSolver;
+using namespace RSDecomp::NormSolver;
 
 // ADD GCD TESTS
 

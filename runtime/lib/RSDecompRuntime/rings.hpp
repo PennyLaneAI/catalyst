@@ -1,18 +1,27 @@
+// Copyright 2025 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #pragma once
 
-#include <algorithm>
 #include <array>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <cmath>
 #include <complex>
 #include <iostream>
-#include <numeric>
 #include <optional>
-#include <stdexcept>
-#include <string>
-#include <vector>
 
-#include "utils.hpp"
+namespace RSDecomp::Rings {
 
 const double LAMBDA = 1.0 + M_SQRT2;
 const std::complex<double> OMEGA = std::complex<double>(M_SQRT1_2, M_SQRT1_2);
@@ -25,10 +34,6 @@ struct ZOmega_multiprec;
 struct ZSqrtTwo;
 struct DyadicMatrix;
 struct SO3Matrix;
-
-std::ostream &operator<<(std::ostream &os, const ZOmega &zomega);
-std::ostream &operator<<(std::ostream &os, const ZSqrtTwo &zsqtwo);
-std::ostream &operator<<(std::ostream &os, const SO3Matrix &matrix);
 
 DyadicMatrix dyadic_matrix_mul(const DyadicMatrix &m1, const DyadicMatrix &m2);
 SO3Matrix so3_matrix_mul(const SO3Matrix &m1, const SO3Matrix &m2);
@@ -75,8 +80,6 @@ struct ZOmega {
     std::complex<double> to_complex() const;
     bool parity() const;
     ZOmega adj2() const;
-    // INT_TYPE abs() const;
-    // MULTI_PREC_INT abs_multiprec() const;
     MULTI_PREC_INT abs() const;
     ZOmega conj() const;
     ZOmega norm() const;
@@ -85,6 +88,9 @@ struct ZOmega {
     std::pair<ZOmega, int> normalize();
 };
 
+// This is a helper struct for high-precision ZOmega calculations
+// When we move to full arbitrary precision, this can be combined with
+// ZOmega
 struct ZOmega_multiprec {
     MULTI_PREC_INT a, b, c, d;
 
@@ -109,8 +115,6 @@ struct DyadicMatrix {
     bool operator==(const DyadicMatrix &other) const;
     std::array<ZOmega, 4> flatten() const;
     DyadicMatrix operator*(const ZOmega &scalar) const;
-
-    friend DyadicMatrix dyadic_matrix_mul(const DyadicMatrix &m1, const DyadicMatrix &m2);
 };
 
 struct SO3Matrix {
@@ -128,6 +132,11 @@ struct SO3Matrix {
     std::array<std::array<int, 3>, 3> parity_mat() const;
     std::array<int, 3> parity_vec() const;
     std::array<ZSqrtTwo, 9> flatten() const;
-
-    friend SO3Matrix so3_matrix_mul(const SO3Matrix &m1, const SO3Matrix &m2);
 };
+
+} // namespace RSDecomp::Rings
+// Helper print functions that can be deleted
+std::ostream &operator<<(std::ostream &os, const RSDecomp::Rings::ZOmega &zomega);
+std::ostream &operator<<(std::ostream &os, const RSDecomp::Rings::ZSqrtTwo &zsqtwo);
+std::ostream &operator<<(std::ostream &os, const RSDecomp::Rings::SO3Matrix &matrix);
+// end helper functions

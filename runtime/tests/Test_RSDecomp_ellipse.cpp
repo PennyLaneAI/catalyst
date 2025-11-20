@@ -21,7 +21,7 @@
 #include "ellipse.hpp"
 
 using namespace Catch::Matchers;
-using namespace GridProblem;
+using namespace RSDecomp::GridProblem;
 
 TEST_CASE("Test Ellipse class", "[RSDecomp][Ellipse]")
 {

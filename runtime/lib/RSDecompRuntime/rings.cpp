@@ -1,8 +1,26 @@
-#include "rings.hpp"
+// Copyright 2025 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #include <algorithm>
 #include <iostream>
 #include <numeric>
+
+#include "rings.hpp"
+#include "utils.hpp"
+
+namespace RSDecomp::Rings {
+using namespace RSDecomp::Utils;
 
 // --- ZSqrtTwo Method Implementations ---
 
@@ -70,8 +88,8 @@ ZSqrtTwo ZSqrtTwo::operator%(const ZSqrtTwo &other) const
 {
     INT_TYPE d = other.abs();
     ZSqrtTwo num = *this * other.adj2();
-    auto q1 = static_cast<INT_TYPE>(std::nearbyint(static_cast<double>(num.a) / d));
-    auto q2 = static_cast<INT_TYPE>(std::nearbyint(static_cast<double>(num.b) / d));
+    INT_TYPE q1 = std::nearbyint(static_cast<double>(num.a) / d);
+    INT_TYPE q2 = std::nearbyint(static_cast<double>(num.b) / d);
     ZSqrtTwo quotient(q1, q2);
     return *this - quotient * other;
 }
@@ -79,15 +97,15 @@ ZSqrtTwo ZSqrtTwo::operator%(const ZSqrtTwo &other) const
 std::optional<ZSqrtTwo> ZSqrtTwo::sqrt() const
 {
     const INT_TYPE d = this->abs();
-    const INT_TYPE r = static_cast<INT_TYPE>(std::sqrt(d));
+    const INT_TYPE r = std::sqrt(d);
     if (r * r != d) {
         return std::nullopt;
     }
     for (INT_TYPE s : {1, -1}) {
         INT_TYPE x_numerator = a + s * r;
         INT_TYPE y_numerator = a - s * r;
-        INT_TYPE x = static_cast<INT_TYPE>(std::sqrt(x_numerator / 2));
-        INT_TYPE y = static_cast<INT_TYPE>(std::sqrt(y_numerator / 4));
+        INT_TYPE x = std::sqrt(x_numerator / 2);
+        INT_TYPE y = std::sqrt(y_numerator / 4);
         ZSqrtTwo zrt{x, y};
         if (zrt * zrt == *this) {
             return zrt;
@@ -159,13 +177,6 @@ std::complex<double> ZOmega::to_complex() const
 bool ZOmega::parity() const { return (a + c) % 2 != 0; }
 
 ZOmega ZOmega::adj2() const { return ZOmega(-a, b, -c, d); }
-
-// INT_TYPE ZOmega::abs() const
-// {
-//     INT_TYPE first = a * a + b * b + c * c + d * d;
-//     INT_TYPE second = a * b + b * c + c * d - d * a;
-//     return first * first - 2 * second * second;
-// }
 
 MULTI_PREC_INT ZOmega::abs() const
 {
@@ -275,10 +286,10 @@ void DyadicMatrix::normalize()
         d = d / 2;
         k -= 2;
     }
-    auto is_sqrt2_divisible = [](const ZOmega &s) {
+    auto is_divisible = [](const ZOmega &s) {
         return ((s.a + s.c) % 2 == 0) && ((s.b + s.d) % 2 == 0);
     };
-    auto div_by_sqrt2 = [](const ZOmega &s) {
+    auto div_by_2 = [](const ZOmega &s) {
         INT_TYPE new_a = (s.b - s.d) / 2;
         INT_TYPE new_b = (s.a + s.c) / 2;
         INT_TYPE new_c = (s.b + s.d) / 2;
@@ -286,12 +297,11 @@ void DyadicMatrix::normalize()
         return ZOmega(new_a, new_b, new_c, new_d);
     };
 
-    while ((k > 0) && is_sqrt2_divisible(a) && is_sqrt2_divisible(b) && is_sqrt2_divisible(c) &&
-           is_sqrt2_divisible(d)) {
-        a = div_by_sqrt2(a);
-        b = div_by_sqrt2(b);
-        c = div_by_sqrt2(c);
-        d = div_by_sqrt2(d);
+    while ((k > 0) && is_divisible(a) && is_divisible(b) && is_divisible(c) && is_divisible(d)) {
+        a = div_by_2(a);
+        b = div_by_2(b);
+        c = div_by_2(c);
+        d = div_by_2(d);
         k -= 1;
     }
 }
@@ -339,13 +349,13 @@ void SO3Matrix::from_dyadic_matrix(const DyadicMatrix &dy_mat)
     std::array<std::pair<ZSqrtTwo, ZSqrtTwo>, 4> z_sqrt2;
     if (has_parity) {
         current_k += 2;
-        for (size_t i = 0; i < su2_elems.size(); ++i) {
+        for (std::size_t i = 0; i < su2_elems.size(); ++i) {
             const auto &s = su2_elems[i];
             z_sqrt2[i] = {ZSqrtTwo((s.c - s.a), s.d), ZSqrtTwo((s.c + s.a), s.b)};
         }
     }
     else {
-        for (size_t i = 0; i < su2_elems.size(); ++i) {
+        for (std::size_t i = 0; i < su2_elems.size(); ++i) {
             const auto &s = su2_elems[i];
             z_sqrt2[i] = {ZSqrtTwo(s.d, (s.c - s.a) / 2), ZSqrtTwo(s.b, (s.c + s.a) / 2)};
         }
@@ -384,8 +394,8 @@ bool SO3Matrix::operator==(const SO3Matrix &other) const
 std::array<std::array<int, 3>, 3> SO3Matrix::parity_mat() const
 {
     std::array<std::array<int, 3>, 3> p_mat;
-    for (size_t i = 0; i < 3; ++i) {
-        for (size_t j = 0; j < 3; ++j) {
+    for (std::size_t i = 0; i < 3; ++i) {
+        for (std::size_t j = 0; j < 3; ++j) {
             p_mat[i][j] = (so3_mat[i][j].a % 2 + 2) % 2;
         }
     }
@@ -396,7 +406,7 @@ std::array<int, 3> SO3Matrix::parity_vec() const
 {
     auto p_mat = this->parity_mat();
     std::array<int, 3> p_vec;
-    for (size_t i = 0; i < 3; ++i) {
+    for (std::size_t i = 0; i < 3; ++i) {
         p_vec[i] = std::accumulate(p_mat[i].begin(), p_mat[i].end(), 0);
     }
     return p_vec;
@@ -408,12 +418,6 @@ std::array<ZSqrtTwo, 9> SO3Matrix::flatten() const
             so3_mat[1][2], so3_mat[2][0], so3_mat[2][1], so3_mat[2][2]};
 }
 
-// DyadicMatrix SO3Matrix::dyadic_matrix()
-// {
-//     // Placeholder: Actual conversion logic needed
-//     return DyadicMatrix(ZOmega(), ZOmega(), ZOmega(), ZOmega(), 0);
-// }
-
 void SO3Matrix::normalize()
 {
     auto elements = this->flatten();
@@ -424,16 +428,14 @@ void SO3Matrix::normalize()
     }
     while (std::all_of(elements.begin(), elements.end(),
                        [](const ZSqrtTwo &z) { return z.a % 2 == 0 && z.b % 2 == 0; })) {
-        // Need to update the elements array as we go
-        for (size_t i = 0; i < elements.size(); ++i) {
+        for (std::size_t i = 0; i < elements.size(); ++i) {
             elements[i] = elements[i] / 2;
         }
         k -= 2;
     }
     while (std::all_of(elements.begin(), elements.end(),
                        [](const ZSqrtTwo &z) { return z.a % 2 == 0; })) {
-        // Need to update the elements array as we go
-        for (size_t i = 0; i < elements.size(); ++i) {
+        for (std::size_t i = 0; i < elements.size(); ++i) {
             elements[i] = ZSqrtTwo(elements[i].b, elements[i].a / 2);
         }
         k -= 1;
@@ -459,10 +461,10 @@ DyadicMatrix dyadic_matrix_mul(const DyadicMatrix &m1, const DyadicMatrix &m2)
 SO3Matrix so3_matrix_mul(const SO3Matrix &m1, const SO3Matrix &m2)
 {
     std::array<std::array<ZSqrtTwo, 3>, 3> result_mat{};
-    for (size_t i = 0; i < 3; ++i) {
-        for (size_t j = 0; j < 3; ++j) {
+    for (std::size_t i = 0; i < 3; ++i) {
+        for (std::size_t j = 0; j < 3; ++j) {
             result_mat[i][j] = ZSqrtTwo(0, 0);
-            for (size_t k = 0; k < 3; ++k) {
+            for (std::size_t k = 0; k < 3; ++k) {
                 result_mat[i][j] = result_mat[i][j] + (m1.so3_mat[i][k] * m2.so3_mat[k][j]);
             }
         }
@@ -472,9 +474,11 @@ SO3Matrix so3_matrix_mul(const SO3Matrix &m1, const SO3Matrix &m2)
     return result;
 }
 
-// --- Class Stream Operator Implementations ---
+} // namespace RSDecomp::Rings
 
-std::ostream &operator<<(std::ostream &os, const SO3Matrix &matrix)
+// Helper print functions that can be deleted
+using namespace RSDecomp::Utils;
+std::ostream &operator<<(std::ostream &os, const RSDecomp::Rings::SO3Matrix &matrix)
 {
     os << "SO3Matrix(k=" << matrix.k << ", mat=[";
     for (const auto &row : matrix.so3_mat) {
@@ -488,14 +492,14 @@ std::ostream &operator<<(std::ostream &os, const SO3Matrix &matrix)
     return os;
 }
 
-std::ostream &operator<<(std::ostream &os, const ZOmega &zomega)
+std::ostream &operator<<(std::ostream &os, const RSDecomp::Rings::ZOmega &zomega)
 {
     os << "ZOmega(" << zomega.a << " ω^3 + " << zomega.b << "ω^2 + " << zomega.c << "ω + "
        << zomega.d << ")";
     return os;
 }
 
-std::ostream &operator<<(std::ostream &os, const ZSqrtTwo &zsqtwo)
+std::ostream &operator<<(std::ostream &os, const RSDecomp::Rings::ZSqrtTwo &zsqtwo)
 {
     os << "ZSqrtTwo(" << zsqtwo.a << " + " << zsqtwo.b << "√2)";
     return os;

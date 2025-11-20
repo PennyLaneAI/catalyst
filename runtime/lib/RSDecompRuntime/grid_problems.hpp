@@ -1,3 +1,17 @@
+// Copyright 2025 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #pragma once
 
 #include "ellipse.hpp"
@@ -14,7 +28,8 @@
 #include <utility>
 #include <vector>
 
-namespace GridProblem {
+namespace RSDecomp::GridProblem {
+using namespace RSDecomp::Rings;
 
 using bbox = std::array<double, 4>;
 
@@ -44,8 +59,8 @@ inline int bbox_grid_points(const bbox &bbox)
 
     double x0_scaled = x_scale * current_x0;
     double x1_scaled = x_scale * current_x1;
-    double y0_scaled = std::min(y_scale * current_y0, y_scale * current_y1);
-    double y1_scaled = std::max(y_scale * current_y0, y_scale * current_y1);
+    double y0_scaled = min(y_scale * current_y0, y_scale * current_y1);
+    double y1_scaled = max(y_scale * current_y0, y_scale * current_y1);
 
     if (x1_scaled - x0_scaled < 1.0 - M_SQRT2) {
         throw std::runtime_error("Value should be larger than 1 - sqrt(2) for bbox");
@@ -166,8 +181,8 @@ class one_dim_problem_solution_iterator {
 
         double y_temp0 = y_scale * y0;
         double y_temp1 = y_scale * y1;
-        y0_scaled = std::min(y_temp0, y_temp1);
-        y1_scaled = std::max(y_temp0, y_temp1);
+        y0_scaled = min(y_temp0, y_temp1);
+        y1_scaled = max(y_temp0, y_temp1);
 
         if (x1_scaled - x0_scaled < 1.0 - M_SQRT2) {
             throw std::runtime_error("Scaled interval width should be larger than 1 - sqrt(2).");
@@ -719,7 +734,7 @@ class GridIterator {
 
                     // 1c. Run the "end of loop" logic (your code 2b)
                     if (main_loop_idx == i_) {
-                        k = std::max(kmin, k + 1);
+                        k = max(kmin, k + 1);
                         e_ = epsilon;
                         t_ = t_ / 10.0;
                         auto [en_, _] = Ellipse::from_region(theta, e_, kmin).normalize();
@@ -813,10 +828,10 @@ class GridIterator {
           e2({1.0, 0.0, 1.0}, {0.0, 0.0}) // Ellipse((1, 0, 1), (0, 0))
     {
         // --- Warm start (from Python __iter__) ---
-        k = std::min(kmin, 14);
+        k = min(kmin, 14);
         i_ = 6;
-        e_ = std::max(epsilon, 1e-3);
-        t_ = std::min(target, 0.9999995);
+        e_ = max(epsilon, 1e-3);
+        t_ = min(target, 0.9999995);
 
         // Assumes Ellipse::from_region and Ellipse::normalize exist
         e1 = Ellipse::from_region(theta, e_, k);
@@ -892,4 +907,4 @@ class GridIterator {
     GridIterator end() { return GridIterator(); }
 };
 
-} // namespace GridProblem
+} // namespace RSDecomp::GridProblem

@@ -14,8 +14,6 @@
 
 #define DEBUG_TYPE "gridsynth-patterns"
 
-#include <memory>
-#include <tuple>
 #include <vector>
 
 #include "llvm/ADT/SmallVector.h"
@@ -23,18 +21,15 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 
-#include "Catalyst/IR/CatalystDialect.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h" // Import pattern declarations
@@ -203,6 +198,7 @@ void populateCliffordTSwitchCases(mlir::PatternRewriter &rewriter, mlir::Locatio
 
 /**
  * @brief Populates the scf.index_switch op for the PPR-Basis.
+ * Maps the new enum (I, X2...adjZ8) to PPRotationOps.
  */
 void populatePPRBasisSwitchCases(mlir::PatternRewriter &rewriter, mlir::Location loc,
                                  mlir::scf::IndexSwitchOp switchOp, mlir::Value qregIn,
@@ -211,13 +207,24 @@ void populatePPRBasisSwitchCases(mlir::PatternRewriter &rewriter, mlir::Location
     auto qregType = qregIn.getType();
     auto qbitType = catalyst::quantum::QubitType::get(rewriter.getContext());
 
-    // Helper lambda to create a single PPRotationOp.
+    // Helper to create a single PPRotationOp.
+    // Handles 'adjoint' by negating the rotationKind.
     auto createPPROp = [&](mlir::OpBuilder &builder, mlir::ArrayRef<StringRef> pauliWord,
-                           uint16_t rotationKind, mlir::Value currentLoopReg) -> mlir::Value {
+                           uint16_t rotationKind, bool isAdjoint,
+                           mlir::Value currentLoopReg) -> mlir::Value {
         mlir::Value currentQbit = builder.create<ExtractOp>(loc, qbitType, currentLoopReg,
                                                             qbitIndex, /*idx_attr=*/nullptr);
 
-        auto pprOp = builder.create<catalyst::qec::PPRotationOp>(loc, pauliWord, rotationKind,
+        // Convert rotation kind to signed integer and negate if adjoint
+        int16_t signedRotation = static_cast<int16_t>(rotationKind);
+        if (isAdjoint) {
+            signedRotation = -signedRotation;
+        }
+
+        // We need to cast back to uint16_t for the C++ builder signature,
+        uint16_t finalRotationArg = static_cast<uint16_t>(signedRotation);
+
+        auto pprOp = builder.create<catalyst::qec::PPRotationOp>(loc, pauliWord, finalRotationArg,
                                                                  mlir::ValueRange{currentQbit},
                                                                  /*condition=*/nullptr);
 
@@ -228,67 +235,67 @@ void populatePPRBasisSwitchCases(mlir::PatternRewriter &rewriter, mlir::Location
         return qregOut;
     };
 
-    // --- Define cases ---
-    // Note: This mapping corresponds to the C++ enum:
-    // { T = 0, Z4, Z8, X4, X8, I, X, Y, Z, H, S, Sd }
-    enum class CaseOpType { CustomGate, PPROp };
-    using Config = std::tuple<CaseOpType, ArrayRef<StringRef>, uint16_t, bool>;
-
-    static StringRef tGate[] = {"T"};
-    static StringRef zPauli[] = {"Z"};
-    static StringRef xPauli[] = {"X"};
-    static StringRef iGate[] = {"Identity"};
-    static StringRef xGate[] = {"PauliX"};
-    static StringRef yGate[] = {"PauliY"};
-    static StringRef zGate[] = {"PauliZ"};
-    static StringRef hGate[] = {"Hadamard"};
-    static StringRef sGate[] = {"S"};
-
-    SmallVector<Config> caseConfigs = {
-        {CaseOpType::CustomGate, tGate, 0, false}, // Case 0: T
-        {CaseOpType::PPROp, zPauli, 4, false},     // Case 1: Z4
-        {CaseOpType::PPROp, zPauli, 8, false},     // Case 2: Z8
-        {CaseOpType::PPROp, xPauli, 4, false},     // Case 3: X4
-        {CaseOpType::PPROp, xPauli, 8, false},     // Case 4: X8
-        {CaseOpType::CustomGate, iGate, 0, false}, // Case 5: I
-        {CaseOpType::CustomGate, xGate, 0, false}, // Case 6: X
-        {CaseOpType::CustomGate, yGate, 0, false}, // Case 7: Y
-        {CaseOpType::CustomGate, zGate, 0, false}, // Case 8: Z
-        {CaseOpType::CustomGate, hGate, 0, false}, // Case 9: H
-        {CaseOpType::CustomGate, sGate, 0, false}, // Case 10: S
-        {CaseOpType::CustomGate, sGate, 0, true},  // Case 11: Sd
+    // Config struct for the new Enum
+    struct PPRConfig {
+        bool isIdentity;
+        ArrayRef<StringRef> pauli;
+        uint16_t n;     // The denominator (2, 4, 8)
+        bool isAdjoint; // True if adjX, adjY, etc.
     };
+
+    static StringRef xPauli[] = {"X"};
+    static StringRef yPauli[] = {"Y"};
+    static StringRef zPauli[] = {"Z"};
+
+    // Map indices 0..18 to configs
+    SmallVector<PPRConfig> caseConfigs;
+
+    // Case 0: I
+    caseConfigs.push_back({true, {}, 0, false});
+
+    // Helper to push X, Y, Z triplets (2, 4, 8) then (adj2, adj4, adj8)
+    auto pushSeries = [&](ArrayRef<StringRef> pauli) {
+        // Normal: 2, 4, 8
+        caseConfigs.push_back({false, pauli, 2, false});
+        caseConfigs.push_back({false, pauli, 4, false});
+        caseConfigs.push_back({false, pauli, 8, false});
+        // Adjoint: 2, 4, 8
+        caseConfigs.push_back({false, pauli, 2, true});
+        caseConfigs.push_back({false, pauli, 4, true});
+        caseConfigs.push_back({false, pauli, 8, true});
+    };
+
+    pushSeries(xPauli); // Cases 1-6
+    pushSeries(yPauli); // Cases 7-12
+    pushSeries(zPauli); // Cases 13-18
 
     // --- Populate Switch Cases ---
     assert(caseConfigs.size() == switchOp.getCases().size() &&
            "Mismatch in case config and case values");
+
     for (size_t i = 0; i < caseConfigs.size(); ++i) {
         const auto &config = caseConfigs[i];
-        auto opType = std::get<0>(config);
-        auto names = std::get<1>(config);
-        auto rotKind = std::get<2>(config);
-        auto isAdjoint = std::get<3>(config);
-
         Region &caseRegion = switchOp.getCaseRegions()[i];
         caseRegion.push_back(new Block());
         rewriter.setInsertionPointToStart(&caseRegion.front());
 
         mlir::Value qregCase;
-        if (opType == CaseOpType::CustomGate) {
-            qregCase = createGateChain(rewriter, loc, qregIn, qbitIndex, names, isAdjoint);
+        if (config.isIdentity) {
+            // Identity: No-op
+            qregCase = qregIn;
         }
-        else { // CaseOpType::PPROp
-            qregCase = createPPROp(rewriter, names, rotKind, qregIn);
+        else {
+            // PPR Op (Adjoint logic handled inside helper)
+            qregCase = createPPROp(rewriter, config.pauli, config.n, config.isAdjoint, qregIn);
         }
 
         rewriter.create<mlir::scf::YieldOp>(loc, qregCase);
     }
 
-    // Populate Default Case
+    // Default Case
     Region &defaultRegion = switchOp.getDefaultRegion();
     defaultRegion.push_back(new Block());
     rewriter.setInsertionPointToStart(&defaultRegion.front());
-    // Default to Identity (do nothing)
     rewriter.create<mlir::scf::YieldOp>(loc, qregIn);
 }
 
@@ -376,8 +383,10 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     // --- Define cases based on pprBasis ---
     SmallVector<int64_t> caseValues;
     if (pprBasis) {
-        // Corresponds to { T = 0, Z4, Z8, X4, X8, I, X, Y, Z, H, S, Sd }
-        caseValues = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+        // I, X(2,4,8), adjX(2,4,8), Y(2,4,8), adjY(2,4,8), Z(2,4,8), adjZ(2,4,8)
+        caseValues.reserve(19);
+        for (int i = 0; i < 19; ++i)
+            caseValues.push_back(i);
     }
     else {
         // Corresponds to { T = 0, HT, SHT, I, X, Y, Z, H, S, Sd }
@@ -464,7 +473,6 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
             return rewriter.notifyMatchFailure(op, "Op does not return a single qubit");
         }
 
-        // find the source ExtractOp for current Qubit
         // find the source ExtractOp for current Qubit
         catalyst::quantum::ExtractOp extractOp = findSourceExtract(qbitOperand);
         if (!extractOp) {
@@ -618,8 +626,7 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
                 return nullptr; // Not a simple unitary mapping
             }
 
-            // --- START: Corrected Logic ---
-            // Find the index of our `qbit` in the *qubit results* list.
+            // Find the index of our qubit in the qubit results list.
             int64_t qubitResultIndex = -1;
             for (size_t i = 0; i < qubitResults.size(); ++i) {
                 if (qubitResults[i] == opResult) {

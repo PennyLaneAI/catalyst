@@ -21,7 +21,7 @@
 #include "grid_problems.hpp"
 
 using namespace Catch::Matchers;
-using namespace GridProblem;
+using namespace RSDecomp::GridProblem;
 using bbox = std::array<double, 4>;
 
 struct OneDimProblemParams {

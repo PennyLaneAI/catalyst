@@ -1,61 +1,19 @@
+// Copyright 2025 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "clifford-data.hpp"
-// CHECK ALL VALUES in this file
-
-// Overload the << operator for std::ostream.
-// This is the idiomatic C++ way to make your custom types printable.
-namespace CliffordData {
-
-std::ostream &operator<<(std::ostream &os, GateType type)
-{
-    os << gateTypeToString(type);
-    return os;
-}
-
-std::string_view gateTypeToString(GateType type)
-{
-    switch (type) {
-    case GateType::I:
-        return "I";
-    case GateType::X:
-        return "X";
-    case GateType::Y:
-        return "Y";
-    case GateType::Z:
-        return "Z";
-    case GateType::H:
-        return "H";
-    case GateType::S:
-        return "S";
-    case GateType::Sd:
-        return "Sd";
-    case GateType::T:
-        return "T";
-    case GateType::HT:
-        return "H, T";
-    case GateType::SHT:
-        return "S, H, T";
-    default:
-        return "Unknown";
-    }
-}
-
-// The function to print your vector
-void printGateVector(const std::vector<GateType> &gates)
-{
-    std::cout << "[";
-    // Loop through the vector, printing each element
-    for (size_t i = 0; i < gates.size(); ++i) {
-        // Use our overloaded << operator
-        std::cout << gates[i];
-
-        // Add a comma and space, but not after the last element
-        if (i < gates.size() - 1) {
-            std::cout << ", ";
-        }
-    }
-    std::cout << "]" << std::endl;
-}
-
+namespace RSDecomp::CliffordData {
 const std::map<std::vector<GateType>, SO3Matrix> clifford_group_to_SO3 = {
     {{I}, SO3Matrix{DyadicMatrix{{0, 0, 0, 1}, {}, {}, {0, 0, 0, 1}}}},
     {{H}, SO3Matrix{-DyadicMatrix{{0, 1, 0, 0}, {0, 1, 0, 0}, {0, 1, 0, 0}, {0, -1, 0, 0}, 1}}},
@@ -104,10 +62,7 @@ const std::unordered_map<GateType, std::pair<DyadicMatrix, double>> clifford_gat
 
 const std::map<std::array<int, 3>, ParityTransformInfo> parity_transforms = {
     // "C"
-    {{1, 1, 1},
-     {SO3Matrix(C_DATA), // Much cleaner and unambiguous
-      {I},
-      0.0}},
+    {{1, 1, 1}, {SO3Matrix(C_DATA), {I}, 0.0}},
     // "T"
     {{2, 2, 0}, {SO3Matrix(T_DATA), {T}, 0.0}},
     // "HT"
@@ -127,9 +82,9 @@ std::vector<PPRGateType> HSTtoPPR(const std::vector<GateType> &input_gates)
             (i + 1 < input_gates.size())) {
             const GateType &next_gate = input_gates[i + 1];
 
-            // Rule: HT, HT -> Z4, Z8
+            // Rule: HT, HT -> X8, Z8
             if (current_gate == GateType::HT && next_gate == GateType::HT) {
-                output_gates.push_back(PPRGateType::Z4);
+                output_gates.push_back(PPRGateType::X8);
                 output_gates.push_back(PPRGateType::Z8);
                 i += 2; // Skip both processed gates
                 continue;
@@ -144,9 +99,9 @@ std::vector<PPRGateType> HSTtoPPR(const std::vector<GateType> &input_gates)
                 continue;
             }
 
-            // Rule: SHT, HT -> Z8, X8, Z8
+            // Rule: SHT, HT -> Z4, X8, Z8
             if (current_gate == GateType::SHT && next_gate == GateType::HT) {
-                output_gates.push_back(PPRGateType::Z8);
+                output_gates.push_back(PPRGateType::Z4);
                 output_gates.push_back(PPRGateType::X8);
                 output_gates.push_back(PPRGateType::Z8);
                 i += 2;
@@ -168,38 +123,43 @@ std::vector<PPRGateType> HSTtoPPR(const std::vector<GateType> &input_gates)
         // We handle the 1-to-1 mappings.
         switch (current_gate) {
         case GateType::T:
-            output_gates.push_back(PPRGateType::T);
+            output_gates.push_back(PPRGateType::Z8);
             break;
         case GateType::I:
             output_gates.push_back(PPRGateType::I);
             break;
         case GateType::X:
-            output_gates.push_back(PPRGateType::X);
+            output_gates.push_back(PPRGateType::X2);
             break;
         case GateType::Y:
-            output_gates.push_back(PPRGateType::Y);
+            output_gates.push_back(PPRGateType::Y2);
             break;
         case GateType::Z:
-            output_gates.push_back(PPRGateType::Z);
+            output_gates.push_back(PPRGateType::Z2);
             break;
         case GateType::H:
-            output_gates.push_back(PPRGateType::H);
+            output_gates.push_back(PPRGateType::Z4);
+            output_gates.push_back(PPRGateType::X4);
+            output_gates.push_back(PPRGateType::Z4);
             break;
         case GateType::S:
-            output_gates.push_back(PPRGateType::S);
+            output_gates.push_back(PPRGateType::Z4);
             break;
         case GateType::Sd:
-            output_gates.push_back(PPRGateType::Sd);
+            output_gates.push_back(PPRGateType::adjZ4);
             break;
         case GateType::HT: {
-            output_gates.push_back(PPRGateType::H);
-            output_gates.push_back(PPRGateType::T);
+            output_gates.push_back(PPRGateType::X8);
+            output_gates.push_back(PPRGateType::Z4);
+            output_gates.push_back(PPRGateType::X4);
+            output_gates.push_back(PPRGateType::Z4);
             break;
         }
         case GateType::SHT: {
-            output_gates.push_back(PPRGateType::S);
-            output_gates.push_back(PPRGateType::H);
-            output_gates.push_back(PPRGateType::T);
+            output_gates.push_back(PPRGateType::adjY8);
+            output_gates.push_back(PPRGateType::adjX4);
+            output_gates.push_back(PPRGateType::Z4);
+            output_gates.push_back(PPRGateType::Z2);
             break;
         }
 
@@ -213,4 +173,63 @@ std::vector<PPRGateType> HSTtoPPR(const std::vector<GateType> &input_gates)
     return output_gates;
 }
 
-} // namespace CliffordData
+/**
+ * HELPER FUNCTION TO BE DELETED
+ */
+std::ostream &operator<<(std::ostream &os, GateType type)
+{
+    os << gateTypeToString(type);
+    return os;
+}
+
+/**
+ * HELPER FUNCTION TO BE DELETED
+ */
+std::string_view gateTypeToString(GateType type)
+{
+    switch (type) {
+    case GateType::I:
+        return "I";
+    case GateType::X:
+        return "X";
+    case GateType::Y:
+        return "Y";
+    case GateType::Z:
+        return "Z";
+    case GateType::H:
+        return "H";
+    case GateType::S:
+        return "S";
+    case GateType::Sd:
+        return "Sd";
+    case GateType::T:
+        return "T";
+    case GateType::HT:
+        return "H, T";
+    case GateType::SHT:
+        return "S, H, T";
+    default:
+        return "Unknown";
+    }
+}
+
+/**
+ * HELPER FUNCTION TO BE DELETED
+ */
+void printGateVector(const std::vector<GateType> &gates)
+{
+    std::cout << "[";
+    // Loop through the vector, printing each element
+    for (size_t i = 0; i < gates.size(); ++i) {
+        // Use our overloaded << operator
+        std::cout << gates[i];
+
+        // Add a comma and space, but not after the last element
+        if (i < gates.size() - 1) {
+            std::cout << ", ";
+        }
+    }
+    std::cout << "]" << std::endl;
+}
+
+} // namespace RSDecomp::CliffordData

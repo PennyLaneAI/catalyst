@@ -1,3 +1,17 @@
+// Copyright 2025 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #pragma once
 
 #include <algorithm>
@@ -7,6 +21,11 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+
+namespace RSDecomp::Utils {
+template <typename T> inline T min(T x, T y) { return (x > y) ? y : x; }
+
+template <typename T> inline T max(T x, T y) { return (x > y) ? x : y; }
 
 template <typename T> inline T abs_val(T x) { return (x < 0) ? -x : x; }
 
@@ -22,6 +41,29 @@ template <typename T> inline T math_mod(T a, T n)
     return r < 0 ? r + n : r;
 }
 
+/**
+ * @brief Performs modular multiplication (a * b) % mod
+ */
+template <typename T> inline T mod_mul(T a, T b, T mod) { return (a * b) % mod; }
+
+/**
+ * @brief Performs modular exponentiation (base^exp) % mod.
+ *
+ * If using Boost cpp_int, boost powm can be used instead.
+ */
+template <typename T> inline T mod_pow(T base, T exp, T mod)
+{
+    T res = 1;
+    base %= mod;
+    while (exp > 0) {
+        if (exp % 2 == 1)
+            res = mod_mul(res, base, mod);
+        base = mod_mul(base, base, mod);
+        exp /= 2;
+    }
+    return res;
+}
+
 template <typename T> inline T floor_div(T a, T b)
 {
     if (b == 0) {
@@ -34,54 +76,6 @@ template <typename T> inline T floor_div(T a, T b)
     }
     return q;
 }
-
-inline std::ostream &operator<<(std::ostream &os, __int128_t value)
-{
-    if (value == 0) {
-        os << "0";
-        return os;
-    }
-    std::string str;
-    bool is_negative = false;
-    if (value < 0) {
-        is_negative = true;
-    }
-    while (value != 0) {
-        int digit;
-        if (is_negative) {
-            digit = -(value % 10);
-            value /= 10;
-        }
-        else {
-            digit = value % 10;
-            value /= 10;
-        }
-        str += (char)('0' + digit);
-    }
-    if (is_negative) {
-        str += '-';
-    }
-    std::reverse(str.begin(), str.end());
-    os << str;
-    return os;
-}
-
-inline std::ostream &operator<<(std::ostream &os, unsigned __int128 n)
-{
-    if (n == 0) {
-        os << "0";
-        return os;
-    }
-    std::string str;
-    while (n != 0) {
-        str += (char)('0' + (n % 10));
-        n /= 10;
-    }
-    std::reverse(str.begin(), str.end());
-    os << str;
-    return os;
-}
-
 template <typename Key, typename Value, size_t MaxSize> class lru_cache {
     static_assert(MaxSize > 0, "LRU cache MaxSize must be greater than 0");
 
@@ -159,3 +153,54 @@ template <typename Key, typename Value, size_t MaxSize> class lru_cache {
     std::list<list_pair_t> cache_list;
     map_t cache_map;
 };
+
+} // namespace RSDecomp::Utils
+
+// helper printing function to be deleted
+
+inline std::ostream &operator<<(std::ostream &os, __int128_t value)
+{
+    if (value == 0) {
+        os << "0";
+        return os;
+    }
+    std::string str;
+    bool is_negative = false;
+    if (value < 0) {
+        is_negative = true;
+    }
+    while (value != 0) {
+        int digit;
+        if (is_negative) {
+            digit = -(value % 10);
+            value /= 10;
+        }
+        else {
+            digit = value % 10;
+            value /= 10;
+        }
+        str += (char)('0' + digit);
+    }
+    if (is_negative) {
+        str += '-';
+    }
+    std::reverse(str.begin(), str.end());
+    os << str;
+    return os;
+}
+
+inline std::ostream &operator<<(std::ostream &os, unsigned __int128 n)
+{
+    if (n == 0) {
+        os << "0";
+        return os;
+    }
+    std::string str;
+    while (n != 0) {
+        str += (char)('0' + (n % 10));
+        n /= 10;
+    }
+    std::reverse(str.begin(), str.end());
+    os << str;
+    return os;
+}

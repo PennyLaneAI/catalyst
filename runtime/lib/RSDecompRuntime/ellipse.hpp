@@ -1,3 +1,17 @@
+// Copyright 2025 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #pragma once
 
 #include "rings.hpp"
@@ -14,8 +28,10 @@
 #include <utility>
 #include <vector>
 
-namespace GridProblem {
+namespace RSDecomp::GridProblem {
 
+using namespace RSDecomp::Rings;
+using namespace RSDecomp::Utils;
 struct GridOp;
 struct Ellipse;
 struct EllipseState;
@@ -428,9 +444,8 @@ struct EllipseState {
                     n_grid_op = n_grid_op * GridOp::from_string("K").adj2();
                 }
                 else if (current_e1.z >= 0.3 && current_e2.z >= 0.3) {
-                    INT_TYPE n = static_cast<INT_TYPE>(std::max(
-                        1.0,
-                        std::floor(std::pow(LAMBDA, std::min(current_e1.z, current_e2.z)) / 2.0)));
+                    INT_TYPE n = static_cast<INT_TYPE>(max(
+                        1.0, std::floor(std::pow(LAMBDA, min(current_e1.z, current_e2.z)) / 2.0)));
                     n_grid_op = n_grid_op * GridOp::from_string("A").pow(n);
                 }
                 else {
@@ -439,9 +454,9 @@ struct EllipseState {
             }
             else {
                 if (current_e1.z >= -0.2 && current_e2.z >= -0.2) {
-                    INT_TYPE n = static_cast<INT_TYPE>(std::max(
-                        1.0, std::floor(std::pow(LAMBDA, std::min(current_e1.z, current_e2.z)) /
-                                        M_SQRT2)));
+                    INT_TYPE n = static_cast<INT_TYPE>(max(
+                        1.0,
+                        std::floor(std::pow(LAMBDA, min(current_e1.z, current_e2.z)) / M_SQRT2)));
                     n_grid_op = n_grid_op * GridOp::from_string("B").pow(n);
                 }
                 else {
@@ -474,4 +489,4 @@ inline EllipseState EllipseState::apply_grid_op(const GridOp &grid_op) const
     return EllipseState(e1.apply_grid_op(grid_op), e2.apply_grid_op(grid_op.adj2()));
 }
 
-} // namespace GridProblem
+} // namespace RSDecomp::GridProblem

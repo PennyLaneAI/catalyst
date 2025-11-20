@@ -1,9 +1,23 @@
+// Copyright 2025 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "clifford-data.hpp"
 #include "rings.hpp"
 #include <complex>
-namespace normal_forms {
-
-using CliffordData::GateType;
+namespace RSDecomp::NormalForms {
+using namespace RSDecomp::Rings;
+using RSDecomp::CliffordData::GateType;
 
 std::pair<std::vector<GateType>, double> ma_normal_form(SO3Matrix &op)
 {
@@ -79,4 +93,4 @@ std::pair<std::vector<GateType>, double> ma_normal_form(SO3Matrix &op)
     return {decomposition, g_phase};
 }
 
-} // namespace normal_forms
+} // namespace RSDecomp::NormalForms
