@@ -96,7 +96,12 @@ class ConstructCircuitDAG:
     @visit.register
     def _unitary_and_state_prep(
         self,
-        op: quantum.CustomOp,
+        op: quantum.CustomOp
+        | quantum.GlobalPhaseOp
+        | quantum.QubitUnitaryOp
+        | quantum.SetStateOp
+        | quantum.MultiRZOp
+        | quantum.SetBasisStateOp,
     ) -> None:
         """Generic handler for unitary gates and quantum state preparation operations."""
 
