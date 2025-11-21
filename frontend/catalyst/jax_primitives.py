@@ -1468,9 +1468,6 @@ def _pauli_rot_lowering(
     assert theta is not None
     assert pauli_word is not None
 
-    if not all(p in ["I", "X", "Y", "Z"] for p in pauli_word):
-        raise ValueError("Only Pauli words consisting of 'I', 'X', 'Y', and 'Z' are allowed.")
-
     pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
 
     i16_type = ir.IntegerType.get_signless(16, ctx)
