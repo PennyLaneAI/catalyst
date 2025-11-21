@@ -62,11 +62,11 @@ class TestRecursiveTraversal:
         utility = ConstructCircuitDAG(mock_dag_builder)
 
         # Mock out the visit dispatcher
-        utility.visit = Mock()
+        utility._visit = Mock()
 
         utility.construct(module_op)
 
-        assert utility.visit.call_count == 5
+        assert utility._visit.call_count == 7
 
         expected_calls = [
             call(container_op),
@@ -78,4 +78,4 @@ class TestRecursiveTraversal:
             call(op),
         ]
 
-        utility.visit.assert_has_calls(expected_calls, any_order=False)
+        utility._visit.assert_has_calls(expected_calls, any_order=False)
