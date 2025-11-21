@@ -111,12 +111,10 @@ module @cz_hadamard {
     // CHECK: [[H1:%.+]] = quantum.custom "Hadamard"() [[EXTRACT1]] : !quantum.bit
     // CHECK: [[SLICE2:%.+]] = stablehlo.slice [[CST]] [0:1] : (tensor<2xi64>) -> tensor<1xi64>
     // CHECK: [[RESHAPE2:%.+]] = stablehlo.reshape [[SLICE2]] : (tensor<1xi64>) -> tensor<i64>
-    // CHECK: [[INSERT_H:%.+]] = quantum.insert [[INSERT2]][[[EXTRACTED]]], [[H1]] : !quantum.reg, !quantum.bit
     // CHECK: [[EXTRACTED_0:%.+]] = tensor.extract [[RESHAPE2]][] : tensor<i64>
-    // CHECK: [[EXTRACT2:%.+]] = quantum.extract [[INSERT_H]][[[EXTRACTED_0]]] : !quantum.reg -> !quantum.bit
-    // CHECK: [[EXTRACT3:%.+]] = quantum.extract [[INSERT_H]][[[EXTRACTED]]] : !quantum.reg -> !quantum.bit
-    // CHECK: [[CZ_RESULT:%.+]]:2 = quantum.custom "CZ"() [[EXTRACT2]], [[EXTRACT3]] : !quantum.bit, !quantum.bit
-    // CHECK: [[INSERT_CZ1:%.+]] = quantum.insert [[INSERT_H]][[[EXTRACTED_0]]], [[CZ_RESULT]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[EXTRACT2:%.+]] = quantum.extract [[INSERT2]][[[EXTRACTED_0]]] : !quantum.reg -> !quantum.bit
+    // CHECK: [[CZ_RESULT:%.+]]:2 = quantum.custom "CZ"() [[EXTRACT2]], [[H1]] : !quantum.bit, !quantum.bit
+    // CHECK: [[INSERT_CZ1:%.+]] = quantum.insert [[INSERT2]][[[EXTRACTED_0]]], [[CZ_RESULT]]#0 : !quantum.reg, !quantum.bit
     // CHECK: [[H2:%.+]] = quantum.custom "Hadamard"() [[CZ_RESULT]]#1 : !quantum.bit
     // CHECK: [[INSERT_CZ2:%.+]] = quantum.insert [[INSERT_CZ1]][[[EXTRACTED]]], [[H2]] : !quantum.reg, !quantum.bit
     // CHECK: [[FINAL_EXTRACT1:%.+]] = quantum.extract [[INSERT_CZ2]][ 0] : !quantum.reg -> !quantum.bit
