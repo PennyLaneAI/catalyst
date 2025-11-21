@@ -13,12 +13,34 @@
 # limitations under the License.
 """Unit tests for the ConstructCircuitDAG utility."""
 
+from unittest.mock import MagicMock, Mock
+
 import pytest
 
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
+
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
-from catalyst.python_interface.visualization.construct_circuit_dag import ConstructCircuitDAG 
-from catalyst.python_interface.visualization.dag_builder import DAGBuilder 
+from catalyst.python_interface.visualization.construct_circuit_dag import (
+    ConstructCircuitDAG,
+)
+from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 
+
+class TestInitialization:
+    """Tests that the state is correctly initialized."""
+
+    def test_dependency_injection(self):
+        """Tests that relevant dependencies are injected."""
+
+        mock_dag_builder = Mock(DAGBuilder)
+        utility = ConstructCircuitDAG(mock_dag_builder)
+        assert utility.dag_builder is mock_dag_builder
+
+
+class TestRecursiveTraversal:
+    """Tests that the recursive traversal logic works correctly."""
+
+    def test_entire_module_is_traversed(self):
+        """Tests that the entire module heirarchy is traversed correctly."""
