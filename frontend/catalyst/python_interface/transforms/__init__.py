@@ -23,6 +23,7 @@ from .mbqc import (
     null_decompose_graph_state_pass,
     outline_state_evolution_pass,
 )
+from .pattern_match import pattern_match
 from .quantum import (
     CombineGlobalPhasesPass,
     DiagonalizeFinalMeasurementsPass,
@@ -61,4 +62,6 @@ __all__ = [
     "outline_state_evolution_pass",
     "null_decompose_graph_state_pass",
     "NullDecomposeGraphStatePass",
+    # Pattern matching
+    "pattern_match",
 ]
