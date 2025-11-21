@@ -281,6 +281,10 @@ class BaseSignatureAnalyzer {
             }
         }
 
+        if (signature.needAllocQreg) {
+            rewriter.create<quantum::DeallocOp>(callOp.getLoc(), qreg);
+        }
+
         return newResults;
     }
 
