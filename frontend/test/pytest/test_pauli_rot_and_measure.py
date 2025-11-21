@@ -21,9 +21,9 @@ import pytest
 from catalyst import qjit
 
 
+@pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_to_ppr():
     """Test that Pauli rotation is converted to qec.ppr."""
-    qml.capture.enable()
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
@@ -37,12 +37,11 @@ def test_pauli_rot_to_ppr():
 
     optimized_ir = test_pauli_rot_to_ppr_workflow.mlir_opt
     assert "qec.ppr" in optimized_ir
-    qml.capture.disable()
 
 
+@pytest.mark.usefixtures("use_capture")
 def test_pauli_measure_to_ppr():
     """Test that Pauli measurement is converted to qec.ppm."""
-    qml.capture.enable()
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
@@ -56,12 +55,11 @@ def test_pauli_measure_to_ppr():
 
     optimized_ir = test_pauli_measure_to_ppr_workflow.mlir_opt
     assert "qec.ppm" in optimized_ir
-    qml.capture.disable()
 
 
+@pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_to_ppr_angle_error():
     """Test that unsupported rotation angle raises `ValueError`."""
-    qml.capture.enable()
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     with pytest.raises(
@@ -77,12 +75,10 @@ def test_pauli_rot_to_ppr_angle_error():
 
             return f()
 
-    qml.capture.disable()
 
-
+@pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_to_ppr_pauli_word_error():
     """Test that unsupported pauli words raises `ValueError`."""
-    qml.capture.enable()
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     with pytest.raises(
@@ -98,12 +94,10 @@ def test_pauli_rot_to_ppr_pauli_word_error():
 
             return f()
 
-    qml.capture.disable()
 
-
+@pytest.mark.usefixtures("use_capture")
 def test_pauli_measure_to_ppr_pauli_word_error():
     """Test that unsupported pauli words raises `ValueError`."""
-    qml.capture.enable()
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     with pytest.raises(
@@ -118,5 +112,3 @@ def test_pauli_measure_to_ppr_pauli_word_error():
                 qml.pauli_measure("A", wires=0)
 
             return f()
-
-    qml.capture.disable()
