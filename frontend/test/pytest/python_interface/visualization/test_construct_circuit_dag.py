@@ -13,12 +13,12 @@
 # limitations under the License.
 """Unit tests for the ConstructCircuitDAG utility."""
 
-from unittest.mock import MagicMock, Mock
+from unittest import mock
+from unittest.mock import MagicMock, Mock, call
 
 import pytest
 
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
-
 
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
@@ -26,6 +26,9 @@ from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from xdsl.dialects import test
+from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir.core import Block, Region
 
 
 class TestInitialization:
@@ -43,4 +46,36 @@ class TestRecursiveTraversal:
     """Tests that the recursive traversal logic works correctly."""
 
     def test_entire_module_is_traversed(self):
-        """Tests that the entire module heirarchy is traversed correctly."""
+        """Tests that the entire module hierarchy is traversed correctly."""
+
+        # Create block containing some ops
+        op = test.TestOp()
+        block = Block(ops=[op, op])
+        # Create region containing some blocks
+        region = Region(blocks=[block, block])
+        # Create op containing the regions
+        container_op = test.TestOp(regions=[region, region])
+        # Create module op to house it all
+        module_op = ModuleOp(ops=[container_op])
+
+        mock_dag_builder = Mock(DAGBuilder)
+        utility = ConstructCircuitDAG(mock_dag_builder)
+
+        # Mock out the visit dispatcher
+        utility.visit = Mock()
+
+        utility.construct(module_op)
+
+        assert utility.visit.call_count == 5
+
+        expected_calls = [
+            call(container_op),
+            call(region),
+            call(region),
+            call(block),
+            call(block),
+            call(op),
+            call(op),
+        ]
+
+        utility.visit.assert_has_calls(expected_calls, any_order=False)
