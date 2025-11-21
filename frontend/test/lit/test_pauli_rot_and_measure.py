@@ -26,7 +26,6 @@ from pennylane.ftqc.catalyst_pass_aliases import (
     to_ppr,
 )
 
-import catalyst.passes as catalyst_passes
 from catalyst import qjit
 
 

@@ -283,7 +283,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
 
 
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument, too-many-arguments
 def _qubit_unitary_bind_call(
     *invals, op, qubits_len, params_len, ctrl_len, adjoint, hyperparameters
 ):
@@ -295,7 +295,7 @@ def _qubit_unitary_bind_call(
     )
 
 
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument, too-many-arguments
 def _gphase_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint, hyperparameters):
     return gphase_p.bind(*invals[qubits_len:], ctrl_len=ctrl_len, adjoint=adjoint)
 
@@ -534,12 +534,12 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
     return ()
 
 
+# pylint: disable=unused-argument, too-many-arguments
 def _pauli_rot_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint, hyperparameters):
     """Handle the conversion from plxpr to Catalyst jaxpr for the PauliMeasure primitive"""
     # invals are the input wires
     wires = invals[:qubits_len]
     theta = invals[qubits_len]
-    ctrl_inputs = invals[qubits_len + 1 :]
     pauli_word = hyperparameters["pauli_word"]
     return pauli_rot_p.bind(
         *wires, theta=theta, pauli_word=pauli_word, qubits_len=qubits_len, adjoint=adjoint
