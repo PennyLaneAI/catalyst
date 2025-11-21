@@ -720,7 +720,7 @@ def test_decomposition_rule_name_update():
         qml.RY(theta, wires=wires)
         qml.RZ(omega, wires=wires)
 
-    @qml.register_resources({qml.RY: 1, qml.PhaseShift: 1})
+    @qml.register_resources({qml.RY: 1, qml.GlobalPhase: 1})
     def ry_gp(wires: WiresLike, **__):
         """Decomposition of PauliY gate using RY and GlobalPhase gates."""
         qml.RY(np.pi, wires=wires)
@@ -729,7 +729,7 @@ def test_decomposition_rule_name_update():
     @qml.qjit(target="mlir")
     @partial(
         qml.transforms.decompose,
-        gate_set={"RX", "RZ", "PhaseShift"},
+        gate_set={"RX", "RZ", "GlobalPhase"},
         fixed_decomps={
             qml.RY: rz_rx,
             qml.Rot: rz_ry_rz,
@@ -919,7 +919,7 @@ def test_decompose_lowering_with_other_passes():
     # CHECK: module attributes {transform.with_named_sequence} {
     # CHECK-NEXT:   transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
     # CHECK-NEXT:   [[ONE:%.+]] = transform.apply_registered_pass "decompose-lowering" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
-    # CHECK-NEXT:   [[TWO:%.+]] = transform.apply_registered_pass "remove-chained-self-inverse" to [[ONE]] : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+    # CHECK-NEXT:   [[TWO:%.+]] = transform.apply_registered_pass "cancel-inverses" to [[ONE]] : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
     # CHECK-NEXT:   {{%.+}} = transform.apply_registered_pass "merge-rotations" to [[TWO]] : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
     # CHECK-NEXT:   transform.yield
     # CHECK-NEXT:   }
@@ -1003,7 +1003,7 @@ def test_decompose_lowering_with_ordered_passes():
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     # CHECK: module attributes {transform.with_named_sequence} {
     # CHECK-NEXT:     transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
-    # CHECK-NEXT:     [[FIRST:%.+]] = transform.apply_registered_pass "remove-chained-self-inverse" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
+    # CHECK-NEXT:     [[FIRST:%.+]] = transform.apply_registered_pass "cancel-inverses" to %arg0 : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
     # CHECK-NEXT:     [[SECOND:%.+]] = transform.apply_registered_pass "merge-rotations" to [[FIRST]] : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
     # CHECK-NEXT:     {{%.+}} = transform.apply_registered_pass "decompose-lowering" to [[SECOND]] : (!transform.op<"builtin.module">) -> !transform.op<"builtin.module">
     # CHECK-NEXT:     transform.yield
