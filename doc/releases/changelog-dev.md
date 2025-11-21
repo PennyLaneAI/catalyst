@@ -11,31 +11,56 @@
   spurred from `A Game of Surface Codes (arXiv1808.02892) <https://arxiv.org/pdf/1808.02892>`_.
   [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
 
-  With program capture enabled (:func:`pennylane.capture.enable`), :class:`~.PauliRot` and 
-  :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes for PPR-PPM 
-  compilation, which includes :func:`catalyst.passes.to_ppr`, :func:`catalyst.passes.commute_ppr`, 
-  :func:`catalyst.passes.merge_ppr_ppm`, :func:`catalyst.passes.ppr_to_ppm`, and 
-  :func:`catalyst.passes.ppm_compilation`. For example,
+  :class:`~.PauliRot` and :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes
+  for PPR-PPM compilation, which includes :func:`catalyst.passes.to_ppr`, 
+  :func:`catalyst.passes.commute_ppr`, :func:`catalyst.passes.merge_ppr_ppm`, 
+  :func:`catalyst.passes.ppr_to_ppm`, :func:`catalyst.passes.reduce_t_depth`, and 
+  :func:`catalyst.passes.ppm_compilation`. For clear and inspectable results, use ``target="mlir"`` 
+  in the ``qjit`` decorator, ensure that PennyLane's program capture is enabled, 
+  :func:`pennylane.capture.enable`, and call the Catalyst passes from the PennyLane frontend (e.g., 
+  ``qml.transforms.ppr_to_ppm`` instead of from ``catalyst.passes.``).
 
   ```python
   import pennylane as qml
+  from functools import partial
   import jax.numpy as jnp
 
   qml.capture.enable()
 
-  dev = qml.device("null.qubit", wires=1)
-  pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
-  
-  @qjit(pipelines=pipeline, target="mlir")
-  @ppm_compilation
-  @qml.qnode(device=dev)
+  @qjit(target="mlir")
+  @partial(qml.transforms.ppm_compilation, decompose_method="auto-corrected")
+  @qml.qnode(qml.device("null.qubit", wires=3))
   def circuit():
-      qml.Hadamard(wires=0)
-      qml.PauliRot(jnp.pi / 2, "X", wires=0)
-      qml.PauliRot(jnp.pi / 4, "Y", wires=0)
-      qml.T(wires=0)
-      ppm = qml.pauli_measure("X", wires=0)
-      return qml.sample()
+      # equivalent to a Hadamard gate
+      qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
+      qml.PauliRot(jnp.pi / 2, pauli_word="X", wires=0)
+      qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
+
+      ppm = qml.pauli_measure(pauli_word="XYZ", wires=[0, 1, 2])
+
+      # equivalent to a CNOT gate
+      qml.PauliRot(jnp.pi / 2, pauli_word="ZX", wires=[0, 1])
+      qml.PauliRot(-jnp.pi / 2, pauli_word="Z", wires=[0])
+      qml.PauliRot(-jnp.pi / 2, pauli_word="X", wires=[1])
+
+      ppm = qml.pauli_measure(pauli_word="YYZ", wires=[0, 2, 1])
+
+      # equivalent to a T gate
+      qml.PauliRot(jnp.pi / 4, pauli_word="Z", wires=0)
+
+      return
+  ```
+
+  ```pycon
+  >>> print(qml.specs(circuit, level="device")()['resources'])
+  num_wires: 3
+  num_gates: 2
+  depth: None
+  shots: Shots(total=None)
+  gate_types:
+  {'PPM-w3': 2}
+  gate_sizes:
+  {3: 2}
   ```
 
 <h3>Improvements 🛠</h3>
