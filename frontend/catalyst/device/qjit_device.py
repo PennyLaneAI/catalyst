@@ -556,6 +556,7 @@ def filter_device_capabilities_with_shots(
     Process the device capabilities depending on whether shots are present in the user program,
     and whether device supports QubitUnitary ops.
     """
+
     device_capabilities = capabilities.filter(finite_shots=shots_present)
 
     # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this

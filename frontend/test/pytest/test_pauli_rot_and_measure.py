@@ -83,7 +83,8 @@ def test_pauli_rot_to_ppr_pauli_word_error():
 
     with pytest.raises(
         ValueError,
-        match=r"The given Pauli word \"A\" contains characters that are not allowed. Allowed characters are I, X, Y and Z",
+        match=r"The given Pauli word \"A\" contains characters that are not allowed. "
+        r"Allowed characters are I, X, Y and Z",
     ):
 
         @qjit(pipelines=pipe, target="mlir")
