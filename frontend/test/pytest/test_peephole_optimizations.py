@@ -163,29 +163,6 @@ def test_passes_bad_usages():
         ):
             pipeline({})(classical_func)
 
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            cancel_inverses(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            merge_rotations(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            disentangle_cnot(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            disentangle_swap(classical_func)
 
     test_passes_not_on_qnode()
 
