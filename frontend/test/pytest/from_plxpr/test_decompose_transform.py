@@ -23,17 +23,13 @@ import pytest
 from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
 
-pytestmark = pytest.mark.usefixtures("disable_capture")
-
 
 class TestGraphDecomposition:
     """Test the new graph-based decomposition integration with from_plxpr."""
 
+    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_with_multiple_decomps_transforms(self):
         """Test that a circuit with multiple decompositions and transforms can be converted."""
-
-        qml.capture.enable()
-        qml.decomposition.enable_graph()
 
         @qml.qjit(target="mlir")
         @partial(
@@ -54,15 +50,9 @@ class TestGraphDecomposition:
         ):
             circuit(0.2)
 
-        qml.decomposition.disable_graph()
-        qml.capture.disable()
-
-        assert qml.decomposition.enabled_graph() is False
-
+    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_fallback_warnings(self):
         """Test the fallback to legacy decomposition system with warnings."""
-        qml.capture.enable()
-        qml.decomposition.enable_graph()
 
         @qml.qjit
         @partial(qml.transforms.decompose, gate_set={qml.GlobalPhase})
@@ -78,14 +68,9 @@ class TestGraphDecomposition:
         ):
             circuit(0)
 
-        qml.decomposition.disable_graph()
-        qml.capture.disable()
-
+    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_decompose_lowering_on_empty_circuit(self):
         """Test that the decompose lowering pass works on an empty circuit."""
-
-        qml.capture.enable()
-        qml.decomposition.enable_graph()
 
         @partial(
             qml.transforms.decompose,
@@ -104,14 +89,9 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-        qml.decomposition.disable_graph()
-        qml.capture.disable()
-
+    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_alt_decomps(self):
         """Test the conversion of a circuit with a custom decomposition."""
-
-        qml.capture.enable()
-        qml.decomposition.enable_graph()
 
         @qml.register_resources({qml.H: 2, qml.CZ: 1})
         def my_cnot(wires):
@@ -139,14 +119,9 @@ class TestGraphDecomposition:
         resources = qml.specs(qjited_circuit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-        qml.decomposition.disable_graph()
-        qml.capture.disable()
-
+    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_fixed_rules(self):
         """Test the decompose lowering pass with custom decomposition rules."""
-
-        qml.capture.enable()
-        qml.decomposition.enable_graph()
 
         @qml.register_resources({qml.RZ: 2, qml.RX: 1})
         def rz_rx(phi, wires: WiresLike, **__):
@@ -198,14 +173,9 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-        qml.decomposition.disable_graph()
-        qml.capture.disable()
-
+    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_tensorlike(self):
         """Test that TensorLike parameters are handled correctly in rules."""
-
-        qml.capture.enable()
-        qml.decomposition.enable_graph()
 
         @qml.register_resources({qml.RZ: 1, qml.CNOT: 4})
         def custom_multirz(params: TensorLike, wires: WiresLike, **__):
@@ -236,14 +206,9 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")(x, y)["resources"].gate_types
         assert resources == expected_resources
 
-        qml.decomposition.disable_graph()
-        qml.capture.disable()
-
+    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_inordered_params(self):
         """Test that unordered parameters in rules are handled correctly."""
-
-        qml.capture.enable()
-        qml.decomposition.enable_graph()
 
         @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
         @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -264,14 +229,9 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")(x, y, z)["resources"].gate_types
         assert resources == expected_resources
 
-        qml.decomposition.disable_graph()
-        qml.capture.disable()
-
+    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_gateset_with_rotxzx(self):
         """Test the runtime raises an error if RotXZX is not decomposed."""
-
-        qml.capture.enable()
-        qml.decomposition.enable_graph()
 
         @partial(
             qml.transforms.decompose,
@@ -288,14 +248,9 @@ class TestGraphDecomposition:
         ):
             qml.qjit(circuit)()
 
-        qml.decomposition.disable_graph()
-        qml.capture.disable()
-
+    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_ftqc_rotxzx(self):
         """Test that FTQC RotXZX decomposition works with from_plxpr."""
-
-        qml.capture.enable()
-        qml.decomposition.enable_graph()
 
         @partial(
             qml.transforms.decompose,
@@ -316,14 +271,9 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-        qml.decomposition.disable_graph()
-        qml.capture.disable()
-
+    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_multirz(self):
         """Test that multirz decomposition works with from_plxpr."""
-
-        qml.capture.enable()
-        qml.decomposition.enable_graph()
 
         @partial(
             qml.transforms.decompose,
@@ -348,14 +298,9 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-        qml.decomposition.disable_graph()
-        qml.capture.disable()
-
+    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_gphase(self):
         """Test that the decompose lowering pass works with GlobalPhase."""
-
-        qml.capture.enable()
-        qml.decomposition.enable_graph()
 
         @partial(
             qml.transforms.decompose,
@@ -377,14 +322,9 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-        qml.decomposition.disable_graph()
-        qml.capture.disable()
-
+    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_multi_qubits(self):
         """Test that the decompose lowering pass works with multi-qubit gates."""
-
-        qml.capture.enable()
-        qml.decomposition.enable_graph()
 
         @partial(
             qml.transforms.decompose,
@@ -406,11 +346,9 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
+    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_adjoint(self):
         """Test the decompose lowering pass with adjoint operations."""
-
-        qml.capture.enable()
-        qml.decomposition.enable_graph()
 
         @partial(
             qml.transforms.decompose,
@@ -433,14 +371,9 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-        qml.decomposition.disable_graph()
-        qml.capture.disable()
-
+    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_ctrl(self):
         """Test the decompose lowering pass with controlled operations."""
-
-        qml.capture.enable()
-        qml.decomposition.enable_graph()
 
         @partial(
             qml.transforms.decompose,
@@ -462,14 +395,9 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-        qml.decomposition.disable_graph()
-        qml.capture.disable()
-
+    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_template_qft(self):
         """Test the decompose lowering pass with the QFT template."""
-
-        qml.capture.enable()
-        qml.decomposition.enable_graph()
 
         @partial(
             qml.transforms.decompose,
@@ -489,14 +417,9 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-        qml.decomposition.disable_graph()
-        qml.capture.disable()
-
+    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_multi_passes(self):
         """Test the decompose lowering pass with multiple passes."""
-
-        qml.capture.enable()
-        qml.decomposition.enable_graph()
 
         @qml.transforms.merge_rotations
         @qml.transforms.cancel_inverses
@@ -520,14 +443,9 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-        qml.decomposition.disable_graph()
-        qml.capture.disable()
-
+    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_autograph(self):
         """Test the decompose lowering pass with autograph."""
-
-        qml.capture.enable()
-        qml.decomposition.enable_graph()
 
         def _multi_rz_decomposition_resources(num_wires):
             """Resources required for MultiRZ decomposition."""
@@ -558,9 +476,6 @@ class TestGraphDecomposition:
         expected_resources = qml.specs(without_qjit, level="device")()["resources"].gate_types
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
-
-        qml.decomposition.disable_graph()
-        qml.capture.disable()
 
 
 if __name__ == "__main__":

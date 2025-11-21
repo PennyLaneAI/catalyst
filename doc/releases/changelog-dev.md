@@ -133,9 +133,6 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Update end-to-end integration tests for the graph-based decomposition in Catalyst.
-  [(#2221)](https://github.com/PennyLaneAI/catalyst/pull/2221)
-
 * Resource tracking now writes out at device destruction time instead of qubit deallocation
   time. The written resources will be the total amount of resources collected throughout the
   lifetime of the execution. For executions that split work between multiple functions,
