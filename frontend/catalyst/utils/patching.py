@@ -33,7 +33,7 @@ class DictPatchWrapper:
         self.key = key
 
     def __getattr__(self, name):
-        if name in ("dictionary", "key"):
+        if name in ("dictionary", "key"):  # pragma: no cover
             return object.__getattribute__(self, name)
         if name == "value":
             return self.dictionary[self.key]
@@ -44,7 +44,7 @@ class DictPatchWrapper:
             object.__setattr__(self, name, value)
         elif name == "value":
             self.dictionary[self.key] = value
-        else:
+        else:  # pragma: no cover
             raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
 

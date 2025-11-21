@@ -29,7 +29,6 @@ from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 from pennylane.capture.primitives import transform_prim
-from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
 from pennylane.transforms import commute_controlled as pl_commute_controlled
 from pennylane.transforms import decompose as pl_decompose
@@ -71,9 +70,10 @@ def _tuple_to_slice(t):
     Returns:
         slice: A slice object
     """
-    if isinstance(t, tuple) and len(t) == 3:
-        return slice(*t)
-    return t
+    assert (
+        isinstance(t, tuple) and len(t) == 3
+    ), "Please only use _tuple_to_slice on a tuple of length 3!"
+    return slice(*t)
 
 
 def _is_dict_like_tuple(t):
@@ -96,10 +96,10 @@ def _tuple_to_dict(t):
     if not isinstance(t, (dict, tuple, list)):
         return t
 
-    if isinstance(t, dict):
+    if isinstance(t, dict):  # pragma: no cover
         return {k: _tuple_to_dict(v) for k, v in t.items()}
 
-    if isinstance(t, list):
+    if isinstance(t, list):  # pragma: no cover
         return [_tuple_to_dict(item) for item in t]
 
     if isinstance(t, tuple):
@@ -113,7 +113,7 @@ def _tuple_to_dict(t):
         else:
             return [_tuple_to_dict(item) for item in t]
 
-    return t
+    return t  # pragma: no cover
 
 
 def _get_device_kwargs(device) -> dict:
@@ -337,7 +337,6 @@ transforms_to_passes = {
     pl_cancel_inverses: ("cancel-inverses", False),
     pl_commute_controlled: (None, False),
     pl_decompose: (None, False),
-    pl_map_wires: (None, False),
     pl_merge_amplitude_embedding: (None, True),
     pl_merge_rotations: ("merge-rotations", False),
     pl_single_qubit_fusion: (None, False),
