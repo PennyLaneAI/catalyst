@@ -17,6 +17,7 @@
 import pennylane as qml
 
 from catalyst import measure, qjit
+from catalyst.passes import merge_rotations
 
 
 @qjit(target="mlir")
@@ -41,9 +42,9 @@ def test_one_shot_with_static_argnums(N):
 
     # CHECK: func.func private @one_shot_wrapper() -> tensor<1024xf64>
     # CHECK-DAG: [[one:%.+]] = arith.constant 1 : index
-    # CHECK-DAG: [[eleven:%.+]] = arith.constant 11 : index
+    # CHECK-DAG: [[ten:%.+]] = arith.constant 10 : index
     # CHECK-DAG: [[zero:%.+]] = arith.constant 0 : index
-    # CHECK: scf.for %arg0 = [[zero]] to [[eleven]] step [[one]]
+    # CHECK: scf.for %arg0 = [[zero]] to [[ten]] step [[one]]
     # CHECK: {{%.+}} = catalyst.launch_kernel @module_circ::@circ() : () -> tensor<1024xf64>
 
     # CHECK: func.func public @circ() -> tensor<1024xf64>
@@ -53,7 +54,7 @@ def test_one_shot_with_static_argnums(N):
 
     dev = qml.device("lightning.qubit", wires=N)
 
-    @qml.set_shots(N + 1)
+    @qml.set_shots(N)
     @qml.qnode(dev, mcm_method="one-shot")
     def circ():
         return qml.probs()
@@ -63,3 +64,34 @@ def test_one_shot_with_static_argnums(N):
 
 test_one_shot_with_static_argnums(10)
 print(test_one_shot_with_static_argnums.mlir)
+
+
+@qjit(target="mlir")
+def test_one_shot_with_passes():
+    """
+    Test pass pipeline is passed correctly to the one shot qnodes.
+    """
+    # CHECK: func.func public @jit_test_one_shot_with_passes() -> tensor<10x1xi64>
+    # CHECK: {{%.+}} = call @one_shot_wrapper() : () -> tensor<10x1xi64>
+
+    # CHECK: func.func private @one_shot_wrapper() -> tensor<10x1xi64>
+    # CHECK: scf.for
+    # CHECK: {{%.+}} = catalyst.launch_kernel @module_circ::@circ() : () -> tensor<1x1xi64>
+
+    # CHECK: module @module_circ
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK: transform.apply_registered_pass "merge-rotations"
+    # CHECK: func.func public @circ() -> tensor<1x1xi64>
+
+    dev = qml.device("lightning.qubit", wires=1)
+
+    @merge_rotations
+    @qml.set_shots(10)
+    @qml.qnode(dev, mcm_method="one-shot")
+    def circ():
+        return qml.sample()
+
+    return circ()
+
+
+print(test_one_shot_with_passes.mlir)

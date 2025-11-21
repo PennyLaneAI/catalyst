@@ -44,6 +44,7 @@ from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
     filter_static_args,
     get_abstract_signature,
+    get_arg_names,
     get_type_annotations,
     merge_static_argname_into_argnum,
     merge_static_args,
@@ -79,6 +80,7 @@ def qjit(
     async_qnodes=False,
     target="binary",
     keep_intermediate=False,
+    use_nameloc=False,
     verbose=False,
     logfile=None,
     pipelines=None,
@@ -103,7 +105,7 @@ def qjit(
         a full of supported devices, please see :doc:`/dev/devices`.
 
     Args:
-        fn (Callable): the quantum or classical function
+        fn (Callable): The quantum or classical function.
         autograph (bool): Experimental support for automatically converting Python control
             flow statements (including ``if`` statements, ``for`` and ``while`` loops) to
             Catalyst-compatible control flow, and more. For more details, see the
@@ -111,16 +113,20 @@ def qjit(
         autograph_include: A list of (sub)modules to be allow-listed for autograph conversion.
         async_qnodes (bool): Experimental support for automatically executing
             QNodes asynchronously, if supported by the device runtime.
-        target (str): the compilation target
+        target (str): The compilation target.
         keep_intermediate (Union[str, int, bool]): Level controlling intermediate file generation.
+
             - ``False`` or ``0`` or ``"none"`` or ``None`` (default): No intermediate file is kept.
             - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
             - ``2`` or ``"pass"``: Intermediate files are saved after each pass.
             If enabled, intermediate representations are available via the following attributes:
+
             - :attr:`~.QJIT.jaxpr`: JAX program representation
             - :attr:`~.QJIT.mlir`: MLIR representation after canonicalization
             - :attr:`~.QJIT.mlir_opt`: MLIR representation after optimization
             - :attr:`~.QJIT.qir`: QIR in LLVM IR form
+        use_nameloc (bool): If ``True``, function parameter names are added to the IR as name
+            locations.
         verbose (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
             printed out.
         logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
@@ -129,9 +135,9 @@ def qjit(
             elements of this list are named sequences of MLIR passes to be executed. A ``None``
             value (the default) results in the execution of the default pipeline. This option is
             considered to be used by advanced users for low-level debugging purposes.
-        static_argnums(int or Seqence[Int]): an index or a sequence of indices that specifies the
+        static_argnums(int or Seqence[Int]): An index or a sequence of indices that specifies the
             positions of static arguments.
-        static_argnames(str or Seqence[str]): a string or a sequence of strings that specifies the
+        static_argnames(str or Seqence[str]): A string or a sequence of strings that specifies the
             names of static arguments.
         abstracted_axes (Sequence[Sequence[str]] or Dict[int, str] or Sequence[Dict[int, str]]):
             An experimental option to specify dynamic tensor shapes.
@@ -517,7 +523,6 @@ class QJIT(CatalystCallable):
     :ivar jaxpr: This attribute stores the Jaxpr compiled from the function as a string.
     :ivar mlir: This attribute stores the MLIR compiled from the function as a string.
     :ivar qir: This attribute stores the QIR in LLVM IR form compiled from the function as a string.
-
     """
 
     @debug_logger_init
@@ -562,20 +567,29 @@ class QJIT(CatalystCallable):
 
     @property
     def mlir(self):
-        """obtain the MLIR representation after canonicalization"""
+        """Obtain the MLIR representation after canonicalization"""
         # Canonicalize the MLIR since there can be a lot of redundancy coming from JAX.
         if not self.mlir_module:
             return None
 
-        return canonicalize(stdin=str(self.mlir_module))
+        stdin = self.mlir_module.operation.get_asm(
+            enable_debug_info=self.compile_options.use_nameloc
+        )
+        return canonicalize(stdin=stdin, options=self.compile_options)
 
     @property
     def mlir_opt(self):
-        """obtain the MLIR representation after optimization"""
+        """Obtain the MLIR representation after optimization"""
         if not self.mlir_module:
             return None
-
-        return to_mlir_opt(stdin=str(self.mlir_module), options=self.compile_options)
+        using_python_compiler = self.compiler.is_using_python_compiler(self.mlir_module)
+        stdin = self.mlir_module.operation.get_asm(
+            print_generic_op_form=using_python_compiler,
+            enable_debug_info=self.compile_options.use_nameloc,
+        )
+        return to_mlir_opt(
+            stdin=stdin, options=self.compile_options, using_python_compiler=using_python_compiler
+        )
 
     @debug_logger
     def __call__(self, *args, **kwargs):
@@ -604,7 +618,6 @@ class QJIT(CatalystCallable):
     @debug_logger
     def aot_compile(self):
         """Compile Python function on initialization using the type hint signature."""
-
         self.workspace = self._get_workspace()
 
         # TODO: awkward, refactor or redesign the target feature
@@ -643,7 +656,6 @@ class QJIT(CatalystCallable):
             bool: whether the provided arguments will require promotion to be used with the compiled
                   function
         """
-
         cached_fn, requires_promotion = self.fn_cache.lookup(args)
 
         if cached_fn is None:
@@ -774,8 +786,9 @@ class QJIT(CatalystCallable):
         Returns:
             Tuple[ir.Module, str]: the in-memory MLIR module and its string representation
         """
-
-        mlir_module, ctx = lower_jaxpr_to_mlir(self.jaxpr, self.__name__)
+        mlir_module, ctx = lower_jaxpr_to_mlir(
+            self.jaxpr, self.__name__, get_arg_names(self.jaxpr.in_avals, self.original_function)
+        )
 
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
         inject_functions(mlir_module, ctx, self.compile_options.seed)
@@ -790,7 +803,6 @@ class QJIT(CatalystCallable):
         Returns:
             Tuple[CompiledFunction, str]: the compilation result and LLVMIR
         """
-
         # WARNING: assumption is that the first function is the entry point to the compiled program.
         entry_point_func = self.mlir_module.body.operations[0]
         restype = entry_point_func.type.results
@@ -833,7 +845,6 @@ class QJIT(CatalystCallable):
         Returns:
             Any: results of the execution arranged into the original function's output PyTrees
         """
-
         results = self.compiled_function(*args, **kwargs)
 
         # TODO: Move this to the compiled function object.
@@ -853,7 +864,6 @@ class QJIT(CatalystCallable):
 
     def _get_workspace(self):
         """Get or create a workspace to use for compilation."""
-
         workspace_name = self.__name__
         preferred_workspace_dir = os.getcwd() if self.use_cwd_for_workspace else None
 

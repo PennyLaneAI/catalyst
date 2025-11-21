@@ -23,6 +23,7 @@ from jax.core import ShapedArray
 
 import catalyst
 from catalyst import qjit
+from catalyst.from_plxpr import register_transform
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
@@ -50,7 +51,7 @@ def circuit_aot_builder(dev):
 def has_catalyst_transforms(mlir):
     """Check in the MLIR if the transforms were scheduled"""
     return (
-        'transform.apply_registered_pass "remove-chained-self-inverse"' in mlir
+        'transform.apply_registered_pass "cancel-inverses"' in mlir
         and 'transform.apply_registered_pass "merge-rotations"' in mlir
     )
 
@@ -287,7 +288,6 @@ class TestCapture:
 
         assert jnp.allclose(capture_result, circuit(init_state))
 
-    @pytest.mark.xfail(reason="Adjoint not supported.")
     @pytest.mark.parametrize("theta, val", [(jnp.pi, 0), (-100.0, 1)])
     def test_adjoint(self, backend, theta, val):
         """Test the integration for a circuit with adjoint."""
@@ -318,7 +318,6 @@ class TestCapture:
 
         assert jnp.allclose(capture_result, circuit(theta, val))
 
-    @pytest.mark.xfail(reason="Ctrl not supported.")
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_ctrl(self, backend, theta):
         """Test the integration for a circuit with control."""
@@ -419,7 +418,7 @@ class TestCapture:
                 qml.CNOT(wires=[0, i])
                 qml.RX(x, wires=i)
 
-            loop()
+            loop()  # pylint: disable=no-value-for-parameter
 
             return qml.expval(qml.Z(2))
 
@@ -457,7 +456,7 @@ class TestCapture:
                 return jnp.sin(x)
 
             # apply the for loop
-            loop_rx(x)
+            loop_rx(x)  # pylint: disable=no-value-for-parameter
 
             return qml.expval(qml.Z(0))
 
@@ -477,7 +476,7 @@ class TestCapture:
                 return jnp.sin(x)
 
             # apply the for loop
-            loop_rx(x)
+            loop_rx(x)  # pylint: disable=no-value-for-parameter
 
             return qml.expval(qml.Z(0))
 
@@ -507,10 +506,10 @@ class TestCapture:
                 def inner(j):
                     qml.ControlledPhaseShift(jnp.pi / 2 ** (n - j + 1), [i, j])
 
-                inner()
+                inner()  # pylint: disable=no-value-for-parameter
 
-            init()
-            qft()
+            init()  # pylint: disable=no-value-for-parameter
+            qft()  # pylint: disable=no-value-for-parameter
 
             # Expected output: |100...>
             return qml.state()
@@ -538,10 +537,10 @@ class TestCapture:
                 def inner(j):
                     qml.ControlledPhaseShift(jnp.pi / 2 ** (n - j + 1), [i, j])
 
-                inner()
+                inner()  # pylint: disable=no-value-for-parameter
 
-            init()
-            qft()
+            init()  # pylint: disable=no-value-for-parameter
+            qft()  # pylint: disable=no-value-for-parameter
 
             # Expected output: |100...>
             return qml.state()
@@ -1048,6 +1047,30 @@ class TestCapture:
 
         assert jnp.allclose(circuit(0.1), capture_result)
 
+    @pytest.mark.usefixtures("use_capture")
+    def test_pass_with_options(self, backend):
+        """Test the integration for a circuit with a pass that takes in options."""
+
+        @qml.transform
+        def my_pass(_tape, my_option=None, my_other_option=None):  # pylint: disable=unused-argument
+            """A dummy qml.transform."""
+            return
+
+        register_transform(my_pass, "my-pass", False)
+
+        @qjit(target="mlir")
+        @partial(my_pass, my_option="my_option_value", my_other_option=False)
+        @qml.qnode(qml.device(backend, wires=1))
+        def captured_circuit():
+            return qml.expval(qml.PauliZ(0))
+
+        capture_mlir = captured_circuit.mlir
+        assert 'transform.apply_registered_pass "my-pass"' in capture_mlir
+        assert (
+            'with options = {"my-option" = "my_option_value", "my-other-option" = false}'
+            in capture_mlir
+        )
+
     def test_transform_cancel_inverses_workflow(self, backend):
         """Test the integration for a circuit with a 'cancel_inverses' transform."""
 
@@ -1065,9 +1088,7 @@ class TestCapture:
             return qml.expval(qml.PauliZ(0))
 
         capture_result = captured_circuit(0.1)
-        assert (
-            'transform.apply_registered_pass "remove-chained-self-inverse"' in captured_circuit.mlir
-        )
+        assert 'transform.apply_registered_pass "cancel-inverses"' in captured_circuit.mlir
 
         qml.capture.disable()
 
@@ -1234,11 +1255,9 @@ class TestCapture:
 
         # Catalyst 'cancel_inverses' should have been scheduled as a pass
         # whereas PL 'unitary_to_rot' should have been expanded
-        assert (
-            'transform.apply_registered_pass "remove-chained-self-inverse"'
-            in captured_inverses_unitary.mlir
-        )
-        assert is_unitary_rotated(captured_inverses_unitary.mlir)
+        capture_mlir = captured_inverses_unitary.mlir
+        assert 'transform.apply_registered_pass "cancel-inverses"' in capture_mlir
+        assert is_unitary_rotated(capture_mlir)
 
         # Case 2: During plxpr interpretation, first comes the PL transform
         # without Catalyst counterpart, second comes the PL transform with it
@@ -1251,12 +1270,10 @@ class TestCapture:
 
         # Both PL transforms should have been expaned and no Catalyst pass should have been
         # scheduled
-        assert (
-            'transform.apply_registered_pass "remove-chained-self-inverse"'
-            not in captured_unitary_inverses.mlir
-        )
-        assert 'quantum.custom "Hadamard"' not in captured_unitary_inverses.mlir
-        assert is_unitary_rotated(captured_unitary_inverses.mlir)
+        capture_mlir = captured_unitary_inverses.mlir
+        assert 'transform.apply_registered_pass "cancel-inverses"' not in capture_mlir
+        assert 'quantum.custom "Hadamard"' not in capture_mlir
+        assert is_unitary_rotated(capture_mlir)
 
         qml.capture.disable()
 
@@ -1313,36 +1330,47 @@ class TestCapture:
 
         assert jnp.allclose(circuit(1.5, 2.5, 3.5), capture_result)
 
-    def test_transform_map_wires_workflow(self, backend):
-        """Test the integration for a circuit with a 'map_wires' transform."""
+    def test_transform_graph_decompose_workflow(self, backend):
+        """Test the integration for a circuit with a 'decompose' graph transform."""
 
         # Capture enabled
 
         qml.capture.enable()
+        qml.decomposition.enable_graph()
 
         @qjit(target="mlir")
-        @partial(qml.map_wires, wire_map={0: 1})
+        @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
         @qml.qnode(qml.device(backend, wires=2))
-        def captured_circuit(x):
-            qml.RX(x, 0)
+        def captured_circuit(x: float, y: float, z: float):
+            m = qml.measure(0)
+
+            @qml.cond(m)
+            def cond_fn():
+                qml.Rot(x, y, z, 0)
+
+            cond_fn()
             return qml.expval(qml.PauliZ(0))
 
-        capture_result = captured_circuit(1.5)
+        capture_result = captured_circuit(1.5, 2.5, 3.5)
 
-        assert is_wire_mapped(captured_circuit.mlir)
-
+        qml.decomposition.disable_graph()
         qml.capture.disable()
 
         # Capture disabled
-
         @qjit
-        @partial(qml.map_wires, wire_map={0: 1})
+        @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
         @qml.qnode(qml.device(backend, wires=2))
-        def circuit(x):
-            qml.RX(x, 0)
+        def circuit(x: float, y: float, z: float):
+            m = catalyst.measure(0)
+
+            @catalyst.cond(m)
+            def cond_fn():
+                qml.Rot(x, y, z, 0)
+
+            cond_fn()
             return qml.expval(qml.PauliZ(0))
 
-        assert jnp.allclose(circuit(1.5), capture_result)
+        assert jnp.allclose(circuit(1.5, 2.5, 3.5), capture_result)
 
     def test_transform_single_qubit_fusion_workflow(self, backend):
         """Test the integration for a circuit with a 'single_qubit_fusion' transform."""
@@ -1404,11 +1432,12 @@ class TestCapture:
 
         capture_result = captured_circuit()
 
+        capture_mlir = captured_circuit.mlir
         assert is_controlled_pushed_back(
-            captured_circuit.mlir, 'quantum.custom "RX"', 'quantum.custom "CNOT"'
+            capture_mlir, 'quantum.custom "RX"', 'quantum.custom "CNOT"'
         )
         assert is_controlled_pushed_back(
-            captured_circuit.mlir, 'quantum.custom "PauliX"', 'quantum.custom "CRX"'
+            capture_mlir, 'quantum.custom "PauliX"', 'quantum.custom "CRX"'
         )
 
         qml.capture.disable()
@@ -1480,7 +1509,7 @@ class TestCapture:
                 def loop_0(i):
                     qml.RX(0, wires=i)
 
-                loop_0()
+                loop_0()  # pylint: disable=no-value-for-parameter
 
                 qml.RX(0, wires=0)
                 return qml.sample()
@@ -1498,7 +1527,7 @@ class TestCapture:
             def loop_0(i):
                 qml.RX(0, wires=i)
 
-            loop_0()
+            loop_0()  # pylint: disable=no-value-for-parameter
 
             qml.RX(0, wires=0)
             return qml.sample()
@@ -1584,7 +1613,7 @@ class TestControlFlow:
             def g(i, x):
                 return c(i) + x
 
-            return g(i0)
+            return g(i0)  # pylint: disable=no-value-for-parameter
 
         out = f(3.0)
         assert qml.math.allclose(out, 3 + jnp.cos(2) + jnp.cos(4) + jnp.cos(6))
@@ -1613,6 +1642,58 @@ class TestControlFlow:
         assert qml.math.allclose(ind, 3)
         expected = 1.0 + jnp.cos(0) + jnp.cos(1) + jnp.cos(2)
         assert qml.math.allclose(res, expected)
+
+    # pylint: disable=unused-argument
+    def test_for_loop_consts(self):
+        """This tests for kinda a weird edge case bug where the consts where getting
+        reordered when translating the inner jaxpr."""
+
+        qml.capture.enable()
+
+        @qml.qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit(x, n):
+            @qml.for_loop(3)
+            def outer(i):
+
+                @qml.for_loop(n)
+                def inner(j):
+                    qml.RY(x, wires=j)
+
+                inner()  # pylint: disable=no-value-for-parameter
+
+            outer()  # pylint: disable=no-value-for-parameter
+
+            # Expected output: |100...>
+            return [qml.expval(qml.PauliZ(i)) for i in range(3)]
+
+        res1, res2, res3 = circuit(0.2, 2)
+
+        assert qml.math.allclose(res1, jnp.cos(0.2 * 3))
+        assert qml.math.allclose(res2, jnp.cos(0.2 * 3))
+        assert qml.math.allclose(res3, 1)
+
+    # pylint: disable=unused-argument
+    def test_for_loop_consts_outside_qnode(self):
+        """Similar test as above for weird edge case, but not using a qnode."""
+
+        qml.capture.enable()
+
+        @qml.qjit
+        def f(x, n):
+            @qml.for_loop(3)
+            def outer(i, a):
+
+                @qml.for_loop(n)
+                def inner(j, b):
+                    return b + x
+
+                return inner(a)  # pylint: disable=no-value-for-parameter
+
+            return outer(0.0)  # pylint: disable=no-value-for-parameter
+
+        res = f(0.2, 2)
+        assert qml.math.allclose(res, 0.2 * 2 * 3)
 
 
 def test_adjoint_transform_integration():

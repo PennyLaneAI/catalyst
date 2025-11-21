@@ -27,7 +27,7 @@ from catalyst.passes import (
     ppm_compilation,
     ppr_to_mbqc,
     ppr_to_ppm,
-    t_layer_reduction,
+    reduce_t_depth,
     to_ppr,
 )
 
@@ -83,10 +83,15 @@ def test_commute_ppr():
 
 
 # CHECK-LABEL: public @cir_commute_ppr
-# CHECK: qec.ppr ["X"](8)
-# CHECK: qec.ppr ["Z"](8)
-# CHECK: qec.ppr ["Z"](4)
-# CHECK: qec.ppr ["Z"](4)
+# CHECK: %0 = quantum.alloc( 2)
+# CHECK: %1 = quantum.extract %0[ 0]
+# CHECK: %2 = qec.ppr ["X"](8) %1
+# CHECK: %3 = qec.ppr ["Z"](4) %2
+# CHECK: %4 = qec.ppr ["X"](4) %3
+# CHECK: %5 = qec.ppr ["Z"](4) %4
+# CHECK: %6 = quantum.extract %0[ 1]
+# CHECK: %7 = qec.ppr ["Z"](8) %6
+# CHECK: %8 = qec.ppr ["Z"](4) %7
 test_commute_ppr()
 
 
@@ -353,20 +358,20 @@ def test_clifford_to_ppm():
 test_clifford_to_ppm()
 
 
-def test_t_layer_reduction():
+def test_reduce_t_depth():
     """
-    Test the `t_layer_reduction` pass.
+    Test the `reduce_t_depth` pass.
     """
 
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
-    @t_layer_reduction
+    @reduce_t_depth
     @merge_ppr_ppm
     @commute_ppr
     @to_ppr
     @qml.qnode(qml.device("null.qubit", wires=3))
-    def test_t_layer_reduction_workflow():
+    def test_reduce_t_depth_workflow():
         n = 3
         for i in range(n):
             qml.H(wires=i)
@@ -378,16 +383,16 @@ def test_t_layer_reduction():
 
         return [measure(wires=i) for i in range(n)]
 
-    print(test_t_layer_reduction_workflow.mlir_opt)
+    print(test_reduce_t_depth_workflow.mlir_opt)
 
 
 # CHECK: qec.ppr ["X"](8)
 # CHECK: qec.ppr ["X"](8)
 # CHECK: qec.ppr ["Y", "X"](8)
-# CHECK: qec.ppr ["X"](8)
 # CHECK: qec.ppr ["X", "Y", "X"](8)
+# CHECK: qec.ppr ["X"](8)
 # CHECK: qec.ppr ["X", "X", "Y"](8)
-test_t_layer_reduction()
+test_reduce_t_depth()
 
 
 def test_ppr_to_mbqc():

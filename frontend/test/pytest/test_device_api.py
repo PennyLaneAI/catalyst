@@ -43,8 +43,8 @@ def test_qjit_device():
         transform_program, _ = device_qjit.preprocess(ctx)
     assert transform_program
     assert len(transform_program) == 3
-    assert transform_program[-2]._transform.__name__ == "verify_operations"
-    assert transform_program[-1]._transform.__name__ == "validate_measurements"
+    assert transform_program[-2].transform.__name__ == "verify_operations"
+    assert transform_program[-1].transform.__name__ == "validate_measurements"
 
     # TODO: readd when we do not discard device preprocessing
     # t = transform_program[0].transform.__name__
@@ -101,7 +101,7 @@ def test_qjit_device_measurements(shots, mocker):
         assert finite_shot_measurements.issubset(expected_measurements)
         assert state_measurements.intersection(expected_measurements) == set()
 
-    spy = mocker.spy(qjit_device, "get_qjit_device_capabilities")
+    spy = mocker.spy(qjit_device, "filter_device_capabilities_with_shots")
 
     @qjit
     @qml.set_shots(shots)

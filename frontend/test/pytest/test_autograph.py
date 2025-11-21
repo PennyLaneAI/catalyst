@@ -714,11 +714,11 @@ class TestConditionals:
 
         m = qml.measure if qml.capture.enabled() else measure
 
-        def circuit():
-            if True:
+        def circuit(pred: bool):
+            if pred:
                 res = m(wires=0)
 
-            return res
+            return res  # pylint: disable=possibly-used-before-assignment
 
         err_type = qml.exceptions.AutoGraphError if qml.capture.enabled() else AutoGraphError
 
@@ -2174,14 +2174,15 @@ class TestDecorators:
         functional wrappers."""
 
         @qml.prod
-        def template():
-            qml.H(0)
-            qml.X(0)
+        def template(b: bool):
+            if b:
+                qml.H(0)
+                qml.X(0)
 
         @qjit(autograph=True, target="jaxpr")
         @qml.qnode(qml.device("null.qubit", wires=0))
         def circuit():
-            qml.adjoint(template())
+            qml.adjoint(template)(True)
             return qml.state()
 
         assert circuit.jaxpr is not None

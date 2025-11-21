@@ -28,7 +28,7 @@ from catalyst.utils.exceptions import CompileError
 ## API ##
 def cancel_inverses(qnode):
     """
-    Specify that the ``-removed-chained-self-inverse`` MLIR compiler pass
+    Specify that the ``-cancel-inverses`` MLIR compiler pass
     for cancelling two neighbouring self-inverse
     gates should be applied to the decorated QNode during :func:`~.qjit`
     compilation.
@@ -136,7 +136,7 @@ def cancel_inverses(qnode):
         %2 = quantum.namedobs %out_qubits[ PauliZ] : !quantum.obs
         %3 = quantum.expval %2 : f64
     """
-    return PassPipelineWrapper(qnode, "remove-chained-self-inverse")
+    return PassPipelineWrapper(qnode, "cancel-inverses")
 
 
 def disentangle_cnot(qnode):
@@ -853,10 +853,10 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
         pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
         @qjit(pipelines=pipeline, target="mlir")
-        @to_ppr
-        @commute_ppr
         @merge_ppr_ppm
         @ppr_to_ppm(decompose_method="auto-corrected")
+        @commute_ppr
+        @to_ppr
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             qml.H(0)
@@ -871,23 +871,23 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
     .. code-block:: mlir
 
         . . .
-        %5 = qec.fabricate  zero : !quantum.bit
-        %6 = qec.fabricate  magic : !quantum.bit
-        %mres, %out_qubits:2 = qec.ppm ["X", "Z"] %1, %6 : !quantum.bit, !quantum.bit
-        %mres_0, %out_qubits_1:2 = qec.ppm ["Z", "Y"](-1) %5, %out_qubits#1 : !quantum.bit, !quantum.bit
-        %mres_2, %out_qubits_3 = qec.ppm ["X"] %out_qubits_1#1 : !quantum.bit
-        %mres_4, %out_qubits_5 = qec.select.ppm(%mres, ["X"], ["Z"]) %out_qubits_1#0 : !quantum.bit
-        %7 = arith.xori %mres_0, %mres_2 : i1
-        %8 = qec.ppr ["X"](2) %out_qubits#0 cond(%7) : !quantum.bit
+        %3 = qec.fabricate  magic : !quantum.bit
+        %mres, %out_qubits:2 = qec.ppm ["X", "Z"] %1, %3 : !quantum.bit, !quantum.bit
+        %mres_0, %out_qubits_1:2 = qec.ppm ["Z", "Y"](-1) %out_qubits#1, %2 : !quantum.bit, !quantum.bit
+        %mres_2, %out_qubits_3 = qec.ppm ["X"] %out_qubits_1#0 : !quantum.bit
+        %mres_4, %out_qubits_5 = qec.select.ppm(%mres, ["X"], ["Z"]) %out_qubits_1#1 : !quantum.bit
+        quantum.dealloc_qb %out_qubits_5 : !quantum.bit
+        quantum.dealloc_qb %out_qubits_3 : !quantum.bit
+        %4 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+        quantum.device_release
         . . .
 
     """
     passes = {
-        "decompose_non_clifford_ppr": {
+        "ppr_to_ppm": {
             "decompose-method": decompose_method,
             "avoid-y-measure": avoid_y_measure,
         },
-        "decompose_clifford_ppr": {"avoid-y-measure": avoid_y_measure},
     }
 
     if qnode is None:
@@ -1112,12 +1112,17 @@ def ppm_specs(fn):
         raise NotImplementedError("PPM passes only support AOT (Ahead-Of-Time) compilation mode.")
 
 
-def t_layer_reduction(qnode):
+def reduce_t_depth(qnode):
     R"""
     An MLIR compiler pass that reduces the depth and count of non-Clifford PPRs (e.g., ``T`` gates) by
     commuting PPRs in adjacent layers and merging compatible ones (a layer comprises a set of PPRs
     that mutually commute). For more details, see the Figure 6 of
     `A Game of Surface Codes <https://arXiv:1808.02892v3>`_.
+
+    The impact can be measured using ``catalyst.passes.ppm_specs`` to compare the circuit depth
+    before and after applying the pass. The ``ppm_specs`` function provides detailed statistics
+    including ``depth_pi8_ppr`` (non-Clifford PPR depth) and ``pi8_ppr`` (number of non-Clifford
+    PPRs), allowing users to quantify the optimization achieved by the pass.
 
     Args:
         qnode (QNode): QNode to apply the pass to.
@@ -1129,7 +1134,7 @@ def t_layer_reduction(qnode):
 
     In the example below, after performing the :func:`catalyst.passes.to_ppr` and
     :func:`catalyst.passes.merge_ppr_ppm` passes, the circuit contains a depth of four of
-    non-Clifford PPRs. Subsequently applying the ``t_layer_reduction`` pass will move PPRs around via
+    non-Clifford PPRs. Subsequently applying the ``reduce_t_depth`` pass will move PPRs around via
     commutation, resulting in a circuit with a smaller PPR depth. Specifically, in the circuit
     below, the Pauli-:math:`X` PPR (:math:`\exp(iX\tfrac{\pi}{8})`) on qubit Q1 will be moved to the
     first layer, which results in a depth of three non-Clifford PPRs.
@@ -1138,13 +1143,13 @@ def t_layer_reduction(qnode):
 
         import pennylane as qml
         from catalyst import qjit, measure
-        from catalyst.passes import to_ppr, commute_ppr, t_layer_reduction, merge_ppr_ppm
+        from catalyst.passes import to_ppr, commute_ppr, reduce_t_depth, merge_ppr_ppm
 
         pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
 
         @qjit(pipelines=pips, target="mlir")
-        @t_layer_reduction
+        @reduce_t_depth
         @merge_ppr_ppm
         @commute_ppr
         @to_ppr
@@ -1187,7 +1192,7 @@ def t_layer_reduction(qnode):
 
     """
 
-    return PassPipelineWrapper(qnode, "t-layer-reduction")
+    return PassPipelineWrapper(qnode, "reduce-t-depth")
 
 
 def ppr_to_mbqc(qnode):

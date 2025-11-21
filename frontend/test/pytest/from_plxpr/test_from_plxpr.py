@@ -1,4 +1,4 @@
-# Copyright 2024 Xanadu Quantum Technologies Inc.
+# Copyright 2024-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,8 @@
 """
 This module tests the from_plxpr conversion function.
 """
+
+# pylint: disable=too-many-lines
 
 from functools import partial
 
@@ -842,7 +844,7 @@ class TestControlFlow:
             def g(i, x):
                 return i + x
 
-            return g(i0)
+            return g(i0)  # pylint: disable=no-value-for-parameter
 
         jaxpr = jax.make_jaxpr(f)(2)
         catalyst_jaxpr = from_plxpr(jaxpr)(2)
@@ -854,7 +856,7 @@ class TestControlFlow:
         assert eqn.primitive == for_p
         assert eqn.params["apply_reverse_transform"] == reverse
         assert eqn.params["body_nconsts"] == 0
-        assert eqn.params["nimplicit"] == 0
+        assert eqn.params["num_implicit_inputs"] == 0
         assert eqn.params["preserve_dimensions"] is True
 
         assert eqn.invars[0].val == start
@@ -884,7 +886,7 @@ class TestControlFlow:
         assert catalyst_xpr.eqns[0].primitive == while_p
         assert catalyst_xpr.eqns[0].params["body_nconsts"] == 1
         assert catalyst_xpr.eqns[0].params["cond_nconsts"] == 1
-        assert catalyst_xpr.eqns[0].params["nimplicit"] == 0
+        assert catalyst_xpr.eqns[0].params["num_implicit_inputs"] == 0
         assert catalyst_xpr.eqns[0].params["preserve_dimensions"] == True
 
         for kind in ["body_jaxpr", "cond_jaxpr"]:
@@ -999,6 +1001,139 @@ class TestGraphDecomposition:
         qml.capture.disable()
 
         assert qml.decomposition.enabled_graph() is False
+
+    def test_decompose_fallback_warnings(self):
+        """Test the fallback to legacy decomposition system with warnings."""
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
+
+        @qml.qjit
+        @partial(qml.transforms.decompose, gate_set={qml.GlobalPhase})
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x):
+            qml.Hadamard(x)
+            return qml.state()
+
+        with pytest.warns(
+            UserWarning,
+            match="The graph-based decomposition system is unable to find a decomposition"
+            " for {'Hadamard'} to the target gate set {'GlobalPhase'}.",
+        ):
+            circuit(0)
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
+
+    def test_decompose_with_custom(self):
+        """Test the conversion of a circuit with a custom decomposition."""
+
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
+
+        @qml.register_resources({qml.H: 2, qml.CZ: 1})
+        def my_cnot(wires):
+            qml.H(wires=wires[1])
+            qml.CZ(wires=wires)
+            qml.H(wires=wires[1])
+
+        @qml.qjit
+        @partial(
+            qml.transforms.decompose,
+            gate_set={"H", "CZ", "GlobalPhase"},
+            alt_decomps={qml.CNOT: [my_cnot]},
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit():
+            qml.H(0)
+            qml.CNOT(wires=[0, 1])
+            return qml.state()
+
+        expected = np.array([1, 0, 0, 1]) / np.sqrt(2)
+        assert qml.math.allclose(circuit(), expected)
+
+        expected_resources = {"CZ": 1, "Hadamard": 3}
+        resources = qml.specs(circuit, level="device")()["resources"]
+        assert resources.gate_types == expected_resources
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
+
+    def test_multirz(self):
+        """Test that multirz decomposition works with from_plxpr."""
+
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
+
+        @partial(
+            qml.transforms.decompose,
+            gate_set={"X", "Y", "Z", "S", "H", "CNOT", "RZ", "Rot", "GlobalPhase"},
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def circuit():
+            qml.Hadamard(0)
+            qml.ctrl(qml.MultiRZ(0.345, wires=[1, 2]), control=0)
+            qml.adjoint(qml.MultiRZ(0.25, wires=[1, 2]))
+            qml.MultiRZ(0.5, wires=[0, 1])
+            qml.MultiRZ(0.5, wires=[0])
+            qml.MultiRZ(0.5, wires=[0, 1, 3])
+            return qml.expval(qml.X(0))
+
+        without_qjit = circuit()
+        with_qjit = qml.qjit(circuit)
+
+        assert qml.math.allclose(without_qjit, with_qjit())
+
+        # TODO: Remove this static dict when capture & graph enabled support
+        # resource counting with qml.specs via from_plxpr conversion.
+        expected_resources = {"GlobalPhase": 14, "RZ": 20, "CNOT": 22, "Hadamard": 5}
+
+        resources = qml.specs(with_qjit, level="device")()["resources"]
+        assert resources.gate_types == expected_resources
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
+
+    def test_autograph(self):
+        """Test the decompose lowering pass with autograph."""
+
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
+
+        def _multi_rz_decomposition_resources(num_wires):
+            """Resources required for MultiRZ decomposition."""
+            return {qml.RZ: 1, qml.CNOT: 2 * (num_wires - 1)}
+
+        @qml.register_resources(_multi_rz_decomposition_resources)
+        def _multi_rz_decomposition(theta, wires, **__):
+            """Decomposition of MultiRZ using CNOTs and RZs."""
+            for i in range(len(wires) - 1):
+                qml.CNOT(wires=(wires[i], wires[i + 1]))
+            qml.RZ(theta, wires=wires[0])
+            for i in range(len(wires) - 1, 0, -1):
+                qml.CNOT(wires=(wires[i], wires[i - 1]))
+
+        @qml.qnode(qml.device("lightning.qubit", wires=5))
+        def circuit():
+            qml.MultiRZ(0.5, wires=[0, 1, 2, 3, 4])
+            qml.MultiRZ(0.5, wires=[0, 1, 4])
+            return qml.expval(qml.Z(0))
+
+        without_qjit = qml.transforms.decompose(circuit, gate_set={"RZ", "CNOT"})
+        with_qjit = qml.qjit(
+            qml.transforms.decompose(circuit, gate_set={"RZ", "CNOT"}), autograph=True
+        )
+
+        assert qml.math.allclose(without_qjit(), with_qjit())
+
+        # TODO: Remove this static dict when capture & graph enabled support
+        # resource counting with qml.specs via from_plxpr conversion.
+        expected_resources = {"RZ": 2, "CNOT": 12}
+
+        resources = qml.specs(with_qjit, level="device")()["resources"]
+        assert resources.gate_types == expected_resources
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
 
 
 if __name__ == "__main__":

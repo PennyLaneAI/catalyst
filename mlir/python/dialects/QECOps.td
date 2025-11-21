@@ -12,16 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef PYTHON_BINDINGS_QEC_OPS
+#define PYTHON_BINDINGS_QEC_OPS
 
-#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/DialectConversion.h"
+include "QEC/IR/QECDialect.td"
 
-namespace catalyst {
-
-void populateScatterPatterns(mlir::RewritePatternSet &);
-
-void populateHloCustomCallPatterns(mlir::RewritePatternSet &);
-
-} // namespace catalyst
+#endif

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "t-layer-reduction"
+#define DEBUG_TYPE "reduce-t-depth"
 
 #include <vector>
 
@@ -34,7 +34,6 @@ namespace catalyst {
 namespace qec {
 
 #define GEN_PASS_DEF_TLAYERREDUCTIONPASS
-#define GEN_PASS_DECL_TLAYERREDUCTIONPASS
 #include "QEC/Transforms/Passes.h.inc"
 
 // Check whether `rhsOp` can commute left across every op in `lhsLayer` (same block),
@@ -208,12 +207,6 @@ struct TLayerReductionPass : impl::TLayerReductionPassBase<TLayerReductionPass> 
         } while (changed);
     };
 };
+
 } // namespace qec
-
-/// Create a pass for lowering operations in the `QECDialect`.
-std::unique_ptr<Pass> createTLayerReductionPass()
-{
-    return std::make_unique<qec::TLayerReductionPass>();
-}
-
 } // namespace catalyst

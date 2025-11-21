@@ -21,6 +21,7 @@ from __future__ import annotations
 import functools
 import inspect
 import types
+import warnings
 from collections.abc import Callable
 from typing import get_type_hints
 
@@ -94,7 +95,6 @@ COMPILER_OPS_FOR_DECOMPOSITION: dict[str, tuple[int, int]] = {
 }
 
 
-# pylint: disable=too-few-public-methods
 class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
     """Interpreter for getting the decomposition graph solution
     from a jaxpr when program capture is enabled.
@@ -113,6 +113,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
     See also: :class:`~.DecompositionGraph`.
 
     Args:
+        ag_enabled (bool): Whether to enable autograph in the decomposition rules.
         gate_set (set[Operator] or None): The target gate set to decompose to
         fixed_decomps (dict or None): A dictionary of fixed decomposition rules
             to use in the decomposition graph.
@@ -126,10 +127,11 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
     def __init__(
         self,
         *,
+        ag_enabled=False,
         gate_set=None,
         fixed_decomps=None,
         alt_decomps=None,
-    ):  # pylint: disable=too-many-arguments
+    ):
 
         if not qml.decomposition.enabled_graph():  # pragma: no cover
             raise TypeError(
@@ -137,6 +139,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                 "graph-based decomposition is enabled."
             )
 
+        self._ag_enabled = ag_enabled
         self._gate_set = gate_set
         self._fixed_decomps = fixed_decomps
         self._alt_decomps = alt_decomps
@@ -218,6 +221,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                         num_wires=len(o.wires),
                         num_params=num_params,
                         requires_copy=num_wires == -1,
+                        ag_enabled=self._ag_enabled,
                     )
                 elif op.op.name in COMPILER_OPS_FOR_DECOMPOSITION:
                     # In this part, we need to handle the case where an operation in
@@ -233,16 +237,30 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                         num_wires=num_wires,
                         num_params=num_params,
                         requires_copy=num_wires == -1,
+                        ag_enabled=self._ag_enabled,
                     )
-                else:  # pragma: no cover
+                elif not any(
+                    keyword in getattr(op.op, "name", "") for keyword in ("Adjoint", "Controlled")
+                ):  # pragma: no cover
+                    # Note that the graph-decomposition returns abstracted rules
+                    # for Adjoint and Controlled operations, so we skip them here.
+                    # These abstracted rules cannot be captured and lowered.
+                    # We use MLIR AdjointOp and ControlledOp primitives
+                    # to deal with decomposition of symbolic operations at PLxPR.
                     raise ValueError(f"Could not capture {op} without the number of wires.")
 
         data, struct = jax.tree_util.tree_flatten(measurement)
         return jax.tree_util.tree_unflatten(struct, data)
 
 
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 def _create_decomposition_rule(
-    func: Callable, op_name: str, num_wires: int, num_params: int, requires_copy: bool = False
+    func: Callable,
+    op_name: str,
+    num_wires: int,
+    num_params: int,
+    requires_copy: bool = False,
+    ag_enabled: bool = False,
 ):
     """Create a decomposition rule from a callable.
 
@@ -256,12 +274,13 @@ def _create_decomposition_rule(
         requires_copy (bool): Whether to create a copy of the function
             to avoid mutating the original. This is required for operations
             with a variable number of wires (e.g., MultiRZ, GlobalPhase).
+        ag_enabled (bool): Whether to enable autograph in the decomposition rule.
     """
 
     sig_func = inspect.signature(func)
     type_hints = get_type_hints(func)
 
-    args = {}
+    args = []
     for name in sig_func.parameters.keys():
         typ = type_hints.get(name, None)
 
@@ -290,23 +309,23 @@ def _create_decomposition_rule(
         possible_names_for_wires = {"wires", "wire", "control_wires", "target_wires"}
 
         if typ is TensorLike or name in possible_names_for_multi_params:
-            args[name] = qml.math.array([0.0] * num_params, like="jax", dtype=float)
+            args.append(qml.math.array([0.0] * num_params, like="jax", dtype=float))
         elif typ is float or name in possible_names_for_single_param:
             # TensorLike is a Union of float, int, array-like, so we use float here
             # to cover the most common case as the JAX tracer doesn't like Union types
             # and we don't have the actual values at this point.
-            args[name] = float
+            args.append(float)
         elif typ is WiresLike or name in possible_names_for_wires:
             # Pass a dummy array of zeros with the correct number of wires
             # This is required for the decomposition_rule to work correctly
             # as it expects an array-like input for wires
-            args[name] = qml.math.array([0] * num_wires, like="jax")
+            args.append(qml.math.array([0] * num_wires, like="jax"))
         elif typ is int:  # pragma: no cover
             # This is only for cases where the rule has an int parameter
             # e.g., dimension in some gates. Not that common though!
             # We cover this when adding end-to-end tests for rules
             # in the MLIR PR.
-            args[name] = int
+            args.append(int)
         else:  # pragma: no cover
             raise ValueError(
                 f"Unsupported type annotation {typ} for parameter {name} in func {func}."
@@ -314,19 +333,29 @@ def _create_decomposition_rule(
 
     func_cp = make_def_copy(func) if requires_copy else func
 
+    if requires_copy:
+        # Include number of wires in the function name to avoid name clashes
+        # when the same rule is compiled multiple times with different number of wires
+        # (e.g., MultiRZ, GlobalPhase)
+        func_cp.__name__ += f"_wires_{num_wires}"
+
+    if ag_enabled:
+        from pennylane.capture.autograph import (  # pylint: disable=import-outside-toplevel
+            run_autograph,
+        )
+
+        # Capture the function with autograph
+        func_cp = run_autograph(func_cp)
+
     # Set custom attributes for the decomposition rule
     # These attributes are used in the MLIR decomposition pass
     # to identify the target gate and the number of wires
     setattr(func_cp, "target_gate", op_name)
     setattr(func_cp, "num_wires", num_wires)
 
-    if requires_copy:
-        # Include number of wires in the function name to avoid name clashes
-        # when the same rule is compiled multiple times with different number of wires
-        # (e.g., MultiRZ, GlobalPhase)
-        func_cp.__name__ += f"_wires_{num_wires}"  # pylint: disable=protected-access
-
-    return decomposition_rule(func_cp)(**args)
+    # Note that we shouldn't pass args as kwargs to decomposition_rule
+    # JAX doesn't like it and it may fail to preserve the order of args.
+    return decomposition_rule(func_cp)(*args)
 
 
 # pylint: disable=protected-access
@@ -358,8 +387,34 @@ def _solve_decomposition_graph(operations, gate_set, fixed_decomps, alt_decomps)
         alt_decomps=alt_decomps,
     )
 
-    # Find the efficient pathways to the target gate set
-    solutions = decomp_graph.solve()
+    with warnings.catch_warnings(record=True) as captured_warnings:
+        warnings.simplefilter("always", UserWarning)
+        solutions = decomp_graph.solve()
+
+    # Check if the graph-based decomposition failed for any operation
+    # We shall do the check after the context manager of warnings.catch_warnings
+    # to be able to check and re-emit the warnings to the user.
+    graph_failed = False
+
+    for wi in captured_warnings:
+        # Re-emit all captured warnings to the user
+        warnings.showwarning(wi.message, wi.category, wi.filename, wi.lineno)
+
+        # TODO: use a custom warning class for this in PennyLane to remove this
+        # string matching and make it more robust.
+        if "The graph-based decomposition system is unable" in str(wi.message):  # pragma: no cover
+            graph_failed = True
+
+    if graph_failed:
+        # Note that this warning is already issued in the DecompositionGraph.solve()
+        # method, but we capture it here to make it more visible to the user
+        # that we are falling back to the standard PennyLane decomposition.
+        # This is important because we cannot use `op.decomposition()` in the
+        # Catalyst MLIR decomposition pass, as it may introduce new unsupported ops
+        # so we need to inform the user that if some operations could not be
+        # decomposed to the target gate set using the graph-based approach,
+        # we need to fallback to the legacy approach without MLIR decomposition.
+        return {}
 
     def is_solved_for(op):
         return (
@@ -375,7 +430,6 @@ def _solve_decomposition_graph(operations, gate_set, fixed_decomps, alt_decomps)
     return decomp_graph_solution
 
 
-# pylint: disable=protected-access
 def make_def_copy(func):
     """Create a copy of a Python definition to avoid mutating the original.
 

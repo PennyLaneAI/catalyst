@@ -603,7 +603,6 @@ def test_undo_swaps(backend):
 class TestMitigate:
     """Test error mitigation transforms"""
 
-    @pytest.mark.xfail(reason="PennyLane and QJIT give different values")
     def test_fold_global(self, backend):
         """Test fold_global"""
 
@@ -642,7 +641,6 @@ class TestMitigate:
         _, observed_shape = jax.tree_util.tree_flatten(observed)
         assert expected_shape == observed_shape
 
-    @pytest.mark.xfail(reason="PennyLane and QJIT give different values")
     def test_mitigate_with_zne(self, backend):
         """Test mitigate_with_zne"""
 
@@ -1072,7 +1070,7 @@ class TestQFuncTransforms:
             @qml.qnode(qml.device(device_name, wires=3))
             def circuit():
                 """Example."""
-                unroll_ccrz(sub_circuit)()
+                unroll_ccrz(sub_circuit)()  # pylint: disable=not-callable
                 return qml.state()
 
             return circuit
@@ -1103,7 +1101,7 @@ class TestTransformValidity:
 
             return program, config
 
-        # Simulate a Qrack-like device that requires meassurement process transforms.
+        # Simulate a Qrack-like device that requires measurement process transforms.
         # Qnode transforms raise this error anyway so we cannot use them directly.
         original_preprocess = QJITDevice.preprocess
         monkeypatch.setattr(QJITDevice, "preprocess", inject_device_transforms)
