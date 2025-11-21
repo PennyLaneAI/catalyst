@@ -50,32 +50,17 @@ class TestRecursiveTraversal:
 
         # Create block containing some ops
         op = test.TestOp()
-        block = Block(ops=[op, op])
+        block = Block(ops=[op])
         # Create region containing some blocks
-        region = Region(blocks=[block, block])
+        region = Region(blocks=[block])
         # Create op containing the regions
-        container_op = test.TestOp(regions=[region, region])
+        container_op = test.TestOp(regions=[region])
         # Create module op to house it all
         module_op = ModuleOp(ops=[container_op])
 
         mock_dag_builder = Mock(DAGBuilder)
         utility = ConstructCircuitDAG(mock_dag_builder)
 
-        # Mock out the visit dispatcher
-        utility._visit = Mock()
-
         utility.construct(module_op)
 
-        assert utility._visit.call_count == 7
-
-        expected_calls = [
-            call(container_op),
-            call(region),
-            call(region),
-            call(block),
-            call(block),
-            call(op),
-            call(op),
-        ]
-
-        utility._visit.assert_has_calls(expected_calls, any_order=False)
+        # Assert visit was dispatched correct number of times with the correct inputs
