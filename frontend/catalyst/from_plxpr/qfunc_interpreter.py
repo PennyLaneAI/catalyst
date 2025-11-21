@@ -162,6 +162,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             raise CompileError(f"Deallocated qubits cannot be used, but used in {op.name}.")
 
         bind_fn = _special_op_bind_call.get(type(op), qinst_p.bind)
+        if bind_fn != qinst_p.bind:
+            bind_fn = partial(bind_fn, hyperparameters=op.hyperparameters)
 
         out_qubits = bind_fn(
             *[*in_qubits, *op.data, *in_ctrl_qubits, *control_values],
@@ -282,7 +284,9 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
 
 # pylint: disable=unused-argument
-def _qubit_unitary_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint):
+def _qubit_unitary_bind_call(
+    *invals, op, qubits_len, params_len, ctrl_len, adjoint, hyperparameters
+):
     wires = invals[:qubits_len]
     mat = invals[qubits_len]
     ctrl_inputs = invals[qubits_len + 1 :]
@@ -292,14 +296,8 @@ def _qubit_unitary_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjo
 
 
 # pylint: disable=unused-argument
-def _gphase_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint):
+def _gphase_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint, hyperparameters):
     return gphase_p.bind(*invals[qubits_len:], ctrl_len=ctrl_len, adjoint=adjoint)
-
-
-_special_op_bind_call = {
-    qml.QubitUnitary: _qubit_unitary_bind_call,
-    qml.GlobalPhase: _gphase_bind_call,
-}
 
 
 # pylint: disable=unused-argument
@@ -536,18 +534,16 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
     return ()
 
 
-@PLxPRToQuantumJaxprInterpreter.register_primitive(qml.PauliRot._primitive)
-def handle_pauli_rot(self, *invals, n_wires, pauli_word, **params):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the PauliRot primitive"""
-    input_wires = invals[1:]  # First element is the theta
-    in_qregs, in_qubits = get_in_qubit_values(
-        input_wires, self.qubit_index_recorder, self.init_qreg
+def _pauli_rot_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint, hyperparameters):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the PauliMeasure primitive"""
+    # invals are the input wires
+    wires = invals[:qubits_len]
+    theta = invals[qubits_len]
+    ctrl_inputs = invals[qubits_len + 1 :]
+    pauli_word = hyperparameters["pauli_word"]
+    return pauli_rot_p.bind(
+        *wires, theta=theta, pauli_word=pauli_word, qubits_len=qubits_len, adjoint=adjoint
     )
-    outvals = pauli_rot_p.bind(
-        *in_qubits, theta=invals[0], pauli_word=pauli_word, qubits_len=n_wires, adjoint=False
-    )
-    for in_qreg, w, new_wire in zip(in_qregs, invals[1:], outvals):
-        in_qreg[in_qreg.global_index_to_local_index(w)] = new_wire
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_pauli_measure_prim)
@@ -723,3 +719,10 @@ def handle_adjoint_transform(
 
     # Return only the output values that match the plxpr output values
     return outvals
+
+
+_special_op_bind_call = {
+    qml.QubitUnitary: _qubit_unitary_bind_call,
+    qml.GlobalPhase: _gphase_bind_call,
+    qml.PauliRot: _pauli_rot_bind_call,
+}

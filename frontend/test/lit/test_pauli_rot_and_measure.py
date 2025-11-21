@@ -319,3 +319,50 @@ def test_pauli_rot_and_measure_with_cond():
 
 
 test_pauli_rot_and_measure_with_cond()
+
+
+def test_pauli_rot_with_adjoint_region():
+    """Test PauliRot with qml.adjoint region"""
+    qml.capture.enable()
+    dev = qml.device("null.qubit", wires=2)
+
+    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    def f():
+        qml.PauliRot(np.pi / 4, "XZ", wires=[0, 1])
+
+    @qjit(pipelines=pipeline, target="mlir")
+    @qml.qnode(device=dev)
+    def circuit():
+        qml.PauliRot(np.pi / 2, "YX", wires=[0, 1])
+        qml.adjoint(f)()
+
+    # CHECK: qec.ppr ["Y", "X"](4)
+    # CHECK: quantum.adjoint
+    # CHECK: qec.ppr ["X", "Z"](8)
+    print(circuit.mlir_opt)
+    qml.capture.disable()
+
+
+test_pauli_rot_with_adjoint_region()
+
+
+def test_pauli_rot_with_adjoint_single_gate():
+    """Test PauliRot with qml.adjoint as a direct gate"""
+    qml.capture.enable()
+    dev = qml.device("null.qubit", wires=2)
+
+    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipeline, target="mlir")
+    @qml.qnode(device=dev)
+    def circuit():
+        qml.adjoint(qml.PauliRot(np.pi / 2, "XZ", wires=[0, 1]))
+
+    # CHECK-NOT: quantum.adjoint
+    # CHECK: qec.ppr ["X", "Z"](-4)
+    print(circuit.mlir_opt)
+    qml.capture.disable()
+
+
+test_pauli_rot_with_adjoint_single_gate()
