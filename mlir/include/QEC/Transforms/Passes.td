@@ -85,6 +85,14 @@ def CommutePPRPass : Pass<"commute-ppr"> {
     let options = [MaxPauliSizeOption];
 }
 
+def MergePPRPass : Pass<"merge-ppr"> {
+    let summary = "Merge like PPRotation operations.";
+
+    let dependentDialects = [ "catalyst::qec::QECDialect" ];
+
+    let options = [MaxPauliSizeOption];
+}
+
 def MergePPRIntoPPMPass : Pass<"merge-ppr-ppm"> {
     let summary = "Absorb Clifford operations into Pauli Product Measurement operations.";
     

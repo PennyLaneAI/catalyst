@@ -26,7 +26,7 @@ using namespace catalyst::qec;
 
 namespace {
 
-struct MergePPR: public OpRewritePattern<PPRotationOp> {
+struct MergePPR : public OpRewritePattern<PPRotationOp> {
     using OpRewritePattern::OpRewritePattern;
 
     size_t MAX_PAULI_SIZE;
@@ -40,9 +40,12 @@ struct MergePPR: public OpRewritePattern<PPRotationOp> {
     {
         // TODO
         // check that next op is PPR
+
         // check same pauli strings
+
         // merge angles
         // delete ops
+        return failure();
     }
 };
 } // namespace
