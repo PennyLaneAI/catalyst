@@ -19,7 +19,7 @@
 
 * Pass instrumentation can be applied to each pass within the `NamedSequenceOp` transform sequence for a qnode.
   [(#1978)](https://github.com/PennyLaneAI/catalyst/pull/1978)
-  
+
 * The new graph-based decomposition framework has Autograph feature parity with PennyLane
   when capture enabled. When compiling with `qml.qjit(autograph=True)`, the decomposition rules
   returned by the graph-based framework are now correctly compiled using Autograph.
@@ -45,7 +45,7 @@
 * `qml.grad` and `qml.jacobian` can now be used with `qjit` when program capture is enabled.
   [(#2078)](https://github.com/PennyLaneAI/catalyst/pull/2078)
 
-* xDSL passes are now automatically detected when using the `qjit` decorator. 
+* xDSL passes are now automatically detected when using the `qjit` decorator.
   This removes the need to pass the `pass_plugins` argument to the `qjit` decorator.
   [(#2169)](https://github.com/PennyLaneAI/catalyst/pull/2169)
   [(#2183)](https://github.com/PennyLaneAI/catalyst/pull/2183)
@@ -140,6 +140,13 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Resource tracking now writes out at device destruction time instead of qubit deallocation
+  time. The written resources will be the total amount of resources collected throughout the
+  lifetime of the execution. For executions that split work between multiple functions,
+  e.g. with the `split-non-commuting` pass, this ensures that resource tracking outputs
+  the total resources used for all splits.
+  [(#2219)](https://github.com/PennyLaneAI/catalyst/pull/2219)
+
 * Replaces the deprecated `shape_dtype_to_ir_type` function with the `RankedTensorType.get` method.
   [(#2159)](https://github.com/PennyLaneAI/catalyst/pull/2159)
 
@@ -180,8 +187,8 @@
       // ... ion operations ...
   }
   ```
-  
-  * Added support for `ppr-to-ppm` as an individual MLIR pass and python binding 
+
+  * Added support for `ppr-to-ppm` as an individual MLIR pass and python binding
   for the qec dialect.
   [(#2189)](https://github.com/PennyLaneAI/catalyst/pull/2189)
 
