@@ -425,7 +425,7 @@ class TestGraphDecomposition:
         @qml.transforms.cancel_inverses
         @partial(
             qml.transforms.decompose,
-            gate_set={"RZ", "RY", "CNOT", "GlobalPhase"},
+            gate_set=frozenset({"RZ", "RY", "CNOT", "GlobalPhase"}),
         )
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit():
