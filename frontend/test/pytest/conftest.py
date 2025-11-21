@@ -62,14 +62,16 @@ def use_capture():
 @pytest.fixture(scope="function")
 def use_capture_dgraph():
     """Enable capture and graph-decomposition before and disable them both after the test."""
-    qml.capture.enable()
     qml.decomposition.enable_graph()
     try:
         yield
     finally:
         qml.decomposition.disable_graph()
-        qml.capture.disable()
 
+
+@pytest.fixture(params=[True, False], scope="function")
+def experimental_capture(request):
+    yield request.param
 
 @pytest.fixture(params=["capture", "no_capture"], scope="function")
 def use_both_frontend(request):

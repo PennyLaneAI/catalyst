@@ -164,29 +164,33 @@ class TestInterpreted:
         with pytest.raises(TypeError, match=MISSING_ARGUMENT_MESSAGE):
             circuit_3(0)
 
-    @pytest.mark.usefixtures("use_capture")
+    @pytest.mark.capture_only
     def test_fails_capture(self):
         """Test that a switch raises an exception with program capture enabled."""
         if not qml.capture.enabled():
             pytest.skip("capture only test")
 
-        with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
+        qml.capture.enable()
+        try:
+            with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            def circuit(i):
-                @switch(i)
-                def my_switch():
-                    return 0
+                def circuit(i):
+                    @switch(i)
+                    def my_switch():
+                        return 0
 
-                @my_switch.branch(0)
-                def my_branch():
-                    return 1
+                    @my_switch.branch(0)
+                    def my_branch():
+                        return 1
 
-                return my_switch()
+                    return my_switch()
 
-            circuit(0)
+                circuit(0)
 
-        error_msg = str(exc_info.value)
-        assert "not supported" in error_msg
+            error_msg = str(exc_info.value)
+            assert "not supported" in error_msg
+        finally:
+            qml.capture.disable()
 
     def test_missing_operation(self):
         """Test that operation access in an interpreted context raises an exception."""
@@ -387,15 +391,13 @@ class TestClassicalCompiled:
         with pytest.raises(TypeError, match=MISSING_ARGUMENT_MESSAGE):
             circuit_3(0)
 
-    @pytest.mark.usefixtures("use_capture")
+    @pytest.mark.capture_only
     def test_fails_capture(self, backend):
         """Test that an exception is raised when program capture is enabled."""
-        if not qml.capture.enabled():
-            pytest.skip("capture only test")
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @qjit
+            @qjit(experimental_capture=True)
             @qml.qnode(qml.device(backend, wires=1))
             def circuit(i):
                 @switch(i)
@@ -638,7 +640,7 @@ class TestQuantum:
         with pytest.raises(TypeError, match=MISSING_ARGUMENT_MESSAGE):
             circuit_2(0)
 
-    @pytest.mark.usefixtures("use_capture")
+    @pytest.mark.capture_only
     def test_fails_capture(self, backend):
         """Test that an exception is raised when program capture is enabled."""
         if not qml.capture.enabled():
@@ -646,7 +648,7 @@ class TestQuantum:
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @qjit
+            @qjit(experimental_capture=True)
             @qml.qnode(qml.device(backend, wires=1))
             def circuit(i):
                 @switch(i)

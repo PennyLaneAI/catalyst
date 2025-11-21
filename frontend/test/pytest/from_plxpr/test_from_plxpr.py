@@ -34,7 +34,7 @@ from catalyst.jax_primitives import (
     while_p,
 )
 
-pytestmark = pytest.mark.usefixtures("disable_capture")
+pytestmark = pytest.mark.capture_only
 
 
 def catalyst_execute_jaxpr(jaxpr):
