@@ -229,6 +229,9 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")(x, y, z)["resources"].gate_types
         assert resources == expected_resources
 
+    @pytest.mark.skip(
+        reason="inconsistent type and error msg across gcc/clang on arm/x86 for undefined symbols"
+    )
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_gateset_with_rotxzx(self):
         """Test the runtime raises an error if RotXZX is not decomposed."""
@@ -244,7 +247,7 @@ class TestGraphDecomposition:
 
         with pytest.raises(
             OSError,
-            match="undefined symbol: __catalyst__qis__RotXZX",
+            match="undefined symbol",  # ___catalyst__qis__RotXZX
         ):
             qml.qjit(circuit)()
 
