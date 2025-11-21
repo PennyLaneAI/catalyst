@@ -22,6 +22,10 @@ from xdsl.ir import Block, Operation, Region
 
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from catalyst.python_interface.visualization.xdsl_conversion import (
+    xdsl_to_qml_measurement,
+    xdsl_to_qml_op,
+)
 
 
 class ConstructCircuitDAG:
@@ -67,19 +71,19 @@ class ConstructCircuitDAG:
     # These methods navigate the recursive IR hierarchy (Op -> Region -> Block -> Op).
 
     @visit.register
-    def visit_operation(self, operation: Operation) -> None:
+    def _operation(self, operation: Operation) -> None:
         """Visit an xDSL Operation."""
         for region in operation.regions:
-            self.visit_region(region)
+            self.visit(region)
 
     @visit.register
-    def visit_region(self, region: Region) -> None:
+    def _region(self, region: Region) -> None:
         """Visit an xDSL Region operation."""
         for block in region.blocks:
-            self.visit_block(block)
+            self.visit(block)
 
     @visit.register
-    def visit_block(self, block: Block) -> None:
+    def _block(self, block: Block) -> None:
         """Visit an xDSL Block operation, dispatching handling for each contained Operation."""
         for op in block.ops:
             self.visit(op)
@@ -96,10 +100,11 @@ class ConstructCircuitDAG:
     ) -> None:
         """Generic handler for unitary gates and quantum state preparation operations."""
 
+        qml_op = xdsl_to_qml_op(op)
         # Build node on graph
         self.dag_builder.add_node(
             node_id=f"node_{id(op)}",
-            node_label=get_label(op),
+            node_label=str(qml_op),
             parent_graph_id=self._cluster_stack[-1],
         )
 
@@ -111,10 +116,11 @@ class ConstructCircuitDAG:
     def _state_op(self, op: quantum.StateOp) -> None:
         """Handler for the terminal state measurement operation."""
 
+        meas = xdsl_to_qml_measurement(op)
         # Build node on graph
         self.dag_builder.add_node(
             node_id=f"node_{id(op)}",
-            node_label=get_label(op),
+            node_label=str(meas),
             parent_graph_id=self._cluster_stack[-1],
         )
 
@@ -125,10 +131,12 @@ class ConstructCircuitDAG:
     ) -> None:
         """Handler for statistical measurement operations."""
 
+        obs_op = op.obs.owner
+        meas = xdsl_to_qml_measurement(op, xdsl_to_qml_measurement(obs_op))
         # Build node on graph
         self.dag_builder.add_node(
             node_id=f"node_{id(op)}",
-            node_label=get_label(op),
+            node_label=str(meas),
             parent_graph_id=self._cluster_stack[-1],
         )
 
@@ -136,10 +144,11 @@ class ConstructCircuitDAG:
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
         """Handler for the single-qubit projective measurement operation."""
 
+        meas = xdsl_to_qml_measurement(op)
         # Build node on graph
         self.dag_builder.add_node(
             node_id=f"node_{id(op)}",
-            node_label=get_label(op),
+            node_label=str(meas),
             parent_graph_id=self._cluster_stack[-1],
         )
 
@@ -161,33 +170,3 @@ class ConstructCircuitDAG:
     def _if_op(self, op: scf.IfOp) -> None:
         """Handle an xDSL IfOp operation."""
         pass
-
-
-@singledispatch
-def get_label(op: Any) -> str:
-    """Gets a human readable label for a given xDSL operation.
-
-    Returns:
-        label (str): The appropriate label for a given xDSL operation. Defaults
-            to the class name.
-    """
-    return type(op).__name__
-
-
-@get_label.register
-def _get_custom_op_label(op: quantum.CustomOp) -> str:
-    name: str = op.gate_name.data
-    wires: str = ""
-    return f"{name}({wires})"
-
-
-@get_label.register
-def _get_statistical_measurement_op_label(
-    op: quantum.ExpvalOp | quantum.VarianceOp,
-) -> str:
-    # e.g. expval(Z(0)) should be the output
-    mp: str = op.name.split(".")[-1]  # quantum.expval -> expval
-    obs_op = op.obs.owner
-    obs_name: str = obs_op.properties.get("type").data.value
-    wires: str = ""
-    return f"{mp}({obs_name}({wires}))"
