@@ -57,19 +57,19 @@ class ConstructCircuitDAG:
     # These methods navigate the recursive IR hierarchy (Op -> Region -> Block -> Op).
 
     @visit.register
-    def visit_operation(self, operation: Operation) -> None:
+    def _operation(self, operation: Operation) -> None:
         """Visit an xDSL Operation."""
         for region in operation.regions:
-            self.visit_region(region)
+            self.visit(region)
 
     @visit.register
-    def visit_region(self, region: Region) -> None:
+    def _region(self, region: Region) -> None:
         """Visit an xDSL Region operation."""
         for block in region.blocks:
-            self.visit_block(block)
+            self.visit(block)
 
     @visit.register
-    def visit_block(self, block: Block) -> None:
+    def _block(self, block: Block) -> None:
         """Visit an xDSL Block operation, dispatching handling for each contained Operation."""
         for op in block.ops:
             self.visit(op)
