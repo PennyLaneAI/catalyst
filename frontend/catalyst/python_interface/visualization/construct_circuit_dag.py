@@ -41,7 +41,7 @@ class ConstructCircuitDAG:
     # =================================
 
     @singledispatchmethod
-    def visit(self, op: Any) -> None:
+    def _visit(self, op: Any) -> None:
         """Central dispatch method (Visitor Pattern). Routes the operation 'op'
         to the specialized handler registered for its type."""
         pass
@@ -49,27 +49,27 @@ class ConstructCircuitDAG:
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module."""
         for op in module.ops:
-            self.visit(op)
+            self._visit(op)
 
     # =======================
     # 2. HIERARCHY TRAVERSAL
     # =======================
     # These methods navigate the recursive IR hierarchy (Op -> Region -> Block -> Op).
 
-    @visit.register
+    @_visit.register
     def _operation(self, operation: Operation) -> None:
         """Visit an xDSL Operation."""
         for region in operation.regions:
-            self.visit(region)
+            self._visit(region)
 
-    @visit.register
+    @_visit.register
     def _region(self, region: Region) -> None:
         """Visit an xDSL Region operation."""
         for block in region.blocks:
-            self.visit(block)
+            self._visit(block)
 
-    @visit.register
+    @_visit.register
     def _block(self, block: Block) -> None:
         """Visit an xDSL Block operation, dispatching handling for each contained Operation."""
         for op in block.ops:
-            self.visit(op)
+            self._visit(op)
