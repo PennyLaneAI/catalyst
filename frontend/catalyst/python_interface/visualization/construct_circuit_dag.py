@@ -156,22 +156,3 @@ class ConstructCircuitDAG:
             node_label=str(meas),
             parent_graph_id=self._cluster_stack[-1],
         )
-
-    # =========================
-    # 5. CONTROL FLOW HANDLERS
-    # =========================
-
-    @visit.register
-    def _for_op(self, op: scf.ForOp) -> None:
-        """Handle an xDSL ForOp operation."""
-        pass
-
-    @visit.register
-    def _while_op(self, op: scf.WhileOp) -> None:
-        """Handle an xDSL WhileOp operation."""
-        pass
-
-    @visit.register
-    def _if_op(self, op: scf.IfOp) -> None:
-        """Handle an xDSL IfOp operation."""
-        pass
