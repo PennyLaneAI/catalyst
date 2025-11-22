@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline="builtin.module(ppr-to-ppm)" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK
+// RUN: quantum-opt --ppr-to-ppm --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK
 
 func.func @test_ppr_to_ppm_clifford(%q1 : !quantum.bit) {
     %0 = qec.ppr ["Z"](4) %q1 : !quantum.bit
