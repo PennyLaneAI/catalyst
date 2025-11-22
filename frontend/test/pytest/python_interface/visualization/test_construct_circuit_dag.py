@@ -42,25 +42,23 @@ class TestInitialization:
         assert utility.dag_builder is mock_dag_builder
 
 
-class TestRecursiveTraversal:
-    """Tests that the recursive traversal logic works correctly."""
+def test_does_not_mutate_module():
+    """Test that the module is not mutated."""
 
-    def test_entire_module_is_traversed(self):
-        """Tests that the entire module hierarchy is traversed correctly."""
+    # Create block containing some ops
+    op = test.TestOp()
+    block = Block(ops=[op])
+    # Create region containing some blocks
+    region = Region(blocks=[block])
+    # Create op containing the regions
+    container_op = test.TestOp(regions=[region])
+    # Create module op to house it all
+    module_op = ModuleOp(ops=[container_op])
 
-        # Create block containing some ops
-        op = test.TestOp()
-        block = Block(ops=[op])
-        # Create region containing some blocks
-        region = Region(blocks=[block])
-        # Create op containing the regions
-        container_op = test.TestOp(regions=[region])
-        # Create module op to house it all
-        module_op = ModuleOp(ops=[container_op])
+    module_op_str_before = str(module_op)
 
-        mock_dag_builder = Mock(DAGBuilder)
-        utility = ConstructCircuitDAG(mock_dag_builder)
+    mock_dag_builder = Mock(DAGBuilder)
+    utility = ConstructCircuitDAG(mock_dag_builder)
+    utility.construct(module_op)
 
-        utility.construct(module_op)
-
-        # Assert visit was dispatched correct number of times with the correct inputs
+    assert str(module_op) == module_op_str_before
