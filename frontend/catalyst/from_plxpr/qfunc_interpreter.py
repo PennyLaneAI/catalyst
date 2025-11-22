@@ -141,6 +141,13 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                 control_wires=control_wires + tuple(op.control_wires),
             )
 
+        # This is a temporary workaround for the PCPhase operation
+        # which does not follow the same pattern as `qinst_p`.
+        # We will revisit this once we have a better solution for
+        # supporting general PL operations in Catalyst.
+        if op.name == "PCPhase":
+            op.data = op.data + (op.hyperparameters["dimension"][0],)
+
         control_wires = control_wires + self.control_wires
         control_values = control_values + self.control_values
 

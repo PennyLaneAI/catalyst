@@ -7,6 +7,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* `qml.PCPhase` can be compiled and executed with capture enabled.
+  [(#2225)](https://github.com/PennyLaneAI/catalyst/pull/2225)
+
 * Resource tracking now supports dynamic qubit allocation
   [(#2203)](https://github.com/PennyLaneAI/catalyst/pull/2203)
 
