@@ -63,8 +63,16 @@ def test_does_not_mutate_module():
 
     assert str(module_op) == module_op_str_before
 
+
 class TestOperatorNodes:
     """Tests that operators can be visualized as nodes."""
 
+    def test_custom_op(self):
+        pass
+
+
 class TestMeasurementNodes:
     """Tests that measurements can be visualized as nodes."""
+
+    def test_state_op(self):
+        pass
