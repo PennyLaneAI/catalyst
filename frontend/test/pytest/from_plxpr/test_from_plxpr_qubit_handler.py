@@ -47,6 +47,8 @@ from catalyst.from_plxpr.qubit_handler import QubitHandler, QubitIndexRecorder
 from catalyst.jax_primitives import AbstractQbit, AbstractQreg, qalloc_p, qextract_p
 from catalyst.utils.exceptions import CompileError
 
+pytestmark = pytest.mark.capture_only
+
 
 @pytest.fixture(autouse=True)
 def launch_empty_jaxpr_interpreter():

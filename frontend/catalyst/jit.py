@@ -77,6 +77,7 @@ def qjit(
     *,
     autograph=False,
     autograph_include=(),
+    experimental_capture=False,
     async_qnodes=False,
     target="binary",
     keep_intermediate=False,
@@ -698,7 +699,7 @@ class QJIT(CatalystCallable):
     def pre_compilation(self):
         """Perform pre-processing tasks on the Python function, such as AST transformations."""
         if self.compile_options.autograph:
-            if qml.capture.enabled():
+            if self.compile_options.experimental_capture:
                 if self.compile_options.autograph_include:
                     raise NotImplementedError(
                         "capture autograph does not yet support autograph_include."
@@ -731,7 +732,7 @@ class QJIT(CatalystCallable):
 
         dbg = debug_info("qjit_capture", self.user_function, args, kwargs)
 
-        if qml.capture.enabled():
+        if self.compile_options.experimental_capture:
             with Patcher(
                 (
                     jax._src.interpreters.partial_eval,  # pylint: disable=protected-access

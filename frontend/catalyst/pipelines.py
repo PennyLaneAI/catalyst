@@ -112,8 +112,12 @@ class CompileOptions:
             Default is ``None``.
         pass_plugins (Optional[Iterable[Path]]): List of paths to pass plugins.
         dialect_plugins (Optional[Iterable[Path]]): List of paths to dialect plugins.
+        experimental_capture (bool): If set to ``True``,
+            use PennyLane's experimental program capture capabilities
+            to capture the function for compilation.
     """
 
+    experimental_capture : bool = False
     verbose: Optional[bool] = False
     logfile: Optional[TextIOWrapper] = sys.stderr
     target: Optional[str] = "binary"

@@ -25,7 +25,7 @@ import jax
 import pennylane as qml
 from jax.extend.core import ClosedJaxpr, Jaxpr
 from jax.extend.linear_util import wrap_init
-from pennylane.capture import PlxprInterpreter, qnode_prim
+from pennylane.capture import PlxprInterpreter, qnode_prim, enable, disable, enabled
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 from pennylane.capture.primitives import transform_prim
@@ -414,9 +414,14 @@ def trace_from_pennylane(
             # https://github.com/jax-ml/jax/blob/636691bba40b936b8b64a4792c1d2158296e9dd4/jax/_src/linear_util.py#L231
             # Therefore we need to coordinate them manually
             fn.static_argnums = static_argnums
-
-        plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-        jaxpr = from_plxpr(plxpr)(*plxpr.in_avals)
+        capture_on = enabled()
+        enable()
+        try:
+            plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
+            jaxpr = from_plxpr(plxpr)(*plxpr.in_avals)
+        finally:
+            if not capture_on:
+                disable()
 
     return jaxpr, out_type, out_treedef, sig
 
