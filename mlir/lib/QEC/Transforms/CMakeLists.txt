@@ -6,6 +6,8 @@ file(GLOB SRC
     clifford_t_to_ppr.cpp
     CommutePPR.cpp
     commute_ppr.cpp
+    MergePPR.cpp
+    merge_ppr.cpp
     MergePPRIntoPPM.cpp
     merge_ppr_into_ppm.cpp
     CountPPMSpecs.cpp
