@@ -43,24 +43,28 @@
       qml.PauliRot(-jnp.pi / 2, pauli_word="Z", wires=[0])
       qml.PauliRot(-jnp.pi / 2, pauli_word="X", wires=[1])
 
-      ppm = qml.pauli_measure(pauli_word="YYZ", wires=[0, 2, 1])
-
       # equivalent to a T gate
       qml.PauliRot(jnp.pi / 4, pauli_word="Z", wires=0)
+
+      ppm = qml.pauli_measure(pauli_word="YYZ", wires=[0, 2, 1])
 
       return
   ```
 
   ```pycon
-  >>> print(qml.specs(circuit, level="device")()['resources'])
-  num_wires: 3
-  num_gates: 2
-  depth: None
-  shots: Shots(total=None)
-  gate_types:
-  {'PPM-w3': 2}
-  gate_sizes:
-  {3: 2}
+  >>> print(qml.specs(circuit, level="all")()['resources'])
+  {
+    'No transforms': ..., 
+    'Before MLIR Passes (MLIR-0)': ...,
+    'ppm-compilation (MLIR-1)': Resources(
+      num_wires=6, 
+      num_gates=14, 
+      gate_types=defaultdict(<class 'int'>, {'PPM-w3': 2, 'PPM-w2': 4, 'PPM-w1': 4, 'PPR-pi/2-w1': 4}), 
+      gate_sizes=defaultdict(<class 'int'>, {3: 2, 2: 4, 1: 8}), 
+      depth=None, 
+      shots=Shots(total_shots=None, shot_vector=())
+    )
+  }
   ```
 
 <h3>Improvements 🛠</h3>

@@ -594,15 +594,19 @@ def to_ppr(qnode):
     from the PennyLane frontend (``qml.transforms.to_ppr``) instead of with
     ``catalyst.passes.to_ppr``.
 
-    >>> print(qml.specs(circuit, level="device")()['resources'])
-    num_wires: 2
-    num_gates: 7
-    depth: None
-    shots: Shots(total=None)
-    gate_types:
-    {'PPR-pi/4-w1': 5, 'PPR-pi/4-w2': 1, 'PPR-pi/8-w1': 1}
-    gate_sizes:
-    {1: 6, 2: 1}
+    >>> print(qml.specs(circuit, level="all")()['resources'])
+    {
+        'No transforms': ...,
+        'Before MLIR Passes (MLIR-0)': ...,
+        'to-ppr (MLIR-1)': Resources(
+            num_wires=2,
+            num_gates=7,
+            gate_types=defaultdict(<class 'int'>, {'PPR-pi/4-w1': 5, 'PPR-pi/4-w2': 1, 'PPR-pi/8-w1': 1}),
+            gate_sizes=defaultdict(<class 'int'>, {1: 6, 2: 1}),
+            depth=None,
+            shots=Shots(total_shots=None, shot_vector=())
+        )
+    }
 
     In the above output, ``PPR-theta-weight`` denotes the type of PPR present in the circuit, where
     ``theta`` is the PPR angle (:math:`\theta`) and ``weight`` is the PPR weight.
@@ -672,15 +676,18 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
     ``commute_ppr`` from the PennyLane frontend (``qml.transforms.commute_ppr``) instead of with
     ``catalyst.passes.commute_ppr``.
 
-    >>> print(qml.specs(circuit, level="device")()['resources'])
-    num_wires: 2
-    num_gates: 7
-    depth: None
-    shots: Shots(total=None)
-    gate_types:
-    {'PPR-pi/8-w1': 1, 'PPR-pi/4-w1': 5, 'PPR-pi/4-w2': 1}
-    gate_sizes:
-    {1: 6, 2: 1}
+    >>> print(qml.specs(circuit, level="all")()['resources'])
+    {
+        'No transforms': ...,
+        'Before MLIR Passes (MLIR-0)': ...,
+        'commute-ppr (MLIR-1)': Resources(
+            num_wires=2,
+            num_gates=7,
+            gate_types=defaultdict(<class 'int'>, {'PPR-pi/8-w1': 1, 'PPR-pi/4-w1': 5, 'PPR-pi/4-w2': 1}),
+            gate_sizes=defaultdict(<class 'int'>, {1: 6, 2: 1}),
+            depth=None,
+            shots=Shots(total_shots=None, shot_vector=()))
+    }
 
     In the example above, the Clifford PPRs (``H`` and ``CNOT``) will be commuted past the
     non-Clifford PPR (``T``). In the output above, ``PPR-theta-weight`` denotes the type of PPR
@@ -744,8 +751,6 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
 
             ppm = qml.pauli_measure(pauli_word="ZX", wires=[0, 1])
 
-            qml.PauliRot(jnp.pi / 4, pauli_word="Z", wires=0)
-
             return
 
     In the above example, every PPR (``PauliRot``) and the PPM (``pauli_measure``) can be merged
@@ -754,15 +759,19 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     :func:`pennylane.capture.enable`, and call ``ppr_to_ppm`` from the PennyLane frontend
     (``qml.transforms.merge_ppr_ppm``) instead of with ``catalyst.passes.merge_ppr_ppm``.
 
-    >>> print(qml.specs(circuit, level="device")()['resources'])
-    num_wires: 2
-    num_gates: 1
-    depth: None
-    shots: Shots(total=None)
-    gate_types:
-    {'PPM-w2': 1}
-    gate_sizes:
-    {2: 1}
+    >>> print(qml.specs(circuit, level="all")()['resources'])
+    {
+        'No transforms': ...,
+        'Before MLIR Passes (MLIR-0)': ...,
+        'merge-ppr-ppm (MLIR-1)': Resources(
+            num_wires=2,
+            num_gates=1,
+            gate_types=defaultdict(<class 'int'>, {'PPM-w2': 1}),
+            gate_sizes=defaultdict(<class 'int'>, {2: 1}),
+            depth=None,
+            shots=Shots(total_shots=None, shot_vector=())
+        )
+    }
 
     In the above output, ``PPM-weight`` denotes the type of PPM present in the circuit, where
     ``weight`` is the PPM weight.
@@ -852,15 +861,19 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
     ``ppr_to_ppm`` from the PennyLane frontend (``qml.transforms.ppr_to_ppm``) instead of with
     ``catalyst.passes.ppr_to_ppm``.
 
-    >>> print(qml.specs(circuit, level="device")()['resources'])
-    num_wires: 8
-    num_gates: 21
-    depth: None
-    shots: Shots(total=None)
-    gate_types:
-    {'PPM-w2': 6, 'PPM-w1': 7, 'PPR-pi/2-w1': 6, 'PPM-w3': 1, 'PPR-pi/2-w2': 1}
-    gate_sizes:
-    {2: 7, 1: 13, 3: 1}
+    >>> print(qml.specs(circuit, level="all")()['resources'])
+    {
+        'No transforms': ...,
+        'Before MLIR Passes (MLIR-0)': ...,
+        'ppr-to-ppm (MLIR-1)': Resources(
+            num_wires=8,
+            num_gates=21,
+            gate_types=defaultdict(<class 'int'>, {'PPM-w2': 6, 'PPM-w1': 7, 'PPR-pi/2-w1': 6, 'PPM-w3': 1, 'PPR-pi/2-w2': 1}),
+            gate_sizes=defaultdict(<class 'int'>, {2: 7, 1: 13, 3: 1}),
+            depth=None,
+            shots=Shots(total_shots=None, shot_vector=())
+        )
+    }
 
     In the above output, ``PPM-weight`` denotes the type of PPM present in the circuit, where
     ``weight`` is the PPM weight. ``PPR-theta-weight`` denotes the type of PPR present in the
@@ -960,15 +973,19 @@ def ppm_compilation(
     ``ppm_compilation`` from the PennyLane frontend (``qml.transforms.ppm_compilation``) instead of
     with ``catalyst.passes.ppm_compilation``.
 
-    >>> print(qml.specs(circuit, level="device")()['resources'])
-    num_wires: 7
-    num_gates: 18
-    depth: None
-    shots: Shots(total=None)
-    gate_types:
-    {'PPM-w2': 5, 'PPM-w1': 6, 'PPR-pi/2-w1': 5, 'PPM-w3': 1, 'PPR-pi/2-w2': 1}
-    gate_sizes:
-    {2: 6, 1: 11, 3: 1}
+    >>> print(qml.specs(circuit, level="all")()['resources'])
+    {
+        'No transforms': ...,
+        'Before MLIR Passes (MLIR-0)': ...,
+        'ppm-compilation (MLIR-1)': Resources(
+            num_wires=7,
+            num_gates=18,
+            gate_types=defaultdict(<class 'int'>, {'PPM-w2': 5, 'PPM-w1': 6, 'PPR-pi/2-w1': 5, 'PPM-w3': 1, 'PPR-pi/2-w2': 1}),
+            gate_sizes=defaultdict(<class 'int'>, {2: 6, 1: 11, 3: 1}),
+            depth=None,
+            shots=Shots(total_shots=None, shot_vector=())
+        )
+    }
 
     In the above output, ``PPM-weight`` denotes the type of PPM present in the circuit, where
     ``weight`` is the PPM weight. ``PPR-theta-weight`` denotes the type of PPR present in the
