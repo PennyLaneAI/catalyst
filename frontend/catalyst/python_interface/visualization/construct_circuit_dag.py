@@ -14,7 +14,7 @@
 
 """Contains the ConstructCircuitDAG tool for constructing a DAG from an xDSL module."""
 
-from functools import singledispatchmethod
+from functools import singledispatch, singledispatchmethod
 from typing import Any
 
 from xdsl.dialects import builtin, scf
@@ -22,6 +22,10 @@ from xdsl.ir import Block, Operation, Region
 
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from catalyst.python_interface.visualization.xdsl_conversion import (
+    xdsl_to_qml_measurement,
+    xdsl_to_qml_op,
+)
 
 
 class ConstructCircuitDAG:
@@ -36,6 +40,14 @@ class ConstructCircuitDAG:
         """
         self.dag_builder: DAGBuilder = dag_builder
 
+        # Record clusters seen as a stack
+        # beginning with the base graph (None)
+        self._cluster_stack: list[str | None] = [None]
+
+    def _reset(self) -> None:
+        """Resets the instance."""
+        self._cluster_stack: list[str | None] = [None]
+
     # =================================
     # 1. CORE DISPATCH AND ENTRY POINT
     # =================================
@@ -48,6 +60,8 @@ class ConstructCircuitDAG:
 
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module."""
+        self._reset()
+
         for op in module.ops:
             self._visit(op)
 
@@ -73,3 +87,72 @@ class ConstructCircuitDAG:
         """Visit an xDSL Block operation, dispatching handling for each contained Operation."""
         for op in block.ops:
             self._visit(op)
+
+    # ======================================
+    # 3. QUANTUM GATE & STATE PREP HANDLERS
+    # ======================================
+    # Handlers for operations that apply unitary transformations or set-up the quantum state.
+
+    @visit.register
+    def _unitary_and_state_prep(
+        self,
+        op: quantum.CustomOp
+        | quantum.GlobalPhaseOp
+        | quantum.QubitUnitaryOp
+        | quantum.SetStateOp
+        | quantum.MultiRZOp
+        | quantum.SetBasisStateOp,
+    ) -> None:
+        """Generic handler for unitary gates and quantum state preparation operations."""
+
+        qml_op = xdsl_to_qml_op(op)
+        # Build node on graph
+        self.dag_builder.add_node(
+            node_id=f"node_{id(op)}",
+            node_label=str(qml_op),
+            parent_graph_id=self._cluster_stack[-1],
+        )
+
+    # =============================================
+    # 4. QUANTUM MEASUREMENT HANDLERS
+    # =============================================
+
+    @visit.register
+    def _state_op(self, op: quantum.StateOp) -> None:
+        """Handler for the terminal state measurement operation."""
+
+        meas = xdsl_to_qml_measurement(op)
+        # Build node on graph
+        self.dag_builder.add_node(
+            node_id=f"node_{id(op)}",
+            node_label=str(meas),
+            parent_graph_id=self._cluster_stack[-1],
+        )
+
+    @visit.register
+    def _statistical_measurement_ops(
+        self,
+        op: quantum.ExpvalOp | quantum.VarianceOp | quantum.ProbsOp | quantum.SampleOp,
+    ) -> None:
+        """Handler for statistical measurement operations."""
+
+        obs_op = op.obs.owner
+        meas = xdsl_to_qml_measurement(op, xdsl_to_qml_measurement(obs_op))
+        # Build node on graph
+        self.dag_builder.add_node(
+            node_id=f"node_{id(op)}",
+            node_label=str(meas),
+            parent_graph_id=self._cluster_stack[-1],
+        )
+
+    @visit.register
+    def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
+        """Handler for the single-qubit projective measurement operation."""
+
+        meas = xdsl_to_qml_measurement(op)
+        # Build node on graph
+        self.dag_builder.add_node(
+            node_id=f"node_{id(op)}",
+            node_label=str(meas),
+            parent_graph_id=self._cluster_stack[-1],
+        )
