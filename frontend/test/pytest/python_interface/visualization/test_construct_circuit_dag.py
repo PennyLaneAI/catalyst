@@ -270,6 +270,64 @@ class TestCreateMeasurementNodes:
         assert len(nodes) == 1
         assert next(iter(nodes.values()))["label"] == str(meas_fn(qml.Z(0)))
 
+    @pytest.mark.unit
+    def test_probs_measurement_op(self):
+        """Tests that the probs measurement function can be captured as a node."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            return qml.probs()
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # sanity check
+        edges = utility.dag_builder.get_edges()
+        assert edges == []
+        clusters = utility.dag_builder.get_clusters()
+        assert clusters == {}
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.get_nodes()
+        assert len(nodes) == 1
+        assert next(iter(nodes.values()))["label"] == str(qml.probs())
+
+    @pytest.mark.unit
+    def test_sample_measurement_op(self):
+        """Tests that the sample measurement function can be captured as a node."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.set_shots(10)
+        @qml.qnode(dev)
+        def my_circuit():
+            return qml.sample()
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # sanity check
+        edges = utility.dag_builder.get_edges()
+        assert edges == []
+        clusters = utility.dag_builder.get_clusters()
+        assert clusters == {}
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.get_nodes()
+        assert len(nodes) == 1
+        assert next(iter(nodes.values()))["label"] == str(qml.sample())
+
+    @pytest.mark.unit
     def test_projective_measurement_op(self):
         """Test that projective measurements can be captured as nodes."""
         dev = qml.device("null.qubit", wires=1)
