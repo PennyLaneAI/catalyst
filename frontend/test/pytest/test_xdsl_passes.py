@@ -180,7 +180,7 @@ class TestXDSLPassesIntegration:
         workspace_path = str(workflow.workspace)
         assert os.path.exists(
             os.path.join(
-                workspace_path, "0_UserTransformPass", "1_remove-chained-self-inverse.mlir"
+                workspace_path, "0_UserTransformPass", "1_cancel-inverses.mlir"
             )
         )
         assert os.path.exists(
