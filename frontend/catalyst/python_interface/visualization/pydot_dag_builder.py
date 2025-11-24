@@ -54,6 +54,7 @@ class PyDotDAGBuilder(DAGBuilder):
             graph_type="digraph", rankdir="TB", compound="true", strict=True
         )
         # Create cache for easy look-up
+        # TODO: Get rid of this and use self._clusters if possible
         self._subgraphs: dict[str, pydot.Graph] = {}
         self._subgraphs["__base__"] = self.graph
 
