@@ -21,15 +21,16 @@ pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
-from catalyst.python_interface.dialects.quantum import CustomOp
-from catalyst.python_interface.visualization.construct_circuit_dag import (
-    ConstructCircuitDAG,
-)
-from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+import pennylane as qml
+from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.dialects.quantum import (
     CustomOp,
     QubitType,
 )
+from catalyst.python_interface.visualization.construct_circuit_dag import (
+    ConstructCircuitDAG,
+)
+from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 from xdsl.dialects import test
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir.core import Block, Region
@@ -74,17 +75,23 @@ class TestCreateOperatorNodes:
     def test_custom_op(self):
         """Tests that the CustomOp operation node can be created and visualized."""
 
-        # Create constant for wire
-        q0 = test.TestOp(result_types=[QubitType()])
-        custom_op = CustomOp(gate_name="Test", in_qubits=q0.results)
+        # Build module with only a CustomOp
+        dev = qml.device("null.qubit", wires=1)
 
-        # Create module
-        module = ModuleOp(ops=[q0, custom_op])
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            qml.H(0)
 
+        module = my_circuit()
+
+        # Construct DAG
         mock_dag_builder = Mock(DAGBuilder)
         utility = ConstructCircuitDAG(mock_dag_builder)
         utility.construct(module)
-        print(utility.dag_builder.to_string())
+
+        # Ensure DAG only has one node
 
     def test_global_phase_op(self):
         pass
