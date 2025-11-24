@@ -126,8 +126,8 @@ def test_does_not_mutate_module():
     assert str(module_op) == module_op_str_before
 
 
-class TestCreateOperatorNodes:
-    """Tests that operators can be created and visualized as nodes."""
+class TestCreateStaticOperatorNodes:
+    """Tests that operators with static parameters can be created and visualized as nodes."""
 
     @pytest.mark.unit
     @pytest.mark.parametrize("op", [qml.H(0), qml.X(0), qml.SWAP([0, 1])])
@@ -210,8 +210,8 @@ class TestCreateOperatorNodes:
         pass
 
 
-class TestCreateMeasurementNodes:
-    """Tests that measurements can be created and visualized as nodes."""
+class TestCreateStaticMeasurementNodes:
+    """Tests that measurements with static parameters can be created and visualized as nodes."""
 
     @pytest.mark.unit
     def test_state_op(self):
