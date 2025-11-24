@@ -92,6 +92,9 @@ class TestCreateOperatorNodes:
         utility.construct(module)
 
         # Ensure DAG only has one node
+        nodes = utility.dag_builder.get_nodes()
+        assert len(nodes) == 1
+        assert next(iter(nodes.values()))["label"] == "H(0)"
 
     def test_global_phase_op(self):
         pass
