@@ -160,10 +160,43 @@ class TestCreateOperatorNodes:
         # Ensure DAG only has one node
         nodes = utility.dag_builder.get_nodes()
         assert len(nodes) == 1
-        assert next(iter(nodes.values()))["label"] == "H(0)"
+        assert next(iter(nodes.values()))["label"] == str(op)
 
-    def test_global_phase_op(self):
-        pass
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "op",
+        [
+            qml.GlobalPhase(0.5),
+            qml.GlobalPhase(0.5, wires=0),
+            qml.GlobalPhase(0.5, wires=[0, 1]),
+        ],
+    )
+    def test_global_phase_op(self, op):
+        # Build module with only a CustomOp
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            qml.apply(op)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # sanity check
+        edges = utility.dag_builder.get_edges()
+        assert edges == []
+        clusters = utility.dag_builder.get_clusters()
+        assert clusters == {}
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.get_nodes()
+        assert len(nodes) == 1
+        assert next(iter(nodes.values()))["label"] == str(op)
 
     def test_qubit_unitary_op(self):
         pass
