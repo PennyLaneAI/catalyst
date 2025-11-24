@@ -17,6 +17,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from frontend.catalyst.python_interface.visualization import dag_builder
+
 pydot = pytest.importorskip("pydot")
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
 # pylint: disable=wrong-import-position
@@ -175,9 +177,7 @@ class TestAttributes:
     @pytest.mark.unit
     def test_add_node_with_attrs(self):
         """Tests that default attributes are applied and can be overridden."""
-        dag_builder = PyDotDAGBuilder(
-            attrs={"fillcolor": "lightblue", "penwidth": 3}
-        )
+        dag_builder = PyDotDAGBuilder(attrs={"fillcolor": "lightblue", "penwidth": 3})
 
         # Defaults
         dag_builder.add_node("0", "node0")
@@ -268,6 +268,23 @@ class TestGetMethods:
         assert nodes["1"]["label"] == "node1"
         assert nodes["1"]["cluster_id"] == "c0"
 
+    def test_get_nodes_doesnt_mutate(self):
+        """Tests that get_nodes doesn't mutate state"""
+
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_node("0", "node0")
+
+        old_nodes = dag_builder.get_nodes()
+
+        dag_builder.add_node("1", "node1")
+
+        new_nodes = dag_builder.get_nodes()
+
+        assert old_nodes is not new_nodes
+        assert len(old_nodes) == 1
+        assert len(new_nodes) == 2
+
     def test_get_edges(self):
         """Tests that get_edges works."""
 
@@ -283,6 +300,25 @@ class TestGetMethods:
         assert edges[0]["from_id"] == "0"
         assert edges[0]["to_id"] == "1"
         assert edges[0]["attrs"]["penwidth"] == 10
+
+    def test_get_edges_doesnt_mutate(self):
+        """Tests that get_edges doesn't mutated."""
+
+        dag_builder = PyDotDAGBuilder()
+        dag_builder.add_node("0", "node0")
+        dag_builder.add_node("1", "node1")
+        dag_builder.add_edge("0", "1")
+
+        old_edges = dag_builder.get_edges()
+
+        dag_builder.add_node("2", "node2")
+        dag_builder.add_edge("1", "2")
+
+        new_edges = dag_builder.get_edges()
+
+        assert old_edges is not new_edges
+        assert len(old_edges) == 1
+        assert len(new_edges) == 2
 
     def test_get_clusters(self):
         """Tests that get_clusters works."""
@@ -310,6 +346,23 @@ class TestGetMethods:
         assert clusters["1"]["cluster_label"] == "my_nested_cluster"
         assert clusters["1"]["node_label"] == "my_other_info_node"
         assert clusters["1"]["parent_id"] == "0"
+
+    def test_get_clusters_doesnt_mutate(self):
+        """Tests that get_clusters doesn't mutate state"""
+
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_cluster("0")
+
+        old_clusters = dag_builder.get_clusters()
+
+        dag_builder.add_cluster("1")
+
+        new_clusters = dag_builder.get_clusters()
+
+        assert old_clusters is not new_clusters
+        assert len(old_clusters) == 1
+        assert len(new_clusters) == 2
 
 
 class TestOutput:
