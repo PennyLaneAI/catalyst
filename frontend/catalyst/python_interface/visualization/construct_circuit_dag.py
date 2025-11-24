@@ -93,7 +93,7 @@ class ConstructCircuitDAG:
     # ======================================
     # Handlers for operations that apply unitary transformations or set-up the quantum state.
 
-    @visit.register
+    @_visit.register
     def _unitary_and_state_prep(
         self,
         op: quantum.CustomOp
@@ -117,7 +117,7 @@ class ConstructCircuitDAG:
     # 4. QUANTUM MEASUREMENT HANDLERS
     # =============================================
 
-    @visit.register
+    @_visit.register
     def _state_op(self, op: quantum.StateOp) -> None:
         """Handler for the terminal state measurement operation."""
 
@@ -129,7 +129,7 @@ class ConstructCircuitDAG:
             parent_graph_id=self._cluster_stack[-1],
         )
 
-    @visit.register
+    @_visit.register
     def _statistical_measurement_ops(
         self,
         op: quantum.ExpvalOp | quantum.VarianceOp | quantum.ProbsOp | quantum.SampleOp,
@@ -145,7 +145,7 @@ class ConstructCircuitDAG:
             parent_graph_id=self._cluster_stack[-1],
         )
 
-    @visit.register
+    @_visit.register
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
         """Handler for the single-qubit projective measurement operation."""
 
@@ -156,3 +156,4 @@ class ConstructCircuitDAG:
             node_label=str(meas),
             parent_graph_id=self._cluster_stack[-1],
         )
+
