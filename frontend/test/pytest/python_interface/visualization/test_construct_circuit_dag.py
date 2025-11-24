@@ -267,7 +267,7 @@ class TestCreateMeasurementNodes:
         # Ensure DAG only has one node
         nodes = utility.dag_builder.get_nodes()
         assert len(nodes) == 1
-        assert next(iter(nodes.values()))["label"] == str(qml.state())
+        assert next(iter(nodes.values()))["label"] == str(meas_fn(qml.Z(0)))
 
     def test_projective_measurement_op(self):
         pass
