@@ -22,6 +22,7 @@ pytestmark = pytest.mark.usefixtures("requires_xdsl")
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
 import pennylane as qml
+from catalyst import measure
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.dialects.quantum import (
     CustomOp,
@@ -270,4 +271,28 @@ class TestCreateMeasurementNodes:
         assert next(iter(nodes.values()))["label"] == str(meas_fn(qml.Z(0)))
 
     def test_projective_measurement_op(self):
-        pass
+        """Test that projective measurements can be captured as nodes."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            measure(0)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # sanity check
+        edges = utility.dag_builder.get_edges()
+        assert edges == []
+        clusters = utility.dag_builder.get_clusters()
+        assert clusters == {}
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.get_nodes()
+        assert len(nodes) == 1
+        assert "MidMeasure" in next(iter(nodes.values()))["label"]
