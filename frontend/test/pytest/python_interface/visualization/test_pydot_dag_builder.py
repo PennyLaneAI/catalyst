@@ -251,7 +251,7 @@ class TestGetMethods:
         dag_builder = PyDotDAGBuilder()
 
         dag_builder.add_node("0", "node0")
-        dag_builder.add_cluster("c0", "my_info_node", label="my_cluster")
+        dag_builder.add_cluster("c0")
         dag_builder.add_node("1", "node1", parent_graph_id="c0")
 
         nodes = dag_builder.get_nodes()
