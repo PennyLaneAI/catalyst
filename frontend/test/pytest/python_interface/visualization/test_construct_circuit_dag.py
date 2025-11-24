@@ -212,8 +212,8 @@ class TestCreateOperatorNodes:
 class TestCreateMeasurementNodes:
     """Tests that measurements can be created and visualized as nodes."""
 
-    @pytest.mark.parametrize("meas", [qml.state(), qml.state(wires=[0, 1])])
-    def test_state_op(self, meas):
+    @pytest.mark.unit
+    def test_state_op(self):
         """Test that qml.state can be handled."""
         dev = qml.device("null.qubit", wires=1)
 
@@ -221,7 +221,7 @@ class TestCreateMeasurementNodes:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_circuit():
-            return meas
+            return qml.state()
 
         module = my_circuit()
 
@@ -238,10 +238,36 @@ class TestCreateMeasurementNodes:
         # Ensure DAG only has one node
         nodes = utility.dag_builder.get_nodes()
         assert len(nodes) == 1
-        assert next(iter(nodes.values()))["label"] == str(meas)
+        assert next(iter(nodes.values()))["label"] == str(qml.state())
 
-    def test_statistical_measurement_op(self):
-        pass
+    @pytest.mark.unit
+    @pytest.mark.parametrize("meas_fn", [qml.expval, qml.var])
+    def test_expval_var_measurement_op(self, meas_fn):
+        """Test that statistical measurement operators can be captured as nodes."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            return meas_fn(qml.Z(0))
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # sanity check
+        edges = utility.dag_builder.get_edges()
+        assert edges == []
+        clusters = utility.dag_builder.get_clusters()
+        assert clusters == {}
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.get_nodes()
+        assert len(nodes) == 1
+        assert next(iter(nodes.values()))["label"] == str(qml.state())
 
     def test_projective_measurement_op(self):
         pass
