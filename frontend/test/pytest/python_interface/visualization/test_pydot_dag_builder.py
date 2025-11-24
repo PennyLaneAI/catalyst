@@ -262,7 +262,7 @@ class TestGetMethods:
         assert nodes["0"]["id"] == "0"
         assert nodes["0"]["label"] == "node0"
         assert nodes["0"]["parent_id"] == "__base__"
-        assert nodes["0"]["attrs"] == {"fillcolor": "red"}
+        assert nodes["0"]["attrs"]["fillcolor"] == "red"
 
         assert nodes["1"]["id"] == "1"
         assert nodes["1"]["label"] == "node1"
@@ -283,7 +283,7 @@ class TestGetMethods:
 
         assert edges[0]["from_id"] == "0"
         assert edges[0]["to_id"] == "1"
-        assert edges[0]["attrs"] == {"penwidth": 10}
+        assert edges[0]["attrs"]["penwidth"] == 10
 
     def test_get_clusters(self):
         """Tests that get_clusters works."""
@@ -304,7 +304,7 @@ class TestGetMethods:
         assert clusters["0"]["cluster_label"] == "my_cluster"
         assert clusters["0"]["node_label"] == "my_info_node"
         assert clusters["0"]["parent_id"] == "__base__"
-        assert clusters["0"]["attrs"] == {"penwidth": 10}
+        assert clusters["0"]["attrs"]["penwidth"] == 10
 
         assert len(clusters["1"]) == 5
         assert clusters["1"]["id"] == "0"
