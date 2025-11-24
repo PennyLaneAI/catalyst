@@ -108,9 +108,9 @@ class ConstructCircuitDAG:
         qml_op = xdsl_to_qml_op(op)
         # Build node on graph
         self.dag_builder.add_node(
-            node_id=f"node_{id(op)}",
-            node_label=str(qml_op),
-            parent_graph_id=self._cluster_stack[-1],
+            id=f"node_{id(op)}",
+            label=str(qml_op),
+            cluster_id=self._cluster_stack[-1],
         )
 
     # =============================================
@@ -124,9 +124,9 @@ class ConstructCircuitDAG:
         meas = xdsl_to_qml_measurement(op)
         # Build node on graph
         self.dag_builder.add_node(
-            node_id=f"node_{id(op)}",
-            node_label=str(meas),
-            parent_graph_id=self._cluster_stack[-1],
+            id=f"node_{id(op)}",
+            label=str(meas),
+            cluster_id=self._cluster_stack[-1],
         )
 
     @_visit.register
@@ -140,9 +140,9 @@ class ConstructCircuitDAG:
         meas = xdsl_to_qml_measurement(op, xdsl_to_qml_measurement(obs_op))
         # Build node on graph
         self.dag_builder.add_node(
-            node_id=f"node_{id(op)}",
-            node_label=str(meas),
-            parent_graph_id=self._cluster_stack[-1],
+            id=f"node_{id(op)}",
+            label=str(meas),
+            cluster_id=self._cluster_stack[-1],
         )
 
     @_visit.register
@@ -152,8 +152,7 @@ class ConstructCircuitDAG:
         meas = xdsl_to_qml_measurement(op)
         # Build node on graph
         self.dag_builder.add_node(
-            node_id=f"node_{id(op)}",
-            node_label=str(meas),
-            parent_graph_id=self._cluster_stack[-1],
+            id=f"node_{id(op)}",
+            label=str(meas),
+            cluster_id=self._cluster_stack[-1],
         )
-
