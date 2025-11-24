@@ -248,12 +248,66 @@ class TestGetMethods:
 
     def test_get_nodes(self):
         """Tests that get_nodes works."""
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_node("0", "node0")
+        dag_builder.add_cluster("c0", "my_info_node", label="my_cluster")
+        dag_builder.add_node("1", "node1", parent_graph_id="c0")
+
+        nodes = dag_builder.get_nodes()
+        assert len(nodes) == 2
+        assert len(nodes["0"]) == 4
+        assert nodes["0"]["id"] == "0"
+        assert nodes["0"]["label"] == "node0"
+        assert nodes["0"]["parent_id"] == "__base__"
+        assert nodes["0"]["attrs"] == {}
+
+        assert nodes["1"]["id"] == "1"
+        assert nodes["1"]["label"] == "node1"
+        assert nodes["1"]["parent_id"] == "c0"
+        assert nodes["1"]["attrs"] == {}
 
     def test_get_edges(self):
         """Tests that get_edges works."""
 
+        dag_builder = PyDotDAGBuilder()
+        dag_builder.add_node("0", "node0")
+        dag_builder.add_node("1", "node1")
+        dag_builder.add_edge("0", "1")
+
+        edges = dag_builder.get_edges()
+        assert len(edges) == 1
+        assert edges[0]["from_id"] == "0"
+        assert edges[0]["to_id"] == "0"
+        assert edges[0]["attrs"] == {}
+
     def test_get_clusters(self):
         """Tests that get_clusters works."""
+
+        dag_builder = PyDotDAGBuilder()
+        dag_builder.add_cluster("0", "my_info_node", label="my_cluster")
+
+        clusters = dag_builder.get_clusters()
+        assert len(clusters) == 1
+        assert len(clusters["0"]) == 5
+        assert clusters["0"]["id"] == "0"
+        assert clusters["0"]["cluster_label"] == "my_cluster"
+        assert clusters["0"]["node_label"] == "my_info_node"
+        assert clusters["0"]["parent_id"] == "__base__"
+        assert clusters["0"]["attrs"] == {}
+
+        dag_builder.add_cluster(
+            "1", "my_other_info_node", parent_graph_id="0", label="my_nested_cluster"
+        )
+
+        clusters = dag_builder.get_clusters()
+        assert len(clusters) == 2
+        assert len(clusters["1"]) == 5
+        assert clusters["1"]["id"] == "0"
+        assert clusters["1"]["cluster_label"] == "my_nested_cluster"
+        assert clusters["1"]["node_label"] == "my_other_info_node"
+        assert clusters["1"]["parent_id"] == "0"
+        assert clusters["1"]["attrs"] == {}
 
 
 class TestOutput:
