@@ -42,7 +42,8 @@ class DAGBuilder(ABC):
         Args:
             id (str): Unique node ID to identify this node.
             label (str): The text to display on the node when rendered.
-            cluster_id (str | None): Optional ID of the cluster this node belongs to.
+            cluster_id (str | None): Optional ID of the cluster this node belongs to. If `None`, this node gets
+                added on the base graph.
             **node_attrs (Any): Any additional styling keyword arguments.
 
         """
