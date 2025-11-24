@@ -278,7 +278,7 @@ class TestGetMethods:
         edges = dag_builder.get_edges()
         assert len(edges) == 1
         assert edges[0]["from_id"] == "0"
-        assert edges[0]["to_id"] == "0"
+        assert edges[0]["to_id"] == "1"
         assert edges[0]["attrs"] == {}
 
     def test_get_clusters(self):
