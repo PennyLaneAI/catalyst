@@ -176,7 +176,7 @@ class TestAttributes:
     def test_add_node_with_attrs(self):
         """Tests that default attributes are applied and can be overridden."""
         dag_builder = PyDotDAGBuilder(
-            node_attrs={"fillcolor": "lightblue", "penwidth": 3}
+            attrs={"fillcolor": "lightblue", "penwidth": 3}
         )
 
         # Defaults
@@ -194,7 +194,7 @@ class TestAttributes:
     @pytest.mark.unit
     def test_add_edge_with_attrs(self):
         """Tests that default attributes are applied and can be overridden."""
-        dag_builder = PyDotDAGBuilder(edge_attrs={"color": "lightblue4", "penwidth": 3})
+        dag_builder = PyDotDAGBuilder(attrs={"color": "lightblue4", "penwidth": 3})
 
         dag_builder.add_node("0", "node0")
         dag_builder.add_node("1", "node1")
@@ -214,7 +214,7 @@ class TestAttributes:
     def test_add_cluster_with_attrs(self):
         """Tests that default cluster attributes are applied and can be overridden."""
         dag_builder = PyDotDAGBuilder(
-            cluster_attrs={
+            attrs={
                 "style": "solid",
                 "fillcolor": None,
                 "penwidth": 2,

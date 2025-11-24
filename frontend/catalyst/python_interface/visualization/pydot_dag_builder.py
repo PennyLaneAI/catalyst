@@ -101,7 +101,7 @@ class PyDotDAGBuilder(DAGBuilder):
         id: str,
         label: str,
         cluster_id: str | None = None,
-        **node_attrs: Any,
+        **attrs: Any,
     ) -> None:
         """Add a single node to the graph.
 
@@ -109,11 +109,11 @@ class PyDotDAGBuilder(DAGBuilder):
             id (str): Unique node ID to identify this node.
             label (str): The text to display on the node when rendered.
             cluster_id (str | None): Optional ID of the cluster this node belongs to.
-            **node_attrs (Any): Any additional styling keyword arguments.
+            **attrs (Any): Any additional styling keyword arguments.
 
         """
         # Use ChainMap so you don't need to construct a new dictionary
-        node_attrs: ChainMap = ChainMap(node_attrs, self._default_node_attrs)
+        node_attrs: ChainMap = ChainMap(attrs, self._default_node_attrs)
         node = pydot.Node(id, label=label, **node_attrs)
         cluster_id = "__base__" if cluster_id is None else cluster_id
 
@@ -126,17 +126,17 @@ class PyDotDAGBuilder(DAGBuilder):
             "attrs": dict(node_attrs),
         }
 
-    def add_edge(self, from_id: str, to_id: str, **edge_attrs: Any) -> None:
+    def add_edge(self, from_id: str, to_id: str, **attrs: Any) -> None:
         """Add a single directed edge between nodes in the graph.
 
         Args:
             from_id (str): The unique ID of the source node.
             to_id (str): The unique ID of the destination node.
-            **edge_attrs (Any): Any additional styling keyword arguments.
+            **attrs (Any): Any additional styling keyword arguments.
 
         """
         # Use ChainMap so you don't need to construct a new dictionary
-        edge_attrs: ChainMap = ChainMap(edge_attrs, self._default_edge_attrs)
+        edge_attrs: ChainMap = ChainMap(attrs, self._default_edge_attrs)
         edge = pydot.Edge(from_id, to_id, **edge_attrs)
         self.graph.add_edge(edge)
 
@@ -149,7 +149,7 @@ class PyDotDAGBuilder(DAGBuilder):
         id: str,
         node_label: str | None = None,
         cluster_id: str | None = None,
-        **cluster_attrs: Any,
+        **attrs: Any,
     ) -> None:
         """Add a single cluster to the graph.
 
@@ -160,11 +160,11 @@ class PyDotDAGBuilder(DAGBuilder):
             id (str): Unique cluster ID to identify this cluster.
             node_label (str | None): The text to display on the information node within the cluster when rendered.
             cluster_id (str | None): Optional ID of the cluster this cluster belongs to. If `None`, the cluster will be positioned on the base graph.
-            **cluster_attrs (Any): Any additional styling keyword arguments.
+            **attrs (Any): Any additional styling keyword arguments.
 
         """
         # Use ChainMap so you don't need to construct a new dictionary
-        cluster_attrs: ChainMap = ChainMap(cluster_attrs, self._default_cluster_attrs)
+        cluster_attrs: ChainMap = ChainMap(attrs, self._default_cluster_attrs)
         cluster = pydot.Cluster(graph_name=id, **cluster_attrs)
 
         # Puts the label in a node within the cluster.

@@ -35,7 +35,7 @@ class DAGBuilder(ABC):
         id: NodeID,
         label: str,
         cluster_id: ClusterID | None = None,
-        **node_attrs: Any,
+        **attrs: Any,
     ) -> None:
         """Add a single node to the graph.
 
@@ -44,19 +44,19 @@ class DAGBuilder(ABC):
             label (str): The text to display on the node when rendered.
             cluster_id (str | None): Optional ID of the cluster this node belongs to. If `None`, this node gets
                 added on the base graph.
-            **node_attrs (Any): Any additional styling keyword arguments.
+            **attrs (Any): Any additional styling keyword arguments.
 
         """
         raise NotImplementedError
 
     @abstractmethod
-    def add_edge(self, from_id: NodeID, to_id: NodeID, **edge_attrs: Any) -> None:
+    def add_edge(self, from_id: NodeID, to_id: NodeID, **attrs: Any) -> None:
         """Add a single directed edge between nodes in the graph.
 
         Args:
             from_id (str): The unique ID of the source node.
             to_id (str): The unique ID of the destination node.
-            **edge_attrs (Any): Any additional styling keyword arguments.
+            **attrs (Any): Any additional styling keyword arguments.
 
         """
         raise NotImplementedError
@@ -67,7 +67,7 @@ class DAGBuilder(ABC):
         id: ClusterID,
         node_label: str | None = None,
         cluster_id: ClusterID | None = None,
-        **cluster_attrs: Any,
+        **attrs: Any,
     ) -> None:
         """Add a single cluster to the graph.
 
@@ -79,7 +79,7 @@ class DAGBuilder(ABC):
             node_label (str | None): The text to display on an information node within the cluster when rendered.
             cluster_id (str | None): Optional ID of the cluster this cluster belongs to. If `None`, the cluster will be
                 placed on the base graph.
-            **cluster_attrs (Any): Any additional styling keyword arguments.
+            **attrs (Any): Any additional styling keyword arguments.
 
         """
         raise NotImplementedError
