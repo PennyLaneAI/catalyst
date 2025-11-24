@@ -132,7 +132,7 @@ class TestCreateOperatorNodes:
     """Tests that operators can be created and visualized as nodes."""
 
     @pytest.mark.unit
-    @pytest.mark.parametrize("op", [qml.H(0), qml.X(0)])
+    @pytest.mark.parametrize("op", [qml.H(0), qml.X(0), qml.SWAP([0, 1])])
     def test_custom_op(self, op):
         """Tests that the CustomOp operation node can be created and visualized."""
 
