@@ -57,7 +57,14 @@ class PyDotDAGBuilder(DAGBuilder):
         self._subgraphs: dict[str, pydot.Graph] = {}
         self._subgraphs["__base__"] = self.graph
 
-        _default_attrs: dict = {"fontname": "Helvetica", "penwidth": 2} if attrs is None else attrs
+        # Internal state for graph structure
+        self._nodes: dict[str, dict[str, Any]] = {}
+        self._edges: list[dict[str, Any]] = []
+        self._clusters: dict[str, dict[str, Any]] = {}
+
+        _default_attrs: dict = (
+            {"fontname": "Helvetica", "penwidth": 2} if attrs is None else attrs
+        )
         self._default_node_attrs: dict = (
             {
                 **_default_attrs,
@@ -111,6 +118,13 @@ class PyDotDAGBuilder(DAGBuilder):
 
         self._subgraphs[parent_graph_id].add_node(node)
 
+        self._nodes[node_id] = {
+            "id": node_id,
+            "label": node_label,
+            "parent_id": parent_graph_id,
+            "attrs": dict(node_attrs),
+        }
+
     def add_edge(self, from_node_id: str, to_node_id: str, **edge_attrs: Any) -> None:
         """Add a single directed edge between nodes in the graph.
 
@@ -124,6 +138,10 @@ class PyDotDAGBuilder(DAGBuilder):
         edge_attrs = ChainMap(edge_attrs, self._default_edge_attrs)
         edge = pydot.Edge(from_node_id, to_node_id, **edge_attrs)
         self.graph.add_edge(edge)
+
+        self._edges.append(
+            {"from_id": from_node_id, "to_id": to_node_id, "attrs": dict(edge_attrs)}
+        )
 
     def add_cluster(
         self,
@@ -176,6 +194,38 @@ class PyDotDAGBuilder(DAGBuilder):
 
         parent_graph_id = "__base__" if parent_graph_id is None else parent_graph_id
         self._subgraphs[parent_graph_id].add_subgraph(cluster)
+
+        self._clusters[cluster_id] = {
+            "id": cluster_id,
+            "cluster_label": cluster_attrs.get("label"),
+            "node_label": node_label,
+            "parent_id": parent_graph_id,
+            "attrs": dict(cluster_attrs),
+        }
+
+    def get_nodes(self) -> dict[str, dict[str, Any]]:
+        """Retrieve the current set of nodes in the graph.
+
+        Returns:
+            nodes (dict[str, dict[str, Any]]): A dictionary that maps the node's ID to it's node information.
+        """
+        return self._nodes
+
+    def get_edges(self) -> list[dict[str, Any]]:
+        """Retrieve the current set of edges in the graph.
+
+        Returns:
+            edges (list[dict[str, Any]]): A list of edges where each edge contains a dictionary of information for a given edge.
+        """
+        return self._edges
+
+    def get_clusters(self) -> dict[str, dict[str, Any]]:
+        """Retrieve the current set of clusters in the graph.
+
+        Returns:
+            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID to it's cluster information.
+        """
+        return self._clusters
 
     def to_file(self, output_filename: str) -> None:
         """Save the graph to a file.
