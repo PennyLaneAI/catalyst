@@ -14,7 +14,10 @@
 """File that defines the DAGBuilder abstract base class."""
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, TypeAlias
+
+ClusterID: TypeAlias = str
+NodeID: TypeAlias = str
 
 
 class DAGBuilder(ABC):
@@ -28,7 +31,11 @@ class DAGBuilder(ABC):
 
     @abstractmethod
     def add_node(
-        self, node_id: str, node_label: str, parent_graph_id: str | None = None, **node_attrs: Any
+        self,
+        node_id: NodeID,
+        node_label: str,
+        parent_graph_id: str | None = None,
+        **node_attrs: Any,
     ) -> None:
         """Add a single node to the graph.
 
@@ -42,7 +49,9 @@ class DAGBuilder(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def add_edge(self, from_node_id: str, to_node_id: str, **edge_attrs: Any) -> None:
+    def add_edge(
+        self, from_node_id: NodeID, to_node_id: NodeID, **edge_attrs: Any
+    ) -> None:
         """Add a single directed edge between nodes in the graph.
 
         Args:
@@ -56,9 +65,9 @@ class DAGBuilder(ABC):
     @abstractmethod
     def add_cluster(
         self,
-        cluster_id: str,
+        cluster_id: ClusterID,
         node_label: str | None = None,
-        parent_graph_id: str | None = None,
+        parent_graph_id: ClusterID | None = None,
         **cluster_attrs: Any,
     ) -> None:
         """Add a single cluster to the graph.
@@ -72,6 +81,33 @@ class DAGBuilder(ABC):
             parent_graph_id (str | None): Optional ID of the cluster this cluster belongs to.
             **cluster_attrs (Any): Any additional styling keyword arguments.
 
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_nodes(self) -> dict[NodeID, dict[str, Any]]:
+        """Retrieve the current set of nodes in the graph.
+
+        Returns:
+            nodes (dict[str, dict[str, Any]]): A dictionary that maps the node's ID to it's node information.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_edges(self) -> list[dict[str, Any]]:
+        """Retrieve the current set of edges in the graph.
+
+        Returns:
+            edges (list[dict[str, Any]]): A list of edges where each edge contains a dictionary of information for a given edge.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_clusters(self) -> dict[ClusterID, dict[str, Any]]:
+        """Retrieve the current set of clusters in the graph.
+
+        Returns:
+            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID to it's cluster information.
         """
         raise NotImplementedError
 
