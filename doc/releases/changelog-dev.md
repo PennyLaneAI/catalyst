@@ -69,6 +69,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* `qml.PCPhase` can be compiled and executed with capture enabled.
+  [(#2226)](https://github.com/PennyLaneAI/catalyst/pull/2226)
+
 * Resource tracking now supports dynamic qubit allocation
   [(#2203)](https://github.com/PennyLaneAI/catalyst/pull/2203)
 
@@ -111,6 +114,9 @@
 
 * Dynamically allocated wires can now be passed into control flow and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
+
+* The `--adjoint-lowering` pass can now handle PPR operations.
+  [(#2227)](https://github.com/PennyLaneAI/catalyst/pull/2227)
 
 <h3>Breaking changes 💔</h3>
 
