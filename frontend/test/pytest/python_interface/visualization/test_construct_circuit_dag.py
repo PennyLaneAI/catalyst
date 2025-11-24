@@ -131,7 +131,9 @@ def test_does_not_mutate_module():
 class TestCreateOperatorNodes:
     """Tests that operators can be created and visualized as nodes."""
 
-    def test_custom_op(self):
+    @pytest.mark.unit
+    @pytest.mark.parametrize("op", [qml.H(0), qml.X(0)])
+    def test_custom_op(self, op):
         """Tests that the CustomOp operation node can be created and visualized."""
 
         # Build module with only a CustomOp
@@ -141,7 +143,7 @@ class TestCreateOperatorNodes:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_circuit():
-            qml.H(0)
+            qml.apply(op)
 
         module = my_circuit()
 
