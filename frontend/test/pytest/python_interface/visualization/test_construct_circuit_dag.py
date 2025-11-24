@@ -36,6 +36,65 @@ from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir.core import Block, Region
 
 
+class FakeDAGBuilder(DAGBuilder):
+    """
+    A concrete implementation of DAGBuilder used ONLY for testing.
+    It stores all graph manipulation calls in simple Python dictionaries
+    for easy assertion of the final graph state.
+    """
+
+    def __init__(self):
+        self._nodes = {}
+        self._edges = []
+        self._clusters = {}
+
+    def add_node(self, id, label, cluster_id=None, **attrs) -> None:
+        self._nodes[id] = {
+            "id": id,
+            "label": label,
+            "parent_id": cluster_id,
+            "attrs": attrs,
+        }
+
+    def add_edge(self, from_id: str, to_id: str, **attrs) -> None:
+        self._edges.append(
+            {
+                "from": from_id,
+                "to": to_id,
+                "attrs": attrs,
+            }
+        )
+
+    def add_cluster(
+        self,
+        id,
+        node_label=None,
+        cluster_id=None,
+        **attrs,
+    ) -> None:
+        self._clusters[id] = {
+            "id": id,
+            "label": node_label,
+            "parent_id": cluster_id,
+            "attrs": attrs,
+        }
+
+    def get_nodes(self):
+        return self._nodes.copy()
+
+    def get_edges(self):
+        return self._edges.copy()
+
+    def get_clusters(self):
+        return self._clusters.copy()
+
+    def to_file(self, output_filename):
+        pass
+
+    def to_string(self) -> str:
+        return "graph"
+
+
 class TestInitialization:
     """Tests that the state is correctly initialized."""
 
@@ -87,8 +146,7 @@ class TestCreateOperatorNodes:
         module = my_circuit()
 
         # Construct DAG
-        mock_dag_builder = Mock(DAGBuilder)
-        utility = ConstructCircuitDAG(mock_dag_builder)
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
         # Ensure DAG only has one node
