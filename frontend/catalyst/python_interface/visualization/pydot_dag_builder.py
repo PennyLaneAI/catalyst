@@ -210,7 +210,7 @@ class PyDotDAGBuilder(DAGBuilder):
         Returns:
             nodes (dict[str, dict[str, Any]]): A dictionary that maps the node's ID to it's node information.
         """
-        return self._nodes
+        return self._nodes.copy()
 
     def get_edges(self) -> list[dict[str, Any]]:
         """Retrieve the current set of edges in the graph.
@@ -218,7 +218,7 @@ class PyDotDAGBuilder(DAGBuilder):
         Returns:
             edges (list[dict[str, Any]]): A list of edges where each element in the list contains a dictionary of edge information.
         """
-        return self._edges
+        return self._edges.copy()
 
     def get_clusters(self) -> dict[str, dict[str, Any]]:
         """Retrieve the current set of clusters in the graph.
@@ -226,7 +226,7 @@ class PyDotDAGBuilder(DAGBuilder):
         Returns:
             clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID to it's cluster information.
         """
-        return self._clusters
+        return self._clusters.copy()
 
     def to_file(self, output_filename: str) -> None:
         """Save the graph to a file.
