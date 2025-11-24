@@ -336,10 +336,11 @@ def test_pauli_rot_with_adjoint_region():
         qml.PauliRot(np.pi / 2, "YX", wires=[0, 1])
         qml.adjoint(f)()
 
+    # CHECK: transform.apply_registered_pass "adjoint-lowering"
     # CHECK: qec.ppr ["Y", "X"](4)
     # CHECK: quantum.adjoint
     # CHECK: qec.ppr ["X", "Z"](8)
-    print(circuit.mlir_opt)
+    print(circuit.mlir)
     qml.capture.disable()
 
 
@@ -358,9 +359,10 @@ def test_pauli_rot_with_adjoint_single_gate():
     def circuit():
         qml.adjoint(qml.PauliRot(np.pi / 2, "XZ", wires=[0, 1]))
 
+    # CHECK-NOT: transform.apply_registered_pass "adjoint-lowering"
     # CHECK-NOT: quantum.adjoint
     # CHECK: qec.ppr ["X", "Z"](-4)
-    print(circuit.mlir_opt)
+    print(circuit.mlir)
     qml.capture.disable()
 
 

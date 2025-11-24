@@ -123,6 +123,7 @@ with Patcher(
     )
     from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
     from catalyst.jax_primitives_utils import (
+        ApplyRegisteredPassOp,
         cache,
         create_call_op,
         get_cached,
@@ -2676,6 +2677,28 @@ def _adjoint_lowering(
         )
 
         QYieldOp([out[-1]])
+
+    # Need to manually add adjoint lowering pass for PPR, since that pipeline is not
+    # end-to-end yet.
+    # TODO: remove this manual addition when PPR is end-to-end, or when PPR has its own
+    # pipeline registered.
+
+    if any(_op.name == "qec.ppr" for _op in adjoint_block.operations):
+
+        def adjoint_pass_injector(_op: ir.Operation) -> ir.WalkResult:
+            if _op.name == "transform.named_sequence":
+                with ir.InsertionPoint.at_block_begin(_op.regions[0].blocks[0]):
+                    adjoint_lowering_pass_op = ApplyRegisteredPassOp(
+                        result=ir.OpaqueType.get("transform", 'op<"builtin.module">'),
+                        target=_op.regions[0].blocks[0].arguments[0],  # just insert at beginning
+                        pass_name="adjoint-lowering",
+                        options={},
+                        dynamic_options={},
+                    )
+                return ir.WalkResult.INTERRUPT
+            return ir.WalkResult.ADVANCE
+
+        op.parent.parent.walk(adjoint_pass_injector, walk_order=ir.WalkOrder.PRE_ORDER)
 
     return op.results
 
