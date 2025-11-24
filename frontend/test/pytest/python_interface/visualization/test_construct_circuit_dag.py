@@ -64,15 +64,36 @@ def test_does_not_mutate_module():
     assert str(module_op) == module_op_str_before
 
 
-class TestOperatorNodes:
-    """Tests that operators can be visualized as nodes."""
+class TestCreateOperatorNodes:
+    """Tests that operators can be created and visualized as nodes."""
 
     def test_custom_op(self):
         pass
 
+    def test_global_phase_op(self):
+        pass
 
-class TestMeasurementNodes:
-    """Tests that measurements can be visualized as nodes."""
+    def test_qubit_unitary_op(self):
+        pass
+
+    def test_set_state_op(self):
+        pass
+
+    def test_multi_rz_op(self):
+        pass
+
+    def test_set_basis_state_op(self):
+        pass
+
+
+class TestCreateMeasurementNodes:
+    """Tests that measurements can be created and visualized as nodes."""
 
     def test_state_op(self):
+        pass
+
+    def test_statistical_measurement_op(self):
+        pass
+
+    def test_projective_measurement_op(self):
         pass
