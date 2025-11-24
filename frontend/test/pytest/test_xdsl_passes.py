@@ -32,6 +32,7 @@ from catalyst.utils.filesystem import Directory
 # pylint: disable=protected-access
 
 
+@pytest.mark.usefixtures("requires_xdsl")
 class TestHasXDSLPassesInTransformModules:
     """Test the has_xdsl_passes_in_transform_modules method and its exception handling."""
 
@@ -56,9 +57,11 @@ class TestHasXDSLPassesInTransformModules:
 
         class MockAttrs:
             def __contains__(self, key):
+                """Mock contains method."""
                 raise exception("Error")
 
             def keys(self):
+                """Mock keys method."""
                 raise exception("Error")
 
         compiler = Compiler()
@@ -66,6 +69,7 @@ class TestHasXDSLPassesInTransformModules:
         assert compiler.has_xdsl_passes_in_transform_modules(module) is False
 
 
+@pytest.mark.usefixtures("requires_xdsl")
 class TestCreatePassSaveCallback:
     """Test the _create_xdsl_pass_save_callback method."""
 
@@ -118,6 +122,7 @@ class TestCreatePassSaveCallback:
     def test_pass_save_callback_saves_ir_correctly(self):
         """Test that callback saves the IR correctly."""
         try:
+            # pylint: disable-next=import-outside-toplevel
             from xdsl.dialects.builtin import ModuleOp
         except ImportError:
             pytest.skip("xdsl not available")
@@ -154,12 +159,14 @@ class TestCreatePassSaveCallback:
             assert files[2] == "3_Pass3.mlir"
 
 
+@pytest.mark.usefixtures("requires_xdsl")
 class TestXDSLPassesIntegration:
     """Test the xDSL passes integration."""
 
     @pytest.mark.usefixtures("use_capture")
     def test_xdsl_passes_integration(self):
         """Test the xDSL passes integration."""
+        # pylint: disable-next=import-outside-toplevel
         from pennylane.compiler.python_compiler.transforms import merge_rotations_pass
 
         @qjit(keep_intermediate="changed", verbose=True)
@@ -179,9 +186,7 @@ class TestXDSLPassesIntegration:
         workflow()
         workspace_path = str(workflow.workspace)
         assert os.path.exists(
-            os.path.join(
-                workspace_path, "0_UserTransformPass", "1_cancel-inverses.mlir"
-            )
+            os.path.join(workspace_path, "0_UserTransformPass", "1_cancel-inverses.mlir")
         )
         assert os.path.exists(
             os.path.join(workspace_path, "0_UserTransformPass", "2_xdsl-merge-rotations.mlir")
