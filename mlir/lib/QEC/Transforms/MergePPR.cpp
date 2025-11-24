@@ -14,8 +14,6 @@
 
 #define DEBUG_TYPE "merge-ppr"
 
-#include "mlir/Analysis/TopologicalSortUtils.h"
-
 #include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOpInterfaces.h"
 #include "QEC/Transforms/Patterns.h"
@@ -38,14 +36,59 @@ struct MergePPR : public OpRewritePattern<PPRotationOp> {
 
     LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override
     {
-        // TODO
-        // check that next op is PPR
+        // NOTE: a bit unorthodox, but we find the *second* PPR in a pair, since it's easier to
+        // look backwards by checking inQubits.getDefiningOp
+        ValueRange inQubits = op.getInQubits();
+        auto definingOp = inQubits[0].getDefiningOp();
+
+        if (!definingOp) {
+            return failure();
+        }
+
+        auto prevOp = cast<PPRotationOp>(definingOp);
 
         // check same pauli strings
+        if (op.getPauliProduct() != prevOp.getPauliProduct()) {
+            return failure();
+        }
 
-        // merge angles
-        // delete ops
-        return failure();
+        // TODO this will need to update when we allow arbitrary angles
+        // for now, the angles must match (otherwise they can't merge or cancel)
+        int16_t opRotation = static_cast<int16_t>(op.getRotationKind());
+        int16_t prevOpRotation = static_cast<int16_t>(prevOp.getRotationKind());
+
+        // cancel inverse operations
+        if (opRotation == -prevOpRotation) {
+            // erase in reverse to avoid use issues
+            ValueRange originalQubits = prevOp.getInQubits();
+            rewriter.replaceOp(op, originalQubits);
+            rewriter.replaceOp(prevOp, originalQubits);
+
+            return success();
+        }
+
+        // TODO this will have to change when we allow arbitrary angles
+        if (opRotation != prevOpRotation) {
+            return failure();
+        }
+
+        int16_t newAngle = opRotation / 2;
+
+        // newAngle of 1 indicates denominator of 1
+        if (newAngle != 1 and newAngle != -1) {
+            // "replace" the operation by changing the rotationKind
+            prevOp.setRotationKind(newAngle);
+
+            // replace references to current op with prevOp
+            rewriter.replaceOp(op, prevOp);
+        }
+        else {
+            ValueRange originalQubits = prevOp.getInQubits();
+            rewriter.replaceOp(op, originalQubits);
+            rewriter.replaceOp(prevOp, originalQubits);
+        }
+
+        return success();
     }
 };
 } // namespace
