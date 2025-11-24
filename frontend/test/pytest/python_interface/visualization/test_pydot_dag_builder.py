@@ -306,7 +306,7 @@ class TestGetMethods:
         assert clusters["0"]["attrs"]["penwidth"] == 10
 
         assert len(clusters["1"]) == 5
-        assert clusters["1"]["id"] == "0"
+        assert clusters["1"]["id"] == "1"
         assert clusters["1"]["cluster_label"] == "my_nested_cluster"
         assert clusters["1"]["node_label"] == "my_other_info_node"
         assert clusters["1"]["parent_id"] == "0"
