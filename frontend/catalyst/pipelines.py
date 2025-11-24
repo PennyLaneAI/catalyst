@@ -87,7 +87,7 @@ class CompileOptions:
 
             - ``False`` or ``0`` or ``"none"`` (default): No intermediate files are kept.
             - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
-            - ``2`` or ``"changed"``: Intermediate files are saved after each pass (only if changed).
+            - ``2`` or ``"changed"``: Intermediate files are saved after each pass only if changed.
             - ``3`` or ``"pass"``: Intermediate files are saved after each pass, even if unchanged.
         use_nameloc (Optional[bool]): If ``True``, add function parameter names to the IR as name
             locations.
