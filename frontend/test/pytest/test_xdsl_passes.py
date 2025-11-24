@@ -56,6 +56,8 @@ class TestHasXDSLPassesInTransformModules:
         """Test that exceptions are handled correctly."""
 
         class MockAttrs:
+            """Mock attrs class."""
+
             def __contains__(self, key):
                 """Mock contains method."""
                 raise exception("Error")
