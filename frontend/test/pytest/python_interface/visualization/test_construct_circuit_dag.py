@@ -26,7 +26,7 @@ from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
-from pennylane.compiler.python_compiler.dialects.quantum import (
+from catalyst.python_interface.dialects.quantum import (
     CustomOp,
     QubitType,
 )
