@@ -172,7 +172,8 @@ class TestCreateOperatorNodes:
         ],
     )
     def test_global_phase_op(self, op):
-        # Build module with only a CustomOp
+        """Test that GlobalPhase can be handled."""
+
         dev = qml.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
@@ -214,8 +215,33 @@ class TestCreateOperatorNodes:
 class TestCreateMeasurementNodes:
     """Tests that measurements can be created and visualized as nodes."""
 
-    def test_state_op(self):
-        pass
+    @pytest.mark.parametrize("meas", [qml.state(), qml.state(wires=[0, 1])])
+    def test_state_op(self, meas):
+        """Test that qml.state can be handled."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            return meas
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # sanity check
+        edges = utility.dag_builder.get_edges()
+        assert edges == []
+        clusters = utility.dag_builder.get_clusters()
+        assert clusters == {}
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.get_nodes()
+        assert len(nodes) == 1
+        assert next(iter(nodes.values()))["label"] == str(meas)
 
     def test_statistical_measurement_op(self):
         pass
