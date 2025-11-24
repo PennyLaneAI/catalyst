@@ -215,7 +215,7 @@ class PyDotDAGBuilder(DAGBuilder):
         """Retrieve the current set of edges in the graph.
 
         Returns:
-            edges (list[dict[str, Any]]): A list of edges where each edge contains a dictionary of information for a given edge.
+            edges (list[dict[str, Any]]): A list of edges where each element in the list contains a dictionary of edge information.
         """
         return self._edges
 
