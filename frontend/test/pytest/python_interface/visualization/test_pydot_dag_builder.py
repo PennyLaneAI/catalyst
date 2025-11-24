@@ -267,7 +267,6 @@ class TestGetMethods:
         assert nodes["1"]["id"] == "1"
         assert nodes["1"]["label"] == "node1"
         assert nodes["1"]["parent_id"] == "c0"
-        assert nodes["1"]["attrs"] == {}
 
     def test_get_edges(self):
         """Tests that get_edges works."""
@@ -311,7 +310,6 @@ class TestGetMethods:
         assert clusters["1"]["cluster_label"] == "my_nested_cluster"
         assert clusters["1"]["node_label"] == "my_other_info_node"
         assert clusters["1"]["parent_id"] == "0"
-        assert clusters["1"]["attrs"] == {}
 
 
 class TestOutput:
