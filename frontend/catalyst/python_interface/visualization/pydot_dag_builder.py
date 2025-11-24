@@ -114,9 +114,9 @@ class PyDotDAGBuilder(DAGBuilder):
         # Use ChainMap so you don't need to construct a new dictionary
         node_attrs: ChainMap = ChainMap(node_attrs, self._default_node_attrs)
         node = pydot.Node(id, label=label, **node_attrs)
-        parent_graph_id = "__base__" if cluster_id is None else cluster_id
+        cluster_id = "__base__" if cluster_id is None else cluster_id
 
-        self._subgraphs[parent_graph_id].add_node(node)
+        self._subgraphs[cluster_id].add_node(node)
 
         self._nodes[id] = {
             "id": id,
@@ -192,14 +192,14 @@ class PyDotDAGBuilder(DAGBuilder):
 
         self._subgraphs[id] = cluster
 
-        parent_graph_id = "__base__" if cluster_id is None else cluster_id
-        self._subgraphs[parent_graph_id].add_subgraph(cluster)
+        cluster_id = "__base__" if cluster_id is None else cluster_id
+        self._subgraphs[cluster_id].add_subgraph(cluster)
 
         self._clusters[id] = {
             "id": id,
             "cluster_label": cluster_attrs.get("label"),
             "node_label": node_label,
-            "parent_id": parent_graph_id,
+            "parent_id": cluster_id,
             "attrs": dict(cluster_attrs),
         }
 
