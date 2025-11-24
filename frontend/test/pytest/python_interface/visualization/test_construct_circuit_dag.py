@@ -151,6 +151,12 @@ class TestCreateOperatorNodes:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
+        # sanity check
+        edges = utility.dag_builder.get_edges()
+        assert edges == []
+        clusters = utility.dag_builder.get_clusters()
+        assert clusters == {}
+
         # Ensure DAG only has one node
         nodes = utility.dag_builder.get_nodes()
         assert len(nodes) == 1
