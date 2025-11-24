@@ -95,15 +95,12 @@ class FakeDAGBuilder(DAGBuilder):
         return "graph"
 
 
-class TestInitialization:
-    """Tests that the state is correctly initialized."""
+def test_dependency_injection():
+    """Tests that relevant dependencies are injected."""
 
-    def test_dependency_injection(self):
-        """Tests that relevant dependencies are injected."""
-
-        mock_dag_builder = Mock(DAGBuilder)
-        utility = ConstructCircuitDAG(mock_dag_builder)
-        assert utility.dag_builder is mock_dag_builder
+    mock_dag_builder = Mock(DAGBuilder)
+    utility = ConstructCircuitDAG(mock_dag_builder)
+    assert utility.dag_builder is mock_dag_builder
 
 
 def test_does_not_mutate_module():
