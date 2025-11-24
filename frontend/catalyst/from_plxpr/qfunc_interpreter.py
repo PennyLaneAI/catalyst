@@ -125,7 +125,23 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         super().__init__()
 
     def interpret_operation(self, op, is_adjoint=False, control_values=(), control_wires=()):
-        """Re-bind a pennylane operation as a catalyst instruction."""
+        """Re-bind a pennylane operation as a catalyst instruction.
+
+        Note that this method handles the unwrapping of adjoint and controlled
+        operations recursively.
+
+        For special operations that require custom parameter handling during
+        binding, we refer to the `_special_op_bind_call` mapping.
+
+        Args:
+            op (qml.operation.Operator): The operation to interpret.
+            is_adjoint (bool): Whether the operation is in adjoint mode.
+            control_values (tuple): Control values for controlled operations.
+            control_wires (tuple): Control wires for controlled operations.
+
+        Returns:
+            List[AbstractQbit]: The resulting qubits after applying the operation.
+        """
         if isinstance(op, qml.ops.Adjoint):
             return self.interpret_operation(
                 op.base,
@@ -140,13 +156,6 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                 control_values=control_values + tuple(op.control_values),
                 control_wires=control_wires + tuple(op.control_wires),
             )
-
-        # This is a temporary workaround for the PCPhase operation
-        # which does not follow the same pattern as `qinst_p`.
-        # We will revisit this once we have a better solution for
-        # supporting general PL operations in Catalyst.
-        if op.name == "PCPhase":
-            op.data = op.data + (op.hyperparameters["dimension"][0],)
 
         control_wires = control_wires + self.control_wires
         control_values = control_values + self.control_values
@@ -165,7 +174,10 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         if any(not qreg.is_qubit_mode() and qreg.expired for qreg in in_qregs + in_ctrl_qregs):
             raise CompileError(f"Deallocated qubits cannot be used, but used in {op.name}.")
 
-        bind_fn = _special_op_bind_call.get(type(op), qinst_p.bind)
+        if (fn := _special_op_bind_call.get(type(op))) is not None:
+            bind_fn = partial(fn, hyperparameters=op.hyperparameters)
+        else:
+            bind_fn = qinst_p.bind
 
         out_qubits = bind_fn(
             *[*in_qubits, *op.data, *in_ctrl_qubits, *control_values],
@@ -211,7 +223,14 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             return compbasis_p.bind(self.init_qreg.get(), qreg_available=True)
 
     def interpret_measurement(self, measurement):
-        """Rebind a measurement as a catalyst instruction."""
+        """Rebind a measurement as a catalyst instruction.
+
+        Args:
+            measurement (qml.measurements.MeasurementProcess): The measurement to interpret.
+
+        Returns:
+            AbstractQbit: The resulting measurement value.
+        """
         if self.has_dynamic_allocation:
             if len(measurement.wires) == 0:
                 raise CompileError(
@@ -285,8 +304,10 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         return self.eval(jaxpr.jaxpr, jaxpr.consts, *args)
 
 
-# pylint: disable=unused-argument
-def _qubit_unitary_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint):
+# pylint: disable=unused-argument, too-many-arguments
+def _qubit_unitary_bind_call(
+    *invals, op, qubits_len, params_len, ctrl_len, adjoint, hyperparameters
+):
     wires = invals[:qubits_len]
     mat = invals[qubits_len]
     ctrl_inputs = invals[qubits_len + 1 :]
@@ -295,14 +316,47 @@ def _qubit_unitary_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjo
     )
 
 
-# pylint: disable=unused-argument
-def _gphase_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint):
+# pylint: disable=unused-argument, too-many-arguments
+def _gphase_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint, hyperparameters):
     return gphase_p.bind(*invals[qubits_len:], ctrl_len=ctrl_len, adjoint=adjoint)
 
 
+# pylint: disable=too-many-arguments
+def _pcphase_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint, hyperparameters):
+    wires = invals[:qubits_len]
+    angle = invals[qubits_len]
+
+    # This is a temporary workaround to properly capture
+    # the dimension of the subspace for the PCPhase operation
+    # which does not follow the same pattern as `qinst_p`.
+    # We will revisit this once we have a better solution for
+    # supporting general PL operations in the capture framework.
+    # See https://docs.pennylane.ai/en/stable/code/api/pennylane.PCPhase.html
+    dim = hyperparameters["dimension"][0]
+    params_len += 1
+
+    ctrl_inputs = invals[qubits_len + 2 :]
+
+    return qinst_p.bind(
+        *wires,
+        angle,
+        dim,
+        *ctrl_inputs,
+        op=op,
+        qubits_len=qubits_len,
+        params_len=params_len,
+        ctrl_len=ctrl_len,
+        adjoint=adjoint,
+    )
+
+
+# Mapping of special operations to their bind calls
+# These operations require special handling of their parameters
+# during the binding process.
 _special_op_bind_call = {
     qml.QubitUnitary: _qubit_unitary_bind_call,
     qml.GlobalPhase: _gphase_bind_call,
+    qml.PCPhase: _pcphase_bind_call,
 }
 
 
