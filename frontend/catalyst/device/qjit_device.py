@@ -1,4 +1,4 @@
-# Copyright 2024 Xanadu Quantum Technologies Inc.
+# Copyright 2024-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -56,44 +56,6 @@ from catalyst.utils.runtime_environment import get_lib_path
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
-RUNTIME_OPERATIONS = [
-    "CNOT",
-    "ControlledPhaseShift",
-    "CRot",
-    "CRX",
-    "CRY",
-    "CRZ",
-    "CSWAP",
-    "CY",
-    "CZ",
-    "Hadamard",
-    "Identity",
-    "IsingXX",
-    "IsingXY",
-    "IsingYY",
-    "IsingZZ",
-    "SingleExcitation",
-    "DoubleExcitation",
-    "ISWAP",
-    "MultiRZ",
-    "PauliX",
-    "PauliY",
-    "PauliZ",
-    "PCPhase",
-    "PhaseShift",
-    "PSWAP",
-    "QubitUnitary",
-    "Rot",
-    "RX",
-    "RY",
-    "RZ",
-    "S",
-    "SWAP",
-    "T",
-    "Toffoli",
-    "GlobalPhase",
-]
-
 RUNTIME_OBSERVABLES = [
     "Identity",
     "PauliX",
@@ -109,11 +71,9 @@ RUNTIME_OBSERVABLES = [
 
 RUNTIME_MPS = ["ExpectationMP", "SampleMP", "VarianceMP", "CountsMP", "StateMP", "ProbabilityMP"]
 
-# The runtime interface does not care about specific gate properties, so set them all to True.
-RUNTIME_OPERATIONS = {
-    op: OperatorProperties(invertible=True, controllable=True, differentiable=True)
-    for op in RUNTIME_OPERATIONS
-}
+# A list of custom operations supported by the Catalyst compiler.
+# This is useful especially for testing a device with custom operations.
+CUSTOM_OPERATIONS = {}
 
 RUNTIME_OBSERVABLES = {
     obs: OperatorProperties(invertible=True, controllable=True, differentiable=True)
@@ -199,6 +159,14 @@ def extract_backend_info(device: qml.devices.QubitDevice) -> BackendInfo:
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
 
 
+def union_operations(
+    a: Dict[str, OperatorProperties], b: Dict[str, OperatorProperties]
+) -> Dict[str, OperatorProperties]:
+    """Union of two sets of operator properties"""
+    return {**a, **b}
+    # return {k: a[k] & b[k] for k in (a.keys() & b.keys())}
+
+
 def intersect_operations(
     a: Dict[str, OperatorProperties], b: Dict[str, OperatorProperties]
 ) -> Dict[str, OperatorProperties]:
@@ -223,8 +191,8 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
     qjit_capabilities = deepcopy(target_capabilities)
 
     # Intersection of gates and observables supported by the device and by Catalyst runtime.
-    qjit_capabilities.operations = intersect_operations(
-        target_capabilities.operations, RUNTIME_OPERATIONS
+    qjit_capabilities.operations = union_operations(
+        target_capabilities.operations, CUSTOM_OPERATIONS
     )
     qjit_capabilities.observables = intersect_operations(
         target_capabilities.observables, RUNTIME_OBSERVABLES
@@ -253,6 +221,7 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
                 invertible=True, controllable=True, differentiable=True
             ),
             "ForLoop": OperatorProperties(invertible=True, controllable=True, differentiable=True),
+            "Switch": OperatorProperties(invertible=True, controllable=True, differentiable=True),
         }
     )
 

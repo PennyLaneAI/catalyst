@@ -29,7 +29,6 @@ from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 from pennylane.capture.primitives import transform_prim
-from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
 from pennylane.transforms import commute_controlled as pl_commute_controlled
 from pennylane.transforms import decompose as pl_decompose
@@ -71,9 +70,10 @@ def _tuple_to_slice(t):
     Returns:
         slice: A slice object
     """
-    if isinstance(t, tuple) and len(t) == 3:
-        return slice(*t)
-    return t
+    assert (
+        isinstance(t, tuple) and len(t) == 3
+    ), "Please only use _tuple_to_slice on a tuple of length 3!"
+    return slice(*t)
 
 
 def _is_dict_like_tuple(t):
@@ -96,10 +96,10 @@ def _tuple_to_dict(t):
     if not isinstance(t, (dict, tuple, list)):
         return t
 
-    if isinstance(t, dict):
+    if isinstance(t, dict):  # pragma: no cover
         return {k: _tuple_to_dict(v) for k, v in t.items()}
 
-    if isinstance(t, list):
+    if isinstance(t, list):  # pragma: no cover
         return [_tuple_to_dict(item) for item in t]
 
     if isinstance(t, tuple):
@@ -113,7 +113,7 @@ def _tuple_to_dict(t):
         else:
             return [_tuple_to_dict(item) for item in t]
 
-    return t
+    return t  # pragma: no cover
 
 
 def _get_device_kwargs(device) -> dict:
@@ -270,11 +270,17 @@ def handle_qnode(
 
     graph_succeeded = False
     if self.requires_decompose_lowering:
+        # Determine if autograph is enabled in the qnode
+        # If so, we need to enable it in the decomposition rules as well
+        # TODO: enable autograph per decomposition rule instead of globally
+        ag_enabled = getattr(qnode, "ag_module", None) is not None
+
         closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
             inner_jaxpr=closed_jaxpr.jaxpr,
             consts=closed_jaxpr.consts,
             tkwargs=self.decompose_tkwargs,
             ncargs=non_const_args,
+            ag_enabled=ag_enabled,
         )
 
         # Fallback to the legacy decomposition if the graph-based decomposition failed
@@ -328,10 +334,9 @@ def handle_qnode(
 # otherwise their value will be None. The second value indicates if the transform
 # requires decomposition to be supported by Catalyst.
 transforms_to_passes = {
-    pl_cancel_inverses: ("remove-chained-self-inverse", False),
+    pl_cancel_inverses: ("cancel-inverses", False),
     pl_commute_controlled: (None, False),
     pl_decompose: (None, False),
-    pl_map_wires: (None, False),
     pl_merge_amplitude_embedding: (None, True),
     pl_merge_rotations: ("merge-rotations", False),
     pl_single_qubit_fusion: (None, False),
@@ -358,9 +363,10 @@ def handle_transform(
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for a
     PL transform."""
-    consts = args[consts_slice]
-    non_const_args = args[args_slice]
-    targs = args[targs_slice]
+    consts = args[_tuple_to_slice(consts_slice)]
+    non_const_args = args[_tuple_to_slice(args_slice)]
+    targs = args[_tuple_to_slice(targs_slice)]
+    tkwargs = _tuple_to_dict(tkwargs)
 
     # If the transform is a decomposition transform
     # and the graph-based decomposition is enabled
@@ -369,12 +375,7 @@ def handle_transform(
         and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
         and qml.decomposition.enabled_graph()
     ):
-        """Handle the conversion from plxpr to Catalyst jaxpr for a
-        PL transform."""
-        consts = args[_tuple_to_slice(consts_slice)]
-        non_const_args = args[_tuple_to_slice(args_slice)]
-        targs = args[_tuple_to_slice(targs_slice)]
-        tkwargs = _tuple_to_dict(tkwargs)
+        # Handle the conversion from plxpr to Catalyst jaxpr for a PL transform.
         if not self.requires_decompose_lowering:
             self.requires_decompose_lowering = True
         else:
@@ -569,7 +570,7 @@ def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=Non
     return final_jaxpr
 
 
-def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs):
+def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs, ag_enabled):
     """Collect and compile graph solutions for a given JAXPR.
 
     This function uses the DecompRuleInterpreter to evaluate
@@ -584,12 +585,13 @@ def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs):
         consts (list): The constants used in the JAXPR.
         tkwargs (list): The keyword arguments of the decompose transform.
         ncargs (list): Non-constant arguments for the JAXPR.
+        ag_enabled (bool): Whether to enable autograph in the decomposition rules.
 
     Returns:
         ClosedJaxpr: The decomposed JAXPR.
         bool: A flag indicating whether the graph-based decomposition was successful.
     """
-    gds_interpreter = DecompRuleInterpreter(**tkwargs)
+    gds_interpreter = DecompRuleInterpreter(ag_enabled=ag_enabled, **tkwargs)
 
     def gds_wrapper(*args):
         return gds_interpreter.eval(inner_jaxpr, consts, *args)

@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2022-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,7 +37,6 @@ from jax.core import AbstractValue
 from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
-from jaxlib.hlo_helpers import shape_dtype_to_ir_type
 from jaxlib.mlir._mlir_libs import _mlir as _ods_cext
 from jaxlib.mlir.dialects.arith import (
     AddIOp,
@@ -49,7 +48,7 @@ from jaxlib.mlir.dialects.arith import (
     SubIOp,
 )
 from jaxlib.mlir.dialects.func import FunctionType
-from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
+from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, IndexSwitchOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from jaxlib.mlir.dialects.stablehlo import ConvertOp as StableHLOConvertOp
 
@@ -140,6 +139,7 @@ from catalyst.jax_extras import (
     cond_expansion_strategy,
     for_loop_expansion_strategy,
     infer_output_type_jaxpr,
+    switch_expansion_strategy,
     while_loop_expansion_strategy,
 )
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
@@ -308,6 +308,8 @@ probs_p = Primitive("probs")
 state_p = Primitive("state")
 cond_p = DynshapePrimitive("cond")
 cond_p.multiple_results = True
+switch_p = DynshapePrimitive("switch")
+switch_p.multiple_results = True
 while_p = DynshapePrimitive("while_loop")
 while_p.multiple_results = True
 for_p = DynshapePrimitive("for_loop")
@@ -676,7 +678,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
             # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to
             # cast such constants to numpy array types.
             const = jax_array_or_tracer
-            const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
+            const_type = ir.RankedTensorType.get(const.shape, mlir.dtype_to_ir_type(const.dtype))
             nparray = np.asarray(const)
             attr = ir.DenseElementsAttr.get(nparray, type=const_type)
             constval = StableHLOConstantOp(attr).results
@@ -769,7 +771,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
             # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to
             # cast such constants to numpy array types.
             const = jax_array_or_tracer
-            const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
+            const_type = ir.RankedTensorType.get(const.shape, mlir.dtype_to_ir_type(const.dtype))
             nparray = np.asarray(const)
             attr = ir.DenseElementsAttr.get(nparray, type=const_type)
             constval = StableHLOConstantOp(attr).results
@@ -960,7 +962,7 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
 
     constants = []
     for const in jaxpr.consts:
-        const_type = shape_dtype_to_ir_type(const.shape, const.dtype)
+        const_type = ir.RankedTensorType.get(const.shape, mlir.dtype_to_ir_type(const.dtype))
         nparray = np.asarray(const)
         if const.dtype == bool:
             nparray = np.packbits(nparray, bitorder="little")
@@ -2013,11 +2015,11 @@ def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_s
 # cond
 #
 @cond_p.def_abstract_eval
-def _cond_abstract_eval(*args, branch_jaxprs, nimplicit_outputs: int, **kwargs):
+def _cond_abstract_eval(*args, branch_jaxprs, num_implicit_outputs: int, **kwargs):
     out_type = infer_output_type_jaxpr(
         [()] + branch_jaxprs[0].jaxpr.invars,
         [],
-        branch_jaxprs[0].jaxpr.outvars[nimplicit_outputs:],
+        branch_jaxprs[0].jaxpr.outvars[num_implicit_outputs:],
         expansion_strategy=cond_expansion_strategy(),
         num_implicit_inputs=None,
     )
@@ -2033,7 +2035,7 @@ def _cond_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *preds_and_branch_args_plus_consts: tuple,
     branch_jaxprs: List[core.ClosedJaxpr],
-    nimplicit_outputs: int,
+    num_implicit_outputs: int,
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
     num_preds = len(branch_jaxprs) - 1
@@ -2100,18 +2102,103 @@ def _cond_lowering(
 
 
 #
+# Index Switch
+#
+@switch_p.def_abstract_eval
+def _switch_p_abstract_eval(*args, branch_jaxprs, num_implicit_outputs: int, **kwargs):
+    out_type = infer_output_type_jaxpr(
+        [()] + branch_jaxprs[0].jaxpr.invars,
+        [],
+        branch_jaxprs[0].jaxpr.outvars[num_implicit_outputs:],
+        expansion_strategy=switch_expansion_strategy(),
+        num_implicit_inputs=None,
+    )
+
+    return out_type
+
+
+@switch_p.def_impl
+def _switch_def_impl(*args, **kwargs):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _switch_lowering(
+    jax_ctx,
+    *index_and_cases_and_branch_args_plus_consts: tuple,
+    branch_jaxprs: List[core.ClosedJaxpr],
+    num_implicit_outputs: int,
+):
+    result_types = [mlir.aval_to_ir_types(outvar)[0] for outvar in branch_jaxprs[0].out_avals]
+
+    index = index_and_cases_and_branch_args_plus_consts[0]
+    # the last branch is default and does not have a case
+    cases = index_and_cases_and_branch_args_plus_consts[1 : len(branch_jaxprs)]
+    branch_args_plus_consts = index_and_cases_and_branch_args_plus_consts[len(branch_jaxprs) :]
+    flat_args_plus_consts = mlir.flatten_ir_values(branch_args_plus_consts)
+
+    index = _cast_to_index(index)
+
+    # enumerate branches so that branch indices and "cases" line up properly
+    cases = ir.DenseI64ArrayAttr.get(
+        [case.owner.attributes["value"].get_splat_value().value for case in cases]
+    )
+
+    scf_switch_op = IndexSwitchOp(result_types, index, cases, len(branch_jaxprs) - 1)
+
+    # construct switch branches
+    for i in range(len(branch_jaxprs) - 1):
+        with ir.InsertionPoint(scf_switch_op.caseRegions[i].blocks.append()):
+            branch_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend(f"branch {i}"))
+            branch_jaxpr = branch_jaxprs[i]
+            (out, _) = mlir.jaxpr_subcomp(
+                branch_ctx.module_context,
+                branch_jaxpr.jaxpr,
+                branch_ctx.name_stack,
+                mlir.TokenSet(),
+                [mlir.ir_constant(const) for const in branch_jaxpr.consts],
+                *flat_args_plus_consts,
+                dim_var_values=jax_ctx.dim_var_values,
+            )
+
+            YieldOp(out)
+
+    with ir.InsertionPoint(scf_switch_op.defaultRegion.blocks.append()):
+        branch_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend("default branch"))
+        branch_jaxpr = branch_jaxprs[-1]
+        (out, _) = mlir.jaxpr_subcomp(
+            branch_ctx.module_context,
+            branch_jaxpr.jaxpr,
+            branch_ctx.name_stack,
+            mlir.TokenSet(),
+            [mlir.ir_constant(const) for const in branch_jaxpr.consts],
+            *flat_args_plus_consts,
+            dim_var_values=jax_ctx.dim_var_values,
+        )
+
+        YieldOp(out)
+
+    return scf_switch_op.results
+
+
+#
 # while loop
 #
 @while_p.def_abstract_eval
 def _while_loop_abstract_eval(
-    *in_type, body_jaxpr, nimplicit, preserve_dimensions, cond_nconsts, body_nconsts, **kwargs
+    *in_type,
+    body_jaxpr,
+    num_implicit_inputs,
+    preserve_dimensions,
+    cond_nconsts,
+    body_nconsts,
+    **kwargs,
 ):
     _assert_jaxpr_without_constants(body_jaxpr)
     all_nconsts = cond_nconsts + body_nconsts
     return infer_output_type_jaxpr(
         body_jaxpr.jaxpr.invars[:all_nconsts],
         body_jaxpr.jaxpr.invars[all_nconsts:],
-        body_jaxpr.jaxpr.outvars[nimplicit:],
+        body_jaxpr.jaxpr.outvars[num_implicit_inputs:],
         expansion_strategy=while_loop_expansion_strategy(preserve_dimensions),
     )
 
@@ -2124,7 +2211,7 @@ def _while_loop_def_impl(
     body_jaxpr,
     cond_nconsts,
     body_nconsts,
-    nimplicit,
+    num_implicit_inputs,
     preserve_dimensions,
 ):  # pragma: no cover
     raise NotImplementedError()
@@ -2137,7 +2224,7 @@ def _while_loop_lowering(
     body_jaxpr: core.ClosedJaxpr,
     cond_nconsts: int,
     body_nconsts: int,
-    nimplicit: int,
+    num_implicit_inputs: int,
     preserve_dimensions: bool,
 ):
     loop_carry_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
@@ -2213,16 +2300,16 @@ def _while_loop_lowering(
 #
 @for_p.def_abstract_eval
 def _for_loop_abstract_eval(
-    *args, body_jaxpr, nimplicit, preserve_dimensions, body_nconsts, **kwargs
+    *args, body_jaxpr, num_implicit_inputs, preserve_dimensions, body_nconsts, **kwargs
 ):
     _assert_jaxpr_without_constants(body_jaxpr)
 
     return infer_output_type_jaxpr(
         body_jaxpr.jaxpr.invars[:body_nconsts],
         body_jaxpr.jaxpr.invars[body_nconsts:],
-        body_jaxpr.jaxpr.outvars[nimplicit:],
+        body_jaxpr.jaxpr.outvars[num_implicit_inputs:],
         expansion_strategy=for_loop_expansion_strategy(preserve_dimensions),
-        num_implicit_inputs=nimplicit,
+        num_implicit_inputs=num_implicit_inputs,
     )
 
 
@@ -2235,7 +2322,7 @@ def _for_loop_def_impl(
     step,
     *iter_args_plus_consts,
     body_jaxpr,
-    nimplicit=0,
+    num_implicit_inputs=0,
     body_nconsts,
     preserve_dimensions,
 ):  # pragma: no cover
@@ -2249,22 +2336,22 @@ def _for_loop_lowering(
     body_jaxpr: core.ClosedJaxpr,
     body_nconsts: int,
     apply_reverse_transform: bool,
-    nimplicit: int,
+    num_implicit_inputs: int,
     preserve_dimensions,
 ):
     body_consts = iter_args_plus_consts[:body_nconsts]
-    body_implicits = iter_args_plus_consts[body_nconsts : body_nconsts + nimplicit]
-    lower_bound = iter_args_plus_consts[body_nconsts + nimplicit + 0]
-    upper_bound = iter_args_plus_consts[body_nconsts + nimplicit + 1]
-    step = iter_args_plus_consts[body_nconsts + nimplicit + 2]
-    loop_index = iter_args_plus_consts[body_nconsts + nimplicit + 3]
-    loop_args = [*body_implicits, *iter_args_plus_consts[body_nconsts + nimplicit + 4 :]]
+    body_implicits = iter_args_plus_consts[body_nconsts : body_nconsts + num_implicit_inputs]
+    lower_bound = iter_args_plus_consts[body_nconsts + num_implicit_inputs + 0]
+    upper_bound = iter_args_plus_consts[body_nconsts + num_implicit_inputs + 1]
+    step = iter_args_plus_consts[body_nconsts + num_implicit_inputs + 2]
+    loop_index = iter_args_plus_consts[body_nconsts + num_implicit_inputs + 3]
+    loop_args = [*body_implicits, *iter_args_plus_consts[body_nconsts + num_implicit_inputs + 4 :]]
 
     loop_index_type = ir.RankedTensorType(loop_index.type).element_type
 
     all_param_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
     assert [lower_bound.type, upper_bound.type, step.type] == all_param_types_plus_consts[
-        body_nconsts + nimplicit : body_nconsts + nimplicit + 3
+        body_nconsts + num_implicit_inputs : body_nconsts + num_implicit_inputs + 3
     ]
     assert [val.type for val in body_consts] == all_param_types_plus_consts[:body_nconsts]
 
@@ -2272,13 +2359,6 @@ def _for_loop_lowering(
     assert result_types == [
         mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out
     ], f"\n{result_types=} doesn't match \n{jax_ctx.avals_out=}"
-
-    def _cast_to_index(p):
-        p = TensorExtractOp(
-            ir.RankedTensorType(p.type).element_type, p, []
-        ).result  # tensor<i64> -> i64
-        p = IndexCastOp(ir.IndexType.get(), p).result  # i64 -> index
-        return p
 
     lower_bound, upper_bound, step = map(_cast_to_index, (lower_bound, upper_bound, step))
 
@@ -2325,8 +2405,8 @@ def _for_loop_lowering(
         # Re-order arguments in accordance with jax dynamic API convensions
         consts = body_consts
         loop_iter = body_args[0]
-        implicit_args = body_args[1 : nimplicit + 1]
-        explicit_args = body_args[nimplicit + 1 :]
+        implicit_args = body_args[1 : num_implicit_inputs + 1]
+        explicit_args = body_args[num_implicit_inputs + 1 :]
         loop_params = (*consts, *implicit_args, loop_iter, *explicit_args)
 
         # Recursively generate the mlir for the loop body
@@ -2340,7 +2420,6 @@ def _for_loop_lowering(
             dim_var_values=jax_ctx.dim_var_values,
             const_lowering=jax_ctx.const_lowering,
         )
-
         YieldOp(out)
 
     return for_op_scf.results
@@ -2501,6 +2580,14 @@ def safe_cast_to_f64(value, op, kind="parameter"):
     return value
 
 
+def _cast_to_index(p):
+    p = TensorExtractOp(
+        ir.RankedTensorType(p.type).element_type, p, []
+    ).result  # tensor<i64> -> i64
+    p = IndexCastOp(ir.IndexType.get(), p).result  # i64 -> index
+    return p
+
+
 def extract_scalar(value, op, kind="parameter"):
     """Utility function to extract real scalars from scalar tensors or one-element 1-D tensors."""
     assert ir.RankedTensorType.isinstance(value.type)
@@ -2578,6 +2665,7 @@ CUSTOM_LOWERING_RULES = (
     (probs_p, _probs_lowering),
     (state_p, _state_lowering),
     (cond_p, _cond_lowering),
+    (switch_p, _switch_lowering),
     (while_p, _while_loop_lowering),
     (for_p, _for_loop_lowering),
     (grad_p, _grad_lowering),

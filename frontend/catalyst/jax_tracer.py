@@ -26,9 +26,12 @@ from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import jax
+import jax._src.interpreters.partial_eval as pe
 import jax.numpy as jnp
 import pennylane as qml
+from jax._src.lax import lax
 from jax._src.lax.lax import _extract_tracers_dyn_shape
+from jax._src.pjit import jit_p
 from jax._src.source_info_util import current as current_source_info
 from jax.api_util import debug_info as jdb
 from jax.core import get_aval
@@ -75,6 +78,12 @@ from catalyst.jax_extras import (
     tree_unflatten,
     wrap_init,
 )
+from catalyst.jax_extras.patches import (
+    patched_drop_unused_vars,
+    patched_dyn_shape_staging_rule,
+    patched_make_eqn,
+    patched_pjit_staging_rule,
+)
 from catalyst.jax_extras.tracing import uses_transform
 from catalyst.jax_primitives import (
     AbstractQreg,
@@ -106,6 +115,7 @@ from catalyst.jax_primitives import (
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.patching import DictPatchWrapper, Patcher
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -140,10 +150,10 @@ def _get_eqn_from_tracing_eqn(eqn_or_callable):
     """Helper function to extract the actual equation from JAX 0.7's TracingEqn wrapper."""
     if callable(eqn_or_callable):
         actual_eqn = eqn_or_callable()
-        if actual_eqn is None:
+        if actual_eqn is None:  # pragma: no cover
             raise RuntimeError("TracingEqn weakref was garbage collected")
         return actual_eqn
-    else:
+    else:  # pragma: no cover
         return eqn_or_callable
 
 
@@ -658,19 +668,6 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs, debug_in
         PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
     """
 
-    # pylint: disable=import-outside-toplevel
-    import jax._src.interpreters.partial_eval as pe
-    from jax._src.lax import lax
-    from jax._src.pjit import jit_p
-
-    from catalyst.jax_extras.patches import (
-        patched_drop_unused_vars,
-        patched_dyn_shape_staging_rule,
-        patched_make_eqn,
-        patched_pjit_staging_rule,
-    )
-    from catalyst.utils.patching import DictPatchWrapper, Patcher
-
     with transient_jax_config(
         {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
     ), Patcher(
@@ -712,7 +709,19 @@ def lower_jaxpr_to_mlir(jaxpr, func_name, arg_names):
 
     MemrefCallable.clearcache()
 
-    with transient_jax_config({"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}):
+    # Apply JAX 0.7.0 compatibility patches during MLIR lowering.
+    # JAX internally calls trace_to_jaxpr_dynamic2 during lowering of nested @jit primitives
+    # (e.g., in jax.scipy.linalg.expm and jax.scipy.linalg.solve), which triggers two bugs:
+    # 1. make_eqn signature changed to include out_tracers parameter
+    # 2. pjit_staging_rule creates JaxprEqn instead of TracingEqn (AssertionError at partial_eval.py:1790)
+    with transient_jax_config(
+        {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
+    ), Patcher(
+        # Fix make_eqn signature change (handles both old/new JAX versions)
+        (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
+        # Fix pjit_staging_rule creating wrong equation type
+        (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
+    ):
         mlir_module, ctx = jaxpr_to_mlir(jaxpr, func_name, arg_names)
 
     return mlir_module, ctx
