@@ -21,10 +21,15 @@ pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
+from catalyst.python_interface.dialects.quantum import CustomOp
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from pennylane.compiler.python_compiler.dialects.quantum import (
+    CustomOp,
+    QubitType,
+)
 from xdsl.dialects import test
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir.core import Block, Region
@@ -67,7 +72,19 @@ class TestCreateOperatorNodes:
     """Tests that operators can be created and visualized as nodes."""
 
     def test_custom_op(self):
-        pass
+        """Tests that the CustomOp operation node can be created and visualized."""
+
+        # Create constant for wire
+        q0 = test.TestOp(result_types=[QubitType()])
+        custom_op = CustomOp(gate_name="Test", in_qubits=q0.results)
+
+        # Create module
+        module = ModuleOp(ops=[q0, custom_op])
+
+        mock_dag_builder = Mock(DAGBuilder)
+        utility = ConstructCircuitDAG(mock_dag_builder)
+        utility.construct(module)
+        print(utility.dag_builder.to_string())
 
     def test_global_phase_op(self):
         pass
