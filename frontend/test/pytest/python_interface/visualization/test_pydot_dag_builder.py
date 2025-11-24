@@ -90,7 +90,7 @@ class TestAddMethods:
         dag_builder.add_cluster("c0")
 
         # Create node inside cluster
-        dag_builder.add_node("1", "node1", parent_graph_id="c0")
+        dag_builder.add_node("1", "node1", cluster_id="c0")
 
         # Verify graph structure
         root_graph = dag_builder.graph
@@ -120,11 +120,11 @@ class TestAddMethods:
         dag_builder.add_cluster("c0")
 
         # Level 1 (Inside c0): Add node on outer cluster and create new cluster on top
-        dag_builder.add_node("n_outer", "node_outer", parent_graph_id="c0")
-        dag_builder.add_cluster("c1", parent_graph_id="c0")
+        dag_builder.add_node("n_outer", "node_outer", cluster_id="c0")
+        dag_builder.add_cluster("c1", cluster_id="c0")
 
         # Level 2 (Inside c1): Add node on second cluster
-        dag_builder.add_node("n_inner", "node_inner", parent_graph_id="c1")
+        dag_builder.add_node("n_inner", "node_inner", cluster_id="c1")
 
         root_graph = dag_builder.graph
 
@@ -252,7 +252,7 @@ class TestGetMethods:
 
         dag_builder.add_node("0", "node0", fillcolor="red")
         dag_builder.add_cluster("c0")
-        dag_builder.add_node("1", "node1", parent_graph_id="c0")
+        dag_builder.add_node("1", "node1", cluster_id="c0")
 
         nodes = dag_builder.get_nodes()
 
@@ -293,7 +293,7 @@ class TestGetMethods:
         clusters = dag_builder.get_clusters()
 
         dag_builder.add_cluster(
-            "1", "my_other_info_node", parent_graph_id="0", label="my_nested_cluster"
+            "1", "my_other_info_node", cluster_id="0", label="my_nested_cluster"
         )
         clusters = dag_builder.get_clusters()
         assert len(clusters) == 2

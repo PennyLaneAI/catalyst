@@ -33,23 +33,21 @@ def test_concrete_implementation_works():
 
         def add_node(
             self,
-            node_id: str,
-            node_label: str,
-            parent_graph_id: str | None = None,
+            id: str,
+            label: str,
+            cluster_id: str | None = None,
             **node_attrs: Any,
         ) -> None:
             return
 
-        def add_edge(
-            self, from_node_id: str, to_node_id: str, **edge_attrs: Any
-        ) -> None:
+        def add_edge(self, from_id: str, to_id: str, **edge_attrs: Any) -> None:
             return
 
         def add_cluster(
             self,
-            cluster_id: str,
+            id: str,
             node_label: str | None = None,
-            parent_graph_id: str | None = None,
+            cluster_id: str | None = None,
             **cluster_attrs: Any,
         ) -> None:
             return
