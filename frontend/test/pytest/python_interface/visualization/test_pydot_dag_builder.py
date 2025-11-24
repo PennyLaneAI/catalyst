@@ -255,8 +255,10 @@ class TestGetMethods:
         dag_builder.add_node("1", "node1", parent_graph_id="c0")
 
         nodes = dag_builder.get_nodes()
+
         assert len(nodes) == 2
         assert len(nodes["0"]) == 4
+
         assert nodes["0"]["id"] == "0"
         assert nodes["0"]["label"] == "node0"
         assert nodes["0"]["parent_id"] == "__base__"
@@ -276,7 +278,9 @@ class TestGetMethods:
         dag_builder.add_edge("0", "1")
 
         edges = dag_builder.get_edges()
+
         assert len(edges) == 1
+
         assert edges[0]["from_id"] == "0"
         assert edges[0]["to_id"] == "1"
         assert edges[0]["attrs"] == {}
@@ -288,7 +292,13 @@ class TestGetMethods:
         dag_builder.add_cluster("0", "my_info_node", label="my_cluster")
 
         clusters = dag_builder.get_clusters()
-        assert len(clusters) == 1
+
+        dag_builder.add_cluster(
+            "1", "my_other_info_node", parent_graph_id="0", label="my_nested_cluster"
+        )
+        clusters = dag_builder.get_clusters()
+        assert len(clusters) == 2
+
         assert len(clusters["0"]) == 5
         assert clusters["0"]["id"] == "0"
         assert clusters["0"]["cluster_label"] == "my_cluster"
@@ -296,12 +306,6 @@ class TestGetMethods:
         assert clusters["0"]["parent_id"] == "__base__"
         assert clusters["0"]["attrs"] == {}
 
-        dag_builder.add_cluster(
-            "1", "my_other_info_node", parent_graph_id="0", label="my_nested_cluster"
-        )
-
-        clusters = dag_builder.get_clusters()
-        assert len(clusters) == 2
         assert len(clusters["1"]) == 5
         assert clusters["1"]["id"] == "0"
         assert clusters["1"]["cluster_label"] == "my_nested_cluster"
