@@ -4,6 +4,7 @@
 
 * Compiled programs can be visualized.
   [(#2213)](https://github.com/PennyLaneAI/catalyst/pull/2213)
+  [(#2229)](https://github.com/PennyLaneAI/catalyst/pull/2229)
   [(#2214)](https://github.com/PennyLaneAI/catalyst/pull/2214)
   [(#2118)](https://github.com/PennyLaneAI/catalyst/pull/2218)
 
