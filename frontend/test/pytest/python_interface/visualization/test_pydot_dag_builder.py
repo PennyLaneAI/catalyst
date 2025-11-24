@@ -261,12 +261,12 @@ class TestGetMethods:
 
         assert nodes["0"]["id"] == "0"
         assert nodes["0"]["label"] == "node0"
-        assert nodes["0"]["parent_id"] == "__base__"
+        assert nodes["0"]["cluster_id"] == "__base__"
         assert nodes["0"]["attrs"]["fillcolor"] == "red"
 
         assert nodes["1"]["id"] == "1"
         assert nodes["1"]["label"] == "node1"
-        assert nodes["1"]["parent_id"] == "c0"
+        assert nodes["1"]["cluster_id"] == "c0"
 
     def test_get_edges(self):
         """Tests that get_edges works."""
