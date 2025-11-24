@@ -13,16 +13,17 @@
 # limitations under the License.
 """Function for applying high-level pattern-matching to xDSL modules."""
 
+import tempfile
+from collections.abc import Callable, Sequence
 from functools import partial, wraps
-from inspect import signature
-from typing import Callable
+from inspect import getsource, signature
 
 import pennylane as qml
 from xdsl.builder import ImplicitBuilder
 from xdsl.context import Context
 from xdsl.dialects import builtin, func, pdl
 from xdsl.ir import Block, Operation, Region
-from xdsl.passes import ModulePass, PassPipeline
+from xdsl.passes import ModulePass
 from xdsl.traits import SymbolTable
 from xdsl.transforms.apply_pdl import ApplyPDLPass
 
@@ -31,15 +32,19 @@ from catalyst.jit import QJIT
 from catalyst.python_interface import QuantumParser
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.dialects import quantum
+from catalyst.python_interface.pass_api import compiler_transform
 
 
 class PatternMatchPass(ModulePass):
     """Module pass to apply Python-level pattern-matching to xDSL modules."""
 
     name: str = "pattern-match"
+    _patterns: dict[Callable, Callable]
+    _pdl_patterns: tuple[pdl.PatternOp, ...]
 
-    def __init__(self, patterns: dict[Callable, Callable] = {}):
-        self.patterns = patterns
+    def __init__(self, patterns: dict[Callable, Callable] | None = None):
+        self._patterns = patterns or {}
+        self._pdl_patterns = ()
 
     def apply(self, ctx: Context, op: builtin.ModuleOp):
         """Apply the provided patterns to the input module."""
@@ -49,11 +54,14 @@ class PatternMatchPass(ModulePass):
             if ctx.get_optional_dialect(dialect.name) is None:
                 ctx.load_dialect(dialect)
 
-        pdl_pass = ApplyPDLPass()
-        for pat, rw in self.patterns.items():
-            pat_fn, rw_fn = self._pattern_to_xdsl(pat, rw)
-            pattern_op = self._create_pdl_pattern(pat_fn, rw_fn)
+        if self._patterns and not self._pdl_patterns:
+            for pat, rw in self._patterns.items():
+                pat_fn, rw_fn = self._pattern_to_xdsl(pat, rw)
+                pattern_op = self._create_pdl_pattern(pat_fn, rw_fn)
+                self._pdl_patterns += (pattern_op,)
 
+        pdl_pass = ApplyPDLPass()
+        for pattern_op in self._pdl_patterns:
             op.body.block.add_op(pattern_op)
             pdl_pass.apply(ctx, op)
             op.body.block.erase_op(pattern_op)
@@ -63,34 +71,32 @@ class PatternMatchPass(ModulePass):
 
         n_args = len(signature(py_pattern).parameters)
         if len(signature(py_rewrite).parameters) != n_args:
-            raise ValueError("Pattern and match must have the same number of qubits as inputs")
+            raise ValueError("Search and rewrite patterns must have the same number of arguments.")
 
+        # Rename functions so that their names in the xDSL module are known
+        pattern_name = "__pattern"
+        rewrite_name = "__rewrite"
+        py_pattern.__name__ = pattern_name
+        py_rewrite.__name__ = rewrite_name
+        args = range(n_args)
+
+        # Lower the functions and extract them from the IR
         @xdsl_from_qjit
         @qml.qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=n_args))
+        @qml.qnode(qml.device("null.qubit", wires=n_args))
         def mod_fn():
-            @decomposition_rule(is_qreg=False, num_params=0)
-            def pattern__(*args__):
-                return py_pattern(*args__)
-
-            @decomposition_rule(is_qreg=False, num_params=0)
-            def rewrite__(*args__):
-                return py_rewrite(*args__)
-
-            pattern__(*range(n_args))
-            rewrite__(*range(n_args))
+            decomposition_rule(py_pattern, is_qreg=False, num_params=0)(*args)
+            decomposition_rule(py_rewrite, is_qreg=False, num_params=0)(*args)
 
             return qml.state()
 
-        qnode_mod: builtin.ModuleOp = [
-            o for o in mod_fn().body.ops if isinstance(o, builtin.ModuleOp)
-        ][0]
-        pattern_fn: func.FuncOp = SymbolTable.lookup_symbol(qnode_mod, "pattern__")
-        rewrite_fn: func.FuncOp = SymbolTable.lookup_symbol(qnode_mod, "rewrite__")
+        mod = mod_fn()
+        pattern_fn: func.FuncOp = SymbolTable.lookup_symbol(mod, pattern_name)
+        rewrite_fn: func.FuncOp = SymbolTable.lookup_symbol(mod, rewrite_name)
 
         # Erase return op from the func bodies. These do not need to be matched.
         # This will make the funcs invalid, but that is fine since they will be
-        # discarded after the rewriting is done.
+        # discarded after the PDL patterns are created.
         pattern_fn.body.block.erase_op(pattern_fn.body.block.last_op)
         rewrite_fn.body.block.erase_op(rewrite_fn.body.block.last_op)
 
@@ -231,16 +237,39 @@ class PatternMatchPass(ModulePass):
 
         return pdl_op
 
+    @classmethod
+    def create_from_serialized_options(cls, **options):
+        """Create a pass instance using serialized patterns."""
+        paths = options["pattern_paths"]
+        py_patterns = _patterns_from_paths(paths)
+        pass_instance = cls(patterns=py_patterns)
+        return pass_instance
 
-def pattern_match(func: QJIT = None, patterns: dict[Callable, Callable] = {}):
-    """Apply pattern matching to q QJIT-ed workflow."""
-    if func is None:
-        return partial(pattern_match, patterns=patterns)
 
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        mod = xdsl_from_qjit(func)(*args, **kwargs)
-        PatternMatchPass(patterns=patterns).apply(Context(), mod)
-        return mod
+pattern_match = compiler_transform(PatternMatchPass)
 
-    return wrapper
+
+@pattern_match.custom_serialize_options
+def _(*, patterns: dict[Callable, Callable] = {}):
+    paths = []
+
+    for pat, rw in patterns.items():
+        # Create source for pattern and rewrite functions
+        cur_program = _create_pattern_source(pat, rw)
+
+        # Create tempfile with search pattern
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as cur_file:
+            cur_file.write(cur_program)
+            paths.append(cur_file.name)
+
+    valued_options = {"pattern_paths": paths}
+    return (), valued_options
+
+
+def _create_pattern_source(pattern: Callable, rewrite: Callable) -> str:
+    """Create a program represented as a string that encodes the ``pattern`` and ``rewrite``
+    functions along with necessary locals and globals."""
+
+
+def _patterns_from_paths(paths: Sequence[str]) -> dict[Callable, Callable]:
+    """Create pattern and rewrite functions using source files specified by ``paths``."""
