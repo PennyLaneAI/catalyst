@@ -231,9 +231,7 @@ class TestAttributes:
         assert cluster1.get("penwidth") == 2
         assert cluster1.get("fontname") == "Helvetica"
 
-        dag_builder.add_cluster(
-            "1", style="filled", penwidth=10, fillcolor="red"
-        )
+        dag_builder.add_cluster("1", style="filled", penwidth=10, fillcolor="red")
         cluster2 = dag_builder.graph.get_subgraph("cluster_1")[0]
 
         # Make sure we can override
@@ -243,6 +241,19 @@ class TestAttributes:
 
         # Check that other defaults are still present
         assert cluster2.get("fontname") == "Helvetica"
+
+
+class TestGetMethods:
+    """Tests the get_* methods."""
+
+    def test_get_nodes(self):
+        """Tests that get_nodes works."""
+
+    def test_get_edges(self):
+        """Tests that get_edges works."""
+
+    def test_get_clusters(self):
+        """Tests that get_clusters works."""
 
 
 class TestOutput:
