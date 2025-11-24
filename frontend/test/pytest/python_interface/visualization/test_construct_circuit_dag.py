@@ -13,8 +13,7 @@
 # limitations under the License.
 """Unit tests for the ConstructCircuitDAG utility."""
 
-from unittest import mock
-from unittest.mock import MagicMock, Mock, call
+from unittest.mock import Mock
 
 import pytest
 
