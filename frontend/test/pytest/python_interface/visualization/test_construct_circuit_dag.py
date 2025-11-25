@@ -78,14 +78,17 @@ class FakeDAGBuilder(DAGBuilder):
             "attrs": attrs,
         }
 
-    def get_nodes(self):
-        return self._nodes.copy()
+    @property
+    def nodes(self):
+        return self._nodes
 
-    def get_edges(self):
-        return self._edges.copy()
+    @property
+    def edges(self):
+        return self._edges
 
-    def get_clusters(self):
-        return self._clusters.copy()
+    @property
+    def clusters(self):
+        return self._clusters
 
     def to_file(self, output_filename):
         pass
@@ -145,7 +148,7 @@ class TestFuncOpVisualization:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        graph_clusters = utility.dag_builder.get_clusters()
+        graph_clusters = utility.dag_builder.clusters
         expected_cluster_labels = [
             "jit_my_workflow",
             "my_workflow",
@@ -181,7 +184,7 @@ class TestFuncOpVisualization:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        graph_clusters = utility.dag_builder.get_clusters()
+        graph_clusters = utility.dag_builder.clusters
         expected_cluster_labels = [
             "jit_my_workflow",
             "my_qnode1",
