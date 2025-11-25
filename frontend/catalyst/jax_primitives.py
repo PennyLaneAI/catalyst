@@ -2158,6 +2158,7 @@ def _switch_lowering(
                 [mlir.ir_constant(const) for const in branch_jaxpr.consts],
                 *flat_args_plus_consts,
                 dim_var_values=jax_ctx.dim_var_values,
+                const_lowering=jax_ctx.const_lowering,
             )
 
             YieldOp(out)
@@ -2173,6 +2174,7 @@ def _switch_lowering(
             [mlir.ir_constant(const) for const in branch_jaxpr.consts],
             *flat_args_plus_consts,
             dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
         )
 
         YieldOp(out)
