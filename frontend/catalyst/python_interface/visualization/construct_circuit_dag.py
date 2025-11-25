@@ -74,7 +74,6 @@ class ConstructCircuitDAG:
 
         # Visualize FuncOp's as bounding boxes
         if isinstance(operation, func.FuncOp):
-            print(operation)
             cluster_id = f"cluster_{id(operation)}"
             self.dag_builder.add_cluster(
                 cluster_id,
