@@ -438,7 +438,11 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
 
         mlir::Value finalPhase;
         if (isPhaseShift) {
-            finalPhase = rewriter.create<mlir::arith::AddFOp>(loc, runtimePhase, angle);
+            // PhaseShift(phi) = RZ(phi) * GlobalPhase(-phi/2)
+            mlir::Value c2 =
+                rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getF64FloatAttr(2.0));
+            mlir::Value halfAngle = rewriter.create<mlir::arith::DivFOp>(loc, angle, c2);
+            finalPhase = rewriter.create<mlir::arith::SubFOp>(loc, runtimePhase, halfAngle);
         }
         else {
             finalPhase = runtimePhase;
