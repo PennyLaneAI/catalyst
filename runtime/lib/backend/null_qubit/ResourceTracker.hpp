@@ -53,11 +53,13 @@ struct ResourceTracker final {
      * @param name The name of the operation being applied
      * @param wires The wires the operation is being applied to
      * @param controlled_wires The control wires the operation is being applied to
+     * @param impacts_depth Whether the operation impacts the circuit depth
      */
     void RecordOperation(const std::string &name, const std::vector<QubitIdType> &wires,
-                         const std::vector<QubitIdType> &controlled_wires)
+                         const std::vector<QubitIdType> &controlled_wires,
+                         bool impacts_depth = true)
     {
-        if (compute_depth_) {
+        if (compute_depth_ && impacts_depth) {
             std::size_t max_depth = 0;
             for (const auto &i : wires) {
                 auto curr_depth = wire_depths_.find(i);
@@ -316,6 +318,30 @@ struct ResourceTracker final {
             op_name = "Adjoint(" + op_name + ")";
         }
         RecordOperation(op_name, wires, controlled_wires);
+    }
+
+    /**
+     * @brief Records a state preparation operation for resource tracking
+     *
+     * Note that as a non-unitary operation, this does not impact circuit depth.
+     *
+     * @param wires The target wires the operation acts upon
+     */
+    void SetState(const std::vector<QubitIdType> &wires)
+    {
+        RecordOperation("StatePrep", wires, {}, false);
+    }
+
+    /**
+     * @brief Records a basis state preparation operation for resource tracking
+     *
+     * Note that as a non-unitary operation, this does not impact circuit depth.
+     *
+     * @param wires The target wires the operation acts upon
+     */
+    void SetBasisState(const std::vector<QubitIdType> &wires)
+    {
+        RecordOperation("BasisState", wires, {}, false);
     }
 
     /**

@@ -7,6 +7,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* Resource tracking now tracks calls to `SetState` and `SetBasisState`, and can report results
+  that include StatePrep operations.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
 * `qml.PCPhase` can be compiled and executed with capture enabled.
   [(#2226)](https://github.com/PennyLaneAI/catalyst/pull/2226)
 

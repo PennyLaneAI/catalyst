@@ -924,6 +924,20 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
 
     std::vector<QubitIdType> Qs = sim->AllocateQubits(4);
 
+    // Apply set state operations
+    {
+        std::vector<std::complex<double>> data = {{0.5, 0.5}, {0.0, 0.0}};
+        DataView<std::complex<double>, 1> data_view(data);
+        std::vector<QubitIdType> wires = {1};
+        sim->SetState(data_view, wires);
+    }
+    {
+        std::vector<int8_t> data = {0};
+        DataView<int8_t, 1> data_view(data);
+        std::vector<QubitIdType> wires = {0};
+        sim->SetBasisState(data_view, wires);
+    }
+
     // Apply named gates to test all possible name modifiers
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
     sim->NamedOperation("T", {}, {Qs[0]}, true);
@@ -953,16 +967,20 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
     resource_file_r.open(RESOURCES_FILENAME);
     CHECK(resource_file_r.is_open()); // fail-fast if file failed to create
 
-    std::vector<std::string> resource_names = {"PauliX",
-                                               "C(Adjoint(T))",
-                                               "Adjoint(T)",
-                                               "C(S)",
-                                               "2C(S)",
-                                               "CNOT",
-                                               "Adjoint(ControlledQubitUnitary)",
-                                               "ControlledQubitUnitary",
-                                               "Adjoint(QubitUnitary)",
-                                               "QubitUnitary"};
+    std::vector<std::string> resource_names = {
+        "PauliX",
+        "C(Adjoint(T))",
+        "Adjoint(T)",
+        "C(S)",
+        "2C(S)",
+        "CNOT",
+        "Adjoint(ControlledQubitUnitary)",
+        "ControlledQubitUnitary",
+        "Adjoint(QubitUnitary)",
+        "QubitUnitary",
+        "StatePrep",
+        "BasisState",
+    };
 
     // Read full Json, check if num_wires and num_gates are correct
     std::string full_json;
@@ -973,7 +991,7 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
             CHECK(line.find("4") != std::string::npos);
         }
         if (line.find("num_gates") != std::string::npos) {
-            CHECK(line.find("10") != std::string::npos);
+            CHECK(line.find("12") != std::string::npos);
         }
         if (line.find("depth") != std::string::npos) {
             CHECK(line.find("10") != std::string::npos);
