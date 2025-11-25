@@ -126,7 +126,7 @@ def test_does_not_mutate_module():
     utility = ConstructCircuitDAG(mock_dag_builder)
     utility.construct(module_op)
 
-    # Ensure not mutated 
+    # Ensure not mutated
     assert str(module_op) == module_op_str_before
 
 
@@ -163,6 +163,7 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.get_nodes()
         assert len(nodes) == 1
         assert next(iter(nodes.values()))["label"] == str(op)
+        assert next(iter(nodes.values()))["cluster_id"] == "__base__"
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
@@ -200,6 +201,7 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.get_nodes()
         assert len(nodes) == 1
         assert next(iter(nodes.values()))["label"] == str(op)
+        assert next(iter(nodes.values()))["cluster_id"] == "__base__"
 
     @pytest.mark.unit
     def test_qubit_unitary_op(self):
@@ -230,6 +232,7 @@ class TestCreateStaticOperatorNodes:
         assert next(iter(nodes.values()))["label"] == str(
             qml.QubitUnitary([[0, 1], [1, 0]], wires=0)
         )
+        assert next(iter(nodes.values()))["cluster_id"] == "__base__"
 
     @pytest.mark.unit
     def test_multi_rz_op(self):
@@ -258,6 +261,7 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.get_nodes()
         assert len(nodes) == 1
         assert next(iter(nodes.values()))["label"] == str(qml.MultiRZ(0.5, wires=[0]))
+        assert next(iter(nodes.values()))["cluster_id"] == "__base__"
 
 
 class TestCreateStaticMeasurementNodes:
@@ -290,6 +294,7 @@ class TestCreateStaticMeasurementNodes:
         nodes = utility.dag_builder.get_nodes()
         assert len(nodes) == 1
         assert next(iter(nodes.values()))["label"] == str(qml.state())
+        assert next(iter(nodes.values()))["cluster_id"] == "__base__"
 
     @pytest.mark.unit
     @pytest.mark.parametrize("meas_fn", [qml.expval, qml.var])
@@ -319,6 +324,7 @@ class TestCreateStaticMeasurementNodes:
         nodes = utility.dag_builder.get_nodes()
         assert len(nodes) == 1
         assert next(iter(nodes.values()))["label"] == str(meas_fn(qml.Z(0)))
+        assert next(iter(nodes.values()))["cluster_id"] == "__base__"
 
     @pytest.mark.unit
     def test_probs_measurement_op(self):
@@ -347,6 +353,7 @@ class TestCreateStaticMeasurementNodes:
         nodes = utility.dag_builder.get_nodes()
         assert len(nodes) == 1
         assert next(iter(nodes.values()))["label"] == str(qml.probs())
+        assert next(iter(nodes.values()))["cluster_id"] == "__base__"
 
     @pytest.mark.unit
     def test_sample_measurement_op(self):
@@ -376,6 +383,7 @@ class TestCreateStaticMeasurementNodes:
         nodes = utility.dag_builder.get_nodes()
         assert len(nodes) == 1
         assert next(iter(nodes.values()))["label"] == str(qml.sample())
+        assert next(iter(nodes.values()))["cluster_id"] == "__base__"
 
     @pytest.mark.unit
     def test_projective_measurement_op(self):
@@ -404,3 +412,4 @@ class TestCreateStaticMeasurementNodes:
         nodes = utility.dag_builder.get_nodes()
         assert len(nodes) == 1
         assert "MidMeasure" in next(iter(nodes.values()))["label"]
+        assert next(iter(nodes.values()))["cluster_id"] == "__base__"
