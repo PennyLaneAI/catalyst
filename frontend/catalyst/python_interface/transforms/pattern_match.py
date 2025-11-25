@@ -269,7 +269,9 @@ def _(*, patterns: dict[Callable, Callable] = {}):
 def _create_pattern_source(pattern: Callable, rewrite: Callable) -> str:
     """Create a program represented as a string that encodes the ``pattern`` and ``rewrite``
     functions."""
+    return ""
 
 
 def _patterns_from_paths(paths: Sequence[str]) -> dict[Callable, Callable]:
     """Create pattern and rewrite functions using source files specified by ``paths``."""
+    return {}
