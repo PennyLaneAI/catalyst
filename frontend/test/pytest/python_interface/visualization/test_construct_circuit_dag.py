@@ -148,7 +148,7 @@ class TestFuncOpVisualization:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        graph_clusters = utility.dag_builder.get_clusters()
+        graph_clusters = utility.dag_builder.clusters
         expected_cluster_labels = [
             "jit_my_workflow",
             "my_workflow",
@@ -184,7 +184,7 @@ class TestFuncOpVisualization:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        graph_clusters = utility.dag_builder.get_clusters()
+        graph_clusters = utility.dag_builder.clusters
         expected_cluster_labels = [
             "jit_my_workflow",
             "my_qnode1",
