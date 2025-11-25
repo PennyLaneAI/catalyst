@@ -22,15 +22,14 @@ pytestmark = pytest.mark.usefixtures("requires_xdsl")
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
 import pennylane as qml
-from xdsl.dialects import test
-from xdsl.dialects.builtin import ModuleOp
-from xdsl.ir.core import Block, Region
-
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from xdsl.dialects import test
+from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir.core import Block, Region
 
 
 class FakeDAGBuilder(DAGBuilder):
@@ -145,12 +144,17 @@ class TestFuncOpVisualization:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        clusters = utility.dag_builder.get_clusters()
-        # 1 = "jit_my_workflow"
-        # 2 = "my_workflow"
-        # 3 = "setup"
-        # 4 = "teardown"
-        assert len(clusters) == 4
+        graph_clusters = utility.dag_builder.get_clusters()
+        expected_cluster_labels = [
+            "jit_my_workflow",
+            "my_workflow",
+            "setup",
+            "teardown",
+        ]
+        assert len(graph_clusters) == len(expected_cluster_labels)
+        cluster_labels = {info["label"] for info in graph_clusters.values()}
+        for expected_name in expected_cluster_labels:
+            assert expected_name in cluster_labels
 
     def test_nested_qnodes(self):
         """Tests that nested QJIT'd QNodes are visualized correctly"""
@@ -176,10 +180,15 @@ class TestFuncOpVisualization:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        clusters = utility.dag_builder.get_clusters()
-        # 1 = "jit_my_workflow"
-        # 2 = "my_qnode1"
-        # 3 = "my_qnode2"
-        # 4 = "setup"
-        # 5 = "teardown"
-        assert len(clusters) == 5
+        graph_clusters = utility.dag_builder.get_clusters()
+        expected_cluster_labels = [
+            "jit_my_workflow",
+            "my_qnode1",
+            "my_qnode2",
+            "setup",
+            "teardown",
+        ]
+        assert len(graph_clusters) == len(expected_cluster_labels)
+        cluster_labels = {info["label"] for info in graph_clusters.values()}
+        for expected_name in expected_cluster_labels:
+            assert expected_name in cluster_labels
