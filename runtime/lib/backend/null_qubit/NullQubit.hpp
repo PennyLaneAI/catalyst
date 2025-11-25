@@ -79,7 +79,16 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
             this->resource_tracker_.SetComputeDepth(device_kwargs["compute_depth"] == "True");
         }
     }
-    ~NullQubit() {} // LCOV_EXCL_LINE
+    ~NullQubit()
+    {
+        // We always want to gather resources that were used for an *entire* execution end-to-end
+        // A device is guaranteed to live as long as its ExecutionContext, so its destructor is a
+        // safe place to write out resource tracking data
+
+        if (this->track_resources_) {
+            this->resource_tracker_.WriteOut();
+        }
+    }
 
     NullQubit &operator=(const NullQubit &) = delete;
     NullQubit(const NullQubit &) = delete;
@@ -146,16 +155,14 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     /**
      * @brief Releases qubits and optionally writes resource tracking data
      *
-     * Releases the specified qubits through the qubit manager,
-     * and if resource tracking is enabled, writes the collected resource data to file.
+     * Decrements the qubit counter and releases the specified qubits through the qubit manager
+     *
+     * @param qubits A vector of the qubit IDs of the qubits to release
      */
     void ReleaseQubits(const std::vector<QubitIdType> &qubits)
     {
         for (auto q : qubits) {
             this->ReleaseQubit(q);
-        }
-        if ((num_qubits_ == 0) && (this->track_resources_)) {
-            this->resource_tracker_.WriteOut();
         }
     }
 
