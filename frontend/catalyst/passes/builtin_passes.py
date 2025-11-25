@@ -540,8 +540,8 @@ def gridsynth(qnode, *, epsilon=1e-4, ppr_basis=False):
     Specify that the ``--gridsynth`` MLIR compiler pass to discretize
     single-qubit RZ and PhaseShift gates into sequences of
     Clifford+T gates using the Ross-Selinger Gridsynth algorithm.
-    
-    This Catalyst pass has an alias as a PennyLane transform, and can 
+
+    This Catalyst pass has an alias as a PennyLane transform, and can
     be called using `@qml.transforms.gridsynth`.
 
 
@@ -575,6 +575,8 @@ def gridsynth(qnode, *, epsilon=1e-4, ppr_basis=False):
             qml.RZ(x, wires=0)
             return qml.expval(qml.PauliZ(0))
 
+    Example MLIR Representation:
+
     .. code-block:: mlir
 
         module @circuit {
@@ -585,15 +587,15 @@ def gridsynth(qnode, *, epsilon=1e-4, ppr_basis=False):
             func.func private @__catalyst_decompose_RZ_0(%arg0: !quantum.reg, %arg1: i64, %arg2: f64) -> (!quantum.reg, f64) {
                 . . .
             }
-            
+
               func.func public @circuit_0(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode} {
                 . . .
                 %3:2 = call @__catalyst_decompose_RZ_0(%2, %c0_i64, %extracted) : (!quantum.reg, i64, f64) -> (!quantum.reg, f64)
                 . . .
             }
         }
-                
-            
+
+
     """
     if qnode is None:
         return functools.partial(gridsynth, epsilon=epsilon, ppr_basis=ppr_basis)
