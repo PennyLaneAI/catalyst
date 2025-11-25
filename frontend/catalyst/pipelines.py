@@ -200,16 +200,16 @@ class CompileOptions:
         """Returns all stages in order for compilation"""
         # Dictionaries in python are ordered
         stages = {}
-        stages["UserTransformPass"] = get_user_transform_stage(self)
-        stages["HLOLoweringPass"] = get_hlo_lowering_stage(self)
         stages["QuantumCompilationPass"] = get_quantum_compilation_stage(self)
+        stages["HLOLoweringPass"] = get_hlo_lowering_stage(self)
+        stages["GradientLoweringPass"] = get_gradient_lowering_stage(self)
         stages["BufferizationPass"] = get_bufferization_stage(self)
         stages["MLIRToLLVMDialect"] = get_convert_to_llvm_stage(self)
         return list(stages.items())
 
 
-def get_user_transform_stage(_options: CompileOptions) -> List[str]:
-    """Returns the list of passes in the user transform stage."""
+def get_quantum_compilation_stage(_options: CompileOptions) -> List[str]:
+    """Returns the list of passes that performs quantum compilation"""
 
     user_transform_passes = [
         # We want the invariant that transforms that generate multiple
@@ -227,8 +227,12 @@ def get_user_transform_stage(_options: CompileOptions) -> List[str]:
         # But qnodes targeting other backends may choose to lower
         # this into something else.
         "inline-nested-module",
+        "annotate-function",
+        "lower-mitigation",
+        "adjoint-lowering",
+        "disable-assertion" if _options.disable_assertions else None,
     ]
-    return user_transform_passes
+    return list(filter(partial(is_not, None), user_transform_passes))
 
 
 def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
@@ -255,17 +259,14 @@ def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
     return hlo_lowering
 
 
-def get_quantum_compilation_stage(options: CompileOptions) -> List[str]:
-    """Returns the list of passes that performs quantum transformations"""
+def get_gradient_lowering_stage(_options: CompileOptions) -> List[str]:
+    """Returns the list of passes that performs gradient lowering"""
 
-    quantum_compilation = [
-        "annotate-function",
-        "lower-mitigation",
+    gradient_lowering = [
+        # TODO: This pass should ideally be moved to the quantum compilation stage
         "lower-gradients",
-        "adjoint-lowering",
-        "disable-assertion" if options.disable_assertions else None,
     ]
-    return list(filter(partial(is_not, None), quantum_compilation))
+    return gradient_lowering
 
 
 def get_bufferization_stage(options: CompileOptions) -> List[str]:

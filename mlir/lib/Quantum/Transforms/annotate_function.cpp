@@ -25,6 +25,7 @@
 #include "Gradient/IR/GradientOps.h"
 #include "Quantum/Transforms/Patterns.h"
 #include "Quantum/Transforms/annotate_function.h"
+#include "stablehlo/dialect/StablehloOps.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -40,7 +41,7 @@ bool invalidGradientOperation(FunctionOpInterface op)
 {
     ModuleOp mod = op->getParentOfType<ModuleOp>();
     auto res = op.walk([&](Operation *o) {
-        if (isa<MeasureOp>(o) || isa<catalyst::CustomCallOp>(o)) {
+        if (isa<MeasureOp>(o) || isa<stablehlo::CustomCallOp>(o)) {
             return WalkResult::interrupt();
         }
         else if (auto callbackCall = dyn_cast<catalyst::CallbackCallOp>(o)) {
