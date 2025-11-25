@@ -95,7 +95,7 @@ class FakeDAGBuilder(DAGBuilder):
     def to_string(self) -> str:
         return "graph"
 
-
+@pytest.mark.unit
 def test_dependency_injection():
     """Tests that relevant dependencies are injected."""
 
@@ -103,7 +103,7 @@ def test_dependency_injection():
     utility = ConstructCircuitDAG(mock_dag_builder)
     assert utility.dag_builder is mock_dag_builder
 
-
+@pytest.mark.unit
 def test_does_not_mutate_module():
     """Test that the module is not mutated."""
 
@@ -197,6 +197,7 @@ class TestCreateStaticOperatorNodes:
         assert len(nodes) == 1
         assert next(iter(nodes.values()))["label"] == str(op)
 
+    @pytest.mark.unit
     def test_qubit_unitary_op(self):
         """Test that QubitUnitary operations can be handled."""
         dev = qml.device("null.qubit", wires=1)
@@ -226,6 +227,7 @@ class TestCreateStaticOperatorNodes:
             qml.QubitUnitary([[0, 1], [1, 0]], wires=0)
         )
 
+    @pytest.mark.unit
     def test_multi_rz_op(self):
         """Test that MultiRZ operations can be handled."""
         dev = qml.device("null.qubit", wires=1)
@@ -252,12 +254,6 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.get_nodes()
         assert len(nodes) == 1
         assert next(iter(nodes.values()))["label"] == str(qml.MultiRZ(0.5, wires=[0]))
-
-    def test_set_state_op(self):
-        pass
-
-    def test_set_basis_state_op(self):
-        pass
 
 
 class TestCreateStaticMeasurementNodes:
