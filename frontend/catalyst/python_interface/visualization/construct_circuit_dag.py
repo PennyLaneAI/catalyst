@@ -20,7 +20,6 @@ from typing import Any
 from xdsl.dialects import builtin
 from xdsl.ir import Block, Operation, Region
 
-from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 from catalyst.python_interface.visualization.xdsl_conversion import (
     xdsl_to_qml_measurement,
@@ -29,11 +28,12 @@ from catalyst.python_interface.visualization.xdsl_conversion import (
 
 
 class ConstructCircuitDAG:
-    """A tool that analyzes an xDSL module and constructs a Directed Acyclic Graph (DAG)
-    using an injected DAGBuilder instance. This tool does not mutate the xDSL module."""
+    """A tool that traverses an xDSL module and constructs a Directed Acyclic Graph (DAG)
+    of it's quantum program using an injected DAGBuilder instance. This tool does not mutate the xDSL module.
+    """
 
     def __init__(self, dag_builder: DAGBuilder) -> None:
-        """Initialize the analysis pass by injecting the DAG builder dependency.
+        """Initialize the utility by injecting the DAG builder dependency.
 
         Args:
             dag_builder (DAGBuilder): The concrete builder instance used for graph construction.
@@ -58,9 +58,12 @@ class ConstructCircuitDAG:
         to the specialized handler registered for its type."""
 
     def construct(self, module: builtin.ModuleOp) -> None:
-        """Constructs the DAG from the module."""
-        self._reset()
+        """Constructs the DAG from the module.
 
+        Args:
+            module (xdsl.builtin.ModuleOp): The module containing the quantum program to visualize.
+
+        """
         for op in module.ops:
             self._visit(op)
 
