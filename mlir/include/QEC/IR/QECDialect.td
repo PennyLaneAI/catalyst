@@ -354,7 +354,7 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def PPRArbitraryRotationOp : QEC_Op<"ppr.arbitrary", [QECOpInterface, AttrSizedOperandSegments]> {
+def PPRArbitraryRotationOp : QEC_Op<"ppr.arbitrary", [AttrSizedOperandSegments]> {
     let summary = "Pauli Product Rotation with arbitrary angle.";
     let description = [{
         The PPRArbitraryRotationOp represents a Pauli product rotation operation with an arbitrary angle.
@@ -387,59 +387,12 @@ def PPRArbitraryRotationOp : QEC_Op<"ppr.arbitrary", [QECOpInterface, AttrSizedO
         Variadic<QubitType>:$out_qubits
     );
 
-    let builders = [
-        OpBuilder<
-        (ins
-            "::mlir::ArrayAttr":$pauli_product,
-            "double":$arbitrary_angle,
-            "::mlir::ValueRange":$in_qubits
-        ),[{
-            PPRArbitraryRotationOp::build($_builder, $_state,
-            /*out_qubits=*/ mlir::TypeRange(in_qubits),
-            /*pauli_product=*/ pauli_product,
-            /*arbitrary_angle=*/ $_builder.create<::mlir::arith::ConstantOp>($_state.location, $_builder.getF64FloatAttr(arbitrary_angle)),
-            /*in_qubits=*/ in_qubits,
-            /*condition=*/ nullptr);
-        }]>, 
-        OpBuilder<
-        (ins
-            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product,
-            "double":$arbitrary_angle,
-            "::mlir::ValueRange":$in_qubits
-        ), [{
-            PPRArbitraryRotationOp::build($_builder, $_state, 
-            /*::mlir::ArrayAttr=*/ $_builder.getStrArrayAttr(pauli_product),
-            /*double=*/ arbitrary_angle,
-            /*::mlir::ValueRange=*/ in_qubits);
-        }]>
-    ];
-
     let assemblyFormat = [{
         $pauli_product `(` $arbitrary_angle `)` $in_qubits attr-dict (`cond` `(` $condition^ `)`)? `:` type($out_qubits)
     }];
 
     let hasVerifier = 1;
     let hasCanonicalizeMethod = 1;
-
-    code extraBaseClassDeclaration = [{
-        uint16_t getRotationKind(){
-            return 0;  // Arbitrary rotations are not characterized by a rotation kind.
-        };
-        void setRotationKind(uint16_t attrValue){
-            // Convert rotation kind to angle: rotation_kind N means angle = π/N.
-            if (attrValue == 0) {
-                // Invalid rotation kind, set to 0 angle as fallback.
-                setArbitraryAngle(::llvm::APFloat(0.0));
-            } else {
-                setArbitraryAngle(::llvm::APFloat(M_PI / static_cast<double>(attrValue)));
-            }
-        };
-        bool isArbitrary(){
-            return true;
-        };
-    }];
-    
-    let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
 def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, AttrSizedOperandSegments]> {
