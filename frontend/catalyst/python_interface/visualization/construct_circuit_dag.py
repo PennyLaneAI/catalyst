@@ -52,9 +52,8 @@ class ConstructCircuitDAG:
             self._visit(op)
 
     # =======================
-    # 2. HIERARCHY TRAVERSAL
+    # 2. IR TRAVERSAL
     # =======================
-    # These methods navigate the recursive IR hierarchy (Op -> Region -> Block -> Op).
 
     @_visit.register
     def _operation(self, operation: Operation) -> None:
