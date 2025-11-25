@@ -17,9 +17,10 @@
 from functools import singledispatchmethod
 from typing import Any
 
-from xdsl.dialects import builtin
+from xdsl.dialects import builtin, func
 from xdsl.ir import Block, Operation, Region
 
+from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 
 
@@ -35,6 +36,14 @@ class ConstructCircuitDAG:
             dag_builder (DAGBuilder): The concrete builder instance used for graph construction.
         """
         self.dag_builder: DAGBuilder = dag_builder
+
+        # Keep track of nesting clusters using a stack
+        # NOTE: `None` corresponds to the base graph 'cluster'
+        self._cluster_stack: list[str | None] = [None]
+
+    def _reset(self) -> None:
+        """Resets the instance."""
+        self._cluster_stack: list[str | None] = [None]
 
     # =================================
     # 1. CORE DISPATCH AND ENTRY POINT
@@ -62,6 +71,18 @@ class ConstructCircuitDAG:
     @_visit.register
     def _operation(self, operation: Operation) -> None:
         """Visit an xDSL Operation."""
+
+        # Visualize FuncOp's as bounding boxes
+        if isinstance(operation, func.FuncOp):
+            print(operation)
+            cluster_id = f"cluster_{id(operation)}"
+            self.dag_builder.add_cluster(
+                cluster_id,
+                node_label=operation.sym_name.data,
+                cluster_id=self._cluster_stack[-1],
+            )
+            self._cluster_stack.append(cluster_id)
+
         for region in operation.regions:
             self._visit(region)
 
@@ -76,3 +97,25 @@ class ConstructCircuitDAG:
         """Visit an xDSL Block operation, dispatching handling for each contained Operation."""
         for op in block.ops:
             self._visit(op)
+
+    @_visit.register
+    def _device_init(self, op: quantum.DeviceInitOp) -> None:
+        """Handles the initialization of a quantum device."""
+        node_id = f"node_{id(op)}"
+        self.dag_builder.add_node(
+            node_id,
+            label=op.device_name.data,
+            cluster_id=self._cluster_stack[-1],
+            fillcolor="white",
+            shape="rectangle",
+        )
+
+    @_visit.register
+    def _func_return(self, op: func.ReturnOp) -> None:
+        """Handle func.return to exit FuncOp's cluster scope."""
+
+        # NOTE: Skip first two because the first is the base graph, second is the jit_* workflow FuncOp
+        if len(self._cluster_stack) > 2:
+            # If we hit a func.return operation we know we are leaving
+            # the FuncOp's scope and so we can pop the ID off the stack.
+            self._cluster_stack.pop()
