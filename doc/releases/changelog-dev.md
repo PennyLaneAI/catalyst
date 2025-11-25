@@ -58,9 +58,9 @@
 
   For example:
   ```mlir
-  %0 = qec.ppr.arbitrary ["X"](0.124) %q1 : !quantum.bit
-  %1:2 = qec.ppr.arbitrary ["X", "Z"](0.14) %0, %q2 : !quantum.bit, !quantum.bit
-  %2:2 = qec.ppr.arbitrary ["X", "Z"](0.14) %1#0, %1#1 cond(%c0) : !quantum.bit, !quantum.bit
+  %const = arith.constant 0.124 : f64
+  %1:2 = qec.ppr.arbitrary ["X", "Z"](%const) %q1, %q2 : !quantum.bit, !quantum.bit
+  %2:2 = qec.ppr.arbitrary ["X", "Z"](%const) %1#0, %1#1 cond(%c0) : !quantum.bit, !quantum.bit
   ```
 
 <h3>Breaking changes 💔</h3>
