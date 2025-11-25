@@ -66,9 +66,8 @@ class ConstructCircuitDAG:
             self._visit(op)
 
     # =======================
-    # 2. HIERARCHY TRAVERSAL
+    # 2. IR TRAVERSAL
     # =======================
-    # These methods navigate the recursive IR hierarchy (Op -> Region -> Block -> Op).
 
     @_visit.register
     def _operation(self, operation: Operation) -> None:
@@ -88,20 +87,17 @@ class ConstructCircuitDAG:
         for op in block.ops:
             self._visit(op)
 
-    # ======================================
-    # 3. QUANTUM GATE & STATE PREP HANDLERS
-    # ======================================
-    # Handlers for operations that apply unitary transformations or set-up the quantum state.
+    # ======================
+    # 3. QUANTUM OPERATIONS
+    # ======================
 
     @_visit.register
-    def _unitary_and_state_prep(
+    def _unitary(
         self,
         op: quantum.CustomOp
         | quantum.GlobalPhaseOp
         | quantum.QubitUnitaryOp
-        | quantum.SetStateOp
-        | quantum.MultiRZOp
-        | quantum.SetBasisStateOp,
+        | quantum.MultiRZOp,
     ) -> None:
         """Generic handler for unitary gates and quantum state preparation operations."""
 
@@ -113,9 +109,9 @@ class ConstructCircuitDAG:
             cluster_id=self._cluster_stack[-1],
         )
 
-    # =============================================
-    # 4. QUANTUM MEASUREMENT HANDLERS
-    # =============================================
+    # ========================
+    # 4. QUANTUM MEASUREMENTS
+    # ========================
 
     @_visit.register
     def _state_op(self, op: quantum.StateOp) -> None:

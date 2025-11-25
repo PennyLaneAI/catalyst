@@ -198,12 +198,62 @@ class TestCreateStaticOperatorNodes:
         assert next(iter(nodes.values()))["label"] == str(op)
 
     def test_qubit_unitary_op(self):
-        pass
+        """Test that QubitUnitary operations can be handled."""
+        dev = qml.device("null.qubit", wires=1)
 
-    def test_set_state_op(self):
-        pass
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            qml.QubitUnitary([[0, 1], [1, 0]], wires=0)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # sanity check
+        edges = utility.dag_builder.get_edges()
+        assert edges == []
+        clusters = utility.dag_builder.get_clusters()
+        assert clusters == {}
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.get_nodes()
+        assert len(nodes) == 1
+        assert next(iter(nodes.values()))["label"] == str(
+            qml.QubitUnitary([[0, 1], [1, 0]], wires=0)
+        )
 
     def test_multi_rz_op(self):
+        """Test that MultiRZ operations can be handled."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            qml.MultiRZ(0.5, wires=[0])
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # sanity check
+        edges = utility.dag_builder.get_edges()
+        assert edges == []
+        clusters = utility.dag_builder.get_clusters()
+        assert clusters == {}
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.get_nodes()
+        assert len(nodes) == 1
+        assert next(iter(nodes.values()))["label"] == str(qml.MultiRZ(0.5, wires=[0]))
+
+    def test_set_state_op(self):
         pass
 
     def test_set_basis_state_op(self):
