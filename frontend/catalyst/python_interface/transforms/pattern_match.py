@@ -238,7 +238,7 @@ class PatternMatchPass(ModulePass):
         return pdl_op
 
     @classmethod
-    def create_from_serialized_options(cls, **options):
+    def create_from_serialized_options(cls, *_, **options):
         """Create a pass instance using serialized patterns."""
         paths = options["pattern_paths"]
         py_patterns = _patterns_from_paths(paths)
@@ -269,7 +269,16 @@ def _(*, patterns: dict[Callable, Callable] = {}):
 def _create_pattern_source(pattern: Callable, rewrite: Callable) -> str:
     """Create a program represented as a string that encodes the ``pattern`` and ``rewrite``
     functions along with necessary locals and globals."""
+    # Collect imports
+    # Collect closure vars
+    # Collect called functions
+    # Collect function source
+    # Add variables pointing to pattern and rewrite functions
 
 
 def _patterns_from_paths(paths: Sequence[str]) -> dict[Callable, Callable]:
     """Create pattern and rewrite functions using source files specified by ``paths``."""
+    # Read files at paths
+    # Exec
+    # Collect locals
+    # Find references to pattern and rewrite functions
