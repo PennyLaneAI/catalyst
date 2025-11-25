@@ -91,3 +91,9 @@ func.func @layer(%arg0 : !quantum.bit, %arg1 : !quantum.bit) -> i1{
 
     func.return %res_1 : i1
 }
+
+func.func @arbitrary(%q1 : !quantum.bit, %q2 : !quantum.bit) {
+    %0 = qec.ppr.arbitrary ["X"](0.124) %q1 : !quantum.bit
+    %1:2 = qec.ppr.arbitrary ["X", "Z"](0.14) %0, %q2 : !quantum.bit, !quantum.bit
+    func.return
+}
