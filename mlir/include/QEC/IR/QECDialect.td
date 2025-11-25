@@ -395,6 +395,17 @@ def PPRArbitraryRotationOp : QEC_Op<"ppr.arbitrary", [QECOpInterface, AttrSizedO
             /*arbitrary_angle=*/ $_builder.getF64FloatAttr(arbitrary_angle),
             /*in_qubits=*/ in_qubits,
             /*condition=*/ nullptr);
+        }]>, 
+        OpBuilder<
+        (ins
+            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product,
+            "double":$arbitrary_angle,
+            "::mlir::ValueRange":$in_qubits
+        ), [{
+            PPRArbitraryRotationOp::build($_builder, $_state, 
+            /*::mlir::ArrayAttr=*/ $_builder.getStrArrayAttr(pauli_product),
+            /*double=*/ arbitrary_angle,
+            /*::mlir::ValueRange=*/ in_qubits);
         }]>
     ];
 
@@ -402,18 +413,15 @@ def PPRArbitraryRotationOp : QEC_Op<"ppr.arbitrary", [QECOpInterface, AttrSizedO
         $pauli_product `(` $arbitrary_angle `)` $in_qubits attr-dict (`cond` `(` $condition^ `)`)? `:` type($out_qubits)
     }];
 
-    // TODO: Add verifier and canonicalize method for arbitrary rotations.
-    let hasVerifier = 0;
-    let hasCanonicalizeMethod = 0;
+    let hasVerifier = 1;
+    let hasCanonicalizeMethod = 1;
 
     code extraBaseClassDeclaration = [{
         uint16_t getRotationKind(){
-            // TODO: try to divide by pi to get the rotation kind.
             return 0;  // Arbitrary rotations are not characterized by a rotation kind.
         };
         void setRotationKind(uint16_t attrValue){
             // Convert rotation kind to angle: rotation_kind N means angle = π/N.
-            // For example, rotation_kind 2 → π/2, rotation_kind 4 → π/4.
             if (attrValue == 0) {
                 // Invalid rotation kind, set to 0 angle as fallback.
                 setArbitraryAngle(::llvm::APFloat(0.0));
