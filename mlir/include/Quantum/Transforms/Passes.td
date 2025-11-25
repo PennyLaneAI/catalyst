@@ -94,7 +94,7 @@ def GridsynthPass : Pass<"gridsynth"> {
         "epsilon",
         "double",
         default="1e-4",
-        desc="Approximation error tolerance for the RS decomposition.">, 
+        desc="Maximum error tolerance for per-gate discretization.">, 
         Option<
         "pprBasis",
         "ppr-basis",
