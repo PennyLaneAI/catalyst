@@ -102,31 +102,31 @@ class FakeDAGBuilder(DAGBuilder):
 def test_dependency_injection():
     """Tests that relevant dependencies are injected."""
 
-    mock_dag_builder = Mock(DAGBuilder)
-    utility = ConstructCircuitDAG(mock_dag_builder)
-    assert utility.dag_builder is mock_dag_builder
+    dag_builder = FakeDAGBuilder()
+    utility = ConstructCircuitDAG(dag_builder)
+    assert utility.dag_builder is dag_builder
 
 
 @pytest.mark.unit
 def test_does_not_mutate_module():
     """Test that the module is not mutated."""
 
-    # Create block containing some ops
+    # Create module
     op = test.TestOp()
     block = Block(ops=[op])
-    # Create region containing some blocks
     region = Region(blocks=[block])
-    # Create op containing the regions
     container_op = test.TestOp(regions=[region])
-    # Create module op to house it all
     module_op = ModuleOp(ops=[container_op])
 
+    # Save state before
     module_op_str_before = str(module_op)
 
+    # Process module
     mock_dag_builder = Mock(DAGBuilder)
     utility = ConstructCircuitDAG(mock_dag_builder)
     utility.construct(module_op)
 
+    # Ensure not mutated 
     assert str(module_op) == module_op_str_before
 
 
