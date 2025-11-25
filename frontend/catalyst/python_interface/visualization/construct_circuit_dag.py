@@ -73,10 +73,7 @@ class ConstructCircuitDAG:
         """Visit an xDSL Operation."""
 
         # Visualize FuncOp's as bounding boxes
-        if isinstance(operation, func.FuncOp) and operation.sym_name.data not in {
-            "setup",
-            "teardown",
-        }:
+        if isinstance(operation, func.FuncOp):
             cluster_id = f"cluster_{id(operation)}"
             self.dag_builder.add_cluster(
                 cluster_id,
