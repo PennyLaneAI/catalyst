@@ -338,14 +338,14 @@ class TestGetMethods:
         assert clusters["0"]["id"] == "0"
         assert clusters["0"]["cluster_label"] == "my_cluster"
         assert clusters["0"]["node_label"] == "my_info_node"
-        assert clusters["0"]["parent_id"] == "__base__"
+        assert clusters["0"]["cluster_id"] == "__base__"
         assert clusters["0"]["attrs"]["penwidth"] == 10
 
         assert len(clusters["1"]) == 5
         assert clusters["1"]["id"] == "1"
         assert clusters["1"]["cluster_label"] == "my_nested_cluster"
         assert clusters["1"]["node_label"] == "my_other_info_node"
-        assert clusters["1"]["parent_id"] == "0"
+        assert clusters["1"]["cluster_id"] == "0"
 
     def test_get_clusters_doesnt_mutate(self):
         """Tests that get_clusters doesn't mutate state"""
