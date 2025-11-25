@@ -215,21 +215,21 @@ func.func @test_rz_decomposition(%arg0: !quantum.reg) -> !quantum.reg {
 
 // -----
 
-func.func @test_phaseshift_decomposition(%arg0: !quantum.reg) -> !quantum.reg {
+func.func @test_phaseshift_decomposition(%arg0: !quantum.reg, %phi: f64) -> !quantum.reg {
     %idx = arith.constant 0 : i64
-    %phi = arith.constant 0.7 : f64
     
     %q_in = quantum.extract %arg0[%idx] : !quantum.reg -> !quantum.bit
 
     // CHECK-LABEL: @test_phaseshift_decomposition
-    // Use regex {{.*}} for the float value to avoid precision mismatch errors
-    // CHECK: [[PHI:%.+]] = arith.constant {{.*}} : f64
+    // CHECK-SAME: [[REG:%.+]]: !quantum.reg, [[PHI:%.+]]: f64
+    
+    // CHECK: [[C2:%.+]] = arith.constant 2.0{{.*}} : f64
     
     // CLIFFORD: [[RES:%.+]]:2 = call @__catalyst_decompose_RZ
     // PPR:      [[RES:%.+]]:2 = call @__catalyst_decompose_RZ_ppr_basis
     
-    // PhaseShift check: The phase IS added to the angle
-    // CHECK: [[TOTAL_PHASE:%.+]] = arith.addf [[RES]]#1, [[PHI]]
+    // CHECK: [[HALF_ANGLE:%.+]] = arith.divf [[PHI]], [[C2]]
+    // CHECK: [[TOTAL_PHASE:%.+]] = arith.subf [[RES]]#1, [[HALF_ANGLE]]
     // CHECK: quantum.gphase([[TOTAL_PHASE]])
 
     %q_out = quantum.custom "PhaseShift"(%phi) %q_in : !quantum.bit
