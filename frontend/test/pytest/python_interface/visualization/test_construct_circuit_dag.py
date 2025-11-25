@@ -16,19 +16,21 @@
 from unittest.mock import Mock
 
 import pytest
+from jax import util
 
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
-from xdsl.dialects import test
-from xdsl.dialects.builtin import ModuleOp
-from xdsl.ir.core import Block, Region
-
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
+import pennylane as qml
+from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from xdsl.dialects import test
+from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir.core import Block, Region
 
 
 class FakeDAGBuilder(DAGBuilder):
@@ -122,3 +124,58 @@ def test_does_not_mutate_module():
 
     # Ensure not mutated
     assert str(module_op) == module_op_str_before
+
+
+@pytest.mark.unit
+class TestFuncOpVisualization:
+    """Tests the visualization of FuncOps with bounding boxes"""
+
+    def test_standard_qnode(self):
+        """Tests that a standard QJIT'd QNode is visualized correctly"""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            qml.H(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.get_clusters()
+        # 1 = "jit_my_workflow"
+        # 2 = "my_workflow"
+        assert len(clusters) == 2
+
+    def test_nested_qnodes(self):
+        """Tests that nested QJIT'd QNodes are visualized correctly"""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def my_qnode2():
+            qml.X(0)
+
+        @qml.qnode(dev)
+        def my_qnode1():
+            qml.H(0)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        def my_workflow():
+            my_qnode1()
+            my_qnode2()
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.get_clusters()
+        # 1 = "jit_my_workflow"
+        # 2 = "my_qnode1"
+        # 3 = "my_qnode2"
+        assert len(clusters) == 3
