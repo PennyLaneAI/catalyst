@@ -377,7 +377,7 @@ def PPRArbitraryRotationOp : QEC_Op<"ppr.arbitrary", [QECOpInterface, AttrSizedO
 
     let arguments = (ins
         PauliWord:$pauli_product,
-        F64Attr:$arbitrary_angle,
+        F64:$arbitrary_angle,
         Variadic<QubitType>:$in_qubits,
         Optional<I1>:$condition
     );
@@ -396,7 +396,7 @@ def PPRArbitraryRotationOp : QEC_Op<"ppr.arbitrary", [QECOpInterface, AttrSizedO
             PPRArbitraryRotationOp::build($_builder, $_state,
             /*out_qubits=*/ mlir::TypeRange(in_qubits),
             /*pauli_product=*/ pauli_product,
-            /*arbitrary_angle=*/ $_builder.getF64FloatAttr(arbitrary_angle),
+            /*arbitrary_angle=*/ $_builder.create<::mlir::arith::ConstantOp>($_state.location, $_builder.getF64FloatAttr(arbitrary_angle)),
             /*in_qubits=*/ in_qubits,
             /*condition=*/ nullptr);
         }]>, 
@@ -428,9 +428,9 @@ def PPRArbitraryRotationOp : QEC_Op<"ppr.arbitrary", [QECOpInterface, AttrSizedO
             // Convert rotation kind to angle: rotation_kind N means angle = π/N.
             if (attrValue == 0) {
                 // Invalid rotation kind, set to 0 angle as fallback.
-                setArbitraryAngle(::llvm::APFloat(0.0));
+                // setArbitraryAngle(::llvm::APFloat(0.0));
             } else {
-                setArbitraryAngle(::llvm::APFloat(M_PI / static_cast<double>(attrValue)));
+                // setArbitraryAngle(::llvm::APFloat(M_PI / static_cast<double>(attrValue)));
             }
         };
         bool isArbitrary(){
