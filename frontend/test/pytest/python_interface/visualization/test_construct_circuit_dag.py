@@ -24,10 +24,6 @@ pytestmark = pytest.mark.usefixtures("requires_xdsl")
 import pennylane as qml
 from catalyst import measure
 from catalyst.python_interface.conversion import xdsl_from_qjit
-from catalyst.python_interface.dialects.quantum import (
-    CustomOp,
-    QubitType,
-)
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )

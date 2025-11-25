@@ -14,10 +14,10 @@
 
 """Contains the ConstructCircuitDAG tool for constructing a DAG from an xDSL module."""
 
-from functools import singledispatch, singledispatchmethod
+from functools import singledispatchmethod
 from typing import Any
 
-from xdsl.dialects import builtin, scf
+from xdsl.dialects import builtin
 from xdsl.ir import Block, Operation, Region
 
 from catalyst.python_interface.dialects import quantum
