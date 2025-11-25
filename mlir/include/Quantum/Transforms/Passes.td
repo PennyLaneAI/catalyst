@@ -101,6 +101,12 @@ def GridsynthPass : Pass<"gridsynth"> {
         "bool",
         default="false",
         desc="Whether to decompose into the PPR basis set instead of the standard Clifford+T basis set.">,];
+
+        let dependentDialects = [
+        "memref::MemRefDialect",
+        "scf::SCFDialect",
+        "catalyst::qec::QECDialect",
+    ];
 }
 
 def MergeRotationsPass : Pass<"merge-rotations"> {

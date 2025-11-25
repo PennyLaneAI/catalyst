@@ -30,9 +30,10 @@
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 
+#include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Patterns.h" // Import pattern declarations
+#include "Quantum/Transforms/Patterns.h"
 
 using llvm::SmallVector;
 using llvm::StringRef;
@@ -41,74 +42,10 @@ using namespace catalyst::quantum;
 
 namespace {
 
-// --- Helper Functions to Declare External Runtime Functions ---
-
-/**
- * @brief Generic helper to find or insert a private function declaration.
- */
-mlir::func::FuncOp getOrDeclareFunc(mlir::ModuleOp module, mlir::PatternRewriter &rewriter,
-                                    StringRef funcName, mlir::FunctionType funcType)
-{
-    auto func = module.lookupSymbol<mlir::func::FuncOp>(funcName);
-    if (func) {
-        return func;
-    }
-
-    mlir::OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPointToStart(module.getBody());
-    func = rewriter.create<mlir::func::FuncOp>(module.getLoc(), funcName, funcType);
-    func.setPrivate();
-
-    return func;
-}
-
-/**
- * @brief Gets or declares the external runtime function `rs_decomposition_get_size`.
- */
-mlir::func::FuncOp getOrDeclareGetSizeFunc(mlir::ModuleOp module, mlir::PatternRewriter &rewriter)
-{
-    const char *funcName = "rs_decomposition_get_size";
-    auto f64Type = rewriter.getF64Type();
-    auto i1Type = rewriter.getI1Type();
-    auto indexType = rewriter.getIndexType();
-    auto funcType = rewriter.getFunctionType({f64Type, f64Type, i1Type}, {indexType});
-
-    return getOrDeclareFunc(module, rewriter, funcName, funcType);
-}
-
-/**
- * @brief Gets or declares the external runtime function `rs_decomposition_get_gates`.
- */
-mlir::func::FuncOp getOrDeclareGetGatesFunc(mlir::ModuleOp module, mlir::PatternRewriter &rewriter)
-{
-    const char *funcName = "rs_decomposition_get_gates";
-    auto f64Type = rewriter.getF64Type();
-    auto i1Type = rewriter.getI1Type();
-    auto rankedMemRefType =
-        mlir::MemRefType::get({mlir::ShapedType::kDynamic}, rewriter.getIndexType());
-    // Signature: (memref<* x index>, f64, f64, i1) -> ()
-    auto funcType = rewriter.getFunctionType({rankedMemRefType, f64Type, f64Type, i1Type}, {});
-
-    return getOrDeclareFunc(module, rewriter, funcName, funcType);
-}
-
-/**
- * @brief Gets or declares the external runtime function `rs_decomposition_get_phase`.
- */
-mlir::func::FuncOp getOrDeclareGetPhaseFunc(mlir::ModuleOp module, mlir::PatternRewriter &rewriter)
-{
-    const char *funcName = "rs_decomposition_get_phase";
-    auto f64Type = rewriter.getF64Type();
-    auto i1Type = rewriter.getI1Type();
-    auto funcType = rewriter.getFunctionType({f64Type, f64Type, i1Type}, {f64Type});
-
-    return getOrDeclareFunc(module, rewriter, funcName, funcType);
-}
-
 // --- Helper Functions to build switch cases ---
 
 /**
- * @brief Helper to create a chain of parameter-less single qubit CUSTOM gates.
+ * @brief Helper to create a chain of parameter-less single qubit quantum custom gates.
  */
 mlir::Value createGateChain(mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::Value qregIn,
                             mlir::Value qbitIndex, mlir::ArrayRef<StringRef> gateNames,
@@ -117,8 +54,7 @@ mlir::Value createGateChain(mlir::PatternRewriter &rewriter, mlir::Location loc,
     auto qregType = qregIn.getType();
     auto qbitType = catalyst::quantum::QubitType::get(rewriter.getContext());
 
-    mlir::Value currentQbit = rewriter.create<ExtractOp>(loc, qbitType, qregIn, qbitIndex,
-                                                         /*idx_attr=*/nullptr);
+    mlir::Value currentQbit = rewriter.create<ExtractOp>(loc, qbitType, qregIn, qbitIndex, nullptr);
 
     for (StringRef gateName : gateNames) {
         mlir::NamedAttrList newAttrs;
@@ -136,8 +72,8 @@ mlir::Value createGateChain(mlir::PatternRewriter &rewriter, mlir::Location loc,
         currentQbit = newOp.getResult(0);
     }
 
-    mlir::Value qregOut = rewriter.create<InsertOp>(loc, qregType, qregIn, qbitIndex,
-                                                    /*idx_attr=*/nullptr, currentQbit);
+    mlir::Value qregOut =
+        rewriter.create<InsertOp>(loc, qregType, qregIn, qbitIndex, nullptr, currentQbit);
     return qregOut;
 }
 
@@ -148,7 +84,6 @@ void populateCliffordTSwitchCases(mlir::PatternRewriter &rewriter, mlir::Locatio
                                   mlir::scf::IndexSwitchOp switchOp, mlir::Value qregIn,
                                   mlir::Value qbitIndex)
 {
-    // --- Define cases ---
     static StringRef gates0[] = {"T"};
     static StringRef gates1[] = {"Hadamard", "T"};
     static StringRef gates2[] = {"S", "Hadamard", "T"};
@@ -172,7 +107,7 @@ void populateCliffordTSwitchCases(mlir::PatternRewriter &rewriter, mlir::Locatio
         {gates8, /*isAdjoint=*/true},  // Case 9
     };
 
-    // --- Populate Switch Cases ---
+    // Populate Switch Cases
     assert(caseConfigs.size() == switchOp.getCases().size() &&
            "Mismatch in case config and case values");
     for (size_t i = 0; i < caseConfigs.size(); ++i) {
@@ -212,8 +147,8 @@ void populatePPRBasisSwitchCases(mlir::PatternRewriter &rewriter, mlir::Location
     auto createPPROp = [&](mlir::OpBuilder &builder, mlir::ArrayRef<StringRef> pauliWord,
                            uint16_t rotationKind, bool isAdjoint,
                            mlir::Value currentLoopReg) -> mlir::Value {
-        mlir::Value currentQbit = builder.create<ExtractOp>(loc, qbitType, currentLoopReg,
-                                                            qbitIndex, /*idx_attr=*/nullptr);
+        mlir::Value currentQbit =
+            builder.create<ExtractOp>(loc, qbitType, currentLoopReg, qbitIndex, nullptr);
 
         // Convert rotation kind to signed integer and negate if adjoint
         int16_t signedRotation = static_cast<int16_t>(rotationKind);
@@ -221,21 +156,19 @@ void populatePPRBasisSwitchCases(mlir::PatternRewriter &rewriter, mlir::Location
             signedRotation = -signedRotation;
         }
 
-        // We need to cast back to uint16_t for the C++ builder signature,
+        // We need to cast back to uint16_t for the C++ builder signature
         uint16_t finalRotationArg = static_cast<uint16_t>(signedRotation);
 
-        auto pprOp = builder.create<catalyst::qec::PPRotationOp>(loc, pauliWord, finalRotationArg,
-                                                                 mlir::ValueRange{currentQbit},
-                                                                 /*condition=*/nullptr);
+        auto pprOp = builder.create<catalyst::qec::PPRotationOp>(
+            loc, pauliWord, finalRotationArg, mlir::ValueRange{currentQbit}, nullptr);
 
         mlir::Value resultQbit = pprOp.getResult(0);
 
-        mlir::Value qregOut = builder.create<InsertOp>(loc, qregType, currentLoopReg, qbitIndex,
-                                                       /*idx_attr=*/nullptr, resultQbit);
+        mlir::Value qregOut =
+            builder.create<InsertOp>(loc, qregType, currentLoopReg, qbitIndex, nullptr, resultQbit);
         return qregOut;
     };
 
-    // Config struct for the new Enum
     struct PPRConfig {
         bool isIdentity;
         ArrayRef<StringRef> pauli;
@@ -253,25 +186,19 @@ void populatePPRBasisSwitchCases(mlir::PatternRewriter &rewriter, mlir::Location
     // Case 0: I
     caseConfigs.push_back({true, {}, 0, false});
 
-    // Helper to push X, Y, Z triplets (2, 4, 8) then (adj2, adj4, adj8)
+    // Helper to push X, Y, Z: (2, 4, 8, adj2, adj4, adj8)
     auto pushSeries = [&](ArrayRef<StringRef> pauli) {
-        // Normal: 2, 4, 8
         caseConfigs.push_back({false, pauli, 2, false});
         caseConfigs.push_back({false, pauli, 4, false});
         caseConfigs.push_back({false, pauli, 8, false});
-        // Adjoint: 2, 4, 8
         caseConfigs.push_back({false, pauli, 2, true});
         caseConfigs.push_back({false, pauli, 4, true});
         caseConfigs.push_back({false, pauli, 8, true});
     };
 
-    pushSeries(xPauli); // Cases 1-6
-    pushSeries(yPauli); // Cases 7-12
-    pushSeries(zPauli); // Cases 13-18
-
-    // --- Populate Switch Cases ---
-    assert(caseConfigs.size() == switchOp.getCases().size() &&
-           "Mismatch in case config and case values");
+    pushSeries(xPauli);
+    pushSeries(yPauli);
+    pushSeries(zPauli);
 
     for (size_t i = 0; i < caseConfigs.size(); ++i) {
         const auto &config = caseConfigs[i];
@@ -279,15 +206,9 @@ void populatePPRBasisSwitchCases(mlir::PatternRewriter &rewriter, mlir::Location
         caseRegion.push_back(new Block());
         rewriter.setInsertionPointToStart(&caseRegion.front());
 
-        mlir::Value qregCase;
-        if (config.isIdentity) {
-            // Identity: No-op
-            qregCase = qregIn;
-        }
-        else {
-            // PPR Op (Adjoint logic handled inside helper)
-            qregCase = createPPROp(rewriter, config.pauli, config.n, config.isAdjoint, qregIn);
-        }
+        mlir::Value qregCase = config.isIdentity ? qregIn
+                                                 : createPPROp(rewriter, config.pauli, config.n,
+                                                               config.isAdjoint, qregIn);
 
         rewriter.create<mlir::scf::YieldOp>(loc, qregCase);
     }
@@ -309,12 +230,21 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
 {
     const char *funcName =
         pprBasis ? "__catalyst_decompose_RZ_ppr_basis" : "__catalyst_decompose_RZ";
+
+    // Check if it exists
     auto func = module.lookupSymbol<mlir::func::FuncOp>(funcName);
     if (func) {
         return func;
     }
 
     // Define function type: (qureg, i64, f64) -> (qureg, f64)
+    // inputs:
+    // qureg: input quantum register
+    // i64: qubit index
+    // f64: rotation angle
+    // returns:
+    // qureg: output quantum register
+    // f64: runtime phase
     auto qregType = catalyst::quantum::QuregType::get(rewriter.getContext());
     auto indexType = rewriter.getI64Type();
     auto f64Type = rewriter.getF64Type();
@@ -325,6 +255,7 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     func = rewriter.create<mlir::func::FuncOp>(module.getLoc(), funcName, funcType);
     func.setPrivate();
 
+    // Build function body
     auto *entryBlock = func.addEntryBlock();
     mlir::OpBuilder::InsertionGuard bodyGuard(rewriter);
     rewriter.setInsertionPointToStart(entryBlock);
@@ -333,34 +264,46 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     mlir::Value qregIn = entryBlock->getArgument(0);
     mlir::Value qbitIndex = entryBlock->getArgument(1);
     mlir::Value angle = entryBlock->getArgument(2);
+    auto i1Type = rewriter.getI1Type();
 
-    // Declare runtime functions
-    mlir::func::FuncOp getSizeFunc = getOrDeclareGetSizeFunc(module, rewriter);
-    mlir::func::FuncOp getGatesFunc = getOrDeclareGetGatesFunc(module, rewriter);
-    mlir::func::FuncOp getPhaseFunc = getOrDeclareGetPhaseFunc(module, rewriter);
+    // Ensure or declare Get Size
+    auto getSizeType =
+        rewriter.getFunctionType({f64Type, f64Type, i1Type}, {rewriter.getIndexType()});
+    auto getSizeFunc =
+        catalyst::ensurefuncOrDeclare(rewriter, func, "rs_decomposition_get_size", getSizeType);
 
+    // Ensure or declare Get Gates
+    auto rankedMemRefType =
+        mlir::MemRefType::get({mlir::ShapedType::kDynamic}, rewriter.getIndexType());
+    auto getGatesType = rewriter.getFunctionType({rankedMemRefType, f64Type, f64Type, i1Type}, {});
+    auto getGatesFunc =
+        catalyst::ensurefuncOrDeclare(rewriter, func, "rs_decomposition_get_gates", getGatesType);
+
+    // Ensure or declare Get Phase
+    auto getPhaseType = rewriter.getFunctionType({f64Type, f64Type, i1Type}, {f64Type});
+    auto getPhaseFunc =
+        catalyst::ensurefuncOrDeclare(rewriter, func, "rs_decomposition_get_phase", getPhaseType);
+
+    // Parameters for compilation
     mlir::Value epsilonVal =
         rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getF64FloatAttr(epsilon));
     mlir::Value pprBasisVal =
         rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getBoolAttr(pprBasis));
 
-    // Call runtime functions
-    // Get required memref size for returning result
+    // Call GetSize
     auto callGetSizeOp = rewriter.create<mlir::func::CallOp>(
         loc, getSizeFunc, mlir::ValueRange{angle, epsilonVal, pprBasisVal});
     mlir::Value num_gates = callGetSizeOp.getResult(0);
 
-    // Alloca memref
+    // Call GetGates
     auto gatesMemRefType =
         mlir::MemRefType::get({mlir::ShapedType::kDynamic}, rewriter.getIndexType());
     mlir::Value gatesMemref =
-        rewriter.create<mlir::memref::AllocaOp>(loc, gatesMemRefType, ValueRange{num_gates});
-
-    // Compute gate sequence into the allocated memref
+        rewriter.create<mlir::memref::AllocaOp>(loc, gatesMemRefType, num_gates);
     rewriter.create<mlir::func::CallOp>(
         loc, getGatesFunc, mlir::ValueRange{gatesMemref, angle, epsilonVal, pprBasisVal});
 
-    // Get phase
+    // Call GetPhase
     auto callGetPhaseOp = rewriter.create<mlir::func::CallOp>(
         loc, getPhaseFunc, mlir::ValueRange{angle, epsilonVal, pprBasisVal});
     mlir::Value runtimePhase = callGetPhaseOp.getResult(0);
@@ -368,37 +311,28 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     // Create the scf.for loop over gate sequence indices
     mlir::Value c0 = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
     mlir::Value c1 = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
-    mlir::Value memrefSize = num_gates;
-    auto forOp = rewriter.create<mlir::scf::ForOp>(loc, c0, memrefSize, c1, ValueRange{qregIn});
+    auto forOp = rewriter.create<mlir::scf::ForOp>(loc, c0, num_gates, c1, ValueRange{qregIn});
 
     mlir::OpBuilder::InsertionGuard loopGuard(rewriter);
     rewriter.setInsertionPointToStart(forOp.getBody());
     mlir::Value iv = forOp.getInductionVar();
     mlir::Value currentLoopReg = forOp.getRegionIterArg(0);
 
-    // Load the gate index inside the loop
     mlir::Value currentGateIndex =
         rewriter.create<mlir::memref::LoadOp>(loc, gatesMemref, ValueRange{iv});
 
-    // --- Define cases based on pprBasis ---
+    const int64_t numCases = pprBasis ? 19 : 10;
     SmallVector<int64_t> caseValues;
-    if (pprBasis) {
-        // I, X(2,4,8), adjX(2,4,8), Y(2,4,8), adjY(2,4,8), Z(2,4,8), adjZ(2,4,8)
-        caseValues.reserve(19);
-        for (int i = 0; i < 19; ++i)
-            caseValues.push_back(i);
+    caseValues.reserve(numCases);
+    for (int64_t i = 0; i < numCases; ++i) {
+        caseValues.push_back(i);
     }
-    else {
-        // Corresponds to { T = 0, HT, SHT, I, X, Y, Z, H, S, Sd }
-        caseValues = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}; // Standard Clifford+T cases
-    }
-
     // Create the switch operation inside the loop
     mlir::DenseI64ArrayAttr caseValuesAttr = rewriter.getDenseI64ArrayAttr(caseValues);
     auto switchOp = rewriter.create<mlir::scf::IndexSwitchOp>(
         loc, mlir::TypeRange{qregType}, currentGateIndex, caseValuesAttr, caseValues.size());
 
-    // --- Populate Switch Cases ---
+    // Populate Switch Cases
     if (pprBasis) {
         populatePPRBasisSwitchCases(rewriter, loc, switchOp, currentLoopReg, qbitIndex);
     }
@@ -410,7 +344,6 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     rewriter.setInsertionPointAfter(switchOp);
     rewriter.create<mlir::scf::YieldOp>(loc, switchOp.getResults());
 
-    // --- Back in function body, after the loop ---
     rewriter.setInsertionPointAfter(forOp);
     mlir::Value finalReg = forOp.getResult(0);
 
@@ -435,16 +368,13 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
 
     mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
     {
-        // Match RZ or PhaseShift
         StringRef gateName = op.getGateName();
         bool isRZ = gateName == "RZ";
         bool isPhaseShift = gateName == "PhaseShift";
         if (!isRZ && !isPhaseShift) {
-            return rewriter.notifyMatchFailure(op, "op is not 'RZ' or 'PhaseShift'");
+            return failure();
         }
-        LLVM_DEBUG(llvm::dbgs() << "Matching op: " << op << "\n");
 
-        // Find Qubit operand and trace it back to its ExtractOp
         mlir::Value qbitOperand;
         SmallVector<mlir::Value> paramOperands;
 
@@ -456,134 +386,72 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
                 paramOperands.push_back(operand);
             }
         }
-        // RZ or PhaseShift op has exactly one parameter
         if (paramOperands.size() != 1) {
-            return rewriter.notifyMatchFailure(op, "Op must have exactly one parameter");
+            return failure();
         }
         mlir::Value angle = paramOperands[0];
-        if (!mlir::isa<mlir::Float64Type>(angle.getType())) {
-            return rewriter.notifyMatchFailure(op, "Op parameter is not f64");
-        }
-
         if (!qbitOperand) {
-            return rewriter.notifyMatchFailure(op, "Op has no qubit operand");
-        }
-        if (op->getNumResults() != 1 ||
-            !mlir::isa<catalyst::quantum::QubitType>(op->getResult(0).getType())) {
-            return rewriter.notifyMatchFailure(op, "Op does not return a single qubit");
+            return failure();
         }
 
-        // find the source ExtractOp for current Qubit
         catalyst::quantum::ExtractOp extractOp = findSourceExtract(qbitOperand);
         if (!extractOp) {
-            LLVM_DEBUG(llvm::dbgs()
-                       << "Failed to find source ExtractOp for: " << qbitOperand << "\n");
-            return rewriter.notifyMatchFailure(op,
-                                               "Qubit operand does not trace back to an ExtractOp");
+            return failure();
         }
-        LLVM_DEBUG(llvm::dbgs() << "Found source ExtractOp: " << extractOp << "\n");
 
-        // Get the register, index, and types
         mlir::Value qregOperand = extractOp.getQreg();
-        if (!qregOperand) {
-            return rewriter.notifyMatchFailure(op, "Source ExtractOp has a null qreg");
-        }
-        LLVM_DEBUG(llvm::dbgs() << "Found source qreg: " << qregOperand << "\n");
+        mlir::Value qbitIndex;
 
-        mlir::Value qbitIndex; // This must be an i64 Value
-
-        // We set the insertion point at the ExtractOp to insert a new
-        // constant index if needed.
         mlir::OpBuilder::InsertionGuard guard(rewriter);
         rewriter.setInsertionPoint(extractOp);
 
         if (extractOp.getIdx()) {
-            // Case 1: Dynamic index (e.g., %idx)
             qbitIndex = extractOp.getIdx();
-            LLVM_DEBUG(llvm::dbgs() << "Found dynamic index: " << qbitIndex << "\n");
         }
         else if (extractOp.getIdxAttr()) {
-            // Case 2: Static index (e.g., [ 0])
-            // We need to create a constant op for this index.
-            int64_t staticIndex = *extractOp.getIdxAttr();
-            LLVM_DEBUG(llvm::dbgs() << "Found static index attr: " << staticIndex << "\n");
             qbitIndex = rewriter.create<mlir::arith::ConstantOp>(
-                extractOp.getLoc(), rewriter.getI64IntegerAttr(staticIndex));
-            LLVM_DEBUG(llvm::dbgs() << "Created new constant index op: " << qbitIndex << "\n");
+                extractOp.getLoc(), rewriter.getI64IntegerAttr(*extractOp.getIdxAttr()));
         }
         else {
-            return rewriter.notifyMatchFailure(
-                op, "Source ExtractOp has neither dynamic nor static index");
+            return failure();
         }
-
-        mlir::Type qregType = qregOperand.getType();
-        mlir::Type qbitType = qbitOperand.getType();
-
-        // Verify the qbitIndex is i64
-        mlir::Type indexType = qbitIndex.getType();
-        if (!indexType) {
-            // This check is almost certainly redundant, but good to have
-            return rewriter.notifyMatchFailure(op, "Source index has a null type");
-        }
-        if (!mlir::isa<mlir::IntegerType>(indexType) ||
-            mlir::cast<mlir::IntegerType>(indexType).getWidth() != 64) {
-            return rewriter.notifyMatchFailure(
-                op, "Traced ExtractOp index is not i64. This shouldn't happen.");
-        }
-        LLVM_DEBUG(llvm::dbgs() << "Index type is i64, proceeding.\n");
 
         mlir::ModuleOp module = op->getParentOfType<mlir::ModuleOp>();
-        if (!module) {
-            return rewriter.notifyMatchFailure(op, "op is not contained within a ModuleOp");
-        }
         mlir::Location loc = op.getLoc();
         rewriter.setInsertionPoint(op);
 
-        // Insert the input qubit back into the register
-        mlir::Value regWithQubit =
-            rewriter.create<InsertOp>(loc, qregType, qregOperand, qbitIndex, nullptr, qbitOperand);
+        mlir::Value regWithQubit = rewriter.create<InsertOp>(
+            loc, qregOperand.getType(), qregOperand, qbitIndex, nullptr, qbitOperand);
 
-        // Replace RZ/PhaseShift with decomposition subroutine
-        // Get or declare the decomposition function, passing the basis flag
         mlir::func::FuncOp decompFunc =
             getOrCreateDecompositionFunc(module, rewriter, epsilon, pprBasis);
 
-        // Call the decomposition function
         auto callDecompOp = rewriter.create<mlir::func::CallOp>(
             loc, decompFunc, mlir::ValueRange{regWithQubit, qbitIndex, angle});
         mlir::Value finalReg = callDecompOp.getResult(0);
         mlir::Value runtimePhase = callDecompOp.getResult(1);
 
-        // Extract the final qubit from the resulting register
         mlir::Value finalQbitResult =
-            rewriter.create<ExtractOp>(loc, qbitType, finalReg, qbitIndex, /*idx_attr=*/nullptr);
+            rewriter.create<ExtractOp>(loc, qbitOperand.getType(), finalReg, qbitIndex, nullptr);
 
-        // Add GlobalPhaseOp
         rewriter.setInsertionPointAfter(finalQbitResult.getDefiningOp());
 
         mlir::Value finalPhase;
         if (isPhaseShift) {
-            // For PhaseShift, add the original angle to the calculated phase
             finalPhase = rewriter.create<mlir::arith::AddFOp>(loc, runtimePhase, angle);
         }
         else {
-            // For RZ, just use the calculated phase
             finalPhase = runtimePhase;
         }
 
         mlir::NamedAttrList gphaseAttrs;
         gphaseAttrs.append(
             rewriter.getNamedAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 0})));
-        rewriter.create<GlobalPhaseOp>(loc, TypeRange{},        // No results
-                                       ValueRange{finalPhase},  // Operands
-                                       gphaseAttrs.getAttrs()); // Attributes
+        rewriter.create<GlobalPhaseOp>(loc, TypeRange{}, ValueRange{finalPhase},
+                                       gphaseAttrs.getAttrs());
 
-        // Clean up original op
         rewriter.replaceAllUsesWith(op->getResults(), finalQbitResult);
         rewriter.eraseOp(op);
-
-        LLVM_DEBUG(llvm::dbgs() << "Replaced " << gateName << " op with call to @"
-                                << decompFunc.getSymName() << "\n");
         return success();
     }
 
@@ -596,20 +464,14 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
         if (!qbit) {
             return nullptr;
         }
-
-        // Base case: Found the ExtractOp
-        if (auto extractOp = qbit.getDefiningOp<ExtractOp>()) {
-            LLVM_DEBUG(llvm::dbgs() << "Found source ExtractOp: " << extractOp << "\n");
+        if (auto extractOp = qbit.getDefiningOp<ExtractOp>())
             return extractOp;
-        }
 
-        // Get defining op
         auto definingOp = qbit.getDefiningOp();
         if (!definingOp) {
-            return nullptr; // Reached top (e.g., block argument)
+            return nullptr;
         }
 
-        // Recursive case: Look through CustomOp
         if (auto customOp = dyn_cast<CustomOp>(definingOp)) {
             auto opResult = mlir::dyn_cast<mlir::OpResult>(qbit);
             if (!opResult) {
@@ -619,14 +481,10 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
             std::vector<mlir::Value> qubitOperands = customOp.getQubitOperands();
             std::vector<mlir::OpResult> qubitResults = customOp.getQubitResults();
 
-            // For unitary ops, the N-th qubit input maps to the N-th qubit output.
             if (qubitOperands.size() != qubitResults.size()) {
-                LLVM_DEBUG(llvm::dbgs() << "Op has mismatched qubit operands/results size: "
-                                        << *definingOp << "\n");
-                return nullptr; // Not a simple unitary mapping
+                return nullptr;
             }
 
-            // Find the index of our qubit in the qubit results list.
             int64_t qubitResultIndex = -1;
             for (size_t i = 0; i < qubitResults.size(); ++i) {
                 if (qubitResults[i] == opResult) {
@@ -634,30 +492,17 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
                     break;
                 }
             }
-
             if (qubitResultIndex == -1) {
-                // The value we are tracing is not a qubit result of this CustomOp.
-                LLVM_DEBUG(llvm::dbgs() << "Stopping trace: Value is not a qubit result of op: "
-                                        << *definingOp << "\n");
                 return nullptr;
             }
 
-            // Use this index to get the corresponding qubit operand
             mlir::Value nextQubit = qubitOperands[qubitResultIndex];
-            // --- END: Corrected Logic ---
-
-            if (nextQubit) {
-                LLVM_DEBUG(llvm::dbgs() << "Looking through op: " << *definingOp
-                                        << " (Qubit Result " << qubitResultIndex
-                                        << " -> Qubit Operand " << qubitResultIndex << ")\n");
-                // Recurse
+            if (nextQubit)
                 return findSourceExtract(nextQubit);
-            }
         }
-
-        // Default case: Hit an op we don't look through
-        LLVM_DEBUG(llvm::dbgs() << "Stopping trace at op: " << *definingOp << "\n");
-        return nullptr;
+        {
+            return nullptr;
+        }
     }
 };
 
@@ -666,7 +511,6 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
 namespace catalyst {
 namespace quantum {
 
-// This is the public function defined in Quantum/Transforms/Patterns.h
 void populateGridsynthPatterns(RewritePatternSet &patterns, double epsilon, bool pprBasis)
 {
     patterns.add<DecomposeCustomOpPattern>(patterns.getContext(), epsilon, pprBasis);
