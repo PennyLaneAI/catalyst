@@ -56,7 +56,6 @@ class ConstructCircuitDAG:
     def _visit(self, op: Any) -> None:
         """Central dispatch method (Visitor Pattern). Routes the operation 'op'
         to the specialized handler registered for its type."""
-        pass
 
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module."""
