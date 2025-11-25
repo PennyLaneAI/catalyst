@@ -370,7 +370,8 @@ def PPRArbitraryRotationOp : QEC_Op<"ppr.arbitrary", [QECOpInterface, AttrSizedO
 
         Example:
         ```mlir
-        %result = qec.ppr.arbitrary ["X", "Z"](0.14) %q0, %q1 : !quantum.bit, !quantum.bit
+        %const = arith.constant 0.14 : f64
+        %result = qec.ppr.arbitrary ["X", "Z"](%const) %q0, %q1 : !quantum.bit, !quantum.bit
         ```
         This applies exp(i0.14 * X⊗Z) to the two qubits.
     }];
