@@ -19,46 +19,105 @@ import pytest
 
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
-from xdsl.dialects import test
-from xdsl.dialects.builtin import ModuleOp
-from xdsl.ir.core import Block, Region
-
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from xdsl.dialects import test
+from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir.core import Block, Region
 
 
-class TestInitialization:
-    """Tests that the state is correctly initialized."""
+class FakeDAGBuilder(DAGBuilder):
+    """
+    A concrete implementation of DAGBuilder used ONLY for testing.
+    It stores all graph manipulation calls in simple Python dictionaries
+    for easy assertion of the final graph state.
+    """
 
-    def test_dependency_injection(self):
-        """Tests that relevant dependencies are injected."""
+    def __init__(self):
+        self._nodes = {}
+        self._edges = []
+        self._clusters = {}
 
-        mock_dag_builder = Mock(DAGBuilder)
-        utility = ConstructCircuitDAG(mock_dag_builder)
-        assert utility.dag_builder is mock_dag_builder
+    def add_node(self, id, label, cluster_id=None, **attrs) -> None:
+        cluster_id = "__base__" if cluster_id is None else cluster_id
+        self._nodes[id] = {
+            "id": id,
+            "label": label,
+            "cluster_id": cluster_id,
+            "attrs": attrs,
+        }
+
+    def add_edge(self, from_id: str, to_id: str, **attrs) -> None:
+        self._edges.append(
+            {
+                "from": from_id,
+                "to": to_id,
+                "attrs": attrs,
+            }
+        )
+
+    def add_cluster(
+        self,
+        id,
+        node_label=None,
+        cluster_id=None,
+        **attrs,
+    ) -> None:
+        cluster_id = "__base__" if cluster_id is None else cluster_id
+        self._clusters[id] = {
+            "id": id,
+            "label": node_label,
+            "cluster_id": cluster_id,
+            "attrs": attrs,
+        }
+
+    def get_nodes(self):
+        return self._nodes.copy()
+
+    def get_edges(self):
+        return self._edges.copy()
+
+    def get_clusters(self):
+        return self._clusters.copy()
+
+    def to_file(self, output_filename):
+        pass
+
+    def to_string(self) -> str:
+        return "graph"
 
 
+@pytest.mark.unit
+def test_dependency_injection():
+    """Tests that relevant dependencies are injected."""
+
+    dag_builder = FakeDAGBuilder()
+    utility = ConstructCircuitDAG(dag_builder)
+    assert utility.dag_builder is dag_builder
+
+
+@pytest.mark.unit
 def test_does_not_mutate_module():
     """Test that the module is not mutated."""
 
-    # Create block containing some ops
+    # Create module
     op = test.TestOp()
     block = Block(ops=[op])
-    # Create region containing some blocks
     region = Region(blocks=[block])
-    # Create op containing the regions
     container_op = test.TestOp(regions=[region])
-    # Create module op to house it all
     module_op = ModuleOp(ops=[container_op])
 
+    # Save state before
     module_op_str_before = str(module_op)
 
+    # Process module
     mock_dag_builder = Mock(DAGBuilder)
     utility = ConstructCircuitDAG(mock_dag_builder)
     utility.construct(module_op)
 
+    # Ensure not mutated
     assert str(module_op) == module_op_str_before
