@@ -31,15 +31,6 @@ class ConstructCircuitDAG:
     def __init__(self, dag_builder: DAGBuilder) -> None:
         self.dag_builder: DAGBuilder = dag_builder
 
-    # =================================
-    # 1. CORE DISPATCH AND ENTRY POINT
-    # =================================
-
-    @singledispatchmethod
-    def _visit(self, op: Any) -> None:
-        """Central dispatch method (Visitor Pattern). Routes the operation 'op'
-        to the specialized handler registered for its type."""
-
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module.
 
@@ -53,6 +44,11 @@ class ConstructCircuitDAG:
     # =======================
     # 2. IR TRAVERSAL
     # =======================
+
+    @singledispatchmethod
+    def _visit(self, op: Any) -> None:
+        """Central dispatch method (Visitor Pattern). Routes the operation 'op'
+        to the specialized handler registered for its type."""
 
     @_visit.register
     def _operation(self, operation: Operation) -> None:
