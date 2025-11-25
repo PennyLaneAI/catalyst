@@ -14,17 +14,12 @@
 
 #pragma once
 
-#include "ellipse.hpp"
+#include "Ellipse.hpp"
 #include <algorithm>
 #include <cmath>
 #include <complex>
-#include <iostream>
-#include <map>
-#include <memory> // For std::shared_ptr
 #include <optional>
 #include <stdexcept>
-#include <string>
-#include <tuple>
 #include <utility>
 #include <vector>
 

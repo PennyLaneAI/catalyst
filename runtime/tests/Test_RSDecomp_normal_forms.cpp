@@ -18,7 +18,7 @@
 #include <cstdint>
 #include <cstdio>
 
-#include "normal_forms.hpp"
+#include "NormalForms.hpp"
 
 using namespace Catch::Matchers;
 using namespace RSDecomp::NormalForms;

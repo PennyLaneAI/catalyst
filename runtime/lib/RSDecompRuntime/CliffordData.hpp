@@ -15,7 +15,7 @@
 #pragma once
 #include <map>
 
-#include "rings.hpp"
+#include "Rings.hpp"
 
 namespace RSDecomp::CliffordData {
 using namespace RSDecomp::Rings;

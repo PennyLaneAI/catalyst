@@ -21,10 +21,9 @@
 #include <optional>
 #include <random>
 #include <tuple>
-#include <vector>
 
-#include "rings.hpp"
-#include "utils.hpp"
+#include "Rings.hpp"
+#include "Utils.hpp"
 
 namespace RSDecomp::NormSolver {
 using namespace RSDecomp::Utils;

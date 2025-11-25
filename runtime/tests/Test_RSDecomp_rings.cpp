@@ -17,7 +17,7 @@
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include <cstdio>
 
-#include "rings.cpp"
+#include "Rings.cpp"
 
 using namespace Catch::Matchers;
 using namespace RSDecomp::Rings;

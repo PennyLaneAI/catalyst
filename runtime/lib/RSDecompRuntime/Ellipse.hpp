@@ -14,17 +14,12 @@
 
 #pragma once
 
-#include "rings.hpp"
-#include "utils.hpp"
+#include "Rings.hpp"
+#include "Utils.hpp"
 #include <array>
 #include <cmath>
-#include <iostream>
-#include <map>
-#include <numeric>
-#include <sstream>
 #include <stdexcept>
 #include <string>
-#include <tuple>
 #include <utility>
 #include <vector>
 

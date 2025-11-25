@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "clifford-data.hpp"
-#include "rings.hpp"
-#include <complex>
+#include "CliffordData.hpp"
+#include "Rings.hpp"
 namespace RSDecomp::NormalForms {
 using namespace RSDecomp::Rings;
 using RSDecomp::CliffordData::GateType;

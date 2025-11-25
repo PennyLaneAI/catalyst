@@ -18,7 +18,7 @@
 #include <cstdint>
 #include <cstdio>
 
-#include "ellipse.hpp"
+#include "Ellipse.hpp"
 
 using namespace Catch::Matchers;
 using namespace RSDecomp::GridProblem;

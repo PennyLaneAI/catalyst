@@ -18,7 +18,7 @@
 #include <cstdint>
 #include <cstdio>
 
-#include "grid_problems.hpp"
+#include "GridProblems.hpp"
 
 using namespace Catch::Matchers;
 using namespace RSDecomp::GridProblem;

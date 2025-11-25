@@ -19,7 +19,7 @@
 #include <cstdint>
 #include <cstdio>
 
-#include "norm_solver.hpp"
+#include "NormSolver.hpp"
 
 using namespace Catch::Matchers;
 using namespace RSDecomp::NormSolver;

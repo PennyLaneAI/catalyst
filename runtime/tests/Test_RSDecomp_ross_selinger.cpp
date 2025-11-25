@@ -23,8 +23,8 @@
 #include <cstdio>
 #include <map>
 
-#include "clifford-data.hpp"
-#include "ross_selinger.hpp"
+#include "CliffordData.hpp"
+#include "RossSelinger.hpp"
 
 using namespace Catch::Matchers;
 using namespace RSDecomp::RossSelinger;

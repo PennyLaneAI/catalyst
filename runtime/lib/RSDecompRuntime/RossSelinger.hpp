@@ -14,10 +14,8 @@
 
 #pragma once
 
-#include "clifford-data.hpp"
+#include "CliffordData.hpp"
 #include <cstdint>
-#include <utility> // for std::pair
-#include <vector>
 
 namespace RSDecomp::RossSelinger {
 using namespace RSDecomp::Rings;

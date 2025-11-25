@@ -17,14 +17,13 @@
 #include <cstdint>
 #include <cstring>
 #include <iostream>
-#include <vector>
 
 #include "DataView.hpp"
-#include "grid_problems.hpp"
-#include "norm_solver.hpp"
-#include "normal_forms.hpp"
-#include "rings.hpp"
-#include "ross_selinger.hpp"
+#include "GridProblems.hpp"
+#include "NormSolver.hpp"
+#include "NormalForms.hpp"
+#include "Rings.hpp"
+#include "RossSelinger.hpp"
 
 #define MAX_FACTORING_TRIALS 1000
 
