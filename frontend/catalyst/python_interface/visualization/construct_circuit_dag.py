@@ -20,6 +20,7 @@ from typing import Any
 from xdsl.dialects import builtin
 from xdsl.ir import Block, Operation, Region
 
+from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 from catalyst.python_interface.visualization.xdsl_conversion import (
     xdsl_to_qml_measurement,
@@ -96,7 +97,10 @@ class ConstructCircuitDAG:
     @_visit.register
     def _unitary(
         self,
-        op: quantum.CustomOp | quantum.GlobalPhaseOp | quantum.QubitUnitaryOp | quantum.MultiRZOp,
+        op: quantum.CustomOp
+        | quantum.GlobalPhaseOp
+        | quantum.QubitUnitaryOp
+        | quantum.MultiRZOp,
     ) -> None:
         """Generic handler for unitary gates."""
 
