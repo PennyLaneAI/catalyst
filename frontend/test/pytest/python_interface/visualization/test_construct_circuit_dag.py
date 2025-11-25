@@ -33,7 +33,7 @@ from xdsl.ir.core import Block, Region
 class FakeDAGBuilder(DAGBuilder):
     """
     A concrete implementation of DAGBuilder used ONLY for testing.
-    It stores all graph manipulation calls in simple Python dictionaries
+    It stores all graph manipulation calls in data structures
     for easy assertion of the final graph state.
     """
 
