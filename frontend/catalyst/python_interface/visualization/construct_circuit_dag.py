@@ -17,7 +17,7 @@
 from functools import singledispatchmethod
 from typing import Any
 
-from xdsl.dialects import builtin, func
+from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region
 
 from catalyst.python_interface.dialects import quantum
@@ -82,8 +82,32 @@ class ConstructCircuitDAG:
             )
             self._cluster_stack.append(cluster_id)
 
-        for region in operation.regions:
-            self._visit(region)
+        if isinstance(operation, scf.IfOp):
+            # Loop through each branch and visualize as a cluster
+            for i, branch in enumerate(operation.regions):
+                cluster_id = f"cluster_ifop_branch{i}_{id(operation)}"
+                self.dag_builder.add_cluster(
+                    cluster_id,
+                    label=f"if ..." if i == 0 else "else",
+                    cluster_id=self._cluster_stack[-1],
+                )
+                self._cluster_stack.append(cluster_id)
+
+                # Go recursively into the branch to process internals
+                self._visit(branch)
+
+                # Pop branch cluster after processing to ensure
+                # logical branches are treated as 'parallel'
+                self._cluster_stack.pop()
+        else:
+            for region in operation.regions:
+                self._visit(region)
+
+        # Pop if the operation was a cluster creating operation
+        # This ensures proper nesting
+        ControlFlowOp = scf.ForOp | scf.WhileOp | scf.IfOp
+        if isinstance(operation, ControlFlowOp):
+            self._cluster_stack.pop()
 
     @_visit.register
     def _region(self, region: Region) -> None:
@@ -120,3 +144,40 @@ class ConstructCircuitDAG:
             # If we hit a func.return operation we know we are leaving
             # the FuncOp's scope and so we can pop the ID off the stack.
             self._cluster_stack.pop()
+
+    # =========================
+    # 3. CONTROL FLOW HANDLERS
+    # =========================
+
+    @_visit.register
+    def _for_op(self, op: scf.ForOp) -> None:
+        """Handle an xDSL ForOp operation."""
+        cluster_id = f"cluster_{id(op)}"
+        self.dag_builder.add_cluster(
+            cluster_id,
+            node_label="for ...",
+            cluster_id=self._cluster_stack[-1],
+        )
+        self._cluster_stack.append(cluster_id)
+
+    @_visit.register
+    def _while_op(self, op: scf.WhileOp) -> None:
+        """Handle an xDSL WhileOp operation."""
+        cluster_id = f"cluster_{id(op)}"
+        self.dag_builder.add_cluster(
+            cluster_id,
+            node_label="while ...",
+            cluster_id=self._cluster_stack[-1],
+        )
+        self._cluster_stack.append(cluster_id)
+
+    @_visit.register
+    def _if_op(self, op: scf.IfOp) -> None:
+        """Handle an xDSL IfOp operation."""
+        cluster_id = f"cluster_{id(op)}"
+        self.dag_builder.add_cluster(
+            cluster_id,
+            node_label="if",
+            cluster_id=self._cluster_stack[-1],
+        )
+        self._cluster_stack.append(cluster_id)

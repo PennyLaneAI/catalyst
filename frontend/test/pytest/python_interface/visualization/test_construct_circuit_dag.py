@@ -22,15 +22,14 @@ pytestmark = pytest.mark.usefixtures("requires_xdsl")
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
 import pennylane as qml
-from xdsl.dialects import test
-from xdsl.dialects.builtin import ModuleOp
-from xdsl.ir.core import Block, Region
-
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from xdsl.dialects import test
+from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir.core import Block, Region
 
 
 class FakeDAGBuilder(DAGBuilder):
@@ -193,3 +192,39 @@ class TestFuncOpVisualization:
         cluster_labels = {info["label"] for info in graph_clusters.values()}
         for expected_name in expected_cluster_labels:
             assert expected_name in cluster_labels
+
+
+class TestControlFlowClusterVisualization:
+    """Tests that the control flow operations are visualized correctly as clusters."""
+
+    @pytest.mark.unit
+    def test_for_loop(self):
+        """Test that the for loop is visualized correctly."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            for i in range(3):
+                qml.H(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.get_clusters()
+        cluster_labels = {info["label"] for info in clusters.values()}
+        assert "for" in cluster_labels
+
+    @pytest.mark.unit
+    def test_while_loop(self):
+        """Test that the while loop is visualized correctly."""
+        pass
+
+    @pytest.mark.unit
+    def test_conditional(self):
+        """Test that the conditional operation is visualized correctly."""
+        pass
