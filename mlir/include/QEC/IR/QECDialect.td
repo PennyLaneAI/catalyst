@@ -216,12 +216,15 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {
         1. A Pauli product (e.g., ["X", "I", "Z"]) specifying which Pauli operators to apply
         2. A rotation kind (in fractions of π) specifying the angle
         3. A list of input qubits to apply the rotation to
+        4. A condition (optional) for the operation to be applied only if the condition is true.
         
         The operation returns the same number of qubits as input.
         
         Example:
         ```mlir
-        %result = qec.ppr ["X", "I", "Z"](4) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+        %c0 = arith.constant true : i1
+        %Q_0:3 = qec.ppr ["X", "I", "Z"](4) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+        %Q_1:3 = qec.ppr ["X", "I", "Z"](4) %Q_0[0], %Q_0[1], %Q_0[2] cond(%c0) : !quantum.bit, !quantum.bit, !quantum.bit
         ```
         This applies exp(iπ/4 * X⊗I⊗Z) to the three qubits.
     }];
@@ -363,6 +366,7 @@ def PPRArbitraryRotationOp : QEC_Op<"ppr.arbitrary", [QECOpInterface, AttrSizedO
         1. A Pauli product (e.g., ["X", "I", "Z"]) specifying which Pauli operators to apply
         2. A rotation angle (specified by arbitrary_angle in radians)
         3. A list of input qubits to apply the rotation to
+        4. A condition (optional) for the operation to be applied only if the condition is true.
 
         Example:
         ```mlir
