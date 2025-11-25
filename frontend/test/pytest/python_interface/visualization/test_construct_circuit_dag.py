@@ -50,6 +50,7 @@ class FakeDAGBuilder(DAGBuilder):
         self._clusters = {}
 
     def add_node(self, id, label, cluster_id=None, **attrs) -> None:
+        cluster_id = "__base__" if cluster_id is None else cluster_id
         self._nodes[id] = {
             "id": id,
             "label": label,
@@ -73,6 +74,7 @@ class FakeDAGBuilder(DAGBuilder):
         cluster_id=None,
         **attrs,
     ) -> None:
+        cluster_id = "__base__" if cluster_id is None else cluster_id
         self._clusters[id] = {
             "id": id,
             "label": node_label,
@@ -95,6 +97,7 @@ class FakeDAGBuilder(DAGBuilder):
     def to_string(self) -> str:
         return "graph"
 
+
 @pytest.mark.unit
 def test_dependency_injection():
     """Tests that relevant dependencies are injected."""
@@ -102,6 +105,7 @@ def test_dependency_injection():
     mock_dag_builder = Mock(DAGBuilder)
     utility = ConstructCircuitDAG(mock_dag_builder)
     assert utility.dag_builder is mock_dag_builder
+
 
 @pytest.mark.unit
 def test_does_not_mutate_module():
