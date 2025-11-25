@@ -321,15 +321,12 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     mlir::Value currentGateIndex =
         rewriter.create<mlir::memref::LoadOp>(loc, gatesMemref, ValueRange{iv});
 
+    const int64_t numCases = pprBasis ? 19 : 10;
     SmallVector<int64_t> caseValues;
-    if (pprBasis) {
-        for (int i = 0; i < 19; ++i)
-            caseValues.push_back(i);
+    caseValues.reserve(numCases);
+    for (int64_t i = 0; i < numCases; ++i) {
+        caseValues.push_back(i);
     }
-    else {
-        caseValues = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-    }
-
     // Create the switch operation inside the loop
     mlir::DenseI64ArrayAttr caseValuesAttr = rewriter.getDenseI64ArrayAttr(caseValues);
     auto switchOp = rewriter.create<mlir::scf::IndexSwitchOp>(
