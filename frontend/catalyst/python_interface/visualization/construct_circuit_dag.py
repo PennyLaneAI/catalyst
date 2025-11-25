@@ -25,7 +25,8 @@ from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 
 class ConstructCircuitDAG:
     """A tool that traverses an xDSL module and constructs a Directed Acyclic Graph (DAG)
-    of it's quantum program using an injected DAGBuilder instance. This tool does not mutate the xDSL module."""
+    of it's quantum program using an injected DAGBuilder instance. This tool does not mutate the xDSL module.
+    """
 
     def __init__(self, dag_builder: DAGBuilder) -> None:
         """Initialize the utility by injecting the DAG builder dependency.
