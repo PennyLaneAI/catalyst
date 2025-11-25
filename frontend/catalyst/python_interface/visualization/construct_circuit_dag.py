@@ -17,10 +17,9 @@
 from functools import singledispatchmethod
 from typing import Any
 
-from xdsl.dialects import builtin, scf
+from xdsl.dialects import builtin
 from xdsl.ir import Block, Operation, Region
 
-from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 
 
