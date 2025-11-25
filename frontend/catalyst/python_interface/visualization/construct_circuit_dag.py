@@ -41,9 +41,9 @@ class ConstructCircuitDAG:
         for op in module.ops:
             self._visit(op)
 
-    # =======================
-    # 2. IR TRAVERSAL
-    # =======================
+    # =============
+    # IR TRAVERSAL
+    # =============
 
     @singledispatchmethod
     def _visit(self, op: Any) -> None:
