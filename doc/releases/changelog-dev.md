@@ -7,6 +7,9 @@
 
 <h3>Improvements 🛠</h3>
 
+* `qml.PCPhase` can be compiled and executed with capture enabled.
+  [(#2226)](https://github.com/PennyLaneAI/catalyst/pull/2226)
+
 * Resource tracking now supports dynamic qubit allocation
   [(#2203)](https://github.com/PennyLaneAI/catalyst/pull/2203)
 
@@ -54,7 +57,7 @@
   This will allow :class:`qml.PauliRot` with arbitrary angles to be lowered to QEC dialect.
   This is implemented as a new `qec.ppr.arbitrary` operation, which takes a Pauli product
   and an arbitrary angle (as a double) as input.
-  [(#?)](https://github.com/PennyLaneAI/catalyst/pull/?)
+  [(#2232)](https://github.com/PennyLaneAI/catalyst/pull/2232)
 
   For example:
   ```mlir
@@ -62,6 +65,9 @@
   %1:2 = qec.ppr.arbitrary ["X", "Z"](%const) %q1, %q2 : !quantum.bit, !quantum.bit
   %2:2 = qec.ppr.arbitrary ["X", "Z"](%const) %1#0, %1#1 cond(%c0) : !quantum.bit, !quantum.bit
   ```
+
+* The `--adjoint-lowering` pass can now handle PPR operations.
+  [(#2227)](https://github.com/PennyLaneAI/catalyst/pull/2227)
 
 <h3>Breaking changes 💔</h3>
 
