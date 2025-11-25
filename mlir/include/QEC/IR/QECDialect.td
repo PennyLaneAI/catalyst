@@ -347,9 +347,6 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {
         bool isClifford(){
             return hasPiOverTwoRotation() || hasPiOverFourRotation();  // π/2 and π/4 rotations are Clifford
         };
-        bool isArbitrary(){
-            return false;
-        };
     }];
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
@@ -533,9 +530,6 @@ def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, AttrSizedOperandSegments]> 
         };
         void setRotationKind(uint16_t attrValue){
             setRotationSign(static_cast<int16_t>(attrValue) < 0 ? -1 : 1);
-        };
-        bool isArbitrary(){
-            return false;
         };
     }];
     let extraClassDeclaration = extraBaseClassDeclaration;
