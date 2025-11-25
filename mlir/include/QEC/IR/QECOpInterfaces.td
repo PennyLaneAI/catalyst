@@ -54,11 +54,6 @@ def QECOpInterface : OpInterface<"QECOpInterface"> {
             /*methodName=*/"getRotationKind"
         >,
         InterfaceMethod<
-            /*desc=*/"Get whether this operation is an arbitrary rotation.",
-            /*retTy=*/"bool",
-            /*methodName=*/"isArbitrary"
-        >,
-        InterfaceMethod<
             /*desc=*/"Set the Pauli product for this operation.",
             /*retTy=*/"void",
             /*methodName=*/"setPauliProductAttr", (ins " ::mlir::ArrayAttr":$attr)
