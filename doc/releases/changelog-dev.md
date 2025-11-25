@@ -50,6 +50,19 @@
 * Dynamically allocated wires can now be passed into control flow and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
 
+* Catalyst now supports arbitrary angle Pauli product rotations in the QEC dialect. 
+  This will allow :class:`qml.PauliRot` with arbitrary angles to be lowered to QEC dialect.
+  This is implemented as a new `qec.ppr.arbitrary` operation, which takes a Pauli product
+  and an arbitrary angle (as a double) as input.
+  [(#?)](https://github.com/PennyLaneAI/catalyst/pull/?)
+
+  For example:
+  ```mlir
+  %0 = qec.ppr.arbitrary ["X"](0.124) %q1 : !quantum.bit
+  %1:2 = qec.ppr.arbitrary ["X", "Z"](0.14) %0, %q2 : !quantum.bit, !quantum.bit
+  %2:2 = qec.ppr.arbitrary ["X", "Z"](0.14) %1#0, %1#1 cond(%c0) : !quantum.bit, !quantum.bit
+  ```
+
 <h3>Breaking changes 💔</h3>
 
 * The plxpr transform `pl_map_wires` has been removed along with its test.
