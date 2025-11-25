@@ -29,11 +29,6 @@ class ConstructCircuitDAG:
     """
 
     def __init__(self, dag_builder: DAGBuilder) -> None:
-        """Initialize the utility by injecting the DAG builder dependency.
-
-        Args:
-            dag_builder (DAGBuilder): The concrete builder instance used for graph construction.
-        """
         self.dag_builder: DAGBuilder = dag_builder
 
     # =================================
