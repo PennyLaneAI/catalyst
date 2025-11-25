@@ -54,7 +54,7 @@ class FakeDAGBuilder(DAGBuilder):
         self._nodes[id] = {
             "id": id,
             "label": label,
-            "parent_id": cluster_id,
+            "cluster_id": cluster_id,
             "attrs": attrs,
         }
 
@@ -78,7 +78,7 @@ class FakeDAGBuilder(DAGBuilder):
         self._clusters[id] = {
             "id": id,
             "label": node_label,
-            "parent_id": cluster_id,
+            "cluster_id": cluster_id,
             "attrs": attrs,
         }
 
