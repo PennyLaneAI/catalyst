@@ -149,7 +149,9 @@ class TestFuncOpVisualization:
         clusters = utility.dag_builder.get_clusters()
         # 1 = "jit_my_workflow"
         # 2 = "my_workflow"
-        assert len(clusters) == 2
+        # 3 = "setup"
+        # 4 = "teardown"
+        assert len(clusters) == 4
 
     def test_nested_qnodes(self):
         """Tests that nested QJIT'd QNodes are visualized correctly"""
@@ -179,4 +181,6 @@ class TestFuncOpVisualization:
         # 1 = "jit_my_workflow"
         # 2 = "my_qnode1"
         # 3 = "my_qnode2"
+        # 4 = "setup"
+        # 5 = "teardown"
         assert len(clusters) == 3
