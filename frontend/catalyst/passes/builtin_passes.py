@@ -536,6 +536,65 @@ def ions_decomposition(qnode):  # pragma: nocover
 
 
 def gridsynth(qnode, *, epsilon=1e-4, ppr_basis=False):
+    """
+    Specify that the ``--gridsynth`` MLIR compiler pass to discretize
+    single-qubit RZ and PhaseShift gates into sequences of
+    Clifford+T gates using the Ross-Selinger Gridsynth algorithm.
+    
+    This Catalyst pass has an alias as a PennyLane transform, and can 
+    be called using `@qml.transforms.gridsynth`.
+
+
+    .. note::
+
+        The actual discretization is only performed during execution time.
+
+    Args:
+        fn (QNode): the QNode to apply the gridsynth compiler pass to
+        epsilon (float): the maximum error tolerance for the per-gate discretization
+        ppr_basis (bool): whether to decompose directly to Pauli Product Rotations (PPRs) in QEC dialect
+
+    Returns:
+        :class:`QNode <pennylane.QNode>`
+
+    **Example**
+
+    In this example the RZ gate will be converted into a new function, which
+    calls the discretization at execution time.
+
+    .. code-block:: python
+
+        from catalyst.passes import gridsynth
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit(keep_intermediate=True)
+        @gridsynth
+        @qml.qnode(dev)
+        def circuit(x: float):
+            qml.RZ(x, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+    .. code-block:: mlir
+
+        module @circuit {
+            . . .
+            func.func private @rs_decomposition_get_phase_0(f64, f64, i1) -> f64
+            func.func private @rs_decomposition_get_gates_0(memref<?xindex>, f64, f64, i1)
+            func.func private @rs_decomposition_get_size_0(f64, f64, i1) -> index
+            func.func private @__catalyst_decompose_RZ_0(%arg0: !quantum.reg, %arg1: i64, %arg2: f64) -> (!quantum.reg, f64) {
+                . . .
+            }
+            
+              func.func public @circuit_0(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode} {
+                . . .
+                %3:2 = call @__catalyst_decompose_RZ_0(%2, %c0_i64, %extracted) : (!quantum.reg, i64, f64) -> (!quantum.reg, f64)
+                . . .
+            }
+        }
+                
+            
+    """
     if qnode is None:
         return functools.partial(gridsynth, epsilon=epsilon, ppr_basis=ppr_basis)
 
