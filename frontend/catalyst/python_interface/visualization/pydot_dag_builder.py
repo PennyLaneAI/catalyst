@@ -200,7 +200,7 @@ class PyDotDAGBuilder(DAGBuilder):
             "id": id,
             "cluster_label": cluster_attrs.get("label"),
             "node_label": node_label,
-            "parent_id": cluster_id,
+            "cluster_id": cluster_id,
             "attrs": dict(cluster_attrs),
         }
 
