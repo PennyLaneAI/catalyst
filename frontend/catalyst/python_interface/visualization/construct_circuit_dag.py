@@ -105,7 +105,9 @@ class ConstructCircuitDAG:
             node_id,
             label=op.device_name.data,
             cluster_id=self._cluster_stack[-1],
-            fillcolor="white",
+            fillcolor="grey",
+            color="black",
+            penwidth=2,
             shape="rectangle",
         )
 
