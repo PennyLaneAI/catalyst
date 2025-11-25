@@ -30,11 +30,6 @@ class ConstructCircuitDAG:
     """
 
     def __init__(self, dag_builder: DAGBuilder) -> None:
-        """Initialize the utility by injecting the DAG builder dependency.
-
-        Args:
-            dag_builder (DAGBuilder): The concrete builder instance used for graph construction.
-        """
         self.dag_builder: DAGBuilder = dag_builder
 
         # Keep track of nesting clusters using a stack
@@ -44,15 +39,6 @@ class ConstructCircuitDAG:
     def _reset(self) -> None:
         """Resets the instance."""
         self._cluster_stack: list[str | None] = [None]
-
-    # =================================
-    # 1. CORE DISPATCH AND ENTRY POINT
-    # =================================
-
-    @singledispatchmethod
-    def _visit(self, op: Any) -> None:
-        """Central dispatch method (Visitor Pattern). Routes the operation 'op'
-        to the specialized handler registered for its type."""
 
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module.
@@ -64,9 +50,14 @@ class ConstructCircuitDAG:
         for op in module.ops:
             self._visit(op)
 
-    # =======================
-    # 2. IR TRAVERSAL
-    # =======================
+    # =============
+    # IR TRAVERSAL
+    # =============
+
+    @singledispatchmethod
+    def _visit(self, op: Any) -> None:
+        """Central dispatch method (Visitor Pattern). Routes the operation 'op'
+        to the specialized handler registered for its type."""
 
     @_visit.register
     def _operation(self, operation: Operation) -> None:
