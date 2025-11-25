@@ -183,4 +183,4 @@ class TestFuncOpVisualization:
         # 3 = "my_qnode2"
         # 4 = "setup"
         # 5 = "teardown"
-        assert len(clusters) == 3
+        assert len(clusters) == 5
