@@ -429,9 +429,9 @@ def PPRArbitraryRotationOp : QEC_Op<"ppr.arbitrary", [QECOpInterface, AttrSizedO
             // Convert rotation kind to angle: rotation_kind N means angle = π/N.
             if (attrValue == 0) {
                 // Invalid rotation kind, set to 0 angle as fallback.
-                // setArbitraryAngle(::llvm::APFloat(0.0));
+                setArbitraryAngle(::llvm::APFloat(0.0));
             } else {
-                // setArbitraryAngle(::llvm::APFloat(M_PI / static_cast<double>(attrValue)));
+                setArbitraryAngle(::llvm::APFloat(M_PI / static_cast<double>(attrValue)));
             }
         };
         bool isArbitrary(){
