@@ -52,13 +52,16 @@ def test_concrete_implementation_works():
         ) -> None:
             return
 
-        def get_nodes(self) -> dict[str, dict[str, Any]]:
+        @property
+        def nodes(self) -> dict[str, dict[str, Any]]:
             return {}
 
-        def get_edges(self) -> list[dict[str, Any]]:
+        @property
+        def edges(self) -> list[dict[str, Any]]:
             return []
 
-        def get_clusters(self) -> dict[str, dict[str, Any]]:
+        @property
+        def clusters(self) -> dict[str, dict[str, Any]]:
             return {}
 
         def to_file(self, output_filename: str) -> None:
@@ -72,9 +75,9 @@ def test_concrete_implementation_works():
     node = dag_builder.add_node("0", "node0")
     edge = dag_builder.add_edge("0", "1")
     cluster = dag_builder.add_cluster("0")
-    nodes = dag_builder.get_nodes()
-    edges = dag_builder.get_edges()
-    clusters = dag_builder.get_clusters()
+    nodes = dag_builder.nodes
+    edges = dag_builder.edges
+    clusters = dag_builder.clusters
     render = dag_builder.to_file("test.png")
     string = dag_builder.to_string()
 

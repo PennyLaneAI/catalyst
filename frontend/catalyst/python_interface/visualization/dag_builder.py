@@ -13,7 +13,7 @@
 # limitations under the License.
 """File that defines the DAGBuilder abstract base class."""
 
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
 from typing import Any, TypeAlias
 
 ClusterID: TypeAlias = str
@@ -84,8 +84,9 @@ class DAGBuilder(ABC):
         """
         raise NotImplementedError
 
+    @property
     @abstractmethod
-    def get_nodes(self) -> dict[NodeID, dict[str, Any]]:
+    def nodes(self) -> dict[NodeID, dict[str, Any]]:
         """Retrieve the current set of nodes in the graph.
 
         Returns:
@@ -93,8 +94,9 @@ class DAGBuilder(ABC):
         """
         raise NotImplementedError
 
+    @property
     @abstractmethod
-    def get_edges(self) -> list[dict[str, Any]]:
+    def edges(self) -> list[dict[str, Any]]:
         """Retrieve the current set of edges in the graph.
 
         Returns:
@@ -102,8 +104,9 @@ class DAGBuilder(ABC):
         """
         raise NotImplementedError
 
+    @property
     @abstractmethod
-    def get_clusters(self) -> dict[ClusterID, dict[str, Any]]:
+    def clusters(self) -> dict[ClusterID, dict[str, Any]]:
         """Retrieve the current set of clusters in the graph.
 
         Returns:
