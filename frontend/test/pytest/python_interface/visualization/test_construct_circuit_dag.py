@@ -76,14 +76,17 @@ class FakeDAGBuilder(DAGBuilder):
             "attrs": attrs,
         }
 
-    def get_nodes(self):
-        return self._nodes.copy()
+    @property
+    def nodes(self):
+        return self._nodes
 
-    def get_edges(self):
-        return self._edges.copy()
+    @property
+    def edges(self):
+        return self._edges
 
-    def get_clusters(self):
-        return self._clusters.copy()
+    @property
+    def clusters(self):
+        return self._clusters
 
     def to_file(self, output_filename):
         pass
