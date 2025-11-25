@@ -96,10 +96,7 @@ class ConstructCircuitDAG:
     @_visit.register
     def _unitary(
         self,
-        op: quantum.CustomOp
-        | quantum.GlobalPhaseOp
-        | quantum.QubitUnitaryOp
-        | quantum.MultiRZOp,
+        op: quantum.CustomOp | quantum.GlobalPhaseOp | quantum.QubitUnitaryOp | quantum.MultiRZOp,
     ) -> None:
         """Generic handler for unitary gates."""
 
