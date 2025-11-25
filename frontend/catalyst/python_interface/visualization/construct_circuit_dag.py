@@ -98,7 +98,7 @@ class ConstructCircuitDAG:
         | quantum.QubitUnitaryOp
         | quantum.MultiRZOp,
     ) -> None:
-        """Generic handler for unitary gates and quantum state preparation operations."""
+        """Generic handler for unitary gates."""
 
         qml_op = xdsl_to_qml_op(op)
         # Build node on graph
