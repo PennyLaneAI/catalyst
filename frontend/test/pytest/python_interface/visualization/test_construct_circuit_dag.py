@@ -19,13 +19,13 @@ import pytest
 
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
+# pylint: disable=wrong-import-position
+# This import needs to be after pytest in order to prevent ImportErrors
+import pennylane as qml
 from xdsl.dialects import test
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir.core import Block, Region
 
-# pylint: disable=wrong-import-position
-# This import needs to be after pytest in order to prevent ImportErrors
-import pennylane as qml
 from catalyst import measure
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
