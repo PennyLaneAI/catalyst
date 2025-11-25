@@ -88,6 +88,10 @@ class ConstructCircuitDAG:
         for op in block.ops:
             self._visit(op)
 
+    # ============
+    # DEVICE NODE
+    # ============
+
     @_visit.register
     def _device_init(self, op: quantum.DeviceInitOp) -> None:
         """Handles the initialization of a quantum device."""
@@ -101,6 +105,10 @@ class ConstructCircuitDAG:
             penwidth=2,
             shape="rectangle",
         )
+
+    # =======================
+    # FuncOp NESTING UTILITY
+    # =======================
 
     @_visit.register
     def _func_return(self, op: func.ReturnOp) -> None:
