@@ -52,11 +52,15 @@ using namespace mlir;
 namespace catalyst {
 namespace driver {
 
-void createUserTransformPipeline(OpPassManager &pm)
+void createQuantumCompilationPipeline(OpPassManager &pm)
 {
     pm.addPass(catalyst::quantum::createSplitMultipleTapesPass());
     pm.addNestedPass<ModuleOp>(catalyst::createApplyTransformSequencePass());
     pm.addPass(catalyst::createInlineNestedModulePass());
+    pm.addPass(catalyst::quantum::createAnnotateFunctionPass());
+    pm.addPass(catalyst::mitigation::createMitigationLoweringPass());
+    pm.addPass(catalyst::quantum::createAdjointLoweringPass());
+    pm.addPass(catalyst::createDisableAssertionPass());
 }
 void createHloLoweringPipeline(OpPassManager &pm)
 {
@@ -83,13 +87,9 @@ void createHloLoweringPipeline(OpPassManager &pm)
     pm.addPass(catalyst::createDetensorizeSCFPass());
     pm.addPass(mlir::createCanonicalizerPass());
 }
-void createQuantumCompilationPipeline(OpPassManager &pm)
+void createGradientLoweringPipeline(OpPassManager &pm)
 {
-    pm.addPass(catalyst::quantum::createAnnotateFunctionPass());
-    pm.addPass(catalyst::mitigation::createMitigationLoweringPass());
     pm.addPass(catalyst::gradient::createGradientLoweringPass());
-    pm.addPass(catalyst::quantum::createAdjointLoweringPass());
-    pm.addPass(catalyst::createDisableAssertionPass());
 }
 void createBufferizationPipeline(OpPassManager &pm)
 {
@@ -151,30 +151,30 @@ void createLLVMDialectLoweringPipeline(OpPassManager &pm)
 
 void createDefaultCatalystPipeline(OpPassManager &pm)
 {
-    createUserTransformPipeline(pm);
-    createHloLoweringPipeline(pm);
     createQuantumCompilationPipeline(pm);
+    createHloLoweringPipeline(pm);
+    createGradientLoweringPipeline(pm);
     createBufferizationPipeline(pm);
     createLLVMDialectLoweringPipeline(pm);
 }
 
-void registerUserTransformPipeline()
+void registerQuantumCompilationPipeline()
 {
     PassPipelineRegistration<>(
-        "user-transform-pipeline",
-        "Register user transform pipeline (tape splitting, user transforms, module inlining).",
-        createUserTransformPipeline);
+        "quantum-compilation-pipeline",
+        "Register quantum compilation pipeline as a pass.",
+        createQuantumCompilationPipeline);
 }
 void registerHloLoweringPipeline()
 {
     PassPipelineRegistration<>("hlo-lowering-pipeline", "Register HLO lowering pipeline as a pass.",
                                createHloLoweringPipeline);
 }
-void registerQuantumCompilationPipeline()
+void registerGradientLoweringPipeline()
 {
-    PassPipelineRegistration<>("quantum-compilation-pipeline",
-                               "Register quantum compilation pipeline as a pass.",
-                               createQuantumCompilationPipeline);
+    PassPipelineRegistration<>("gradient-lowering-pipeline",
+                               "Register gradient lowering pipeline as a pass.",
+                               createGradientLoweringPipeline);
 }
 void registerBufferizationPipeline()
 {
@@ -198,9 +198,9 @@ void registerDefaultCatalystPipeline()
 
 void registerAllCatalystPipelines()
 {
-    registerUserTransformPipeline();
-    registerHloLoweringPipeline();
     registerQuantumCompilationPipeline();
+    registerHloLoweringPipeline();
+    registerGradientLoweringPipeline();
     registerBufferizationPipeline();
     registerLLVMDialectLoweringPipeline();
     registerDefaultCatalystPipeline();
@@ -210,7 +210,7 @@ std::vector<Pipeline> getDefaultPipeline()
 {
     using PipelineFunc = void (*)(mlir::OpPassManager &);
     std::vector<PipelineFunc> pipelineFuncs = {
-        &createUserTransformPipeline, &createHloLoweringPipeline, &createQuantumCompilationPipeline,
+        &createQuantumCompilationPipeline, &createHloLoweringPipeline, &createGradientLoweringPipeline,
         &createBufferizationPipeline, &createLLVMDialectLoweringPipeline};
 
     llvm::SmallVector<std::string> defaultPipelineNames = {
