@@ -42,7 +42,7 @@ class ConstructCircuitDAG:
         self.dag_builder: DAGBuilder = dag_builder
 
         # Keep track of nesting clusters using a stack
-        # NOTE: `None` corresponds to the base graph 'cluster'
+        # NOTE: `None` corresponds to the base graph
         self._cluster_stack: list[str | None] = [None]
 
     def _reset(self) -> None:
@@ -175,6 +175,7 @@ class ConstructCircuitDAG:
     def _func_op(self, operation: func.FuncOp) -> None:
         """Visit a FuncOp Operation."""
 
+        # Visualize the FuncOp as a cluster with a label
         cluster_id = f"cluster_{id(operation)}"
         self.dag_builder.add_cluster(
             cluster_id,
@@ -191,6 +192,7 @@ class ConstructCircuitDAG:
         """Handle func.return to exit FuncOp's cluster scope."""
 
         # NOTE: Skip first two because the first is the base graph, second is the jit_* workflow FuncOp
+        # and we want to use the jit_* workflow as the outer most bounding box.
         if len(self._cluster_stack) > 2:
             # If we hit a func.return operation we know we are leaving
             # the FuncOp's scope and so we can pop the ID off the stack.
