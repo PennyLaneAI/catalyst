@@ -24,8 +24,18 @@ from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 
 
 class ConstructCircuitDAG:
-    """A tool that traverses an xDSL module and constructs a Directed Acyclic Graph (DAG)
+    """Utility tool following the director pattern to build a DAG representation of a compiled quantum program.
+
+    This tool traverses an xDSL module and constructs a Directed Acyclic Graph (DAG)
     of it's quantum program using an injected DAGBuilder instance. This tool does not mutate the xDSL module.
+
+    **Example**
+
+    >>> builder = PyDotDAGBuilder()
+    >>> director = ConstructCircuitDAG(builder)
+    >>> director.construct(module)
+    >>> director.dag_builder.to_string()
+    ...
     """
 
     def __init__(self, dag_builder: DAGBuilder) -> None:
@@ -46,6 +56,7 @@ class ConstructCircuitDAG:
             module (xdsl.builtin.ModuleOp): The module containing the quantum program to visualize.
 
         """
+        self._reset()
         for op in module.ops:
             self._visit_operation(op)
 
@@ -167,7 +178,7 @@ class ConstructCircuitDAG:
         cluster_id = f"cluster_{id(operation)}"
         self.dag_builder.add_cluster(
             cluster_id,
-            node_label=operation.sym_name.data,
+            label=operation.sym_name.data,
             cluster_id=self._cluster_stack[-1],
         )
         self._cluster_stack.append(cluster_id)

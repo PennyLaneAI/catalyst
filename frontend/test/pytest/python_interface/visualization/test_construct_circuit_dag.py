@@ -16,6 +16,8 @@
 from unittest.mock import Mock
 
 import pytest
+from _typeshed import GenericPath
+from jax import util
 
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
@@ -46,7 +48,6 @@ class FakeDAGBuilder(DAGBuilder):
         self._clusters = {}
 
     def add_node(self, id, label, cluster_id=None, **attrs) -> None:
-        cluster_id = "__base__" if cluster_id is None else cluster_id
         self._nodes[id] = {
             "id": id,
             "label": label,
@@ -57,8 +58,8 @@ class FakeDAGBuilder(DAGBuilder):
     def add_edge(self, from_id: str, to_id: str, **attrs) -> None:
         self._edges.append(
             {
-                "from": from_id,
-                "to": to_id,
+                "from_id": from_id,
+                "to_id": to_id,
                 "attrs": attrs,
             }
         )
@@ -70,10 +71,10 @@ class FakeDAGBuilder(DAGBuilder):
         cluster_id=None,
         **attrs,
     ) -> None:
-        cluster_id = "__base__" if cluster_id is None else cluster_id
         self._clusters[id] = {
             "id": id,
-            "label": node_label,
+            "cluster_label": attrs.get("label"),
+            "node_label": node_label,
             "cluster_id": cluster_id,
             "attrs": attrs,
         }
@@ -149,16 +150,34 @@ class TestFuncOpVisualization:
         utility.construct(module)
 
         graph_clusters = utility.dag_builder.clusters
+
+        # Check labels we expected are there
         expected_cluster_labels = [
             "jit_my_workflow",
             "my_workflow",
             "setup",
             "teardown",
         ]
-        assert len(graph_clusters) == len(expected_cluster_labels)
-        cluster_labels = {info["label"] for info in graph_clusters.values()}
-        for expected_name in expected_cluster_labels:
-            assert expected_name in cluster_labels
+        generated_cluster_labels = {info["cluster_label"] for info in graph_clusters.values()}
+        for cluster_label in expected_cluster_labels:
+            assert cluster_label in generated_cluster_labels
+
+        # Check nesting is correct
+        # graph
+        # └── jit_my_workflow
+        #     └── my_workflow
+
+        # Get the parent labels for each cluster and ensure they are what we expect.
+        parent_labels = (
+            graph_clusters[child_cluster["cluster_id"]]["label"]
+            for child_cluster in graph_clusters.values()
+            if child_cluster.get("cluster_id") is not None
+        )
+        cluster_label_to_parent_label: dict[str, str] = dict(
+            zip(tuple(generated_cluster_labels), parent_labels)
+        )
+        assert cluster_label_to_parent_label["jit_my_workflow"] is None
+        assert cluster_label_to_parent_label["my_qnode1"] == "jit_my_workflow"
 
     def test_nested_qnodes(self):
         """Tests that nested QJIT'd QNodes are visualized correctly"""
@@ -185,6 +204,8 @@ class TestFuncOpVisualization:
         utility.construct(module)
 
         graph_clusters = utility.dag_builder.clusters
+
+        # Check labels we expected are there as clusters
         expected_cluster_labels = [
             "jit_my_workflow",
             "my_qnode1",
@@ -196,7 +217,25 @@ class TestFuncOpVisualization:
         cluster_labels = {info["label"] for info in graph_clusters.values()}
         for expected_name in expected_cluster_labels:
             assert expected_name in cluster_labels
+            
+        # Check nesting is correct
+        # graph
+        # └── jit_my_workflow
+        #     ├── my_qnode1
+        #     └── my_qnode2
 
+        # Get the parent labels for each cluster and ensure they are what we expect.
+        parent_labels = (
+            graph_clusters[child_cluster["cluster_id"]]["label"]
+            for child_cluster in graph_clusters.values()
+            if child_cluster.get("cluster_id") is not None
+        )
+        cluster_label_to_parent_label: dict[str, str] = dict(
+            zip(tuple(cluster_labels), parent_labels)
+        )
+        assert cluster_label_to_parent_label["jit_my_workflow"] is None
+        assert cluster_label_to_parent_label["my_qnode1"] == "jit_my_workflow"
+        assert cluster_label_to_parent_label["my_qnode2"] == "jit_my_workflow"
 
 class TestControlFlowClusterVisualization:
     """Tests that the control flow operations are visualized correctly as clusters."""
@@ -299,3 +338,39 @@ class TestControlFlowClusterVisualization:
         assert cluster_labels.count("if ...") == 2
         assert "else" in cluster_labels
         assert cluster_labels.count("else") == 2
+
+
+class TestDeviceNode:
+    """Tests that the device node is correctly visualized."""
+
+    def test_standard_qnode(self):
+        """Tests that a standard setup works."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            qml.H(0)
+        
+        module = my_workflow()
+        
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+        
+        graph_nodes = utility.dag_builder.nodes
+
+        # Basic check for node
+        node_labels = {info["label"] for info in graph_nodes.values()}
+        assert "NullQubit" in node_labels
+
+        # Ensure nesting is correct
+        graph_clusters = utility.dag_builder.clusters
+        parent_labels = (
+            graph_clusters[child_cluster["cluster_id"]]["label"]
+            for child_cluster in graph_clusters.values()
+            if child_cluster.get("cluster_id") is not None
+        )
+        cluster_label_to_parent_label: dict[str, str] = dict(zip(tuple(node_labels), parent_labels))
+        assert cluster_label_to_parent_label["NullQubit"] == "my_workflow"
