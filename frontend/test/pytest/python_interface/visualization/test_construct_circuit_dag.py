@@ -44,7 +44,6 @@ class FakeDAGBuilder(DAGBuilder):
         self._clusters = {}
 
     def add_node(self, id, label, cluster_id=None, **attrs) -> None:
-        cluster_id = "__base__" if cluster_id is None else cluster_id
         self._nodes[id] = {
             "id": id,
             "label": label,
@@ -55,8 +54,8 @@ class FakeDAGBuilder(DAGBuilder):
     def add_edge(self, from_id: str, to_id: str, **attrs) -> None:
         self._edges.append(
             {
-                "from": from_id,
-                "to": to_id,
+                "from_id": from_id,
+                "to_id": to_id,
                 "attrs": attrs,
             }
         )
@@ -68,10 +67,10 @@ class FakeDAGBuilder(DAGBuilder):
         cluster_id=None,
         **attrs,
     ) -> None:
-        cluster_id = "__base__" if cluster_id is None else cluster_id
         self._clusters[id] = {
             "id": id,
-            "label": node_label,
+            "node_label": node_label,
+            "cluster_label": attrs.get("label"),
             "cluster_id": cluster_id,
             "attrs": attrs,
         }
