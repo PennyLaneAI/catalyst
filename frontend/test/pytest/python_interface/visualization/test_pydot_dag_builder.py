@@ -17,7 +17,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-
 pydot = pytest.importorskip("pydot")
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
 # pylint: disable=wrong-import-position
