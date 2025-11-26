@@ -42,7 +42,7 @@ class ConstructCircuitDAG:
         self.dag_builder: DAGBuilder = dag_builder
 
         # Keep track of nesting clusters using a stack
-        # NOTE: `None` corresponds to the base graph 'cluster'
+        # NOTE: `None` corresponds to the base graph
         self._cluster_stack: list[str | None] = [None]
 
     def _reset(self) -> None:
