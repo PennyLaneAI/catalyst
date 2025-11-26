@@ -122,7 +122,7 @@ class PyDotDAGBuilder(DAGBuilder):
         if cluster_id is None:
             self.graph.add_node(node)
         else:
-            parent_cluster = self._subgraph_cache[cluster_id].add_node(node)
+            self._subgraph_cache[cluster_id].add_node(node)
 
         self._nodes[id] = {
             "id": id,
@@ -199,12 +199,12 @@ class PyDotDAGBuilder(DAGBuilder):
 
         # Record new cluster
         self._subgraph_cache[id] = cluster
-        
+
         # Add node to cluster
         if cluster_id is None:
             self.graph.add_subgraph(cluster)
         else:
-            parent_cluster = self._subgraph_cache[cluster_id].add_subgraph(cluster)
+            self._subgraph_cache[cluster_id].add_subgraph(cluster)
 
         self._clusters[id] = {
             "id": id,
