@@ -57,8 +57,6 @@ struct MergePPR : public OpRewritePattern<PPRotationOp> {
             return failure();
         }
 
-        // TODO this will need to update when we allow arbitrary angles
-        // for now, the angles must match (otherwise they can't merge or cancel)
         int16_t opRotation = static_cast<int16_t>(op.getRotationKind());
         int16_t prevOpRotation = static_cast<int16_t>(prevOp.getRotationKind());
 
@@ -72,7 +70,6 @@ struct MergePPR : public OpRewritePattern<PPRotationOp> {
             return success();
         }
 
-        // TODO this will have to change when we allow arbitrary angles
         if (opRotation != prevOpRotation) {
             return failure();
         }
