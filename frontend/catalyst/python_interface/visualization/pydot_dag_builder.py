@@ -118,8 +118,10 @@ class PyDotDAGBuilder(DAGBuilder):
             self.graph.add_node(node)
         else:
             # Use cluster ID to look up the subgraph
-            parent_clusters = self.graph.get_subgraph("cluster_"+cluster_id)
-            assert len(parent_clusters) == 1
+            parent_clusters = self.graph.get_subgraph("cluster_" + cluster_id)
+            assert len(parent_clusters) == 1, (
+                f"Found {len(parent_clusters)} parent clusters with id {'cluster_' + cluster_id}"
+            )
             parent_clusters[0].add_node(node)
 
         self._nodes[id] = {
@@ -169,7 +171,7 @@ class PyDotDAGBuilder(DAGBuilder):
         """
         # Use ChainMap so you don't need to construct a new dictionary
         cluster_attrs: ChainMap = ChainMap(attrs, self._default_cluster_attrs)
-        cluster = Cluster(graph_name=id, **cluster_attrs)
+        cluster = Cluster(id, **cluster_attrs)
 
         # Puts the label in a node within the cluster.
         # Ensures that any edges connecting nodes through the cluster
@@ -200,8 +202,10 @@ class PyDotDAGBuilder(DAGBuilder):
             self.graph.add_subgraph(cluster)
         else:
             # Use cluster ID to look up the subgraph
-            parent_clusters = self.graph.get_subgraph("cluster_"+cluster_id)
-            assert len(parent_clusters) == 1
+            parent_clusters = self.graph.get_subgraph("cluster_" + cluster_id)
+            assert len(parent_clusters) == 1, (
+                f"Found {len(parent_clusters)} parent clusters with id {'cluster_' + cluster_id}"
+            )
             parent_clusters[0].add_subgraph(cluster)
 
         self._clusters[id] = {
