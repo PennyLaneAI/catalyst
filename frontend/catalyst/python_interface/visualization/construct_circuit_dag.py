@@ -74,9 +74,9 @@ class ConstructCircuitDAG:
     # =============
 
     @_visit_operation.register
-    def _for_op(self, op: scf.ForOp) -> None:
+    def _for_op(self, operation: scf.ForOp) -> None:
         """Handle an xDSL ForOp operation."""
-        cluster_id = f"cluster_{id(op)}"
+        cluster_id = f"cluster_{id(operation)}"
         self.dag_builder.add_cluster(
             cluster_id,
             node_label="for ...",
@@ -90,9 +90,9 @@ class ConstructCircuitDAG:
         self._cluster_stack.pop()
 
     @_visit_operation.register
-    def _while_op(self, op: scf.WhileOp) -> None:
+    def _while_op(self, operation: scf.WhileOp) -> None:
         """Handle an xDSL WhileOp operation."""
-        cluster_id = f"cluster_{id(op)}"
+        cluster_id = f"cluster_{id(operation)}"
         self.dag_builder.add_cluster(
             cluster_id,
             node_label="while ...",
@@ -108,7 +108,7 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _if_op(self, operation: scf.IfOp):
         """Handles the scf.IfOp operation."""
-        cluster_id = f"cluster_{id(op)}"
+        cluster_id = f"cluster_{id(operation)}"
         self.dag_builder.add_cluster(
             cluster_id,
             node_label="if",
