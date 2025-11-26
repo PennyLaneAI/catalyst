@@ -109,6 +109,7 @@ class ConstructCircuitDAG:
     def _func_op(self, operation: func.FuncOp) -> None:
         """Visit a FuncOp Operation."""
 
+        # Visualize the FuncOp as a cluster with a label
         cluster_id = f"cluster_{id(operation)}"
         self.dag_builder.add_cluster(
             cluster_id,
