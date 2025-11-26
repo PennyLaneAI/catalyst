@@ -10,13 +10,7 @@
   :func:`~.pauli_measure`, respectively. This support enables research and development 
   spurred from `A Game of Surface Codes (arXiv1808.02892) <https://arxiv.org/pdf/1808.02892>`_.
   [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
-<<<<<<< Updated upstream
-=======
-<<<<<<< HEAD
   [(#2233)](https://github.com/PennyLaneAI/catalyst/pull/2233)
-=======
->>>>>>> edf77a2c328ace4abfa5e2d7048dbcc5ed11024a
->>>>>>> Stashed changes
 
   :class:`~.PauliRot` and :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes
   for PPR-PPM compilation, which includes :func:`catalyst.passes.to_ppr`, 
