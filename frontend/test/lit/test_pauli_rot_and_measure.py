@@ -53,8 +53,6 @@ def test_single_qubit_pauli_rotations():
 test_single_qubit_pauli_rotations()
 
 
-<<<<<<< Updated upstream
-=======
 def test_arbitrary_angle_pauli_rotations():
     """Test arbitrary angle PauliRot"""
     qml.capture.enable()
@@ -97,7 +95,6 @@ def test_dynamic_angle_pauli_rotations():
 test_dynamic_angle_pauli_rotations()
 
 
->>>>>>> Stashed changes
 def test_multi_qubit_pauli_rotations():
     """Test multi-qubit PauliRot"""
     qml.capture.enable()
