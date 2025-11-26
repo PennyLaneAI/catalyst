@@ -284,8 +284,8 @@ class TestProperties:
         assert edges[0]["to_id"] == "1"
         assert edges[0]["attrs"]["penwidth"] == 10
 
-    def test_get_clusters(self):
-        """Tests that get_clusters works."""
+    def test_clusters(self):
+        """Tests that clusters property works."""
 
         dag_builder = PyDotDAGBuilder()
         dag_builder.add_cluster("0", "my_info_node", label="my_cluster", penwidth=10)
