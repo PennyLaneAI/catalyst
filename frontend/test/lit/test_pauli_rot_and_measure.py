@@ -53,6 +53,51 @@ def test_single_qubit_pauli_rotations():
 test_single_qubit_pauli_rotations()
 
 
+<<<<<<< Updated upstream
+=======
+def test_arbitrary_angle_pauli_rotations():
+    """Test arbitrary angle PauliRot"""
+    qml.capture.enable()
+    dev = qml.device("null.qubit", wires=1)
+
+    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipeline, target="mlir")
+    @qml.qnode(device=dev)
+    def circuit():
+        qml.PauliRot(0.42, "X", wires=0)
+
+    # CHECK: [[cst:%.+]] = arith.constant 4.200000e-01 : f64
+    # CHECK: [[q0:%.+]] = qec.ppr.arbitrary ["X"]([[cst]])
+    print(circuit.mlir_opt)
+    qml.capture.disable()
+
+
+test_arbitrary_angle_pauli_rotations()
+
+
+def test_dynamic_angle_pauli_rotations():
+    """Test dynamic angle PauliRot"""
+    qml.capture.enable()
+    dev = qml.device("null.qubit", wires=1)
+
+    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qjit(pipelines=pipeline, target="mlir")
+    @qml.qnode(device=dev)
+    def circuit(x: float):
+        qml.PauliRot(x, "X", wires=0)
+
+    # CHECK: [[extracted:%.+]] = tensor.extract
+    # CHECK: [[q0:%.+]] = qec.ppr.arbitrary ["X"]([[extracted]])
+    print(circuit.mlir_opt)
+    qml.capture.disable()
+
+
+test_dynamic_angle_pauli_rotations()
+
+
+>>>>>>> Stashed changes
 def test_multi_qubit_pauli_rotations():
     """Test multi-qubit PauliRot"""
     qml.capture.enable()

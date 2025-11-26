@@ -15,6 +15,7 @@
 #include "llvm/ADT/TypeSwitch.h" // needed for enums
 #include "llvm/Support/LogicalResult.h"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
@@ -94,6 +95,20 @@ LogicalResult PPRotationOp::verify()
     return mlir::success();
 }
 
+LogicalResult PPRotationArbitraryOp::verify()
+{
+    size_t numPauliProduct = getPauliProduct().size();
+
+    if (numPauliProduct == 0) {
+        return emitOpError("Pauli string must be non-empty");
+    }
+
+    if (numPauliProduct != getInQubits().size()) {
+        return emitOpError("Number of qubits must match number of pauli operators");
+    }
+    return mlir::success();
+}
+
 LogicalResult PPMeasurementOp::verify()
 {
     if (getInQubits().size() != getPauliProduct().size()) {
@@ -132,6 +147,23 @@ LogicalResult FabricateOp::verify()
 }
 
 LogicalResult PPRotationOp::canonicalize(PPRotationOp op, PatternRewriter &rewriter)
+{
+    auto pauliProduct = op.getPauliProduct();
+
+    bool allIdentity = llvm::all_of(pauliProduct, [](mlir::Attribute attr) {
+        auto pauliStr = llvm::cast<mlir::StringAttr>(attr);
+        return pauliStr.getValue() == "I";
+    });
+
+    if (allIdentity) {
+        rewriter.replaceOp(op, op.getInQubits());
+        return mlir::success();
+    }
+    return mlir::failure();
+}
+
+LogicalResult PPRotationArbitraryOp::canonicalize(PPRotationArbitraryOp op,
+                                                  PatternRewriter &rewriter)
 {
     auto pauliProduct = op.getPauliProduct();
 

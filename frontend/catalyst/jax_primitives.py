@@ -90,7 +90,7 @@ with Patcher(
     )
     from mlir_quantum.dialects.mbqc import MeasureInBasisOp
     from mlir_quantum.dialects.mitigation import ZneOp
-    from mlir_quantum.dialects.qec import PPMeasurementOp, PPRotationOp
+    from mlir_quantum.dialects.qec import PPMeasurementOp, PPRotationArbitraryOp, PPRotationOp
     from mlir_quantum.dialects.quantum import (
         AdjointOp,
         AllocOp,
@@ -297,6 +297,8 @@ unitary_p = Primitive("unitary")
 unitary_p.multiple_results = True
 pauli_rot_p = Primitive("pauli_rot")
 pauli_rot_p.multiple_results = True
+pauli_rot_arbitrary_p = Primitive("pauli_rot_arbitrary")
+pauli_rot_arbitrary_p.multiple_results = True
 pauli_measure_p = Primitive("pauli_measure")
 pauli_measure_p.multiple_results = True
 measure_p = Primitive("measure")
@@ -1486,6 +1488,61 @@ def _pauli_rot_lowering(
         out_qubits=[q.type for q in qubits],
         pauli_product=pauli_word,
         rotation_kind=rotation_kind,
+        in_qubits=qubits,
+    ).results
+
+
+#
+# pauli rot arbitrary operation
+#
+@pauli_rot_arbitrary_p.def_abstract_eval
+def _pauli_rot_arbitrary_abstract_eval(
+    *qubits_or_params, pauli_word=None, qubits_len=0, params_len=0, adjoint=False
+):
+    qubits = qubits_or_params[:qubits_len]
+    assert all(isinstance(qubit, AbstractQbit) for qubit in qubits)
+    return (AbstractQbit(),) * (qubits_len)
+
+
+@pauli_rot_arbitrary_p.def_impl
+def _pauli_rot_arbitrary_def_impl(*args, **kwargs):  # pragma: no cover
+    raise NotImplementedError()
+
+
+# pylint: disable=unused-argument
+def _pauli_rot_arbitrary_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    *qubits_or_params: tuple,
+    pauli_word=None,
+    qubits_len=0,
+    params_len=0,
+    adjoint=False,
+):
+    # Adjoint is currently not supported for PauliRot
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    qubits = qubits_or_params[:qubits_len]
+    params = qubits_or_params[qubits_len : qubits_len + params_len]
+
+    for q in qubits:
+        assert ir.OpaqueType.isinstance(q.type)
+        assert ir.OpaqueType(q.type).dialect_namespace == "quantum"
+        assert ir.OpaqueType(q.type).data == "bit"
+
+    assert len(params) == 1  # PauliRot takes one parameter
+    theta = params[0]
+    theta = safe_cast_to_f64(theta, "PauliRot")
+    theta = extract_scalar(theta, "PauliRot")
+    assert ir.F64Type.isinstance(theta.type)
+    assert pauli_word is not None
+
+    pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
+
+    return PPRotationArbitraryOp(
+        out_qubits=[q.type for q in qubits],
+        pauli_product=pauli_word,
+        arbitrary_angle=theta,
         in_qubits=qubits,
     ).results
 
@@ -2800,6 +2857,7 @@ CUSTOM_LOWERING_RULES = (
     (gphase_p, _gphase_lowering),
     (unitary_p, _unitary_lowering),
     (pauli_rot_p, _pauli_rot_lowering),
+    (pauli_rot_arbitrary_p, _pauli_rot_arbitrary_lowering),
     (pauli_measure_p, _pauli_measure_lowering),
     (measure_p, _measure_lowering),
     (compbasis_p, _compbasis_lowering),

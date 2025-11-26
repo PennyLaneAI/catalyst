@@ -10,6 +10,13 @@
   :func:`~.pauli_measure`, respectively. This support enables research and development 
   spurred from `A Game of Surface Codes (arXiv1808.02892) <https://arxiv.org/pdf/1808.02892>`_.
   [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
+<<<<<<< Updated upstream
+=======
+<<<<<<< HEAD
+  [(#2233)](https://github.com/PennyLaneAI/catalyst/pull/2233)
+=======
+>>>>>>> edf77a2c328ace4abfa5e2d7048dbcc5ed11024a
+>>>>>>> Stashed changes
 
   :class:`~.PauliRot` and :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes
   for PPR-PPM compilation, which includes :func:`catalyst.passes.to_ppr`, 
@@ -117,6 +124,21 @@
 
 * The `--adjoint-lowering` pass can now handle PPR operations.
   [(#2227)](https://github.com/PennyLaneAI/catalyst/pull/2227)
+
+* Catalyst now supports Pauli product rotations with arbitrary or dynamic angles in the 
+  QEC dialect. This will allow :class:`qml.PauliRot` with arbitrary or dynamic angles, 
+  angles not known at compile time, to be lowered to the QEC dialect. This is implemented 
+  as a new `qec.ppr.arbitrary` operation, which takes a Pauli product and an arbitrary or
+  dynamic angle as input. The arbitrary angles are specified as a double in terms of radian.
+  [(#2232)](https://github.com/PennyLaneAI/catalyst/pull/2232)
+  [(#2233)](https://github.com/PennyLaneAI/catalyst/pull/2233)
+
+  For example:
+  ```mlir
+  %const = arith.constant 0.124 : f64
+  %1:2 = qec.ppr.arbitrary ["X", "Z"](%const) %q1, %q2 : !quantum.bit, !quantum.bit
+  %2:2 = qec.ppr.arbitrary ["X", "Z"](%const) %1#0, %1#1 cond(%c0) : !quantum.bit, !quantum.bit
+  ```
 
 <h3>Breaking changes 💔</h3>
 
