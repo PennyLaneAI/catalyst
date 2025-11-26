@@ -65,9 +65,6 @@ class PyDotDAGBuilder(DAGBuilder):
         self._edges: list[dict[str, Any]] = []
         self._clusters: dict[str, dict[str, Any]] = {}
 
-        # Keep track of nesting clusters using an internal stack
-        self.cluster_id_stack: list[str] = []
-
         _default_attrs: dict = (
             {"fontname": "Helvetica", "penwidth": 2} if attrs is None else attrs
         )
@@ -100,20 +97,6 @@ class PyDotDAGBuilder(DAGBuilder):
             if cluster_attrs is None
             else cluster_attrs
         )
-
-    def reset(self) -> None:
-        """Resets the instance."""
-        self.graph: Dot = Dot(
-            graph_type="digraph", rankdir="TB", compound="true", strict=True
-        )
-
-        self._subgraph_cache: dict[str, Graph] = {}
-
-        self._nodes: dict[str, dict[str, Any]] = {}
-        self._edges: list[dict[str, Any]] = []
-        self._clusters: dict[str, dict[str, Any]] = {}
-
-        self.cluster_id_stack: list[str] = []
 
     def add_node(
         self,
@@ -217,18 +200,11 @@ class PyDotDAGBuilder(DAGBuilder):
         # Record new cluster
         self._subgraph_cache[id] = cluster
 
+        # Add node to cluster
         if cluster_id is None:
-            if self.cluster_id_stack:
-                # Nest on top of top most cluster 
-                self._subgraph_cache[self.cluster_id_stack[-1]].add_subgraph(cluster)
-            else:
-                # If stack is empty, place on base graph
-                self.graph.add_subgraph(cluster)
+            self.graph.add_subgraph(cluster)
         else:
             self._subgraph_cache[cluster_id].add_subgraph(cluster)
-
-        # Add cluster to stack
-        self.cluster_id_stack.append(id)
 
         self._clusters[id] = {
             "id": id,
