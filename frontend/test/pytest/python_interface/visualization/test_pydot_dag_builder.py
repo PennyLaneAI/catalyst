@@ -119,13 +119,13 @@ class TestAddMethods:
 
         # Level 0 (Root): Adds cluster on top of base graph
         dag_builder.add_node("n_root", "node_root")
+
+        # Level 1 (c0): Add node on outer cluster 
         dag_builder.add_cluster("c0")
-
-        # Level 1 (Inside c0): Add node on outer cluster and create new cluster on top
         dag_builder.add_node("n_outer", "node_outer", cluster_id="c0")
-        dag_builder.add_cluster("c1", cluster_id="c0")
 
-        # Level 2 (Inside c1): Add node on second cluster
+        # Level 2 (c1): Add node on inner cluster
+        dag_builder.add_cluster("c1", cluster_id="c0")
         dag_builder.add_node("n_inner", "node_inner", cluster_id="c1")
 
         root_graph = dag_builder.graph
