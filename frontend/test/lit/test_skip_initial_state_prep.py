@@ -102,7 +102,7 @@ print(state_prep_trotter.mlir)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def basis_state_trotter():
     """
-    Test state prep used with Trotter Product.
+    Test basis state used with Trotter Product.
     https://github.com/PennyLaneAI/catalyst/issues/2235
     """
     H = qml.Hamiltonian([1, 1], [qml.PauliZ(0), qml.PauliZ(1)])
