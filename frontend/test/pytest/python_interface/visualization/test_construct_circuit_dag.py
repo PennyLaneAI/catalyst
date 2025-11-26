@@ -24,15 +24,14 @@ pytestmark = pytest.mark.usefixtures("requires_xdsl")
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
 import pennylane as qml
-from xdsl.dialects import test
-from xdsl.dialects.builtin import ModuleOp
-from xdsl.ir.core import Block, Region
-
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from xdsl.dialects import test
+from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir.core import Block, Region
 
 
 class FakeDAGBuilder(DAGBuilder):
@@ -158,7 +157,9 @@ class TestFuncOpVisualization:
             "setup",
             "teardown",
         ]
-        generated_cluster_labels = {info["cluster_label"] for info in graph_clusters.values()}
+        generated_cluster_labels = {
+            info["cluster_label"] for info in graph_clusters.values()
+        }
         for cluster_label in expected_cluster_labels:
             assert cluster_label in generated_cluster_labels
 
@@ -270,5 +271,82 @@ class TestDeviceNode:
             for child_cluster in graph_clusters.values()
             if child_cluster.get("cluster_id") is not None
         )
-        cluster_label_to_parent_label: dict[str, str] = dict(zip(tuple(node_labels), parent_labels))
+        cluster_label_to_parent_label: dict[str, str] = dict(
+            zip(tuple(node_labels), parent_labels)
+        )
         assert cluster_label_to_parent_label["NullQubit"] == "my_workflow"
+
+    def test_nested_qnodes(self):
+        """Tests that nested QJIT'd QNodes are visualized correctly"""
+
+        dev1 = qml.device("null.qubit", wires=1)
+        dev2 = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev2)
+        def my_qnode2():
+            qml.X(0)
+
+        @qml.qnode(dev1)
+        def my_qnode1():
+            qml.H(0)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        def my_workflow():
+            my_qnode1()
+            my_qnode2()
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        graph_clusters = utility.dag_builder.clusters
+        graph_nodes = utility.dag_builder.nodes
+
+        # Check labels we expected are there as clusters
+        expected_cluster_labels = [
+            "jit_my_workflow",
+            "my_qnode1",
+            "my_qnode2",
+            "setup",
+            "teardown",
+        ]
+        assert len(graph_clusters) == len(expected_cluster_labels)
+        cluster_labels = {info["label"] for info in graph_clusters.values()}
+        for expected_name in expected_cluster_labels:
+            assert expected_name in cluster_labels
+
+        # Check nesting is correct
+        # graph
+        # └── jit_my_workflow
+        #     ├── my_qnode1
+        #     │   └── node: NullQubit
+        #     └── my_qnode2
+        #         └── node: LightningQubit
+
+        # Get the parent labels for each cluster and ensure they are what we expect.
+        parent_labels = (
+            graph_clusters[child_cluster["cluster_id"]]["label"]
+            for child_cluster in graph_clusters.values()
+            if child_cluster.get("cluster_id") is not None
+        )
+        cluster_label_to_parent_label: dict[str, str] = dict(
+            zip(tuple(cluster_labels), parent_labels)
+        )
+        assert cluster_label_to_parent_label["jit_my_workflow"] is None
+        assert cluster_label_to_parent_label["my_qnode1"] == "jit_my_workflow"
+        assert cluster_label_to_parent_label["my_qnode2"] == "jit_my_workflow"
+
+        # Check nodes are in the correct clusters
+        parent_labels = (
+            graph_clusters[child_node["cluster_id"]]["label"]
+            for child_node in graph_nodes.values()
+            if child_node.get("cluster_id") is not None
+        )
+        node_labels = {info["label"] for info in graph_nodes.values()}
+        node_label_to_parent_label: dict[str, str] = dict(
+            zip(tuple(node_labels), parent_labels)
+        )
+        assert node_label_to_parent_label["NullQubit"] == "my_qnode1"
+        assert node_label_to_parent_label["LightningSimulator"] == "my_qnode2"
