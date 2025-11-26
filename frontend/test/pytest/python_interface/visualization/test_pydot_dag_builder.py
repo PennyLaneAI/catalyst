@@ -40,6 +40,53 @@ def test_initialization_defaults():
     assert dag_builder.graph.obj_dict["strict"] is True
 
 
+class TestExceptions:
+    """Tests the various exceptions defined in the class."""
+
+    def test_duplicate_node_ids(self):
+        """Tests that a ValueError is raised for duplicate nodes."""
+
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_node("0", "node0")
+        with pytest.raises(ValueError, match="Node ID 0 already present in graph."):
+            dag_builder.add_node("0", "node1")
+
+    def test_edge_duplicate_source_destination(self):
+        """Tests that a ValueError is raised when an edge is created with the
+        same source and destination"""
+
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_node("0", "node0")
+        with pytest.raises(ValueError, match="Edges must connect two unique IDs."):
+            dag_builder.add_edge("0", "0")
+
+    def test_edge_missing_ids(self):
+        """Tests that an error is raised if IDs are missing."""
+
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_node("0", "node0")
+        with pytest.raises(ValueError, match="Destination is not found in the graph."):
+            dag_builder.add_edge("0", "1")
+
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_node("1", "node1")
+        with pytest.raises(ValueError, match="Source is not found in the graph."):
+            dag_builder.add_edge("0", "1")
+
+    def test_duplicate_cluster_id(self):
+        """Tests that an exception is raised if an ID is already present."""
+
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_cluster("0")
+        with pytest.raises(ValueError, match="Cluster ID 0 already present in graph."):
+            dag_builder.add_cluster("0")
+
+
 class TestAddMethods:
     """Test that elements can be added to the graph."""
 
@@ -90,7 +137,7 @@ class TestAddMethods:
         dag_builder.add_cluster("c0")
 
         # Create node inside cluster
-        dag_builder.add_node("1", "node1", parent_graph_id="c0")
+        dag_builder.add_node("1", "node1", cluster_id="c0")
 
         # Verify graph structure
         root_graph = dag_builder.graph
@@ -117,14 +164,14 @@ class TestAddMethods:
 
         # Level 0 (Root): Adds cluster on top of base graph
         dag_builder.add_node("n_root", "node_root")
+
+        # Level 1 (c0): Add node on outer cluster
         dag_builder.add_cluster("c0")
+        dag_builder.add_node("n_outer", "node_outer", cluster_id="c0")
 
-        # Level 1 (Inside c0): Add node on outer cluster and create new cluster on top
-        dag_builder.add_node("n_outer", "node_outer", parent_graph_id="c0")
-        dag_builder.add_cluster("c1", parent_graph_id="c0")
-
-        # Level 2 (Inside c1): Add node on second cluster
-        dag_builder.add_node("n_inner", "node_inner", parent_graph_id="c1")
+        # Level 2 (c1): Add node on inner cluster
+        dag_builder.add_cluster("c1", cluster_id="c0")
+        dag_builder.add_node("n_inner", "node_inner", cluster_id="c1")
 
         root_graph = dag_builder.graph
 
@@ -175,9 +222,7 @@ class TestAttributes:
     @pytest.mark.unit
     def test_add_node_with_attrs(self):
         """Tests that default attributes are applied and can be overridden."""
-        dag_builder = PyDotDAGBuilder(
-            node_attrs={"fillcolor": "lightblue", "penwidth": 3}
-        )
+        dag_builder = PyDotDAGBuilder(attrs={"fillcolor": "lightblue", "penwidth": 3})
 
         # Defaults
         dag_builder.add_node("0", "node0")
@@ -194,7 +239,7 @@ class TestAttributes:
     @pytest.mark.unit
     def test_add_edge_with_attrs(self):
         """Tests that default attributes are applied and can be overridden."""
-        dag_builder = PyDotDAGBuilder(edge_attrs={"color": "lightblue4", "penwidth": 3})
+        dag_builder = PyDotDAGBuilder(attrs={"color": "lightblue4", "penwidth": 3})
 
         dag_builder.add_node("0", "node0")
         dag_builder.add_node("1", "node1")
@@ -214,7 +259,7 @@ class TestAttributes:
     def test_add_cluster_with_attrs(self):
         """Tests that default cluster attributes are applied and can be overridden."""
         dag_builder = PyDotDAGBuilder(
-            cluster_attrs={
+            attrs={
                 "style": "solid",
                 "fillcolor": None,
                 "penwidth": 2,
@@ -231,9 +276,7 @@ class TestAttributes:
         assert cluster1.get("penwidth") == 2
         assert cluster1.get("fontname") == "Helvetica"
 
-        dag_builder.add_cluster(
-            "1", style="filled", penwidth=10, fillcolor="red"
-        )
+        dag_builder.add_cluster("1", style="filled", penwidth=10, fillcolor="red")
         cluster2 = dag_builder.graph.get_subgraph("cluster_1")[0]
 
         # Make sure we can override
@@ -243,6 +286,75 @@ class TestAttributes:
 
         # Check that other defaults are still present
         assert cluster2.get("fontname") == "Helvetica"
+
+
+class TestProperties:
+    """Tests the properties."""
+
+    def test_nodes(self):
+        """Tests that nodes works."""
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_node("0", "node0", fillcolor="red")
+        dag_builder.add_cluster("c0")
+        dag_builder.add_node("1", "node1", cluster_id="c0")
+
+        nodes = dag_builder.nodes
+
+        assert len(nodes) == 2
+        assert len(nodes["0"]) == 4
+
+        assert nodes["0"]["id"] == "0"
+        assert nodes["0"]["label"] == "node0"
+        assert nodes["0"]["cluster_id"] == None
+        assert nodes["0"]["attrs"]["fillcolor"] == "red"
+
+        assert nodes["1"]["id"] == "1"
+        assert nodes["1"]["label"] == "node1"
+        assert nodes["1"]["cluster_id"] == "c0"
+
+    def test_edges(self):
+        """Tests that edges works."""
+
+        dag_builder = PyDotDAGBuilder()
+        dag_builder.add_node("0", "node0")
+        dag_builder.add_node("1", "node1")
+        dag_builder.add_edge("0", "1", penwidth=10)
+
+        edges = dag_builder.edges
+
+        assert len(edges) == 1
+
+        assert edges[0]["from_id"] == "0"
+        assert edges[0]["to_id"] == "1"
+        assert edges[0]["attrs"]["penwidth"] == 10
+
+    def test_clusters(self):
+        """Tests that clusters property works."""
+
+        dag_builder = PyDotDAGBuilder()
+        dag_builder.add_cluster("0", "my_info_node", label="my_cluster", penwidth=10)
+
+        clusters = dag_builder.clusters
+
+        dag_builder.add_cluster(
+            "1", "my_other_info_node", cluster_id="0", label="my_nested_cluster"
+        )
+        clusters = dag_builder.clusters
+        assert len(clusters) == 2
+
+        assert len(clusters["0"]) == 5
+        assert clusters["0"]["id"] == "0"
+        assert clusters["0"]["cluster_label"] == "my_cluster"
+        assert clusters["0"]["node_label"] == "my_info_node"
+        assert clusters["0"]["cluster_id"] == None
+        assert clusters["0"]["attrs"]["penwidth"] == 10
+
+        assert len(clusters["1"]) == 5
+        assert clusters["1"]["id"] == "1"
+        assert clusters["1"]["cluster_label"] == "my_nested_cluster"
+        assert clusters["1"]["node_label"] == "my_other_info_node"
+        assert clusters["1"]["cluster_id"] == "0"
 
 
 class TestOutput:
