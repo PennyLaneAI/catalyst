@@ -244,7 +244,7 @@ class TestControlFlowClusterVisualization:
 
         clusters = utility.dag_builder.clusters
         cluster_labels = {info["label"] for info in clusters.values()}
-        assert "while..." in cluster_labels
+        assert "while ..." in cluster_labels
 
     @pytest.mark.unit
     def test_conditional(self):
