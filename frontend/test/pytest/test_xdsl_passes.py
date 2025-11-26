@@ -191,8 +191,6 @@ class TestXDSLPassesIntegration:
             os.path.join(workspace_path, "0_QuantumCompilationStage", "1_cancel-inverses.mlir")
         )
         assert os.path.exists(
-            os.path.join(
-                workspace_path, "0_QuantumCompilationStage", "2_xdsl-merge-rotations.mlir"
-            )
+            os.path.join(workspace_path, "0_QuantumCompilationStage", "2_xdsl-merge-rotations.mlir")
         )
         workflow.workspace.cleanup()

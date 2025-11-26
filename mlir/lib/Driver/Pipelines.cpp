@@ -177,8 +177,7 @@ void registerGradientLoweringStage()
 }
 void registerBufferizationStage()
 {
-    PassPipelineRegistration<>("bufferization-stage",
-                               "Register bufferization stage as a pass.",
+    PassPipelineRegistration<>("bufferization-stage", "Register bufferization stage as a pass.",
                                createBufferizationStage);
 }
 void registerLLVMDialectLoweringStage()
@@ -209,9 +208,8 @@ std::vector<Pipeline> getDefaultPipeline()
 {
     using PipelineFunc = void (*)(mlir::OpPassManager &);
     std::vector<PipelineFunc> pipelineFuncs = {
-        &createQuantumCompilationStage, &createHloLoweringStage,
-        &createGradientLoweringStage, &createBufferizationStage,
-        &createLLVMDialectLoweringStage};
+        &createQuantumCompilationStage, &createHloLoweringStage, &createGradientLoweringStage,
+        &createBufferizationStage, &createLLVMDialectLoweringStage};
 
     llvm::SmallVector<std::string> defaultPipelineNames = {
         "QuantumCompilationStage", "HLOLoweringStage", "GradientLoweringStage",
