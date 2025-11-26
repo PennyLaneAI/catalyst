@@ -49,7 +49,7 @@ class FakeDAGBuilder(DAGBuilder):
         self._nodes[id] = {
             "id": id,
             "label": label,
-            "cluster_id": cluster_id,
+            "parent_cluster_id": "base" if cluster_id is None else cluster_id,
             "attrs": attrs,
         }
 
@@ -73,7 +73,7 @@ class FakeDAGBuilder(DAGBuilder):
             "id": id,
             "node_label": node_label,
             "cluster_label": attrs.get("label"),
-            "cluster_id": cluster_id,
+            "parent_cluster_id": "base" if cluster_id is None else cluster_id,
             "attrs": attrs,
         }
 
@@ -167,9 +167,8 @@ class TestFuncOpVisualization:
 
         # Get the parent labels for each cluster and ensure they are what we expect.
         parent_labels = (
-            graph_clusters[child_cluster["cluster_id"]]["cluster_label"]
+            graph_clusters[child_cluster["parent_cluster_id"]]["cluster_label"]
             for child_cluster in graph_clusters.values()
-            if child_cluster.get("cluster_id") is not None
         )
         cluster_label_to_parent_label: dict[str, str] = dict(
             zip(tuple(generated_cluster_labels), parent_labels)
@@ -224,9 +223,9 @@ class TestFuncOpVisualization:
 
         # Get the parent labels for each cluster and ensure they are what we expect.
         parent_labels = (
-            graph_clusters[child_cluster["cluster_id"]]["cluster_label"]
+            graph_clusters[child_cluster["parent_cluster_id"]]["cluster_label"]
             for child_cluster in graph_clusters.values()
-            if child_cluster.get("cluster_id") is not None
+            if child_cluster.get("parent_cluster_id") is not None
         )
         cluster_label_to_parent_label: dict[str, str] = dict(
             zip(tuple(cluster_labels), parent_labels)
@@ -264,9 +263,9 @@ class TestDeviceNode:
 
         # Ensure nesting is correct
         parent_labels = (
-            graph_clusters[child_cluster["cluster_id"]]["cluster_label"]
+            graph_clusters[child_cluster["parent_cluster_id"]]["cluster_label"]
             for child_cluster in graph_clusters.values()
-            if child_cluster.get("cluster_id") is not None
+            if child_cluster.get("parent_cluster_id") is not None
         )
         node_label_to_parent_label: dict[str, str] = dict(zip(tuple(node_labels), parent_labels))
         assert node_label_to_parent_label["NullQubit"] == "my_workflow"
@@ -321,12 +320,19 @@ class TestDeviceNode:
         #         └── node: LightningQubit
 
         # Check nodes are in the correct clusters
-        parent_labels = (
-            graph_clusters[child_node["cluster_id"]]["cluster_label"]
-            for child_node in graph_nodes.values()
-            if child_node.get("cluster_id") is not None
+        nesting_relationships = dict(
+            (
+                child_data["cluster_label"],  # Child label (e.g., 'my_workflow')
+                # If the parent ID is the literal "base", assign the conceptual label.
+                (
+                    "base"
+                    if child_data["parent_cluster_id"] == "base"
+                    # Otherwise, perform the standard dictionary lookup using the parent ID.
+                    else clusters[child_data["parent_cluster_id"]]["cluster_label"]
+                ),
+            )
+            # Iterate over all cluster objects (the children)
+            for child_data in clusters.values()
         )
-        node_labels = {info["label"] for info in graph_nodes.values()}
-        node_label_to_parent_label: dict[str, str] = dict(zip(tuple(node_labels), parent_labels))
         assert node_label_to_parent_label["NullQubit"] == "my_qnode1"
         assert node_label_to_parent_label["LightningSimulator"] == "my_qnode2"
