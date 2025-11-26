@@ -113,6 +113,9 @@ class PyDotDAGBuilder(DAGBuilder):
             cluster_id (str | None): Optional ID of the cluster this node belongs to.
             **attrs (Any): Any additional styling keyword arguments.
 
+        Raises:
+            ValueError: Node ID is already present in the graph.
+
         """
         if id in self.nodes:
             raise ValueError(f"Node ID {id} already present in graph.")
@@ -141,6 +144,11 @@ class PyDotDAGBuilder(DAGBuilder):
             from_id (str): The unique ID of the source node.
             to_id (str): The unique ID of the destination node.
             **attrs (Any): Any additional styling keyword arguments.
+
+        Raises:
+            ValueError: Source and destination have the same ID
+            ValueError: Source is not found in the graph.
+            ValueError: Destination is not found in the graph.
 
         """
         if from_id == to_id:
@@ -178,6 +186,8 @@ class PyDotDAGBuilder(DAGBuilder):
             cluster_id (str | None): Optional ID of the cluster this cluster belongs to. If `None`, the cluster will be positioned on the base graph.
             **attrs (Any): Any additional styling keyword arguments.
 
+        Raises:
+            ValueError: Cluster ID is already present in the graph. 
         """
         if id in self.clusters:
             raise ValueError(f"Cluster ID {id} already present in graph.")
