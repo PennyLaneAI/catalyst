@@ -53,10 +53,6 @@ class PyDotDAGBuilder(DAGBuilder):
         self.graph: pydot.Dot = pydot.Dot(
             graph_type="digraph", rankdir="TB", compound="true", strict=True
         )
-        # Create cache for easy look-up
-        # TODO: Get rid of this and use self._clusters if possible
-        self._subgraphs: dict[str, pydot.Graph] = {}
-        self._subgraphs["__base__"] = self.graph
 
         # Internal state for graph structure
         self._nodes: dict[str, dict[str, Any]] = {}
@@ -115,9 +111,14 @@ class PyDotDAGBuilder(DAGBuilder):
         # Use ChainMap so you don't need to construct a new dictionary
         node_attrs: ChainMap = ChainMap(attrs, self._default_node_attrs)
         node = pydot.Node(id, label=label, **node_attrs)
-        cluster_id = "__base__" if cluster_id is None else cluster_id
 
-        self._subgraphs[cluster_id].add_node(node)
+        # Add node to cluster
+        if cluster_id is None:
+            self.graph.add_node(node)
+        else:
+            # Use cluster ID to look up the subgraph
+            assert len(self.graph.get_subgraph(cluster_id)) == 1
+            self.graph.get_subgraph(cluster_id)[0].add_node(node)
 
         self._nodes[id] = {
             "id": id,
@@ -191,10 +192,13 @@ class PyDotDAGBuilder(DAGBuilder):
             cluster.add_subgraph(rank_subgraph)
             cluster.add_node(node)
 
-        self._subgraphs[id] = cluster
-
-        cluster_id = "__base__" if cluster_id is None else cluster_id
-        self._subgraphs[cluster_id].add_subgraph(cluster)
+        # Add cluster to parent cluster
+        if cluster_id is None:
+            self.graph.add_subgraph(cluster)
+        else:
+            # Use cluster ID to look up the subgraph
+            assert len(self.graph.get_subgraph(cluster_id)) == 1
+            self.graph.get_subgraph(cluster_id)[0].add_subgraph(cluster)
 
         self._clusters[id] = {
             "id": id,
