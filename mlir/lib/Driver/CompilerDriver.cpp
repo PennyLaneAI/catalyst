@@ -738,7 +738,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             return failure();
         }
         inType = InputType::LLVMIR;
-        output.isCheckpointFound = options.checkpointStage == "llvm_ir";
+        output.isCheckpointFound = options.checkpointStage == "LLVMIRTranslation";
         catalyst::utils::LinesCount::Module(*llvmModule);
     }
     if (failed(verifyInputType(options, inType))) {
@@ -787,11 +787,11 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         catalyst::utils::LinesCount::Module(*llvmModule);
 
         if (options.keepIntermediate) {
-            output.setStage("llvm_ir");
+            output.setStage("LLVMIRTranslation");
             std::string tmp;
             llvm::raw_string_ostream rawStringOstream{tmp};
             llvmModule->print(rawStringOstream, nullptr);
-            auto outFile = output.nextPipelineSummaryFilename("llvm_ir", ".ll", false);
+            auto outFile = output.nextPipelineSummaryFilename("LLVMIRTranslation", ".ll", false);
             dumpToFile(options, outFile, tmp);
         }
         output.outIR.clear();

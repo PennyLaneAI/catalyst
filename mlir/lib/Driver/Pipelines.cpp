@@ -214,8 +214,8 @@ std::vector<Pipeline> getDefaultPipeline()
         &createBufferizationPipeline, &createLLVMDialectLoweringPipeline};
 
     llvm::SmallVector<std::string> defaultPipelineNames = {
-        "QuantumCompilationPass", "HLOLoweringPass", "GradientLoweringPass", "BufferizationPass",
-        "MLIRToLLVMDialect"};
+        "QuantumCompilationPasses", "HLOLoweringPasses", "GradientLoweringPasses", "BufferizationPasses",
+        "MLIRToLLVMDialectConversion"};
 
     std::vector<Pipeline> defaultPipelines(defaultPipelineNames.size());
     for (size_t i = 0; i < defaultPipelineNames.size(); ++i) {
