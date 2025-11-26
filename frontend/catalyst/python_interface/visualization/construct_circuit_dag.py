@@ -41,13 +41,9 @@ class ConstructCircuitDAG:
     def __init__(self, dag_builder: DAGBuilder) -> None:
         self.dag_builder: DAGBuilder = dag_builder
 
-        # Keep track of nesting clusters using a stack
-        # NOTE: `None` corresponds to the base graph 'cluster'
-        self._cluster_stack: list[str | None] = [None]
-
     def _reset(self) -> None:
         """Resets the instance."""
-        self._cluster_stack: list[str | None] = [None]
+        self.dag_builder.reset()
 
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module.
@@ -91,7 +87,6 @@ class ConstructCircuitDAG:
         self.dag_builder.add_node(
             node_id,
             label=operation.device_name.data,
-            cluster_id=self._cluster_stack[-1],
             fillcolor="grey",
             color="black",
             penwidth=2,
@@ -113,9 +108,7 @@ class ConstructCircuitDAG:
         self.dag_builder.add_cluster(
             cluster_id,
             label=operation.sym_name.data,
-            cluster_id=self._cluster_stack[-1],
         )
-        self._cluster_stack.append(cluster_id)
 
         for region in operation.regions:
             self._visit_region(region)
@@ -125,10 +118,10 @@ class ConstructCircuitDAG:
         """Handle func.return to exit FuncOp's cluster scope."""
 
         # NOTE: Skip first two because the first is the base graph, second is the jit_* workflow FuncOp
-        if len(self._cluster_stack) > 2:
+        if len(self.dag_builder.cluster_id_stack) > 2:
             # If we hit a func.return operation we know we are leaving
             # the FuncOp's scope and so we can pop the ID off the stack.
-            self._cluster_stack.pop()
+            self.dag_builder.cluster_id_stack.pop()
 
         for region in operation.regions:
             self._visit_region(region)
