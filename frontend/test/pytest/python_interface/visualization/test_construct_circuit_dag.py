@@ -217,7 +217,6 @@ class TestFuncOpVisualization:
         cluster_labels = {info["label"] for info in graph_clusters.values()}
         for expected_name in expected_cluster_labels:
             assert expected_name in cluster_labels
-            
         # Check nesting is correct
         # graph
         # └── jit_my_workflow
