@@ -246,7 +246,7 @@ def test_disentangle_passes():
 
 def test_convert_clifford_to_ppr():
 
-    pipe = [("pipe", ["user-transform-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_convert_clifford_to_ppr_workflow():
@@ -276,7 +276,7 @@ def test_convert_clifford_to_ppr():
 
 def test_commute_ppr():
 
-    pipe = [("pipe", ["user-transform-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_commute_ppr_workflow():
@@ -310,7 +310,7 @@ def test_commute_ppr():
 
 def test_merge_ppr_ppm():
 
-    pipe = [("pipe", ["user-transform-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_merge_ppr_ppm_workflow():
@@ -339,7 +339,7 @@ def test_merge_ppr_ppm():
 
 def test_ppr_to_ppm_auto_corrected():
 
-    pipe = [("pipe", ["user-transform-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_ppr_to_ppm_workflow():
@@ -373,7 +373,7 @@ def test_ppr_to_ppm_auto_corrected():
 
 def test_ppr_to_ppm_inject_magic_state():
 
-    pipe = [("pipe", ["user-transform-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_ppr_to_ppm_workflow():
@@ -403,7 +403,7 @@ def test_ppr_to_ppm_inject_magic_state():
 
 def test_ppr_to_ppm_pauli_corrected():
 
-    pipe = [("pipe", ["user-transform-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_ppr_to_ppm_workflow():
@@ -436,7 +436,7 @@ def test_ppr_to_ppm_pauli_corrected():
 
 def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
 
-    pipe = [("pipe", ["user-transform-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_convert_clifford_to_ppr_workflow():
@@ -495,7 +495,7 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
 
 def test_clifford_to_ppm():
 
-    pipe = [("pipe", ["user-transform-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-pipeline"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_clifford_to_ppm_workflow():
