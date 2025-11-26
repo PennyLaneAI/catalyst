@@ -11,7 +11,7 @@
   which moves all quantum gate operations to a private callable.
   [(#8367)](https://github.com/PennyLaneAI/pennylane/pull/8367)
 
-* A new experimental `split_non_commuting_pass` compiler pass has been added to 
+* A new experimental `split_non_commuting_pass` compiler pass has been added to
   `catalyst.python_interface.transforms`. This pass splits quantum functions that
   measure observables on the same wires into multiple function executions, where
   each execution measures observables on different wires (using the "wires" grouping
@@ -29,7 +29,7 @@
   [(#2169)](https://github.com/PennyLaneAI/catalyst/pull/2169)
   [(#2183)](https://github.com/PennyLaneAI/catalyst/pull/2183)
 
-* The :meth:`catalyst.python_interface.transforms.convert_to_mbqc_formalism_pass` now 
+* The :meth:`catalyst.python_interface.transforms.convert_to_mbqc_formalism_pass` now
   supports :class:`~xdsl.dialects.scf.IndexSwitchOp` in IR and ignores regions that have no body.
   [(#8632)](https://github.com/PennyLaneAI/pennylane/pull/8632)
 
@@ -194,6 +194,11 @@
   [(#2198)](https://github.com/PennyLaneAI/catalyst/pull/2198)
 
 <h3>Internal changes ⚙️</h3>
+
+* The `catalyst.python_interface.visualization` module has been renamed to
+  `catalyst.python_interface.inspection`, and various utility functions within this module
+  have been streamlined.
+  [(#2237)](https://github.com/PennyLaneAI/catalyst/pull/2237)
 
 * Migrated the `pennylane.compiler.python_compiler` submodule from PennyLane to Catalyst.
   It is now accessible as `catalyst.python_interface`.
