@@ -42,7 +42,7 @@ def get_compilation_stage(fn, stage):
 
     All the available stages are:
 
-    - MLIR: ``mlir``, ``QuantumCompilationPasses``, ``HLOLoweringPasses``, 
+    - MLIR: ``mlir``, ``QuantumCompilationPasses``, ``HLOLoweringPasses``,
       ``GradientLoweringPasses``, ``BufferizationPasses``, and ``MLIRToLLVMDialectConversion``.
 
     - LLVM: ``LLVMIRTranslation``, ``CoroOpt``, ``O2Opt``, ``Enzyme``, and ``last``.
@@ -139,7 +139,7 @@ def replace_ir(fn, stage, new_ir):
 
     Available stages include:
 
-    - MLIR: ``mlir``, ``QuantumCompilationPasses``, ``HLOLoweringPasses``, 
+    - MLIR: ``mlir``, ``QuantumCompilationPasses``, ``HLOLoweringPasses``,
       ``GradientLoweringPasses``, ``BufferizationPasses``,and ``MLIRToLLVMDialectConversion``.
 
     - LLVM: ``LLVMIRTranslation``, ``CoroOpt``, ``O2Opt``, ``Enzyme``, and ``last``.
