@@ -372,7 +372,7 @@ class TestCProgramGeneration:
                 "%t = llvm.fmul %4, %4  : f64\n" + "    %5 = llvm.fmul %t, %4  : f64\n",
             ),
             (
-                "llvm_ir",
+                "LLVMIRTranslation",
                 "%5 = fmul double %4, %4\n",
                 "%t = fmul double %4, %4\n" + "%5 = fmul double %t, %4\n",
             ),
