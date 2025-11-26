@@ -45,7 +45,11 @@ struct MergePPR : public OpRewritePattern<PPRotationOp> {
             return failure();
         }
 
-        auto prevOp = cast<PPRotationOp>(definingOp);
+        auto prevOp = dyn_cast<PPRotationOp>(definingOp);
+
+        if (!prevOp) {
+            return failure();
+        }
 
         // if pauli string too long
         if (exceedPauliSizeLimit(op.getPauliProduct().size(), MAX_PAULI_SIZE)) {

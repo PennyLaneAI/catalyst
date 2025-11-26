@@ -334,3 +334,16 @@ func.func public @max_pauli_size(%q1: !quantum.bit, %q2: !quantum.bit, %q3: !qua
     %1:4 = qec.ppr ["Z", "X", "Y", "Z"](4) %0#0, %0#1, %0#2, %0#3: !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
     func.return
 }
+
+///////////////////////////////////////////// Other ////////////////////////////////////////////////
+
+// CHECK-LABEL: mixed_operations
+func.func public @mixed_operations(%q1: !quantum.bit) {
+    // CHECK: qec.ppr ["Z"](4)
+    // CHECK: quantum.custom "Hadamard"()
+    // CHECK: qec.ppr ["Z"](4)
+    %0 = qec.ppr ["Z"](4) %q1: !quantum.bit
+    %1 = quantum.custom "Hadamard"() %0: !quantum.bit
+    %2 = qec.ppr ["Z"](4) %1: !quantum.bit
+    func.return
+}
