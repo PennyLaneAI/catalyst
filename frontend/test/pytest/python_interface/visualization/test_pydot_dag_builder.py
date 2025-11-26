@@ -40,6 +40,53 @@ def test_initialization_defaults():
     assert dag_builder.graph.obj_dict["strict"] is True
 
 
+class TestExceptions:
+    """Tests the various exceptions defined in the class."""
+
+    def test_double_node_id(self):
+        """Tests that a ValueError is raised for duplicate nodes."""
+
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_node("0", "node0")
+        with pytest.raises(ValueError, match="Node ID 0 already present in graph."):
+            dag_builder.add_node("0", "node1")
+
+    def test_edge_duplicate_source_destination(self):
+        """Tests that a ValueError is raised when an edge is created with the
+        same source and destination"""
+
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_node("0", "node0")
+        with pytest.raises(ValueError, match="Edges must connect two uniques IDs."):
+            dag_builder.add_edge("0", "0")
+
+    def test_edge_missing_ids(self):
+        """Tests that an error is raised if IDs are missing."""
+
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_node("0", "node0")
+        with pytest.raises(ValueError, match="Destination is not found in the graph."):
+            dag_builder.add_edge("0", "1")
+
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_node("1", "node1")
+        with pytest.raises(ValueError, match="Source is not found in the graph."):
+            dag_builder.add_edge("0", "1")
+
+    def test_duplicate_cluster_id(self):
+        """Tests that an exception is raised if an ID is already present."""
+
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_cluster("0")
+        with pytest.raises(ValueError, match="Cluster ID 0 already present in graph."):
+            dag_builder.add_cluster("0")
+
+
 class TestAddMethods:
     """Test that elements can be added to the graph."""
 
@@ -118,7 +165,7 @@ class TestAddMethods:
         # Level 0 (Root): Adds cluster on top of base graph
         dag_builder.add_node("n_root", "node_root")
 
-        # Level 1 (c0): Add node on outer cluster 
+        # Level 1 (c0): Add node on outer cluster
         dag_builder.add_cluster("c0")
         dag_builder.add_node("n_outer", "node_outer", cluster_id="c0")
 

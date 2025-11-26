@@ -114,6 +114,9 @@ class PyDotDAGBuilder(DAGBuilder):
             **attrs (Any): Any additional styling keyword arguments.
 
         """
+        if id in self.nodes:
+            raise ValueError(f"Node ID {id} already present in graph.")
+
         # Use ChainMap so you don't need to construct a new dictionary
         node_attrs: ChainMap = ChainMap(attrs, self._default_node_attrs)
         node = Node(id, label=label, **node_attrs)
@@ -140,6 +143,13 @@ class PyDotDAGBuilder(DAGBuilder):
             **attrs (Any): Any additional styling keyword arguments.
 
         """
+        if from_id == to_id:
+            raise ValueError("Edges must connect two unique IDs.")
+        if from_id not in self.nodes:
+            raise ValueError("Source is not found in the graph.")
+        if to_id not in self.nodes:
+            raise ValueError("Destination is not found in the graph.")
+
         # Use ChainMap so you don't need to construct a new dictionary
         edge_attrs: ChainMap = ChainMap(attrs, self._default_edge_attrs)
         edge = Edge(from_id, to_id, **edge_attrs)
@@ -169,6 +179,9 @@ class PyDotDAGBuilder(DAGBuilder):
             **attrs (Any): Any additional styling keyword arguments.
 
         """
+        if id in self.clusters:
+            raise ValueError(f"Cluster ID {id} already present in graph.")
+
         # Use ChainMap so you don't need to construct a new dictionary
         cluster_attrs: ChainMap = ChainMap(attrs, self._default_cluster_attrs)
         cluster = Cluster(id, **cluster_attrs)
