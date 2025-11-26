@@ -53,7 +53,7 @@ class ConstructCircuitDAG:
     # =============
     # IR TRAVERSAL
     # =============
-    
+
     @singledispatchmethod
     def _visit_operation(self, operation: Operation) -> None:
         """Visit an xDSL Operation. Default to visiting each region contained in the operation."""
@@ -75,18 +75,21 @@ class ConstructCircuitDAG:
     # ============
 
     @_visit_operation.register
-    def _device_init(self, op: quantum.DeviceInitOp) -> None:
+    def _device_init(self, operation: quantum.DeviceInitOp) -> None:
         """Handles the initialization of a quantum device."""
-        node_id = f"node_{id(op)}"
+        node_id = f"node_{id(operation)}"
         self.dag_builder.add_node(
             node_id,
-            label=op.device_name.data,
+            label=operation.device_name.data,
             cluster_id=self._cluster_stack[-1],
             fillcolor="grey",
             color="black",
             penwidth=2,
             shape="rectangle",
         )
+
+        for region in operation.regions:
+            self._visit_region(region)
 
     # =======================
     # FuncOp NESTING UTILITY
@@ -103,7 +106,10 @@ class ConstructCircuitDAG:
             cluster_id=self._cluster_stack[-1],
         )
         self._cluster_stack.append(cluster_id)
-        
+
+        for region in operation.regions:
+            self._visit_region(region)
+
     @_visit_operation.register
     def _func_return(self, op: func.ReturnOp) -> None:
         """Handle func.return to exit FuncOp's cluster scope."""
