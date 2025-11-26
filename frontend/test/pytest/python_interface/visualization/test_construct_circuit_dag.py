@@ -212,7 +212,7 @@ class TestFuncOpVisualization:
             "teardown",
         ]
         assert len(graph_clusters) == len(expected_cluster_labels)
-        cluster_labels = {info["label"] for info in graph_clusters.values()}
+        cluster_labels = {info["cluster_label"] for info in graph_clusters.values()}
         for expected_name in expected_cluster_labels:
             assert expected_name in cluster_labels
 
@@ -308,7 +308,7 @@ class TestDeviceNode:
             "teardown",
         ]
         assert len(graph_clusters) == len(expected_cluster_labels)
-        cluster_labels = {info["label"] for info in graph_clusters.values()}
+        cluster_labels = {info["cluster_label"] for info in graph_clusters.values()}
         for expected_name in expected_cluster_labels:
             assert expected_name in cluster_labels
 
@@ -335,7 +335,7 @@ class TestDeviceNode:
 
         # Check nodes are in the correct clusters
         parent_labels = (
-            graph_clusters[child_node["cluster_id"]]["label"]
+            graph_clusters[child_node["cluster_id"]]["cluster_label"]
             for child_node in graph_nodes.values()
             if child_node.get("cluster_id") is not None
         )
