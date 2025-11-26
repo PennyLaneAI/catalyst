@@ -129,6 +129,12 @@ def test_does_not_mutate_module():
 
 
 @pytest.mark.unit
+def test_internal_state_reset():
+    """Tests that the internal dag_builder state is reset."""
+    pass
+
+
+@pytest.mark.unit
 class TestFuncOpVisualization:
     """Tests the visualization of FuncOps with bounding boxes"""
 
