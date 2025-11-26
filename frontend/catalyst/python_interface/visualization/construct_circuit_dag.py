@@ -94,7 +94,7 @@ class ConstructCircuitDAG:
         ControlFlowOp = scf.ForOp | scf.WhileOp | scf.IfOp
         if isinstance(operation, ControlFlowOp):
             self._cluster_stack.pop()
-            
+
     @singledispatchmethod
     def _visit_operation(self, operation: Operation) -> None:
         """Visit an xDSL Operation. Default to visiting each region contained in the operation."""
@@ -114,7 +114,7 @@ class ConstructCircuitDAG:
     # =============
     # CONTROL FLOW
     # =============
-           
+
     @_visit_operation.register
     def _for_op(self, op: scf.ForOp) -> None:
         """Handle an xDSL ForOp operation."""
@@ -125,10 +125,10 @@ class ConstructCircuitDAG:
             cluster_id=self._cluster_stack[-1],
         )
         self._cluster_stack.append(cluster_id)
-        
+
         for region in operation.regions:
             self._visit_region(region)
-            
+
         self._cluster_stack.pop()
 
     @_visit_operation.register
@@ -141,12 +141,12 @@ class ConstructCircuitDAG:
             cluster_id=self._cluster_stack[-1],
         )
         self._cluster_stack.append(cluster_id)
-        
+
         for region in operation.regions:
             self._visit_region(region)
 
         self._cluster_stack.pop()
-      
+
     @_visit_operation.register
     def _if_op(self, operation: scf.IfOp):
         """Handles the scf.IfOp operation."""
@@ -157,7 +157,7 @@ class ConstructCircuitDAG:
             cluster_id=self._cluster_stack[-1],
         )
         self._cluster_stack.append(cluster_id)
-        
+
         # Loop through each branch and visualize as a cluster
         for i, branch in enumerate(operation.regions):
             cluster_id = f"cluster_ifop_branch{i}_{id(operation)}"
@@ -174,9 +174,9 @@ class ConstructCircuitDAG:
             # Pop branch cluster after processing to ensure
             # logical branches are treated as 'parallel'
             self._cluster_stack.pop()
-            
+
         self._cluster_stack.pop()
-      
+
     # ============
     # DEVICE NODE
     # ============
