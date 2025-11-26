@@ -15,6 +15,7 @@
 
 from unittest.mock import Mock
 
+from jax import util
 import pytest
 from _typeshed import GenericPath
 
@@ -243,4 +244,34 @@ class TestDeviceNode:
 
     def test_standard_qnode(self):
         """Tests that a standard setup works."""
-        pass
+        
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            qml.H(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        graph_nodes = utility.dag_builder.nodes
+
+        # Basic check for node
+        node_labels = {info["label"] for info in graph_nodes.values()}
+        assert "NullQubit" in node_labels
+
+        # Ensure nesting is correct
+        graph_clusters = utility.dag_builder.clusters
+        parent_labels = (
+            graph_clusters[child_cluster["cluster_id"]]["label"]
+            for child_cluster in graph_clusters.values()
+            if child_cluster.get("cluster_id") is not None
+        )
+        cluster_label_to_parent_label: dict[str, str] = dict(
+            zip(tuple(node_labels), parent_labels)
+        )
+        assert cluster_label_to_parent_label["NullQubit"] == "my_workflow" 
