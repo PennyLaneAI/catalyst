@@ -17,8 +17,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from frontend.catalyst.python_interface.visualization import dag_builder
-
 pydot = pytest.importorskip("pydot")
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
 # pylint: disable=wrong-import-position
@@ -40,6 +38,53 @@ def test_initialization_defaults():
     assert dag_builder.graph.get_compound() == "true"
     # Ensure duplicated edges cannot be added
     assert dag_builder.graph.obj_dict["strict"] is True
+
+
+class TestExceptions:
+    """Tests the various exceptions defined in the class."""
+
+    def test_duplicate_node_ids(self):
+        """Tests that a ValueError is raised for duplicate nodes."""
+
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_node("0", "node0")
+        with pytest.raises(ValueError, match="Node ID 0 already present in graph."):
+            dag_builder.add_node("0", "node1")
+
+    def test_edge_duplicate_source_destination(self):
+        """Tests that a ValueError is raised when an edge is created with the
+        same source and destination"""
+
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_node("0", "node0")
+        with pytest.raises(ValueError, match="Edges must connect two unique IDs."):
+            dag_builder.add_edge("0", "0")
+
+    def test_edge_missing_ids(self):
+        """Tests that an error is raised if IDs are missing."""
+
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_node("0", "node0")
+        with pytest.raises(ValueError, match="Destination is not found in the graph."):
+            dag_builder.add_edge("0", "1")
+
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_node("1", "node1")
+        with pytest.raises(ValueError, match="Source is not found in the graph."):
+            dag_builder.add_edge("0", "1")
+
+    def test_duplicate_cluster_id(self):
+        """Tests that an exception is raised if an ID is already present."""
+
+        dag_builder = PyDotDAGBuilder()
+
+        dag_builder.add_cluster("0")
+        with pytest.raises(ValueError, match="Cluster ID 0 already present in graph."):
+            dag_builder.add_cluster("0")
 
 
 class TestAddMethods:
@@ -119,13 +164,13 @@ class TestAddMethods:
 
         # Level 0 (Root): Adds cluster on top of base graph
         dag_builder.add_node("n_root", "node_root")
+
+        # Level 1 (c0): Add node on outer cluster
         dag_builder.add_cluster("c0")
-
-        # Level 1 (Inside c0): Add node on outer cluster and create new cluster on top
         dag_builder.add_node("n_outer", "node_outer", cluster_id="c0")
-        dag_builder.add_cluster("c1", cluster_id="c0")
 
-        # Level 2 (Inside c1): Add node on second cluster
+        # Level 2 (c1): Add node on inner cluster
+        dag_builder.add_cluster("c1", cluster_id="c0")
         dag_builder.add_node("n_inner", "node_inner", cluster_id="c1")
 
         root_graph = dag_builder.graph
@@ -243,57 +288,40 @@ class TestAttributes:
         assert cluster2.get("fontname") == "Helvetica"
 
 
-class TestGetMethods:
-    """Tests the get_* methods."""
+class TestProperties:
+    """Tests the properties."""
 
-    def test_get_nodes(self):
-        """Tests that get_nodes works."""
+    def test_nodes(self):
+        """Tests that nodes works."""
         dag_builder = PyDotDAGBuilder()
 
         dag_builder.add_node("0", "node0", fillcolor="red")
         dag_builder.add_cluster("c0")
         dag_builder.add_node("1", "node1", cluster_id="c0")
 
-        nodes = dag_builder.get_nodes()
+        nodes = dag_builder.nodes
 
         assert len(nodes) == 2
         assert len(nodes["0"]) == 4
 
         assert nodes["0"]["id"] == "0"
         assert nodes["0"]["label"] == "node0"
-        assert nodes["0"]["cluster_id"] == "__base__"
+        assert nodes["0"]["cluster_id"] == None
         assert nodes["0"]["attrs"]["fillcolor"] == "red"
 
         assert nodes["1"]["id"] == "1"
         assert nodes["1"]["label"] == "node1"
         assert nodes["1"]["cluster_id"] == "c0"
 
-    def test_get_nodes_doesnt_mutate(self):
-        """Tests that get_nodes doesn't mutate state"""
-
-        dag_builder = PyDotDAGBuilder()
-
-        dag_builder.add_node("0", "node0")
-
-        old_nodes = dag_builder.get_nodes()
-
-        dag_builder.add_node("1", "node1")
-
-        new_nodes = dag_builder.get_nodes()
-
-        assert old_nodes is not new_nodes
-        assert len(old_nodes) == 1
-        assert len(new_nodes) == 2
-
-    def test_get_edges(self):
-        """Tests that get_edges works."""
+    def test_edges(self):
+        """Tests that edges works."""
 
         dag_builder = PyDotDAGBuilder()
         dag_builder.add_node("0", "node0")
         dag_builder.add_node("1", "node1")
         dag_builder.add_edge("0", "1", penwidth=10)
 
-        edges = dag_builder.get_edges()
+        edges = dag_builder.edges
 
         assert len(edges) == 1
 
@@ -301,44 +329,25 @@ class TestGetMethods:
         assert edges[0]["to_id"] == "1"
         assert edges[0]["attrs"]["penwidth"] == 10
 
-    def test_get_edges_doesnt_mutate(self):
-        """Tests that get_edges doesn't mutated."""
-
-        dag_builder = PyDotDAGBuilder()
-        dag_builder.add_node("0", "node0")
-        dag_builder.add_node("1", "node1")
-        dag_builder.add_edge("0", "1")
-
-        old_edges = dag_builder.get_edges()
-
-        dag_builder.add_node("2", "node2")
-        dag_builder.add_edge("1", "2")
-
-        new_edges = dag_builder.get_edges()
-
-        assert old_edges is not new_edges
-        assert len(old_edges) == 1
-        assert len(new_edges) == 2
-
-    def test_get_clusters(self):
-        """Tests that get_clusters works."""
+    def test_clusters(self):
+        """Tests that clusters property works."""
 
         dag_builder = PyDotDAGBuilder()
         dag_builder.add_cluster("0", "my_info_node", label="my_cluster", penwidth=10)
 
-        clusters = dag_builder.get_clusters()
+        clusters = dag_builder.clusters
 
         dag_builder.add_cluster(
             "1", "my_other_info_node", cluster_id="0", label="my_nested_cluster"
         )
-        clusters = dag_builder.get_clusters()
+        clusters = dag_builder.clusters
         assert len(clusters) == 2
 
         assert len(clusters["0"]) == 5
         assert clusters["0"]["id"] == "0"
         assert clusters["0"]["cluster_label"] == "my_cluster"
         assert clusters["0"]["node_label"] == "my_info_node"
-        assert clusters["0"]["cluster_id"] == "__base__"
+        assert clusters["0"]["cluster_id"] == None
         assert clusters["0"]["attrs"]["penwidth"] == 10
 
         assert len(clusters["1"]) == 5
@@ -346,23 +355,6 @@ class TestGetMethods:
         assert clusters["1"]["cluster_label"] == "my_nested_cluster"
         assert clusters["1"]["node_label"] == "my_other_info_node"
         assert clusters["1"]["cluster_id"] == "0"
-
-    def test_get_clusters_doesnt_mutate(self):
-        """Tests that get_clusters doesn't mutate state"""
-
-        dag_builder = PyDotDAGBuilder()
-
-        dag_builder.add_cluster("0")
-
-        old_clusters = dag_builder.get_clusters()
-
-        dag_builder.add_cluster("1")
-
-        new_clusters = dag_builder.get_clusters()
-
-        assert old_clusters is not new_clusters
-        assert len(old_clusters) == 1
-        assert len(new_clusters) == 2
 
 
 class TestOutput:

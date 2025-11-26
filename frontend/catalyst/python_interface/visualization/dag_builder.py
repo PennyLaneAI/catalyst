@@ -84,17 +84,19 @@ class DAGBuilder(ABC):
         """
         raise NotImplementedError
 
+    @property
     @abstractmethod
-    def get_nodes(self) -> dict[NodeID, dict[str, Any]]:
+    def nodes(self) -> dict[NodeID, dict[str, Any]]:
         """Retrieve the current set of nodes in the graph.
 
         Returns:
-            nodes (dict[str, dict[str, Any]]): A dictionary that maps the node's ID to it's node information.
+            nodes (dict[str, dict[str, Any]]): A dictionary that maps the node's ID to its node information.
         """
         raise NotImplementedError
 
+    @property
     @abstractmethod
-    def get_edges(self) -> list[dict[str, Any]]:
+    def edges(self) -> list[dict[str, Any]]:
         """Retrieve the current set of edges in the graph.
 
         Returns:
@@ -102,12 +104,13 @@ class DAGBuilder(ABC):
         """
         raise NotImplementedError
 
+    @property
     @abstractmethod
-    def get_clusters(self) -> dict[ClusterID, dict[str, Any]]:
+    def clusters(self) -> dict[ClusterID, dict[str, Any]]:
         """Retrieve the current set of clusters in the graph.
 
         Returns:
-            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID to it's cluster information.
+            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID to its cluster information.
         """
         raise NotImplementedError
 

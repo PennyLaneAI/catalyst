@@ -29,16 +29,21 @@ from catalyst.python_interface.visualization.xdsl_conversion import (
 
 
 class ConstructCircuitDAG:
-    """A tool that traverses an xDSL module and constructs a Directed Acyclic Graph (DAG)
+    """Utility tool following the director pattern to build a DAG representation of a compiled quantum program.
+
+    This tool traverses an xDSL module and constructs a Directed Acyclic Graph (DAG)
     of it's quantum program using an injected DAGBuilder instance. This tool does not mutate the xDSL module.
+
+    **Example**
+
+    >>> builder = PyDotDAGBuilder()
+    >>> director = ConstructCircuitDAG(builder)
+    >>> director.construct(module)
+    >>> director.dag_builder.to_string()
+    ...
     """
 
     def __init__(self, dag_builder: DAGBuilder) -> None:
-        """Initialize the utility by injecting the DAG builder dependency.
-
-        Args:
-            dag_builder (DAGBuilder): The concrete builder instance used for graph construction.
-        """
         self.dag_builder: DAGBuilder = dag_builder
 
         # Record clusters seen as a stack
@@ -49,15 +54,6 @@ class ConstructCircuitDAG:
         """Resets the instance."""
         self._cluster_stack: list[str | None] = [None]
 
-    # =================================
-    # 1. CORE DISPATCH AND ENTRY POINT
-    # =================================
-
-    @singledispatchmethod
-    def _visit(self, op: Any) -> None:
-        """Central dispatch method (Visitor Pattern). Routes the operation 'op'
-        to the specialized handler registered for its type."""
-
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module.
 
@@ -65,36 +61,35 @@ class ConstructCircuitDAG:
             module (xdsl.builtin.ModuleOp): The module containing the quantum program to visualize.
 
         """
+        self._reset()
         for op in module.ops:
-            self._visit(op)
+            self._visit_operation(op)
 
-    # =======================
-    # 2. IR TRAVERSAL
-    # =======================
+    # =============
+    # IR TRAVERSAL
+    # =============
 
-    @_visit.register
-    def _operation(self, operation: Operation) -> None:
-        """Visit an xDSL Operation."""
+    @singledispatchmethod
+    def _visit_operation(self, operation: Operation) -> None:
+        """Visit an xDSL Operation. Default to visiting each region contained in the operation."""
         for region in operation.regions:
-            self._visit(region)
+            self._visit_region(region)
 
-    @_visit.register
-    def _region(self, region: Region) -> None:
+    def _visit_region(self, region: Region) -> None:
         """Visit an xDSL Region operation."""
         for block in region.blocks:
-            self._visit(block)
+            self._visit_block(block)
 
-    @_visit.register
-    def _block(self, block: Block) -> None:
+    def _visit_block(self, block: Block) -> None:
         """Visit an xDSL Block operation, dispatching handling for each contained Operation."""
         for op in block.ops:
-            self._visit(op)
+            self._visit_operation(op)
 
-    # ======================
-    # 3. QUANTUM OPERATIONS
-    # ======================
+    # ===================
+    # QUANTUM OPERATIONS
+    # ===================
 
-    @_visit.register
+    @_visit_operation.register
     def _unitary(
         self,
         op: quantum.CustomOp | quantum.GlobalPhaseOp | quantum.QubitUnitaryOp | quantum.MultiRZOp,
@@ -109,11 +104,11 @@ class ConstructCircuitDAG:
             cluster_id=self._cluster_stack[-1],
         )
 
-    # ========================
-    # 4. QUANTUM MEASUREMENTS
-    # ========================
+    # =====================
+    # QUANTUM MEASUREMENTS
+    # =====================
 
-    @_visit.register
+    @_visit_operation.register
     def _state_op(self, op: quantum.StateOp) -> None:
         """Handler for the terminal state measurement operation."""
 
@@ -125,7 +120,7 @@ class ConstructCircuitDAG:
             cluster_id=self._cluster_stack[-1],
         )
 
-    @_visit.register
+    @_visit_operation.register
     def _statistical_measurement_ops(
         self,
         op: quantum.ExpvalOp | quantum.VarianceOp | quantum.ProbsOp | quantum.SampleOp,
@@ -141,7 +136,7 @@ class ConstructCircuitDAG:
             cluster_id=self._cluster_stack[-1],
         )
 
-    @_visit.register
+    @_visit_operation.register
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
         """Handler for the single-qubit projective measurement operation."""
 

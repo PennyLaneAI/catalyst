@@ -51,19 +51,18 @@ class FakeDAGBuilder(DAGBuilder):
         self._clusters = {}
 
     def add_node(self, id, label, cluster_id=None, **attrs) -> None:
-        cluster_id = "__base__" if cluster_id is None else cluster_id
         self._nodes[id] = {
             "id": id,
             "label": label,
-            "cluster_id": cluster_id,
+            "parent_cluster_id": cluster_id,
             "attrs": attrs,
         }
 
     def add_edge(self, from_id: str, to_id: str, **attrs) -> None:
         self._edges.append(
             {
-                "from": from_id,
-                "to": to_id,
+                "from_id": from_id,
+                "to_id": to_id,
                 "attrs": attrs,
             }
         )
@@ -75,22 +74,25 @@ class FakeDAGBuilder(DAGBuilder):
         cluster_id=None,
         **attrs,
     ) -> None:
-        cluster_id = "__base__" if cluster_id is None else cluster_id
         self._clusters[id] = {
             "id": id,
-            "label": node_label,
-            "cluster_id": cluster_id,
+            "node_label": node_label,
+            "cluster_label": attrs.get("label"),
+            "parent_cluster_id": cluster_id,
             "attrs": attrs,
         }
 
-    def get_nodes(self):
-        return self._nodes.copy()
+    @property
+    def nodes(self):
+        return self._nodes
 
-    def get_edges(self):
-        return self._edges.copy()
+    @property
+    def edges(self):
+        return self._edges
 
-    def get_clusters(self):
-        return self._clusters.copy()
+    @property
+    def clusters(self):
+        return self._clusters
 
     def to_file(self, output_filename):
         pass

@@ -22,6 +22,7 @@ from .dag_builder import DAGBuilder
 has_pydot = True
 try:
     import pydot
+    from pydot import Cluster, Dot, Edge, Graph, Node, Subgraph
 except ImportError:
     has_pydot = False
 
@@ -50,13 +51,14 @@ class PyDotDAGBuilder(DAGBuilder):
         # - rankdir="TB": Set layout direction from Top to Bottom.
         # - compound="true": Allow edges to connect directly to clusters/subgraphs.
         # - strict=True: Prevent duplicate edges (e.g., A -> B added twice).
-        self.graph: pydot.Dot = pydot.Dot(
+        self.graph: Dot = Dot(
             graph_type="digraph", rankdir="TB", compound="true", strict=True
         )
-        # Create cache for easy look-up
-        # TODO: Get rid of this and use self._clusters if possible
-        self._subgraphs: dict[str, pydot.Graph] = {}
-        self._subgraphs["__base__"] = self.graph
+
+        # Use internal cache that maps cluster ID to actual pydot (Dot or Cluster) object
+        # NOTE: This is needed so we don't need to traverse the graph to find the relevant
+        # cluster object to modify
+        self._subgraph_cache: dict[str, Graph] = {}
 
         # Internal state for graph structure
         self._nodes: dict[str, dict[str, Any]] = {}
@@ -111,13 +113,22 @@ class PyDotDAGBuilder(DAGBuilder):
             cluster_id (str | None): Optional ID of the cluster this node belongs to.
             **attrs (Any): Any additional styling keyword arguments.
 
+        Raises:
+            ValueError: Node ID is already present in the graph.
+
         """
+        if id in self.nodes:
+            raise ValueError(f"Node ID {id} already present in graph.")
+
         # Use ChainMap so you don't need to construct a new dictionary
         node_attrs: ChainMap = ChainMap(attrs, self._default_node_attrs)
-        node = pydot.Node(id, label=label, **node_attrs)
-        cluster_id = "__base__" if cluster_id is None else cluster_id
+        node = Node(id, label=label, **node_attrs)
 
-        self._subgraphs[cluster_id].add_node(node)
+        # Add node to cluster
+        if cluster_id is None:
+            self.graph.add_node(node)
+        else:
+            self._subgraph_cache[cluster_id].add_node(node)
 
         self._nodes[id] = {
             "id": id,
@@ -134,10 +145,23 @@ class PyDotDAGBuilder(DAGBuilder):
             to_id (str): The unique ID of the destination node.
             **attrs (Any): Any additional styling keyword arguments.
 
+        Raises:
+            ValueError: Source and destination have the same ID
+            ValueError: Source is not found in the graph.
+            ValueError: Destination is not found in the graph.
+
         """
+        if from_id == to_id:
+            raise ValueError("Edges must connect two unique IDs.")
+        if from_id not in self.nodes:
+            raise ValueError("Source is not found in the graph.")
+        if to_id not in self.nodes:
+            raise ValueError("Destination is not found in the graph.")
+
         # Use ChainMap so you don't need to construct a new dictionary
         edge_attrs: ChainMap = ChainMap(attrs, self._default_edge_attrs)
-        edge = pydot.Edge(from_id, to_id, **edge_attrs)
+        edge = Edge(from_id, to_id, **edge_attrs)
+
         self.graph.add_edge(edge)
 
         self._edges.append(
@@ -162,10 +186,15 @@ class PyDotDAGBuilder(DAGBuilder):
             cluster_id (str | None): Optional ID of the cluster this cluster belongs to. If `None`, the cluster will be positioned on the base graph.
             **attrs (Any): Any additional styling keyword arguments.
 
+        Raises:
+            ValueError: Cluster ID is already present in the graph. 
         """
+        if id in self.clusters:
+            raise ValueError(f"Cluster ID {id} already present in graph.")
+
         # Use ChainMap so you don't need to construct a new dictionary
         cluster_attrs: ChainMap = ChainMap(attrs, self._default_cluster_attrs)
-        cluster = pydot.Cluster(graph_name=id, **cluster_attrs)
+        cluster = Cluster(id, **cluster_attrs)
 
         # Puts the label in a node within the cluster.
         # Ensures that any edges connecting nodes through the cluster
@@ -177,9 +206,9 @@ class PyDotDAGBuilder(DAGBuilder):
         # │           │
         # └───────────┘
         if node_label:
-            node_id = f"{cluster_id}_info_node"
-            rank_subgraph = pydot.Subgraph()
-            node = pydot.Node(
+            node_id = f"{id}_info_node"
+            rank_subgraph = Subgraph()
+            node = Node(
                 node_id,
                 label=node_label,
                 shape="rectangle",
@@ -191,10 +220,14 @@ class PyDotDAGBuilder(DAGBuilder):
             cluster.add_subgraph(rank_subgraph)
             cluster.add_node(node)
 
-        self._subgraphs[id] = cluster
+        # Record new cluster
+        self._subgraph_cache[id] = cluster
 
-        cluster_id = "__base__" if cluster_id is None else cluster_id
-        self._subgraphs[cluster_id].add_subgraph(cluster)
+        # Add node to cluster
+        if cluster_id is None:
+            self.graph.add_subgraph(cluster)
+        else:
+            self._subgraph_cache[cluster_id].add_subgraph(cluster)
 
         self._clusters[id] = {
             "id": id,
@@ -204,29 +237,32 @@ class PyDotDAGBuilder(DAGBuilder):
             "attrs": dict(cluster_attrs),
         }
 
-    def get_nodes(self) -> dict[str, dict[str, Any]]:
+    @property
+    def nodes(self) -> dict[str, dict[str, Any]]:
         """Retrieve the current set of nodes in the graph.
 
         Returns:
-            nodes (dict[str, dict[str, Any]]): A dictionary that maps the node's ID to it's node information.
+            nodes (dict[str, dict[str, Any]]): A dictionary that maps the node's ID to its node information.
         """
-        return self._nodes.copy()
+        return self._nodes
 
-    def get_edges(self) -> list[dict[str, Any]]:
+    @property
+    def edges(self) -> list[dict[str, Any]]:
         """Retrieve the current set of edges in the graph.
 
         Returns:
             edges (list[dict[str, Any]]): A list of edges where each element in the list contains a dictionary of edge information.
         """
-        return self._edges.copy()
+        return self._edges
 
-    def get_clusters(self) -> dict[str, dict[str, Any]]:
+    @property
+    def clusters(self) -> dict[str, dict[str, Any]]:
         """Retrieve the current set of clusters in the graph.
 
         Returns:
-            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID to it's cluster information.
+            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID to its cluster information.
         """
-        return self._clusters.copy()
+        return self._clusters
 
     def to_file(self, output_filename: str) -> None:
         """Save the graph to a file.
