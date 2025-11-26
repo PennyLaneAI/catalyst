@@ -16,21 +16,21 @@
 from unittest.mock import Mock
 
 import pytest
+from _typeshed import GenericPath
 
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
 import pennylane as qml
-from xdsl.dialects import test
-from xdsl.dialects.builtin import ModuleOp
-from xdsl.ir.core import Block, Region
-
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from xdsl.dialects import test
+from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir.core import Block, Region
 
 
 class FakeDAGBuilder(DAGBuilder):
@@ -46,7 +46,6 @@ class FakeDAGBuilder(DAGBuilder):
         self._clusters = {}
 
     def add_node(self, id, label, cluster_id=None, **attrs) -> None:
-        cluster_id = "__base__" if cluster_id is None else cluster_id
         self._nodes[id] = {
             "id": id,
             "label": label,
@@ -70,7 +69,6 @@ class FakeDAGBuilder(DAGBuilder):
         cluster_id=None,
         **attrs,
     ) -> None:
-        cluster_id = "__base__" if cluster_id is None else cluster_id
         self._clusters[id] = {
             "id": id,
             "cluster_label": attrs.get("label"),
@@ -158,7 +156,9 @@ class TestFuncOpVisualization:
             "setup",
             "teardown",
         ]
-        generated_cluster_labels = {info["cluster_label"] for info in graph_clusters.values()}
+        generated_cluster_labels = {
+            info["cluster_label"] for info in graph_clusters.values()
+        }
         for cluster_label in expected_cluster_labels:
             assert cluster_label in generated_cluster_labels
 
@@ -166,6 +166,18 @@ class TestFuncOpVisualization:
         # graph
         # └── jit_my_workflow
         #     └── my_workflow
+
+        # Get the parent labels for each cluster and ensure they are what we expect.
+        parent_labels = (
+            graph_clusters[child_cluster["cluster_id"]]["label"]
+            for child_cluster in graph_clusters.values()
+            if child_cluster.get("cluster_id") is not None
+        )
+        cluster_label_to_parent_label: dict[str, str] = dict(
+            zip(tuple(generated_cluster_labels), parent_labels)
+        )
+        assert cluster_label_to_parent_label["jit_my_workflow"] is None
+        assert cluster_label_to_parent_label["my_qnode1"] == "jit_my_workflow"
 
     def test_nested_qnodes(self):
         """Tests that nested QJIT'd QNodes are visualized correctly"""
@@ -211,3 +223,24 @@ class TestFuncOpVisualization:
         # └── jit_my_workflow
         #     ├── my_qnode1
         #     └── my_qnode2
+
+        # Get the parent labels for each cluster and ensure they are what we expect.
+        parent_labels = (
+            graph_clusters[child_cluster["cluster_id"]]["label"]
+            for child_cluster in graph_clusters.values()
+            if child_cluster.get("cluster_id") is not None
+        )
+        cluster_label_to_parent_label: dict[str, str] = dict(
+            zip(tuple(cluster_labels), parent_labels)
+        )
+        assert cluster_label_to_parent_label["jit_my_workflow"] is None
+        assert cluster_label_to_parent_label["my_qnode1"] == "jit_my_workflow"
+        assert cluster_label_to_parent_label["my_qnode2"] == "jit_my_workflow"
+
+
+class TestDeviceNode:
+    """Tests that the device node is correctly visualized."""
+
+    def test_standard_qnode(self):
+        """Tests that a standard setup works."""
+        pass
