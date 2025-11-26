@@ -111,7 +111,7 @@ class ConstructCircuitDAG:
             self._visit_region(region)
 
     @_visit_operation.register
-    def _func_return(self, op: func.ReturnOp) -> None:
+    def _func_return(self, operation: func.ReturnOp) -> None:
         """Handle func.return to exit FuncOp's cluster scope."""
 
         # NOTE: Skip first two because the first is the base graph, second is the jit_* workflow FuncOp
@@ -119,3 +119,6 @@ class ConstructCircuitDAG:
             # If we hit a func.return operation we know we are leaving
             # the FuncOp's scope and so we can pop the ID off the stack.
             self._cluster_stack.pop()
+
+        for region in operation.regions:
+            self._visit_region(region)
