@@ -118,7 +118,7 @@ class PyDotDAGBuilder(DAGBuilder):
             self.graph.add_node(node)
         else:
             # Use cluster ID to look up the subgraph
-            parent_clusters = self.graph.get_subgraph(cluster_id)
+            parent_clusters = self.graph.get_subgraph("cluster_"+cluster_id)
             assert len(parent_clusters) == 1
             parent_clusters[0].add_node(node)
 
@@ -200,7 +200,7 @@ class PyDotDAGBuilder(DAGBuilder):
             self.graph.add_subgraph(cluster)
         else:
             # Use cluster ID to look up the subgraph
-            parent_clusters = self.graph.get_subgraph(cluster_id)
+            parent_clusters = self.graph.get_subgraph("cluster_"+cluster_id)
             assert len(parent_clusters) == 1
             parent_clusters[0].add_subgraph(cluster)
 
