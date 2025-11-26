@@ -167,7 +167,7 @@ class TestFuncOpVisualization:
 
         # Get the parent labels for each cluster and ensure they are what we expect.
         parent_labels = (
-            graph_clusters[child_cluster["cluster_id"]]["label"]
+            graph_clusters[child_cluster["cluster_id"]]["cluster_label"]
             for child_cluster in graph_clusters.values()
             if child_cluster.get("cluster_id") is not None
         )
@@ -223,7 +223,7 @@ class TestFuncOpVisualization:
 
         # Get the parent labels for each cluster and ensure they are what we expect.
         parent_labels = (
-            graph_clusters[child_cluster["cluster_id"]]["label"]
+            graph_clusters[child_cluster["cluster_id"]]["cluster_label"]
             for child_cluster in graph_clusters.values()
             if child_cluster.get("cluster_id") is not None
         )
@@ -365,7 +365,7 @@ class TestDeviceNode:
         # Ensure nesting is correct
         graph_clusters = utility.dag_builder.clusters
         parent_labels = (
-            graph_clusters[child_cluster["cluster_id"]]["label"]
+            graph_clusters[child_cluster["cluster_id"]]["cluster_label"]
             for child_cluster in graph_clusters.values()
             if child_cluster.get("cluster_id") is not None
         )
@@ -423,7 +423,7 @@ class TestDeviceNode:
 
         # Get the parent labels for each cluster and ensure they are what we expect.
         parent_labels = (
-            graph_clusters[child_cluster["cluster_id"]]["label"]
+            graph_clusters[child_cluster["cluster_id"]]["cluster_label"]
             for child_cluster in graph_clusters.values()
             if child_cluster.get("cluster_id") is not None
         )
