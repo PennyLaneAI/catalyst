@@ -22,14 +22,15 @@ pytestmark = pytest.mark.usefixtures("requires_xdsl")
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
 import pennylane as qml
+from xdsl.dialects import test
+from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir.core import Block, Region
+
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
-from xdsl.dialects import test
-from xdsl.dialects.builtin import ModuleOp
-from xdsl.ir.core import Block, Region
 
 
 class FakeDAGBuilder(DAGBuilder):
@@ -233,6 +234,7 @@ class TestFuncOpVisualization:
         assert cluster_label_to_parent_label["my_qnode1"] == "jit_my_workflow"
         assert cluster_label_to_parent_label["my_qnode2"] == "jit_my_workflow"
 
+
 class TestControlFlowClusterVisualization:
     """Tests that the control flow operations are visualized correctly as clusters."""
 
@@ -343,6 +345,7 @@ class TestControlFlowClusterVisualization:
 
         # Ensure proper nesting
 
+
 class TestDeviceNode:
     """Tests that the device node is correctly visualized."""
 
@@ -356,12 +359,12 @@ class TestDeviceNode:
         @qml.qnode(dev)
         def my_workflow():
             qml.H(0)
-        
+
         module = my_workflow()
-        
+
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
-        
+
         graph_nodes = utility.dag_builder.nodes
 
         # Basic check for node
