@@ -126,6 +126,7 @@ class ConstructCircuitDAG:
         """Handle func.return to exit FuncOp's cluster scope."""
 
         # NOTE: Skip first two because the first is the base graph, second is the jit_* workflow FuncOp
+        # and we want to use the jit_* workflow as the outer most bounding box.
         if len(self._cluster_stack) > 2:
             # If we hit a func.return operation we know we are leaving
             # the FuncOp's scope and so we can pop the ID off the stack.
