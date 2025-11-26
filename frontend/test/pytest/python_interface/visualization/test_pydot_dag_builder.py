@@ -261,7 +261,7 @@ class TestProperties:
 
         assert nodes["0"]["id"] == "0"
         assert nodes["0"]["label"] == "node0"
-        assert nodes["0"]["cluster_id"] == "__base__"
+        assert nodes["0"]["cluster_id"] == None
         assert nodes["0"]["attrs"]["fillcolor"] == "red"
 
         assert nodes["1"]["id"] == "1"
@@ -284,8 +284,8 @@ class TestProperties:
         assert edges[0]["to_id"] == "1"
         assert edges[0]["attrs"]["penwidth"] == 10
 
-    def test_get_clusters(self):
-        """Tests that get_clusters works."""
+    def test_clusters(self):
+        """Tests that clusters property works."""
 
         dag_builder = PyDotDAGBuilder()
         dag_builder.add_cluster("0", "my_info_node", label="my_cluster", penwidth=10)
@@ -302,7 +302,7 @@ class TestProperties:
         assert clusters["0"]["id"] == "0"
         assert clusters["0"]["cluster_label"] == "my_cluster"
         assert clusters["0"]["node_label"] == "my_info_node"
-        assert clusters["0"]["cluster_id"] == "__base__"
+        assert clusters["0"]["cluster_id"] == None
         assert clusters["0"]["attrs"]["penwidth"] == 10
 
         assert len(clusters["1"]) == 5
