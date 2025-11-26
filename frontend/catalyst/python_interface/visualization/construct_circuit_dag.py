@@ -54,47 +54,6 @@ class ConstructCircuitDAG:
     # IR TRAVERSAL
     # =============
 
-    @_visit.register
-    def _operation(self, operation: Operation) -> None:
-        """Visit an xDSL Operation."""
-
-        # Visualize FuncOp's as bounding boxes
-        if isinstance(operation, func.FuncOp):
-            cluster_id = f"cluster_{id(operation)}"
-            self.dag_builder.add_cluster(
-                cluster_id,
-                node_label=operation.sym_name.data,
-                cluster_id=self._cluster_stack[-1],
-            )
-            self._cluster_stack.append(cluster_id)
-
-        if isinstance(operation, scf.IfOp):
-            # Loop through each branch and visualize as a cluster
-            for i, branch in enumerate(operation.regions):
-                cluster_id = f"cluster_ifop_branch{i}_{id(operation)}"
-                self.dag_builder.add_cluster(
-                    cluster_id,
-                    label=f"if ..." if i == 0 else "else",
-                    cluster_id=self._cluster_stack[-1],
-                )
-                self._cluster_stack.append(cluster_id)
-
-                # Go recursively into the branch to process internals
-                self._visit(branch)
-
-                # Pop branch cluster after processing to ensure
-                # logical branches are treated as 'parallel'
-                self._cluster_stack.pop()
-        else:
-            for region in operation.regions:
-                self._visit(region)
-
-        # Pop if the operation was a cluster creating operation
-        # This ensures proper nesting
-        ControlFlowOp = scf.ForOp | scf.WhileOp | scf.IfOp
-        if isinstance(operation, ControlFlowOp):
-            self._cluster_stack.pop()
-
     @singledispatchmethod
     def _visit_operation(self, operation: Operation) -> None:
         """Visit an xDSL Operation. Default to visiting each region contained in the operation."""
