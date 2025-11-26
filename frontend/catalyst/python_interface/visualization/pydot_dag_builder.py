@@ -197,6 +197,9 @@ class PyDotDAGBuilder(DAGBuilder):
             cluster.add_subgraph(rank_subgraph)
             cluster.add_node(node)
 
+        # Record new cluster
+        self._subgraph_cache[id] = cluster
+        
         # Add node to cluster
         if cluster_id is None:
             self.graph.add_subgraph(cluster)
