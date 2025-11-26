@@ -91,6 +91,7 @@ class ConstructCircuitDAG:
         self.dag_builder.add_cluster(
             cluster_id,
             node_label="for ...",
+            label="",
             cluster_id=self._cluster_stack[-1],
         )
         self._cluster_stack.append(cluster_id)
@@ -107,6 +108,7 @@ class ConstructCircuitDAG:
         self.dag_builder.add_cluster(
             cluster_id,
             node_label="while ...",
+            label="",
             cluster_id=self._cluster_stack[-1],
         )
         self._cluster_stack.append(cluster_id)
@@ -122,7 +124,8 @@ class ConstructCircuitDAG:
         cluster_id = f"cluster_{id(operation)}"
         self.dag_builder.add_cluster(
             cluster_id,
-            node_label="if",
+            node_label="",
+            label="conditional",
             cluster_id=self._cluster_stack[-1],
         )
         self._cluster_stack.append(cluster_id)
@@ -132,7 +135,8 @@ class ConstructCircuitDAG:
             cluster_id = f"cluster_ifop_branch{i}_{id(operation)}"
             self.dag_builder.add_cluster(
                 cluster_id,
-                label=f"if ..." if i == 0 else "else",
+                node_label=f"if ..." if i == 0 else "else",
+                label="",
                 cluster_id=self._cluster_stack[-1],
             )
             self._cluster_stack.append(cluster_id)
