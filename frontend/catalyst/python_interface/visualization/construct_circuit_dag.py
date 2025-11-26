@@ -48,51 +48,33 @@ class ConstructCircuitDAG:
 
         """
         for op in module.ops:
-            self._visit(op)
+            self._visit_operation(op)
 
     # =============
     # IR TRAVERSAL
     # =============
-
+    
     @singledispatchmethod
-    def _visit(self, op: Any) -> None:
-        """Central dispatch method (Visitor Pattern). Routes the operation 'op'
-        to the specialized handler registered for its type."""
-
-    @_visit.register
-    def _operation(self, operation: Operation) -> None:
-        """Visit an xDSL Operation."""
-
-        # Visualize FuncOp's as bounding boxes
-        if isinstance(operation, func.FuncOp):
-            cluster_id = f"cluster_{id(operation)}"
-            self.dag_builder.add_cluster(
-                cluster_id,
-                node_label=operation.sym_name.data,
-                cluster_id=self._cluster_stack[-1],
-            )
-            self._cluster_stack.append(cluster_id)
-
+    def _visit_operation(self, operation: Operation) -> None:
+        """Visit an xDSL Operation. Default to visiting each region contained in the operation."""
         for region in operation.regions:
-            self._visit(region)
+            self._visit_region(region)
 
-    @_visit.register
-    def _region(self, region: Region) -> None:
+    def _visit_region(self, region: Region) -> None:
         """Visit an xDSL Region operation."""
         for block in region.blocks:
-            self._visit(block)
+            self._visit_block(block)
 
-    @_visit.register
-    def _block(self, block: Block) -> None:
+    def _visit_block(self, block: Block) -> None:
         """Visit an xDSL Block operation, dispatching handling for each contained Operation."""
         for op in block.ops:
-            self._visit(op)
+            self._visit_operation(op)
 
     # ============
     # DEVICE NODE
     # ============
 
-    @_visit.register
+    @_visit_operation.register
     def _device_init(self, op: quantum.DeviceInitOp) -> None:
         """Handles the initialization of a quantum device."""
         node_id = f"node_{id(op)}"
@@ -110,7 +92,19 @@ class ConstructCircuitDAG:
     # FuncOp NESTING UTILITY
     # =======================
 
-    @_visit.register
+    @_visit_operation.register
+    def _func_op(self, operation: func.FuncOp) -> None:
+        """Visit a FuncOp Operation."""
+
+        cluster_id = f"cluster_{id(operation)}"
+        self.dag_builder.add_cluster(
+            cluster_id,
+            node_label=operation.sym_name.data,
+            cluster_id=self._cluster_stack[-1],
+        )
+        self._cluster_stack.append(cluster_id)
+        
+    @_visit_operation.register
     def _func_return(self, op: func.ReturnOp) -> None:
         """Handle func.return to exit FuncOp's cluster scope."""
 
