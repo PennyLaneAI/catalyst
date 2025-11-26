@@ -111,7 +111,7 @@ class ConstructCircuitDAG:
         cluster_id = f"cluster_{id(operation)}"
         self.dag_builder.add_cluster(
             cluster_id,
-            node_label=operation.sym_name.data,
+            label=operation.sym_name.data,
             cluster_id=self._cluster_stack[-1],
         )
         self._cluster_stack.append(cluster_id)

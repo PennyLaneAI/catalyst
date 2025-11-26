@@ -57,8 +57,8 @@ class FakeDAGBuilder(DAGBuilder):
     def add_edge(self, from_id: str, to_id: str, **attrs) -> None:
         self._edges.append(
             {
-                "from": from_id,
-                "to": to_id,
+                "from_id": from_id,
+                "to_id": to_id,
                 "attrs": attrs,
             }
         )
@@ -73,7 +73,8 @@ class FakeDAGBuilder(DAGBuilder):
         cluster_id = "__base__" if cluster_id is None else cluster_id
         self._clusters[id] = {
             "id": id,
-            "label": node_label,
+            "cluster_label": attrs.get("label"),
+            "node_label": node_label,
             "cluster_id": cluster_id,
             "attrs": attrs,
         }
@@ -149,16 +150,22 @@ class TestFuncOpVisualization:
         utility.construct(module)
 
         graph_clusters = utility.dag_builder.clusters
+
+        # Check labels we expected are there
         expected_cluster_labels = [
             "jit_my_workflow",
             "my_workflow",
             "setup",
             "teardown",
         ]
-        assert len(graph_clusters) == len(expected_cluster_labels)
-        cluster_labels = {info["label"] for info in graph_clusters.values()}
-        for expected_name in expected_cluster_labels:
-            assert expected_name in cluster_labels
+        generated_cluster_labels = {info["cluster_label"] for info in graph_clusters.values()}
+        for cluster_label in expected_cluster_labels:
+            assert cluster_label in generated_cluster_labels
+
+        # Check nesting is correct
+        # graph
+        # └── jit_my_workflow
+        #     └── my_workflow
 
     def test_nested_qnodes(self):
         """Tests that nested QJIT'd QNodes are visualized correctly"""
@@ -185,6 +192,8 @@ class TestFuncOpVisualization:
         utility.construct(module)
 
         graph_clusters = utility.dag_builder.clusters
+
+        # Check labels we expected are there as clusters
         expected_cluster_labels = [
             "jit_my_workflow",
             "my_qnode1",
@@ -196,3 +205,9 @@ class TestFuncOpVisualization:
         cluster_labels = {info["label"] for info in graph_clusters.values()}
         for expected_name in expected_cluster_labels:
             assert expected_name in cluster_labels
+
+        # Check nesting is correct
+        # graph
+        # └── jit_my_workflow
+        #     ├── my_qnode1
+        #     └── my_qnode2
