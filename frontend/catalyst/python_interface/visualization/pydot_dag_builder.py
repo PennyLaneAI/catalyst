@@ -183,7 +183,7 @@ class PyDotDAGBuilder(DAGBuilder):
         # │           │
         # └───────────┘
         if node_label:
-            node_id = f"{cluster_id}_info_node"
+            node_id = f"{id}_info_node"
             rank_subgraph = Subgraph()
             node = Node(
                 node_id,
