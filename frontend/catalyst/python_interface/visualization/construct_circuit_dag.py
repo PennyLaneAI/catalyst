@@ -39,31 +39,24 @@ class ConstructCircuitDAG:
 
         """
         for op in module.ops:
-            self._visit(op)
+            self._visit_operation(op)
 
     # =============
     # IR TRAVERSAL
     # =============
 
     @singledispatchmethod
-    def _visit(self, op: Any) -> None:
-        """Central dispatch method (Visitor Pattern). Routes the operation 'op'
-        to the specialized handler registered for its type."""
-
-    @_visit.register
-    def _operation(self, operation: Operation) -> None:
-        """Visit an xDSL Operation."""
+    def _visit_operation(self, operation: Operation) -> None:
+        """Visit an xDSL Operation. Default to visiting each region contained in the operation."""
         for region in operation.regions:
-            self._visit(region)
+            self._visit_region(region)
 
-    @_visit.register
-    def _region(self, region: Region) -> None:
+    def _visit_region(self, region: Region) -> None:
         """Visit an xDSL Region operation."""
         for block in region.blocks:
-            self._visit(block)
+            self._visit_block(block)
 
-    @_visit.register
-    def _block(self, block: Block) -> None:
+    def _visit_block(self, block: Block) -> None:
         """Visit an xDSL Block operation, dispatching handling for each contained Operation."""
         for op in block.ops:
-            self._visit(op)
+            self._visit_operation(op)
