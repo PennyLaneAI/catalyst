@@ -28,7 +28,7 @@ from xdsl.printer import Printer
 from catalyst.compiler import CompileError, _get_catalyst_cli_cmd
 from catalyst.python_interface.compiler import Compiler
 
-from .draw import _get_mlir_module
+from .xdsl_conversion import get_mlir_module
 
 if TYPE_CHECKING:
     from pennylane import QNode
@@ -115,7 +115,7 @@ def generate_mlir_graph(qnode: QNode) -> Callable:
         # with the args and kwargs provided by the user.
         # TODO: we could integrate the callback mechanism within `qjit`,
         # so that we wouldn't need to recompile the qnode twice.
-        mlir_module = _get_mlir_module(qnode, args, kwargs)
+        mlir_module = get_mlir_module(qnode, args, kwargs)
         Compiler.run(mlir_module, callback=_mlir_graph_callback)
 
     return wrapper

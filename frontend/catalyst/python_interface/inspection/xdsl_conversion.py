@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This file contains the implementation of the QMLCollector class,
-which collects and maps PennyLane operations and measurements from xDSL."""
+"""This file contains utility functions for parsing PennyLane objects from xDSL."""
 
 from __future__ import annotations
 
@@ -27,10 +26,13 @@ from pennylane.ops import MidMeasure
 from pennylane.ops import __all__ as ops_all
 from pennylane.ops import measure
 from xdsl.dialects.builtin import DenseIntOrFPElementsAttr, IntegerAttr, IntegerType
+from xdsl.dialects.scf import ForOp
 from xdsl.dialects.tensor import ExtractOp as TensorExtractOp
 from xdsl.ir import SSAValue
 
-from catalyst.python_interface.dialects.quantum import (
+from ...jit import QJIT, qjit
+from ...passes.xdsl_plugin import getXDSLPluginAbsolutePath
+from ..dialects.quantum import (
     CustomOp,
     ExtractOp,
     GlobalPhaseOp,
@@ -44,12 +46,32 @@ from catalyst.python_interface.dialects.quantum import (
 
 if TYPE_CHECKING:
     from pennylane.measurements import MeasurementProcess
+    from pennylane.workflow.qnode import QNode
+    from xdsl.dialects.builtin import ModuleOp
 
 has_jax = True
 try:
     import jax
 except ImportError:
     has_jax = False
+
+
+def get_mlir_module(qnode: QNode | QJIT, args, kwargs) -> ModuleOp:
+    """Ensure the QNode is compiled and return its MLIR module."""
+    if hasattr(qnode, "mlir_module") and qnode.mlir_module is not None:
+        return qnode.mlir_module
+
+    if isinstance(qnode, QJIT):
+        compile_options = qnode.compile_options
+        compile_options.autograph = False  # Autograph has already been applied for `user_function`
+        compile_options.pass_plugins.add(getXDSLPluginAbsolutePath())
+
+        jitted_qnode = QJIT(qnode.user_function, compile_options)
+    else:
+        jitted_qnode = qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(qnode)
+
+    jitted_qnode.jit_compile(args, **kwargs)
+    return jitted_qnode.mlir_module
 
 
 from_str_to_PL_gate = {
@@ -146,6 +168,9 @@ def resolve_constant_params(ssa: SSAValue) -> float | int:
         case "arith.constant":
             return op.value.value.data  # Catalyst
 
+        case "arith.index_cast":
+            return resolve_constant_params(op.input)
+
         case "stablehlo.constant":
             return _extract_dense_constant_value(op)
 
@@ -163,6 +188,24 @@ def resolve_constant_params(ssa: SSAValue) -> float | int:
 
         case _:
             raise NotImplementedError(f"Cannot resolve parameters for operation: {op}")
+
+
+def count_static_loop_iterations(for_op: ForOp) -> int:
+    """
+    Calculates static loop iterations for a given ForOp.
+
+    Requires that the loop bounds and step are constant values.
+    """
+
+    lower_bound = resolve_constant_params(for_op.lb)
+    upper_bound = resolve_constant_params(for_op.ub)
+    step = resolve_constant_params(for_op.step)
+
+    if upper_bound <= lower_bound:
+        return 0
+
+    num_elements = upper_bound - lower_bound
+    return (num_elements + step - 1) // step
 
 
 def dispatch_wires_extract(op: ExtractOp):

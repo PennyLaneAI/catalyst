@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Unit test module for the draw function in the Python Compiler visualization module."""
+"""Unit test module for the draw function in the Python Compiler inspection module."""
 
 
 import pytest
@@ -23,16 +23,16 @@ import jax
 import pennylane as qml
 
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
+from catalyst.python_interface.inspection import draw
 from catalyst.python_interface.transforms import (
     iterative_cancel_inverses_pass,
     merge_rotations_pass,
 )
-from catalyst.python_interface.visualization import draw
 
 
 @pytest.mark.usefixtures("use_capture")
 class Testdraw:
-    """Unit tests for the draw function in the Python Compiler visualization module."""
+    """Unit tests for the draw function in the Python Compiler inspection module."""
 
     @pytest.fixture
     def transforms_circuit(self):
