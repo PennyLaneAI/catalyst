@@ -43,7 +43,7 @@ def test_initialization_defaults():
 class TestExceptions:
     """Tests the various exceptions defined in the class."""
 
-    def test_double_node_id(self):
+    def test_duplicate_node_ids(self):
         """Tests that a ValueError is raised for duplicate nodes."""
 
         dag_builder = PyDotDAGBuilder()
