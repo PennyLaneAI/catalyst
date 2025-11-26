@@ -56,6 +56,8 @@ class PyDotDAGBuilder(DAGBuilder):
         )
 
         # Use internal cache that maps cluster ID to actual pydot (Dot or Cluster) object
+        # NOTE: This is needed so we don't need to traverse the graph to find the relevant
+        # cluster object to modify
         self._subgraph_cache: dict[str, Graph] = {}
 
         # Internal state for graph structure
