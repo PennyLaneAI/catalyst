@@ -17,7 +17,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from frontend.catalyst.python_interface.visualization import dag_builder
 
 pydot = pytest.importorskip("pydot")
 pytestmark = pytest.mark.usefixtures("requires_xdsl")

@@ -183,7 +183,7 @@ class PyDotDAGBuilder(DAGBuilder):
         # │           │
         # └───────────┘
         if node_label:
-            node_id = f"{cluster_id}_info_node"
+            node_id = f"{id}_info_node"
             rank_subgraph = Subgraph()
             node = Node(
                 node_id,
@@ -219,7 +219,7 @@ class PyDotDAGBuilder(DAGBuilder):
         """Retrieve the current set of nodes in the graph.
 
         Returns:
-            nodes (dict[str, dict[str, Any]]): A dictionary that maps the node's ID to it's node information.
+            nodes (dict[str, dict[str, Any]]): A dictionary that maps the node's ID to its node information.
         """
         return self._nodes
 
@@ -237,7 +237,7 @@ class PyDotDAGBuilder(DAGBuilder):
         """Retrieve the current set of clusters in the graph.
 
         Returns:
-            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID to it's cluster information.
+            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID to its cluster information.
         """
         return self._clusters
 

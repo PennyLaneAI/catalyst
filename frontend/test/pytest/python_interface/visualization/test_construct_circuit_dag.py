@@ -73,8 +73,8 @@ class FakeDAGBuilder(DAGBuilder):
     ) -> None:
         self._clusters[id] = {
             "id": id,
-            "cluster_label": attrs.get("label"),
             "node_label": node_label,
+            "cluster_label": attrs.get("label"),
             "cluster_id": cluster_id,
             "attrs": attrs,
         }
