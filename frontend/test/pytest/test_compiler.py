@@ -298,11 +298,11 @@ class TestCompilerState:
         compiler = workflow.compiler
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             compiler.get_output_of("EmptyPipeline1", workflow.workspace)
-        assert compiler.get_output_of("HLOLoweringPasses", workflow.workspace)
-        assert compiler.get_output_of("QuantumCompilationPasses", workflow.workspace)
+        assert compiler.get_output_of("HLOLoweringStage", workflow.workspace)
+        assert compiler.get_output_of("QuantumCompilationStage", workflow.workspace)
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             compiler.get_output_of("EmptyPipeline2", workflow.workspace)
-        assert compiler.get_output_of("BufferizationPasses", workflow.workspace)
+        assert compiler.get_output_of("BufferizationStage", workflow.workspace)
         assert compiler.get_output_of("MLIRToLLVMDialectConversion", workflow.workspace)
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             compiler.get_output_of("None-existing-pipeline", workflow.workspace)

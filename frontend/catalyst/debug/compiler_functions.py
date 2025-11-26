@@ -42,8 +42,8 @@ def get_compilation_stage(fn, stage):
 
     All the available stages are:
 
-    - MLIR: ``mlir``, ``QuantumCompilationPasses``, ``HLOLoweringPasses``,
-      ``GradientLoweringPasses``, ``BufferizationPasses``, and ``MLIRToLLVMDialectConversion``.
+    - MLIR: ``mlir``, ``QuantumCompilationStage``, ``HLOLoweringStage``,
+      ``GradientLoweringStage``, ``BufferizationStage``, and ``MLIRToLLVMDialectConversion``.
 
     - LLVM: ``LLVMIRTranslation``, ``CoroOpt``, ``O2Opt``, ``Enzyme``, and ``last``.
 
@@ -73,7 +73,7 @@ def get_compilation_stage(fn, stage):
         def func(x: float):
             return x
 
-    >>> print(debug.get_compilation_stage(func, "HLOLoweringPasses"))
+    >>> print(debug.get_compilation_stage(func, "HLOLoweringStage"))
     module @func {
       func.func public @jit_func(%arg0: tensor<f64>)
       -> tensor<f64> attributes {llvm.emit_c_interface} {
@@ -139,8 +139,8 @@ def replace_ir(fn, stage, new_ir):
 
     Available stages include:
 
-    - MLIR: ``mlir``, ``QuantumCompilationPasses``, ``HLOLoweringPasses``,
-      ``GradientLoweringPasses``, ``BufferizationPasses``,and ``MLIRToLLVMDialectConversion``.
+    - MLIR: ``mlir``, ``QuantumCompilationStage``, ``HLOLoweringStage``,
+      ``GradientLoweringStage``, ``BufferizationStage``,and ``MLIRToLLVMDialectConversion``.
 
     - LLVM: ``LLVMIRTranslation``, ``CoroOpt``, ``O2Opt``, ``Enzyme``, and ``last``.
 
@@ -166,7 +166,7 @@ def replace_ir(fn, stage, new_ir):
 
     Here we modify ``%2 = arith.mulf %in, %in_0 : f64`` to turn the square function into a cubic one:
 
-    >>> old_ir = get_compilation_stage(f, "HLOLoweringPasses")
+    >>> old_ir = get_compilation_stage(f, "HLOLoweringStage")
     >>> new_ir = old_ir.replace(
     ...   "%2 = arith.mulf %in, %in_0 : f64\n",
     ...   "%t = arith.mulf %in, %in_0 : f64\n    %2 = arith.mulf %t, %in_0 : f64\n"
@@ -174,7 +174,7 @@ def replace_ir(fn, stage, new_ir):
 
     The recompilation starts after the given checkpoint stage:
 
-    >>> replace_ir(f, "HLOLoweringPasses", new_ir)
+    >>> replace_ir(f, "HLOLoweringStage", new_ir)
     >>> f(2.0)
     8.0
     """

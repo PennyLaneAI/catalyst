@@ -200,10 +200,10 @@ class CompileOptions:
         """Returns all stages in order for compilation"""
         # Dictionaries in python are ordered
         stages = {}
-        stages["QuantumCompilationPasses"] = get_quantum_compilation_stage(self)
-        stages["HLOLoweringPasses"] = get_hlo_lowering_stage(self)
-        stages["GradientLoweringPasses"] = get_gradient_lowering_stage(self)
-        stages["BufferizationPasses"] = get_bufferization_stage(self)
+        stages["QuantumCompilationStage"] = get_quantum_compilation_stage(self)
+        stages["HLOLoweringStage"] = get_hlo_lowering_stage(self)
+        stages["GradientLoweringStage"] = get_gradient_lowering_stage(self)
+        stages["BufferizationStage"] = get_bufferization_stage(self)
         stages["MLIRToLLVMDialectConversion"] = get_convert_to_llvm_stage(self)
         return list(stages.items())
 
