@@ -59,7 +59,7 @@ class TestExceptions:
         dag_builder = PyDotDAGBuilder()
 
         dag_builder.add_node("0", "node0")
-        with pytest.raises(ValueError, match="Edges must connect two uniques IDs."):
+        with pytest.raises(ValueError, match="Edges must connect two unique IDs."):
             dag_builder.add_edge("0", "0")
 
     def test_edge_missing_ids(self):
