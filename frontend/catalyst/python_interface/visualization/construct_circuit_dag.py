@@ -20,7 +20,12 @@ from typing import Any
 from xdsl.dialects import builtin
 from xdsl.ir import Block, Operation, Region
 
+from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from catalyst.python_interface.visualization.xdsl_conversion import (
+    xdsl_to_qml_measurement,
+    xdsl_to_qml_op,
+)
 
 
 class ConstructCircuitDAG:
@@ -41,6 +46,14 @@ class ConstructCircuitDAG:
     def __init__(self, dag_builder: DAGBuilder) -> None:
         self.dag_builder: DAGBuilder = dag_builder
 
+        # Record clusters seen as a stack
+        # beginning with the base graph (None)
+        self._cluster_stack: list[str | None] = [None]
+
+    def _reset(self) -> None:
+        """Resets the instance."""
+        self._cluster_stack: list[str | None] = [None]
+
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module.
 
@@ -48,6 +61,7 @@ class ConstructCircuitDAG:
             module (xdsl.builtin.ModuleOp): The module containing the quantum program to visualize.
 
         """
+        self._reset()
         for op in module.ops:
             self._visit_operation(op)
 
@@ -70,3 +84,66 @@ class ConstructCircuitDAG:
         """Visit an xDSL Block operation, dispatching handling for each contained Operation."""
         for op in block.ops:
             self._visit_operation(op)
+
+    # ===================
+    # QUANTUM OPERATIONS
+    # ===================
+
+    @_visit_operation.register
+    def _unitary(
+        self,
+        op: quantum.CustomOp | quantum.GlobalPhaseOp | quantum.QubitUnitaryOp | quantum.MultiRZOp,
+    ) -> None:
+        """Generic handler for unitary gates."""
+
+        qml_op = xdsl_to_qml_op(op)
+        # Build node on graph
+        self.dag_builder.add_node(
+            id=f"node_{id(op)}",
+            label=str(qml_op),
+            cluster_id=self._cluster_stack[-1],
+        )
+
+    # =====================
+    # QUANTUM MEASUREMENTS
+    # =====================
+
+    @_visit_operation.register
+    def _state_op(self, op: quantum.StateOp) -> None:
+        """Handler for the terminal state measurement operation."""
+
+        meas = xdsl_to_qml_measurement(op)
+        # Build node on graph
+        self.dag_builder.add_node(
+            id=f"node_{id(op)}",
+            label=str(meas),
+            cluster_id=self._cluster_stack[-1],
+        )
+
+    @_visit_operation.register
+    def _statistical_measurement_ops(
+        self,
+        op: quantum.ExpvalOp | quantum.VarianceOp | quantum.ProbsOp | quantum.SampleOp,
+    ) -> None:
+        """Handler for statistical measurement operations."""
+
+        obs_op = op.obs.owner
+        meas = xdsl_to_qml_measurement(op, xdsl_to_qml_measurement(obs_op))
+        # Build node on graph
+        self.dag_builder.add_node(
+            id=f"node_{id(op)}",
+            label=str(meas),
+            cluster_id=self._cluster_stack[-1],
+        )
+
+    @_visit_operation.register
+    def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
+        """Handler for the single-qubit projective measurement operation."""
+
+        meas = xdsl_to_qml_measurement(op)
+        # Build node on graph
+        self.dag_builder.add_node(
+            id=f"node_{id(op)}",
+            label=str(meas),
+            cluster_id=self._cluster_stack[-1],
+        )
