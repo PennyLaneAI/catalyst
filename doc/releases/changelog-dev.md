@@ -189,6 +189,10 @@
   of identities.
   [(#2192)](https://github.com/PennyLaneAI/catalyst/pull/2192)
 
+  * Added a `merge-ppr` pass that allows merging of PPRs with equivalent angles, and cancelling of
+  PPRs with opposite angles.
+  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)	
+
 <h3>Documentation 📝</h3>
 
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
