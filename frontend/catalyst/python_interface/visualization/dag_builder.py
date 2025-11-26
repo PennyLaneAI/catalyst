@@ -90,7 +90,7 @@ class DAGBuilder(ABC):
         """Retrieve the current set of nodes in the graph.
 
         Returns:
-            nodes (dict[str, dict[str, Any]]): A dictionary that maps the node's ID to it's node information.
+            nodes (dict[str, dict[str, Any]]): A dictionary that maps the node's ID to its node information.
         """
         raise NotImplementedError
 
@@ -110,7 +110,7 @@ class DAGBuilder(ABC):
         """Retrieve the current set of clusters in the graph.
 
         Returns:
-            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID to it's cluster information.
+            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID to its cluster information.
         """
         raise NotImplementedError
 
