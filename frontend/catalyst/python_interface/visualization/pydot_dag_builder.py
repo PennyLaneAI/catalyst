@@ -22,7 +22,7 @@ from .dag_builder import DAGBuilder
 has_pydot = True
 try:
     import pydot
-    from pydot import Cluster, Dot, Edge, Node, Subgraph
+    from pydot import Cluster, Dot, Edge, Graph, Node, Subgraph
 except ImportError:
     has_pydot = False
 
@@ -54,6 +54,9 @@ class PyDotDAGBuilder(DAGBuilder):
         self.graph: Dot = Dot(
             graph_type="digraph", rankdir="TB", compound="true", strict=True
         )
+
+        # Use internal cache that maps cluster ID to actual pydot (Dot or Cluster) object
+        self._subgraph_cache: dict[str, Graph] = {}
 
         # Internal state for graph structure
         self._nodes: dict[str, dict[str, Any]] = {}
@@ -117,12 +120,7 @@ class PyDotDAGBuilder(DAGBuilder):
         if cluster_id is None:
             self.graph.add_node(node)
         else:
-            # Use cluster ID to look up the subgraph
-            parent_clusters = self.graph.get_subgraph("cluster_" + cluster_id)
-            assert len(parent_clusters) == 1, (
-                f"Found {len(parent_clusters)} parent clusters with id {'cluster_' + cluster_id}"
-            )
-            parent_clusters[0].add_node(node)
+            parent_cluster = self._subgraph_cache[cluster_id].add_node(node)
 
         self._nodes[id] = {
             "id": id,
@@ -197,16 +195,11 @@ class PyDotDAGBuilder(DAGBuilder):
             cluster.add_subgraph(rank_subgraph)
             cluster.add_node(node)
 
-        # Add cluster to parent cluster
+        # Add node to cluster
         if cluster_id is None:
             self.graph.add_subgraph(cluster)
         else:
-            # Use cluster ID to look up the subgraph
-            parent_clusters = self.graph.get_subgraph("cluster_" + cluster_id)
-            assert len(parent_clusters) == 1, (
-                f"Found {len(parent_clusters)} parent clusters with id {'cluster_' + cluster_id}"
-            )
-            parent_clusters[0].add_subgraph(cluster)
+            parent_cluster = self._subgraph_cache[cluster_id].add_node(cluster)
 
         self._clusters[id] = {
             "id": id,
