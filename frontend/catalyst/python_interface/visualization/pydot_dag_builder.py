@@ -219,7 +219,7 @@ class PyDotDAGBuilder(DAGBuilder):
         """Retrieve the current set of nodes in the graph.
 
         Returns:
-            nodes (dict[str, dict[str, Any]]): A dictionary that maps the node's ID to it's node information.
+            nodes (dict[str, dict[str, Any]]): A dictionary that maps the node's ID to its node information.
         """
         return self._nodes
 
