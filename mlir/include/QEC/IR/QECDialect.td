@@ -351,10 +351,10 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def PPRArbitraryRotationOp : QEC_Op<"ppr.arbitrary", [AttrSizedOperandSegments]> {
+def PPRotationArbitraryOp : QEC_Op<"ppr.arbitrary", [AttrSizedOperandSegments]> {
     let summary = "Pauli Product Rotation with arbitrary angle.";
     let description = [{
-        The PPRArbitraryRotationOp represents a Pauli product rotation operation with an arbitrary angle.
+        The PPRotationArbitraryOp represents a Pauli product rotation operation with an arbitrary angle.
         It applies a rotation of the form exp(iθP) to a set of qubits, where:
         - P is a Pauli product (specified by pauli_product)
         - θ is the rotation angle (specified by arbitrary_angle in radians)

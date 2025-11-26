@@ -95,7 +95,7 @@ LogicalResult PPRotationOp::verify()
     return mlir::success();
 }
 
-LogicalResult PPRArbitraryRotationOp::verify()
+LogicalResult PPRotationArbitraryOp::verify()
 {
     size_t numPauliProduct = getPauliProduct().size();
 
@@ -162,8 +162,8 @@ LogicalResult PPRotationOp::canonicalize(PPRotationOp op, PatternRewriter &rewri
     return mlir::failure();
 }
 
-LogicalResult PPRArbitraryRotationOp::canonicalize(PPRArbitraryRotationOp op,
-                                                   PatternRewriter &rewriter)
+LogicalResult PPRotationArbitraryOp::canonicalize(PPRotationArbitraryOp op,
+                                                  PatternRewriter &rewriter)
 {
     auto pauliProduct = op.getPauliProduct();
 
