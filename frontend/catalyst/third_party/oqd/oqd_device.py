@@ -47,9 +47,9 @@ def OQDDevicePipeline(device, qubit, gate):
         (
             "device-agnostic-pipeline",
             [
-                "user-transform-pipeline",
-                "hlo-lowering-pipeline",
                 "quantum-compilation-pipeline",
+                "hlo-lowering-pipeline",
+                "gradient-lowering-pipeline",
                 "bufferization-pipeline",
             ],
         ),

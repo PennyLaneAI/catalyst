@@ -68,9 +68,9 @@
 <h3>Breaking changes 💔</h3>
 
 * The MLIR pipeline ``enforce-runtime-invariants-pipeline`` has been renamed to
-  ``user-transform-pipeline`` to better reflect its purpose. Users who reference this
-  pipeline name directly (e.g., in custom pipeline configurations) will need to update
-  their code to use the new name.
+  ``quantum-compilation-pipeline`` and the old ``quantum-compilation-pipeline`` has been renamed to
+  ``gradient-lowering-pipeline``. Users who referenced these pipeline names directly would need to 
+  update their code to use the new names.
   [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
   [(#2230)](https://github.com/PennyLaneAI/catalyst/pull/2230)
 

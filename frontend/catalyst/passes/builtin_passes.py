@@ -680,7 +680,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
 
         from catalyst.passes import to_ppr, commute_ppr
 
-        pips = [("pipe", ["user-transform-pipeline"])]
+        pips = [("pipe", ["quantum-compilation-pipeline"])]
 
         @qjit(pipelines=pips, target="mlir")
         @to_ppr
@@ -772,7 +772,7 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
         from catalyst import measure, qjit
         from catalyst.passes import to_ppr, merge_ppr_ppm
 
-        pips = [("pipe", ["user-transform-pipeline"])]
+        pips = [("pipe", ["quantum-compilation-pipeline"])]
 
         @qjit(pipelines=pips, target="mlir")
         @to_ppr
@@ -850,7 +850,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
         from catalyst import qjit, measure
         from catalyst.passes import to_ppr, commute_ppr, merge_ppr_ppm, ppr_to_ppm
 
-        pipeline = [("pipe", ["user-transform-pipeline"])]
+        pipeline = [("pipe", ["quantum-compilation-pipeline"])]
 
         @qjit(pipelines=pipeline, target="mlir")
         @merge_ppr_ppm
@@ -952,7 +952,7 @@ def ppm_compilation(
         from catalyst import qjit, measure
         from catalyst.passes import ppm_compilation
 
-        pipeline = [("pipe", ["user-transform-pipeline"])]
+        pipeline = [("pipe", ["quantum-compilation-pipeline"])]
         method = "clifford-corrected"
 
         @qjit(pipelines=pipeline, target="mlir")
@@ -1048,7 +1048,7 @@ def ppm_specs(fn):
         from catalyst import qjit, measure, for_loop
         from catalyst.passes import ppm_specs, ppm_compilation
 
-        pipe = [("pipe", ["user-transform-pipeline"])]
+        pipe = [("pipe", ["quantum-compilation-pipeline"])]
         device = qml.device("lightning.qubit", wires=2)
 
         @qjit(pipelines=pipe, target="mlir")
@@ -1145,7 +1145,7 @@ def reduce_t_depth(qnode):
         from catalyst import qjit, measure
         from catalyst.passes import to_ppr, commute_ppr, reduce_t_depth, merge_ppr_ppm
 
-        pips = [("pipe", ["user-transform-pipeline"])]
+        pips = [("pipe", ["quantum-compilation-pipeline"])]
 
 
         @qjit(pipelines=pips, target="mlir")
@@ -1241,7 +1241,7 @@ def ppr_to_mbqc(qnode):
         from catalyst import qjit, measure
         from catalyst.passes import to_ppr, ppr_to_mbqc
 
-        pipeline = [("pipe", ["user-transform-pipeline"])]
+        pipeline = [("pipe", ["quantum-compilation-pipeline"])]
 
         @qjit(pipelines=pipeline, keep_intermediate=True, target="mlir")
         @ppr_to_mbqc

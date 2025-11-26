@@ -113,9 +113,9 @@ Enable a specific pass. For example, to enable the ``cancel-inverses`` pass, use
 Catalyst's main ``mlir`` stage is split up into a sequence of pass pipelines that can also be run
 individually via this option. In that case, the name of the pipeline is substituted for the pass
 name. Currently, the following pipelines are available:
-``user-transform-pipeline``,
-``hlo-lowering-pipeline``,
 ``quantum-compilation-pipeline``,
+``hlo-lowering-pipeline``,
+``gradient-lowering-pipeline``,
 ``bufferization-pipeline``,
 ``llvm-dialect-lowering-pipeline``, and finally
 ``default-catalyst-pipeline`` which encompasses all the above as the default pipeline used by the
