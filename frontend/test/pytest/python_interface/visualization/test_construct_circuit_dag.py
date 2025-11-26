@@ -341,6 +341,8 @@ class TestControlFlowClusterVisualization:
         assert "else" in cluster_labels
         assert cluster_labels.count("else") == 2
 
+        # Ensure proper nesting
+
 class TestDeviceNode:
     """Tests that the device node is correctly visualized."""
 
