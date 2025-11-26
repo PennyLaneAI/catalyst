@@ -60,7 +60,7 @@ def cancel_inverses(qnode):
         to display the circuit as written in Python.
 
         To instead view the optimized circuit, the MLIR must be viewed
-        after the ``"QuantumCompilationPass"`` stage via the
+        after the ``"QuantumCompilationPasses"`` stage via the
         :func:`~.get_compilation_stage` function.
 
     Args:
@@ -95,9 +95,9 @@ def cancel_inverses(qnode):
     with :func:`~.draw`).
 
     To instead view the optimized circuit, the MLIR must be viewed
-    after the ``"QuantumCompilationPass"`` stage:
+    after the ``"QuantumCompilationPasses"`` stage:
 
-    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationPass"))
+    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationPasses"))
     module @circuit {
       func.func public @jit_circuit(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
         %0 = call @circuit(%arg0) : (tensor<f64>) -> tensor<f64>
@@ -181,9 +181,9 @@ def disentangle_cnot(qnode):
     with :func:`~.draw`).
 
     To instead view the optimized circuit, the MLIR must be viewed
-    after the ``"QuantumCompilationPass"`` stage:
+    after the ``"QuantumCompilationPasses"`` stage:
 
-    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationPass"))
+    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationPasses"))
 
     .. code-block:: mlir
 
@@ -271,9 +271,9 @@ def disentangle_swap(qnode):
     with :func:`~.draw`).
 
     To instead view the optimized circuit, the MLIR must be viewed
-    after the ``"QuantumCompilationPass"`` stage:
+    after the ``"QuantumCompilationPasses"`` stage:
 
-    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationPass"))
+    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationPasses"))
 
     .. code-block:: mlir
 
@@ -358,7 +358,7 @@ def merge_rotations(qnode):
         to display the circuit as written in Python.
 
         To instead view the optimized circuit, the MLIR must be viewed
-        after the ``"QuantumCompilationPass"`` stage via the
+        after the ``"QuantumCompilationPasses"`` stage via the
         :func:`~.get_compilation_stage` function.
 
     Args:
@@ -433,7 +433,7 @@ def ions_decomposition(qnode):  # pragma: nocover
         to display the circuit as written in Python.
 
         To instead view the optimized circuit, the MLIR must be viewed
-        after the ``"QuantumCompilationPass"`` stage via the
+        after the ``"QuantumCompilationPasses"`` stage via the
         :func:`~.get_compilation_stage` function.
 
     Args:
@@ -463,7 +463,7 @@ def ions_decomposition(qnode):  # pragma: nocover
             return qml.expval(qml.PauliY(wires=0))
 
 
-    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationPass"))
+    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationPasses"))
     module @circuit {
       func.func public @jit_circuit() -> tensor<f64> attributes {llvm.emit_c_interface} {
         %0 = call @circuit_0() : () -> tensor<f64>

@@ -166,7 +166,7 @@ given stage. The stages that are currently available are:
 * MLIR: ``mlir`` (start with first MLIR stage), ``{pipeline}`` such as any of the built-in pipeline
   names described under the ``--{passname}`` option, OR any custom pipeline names if the
   ``--catalyst-pipeline={pipeline(...),...}`` option is used.
-* LLVM: ``llvm_ir`` (start with first LLVM stage), ``CoroOpt``, ``O2Opt``, ``Enzyme``.
+* LLVM: ``LLVMIRTranslation`` (start with first LLVM stage), ``CoroOpt``, ``O2Opt``, ``Enzyme``.
   Note that ``CoroOpt`` (Coroutine lowering), ``O2Opt`` (O2 optimization), and ``Enzyme``
   (automatic differentiation) passes are only run conditionally as needed.
 

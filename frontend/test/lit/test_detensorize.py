@@ -32,7 +32,7 @@ def a_plus_b_times_2(a, b):
 
 
 a_plus_b_times_2(1.0, 2.0)
-print(get_compilation_stage(a_plus_b_times_2, "HLOLoweringPass"))
+print(get_compilation_stage(a_plus_b_times_2, "HLOLoweringPasses"))
 a_plus_b_times_2.workspace.cleanup()
 
 
@@ -60,7 +60,7 @@ def f_with_cond(a, b):
 
 
 f_with_cond(1.0, 2.0)
-print(get_compilation_stage(f_with_cond, "HLOLoweringPass"))
+print(get_compilation_stage(f_with_cond, "HLOLoweringPasses"))
 f_with_cond.workspace.cleanup()
 
 
@@ -83,7 +83,7 @@ def f_with_for_loop(a, b):
 
 
 f_with_for_loop(1.0, 2.0)
-print(get_compilation_stage(f_with_for_loop, "HLOLoweringPass"))
+print(get_compilation_stage(f_with_for_loop, "HLOLoweringPasses"))
 f_with_for_loop.workspace.cleanup()
 
 
@@ -106,7 +106,7 @@ def f_with_loop_over_list(a, b):
 
 
 f_with_loop_over_list(1.0, 2.0)
-print(get_compilation_stage(f_with_loop_over_list, "HLOLoweringPass"))
+print(get_compilation_stage(f_with_loop_over_list, "HLOLoweringPasses"))
 f_with_loop_over_list.workspace.cleanup()
 
 
@@ -129,5 +129,5 @@ def f_with_enumerate(a, b):
 
 
 f_with_enumerate(1.0, 2.0)
-print(get_compilation_stage(f_with_enumerate, "HLOLoweringPass"))
+print(get_compilation_stage(f_with_enumerate, "HLOLoweringPasses"))
 f_with_enumerate.workspace.cleanup()
