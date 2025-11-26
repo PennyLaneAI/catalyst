@@ -15,12 +15,6 @@
 // RUN: quantum-opt --merge-ppr --split-input-file -verify-diagnostics %s | FileCheck %s
 // TODO: RUN: quantum-opt --merge-ppr="max-pauli-size=3" --split-input-file -verify-diagnostics %s | FileCheck %s
 
-
-// TODO: 
-//  - test negatives
-//  - test merge + cancel
-
-
 //////////////////////////////////////////// MERGE TESTS ///////////////////////////////////////////
 ////////////////////////////////////// Single gate merge tests /////////////////////////////////////
 
@@ -48,6 +42,15 @@ func.func public @merge_Z_pi_8(%q1: !quantum.bit) {
     // CHECK: qec.ppr ["Z"](4)
     %0 = qec.ppr ["Z"](8) %q1: !quantum.bit
     %1 = qec.ppr ["Z"](8) %0: !quantum.bit
+    func.return
+}
+
+// CHECK-LABEL: merge_X_minus_pi_8
+func.func public @merge_X_minus_pi_8(%q1: !quantum.bit) {
+    // CHECK-NOT: qec.ppr ["X"](-8)
+    // CHECK: qec.ppr ["X"](-4)
+    %0 = qec.ppr ["X"](-8) %q1: !quantum.bit
+    %1 = qec.ppr ["X"](-8) %0: !quantum.bit
     func.return
 }
 
@@ -282,6 +285,7 @@ func.func public @dont_cancel_multi(%q1: !quantum.bit) {
 }
 
 ///////////////////////////////////////// MERGE AND CANCEL /////////////////////////////////////////
+//////////////////////////////////////////// single gate ///////////////////////////////////////////
 
 // CHECK-LABEL: merge_and_cancel
 func.func public @merge_and_cancel(%q1: !quantum.bit) {
@@ -289,5 +293,38 @@ func.func public @merge_and_cancel(%q1: !quantum.bit) {
     %0 = qec.ppr ["X"](-4) %q1: !quantum.bit
     %1 = qec.ppr ["X"](-4) %0: !quantum.bit
     %2 = qec.ppr ["X"](2) %1: !quantum.bit
+    func.return
+}
+
+// CHECK-LABEL: cancel_and_merge
+func.func public @cancel_and_merge(%q1: !quantum.bit) {
+    // CHECK-NOT: qec.ppr ["X"]
+    // CHECK: qec.ppr ["Z"](2)
+    %0 = qec.ppr ["Z"](4) %q1: !quantum.bit
+    %1 = qec.ppr ["X"](-2) %0: !quantum.bit
+    %2 = qec.ppr ["X"](2) %1: !quantum.bit
+    %3 = qec.ppr ["Z"](4) %2: !quantum.bit
+    func.return
+}
+
+//////////////////////////////////////////// multi-gate ////////////////////////////////////////////
+
+// CHECK-LABEL: multi_merge_and_cancel
+func.func public @multi_merge_and_cancel(%q1: !quantum.bit) {
+    // CHECK-NOT: qec.ppr
+    %0 = qec.ppr ["ZX"](4) %q1: !quantum.bit
+    %1 = qec.ppr ["ZX"](-8) %0: !quantum.bit
+    %2 = qec.ppr ["ZX"](-8) %1: !quantum.bit
+    func.return
+}
+
+// CHECK-LABEL: multi_cancel_and_merge
+func.func public @multi_cancel_and_merge(%q1: !quantum.bit) {
+    // CHECK-NOT: qec.ppr ["XY"]
+    // CHECK: qec.ppr ["YZ"](4)
+    %0 = qec.ppr ["YZ"](8) %q1: !quantum.bit
+    %1 = qec.ppr ["XY"](-4) %0: !quantum.bit
+    %2 = qec.ppr ["XY"](4) %1: !quantum.bit
+    %3 = qec.ppr ["YZ"](8) %2: !quantum.bit
     func.return
 }
