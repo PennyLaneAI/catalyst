@@ -247,6 +247,55 @@ class TestControlFlowClusterVisualization:
         assert "while ..." in cluster_labels
 
     @pytest.mark.unit
-    def test_conditional(self):
+    def test_if_else_conditional(self):
         """Test that the conditional operation is visualized correctly."""
-        pass
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            flag = 1
+            if flag == 1:
+                qml.X(0)
+            else:
+                qml.Y(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+        cluster_labels = {info["label"] for info in clusters.values()}
+        assert "if ..." in cluster_labels
+        assert "else" in cluster_labels
+
+    @pytest.mark.unit
+    def test_if_elif_else_conditional(self):
+        """Test that the conditional operation is visualized correctly."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            flag = 1
+            if flag == 1:
+                qml.X(0)
+            elif flag == 2:
+                qml.Y(0)
+            else:
+                qml.Z(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+        cluster_labels = [info["label"] for info in clusters.values()]
+        assert "if ..." in cluster_labels
+        assert cluster_labels.count("if ...") == 2
+        assert "else" in cluster_labels
+        assert cluster_labels.count("else") == 2
