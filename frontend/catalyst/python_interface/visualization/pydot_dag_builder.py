@@ -22,6 +22,7 @@ from .dag_builder import DAGBuilder
 has_pydot = True
 try:
     import pydot
+    from pydot import Cluster, Dot, Edge, Graph, Node, Subgraph
 except ImportError:
     has_pydot = False
 
@@ -50,9 +51,12 @@ class PyDotDAGBuilder(DAGBuilder):
         # - rankdir="TB": Set layout direction from Top to Bottom.
         # - compound="true": Allow edges to connect directly to clusters/subgraphs.
         # - strict=True: Prevent duplicate edges (e.g., A -> B added twice).
-        self.graph: pydot.Dot = pydot.Dot(
+        self.graph: Dot = Dot(
             graph_type="digraph", rankdir="TB", compound="true", strict=True
         )
+
+        # Use internal cache that maps cluster ID to actual pydot (Dot or Cluster) object
+        self._subgraph_cache: dict[str, Graph] = {}
 
         # Internal state for graph structure
         self._nodes: dict[str, dict[str, Any]] = {}
@@ -110,15 +114,13 @@ class PyDotDAGBuilder(DAGBuilder):
         """
         # Use ChainMap so you don't need to construct a new dictionary
         node_attrs: ChainMap = ChainMap(attrs, self._default_node_attrs)
-        node = pydot.Node(id, label=label, **node_attrs)
+        node = Node(id, label=label, **node_attrs)
 
         # Add node to cluster
         if cluster_id is None:
             self.graph.add_node(node)
         else:
-            # Use cluster ID to look up the subgraph
-            assert len(self.graph.get_subgraph(cluster_id)) == 1
-            self.graph.get_subgraph(cluster_id)[0].add_node(node)
+            parent_cluster = self._subgraph_cache[cluster_id].add_node(node)
 
         self._nodes[id] = {
             "id": id,
@@ -138,7 +140,8 @@ class PyDotDAGBuilder(DAGBuilder):
         """
         # Use ChainMap so you don't need to construct a new dictionary
         edge_attrs: ChainMap = ChainMap(attrs, self._default_edge_attrs)
-        edge = pydot.Edge(from_id, to_id, **edge_attrs)
+        edge = Edge(from_id, to_id, **edge_attrs)
+
         self.graph.add_edge(edge)
 
         self._edges.append(
@@ -166,7 +169,7 @@ class PyDotDAGBuilder(DAGBuilder):
         """
         # Use ChainMap so you don't need to construct a new dictionary
         cluster_attrs: ChainMap = ChainMap(attrs, self._default_cluster_attrs)
-        cluster = pydot.Cluster(graph_name=id, **cluster_attrs)
+        cluster = Cluster(id, **cluster_attrs)
 
         # Puts the label in a node within the cluster.
         # Ensures that any edges connecting nodes through the cluster
@@ -179,8 +182,8 @@ class PyDotDAGBuilder(DAGBuilder):
         # └───────────┘
         if node_label:
             node_id = f"{cluster_id}_info_node"
-            rank_subgraph = pydot.Subgraph()
-            node = pydot.Node(
+            rank_subgraph = Subgraph()
+            node = Node(
                 node_id,
                 label=node_label,
                 shape="rectangle",
@@ -192,13 +195,11 @@ class PyDotDAGBuilder(DAGBuilder):
             cluster.add_subgraph(rank_subgraph)
             cluster.add_node(node)
 
-        # Add cluster to parent cluster
+        # Add node to cluster
         if cluster_id is None:
             self.graph.add_subgraph(cluster)
         else:
-            # Use cluster ID to look up the subgraph
-            assert len(self.graph.get_subgraph(cluster_id)) == 1
-            self.graph.get_subgraph(cluster_id)[0].add_subgraph(cluster)
+            parent_cluster = self._subgraph_cache[cluster_id].add_node(cluster)
 
         self._clusters[id] = {
             "id": id,
