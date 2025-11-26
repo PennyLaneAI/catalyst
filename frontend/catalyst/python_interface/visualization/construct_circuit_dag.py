@@ -56,6 +56,7 @@ class ConstructCircuitDAG:
             module (xdsl.builtin.ModuleOp): The module containing the quantum program to visualize.
 
         """
+        self._reset()
         for op in module.ops:
             self._visit_operation(op)
 
