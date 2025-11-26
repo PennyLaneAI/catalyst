@@ -16,6 +16,9 @@
   when using ``keep_intermediate="changed"`` or ``keep_intermediate="pass"``.
   [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
 
+* `qml.PCPhase` can be compiled and executed with capture enabled.
+  [(#2226)](https://github.com/PennyLaneAI/catalyst/pull/2226)
+
 * Resource tracking now supports dynamic qubit allocation
   [(#2203)](https://github.com/PennyLaneAI/catalyst/pull/2203)
 
