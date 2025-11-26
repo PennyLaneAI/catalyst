@@ -22,15 +22,14 @@ pytestmark = pytest.mark.usefixtures("requires_xdsl")
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
 import pennylane as qml
-from xdsl.dialects import test
-from xdsl.dialects.builtin import ModuleOp
-from xdsl.ir.core import Block, Region
-
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from xdsl.dialects import test
+from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir.core import Block, Region
 
 
 class FakeDAGBuilder(DAGBuilder):
@@ -259,6 +258,8 @@ class TestControlFlowClusterVisualization:
         cluster_labels = {info["label"] for info in clusters.values()}
         assert "for ..." in cluster_labels
 
+        # Ensure proper nesting of clusters
+
     @pytest.mark.unit
     def test_while_loop(self):
         """Test that the while loop is visualized correctly."""
@@ -281,6 +282,8 @@ class TestControlFlowClusterVisualization:
         clusters = utility.dag_builder.clusters
         cluster_labels = {info["label"] for info in clusters.values()}
         assert "while ..." in cluster_labels
+
+        # Ensure proper nesting of clusters
 
     @pytest.mark.unit
     def test_if_else_conditional(self):
@@ -306,6 +309,8 @@ class TestControlFlowClusterVisualization:
         cluster_labels = {info["label"] for info in clusters.values()}
         assert "if ..." in cluster_labels
         assert "else" in cluster_labels
+
+        # Ensure proper nesting of clusters
 
     @pytest.mark.unit
     def test_if_elif_else_conditional(self):
@@ -335,7 +340,6 @@ class TestControlFlowClusterVisualization:
         assert cluster_labels.count("if ...") == 2
         assert "else" in cluster_labels
         assert cluster_labels.count("else") == 2
-
 
 class TestDeviceNode:
     """Tests that the device node is correctly visualized."""
