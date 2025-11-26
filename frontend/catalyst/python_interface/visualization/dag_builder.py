@@ -13,7 +13,7 @@
 # limitations under the License.
 """File that defines the DAGBuilder abstract base class."""
 
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from typing import Any, TypeAlias
 
 ClusterID: TypeAlias = str
