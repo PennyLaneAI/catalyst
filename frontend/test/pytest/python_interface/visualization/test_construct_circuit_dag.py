@@ -235,7 +235,7 @@ class TestFuncOpVisualization:
         assert cluster_label_to_parent_label["my_qnode2"] == "jit_my_workflow"
 
 
-class TestControlFlowClusterVisualization:
+class TestControlFlowVisualization:
     """Tests that the control flow operations are visualized correctly as clusters."""
 
     @pytest.mark.unit
