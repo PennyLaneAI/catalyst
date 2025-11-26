@@ -15,7 +15,6 @@
 """Contains the ConstructCircuitDAG tool for constructing a DAG from an xDSL module."""
 
 from functools import singledispatchmethod
-from typing import Any
 
 from xdsl.dialects import builtin, func
 from xdsl.ir import Block, Operation, Region
