@@ -237,7 +237,7 @@ class PyDotDAGBuilder(DAGBuilder):
         """Retrieve the current set of clusters in the graph.
 
         Returns:
-            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID to it's cluster information.
+            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID to its cluster information.
         """
         return self._clusters
 
