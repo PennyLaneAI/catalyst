@@ -72,6 +72,7 @@
   pipeline name directly (e.g., in custom pipeline configurations) will need to update
   their code to use the new name.
   [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
+  [(#2230)](https://github.com/PennyLaneAI/catalyst/pull/2230)
 
 * The plxpr transform `pl_map_wires` has been removed along with its test.
   [(#2220)](https://github.com/PennyLaneAI/catalyst/pull/2220)
