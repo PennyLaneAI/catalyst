@@ -48,16 +48,11 @@ class ConstructCircuitDAG:
 
         """
         for op in module.ops:
-            self._visit(op)
+            self._visit_operation(op)
 
     # =============
     # IR TRAVERSAL
     # =============
-
-    @singledispatchmethod
-    def _visit(self, op: Any) -> None:
-        """Central dispatch method (Visitor Pattern). Routes the operation 'op'
-        to the specialized handler registered for its type."""
 
     @_visit.register
     def _operation(self, operation: Operation) -> None:
@@ -99,56 +94,28 @@ class ConstructCircuitDAG:
         ControlFlowOp = scf.ForOp | scf.WhileOp | scf.IfOp
         if isinstance(operation, ControlFlowOp):
             self._cluster_stack.pop()
+            
+    @singledispatchmethod
+    def _visit_operation(self, operation: Operation) -> None:
+        """Visit an xDSL Operation. Default to visiting each region contained in the operation."""
+        for region in operation.regions:
+            self._visit_region(region)
 
-    @_visit.register
-    def _region(self, region: Region) -> None:
+    def _visit_region(self, region: Region) -> None:
         """Visit an xDSL Region operation."""
         for block in region.blocks:
-            self._visit(block)
+            self._visit_block(block)
 
-    @_visit.register
-    def _block(self, block: Block) -> None:
+    def _visit_block(self, block: Block) -> None:
         """Visit an xDSL Block operation, dispatching handling for each contained Operation."""
         for op in block.ops:
-            self._visit(op)
+            self._visit_operation(op)
 
-    # ============
-    # DEVICE NODE
-    # ============
-
-    @_visit.register
-    def _device_init(self, op: quantum.DeviceInitOp) -> None:
-        """Handles the initialization of a quantum device."""
-        node_id = f"node_{id(op)}"
-        self.dag_builder.add_node(
-            node_id,
-            label=op.device_name.data,
-            cluster_id=self._cluster_stack[-1],
-            fillcolor="grey",
-            color="black",
-            penwidth=2,
-            shape="rectangle",
-        )
-
-    # =======================
-    # FuncOp NESTING UTILITY
-    # =======================
-
-    @_visit.register
-    def _func_return(self, op: func.ReturnOp) -> None:
-        """Handle func.return to exit FuncOp's cluster scope."""
-
-        # NOTE: Skip first two because the first is the base graph, second is the jit_* workflow FuncOp
-        if len(self._cluster_stack) > 2:
-            # If we hit a func.return operation we know we are leaving
-            # the FuncOp's scope and so we can pop the ID off the stack.
-            self._cluster_stack.pop()
-
-    # =========================
-    # 3. CONTROL FLOW HANDLERS
-    # =========================
-
-    @_visit.register
+    # =============
+    # CONTROL FLOW
+    # =============
+           
+    @_visit_operation.register
     def _for_op(self, op: scf.ForOp) -> None:
         """Handle an xDSL ForOp operation."""
         cluster_id = f"cluster_{id(op)}"
@@ -158,8 +125,13 @@ class ConstructCircuitDAG:
             cluster_id=self._cluster_stack[-1],
         )
         self._cluster_stack.append(cluster_id)
+        
+        for region in operation.regions:
+            self._visit_region(region)
+            
+        self._cluster_stack.pop()
 
-    @_visit.register
+    @_visit_operation.register
     def _while_op(self, op: scf.WhileOp) -> None:
         """Handle an xDSL WhileOp operation."""
         cluster_id = f"cluster_{id(op)}"
@@ -169,10 +141,15 @@ class ConstructCircuitDAG:
             cluster_id=self._cluster_stack[-1],
         )
         self._cluster_stack.append(cluster_id)
+        
+        for region in operation.regions:
+            self._visit_region(region)
 
-    @_visit.register
-    def _if_op(self, op: scf.IfOp) -> None:
-        """Handle an xDSL IfOp operation."""
+        self._cluster_stack.pop()
+      
+    @_visit_operation.register
+    def _if_op(self, operation: scf.IfOp):
+        """Handles the scf.IfOp operation."""
         cluster_id = f"cluster_{id(op)}"
         self.dag_builder.add_cluster(
             cluster_id,
@@ -180,3 +157,72 @@ class ConstructCircuitDAG:
             cluster_id=self._cluster_stack[-1],
         )
         self._cluster_stack.append(cluster_id)
+        
+        # Loop through each branch and visualize as a cluster
+        for i, branch in enumerate(operation.regions):
+            cluster_id = f"cluster_ifop_branch{i}_{id(operation)}"
+            self.dag_builder.add_cluster(
+                cluster_id,
+                label=f"if ..." if i == 0 else "else",
+                cluster_id=self._cluster_stack[-1],
+            )
+            self._cluster_stack.append(cluster_id)
+
+            # Go recursively into the branch to process internals
+            self._visit_region(branch)
+
+            # Pop branch cluster after processing to ensure
+            # logical branches are treated as 'parallel'
+            self._cluster_stack.pop()
+            
+        self._cluster_stack.pop()
+      
+    # ============
+    # DEVICE NODE
+    # ============
+
+    @_visit_operation.register
+    def _device_init(self, operation: quantum.DeviceInitOp) -> None:
+        """Handles the initialization of a quantum device."""
+        node_id = f"node_{id(operation)}"
+        self.dag_builder.add_node(
+            node_id,
+            label=operation.device_name.data,
+            cluster_id=self._cluster_stack[-1],
+            fillcolor="grey",
+            color="black",
+            penwidth=2,
+            shape="rectangle",
+        )
+
+        for region in operation.regions:
+            self._visit_region(region)
+
+    # =======================
+    # FuncOp NESTING UTILITY
+    # =======================
+
+    @_visit_operation.register
+    def _func_op(self, operation: func.FuncOp) -> None:
+        """Visit a FuncOp Operation."""
+
+        cluster_id = f"cluster_{id(operation)}"
+        self.dag_builder.add_cluster(
+            cluster_id,
+            node_label=operation.sym_name.data,
+            cluster_id=self._cluster_stack[-1],
+        )
+        self._cluster_stack.append(cluster_id)
+
+        for region in operation.regions:
+            self._visit_region(region)
+
+    @_visit_operation.register
+    def _func_return(self, operation: func.ReturnOp) -> None:
+        """Handle func.return to exit FuncOp's cluster scope."""
+
+        # NOTE: Skip first two because the first is the base graph, second is the jit_* workflow FuncOp
+        if len(self._cluster_stack) > 2:
+            # If we hit a func.return operation we know we are leaving
+            # the FuncOp's scope and so we can pop the ID off the stack.
+            self._cluster_stack.pop()
