@@ -35,6 +35,7 @@ from operator import is_not
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
+from catalyst.default_pipelines import get_enforce_runtime_invariants_stage
 from catalyst.utils.exceptions import CompileError
 
 PipelineStage = Tuple[str, List[str]]
@@ -200,11 +201,11 @@ class CompileOptions:
         """Returns all stages in order for compilation"""
         # Dictionaries in python are ordered
         stages = {}
-        stages["QuantumCompilationStage"] = get_quantum_compilation_stage(self)
-        stages["HLOLoweringStage"] = get_hlo_lowering_stage(self)
-        stages["GradientLoweringStage"] = get_gradient_lowering_stage(self)
-        stages["BufferizationStage"] = get_bufferization_stage(self)
-        stages["MLIRToLLVMDialectConversion"] = get_convert_to_llvm_stage(self)
+        stages["QuantumCompilationStage"] = get_quantum_compilation_stage()
+        stages["HLOLoweringStage"] = get_hlo_lowering_stage()
+        stages["GradientLoweringStage"] = get_gradient_lowering_stage()
+        stages["BufferizationStage"] = get_bufferization_stage()
+        stages["MLIRToLLVMDialectConversion"] = get_convert_to_llvm_stage()
         return list(stages.items())
 
 

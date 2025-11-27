@@ -14,6 +14,9 @@
 
 #include <memory>
 
+#include <fmt/core.h>
+#include <fmt/ranges.h>
+
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
 #include "mlir/Conversion/BufferizationToMemRef/BufferizationToMemRef.h"
@@ -39,6 +42,7 @@
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Passes.h"
+#include "Driver/DefaultPipelines.h"
 #include "Driver/Pipelines.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/Passes.h"
@@ -54,14 +58,14 @@ namespace driver {
 
 void createQuantumCompilationStage(OpPassManager &pm)
 {
-    pm.addPass(catalyst::quantum::createSplitMultipleTapesPass());
-    pm.addNestedPass<ModuleOp>(catalyst::createApplyTransformSequencePass());
-    pm.addPass(catalyst::createInlineNestedModulePass());
-    pm.addPass(catalyst::mitigation::createMitigationLoweringPass());
-    pm.addPass(catalyst::quantum::createAdjointLoweringPass());
-    pm.addPass(catalyst::createDisableAssertionPass());
+    const auto &passList = getEnforceRuntimeInvariantsPipeline();
+    std::string passNames = fmt::format("{}", fmt::join(passList, ","));
+    if (failed(mlir::parsePassPipeline(passNames, pm))) {
+        llvm::errs() << fmt::format("Error: analysing {}\n", passNames);
+    }
 }
-void createHloLoweringStage(OpPassManager &pm)
+
+void createHloLoweringPipeline(OpPassManager &pm)
 {
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addNestedPass<mlir::func::FuncOp>(stablehlo::createChloLegalizeToStablehloPass());
