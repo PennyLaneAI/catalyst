@@ -160,10 +160,9 @@ void createDefaultCatalystPipeline(OpPassManager &pm)
 
 void registerQuantumCompilationPipeline()
 {
-    PassPipelineRegistration<>(
-        "quantum-compilation-pipeline",
-        "Register quantum compilation pipeline as a pass.",
-        createQuantumCompilationPipeline);
+    PassPipelineRegistration<>("quantum-compilation-pipeline",
+                               "Register quantum compilation pipeline as a pass.",
+                               createQuantumCompilationPipeline);
 }
 void registerHloLoweringPipeline()
 {
@@ -210,8 +209,9 @@ std::vector<Pipeline> getDefaultPipeline()
 {
     using PipelineFunc = void (*)(mlir::OpPassManager &);
     std::vector<PipelineFunc> pipelineFuncs = {
-        &createQuantumCompilationPipeline, &createHloLoweringPipeline, &createGradientLoweringPipeline,
-        &createBufferizationPipeline, &createLLVMDialectLoweringPipeline};
+        &createQuantumCompilationPipeline, &createHloLoweringPipeline,
+        &createGradientLoweringPipeline, &createBufferizationPipeline,
+        &createLLVMDialectLoweringPipeline};
 
     llvm::SmallVector<std::string> defaultPipelineNames = {
         "QuantumCompilationPass", "HLOLoweringPass", "GradientLoweringPass", "BufferizationPass",
