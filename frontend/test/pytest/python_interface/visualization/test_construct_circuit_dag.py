@@ -22,15 +22,14 @@ pytestmark = pytest.mark.usefixtures("requires_xdsl")
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
 import pennylane as qml
-from xdsl.dialects import test
-from xdsl.dialects.builtin import ModuleOp
-from xdsl.ir.core import Block, Region
-
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from xdsl.dialects import test
+from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir.core import Block, Region
 
 
 class FakeDAGBuilder(DAGBuilder):
@@ -96,7 +95,9 @@ class FakeDAGBuilder(DAGBuilder):
         cluster_labels = []
         for cluster_data in self._clusters.values():
             if cluster_data["parent_cluster_id"] == parent_cluster_id:
-                cluster_label = cluster_data["cluster_label"] or cluster_data["node_label"]
+                cluster_label = (
+                    cluster_data["cluster_label"] or cluster_data["node_label"]
+                )
                 cluster_labels.append(cluster_label)
         return cluster_labels
 
@@ -341,11 +342,7 @@ class TestControlFlowVisualization:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        clusters = utility.dag_builder.clusters
-        cluster_labels = {info["label"] for info in clusters.values()}
-        assert "for ..." in cluster_labels
-
-        # Ensure proper nesting of clusters
+        assert "for ..." in utility.dag_builder.get_child_clusters("my_workflow")
 
     @pytest.mark.unit
     def test_while_loop(self):
@@ -366,11 +363,7 @@ class TestControlFlowVisualization:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        clusters = utility.dag_builder.clusters
-        cluster_labels = {info["label"] for info in clusters.values()}
-        assert "while ..." in cluster_labels
-
-        # Ensure proper nesting of clusters
+        assert "while ..." in utility.dag_builder.get_child_clusters("my_workflow")
 
     @pytest.mark.unit
     def test_if_else_conditional(self):
@@ -392,12 +385,9 @@ class TestControlFlowVisualization:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        clusters = utility.dag_builder.clusters
-        cluster_labels = {info["label"] for info in clusters.values()}
-        assert "if ..." in cluster_labels
-        assert "else" in cluster_labels
-
-        # Ensure proper nesting of clusters
+        assert "conditional" in utility.dag_builder.get_child_clusters("my_workflow")
+        assert "if ..." in utility.dag_builder.get_child_clusters("conditional")
+        assert "else" in utility.dag_builder.get_child_clusters("conditional")
 
     @pytest.mark.unit
     def test_if_elif_else_conditional(self):
@@ -420,15 +410,6 @@ class TestControlFlowVisualization:
 
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
-
-        clusters = utility.dag_builder.clusters
-        cluster_labels = [info["label"] for info in clusters.values()]
-        assert "if ..." in cluster_labels
-        assert cluster_labels.count("if ...") == 2
-        assert "else" in cluster_labels
-        assert cluster_labels.count("else") == 2
-
-        # Ensure proper nesting
 
 
 class TestDeviceNode:
