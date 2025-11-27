@@ -201,6 +201,9 @@ class TestFakeDAGBuilder:
         clusters_in_company = builder_with_data.get_child_clusters("Company")
         assert {"Finance", "Marketing"} == set(clusters_in_company)
 
+        clusters_in_base = builder_with_data.get_child_clusters("base")
+        assert clusters_in_base == ["Company"] 
+
 
 @pytest.mark.unit
 def test_dependency_injection():
