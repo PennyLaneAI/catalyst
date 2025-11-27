@@ -720,7 +720,7 @@ def test_decomposition_rule_name_update():
         qml.RY(theta, wires=wires)
         qml.RZ(omega, wires=wires)
 
-    @qml.register_resources({qml.RY: 1, qml.PhaseShift: 1})
+    @qml.register_resources({qml.RY: 1, qml.GlobalPhase: 1})
     def ry_gp(wires: WiresLike, **__):
         """Decomposition of PauliY gate using RY and GlobalPhase gates."""
         qml.RY(np.pi, wires=wires)
@@ -729,7 +729,7 @@ def test_decomposition_rule_name_update():
     @qml.qjit(target="mlir")
     @partial(
         qml.transforms.decompose,
-        gate_set={"RX", "RZ", "PhaseShift"},
+        gate_set={"RX", "RZ", "GlobalPhase"},
         fixed_decomps={
             qml.RY: rz_rx,
             qml.Rot: rz_ry_rz,

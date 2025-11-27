@@ -49,9 +49,15 @@
   working with xDSL. This includes a function that extracts the concrete value of scalar, constant SSA values.
   [(#8514)](https://github.com/PennyLaneAI/pennylane/pull/8514)
 
+* `qml.PCPhase` can be compiled and executed with capture enabled.
+  [(#2226)](https://github.com/PennyLaneAI/catalyst/pull/2226)
+
+* Resource tracking now supports dynamic qubit allocation
+  [(#2203)](https://github.com/PennyLaneAI/catalyst/pull/2203)
+
 * Pass instrumentation can be applied to each pass within the `NamedSequenceOp` transform sequence for a qnode.
   [(#1978)](https://github.com/PennyLaneAI/catalyst/pull/1978)
-  
+
 * The new graph-based decomposition framework has Autograph feature parity with PennyLane
   when capture enabled. When compiling with `qml.qjit(autograph=True)`, the decomposition rules
   returned by the graph-based framework are now correctly compiled using Autograph.
@@ -77,6 +83,11 @@
 * `qml.grad` and `qml.jacobian` can now be used with `qjit` when program capture is enabled.
   [(#2078)](https://github.com/PennyLaneAI/catalyst/pull/2078)
 
+* xDSL passes are now automatically detected when using the `qjit` decorator.
+  This removes the need to pass the `pass_plugins` argument to the `qjit` decorator.
+  [(#2169)](https://github.com/PennyLaneAI/catalyst/pull/2169)
+  [(#2183)](https://github.com/PennyLaneAI/catalyst/pull/2183)
+
 * The ``mlir_opt`` property now correctly handles xDSL passes by automatically
   detecting when the Python compiler is being used and routing through it appropriately.
   [(#2190)](https://github.com/PennyLaneAI/catalyst/pull/2190)
@@ -84,7 +95,13 @@
 * Dynamically allocated wires can now be passed into control flow and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
 
+* The `--adjoint-lowering` pass can now handle PPR operations.
+  [(#2227)](https://github.com/PennyLaneAI/catalyst/pull/2227)
+
 <h3>Breaking changes 💔</h3>
+
+* The plxpr transform `pl_map_wires` has been removed along with its test.
+  [(#2220)](https://github.com/PennyLaneAI/catalyst/pull/2220)
 
 * (Compiler integrators only) The versions of LLVM/Enzyme/stablehlo used by Catalyst have been
   updated. Enzyme now targets `v0.0.203` with the build target `EnzymeStatic-22`, and the nanobind
@@ -167,6 +184,11 @@
   // ... use %4
   ```
 
+* Fixes :func:`~.passes.commute_ppr` and :func:`~.passes.merge_ppr_ppm` incorrectly
+  moving nullary operations. This also improves the compilation time by reducing
+  the sort function, by explicitly passing the operations that need to be sorted.
+  [(#2200)](https://github.com/PennyLaneAI/catalyst/pull/2200)
+
 * The pass pipeline is correctly registered to the transform named sequence of the
   one-shot qnode when `one-shot` mcm method is used.
   [(#2198)](https://github.com/PennyLaneAI/catalyst/pull/2198)
@@ -180,6 +202,13 @@
 * Migrated the `pennylane.compiler.python_compiler` submodule from PennyLane to Catalyst.
   It is now accessible as `catalyst.python_interface`.
   [(#2199)](https://github.com/PennyLaneAI/catalyst/pull/2199)
+
+* Resource tracking now writes out at device destruction time instead of qubit deallocation
+  time. The written resources will be the total amount of resources collected throughout the
+  lifetime of the execution. For executions that split work between multiple functions,
+  e.g. with the `split-non-commuting` pass, this ensures that resource tracking outputs
+  the total resources used for all splits.
+  [(#2219)](https://github.com/PennyLaneAI/catalyst/pull/2219)
 
 * Replaces the deprecated `shape_dtype_to_ir_type` function with the `RankedTensorType.get` method.
   [(#2159)](https://github.com/PennyLaneAI/catalyst/pull/2159)
@@ -221,8 +250,8 @@
       // ... ion operations ...
   }
   ```
-  
-  * Added support for `ppr-to-ppm` as an individual MLIR pass and python binding 
+
+  * Added support for `ppr-to-ppm` as an individual MLIR pass and python binding
   for the qec dialect.
   [(#2189)](https://github.com/PennyLaneAI/catalyst/pull/2189)
 
@@ -252,6 +281,8 @@
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+Yushao Chen,
+Sengthai Heng,
 Jeffrey Kam,
 Christina Lee,
 Mehrdad Malekmohammadi,
@@ -259,4 +290,5 @@ River McCubbin,
 Lee J. O'Riordan,
 Roberto Turrado,
 Paul Haochen Wang,
+Jake Zaia,
 Hongsheng Zheng.
