@@ -125,7 +125,7 @@ class ConstructCircuitDAG:
         self.dag_builder.add_cluster(
             cluster_id,
             node_label="",
-            label="conditional",
+            label="",
             cluster_id=self._cluster_stack[-1],
         )
         self._cluster_stack.append(cluster_id)
