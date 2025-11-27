@@ -355,7 +355,7 @@ struct MergePPRRewritePattern : public OpRewritePattern<PPRotationOp> {
             // erase in reverse to avoid use issues
             ValueRange originalQubits = prevOp.getInQubits();
             rewriter.replaceOp(op, originalQubits);
-            rewriter.replaceOp(prevOp, originalQubits);
+            rewriter.eraseOp(prevOp);
 
             return success();
         }
@@ -377,7 +377,7 @@ struct MergePPRRewritePattern : public OpRewritePattern<PPRotationOp> {
         else {
             ValueRange originalQubits = prevOp.getInQubits();
             rewriter.replaceOp(op, originalQubits);
-            rewriter.replaceOp(prevOp, originalQubits);
+            rewriter.eraseOp(prevOp);
         }
 
         return success();
