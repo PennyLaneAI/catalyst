@@ -228,8 +228,8 @@ class PLPatternRewriter(PatternRewriter):
                     else:
                         insert_idx = DynamicWire(var=root.idx)
 
-                # Qubit's root is either AllocQubitOp or it is a block argument.
-                # Either way, the qubit does not correspond to an index
+                # Qubit's root is either AllocQubitOp or a Block. Either way,
+                # the qubit does not correspond to an index.
                 else:
                     insert_idx = DynamicWire()
 
