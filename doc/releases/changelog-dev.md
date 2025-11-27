@@ -210,6 +210,11 @@
   of identities.
   [(#2192)](https://github.com/PennyLaneAI/catalyst/pull/2192)
 
+  * Renamed `annotate-function` pass to `annotate-invalid-gradient-functions` and move it to the 
+  gradient dialect and the `lower-gradients` compilation stage.
+  [(#2241)](https://github.com/PennyLaneAI/catalyst/pull/2241)
+
+
 <h3>Documentation 📝</h3>
 
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
