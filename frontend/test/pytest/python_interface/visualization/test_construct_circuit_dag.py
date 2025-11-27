@@ -49,7 +49,7 @@ class FakeDAGBuilder(DAGBuilder):
         self._nodes[id] = {
             "id": id,
             "label": label,
-            "cluster_id": cluster_id,
+            "parent_cluster_id": "base" if cluster_id is None else cluster_id,
             "attrs": attrs,
         }
 
@@ -73,9 +73,56 @@ class FakeDAGBuilder(DAGBuilder):
             "id": id,
             "node_label": node_label,
             "cluster_label": attrs.get("label"),
-            "cluster_id": cluster_id,
+            "parent_cluster_id": "base" if cluster_id is None else cluster_id,
             "attrs": attrs,
         }
+
+    def get_nodes_in_cluster(self, cluster_label: str) -> list[str]:
+        """
+        Returns a list of node labels that are direct children of the given cluster.
+        """
+        node_ids = []
+        cluster_id = self.get_cluster_id_by_label(cluster_label)
+        for node_data in self._nodes.values():
+            if node_data["parent_cluster_id"] == cluster_id:
+                node_ids.append(node_data["label"])
+        return node_ids
+
+    def get_child_clusters(self, parent_cluster_label: str) -> list[str]:
+        """
+        Returns a list of cluster labels that are direct children of the given parent cluster.
+        """
+        parent_cluster_id = self.get_cluster_id_by_label(parent_cluster_label)
+        cluster_labels = []
+        for cluster_data in self._clusters.values():
+            if cluster_data["parent_cluster_id"] == parent_cluster_id:
+                cluster_label = cluster_data["cluster_label"] or cluster_data["node_label"]
+                cluster_labels.append(cluster_label)
+        return cluster_labels
+
+    def get_node_id_by_label(self, label: str) -> str | None:
+        """
+        Finds the ID of a node given its label.
+        Assumes labels are unique for testing purposes.
+        """
+        for id, node_data in self._nodes.items():
+            if node_data["label"] == label:
+                return id
+        return None
+
+    def get_cluster_id_by_label(self, label: str) -> str | None:
+        """
+        Finds the ID of a cluster given its label.
+        Assumes cluster labels are unique for testing purposes.
+        """
+        # Work around for base graph
+        if label == "base":
+            return "base"
+        for id, cluster_data in self._clusters.items():
+            cluster_label = cluster_data["cluster_label"] or cluster_data["node_label"]
+            if cluster_label == label:
+                return id
+        return None
 
     @property
     def nodes(self):
@@ -94,6 +141,71 @@ class FakeDAGBuilder(DAGBuilder):
 
     def to_string(self) -> str:
         return "graph"
+
+
+class TestFakeDAGBuilder:
+    """Test the FakeDAGBuilder to ensure helper functions work as intended."""
+
+    @pytest.fixture
+    def builder_with_data(self):
+        """Sets up an instance with a complex graph already built."""
+
+        builder = FakeDAGBuilder()
+
+        # Cluster set-up
+        builder.add_cluster("c0", label="Company", cluster_id=None)  # Add to base graph
+        builder.add_cluster("c1", label="Marketing", cluster_id="c0")
+        builder.add_cluster("c2", label="Finance", cluster_id="c0")
+
+        # Node set-up
+        builder.add_node("n0", "CEO", cluster_id=None)  # Add to base cluster "Company"
+        builder.add_node("n1", "Marketing Manager", cluster_id="c1")
+        builder.add_node("n2", "Finance Manager", cluster_id="c2")
+
+        return builder
+
+    # Test ID look up
+
+    def test_get_node_id_by_label_success(self, builder_with_data):
+        assert builder_with_data.get_node_id_by_label("Finance Manager") == "n2"
+        assert builder_with_data.get_node_id_by_label("Marketing Manager") == "n1"
+        assert builder_with_data.get_node_id_by_label("CEO") == "n0"
+
+    def test_get_node_id_by_label_failure(self, builder_with_data):
+        assert builder_with_data.get_node_id_by_label("Software Manager") is None
+
+    def test_get_cluster_id_by_label_success(self, builder_with_data):
+        assert builder_with_data.get_cluster_id_by_label("Finance") == "c2"
+        assert builder_with_data.get_cluster_id_by_label("Marketing") == "c1"
+        assert builder_with_data.get_cluster_id_by_label("Company") == "c0"
+
+    def test_get_cluster_id_by_label_failure(self, builder_with_data):
+        assert builder_with_data.get_cluster_id_by_label("Software") is None
+
+    # Test relationship probing
+
+    def test_node_heirarchy(self, builder_with_data):
+        finance_nodes = builder_with_data.get_nodes_in_cluster("Finance")
+        assert finance_nodes == ["Finance Manager"]
+
+        marketing_nodes = builder_with_data.get_nodes_in_cluster("Marketing")
+        assert marketing_nodes == ["Marketing Manager"]
+
+        company_nodes = builder_with_data.get_nodes_in_cluster("Company")
+        assert company_nodes == ["CEO"]
+
+    def test_cluster_heirarchy(self, builder_with_data):
+        clusters_in_finance = builder_with_data.get_child_clusters("Finance")
+        assert not clusters_in_finance
+
+        clusters_in_marketing = builder_with_data.get_child_clusters("Marketing")
+        assert not clusters_in_marketing
+
+        clusters_in_company = builder_with_data.get_child_clusters("Company")
+        assert {"Finance", "Marketing"} == set(clusters_in_company)
+
+        clusters_in_base = builder_with_data.get_child_clusters("base")
+        assert clusters_in_base == ["Company"]
 
 
 @pytest.mark.unit
@@ -147,35 +259,18 @@ class TestFuncOpVisualization:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        graph_clusters = utility.dag_builder.clusters
-
         # Check labels we expected are there
-        expected_cluster_labels = [
-            "jit_my_workflow",
-            "my_workflow",
-            "setup",
-            "teardown",
-        ]
-        generated_cluster_labels = {info["cluster_label"] for info in graph_clusters.values()}
-        for cluster_label in expected_cluster_labels:
-            assert cluster_label in generated_cluster_labels
+        graph_clusters = utility.dag_builder.clusters
+        all_cluster_labels = {info["cluster_label"] for info in graph_clusters.values()}
+        assert "my_workflow" in all_cluster_labels
 
         # Check nesting is correct
         # graph
-        # └── jit_my_workflow
-        #     └── my_workflow
+        # └── my_workflow
 
-        # Get the parent labels for each cluster and ensure they are what we expect.
-        parent_labels = (
-            graph_clusters[child_cluster["cluster_id"]]["cluster_label"]
-            for child_cluster in graph_clusters.values()
-            if child_cluster.get("cluster_id") is not None
-        )
-        cluster_label_to_parent_label: dict[str, str] = dict(
-            zip(tuple(generated_cluster_labels), parent_labels)
-        )
-        assert cluster_label_to_parent_label["jit_my_workflow"] is None
-        assert cluster_label_to_parent_label["my_qnode1"] == "jit_my_workflow"
+        # Check my_workflow is nested under my_workflow
+        my_workflow_id = utility.dag_builder.get_cluster_id_by_label("my_workflow")
+        assert graph_clusters[my_workflow_id]["parent_cluster_id"] == "base"
 
     def test_nested_qnodes(self):
         """Tests that nested QJIT'd QNodes are visualized correctly"""
@@ -204,35 +299,25 @@ class TestFuncOpVisualization:
         graph_clusters = utility.dag_builder.clusters
 
         # Check labels we expected are there as clusters
-        expected_cluster_labels = [
-            "jit_my_workflow",
-            "my_qnode1",
-            "my_qnode2",
-            "setup",
-            "teardown",
-        ]
-        assert len(graph_clusters) == len(expected_cluster_labels)
-        cluster_labels = {info["cluster_label"] for info in graph_clusters.values()}
-        for expected_name in expected_cluster_labels:
-            assert expected_name in cluster_labels
+        graph_clusters = utility.dag_builder.clusters
+        all_cluster_labels = {info["cluster_label"] for info in graph_clusters.values()}
+        assert "my_workflow" in all_cluster_labels
+        assert "my_qnode1" in all_cluster_labels
+        assert "my_qnode2" in all_cluster_labels
+
         # Check nesting is correct
         # graph
-        # └── jit_my_workflow
+        # └── my_workflow
         #     ├── my_qnode1
         #     └── my_qnode2
 
-        # Get the parent labels for each cluster and ensure they are what we expect.
-        parent_labels = (
-            graph_clusters[child_cluster["cluster_id"]]["cluster_label"]
-            for child_cluster in graph_clusters.values()
-            if child_cluster.get("cluster_id") is not None
-        )
-        cluster_label_to_parent_label: dict[str, str] = dict(
-            zip(tuple(cluster_labels), parent_labels)
-        )
-        assert cluster_label_to_parent_label["jit_my_workflow"] is None
-        assert cluster_label_to_parent_label["my_qnode1"] == "jit_my_workflow"
-        assert cluster_label_to_parent_label["my_qnode2"] == "jit_my_workflow"
+        # Check my_workflow is under graph
+        my_workflow_id = utility.dag_builder.get_cluster_id_by_label("my_workflow")
+        assert graph_clusters[my_workflow_id]["parent_cluster_id"] == "base"
+
+        # Check both qnodes are under my_workflow
+        assert "my_qnode1" in utility.dag_builder.get_child_clusters("my_workflow")
+        assert "my_qnode2" in utility.dag_builder.get_child_clusters("my_workflow")
 
 
 class TestControlFlowVisualization:
@@ -365,21 +450,9 @@ class TestDeviceNode:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        graph_nodes = utility.dag_builder.nodes
-        graph_clusters = utility.dag_builder.clusters
-
-        # Basic check for node
-        node_labels = {info["label"] for info in graph_nodes.values()}
-        assert "NullQubit" in node_labels
-
-        # Ensure nesting is correct
-        parent_labels = (
-            graph_clusters[child_cluster["cluster_id"]]["cluster_label"]
-            for child_cluster in graph_clusters.values()
-            if child_cluster.get("cluster_id") is not None
-        )
-        node_label_to_parent_label: dict[str, str] = dict(zip(tuple(node_labels), parent_labels))
-        assert node_label_to_parent_label["NullQubit"] == "my_workflow"
+        # Check that device node is within the my_workflow cluster
+        nodes_in_my_workflow = utility.dag_builder.get_nodes_in_cluster("my_workflow")
+        assert "NullQubit" in nodes_in_my_workflow
 
     def test_nested_qnodes(self):
         """Tests that nested QJIT'd QNodes are visualized correctly"""
@@ -406,37 +479,8 @@ class TestDeviceNode:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        graph_clusters = utility.dag_builder.clusters
-        graph_nodes = utility.dag_builder.nodes
-
-        # Check labels we expected are there as clusters
-        expected_cluster_labels = [
-            "jit_my_workflow",
-            "my_qnode1",
-            "my_qnode2",
-            "setup",
-            "teardown",
-        ]
-        assert len(graph_clusters) == len(expected_cluster_labels)
-        cluster_labels = {info["cluster_label"] for info in graph_clusters.values()}
-        for expected_name in expected_cluster_labels:
-            assert expected_name in cluster_labels
-
-        # Check nesting is correct
-        # graph
-        # └── jit_my_workflow
-        #     ├── my_qnode1
-        #     │   └── node: NullQubit
-        #     └── my_qnode2
-        #         └── node: LightningQubit
-
-        # Check nodes are in the correct clusters
-        parent_labels = (
-            graph_clusters[child_node["cluster_id"]]["cluster_label"]
-            for child_node in graph_nodes.values()
-            if child_node.get("cluster_id") is not None
-        )
-        node_labels = {info["label"] for info in graph_nodes.values()}
-        node_label_to_parent_label: dict[str, str] = dict(zip(tuple(node_labels), parent_labels))
-        assert node_label_to_parent_label["NullQubit"] == "my_qnode1"
-        assert node_label_to_parent_label["LightningSimulator"] == "my_qnode2"
+        # Check that device node is within the my_workflow cluster
+        nodes_in_my_workflow = utility.dag_builder.get_nodes_in_cluster("my_qnode1")
+        assert "NullQubit" in nodes_in_my_workflow
+        nodes_in_my_workflow = utility.dag_builder.get_nodes_in_cluster("my_qnode2")
+        assert "LightningSimulator" in nodes_in_my_workflow
