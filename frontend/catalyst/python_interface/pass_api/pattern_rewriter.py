@@ -486,12 +486,13 @@ class PLPatternRewriter(PatternRewriter):
                 params.append(constOp.results[0])
                 insertion_point = InsertPoint.after(constOp)
 
-            # TODO: Uncomment after PCPhaseOp is added to Quantum dialect
-            # # PCPhase has a `dim` hyperparameter which also needs to be inserted into the IR.
-            # if isinstance(gate, ops.PCPhase):
-            #     constOp = self.insert_constant(float(gate.hyperparameters["dimension"][0]), insertion_point)
-            #     params.append(constOp.results[0])
-            #     insertion_point = InsertPoint.after(constOp)
+            # PCPhase has a `dim` hyperparameter which also needs to be inserted into the IR.
+            if isinstance(gate, ops.PCPhase):
+                constOp = self.insert_constant(
+                    float(gate.hyperparameters["dimension"][0]), insertion_point
+                )
+                params.append(constOp.results[0])
+                insertion_point = InsertPoint.after(constOp)
 
         # Different gate types may be represented in MLIR by different operations, which may
         # take slightly different arguments
@@ -508,11 +509,10 @@ class PLPatternRewriter(PatternRewriter):
                 op_class = quantum.QubitUnitaryOp
                 assert len(params) == 1
                 op_args["matrix"] = params[0]
-            # TODO: Uncomment after PCPhaseOp is added to Quantum dialect
-            # case ops.PCPhase:
-            #     op_class = quantum.PCPhaseOp
-            #     op_args["theta"] = params[0]
-            #     op_args["dim"] = params[1]
+            case ops.PCPhase:
+                op_class = quantum.PCPhaseOp
+                op_args["theta"] = params[0]
+                op_args["dim"] = params[1]
             case _:
                 op_class = quantum.CustomOp
                 op_args["gate_name"] = gate.name
