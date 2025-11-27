@@ -115,6 +115,9 @@ class FakeDAGBuilder(DAGBuilder):
         Finds the ID of a cluster given its label.
         Assumes cluster labels are unique for testing purposes.
         """
+        # Work around for base graph
+        if label == "base":
+            return "base"
         for id, cluster_data in self._clusters.items():
             cluster_label = cluster_data["cluster_label"] or cluster_data["node_label"]
             if cluster_label == label:
@@ -150,7 +153,7 @@ class TestFakeDAGBuilder:
         builder = FakeDAGBuilder()
 
         # Cluster set-up
-        builder.add_cluster("c0", label="Company")
+        builder.add_cluster("c0", label="Company", cluster_id=None)  # Add to base graph
         builder.add_cluster("c1", label="Marketing", cluster_id="c0")
         builder.add_cluster("c2", label="Finance", cluster_id="c0")
 
@@ -202,7 +205,7 @@ class TestFakeDAGBuilder:
         assert {"Finance", "Marketing"} == set(clusters_in_company)
 
         clusters_in_base = builder_with_data.get_child_clusters("base")
-        assert clusters_in_base == ["Company"] 
+        assert clusters_in_base == ["Company"]
 
 
 @pytest.mark.unit
