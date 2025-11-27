@@ -38,8 +38,7 @@ _gate_like_ops = (
     quantum.CustomOp,
     quantum.GlobalPhaseOp,
     quantum.MultiRZOp,
-    # TODO: Uncomment once PCPhaseOp is added to Quantum dialect
-    # quantum.PCPhaseOp,
+    quantum.PCPhaseOp,
     quantum.QubitUnitaryOp,
 )
 
