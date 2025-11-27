@@ -116,6 +116,19 @@
 * Dynamically allocated wires can now be passed into control flow and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
 
+* Catalyst now supports arbitrary angle Pauli product rotations in the QEC dialect. 
+  This will allow :class:`qml.PauliRot` with arbitrary angles to be lowered to QEC dialect.
+  This is implemented as a new `qec.ppr.arbitrary` operation, which takes a Pauli product
+  and an arbitrary angle (as a double) as input.
+  [(#2232)](https://github.com/PennyLaneAI/catalyst/pull/2232)
+
+  For example:
+  ```mlir
+  %const = arith.constant 0.124 : f64
+  %1:2 = qec.ppr.arbitrary ["X", "Z"](%const) %q1, %q2 : !quantum.bit, !quantum.bit
+  %2:2 = qec.ppr.arbitrary ["X", "Z"](%const) %1#0, %1#1 cond(%c0) : !quantum.bit, !quantum.bit
+  ```
+
 * The `--adjoint-lowering` pass can now handle PPR operations.
   [(#2227)](https://github.com/PennyLaneAI/catalyst/pull/2227)
 
@@ -214,6 +227,10 @@
 * The pass pipeline is correctly registered to the transform named sequence of the
   one-shot qnode when `one-shot` mcm method is used.
   [(#2198)](https://github.com/PennyLaneAI/catalyst/pull/2198)
+
+* Fixed a bug where `qml.StatePrep` and `qml.BasisState` might be pushed after other
+  gates, overwriting their effects.
+  [(#2239)](https://github.com/PennyLaneAI/catalyst/pull/2239)
 
 <h3>Internal changes ⚙️</h3>
 
