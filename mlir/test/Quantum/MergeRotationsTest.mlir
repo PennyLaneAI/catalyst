@@ -713,9 +713,9 @@ func.func public @dont_merge(%q1: !quantum.bit) {
 
 // CHECK-LABEL: merge_correct_references
 func.func public @merge_correct_references(%q1: !quantum.bit) {
-    // CHECK: %[[in:[a-zA-Z0-9_]+]] = qec.ppr ["Y"](4)
-    // CHECK: %[[merge_out:[a-zA-Z0-9_]+]] = qec.ppr ["X"](2) %[[in]]
-    // CHECK: qec.ppr ["Z"](4) %[[merge_out]]
+    // CHECK: [[in:%.+]] = qec.ppr ["Y"](4)
+    // CHECK: [[merge_out:%.+]] = qec.ppr ["X"](2) [[in]]
+    // CHECK: qec.ppr ["Z"](4) [[merge_out]]
     %0 = qec.ppr ["Y"](4) %q1: !quantum.bit
     %1 = qec.ppr ["X"](4) %0: !quantum.bit
     %2 = qec.ppr ["X"](4) %1: !quantum.bit
@@ -788,8 +788,8 @@ func.func public @dont_cancel(%q1: !quantum.bit) {
 
 // CHECK-LABEL: cancel_correct_references
 func.func public @cancel_correct_references(%q1: !quantum.bit) {
-    // CHECK: %[[in:[a-zA-Z0-9_]+]] = qec.ppr ["Y"](2)
-    // CHECK: qec.ppr ["Z"](4) %[[in]]
+    // CHECK: [[in:%.+]] = qec.ppr ["Y"](2)
+    // CHECK: qec.ppr ["Z"](4) [[in]]
     %0 = qec.ppr ["Y"](2) %q1: !quantum.bit
     %1 = qec.ppr ["X"](8) %0: !quantum.bit
     %2 = qec.ppr ["X"](-8) %1: !quantum.bit
