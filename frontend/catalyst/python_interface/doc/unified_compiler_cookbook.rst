@@ -640,7 +640,7 @@ the “PennyLane integration” section below.
 PennyLane integration
 =====================
 
-This section will cover the API in the ``qml.compiler.python_compiler``
+This section will cover the API in the ``catalyst.python_interface``
 submodule.
 
 Lowering to MLIR
@@ -981,7 +981,7 @@ Implications/notes
 ``compiler_transform`` is the function used to register xDSL
 ``ModulePass``\ es to be used with ``qjit``-ed workflows. It is
 currently accessible as
-``qml.compiler.python_compiler.compiler_transform``.
+``catalyst.python_interface.compiler_transform``.
 
 .. code-block:: python
 
@@ -1031,7 +1031,7 @@ is compiled!
 Conversion utilities
 --------------------
 
-The ``python_compiler.conversion`` submodule provides several utilities
+The ``catalyst.python_interface.conversion`` submodule provides several utilities
 for creating xDSL modules from Python functions. There are many more
 utilities in the submodule, but I will focus on the most important ones,
 and provide examples of how to use them.
@@ -1230,7 +1230,7 @@ To use FileCheck with ``pytest``, we use the ```filecheck`` Python
 package <https://pypi.org/project/filecheck/>`__, which allows us to use
 assertions for testing in a way that ``pytest`` can understand. All of
 the ``filecheck`` API has been captured inside two fixtures available
-within the ``tests/python_compiler`` folder:
+within the ``tests/python_interface`` folder:
 
 - ``run_filecheck``: This fixture is for unit testing. One can specify a
   program along with filecheck directives as a multi-line string.
@@ -1331,7 +1331,7 @@ Key blockers
 ============
 
 There are several blockers that are currently disabling developers from
-taking full advantage of the ``python_compiler`` submodule. These
+taking full advantage of the ``catalyst.python_interface`` submodule. These
 include:
 
 * Lack of support for quantum subroutines. This impacts pattern
