@@ -1,4 +1,4 @@
-# Copyright 2024 Xanadu Quantum Technologies Inc.
+# Copyright 2024-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -501,9 +501,9 @@ def test_merge_rotation_ppr():
 
     qml.capture.enable()  # capture is needed for PauliRot -> qec.ppr
 
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    my_pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
-    @qml.qjit(pipelines=pipeline, target="mlir")
+    @qml.qjit(pipelines=my_pipeline, target="mlir")
     def test_merge_rotation_ppr_workflow():
         @qml.transforms.merge_rotations  # have to use qml to be capture-compatible
         @qml.qnode(qml.device("lightning.qubit", wires=3))
@@ -511,7 +511,6 @@ def test_merge_rotation_ppr():
             # equivalent to a Hadamard gate
             qml.PauliRot(np.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
             qml.PauliRot(np.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
-            return
 
         return circuit()
 
