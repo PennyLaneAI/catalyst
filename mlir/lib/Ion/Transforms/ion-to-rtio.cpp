@@ -880,6 +880,9 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         auto newFuncType = FunctionType::get(ctx, oldFuncType.getInputs(), {});
         newQnodeFunc.setFunctionType(newFuncType);
 
+        // set public visibility for kernel function
+        newQnodeFunc.setPublic();
+
         // Clear operands from all return ops (make them return nothing)
         newQnodeFunc.walk([](func::ReturnOp returnOp) { returnOp.getOperandsMutable().clear(); });
 
@@ -963,56 +966,6 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         });
     }
 
-    LogicalResult updateEntryFunction(func::FuncOp entryFunc, func::FuncOp newQnodeFunc,
-                                      MLIRContext *ctx)
-    {
-        // Update entry function return type to empty
-        auto oldEntryFuncType = entryFunc.getFunctionType();
-        auto newEntryFuncType = FunctionType::get(ctx, oldEntryFuncType.getInputs(), {});
-        entryFunc.setFunctionType(newEntryFuncType);
-
-        // Clear the function body (reverse order so uses are erased before defs)
-        Block *entryBlock = &entryFunc.getBody().front();
-        for (auto &op : llvm::make_early_inc_range(llvm::reverse(*entryBlock)))
-            op.erase();
-
-        // Create call to kernel function
-        OpBuilder entryBuilder(ctx);
-        entryBuilder.setInsertionPointToStart(entryBlock);
-
-        SmallVector<Value> kernelArgs(entryFunc.getArguments().begin(),
-                                      entryFunc.getArguments().end());
-
-        // compare args type with kernel function arguments
-        if (kernelArgs.size() != newQnodeFunc.getArguments().size()) {
-            entryFunc->emitError("Failed to update entry function: number of arguments mismatch");
-            return failure();
-        }
-        for (size_t i = 0; i < kernelArgs.size(); i++) {
-            if (kernelArgs[i].getType() != newQnodeFunc.getArguments()[i].getType()) {
-                entryFunc->emitError("Failed to update entry function: argument type mismatch");
-                return failure();
-            }
-        }
-
-        entryBuilder.create<func::CallOp>(entryFunc.getLoc(), newQnodeFunc.getName(), TypeRange{},
-                                          kernelArgs);
-
-        entryBuilder.setInsertionPointToEnd(entryBlock);
-        entryBuilder.create<func::ReturnOp>(entryFunc.getLoc());
-
-        // Remove other functions
-        // We currently just lower to the kernel function
-        auto module = entryFunc->getParentOfType<ModuleOp>();
-        module.walk([&](func::FuncOp funcOp) {
-            if (funcOp.getName().str() == "teardown" || funcOp.getName().str() == "setup") {
-                funcOp.erase();
-            }
-        });
-
-        return success();
-    }
-
     void runOnOperation() override
     {
         MLIRContext *ctx = &getContext();
@@ -1047,13 +1000,13 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
 
         // drop one of the pulse from the certain protocol
         // the way we handle the dropped pulse will be updated in the future
-        newQnodeFunc.walk([&](ion::ParallelProtocolOp parallelProtocolOp) {
-            parallelProtocolOp.walk([&](ion::PulseOp pulseOp) {
-                if (pulseOp.getBeamAttr().getTransitionIndex().getInt() == 0) {
-                    pulseOp.erase();
-                }
-            });
+        SmallVector<ion::PulseOp> pulsesToErase;
+        newQnodeFunc.walk([&](ion::PulseOp pulseOp) {
+            if (pulseOp.getBeamAttr().getTransitionIndex().getInt() == 0)
+                pulsesToErase.push_back(pulseOp);
         });
+        for (auto pulseOp : pulsesToErase)
+            pulseOp.erase();
 
         // Construct mapping from qreg alloc and qreg extract to memref
         // In the later conversion, we use the mapping to construct the channel for rtio.pulse
@@ -1082,19 +1035,11 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
             return signalPassFailure();
         }
 
-        // remove body of entry function and add call to kernel function
-        auto entryFunc = module.lookupSymbol<func::FuncOp>("jit_circuit");
-        if (!entryFunc) {
-            module.emitError("Cannot find entry function 'jit_circuit'");
-            return signalPassFailure();
+        for (auto funcOp : llvm::make_early_inc_range(module.getOps<func::FuncOp>())) {
+            if (funcOp.getName().str() != newQnodeFunc.getName().str()) {
+                funcOp.erase();
+            }
         }
-
-        if (failed(updateEntryFunction(entryFunc, newQnodeFunc, ctx))) {
-            module.emitError("Failed to update entry function");
-            return signalPassFailure();
-        }
-
-        qnodeFunc->erase();
     }
 };
 
