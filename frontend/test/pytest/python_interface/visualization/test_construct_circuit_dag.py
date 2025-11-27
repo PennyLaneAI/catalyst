@@ -262,19 +262,15 @@ class TestFuncOpVisualization:
         # Check labels we expected are there
         graph_clusters = utility.dag_builder.clusters
         all_cluster_labels = {info["cluster_label"] for info in graph_clusters.values()}
-        assert "jit_my_workflow" in all_cluster_labels
         assert "my_workflow" in all_cluster_labels
 
         # Check nesting is correct
         # graph
-        # └── jit_my_workflow
-        #     └── my_workflow
+        # └── my_workflow
 
-        # Check my_workflow is nested under jit_my_workflow
-        assert "my_workflow" in utility.dag_builder.get_child_clusters("jit_my_workflow")
-        # Check that jit_my_workflow is the first cluster on top of the graph
-        jit_my_workflow_id = utility.dag_builder.get_cluster_id_by_label("jit_my_workflow")
-        assert graph_clusters[jit_my_workflow_id]["parent_cluster_id"] == "base"
+        # Check my_workflow is nested under my_workflow
+        my_workflow_id = utility.dag_builder.get_cluster_id_by_label("my_workflow")
+        assert graph_clusters[my_workflow_id]["parent_cluster_id"] == "base"
 
     def test_nested_qnodes(self):
         """Tests that nested QJIT'd QNodes are visualized correctly"""
@@ -305,23 +301,23 @@ class TestFuncOpVisualization:
         # Check labels we expected are there as clusters
         graph_clusters = utility.dag_builder.clusters
         all_cluster_labels = {info["cluster_label"] for info in graph_clusters.values()}
-        assert "jit_my_workflow" in all_cluster_labels
+        assert "my_workflow" in all_cluster_labels
         assert "my_qnode1" in all_cluster_labels
         assert "my_qnode2" in all_cluster_labels
 
         # Check nesting is correct
         # graph
-        # └── jit_my_workflow
+        # └── my_workflow
         #     ├── my_qnode1
         #     └── my_qnode2
 
-        # Check jit_my_workflow is under graph
-        jit_my_workflow_id = utility.dag_builder.get_cluster_id_by_label("jit_my_workflow")
-        assert graph_clusters[jit_my_workflow_id]["parent_cluster_id"] == "base"
+        # Check my_workflow is under graph
+        my_workflow_id = utility.dag_builder.get_cluster_id_by_label("my_workflow")
+        assert graph_clusters[my_workflow_id]["parent_cluster_id"] == "base"
 
-        # Check both qnodes are under jit_my_workflow
-        assert "my_qnode1" in utility.dag_builder.get_child_clusters("jit_my_workflow")
-        assert "my_qnode2" in utility.dag_builder.get_child_clusters("jit_my_workflow")
+        # Check both qnodes are under my_workflow
+        assert "my_qnode1" in utility.dag_builder.get_child_clusters("my_workflow")
+        assert "my_qnode2" in utility.dag_builder.get_child_clusters("my_workflow")
 
 
 class TestDeviceNode:

@@ -19,7 +19,7 @@ from functools import singledispatchmethod
 from xdsl.dialects import builtin, func
 from xdsl.ir import Block, Operation, Region
 
-from catalyst.python_interface.dialects import quantum
+from catalyst.python_interface.dialects import catalyst, quantum
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 
 
@@ -109,14 +109,29 @@ class ConstructCircuitDAG:
     def _func_op(self, operation: func.FuncOp) -> None:
         """Visit a FuncOp Operation."""
 
+        # If this is the jit_* FuncOp, only draw if there's more than one qnode (launch kernel)
+        # This avoids redundant nested clusters: jit_my_circuit -> my_circuit -> ...
+        visualize = True
+        label = operation.sym_name.data
+        if "jit_" in operation.sym_name.data:
+            num_qnodes = 0
+            for op in operation.walk():
+                if isinstance(op, catalyst.LaunchKernelOp):
+                    num_qnodes += 1
+            # Get everything after the jit_* prefix
+            label = str(label).split("_", maxsplit=1)[-1]
+            if num_qnodes == 1:
+                visualize = False
+
         # Visualize the FuncOp as a cluster with a label
-        cluster_id = f"cluster_{id(operation)}"
-        self.dag_builder.add_cluster(
-            cluster_id,
-            label=operation.sym_name.data,
-            cluster_id=self._cluster_stack[-1],
-        )
-        self._cluster_stack.append(cluster_id)
+        if visualize:
+            cluster_id = f"cluster_{id(operation)}"
+            self.dag_builder.add_cluster(
+                cluster_id,
+                label=label,
+                cluster_id=self._cluster_stack[-1],
+            )
+            self._cluster_stack.append(cluster_id)
 
         for region in operation.regions:
             self._visit_region(region)
