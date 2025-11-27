@@ -493,6 +493,39 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
     assert ppm_specs_output["g_0"]["max_weight_pi8"] == 1
 
 
+@pytest.mark.usefixtures("use_capture")
+def test_merge_rotation_ppr():
+    """Test that the merge_rotation pass correctly merges PPRs."""
+    if not qml.capture.enabled():
+        pytest.skip("capture only test")
+
+    qml.capture.enable()  # capture is needed for PauliRot -> qec.ppr
+
+    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+    @qml.qjit(pipelines=pipeline, target="mlir")
+    def test_merge_rotation_ppr_workflow():
+        @qml.transforms.merge_rotations  # have to use qml to be capture-compatible
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            # equivalent to a Hadamard gate
+            qml.PauliRot(np.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
+            qml.PauliRot(np.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
+            return
+
+        return circuit()
+
+    ir = test_merge_rotation_ppr_workflow.mlir
+    ir_opt = test_merge_rotation_ppr_workflow.mlir_opt
+    print(ir_opt)
+    assert 'transform.apply_registered_pass "merge-rotations"' in ir
+    assert "qec.ppr" in ir
+    assert 'qec.ppr ["X", "Y", "Z"](4)' not in ir_opt
+    assert 'qec.ppr ["X", "Y", "Z"](2)' in ir_opt
+
+    qml.capture.disable()
+
+
 def test_clifford_to_ppm():
 
     pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
