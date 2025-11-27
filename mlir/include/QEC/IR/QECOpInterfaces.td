@@ -17,12 +17,16 @@
 
 include "mlir/IR/OpBase.td"
 
+//===----------------------------------------------------------------------===//
+// QEC Operation Interface
+//===----------------------------------------------------------------------===//
+
 def QECOpInterface : OpInterface<"QECOpInterface"> {
 
     let description = [{
         This interface provides a generic way to interact with instructions that are
-        considered QEC Operations. These are characterized by operating on zero
-        or more qubit values, and returning the same amount of qubit values.
+        considered QEC Operations. These are characterized by operating on one or more qubit values,
+        and returning the same amount of qubit values.
     }];
 
     let cppNamespace = "::catalyst::qec";
@@ -36,36 +40,69 @@ def QECOpInterface : OpInterface<"QECOpInterface"> {
         InterfaceMethod<
             /*desc=*/"Get the output qubits for this operation.",
             /*retTy=*/"mlir::Operation::result_range",
-            /*methodName=*/"getOutQubits"
+            /*meth
+            odName=*/"getOutQubits"
         >,
         InterfaceMethod<
             /*desc=*/"Get the Pauli product for this operation.",
-            /*retTy=*/" ::mlir::ArrayAttr",
+            /*retTy=*/"::mlir::ArrayAttr",
             /*methodName=*/"getPauliProduct"
         >,
         InterfaceMethod<
-            /*desc=*/"Get the Pauli product for this operation.",
-            /*retTy=*/" ::mlir::ArrayAttr",
-            /*methodName=*/"getPauliProductAttr"
-        >,
+            /*desc=*/"Set the Pauli product for this operation.",
+            /*retTy=*/"void",
+            /*methodName=*/"setPauliProductAttr", (ins "const ::mlir::ArrayAttr&":$propValue)
+        >
+    ];
+
+}
+
+//===----------------------------------------------------------------------===//
+// Pauli Product Rotation Interface
+//===----------------------------------------------------------------------===//
+
+def PPRNonArbitraryOpInterface : OpInterface<"PPRNonArbitraryOpInterface", [QECOpInterface]> {
+    let description = [{
+        This interface provides a generic way to interact with non-arbitrary rotation operations.
+    }];
+    
+    let methods = [
         InterfaceMethod<
             /*desc=*/"Get the rotation kind for this operation.",
             /*retTy=*/"uint16_t",
             /*methodName=*/"getRotationKind"
         >,
         InterfaceMethod<
-            /*desc=*/"Set the Pauli product for this operation.",
-            /*retTy=*/"void",
-            /*methodName=*/"setPauliProductAttr", (ins " ::mlir::ArrayAttr":$attr)
-        >,
-        InterfaceMethod<
             /*desc=*/"Set the rotation kind for this operation.",
             /*retTy=*/"void",
-            /*methodName=*/"setRotationKind", (ins "uint16_t":$attrValue)
+            /*methodName=*/"setRotationKind", (ins "uint16_t":$rotationKind)
         >
     ];
-
-
 }
+
+def PPRArbitraryOpInterface: OpInterface<"PPRArbitraryOpInterface", [QECOpInterface]>{
+    let description = [{
+        This interface provides a generic way to interact with arbitrary rotation operations.
+    }];
+    
+    let methods = [
+        InterfaceMethod<
+            /*desc=*/"Get the arbitrary angle for this operation.",
+            /*retTy=*/"::mlir::Value",
+            /*methodName=*/"getArbitraryAngle"
+        >,
+        InterfaceMethod<
+            /*desc=*/"Set the arbitrary angle for this operation.",
+            /*retTy=*/"void",
+            /*methodName=*/"setArbitraryAngle", (ins "::mlir::Value":$attrValue)
+        >
+    ];
+}
+
+//===----------------------------------------------------------------------===//
+// Pauli Product Measurement Interface
+//===----------------------------------------------------------------------===//
+
+def PauliProductMeasurementInterface: OpInterface<"PauliProductMeasurementInterface", [QECOpInterface]>;
 
 #endif // QECOP_INTERFACES

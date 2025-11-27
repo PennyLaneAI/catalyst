@@ -203,7 +203,7 @@ def FabricateOp : QEC_Op<"fabricate"> {
     let hasVerifier = 1;
 }
 
-def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {
+def PPRotationOp : QEC_Op<"ppr", [PPRNonArbitraryOpInterface, AttrSizedOperandSegments]> {
     let summary = "Pauli Product Rotation on qubits.";
 
     let description = [{
@@ -351,7 +351,7 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def PPRotationArbitraryOp : QEC_Op<"ppr.arbitrary", [AttrSizedOperandSegments]> {
+def PPRotationArbitraryOp : QEC_Op<"ppr.arbitrary", [PPRArbitraryOpInterface,AttrSizedOperandSegments]> {
     let summary = "Pauli Product Rotation with arbitrary angle.";
     let description = [{
         The PPRotationArbitraryOp represents a Pauli product rotation operation with an arbitrary angle.
@@ -392,7 +392,7 @@ def PPRotationArbitraryOp : QEC_Op<"ppr.arbitrary", [AttrSizedOperandSegments]> 
     let hasCanonicalizeMethod = 1;
 }
 
-def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, AttrSizedOperandSegments]> {
+def PPMeasurementOp : QEC_Op<"ppm", [PauliProductMeasurementInterface, AttrSizedOperandSegments]> {
     let summary = "Pauli Product Measurement on qubits.";
 
     let description = [{
@@ -523,19 +523,9 @@ def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, AttrSizedOperandSegments]> 
     }];
 
     let hasVerifier = 1;
-
-    code extraBaseClassDeclaration = [{
-        uint16_t getRotationKind(){
-            return getRotationSign();
-        };
-        void setRotationKind(uint16_t attrValue){
-            setRotationSign(static_cast<int16_t>(attrValue) < 0 ? -1 : 1);
-        };
-    }];
-    let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def SelectPPMeasurementOp : QEC_Op<"select.ppm"> {
+def SelectPPMeasurementOp : QEC_Op<"select.ppm", [PauliProductMeasurementInterface]> {
     let summary = "Multiplexed Pauli product measurement.";
 
     let description = [{
