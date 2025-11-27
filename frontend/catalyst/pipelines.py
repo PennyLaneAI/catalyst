@@ -35,6 +35,7 @@ from operator import is_not
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
+from catalyst.default_pipelines import get_enforce_runtime_invariants_stage
 from catalyst.utils.exceptions import CompileError
 
 PipelineStage = Tuple[str, List[str]]
@@ -196,34 +197,12 @@ class CompileOptions:
         """Returns all stages in order for compilation"""
         # Dictionaries in python are ordered
         stages = {}
-        stages["EnforceRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(self)
+        stages["EnforceRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage()
         stages["HLOLoweringPass"] = get_hlo_lowering_stage(self)
         stages["QuantumCompilationPass"] = get_quantum_compilation_stage(self)
         stages["BufferizationPass"] = get_bufferization_stage(self)
         stages["MLIRToLLVMDialect"] = get_convert_to_llvm_stage(self)
         return list(stages.items())
-
-
-def get_enforce_runtime_invariants_stage(_options: CompileOptions) -> List[str]:
-    """Returns the list of passes in the enforce runtime invariant stage."""
-    enforce_runtime_invariants = [
-        # We want the invariant that transforms that generate multiple
-        # tapes will generate multiple qnodes. One for each tape.
-        # Split multiple tapes enforces that invariant.
-        "split-multiple-tapes",
-        # Run the transform sequence defined in the MLIR module
-        "builtin.module(apply-transform-sequence)",
-        # Nested modules are something that will be used in the future
-        # for making device specific transformations.
-        # Since at the moment, nothing in the runtime is using them
-        # and there is no lowering for them,
-        # we inline them to preserve the semantics. We may choose to
-        # keep inlining modules targeting the Catalyst runtime.
-        # But qnodes targeting other backends may choose to lower
-        # this into something else.
-        "inline-nested-module",
-    ]
-    return enforce_runtime_invariants
 
 
 def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
