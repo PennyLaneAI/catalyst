@@ -227,7 +227,6 @@ def get_quantum_compilation_stage(_options: CompileOptions) -> List[str]:
         # But qnodes targeting other backends may choose to lower
         # this into something else.
         "inline-nested-module",
-        "annotate-function",
         "lower-mitigation",
         "adjoint-lowering",
         "disable-assertion" if _options.disable_assertions else None,
@@ -263,7 +262,7 @@ def get_gradient_lowering_stage(_options: CompileOptions) -> List[str]:
     """Returns the list of passes that performs gradient lowering"""
 
     gradient_lowering = [
-        # TODO: This pass should ideally be moved to the quantum compilation stage
+        "annotate-invalid-gradient-functions",
         "lower-gradients",
     ]
     return gradient_lowering

@@ -57,7 +57,6 @@ void createQuantumCompilationPipeline(OpPassManager &pm)
     pm.addPass(catalyst::quantum::createSplitMultipleTapesPass());
     pm.addNestedPass<ModuleOp>(catalyst::createApplyTransformSequencePass());
     pm.addPass(catalyst::createInlineNestedModulePass());
-    pm.addPass(catalyst::quantum::createAnnotateFunctionPass());
     pm.addPass(catalyst::mitigation::createMitigationLoweringPass());
     pm.addPass(catalyst::quantum::createAdjointLoweringPass());
     pm.addPass(catalyst::createDisableAssertionPass());
@@ -89,6 +88,7 @@ void createHloLoweringPipeline(OpPassManager &pm)
 }
 void createGradientLoweringPipeline(OpPassManager &pm)
 {
+    pm.addPass(catalyst::gradient::createAnnotateInvalidGradientFunctionsPass());
     pm.addPass(catalyst::gradient::createGradientLoweringPass());
 }
 void createBufferizationPipeline(OpPassManager &pm)
@@ -160,10 +160,9 @@ void createDefaultCatalystPipeline(OpPassManager &pm)
 
 void registerQuantumCompilationPipeline()
 {
-    PassPipelineRegistration<>(
-        "quantum-compilation-pipeline",
-        "Register quantum compilation pipeline as a pass.",
-        createQuantumCompilationPipeline);
+    PassPipelineRegistration<>("quantum-compilation-pipeline",
+                               "Register quantum compilation pipeline as a pass.",
+                               createQuantumCompilationPipeline);
 }
 void registerHloLoweringPipeline()
 {
@@ -210,8 +209,9 @@ std::vector<Pipeline> getDefaultPipeline()
 {
     using PipelineFunc = void (*)(mlir::OpPassManager &);
     std::vector<PipelineFunc> pipelineFuncs = {
-        &createQuantumCompilationPipeline, &createHloLoweringPipeline, &createGradientLoweringPipeline,
-        &createBufferizationPipeline, &createLLVMDialectLoweringPipeline};
+        &createQuantumCompilationPipeline, &createHloLoweringPipeline,
+        &createGradientLoweringPipeline, &createBufferizationPipeline,
+        &createLLVMDialectLoweringPipeline};
 
     llvm::SmallVector<std::string> defaultPipelineNames = {
         "QuantumCompilationPass", "HLOLoweringPass", "GradientLoweringPass", "BufferizationPass",
