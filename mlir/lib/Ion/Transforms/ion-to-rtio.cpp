@@ -19,7 +19,9 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/Transforms/CSE.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -135,6 +137,9 @@ auto traceValueWithCallback(Value value, CallbackT &&callback)
         else if (auto op = dyn_cast<quantum::ExtractOp>(defOp)) {
             visited.push(op.getQreg());
         }
+        else if (auto op = dyn_cast<rtio::RTIOQubitToChannelOp>(defOp)) {
+            visited.push(op.getQubit());
+        }
         else if (auto op = dyn_cast<quantum::InsertOp>(defOp)) {
             Value inQreg = op.getInQreg();
             Value qubit = op.getQubit();
@@ -156,7 +161,7 @@ auto traceValueWithCallback(Value value, CallbackT &&callback)
     }
 }
 
-Value createSyncEvent(ArrayRef<Value> events, PatternRewriter &rewriter)
+Value awaitEvents(ArrayRef<Value> events, PatternRewriter &rewriter)
 {
     if (events.size() == 1) {
         return events.front();
@@ -317,23 +322,59 @@ struct ParallelProtocolToRTIOPattern : public OpConversionPattern<ion::ParallelP
             }
         }
 
-        rewriter.setInsertionPointAfter(op);
-
         // create events for each qubit
         auto events = llvm::map_range(inQubits, [&](Value qubit) {
             auto eventType = rtio::EventType::get(ctx);
             return rewriter.create<UnrealizedConversionCastOp>(loc, eventType, qubit).getResult(0);
         });
 
-        Value inputSyncEvent = createSyncEvent(llvm::to_vector(events), rewriter);
+        Value inputSyncEvent = awaitEvents(llvm::to_vector(events), rewriter);
 
         // Clone operations from the region to outside
         SmallVector<Value> pulseEvents;
+        DenseMap<Value, int64_t> qubitToOffset;
+
+        // we cache the channel to index mapping to avoid multiple lookups
+        DenseMap<Value, Value> cache;
         for (auto &regionOp : regionBlock->without_terminator()) {
             auto *clonedOp = rewriter.clone(regionOp, irMapping);
             if (auto pulseOp = dyn_cast<rtio::RTIOPulseOp>(clonedOp)) {
                 // set wait event for the pulse operation
                 pulseOp.setWait(inputSyncEvent);
+
+                Value index = nullptr;
+
+                SmallVector<Value> chain;
+                traceValueWithCallback<TraceMode::Qreg>(
+                    pulseOp.getChannel(), [&](Value value) -> WalkResult {
+                        if (cache.count(value)) {
+                            index = cache[value];
+                            return WalkResult::interrupt();
+                        }
+                        chain.push_back(value);
+                        if (auto loadOp =
+                                llvm::dyn_cast_if_present<memref::LoadOp>(value.getDefiningOp())) {
+                            index = loadOp.getIndices()[0];
+
+                            // cache the channel to index mapping
+                            cache[pulseOp.getChannel()] = index;
+                            return WalkResult::interrupt();
+                        }
+                        return WalkResult::advance();
+                    });
+
+                assert(index != nullptr && "index must not be null");
+
+                // update cache
+                for (Value value : chain) {
+                    cache[value] = index;
+                }
+                pulseOp->setAttr("offset", rewriter.getI64IntegerAttr(qubitToOffset[index]));
+
+                // the same qubit may appear multiple times in the parallel protocol
+                // so we need to increment the offset for each appearance
+                qubitToOffset[index]++;
+
                 pulseEvents.push_back(pulseOp.getEvent());
             }
             irMapping.map(regionOp.getResults(), clonedOp->getResults());
@@ -343,7 +384,7 @@ struct ParallelProtocolToRTIOPattern : public OpConversionPattern<ion::ParallelP
         assert(pulseEvents.size() > 0 &&
                "must have at least one pulse operation after parallel protocol conversion");
 
-        Value outputSyncEvent = createSyncEvent(llvm::to_vector(pulseEvents), rewriter);
+        Value outputSyncEvent = awaitEvents(llvm::to_vector(pulseEvents), rewriter);
 
         SmallVector<Value> results;
         for (Value result : op.getResults()) {
@@ -528,15 +569,14 @@ struct ResolveChannelMappingPattern : public OpRewritePattern<rtio::RTIOQubitToC
         StringRef kind = originalChannelType.getKind();
         ArrayAttr qualifiers = originalChannelType.getQualifiers();
 
-        int offset = 0;
-        // If the qualifiers is not empty, get the first qualifier and check if it is 0 or 1
-        if (qualifiers.size() >= 1) {
-            IntegerAttr qualifier0 = llvm::dyn_cast<IntegerAttr>(qualifiers[0]);
-            offset = qualifier0.getInt() == 0 ? 0 : 1;
-        }
+        // channel should have exactly one use before lowering to channel op
+        assert(op.getChannel().hasOneUse() && "channel should have exactly one use");
 
-        IntegerAttr channelIdAttr = rewriter.getIntegerAttr(rewriter.getIndexType(),
-                                                            channelIdValue.getSExtValue() + offset);
+        auto pulseOp = cast<rtio::RTIOPulseOp>(*op.getChannel().getUsers().begin());
+        int64_t offset = cast<IntegerAttr>(pulseOp->getAttr("offset")).getInt();
+
+        IntegerAttr channelIdAttr = rewriter.getIntegerAttr(
+            rewriter.getIndexType(), (channelIdValue.getSExtValue() + offset));
 
         auto resolvedChannelType =
             rtio::ChannelType::get(rewriter.getContext(), kind, qualifiers, channelIdAttr);
@@ -622,7 +662,7 @@ struct PropagateEventsPattern : public OpRewritePattern<UnrealizedConversionCast
         // Create a sync event from all collected events
         // TODO: check domination, so that we can avoid creating a sync event if events are
         // already dominated by one of the events
-        Value syncEvent = createSyncEvent(events.getArrayRef(), rewriter);
+        Value syncEvent = awaitEvents(events.getArrayRef(), rewriter);
         rewriter.replaceOp(op, syncEvent);
         return success();
     }
@@ -673,6 +713,11 @@ LogicalResult CanonicalizeKernelFunction(func::FuncOp funcOp, MLIRContext *ctx)
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return failure();
     }
+
+    IRRewriter rewriter(ctx);
+    DominanceInfo domInfo(funcOp);
+    eliminateCommonSubExpressions(rewriter, domInfo, funcOp);
+
     return success();
 }
 
@@ -835,15 +880,8 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         auto newFuncType = FunctionType::get(ctx, oldFuncType.getInputs(), {});
         newQnodeFunc.setFunctionType(newFuncType);
 
-        // Replace all return ops with empty returns
-        SmallVector<func::ReturnOp> returnsToReplace;
-        newQnodeFunc.walk([&](func::ReturnOp returnOp) { returnsToReplace.push_back(returnOp); });
-
-        for (auto returnOp : returnsToReplace) {
-            builder.setInsertionPoint(returnOp);
-            builder.create<func::ReturnOp>(returnOp.getLoc());
-            returnOp.erase();
-        }
+        // Clear operands from all return ops (make them return nothing)
+        newQnodeFunc.walk([](func::ReturnOp returnOp) { returnOp.getOperandsMutable().clear(); });
 
         return newQnodeFunc;
     }
@@ -864,14 +902,14 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
             std::string globalNameStr = "__qubit_map_" + std::to_string(globalCounter++);
             StringRef globalName = globalNameStr;
 
-            // Create dense attribute with values [0, 1, 2, ..., numQubits-1] * 2
+            // Create dense attribute with values [0, 1, 2, ..., numQubits-1]
             auto tensorType =
                 RankedTensorType::get({static_cast<int64_t>(numQubits)}, builder.getIndexType());
             SmallVector<APInt> values;
             // Use IndexType::kInternalStorageBitWidth for index type
             unsigned indexWidth = IndexType::kInternalStorageBitWidth;
             for (size_t i = 0; i < numQubits; i++) {
-                values.push_back(APInt(indexWidth, i * 2));
+                values.push_back(APInt(indexWidth, i));
             }
             auto denseAttr = DenseIntElementsAttr::get(tensorType, values);
 
@@ -933,16 +971,10 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         auto newEntryFuncType = FunctionType::get(ctx, oldEntryFuncType.getInputs(), {});
         entryFunc.setFunctionType(newEntryFuncType);
 
-        // Clear the function body
+        // Clear the function body (reverse order so uses are erased before defs)
         Block *entryBlock = &entryFunc.getBody().front();
-        SmallVector<Operation *> opsToErase;
-        for (Operation &op : entryBlock->getOperations()) {
-            opsToErase.push_back(&op);
-        }
-        for (auto op : opsToErase) {
-            op->dropAllUses();
-            op->erase();
-        }
+        for (auto &op : llvm::make_early_inc_range(llvm::reverse(*entryBlock)))
+            op.erase();
 
         // Create call to kernel function
         OpBuilder entryBuilder(ctx);
@@ -1044,25 +1076,11 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
             failed(SCFStructuralConversion(newQnodeFunc, target, typeConverter, ctx)) ||
             failed(PropagateEvents(newQnodeFunc, ctx)) ||
             failed(CleanQuantumOps(newQnodeFunc, ctx)) ||
+            failed(ResolveChannelMapping(newQnodeFunc, ctx)) ||
             failed(CanonicalizeKernelFunction(newQnodeFunc, ctx))) {
             newQnodeFunc->emitError("Failed to convert to rtio dialect");
             return signalPassFailure();
         }
-
-        // Resolve the static channel, the dynamic channel will be remained as `?`
-        if (failed(ResolveChannelMapping(newQnodeFunc, ctx))) {
-            newQnodeFunc->emitError("Failed to resolve channel mapping");
-            return signalPassFailure();
-        }
-
-        // TODO: Naive scheduling to generate the simple Timeline RTIO IR
-        // To shorten the `timeline`: `list scheduling`, `graph scheduling`, ... etc. can also be
-        // used to schedule the operations. Here we just linearly mapping the operation based on the
-        // order in the function without caring any latency issues.
-        // if (failed(NaiveScheduling(newQnodeFunc, ctx))) {
-        //     newQnodeFunc->emitError("Failed to schedule");
-        //     return signalPassFailure();
-        // }
 
         // remove body of entry function and add call to kernel function
         auto entryFunc = module.lookupSymbol<func::FuncOp>("jit_circuit");
