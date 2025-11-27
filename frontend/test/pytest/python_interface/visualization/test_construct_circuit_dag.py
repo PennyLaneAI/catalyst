@@ -140,6 +140,68 @@ class FakeDAGBuilder(DAGBuilder):
         return "graph"
 
 
+class TestFakeDAGBuilder:
+    """Test the FakeDAGBuilder to ensure helper functions work as intended."""
+
+    @pytest.fixture
+    def builder_with_data(self):
+        """Sets up an instance with a complex graph already built."""
+
+        builder = FakeDAGBuilder()
+
+        # Cluster set-up
+        builder.add_cluster("c0", label="Company")
+        builder.add_cluster("c1", label="Marketing", cluster_id="c0")
+        builder.add_cluster("c2", label="Finance", cluster_id="c0")
+
+        # Node set-up
+        builder.add_node("n0", "CEO", cluster_id=None)  # Add to base cluster "Company"
+        builder.add_node("n1", "Marketing Manager", cluster_id="c1")
+        builder.add_node("n2", "Finance Manager", cluster_id="c2")
+
+        return builder
+
+    # Test ID look up
+
+    def test_get_node_id_by_label_success(self, builder_with_data):
+        assert builder_with_data.get_node_id_by_label("Finance Manager") == "n2"
+        assert builder_with_data.get_node_id_by_label("Marketing Manager") == "n1"
+        assert builder_with_data.get_node_id_by_label("CEO") == "n0"
+
+    def test_get_node_id_by_label_failure(self, builder_with_data):
+        assert builder_with_data.get_node_id_by_label("Software Manager") is None
+
+    def test_get_cluster_id_by_label_success(self, builder_with_data):
+        assert builder_with_data.get_cluster_id_by_label("Finance") == "c2"
+        assert builder_with_data.get_cluster_id_by_label("Marketing") == "c1"
+        assert builder_with_data.get_cluster_id_by_label("Company") == "c0"
+
+    def test_get_cluster_id_by_label_failure(self, builder_with_data):
+        assert builder_with_data.get_cluster_id_by_label("Software") is None
+
+    # Test relationship probing
+
+    def test_node_heirarchy(self, builder_with_data):
+        finance_nodes = builder_with_data.get_nodes_in_cluster("Finance")
+        assert finance_nodes == ["Finance Manager"]
+
+        marketing_nodes = builder_with_data.get_nodes_in_cluster("Marketing")
+        assert marketing_nodes == ["Marketing Manager"]
+
+        company_nodes = builder_with_data.get_nodes_in_cluster("Company")
+        assert company_nodes == ["CEO"]
+
+    def test_cluster_heirarchy(self, builder_with_data):
+        clusters_in_finance = builder_with_data.get_child_clusters("Finance")
+        assert not clusters_in_finance
+
+        clusters_in_marketing = builder_with_data.get_child_clusters("Marketing")
+        assert not clusters_in_marketing
+
+        clusters_in_company = builder_with_data.get_child_clusters("Company")
+        assert {"Finance", "Marketing"} == set(clusters_in_company)
+
+
 @pytest.mark.unit
 def test_dependency_injection():
     """Tests that relevant dependencies are injected."""
