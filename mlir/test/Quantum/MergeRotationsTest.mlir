@@ -1,4 +1,4 @@
-// Copyright 2024 Xanadu Quantum Technologies Inc.
+// Copyright 2024-2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -642,4 +642,231 @@ func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> (!quantum.bit, !quant
 
     // CHECK: return [[ret_0]]#0, [[ret_0]]#1
     return %4#0, %4#1 : !quantum.bit, !quantum.bit
+}
+
+// PPR Tests
+
+// -----
+
+// simple PPR merge
+
+// CHECK-LABEL: merge_Y_pi_4
+func.func public @merge_Y_pi_4(%q1: !quantum.bit) {
+    // CHECK-NOT: qec.ppr ["Y"](4)
+    // CHECK: qec.ppr ["Y"](2)
+    %0 = qec.ppr ["Y"](4) %q1: !quantum.bit
+    %1 = qec.ppr ["Y"](4) %0: !quantum.bit
+    func.return
+}
+
+// -----
+
+// merging to identity
+
+func.func public @test_merge_rotations(%q1: !quantum.bit) {
+    // CHECK-NOT: qec.ppr
+    %0 = qec.ppr ["X"](2) %q1: !quantum.bit
+    %1 = qec.ppr ["X"](2) %0: !quantum.bit
+    func.return
+}
+
+// -----
+
+// multiple merges
+
+// CHECK-LABEL: merge_multi_Y
+func.func public @merge_multi_Y(%q1: !quantum.bit) {
+    // CHECK-NOT: qec.ppr
+    %0 = qec.ppr ["Y"](4) %q1: !quantum.bit
+    %1 = qec.ppr ["Y"](4) %0: !quantum.bit
+    %2 = qec.ppr ["Y"](8) %1: !quantum.bit
+    %3 = qec.ppr ["Y"](8) %2: !quantum.bit
+    %4 = qec.ppr ["Y"](8) %3: !quantum.bit
+    %5 = qec.ppr ["Y"](8) %4: !quantum.bit
+    func.return
+}
+
+// -----
+
+// not merging when incompatible
+
+// CHECK-LABEL: dont_merge
+func.func public @dont_merge(%q1: !quantum.bit) {
+    // CHECK: qec.ppr ["Y"](4)
+    // CHECK: qec.ppr ["X"](4)
+    // CHECK: qec.ppr ["Z"](8)
+    // CHECK: qec.ppr ["X"](8)
+    // CHECK: qec.ppr ["Y"](2)
+    // CHECK: qec.ppr ["Z"](2)
+    %0 = qec.ppr ["Y"](4) %q1: !quantum.bit
+    %1 = qec.ppr ["X"](4) %0: !quantum.bit
+    %2 = qec.ppr ["Z"](8) %1: !quantum.bit
+    %3 = qec.ppr ["X"](8) %2: !quantum.bit
+    %4 = qec.ppr ["Y"](2) %3: !quantum.bit
+    %5 = qec.ppr ["Z"](2) %4: !quantum.bit
+    func.return
+}
+
+// -----
+
+// updating references
+
+// CHECK-LABEL: merge_correct_references
+func.func public @merge_correct_references(%q1: !quantum.bit) {
+    // CHECK: %[[in:[a-zA-Z0-9_]+]] = qec.ppr ["Y"](4)
+    // CHECK: %[[merge_out:[a-zA-Z0-9_]+]] = qec.ppr ["X"](2) %[[in]]
+    // CHECK: qec.ppr ["Z"](4) %[[merge_out]]
+    %0 = qec.ppr ["Y"](4) %q1: !quantum.bit
+    %1 = qec.ppr ["X"](4) %0: !quantum.bit
+    %2 = qec.ppr ["X"](4) %1: !quantum.bit
+    %3 = qec.ppr ["Z"](4) %2: !quantum.bit
+    func.return
+}
+
+// -----
+
+// multi-qubit merge
+
+// CHECK-LABEL: merge_multi_XYZ
+func.func public @merge_multi_XYZ(%q1: !quantum.bit, %q2: !quantum.bit, %q3: !quantum.bit) {
+    // CHECK: qec.ppr ["X", "Y", "Z"](4)
+    // CHECK-NOT: qec.ppr ["X", "Y", "Z"](2)
+    // CHECK-NOT: qec.ppr ["X", "Y", "Z"](8)
+    %0:3 = qec.ppr ["X", "Y", "Z"](4) %q1, %q2, %q3: !quantum.bit, !quantum.bit, !quantum.bit
+    %1:3 = qec.ppr ["X", "Y", "Z"](4) %0#0, %0#1, %0#2: !quantum.bit, !quantum.bit, !quantum.bit
+    %2:3 = qec.ppr ["X", "Y", "Z"](8) %1#0, %1#1, %1#2: !quantum.bit, !quantum.bit, !quantum.bit
+    %3:3 = qec.ppr ["X", "Y", "Z"](8) %2#0, %2#1, %2#2: !quantum.bit, !quantum.bit, !quantum.bit
+    %4:3 = qec.ppr ["X", "Y", "Z"](2) %3#0, %3#1, %3#2: !quantum.bit, !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// simple inverse PPRs
+
+// CHECK-LABEL: cancel_Z_pi_2
+func.func public @cancel_Z_pi_2(%q1: !quantum.bit) {
+    // CHECK-NOT: qec.ppr
+    %0 = qec.ppr ["Z"](2) %q1: !quantum.bit
+    %1 = qec.ppr ["Z"](-2) %0: !quantum.bit
+    func.return
+}
+
+// -----
+
+// multiple inverse PPRs
+
+// CHECK-LABEL: cancel_multi_Z
+func.func public @cancel_multi_Z(%q1: !quantum.bit) {
+    // CHECK-NOT: qec.ppr
+    %0 = qec.ppr ["Z"](8) %q1: !quantum.bit
+    %1 = qec.ppr ["X"](-4) %0: !quantum.bit
+    %2 = qec.ppr ["X"](4) %1: !quantum.bit
+    %3 = qec.ppr ["Z"](-8) %2: !quantum.bit
+    func.return
+}
+
+// -----
+
+// incorrect order inverse PPRs
+// CHECK-LABEL: dont_cancel
+func.func public @dont_cancel(%q1: !quantum.bit) {
+    // CHECK: qec.ppr ["Z"](8)
+    // CHECK: qec.ppr ["X"](-4)
+    // CHECK: qec.ppr ["Z"](-8)
+    // CHECK: qec.ppr ["X"](4)
+    %0 = qec.ppr ["Z"](8) %q1: !quantum.bit
+    %1 = qec.ppr ["X"](-4) %0: !quantum.bit
+    %2 = qec.ppr ["Z"](-8) %1: !quantum.bit
+    %3 = qec.ppr ["X"](4) %2: !quantum.bit
+    func.return
+}
+
+// ----- 
+
+// correct reference updates on cancel
+
+// CHECK-LABEL: cancel_correct_references
+func.func public @cancel_correct_references(%q1: !quantum.bit) {
+    // CHECK: %[[in:[a-zA-Z0-9_]+]] = qec.ppr ["Y"](2)
+    // CHECK: qec.ppr ["Z"](4) %[[in]]
+    %0 = qec.ppr ["Y"](2) %q1: !quantum.bit
+    %1 = qec.ppr ["X"](8) %0: !quantum.bit
+    %2 = qec.ppr ["X"](-8) %1: !quantum.bit
+    %3 = qec.ppr ["Z"](4) %2: !quantum.bit
+    func.return
+}
+
+// -----
+
+// multi-qubit inverse PPRs
+
+// CHECK-LABEL: cancel_multi_XY
+func.func public @cancel_multi_XY(%q1: !quantum.bit, %q2: !quantum.bit) {
+    // CHECK-NOT: qec.ppr
+    %0:2 = qec.ppr ["X", "Y"](2) %q1, %q2: !quantum.bit, !quantum.bit
+    %1:2 = qec.ppr ["X", "Y"](-2) %0#0, %0#1: !quantum.bit, !quantum.bit
+    %2:2 = qec.ppr ["X", "Y"](4) %1#0, %1#1: !quantum.bit, !quantum.bit
+    %3:2 = qec.ppr ["X", "Y"](-4) %2#0, %2#1: !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// multi-qubit incompatible inverse PPRs
+
+// CHECK-LABEL: dont_cancel_multi
+func.func public @dont_cancel_multi(%q1: !quantum.bit, %q2: !quantum.bit) {
+    // CHECK: qec.ppr ["X", "Y"](2)
+    // CHECK: qec.ppr ["Y", "X"](-2)
+    // CHECK: qec.ppr ["Z", "Y"](4)
+    // CHECK: qec.ppr ["Y", "Z"](-4)
+    %0:2 = qec.ppr ["X", "Y"](2) %q1, %q2: !quantum.bit, !quantum.bit
+    %1:2 = qec.ppr ["Y", "X"](-2) %0#0, %0#1: !quantum.bit, !quantum.bit
+    %2:2 = qec.ppr ["Z", "Y"](4) %1#0, %1#1: !quantum.bit, !quantum.bit
+    %3:2 = qec.ppr ["Y", "Z"](-4) %2#0, %2#1: !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// merge and cancel PPRs
+
+// CHECK-LABEL: multi_cancel_and_merge
+func.func public @multi_cancel_and_merge(%q1: !quantum.bit, %q2: !quantum.bit) {
+    // CHECK-NOT: qec.ppr ["X", "Y"]
+    // CHECK: qec.ppr ["Y", "Z"](4)
+    %0:2 = qec.ppr ["Y", "Z"](8) %q1, %q2: !quantum.bit, !quantum.bit
+    %1:2 = qec.ppr ["X", "Y"](-4) %0#0, %0#1: !quantum.bit, !quantum.bit
+    %2:2 = qec.ppr ["X", "Y"](4) %1#0, %1#1: !quantum.bit, !quantum.bit
+    %3:2 = qec.ppr ["Y", "Z"](8) %2#0, %2#1: !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// cancel and merge PPRs
+
+// CHECK-LABEL: multi_merge_and_cancel
+func.func public @multi_merge_and_cancel(%q1: !quantum.bit, %q2: !quantum.bit) {
+    // CHECK-NOT: qec.ppr
+    %0:2 = qec.ppr ["Z", "X"](4) %q1, %q2: !quantum.bit, !quantum.bit
+    %1:2 = qec.ppr ["Z", "X"](-8) %0#0, %0#1: !quantum.bit, !quantum.bit
+    %2:2 = qec.ppr ["Z", "X"](-8) %1#0, %1#1: !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// don't merge through other operations
+
+// CHECK-LABEL: mixed_operations
+func.func public @mixed_operations(%q1: !quantum.bit) {
+    // CHECK: qec.ppr ["Z"](4)
+    // CHECK: quantum.custom "Hadamard"()
+    // CHECK: qec.ppr ["Z"](4)
+    %0 = qec.ppr ["Z"](4) %q1: !quantum.bit
+    %1 = quantum.custom "Hadamard"() %0: !quantum.bit
+    %2 = qec.ppr ["Z"](4) %1: !quantum.bit
+    func.return
 }
