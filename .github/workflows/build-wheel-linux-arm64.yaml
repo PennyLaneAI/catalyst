@@ -53,7 +53,7 @@ jobs:
 
   constants:
     needs: [check_if_wheel_build_required]
-    if: needs.check_if_wheel_build_required.outputs.build-wheels == 'true'
+    if: true
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
 
