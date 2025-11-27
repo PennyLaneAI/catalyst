@@ -14,14 +14,17 @@
 """Pattern rewriter API for quantum compilation passes."""
 
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from numbers import Number
+from typing import TypeAlias
+from uuid import UUID, uuid4
 
 from pennylane import math, measurements, ops
 from pennylane.exceptions import TransformError
 from pennylane.operation import Operator
 from xdsl.builder import ImplicitBuilder
 from xdsl.dialects import arith, builtin, func, scf, tensor
-from xdsl.ir import BlockArgument
+from xdsl.ir import Block, BlockArgument
 from xdsl.ir import Operation as xOperation
 from xdsl.ir import Region, SSAValue
 from xdsl.pattern_rewriter import PatternRewriter, PatternRewriterListener, PatternRewriteWalker
@@ -39,6 +42,33 @@ _gate_like_ops = (
     # quantum.PCPhaseOp,
     quantum.QubitUnitaryOp,
 )
+
+
+@dataclass
+class DynamicWire:
+    """Dynamic wire label wrapper."""
+
+    var: SSAValue[builtin.i64] | None = None
+    """SSA value representing the wire's dynamic index into the quantum register."""
+
+    _id: UUID = field(default_factory=uuid4, init=False)
+    """Unique ID representing the qubit. This is only used if the wire was allocated dynamically
+    (``quantum.AllocQubitOp``) or the qubit originated as a ``BlockArgument``."""
+
+    def __hash__(self) -> int:
+        if self.var:
+            return hash(self.var)
+
+        return hash(self._id)
+
+    def __eq__(self, other: "DynamicWire") -> bool:
+        if self.var and other.var:
+            return self.var == other.var
+
+        return self._id == other._id
+
+
+WireLabelLike: TypeAlias = int | DynamicWire
 
 
 class PLPatternRewriter(PatternRewriter):
@@ -90,6 +120,122 @@ class PLPatternRewriter(PatternRewriter):
             raise TransformError(f"{current_op} is not inside a QNode's scope.")
 
         return qnode_func if get_func else current_op
+
+    def get_qreg(self, insertion_point: InsertPoint) -> quantum.QuregSSAValue | None:
+        """Get the active quantum register at a given point in the program. Returns ``None``
+        If there are no active quantum registers. Currently, we assume that there can only be
+        one active quantum register at any given point in the program."""
+        cur_op = insertion_point.insert_before
+        qreg = None
+
+        while cur_op.prev_op is not None:
+            if isinstance(cur_op, quantum.DeallocOp):
+                break
+
+            cur_op = cur_op.prev_op
+            for r in cur_op.results:
+                if isinstance(r.type, quantum.QuregType):
+                    qreg = r
+                    break
+
+        return qreg
+
+    def _find_qubit_root(
+        self, qubit: quantum.QubitSSAValue
+    ) -> tuple[quantum.ExtractOp | quantum.AllocQubitOp | Block, list[quantum.QubitSSAValue]]:
+        """Find the root operation that created a qubit."""
+        root = None
+        owner = qubit.owner
+        seen_qubits = set()
+
+        while True:
+            seen_qubits.add(qubit)
+
+            if isinstance(owner, (Block, quantum.AllocQubitOp, quantum.ExtractOp)):
+                root = owner
+                break
+
+            if isinstance(owner, _gate_like_ops):
+                qb_idx = qubit.index
+                n_classical_operands = (
+                    len(owner.operands)
+                    - len(owner.in_ctrl_qubits)
+                    - len(getattr(owner, "in_qubits", []))
+                )
+                qubit = owner.operands[n_classical_operands + qb_idx]
+                owner = qubit.owner
+
+            raise ValueError(f"Cannot handle {owner} type yet for finding a qubit's root.")
+
+        return root, seen_qubits
+
+    def get_qreg_idx_from_qubit(self, qubit: quantum.QubitSSAValue) -> int | DynamicWire | None:
+        """Get the index to the quantum register to which a qubit corresponds.
+
+        If the index is unknown at compile-time, a ``DynamicWire`` will be returned with
+        a handle to the SSA value corresponding to the index. If the qubit was dynamically
+        allocated, or originated from an argument, ``None`` will be returned.
+        """
+        if not isinstance(qubit.type, quantum.QubitType):
+            raise TypeError(f"The input must be a QubitType SSAValue, got {qubit}.")
+
+        root, _ = self._find_qubit_root(qubit)
+
+        if isinstance(root, quantum.ExtractOp):
+            if (idx_attr := getattr(root, "idx_attr", None)) is not None:
+                return idx_attr.data
+            elif (idx := get_constant_from_ssa(root.idx)) is not None:
+                return idx
+
+            return DynamicWire(var=root.idx)
+
+        # If the qubit's root is an AllocQubitOp, the qubit does not correspond to a
+        # qreg index. Else, it originates from a BlockArgument, in which case, its
+        # corresponding index, if there is one, cannot be inferred.
+        return None
+
+    def get_active_qubits(
+        self, insertion_point: InsertPoint
+    ) -> dict[WireLabelLike | quantum.QubitSSAValue, quantum.QubitSSAValue | WireLabelLike]:
+        """Get a bidirectional map from wire indices to active qubits corresponding to
+        those wire labels and vice versa."""
+        # Starting constraint: deal with flat regions
+        qubit_map: dict[int | DynamicWire, quantum.QubitSSAValue] = {}
+        seen_qubits: set[quantum.QubitSSAValue] = set()
+        cur_op: xOperation = insertion_point.insert_before
+
+        while not (isinstance(cur_op.prev_op, quantum.AllocOp) or cur_op.prev_op is None):
+            cur_op = cur_op.prev_op
+
+            if isinstance(cur_op, quantum.InsertOp):
+                seen_qubits.add(cur_op.qubit)
+                continue
+
+            for r in cur_op.results:
+                if not isinstance(r.type, quantum.QubitType) or r in seen_qubits:
+                    continue
+
+                root, cur_seen_qubits = self._find_qubit_root(r)
+                seen_qubits |= cur_seen_qubits
+                insert_idx = None
+
+                if isinstance(root, quantum.ExtractOp):
+                    if (idx_attr := getattr(root, "idx_attr", None)) is not None:
+                        insert_idx = idx_attr
+                    elif (idx := get_constant_from_ssa(root.idx)) is not None:
+                        insert_idx = idx
+                    else:
+                        insert_idx = DynamicWire(var=root.idx)
+
+                # Qubit's root is either AllocQubitOp or it is a block argument.
+                # Either way, the qubit does not correspond to an index
+                else:
+                    insert_idx = DynamicWire()
+
+                qubit_map[insert_idx] = r
+                qubit_map[r] = insert_idx
+
+        return qubit_map
 
     def insert_constant(self, cst: Number, insertion_point: InsertPoint) -> xOperation:
         """Create a scalar ConstantOp and insert it into the IR.
