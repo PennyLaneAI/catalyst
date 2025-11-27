@@ -212,6 +212,10 @@
   one-shot qnode when `one-shot` mcm method is used.
   [(#2198)](https://github.com/PennyLaneAI/catalyst/pull/2198)
 
+* Fixed a bug where `qml.StatePrep` and `qml.BasisState` might be pushed after other
+  gates, overwriting their effects.
+  [(#2239)](https://github.com/PennyLaneAI/catalyst/pull/2239)
+
 <h3>Internal changes ⚙️</h3>
 
 * Resource tracking now writes out at device destruction time instead of qubit deallocation
