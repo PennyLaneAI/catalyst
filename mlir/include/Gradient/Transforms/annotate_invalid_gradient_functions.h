@@ -16,7 +16,7 @@
 namespace catalyst {
 namespace gradient {
 
-static constexpr const char *hasInvalidGradientOp = "gradient.invalidGradientOperation";
+static constexpr const char *hasInvalidGradientOp = "catalyst.invalidGradientOperation";
 
 } // namespace gradient
 } // namespace catalyst
