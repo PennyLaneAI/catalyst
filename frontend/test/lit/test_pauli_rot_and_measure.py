@@ -151,7 +151,7 @@ def test_dynamic_angle_multi_qubit_pauli_rotations():
     dev = qml.device("null.qubit", wires=3)
 
     pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
-    
+
     @qjit(pipelines=pipeline, target="mlir")
     @qml.qnode(device=dev)
     def circuit(x: float):
