@@ -22,14 +22,15 @@ pytestmark = pytest.mark.usefixtures("requires_xdsl")
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
 import pennylane as qml
+from xdsl.dialects import test
+from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir.core import Block, Region
+
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
-from xdsl.dialects import test
-from xdsl.dialects.builtin import ModuleOp
-from xdsl.ir.core import Block, Region
 
 
 class FakeDAGBuilder(DAGBuilder):
@@ -95,9 +96,7 @@ class FakeDAGBuilder(DAGBuilder):
         cluster_labels = []
         for cluster_data in self._clusters.values():
             if cluster_data["parent_cluster_id"] == parent_cluster_id:
-                cluster_label = (
-                    cluster_data["cluster_label"] or cluster_data["node_label"]
-                )
+                cluster_label = cluster_data["cluster_label"] or cluster_data["node_label"]
                 cluster_labels.append(cluster_label)
         return cluster_labels
 
@@ -204,13 +203,9 @@ class TestFuncOpVisualization:
         #     └── my_workflow
 
         # Check my_workflow is nested under jit_my_workflow
-        assert "my_workflow" in utility.dag_builder.get_child_clusters(
-            "jit_my_workflow"
-        )
+        assert "my_workflow" in utility.dag_builder.get_child_clusters("jit_my_workflow")
         # Check that jit_my_workflow is the first cluster on top of the graph
-        jit_my_workflow_id = utility.dag_builder.get_cluster_id_by_label(
-            "jit_my_workflow"
-        )
+        jit_my_workflow_id = utility.dag_builder.get_cluster_id_by_label("jit_my_workflow")
         assert graph_clusters[jit_my_workflow_id]["parent_cluster_id"] == "base"
 
     def test_nested_qnodes(self):
@@ -253,9 +248,7 @@ class TestFuncOpVisualization:
         #     └── my_qnode2
 
         # Check jit_my_workflow is under graph
-        jit_my_workflow_id = utility.dag_builder.get_cluster_id_by_label(
-            "jit_my_workflow"
-        )
+        jit_my_workflow_id = utility.dag_builder.get_cluster_id_by_label("jit_my_workflow")
         assert graph_clusters[jit_my_workflow_id]["parent_cluster_id"] == "base"
 
         # Check both qnodes are under jit_my_workflow
