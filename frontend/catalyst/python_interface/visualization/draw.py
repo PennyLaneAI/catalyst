@@ -15,10 +15,13 @@
 
 from __future__ import annotations
 
+import io
 import warnings
 from functools import wraps
 from typing import TYPE_CHECKING
 
+import matplotlib.image as mpimg
+import matplotlib.pyplot as plt
 from pennylane.tape import QuantumScript
 
 from catalyst import qjit
@@ -26,6 +29,8 @@ from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface.compiler import Compiler
 
 from .collector import QMLCollector
+from .construct_circuit_dag import ConstructCircuitDAG
+from .pydot_dag_builder import PyDotDAGBuilder
 
 if TYPE_CHECKING:
     from pennylane.typing import Callable
@@ -79,7 +84,9 @@ def draw(qnode: QNode, *, level: None | int = None) -> Callable:
         collector = QMLCollector(module)
         ops, meas = collector.collect()
         tape = QuantumScript(ops, meas)
-        pass_name = pass_instance.name if hasattr(pass_instance, "name") else pass_instance
+        pass_name = (
+            pass_instance.name if hasattr(pass_instance, "name") else pass_instance
+        )
         cache[pass_level] = (
             tape.draw(show_matrices=False),
             pass_name if pass_level else "No transforms",
@@ -101,5 +108,80 @@ def draw(qnode: QNode, *, level: None | int = None) -> Callable:
             return None
 
         return cache.get(level, cache[max(cache.keys())])[0]
+
+    return wrapper
+
+
+def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
+    """
+    Draw the QNode at the specified level.
+
+    This function can be used to visualize the QNode at different stages of the transformation
+    pipeline when xDSL or Catalyst compilation passes are applied.
+    If the specified level is not available, the highest level will be used as a fallback.
+
+    The provided QNode is assumed to be decorated with compilation passes.
+    If no passes are applied, the original QNode is visualized.
+
+    Args:
+        qnode (.QNode): the input QNode that is to be visualized. The QNode is assumed to be
+            compiled with ``qjit``.
+        level (None | int): the level of transformation to visualize. If `None`, the final
+            level is visualized.
+
+
+    Returns:
+        Callable: A wrapper function that visualizes the QNode at the specified level.
+
+    """
+    cache: dict[int, tuple[str, str]] = _cache_store.setdefault(qnode, {})
+
+    def _draw_callback(previous_pass, module, next_pass, pass_level=0):
+        """Callback function for circuit drawing."""
+
+        pass_instance = previous_pass if previous_pass else next_pass
+        utility = ConstructCircuitDAG(PyDotDAGBuilder())
+        utility.construct(module)
+        svg_str = utility.dag_builder.graph.create_svg(prog="dot")
+        pass_name = (
+            pass_instance.name if hasattr(pass_instance, "name") else pass_instance
+        )
+        cache[pass_level] = (
+            svg_str,
+            pass_name if pass_level else "No transforms",
+        )
+
+    @wraps(qnode)
+    def wrapper(*args, **kwargs):
+        if args or kwargs:
+            warnings.warn(
+                "The `draw` function does not yet support dynamic arguments.\n"
+                "To visualize the circuit with dynamic parameters or wires, please use the\n"
+                "`compiler.python_compiler.visualization.generate_mlir_graph` function instead.",
+                UserWarning,
+            )
+        mlir_module = _get_mlir_module(qnode, args, kwargs)
+        Compiler.run(mlir_module, callback=_draw_callback)
+
+        if not cache:
+            return None
+
+        # Retrieve the SVG string (or the high-DPI PNG string)
+        image_data = cache.get(level, cache[max(cache.keys())])[0]
+
+        if image_data.startswith(b"<?xml") or image_data.startswith(b"<svg"):
+            from IPython.display import HTML
+
+            return HTML(image_data.decode("utf-8"))  # Requires IPython.display.HTML
+        else:
+            sio = io.BytesIO()
+            sio.write(image_data)
+            sio.seek(0)
+            img = mpimg.imread(sio)
+
+            fig, ax = plt.subplots()
+            ax.imshow(img)
+            ax.set_axis_off()
+            return fig
 
     return wrapper
