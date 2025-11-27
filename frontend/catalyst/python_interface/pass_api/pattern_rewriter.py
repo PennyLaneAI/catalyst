@@ -165,7 +165,8 @@ class PLPatternRewriter(PatternRewriter):
                 qubit = owner.operands[n_classical_operands + qb_idx]
                 owner = qubit.owner
 
-            raise ValueError(f"Cannot handle {owner} type yet for finding a qubit's root.")
+            else:
+                raise ValueError(f"Cannot handle {owner} type yet for finding a qubit's root.")
 
         return root, seen_qubits
 
@@ -208,7 +209,7 @@ class PLPatternRewriter(PatternRewriter):
             cur_op = cur_op.prev_op
 
             if isinstance(cur_op, quantum.InsertOp):
-                seen_qubits.add(cur_op.qubit)
+                seen_qubits |= self._find_qubit_root(cur_op.qubit)[1]
                 continue
 
             for r in cur_op.results:
@@ -221,7 +222,7 @@ class PLPatternRewriter(PatternRewriter):
 
                 if isinstance(root, quantum.ExtractOp):
                     if (idx_attr := getattr(root, "idx_attr", None)) is not None:
-                        insert_idx = idx_attr
+                        insert_idx = idx_attr.value.data
                     elif (idx := get_constant_from_ssa(root.idx)) is not None:
                         insert_idx = idx
                     else:
