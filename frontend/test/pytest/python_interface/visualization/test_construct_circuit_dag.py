@@ -158,7 +158,7 @@ class TestFakeDAGBuilder:
         builder.add_cluster("c2", label="Finance", cluster_id="c0")
 
         # Node set-up
-        builder.add_node("n0", "CEO", cluster_id=None)  # Add to base cluster "Company"
+        builder.add_node("n0", "CEO", cluster_id="c0")
         builder.add_node("n1", "Marketing Manager", cluster_id="c1")
         builder.add_node("n2", "Finance Manager", cluster_id="c2")
 
