@@ -261,7 +261,7 @@
   of identities.
   [(#2192)](https://github.com/PennyLaneAI/catalyst/pull/2192)
 
-  * Added support for PPRs to the `merge_rotations` pass to merge PPRs with
+  * Added support for PPRs to the :func:`~.passes.merge_rotations` pass to merge PPRs with
   equivalent angles, and cancelling of PPRs with opposite angles, or angles
   that sum to identity.
   [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)	
