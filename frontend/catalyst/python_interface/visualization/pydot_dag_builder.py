@@ -28,7 +28,35 @@ except ImportError:
 
 
 class PyDotDAGBuilder(DAGBuilder):
-    """A Directed Acyclic Graph builder for the PyDot backend."""
+    """A Directed Acyclic Graph builder for the PyDot backend.
+
+    Args:
+        attrs (dict | None): User default attributes to be used for all elements (nodes, edges, clusters) in the graph.
+        node_attrs (dict | None): User default attributes for a node.
+        edge_attrs (dict | None): User default attributes for an edge.
+        cluster_attrs (dict | None): User default attributes for a cluster.
+
+    Example:
+        >>> builder = PyDotDAGBuilder()
+        >>> builder.add_node("n0", "node 0")
+        >>> builder.add_cluster("c0")
+        >>> builder.add_node("n1", "node 1", cluster_uid="c0")
+        >>> print(builder.to_string())
+        strict digraph G {
+        rankdir=TB;
+        compound=true;
+        n0 [label="node 0", fontname=Helvetica, penwidth=3, shape=ellipse, style=filled, fillcolor=lightblue, color=lightblue4];
+        subgraph cluster_c0 {
+        fontname=Helvetica;
+        penwidth=2;
+        shape=rectangle;
+        style=solid;
+        }
+
+        n1 [label="node 1", fontname=Helvetica, penwidth=3, shape=ellipse, style=filled, fillcolor=lightblue, color=lightblue4, cluster_uid=c0];
+        }
+
+    """
 
     def __init__(
         self,
@@ -37,15 +65,6 @@ class PyDotDAGBuilder(DAGBuilder):
         edge_attrs: dict | None = None,
         cluster_attrs: dict | None = None,
     ) -> None:
-        """Initialize PyDotDAGBuilder instance.
-
-        Args:
-            attrs (dict | None): User default attributes to be used for all elements (nodes, edges, clusters) in the graph.
-            node_attrs (dict | None): User default attributes for a node.
-            edge_attrs (dict | None): User default attributes for an edge.
-            cluster_attrs (dict | None): User default attributes for a cluster.
-
-        """
         # Initialize the pydot graph:
         # - graph_type="digraph": Create a directed graph (edges have arrows).
         # - rankdir="TB": Set layout direction from Top to Bottom.
@@ -100,49 +119,49 @@ class PyDotDAGBuilder(DAGBuilder):
 
     def add_node(
         self,
-        id: str,
+        uid: str,
         label: str,
-        cluster_id: str | None = None,
+        cluster_uid: str | None = None,
         **attrs: Any,
     ) -> None:
         """Add a single node to the graph.
 
         Args:
-            id (str): Unique node ID to identify this node.
+            uid (str): Unique node ID to identify this node.
             label (str): The text to display on the node when rendered.
-            cluster_id (str | None): Optional ID of the cluster this node belongs to.
+            cluster_uid (str | None): Optional unique ID of the cluster this node belongs to.
             **attrs (Any): Any additional styling keyword arguments.
 
         Raises:
             ValueError: Node ID is already present in the graph.
 
         """
-        if id in self.nodes:
-            raise ValueError(f"Node ID {id} already present in graph.")
+        if uid in self.nodes:
+            raise ValueError(f"Node ID {uid} already present in graph.")
 
         # Use ChainMap so you don't need to construct a new dictionary
         node_attrs: ChainMap = ChainMap(attrs, self._default_node_attrs)
-        node = Node(id, label=label, **node_attrs)
+        node = Node(uid, label=label, **node_attrs)
 
         # Add node to cluster
-        if cluster_id is None:
+        if cluster_uid is None:
             self.graph.add_node(node)
         else:
-            self._subgraph_cache[cluster_id].add_node(node)
+            self._subgraph_cache[cluster_uid].add_node(node)
 
-        self._nodes[id] = {
-            "id": id,
+        self._nodes[uid] = {
+            "uid": uid,
             "label": label,
-            "cluster_id": cluster_id,
+            "cluster_uid": cluster_uid,
             "attrs": dict(node_attrs),
         }
 
-    def add_edge(self, from_id: str, to_id: str, **attrs: Any) -> None:
+    def add_edge(self, from_uid: str, to_uid: str, **attrs: Any) -> None:
         """Add a single directed edge between nodes in the graph.
 
         Args:
-            from_id (str): The unique ID of the source node.
-            to_id (str): The unique ID of the destination node.
+            from_uid (str): The unique ID of the source node.
+            to_uid (str): The unique ID of the destination node.
             **attrs (Any): Any additional styling keyword arguments.
 
         Raises:
@@ -151,28 +170,28 @@ class PyDotDAGBuilder(DAGBuilder):
             ValueError: Destination is not found in the graph.
 
         """
-        if from_id == to_id:
+        if from_uid == to_uid:
             raise ValueError("Edges must connect two unique IDs.")
-        if from_id not in self.nodes:
+        if from_uid not in self.nodes:
             raise ValueError("Source is not found in the graph.")
-        if to_id not in self.nodes:
+        if to_uid not in self.nodes:
             raise ValueError("Destination is not found in the graph.")
 
         # Use ChainMap so you don't need to construct a new dictionary
         edge_attrs: ChainMap = ChainMap(attrs, self._default_edge_attrs)
-        edge = Edge(from_id, to_id, **edge_attrs)
+        edge = Edge(from_uid, to_uid, **edge_attrs)
 
         self.graph.add_edge(edge)
 
         self._edges.append(
-            {"from_id": from_id, "to_id": to_id, "attrs": dict(edge_attrs)}
+            {"from_uid": from_uid, "to_uid": to_uid, "attrs": dict(edge_attrs)}
         )
 
     def add_cluster(
         self,
-        id: str,
+        uid: str,
         node_label: str | None = None,
-        cluster_id: str | None = None,
+        cluster_uid: str | None = None,
         **attrs: Any,
     ) -> None:
         """Add a single cluster to the graph.
@@ -181,20 +200,20 @@ class PyDotDAGBuilder(DAGBuilder):
         within it are visually and logically grouped.
 
         Args:
-            id (str): Unique cluster ID to identify this cluster.
+            uid (str): Unique cluster ID to identify this cluster.
             node_label (str | None): The text to display on the information node within the cluster when rendered.
-            cluster_id (str | None): Optional ID of the cluster this cluster belongs to. If `None`, the cluster will be positioned on the base graph.
+            cluster_uid (str | None): Optional unique ID of the cluster this cluster belongs to. If `None`, the cluster will be positioned on the base graph.
             **attrs (Any): Any additional styling keyword arguments.
 
         Raises:
-            ValueError: Cluster ID is already present in the graph. 
+            ValueError: Cluster ID is already present in the graph.
         """
-        if id in self.clusters:
-            raise ValueError(f"Cluster ID {id} already present in graph.")
+        if uid in self.clusters:
+            raise ValueError(f"Cluster ID {uid} already present in graph.")
 
         # Use ChainMap so you don't need to construct a new dictionary
         cluster_attrs: ChainMap = ChainMap(attrs, self._default_cluster_attrs)
-        cluster = Cluster(id, **cluster_attrs)
+        cluster = Cluster(uid, **cluster_attrs)
 
         # Puts the label in a node within the cluster.
         # Ensures that any edges connecting nodes through the cluster
@@ -206,10 +225,10 @@ class PyDotDAGBuilder(DAGBuilder):
         # │           │
         # └───────────┘
         if node_label:
-            node_id = f"{id}_info_node"
+            node_uid = f"{uid}_info_node"
             rank_subgraph = Subgraph()
             node = Node(
-                node_id,
+                node_uid,
                 label=node_label,
                 shape="rectangle",
                 style="dashed",
@@ -221,19 +240,19 @@ class PyDotDAGBuilder(DAGBuilder):
             cluster.add_node(node)
 
         # Record new cluster
-        self._subgraph_cache[id] = cluster
+        self._subgraph_cache[uid] = cluster
 
         # Add node to cluster
-        if cluster_id is None:
+        if cluster_uid is None:
             self.graph.add_subgraph(cluster)
         else:
-            self._subgraph_cache[cluster_id].add_subgraph(cluster)
+            self._subgraph_cache[cluster_uid].add_subgraph(cluster)
 
-        self._clusters[id] = {
-            "id": id,
+        self._clusters[uid] = {
+            "uid": uid,
             "cluster_label": cluster_attrs.get("label"),
             "node_label": node_label,
-            "cluster_id": cluster_id,
+            "cluster_uid": cluster_uid,
             "attrs": dict(cluster_attrs),
         }
 

@@ -42,12 +42,11 @@ class ConstructCircuitDAG:
         self.dag_builder: DAGBuilder = dag_builder
 
         # Keep track of nesting clusters using a stack
-        # NOTE: `None` corresponds to the base graph
-        self._cluster_stack: list[str | None] = [None]
+        self._cluster_uid_stack: list[str] = []
 
     def _reset(self) -> None:
         """Resets the instance."""
-        self._cluster_stack: list[str | None] = [None]
+        self._cluster_uid_stack: list[str] = []
 
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module.
@@ -161,7 +160,7 @@ class ConstructCircuitDAG:
         self.dag_builder.add_node(
             node_id,
             label=operation.device_name.data,
-            cluster_id=self._cluster_stack[-1],
+            cluster_id=self._cluster_uid_stack[-1],
             fillcolor="grey",
             color="black",
             penwidth=2,
@@ -199,9 +198,9 @@ class ConstructCircuitDAG:
             self.dag_builder.add_cluster(
                 cluster_id,
                 label=label,
-                cluster_id=self._cluster_stack[-1],
+                cluster_id=self._cluster_uid_stack[-1],
             )
-            self._cluster_stack.append(cluster_id)
+            self._cluster_uid_stack.append(cluster_id)
 
         for region in operation.regions:
             self._visit_region(region)
@@ -210,12 +209,13 @@ class ConstructCircuitDAG:
     def _func_return(self, operation: func.ReturnOp) -> None:
         """Handle func.return to exit FuncOp's cluster scope."""
 
-        # NOTE: Skip first two because the first is the base graph, second is the jit_* workflow FuncOp
-        # and we want to use the jit_* workflow as the outer most bounding box.
-        if len(self._cluster_stack) > 2:
+        # NOTE: Skip first cluster as it is the "base" of the graph diagram.
+        # If it is a multi-qnode workflow, it will represent the "workflow" function
+        # If it is a single qnode, it will represent the quantum function.
+        if len(self._cluster_uid_stack) > 1:
             # If we hit a func.return operation we know we are leaving
             # the FuncOp's scope and so we can pop the ID off the stack.
-            self._cluster_stack.pop()
+            self._cluster_uid_stack.pop()
 
         for region in operation.regions:
             self._visit_region(region)

@@ -44,35 +44,35 @@ class FakeDAGBuilder(DAGBuilder):
         self._edges = []
         self._clusters = {}
 
-    def add_node(self, id, label, cluster_id=None, **attrs) -> None:
-        self._nodes[id] = {
-            "id": id,
+    def add_node(self, uid, label, cluster_uid=None, **attrs) -> None:
+        self._nodes[uid] = {
+            "uid": uid,
             "label": label,
-            "parent_cluster_id": "base" if cluster_id is None else cluster_id,
+            "parent_cluster_uid": "base" if cluster_uid is None else cluster_uid,
             "attrs": attrs,
         }
 
-    def add_edge(self, from_id: str, to_id: str, **attrs) -> None:
+    def add_edge(self, from_uid: str, to_uid: str, **attrs) -> None:
         self._edges.append(
             {
-                "from_id": from_id,
-                "to_id": to_id,
+                "from_uid": from_uid,
+                "to_uid": to_uid,
                 "attrs": attrs,
             }
         )
 
     def add_cluster(
         self,
-        id,
+        uid,
         node_label=None,
-        cluster_id=None,
+        cluster_uid=None,
         **attrs,
     ) -> None:
-        self._clusters[id] = {
-            "id": id,
+        self._clusters[uid] = {
+            "uid": uid,
             "node_label": node_label,
             "cluster_label": attrs.get("label"),
-            "parent_cluster_id": "base" if cluster_id is None else cluster_id,
+            "parent_cluster_uid": "base" if cluster_uid is None else cluster_uid,
             "attrs": attrs,
         }
 
@@ -80,28 +80,26 @@ class FakeDAGBuilder(DAGBuilder):
         """
         Returns a list of node labels that are direct children of the given cluster.
         """
-        node_ids = []
-        cluster_id = self.get_cluster_id_by_label(cluster_label)
+        node_uids = []
+        cluster_uid = self.get_cluster_uid_by_label(cluster_label)
         for node_data in self._nodes.values():
-            if node_data["parent_cluster_id"] == cluster_id:
-                node_ids.append(node_data["label"])
-        return node_ids
+            if node_data["parent_cluster_uid"] == cluster_uid:
+                node_uids.append(node_data["label"])
+        return node_uids
 
     def get_child_clusters(self, parent_cluster_label: str) -> list[str]:
         """
         Returns a list of cluster labels that are direct children of the given parent cluster.
         """
-        parent_cluster_id = self.get_cluster_id_by_label(parent_cluster_label)
+        parent_cluster_uid = self.get_cluster_uid_by_label(parent_cluster_label)
         cluster_labels = []
         for cluster_data in self._clusters.values():
-            if cluster_data["parent_cluster_id"] == parent_cluster_id:
-                cluster_label = (
-                    cluster_data["cluster_label"] or cluster_data["node_label"]
-                )
+            if cluster_data["parent_cluster_uid"] == parent_cluster_uid:
+                cluster_label = cluster_data["cluster_label"] or cluster_data["node_label"]
                 cluster_labels.append(cluster_label)
         return cluster_labels
 
-    def get_node_id_by_label(self, label: str) -> str | None:
+    def get_node_uid_by_label(self, label: str) -> str | None:
         """
         Finds the ID of a node given its label.
         Assumes labels are unique for testing purposes.
@@ -111,7 +109,7 @@ class FakeDAGBuilder(DAGBuilder):
                 return id
         return None
 
-    def get_cluster_id_by_label(self, label: str) -> str | None:
+    def get_cluster_uid_by_label(self, label: str) -> str | None:
         """
         Finds the ID of a cluster given its label.
         Assumes cluster labels are unique for testing purposes.
@@ -154,34 +152,34 @@ class TestFakeDAGBuilder:
         builder = FakeDAGBuilder()
 
         # Cluster set-up
-        builder.add_cluster("c0", label="Company", cluster_id=None)  # Add to base graph
-        builder.add_cluster("c1", label="Marketing", cluster_id="c0")
-        builder.add_cluster("c2", label="Finance", cluster_id="c0")
+        builder.add_cluster("c0", label="Company", cluster_uid=None)  # Add to base graph
+        builder.add_cluster("c1", label="Marketing", cluster_uid="c0")
+        builder.add_cluster("c2", label="Finance", cluster_uid="c0")
 
         # Node set-up
-        builder.add_node("n0", "CEO", cluster_id="c0")
-        builder.add_node("n1", "Marketing Manager", cluster_id="c1")
-        builder.add_node("n2", "Finance Manager", cluster_id="c2")
+        builder.add_node("n0", "CEO", cluster_uid="c0")
+        builder.add_node("n1", "Marketing Manager", cluster_uid="c1")
+        builder.add_node("n2", "Finance Manager", cluster_uid="c2")
 
         return builder
 
     # Test ID look up
 
-    def test_get_node_id_by_label_success(self, builder_with_data):
-        assert builder_with_data.get_node_id_by_label("Finance Manager") == "n2"
-        assert builder_with_data.get_node_id_by_label("Marketing Manager") == "n1"
-        assert builder_with_data.get_node_id_by_label("CEO") == "n0"
+    def test_get_node_uid_by_label_success(self, builder_with_data):
+        assert builder_with_data.get_node_uid_by_label("Finance Manager") == "n2"
+        assert builder_with_data.get_node_uid_by_label("Marketing Manager") == "n1"
+        assert builder_with_data.get_node_uid_by_label("CEO") == "n0"
 
-    def test_get_node_id_by_label_failure(self, builder_with_data):
-        assert builder_with_data.get_node_id_by_label("Software Manager") is None
+    def test_get_node_uid_by_label_failure(self, builder_with_data):
+        assert builder_with_data.get_node_uid_by_label("Software Manager") is None
 
-    def test_get_cluster_id_by_label_success(self, builder_with_data):
-        assert builder_with_data.get_cluster_id_by_label("Finance") == "c2"
-        assert builder_with_data.get_cluster_id_by_label("Marketing") == "c1"
-        assert builder_with_data.get_cluster_id_by_label("Company") == "c0"
+    def test_get_cluster_uid_by_label_success(self, builder_with_data):
+        assert builder_with_data.get_cluster_uid_by_label("Finance") == "c2"
+        assert builder_with_data.get_cluster_uid_by_label("Marketing") == "c1"
+        assert builder_with_data.get_cluster_uid_by_label("Company") == "c0"
 
-    def test_get_cluster_id_by_label_failure(self, builder_with_data):
-        assert builder_with_data.get_cluster_id_by_label("Software") is None
+    def test_get_cluster_uid_by_label_failure(self, builder_with_data):
+        assert builder_with_data.get_cluster_uid_by_label("Software") is None
 
     # Test relationship probing
 
@@ -213,9 +211,9 @@ class TestFakeDAGBuilder:
 def test_dependency_injection():
     """Tests that relevant dependencies are injected."""
 
-    dag_builder = FakeDAGBuilder()
-    utility = ConstructCircuitDAG(dag_builder)
-    assert utility.dag_builder is dag_builder
+    mock_dag_builder = Mock(DAGBuilder)
+    utility = ConstructCircuitDAG(mock_dag_builder)
+    assert utility.dag_builder is mock_dag_builder
 
 
 @pytest.mark.unit
@@ -270,8 +268,8 @@ class TestFuncOpVisualization:
         # └── my_workflow
 
         # Check my_workflow is nested under my_workflow
-        my_workflow_id = utility.dag_builder.get_cluster_id_by_label("my_workflow")
-        assert graph_clusters[my_workflow_id]["parent_cluster_id"] == "base"
+        my_workflow_id = utility.dag_builder.get_cluster_uid_by_label("my_workflow")
+        assert graph_clusters[my_workflow_id]["parent_cluster_uid"] == "base"
 
     def test_nested_qnodes(self):
         """Tests that nested QJIT'd QNodes are visualized correctly"""
@@ -313,8 +311,8 @@ class TestFuncOpVisualization:
         #     └── my_qnode2
 
         # Check my_workflow is under graph
-        my_workflow_id = utility.dag_builder.get_cluster_id_by_label("my_workflow")
-        assert graph_clusters[my_workflow_id]["parent_cluster_id"] == "base"
+        my_workflow_id = utility.dag_builder.get_cluster_uid_by_label("my_workflow")
+        assert graph_clusters[my_workflow_id]["parent_cluster_uid"] == "base"
 
         # Check both qnodes are under my_workflow
         assert "my_qnode1" in utility.dag_builder.get_child_clusters("my_workflow")
