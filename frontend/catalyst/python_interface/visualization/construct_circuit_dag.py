@@ -125,10 +125,11 @@ class ConstructCircuitDAG:
         # Visualize the FuncOp as a cluster with a label
         if visualize:
             cluster_id = f"cluster_{id(operation)}"
+            parent_cluster_uid = None if self._cluster_uid_stack == [] else self._cluster_uid_stack[-1]
             self.dag_builder.add_cluster(
                 cluster_id,
                 label=label,
-                cluster_id=self._cluster_uid_stack[-1],
+                cluster_id=parent_cluster_uid,
             )
             self._cluster_uid_stack.append(cluster_id)
 
