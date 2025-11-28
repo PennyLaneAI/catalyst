@@ -602,7 +602,7 @@ class Compiler:
         # pylint: disable-next=import-outside-toplevel
         from xdsl.printer import Printer
 
-        user_transform_dir = os.path.join(str(workspace), "0_QuantumCompilationPass")
+        user_transform_dir = os.path.join(str(workspace), "0_QuantumCompilationStage")
         os.makedirs(user_transform_dir, exist_ok=True)
 
         class SavePassIRCallback:

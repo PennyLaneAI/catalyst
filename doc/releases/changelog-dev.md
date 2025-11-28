@@ -148,6 +148,9 @@
   update their code to use the new names.
   [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
 
+  * The ``pipeline``  and "passes" postfixes in the compilation stage names have been changed to ``stage``.
+  [(#2230)](https://github.com/PennyLaneAI/catalyst/pull/2230)
+
 * The plxpr transform `pl_map_wires` has been removed along with its test.
   [(#2220)](https://github.com/PennyLaneAI/catalyst/pull/2220)
 

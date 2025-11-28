@@ -29,7 +29,7 @@ as load and run external MLIR passes from plugins.
     Instead, these compiler passes are applied at the MLIR level, which occurs
     outside of Python during compile time. To inspect the compiled MLIR from
     Catalyst, use :func:`~.get_compilation_stage` with
-    ``stage="QuantumCompilationPass"``.
+    ``stage="QuantumCompilationStage"``.
 
 """
 

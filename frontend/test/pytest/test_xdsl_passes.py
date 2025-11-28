@@ -116,7 +116,7 @@ class TestCreatePassSaveCallback:
             mock_module = Mock()
             callback(None, mock_module)
 
-            expected_dir = os.path.join(str(workspace), "0_QuantumCompilationPass")
+            expected_dir = os.path.join(str(workspace), "0_QuantumCompilationStage")
             assert os.path.exists(expected_dir)
             files = os.listdir(expected_dir)
             assert len(files) == 0
@@ -151,7 +151,7 @@ class TestCreatePassSaveCallback:
             callback(pass2, module)
             callback(pass3, module)
 
-            expected_dir = os.path.join(str(workspace), "0_QuantumCompilationPass")
+            expected_dir = os.path.join(str(workspace), "0_QuantumCompilationStage")
             assert os.path.exists(expected_dir)
             assert os.path.isdir(expected_dir)
             files = sorted(os.listdir(expected_dir))
@@ -188,9 +188,9 @@ class TestXDSLPassesIntegration:
         workflow()
         workspace_path = str(workflow.workspace)
         assert os.path.exists(
-            os.path.join(workspace_path, "0_QuantumCompilationPass", "1_cancel-inverses.mlir")
+            os.path.join(workspace_path, "0_QuantumCompilationStage", "1_cancel-inverses.mlir")
         )
         assert os.path.exists(
-            os.path.join(workspace_path, "0_QuantumCompilationPass", "2_xdsl-merge-rotations.mlir")
+            os.path.join(workspace_path, "0_QuantumCompilationStage", "2_xdsl-merge-rotations.mlir")
         )
         workflow.workspace.cleanup()

@@ -113,7 +113,7 @@ with open(filename, mode="r", encoding="UTF-8") as f:
 # CHECK-NEXT:             walltime: {{[0-9\.]+}}
 # CHECK-NEXT:             cputime: {{[0-9\.]+}}
 # CHECK-NEXT:             programsize: {{[0-9\]+}}
-# CHECK-NEXT:         - {{[a-zA-Z]+}}Pass:
+# CHECK-NEXT:         - {{[a-zA-Z]+}}Stage:
 # CHECK-NEXT:             walltime: {{[0-9\.]+}}
 # CHECK-NEXT:             cputime: {{[0-9\.]+}}
 # CHECK-NEXT:             programsize: {{[0-9\]+}}
