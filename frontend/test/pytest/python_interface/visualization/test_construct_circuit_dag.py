@@ -19,10 +19,6 @@ import pytest
 
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
-from xdsl.dialects import test
-from xdsl.dialects.builtin import ModuleOp
-from xdsl.ir.core import Block, Region
-
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
 import pennylane as qml
