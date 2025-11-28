@@ -14,7 +14,6 @@
 
 #include <cstdint>
 #include <cstring>
-#include <iostream>
 #include <vector>
 
 #include "DataView.hpp"
@@ -25,7 +24,6 @@
 extern "C" {
 int64_t rs_decomposition_get_size_0(double theta, double epsilon, bool ppr_basis)
 {
-    // std::cout << "Calling rs_decomposition_get_size runtime function!\n";
     // This is a dummy implementation
     (void)theta;
     (void)epsilon;
@@ -56,18 +54,6 @@ void rs_decomposition_get_gates_0([[maybe_unused]] int64_t *data_allocated, int6
                                   size_t offset, size_t size0, size_t stride0, double theta,
                                   double epsilon, bool ppr_basis)
 {
-    // --- VERIFICATION LOGS ---
-    std::cout << "[rs_decomposition_get_gates] VERIFICATION LOGS:" << std::endl;
-    std::cout << "  data_allocated: " << static_cast<void *>(data_allocated) << std::endl;
-    std::cout << "  data_aligned:   " << static_cast<void *>(data_aligned) << std::endl;
-    std::cout << "  offset:         " << offset << std::endl;
-    std::cout << "  size0:          " << size0 << std::endl;
-    std::cout << "  stride0:        " << stride0 << std::endl;
-    std::cout << "  theta:          " << theta << std::endl;
-    std::cout << "  epsilon:        " << epsilon << std::endl;
-    std::cout << "  ppr_basis:      " << (ppr_basis ? "true" : "false") << std::endl;
-    std::cout << "-----------------------------------------------" << std::endl;
-
     // This is the dummy gate sequence for testing
     std::vector<int64_t> gates_data = {0, 2, 4, 6, 8, 1, 3, 5, 7, 9};
 
@@ -79,10 +65,8 @@ void rs_decomposition_get_gates_0([[maybe_unused]] int64_t *data_allocated, int6
     DataView<int64_t, 1> gates_view(data_aligned, offset, sizes, strides);
 
     // Ensure the MLIR-allocated buffer is at least as large as the data we're writing
-    if (static_cast<size_t>(gates_view.size()) < gates_data.size()) {
-        std::cerr << "Error: memref allocated for rs_decomposition is too small." << std::endl;
-        return;
-    }
+    RT_FAIL_IF(static_cast<size_t>(gates_view.size()) < gates_data.size(),
+               "memref allocated for rs_decomposition is too small.")
 
     // Fill the memref data buffer
     for (size_t i = 0; i < gates_data.size(); ++i) {
@@ -100,10 +84,6 @@ void rs_decomposition_get_gates_0([[maybe_unused]] int64_t *data_allocated, int6
  */
 double rs_decomposition_get_phase_0(double theta, double epsilon, bool ppr_basis)
 {
-    std::cout << "Calling rs_decomposition_get_phase runtime function!\n";
-    std::cout << "phase got ppr_basis " << ppr_basis << std::endl;
-    std::cout << "phase got theta " << theta << std::endl;
-    std::cout << "phase got epsilon " << epsilon << std::endl;
     (void)theta;
     (void)epsilon;
     (void)ppr_basis;

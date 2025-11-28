@@ -535,14 +535,12 @@ def ions_decomposition(qnode):  # pragma: nocover
     return PassPipelineWrapper(qnode, "ions-decomposition")
 
 
-def gridsynth(qnode, *, epsilon=1e-4, ppr_basis=False):
+def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
     """
     Specify that the ``--gridsynth`` MLIR compiler pass to discretize
     single-qubit RZ and PhaseShift gates into sequences of
     Clifford+T gates using the Ross-Selinger Gridsynth algorithm.
-
-    This Catalyst pass has an alias as a PennyLane transform, and can
-    be called using `@qml.transforms.gridsynth`.
+    Reference: https://arxiv.org/abs/1403.2975
 
 
     .. note::

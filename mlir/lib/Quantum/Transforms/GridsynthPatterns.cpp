@@ -47,14 +47,11 @@ namespace {
 /**
  * @brief Helper to create a chain of parameter-less single qubit quantum custom gates.
  */
-mlir::Value createGateChain(mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::Value qregIn,
-                            mlir::Value qbitIndex, mlir::ArrayRef<StringRef> gateNames,
-                            bool isAdjoint = false)
+mlir::Value createGateChain(mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::Value qbitIn,
+                            mlir::ArrayRef<StringRef> gateNames, bool isAdjoint = false)
 {
-    auto qregType = qregIn.getType();
     auto qbitType = catalyst::quantum::QubitType::get(rewriter.getContext());
-
-    mlir::Value currentQbit = rewriter.create<ExtractOp>(loc, qbitType, qregIn, qbitIndex, nullptr);
+    mlir::Value currentQbit = qbitIn;
 
     for (StringRef gateName : gateNames) {
         mlir::NamedAttrList newAttrs;
@@ -72,17 +69,14 @@ mlir::Value createGateChain(mlir::PatternRewriter &rewriter, mlir::Location loc,
         currentQbit = newOp.getResult(0);
     }
 
-    mlir::Value qregOut =
-        rewriter.create<InsertOp>(loc, qregType, qregIn, qbitIndex, nullptr, currentQbit);
-    return qregOut;
+    return currentQbit;
 }
 
 /**
  * @brief Populates the scf.index_switch op for the Clifford+T basis.
  */
 void populateCliffordTSwitchCases(mlir::PatternRewriter &rewriter, mlir::Location loc,
-                                  mlir::scf::IndexSwitchOp switchOp, mlir::Value qregIn,
-                                  mlir::Value qbitIndex)
+                                  mlir::scf::IndexSwitchOp switchOp, mlir::Value qbitIn)
 {
     static StringRef gates0[] = {"T"};
     static StringRef gates1[] = {"Hadamard", "T"};
@@ -116,9 +110,9 @@ void populateCliffordTSwitchCases(mlir::PatternRewriter &rewriter, mlir::Locatio
         caseRegion.push_back(new Block());
         rewriter.setInsertionPointToStart(&caseRegion.front());
 
-        mlir::Value qregCase =
-            createGateChain(rewriter, loc, qregIn, qbitIndex, config.first, config.second);
-        rewriter.create<mlir::scf::YieldOp>(loc, qregCase);
+        // Pass the qubit through the chain
+        mlir::Value qbitOut = createGateChain(rewriter, loc, qbitIn, config.first, config.second);
+        rewriter.create<mlir::scf::YieldOp>(loc, qbitOut);
     }
 
     // Populate Default Case
@@ -126,9 +120,9 @@ void populateCliffordTSwitchCases(mlir::PatternRewriter &rewriter, mlir::Locatio
     defaultRegion.push_back(new Block());
     rewriter.setInsertionPointToStart(&defaultRegion.front());
     static StringRef gatesDefault[] = {"Identity"};
-    mlir::Value qregDefault =
-        createGateChain(rewriter, loc, qregIn, qbitIndex, gatesDefault, /*isAdjoint=*/false);
-    rewriter.create<mlir::scf::YieldOp>(loc, qregDefault);
+    mlir::Value qbitDefault =
+        createGateChain(rewriter, loc, qbitIn, gatesDefault, /*isAdjoint=*/false);
+    rewriter.create<mlir::scf::YieldOp>(loc, qbitDefault);
 }
 
 /**
@@ -136,20 +130,12 @@ void populateCliffordTSwitchCases(mlir::PatternRewriter &rewriter, mlir::Locatio
  * Maps the new enum (I, X2...adjZ8) to PPRotationOps.
  */
 void populatePPRBasisSwitchCases(mlir::PatternRewriter &rewriter, mlir::Location loc,
-                                 mlir::scf::IndexSwitchOp switchOp, mlir::Value qregIn,
-                                 mlir::Value qbitIndex)
+                                 mlir::scf::IndexSwitchOp switchOp, mlir::Value qbitIn)
 {
-    auto qregType = qregIn.getType();
-    auto qbitType = catalyst::quantum::QubitType::get(rewriter.getContext());
-
-    // Helper to create a single PPRotationOp.
-    // Handles 'adjoint' by negating the rotationKind.
+    // Helper to create a single PPRotationOp directly on the qubit.
     auto createPPROp = [&](mlir::OpBuilder &builder, mlir::ArrayRef<StringRef> pauliWord,
                            uint16_t rotationKind, bool isAdjoint,
-                           mlir::Value currentLoopReg) -> mlir::Value {
-        mlir::Value currentQbit =
-            builder.create<ExtractOp>(loc, qbitType, currentLoopReg, qbitIndex, nullptr);
-
+                           mlir::Value currentQbit) -> mlir::Value {
         // Convert rotation kind to signed integer and negate if adjoint
         int16_t signedRotation = static_cast<int16_t>(rotationKind);
         if (isAdjoint) {
@@ -162,11 +148,7 @@ void populatePPRBasisSwitchCases(mlir::PatternRewriter &rewriter, mlir::Location
         auto pprOp = builder.create<catalyst::qec::PPRotationOp>(
             loc, pauliWord, finalRotationArg, mlir::ValueRange{currentQbit}, nullptr);
 
-        mlir::Value resultQbit = pprOp.getResult(0);
-
-        mlir::Value qregOut =
-            builder.create<InsertOp>(loc, qregType, currentLoopReg, qbitIndex, nullptr, resultQbit);
-        return qregOut;
+        return pprOp.getResult(0);
     };
 
     struct PPRConfig {
@@ -180,13 +162,12 @@ void populatePPRBasisSwitchCases(mlir::PatternRewriter &rewriter, mlir::Location
     static StringRef yPauli[] = {"Y"};
     static StringRef zPauli[] = {"Z"};
 
-    // Map indices 0..18 to configs
     SmallVector<PPRConfig> caseConfigs;
 
     // Case 0: I
     caseConfigs.push_back({true, {}, 0, false});
 
-    // Helper to push X, Y, Z: (2, 4, 8, adj2, adj4, adj8)
+    // Helper to push X, Y, Z series
     auto pushSeries = [&](ArrayRef<StringRef> pauli) {
         caseConfigs.push_back({false, pauli, 2, false});
         caseConfigs.push_back({false, pauli, 4, false});
@@ -206,23 +187,23 @@ void populatePPRBasisSwitchCases(mlir::PatternRewriter &rewriter, mlir::Location
         caseRegion.push_back(new Block());
         rewriter.setInsertionPointToStart(&caseRegion.front());
 
-        mlir::Value qregCase = config.isIdentity ? qregIn
-                                                 : createPPROp(rewriter, config.pauli, config.n,
-                                                               config.isAdjoint, qregIn);
+        mlir::Value qbitOut = config.isIdentity ? qbitIn
+                                                : createPPROp(rewriter, config.pauli, config.n,
+                                                              config.isAdjoint, qbitIn);
 
-        rewriter.create<mlir::scf::YieldOp>(loc, qregCase);
+        rewriter.create<mlir::scf::YieldOp>(loc, qbitOut);
     }
 
     // Default Case
     Region &defaultRegion = switchOp.getDefaultRegion();
     defaultRegion.push_back(new Block());
     rewriter.setInsertionPointToStart(&defaultRegion.front());
-    rewriter.create<mlir::scf::YieldOp>(loc, qregIn);
+    rewriter.create<mlir::scf::YieldOp>(loc, qbitIn);
 }
 
 /**
  * @brief Gets or creates the RZ/PhaseShift decomposition function.
- * This function contains the loop and switch logic.
+ * This function contains the loop and switch logic acting on a Qubit.
  */
 mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
                                                 mlir::PatternRewriter &rewriter, double epsilon,
@@ -237,18 +218,16 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
         return func;
     }
 
-    // Define function type: (qureg, i64, f64) -> (qureg, f64)
+    // Define function type: (qubit, f64) -> (qubit, f64)
     // inputs:
-    // qureg: input quantum register
-    // i64: qubit index
+    // qubit: input qubit wire
     // f64: rotation angle
     // returns:
-    // qureg: output quantum register
+    // qubit: output qubit wire
     // f64: runtime phase
-    auto qregType = catalyst::quantum::QuregType::get(rewriter.getContext());
-    auto indexType = rewriter.getI64Type();
+    auto qbitType = catalyst::quantum::QubitType::get(rewriter.getContext());
     auto f64Type = rewriter.getF64Type();
-    auto funcType = rewriter.getFunctionType({qregType, indexType, f64Type}, {qregType, f64Type});
+    auto funcType = rewriter.getFunctionType({qbitType, f64Type}, {qbitType, f64Type});
 
     mlir::OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(module.getBody());
@@ -261,9 +240,8 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     rewriter.setInsertionPointToStart(entryBlock);
 
     mlir::Location loc = func.getLoc();
-    mlir::Value qregIn = entryBlock->getArgument(0);
-    mlir::Value qbitIndex = entryBlock->getArgument(1);
-    mlir::Value angle = entryBlock->getArgument(2);
+    mlir::Value qbitIn = entryBlock->getArgument(0);
+    mlir::Value angle = entryBlock->getArgument(1);
     auto i1Type = rewriter.getI1Type();
 
     // Ensure or declare Get Size
@@ -309,14 +287,15 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     mlir::Value runtimePhase = callGetPhaseOp.getResult(0);
 
     // Create the scf.for loop over gate sequence indices
+    // The loop carries the Qubit as an argument
     mlir::Value c0 = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
     mlir::Value c1 = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
-    auto forOp = rewriter.create<mlir::scf::ForOp>(loc, c0, num_gates, c1, ValueRange{qregIn});
+    auto forOp = rewriter.create<mlir::scf::ForOp>(loc, c0, num_gates, c1, ValueRange{qbitIn});
 
     mlir::OpBuilder::InsertionGuard loopGuard(rewriter);
     rewriter.setInsertionPointToStart(forOp.getBody());
     mlir::Value iv = forOp.getInductionVar();
-    mlir::Value currentLoopReg = forOp.getRegionIterArg(0);
+    mlir::Value currentQbit = forOp.getRegionIterArg(0);
 
     mlir::Value currentGateIndex =
         rewriter.create<mlir::memref::LoadOp>(loc, gatesMemref, ValueRange{iv});
@@ -327,17 +306,19 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     for (int64_t i = 0; i < numCases; ++i) {
         caseValues.push_back(i);
     }
+
     // Create the switch operation inside the loop
+    // Switch returns a Qubit
     mlir::DenseI64ArrayAttr caseValuesAttr = rewriter.getDenseI64ArrayAttr(caseValues);
     auto switchOp = rewriter.create<mlir::scf::IndexSwitchOp>(
-        loc, mlir::TypeRange{qregType}, currentGateIndex, caseValuesAttr, caseValues.size());
+        loc, mlir::TypeRange{qbitType}, currentGateIndex, caseValuesAttr, caseValues.size());
 
     // Populate Switch Cases
     if (pprBasis) {
-        populatePPRBasisSwitchCases(rewriter, loc, switchOp, currentLoopReg, qbitIndex);
+        populatePPRBasisSwitchCases(rewriter, loc, switchOp, currentQbit);
     }
     else {
-        populateCliffordTSwitchCases(rewriter, loc, switchOp, currentLoopReg, qbitIndex);
+        populateCliffordTSwitchCases(rewriter, loc, switchOp, currentQbit);
     }
 
     // Yield the result of the switch op from the for loop
@@ -345,10 +326,10 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     rewriter.create<mlir::scf::YieldOp>(loc, switchOp.getResults());
 
     rewriter.setInsertionPointAfter(forOp);
-    mlir::Value finalReg = forOp.getResult(0);
+    mlir::Value finalQbit = forOp.getResult(0);
 
-    // Return the final register and the computed runtime phase
-    rewriter.create<mlir::func::ReturnOp>(loc, mlir::ValueRange{finalReg, runtimePhase});
+    // Return the final qubit and the computed runtime phase
+    rewriter.create<mlir::func::ReturnOp>(loc, mlir::ValueRange{finalQbit, runtimePhase});
 
     return func;
 }
@@ -375,67 +356,27 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
             return failure();
         }
 
-        mlir::Value qbitOperand;
-        SmallVector<mlir::Value> paramOperands;
+        assert(op.getQubitOperands().size() == 1 && op.getAllParams().size() == 1 &&
+               "only RZ and PhaseShift are allowed in Gridsynth decomposition");
 
-        for (mlir::Value operand : op->getOperands()) {
-            if (mlir::isa<catalyst::quantum::QubitType>(operand.getType())) {
-                qbitOperand = operand;
-            }
-            else {
-                paramOperands.push_back(operand);
-            }
-        }
-        if (paramOperands.size() != 1) {
-            return failure();
-        }
-        mlir::Value angle = paramOperands[0];
-        if (!qbitOperand) {
-            return failure();
-        }
-
-        catalyst::quantum::ExtractOp extractOp = findSourceExtract(qbitOperand);
-        if (!extractOp) {
-            return failure();
-        }
-
-        mlir::Value qregOperand = extractOp.getQreg();
-        mlir::Value qbitIndex;
-
-        mlir::OpBuilder::InsertionGuard guard(rewriter);
-        rewriter.setInsertionPoint(extractOp);
-
-        if (extractOp.getIdx()) {
-            qbitIndex = extractOp.getIdx();
-        }
-        else if (extractOp.getIdxAttr()) {
-            qbitIndex = rewriter.create<mlir::arith::ConstantOp>(
-                extractOp.getLoc(), rewriter.getI64IntegerAttr(*extractOp.getIdxAttr()));
-        }
-        else {
-            return failure();
-        }
+        // Directly grab the SSA value of the qubit. No need to look up ExtractOps.
+        mlir::Value qbitOperand = op.getQubitOperands()[0];
+        mlir::Value angle = op.getAllParams()[0];
 
         mlir::ModuleOp module = op->getParentOfType<mlir::ModuleOp>();
         mlir::Location loc = op.getLoc();
-        rewriter.setInsertionPoint(op);
-
-        mlir::Value regWithQubit = rewriter.create<InsertOp>(
-            loc, qregOperand.getType(), qregOperand, qbitIndex, nullptr, qbitOperand);
 
         mlir::func::FuncOp decompFunc =
             getOrCreateDecompositionFunc(module, rewriter, epsilon, pprBasis);
 
+        // Call the function using the qubit directly
         auto callDecompOp = rewriter.create<mlir::func::CallOp>(
-            loc, decompFunc, mlir::ValueRange{regWithQubit, qbitIndex, angle});
-        mlir::Value finalReg = callDecompOp.getResult(0);
+            loc, decompFunc, mlir::ValueRange{qbitOperand, angle});
+
+        mlir::Value finalQbitResult = callDecompOp.getResult(0);
         mlir::Value runtimePhase = callDecompOp.getResult(1);
 
-        mlir::Value finalQbitResult =
-            rewriter.create<ExtractOp>(loc, qbitOperand.getType(), finalReg, qbitIndex, nullptr);
-
-        rewriter.setInsertionPointAfter(finalQbitResult.getDefiningOp());
-
+        // Handle Global Phase for PhaseShift
         mlir::Value finalPhase;
         if (isPhaseShift) {
             // PhaseShift(phi) = RZ(phi) * GlobalPhase(-phi/2)
@@ -454,59 +395,10 @@ struct DecomposeCustomOpPattern : public mlir::OpRewritePattern<CustomOp> {
         rewriter.create<GlobalPhaseOp>(loc, TypeRange{}, ValueRange{finalPhase},
                                        gphaseAttrs.getAttrs());
 
+        // Replace the RZ/PhaseShift op with the resulting qubit
         rewriter.replaceAllUsesWith(op->getResults(), finalQbitResult);
         rewriter.eraseOp(op);
         return success();
-    }
-
-  private:
-    /**
-     * @brief Traces a qubit value backward to find its source ExtractOp.
-     */
-    catalyst::quantum::ExtractOp findSourceExtract(mlir::Value qbit) const
-    {
-        if (!qbit) {
-            return nullptr;
-        }
-        if (auto extractOp = qbit.getDefiningOp<ExtractOp>())
-            return extractOp;
-
-        auto definingOp = qbit.getDefiningOp();
-        if (!definingOp) {
-            return nullptr;
-        }
-
-        if (auto customOp = dyn_cast<CustomOp>(definingOp)) {
-            auto opResult = mlir::dyn_cast<mlir::OpResult>(qbit);
-            if (!opResult) {
-                return nullptr;
-            }
-
-            std::vector<mlir::Value> qubitOperands = customOp.getQubitOperands();
-            std::vector<mlir::OpResult> qubitResults = customOp.getQubitResults();
-
-            if (qubitOperands.size() != qubitResults.size()) {
-                return nullptr;
-            }
-
-            int64_t qubitResultIndex = -1;
-            for (size_t i = 0; i < qubitResults.size(); ++i) {
-                if (qubitResults[i] == opResult) {
-                    qubitResultIndex = i;
-                    break;
-                }
-            }
-            if (qubitResultIndex == -1) {
-                return nullptr;
-            }
-
-            mlir::Value nextQubit = qubitOperands[qubitResultIndex];
-            if (nextQubit)
-                return findSourceExtract(nextQubit);
-        }
-        {
-            return nullptr;
-        }
     }
 };
 
