@@ -216,12 +216,15 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {
         1. A Pauli product (e.g., ["X", "I", "Z"]) specifying which Pauli operators to apply
         2. A rotation kind (in fractions of π) specifying the angle
         3. A list of input qubits to apply the rotation to
+        4. A condition (optional) for the operation to be applied only if the condition is true.
         
         The operation returns the same number of qubits as input.
         
         Example:
         ```mlir
-        %result = qec.ppr ["X", "I", "Z"](4) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+        %c0 = arith.constant true : i1
+        %Q_0:3 = qec.ppr ["X", "I", "Z"](4) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+        %Q_1:3 = qec.ppr ["X", "I", "Z"](4) %Q_0[0], %Q_0[1], %Q_0[2] cond(%c0) : !quantum.bit, !quantum.bit, !quantum.bit
         ```
         This applies exp(iπ/4 * X⊗I⊗Z) to the three qubits.
     }];
@@ -346,6 +349,47 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {
         };
     }];
     let extraClassDeclaration = extraBaseClassDeclaration;
+}
+
+def PPRotationArbitraryOp : QEC_Op<"ppr.arbitrary", [AttrSizedOperandSegments]> {
+    let summary = "Pauli Product Rotation with arbitrary angle.";
+    let description = [{
+        The PPRotationArbitraryOp represents a Pauli product rotation operation with an arbitrary angle.
+        It applies a rotation of the form exp(iθP) to a set of qubits, where:
+        - P is a Pauli product (specified by pauli_product)
+        - θ is the rotation angle (specified by arbitrary_angle in radians)
+        
+        The operation is characterized by:
+        1. A Pauli product (e.g., ["X", "I", "Z"]) specifying which Pauli operators to apply
+        2. A rotation angle (specified by arbitrary_angle in radians)
+        3. A list of input qubits to apply the rotation to
+        4. A condition (optional) for the operation to be applied only if the condition is true.
+
+        Example:
+        ```mlir
+        %const = arith.constant 0.14 : f64
+        %result = qec.ppr.arbitrary ["X", "Z"](%const) %q0, %q1 : !quantum.bit, !quantum.bit
+        ```
+        This applies exp(i0.14 * X⊗Z) to the two qubits.
+    }];
+
+    let arguments = (ins
+        PauliWord:$pauli_product,
+        F64:$arbitrary_angle,
+        Variadic<QubitType>:$in_qubits,
+        Optional<I1>:$condition
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits
+    );
+
+    let assemblyFormat = [{
+        $pauli_product `(` $arbitrary_angle `)` $in_qubits attr-dict (`cond` `(` $condition^ `)`)? `:` type($out_qubits)
+    }];
+
+    let hasVerifier = 1;
+    let hasCanonicalizeMethod = 1;
 }
 
 def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, AttrSizedOperandSegments]> {
@@ -486,7 +530,7 @@ def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, AttrSizedOperandSegments]> 
         };
         void setRotationKind(uint16_t attrValue){
             setRotationSign(static_cast<int16_t>(attrValue) < 0 ? -1 : 1);
-        }
+        };
     }];
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
