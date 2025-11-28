@@ -212,9 +212,9 @@ class TestFakeDAGBuilder:
 def test_dependency_injection():
     """Tests that relevant dependencies are injected."""
 
-    dag_builder = FakeDAGBuilder()
-    utility = ConstructCircuitDAG(dag_builder)
-    assert utility.dag_builder is dag_builder
+    mock_dag_builder = Mock(DAGBuilder)
+    utility = ConstructCircuitDAG(mock_dag_builder)
+    assert utility.dag_builder is mock_dag_builder
 
 
 @pytest.mark.unit
