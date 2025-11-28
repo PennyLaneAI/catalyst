@@ -160,7 +160,8 @@ def test_dynamic_angle_multi_qubit_pauli_rotations():
 
     # CHECK: [[extracted:%.+]] = tensor.extract
     # CHECK: [[q0:%.+]]:2 = qec.ppr.arbitrary ["X", "Z"]([[extracted]])
-    # CHECK: [[q1:%.+]]:2 = qec.ppr.arbitrary ["Y", "X"]([[extracted]]) [[q0]]#0, [[q0]]#1
+    # CHECK: [[extracted_1:%.+]] = tensor.extract
+    # CHECK: [[q1:%.+]]:2 = qec.ppr.arbitrary ["Y", "X"]([[extracted_1]]) [[q0]]#0, [[q0]]#1
     print(circuit.mlir_opt)
     qml.capture.disable()
 
