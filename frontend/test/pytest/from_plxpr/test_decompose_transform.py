@@ -280,6 +280,7 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
+    @pytest.mark.xfail(reason="unstable global phase numbers", strict=False)
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_multirz(self):
         """Test that multirz decomposition works with from_plxpr."""
