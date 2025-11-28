@@ -66,7 +66,8 @@ def mbqc_pipeline() -> PipelineStages:
     _, pipeline = stages[llvm_dialect_conversion_stage_index]
 
     assert "convert-quantum-to-llvm" in pipeline, (
-        f"Pipeline for stage 'MLIRToLLVMDialectConversion' missing required pass 'convert-quantum-to-llvm'.\n"
+        "Pipeline for stage 'MLIRToLLVMDialectConversion' missing required pass "
+        "'convert-quantum-to-llvm'.\n"
         f"The pipeline for this stage is: {pipeline}"
     )
 
