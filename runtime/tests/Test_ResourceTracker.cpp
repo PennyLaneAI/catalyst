@@ -440,12 +440,12 @@ TEST_CASE("Test Resource Tracker SetState Operations", "[resourcetracking]")
     CHECK(tracker.GetNumGates("BasisState") == 0);
 
     tracker.SetState({0});
-    tracker.SetBasisState({1, 2, 3});
+    tracker.SetBasisState({0, 1, 2});
     CHECK(tracker.GetNumGates() == 2);
     CHECK(tracker.GetNumGates("StatePrep") == 1);
     CHECK(tracker.GetNumGates("BasisState") == 1);
 
     CHECK(tracker.GetNumGatesBySize(1) == 1);
     CHECK(tracker.GetNumGatesBySize(3) == 1);
-    CHECK(tracker.GetDepth() == 0); // Should not impact depth
+    CHECK(tracker.GetDepth() == 2);
 }

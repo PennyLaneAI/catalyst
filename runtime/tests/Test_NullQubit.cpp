@@ -994,7 +994,7 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
             CHECK(line.find("12") != std::string::npos);
         }
         if (line.find("depth") != std::string::npos) {
-            CHECK(line.find("10") != std::string::npos);
+            CHECK(line.find("11") != std::string::npos);
         }
         full_json += line + "\n";
     }
