@@ -62,3 +62,26 @@ module @outer {
   }
 }
 
+// -----
+
+// Test external func decls
+// CHECK-LABEL: @global
+module @global {
+  // CHECK-DAG: func.func private @f()
+  func.func private @f()
+
+  module @local0 {
+    // CHECK-DAG: func.func @f_0()
+    func.func @f() {
+      return
+    }
+  }
+
+  module @local1 {
+    // CHECK-DAG: func.func @f_1()
+    func.func @f() {
+      return
+    }
+  }
+
+}

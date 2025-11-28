@@ -228,8 +228,15 @@ LogicalResult RenameFunctionsPattern::matchAndRewrite(Operation *child,
     for (auto &region : child->getRegions()) {
         for (auto &block : region.getBlocks()) {
             for (auto &op : block) {
-                if (!isa<SymbolOpInterface>(op))
+                if (!isa<SymbolOpInterface>(op)) {
                     continue;
+                }
+
+                // Do not rename external function declarations, as they can be
+                // names required by other APIs.
+                if (auto f = dyn_cast<FunctionOpInterface>(op); f.isExternal()) {
+                    continue;
+                }
 
                 if (failed(childSymTab.renameToUnique(&op, raw_tables))) {
                     // TODO: Check for error in one of the tests.
