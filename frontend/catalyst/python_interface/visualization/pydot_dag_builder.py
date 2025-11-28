@@ -36,6 +36,26 @@ class PyDotDAGBuilder(DAGBuilder):
         edge_attrs (dict | None): User default attributes for an edge.
         cluster_attrs (dict | None): User default attributes for a cluster.
 
+    Example:
+        >>> builder = PyDotDAGBuilder()
+        >>> builder.add_node("n0", "node 0")
+        >>> builder.add_cluster("c0")
+        >>> builder.add_node("n1", "node 1", cluster_uid="c0")
+        >>> print(builder.to_string())
+        strict digraph G {
+        rankdir=TB;
+        compound=true;
+        n0 [label="node 0", fontname=Helvetica, penwidth=3, shape=ellipse, style=filled, fillcolor=lightblue, color=lightblue4];
+        subgraph cluster_c0 {
+        fontname=Helvetica;
+        penwidth=2;
+        shape=rectangle;
+        style=solid;
+        }
+
+        n1 [label="node 1", fontname=Helvetica, penwidth=3, shape=ellipse, style=filled, fillcolor=lightblue, color=lightblue4, cluster_uid=c0];
+        }
+
     """
 
     def __init__(
