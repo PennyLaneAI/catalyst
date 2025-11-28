@@ -57,7 +57,6 @@ void createQuantumCompilationStage(OpPassManager &pm)
     pm.addPass(catalyst::quantum::createSplitMultipleTapesPass());
     pm.addNestedPass<ModuleOp>(catalyst::createApplyTransformSequencePass());
     pm.addPass(catalyst::createInlineNestedModulePass());
-    pm.addPass(catalyst::quantum::createAnnotateFunctionPass());
     pm.addPass(catalyst::mitigation::createMitigationLoweringPass());
     pm.addPass(catalyst::quantum::createAdjointLoweringPass());
     pm.addPass(catalyst::createDisableAssertionPass());
@@ -89,6 +88,7 @@ void createHloLoweringStage(OpPassManager &pm)
 }
 void createGradientLoweringStage(OpPassManager &pm)
 {
+    pm.addPass(catalyst::gradient::createAnnotateInvalidGradientFunctionsPass());
     pm.addPass(catalyst::gradient::createGradientLoweringPass());
 }
 void createBufferizationStage(OpPassManager &pm)

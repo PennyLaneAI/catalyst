@@ -292,6 +292,10 @@
   of identities.
   [(#2192)](https://github.com/PennyLaneAI/catalyst/pull/2192)
 
+  * Renamed `annotate-function` pass to `annotate-invalid-gradient-functions` and move it to the 
+  gradient dialect and the `lower-gradients` compilation stage.
+  [(#2241)](https://github.com/PennyLaneAI/catalyst/pull/2241)
+
   * Added support for PPRs to the :func:`~.passes.merge_rotations` pass to merge PPRs with
   equivalent angles, and cancelling of PPRs with opposite angles, or angles
   that sum to identity.
