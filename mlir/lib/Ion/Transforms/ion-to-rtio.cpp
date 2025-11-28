@@ -576,7 +576,7 @@ struct ResolveChannelMappingPattern : public OpRewritePattern<rtio::RTIOQubitToC
         int64_t offset = cast<IntegerAttr>(pulseOp->getAttr("offset")).getInt();
 
         IntegerAttr channelIdAttr = rewriter.getIntegerAttr(
-            rewriter.getIndexType(), (channelIdValue.getSExtValue() + offset));
+            rewriter.getIndexType(), (channelIdValue.getSExtValue() * 2 + offset));
 
         auto resolvedChannelType =
             rtio::ChannelType::get(rewriter.getContext(), kind, qualifiers, channelIdAttr);
@@ -880,8 +880,9 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         auto newFuncType = FunctionType::get(ctx, oldFuncType.getInputs(), {});
         newQnodeFunc.setFunctionType(newFuncType);
 
-        // set public visibility for kernel function
+        // set public visibility and remove internal linkage for kernel function
         newQnodeFunc.setPublic();
+        newQnodeFunc->removeAttr("llvm.linkage");
 
         // Clear operands from all return ops (make them return nothing)
         newQnodeFunc.walk([](func::ReturnOp returnOp) { returnOp.getOperandsMutable().clear(); });
