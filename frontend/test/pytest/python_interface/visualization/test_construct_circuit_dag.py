@@ -98,7 +98,7 @@ class FakeDAGBuilder(DAGBuilder):
 def test_dependency_injection():
     """Tests that relevant dependencies are injected."""
 
-    mock_dag_builder = Mock(DAGBuilder) 
+    mock_dag_builder = Mock(DAGBuilder)
     utility = ConstructCircuitDAG(mock_dag_builder)
     assert utility.dag_builder is mock_dag_builder
 
