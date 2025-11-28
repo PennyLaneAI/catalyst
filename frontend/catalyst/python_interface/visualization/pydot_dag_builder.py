@@ -183,7 +183,7 @@ class PyDotDAGBuilder(DAGBuilder):
         Args:
             uid (str): Unique cluster ID to identify this cluster.
             node_label (str | None): The text to display on the information node within the cluster when rendered.
-            cluster_id (str | None): Optional unique ID of the cluster this cluster belongs to. If `None`, the cluster will be positioned on the base graph.
+            cluster_uid (str | None): Optional unique ID of the cluster this cluster belongs to. If `None`, the cluster will be positioned on the base graph.
             **attrs (Any): Any additional styling keyword arguments.
 
         Raises:

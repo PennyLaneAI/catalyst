@@ -35,7 +35,7 @@ class DAGBuilder(ABC):
         uid: NodeUID,
         label: str,
         *,
-        cluster_id: ClusterUID | None = None,
+        cluster_uid: ClusterUID | None = None,
         **attrs: Any,
     ) -> None:
         """Add a single node to the graph.
@@ -43,7 +43,7 @@ class DAGBuilder(ABC):
         Args:
             uid (str): Unique node ID to identify this node.
             label (str): The text to display on the node when rendered.
-            cluster_id (str | None): Optional ID of the cluster this node belongs to. If `None`, this node gets
+            cluster_uid (str | None): Optional unique ID of the cluster this node belongs to. If `None`, this node gets
                 added on the base graph.
             **attrs (Any): Any additional styling keyword arguments.
 
@@ -68,7 +68,7 @@ class DAGBuilder(ABC):
         uid: ClusterUID,
         *,
         node_label: str | None = None,
-        cluster_id: ClusterUID | None = None,
+        cluster_uid: ClusterUID | None = None,
         **attrs: Any,
     ) -> None:
         """Add a single cluster to the graph.
@@ -79,7 +79,7 @@ class DAGBuilder(ABC):
         Args:
             uid (str): Unique cluster ID to identify this cluster.
             node_label (str | None): The text to display on an information node within the cluster when rendered.
-            cluster_id (str | None): Optional ID of the cluster this cluster belongs to. If `None`, the cluster will be
+            cluster_uid (str | None): Optional unique ID of the cluster this cluster belongs to. If `None`, the cluster will be
                 placed on the base graph.
             **attrs (Any): Any additional styling keyword arguments.
 
