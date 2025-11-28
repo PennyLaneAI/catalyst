@@ -131,7 +131,7 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
 
 
     Returns:
-        Callable: A wrapper function that visualizes the QNode at the specified level.
+       ????
 
     """
     cache: dict[int, tuple[str, str]] = _cache_store.setdefault(qnode, {})
@@ -140,6 +140,7 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
         """Callback function for circuit drawing."""
 
         pass_instance = previous_pass if previous_pass else next_pass
+        # Process module to build DAG
         utility = ConstructCircuitDAG(PyDotDAGBuilder())
         utility.construct(module)
         svg_str = utility.dag_builder.graph.create_svg(prog="dot")
@@ -153,13 +154,6 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
 
     @wraps(qnode)
     def wrapper(*args, **kwargs):
-        if args or kwargs:
-            warnings.warn(
-                "The `draw` function does not yet support dynamic arguments.\n"
-                "To visualize the circuit with dynamic parameters or wires, please use the\n"
-                "`compiler.python_compiler.visualization.generate_mlir_graph` function instead.",
-                UserWarning,
-            )
         mlir_module = _get_mlir_module(qnode, args, kwargs)
         Compiler.run(mlir_module, callback=_draw_callback)
 
@@ -182,6 +176,6 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
             fig, ax = plt.subplots()
             ax.imshow(img)
             ax.set_axis_off()
-            return fig
+            return fig, ax
 
     return wrapper
