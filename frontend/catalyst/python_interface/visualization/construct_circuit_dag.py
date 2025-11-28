@@ -91,14 +91,14 @@ class ConstructCircuitDAG:
             uid,
             node_label="for ...",
             label="",
-            cluster_uid=self._cluster_stack[-1],
+            cluster_uid=self._cluster_uid_stack[-1],
         )
-        self._cluster_stack.append(uid)
+        self._cluster_uid_stack.append(uid)
 
         for region in operation.regions:
             self._visit_region(region)
 
-        self._cluster_stack.pop()
+        self._cluster_uid_stack.pop()
 
     @_visit_operation.register
     def _while_op(self, operation: scf.WhileOp) -> None:
@@ -108,14 +108,14 @@ class ConstructCircuitDAG:
             uid,
             node_label="while ...",
             label="",
-            cluster_uid=self._cluster_stack[-1],
+            cluster_uid=self._cluster_uid_stack[-1],
         )
-        self._cluster_stack.append(uid)
+        self._cluster_uid_stack.append(uid)
 
         for region in operation.regions:
             self._visit_region(region)
 
-        self._cluster_stack.pop()
+        self._cluster_uid_stack.pop()
 
     @_visit_operation.register
     def _if_op(self, operation: scf.IfOp):
@@ -125,9 +125,9 @@ class ConstructCircuitDAG:
             uid,
             node_label="",
             label="",
-            cluster_uid=self._cluster_stack[-1],
+            cluster_uid=self._cluster_uid_stack[-1],
         )
-        self._cluster_stack.append(uid)
+        self._cluster_uid_stack.append(uid)
 
         # Loop through each branch and visualize as a cluster
         for i, branch in enumerate(operation.regions):
@@ -136,18 +136,18 @@ class ConstructCircuitDAG:
                 uid,
                 node_label=f"if ..." if i == 0 else "else",
                 label="",
-                cluster_uid=self._cluster_stack[-1],
+                cluster_uid=self._cluster_uid_stack[-1],
             )
-            self._cluster_stack.append(uid)
+            self._cluster_uid_stack.append(uid)
 
             # Go recursively into the branch to process internals
             self._visit_region(branch)
 
             # Pop branch cluster after processing to ensure
             # logical branches are treated as 'parallel'
-            self._cluster_stack.pop()
+            self._cluster_uid_stack.pop()
 
-        self._cluster_stack.pop()
+        self._cluster_uid_stack.pop()
 
     # ============
     # DEVICE NODE
