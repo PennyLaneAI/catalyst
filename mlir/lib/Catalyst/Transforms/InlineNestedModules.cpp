@@ -239,8 +239,12 @@ LogicalResult RenameFunctionsPattern::matchAndRewrite(Operation *child,
                 // During inlining, on-the-fly they still need to be renamed, otherwise module
                 // verifier complains. So we save the original external API name and rename
                 // them back after inlining is finished.
-                if (auto f = dyn_cast<FunctionOpInterface>(op); f.isExternal()) {
-                    f->setAttr("original_external_API_name", rewriter.getStringAttr(f.getName()));
+                if (isa<func::FuncOp>(op)) {
+                    auto f = cast<func::FuncOp>(op);
+                    if (f.isExternal()) {
+                        op.setAttr("original_external_API_name",
+                                   rewriter.getStringAttr(f.getName()));
+                    }
                 }
 
                 if (failed(childSymTab.renameToUnique(&op, raw_tables))) {
