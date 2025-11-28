@@ -16,8 +16,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, TypeAlias
 
-ClusterID: TypeAlias = str
-NodeID: TypeAlias = str
+ClusterUID: TypeAlias = str
+NodeUID: TypeAlias = str
 
 
 class DAGBuilder(ABC):
@@ -32,15 +32,16 @@ class DAGBuilder(ABC):
     @abstractmethod
     def add_node(
         self,
-        id: NodeID,
+        uid: NodeUID,
         label: str,
-        cluster_id: ClusterID | None = None,
+        *,
+        cluster_id: ClusterUID | None = None,
         **attrs: Any,
     ) -> None:
         """Add a single node to the graph.
 
         Args:
-            id (str): Unique node ID to identify this node.
+            uid (str): Unique node ID to identify this node.
             label (str): The text to display on the node when rendered.
             cluster_id (str | None): Optional ID of the cluster this node belongs to. If `None`, this node gets
                 added on the base graph.
@@ -50,12 +51,12 @@ class DAGBuilder(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def add_edge(self, from_id: NodeID, to_id: NodeID, **attrs: Any) -> None:
+    def add_edge(self, from_uid: NodeUID, to_uid: NodeUID, **attrs: Any) -> None:
         """Add a single directed edge between nodes in the graph.
 
         Args:
-            from_id (str): The unique ID of the source node.
-            to_id (str): The unique ID of the destination node.
+            from_uid (str): The unique ID of the source node.
+            to_uid (str): The unique ID of the destination node.
             **attrs (Any): Any additional styling keyword arguments.
 
         """
@@ -64,9 +65,10 @@ class DAGBuilder(ABC):
     @abstractmethod
     def add_cluster(
         self,
-        id: ClusterID,
+        uid: ClusterUID,
+        *,
         node_label: str | None = None,
-        cluster_id: ClusterID | None = None,
+        cluster_id: ClusterUID | None = None,
         **attrs: Any,
     ) -> None:
         """Add a single cluster to the graph.
@@ -75,7 +77,7 @@ class DAGBuilder(ABC):
         within it are visually and logically grouped.
 
         Args:
-            id (str): Unique cluster ID to identify this cluster.
+            uid (str): Unique cluster ID to identify this cluster.
             node_label (str | None): The text to display on an information node within the cluster when rendered.
             cluster_id (str | None): Optional ID of the cluster this cluster belongs to. If `None`, the cluster will be
                 placed on the base graph.
@@ -86,7 +88,7 @@ class DAGBuilder(ABC):
 
     @property
     @abstractmethod
-    def nodes(self) -> dict[NodeID, dict[str, Any]]:
+    def nodes(self) -> dict[NodeUID, dict[str, Any]]:
         """Retrieve the current set of nodes in the graph.
 
         Returns:
@@ -106,7 +108,7 @@ class DAGBuilder(ABC):
 
     @property
     @abstractmethod
-    def clusters(self) -> dict[ClusterID, dict[str, Any]]:
+    def clusters(self) -> dict[ClusterUID, dict[str, Any]]:
         """Retrieve the current set of clusters in the graph.
 
         Returns:
