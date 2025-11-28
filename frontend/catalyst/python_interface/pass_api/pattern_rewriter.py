@@ -554,7 +554,6 @@ class PLPatternRewriter(PatternRewriter):
             iq.replace_by_if(oq, lambda use: use.operation != gateOp)
             for use in in_qubit_uses:
                 self.notify_op_modified(use.operation)
-            # self.ctx.update_qubit(iq, oq)
 
         return gateOp
 
