@@ -137,7 +137,7 @@ class TestAddMethods:
         dag_builder.add_cluster("c0")
 
         # Create node inside cluster
-        dag_builder.add_node("1", "node1", cluster_id="c0")
+        dag_builder.add_node("1", "node1", cluster_uid="c0")
 
         # Verify graph structure
         root_graph = dag_builder.graph
@@ -167,11 +167,11 @@ class TestAddMethods:
 
         # Level 1 (c0): Add node on outer cluster
         dag_builder.add_cluster("c0")
-        dag_builder.add_node("n_outer", "node_outer", cluster_id="c0")
+        dag_builder.add_node("n_outer", "node_outer", cluster_uid="c0")
 
         # Level 2 (c1): Add node on inner cluster
-        dag_builder.add_cluster("c1", cluster_id="c0")
-        dag_builder.add_node("n_inner", "node_inner", cluster_id="c1")
+        dag_builder.add_cluster("c1", cluster_uid="c0")
+        dag_builder.add_node("n_inner", "node_inner", cluster_uid="c1")
 
         root_graph = dag_builder.graph
 
@@ -297,21 +297,21 @@ class TestProperties:
 
         dag_builder.add_node("0", "node0", fillcolor="red")
         dag_builder.add_cluster("c0")
-        dag_builder.add_node("1", "node1", cluster_id="c0")
+        dag_builder.add_node("1", "node1", cluster_uid="c0")
 
         nodes = dag_builder.nodes
 
         assert len(nodes) == 2
         assert len(nodes["0"]) == 4
 
-        assert nodes["0"]["id"] == "0"
+        assert nodes["0"]["uid"] == "0"
         assert nodes["0"]["label"] == "node0"
-        assert nodes["0"]["cluster_id"] == None
+        assert nodes["0"]["cluster_uid"] == None
         assert nodes["0"]["attrs"]["fillcolor"] == "red"
 
-        assert nodes["1"]["id"] == "1"
+        assert nodes["1"]["uid"] == "1"
         assert nodes["1"]["label"] == "node1"
-        assert nodes["1"]["cluster_id"] == "c0"
+        assert nodes["1"]["cluster_uid"] == "c0"
 
     def test_edges(self):
         """Tests that edges works."""
@@ -325,8 +325,8 @@ class TestProperties:
 
         assert len(edges) == 1
 
-        assert edges[0]["from_id"] == "0"
-        assert edges[0]["to_id"] == "1"
+        assert edges[0]["from_uid"] == "0"
+        assert edges[0]["to_uid"] == "1"
         assert edges[0]["attrs"]["penwidth"] == 10
 
     def test_clusters(self):
@@ -338,23 +338,23 @@ class TestProperties:
         clusters = dag_builder.clusters
 
         dag_builder.add_cluster(
-            "1", "my_other_info_node", cluster_id="0", label="my_nested_cluster"
+            "1", "my_other_info_node", cluster_uid="0", label="my_nested_cluster"
         )
         clusters = dag_builder.clusters
         assert len(clusters) == 2
 
         assert len(clusters["0"]) == 5
-        assert clusters["0"]["id"] == "0"
+        assert clusters["0"]["uid"] == "0"
         assert clusters["0"]["cluster_label"] == "my_cluster"
         assert clusters["0"]["node_label"] == "my_info_node"
-        assert clusters["0"]["cluster_id"] == None
+        assert clusters["0"]["cluster_uid"] == None
         assert clusters["0"]["attrs"]["penwidth"] == 10
 
         assert len(clusters["1"]) == 5
-        assert clusters["1"]["id"] == "1"
+        assert clusters["1"]["uid"] == "1"
         assert clusters["1"]["cluster_label"] == "my_nested_cluster"
         assert clusters["1"]["node_label"] == "my_other_info_node"
-        assert clusters["1"]["cluster_id"] == "0"
+        assert clusters["1"]["cluster_uid"] == "0"
 
 
 class TestOutput:
