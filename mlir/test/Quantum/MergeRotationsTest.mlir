@@ -870,3 +870,16 @@ func.func public @mixed_operations(%q1: !quantum.bit) {
     %2 = qec.ppr ["Z"](4) %1: !quantum.bit
     func.return
 }
+
+// -----
+
+// don't merge if only one qubit matches
+
+// CHECK-LABEL: half_compatible_qubits
+func.func public @half_compatible_qubits(%q1: !quantum.bit, %q2: !quantum.bit, %q3: !quantum.bit) {
+    // CHECK: qec.ppr ["X", "X"](4)
+    // CHECK: qec.ppr ["X", "X"](4)
+    %0, %1 = qec.ppr ["X", "X"](4) %q1, %q2: !quantum.bit, !quantum.bit
+    %2:2 = qec.ppr ["X", "X"](4) %0, %q3: !quantum.bit, !quantum.bit
+    func.return
+}
