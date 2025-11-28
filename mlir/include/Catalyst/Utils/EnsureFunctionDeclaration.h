@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 
 using namespace mlir;
@@ -23,5 +24,9 @@ namespace catalyst {
 // dialect IR.
 LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op,
                                            StringRef fnSymbol, Type fnType);
+
+// Similar to above, but for MLIR func::FuncOp with external runtime functions.
+func::FuncOp ensurefuncOrDeclare(PatternRewriter &rewriter, Operation *op, StringRef fnSymbol,
+                                 FunctionType fnType);
 
 } // namespace catalyst

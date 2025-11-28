@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 
 using namespace mlir;
@@ -35,6 +36,36 @@ LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation 
     }
 
     return cast<LLVM::LLVMFuncOp>(fnDecl);
+}
+
+func::FuncOp ensurefuncOrDeclare(PatternRewriter &rewriter, Operation *op, StringRef fnSymbol,
+                                 FunctionType fnType)
+{
+    Operation *fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
+
+    if (!fnDecl) {
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+
+        // FIX: Check if 'op' is already a Module, otherwise find the parent.
+        ModuleOp mod = dyn_cast<ModuleOp>(op);
+        if (!mod) {
+            mod = op->getParentOfType<ModuleOp>();
+        }
+
+        // Fallback if we somehow have no module (shouldn't happen in valid IR)
+        assert(mod && "Could not find a valid ModuleOp to insert function declaration");
+
+        rewriter.setInsertionPointToStart(mod.getBody());
+
+        auto funcOp = rewriter.create<func::FuncOp>(op->getLoc(), fnSymbol, fnType);
+        funcOp.setPrivate();
+        fnDecl = funcOp;
+    }
+    else {
+        assert(isa<func::FuncOp>(fnDecl) && "Function declaration is not a func::FuncOp");
+    }
+
+    return cast<func::FuncOp>(fnDecl);
 }
 
 } // namespace catalyst
