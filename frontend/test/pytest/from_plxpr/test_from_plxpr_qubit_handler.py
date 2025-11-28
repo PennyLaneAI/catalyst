@@ -45,6 +45,7 @@ from jax.interpreters.partial_eval import DynamicJaxprTrace
 
 from catalyst.from_plxpr.qubit_handler import QubitHandler, QubitIndexRecorder
 from catalyst.jax_primitives import AbstractQbit, AbstractQreg, qalloc_p, qextract_p
+from catalyst.jax_tracer import _get_eqn_from_tracing_eqn
 from catalyst.utils.exceptions import CompileError
 
 
@@ -239,13 +240,17 @@ class TestQubitValues:
         assert qubit_handler[0] is new_qubit
         with take_current_trace() as trace:
             # Check that an extract primitive is added
-            assert trace.frame.eqns[-1].primitive is qextract_p
+            last_eqn = _get_eqn_from_tracing_eqn(trace.frame.tracing_eqns[-1])
+            assert last_eqn.primitive is qextract_p
 
             # Check that the extract primitive follows the wire index in the qreg manager
             # __getitem__ method
-            extract_p_index_invar = trace.frame.eqns[-1].invars[-1]
-            assert isinstance(extract_p_index_invar, Literal)
-            assert extract_p_index_invar.val == 0
+            extract_p_index_invar = last_eqn.invars[-1]
+            if isinstance(extract_p_index_invar, Literal):
+                assert extract_p_index_invar.val == 0
+            else:
+                assert isinstance(extract_p_index_invar.val, Literal)
+                assert extract_p_index_invar.val.val == 0
 
     def test_no_overwriting_extract(self):
         """Test that no new qubit is extracted when indexing into an existing wire"""
@@ -273,9 +278,10 @@ class TestQubitValues:
 
         # Also check with actual jaxpr variables
         with take_current_trace() as trace:
-            gate_out_qubits = trace.frame.eqns[-1].outvars
-            assert trace.frame.tracer_to_var[id(qubit_handler[0])] == gate_out_qubits[0]
-            assert trace.frame.tracer_to_var[id(qubit_handler[1])] == gate_out_qubits[1]
+            last_eqn = _get_eqn_from_tracing_eqn(trace.frame.tracing_eqns[-1])
+            gate_out_qubits = last_eqn.outvars
+            assert qubit_handler[0].val == gate_out_qubits[0]
+            assert qubit_handler[1].val == gate_out_qubits[1]
 
     def test_iter(self):
         """Test __iter__ in the qreg manager"""
@@ -315,9 +321,10 @@ class TestQubitValues:
 
         # Also check with actual jaxpr variables
         with take_current_trace() as trace:
-            gate_out_qubits = trace.frame.eqns[-1].outvars
-            assert trace.frame.tracer_to_var[id(qubit_handler[0])] == gate_out_qubits[0]
-            assert trace.frame.tracer_to_var[id(qubit_handler[1])] == gate_out_qubits[1]
+            last_eqn = _get_eqn_from_tracing_eqn(trace.frame.tracing_eqns[-1])
+            gate_out_qubits = last_eqn.outvars
+            assert qubit_handler[0].val == gate_out_qubits[0]
+            assert qubit_handler[1].val == gate_out_qubits[1]
 
     def test_insert_all_dangling_qubits(self):
         """
