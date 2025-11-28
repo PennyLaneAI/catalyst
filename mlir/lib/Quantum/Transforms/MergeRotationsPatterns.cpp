@@ -343,8 +343,10 @@ struct MergePPRRewritePattern : public OpRewritePattern<PPRotationOp> {
         }
 
         // verify that prevOp agrees on all qubits, not just the first
-        if (prevOp.getOutQubits() != inQubits) {
-            return failure();
+        for (auto qubit : inQubits) {
+            if (qubit.getDefiningOp() != prevOp) {
+                return failure();
+            }
         }
 
         // check same pauli strings
