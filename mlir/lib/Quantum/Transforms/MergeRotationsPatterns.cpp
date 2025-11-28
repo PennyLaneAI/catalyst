@@ -343,7 +343,8 @@ struct MergePPRRewritePattern : public OpRewritePattern<PPRotationOp> {
         }
 
         // verify that prevOp agrees on all qubits, not just the first
-        if (prevOp.getOutQubits() != inQubits) {
+        ValueRange outQubits = prevOp.getOutQubits();
+        if (outQubits != inQubits) {
             return failure();
         }
 
