@@ -497,7 +497,7 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
 def test_merge_rotation_ppr():
     """Test that the merge_rotation pass correctly merges PPRs."""
 
-    my_pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    my_pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qml.qjit(pipelines=my_pipeline, target="mlir")
     def test_merge_rotation_ppr_workflow():
