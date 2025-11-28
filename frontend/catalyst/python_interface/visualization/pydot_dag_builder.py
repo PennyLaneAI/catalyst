@@ -28,7 +28,15 @@ except ImportError:
 
 
 class PyDotDAGBuilder(DAGBuilder):
-    """A Directed Acyclic Graph builder for the PyDot backend."""
+    """A Directed Acyclic Graph builder for the PyDot backend.
+
+    Args:
+        attrs (dict | None): User default attributes to be used for all elements (nodes, edges, clusters) in the graph.
+        node_attrs (dict | None): User default attributes for a node.
+        edge_attrs (dict | None): User default attributes for an edge.
+        cluster_attrs (dict | None): User default attributes for a cluster.
+
+    """
 
     def __init__(
         self,
@@ -37,15 +45,6 @@ class PyDotDAGBuilder(DAGBuilder):
         edge_attrs: dict | None = None,
         cluster_attrs: dict | None = None,
     ) -> None:
-        """Initialize PyDotDAGBuilder instance.
-
-        Args:
-            attrs (dict | None): User default attributes to be used for all elements (nodes, edges, clusters) in the graph.
-            node_attrs (dict | None): User default attributes for a node.
-            edge_attrs (dict | None): User default attributes for an edge.
-            cluster_attrs (dict | None): User default attributes for a cluster.
-
-        """
         # Initialize the pydot graph:
         # - graph_type="digraph": Create a directed graph (edges have arrows).
         # - rankdir="TB": Set layout direction from Top to Bottom.
