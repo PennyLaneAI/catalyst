@@ -53,7 +53,7 @@ struct ResourceTracker final {
      * @param name The name of the operation being applied
      * @param wires The wires the operation is being applied to
      * @param controlled_wires The control wires the operation is being applied to
-     * @param impacts_depth Whether the operation impacts the circuit depth
+     * @param impacts_depth Whether the operation impacts the circuit depth. Defaults to true.
      */
     void RecordOperation(const std::string &name, const std::vector<QubitIdType> &wires,
                          const std::vector<QubitIdType> &controlled_wires)
