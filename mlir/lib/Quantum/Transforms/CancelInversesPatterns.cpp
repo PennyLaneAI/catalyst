@@ -159,8 +159,12 @@ void populateCancelInversesPatterns(RewritePatternSet &patterns)
     // but interfaces cannot be accepted by pattern matchers, since pattern
     // matchers require the target operations to have concrete names in the IR.
     patterns.add<ChainedUUadjOpRewritePattern<CustomOp>>(patterns.getContext(), 1);
-    patterns.add<ChainedUUadjOpRewritePattern<QubitUnitaryOp>>(patterns.getContext(), 1);
+    // TODO: add other explicit unitary gate ops here as they are implemented
+    patterns.add<ChainedUUadjOpRewritePattern<RXOp>>(patterns.getContext(), 1);
+    patterns.add<ChainedUUadjOpRewritePattern<RYOp>>(patterns.getContext(), 1);
+    patterns.add<ChainedUUadjOpRewritePattern<RZOp>>(patterns.getContext(), 1);
     patterns.add<ChainedUUadjOpRewritePattern<MultiRZOp>>(patterns.getContext(), 1);
+    patterns.add<ChainedUUadjOpRewritePattern<QubitUnitaryOp>>(patterns.getContext(), 1);
 }
 
 } // namespace quantum

@@ -564,6 +564,267 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
     let hasVerifier = 1;
 }
 
+def PauliXOp : UnitaryGate_Op<"x", [NoMemoryEffect,
+                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+    let summary = "PauliX";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        Variadic<QubitType>:$in_qubits,
+        UnitAttr:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+}
+
+def PauliYOp : UnitaryGate_Op<"y", [NoMemoryEffect,
+                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+    let summary = "PauliY";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        Variadic<QubitType>:$in_qubits,
+        UnitAttr:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+}
+
+def PauliZOp : UnitaryGate_Op<"z", [NoMemoryEffect,
+                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+    let summary = "PauliX";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        Variadic<QubitType>:$in_qubits,
+        UnitAttr:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+}
+
+def HadamardOp : UnitaryGate_Op<"h", [NoMemoryEffect,
+                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+    let summary = "Hadamard";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        Variadic<QubitType>:$in_qubits,
+        UnitAttr:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+}
+
+def TGateOp : UnitaryGate_Op<"t", [NoMemoryEffect,
+                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+    let summary = "T Gate";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        Variadic<QubitType>:$in_qubits,
+        UnitAttr:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+}
+
+def SGateOp : UnitaryGate_Op<"s", [NoMemoryEffect,
+                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+    let summary = "S Gate";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        Variadic<QubitType>:$in_qubits,
+        UnitAttr:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+}
+
+def CNOTOp : UnitaryGate_Op<"cnot", [NoMemoryEffect,
+                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+    let summary = "CNOT";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        Variadic<QubitType>:$in_qubits,
+        UnitAttr:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+}
+
+
+def RXOp : UnitaryGate_Op<"rx", [DifferentiableGate, NoMemoryEffect,
+                                           AttrSizedOperandSegments, AttrSizedResultSegments]> {
+    let summary = "RX";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        F64:$theta,
+        Variadic<QubitType>:$in_qubits,
+        UnitAttr:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        `(` $theta `)` $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getAllParams() {
+            return getODSOperands(getParamOperandIdx());
+        }
+    }];
+
+    let hasCanonicalizeMethod = 1;
+}
+
+
+def RYOp : UnitaryGate_Op<"ry", [DifferentiableGate, NoMemoryEffect,
+                                           AttrSizedOperandSegments, AttrSizedResultSegments]> {
+    let summary = "RY";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        F64:$theta,
+        Variadic<QubitType>:$in_qubits,
+        UnitAttr:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        `(` $theta `)` $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getAllParams() {
+            return getODSOperands(getParamOperandIdx());
+        }
+    }];
+
+    let hasCanonicalizeMethod = 1;
+}
+
+
+def RZOp : UnitaryGate_Op<"rz", [DifferentiableGate, NoMemoryEffect,
+                                           AttrSizedOperandSegments, AttrSizedResultSegments]> {
+    let summary = "RZ";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        F64:$theta,
+        Variadic<QubitType>:$in_qubits,
+        UnitAttr:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        `(` $theta `)` $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getAllParams() {
+            return getODSOperands(getParamOperandIdx());
+        }
+    }];
+
+    let hasCanonicalizeMethod = 1;
+}
+
+
 def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
     let summary = "Global Phase.";
 
