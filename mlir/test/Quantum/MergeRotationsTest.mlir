@@ -769,6 +769,7 @@ func.func public @cancel_multi_Z(%q1: !quantum.bit) {
 // -----
 
 // incorrect order inverse PPRs
+
 // CHECK-LABEL: dont_cancel
 func.func public @dont_cancel(%q1: !quantum.bit) {
     // CHECK: qec.ppr ["Z"](8)
@@ -780,6 +781,21 @@ func.func public @dont_cancel(%q1: !quantum.bit) {
     %2 = qec.ppr ["Z"](-8) %1: !quantum.bit
     %3 = qec.ppr ["X"](4) %2: !quantum.bit
     func.return
+}
+
+// -----
+
+// merge through other ops
+
+// CHECK-LABEL: merge_through
+func.func public @merge_through(%q1: !quantum.bit, %q2: !quantum.bit) -> !quantum.bit {
+    // CHECK-NOT: qec.ppr ["X"](4)
+    // CHECK-DAG: quantum.custom
+    // CHECK-DAG: qec.ppr ["X"](2)
+    %0 = qec.ppr ["X"](4) %q1: !quantum.bit
+    %1 = quantum.custom "Hadamard"() %q2: !quantum.bit
+    %2 = qec.ppr ["X"](4) %0: !quantum.bit
+    func.return %1: !quantum.bit
 }
 
 // ----- 
