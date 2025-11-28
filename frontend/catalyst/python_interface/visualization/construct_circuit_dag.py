@@ -160,7 +160,7 @@ class ConstructCircuitDAG:
         self.dag_builder.add_node(
             node_id,
             label=operation.device_name.data,
-            cluster_id=self._cluster_uid_stack[-1],
+            cluster_uid=self._cluster_uid_stack[-1],
             fillcolor="grey",
             color="black",
             penwidth=2,
@@ -194,16 +194,16 @@ class ConstructCircuitDAG:
 
         # Visualize the FuncOp as a cluster with a label
         if visualize:
-            cluster_id = f"cluster_{id(operation)}"
+            uid = f"cluster_{id(operation)}"
             parent_cluster_uid = (
                 None if self._cluster_uid_stack == [] else self._cluster_uid_stack[-1]
             )
             self.dag_builder.add_cluster(
-                cluster_id,
+                uid,
                 label=label,
-                cluster_id=parent_cluster_uid,
+                cluster_uid=parent_cluster_uid,
             )
-            self._cluster_uid_stack.append(cluster_id)
+            self._cluster_uid_stack.append(uid)
 
         for region in operation.regions:
             self._visit_region(region)
