@@ -376,14 +376,14 @@ def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
 
 
 def to_mlir_opt(
-    *args, stdin=None, options: Optional[CompileOptions] = None, using_python_compiler=False
+    *args, stdin=None, options: Optional[CompileOptions] = None, using_unified_compiler=False
 ):
     """echo ${input} | catalyst --tool=opt *args *opts -"""
     # Check if we need to use Python compiler for xDSL passes
-    if using_python_compiler:
+    if using_unified_compiler:
         # Use Python compiler path for xDSL passes
         # pylint: disable-next=import-outside-toplevel
-        from pennylane.compiler.python_compiler import Compiler as PythonCompiler
+        from catalyst.python_interface import Compiler as PythonCompiler
 
         compiler = PythonCompiler()
         stdin = compiler.run(stdin, callback=None)
@@ -542,7 +542,7 @@ class Compiler:
             return False
 
     @debug_logger
-    def is_using_python_compiler(self, mlir_module=None):
+    def is_using_unified_compiler(self, mlir_module=None):
         """Returns true if we need the Python compiler path.
 
         This happens when:
@@ -598,11 +598,11 @@ class Compiler:
             (str): filename of shared object
         """
 
-        if self.is_using_python_compiler(mlir_module):
+        if self.is_using_unified_compiler(mlir_module):
             # We keep this module here to keep xDSL requirement optional
             # Only move this is it has been decided that xDSL is no longer optional.
             # pylint: disable-next=import-outside-toplevel
-            from pennylane.compiler.python_compiler import Compiler as PythonCompiler
+            from catalyst.python_interface import Compiler as PythonCompiler
 
             compiler = PythonCompiler()
             mlir_module = compiler.run(mlir_module)

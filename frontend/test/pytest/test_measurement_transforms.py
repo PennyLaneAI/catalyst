@@ -24,10 +24,10 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pennylane as qml
 import pytest
-from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import Device
 from pennylane.devices.capabilities import OperatorProperties
 from pennylane.transforms import split_non_commuting, split_to_single_terms
+from utils import CONFIG_CUSTOM_DEVICE
 
 from catalyst import qjit
 from catalyst.compiler import get_lib_path

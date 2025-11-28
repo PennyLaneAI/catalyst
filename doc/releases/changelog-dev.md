@@ -69,6 +69,48 @@
 
 <h3>Improvements 🛠</h3>
 
+* Add an experimental `outline_state_evolution_pass` xDSL pass to `catalyst.python_interface.transforms`,
+  which moves all quantum gate operations to a private callable.
+  [(#8367)](https://github.com/PennyLaneAI/pennylane/pull/8367)
+
+* A new experimental `split_non_commuting_pass` compiler pass has been added to 
+  `catalyst.python_interface.transforms`. This pass splits quantum functions that
+  measure observables on the same wires into multiple function executions, where
+  each execution measures observables on different wires (using the "wires" grouping
+  strategy). The original function is replaced with calls to these generated functions,
+  and the results are combined appropriately.
+  [(#8531)](https://github.com/PennyLaneAI/pennylane/pull/8531)
+
+* Add the `PCPhaseOp` operation to the xDSL Quantum dialect.
+  [(#8621)](https://github.com/PennyLaneAI/pennylane/pull/8621)
+
+* Users can now apply xDSL passes without the need to pass the `pass_plugins` argument to
+  the `qjit` decorator.
+  [(#8572)](https://github.com/PennyLaneAI/pennylane/pull/8572)
+  [(#8573)](https://github.com/PennyLaneAI/pennylane/pull/8573)
+  [(#2169)](https://github.com/PennyLaneAI/catalyst/pull/2169)
+  [(#2183)](https://github.com/PennyLaneAI/catalyst/pull/2183)
+
+* The :meth:`catalyst.python_interface.transforms.convert_to_mbqc_formalism_pass` now 
+  supports :class:`~xdsl.dialects.scf.IndexSwitchOp` in IR and ignores regions that have no body.
+  [(#8632)](https://github.com/PennyLaneAI/pennylane/pull/8632)
+
+* The `convert_to_mbqc_formalism` compilation pass now outlines the operations to represent a gate
+  in the MBQC formalism into subroutines in order to reduce the IR size for large programs.
+  [(#8619)](https://github.com/PennyLaneAI/pennylane/pull/8619)
+
+* The :meth:`catalyst.python_interface.Compiler.run` method now accepts a string as input,
+  which is parsed and transformed with xDSL.
+  [(#8587)](https://github.com/PennyLaneAI/pennylane/pull/8587)
+
+* An `is_xdsl_pass` function has been added to the `catalyst.python_interface.pass_api` module.
+  This function checks if a pass name corresponds to an xDSL implemented pass.
+  [(#8572)](https://github.com/PennyLaneAI/pennylane/pull/8572)
+
+* A new `catalyst.python_interface.utils` submodule has been added, containing general-purpose utilities for
+  working with xDSL. This includes a function that extracts the concrete value of scalar, constant SSA values.
+  [(#8514)](https://github.com/PennyLaneAI/pennylane/pull/8514)
+
 * `qml.PCPhase` can be compiled and executed with capture enabled.
   [(#2226)](https://github.com/PennyLaneAI/catalyst/pull/2226)
 
@@ -159,6 +201,20 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* The experimental xDSL :func:`~catalyst.python_interface.transforms.measurements_from_samples_pass`
+  pass has been updated to support `shots` defined by an `arith.constant` operation.
+  [(#8460)](https://github.com/PennyLaneAI/pennylane/pull/8460)
+
+* The experimental xDSL :func:`~catalyst.python_interface.transforms.diagonalize_measurements`
+  pass has been updated to fix a bug that included the wrong SSA value for final qubit insertion
+  and deallocation at the end of the circuit. A clear error is now also raised when there are
+  observables with overlapping wires.
+  [(#8383)](https://github.com/PennyLaneAI/pennylane/pull/8383)
+
+* Fixes a bug in the constructor of the xDSL Quantum dialect's `QubitUnitaryOp` that
+  prevented an instance from being constructed.
+  [(#8456)](https://github.com/PennyLaneAI/pennylane/pull/8456)
+
 * Fixes an issue where a heap-to-stack allocation conversion pass was causing SIGSEGV issues
   during program execution at runtime.
   [(#2172)](https://github.com/PennyLaneAI/catalyst/pull/2172)
@@ -217,6 +273,10 @@
   [(#2239)](https://github.com/PennyLaneAI/catalyst/pull/2239)
 
 <h3>Internal changes ⚙️</h3>
+
+* Migrated the `pennylane.compiler.python_compiler` submodule from PennyLane to Catalyst.
+  It is now accessible as `catalyst.python_interface`.
+  [(#2199)](https://github.com/PennyLaneAI/catalyst/pull/2199)
 
 * Resource tracking now writes out at device destruction time instead of qubit deallocation
   time. The written resources will be the total amount of resources collected throughout the
@@ -280,6 +340,11 @@
   [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)	
 
 <h3>Documentation 📝</h3>
+
+* Added a "Unified Compiler Cookbook" RST file, along with tutorials, to `catalyst.python_interface.doc`,
+  which provides a quickstart guide for getting started with xDSL and its integration with PennyLane and
+  Catalyst.
+  [(#8571)](https://github.com/PennyLaneAI/pennylane/pull/8571)
 
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
   [(#2136)](https://github.com/PennyLaneAI/catalyst/pull/2136)

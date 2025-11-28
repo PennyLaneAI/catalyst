@@ -19,10 +19,10 @@ from dataclasses import replace
 import numpy as np
 import pennylane as qml
 import pytest
-from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import Device, NullQubit
 from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
 from pennylane.tape import QuantumScript
+from utils import CONFIG_CUSTOM_DEVICE
 
 from catalyst import CompileError, ctrl, qjit
 from catalyst.api_extensions.control_flow import (
