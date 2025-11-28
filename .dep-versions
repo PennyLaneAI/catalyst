@@ -16,4 +16,4 @@ enzyme=v0.0.203
 
 # For a custom LQ/LK version, update the package version here and at
 # 'doc/requirements.txt'
-lightning=0.44.0-dev11
+lightning=0.44.0-dev16
