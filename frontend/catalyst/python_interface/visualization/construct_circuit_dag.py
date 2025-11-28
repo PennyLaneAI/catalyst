@@ -16,7 +16,7 @@
 
 from functools import singledispatchmethod
 
-from xdsl.dialects import builtin, func
+from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region
 
 from catalyst.python_interface.dialects import catalyst, quantum
@@ -78,6 +78,76 @@ class ConstructCircuitDAG:
         """Visit an xDSL Block operation, dispatching handling for each contained Operation."""
         for op in block.ops:
             self._visit_operation(op)
+
+    # =============
+    # CONTROL FLOW
+    # =============
+
+    @_visit_operation.register
+    def _for_op(self, operation: scf.ForOp) -> None:
+        """Handle an xDSL ForOp operation."""
+        uid = f"cluster_{id(operation)}"
+        self.dag_builder.add_cluster(
+            uid,
+            node_label="for ...",
+            label="",
+            cluster_uid=self._cluster_uid_stack[-1],
+        )
+        self._cluster_uid_stack.append(uid)
+
+        for region in operation.regions:
+            self._visit_region(region)
+
+        self._cluster_uid_stack.pop()
+
+    @_visit_operation.register
+    def _while_op(self, operation: scf.WhileOp) -> None:
+        """Handle an xDSL WhileOp operation."""
+        uid = f"cluster_{id(operation)}"
+        self.dag_builder.add_cluster(
+            uid,
+            node_label="while ...",
+            label="",
+            cluster_uid=self._cluster_uid_stack[-1],
+        )
+        self._cluster_uid_stack.append(uid)
+
+        for region in operation.regions:
+            self._visit_region(region)
+
+        self._cluster_uid_stack.pop()
+
+    @_visit_operation.register
+    def _if_op(self, operation: scf.IfOp):
+        """Handles the scf.IfOp operation."""
+        uid = f"cluster_{id(operation)}"
+        self.dag_builder.add_cluster(
+            uid,
+            node_label="",
+            label="",
+            cluster_uid=self._cluster_uid_stack[-1],
+        )
+        self._cluster_uid_stack.append(uid)
+
+        # Loop through each branch and visualize as a cluster
+        for i, branch in enumerate(operation.regions):
+            uid = f"cluster_ifop_branch{i}_{id(operation)}"
+            self.dag_builder.add_cluster(
+                uid,
+                node_label=f"if ..." if i == 0 else "else",
+                label="",
+                cluster_uid=self._cluster_uid_stack[-1],
+            )
+            self._cluster_uid_stack.append(uid)
+
+            # Go recursively into the branch to process internals
+            self._visit_region(branch)
+
+            # Pop branch cluster after processing to ensure
+            # logical branches are treated as 'parallel'
+            self._cluster_uid_stack.pop()
+
+        self._cluster_uid_stack.pop()
 
     # ============
     # DEVICE NODE

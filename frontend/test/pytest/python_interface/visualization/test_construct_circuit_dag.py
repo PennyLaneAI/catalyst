@@ -320,6 +320,97 @@ class TestFuncOpVisualization:
         assert "my_qnode2" in utility.dag_builder.get_child_clusters("my_workflow")
 
 
+class TestControlFlowVisualization:
+    """Tests that the control flow operations are visualized correctly as clusters."""
+
+    @pytest.mark.unit
+    def test_for_loop(self):
+        """Test that the for loop is visualized correctly."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            for i in range(3):
+                qml.H(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        assert "for ..." in utility.dag_builder.get_child_clusters("my_workflow")
+
+    @pytest.mark.unit
+    def test_while_loop(self):
+        """Test that the while loop is visualized correctly."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            counter = 0
+            while counter < 5:
+                qml.H(0)
+                counter += 1
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        assert "while ..." in utility.dag_builder.get_child_clusters("my_workflow")
+
+    @pytest.mark.unit
+    def test_if_else_conditional(self):
+        """Test that the conditional operation is visualized correctly."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            flag = 1
+            if flag == 1:
+                qml.X(0)
+            else:
+                qml.Y(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        assert "conditional" in utility.dag_builder.get_child_clusters("my_workflow")
+        assert "if ..." in utility.dag_builder.get_child_clusters("conditional")
+        assert "else" in utility.dag_builder.get_child_clusters("conditional")
+
+    @pytest.mark.unit
+    def test_if_elif_else_conditional(self):
+        """Test that the conditional operation is visualized correctly."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            flag = 1
+            if flag == 1:
+                qml.X(0)
+            elif flag == 2:
+                qml.Y(0)
+            else:
+                qml.Z(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+
 class TestDeviceNode:
     """Tests that the device node is correctly visualized."""
 
