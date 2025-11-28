@@ -24,6 +24,8 @@ from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
 
 
+pytestmark = pytest.mark.capture_only
+
 class TestGraphDecomposition:
     """Test the new graph-based decomposition integration with from_plxpr."""
 
@@ -31,7 +33,7 @@ class TestGraphDecomposition:
     def test_with_multiple_decomps_transforms(self):
         """Test that a circuit with multiple decompositions and transforms can be converted."""
 
-        @qml.qjit(target="mlir")
+        @qml.qjit(target="mlir", experimental_capture=True)
         @partial(
             qml.transforms.decompose,
             gate_set={"RX", "RY"},
@@ -54,7 +56,7 @@ class TestGraphDecomposition:
     def test_fallback_warnings(self):
         """Test the fallback to legacy decomposition system with warnings."""
 
-        @qml.qjit
+        @qml.qjit(experimental_capture=True)
         @partial(qml.transforms.decompose, gate_set={qml.GlobalPhase})
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit(x):
@@ -81,7 +83,7 @@ class TestGraphDecomposition:
             return qml.expval(qml.X(0))
 
         without_qjit = circuit()
-        with_qjit = qml.qjit(circuit)
+        with_qjit = qml.qjit(circuit, experimental_capture=True)
 
         assert qml.math.allclose(without_qjit, with_qjit())
 
@@ -110,7 +112,7 @@ class TestGraphDecomposition:
             qml.CNOT(wires=[0, 1])
             return qml.state()
 
-        qjited_circuit = qml.qjit(circuit)
+        qjited_circuit = qml.qjit(circuit, experimental_capture=True)
 
         expected = np.array([1, 0, 0, 1]) / np.sqrt(2)
         assert qml.math.allclose(qjited_circuit(), expected)
@@ -165,7 +167,7 @@ class TestGraphDecomposition:
             return qml.expval(qml.Z(0))
 
         without_qjit = circuit()
-        with_qjit = qml.qjit(circuit)
+        with_qjit = qml.qjit(circuit, experimental_capture=True)
 
         assert qml.math.allclose(without_qjit, with_qjit())
 
@@ -199,7 +201,7 @@ class TestGraphDecomposition:
         y = 0.3
 
         without_qjit = circuit(x, y)
-        with_qjit = qml.qjit(circuit)
+        with_qjit = qml.qjit(circuit, experimental_capture=True)
 
         assert qml.math.allclose(without_qjit, with_qjit(x, y))
         expected_resources = qml.specs(circuit, level="device")(x, y)["resources"].gate_types
@@ -221,7 +223,7 @@ class TestGraphDecomposition:
         z = 0.2
 
         without_qjit = circuit(x, y, z)
-        with_qjit = qml.qjit(circuit)
+        with_qjit = qml.qjit(circuit, experimental_capture=True)
 
         assert qml.math.allclose(without_qjit, with_qjit(x, y, z))
 
@@ -249,7 +251,7 @@ class TestGraphDecomposition:
             OSError,
             match="undefined symbol",  # ___catalyst__qis__RotXZX
         ):
-            qml.qjit(circuit)()
+            qml.qjit(circuit, experimental_capture=True)()
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_ftqc_rotxzx(self):
@@ -266,7 +268,7 @@ class TestGraphDecomposition:
             return qml.expval(qml.X(0))
 
         without_qjit = circuit()
-        with_qjit = qml.qjit(circuit)
+        with_qjit = qml.qjit(circuit, experimental_capture=True)
 
         assert qml.math.allclose(without_qjit, with_qjit())
 
@@ -293,7 +295,7 @@ class TestGraphDecomposition:
             return qml.expval(qml.X(0))
 
         without_qjit = circuit()
-        with_qjit = qml.qjit(circuit)
+        with_qjit = qml.qjit(circuit, experimental_capture=True)
 
         assert qml.math.allclose(without_qjit, with_qjit())
 
@@ -317,7 +319,7 @@ class TestGraphDecomposition:
             return qml.expval(qml.Z(0))
 
         without_qjit = circuit()
-        with_qjit = qml.qjit(circuit)
+        with_qjit = qml.qjit(circuit, experimental_capture=True)
 
         assert qml.math.allclose(without_qjit, with_qjit())
 
@@ -342,7 +344,7 @@ class TestGraphDecomposition:
             return qml.expval(qml.Z(0))
 
         without_qjit = circuit()
-        with_qjit = qml.qjit(circuit)
+        with_qjit = qml.qjit(circuit, experimental_capture=True)
         assert qml.math.allclose(without_qjit, with_qjit())
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
@@ -366,7 +368,7 @@ class TestGraphDecomposition:
             return qml.expval(qml.Z(0))
 
         without_qjit = circuit()
-        with_qjit = qml.qjit(circuit)
+        with_qjit = qml.qjit(circuit, experimental_capture=True)
 
         assert qml.math.allclose(without_qjit, with_qjit())
 
@@ -390,7 +392,7 @@ class TestGraphDecomposition:
             return qml.expval(qml.Z(0))
 
         without_qjit = circuit()
-        with_qjit = qml.qjit(circuit)
+        with_qjit = qml.qjit(circuit, experimental_capture=True)
 
         assert qml.math.allclose(without_qjit, with_qjit())
 
@@ -412,7 +414,7 @@ class TestGraphDecomposition:
             return qml.expval(qml.Z(0))
 
         without_qjit = circuit()
-        with_qjit = qml.qjit(circuit)
+        with_qjit = qml.qjit(circuit, experimental_capture=True)
 
         assert qml.math.allclose(without_qjit, with_qjit())
 
@@ -438,7 +440,7 @@ class TestGraphDecomposition:
             return qml.expval(qml.PauliX(0))
 
         without_qjit = circuit()
-        with_qjit = qml.qjit(circuit)
+        with_qjit = qml.qjit(circuit, experimental_capture=True)
 
         assert qml.math.allclose(without_qjit, with_qjit())
 
@@ -472,7 +474,7 @@ class TestGraphDecomposition:
         without_qjit = qml.transforms.decompose(circuit, gate_set={"RZ", "CNOT"})
         with_qjit = qml.qjit(
             qml.transforms.decompose(circuit, gate_set={"RZ", "CNOT"}), autograph=True
-        )
+        , experimental_capture=True)
 
         assert qml.math.allclose(without_qjit(), with_qjit())
 

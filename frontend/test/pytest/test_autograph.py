@@ -705,8 +705,7 @@ class TestConditionals:
         assert circuit(3) == False
         assert circuit(6) == True
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_branch_return_mismatch(self, backend):
+    def test_branch_return_mismatch(self, backend, experimental_capture):
         """Test that an exception is raised when the true branch returns a value without an else
         branch.
         """
@@ -725,7 +724,7 @@ class TestConditionals:
         with pytest.raises(
             err_type, match="Some branches did not define a value for variable 'res'"
         ):
-            qjit(autograph=True)(qml.qnode(qml.device(backend, wires=1))(circuit))
+            qjit(autograph=True, experimental_capture=experimental_capture)(qml.qnode(qml.device(backend, wires=1))(circuit))
 
     def test_branch_no_multi_return_mismatch(self, backend):
         """Test that case when the return types of all branches do not match."""
@@ -816,11 +815,10 @@ class TestForLoops:
         assert isinstance(c_range._py_range, range)
         assert c_range[2] == 2
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_for_in_array(self):
+    def test_for_in_array(self, experimental_capture):
         """Test for loop over JAX array."""
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, experimental_capture=experimental_capture)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(params):
             for x in params:
@@ -830,11 +828,10 @@ class TestForLoops:
         result = f(jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]))
         assert np.allclose(result, -jnp.sqrt(2) / 2)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_for_in_array_unpack(self):
+    def test_for_in_array_unpack(self, experimental_capture):
         """Test for loop over a 2D JAX array unpacking the inner dimension."""
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, experimental_capture=experimental_capture)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(params):
             for x1, x2 in params:
@@ -845,11 +842,10 @@ class TestForLoops:
         result = f(jnp.array([[0.0, 1 / 4 * jnp.pi], [2 / 4 * jnp.pi, jnp.pi]]))
         assert np.allclose(result, jnp.sqrt(2) / 2)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_for_in_numeric_list(self):
+    def test_for_in_numeric_list(self, experimental_capture):
         """Test for loop over a Python list that is convertible to an array."""
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, experimental_capture=experimental_capture)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f():
             params = [0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]
@@ -860,11 +856,10 @@ class TestForLoops:
         result = f()
         assert np.allclose(result, -jnp.sqrt(2) / 2)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_for_in_numeric_list_of_list(self):
+    def test_for_in_numeric_list_of_list(self, experimental_capture):
         """Test for loop over a nested Python list that is convertible to an array."""
 
-        @qjit(autograph=True)
+        @qjit(autograph=True, experimental_capture=experimental_capture)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f():
             params = [[0.0, 1 / 4 * jnp.pi], [2 / 4 * jnp.pi, jnp.pi]]
