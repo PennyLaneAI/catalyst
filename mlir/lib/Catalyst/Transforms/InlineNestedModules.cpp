@@ -377,7 +377,6 @@ struct RestoreExternalFuncDeclNamePattern : public OpRewritePattern<func::FuncOp
 
     LogicalResult matchAndRewrite(func::FuncOp op, PatternRewriter &rewriter) const override
     {
-
         if (!op->hasAttr("original_external_API_name")) {
             return failure();
         }
@@ -473,6 +472,34 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
     int _stopAfterStep;
     InlineNestedSymbolTablePass(int stopAfter) : _stopAfterStep(stopAfter) {}
 
+    void restoreExternalFuncDeclName(Operation *symbolTable, MLIRContext *context,
+                                     GreedyRewriteConfig config)
+    {
+        mlir::DenseMap<StringRef, StringAttr> uniqued_names_to_APIName;
+        symbolTable->walk([&](func::FuncOp funcOp) {
+            if (funcOp->hasAttr("original_external_API_name")) {
+                uniqued_names_to_APIName[funcOp.getSymName()] =
+                    cast<StringAttr>(funcOp->getAttr("original_external_API_name"));
+            }
+        });
+        RewritePatternSet restoreExternalFuncDeclName(context);
+        restoreExternalFuncDeclName.add<RestoreExternalFuncDeclNamePattern>(context);
+        bool run = _stopAfterStep >= 5 || _stopAfterStep == 0;
+        if (run && failed(applyPatternsGreedily(symbolTable, std::move(restoreExternalFuncDeclName),
+                                                config))) {
+            signalPassFailure();
+        }
+
+        RewritePatternSet updateCalleeToExternalAPINames(context);
+        updateCalleeToExternalAPINames.add<UpdateCalleeToExternalAPINamesPattern>(
+            context, uniqued_names_to_APIName);
+        run = _stopAfterStep >= 5 || _stopAfterStep == 0;
+        if (run && failed(applyPatternsGreedily(
+                       symbolTable, std::move(updateCalleeToExternalAPINames), config))) {
+            signalPassFailure();
+        }
+    }
+
     void runOnOperation() override
     {
         // Here we are in a root module/symbol table
@@ -542,29 +569,7 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         }
 
         // Restore external API func decl names and update calls.
-        mlir::DenseMap<StringRef, StringAttr> uniqued_names_to_APIName;
-        symbolTable->walk([&](func::FuncOp funcOp) {
-            if (funcOp->hasAttr("original_external_API_name")) {
-                uniqued_names_to_APIName[funcOp.getSymName()] =
-                    cast<StringAttr>(funcOp->getAttr("original_external_API_name"));
-            }
-        });
-        RewritePatternSet restoreExternalFuncDeclName(context);
-        restoreExternalFuncDeclName.add<RestoreExternalFuncDeclNamePattern>(context);
-        run = _stopAfterStep >= 5 || _stopAfterStep == 0;
-        if (run && failed(applyPatternsGreedily(symbolTable, std::move(restoreExternalFuncDeclName),
-                                                config))) {
-            signalPassFailure();
-        }
-
-        RewritePatternSet updateCalleeToExternalAPINames(context);
-        updateCalleeToExternalAPINames.add<UpdateCalleeToExternalAPINamesPattern>(
-            context, uniqued_names_to_APIName);
-        run = _stopAfterStep >= 5 || _stopAfterStep == 0;
-        if (run && failed(applyPatternsGreedily(
-                       symbolTable, std::move(updateCalleeToExternalAPINames), config))) {
-            signalPassFailure();
-        }
+        restoreExternalFuncDeclName(symbolTable, context, config);
 
         RewritePatternSet cleanup(context);
         cleanup.add<CleanupPattern>(context);
