@@ -65,6 +65,8 @@
 
 #include <deque>
 
+#include "llvm/ADT/SmallSet.h"
+
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -232,10 +234,13 @@ LogicalResult RenameFunctionsPattern::matchAndRewrite(Operation *child,
                     continue;
                 }
 
-                // Do not rename external function declarations, as they can be
+                // We should not rename external function declarations, as they can be
                 // names required by other APIs.
+                // During inlining, on-the-fly they still need to be renamed, otherwise module
+                // verifier complains. So we save the original external API name and rename
+                // them back after inlining is finished.
                 if (auto f = dyn_cast<FunctionOpInterface>(op); f.isExternal()) {
-                    continue;
+                    f->setAttr("original_external_API_name", rewriter.getStringAttr(f.getName()));
                 }
 
                 if (failed(childSymTab.renameToUnique(&op, raw_tables))) {
@@ -356,6 +361,61 @@ struct NestedToFlatCallPattern : public OpRewritePattern<catalyst::LaunchKernelO
     const DenseMap<SymbolRefAttr, SymbolRefAttr> *_map;
 };
 
+struct RestoreExternalFuncDeclNamePattern : public OpRewritePattern<func::FuncOp> {
+    using OpRewritePattern<func::FuncOp>::OpRewritePattern;
+
+    RestoreExternalFuncDeclNamePattern(MLIRContext *context)
+        : OpRewritePattern<func::FuncOp>::OpRewritePattern(context)
+    {
+    }
+
+    mutable llvm::SmallSet<StringRef, 8> CreatedAPIFuncNames;
+
+    LogicalResult matchAndRewrite(func::FuncOp op, PatternRewriter &rewriter) const override
+    {
+
+        if (!op->hasAttr("original_external_API_name")) {
+            return failure();
+        }
+
+        // Create func decl that matches the original name for the external API.
+        // This must happen only once.
+        StringRef APIFuncName =
+            cast<StringAttr>(op->getAttr("original_external_API_name")).getValue();
+        if (!CreatedAPIFuncNames.contains(APIFuncName)) {
+            auto APIFuncDecl = rewriter.create<func::FuncOp>(
+                op->getLoc(), rewriter.getStringAttr(APIFuncName), op.getFunctionType());
+            APIFuncDecl.setPrivate();
+            CreatedAPIFuncNames.insert(APIFuncName);
+            return success();
+        }
+        return failure();
+    }
+};
+
+struct UpdateCalleeToExternalAPINamesPattern : public OpRewritePattern<func::CallOp> {
+    using OpRewritePattern<func::CallOp>::OpRewritePattern;
+
+    UpdateCalleeToExternalAPINamesPattern(
+        MLIRContext *context, mlir::DenseMap<StringRef, StringAttr> uniqued_names_to_APIName)
+        : OpRewritePattern<func::CallOp>::OpRewritePattern(context),
+          _uniqued_names_to_APIName(uniqued_names_to_APIName)
+    {
+    }
+
+    mlir::DenseMap<StringRef, StringAttr> _uniqued_names_to_APIName;
+
+    LogicalResult matchAndRewrite(func::CallOp op, PatternRewriter &rewriter) const override
+    {
+        if (_uniqued_names_to_APIName.contains(op.getCallee())) {
+            op.setCallee(_uniqued_names_to_APIName.at(op.getCallee()));
+            return success();
+        }
+
+        return failure();
+    }
+};
+
 struct CleanupPattern : public RewritePattern {
     /// This overload constructs a pattern that matches any operation type.
     CleanupPattern(MLIRContext *context) : RewritePattern(MatchAnyOpTypeTag(), 1, context) {}
@@ -367,6 +427,10 @@ struct CleanupPattern : public RewritePattern {
             return failure();
         }
         rewriter.modifyOpInPlace(op, [&] { op->removeAttr(fullyQualifiedNameAttr); });
+
+        if (op->hasAttr("original_external_API_name")) {
+            op->erase();
+        }
         return success();
     }
 };
@@ -470,6 +534,31 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
             context, &old_to_new);
         run = _stopAfterStep >= 4 || _stopAfterStep == 0;
         if (run && failed(applyPatternsGreedily(symbolTable, std::move(nestedToFlat), config))) {
+            signalPassFailure();
+        }
+
+        // Restore external API func decl names and update calls.
+        mlir::DenseMap<StringRef, StringAttr> uniqued_names_to_APIName;
+        symbolTable->walk([&](func::FuncOp funcOp) {
+            if (funcOp->hasAttr("original_external_API_name")) {
+                uniqued_names_to_APIName[funcOp.getSymName()] =
+                    cast<StringAttr>(funcOp->getAttr("original_external_API_name"));
+            }
+        });
+        RewritePatternSet restoreExternalFuncDeclName(context);
+        restoreExternalFuncDeclName.add<RestoreExternalFuncDeclNamePattern>(context);
+        run = _stopAfterStep >= 5 || _stopAfterStep == 0;
+        if (run && failed(applyPatternsGreedily(symbolTable, std::move(restoreExternalFuncDeclName),
+                                                config))) {
+            signalPassFailure();
+        }
+
+        RewritePatternSet updateCalleeToExternalAPINames(context);
+        updateCalleeToExternalAPINames.add<UpdateCalleeToExternalAPINamesPattern>(
+            context, uniqued_names_to_APIName);
+        run = _stopAfterStep >= 5 || _stopAfterStep == 0;
+        if (run && failed(applyPatternsGreedily(
+                       symbolTable, std::move(updateCalleeToExternalAPINames), config))) {
             signalPassFailure();
         }
 
