@@ -29,3 +29,35 @@ module @outer {
   catalyst.launch_kernel @inner::@f() : () -> ()
 }
 
+// -----
+
+// Test external API func decl names are preserved
+module @global {
+
+  // CHECK-DAG: func.func private @f()
+  // CHECK-DAG: func.func @main_0() {
+  // CHECK-DAG:   call @f() : () -> ()
+  // CHECK-DAG:   return
+  // CHECK-DAG: }
+  // CHECK-DAG: func.func @main_1() {
+  // CHECK-DAG:   call @f() : () -> ()
+  // CHECK-DAG:   return
+  // CHECK-DAG: }
+
+  module @local0 {
+    func.func private @f()
+    func.func @main() {
+      func.call @f() : () -> ()
+      return
+    }
+  }
+
+  module @local1 {
+    func.func private @f()
+    func.func @main() {
+      func.call @f() : () -> ()
+      return
+    }
+  }
+
+}
