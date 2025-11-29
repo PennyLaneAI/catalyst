@@ -224,7 +224,12 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param state The state vector data (ignored)
      * @param wires The qubits to prepare (ignored)
      */
-    void SetState(DataView<std::complex<double>, 1> &, std::vector<QubitIdType> &) {}
+    void SetState(DataView<std::complex<double>, 1> &, std::vector<QubitIdType> &wires)
+    {
+        if (this->track_resources_) {
+            this->resource_tracker_.SetState(wires);
+        }
+    }
 
     /**
      * @brief No-op implementation for computational basis state preparation
@@ -235,7 +240,12 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param basis_state The computational basis state (ignored)
      * @param wires The qubits to prepare (ignored)
      */
-    void SetBasisState(DataView<int8_t, 1> &, std::vector<QubitIdType> &) {}
+    void SetBasisState(DataView<int8_t, 1> &, std::vector<QubitIdType> &wires)
+    {
+        if (this->track_resources_) {
+            this->resource_tracker_.SetBasisState(wires);
+        }
+    }
 
     /**
      * @brief No-op implementation for a named quantum operation

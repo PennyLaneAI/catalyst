@@ -427,3 +427,25 @@ TEST_CASE("Test Resource Tracker WriteOut", "[resourcetracking]")
         CHECK(full_json.find(name) != std::string::npos);
     }
 }
+
+TEST_CASE("Test Resource Tracker SetState Operations", "[resourcetracking]")
+{
+    ResourceTracker tracker;
+    tracker.SetComputeDepth(true);
+    for (size_t i = 0; i < 5; i++) {
+        tracker.AllocateQubit(i);
+    }
+    CHECK(tracker.GetNumGates() == 0);
+    CHECK(tracker.GetNumGates("StatePrep") == 0);
+    CHECK(tracker.GetNumGates("BasisState") == 0);
+
+    tracker.SetState({0});
+    tracker.SetBasisState({0, 1, 2});
+    CHECK(tracker.GetNumGates() == 2);
+    CHECK(tracker.GetNumGates("StatePrep") == 1);
+    CHECK(tracker.GetNumGates("BasisState") == 1);
+
+    CHECK(tracker.GetNumGatesBySize(1) == 1);
+    CHECK(tracker.GetNumGatesBySize(3) == 1);
+    CHECK(tracker.GetDepth() == 2);
+}

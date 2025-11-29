@@ -319,6 +319,26 @@ struct ResourceTracker final {
     }
 
     /**
+     * @brief Records a state preparation operation for resource tracking
+     *
+     * @param wires The target wires the operation acts upon
+     */
+    void SetState(const std::vector<QubitIdType> &wires)
+    {
+        RecordOperation("StatePrep", wires, {});
+    }
+
+    /**
+     * @brief Records a basis state preparation operation for resource tracking
+     *
+     * @param wires The target wires the operation acts upon
+     */
+    void SetBasisState(const std::vector<QubitIdType> &wires)
+    {
+        RecordOperation("BasisState", wires, {});
+    }
+
+    /**
      * @brief Prints resource usage statistics in JSON format to the specified file
      *
      * Outputs comprehensive resource tracking data including number of wires,
