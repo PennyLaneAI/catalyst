@@ -101,9 +101,11 @@ class TestCompilerOptions:
             (True, KeepIntermediateLevel.PIPELINE),
             (0, KeepIntermediateLevel.NONE),
             (1, KeepIntermediateLevel.PIPELINE),
-            (2, KeepIntermediateLevel.PASS),
+            (2, KeepIntermediateLevel.CHANGED),
+            (3, KeepIntermediateLevel.PASS),
             ("none", KeepIntermediateLevel.NONE),
             ("pipeline", KeepIntermediateLevel.PIPELINE),
+            ("changed", KeepIntermediateLevel.CHANGED),
             ("pass", KeepIntermediateLevel.PASS),
         ],
     )
@@ -112,7 +114,7 @@ class TestCompilerOptions:
         options = CompileOptions(keep_intermediate=input_value)
         assert options.keep_intermediate == expected_level
 
-    @pytest.mark.parametrize("invalid_input", [3, -1, "invalid_string", 3.0, []])
+    @pytest.mark.parametrize("invalid_input", [4, -1, "invalid_string", 4.0, []])
     def test_keep_intermediate_invalid_inputs(self, invalid_input):
         """Test that invalid inputs for keep_intermediate raise appropriate errors."""
         with pytest.raises(ValueError, match="Invalid value for keep_intermediate:"):
@@ -132,7 +134,15 @@ class TestCompilerOptions:
         assert "--keep-intermediate" in flags
         assert "--save-ir-after-each=pass" not in flags
 
-    def test_options_to_cli_flags_keep_intermediate_debug(self):
+    def test_options_to_cli_flags_keep_intermediate_changed(self):
+        """Test _options_to_cli_flags with KeepIntermediateLevel.CHANGED."""
+        options = CompileOptions(keep_intermediate=KeepIntermediateLevel.CHANGED)
+        flags = _options_to_cli_flags(options)
+        assert "--keep-intermediate" in flags
+        assert "--save-ir-after-each=changed" in flags
+        assert "--dump-module-scope" in flags
+
+    def test_options_to_cli_flags_keep_intermediate_pass(self):
         """Test _options_to_cli_flags with KeepIntermediateLevel.PASS."""
         options = CompileOptions(keep_intermediate=KeepIntermediateLevel.PASS)
         flags = _options_to_cli_flags(options)
@@ -288,12 +298,12 @@ class TestCompilerState:
         compiler = workflow.compiler
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             compiler.get_output_of("EmptyPipeline1", workflow.workspace)
-        assert compiler.get_output_of("HLOLoweringPass", workflow.workspace)
-        assert compiler.get_output_of("QuantumCompilationPass", workflow.workspace)
+        assert compiler.get_output_of("HLOLoweringStage", workflow.workspace)
+        assert compiler.get_output_of("QuantumCompilationStage", workflow.workspace)
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             compiler.get_output_of("EmptyPipeline2", workflow.workspace)
-        assert compiler.get_output_of("BufferizationPass", workflow.workspace)
-        assert compiler.get_output_of("MLIRToLLVMDialect", workflow.workspace)
+        assert compiler.get_output_of("BufferizationStage", workflow.workspace)
+        assert compiler.get_output_of("MLIRToLLVMDialectConversion", workflow.workspace)
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             compiler.get_output_of("None-existing-pipeline", workflow.workspace)
         workflow.workspace.cleanup()
@@ -359,7 +369,7 @@ class TestCompilerState:
         assert "Failed to lower MLIR module" in e.value.args[0]
         assert "While processing 'TestPass' pass " in e.value.args[0]
         assert stack_trace_pattern not in e.value.args[0]
-        assert isfile(os.path.join(str(compiled.workspace), "2_TestPass_FAILED.mlir"))
+        assert isfile(os.path.join(str(compiled.workspace), "2_AfterTestPass_FAILED.mlir"))
         compiled.workspace.cleanup()
 
         with pytest.raises(CompileError) as e:

@@ -47,10 +47,10 @@ def OQDDevicePipeline(device, qubit, gate):
         (
             "device-agnostic-pipeline",
             [
-                "enforce-runtime-invariants-pipeline",
-                "hlo-lowering-pipeline",
-                "quantum-compilation-pipeline",
-                "bufferization-pipeline",
+                "quantum-compilation-stage",
+                "hlo-lowering-stage",
+                "gradient-lowering-stage",
+                "bufferization-stage",
             ],
         ),
         (
@@ -69,9 +69,9 @@ def OQDDevicePipeline(device, qubit, gate):
             ],
         ),
         (
-            "llvm-dialect-lowering-pipeline",
+            "llvm-dialect-lowering-stage",
             [
-                "llvm-dialect-lowering-pipeline",
+                "llvm-dialect-lowering-stage",
             ],
         ),
     ]
