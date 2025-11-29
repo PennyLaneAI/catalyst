@@ -23,6 +23,7 @@
 #include "Mitigation/IR/MitigationDialect.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
+#include "RTIO/IR/RTIODialect.h"
 
 #include "stablehlo/dialect/Register.h"
 
@@ -37,6 +38,7 @@ int main(int argc, char **argv)
     registry.insert<catalyst::mbqc::MBQCDialect>();
     registry.insert<catalyst::mitigation::MitigationDialect>();
     registry.insert<catalyst::ion::IonDialect>();
+    registry.insert<catalyst::rtio::RTIODialect>();
 
     mlir::stablehlo::registerAllDialects(registry);
 
