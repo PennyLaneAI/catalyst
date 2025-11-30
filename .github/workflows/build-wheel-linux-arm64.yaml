@@ -468,15 +468,15 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock
 
+    - name: Install PennyLane Plugins
+      run: |
+        python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
+        python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>=1.31.0'
+
     - name: Install OQC client
       if: matrix.python_version != '3.13'
       run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
-
-    - name: Install PennyLane
-      run: |
-        # Install the specific pennylane version required
-        python${{ matrix.python_version }} -m pip install git+https://github.com/PennyLaneAI/pennylane@bump-jax-api-hashability
 
     - name: Install Catalyst
       run: |
