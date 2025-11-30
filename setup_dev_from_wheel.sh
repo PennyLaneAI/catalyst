@@ -53,8 +53,7 @@ checkout_nightly_build(){
 
     # Search for the commit corresponding to latest available Wheel at TestPyPI
     git log --grep="bump nightly version" | grep "commit" | cut -d " " -f 2 | while read -r NIGHTLY_BUMP; do
-        # The commit right before the nightly bump must have the same version as the Wheel
-        git checkout $NIGHTLY_BUMP^1; 
+        git checkout $NIGHTLY_BUMP; 
         export DIFF=$(diff $CATALYST_WHEEL/_version.py $CATALYST_FRONTEND_SRC/_version.py)
         if [ -z "${DIFF}" ]; then
             export CATALYST_WHEEL_COMMIT=$(git log -1 --format="%h")
