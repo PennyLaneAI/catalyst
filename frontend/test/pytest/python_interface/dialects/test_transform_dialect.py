@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit test module for pennylane/compiler/python_compiler/transform.py."""
+"""Unit tests for the xDSL Transform dialect."""
 
 from dataclasses import dataclass
 
