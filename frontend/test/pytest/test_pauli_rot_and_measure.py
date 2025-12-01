@@ -42,7 +42,7 @@ def test_pauli_rot_to_ppr():
 @pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_with_arbitrary_angle_to_ppr():
     """Test that Pauli rotation for arbitrary angle."""
-    pipe = [("pipe", ["quantum-compilation-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_pauli_rot_with_arbitrary_angle_to_ppr_workflow():
@@ -60,7 +60,7 @@ def test_pauli_rot_with_arbitrary_angle_to_ppr():
 @pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_with_dynamic_angle_to_ppr():
     """Test that Pauli rotation for dynamic angle."""
-    pipe = [("pipe", ["quantum-compilation-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_pauli_rot_with_dynamic_angle_to_ppr_workflow():
@@ -78,7 +78,7 @@ def test_pauli_rot_with_dynamic_angle_to_ppr():
 @pytest.mark.usefixtures("use_capture")
 def test_pauli_measure_to_ppm():
     """Test that Pauli measurement is converted to qec.ppm."""
-    pipe = [("pipe", ["quantum-compilation-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_pauli_measure_to_ppr_workflow():
