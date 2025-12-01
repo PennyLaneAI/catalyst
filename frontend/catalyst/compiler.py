@@ -16,6 +16,7 @@ MLIR/LLVM representations.
 """
 import glob
 import importlib
+import io
 import logging
 import os
 import pathlib
@@ -349,9 +350,13 @@ def _options_to_cli_flags(options):
     if options.keep_intermediate:
         extra_args += ["--keep-intermediate"]
 
-    if options.keep_intermediate >= KeepIntermediateLevel.PASS:
-        extra_args += ["--save-ir-after-each=pass"]
-        extra_args += ["--dump-module-scope"]
+    match options.keep_intermediate:
+        case KeepIntermediateLevel.CHANGED:
+            extra_args += ["--save-ir-after-each=changed", "--dump-module-scope"]
+        case KeepIntermediateLevel.PASS:
+            extra_args += ["--save-ir-after-each=pass", "--dump-module-scope"]
+        case _:
+            pass
 
     if options.use_nameloc:
         extra_args += ["--use-nameloc-as-prefix"]
@@ -376,16 +381,16 @@ def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
 
 
 def to_mlir_opt(
-    *args, stdin=None, options: Optional[CompileOptions] = None, using_unified_compiler=False
+    *args, stdin=None, options: Optional[CompileOptions] = None, using_python_compiler=False
 ):
     """echo ${input} | catalyst --tool=opt *args *opts -"""
-    # Check if we need to use Python compiler for xDSL passes
-    if using_unified_compiler:
-        # Use Python compiler path for xDSL passes
+    # Check if we need to use the Python interface for xDSL passes
+    if using_python_compiler:
+        # Use the Python interface path for xDSL passes
         # pylint: disable-next=import-outside-toplevel
-        from catalyst.python_interface import Compiler as PythonCompiler
+        from catalyst.python_interface import Compiler as UnifiedCompiler
 
-        compiler = PythonCompiler()
+        compiler = UnifiedCompiler()
         stdin = compiler.run(stdin, callback=None)
 
     # These are the options that may affect compilation
@@ -542,8 +547,8 @@ class Compiler:
             return False
 
     @debug_logger
-    def is_using_unified_compiler(self, mlir_module=None):
-        """Returns true if we need the Python compiler path.
+    def is_using_python_compiler(self, mlir_module=None):
+        """Returns true if we need the Python interface path.
 
         This happens when:
         1. xDSL plugin is explicitly loaded (legacy), OR
@@ -582,6 +587,52 @@ class Compiler:
 
         return True
 
+    def _create_xdsl_pass_save_callback(self, workspace):
+        """Create a callback function to save IR after each xdsl pass.
+
+        Args:
+            workspace: The workspace directory path
+
+        Returns:
+            Callable or None: The callback function if intermediate saving is enabled, None otherwise
+        """
+        if not (workspace and self.options.keep_intermediate >= KeepIntermediateLevel.CHANGED):
+            return None
+
+        # pylint: disable-next=import-outside-toplevel
+        from xdsl.printer import Printer
+
+        user_transform_dir = os.path.join(str(workspace), "0_QuantumCompilationStage")
+        os.makedirs(user_transform_dir, exist_ok=True)
+
+        class SavePassIRCallback:
+            """Callback to save IR after each pass in python_interface."""
+
+            def __init__(self, transform_dir):
+                self.transform_dir = transform_dir
+                self.counter = 1
+
+            def __call__(self, previous_pass, module, _next_pass=None, **_kwargs):
+                """Save IR after each pass."""
+                # Only save after a pass has run (when previous_pass is not None)
+                if previous_pass is None:
+                    return
+
+                pass_name = (
+                    previous_pass.name if hasattr(previous_pass, "name") else str(previous_pass)
+                )
+                buffer = io.StringIO()
+                Printer(stream=buffer, print_generic_format=False).print_op(module)
+                ir_file = os.path.join(
+                    self.transform_dir,
+                    f"{self.counter}_{pass_name}.mlir",
+                )
+                with open(ir_file, "w", encoding="utf-8") as f:
+                    f.write(buffer.getvalue())
+                self.counter += 1
+
+        return SavePassIRCallback(user_transform_dir)
+
     @debug_logger
     def run(self, mlir_module, *args, **kwargs):
         """Compile an MLIR module to a shared object.
@@ -597,21 +648,33 @@ class Compiler:
         Returns:
             (str): filename of shared object
         """
+        using_python_compiler = self.is_using_python_compiler(mlir_module)
+        workspace = args[0] if args else kwargs.get("workspace")
+        module_name = str(mlir_module.operation.attributes["sym_name"]).replace('"', "")
+        ir = mlir_module.operation.get_asm(
+            binary=False, print_generic_op_form=using_python_compiler, assume_verified=True
+        )
 
-        if self.is_using_unified_compiler(mlir_module):
+        # Save intermediate IR before any compiler transformation is applied
+        if workspace and self.options.keep_intermediate:
+            initial_ir_file = os.path.join(str(workspace), f"0_{module_name}.mlir")
+            with open(initial_ir_file, "w", encoding="utf-8") as f:
+                # We need to canonicalize the IR to get the pretty format
+                f.write(canonicalize(stdin=ir, options=self.options))
+
+        if using_python_compiler:
             # We keep this module here to keep xDSL requirement optional
             # Only move this is it has been decided that xDSL is no longer optional.
             # pylint: disable-next=import-outside-toplevel
-            from catalyst.python_interface import Compiler as PythonCompiler
+            from catalyst.python_interface import Compiler as UnifiedCompiler
 
-            compiler = PythonCompiler()
-            mlir_module = compiler.run(mlir_module)
+            callback = self._create_xdsl_pass_save_callback(workspace)
+            compiler = UnifiedCompiler()
+            ir = compiler.run(ir, callback=callback)
 
         return self.run_from_ir(
-            mlir_module.operation.get_asm(
-                binary=False, print_generic_op_form=False, assume_verified=True
-            ),
-            str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
+            ir,
+            module_name,
             *args,
             **kwargs,
         )
