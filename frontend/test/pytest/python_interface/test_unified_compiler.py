@@ -261,7 +261,7 @@ def test_integration_for_transform_interpreter(capsys):
 
 
 class TestCatalystIntegration:
-    """Tests for integration of the Python compiler with Catalyst"""
+    """Tests for integration of the unified compiler with Catalyst"""
 
     @pytest.mark.usefixtures("use_capture")
     def test_integration_catalyst_no_passes_with_capture(self):
@@ -333,7 +333,7 @@ class TestCatalystIntegration:
 
     @pytest.mark.usefixtures("use_capture")
     def test_integration_catalyst_mixed_passes_with_capture(self, capsys):
-        """Test that both Catalyst and Python compiler passes can be used with qjit
+        """Test that both MLIR and xDSL passes can be used with qjit
         when capture is enabled."""
 
         assert capture_enabled()
@@ -354,7 +354,7 @@ class TestCatalystIntegration:
         assert captured.out.strip() == "hello world"
 
     def test_integration_catalyst_mixed_passes_no_capture(self, capsys):
-        """Test that both Catalyst and Python compiler passes can be used with qjit
+        """Test that both MLIR and xDSL passes can be used with qjit
         when capture is disabled."""
 
         assert not capture_enabled()

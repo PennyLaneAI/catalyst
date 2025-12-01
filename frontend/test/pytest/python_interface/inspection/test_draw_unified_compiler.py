@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Unit test module for the draw function in the Python Compiler inspection module."""
+"""Unit test module for the draw function in the unified compiler inspection module."""
 
 
 import pytest
@@ -32,7 +32,7 @@ from catalyst.python_interface.transforms import (
 
 @pytest.mark.usefixtures("use_capture")
 class Testdraw:
-    """Unit tests for the draw function in the Python Compiler inspection module."""
+    """Unit tests for the draw function in the unified compiler inspection module."""
 
     @pytest.fixture
     def transforms_circuit(self):
@@ -376,7 +376,6 @@ class Testdraw:
 
         assert drawing == expected_drawing
 
-    @pytest.mark.jax
     @pytest.mark.parametrize(
         "ops, expected",
         [

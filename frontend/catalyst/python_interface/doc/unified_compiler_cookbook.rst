@@ -1060,7 +1060,7 @@ Useful patterns
 ===============
 
 Now that we have gone over compilers, xDSL, and how it’s being used in
-PennyLane, let’s take a look at some common patterns that might be
+Catalyst, let’s take a look at some common patterns that might be
 useful.
 
 Post-processing functions
@@ -1102,7 +1102,7 @@ I’ll use tapes to provide details below about some common cases:
 All of the above are very non-trivial. I will leave out code examples
 for now, as that may be unnecessarily time consuming. If we get to the
 stage where we need to write a transform that splits into multiple
-tapes, we can revisit this section and the Python compiler/compilation
+tapes, we can revisit this section and the unified compiler/compilation
 team can assist in developing such transforms.
 
 Note
@@ -1119,9 +1119,8 @@ Writing tests
 =============
 
 **Note to readers**: this section is written based on how the testing
-infrastructure for the Python compiler exists in PennyLane. However, the
-Python compiler may be getting moved to Catalyst, in which case, the
-infrastructure would likely change.
+infrastructure for the unified compiler exists in Catalyst currently.
+However, this infrastructure may change in the future.
 
 FileCheck
 ---------
