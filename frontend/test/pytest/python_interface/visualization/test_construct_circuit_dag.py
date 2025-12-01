@@ -324,7 +324,8 @@ class TestFuncOpVisualization:
 class TestForOp:
     """Tests that the for loop control flow can be visualized correctly."""
 
-    def test_cluster_visualization(self):
+    @pytest.mark.unit
+    def test_basic_example(self):
         """Tests that the for loop cluster can be visualized correctly."""
 
         dev = qml.device("null.qubit", wires=1)
@@ -351,7 +352,7 @@ class TestWhileOp:
     """Tests that the while loop control flow can be visualized correctly."""
 
     @pytest.mark.unit
-    def test_while_loop(self):
+    def test_basic_example(self):
         """Test that the while loop is visualized correctly."""
         dev = qml.device("null.qubit", wires=1)
 
@@ -376,7 +377,7 @@ class TestIfOp:
     """Tests that the conditional control flow can be visualized correctly."""
 
     @pytest.mark.unit
-    def test_if_else_conditional(self):
+    def test_basic_example(self):
         """Test that the conditional operation is visualized correctly."""
         dev = qml.device("null.qubit", wires=1)
 
