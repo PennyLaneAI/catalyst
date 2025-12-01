@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit test module for pennylane/compiler/python_compiler/dialects/catalyst.py."""
+"""Unit test module for the xDSL Catalyst dialect."""
 
 import pytest
 
