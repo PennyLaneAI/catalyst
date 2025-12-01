@@ -1,4 +1,4 @@
-Python compiler utilities
+Unified compiler utilities
 =========================
 
 All utilities we care about are in the
@@ -343,7 +343,7 @@ have been inlined into ``qjit_mod2``, just like we wanted.
 
 One might wonder why we need both ``inline_jit_to_module`` and
 ``inline_module``. At this stage, the intention is just to enable as
-much functionality for users of the Python compiler as possible. There
+much functionality for users of the unified compiler as possible. There
 may be use cases where users may want to create their own module
 manually instead of having one be created automatically by JAX or
 Catalyst.

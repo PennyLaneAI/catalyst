@@ -26,9 +26,6 @@ from catalyst import CompileError, ctrl, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.device.decomposition import catalyst_decomposer
 
-# TEST_PATH = os.path.dirname(__file__)
-# CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../../custom_device/custom_device.toml")
-
 
 class TestGateAliases:
     """Test the decomposition of gates wich are in fact supported via aliased or equivalent
