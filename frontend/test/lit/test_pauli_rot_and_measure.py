@@ -58,7 +58,7 @@ def test_arbitrary_angle_pauli_rotations():
     qml.capture.enable()
     dev = qml.device("null.qubit", wires=1)
 
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipeline = [("pipe", ["quantum-compilation-pipeline"])]
 
     @qjit(pipelines=pipeline, target="mlir")
     @qml.qnode(device=dev)
@@ -79,7 +79,7 @@ def test_dynamic_angle_pauli_rotations():
     qml.capture.enable()
     dev = qml.device("null.qubit", wires=1)
 
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipeline = [("pipe", ["quantum-compilation-pipeline"])]
 
     @qjit(pipelines=pipeline, target="mlir")
     @qml.qnode(device=dev)
@@ -126,7 +126,7 @@ def test_arbitrary_angle_multi_qubit_pauli_rotations():
     qml.capture.enable()
     dev = qml.device("null.qubit", wires=3)
 
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipeline = [("pipe", ["quantum-compilation-pipeline"])]
 
     @qjit(pipelines=pipeline, target="mlir")
     @qml.qnode(device=dev)
@@ -150,7 +150,7 @@ def test_dynamic_angle_multi_qubit_pauli_rotations():
     qml.capture.enable()
     dev = qml.device("null.qubit", wires=3)
 
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipeline = [("pipe", ["quantum-compilation-pipeline"])]
 
     @qjit(pipelines=pipeline, target="mlir")
     @qml.qnode(device=dev)
