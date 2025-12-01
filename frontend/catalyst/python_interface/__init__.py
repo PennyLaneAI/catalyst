@@ -14,9 +14,9 @@
 """Python Compiler API for integration of Catalyst with xDSL."""
 
 from .compiler import Compiler
+from .inspection import QMLCollector
 from .parser import QuantumParser
 from .pass_api import compiler_transform
-from .visualization import QMLCollector
 
 __all__ = [
     "Compiler",
