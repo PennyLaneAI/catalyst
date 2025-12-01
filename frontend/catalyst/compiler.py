@@ -648,7 +648,7 @@ class Compiler:
         Returns:
             (str): filename of shared object
         """
-        using_python_compiler = self.is_using_unified_compiler(mlir_module)
+        using_python_compiler = self.is_using_python_compiler(mlir_module)
         workspace = args[0] if args else kwargs.get("workspace")
         module_name = str(mlir_module.operation.attributes["sym_name"]).replace('"', "")
         ir = mlir_module.operation.get_asm(
