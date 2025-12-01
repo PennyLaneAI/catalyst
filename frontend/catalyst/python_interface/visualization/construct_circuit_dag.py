@@ -149,6 +149,3 @@ class ConstructCircuitDAG:
             # If we hit a func.return operation we know we are leaving
             # the FuncOp's scope and so we can pop the ID off the stack.
             self._cluster_uid_stack.pop()
-
-        for region in operation.regions:
-            self._visit_region(region)
