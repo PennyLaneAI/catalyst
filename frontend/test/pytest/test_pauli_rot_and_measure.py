@@ -40,7 +40,43 @@ def test_pauli_rot_to_ppr():
 
 
 @pytest.mark.usefixtures("use_capture")
-def test_pauli_measure_to_ppr():
+def test_pauli_rot_with_arbitrary_angle_to_ppr():
+    """Test that Pauli rotation for arbitrary angle."""
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    def test_pauli_rot_with_arbitrary_angle_to_ppr_workflow():
+
+        @qml.qnode(qml.device("null.qubit", wires=1))
+        def f():
+            qml.PauliRot(0.42, "X", wires=0)
+
+        return f()
+
+    optimized_ir = test_pauli_rot_with_arbitrary_angle_to_ppr_workflow.mlir_opt
+    assert "qec.ppr.arbitrary" in optimized_ir
+
+
+@pytest.mark.usefixtures("use_capture")
+def test_pauli_rot_with_dynamic_angle_to_ppr():
+    """Test that Pauli rotation for dynamic angle."""
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    def test_pauli_rot_with_dynamic_angle_to_ppr_workflow():
+
+        @qml.qnode(qml.device("null.qubit", wires=1))
+        def f(x: float):
+            qml.PauliRot(x, "X", wires=0)
+
+        return f(0.42)
+
+    optimized_ir = test_pauli_rot_with_dynamic_angle_to_ppr_workflow.mlir_opt
+    assert "qec.ppr.arbitrary" in optimized_ir
+
+
+@pytest.mark.usefixtures("use_capture")
+def test_pauli_measure_to_ppm():
     """Test that Pauli measurement is converted to qec.ppm."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
@@ -55,25 +91,6 @@ def test_pauli_measure_to_ppr():
 
     optimized_ir = test_pauli_measure_to_ppr_workflow.mlir_opt
     assert "qec.ppm" in optimized_ir
-
-
-@pytest.mark.usefixtures("use_capture")
-def test_pauli_rot_to_ppr_angle_error():
-    """Test that unsupported rotation angle raises `ValueError`."""
-    pipe = [("pipe", ["quantum-compilation-stage"])]
-
-    with pytest.raises(
-        ValueError,
-    ):
-
-        @qjit(pipelines=pipe, target="mlir")
-        def test_pauli_rot_to_ppr_angle_error_workflow():
-
-            @qml.qnode(qml.device("null.qubit", wires=1))
-            def f():
-                qml.PauliRot(np.pi / 12, "X", wires=0)
-
-            return f()
 
 
 @pytest.mark.usefixtures("use_capture")
