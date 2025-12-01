@@ -10,6 +10,7 @@
   :func:`~.pauli_measure`, respectively. This support enables research and development
   spurred from `A Game of Surface Codes (arXiv1808.02892) <https://arxiv.org/pdf/1808.02892>`_.
   [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
+  [(#2233)](https://github.com/PennyLaneAI/catalyst/pull/2233)
 
   :class:`~.PauliRot` and :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes
   for PPR-PPM compilation, which includes :func:`catalyst.passes.to_ppr`,
@@ -135,11 +136,16 @@
 * Dynamically allocated wires can now be passed into control flow and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
 
-* Catalyst now supports arbitrary angle Pauli product rotations in the QEC dialect.
-  This will allow :class:`qml.PauliRot` with arbitrary angles to be lowered to QEC dialect.
-  This is implemented as a new `qec.ppr.arbitrary` operation, which takes a Pauli product
-  and an arbitrary angle (as a double) as input.
+* The `--adjoint-lowering` pass can now handle PPR operations.
+  [(#2227)](https://github.com/PennyLaneAI/catalyst/pull/2227)
+
+* Catalyst now supports Pauli product rotations with arbitrary or dynamic angles in the 
+  QEC dialect. This will allow :class:`qml.PauliRot` with arbitrary or dynamic angles, 
+  angles not known at compile time, to be lowered to the QEC dialect. This is implemented 
+  as a new `qec.ppr.arbitrary` operation, which takes a Pauli product and an arbitrary or
+  dynamic angle as input. The arbitrary angles are specified as a double in terms of radian.
   [(#2232)](https://github.com/PennyLaneAI/catalyst/pull/2232)
+  [(#2233)](https://github.com/PennyLaneAI/catalyst/pull/2233)
 
   For example:
   ```mlir
@@ -147,9 +153,6 @@
   %1:2 = qec.ppr.arbitrary ["X", "Z"](%const) %q1, %q2 : !quantum.bit, !quantum.bit
   %2:2 = qec.ppr.arbitrary ["X", "Z"](%const) %1#0, %1#1 cond(%c0) : !quantum.bit, !quantum.bit
   ```
-
-* The `--adjoint-lowering` pass can now handle PPR operations.
-  [(#2227)](https://github.com/PennyLaneAI/catalyst/pull/2227)
 
 <h3>Breaking changes 💔</h3>
 
@@ -312,8 +315,11 @@
 
   * Added support for PPRs to the :func:`~.passes.merge_rotations` pass to merge PPRs with
   equivalent angles, and cancelling of PPRs with opposite angles, or angles
-  that sum to identity.
+  that sum to identity. Also supports conditions on PPRs, merging when conditions are 
+  identical and not merging otherwise.
   [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)	
+  [(#2245)](https://github.com/PennyLaneAI/catalyst/pull/2245)
+  [(#2254)](https://github.com/PennyLaneAI/catalyst/pull/2254)
 
 <h3>Documentation 📝</h3>
 

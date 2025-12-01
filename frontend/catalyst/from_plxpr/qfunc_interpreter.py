@@ -21,6 +21,7 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pennylane as qml
 from jax._src.sharding_impls import UNSPECIFIED
 from jax._src.tree_util import tree_flatten
@@ -51,6 +52,7 @@ from catalyst.jax_primitives import (
     measure_p,
     namedobs_p,
     pauli_measure_p,
+    pauli_rot_arbitrary_p,
     pauli_rot_p,
     probs_p,
     qalloc_p,
@@ -367,6 +369,49 @@ def _pcphase_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint, h
     )
 
 
+# pylint: disable=unused-argument, too-many-arguments
+def _pauli_rot_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint, hyperparameters):
+    """Handle the conversion from plxpr to Catalyst jaxpr for the PauliMeasure primitive"""
+    # invals are the input wires
+    wires = invals[:qubits_len]
+    params = invals[qubits_len : qubits_len + params_len]
+    pauli_word = hyperparameters["pauli_word"]
+    theta = params[0]  # This is a float or a tracer object
+
+    allowed_angles = [np.pi / 4, np.pi / 2, np.pi, -np.pi / 4, -np.pi / 2, -np.pi]
+    is_arbitrary = isinstance(
+        theta, jax._src.interpreters.partial_eval.DynamicJaxprTracer
+    ) or not np.any(np.isclose(theta, allowed_angles))
+
+    if is_arbitrary:
+        return pauli_rot_arbitrary_p.bind(
+            *[*wires, *params],
+            pauli_word=pauli_word,
+            qubits_len=qubits_len,
+            params_len=params_len,
+            adjoint=adjoint,
+        )
+    else:
+        return pauli_rot_p.bind(
+            *wires,
+            pauli_word=pauli_word,
+            theta=theta,
+            qubits_len=qubits_len,
+            adjoint=adjoint,
+        )
+
+
+# Mapping of special operations to their bind calls
+# These operations require special handling of their parameters
+# during the binding process.
+_special_op_bind_call = {
+    qml.QubitUnitary: _qubit_unitary_bind_call,
+    qml.GlobalPhase: _gphase_bind_call,
+    qml.PCPhase: _pcphase_bind_call,
+    qml.PauliRot: _pauli_rot_bind_call,
+}
+
+
 # pylint: disable=unused-argument
 @PLxPRToQuantumJaxprInterpreter.register_primitive(qml.allocation.allocate_prim)
 def handle_qml_alloc(self, *, num_wires, state=None, restored=False):
@@ -599,18 +644,6 @@ def handle_decomposition_rule(self, *, pyfun, func_jaxpr, is_qreg, num_params):
     decomprule_p.bind(pyfun=pyfun, func_jaxpr=converted_closed_jaxpr_branch)
 
     return ()
-
-
-# pylint: disable=unused-argument, too-many-arguments
-def _pauli_rot_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint, hyperparameters):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the PauliMeasure primitive"""
-    # invals are the input wires
-    wires = invals[:qubits_len]
-    theta = invals[qubits_len]
-    pauli_word = hyperparameters["pauli_word"]
-    return pauli_rot_p.bind(
-        *wires, theta=theta, pauli_word=pauli_word, qubits_len=qubits_len, adjoint=adjoint
-    )
 
 
 @PLxPRToQuantumJaxprInterpreter.register_primitive(plxpr_pauli_measure_prim)
