@@ -176,13 +176,11 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=False):
     kwargs["name"] = name
     kwargs["jaxpr"] = call_jaxpr
     kwargs["effects"] = []
-    kwargs["name_stack"] = ctx.name_stack
-
-    # Make the visibility of the function public=True
-    # to avoid elimination by the compiler
-    kwargs["public"] = public
+    kwargs["main_function"] = False
 
     func_op = mlir.lower_jaxpr_to_fun(**kwargs)
+    if public:
+        func_op.attributes["sym_visibility"] = ir.StringAttr.get("public")
 
     if isinstance(callable_, qml.QNode):
         func_op.attributes["qnode"] = ir.UnitAttr.get()
@@ -281,7 +279,7 @@ def create_call_op(ctx, func_op, *args):
     """Create a func::CallOp from JAXPR."""
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
-    mlir_args = mlir.flatten_lowering_ir_args(args)
+    mlir_args = mlir.flatten_ir_values(args)
     symbol_ref = get_symbolref(ctx, func_op)
     is_call_same_module = ctx.module_context.module.operation == func_op.parent
     constructor = CallOp if is_call_same_module else LaunchKernelOp
