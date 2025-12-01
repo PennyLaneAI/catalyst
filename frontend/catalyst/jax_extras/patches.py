@@ -20,7 +20,7 @@ from __future__ import annotations
 from functools import partial
 
 import jax
-import jax._src.interpreters.mlir as mlir
+from jax._src.interpreters import mlir
 import jax._src.interpreters.partial_eval as pe
 from jax._src import config, core, source_info_util
 from jax._src.core import JaxprEqnContext, abstractify, standard_vma_rule

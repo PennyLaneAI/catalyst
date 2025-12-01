@@ -2685,7 +2685,7 @@ def _adjoint_lowering(
         def adjoint_pass_injector(_op: ir.Operation) -> ir.WalkResult:
             if _op.name == "transform.named_sequence":
                 with ir.InsertionPoint.at_block_begin(_op.regions[0].blocks[0]):
-                    adjoint_lowering_pass_op = ApplyRegisteredPassOp(
+                    ApplyRegisteredPassOp(
                         result=ir.OpaqueType.get("transform", 'op<"builtin.module">'),
                         target=_op.regions[0].blocks[0].arguments[0],  # just insert at beginning
                         pass_name="adjoint-lowering",
