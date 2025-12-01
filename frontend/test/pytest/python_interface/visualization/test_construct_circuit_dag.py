@@ -383,6 +383,56 @@ class TestForOp:
             child_clusters,
         )
 
+    def test_dynamic_start_stop_step(self):
+        """Tests that dynamic start, stop, step variables can be displayed."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def step_dynamic(x):
+            for i in range(0, 3, x):
+                qml.H(0)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def stop_dynamic(x):
+            for i in range(0, x, 1):
+                qml.H(0)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def start_dynamic(x):
+            for i in range(x, 3, 1):
+                qml.H(0)
+
+        args = (1,)
+        start_dynamic_module = start_dynamic(*args)
+        stop_dynamic_module = stop_dynamic(*args)
+        step_dynamic_module = step_dynamic(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(start_dynamic_module)
+        assert re.search(
+            r"for arg\d in range\(arg\d,3,1\)",
+            utility.dag_builder.get_child_clusters("my_workflow"),
+        )
+
+        utility.construct(stop_dynamic_module)
+        assert re.search(
+            r"for arg\d in range\(0,arg\d,1\)",
+            utility.dag_builder.get_child_clusters("my_workflow"),
+        )
+
+        utility.construct(step_dynamic_module)
+        assert re.search(
+            r"for arg\d in range\(0,3,arg\d\)",
+            utility.dag_builder.get_child_clusters("my_workflow"),
+        )
+
 
 class TestWhileOp:
     """Tests that the while loop control flow can be visualized correctly."""
