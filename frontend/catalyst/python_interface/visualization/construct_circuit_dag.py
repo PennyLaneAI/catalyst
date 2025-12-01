@@ -20,6 +20,7 @@ from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region
 
 from catalyst.python_interface.dialects import catalyst, quantum
+from catalyst.python_interface.inspection.xdsl_conversion import resolve_constant_params
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 
 
@@ -86,10 +87,18 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _for_op(self, operation: scf.ForOp) -> None:
         """Handle an xDSL ForOp operation."""
+        lower_bound, upper_bound, step = (
+            resolve_constant_params(operation.lb),
+            resolve_constant_params(operation.ub),
+            resolve_constant_params(operation.step),
+        )
+
+        index_var_name = operation.body.blocks[0].args[0].name_hint
+
         uid = f"cluster_{id(operation)}"
         self.dag_builder.add_cluster(
             uid,
-            node_label="for ...",
+            node_label=f"for {index_var_name} in range({lower_bound},{upper_bound},{step})",
             label="",
             cluster_uid=self._cluster_uid_stack[-1],
         )

@@ -13,6 +13,7 @@
 # limitations under the License.
 """Unit tests for the ConstructCircuitDAG utility."""
 
+import re
 from unittest.mock import Mock
 
 import pytest
@@ -320,12 +321,11 @@ class TestFuncOpVisualization:
         assert "my_qnode2" in utility.dag_builder.get_child_clusters("my_workflow")
 
 
-class TestControlFlowVisualization:
-    """Tests that the control flow operations are visualized correctly as clusters."""
+class TestForOp:
+    """Tests that the for loop control flow can be visualized correctly."""
 
-    @pytest.mark.unit
-    def test_for_loop(self):
-        """Test that the for loop is visualized correctly."""
+    def test_cluster_visualization(self):
+        """Tests that the for loop cluster can be visualized correctly."""
 
         dev = qml.device("null.qubit", wires=1)
 
@@ -341,7 +341,14 @@ class TestControlFlowVisualization:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        assert "for ..." in utility.dag_builder.get_child_clusters("my_workflow")
+        assert re.search(
+            r"for arg\d in range\(0,2,1\)",
+            utility.dag_builder.get_child_clusters("my_workflow"),
+        )
+
+
+class TestWhileOp:
+    """Tests that the while loop control flow can be visualized correctly."""
 
     @pytest.mark.unit
     def test_while_loop(self):
@@ -363,6 +370,10 @@ class TestControlFlowVisualization:
         utility.construct(module)
 
         assert "while ..." in utility.dag_builder.get_child_clusters("my_workflow")
+
+
+class TestIfOp:
+    """Tests that the conditional control flow can be visualized correctly."""
 
     @pytest.mark.unit
     def test_if_else_conditional(self):
