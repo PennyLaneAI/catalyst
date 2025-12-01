@@ -78,7 +78,7 @@ def draw(qnode: QNode, *, level: None | int = None) -> Callable:
             warnings.warn(
                 "The `draw` function does not yet support dynamic arguments.\n"
                 "To visualize the circuit with dynamic parameters or wires, please use the\n"
-                "`compiler.python_compiler.inspection.generate_mlir_graph` function instead.",
+                "`catalyst.python_interface.inspection.generate_mlir_graph` function instead.",
                 UserWarning,
             )
         mlir_module = get_mlir_module(qnode, args, kwargs)
