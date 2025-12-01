@@ -478,6 +478,11 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
 
+    - name: Install PennyLane
+      run: |
+        # Install the specific pennylane version required
+        python${{ matrix.python_version }} -m pip install git+https://github.com/PennyLaneAI/pennylane@bump-jax-api-hashability
+
     - name: Install Catalyst
       run: |
         python${{ matrix.python_version }} -m pip install dist/*.whl --extra-index-url https://test.pypi.org/simple

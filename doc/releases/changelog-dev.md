@@ -69,6 +69,17 @@
 
 <h3>Improvements 🛠</h3>
 
+* Resource tracking now tracks calls to `SetState` and `SetBasisState`, and can report results
+  that include `qml.StatePrep` operations.
+  [(#2230)](https://github.com/PennyLaneAI/catalyst/pull/2230)
+  
+* Remove the hardcoded list of runtime operations in the frontend.
+  This will allow arbitrary PL gates to be represented without hyperparameters in MLIR.
+  For gates that do not have a QIR representation, a runtime error will be raised at execution.
+  Users can still decompose these gates via `qml.transforms.decompose`
+  when both capture and graph-decomposition are enabled.
+  [(#2215)](https://github.com/PennyLaneAI/catalyst/pull/2215)
+
 * `qml.PCPhase` can be compiled and executed with capture enabled.
   [(#2226)](https://github.com/PennyLaneAI/catalyst/pull/2226)
 
@@ -273,6 +284,11 @@
   * Added a canonicalization pattern for `qec.ppr` to remove any PPRs consisting only
   of identities.
   [(#2192)](https://github.com/PennyLaneAI/catalyst/pull/2192)
+
+  * Added support for PPRs to the :func:`~.passes.merge_rotations` pass to merge PPRs with
+  equivalent angles, and cancelling of PPRs with opposite angles, or angles
+  that sum to identity.
+  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)	
 
 <h3>Documentation 📝</h3>
 

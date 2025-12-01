@@ -36,7 +36,6 @@ from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvmir, to_mlir_opt
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
-from catalyst.jax_extras.patches import get_aval2
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.qfunc import QFunc
@@ -732,22 +731,15 @@ class QJIT(CatalystCallable):
         dbg = debug_info("qjit_capture", self.user_function, args, kwargs)
 
         if qml.capture.enabled():
-            with Patcher(
-                (
-                    jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
-                    "get_aval",
-                    get_aval2,
-                ),
-            ):
-                return trace_from_pennylane(
-                    self.user_function,
-                    static_argnums,
-                    dynamic_args,
-                    abstracted_axes,
-                    full_sig,
-                    kwargs,
-                    debug_info=dbg,
-                )
+            return trace_from_pennylane(
+                self.user_function,
+                static_argnums,
+                dynamic_args,
+                abstracted_axes,
+                full_sig,
+                kwargs,
+                debug_info=dbg,
+            )
 
         def closure(qnode, *args, **kwargs):
             params = {}
