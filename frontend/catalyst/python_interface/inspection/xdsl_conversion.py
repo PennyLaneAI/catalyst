@@ -440,7 +440,11 @@ def xdsl_to_qml_measurement_type(op, obs_op=None) -> str:
     elif op.name == "quantum.compbasis":
         # Defines a pseudo-observable to represent measurements in the computational basis
         # Used within e.g. `probs()`
-        gate_name = f"{len(op.qubits)} wires"
+        if len(op.qubits) == 0:
+            # No specified qubits means use all qubits
+            gate_name = "all wires"
+        else:
+            gate_name = f"{len(op.qubits)} wires"
 
     elif op.name == "quantum.hamiltonian":
         ops_list = [xdsl_to_qml_measurement_type(term.owner) for term in op.terms]
