@@ -5,12 +5,6 @@
 * Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
   [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
 
-* Catalyst can now compile circuits that are directly expressed in terms of Pauli product rotation 
-  (PPR) and Pauli product measurement (PPM) operations: :class:`~.PauliRot` and 
-  :func:`~.pauli_measure`, respectively. This support enables research and development 
-  spurred from `A Game of Surface Codes (arXiv1808.02892) <https://arxiv.org/pdf/1808.02892>`_.
-  [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
-
   :class:`~.PauliRot` and :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes
   for PPR-PPM compilation, which includes :func:`catalyst.passes.to_ppr`, 
   :func:`catalyst.passes.commute_ppr`, :func:`catalyst.passes.merge_ppr_ppm`, 

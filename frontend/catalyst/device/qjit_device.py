@@ -56,6 +56,44 @@ from catalyst.utils.runtime_environment import get_lib_path
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
+RUNTIME_OPERATIONS = [
+    "CNOT",
+    "ControlledPhaseShift",
+    "CRot",
+    "CRX",
+    "CRY",
+    "CRZ",
+    "CSWAP",
+    "CY",
+    "CZ",
+    "Hadamard",
+    "Identity",
+    "IsingXX",
+    "IsingXY",
+    "IsingYY",
+    "IsingZZ",
+    "SingleExcitation",
+    "DoubleExcitation",
+    "ISWAP",
+    "MultiRZ",
+    "PauliX",
+    "PauliY",
+    "PauliZ",
+    "PCPhase",
+    "PhaseShift",
+    "PSWAP",
+    "QubitUnitary",
+    "Rot",
+    "RX",
+    "RY",
+    "RZ",
+    "S",
+    "SWAP",
+    "T",
+    "Toffoli",
+    "GlobalPhase",
+]
+
 RUNTIME_OBSERVABLES = [
     "Identity",
     "PauliX",
@@ -71,9 +109,11 @@ RUNTIME_OBSERVABLES = [
 
 RUNTIME_MPS = ["ExpectationMP", "SampleMP", "VarianceMP", "CountsMP", "StateMP", "ProbabilityMP"]
 
-# A list of custom operations supported by the Catalyst compiler.
-# This is useful especially for testing a device with custom operations.
-CUSTOM_OPERATIONS = {}
+# The runtime interface does not care about specific gate properties, so set them all to True.
+RUNTIME_OPERATIONS = {
+    op: OperatorProperties(invertible=True, controllable=True, differentiable=True)
+    for op in RUNTIME_OPERATIONS
+}
 
 RUNTIME_OBSERVABLES = {
     obs: OperatorProperties(invertible=True, controllable=True, differentiable=True)
@@ -157,14 +197,6 @@ def extract_backend_info(device: qml.devices.QubitDevice) -> BackendInfo:
             device_kwargs[k] = v
 
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
-
-
-def union_operations(
-    a: Dict[str, OperatorProperties], b: Dict[str, OperatorProperties]
-) -> Dict[str, OperatorProperties]:
-    """Union of two sets of operator properties"""
-    return {**a, **b}
-    # return {k: a[k] & b[k] for k in (a.keys() & b.keys())}
 
 
 def intersect_operations(
