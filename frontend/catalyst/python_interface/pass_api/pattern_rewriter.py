@@ -694,9 +694,36 @@ class PLPatternRewriter(PatternRewriter):
         self.insert_op(hamiltonianOp, insertion_point=insertion_point)
         return hamiltonianOp
 
+    def _resolve_dynamic_shape(
+        self, n_qubits: SSAValue | int, insertion_point: InsertPoint
+    ) -> tuple[tuple[int], tuple[SSAValue] | None, InsertPoint]:
+        """Get dynamic shape and output tensor shape for dynamic shape for observables
+        when number of qubits is not known at compile time."""
+
+        if isinstance(n_qubits, SSAValue):
+            # If number of qubits is not known, we indicate the dynamic shape, and
+            # set the shape of the resulting tensor to (-1,), indicating that the shape is
+            # not known at compile time.
+            tensor_shape = (-1,)
+            # Create dynamic shape, which is (2**num_qubits,) or (1 << num_qubits,)
+            const1Op = self.create_scalar_constant(1, insertion_point=insertion_point)
+            leftShiftOp = arith.ShLIOp(const1Op, n_qubits)
+            self.insert_op(leftShiftOp, insertion_point=InsertPoint.after(const1Op))
+            insertion_point = InsertPoint.after(leftShiftOp)
+            dynamic_shape = (leftShiftOp.results[0],)
+        else:
+            tensor_shape = (2**n_qubits,)
+            dynamic_shape = None
+
+        return tensor_shape, dynamic_shape, insertion_point
+
     # TODO: Improve docstring
     def insert_measurement(
-        self, mp: MeasurementProcess, insertion_point: InsertPoint
+        self,
+        mp: MeasurementProcess,
+        insertion_point: InsertPoint,
+        params: Sequence[SSAValue] | None = None,
+        insert_active_qubits: bool = False,
     ) -> xOperation:
         """Insert a measurement operation into the program."""
         if mp.mv:
@@ -705,12 +732,12 @@ class PLPatternRewriter(PatternRewriter):
                 "is currently not supported."
             )
 
-        meas_op = None
+        measurementOp = None
         qreg = None
 
         if mp.obs:
             # Measurement on observable
-            obs = self.insert_observable(mp.obs, insertion_point)
+            obs = self.insert_observable(mp.obs, insertion_point, params=params)
             n_qubits = len(mp.obs.wires)
 
             insertion_point = InsertPoint.after(obs)
@@ -729,6 +756,14 @@ class PLPatternRewriter(PatternRewriter):
         else:
             # Measurement on all wires
             qreg = self.get_qreg(insertion_point)
+            if insert_active_qubits:
+                new_qreg = self.insert_active_qubits(insertion_point, qreg=qreg)
+                # If a new qreg is returned, that means that quantum.InsertOps were inserted
+                # into the program. So, we need to update the insertion point.
+                if new_qreg != qreg:
+                    insertion_point = InsertPoint.after(new_qreg.owner)
+                    qreg = new_qreg
+
             obs = quantum.ComputationalBasisOp(
                 operands=((), qreg), result_types=(quantum.ObservableType(),)
             )
@@ -736,76 +771,77 @@ class PLPatternRewriter(PatternRewriter):
             insertion_point = InsertPoint.after(obs)
             n_qubits = self.get_num_qubits(InsertPoint.before(obs))
 
-        # # Create the measurement xDSL operation
-        # match type(mp):
-        #     case measurements.ExpectationMP:
-        #         measurementOp = quantum.ExpvalOp(obs=obs)
+        # Create the measurement xDSL operation
+        match type(mp):
+            case measurements.ExpectationMP:
+                measurementOp = quantum.ExpvalOp(obs=obs)
 
-        #     case measurements.VarianceMP:
-        #         measurementOp = quantum.VarianceOp(obs=obs)
+            case measurements.VarianceMP:
+                measurementOp = quantum.VarianceOp(obs=obs)
 
-        #     case measurements.StateMP:
-        #         # For now, we assume that there is no input MemRefType
-        #         tensor_shape, dynamic_shape, insertion_point = self._resolve_dynamic_shape(
-        #             n_qubits, insertion_point
-        #         )
-        #         measurementOp = quantum.StateOp(
-        #             operands=(obs, dynamic_shape, None),
-        #             result_types=(
-        #                 builtin.TensorType(
-        #                     element_type=builtin.ComplexType(builtin.Float64Type()),
-        #                     shape=tensor_shape,
-        #                 )
-        #             ),
-        #         )
+            case measurements.StateMP:
+                # For now, we assume that there is no input MemRefType
+                tensor_shape, dynamic_shape, insertion_point = self._resolve_dynamic_shape(
+                    n_qubits, insertion_point
+                )
+                measurementOp = quantum.StateOp(
+                    operands=(obs, dynamic_shape, None),
+                    result_types=(
+                        builtin.TensorType(
+                            element_type=builtin.ComplexType(builtin.Float64Type()),
+                            shape=tensor_shape,
+                        )
+                    ),
+                )
 
-        #     case measurements.ProbabilityMP:
-        #         # For now, we assume that there is no input MemRefType
-        #         tensor_shape, dynamic_shape, insertion_point = self._resolve_dynamic_shape(
-        #             n_qubits, insertion_point
-        #         )
-        #         measurementOp = quantum.ProbsOp(
-        #             operands=(obs, dynamic_shape, None, None),
-        #             result_types=(
-        #                 builtin.TensorType(element_type=builtin.Float64Type(), shape=tensor_shape),
-        #             ),
-        #         )
+            case measurements.ProbabilityMP:
+                # For now, we assume that there is no input MemRefType
+                tensor_shape, dynamic_shape, insertion_point = self._resolve_dynamic_shape(
+                    n_qubits, insertion_point
+                )
+                measurementOp = quantum.ProbsOp(
+                    operands=(obs, dynamic_shape, None, None),
+                    result_types=(
+                        builtin.TensorType(element_type=builtin.Float64Type(), shape=tensor_shape),
+                    ),
+                )
 
-        #     case measurements.SampleMP:
-        #         #  n_qubits or shots may not be known at compile time
-        #         _iter = (self.wire_manager.shots, n_qubits)
-        #         tensor_shape = tuple(-1 if isinstance(i, SSAValue) else i for i in _iter)
-        #         # We only insert values into dynamic_shape that are unknown at compile time
-        #         dynamic_shape = tuple(i for i in _iter if isinstance(i, SSAValue))
-        #         if isinstance(n_qubits, int) and n_qubits == 1:
-        #             tensor_shape = (tensor_shape[0],)
+            case measurements.SampleMP:
+                #  n_qubits or shots may not be known at compile time
+                _iter = (self.wire_manager.shots, n_qubits)
+                tensor_shape = tuple(-1 if isinstance(i, SSAValue) else i for i in _iter)
+                # We only insert values into dynamic_shape that are unknown at compile time
+                dynamic_shape = tuple(i for i in _iter if isinstance(i, SSAValue))
+                if isinstance(n_qubits, int) and n_qubits == 1:
+                    tensor_shape = (tensor_shape[0],)
 
-        #         measurementOp = quantum.SampleOp(
-        #             operands=(obs, dynamic_shape, None),
-        #             result_types=(
-        #                 builtin.TensorType(element_type=builtin.Float64Type(), shape=tensor_shape),
-        #             ),
-        #         )
+                measurementOp = quantum.SampleOp(
+                    operands=(obs, dynamic_shape, None),
+                    result_types=(
+                        builtin.TensorType(element_type=builtin.Float64Type(), shape=tensor_shape),
+                    ),
+                )
 
-        #     case measurements.CountsMP:
-        #         # For now, we assume that there are no input MemRefTypes
-        #         tensor_shape, dynamic_shape, insertion_point = self._resolve_dynamic_shape(
-        #             n_qubits, insertion_point
-        #         )
-        #         measurementOp = quantum.CountsOp(
-        #             operands=(obs, dynamic_shape, None, None),
-        #             result_types=(
-        #                 builtin.TensorType(element_type=builtin.Float64Type(), shape=tensor_shape),
-        #                 builtin.TensorType(element_type=builtin.i64, shape=tensor_shape),
-        #             ),
-        #         )
+            case measurements.CountsMP:
+                # For now, we assume that there are no input MemRefTypes
+                tensor_shape, dynamic_shape, insertion_point = self._resolve_dynamic_shape(
+                    n_qubits, insertion_point
+                )
+                measurementOp = quantum.CountsOp(
+                    operands=(obs, dynamic_shape, None, None),
+                    result_types=(
+                        builtin.TensorType(element_type=builtin.Float64Type(), shape=tensor_shape),
+                        builtin.TensorType(element_type=builtin.i64, shape=tensor_shape),
+                    ),
+                )
 
-        #     case _:
-        #         raise TransformError(
-        #             f"The measurement {type(mp).__name__} cannot be supported into the module."
-        #         )
+            case _:
+                raise TransformError(
+                    f"The measurement {type(mp).__name__} cannot be supported into the module."
+                )
 
-        self.insert_op(meas_op, insertion_point=insertion_point)
+        self.insert_op(measurementOp, insertion_point=insertion_point)
+        return measurementOp
 
     # TODO: Finish implementation
     def swap_gates(self, op1: xOperation, op2: xOperation) -> None:
