@@ -35,6 +35,13 @@ func.func @test_pauli_frame_init_qreg(%qreg : !quantum.reg) {
 
 // -----
 
+func.func @test_pauli_frame_read(%q0 : !quantum.bit) {
+    %record_x, %record_z, %out_qubit = pauli_frame.read %q0 : i1, i1, !quantum.bit
+    func.return
+}
+
+// -----
+
 func.func @test_pauli_frame_update_single_qubit(%q0 : !quantum.bit) {
     %0 = arith.constant 0 : i1
     %1 = arith.constant 1 : i1
@@ -59,34 +66,24 @@ func.func @test_pauli_frame_update_multi_qubit(%q00 : !quantum.bit, %q10 : !quan
 
 // -----
 
-func.func @test_pauli_frame_read(%q0 : !quantum.bit) {
-    %record_x, %record_z, %out_qubit = pauli_frame.read %q0 : i1, i1, !quantum.bit
+func.func @test_pauli_frame_update_with_clifford(%q00 : !quantum.bit, %q10 : !quantum.bit) {
+    %q01, %q11 = pauli_frame.update_with_clifford [CNOT] %q00, %q10 : !quantum.bit, !quantum.bit
+    %q02 = pauli_frame.update_with_clifford [Hadamard] %q01 : !quantum.bit
+    %q12 = pauli_frame.update_with_clifford [S] %q11 : !quantum.bit
     func.return
 }
 
 // -----
 
-func.func @test_pauli_frame_correct_measurement(%mres : i1) {
-    %0 = arith.constant 0 : i1
-    %1 = arith.constant 1 : i1
-    %out_mres_0 = pauli_frame.correct_measurement [%0, %0] %mres : i1
-    %out_mres_1 = pauli_frame.correct_measurement [%0, %1] %mres : i1
-    %out_mres_2 = pauli_frame.correct_measurement [%1, %0] %mres : i1
-    %out_mres_3 = pauli_frame.correct_measurement [%1, %1] %mres : i1
+func.func @test_pauli_frame_correct_measurement(%mres : i1, %q0 : !quantum.bit) {
+    %out_mres, %q1 = pauli_frame.correct_measurement %mres, %q0 : i1, !quantum.bit
     func.return
 }
 
 // -----
 
-func.func @test_pauli_frame_flush_single_qubit(%q0 : !quantum.bit) {
-    %q1 = pauli_frame.flush %q0 : !quantum.bit
-    func.return
-}
-
-// -----
-
-func.func @test_pauli_frame_flush_multi_qubit(%q00 : !quantum.bit, %q10 : !quantum.bit) {
-    %q01, %q11 = pauli_frame.flush %q00, %q10 : !quantum.bit, !quantum.bit
+func.func @test_pauli_frame_flush(%q0 : !quantum.bit) {
+    %x, %z, %q1 = pauli_frame.flush %q0 : i1, i1, !quantum.bit
     func.return
 }
 

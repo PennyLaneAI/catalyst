@@ -24,6 +24,8 @@ using namespace catalyst::pauli_frame;
 // PauliFrame op definitions.
 //===----------------------------------------------------------------------===//
 
+#include "PauliFrame/IR/PauliFrameEnums.cpp.inc"
+
 #define GET_OP_CLASSES
 #include "PauliFrame/IR/PauliFrameOps.cpp.inc"
 
@@ -53,13 +55,32 @@ LogicalResult UpdateOp::verify()
     return success();
 }
 
-LogicalResult FlushOp::verify()
+LogicalResult UpdateWithCliffordOp::verify()
 {
     if (getInQubits().size() == 0) {
         return emitOpError("expected to have at least one qubit");
     }
     if (getInQubits().size() != getOutQubits().size()) {
         return emitOpError("expected to consume and return the same number of qubits");
+    }
+    switch (getCliffordGate()) {
+    case CliffordGate::Hadamard:
+        if (getInQubits().size() != 1) {
+            return emitOpError("expected exactly one input qubit for Clifford gate 'Hadamard'");
+        }
+        break;
+
+    case CliffordGate::S:
+        if (getInQubits().size() != 1) {
+            return emitOpError("expected exactly one input qubit for Clifford gate 'S'");
+        }
+        break;
+
+    case CliffordGate::CNOT:
+        if (getInQubits().size() != 2) {
+            return emitOpError("expected exactly two input qubits for Clifford gate 'CNOT'");
+        }
+        break;
     }
     return success();
 }

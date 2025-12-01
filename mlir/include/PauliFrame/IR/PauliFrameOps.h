@@ -22,9 +22,10 @@
 // PauliFrame ops declarations.
 //===----------------------------------------------------------------------===//
 
-/// Uncomment the lines below if defining attributes for the PauliFrame dialect
-// #define GET_ATTRDEF_CLASSES
-// #include "PauliFrame/IR/PauliFrameAttributes.h.inc"
+#include "PauliFrame/IR/PauliFrameEnums.h.inc"
+
+#define GET_ATTRDEF_CLASSES
+#include "PauliFrame/IR/PauliFrameAttributes.h.inc"
 
 #define GET_OP_CLASSES
 #include "PauliFrame/IR/PauliFrameOps.h.inc"

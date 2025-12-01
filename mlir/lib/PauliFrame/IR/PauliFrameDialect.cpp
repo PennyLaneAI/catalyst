@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
+#include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
 
 #include "PauliFrame/IR/PauliFrameDialect.h"
 #include "PauliFrame/IR/PauliFrameOps.h"
@@ -34,11 +36,10 @@ void PauliFrameDialect::initialize()
     // #include "PauliFrame/IR/PauliFrameOpsTypes.cpp.inc"
     //         >();
 
-    /// Uncomment the lines below if defining attributes for the PauliFrame dialect
-    //     addAttributes<
-    // #define GET_ATTRDEF_LIST
-    // #include "PauliFrame/IR/PauliFrameAttributes.cpp.inc"
-    //         >();
+    addAttributes<
+#define GET_ATTRDEF_LIST
+#include "PauliFrame/IR/PauliFrameAttributes.cpp.inc"
+        >();
 
     addOperations<
 #define GET_OP_LIST
@@ -54,6 +55,5 @@ void PauliFrameDialect::initialize()
 // #define GET_TYPEDEF_CLASSES
 // #include "PauliFrame/IR/PauliFrameOpsTypes.cpp.inc"
 
-/// Uncomment the lines below if defining attributes for the PauliFrame dialect
-// #define GET_ATTRDEF_CLASSES
-// #include "PauliFrame/IR/PauliFrameAttributes.cpp.inc"
+#define GET_ATTRDEF_CLASSES
+#include "PauliFrame/IR/PauliFrameAttributes.cpp.inc"

@@ -7,4 +7,5 @@ add_mlir_library(MLIRPauliFrame
 
     DEPENDS
     MLIRPauliFrameOpsIncGen
+    MLIRPauliFrameEnumsIncGen
 )
