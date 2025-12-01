@@ -16,6 +16,7 @@
 #include "mlir/IR/TypeRange.h"
 
 #include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
 

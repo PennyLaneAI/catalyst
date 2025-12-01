@@ -19,6 +19,7 @@
 #include <mlir/IR/Value.h>
 
 #include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/PPRDecomposeUtils.h"
 #include "QEC/Transforms/Patterns.h"
 #include "QEC/Utils/PauliStringWrapper.h"

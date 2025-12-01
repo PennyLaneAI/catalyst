@@ -25,6 +25,7 @@
 
 #include "Catalyst/Utils/SCFUtils.h"
 #include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOps.h"
 #include "QEC/IR/QECOpInterfaces.h"
 #include "QEC/Utils/QECLayer.h"
 #include "QEC/Utils/QECOpUtils.h"

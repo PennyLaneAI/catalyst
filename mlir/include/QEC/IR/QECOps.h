@@ -12,9 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef PYTHON_BINDINGS_QEC_OPS
-#define PYTHON_BINDINGS_QEC_OPS
+#pragma once
 
-include "QEC/IR/QECOps.td"
+#include "mlir/Bytecode/BytecodeOpInterface.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Dialect.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/ControlFlowInterfaces.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
-#endif
+#include "QEC/IR/QECOpInterfaces.h"
+
+//===----------------------------------------------------------------------===//
+// QEC ops declarations.
+//===----------------------------------------------------------------------===//
+
+#include "QEC/IR/QECDialect.h"
+#define GET_OP_CLASSES
+#include "QEC/IR/QECOps.h.inc"

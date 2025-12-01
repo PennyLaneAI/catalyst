@@ -24,6 +24,7 @@
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOps.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 
