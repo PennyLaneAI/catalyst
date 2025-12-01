@@ -290,6 +290,11 @@
   that sum to identity.
   [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)	
 
+
+  * Refactor QEC tablegen files to separate QEC operations into a new `QECOp.td` file
+  [(#2253](https://github.com/PennyLaneAI/catalyst/pull/2253)	
+
+
 <h3>Documentation 📝</h3>
 
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
