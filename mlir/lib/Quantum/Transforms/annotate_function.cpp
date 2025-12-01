@@ -119,7 +119,8 @@ std::optional<FunctionOpInterface> getCallee(CallGraphNode::Edge edge, CallGraph
 
 bool anyCalleeIsAnnotated(FunctionOpInterface op, const char *attr, CallGraph &cg)
 {
-    if (op.isExternal()) {
+    if (!op.getCallableRegion()) {
+        // No need to annotate if the func has no callable regions
         return false;
     }
 
@@ -139,12 +140,14 @@ bool anyCalleeIsAnnotated(FunctionOpInterface op, const char *attr, CallGraph &c
         // We can get better precision by using one of the many callgraph analyses.
         // See Sundaresan, Vijay, et al. "Practical virtual method call resolution for Java." ACM
         // SIGPLAN Notices 35.10 (2000): 264-280.
-        if (!maybeCallee)
+        if (!maybeCallee) {
             return true;
+        }
 
         FunctionOpInterface calleeOp = maybeCallee.value();
-        if (isAnnotated(calleeOp, attr))
+        if (isAnnotated(calleeOp, attr)) {
             return true;
+        }
     }
     return false;
 }
