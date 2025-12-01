@@ -32,6 +32,7 @@ from xdsl.ir import SSAValue
 
 from catalyst.jit import QJIT, qjit
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
+
 from ..dialects.quantum import (
     CustomOp,
     ExtractOp,
