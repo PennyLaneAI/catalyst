@@ -46,7 +46,8 @@ class KeepIntermediateLevel(enum.IntEnum):
 
     NONE = 0  # No intermediate files are kept.
     PIPELINE = 1  # Intermediate files are saved after each pipeline.
-    PASS = 2  # Intermediate files are saved after each pass.
+    CHANGED = 2  # Intermediate files are saved after each pass (only if changed).
+    PASS = 3  # Intermediate files are saved after each pass, even if unchanged.
 
 
 def _parse_keep_intermediate(
@@ -54,18 +55,20 @@ def _parse_keep_intermediate(
 ) -> KeepIntermediateLevel:
     """Parse the keep_intermediate value into a KeepIntermediateLevel enum."""
     match level:
-        case 0 | 1 | 2:
+        case 0 | 1 | 2 | 3:
             return KeepIntermediateLevel(level)
         case "none" | None:
             return KeepIntermediateLevel.NONE
         case "pipeline":
             return KeepIntermediateLevel.PIPELINE
+        case "changed":
+            return KeepIntermediateLevel.CHANGED
         case "pass":
             return KeepIntermediateLevel.PASS
         case _:
             raise ValueError(
                 f"Invalid value for keep_intermediate: {level}. "
-                "Valid values are True, False, 0, 1, 2, 'none', 'pipeline', 'pass'."
+                "Valid values are True, False, 0, 1, 2, 3, 'none', 'pipeline', 'changed', 'pass'."
             )
 
 
@@ -84,7 +87,8 @@ class CompileOptions:
 
             - ``False`` or ``0`` or ``"none"`` (default): No intermediate files are kept.
             - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
-            - ``2`` or ``"pass"``: Intermediate files are saved after each pass.
+            - ``2`` or ``"changed"``: Intermediate files are saved after each pass only if changed.
+            - ``3`` or ``"pass"``: Intermediate files are saved after each pass, even if unchanged.
         use_nameloc (Optional[bool]): If ``True``, add function parameter names to the IR as name
             locations.
         pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples. The first entry of the
@@ -196,17 +200,18 @@ class CompileOptions:
         """Returns all stages in order for compilation"""
         # Dictionaries in python are ordered
         stages = {}
-        stages["EnforceRuntimeInvariantsPass"] = get_enforce_runtime_invariants_stage(self)
-        stages["HLOLoweringPass"] = get_hlo_lowering_stage(self)
-        stages["QuantumCompilationPass"] = get_quantum_compilation_stage(self)
-        stages["BufferizationPass"] = get_bufferization_stage(self)
-        stages["MLIRToLLVMDialect"] = get_convert_to_llvm_stage(self)
+        stages["QuantumCompilationStage"] = get_quantum_compilation_stage(self)
+        stages["HLOLoweringStage"] = get_hlo_lowering_stage(self)
+        stages["GradientLoweringStage"] = get_gradient_lowering_stage(self)
+        stages["BufferizationStage"] = get_bufferization_stage(self)
+        stages["MLIRToLLVMDialectConversion"] = get_convert_to_llvm_stage(self)
         return list(stages.items())
 
 
-def get_enforce_runtime_invariants_stage(_options: CompileOptions) -> List[str]:
-    """Returns the list of passes in the enforce runtime invariant stage."""
-    enforce_runtime_invariants = [
+def get_quantum_compilation_stage(_options: CompileOptions) -> List[str]:
+    """Returns the list of passes that performs quantum compilation"""
+
+    user_transform_passes = [
         # We want the invariant that transforms that generate multiple
         # tapes will generate multiple qnodes. One for each tape.
         # Split multiple tapes enforces that invariant.
@@ -222,8 +227,11 @@ def get_enforce_runtime_invariants_stage(_options: CompileOptions) -> List[str]:
         # But qnodes targeting other backends may choose to lower
         # this into something else.
         "inline-nested-module",
+        "lower-mitigation",
+        "adjoint-lowering",
+        "disable-assertion" if _options.disable_assertions else None,
     ]
-    return enforce_runtime_invariants
+    return list(filter(partial(is_not, None), user_transform_passes))
 
 
 def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
@@ -250,17 +258,14 @@ def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
     return hlo_lowering
 
 
-def get_quantum_compilation_stage(options: CompileOptions) -> List[str]:
-    """Returns the list of passes that performs quantum transformations"""
+def get_gradient_lowering_stage(_options: CompileOptions) -> List[str]:
+    """Returns the list of passes that performs gradient lowering"""
 
-    quantum_compilation = [
-        "annotate-function",
-        "lower-mitigation",
+    gradient_lowering = [
+        "annotate-invalid-gradient-functions",
         "lower-gradients",
-        "adjoint-lowering",
-        "disable-assertion" if options.disable_assertions else None,
     ]
-    return list(filter(partial(is_not, None), quantum_compilation))
+    return gradient_lowering
 
 
 def get_bufferization_stage(options: CompileOptions) -> List[str]:

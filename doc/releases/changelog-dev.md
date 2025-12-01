@@ -69,6 +69,15 @@
 
 <h3>Improvements 🛠</h3>
 
+* A new ``"changed"`` option has been added to the ``keep_intermediate`` parameter of 
+  :func:`~.qjit`. This option saves intermediate IR files after each pass,
+  but only when the IR is actually modified by the pass.
+  [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
+
+* Intermediate IR files are now organized into subdirectories for each compilation stage
+  when using ``keep_intermediate="changed"`` or ``keep_intermediate="pass"``.
+  [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
+
 * Resource tracking now tracks calls to `SetState` and `SetBasisState`, and can report results
   that include `qml.StatePrep` operations.
   [(#2230)](https://github.com/PennyLaneAI/catalyst/pull/2230)
@@ -136,6 +145,15 @@
   [(#2227)](https://github.com/PennyLaneAI/catalyst/pull/2227)
 
 <h3>Breaking changes 💔</h3>
+
+* The MLIR pipeline ``enforce-runtime-invariants-pipeline`` has been renamed to
+  ``quantum-compilation-pipeline`` and the old ``quantum-compilation-pipeline`` has been renamed to
+  ``gradient-lowering-pipeline``. Users who referenced these pipeline names directly would need to 
+  update their code to use the new names.
+  [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
+
+  * The ``pipeline``  and "passes" postfixes in the compilation stage names have been changed to ``stage``.
+  [(#2230)](https://github.com/PennyLaneAI/catalyst/pull/2230)
 
 * The plxpr transform `pl_map_wires` has been removed along with its test.
   [(#2220)](https://github.com/PennyLaneAI/catalyst/pull/2220)
@@ -280,6 +298,10 @@
   * Added a canonicalization pattern for `qec.ppr` to remove any PPRs consisting only
   of identities.
   [(#2192)](https://github.com/PennyLaneAI/catalyst/pull/2192)
+
+  * Renamed `annotate-function` pass to `annotate-invalid-gradient-functions` and move it to the 
+  gradient dialect and the `lower-gradients` compilation stage.
+  [(#2241)](https://github.com/PennyLaneAI/catalyst/pull/2241)
 
   * Added support for PPRs to the :func:`~.passes.merge_rotations` pass to merge PPRs with
   equivalent angles, and cancelling of PPRs with opposite angles, or angles
