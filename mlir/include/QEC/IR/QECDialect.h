@@ -20,14 +20,14 @@
 // QEC dialect declarations.
 //===----------------------------------------------------------------------===//
 
-#include "QEC/IR/QECDialectDialect.h.inc"
+#include "QEC/IR/QECOpsDialect.h.inc"
 
 //===----------------------------------------------------------------------===//
 // QEC type declarations.
 //===----------------------------------------------------------------------===//
 
 #define GET_TYPEDEF_CLASSES
-#include "QEC/IR/QECDialectTypes.h.inc"
+#include "QEC/IR/QECOpsTypes.h.inc"
 
 //===----------------------------------------------------------------------===//
 // QEC enum declarations.

@@ -27,13 +27,13 @@ using namespace catalyst::qec;
 // QEC dialect definitions.
 //===----------------------------------------------------------------------===//
 
-#include "QEC/IR/QECDialectDialect.cpp.inc"
+#include "QEC/IR/QECOpsDialect.cpp.inc"
 
 void QECDialect::initialize()
 {
     addTypes<
 #define GET_TYPEDEF_LIST
-#include "QEC/IR/QECDialectTypes.cpp.inc"
+#include "QEC/IR/QECOpsTypes.cpp.inc"
         >();
     addAttributes<
 #define GET_ATTRDEF_LIST
@@ -50,7 +50,7 @@ void QECDialect::initialize()
 //===----------------------------------------------------------------------===//
 
 #define GET_TYPEDEF_CLASSES
-#include "QEC/IR/QECDialectTypes.cpp.inc"
+#include "QEC/IR/QECOpsTypes.cpp.inc"
 
 //===----------------------------------------------------------------------===//
 // QEC enum definitions.
