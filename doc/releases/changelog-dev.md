@@ -5,19 +5,19 @@
 * Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
   [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
 
-* Catalyst can now compile circuits that are directly expressed in terms of Pauli product rotation 
-  (PPR) and Pauli product measurement (PPM) operations: :class:`~.PauliRot` and 
-  :func:`~.pauli_measure`, respectively. This support enables research and development 
+* Catalyst can now compile circuits that are directly expressed in terms of Pauli product rotation
+  (PPR) and Pauli product measurement (PPM) operations: :class:`~.PauliRot` and
+  :func:`~.pauli_measure`, respectively. This support enables research and development
   spurred from `A Game of Surface Codes (arXiv1808.02892) <https://arxiv.org/pdf/1808.02892>`_.
   [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
 
   :class:`~.PauliRot` and :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes
-  for PPR-PPM compilation, which includes :func:`catalyst.passes.to_ppr`, 
-  :func:`catalyst.passes.commute_ppr`, :func:`catalyst.passes.merge_ppr_ppm`, 
-  :func:`catalyst.passes.ppr_to_ppm`, :func:`catalyst.passes.reduce_t_depth`, and 
-  :func:`catalyst.passes.ppm_compilation`. For clear and inspectable results, use ``target="mlir"`` 
-  in the ``qjit`` decorator, ensure that PennyLane's program capture is enabled, 
-  :func:`pennylane.capture.enable`, and call the Catalyst passes from the PennyLane frontend (e.g., 
+  for PPR-PPM compilation, which includes :func:`catalyst.passes.to_ppr`,
+  :func:`catalyst.passes.commute_ppr`, :func:`catalyst.passes.merge_ppr_ppm`,
+  :func:`catalyst.passes.ppr_to_ppm`, :func:`catalyst.passes.reduce_t_depth`, and
+  :func:`catalyst.passes.ppm_compilation`. For clear and inspectable results, use ``target="mlir"``
+  in the ``qjit`` decorator, ensure that PennyLane's program capture is enabled,
+  :func:`pennylane.capture.enable`, and call the Catalyst passes from the PennyLane frontend (e.g.,
   ``qml.transforms.ppr_to_ppm`` instead of from ``catalyst.passes.``).
 
   ```python
@@ -54,14 +54,14 @@
   ```pycon
   >>> print(qml.specs(circuit, level="all")()['resources'])
   {
-    'No transforms': ..., 
+    'No transforms': ...,
     'Before MLIR Passes (MLIR-0)': ...,
     'ppm-compilation (MLIR-1)': Resources(
-      num_wires=6, 
-      num_gates=14, 
-      gate_types=defaultdict(<class 'int'>, {'PPM-w3': 2, 'PPM-w2': 4, 'PPM-w1': 4, 'PPR-pi/2-w1': 4}), 
-      gate_sizes=defaultdict(<class 'int'>, {3: 2, 2: 4, 1: 8}), 
-      depth=None, 
+      num_wires=6,
+      num_gates=14,
+      gate_types=defaultdict(<class 'int'>, {'PPM-w3': 2, 'PPM-w2': 4, 'PPM-w1': 4, 'PPR-pi/2-w1': 4}),
+      gate_sizes=defaultdict(<class 'int'>, {3: 2, 2: 4, 1: 8}),
+      depth=None,
       shots=Shots(total_shots=None, shot_vector=())
     )
   }
@@ -119,7 +119,7 @@
 * Dynamically allocated wires can now be passed into control flow and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
 
-* Catalyst now supports arbitrary angle Pauli product rotations in the QEC dialect. 
+* Catalyst now supports arbitrary angle Pauli product rotations in the QEC dialect.
   This will allow :class:`qml.PauliRot` with arbitrary angles to be lowered to QEC dialect.
   This is implemented as a new `qec.ppr.arbitrary` operation, which takes a Pauli product
   and an arbitrary angle (as a double) as input.
