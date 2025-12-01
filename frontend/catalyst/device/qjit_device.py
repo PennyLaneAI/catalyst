@@ -223,8 +223,8 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
     qjit_capabilities = deepcopy(target_capabilities)
 
     # Intersection of gates and observables supported by the device and by Catalyst runtime.
-    qjit_capabilities.operations = union_operations(
-        target_capabilities.operations, CUSTOM_OPERATIONS
+    qjit_capabilities.operations = intersect_operations(
+        target_capabilities.operations, RUNTIME_OPERATIONS
     )
     qjit_capabilities.observables = intersect_operations(
         target_capabilities.observables, RUNTIME_OBSERVABLES
