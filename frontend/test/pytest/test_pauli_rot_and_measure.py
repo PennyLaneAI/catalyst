@@ -24,7 +24,7 @@ from catalyst import qjit
 @pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_to_ppr():
     """Test that Pauli rotation is converted to qec.ppr."""
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_pauli_rot_to_ppr_workflow():
@@ -96,7 +96,7 @@ def test_pauli_measure_to_ppm():
 @pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_to_ppr_pauli_word_error():
     """Test that unsupported pauli words raises `ValueError`."""
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     with pytest.raises(
         ValueError,
@@ -117,7 +117,7 @@ def test_pauli_rot_to_ppr_pauli_word_error():
 @pytest.mark.usefixtures("use_capture")
 def test_pauli_measure_to_ppr_pauli_word_error():
     """Test that unsupported pauli words raises `ValueError`."""
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     with pytest.raises(
         ValueError,

@@ -134,7 +134,7 @@ enzyme:
 
 dialects:
 	$(MAKE) -C mlir dialects
-	
+
 .PHONY: dialect-docs
 dialect-docs:
 	$(MAKE) -C mlir dialect-docs

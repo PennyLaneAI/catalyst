@@ -32,9 +32,8 @@ from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
-from jax._src.pjit import _pjit_lowering
+from jax._src.pjit import _pjit_lowering, jit_p
 from jax.core import AbstractValue
-from jax.experimental.pjit import pjit_p
 from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
@@ -352,7 +351,7 @@ measure_in_basis_p.multiple_results = True
 decomprule_p = core.Primitive("decomposition_rule")
 decomprule_p.multiple_results = True
 
-quantum_subroutine_p = copy.deepcopy(pjit_p)
+quantum_subroutine_p = copy.deepcopy(jit_p)
 quantum_subroutine_p.name = "quantum_subroutine_p"
 subroutine_cache: dict[callable, callable] = {}
 
@@ -396,15 +395,15 @@ def subroutine(func):
     # pylint: disable-next=import-outside-toplevel
     from catalyst.api_extensions.callbacks import WRAPPER_ASSIGNMENTS
 
-    old_pjit = jax._src.pjit.pjit_p
+    old_jit_p = jax._src.pjit.jit_p
 
     @functools.wraps(func, assigned=WRAPPER_ASSIGNMENTS)
     def inside(*args, **kwargs):
         with Patcher(
             (
                 jax._src.pjit,
-                "pjit_p",
-                old_pjit,
+                "jit_p",
+                old_jit_p,
             ),
         ):
             return func(*args, **kwargs)
@@ -419,7 +418,7 @@ def subroutine(func):
         with Patcher(
             (
                 jax._src.pjit,
-                "pjit_p",
+                "jit_p",
                 quantum_subroutine_p,
             ),
         ):
@@ -716,7 +715,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         flat_output_types,
         ir.StringAttr.get(method),
         symbol_ref,
-        mlir.flatten_lowering_ir_args(args_and_consts),
+        mlir.flatten_ir_values(args_and_consts),
         diffArgIndices=diffArgIndices,
         finiteDiffParam=finiteDiffParam,
     ).results
@@ -740,7 +739,7 @@ def _capture_grad_lowering(ctx, *args, argnums, jaxpr, n_consts, method, h, fn, 
         flat_output_types,
         ir.StringAttr.get(method),
         symbol_ref,
-        mlir.flatten_lowering_ir_args(args),
+        mlir.flatten_ir_values(args),
         diffArgIndices=diffArgIndices,
         finiteDiffParam=finiteDiffParam,
     ).results
@@ -817,7 +816,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         gradient_result_types,
         ir.StringAttr.get(method),
         symbol_ref,
-        mlir.flatten_lowering_ir_args(func_args),
+        mlir.flatten_ir_values(func_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
@@ -870,8 +869,8 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
         flat_output_types[len(flat_output_types) // 2 :],
         ir.StringAttr.get(method),
         symbol_ref,
-        mlir.flatten_lowering_ir_args(func_args),
-        mlir.flatten_lowering_ir_args(tang_args),
+        mlir.flatten_ir_values(func_args),
+        mlir.flatten_ir_values(tang_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
@@ -920,8 +919,8 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         vjp_result_types,
         ir.StringAttr.get(method),
         symbol_ref,
-        mlir.flatten_lowering_ir_args(func_args),
-        mlir.flatten_lowering_ir_args(cotang_args),
+        mlir.flatten_ir_values(func_args),
+        mlir.flatten_ir_values(cotang_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
@@ -984,7 +983,7 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
     return ZneOp(
         flat_output_types,
         symbol_ref,
-        mlir.flatten_lowering_ir_args(args_and_consts),
+        mlir.flatten_ir_values(args_and_consts),
         _folding_attribute(ctx, folding),
         num_folds,
     ).results
@@ -1909,21 +1908,11 @@ def custom_measurement_staging_rule(
     else:
         out_shapes = tuple(core.DShapedArray(shape, dtype) for dtype in dtypes)
 
-    invars = [jaxpr_trace.getvar(obs)]
-    for dyn_dim in dynamic_shape:
-        invars.append(jaxpr_trace.getvar(dyn_dim))
+    in_tracers = [obs] + list(dynamic_shape)
 
     params = {"static_shape": static_shape}
 
-    out_tracers = tuple(pe.DynamicJaxprTracer(jaxpr_trace, out_shape) for out_shape in out_shapes)
-
-    eqn = pe.new_jaxpr_eqn(
-        invars,
-        [jaxpr_trace.makevar(out_tracer) for out_tracer in out_tracers],
-        primitive,
-        params,
-        jax.core.no_effects,
-    )
+    eqn, out_tracers = jaxpr_trace.make_eqn(in_tracers, out_shapes, primitive, params, [])
 
     jaxpr_trace.frame.add_eqn(eqn)
     return out_tracers if len(out_tracers) > 1 else out_tracers[0]
@@ -2229,7 +2218,7 @@ def _cond_lowering(
     num_preds = len(branch_jaxprs) - 1
     preds = preds_and_branch_args_plus_consts[:num_preds]
     branch_args_plus_consts = preds_and_branch_args_plus_consts[num_preds:]
-    flat_args_plus_consts = mlir.flatten_lowering_ir_args(branch_args_plus_consts)
+    flat_args_plus_consts = mlir.flatten_ir_values(branch_args_plus_consts)
 
     # recursively lower if-else chains to nested IfOps
     def emit_branches(preds, branch_jaxprs, ip):
@@ -2320,7 +2309,7 @@ def _switch_lowering(
     # the last branch is default and does not have a case
     cases = index_and_cases_and_branch_args_plus_consts[1 : len(branch_jaxprs)]
     branch_args_plus_consts = index_and_cases_and_branch_args_plus_consts[len(branch_jaxprs) :]
-    flat_args_plus_consts = mlir.flatten_lowering_ir_args(branch_args_plus_consts)
+    flat_args_plus_consts = mlir.flatten_ir_values(branch_args_plus_consts)
 
     index = _cast_to_index(index)
 
@@ -2414,7 +2403,7 @@ def _while_loop_lowering(
     preserve_dimensions: bool,
 ):
     loop_carry_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
-    flat_args_plus_consts = mlir.flatten_lowering_ir_args(iter_args_plus_consts)
+    flat_args_plus_consts = mlir.flatten_ir_values(iter_args_plus_consts)
     assert [val.type for val in flat_args_plus_consts] == loop_carry_types_plus_consts
 
     # split the argument list into 3 separate groups

@@ -34,7 +34,7 @@ def test_single_qubit_pauli_rotations():
     qml.capture.enable()
     dev = qml.device("null.qubit", wires=1)
 
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
     @qml.qnode(device=dev)
@@ -100,7 +100,7 @@ def test_multi_qubit_pauli_rotations():
     qml.capture.enable()
     dev = qml.device("null.qubit", wires=3)
 
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
     @qml.qnode(device=dev)
@@ -174,7 +174,7 @@ def test_single_qubit_pauli_measurements():
     qml.capture.enable()
     dev = qml.device("null.qubit", wires=1)
 
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
     @qml.qnode(device=dev)
@@ -198,7 +198,7 @@ def test_multi_qubit_pauli_measurements():
     qml.capture.enable()
     dev = qml.device("null.qubit", wires=3)
 
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
     @qml.qnode(device=dev)
@@ -222,7 +222,7 @@ def test_pauli_rot_and_measure_combined():
     qml.capture.enable()
     dev = qml.device("null.qubit", wires=2)
 
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
     @qml.qnode(device=dev)
@@ -252,7 +252,7 @@ def test_clifford_t_ppr_ppm_combined():
     qml.capture.enable()
     dev = qml.device("null.qubit", wires=3)
 
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
     @to_ppr
@@ -283,7 +283,7 @@ def test_commute_ppr():
     qml.capture.enable()
     dev = qml.device("null.qubit", wires=1)
 
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
     @commute_ppr
@@ -310,7 +310,7 @@ def test_merge_ppr_ppm():
     qml.capture.enable()
     dev = qml.device("null.qubit", wires=1)
 
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
     @merge_ppr_ppm
@@ -332,7 +332,7 @@ def test_ppr_to_ppm():
     qml.capture.enable()
     dev = qml.device("null.qubit", wires=1)
 
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
     @ppr_to_ppm
@@ -358,7 +358,7 @@ def test_ppm_compilation():
     qml.capture.enable()
     dev = qml.device("null.qubit", wires=1)
 
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
     @ppm_compilation
@@ -387,7 +387,7 @@ def test_pauli_rot_and_measure_with_cond():
     qml.capture.enable()
     dev = qml.device("null.qubit", wires=1)
 
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
     @qml.qnode(device=dev)
@@ -415,7 +415,7 @@ def test_pauli_rot_with_adjoint_region():
     qml.capture.enable()
     dev = qml.device("null.qubit", wires=2)
 
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     def f():
         qml.PauliRot(np.pi / 4, "XZ", wires=[0, 1])
@@ -442,7 +442,7 @@ def test_pauli_rot_with_adjoint_single_gate():
     qml.capture.enable()
     dev = qml.device("null.qubit", wires=2)
 
-    pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
     @qml.qnode(device=dev)
