@@ -23,11 +23,11 @@ pytestmark = pytest.mark.usefixtures("requires_xdsl")
 import pennylane as qml
 
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
+from catalyst.python_interface.inspection import generate_mlir_graph
 from catalyst.python_interface.transforms import (
     iterative_cancel_inverses_pass,
     merge_rotations_pass,
 )
-from catalyst.python_interface.visualization import generate_mlir_graph
 
 
 @pytest.fixture(autouse=True)
