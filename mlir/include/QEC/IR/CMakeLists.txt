@@ -1,6 +1,6 @@
 add_mlir_dialect(QECOps qec)
 add_mlir_interface(QECOpInterfaces)
-add_mlir_doc(QECDialect QECDialect QEC/ -gen-dialect-doc)
+add_mlir_doc(QECDialect QECDialect QEC/ -gen-dialect-doc -dialect qec)
 add_mlir_doc(QECOps QECOps QEC/ -gen-op-doc)
 add_mlir_doc(QECOpInterfaces QECOpInterfaces QEC/ -gen-op-interface-docs)
 
