@@ -177,10 +177,24 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         if any(not qreg.is_qubit_mode() and qreg.expired for qreg in in_qregs + in_ctrl_qregs):
             raise CompileError(f"Deallocated qubits cannot be used, but used in {op.name}.")
 
+        _spacial_bind = False
         if (fn := _special_op_bind_call.get(type(op))) is not None:
             bind_fn = partial(fn, hyperparameters=op.hyperparameters)
+            _spacial_bind = True
         else:
             bind_fn = qinst_p.bind
+
+        if not _spacial_bind:
+            # raise an error if there are unsupported hyperparameters
+            # for the generic qinst_p bind call
+            # This is to avoid silent bugs where hyperparameters
+            # are simply ignored
+            for key in op.hyperparameters.keys():
+                if key not in _accepted_hyperparams:
+                    raise CompileError(
+                        f"Operation {op.name} has unsupported hyperparameter '{key}' "
+                        "for generic quantum instruction binding."
+                    )
 
         out_qubits = bind_fn(
             *[*in_qubits, *op.data, *in_ctrl_qubits, *control_values],
@@ -779,4 +793,15 @@ _special_op_bind_call = {
     qml.GlobalPhase: _gphase_bind_call,
     qml.PCPhase: _pcphase_bind_call,
     qml.PauliRot: _pauli_rot_bind_call,
+}
+
+# Accepted hyperparameters for quantum instructions bind calls
+_accepted_hyperparams = {
+    "num_wires",  # CNOT, etc.
+    "n_wires",  # Identity, etc.
+    "control_wires",  # CNOT, etc.
+    "control_values",  # CNOT, etc.
+    "work_wires",  # CNOT, etc.
+    "work_wire_type",  # CNOT, etc.
+    "base",  # CNOT, etc.
 }
