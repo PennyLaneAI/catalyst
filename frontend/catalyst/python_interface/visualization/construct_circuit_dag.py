@@ -122,7 +122,6 @@ class ConstructCircuitDAG:
             if num_qnodes == 1:
                 visualize = False
 
-        # Visualize the FuncOp as a cluster with a label
         if visualize:
             uid = f"cluster_{id(operation)}"
             parent_cluster_uid = (
