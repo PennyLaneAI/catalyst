@@ -60,7 +60,7 @@ def cancel_inverses(qnode):
         to display the circuit as written in Python.
 
         To instead view the optimized circuit, the MLIR must be viewed
-        after the ``"QuantumCompilationPass"`` stage via the
+        after the ``"QuantumCompilationStage"`` stage via the
         :func:`~.get_compilation_stage` function.
 
     Args:
@@ -95,9 +95,9 @@ def cancel_inverses(qnode):
     with :func:`~.draw`).
 
     To instead view the optimized circuit, the MLIR must be viewed
-    after the ``"QuantumCompilationPass"`` stage:
+    after the ``"QuantumCompilationStage"`` stage:
 
-    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationPass"))
+    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationStage"))
     module @circuit {
       func.func public @jit_circuit(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
         %0 = call @circuit(%arg0) : (tensor<f64>) -> tensor<f64>
@@ -181,9 +181,9 @@ def disentangle_cnot(qnode):
     with :func:`~.draw`).
 
     To instead view the optimized circuit, the MLIR must be viewed
-    after the ``"QuantumCompilationPass"`` stage:
+    after the ``"QuantumCompilationStage"`` stage:
 
-    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationPass"))
+    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationStage"))
 
     .. code-block:: mlir
 
@@ -271,9 +271,9 @@ def disentangle_swap(qnode):
     with :func:`~.draw`).
 
     To instead view the optimized circuit, the MLIR must be viewed
-    after the ``"QuantumCompilationPass"`` stage:
+    after the ``"QuantumCompilationStage"`` stage:
 
-    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationPass"))
+    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationStage"))
 
     .. code-block:: mlir
 
@@ -358,7 +358,7 @@ def merge_rotations(qnode):
         to display the circuit as written in Python.
 
         To instead view the optimized circuit, the MLIR must be viewed
-        after the ``"QuantumCompilationPass"`` stage via the
+        after the ``"QuantumCompilationStage`` stage via the
         :func:`~.get_compilation_stage` function.
 
     Args:
@@ -433,7 +433,7 @@ def ions_decomposition(qnode):  # pragma: nocover
         to display the circuit as written in Python.
 
         To instead view the optimized circuit, the MLIR must be viewed
-        after the ``"QuantumCompilationPass"`` stage via the
+        after the ``"QuantumCompilationStage"`` stage via the
         :func:`~.get_compilation_stage` function.
 
     Args:
@@ -463,7 +463,7 @@ def ions_decomposition(qnode):  # pragma: nocover
             return qml.expval(qml.PauliY(wires=0))
 
 
-    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationPass"))
+    >>> print(get_compilation_stage(circuit, stage="QuantumCompilationStage"))
     module @circuit {
       func.func public @jit_circuit() -> tensor<f64> attributes {llvm.emit_c_interface} {
         %0 = call @circuit_0() : () -> tensor<f64>
@@ -1054,7 +1054,7 @@ def ppm_specs(fn):
         from catalyst import qjit, measure, for_loop
         from catalyst.passes import ppm_specs, ppm_compilation
 
-        pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+        pipe = [("pipe", ["quantum-compilation-stage"])]
         device = qml.device("lightning.qubit", wires=2)
 
         @qjit(pipelines=pipe, target="mlir")
@@ -1154,7 +1154,7 @@ def reduce_t_depth(qnode):
         from catalyst import qjit, measure
         from catalyst.passes import to_ppr, commute_ppr, reduce_t_depth, merge_ppr_ppm
 
-        pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+        pips = [("pipe", ["quantum-compilation-stage"])]
 
 
         @qjit(pipelines=pips, target="mlir")
@@ -1244,7 +1244,7 @@ def ppr_to_mbqc(qnode):
         from catalyst import qjit, measure
         from catalyst.passes import to_ppr, ppr_to_mbqc
 
-        pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+        pipeline = [("pipe", ["quantum-compilation-stage"])]
 
         @qjit(pipelines=pipeline, keep_intermediate=True, target="mlir")
         @ppr_to_mbqc
