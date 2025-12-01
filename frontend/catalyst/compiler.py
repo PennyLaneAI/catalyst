@@ -388,9 +388,9 @@ def to_mlir_opt(
     if using_python_compiler:
         # Use the Python interface path for xDSL passes
         # pylint: disable-next=import-outside-toplevel
-        from catalyst.python_interface import Compiler as PythonCompiler
+        from catalyst.python_interface import Compiler as UnifiedCompiler
 
-        compiler = PythonCompiler()
+        compiler = UnifiedCompiler()
         stdin = compiler.run(stdin, callback=None)
 
     # These are the options that may affect compilation
@@ -666,10 +666,10 @@ class Compiler:
             # We keep this module here to keep xDSL requirement optional
             # Only move this is it has been decided that xDSL is no longer optional.
             # pylint: disable-next=import-outside-toplevel
-            from catalyst.python_interface import Compiler as PythonCompiler
+            from catalyst.python_interface import Compiler as UnifiedCompiler
 
             callback = self._create_xdsl_pass_save_callback(workspace)
-            compiler = PythonCompiler()
+            compiler = UnifiedCompiler()
             ir = compiler.run(ir, callback=callback)
 
         return self.run_from_ir(

@@ -376,7 +376,6 @@ class Testdraw:
 
         assert drawing == expected_drawing
 
-    @pytest.mark.jax
     @pytest.mark.parametrize(
         "ops, expected",
         [
