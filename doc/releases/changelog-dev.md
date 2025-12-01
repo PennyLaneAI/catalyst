@@ -281,14 +281,14 @@
   for the qec dialect.
   [(#2189)](https://github.com/PennyLaneAI/catalyst/pull/2189)
 
-* Added a canonicalization pattern for `qec.ppr` to remove any PPRs consisting only
+  * Added a canonicalization pattern for `qec.ppr` to remove any PPRs consisting only
   of identities.
   [(#2192)](https://github.com/PennyLaneAI/catalyst/pull/2192)
 
   * Added support for PPRs to the :func:`~.passes.merge_rotations` pass to merge PPRs with
   equivalent angles, and cancelling of PPRs with opposite angles, or angles
   that sum to identity.
-  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)
+  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)	
 
 * A new `PauliFrame` dialect has been added. This dialect includes a set of abstractions and
   operations for interacting with an external Pauli frame tracking library.
