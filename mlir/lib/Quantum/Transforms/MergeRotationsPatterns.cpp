@@ -354,6 +354,11 @@ struct MergePPRRewritePattern : public OpRewritePattern<PPRotationOp> {
             return failure();
         }
 
+        // check same conditionals
+        if (op.getCondition() != prevOp.getCondition()) {
+            return failure();
+        }
+
         int16_t opRotation = static_cast<int16_t>(op.getRotationKind());
         int16_t prevOpRotation = static_cast<int16_t>(prevOp.getRotationKind());
 

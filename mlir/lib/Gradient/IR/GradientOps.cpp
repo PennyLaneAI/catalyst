@@ -19,9 +19,9 @@
 
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientOps.h"
+#include "Gradient/Transforms/annotate_invalid_gradient_functions.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/annotate_function.h"
 
 #define GET_OP_CLASSES
 #include "Gradient/IR/GradientOps.cpp.inc"
@@ -56,7 +56,7 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
         return op_state->emitOpError("incorrect number of operands for callee, ")
                << "expected " << fnType.getNumInputs() << " but got " << fnArgs.size();
 
-    if (callee->getAttrOfType<UnitAttr>(catalyst::quantum::hasInvalidGradientOp)) {
+    if (callee->getAttrOfType<UnitAttr>(catalyst::gradient::hasInvalidGradientOp)) {
         // Check that the method is not finite difference, as finite difference should always be
         // available
         auto gradOpInterface = cast<GradientOpInterface>(op_state->getOperation());
