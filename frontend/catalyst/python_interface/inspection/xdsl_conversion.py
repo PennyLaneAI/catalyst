@@ -30,8 +30,8 @@ from xdsl.dialects.scf import ForOp
 from xdsl.dialects.tensor import ExtractOp as TensorExtractOp
 from xdsl.ir import SSAValue
 
-from ...jit import QJIT, qjit
-from ...passes.xdsl_plugin import getXDSLPluginAbsolutePath
+from catalyst.jit import QJIT, qjit
+from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from ..dialects.quantum import (
     CustomOp,
     ExtractOp,
