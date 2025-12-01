@@ -137,7 +137,6 @@ void constructReverseCNOTLadder(SmallVector<Value> &qubits, ConversionPatternRew
 void constructKernelOperation(SmallVector<Value> &qubits, Value &measResult, QECOpInterface op,
                               ConversionPatternRewriter &rewriter)
 {
-
     if (isa<PPMeasurementOp>(op.getOperation())) {
         auto measOp = buildMeasurementOp(qubits[0], rewriter);
         measResult = measOp.getMres();
