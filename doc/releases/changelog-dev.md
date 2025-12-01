@@ -76,6 +76,10 @@
   when both capture and graph-decomposition are enabled.
   [(#2215)](https://github.com/PennyLaneAI/catalyst/pull/2215)
 
+* Resource tracking now tracks calls to `SetState` and `SetBasisState`, and can report results
+  that include `qml.StatePrep` operations.
+  [(#2230)](https://github.com/PennyLaneAI/catalyst/pull/2230)
+
 * `qml.PCPhase` can be compiled and executed with capture enabled.
   [(#2226)](https://github.com/PennyLaneAI/catalyst/pull/2226)
 
@@ -280,6 +284,11 @@
   * Added a canonicalization pattern for `qec.ppr` to remove any PPRs consisting only
   of identities.
   [(#2192)](https://github.com/PennyLaneAI/catalyst/pull/2192)
+
+  * Added support for PPRs to the :func:`~.passes.merge_rotations` pass to merge PPRs with
+  equivalent angles, and cancelling of PPRs with opposite angles, or angles
+  that sum to identity.
+  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)	
 
 <h3>Documentation 📝</h3>
 
