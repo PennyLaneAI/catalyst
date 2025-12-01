@@ -296,7 +296,6 @@ struct InlineNestedModule : public RewritePattern {
         op->walk([&](func::FuncOp f) {
             StringRef funcName = f.getName();
             if (f.isExternal() && _externalFuncDeclNames.contains(funcName)) {
-
                 if (alreadyInlinedFuncDeclNames.contains(funcName)) {
                     _erasureWorklist.push_back(f);
                 }
