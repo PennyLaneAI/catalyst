@@ -23,7 +23,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
-#include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOps.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
