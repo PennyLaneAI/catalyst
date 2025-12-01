@@ -227,6 +227,9 @@
   gates, overwriting their effects.
   [(#2239)](https://github.com/PennyLaneAI/catalyst/pull/2239)
 
+* The `--inline-nested-module` pass no longer renames external function declarations.
+  [(#2244)](https://github.com/PennyLaneAI/catalyst/pull/2244)
+
 <h3>Internal changes ⚙️</h3>
 
 * Resource tracking now writes out at device destruction time instead of qubit deallocation
