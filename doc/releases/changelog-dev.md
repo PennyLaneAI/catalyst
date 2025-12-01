@@ -2,7 +2,98 @@
 
 <h3>New features since last release</h3>
 
+* Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
+  [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
+
+* Catalyst can now compile circuits that are directly expressed in terms of Pauli product rotation 
+  (PPR) and Pauli product measurement (PPM) operations: :class:`~.PauliRot` and 
+  :func:`~.pauli_measure`, respectively. This support enables research and development 
+  spurred from `A Game of Surface Codes (arXiv1808.02892) <https://arxiv.org/pdf/1808.02892>`_.
+  [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
+
+  :class:`~.PauliRot` and :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes
+  for PPR-PPM compilation, which includes :func:`catalyst.passes.to_ppr`, 
+  :func:`catalyst.passes.commute_ppr`, :func:`catalyst.passes.merge_ppr_ppm`, 
+  :func:`catalyst.passes.ppr_to_ppm`, :func:`catalyst.passes.reduce_t_depth`, and 
+  :func:`catalyst.passes.ppm_compilation`. For clear and inspectable results, use ``target="mlir"`` 
+  in the ``qjit`` decorator, ensure that PennyLane's program capture is enabled, 
+  :func:`pennylane.capture.enable`, and call the Catalyst passes from the PennyLane frontend (e.g., 
+  ``qml.transforms.ppr_to_ppm`` instead of from ``catalyst.passes.``).
+
+  ```python
+  import pennylane as qml
+  from functools import partial
+  import jax.numpy as jnp
+
+  qml.capture.enable()
+
+  @qjit(target="mlir")
+  @partial(qml.transforms.ppm_compilation, decompose_method="auto-corrected")
+  @qml.qnode(qml.device("null.qubit", wires=3))
+  def circuit():
+      # equivalent to a Hadamard gate
+      qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
+      qml.PauliRot(jnp.pi / 2, pauli_word="X", wires=0)
+      qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
+
+      ppm = qml.pauli_measure(pauli_word="XYZ", wires=[0, 1, 2])
+
+      # equivalent to a CNOT gate
+      qml.PauliRot(jnp.pi / 2, pauli_word="ZX", wires=[0, 1])
+      qml.PauliRot(-jnp.pi / 2, pauli_word="Z", wires=[0])
+      qml.PauliRot(-jnp.pi / 2, pauli_word="X", wires=[1])
+
+      # equivalent to a T gate
+      qml.PauliRot(jnp.pi / 4, pauli_word="Z", wires=0)
+
+      ppm = qml.pauli_measure(pauli_word="YYZ", wires=[0, 2, 1])
+
+      return
+  ```
+
+  ```pycon
+  >>> print(qml.specs(circuit, level="all")()['resources'])
+  {
+    'No transforms': ..., 
+    'Before MLIR Passes (MLIR-0)': ...,
+    'ppm-compilation (MLIR-1)': Resources(
+      num_wires=6, 
+      num_gates=14, 
+      gate_types=defaultdict(<class 'int'>, {'PPM-w3': 2, 'PPM-w2': 4, 'PPM-w1': 4, 'PPR-pi/2-w1': 4}), 
+      gate_sizes=defaultdict(<class 'int'>, {3: 2, 2: 4, 1: 8}), 
+      depth=None, 
+      shots=Shots(total_shots=None, shot_vector=())
+    )
+  }
+  ```
+
 <h3>Improvements 🛠</h3>
+
+* Resource tracking now tracks calls to `SetState` and `SetBasisState`, and can report results
+  that include `qml.StatePrep` operations.
+  [(#2230)](https://github.com/PennyLaneAI/catalyst/pull/2230)
+  
+* Remove the hardcoded list of runtime operations in the frontend.
+  This will allow arbitrary PL gates to be represented without hyperparameters in MLIR.
+  For gates that do not have a QIR representation, a runtime error will be raised at execution.
+  Users can still decompose these gates via `qml.transforms.decompose`
+  when both capture and graph-decomposition are enabled.
+  [(#2215)](https://github.com/PennyLaneAI/catalyst/pull/2215)
+
+* `qml.PCPhase` can be compiled and executed with capture enabled.
+  [(#2226)](https://github.com/PennyLaneAI/catalyst/pull/2226)
+
+* Resource tracking now supports dynamic qubit allocation
+  [(#2203)](https://github.com/PennyLaneAI/catalyst/pull/2203)
+
+* Pass instrumentation can be applied to each pass within the `NamedSequenceOp` transform sequence for a qnode.
+  [(#1978)](https://github.com/PennyLaneAI/catalyst/pull/1978)
+
+* The new graph-based decomposition framework has Autograph feature parity with PennyLane
+  when capture enabled. When compiling with `qml.qjit(autograph=True)`, the decomposition rules
+  returned by the graph-based framework are now correctly compiled using Autograph.
+  This ensures compatibility and deeper optimization for dynamically generated rules.
+  [(#2161)](https://github.com/PennyLaneAI/catalyst/pull/2161)
 
 * The ``decompose-lowering`` MLIR pass now supports ``qml.MultiRZ``
   with an arbitrary number of wires. This decomposition is performed
@@ -23,15 +114,38 @@
 * `qml.grad` and `qml.jacobian` can now be used with `qjit` when program capture is enabled.
   [(#2078)](https://github.com/PennyLaneAI/catalyst/pull/2078)
 
-* xDSL passes are now automatically detected when using the `qjit` decorator. 
+* xDSL passes are now automatically detected when using the `qjit` decorator.
   This removes the need to pass the `pass_plugins` argument to the `qjit` decorator.
   [(#2169)](https://github.com/PennyLaneAI/catalyst/pull/2169)
   [(#2183)](https://github.com/PennyLaneAI/catalyst/pull/2183)
 
+* The ``mlir_opt`` property now correctly handles xDSL passes by automatically
+  detecting when the Python compiler is being used and routing through it appropriately.
+  [(#2190)](https://github.com/PennyLaneAI/catalyst/pull/2190)
+
 * Dynamically allocated wires can now be passed into control flow and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
 
+* Catalyst now supports arbitrary angle Pauli product rotations in the QEC dialect. 
+  This will allow :class:`qml.PauliRot` with arbitrary angles to be lowered to QEC dialect.
+  This is implemented as a new `qec.ppr.arbitrary` operation, which takes a Pauli product
+  and an arbitrary angle (as a double) as input.
+  [(#2232)](https://github.com/PennyLaneAI/catalyst/pull/2232)
+
+  For example:
+  ```mlir
+  %const = arith.constant 0.124 : f64
+  %1:2 = qec.ppr.arbitrary ["X", "Z"](%const) %q1, %q2 : !quantum.bit, !quantum.bit
+  %2:2 = qec.ppr.arbitrary ["X", "Z"](%const) %1#0, %1#1 cond(%c0) : !quantum.bit, !quantum.bit
+  ```
+
+* The `--adjoint-lowering` pass can now handle PPR operations.
+  [(#2227)](https://github.com/PennyLaneAI/catalyst/pull/2227)
+
 <h3>Breaking changes 💔</h3>
+
+* The plxpr transform `pl_map_wires` has been removed along with its test.
+  [(#2220)](https://github.com/PennyLaneAI/catalyst/pull/2220)
 
 * (Compiler integrators only) The versions of LLVM/Enzyme/stablehlo used by Catalyst have been
   updated. Enzyme now targets `v0.0.203` with the build target `EnzymeStatic-22`, and the nanobind
@@ -47,6 +161,10 @@
   [commit 0a4440a](https://github.com/openxla/stablehlo/commit/0a4440a5c8de45c4f9649bf3eb4913bf3f97da0d).
   - The Enzyme version has been updated to
   [v0.0.203](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.203).
+
+* The pass `remove-chained-self-inverse` has been renamed to `cancel-inverses`, to better
+  conform with the name of the corresponding transform in PennyLane.
+  [(#2201)](https://github.com/PennyLaneAI/catalyst/pull/2201)
 
 <h3>Deprecations 👋</h3>
 
@@ -96,7 +214,33 @@
   // ... use %4
   ```
 
+* Fixes :func:`~.passes.commute_ppr` and :func:`~.passes.merge_ppr_ppm` incorrectly
+  moving nullary operations. This also improves the compilation time by reducing
+  the sort function, by explicitly passing the operations that need to be sorted.
+  [(#2200)](https://github.com/PennyLaneAI/catalyst/pull/2200)
+
+* The pass pipeline is correctly registered to the transform named sequence of the
+  one-shot qnode when `one-shot` mcm method is used.
+  [(#2198)](https://github.com/PennyLaneAI/catalyst/pull/2198)
+
+* Fixed a bug where `qml.StatePrep` and `qml.BasisState` might be pushed after other
+  gates, overwriting their effects.
+  [(#2239)](https://github.com/PennyLaneAI/catalyst/pull/2239)
+
 <h3>Internal changes ⚙️</h3>
+
+* Resource tracking now writes out at device destruction time instead of qubit deallocation
+  time. The written resources will be the total amount of resources collected throughout the
+  lifetime of the execution. For executions that split work between multiple functions,
+  e.g. with the `split-non-commuting` pass, this ensures that resource tracking outputs
+  the total resources used for all splits.
+  [(#2219)](https://github.com/PennyLaneAI/catalyst/pull/2219)
+
+* Replaces the deprecated `shape_dtype_to_ir_type` function with the `RankedTensorType.get` method.
+  [(#2159)](https://github.com/PennyLaneAI/catalyst/pull/2159)
+
+* Updates to PennyLane's use of a single transform primitive with a `transform` kwarg.
+  [(#2177)](https://github.com/PennyLaneAI/catalyst/pull/2177)
 
 * The pytest tests are now run with `strict=True` by default.
   [(#2180)](https://github.com/PennyLaneAI/catalyst/pull/2180)
@@ -132,10 +276,19 @@
       // ... ion operations ...
   }
   ```
-  
-  * Added support for `ppr-to-ppm` as an individual MLIR pass and python binding 
+
+  * Added support for `ppr-to-ppm` as an individual MLIR pass and python binding
   for the qec dialect.
   [(#2189)](https://github.com/PennyLaneAI/catalyst/pull/2189)
+
+* Added a canonicalization pattern for `qec.ppr` to remove any PPRs consisting only
+  of identities.
+  [(#2192)](https://github.com/PennyLaneAI/catalyst/pull/2192)
+
+  * Added support for PPRs to the :func:`~.passes.merge_rotations` pass to merge PPRs with
+  equivalent angles, and cancelling of PPRs with opposite angles, or angles
+  that sum to identity.
+  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)
 
 * A new `PauliFrame` dialect has been added. This dialect includes a set of abstractions and
   operations for interacting with an external Pauli frame tracking library.
@@ -159,10 +312,14 @@ This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
 Joey Carter,
+Yushao Chen,
+Sengthai Heng,
 Jeffrey Kam,
 Christina Lee,
+Mehrdad Malekmohammadi,
 River McCubbin,
 Lee J. O'Riordan,
 Roberto Turrado,
 Paul Haochen Wang,
+Jake Zaia,
 Hongsheng Zheng.
