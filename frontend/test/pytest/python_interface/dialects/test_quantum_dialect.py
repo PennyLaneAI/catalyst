@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit test module for pennylane/compiler/python_compiler/dialects/quantum.py."""
+"""Unit tests for the xDSL Quantum dialect."""
 
 import pytest
 
