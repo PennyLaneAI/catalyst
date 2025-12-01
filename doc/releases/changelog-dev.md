@@ -66,13 +66,6 @@
 * Resource tracking now tracks calls to `SetState` and `SetBasisState`, and can report results
   that include `qml.StatePrep` operations.
   [(#2230)](https://github.com/PennyLaneAI/catalyst/pull/2230)
-  
-* Remove the hardcoded list of runtime operations in the frontend.
-  This will allow arbitrary PL gates to be represented without hyperparameters in MLIR.
-  For gates that do not have a QIR representation, a runtime error will be raised at execution.
-  Users can still decompose these gates via `qml.transforms.decompose`
-  when both capture and graph-decomposition are enabled.
-  [(#2215)](https://github.com/PennyLaneAI/catalyst/pull/2215)
 
 * `qml.PCPhase` can be compiled and executed with capture enabled.
   [(#2226)](https://github.com/PennyLaneAI/catalyst/pull/2226)
@@ -140,6 +133,9 @@
 
 * The plxpr transform `pl_map_wires` has been removed along with its test.
   [(#2220)](https://github.com/PennyLaneAI/catalyst/pull/2220)
+
+* The JAX version used by Catalyst has been updated to 0.7.0.
+  [(#2131)](https://github.com/PennyLaneAI/catalyst/pull/2131)
 
 * (Compiler integrators only) The versions of LLVM/Enzyme/stablehlo used by Catalyst have been
   updated. Enzyme now targets `v0.0.203` with the build target `EnzymeStatic-22`, and the nanobind
