@@ -19,14 +19,14 @@
 namespace catalyst {
 namespace driver {
 
-void createEnforceRuntimeInvariantsPipeline(mlir::OpPassManager &pm);
+void createUserTransformPipeline(mlir::OpPassManager &pm);
 void createHloLoweringPipeline(mlir::OpPassManager &pm);
 void createQuantumCompilationPipeline(mlir::OpPassManager &pm);
 void createBufferizationPipeline(mlir::OpPassManager &pm);
 void createLLVMDialectLoweringPipeline(mlir::OpPassManager &pm);
 void createDefaultCatalystPipeline(mlir::OpPassManager &pm);
 
-void registerEnforceRuntimeInvariantsPipeline();
+void registerUserTransformPipeline();
 void registerHloLoweringPipeline();
 void registerQuantumCompilationPipeline();
 void registerBufferizationPipeline();
