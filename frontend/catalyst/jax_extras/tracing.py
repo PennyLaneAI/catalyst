@@ -13,7 +13,7 @@
 # limitations under the License.
 """Jax extras module containing functions related to the Python program tracing"""
 
-# pylint: disable=line-too-long
+# pylint: disable=line-too-long,too-many-lines
 
 from __future__ import annotations
 
@@ -47,7 +47,6 @@ from jax.core import (
     eval_jaxpr,
     find_top_trace,
     gensym,
-    new_jaxpr_eqn,
 )
 from jax.extend.core import ClosedJaxpr, Jaxpr, JaxprEqn
 from jax.extend.core import Primitive as JaxprPrimitive
@@ -197,8 +196,23 @@ def stable_toposort(end_nodes: list) -> list:
     return sorted_nodes
 
 
-def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]) -> List[JaxprEqn]:
-    """Topologically sort JAXRR equations in a unsorted list of equations, based on their
+class Box:
+    """Wrapper for TracingEqn keeping track of its id and parents."""
+
+    def __init__(self, boxid: int, e: JaxprEqn):
+        self.id: int = boxid
+        self.e: JaxprEqn = e
+        self.parents: List["Box"] = []  # to be filled later
+
+    def __lt__(self, other):
+        return self.id < other.id
+
+
+def sort_eqns(
+    eqns: List[JaxprEqn | Callable[[], JaxprEqn]],
+    forced_order_primitives: Set[JaxprPrimitive],
+) -> List[JaxprEqn | Callable[[], JaxprEqn]]:
+    """Topologically sort TracingEqns in a unsorted list of equations, based on their
     input/output variables and additional criterias."""
 
     # The procedure goes as follows: [1] - initialize the `origin` map mapping variable identifiers
@@ -206,18 +220,18 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
     # correct values, [3] - add additional equation order restrictions to boxes, [4] - call the
     # topological sorting.
 
-    class Box:
-        """Wrapper for JaxprEqn keeping track of its id and parents."""
+    # JAX 0.7+: eqns might be lambda functions that return TracingEqn or weakrefs
+    # We need to preserve the mapping from actual_eqn to the original callable
+    actual_eqns = []
+    eqn_to_callable = {}  # Maps actual TracingEqn to its original callable/wrapper
+    for eqn_or_callable in eqns:
+        eqn = eqn_or_callable() if callable(eqn_or_callable) else eqn_or_callable
+        assert eqn is not None
+        actual_eqns.append(eqn)
+        eqn_to_callable[id(eqn)] = eqn_or_callable
 
-        def __init__(self, boxid: int, e: JaxprEqn):
-            self.id: int = boxid
-            self.e: JaxprEqn = e
-            self.parents: List["Box"] = []  # to be filled later
+    boxes = [Box(i, e) for i, e in enumerate(actual_eqns)]
 
-        def __lt__(self, other):
-            return self.id < other.id
-
-    boxes = [Box(i, e) for i, e in enumerate(eqns)]
     fixedorder = [(i, b) for (i, b) in enumerate(boxes) if b.e.primitive in forced_order_primitives]
     origin: Dict[int, Box] = {}
     for b in boxes:
@@ -225,15 +239,28 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
     for b in boxes:
         b.parents = []
         for v in b.e.invars:
-            if not isinstance(v, jax._src.core.Var):
+            if hasattr(v, "val") and isinstance(v.val, jax._src.core.Var):
+                actual_var = v.val
+            elif isinstance(v, jax._src.core.Var):
+                actual_var = v
+            else:
                 # constant literal invar, no need to track def use order
                 continue
-            if v.count in origin:
-                b.parents.append(origin[v.count])  # [2]
+
+            if actual_var.count in origin:
+                b.parents.append(origin[actual_var.count])  # [2]
     for i, q in fixedorder:
         for b in boxes[i + 1 :]:
             b.parents.append(q)  # [3]
-    return [b.e for b in stable_toposort(boxes)]  # [4]
+
+    sorted_boxes = stable_toposort(boxes)
+
+    # Restore the original callables/wrappers for the sorted equations
+    result = []
+    for b in sorted_boxes:
+        result.append(eqn_to_callable.get(id(b.e), b.e))
+
+    return result  # [4]
 
 
 def jaxpr_pad_consts(jaxprs: List[Jaxpr]) -> List[ClosedJaxpr]:
@@ -428,9 +455,8 @@ def trace_to_jaxpr(
 def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
     """Create a JAX tracer tracing an abstract value ``aval`, without specifying its source
     primitive."""
-    dt = DynamicJaxprTracer(trace, aval, current_source_info())
-    trace.frame.tracers.append(dt)
-    trace.frame.tracer_to_var[id(dt)] = trace.frame.newvar(aval)
+    atom = trace.frame.newvar(aval)
+    dt = DynamicJaxprTracer(trace, aval, atom, line_info=current_source_info())
     return dt
 
 
@@ -913,13 +939,16 @@ class DynshapePrimitive(JaxprPrimitive):
             # `abstract_eval` returned `out_type` calculated for empty constants.
             [],
             tracers,
-            maker=lambda a: DynamicJaxprTracer(trace, a, source_info),
+            maker=lambda aval: new_inner_tracer(trace, aval),
         )
 
-        invars = map(trace.getvar, tracers)
-        outvars = map(trace.makevar, out_tracers)
-
-        eqn = new_jaxpr_eqn(invars, outvars, self, params, [], source_info)
+        # invars = map(lambda t: t.val, tracers)
+        # outvars = map(lambda t: t.val, out_tracers)
+        # eqn = new_jaxpr_eqn(invars, outvars, self, params, [], source_info)
+        out_avals = [t.aval for t in out_tracers]
+        eqn, out_tracers = trace.make_eqn(
+            tracers, out_avals, self, params, [], source_info, out_tracers=out_tracers
+        )
         trace.frame.add_eqn(eqn)
         return out_tracers if self.multiple_results else out_tracers.pop()
 
