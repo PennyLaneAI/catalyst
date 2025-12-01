@@ -366,12 +366,15 @@ class TestForOp:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
+        # Check first for loop
         child_clusters = utility.dag_builder.get_child_clusters("my_workflow")
         assert len(child_clusters) == 1
         assert re.search(
             r"for arg\d in range\(0,5,2\)",
             child_clusters,
         )
+
+        # Check second for loop
         for_loop_label = utility.dag_builder.get_child_clusters(child_clusters[0])
         child_clusters = utility.dag_builder.get_child_clusters(for_loop_label)
         assert len(child_clusters) == 1
