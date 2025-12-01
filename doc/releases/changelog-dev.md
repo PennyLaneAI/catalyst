@@ -77,6 +77,10 @@
 * Intermediate IR files are now organized into subdirectories for each compilation stage
   when using ``keep_intermediate="changed"`` or ``keep_intermediate="pass"``.
   [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
+
+* Resource tracking now tracks calls to `SetState` and `SetBasisState`, and can report results
+  that include `qml.StatePrep` operations.
+  [(#2230)](https://github.com/PennyLaneAI/catalyst/pull/2230)
   
 * Remove the hardcoded list of runtime operations in the frontend.
   This will allow arbitrary PL gates to be represented without hyperparameters in MLIR.
