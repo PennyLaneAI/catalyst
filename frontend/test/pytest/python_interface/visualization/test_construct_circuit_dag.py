@@ -343,8 +343,41 @@ class TestForOp:
         utility.construct(module)
 
         assert re.search(
-            r"for arg\d in range\(0,2,1\)",
+            r"for arg\d in range\(0,3,1\)",
             utility.dag_builder.get_child_clusters("my_workflow"),
+        )
+
+    @pytest.mark.unit
+    def test_nested_loop(self):
+        """Tests that nested for loops are visualized correctly."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            for i in range(0, 5, 2):
+                for j in range(1, 6, 2):
+                    qml.H(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        child_clusters = utility.dag_builder.get_child_clusters("my_workflow")
+        assert len(child_clusters) == 1
+        assert re.search(
+            r"for arg\d in range\(0,5,2\)",
+            child_clusters,
+        )
+        for_loop_label = utility.dag_builder.get_child_clusters(child_clusters[0])
+        child_clusters = utility.dag_builder.get_child_clusters(for_loop_label)
+        assert len(child_clusters) == 1
+        assert re.search(
+            r"for arg\d in range\(1,6,2\)",
+            child_clusters,
         )
 
 
