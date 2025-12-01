@@ -198,6 +198,7 @@ def extract_backend_info(device: qml.devices.QubitDevice) -> BackendInfo:
 
     return BackendInfo(dname, device_name, device_lpath, device_kwargs)
 
+
 def intersect_operations(
     a: Dict[str, OperatorProperties], b: Dict[str, OperatorProperties]
 ) -> Dict[str, OperatorProperties]:
