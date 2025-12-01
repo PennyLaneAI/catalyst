@@ -410,23 +410,23 @@ class TestForOp:
                 qml.H(0)
 
         args = (1,)
-        start_dynamic_module = start_dynamic(*args)
-        stop_dynamic_module = stop_dynamic(*args)
-        step_dynamic_module = step_dynamic(*args)
-
         utility = ConstructCircuitDAG(FakeDAGBuilder())
+
+        start_dynamic_module = start_dynamic(*args)
         utility.construct(start_dynamic_module)
         assert re.search(
             r"for arg\d in range\(arg\d,3,1\)",
             utility.dag_builder.get_child_clusters("my_workflow"),
         )
 
+        stop_dynamic_module = stop_dynamic(*args)
         utility.construct(stop_dynamic_module)
         assert re.search(
             r"for arg\d in range\(0,arg\d,1\)",
             utility.dag_builder.get_child_clusters("my_workflow"),
         )
 
+        step_dynamic_module = step_dynamic(*args)
         utility.construct(step_dynamic_module)
         assert re.search(
             r"for arg\d in range\(0,3,arg\d\)",
