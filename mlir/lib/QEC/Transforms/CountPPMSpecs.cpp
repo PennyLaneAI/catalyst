@@ -24,9 +24,8 @@
 #include "mlir/Pass/Pass.h"
 
 #include "Catalyst/Utils/SCFUtils.h"
-#include "QEC/IR/QECDialect.h"
-#include "QEC/IR/QECOps.h"
 #include "QEC/IR/QECOpInterfaces.h"
+#include "QEC/IR/QECOps.h"
 #include "QEC/Utils/QECLayer.h"
 #include "QEC/Utils/QECOpUtils.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -40,6 +39,7 @@ using json = nlohmann::json;
 namespace catalyst {
 namespace qec {
 
+#define GEN_PASS_DECL_COUNTPPMSPECSPASS
 #define GEN_PASS_DEF_COUNTPPMSPECSPASS
 #include "QEC/Transforms/Passes.h.inc"
 

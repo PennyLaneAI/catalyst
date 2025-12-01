@@ -243,4 +243,3 @@ void LayerOp::print(OpAsmPrinter &p)
                   /*printEntryBlockArgs=*/false,
                   /*printBlockTerminators=*/!getInitArgs().empty());
 }
-

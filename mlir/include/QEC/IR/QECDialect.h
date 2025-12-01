@@ -30,7 +30,7 @@
 #include "QEC/IR/QECDialectTypes.h.inc"
 
 //===----------------------------------------------------------------------===//
-// QEC enum definitions.
+// QEC enum declarations.
 //===----------------------------------------------------------------------===//
 
 #include "QEC/IR/QECEnums.h.inc"

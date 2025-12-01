@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "llvm/ADT/TypeSwitch.h"
+#include "llvm/ADT/TypeSwitch.h" // needed for enums
 
 #include "mlir/IR/DialectImplementation.h"
 

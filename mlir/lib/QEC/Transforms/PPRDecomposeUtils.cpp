@@ -14,7 +14,6 @@
 
 #include "Quantum/IR/QuantumOps.h" // for quantum::AllocQubitOp
 
-#include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOps.h" // for FabricateOp
 #include "QEC/Transforms/PPRDecomposeUtils.h"
 
