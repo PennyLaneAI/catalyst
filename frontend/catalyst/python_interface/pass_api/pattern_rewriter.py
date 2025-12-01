@@ -15,12 +15,14 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from functools import singledispatchmethod
 from numbers import Number
 from typing import TypeAlias
 from uuid import UUID, uuid4
 
 from pennylane import math, measurements, ops
 from pennylane.exceptions import TransformError
+from pennylane.measurements import MeasurementProcess
 from pennylane.operation import Operator
 from xdsl.builder import ImplicitBuilder
 from xdsl.dialects import arith, builtin, func, scf, tensor
@@ -123,15 +125,11 @@ class PLPatternRewriter(PatternRewriter):
     def get_qreg(self, insertion_point: InsertPoint) -> quantum.QuregSSAValue | None:
         """Get the active quantum register at a given point in the program. Returns ``None``
         If there are no active quantum registers. Currently, we assume that there can only be
-        one active quantum register at any given point in the program."""
-        cur_op = insertion_point.insert_before
+        at most one active quantum register at any given point in the program."""
+        cur_op = insertion_point.insert_before.prev_op
         qreg = None
 
-        while cur_op.prev_op is not None:
-            if isinstance(cur_op, quantum.DeallocOp):
-                break
-
-            cur_op = cur_op.prev_op
+        while not (cur_op is None or isinstance(cur_op, quantum.DeallocOp)):
             for r in cur_op.results:
                 if isinstance(r.type, quantum.QuregType):
                     qreg = r
@@ -169,12 +167,13 @@ class PLPatternRewriter(PatternRewriter):
 
         return root, seen_qubits
 
-    def get_qreg_idx_from_qubit(self, qubit: quantum.QubitSSAValue) -> int | DynamicWire | None:
+    # TODO: Improve docstring
+    def get_idx_from_qubit(self, qubit: quantum.QubitSSAValue) -> int | SSAValue | None:
         """Get the index to the quantum register to which a qubit corresponds.
 
-        If the index is unknown at compile-time, a ``DynamicWire`` will be returned with
-        a handle to the SSA value corresponding to the index. If the qubit was dynamically
-        allocated, or originated from an argument, ``None`` will be returned.
+        If the index is unknown at compile-time, an SSA value corresponding to the index
+        will be returned. If the qubit was dynamically allocated, or originated from a
+        block argument, ``None`` will be returned.
         """
         if not isinstance(qubit.type, quantum.QubitType):
             raise TypeError(f"The input must be a QubitType SSAValue, got {qubit}.")
@@ -183,17 +182,18 @@ class PLPatternRewriter(PatternRewriter):
 
         if isinstance(root, quantum.ExtractOp):
             if (idx_attr := getattr(root, "idx_attr", None)) is not None:
-                return idx_attr.data
+                return idx_attr.value.data
             elif (idx := get_constant_from_ssa(root.idx)) is not None:
                 return idx
 
-            return DynamicWire(var=root.idx)
+            return root.idx
 
-        # If the qubit's root is an AllocQubitOp, the qubit does not correspond to a
-        # qreg index. Else, it originates from a BlockArgument, in which case, its
+        # If the qubit's root is an ``AllocQubitOp``, the qubit does not correspond to a
+        # qreg index. Else, it originates from a ``BlockArgument``, in which case, its
         # corresponding index, if there is one, cannot be inferred.
         return None
 
+    # TODO: Improve docstring
     def get_active_qubits(
         self, insertion_point: InsertPoint
     ) -> dict[WireLabelLike | quantum.QubitSSAValue, quantum.QubitSSAValue | WireLabelLike]:
@@ -236,6 +236,30 @@ class PLPatternRewriter(PatternRewriter):
                 qubit_map[r] = insert_idx
 
         return qubit_map
+
+    def insert_active_qubits(
+        self,
+        insertion_point: InsertPoint,
+        qreg: quantum.QuregSSAValue | None,
+        active_qubits: dict | None = None,
+    ) -> quantum.QuregSSAValue:
+        """Insert all currently active qubits into the quantum register."""
+        if active_qubits is None:
+            active_qubits = self.get_active_qubits(insertion_point)
+        if qreg is None:
+            qreg = self.get_qreg(insertion_point)
+
+        for idx, qubit in active_qubits.items():
+            if isinstance(idx, (int, DynamicWire)):
+                if isinstance(idx, DynamicWire) and idx.var is not None:
+                    idx = idx.var
+
+                insertOp = quantum.InsertOp(in_qreg=qreg, idx=idx, qubit=qubit)
+                self.insert_op(insertOp, insertion_point=insertion_point)
+                insertion_point = InsertPoint.after(insertOp)
+                qreg = insertOp.results[0]
+
+        return qreg
 
     def insert_constant(self, cst: Number, insertion_point: InsertPoint) -> xOperation:
         """Create a scalar ConstantOp and insert it into the IR.
@@ -556,6 +580,232 @@ class PLPatternRewriter(PatternRewriter):
                 self.notify_op_modified(use.operation)
 
         return gateOp
+
+    @singledispatchmethod
+    def insert_observable(
+        self, obs: Operator, insertion_point: InsertPoint, params: Sequence[SSAValue] | None = None
+    ) -> xOperation:
+        """Insert a PL observable into the IR at the provided insertion point."""
+        if isinstance(obs, _named_observables):
+            in_qubit = obs.wires[0]
+            namedObsOp = quantum.NamedObsOp(
+                in_qubit, quantum.NamedObservableAttr(getattr(quantum.NamedObservable, obs.name))
+            )
+            self.insert_op(namedObsOp, insertion_point=insertion_point)
+            return namedObsOp
+
+        raise TransformError(
+            f"The observable {type(obs).__name__} cannot be inserted into the module."
+        )
+
+    @insert_observable.register(ops.Hermitian)
+    def _insert_hermitian(
+        self,
+        obs: ops.Hermitian,
+        insertion_point: InsertPoint,
+        params: Sequence[SSAValue] | None = None,
+    ) -> xOperation:
+        """Insert a qml.Hermitian observable into the IR at the provided insertion point."""
+        if params:
+            mat_op = params[0]
+        else:
+            mat = obs.matrix()
+            mat_attr = builtin.DenseIntOrFPElementsAttr.from_list(
+                builtin.TensorType(
+                    builtin.ComplexType(builtin.Float64Type()), shape=math.shape(mat)
+                ),
+                mat,
+            )
+            mat_op = arith.ConstantOp(value=mat_attr)
+            self.insert_op(mat_op, insertion_point=insertion_point)
+            insertion_point = InsertPoint.after(mat_op)
+
+        in_qubits = tuple(obs.wires)
+        hermitianOp = quantum.HermitianOp(
+            operands=(mat_op.results[0], in_qubits), result_types=(quantum.ObservableType(),)
+        )
+        self.insert_op(hermitianOp, insertion_point=insertion_point)
+        return hermitianOp
+
+    @insert_observable.register(ops.Prod)
+    def _insert_prod(
+        self, obs: ops.Prod, insertion_point: InsertPoint, params: Sequence[SSAValue] | None = None
+    ) -> xOperation:
+        """Insert a qml.ops.Prod observable into the IR at the provided insertion point."""
+        operands = []
+        for o in obs.operands:
+            cur_obs = self.insert_observable(o, insertion_point, params=params)
+            operands.append(cur_obs.results[0])
+            insertion_point = InsertPoint.after(cur_obs)
+        prodOp = quantum.TensorOp(operands=operands, result_types=(quantum.ObservableType(),))
+        self.insert_op(prodOp, insertion_point=insertion_point)
+        return prodOp
+
+    @insert_observable.register(ops.Sum)
+    def _insert_sum(
+        self, obs: ops.Sum, insertion_point: InsertPoint, params: Sequence[SSAValue] | None = None
+    ) -> xOperation:
+        """Insert a qml.ops.Sum observable into the IR at the provided insertion point."""
+        # Create static tensor for coefficients
+        if params:
+            coeffs = params[0]
+            ops = obs.operands
+        else:
+            coeffs, ops = obs.terms()
+            coeffs_attr = builtin.DenseIntOrFPElementsAttr.from_list(
+                builtin.TensorType(builtin.Float64Type(), shape=(len(coeffs),)), coeffs
+            )
+            constantOp = arith.ConstantOp(value=coeffs_attr)
+            self.insert_op(constantOp, insertion_point=insertion_point)
+            insertion_point = InsertPoint.after(constantOp)
+            coeffs = constantOp.results[0]
+
+        _ops = []
+        for o in ops:
+            cur_obs = self.insert_observable(o, insertion_point, params=params[1:])
+            _ops.append(cur_obs.results[0])
+            insertion_point = InsertPoint.after(cur_obs)
+
+        hamiltonianOp = quantum.HamiltonianOp(
+            operands=(coeffs, _ops), result_types=(quantum.ObservableType(),)
+        )
+        return hamiltonianOp
+
+    @insert_observable.register(ops.SProd)
+    def _insert_sprod(
+        self, obs: ops.SProd, insertion_point: InsertPoint, params: Sequence[SSAValue] | None = None
+    ) -> xOperation:
+        """Insert a qml.ops.SProd observable into the IR at the provided insertion point."""
+        if params:
+            coeff = params[0]
+        else:
+            coeffs_attr = builtin.DenseIntOrFPElementsAttr.from_list(
+                builtin.TensorType(builtin.Float64Type(), shape=(1,)), [obs.scalar]
+            )
+            constantOp = arith.ConstantOp(value=coeffs_attr)
+            self.insert_op(constantOp, insertion_point=insertion_point)
+            insertion_point = InsertPoint.after(constantOp)
+            coeff = constantOp.results[0]
+
+        base_obs = self.insert_observable(obs.base, insertion_point, params=params[1:])
+        hamiltonianOp = quantum.HamiltonianOp(
+            operands=(coeff, (base_obs.results[0],)), result_types=(quantum.ObservableType(),)
+        )
+        self.insert_op(hamiltonianOp, insertion_point=insertion_point)
+        return hamiltonianOp
+
+    # TODO: Improve docstring
+    def insert_measurement(
+        self, mp: MeasurementProcess, insertion_point: InsertPoint
+    ) -> xOperation:
+        """Insert a measurement operation into the program."""
+        if mp.mv:
+            raise TransformError(
+                "Inserting measurements that collect statistics on mid-circuit measurements "
+                "is currently not supported."
+            )
+
+        meas_op = None
+        qreg = None
+
+        if mp.obs:
+            # Measurement on observable
+            obs = self.insert_observable(mp.obs, insertion_point)
+            n_qubits = len(mp.obs.wires)
+
+            insertion_point = InsertPoint.after(obs)
+
+        if mp.wires:
+            # Measurement on some wires
+            obs = quantum.ComputationalBasisOp(
+                operands=(tuple(mp.wires), None),
+                result_types=(quantum.ObservableType()),
+            )
+            n_qubits = len(mp.wires)
+            self.insert_op(obs, insertion_point=insertion_point)
+
+            insertion_point = InsertPoint.after(obs)
+
+        else:
+            # Measurement on all wires
+            qreg = self.get_qreg(insertion_point)
+            obs = quantum.ComputationalBasisOp(
+                operands=((), qreg), result_types=(quantum.ObservableType(),)
+            )
+            self.insert_op(obs, insertion_point=insertion_point)
+            insertion_point = InsertPoint.after(obs)
+            n_qubits = self.get_num_qubits(InsertPoint.before(obs))
+
+        # # Create the measurement xDSL operation
+        # match type(mp):
+        #     case measurements.ExpectationMP:
+        #         measurementOp = quantum.ExpvalOp(obs=obs)
+
+        #     case measurements.VarianceMP:
+        #         measurementOp = quantum.VarianceOp(obs=obs)
+
+        #     case measurements.StateMP:
+        #         # For now, we assume that there is no input MemRefType
+        #         tensor_shape, dynamic_shape, insertion_point = self._resolve_dynamic_shape(
+        #             n_qubits, insertion_point
+        #         )
+        #         measurementOp = quantum.StateOp(
+        #             operands=(obs, dynamic_shape, None),
+        #             result_types=(
+        #                 builtin.TensorType(
+        #                     element_type=builtin.ComplexType(builtin.Float64Type()),
+        #                     shape=tensor_shape,
+        #                 )
+        #             ),
+        #         )
+
+        #     case measurements.ProbabilityMP:
+        #         # For now, we assume that there is no input MemRefType
+        #         tensor_shape, dynamic_shape, insertion_point = self._resolve_dynamic_shape(
+        #             n_qubits, insertion_point
+        #         )
+        #         measurementOp = quantum.ProbsOp(
+        #             operands=(obs, dynamic_shape, None, None),
+        #             result_types=(
+        #                 builtin.TensorType(element_type=builtin.Float64Type(), shape=tensor_shape),
+        #             ),
+        #         )
+
+        #     case measurements.SampleMP:
+        #         #  n_qubits or shots may not be known at compile time
+        #         _iter = (self.wire_manager.shots, n_qubits)
+        #         tensor_shape = tuple(-1 if isinstance(i, SSAValue) else i for i in _iter)
+        #         # We only insert values into dynamic_shape that are unknown at compile time
+        #         dynamic_shape = tuple(i for i in _iter if isinstance(i, SSAValue))
+        #         if isinstance(n_qubits, int) and n_qubits == 1:
+        #             tensor_shape = (tensor_shape[0],)
+
+        #         measurementOp = quantum.SampleOp(
+        #             operands=(obs, dynamic_shape, None),
+        #             result_types=(
+        #                 builtin.TensorType(element_type=builtin.Float64Type(), shape=tensor_shape),
+        #             ),
+        #         )
+
+        #     case measurements.CountsMP:
+        #         # For now, we assume that there are no input MemRefTypes
+        #         tensor_shape, dynamic_shape, insertion_point = self._resolve_dynamic_shape(
+        #             n_qubits, insertion_point
+        #         )
+        #         measurementOp = quantum.CountsOp(
+        #             operands=(obs, dynamic_shape, None, None),
+        #             result_types=(
+        #                 builtin.TensorType(element_type=builtin.Float64Type(), shape=tensor_shape),
+        #                 builtin.TensorType(element_type=builtin.i64, shape=tensor_shape),
+        #             ),
+        #         )
+
+        #     case _:
+        #         raise TransformError(
+        #             f"The measurement {type(mp).__name__} cannot be supported into the module."
+        #         )
+
+        self.insert_op(meas_op, insertion_point=insertion_point)
 
     # TODO: Finish implementation
     def swap_gates(self, op1: xOperation, op2: xOperation) -> None:
