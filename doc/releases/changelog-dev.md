@@ -286,6 +286,10 @@
   that sum to identity.
   [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)	
 
+  * Removed the `getRotationKind` and `setRotationKind` methods from 
+  the QEC interface `QECOpInterface` to simplify the interface.
+  [(#2250)](https://github.com/PennyLaneAI/catalyst/pull/2250)
+
 <h3>Documentation 📝</h3>
 
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.

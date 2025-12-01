@@ -40,8 +40,7 @@ def QECOpInterface : OpInterface<"QECOpInterface"> {
         InterfaceMethod<
             /*desc=*/"Get the output qubits for this operation.",
             /*retTy=*/"mlir::Operation::result_range",
-            /*meth
-            odName=*/"getOutQubits"
+            /*methodName=*/"getOutQubits"
         >,
         InterfaceMethod<
             /*desc=*/"Get the Pauli product for this operation.",
