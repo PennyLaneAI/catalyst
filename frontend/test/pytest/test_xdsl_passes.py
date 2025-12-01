@@ -169,7 +169,7 @@ class TestXDSLPassesIntegration:
     def test_xdsl_passes_integration(self):
         """Test the xDSL passes integration."""
         # pylint: disable-next=import-outside-toplevel
-        from pennylane.compiler.python_compiler.transforms import merge_rotations_pass
+        from catalyst.python_interface.transforms import merge_rotations_pass
 
         @qjit(keep_intermediate="changed", verbose=True)
         def workflow():

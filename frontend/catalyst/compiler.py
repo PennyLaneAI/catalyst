@@ -381,12 +381,12 @@ def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
 
 
 def to_mlir_opt(
-    *args, stdin=None, options: Optional[CompileOptions] = None, using_unified_compiler=False
+    *args, stdin=None, options: Optional[CompileOptions] = None, using_python_compiler=False
 ):
     """echo ${input} | catalyst --tool=opt *args *opts -"""
-    # Check if we need to use Python compiler for xDSL passes
-    if using_unified_compiler:
-        # Use Python compiler path for xDSL passes
+    # Check if we need to use the Python interface for xDSL passes
+    if using_python_compiler:
+        # Use the Python interface path for xDSL passes
         # pylint: disable-next=import-outside-toplevel
         from catalyst.python_interface import Compiler as PythonCompiler
 
@@ -547,8 +547,8 @@ class Compiler:
             return False
 
     @debug_logger
-    def is_using_unified_compiler(self, mlir_module=None):
-        """Returns true if we need the Python compiler path.
+    def is_using_python_compiler(self, mlir_module=None):
+        """Returns true if we need the Python interface path.
 
         This happens when:
         1. xDSL plugin is explicitly loaded (legacy), OR
@@ -606,7 +606,7 @@ class Compiler:
         os.makedirs(user_transform_dir, exist_ok=True)
 
         class SavePassIRCallback:
-            """Callback to save IR after each pass in python_compiler."""
+            """Callback to save IR after each pass in python_interface."""
 
             def __init__(self, transform_dir):
                 self.transform_dir = transform_dir
