@@ -129,8 +129,8 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         return true;
     }
 
-    bool isPPR(QECOpInterface op) { return isa<qec::PPRotationOp>(op); }
-    bool isPPM(QECOpInterface op) { return isa<qec::PPMeasurementOp>(op); }
+    bool isPPR(QECOpInterface op) { return isa<qec::PPRotationOp>(op.getOperation()); }
+    bool isPPM(QECOpInterface op) { return isa<qec::PPMeasurementOp>(op.getOperation()); }
 
     // Check if two ops have the same rotation kind.
     bool equalTypes(QECOpInterface lhsOp, QECOpInterface rhsOp)
@@ -156,7 +156,11 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             assert(!layer.empty() && "Layer is empty");
 
             auto op = layer.getOps().back();
-            int16_t absRk = std::abs(static_cast<int16_t>(op.getRotationKind()));
+
+            int16_t absRk = 0;
+            if (auto pprOp = dyn_cast<PPRotationOp>(op.getOperation())) {
+                absRk = std::abs(static_cast<int16_t>(pprOp.getRotationKind()));
+            }
             auto parentFuncOp = op->getParentOfType<func::FuncOp>();
             StringRef funcName = parentFuncOp.getName();
             llvm::StringSaver saver(stringAllocator);
