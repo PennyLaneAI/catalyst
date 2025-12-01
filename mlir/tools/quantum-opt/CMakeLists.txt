@@ -23,7 +23,6 @@ set(LIBS
     MLIRMitigation
     mitigation-transforms
     MLIRPauliFrame
-    # pauli-frame-transforms
     MLIRIon
     ion-transforms
     MLIRCatalystTest
