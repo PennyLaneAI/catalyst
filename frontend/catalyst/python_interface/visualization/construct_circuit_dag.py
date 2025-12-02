@@ -16,15 +16,14 @@
 
 from functools import singledispatchmethod
 
-from xdsl.dialects import builtin, func, scf
-from xdsl.ir import Block, Operation, Region, SSAValue
-
 from catalyst.python_interface.dialects import catalyst, quantum
-from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 from catalyst.python_interface.inspection.xdsl_conversion import (
     xdsl_to_qml_measurement,
     xdsl_to_qml_op,
 )
+from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from xdsl.dialects import builtin, func, scf
+from xdsl.ir import Block, Operation, Region, SSAValue
 
 
 class ConstructCircuitDAG:
@@ -90,14 +89,20 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _unitary(
         self,
-        op: quantum.CustomOp | quantum.GlobalPhaseOp | quantum.QubitUnitaryOp | quantum.MultiRZOp,
+        op: quantum.CustomOp
+        | quantum.GlobalPhaseOp
+        | quantum.QubitUnitaryOp
+        | quantum.MultiRZOp,
     ) -> None:
         """Generic handler for unitary gates."""
 
+        # Create PennyLane instance
         qml_op = xdsl_to_qml_op(op)
-        # Build node on graph
+
+        # Add node to current cluster
+        node_uid = f"node_{id(op)}"
         self.dag_builder.add_node(
-            uid=f"node_{id(op)}",
+            uid=node_uid,
             label=str(qml_op),
             cluster_uid=self._cluster_uid_stack[-1],
         )
@@ -111,11 +116,14 @@ class ConstructCircuitDAG:
         """Handler for the terminal state measurement operation."""
 
         meas = xdsl_to_qml_measurement(op)
+        node_uid = f"node_{id(op)}"
         # Build node on graph
         self.dag_builder.add_node(
-            uid=f"node_{id(op)}",
+            uid=node_uid,
             label=str(meas),
             cluster_uid=self._cluster_uid_stack[-1],
+            fillcolor="lightpink",
+            color="lightpink3",
         )
 
     @_visit_operation.register
@@ -127,11 +135,14 @@ class ConstructCircuitDAG:
 
         obs_op = op.obs.owner
         meas = xdsl_to_qml_measurement(op, xdsl_to_qml_measurement(obs_op))
+        node_uid = f"node_{id(op)}"
         # Build node on graph
         self.dag_builder.add_node(
-            uid=f"node_{id(op)}",
+            uid=node_uid,
             label=str(meas),
             cluster_uid=self._cluster_uid_stack[-1],
+            fillcolor="lightpink",
+            color="lightpink3",
         )
 
     @_visit_operation.register
@@ -139,9 +150,10 @@ class ConstructCircuitDAG:
         """Handler for the single-qubit projective measurement operation."""
 
         meas = xdsl_to_qml_measurement(op)
+        node_uid = f"node_{id(op)}"
         # Build node on graph
         self.dag_builder.add_node(
-            uid=f"node_{id(op)}",
+            uid=node_uid,
             label=str(meas),
             cluster_uid=self._cluster_uid_stack[-1],
         )
@@ -187,7 +199,9 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _if_op(self, operation: scf.IfOp):
         """Handles the scf.IfOp operation."""
-        flattened_if_op: list[tuple[SSAValue | None, Region]] = _flatten_if_op(operation)
+        flattened_if_op: list[tuple[SSAValue | None, Region]] = _flatten_if_op(
+            operation
+        )
 
         uid = f"cluster_{id(operation)}"
         self.dag_builder.add_cluster(
