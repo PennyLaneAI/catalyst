@@ -74,12 +74,14 @@ static ParseResult parseChannelTypeBody(AsmParser &parser, std::string &kind, Ar
     }
 
     int64_t id;
-    if (failed(parser.parseInteger(id)))
+    if (failed(parser.parseInteger(id))) {
         return failure();
+    }
 
-    if (id < 0)
+    if (id < 0) {
         return parser.emitError(parser.getCurrentLocation(),
                                 "static channel ID must be non-negative");
+    }
 
     channelId = parser.getBuilder().getI64IntegerAttr(id);
     return success();
