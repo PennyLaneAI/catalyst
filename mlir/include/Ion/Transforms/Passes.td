@@ -69,7 +69,7 @@ def IonToRTIOPass : Pass<"convert-ion-to-rtio", "mlir::ModuleOp"> {
     let options = [
         Option<"kernelName", "kernel-name",
                "std::string", /*default=*/"\"__kernel__\"",
-               "Name of the generated kernel function">
+               "Name of the generated kernel function">,
         Option<"deviceDb", "device_db",
                "std::string", /*default=*/"\"\"",
                "Path to the device database JSON file">,
