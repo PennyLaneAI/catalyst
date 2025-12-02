@@ -97,9 +97,6 @@ class ConstructCircuitDAG:
             shape="rectangle",
         )
 
-        for region in operation.regions:
-            self._visit_region(region)
-
     # =======================
     # FuncOp NESTING UTILITY
     # =======================
