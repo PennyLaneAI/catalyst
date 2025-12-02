@@ -249,7 +249,10 @@ def _flatten_if_op(op: scf.IfOp) -> list[tuple[SSAValue, Region]]:
 
     # Peak into else region to see if there's another IfOp
     else_block: Block = else_region.block
+    # Completely relies on the structure that the second last operation
+    # will be an IfOp (seems to hold true)
     if isinstance(else_block.ops.last.prev_op, scf.IfOp):
+        # Recursively flatten any IfOps found in said block
         nested_flattened_op = _flatten_if_op(else_block.ops.last.prev_op)
         flattened_op.extend(nested_flattened_op)
         return flattened_op
