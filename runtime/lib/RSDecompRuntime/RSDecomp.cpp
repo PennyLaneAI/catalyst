@@ -22,7 +22,8 @@
  * This is a dummy implementation of the rs decomposition
  */
 extern "C" {
-int64_t rs_decomposition_get_size_0(double theta, double epsilon, bool ppr_basis)
+
+size_t rs_decomposition_get_size_0(double theta, double epsilon, bool ppr_basis)
 {
     // This is a dummy implementation
     (void)theta;
@@ -36,8 +37,8 @@ int64_t rs_decomposition_get_size_0(double theta, double epsilon, bool ppr_basis
  * @brief Fills a pre-allocated memref with the gate sequence.
  *
  * This function signature matches the standard MLIR calling convention for
- * a 1D memref, which passes the struct fields as individual arguments.
- * Note: I have tried to use `MemRefT_int64_1d` directly from Types.h, but ran into
+ * a 1D memref (IndexType), which passes the struct fields as individual arguments.
+ * Note: I have tried to use `MemRefT` directly from Types.h, but ran into
  * C++ ABI errors (on macOS) leading to segmentation faults. Thus, we manually unpack the memref
  * here.
  *
@@ -50,19 +51,19 @@ int64_t rs_decomposition_get_size_0(double theta, double epsilon, bool ppr_basis
  * @param epsilon Error
  * @param ppr_basis Whether to use PPR basis
  */
-void rs_decomposition_get_gates_0([[maybe_unused]] int64_t *data_allocated, int64_t *data_aligned,
+void rs_decomposition_get_gates_0([[maybe_unused]] size_t *data_allocated, size_t *data_aligned,
                                   size_t offset, size_t size0, size_t stride0, double theta,
                                   double epsilon, bool ppr_basis)
 {
     // This is the dummy gate sequence for testing
-    std::vector<int64_t> gates_data = {0, 2, 4, 6, 8, 1, 3, 5, 7, 9};
+    std::vector<size_t> gates_data = {0, 2, 4, 6, 8, 1, 3, 5, 7, 9};
 
     // Re-construct the sizes and strides arrays for the DataView constructor
     const size_t sizes[1] = {size0};
     const size_t strides[1] = {stride0};
 
     // Wrap the memref descriptor in a DataView for access
-    DataView<int64_t, 1> gates_view(data_aligned, offset, sizes, strides);
+    DataView<size_t, 1> gates_view(data_aligned, offset, sizes, strides);
 
     // Ensure the MLIR-allocated buffer is at least as large as the data we're writing
     RT_FAIL_IF(static_cast<size_t>(gates_view.size()) < gates_data.size(),
