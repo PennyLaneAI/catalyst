@@ -52,7 +52,7 @@ class ConstructCircuitDAG:
         # Create a map of wire to node uid
         # Keys represent static (int) or dynamic wires (str)
         # Values represent the set of all node uids that are on that wire.
-        self._wire_to_node_uid: dict[str | int, set[str]] = defaultdict(set)
+        self._wire_to_node_uids: dict[str | int, set[str]] = defaultdict(set)
 
     def _reset(self) -> None:
         """Resets the instance."""
@@ -112,13 +112,13 @@ class ConstructCircuitDAG:
         )
 
         # Search through previous ops found on current wires and connect
-        prev_ops = set.union(*(self._wire_to_node_uid[wire] for wire in qml_op.wires))
+        prev_ops = set.union(*(self._wire_to_node_uids[wire] for wire in qml_op.wires))
         for prev_op in prev_ops:
             self.dag_builder.add_edge(prev_op, node_uid)
 
         # Update affected wires to source from this node UID
         for wire in qml_op.wires:
-            self._wire_to_node_uid[wire] = {node_uid}
+            self._wire_to_node_uids[wire] = {node_uid}
 
     # =====================
     # QUANTUM MEASUREMENTS
@@ -139,7 +139,7 @@ class ConstructCircuitDAG:
             color="lightpink3",
         )
 
-        for seen_wire, seen_nodes in self._wire_to_node_uid.items():
+        for seen_wire, seen_nodes in self._wire_to_node_uids.items():
             for seen_node in seen_nodes:
                 self.dag_builder.add_edge(seen_node, node_uid)
 
@@ -163,7 +163,7 @@ class ConstructCircuitDAG:
         )
 
         for wire in meas.wires:
-            for seen_node in self._wire_to_node_uid[wire]:
+            for seen_node in self._wire_to_node_uids[wire]:
                 self.dag_builder.add_edge(seen_node, node_uid)
 
     @_visit_operation.register
@@ -233,7 +233,7 @@ class ConstructCircuitDAG:
         self._cluster_uid_stack.append(uid)
 
         # Save wires state before all of the branches
-        wire_map_before = self._wire_to_node_uid.copy()
+        wire_map_before = self._wire_to_node_uids.copy()
         region_wire_maps: list[dict[int | str, set[str]]] = []
 
         # Loop through each branch and visualize as a cluster
@@ -260,14 +260,14 @@ class ConstructCircuitDAG:
             self._cluster_uid_stack.append(uid)
 
             # Make fresh wire map before going into region
-            self._wire_to_node_uid = wire_map_before.copy()
+            self._wire_to_node_uids = wire_map_before.copy()
 
             # Go recursively into the branch to process internals
             self._visit_region(region)
 
             # Update branch wire maps
-            if self._wire_to_node_uid != wire_map_before:
-                region_wire_maps.append(self._wire_to_node_uid)
+            if self._wire_to_node_uids != wire_map_before:
+                region_wire_maps.append(self._wire_to_node_uids)
 
             # Pop branch cluster after processing to ensure
             # logical branches are treated as 'parallel'
@@ -293,7 +293,7 @@ class ConstructCircuitDAG:
                     all_nodes.update(region_wire_map.get(wire, {}))
 
                 final_wire_map[wire] = all_nodes
-        self._wire_to_node_uid = final_wire_map
+        self._wire_to_node_uids = final_wire_map
 
     # ============
     # DEVICE NODE
