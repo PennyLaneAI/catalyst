@@ -56,49 +56,31 @@ using namespace mlir;
 namespace catalyst {
 namespace driver {
 
-void createQuantumCompilationStage(OpPassManager &pm)
+void parsePassPipeline(const PassNames &passNames, OpPassManager &pm)
 {
-    const auto &passList = getQuantumCompilationStage();
-    std::string passNames = fmt::format("{}", fmt::join(passList, ","));
-    if (failed(mlir::parsePassPipeline(passNames, pm))) {
+    std::string passNamesStr = fmt::format("{}", fmt::join(passNames, ","));
+    if (failed(mlir::parsePassPipeline(passNamesStr, pm))) {
         llvm::errs() << fmt::format("Error: analysing {}\n", passNames);
     }
 }
 
-void createHLOLoweringStage(OpPassManager &pm)
+void createQuantumCompilationStage(OpPassManager &pm)
 {
-    const auto &passList = getHLOLoweringStage();
-    std::string passNames = fmt::format("{}", fmt::join(passList, ","));
-    if (failed(mlir::parsePassPipeline(passNames, pm))) {
-        llvm::errs() << fmt::format("Error: analysing {}\n", passNames);
-    }
+    parsePassPipeline(getQuantumCompilationStage(), pm);
 }
+
+void createHLOLoweringStage(OpPassManager &pm) { parsePassPipeline(getHLOLoweringStage(), pm); }
 
 void createGradientLoweringStage(OpPassManager &pm)
 {
-    const auto &passList = getGradientLoweringStage();
-    std::string passNames = fmt::format("{}", fmt::join(passList, ","));
-    if (failed(mlir::parsePassPipeline(passNames, pm))) {
-        llvm::errs() << fmt::format("Error: analysing {}\n", passNames);
-    }
+    parsePassPipeline(getGradientLoweringStage(), pm);
 }
 
-void createBufferizationStage(OpPassManager &pm)
-{
-    const auto &passList = getBufferizationStage();
-    std::string passNames = fmt::format("{}", fmt::join(passList, ","));
-    if (failed(mlir::parsePassPipeline(passNames, pm))) {
-        llvm::errs() << fmt::format("Error: analysing {}\n", passNames);
-    }
-}
+void createBufferizationStage(OpPassManager &pm) { parsePassPipeline(getBufferizationStage(), pm); }
 
 void createLLVMDialectLoweringStage(OpPassManager &pm)
 {
-    const auto &passList = getLLVMDialectLoweringStage();
-    std::string passNames = fmt::format("{}", fmt::join(passList, ","));
-    if (failed(mlir::parsePassPipeline(passNames, pm))) {
-        llvm::errs() << fmt::format("Error: analysing {}\n", passNames);
-    }
+    parsePassPipeline(getLLVMDialectLoweringStage(), pm);
 }
 
 void createDefaultCatalystPipeline(OpPassManager &pm)
