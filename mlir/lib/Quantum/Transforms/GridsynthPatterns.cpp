@@ -274,10 +274,12 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     mlir::Value num_gates = callGetSizeOp.getResult(0);
 
     // Call GetGates
+    // Use memref.alloc (Heap) instead of alloca (Stack) because num_gates is dynamic.
     auto gatesMemRefType =
         mlir::MemRefType::get({mlir::ShapedType::kDynamic}, rewriter.getIndexType());
     mlir::Value gatesMemref =
-        rewriter.create<mlir::memref::AllocaOp>(loc, gatesMemRefType, num_gates);
+        rewriter.create<mlir::memref::AllocOp>(loc, gatesMemRefType, num_gates);
+
     rewriter.create<mlir::func::CallOp>(
         loc, getGatesFunc, mlir::ValueRange{gatesMemref, angle, epsilonVal, pprBasisVal});
 
@@ -305,6 +307,10 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     mlir::Value currentGateIndex =
         rewriter.create<mlir::memref::LoadOp>(loc, gatesMemref, ValueRange{iv});
 
+    // 19 cases for PPR basis:
+    //   Identity + (X, Y, Z) x (2, 4, 8) x (normal, adjoint)
+    // 10 cases for Clifford+T basis:
+    //   {T, H T, S H T, I, X, Y, Z, H, S, adjS}
     const int64_t numCases = pprBasis ? 19 : 10;
     SmallVector<int64_t> caseValues;
     caseValues.reserve(numCases);
@@ -332,6 +338,9 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
 
     rewriter.setInsertionPointAfter(forOp);
     mlir::Value finalQbit = forOp.getResult(0);
+
+    // Clean up heap memory
+    rewriter.create<mlir::memref::DeallocOp>(loc, gatesMemref);
 
     // Return the final qubit and the computed runtime phase
     rewriter.create<mlir::func::ReturnOp>(loc, mlir::ValueRange{finalQbit, runtimePhase});
