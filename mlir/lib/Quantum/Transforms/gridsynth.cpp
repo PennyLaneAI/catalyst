@@ -27,7 +27,6 @@
 
 using namespace llvm;
 using namespace mlir;
-using namespace catalyst::quantum;
 
 namespace catalyst {
 namespace quantum {
