@@ -16,14 +16,15 @@
 
 from functools import singledispatchmethod
 
+from xdsl.dialects import builtin, func, scf
+from xdsl.ir import Block, Operation, Region, SSAValue
+
 from catalyst.python_interface.dialects import catalyst, quantum
 from catalyst.python_interface.inspection.xdsl_conversion import (
     xdsl_to_qml_measurement,
     xdsl_to_qml_op,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
-from xdsl.dialects import builtin, func, scf
-from xdsl.ir import Block, Operation, Region, SSAValue
 
 
 class ConstructCircuitDAG:
@@ -89,10 +90,7 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _unitary(
         self,
-        op: quantum.CustomOp
-        | quantum.GlobalPhaseOp
-        | quantum.QubitUnitaryOp
-        | quantum.MultiRZOp,
+        op: quantum.CustomOp | quantum.GlobalPhaseOp | quantum.QubitUnitaryOp | quantum.MultiRZOp,
     ) -> None:
         """Generic handler for unitary gates."""
 
@@ -118,7 +116,7 @@ class ConstructCircuitDAG:
         # Create PennyLane instance
         meas = xdsl_to_qml_measurement(op)
 
-        # Add node to current cluster 
+        # Add node to current cluster
         node_uid = f"node_{id(op)}"
         self.dag_builder.add_node(
             uid=node_uid,
@@ -139,7 +137,7 @@ class ConstructCircuitDAG:
         obs_op = op.obs.owner
         meas = xdsl_to_qml_measurement(op, xdsl_to_qml_measurement(obs_op))
 
-        # Add node to current cluster 
+        # Add node to current cluster
         node_uid = f"node_{id(op)}"
         self.dag_builder.add_node(
             uid=node_uid,
@@ -156,7 +154,7 @@ class ConstructCircuitDAG:
         # Create PennyLane instance
         meas = xdsl_to_qml_measurement(op)
 
-        # Add node to current cluster 
+        # Add node to current cluster
         node_uid = f"node_{id(op)}"
         self.dag_builder.add_node(
             uid=node_uid,
@@ -205,9 +203,7 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _if_op(self, operation: scf.IfOp):
         """Handles the scf.IfOp operation."""
-        flattened_if_op: list[tuple[SSAValue | None, Region]] = _flatten_if_op(
-            operation
-        )
+        flattened_if_op: list[tuple[SSAValue | None, Region]] = _flatten_if_op(operation)
 
         uid = f"cluster_{id(operation)}"
         self.dag_builder.add_cluster(
