@@ -14,17 +14,18 @@
 
 """Contains the ConstructCircuitDAG tool for constructing a DAG from an xDSL module."""
 
+from collections import defaultdict
 from functools import singledispatchmethod
 
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region, SSAValue
 
 from catalyst.python_interface.dialects import catalyst, quantum
-from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 from catalyst.python_interface.inspection.xdsl_conversion import (
     xdsl_to_qml_measurement,
     xdsl_to_qml_op,
 )
+from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 
 
 class ConstructCircuitDAG:
@@ -47,6 +48,11 @@ class ConstructCircuitDAG:
 
         # Keep track of nesting clusters using a stack
         self._cluster_uid_stack: list[str] = []
+
+        # Create a map of wire to node uid
+        # Keys represent static (int) or dynamic wires (str)
+        # Values represent the set of all node uids that are on that wire.
+        self._wire_to_node_uid: dict[str | int, set[str]] = defaultdict(set)
 
     def _reset(self) -> None:
         """Resets the instance."""
@@ -94,13 +100,25 @@ class ConstructCircuitDAG:
     ) -> None:
         """Generic handler for unitary gates."""
 
+        # Create PennyLane instance
         qml_op = xdsl_to_qml_op(op)
-        # Build node on graph
+
+        # Add node to current cluster
+        node_uid = f"node_{id(op)}"
         self.dag_builder.add_node(
-            uid=f"node_{id(op)}",
+            uid=node_uid,
             label=str(qml_op),
             cluster_uid=self._cluster_uid_stack[-1],
         )
+
+        # Search through previous ops found on current wires and connect
+        prev_ops = set.union(*(self._wire_to_node_uid[wire] for wire in qml_op.wires))
+        for prev_op in prev_ops:
+            self.dag_builder.add_edge(prev_op, node_uid)
+
+        # Update affected wires to source from this node UID
+        for wire in qml_op.wires:
+            self._wire_to_node_uid[wire] = {node_uid}
 
     # =====================
     # QUANTUM MEASUREMENTS
@@ -111,12 +129,19 @@ class ConstructCircuitDAG:
         """Handler for the terminal state measurement operation."""
 
         meas = xdsl_to_qml_measurement(op)
+        node_uid = f"node_{id(op)}"
         # Build node on graph
         self.dag_builder.add_node(
-            uid=f"node_{id(op)}",
+            uid=node_uid,
             label=str(meas),
             cluster_uid=self._cluster_uid_stack[-1],
+            fillcolor="lightpink",
+            color="lightpink3",
         )
+
+        for seen_wire, seen_nodes in self._wire_to_node_uid.items():
+            for seen_node in seen_nodes:
+                self.dag_builder.add_edge(seen_node, node_uid)
 
     @_visit_operation.register
     def _statistical_measurement_ops(
@@ -127,12 +152,19 @@ class ConstructCircuitDAG:
 
         obs_op = op.obs.owner
         meas = xdsl_to_qml_measurement(op, xdsl_to_qml_measurement(obs_op))
+        node_uid = f"node_{id(op)}"
         # Build node on graph
         self.dag_builder.add_node(
-            uid=f"node_{id(op)}",
+            uid=node_uid,
             label=str(meas),
             cluster_uid=self._cluster_uid_stack[-1],
+            fillcolor="lightpink",
+            color="lightpink3",
         )
+
+        for wire in meas.wires:
+            for seen_node in self._wire_to_node_uid[wire]:
+                self.dag_builder.add_edge(seen_node, node_uid)
 
     @_visit_operation.register
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
@@ -200,10 +232,14 @@ class ConstructCircuitDAG:
         )
         self._cluster_uid_stack.append(uid)
 
+        # Save wires state before all of the branches
+        wire_map_before = self._wire_to_node_uid.copy()
+        region_wire_maps: list[dict[int | str, set[str]]] = []
+
         # Loop through each branch and visualize as a cluster
         num_regions = len(flattened_if_op)
         for i, (condition_ssa, region) in enumerate(flattened_if_op):
-
+            # Visualize with a cluster
             def _get_conditional_branch_label(i):
                 if i == 0:
                     return "if ..."
@@ -223,8 +259,15 @@ class ConstructCircuitDAG:
             )
             self._cluster_uid_stack.append(uid)
 
+            # Make fresh wire map before going into region
+            self._wire_to_node_uid = wire_map_before.copy()
+
             # Go recursively into the branch to process internals
             self._visit_region(region)
+
+            # Update branch wire maps
+            if self._wire_to_node_uid != wire_map_before:
+                region_wire_maps.append(self._wire_to_node_uid)
 
             # Pop branch cluster after processing to ensure
             # logical branches are treated as 'parallel'
@@ -232,6 +275,25 @@ class ConstructCircuitDAG:
 
         # Pop IfOp cluster before leaving this handler
         self._cluster_uid_stack.pop()
+
+        # Check what wires were affected
+        affected_wires = set(wire_map_before.keys())
+        for region_wire_map in region_wire_maps:
+            affected_wires.update(region_wire_map.keys())
+
+        # Update state to be the union of all branch wire maps
+        final_wire_map = defaultdict(set)
+        for wire in affected_wires:
+            all_nodes: set = set()
+            for region_wire_map in region_wire_maps:
+                if not wire in region_wire_map:
+                    # Branch didn't touch this wire, so just use previous node
+                    all_nodes.update(wire_map_before.get(wire, {}))
+                else:
+                    all_nodes.update(region_wire_map.get(wire, {}))
+
+                final_wire_map[wire] = all_nodes
+        self._wire_to_node_uid = final_wire_map
 
     # ============
     # DEVICE NODE
