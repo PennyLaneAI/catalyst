@@ -16,11 +16,7 @@
 
 import pytest
 
-pytestmark = pytest.mark.external
-
-pytest.importorskip("xdsl")
-pytest.importorskip("catalyst")
-pytest.importorskip("jax")
+pytestmark = pytest.mark.requires_xdsl
 
 # pylint: disable=wrong-import-position
 import jax.numpy as jnp
