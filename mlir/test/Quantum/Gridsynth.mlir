@@ -16,7 +16,14 @@
 // RUN: quantum-opt --pass-pipeline="builtin.module(gridsynth{epsilon=0.01 ppr-basis=True})" --split-input-file %s | FileCheck %s --check-prefixes=CHECK,PPR
 
 
-// Test the defined decomposition function
+
+// COMMENT: Check that the external helpers are declared in the module
+
+// CHECK-DAG: func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
+// CHECK-DAG: func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
+// CHECK-DAG: func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
+
+// COMMENT: Test the defined decomposition function
 
 // CLIFFORD-LABEL: func.func private @__catalyst_decompose_RZ(
 // CLIFFORD-SAME: [[ARG_QBIT:%.+]]: !quantum.bit, [[ARG_ANGLE:%.+]]: f64)
@@ -179,12 +186,13 @@ func.func @test_rz_decomposition(%arg0: !quantum.bit) -> !quantum.bit {
     return %q_out : !quantum.bit
 }
 
-// Check that the external helpers are declared in the module
+
+// -----
+
+// Check that the external helpers are declared in the module 
 // CHECK-DAG: func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
 // CHECK-DAG: func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
 // CHECK-DAG: func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
-
-// -----
 
 // CHECK-LABEL: @test_phaseshift_decomposition
 // CHECK-SAME: ([[Q_IN:%.+]]: !quantum.bit, [[PHI:%.+]]: f64)
@@ -204,10 +212,6 @@ func.func @test_phaseshift_decomposition(%arg0: !quantum.bit, %phi: f64) -> !qua
     return %q_out : !quantum.bit
 }
 
-// Check that the external helpers are declared in the module 
-// CHECK-DAG: func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
-// CHECK-DAG: func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
-// CHECK-DAG: func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
 
 // -----
 
