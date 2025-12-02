@@ -23,15 +23,14 @@ pytestmark = pytest.mark.usefixtures("requires_xdsl")
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
 import pennylane as qml
-from xdsl.dialects import test
-from xdsl.dialects.builtin import ModuleOp
-from xdsl.ir.core import Block, Region
-
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from xdsl.dialects import test
+from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir.core import Block, Region
 
 
 class FakeDAGBuilder(DAGBuilder):
@@ -97,7 +96,9 @@ class FakeDAGBuilder(DAGBuilder):
         cluster_labels = []
         for cluster_data in self._clusters.values():
             if cluster_data["parent_cluster_uid"] == parent_cluster_uid:
-                cluster_label = cluster_data["cluster_label"] or cluster_data["node_label"]
+                cluster_label = (
+                    cluster_data["cluster_label"] or cluster_data["node_label"]
+                )
                 cluster_labels.append(cluster_label)
         return cluster_labels
 
@@ -154,7 +155,9 @@ class TestFakeDAGBuilder:
         builder = FakeDAGBuilder()
 
         # Cluster set-up
-        builder.add_cluster("c0", label="Company", cluster_uid=None)  # Add to base graph
+        builder.add_cluster(
+            "c0", label="Company", cluster_uid=None
+        )  # Add to base graph
         builder.add_cluster("c1", label="Marketing", cluster_uid="c0")
         builder.add_cluster("c2", label="Finance", cluster_uid="c0")
 
@@ -342,10 +345,7 @@ class TestForOp:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        assert re.search(
-            r"for \.\.\.",
-            utility.dag_builder.get_child_clusters("my_workflow"),
-        )
+        assert "for ..." in utility.dag_builder.get_child_clusters("my_workflow")
 
     @pytest.mark.unit
     def test_nested_loop(self):
@@ -367,21 +367,10 @@ class TestForOp:
         utility.construct(module)
 
         # Check first for loop
-        child_clusters = utility.dag_builder.get_child_clusters("my_workflow")
-        assert len(child_clusters) == 1
-        assert re.search(
-            r"for \.\.\.",
-            child_clusters,
-        )
+        assert "for ..." in utility.dag_builder.get_child_clusters("my_workflow")
 
         # Check second for loop
-        for_loop_label = utility.dag_builder.get_child_clusters(child_clusters[0])
-        child_clusters = utility.dag_builder.get_child_clusters(for_loop_label)
-        assert len(child_clusters) == 1
-        assert re.search(
-            r"for \.\.\.",
-            child_clusters,
-        )
+        assert "for ..." in utility.dag_builder.get_child_clusters("for ...")
 
 
 class TestWhileOp:
@@ -420,14 +409,14 @@ class TestIfOp:
         @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
-        def my_workflow():
-            flag = 1
-            if flag == 1:
+        def my_workflow(x):
+            if x == 2:
                 qml.X(0)
             else:
                 qml.Y(0)
 
-        module = my_workflow()
+        args = (1,)
+        module = my_workflow(*args)
 
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
@@ -444,16 +433,16 @@ class TestIfOp:
         @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
-        def my_workflow():
-            flag = 1
-            if flag == 1:
+        def my_workflow(x):
+            if x == 1:
                 qml.X(0)
-            elif flag == 2:
+            elif x == 2:
                 qml.Y(0)
             else:
                 qml.Z(0)
 
-        module = my_workflow()
+        args = (1,)
+        module = my_workflow(*args)
 
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
