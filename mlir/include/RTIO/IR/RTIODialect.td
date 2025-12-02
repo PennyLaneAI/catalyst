@@ -30,11 +30,7 @@ def RTIO_Dialect : Dialect {
         The RTIO dialect provides operations for precise timing control
         and hardware signal generation on FPGAs for quantum computing.
 
-        This dialect supports two levels of abstraction:
-        1. Event-Based IR (high-level): Declarative operations with explicit event dependencies
-
-        // TODO: Do we need the separate Timeline IR for artiq family?
-        2. Timeline IR (low-level): Stateful operations with implicit time cursor
+        It provides declarative operations with explicit event dependencies for hardware control.
     }];
 
     let name = "rtio";
