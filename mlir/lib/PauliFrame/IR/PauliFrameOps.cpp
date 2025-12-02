@@ -33,36 +33,40 @@ using namespace catalyst::pauli_frame;
 // PauliFrame op verifiers.
 //===----------------------------------------------------------------------===//
 
-LogicalResult InitOp::verify()
+namespace catalyst::pauli_frame {
+/**
+ * @brief Verifies the number of input and output qubits for PauliFrame operations
+ *
+ * @param op The PauliFrame op to verify
+ * @param inQubits The OperandRange containing the input qubits of the op
+ * @param outQubits The ResultRange containing the output qubits of the op
+ * @return LogicalResult Success if verified, opError otherwise
+ */
+LogicalResult verifyQubitCounts(Operation *op, const OperandRange &inQubits,
+                                const ResultRange &outQubits)
 {
-    if (getInQubits().size() == 0) {
-        return emitOpError("expected to have at least one qubit");
+    if (inQubits.size() == 0) {
+        return op->emitOpError("expected to have at least one qubit");
     }
-    if (getInQubits().size() != getOutQubits().size()) {
-        return emitOpError("expected to consume and return the same number of qubits");
+    if (inQubits.size() != outQubits.size()) {
+        return op->emitOpError("expected to consume and return the same number of qubits");
     }
     return success();
 }
+} // namespace catalyst::pauli_frame
 
-LogicalResult UpdateOp::verify()
-{
-    if (getInQubits().size() == 0) {
-        return emitOpError("expected to have at least one qubit");
-    }
-    if (getInQubits().size() != getOutQubits().size()) {
-        return emitOpError("expected to consume and return the same number of qubits");
-    }
-    return success();
-}
+LogicalResult InitOp::verify() { return verifyQubitCounts(*this, getInQubits(), getOutQubits()); }
+
+LogicalResult UpdateOp::verify() { return verifyQubitCounts(*this, getInQubits(), getOutQubits()); }
 
 LogicalResult UpdateWithCliffordOp::verify()
 {
-    if (getInQubits().size() == 0) {
-        return emitOpError("expected to have at least one qubit");
+    LogicalResult result = verifyQubitCounts(*this, getInQubits(), getOutQubits());
+
+    if (!result.succeeded()) {
+        return result;
     }
-    if (getInQubits().size() != getOutQubits().size()) {
-        return emitOpError("expected to consume and return the same number of qubits");
-    }
+
     switch (getCliffordGate()) {
     case CliffordGate::Hadamard:
         if (getInQubits().size() != 1) {
@@ -85,13 +89,4 @@ LogicalResult UpdateWithCliffordOp::verify()
     return success();
 }
 
-LogicalResult SetOp::verify()
-{
-    if (getInQubits().size() == 0) {
-        return emitOpError("expected to have at least one qubit");
-    }
-    if (getInQubits().size() != getOutQubits().size()) {
-        return emitOpError("expected to consume and return the same number of qubits");
-    }
-    return success();
-}
+LogicalResult SetOp::verify() { return verifyQubitCounts(*this, getInQubits(), getOutQubits()); }
