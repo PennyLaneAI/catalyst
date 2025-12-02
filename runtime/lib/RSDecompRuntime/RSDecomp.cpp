@@ -16,7 +16,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
-#include <iostream>
+#include <vector>
 
 #include "DataView.hpp"
 #include "GridProblems.hpp"
@@ -165,7 +165,7 @@ std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle
 // Extern C implementation
 extern "C" {
 
-int64_t rs_decomposition_get_size_0(double theta, double epsilon, bool ppr_basis)
+size_t rs_decomposition_get_size_0(double theta, double epsilon, bool ppr_basis)
 {
     if (ppr_basis) {
         auto result = eval_ross_algorithm_ppr(theta, epsilon);
@@ -185,7 +185,9 @@ void rs_decomposition_get_gates_0(int64_t *data_allocated, int64_t *data_aligned
 
     const size_t sizes[1] = {size0};
     const size_t strides[1] = {stride0};
-    DataView<int64_t, 1> gates_view(data_aligned, offset, sizes, strides);
+
+    // Wrap the memref descriptor in a DataView for access
+    DataView<size_t, 1> gates_view(data_aligned, offset, sizes, strides);
 
     if (ppr_basis) {
         auto result = eval_ross_algorithm_ppr(theta, epsilon);

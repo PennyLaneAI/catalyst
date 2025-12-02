@@ -41,6 +41,7 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
+from catalyst.jax_extras.patches import patched_make_eqn
 from catalyst.jax_primitives import (
     device_init_p,
     device_release_p,
@@ -49,12 +50,71 @@ from catalyst.jax_primitives import (
     quantum_kernel_p,
 )
 from catalyst.passes.pass_api import Pass
+from catalyst.utils.patching import Patcher
 
 from .qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
 from .qubit_handler import (
     QubitHandler,
     QubitIndexRecorder,
 )
+
+
+def _tuple_to_slice(t):
+    """Convert a tuple representation of a slice back to a slice object.
+
+    JAX converts slice objects to tuples for hashability in jaxpr parameters.
+    This function converts them back to slice objects for use with indexing.
+
+    Args:
+        t: Either a slice object (returned as-is) or a tuple (start, stop, step)
+
+    Returns:
+        slice: A slice object
+    """
+    assert (
+        isinstance(t, tuple) and len(t) == 3
+    ), "Please only use _tuple_to_slice on a tuple of length 3!"
+    return slice(*t)
+
+
+def _is_dict_like_tuple(t):
+    """Checks if a tuple t is structured like a list of (key, value) pairs."""
+    return isinstance(t, tuple) and all(isinstance(item, tuple) and len(item) == 2 for item in t)
+
+
+def _tuple_to_dict(t):
+    """
+    Recursively converts JAX-hashable tuple representations back to dicts,
+    and list-like tuples back to lists.
+
+    Args:
+        t: The item to convert. Can be a dict, a tuple, or a scalar.
+
+    Returns:
+        The converted dict, list, or the original scalar value.
+    """
+
+    if not isinstance(t, (dict, tuple, list)):
+        return t
+
+    if isinstance(t, dict):  # pragma: no cover
+        return {k: _tuple_to_dict(v) for k, v in t.items()}
+
+    if isinstance(t, list):  # pragma: no cover
+        return [_tuple_to_dict(item) for item in t]
+
+    if isinstance(t, tuple):
+
+        # A. Dict-like tuple: Convert to dict, then recurse on values
+        if _is_dict_like_tuple(t):
+            # This handles the main (key, value) pair structure
+            return {key: _tuple_to_dict(value) for key, value in t}
+
+        # B. List-like tuple: Convert to list, then recurse on elements
+        else:
+            return [_tuple_to_dict(item) for item in t]
+
+    return t  # pragma: no cover
 
 
 def _get_device_kwargs(device) -> dict:
@@ -133,7 +193,19 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
         in (b,) }
 
     """
-    return jax.make_jaxpr(partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts))
+
+    original_fn = partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts)
+
+    # pylint: disable=import-outside-toplevel
+    from jax._src.interpreters.partial_eval import DynamicJaxprTrace
+
+    def wrapped_fn(*args, **kwargs):
+        with Patcher(
+            (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
+        ):
+            return jax.make_jaxpr(original_fn)(*args, **kwargs)
+
+    return wrapped_fn
 
 
 class WorkflowInterpreter(PlxprInterpreter):
@@ -293,9 +365,10 @@ def handle_transform(
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for a
     PL transform."""
-    consts = args[consts_slice]
-    non_const_args = args[args_slice]
-    targs = args[targs_slice]
+    consts = args[_tuple_to_slice(consts_slice)]
+    non_const_args = args[_tuple_to_slice(args_slice)]
+    targs = args[_tuple_to_slice(targs_slice)]
+    tkwargs = _tuple_to_dict(tkwargs)
 
     # If the transform is a decomposition transform
     # and the graph-based decomposition is enabled
@@ -304,6 +377,7 @@ def handle_transform(
         and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
         and qml.decomposition.enabled_graph()
     ):
+        # Handle the conversion from plxpr to Catalyst jaxpr for a PL transform.
         if not self.requires_decompose_lowering:
             self.requires_decompose_lowering = True
         else:
@@ -399,7 +473,34 @@ def trace_from_pennylane(
         Tuple[Any]: the dynamic argument signature
     """
 
-    with transient_jax_config({"jax_dynamic_shapes": True}):
+    # pylint: disable=import-outside-toplevel
+    import jax._src.interpreters.partial_eval as pe
+    from jax._src.interpreters.partial_eval import DynamicJaxprTrace
+    from jax._src.lax import lax
+    from jax._src.pjit import jit_p
+
+    from catalyst.jax_extras.patches import (
+        get_aval2,
+        patched_drop_unused_vars,
+        patched_dyn_shape_staging_rule,
+        patched_pjit_staging_rule,
+    )
+    from catalyst.utils.patching import DictPatchWrapper
+
+    with transient_jax_config(
+        {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
+    ), Patcher(
+        (pe, "_drop_unused_vars", patched_drop_unused_vars),
+        (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
+        (lax, "_dyn_shape_staging_rule", patched_dyn_shape_staging_rule),
+        (
+            jax._src.pjit,  # pylint: disable=protected-access
+            "pjit_staging_rule",
+            patched_pjit_staging_rule,
+        ),
+        (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
+        (pe, "get_aval", get_aval2),
+    ):
 
         make_jaxpr_kwargs = {
             "static_argnums": static_argnums,
