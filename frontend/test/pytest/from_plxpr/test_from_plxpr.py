@@ -36,6 +36,8 @@ from catalyst.jax_primitives import (
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
+# pylint: disable=too-many-lines
+
 
 def catalyst_execute_jaxpr(jaxpr):
     """Create a function capable of executing the provided catalyst-variant jaxpr."""
