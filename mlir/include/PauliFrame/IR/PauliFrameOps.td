@@ -124,9 +124,9 @@ def UpdateOp : PauliFrame_Op<"update"> {
     }];
 
     let arguments = (ins
-        Variadic<QubitType>:$in_qubits,
         I1:$x_parity,
-        I1:$z_parity
+        I1:$z_parity,
+        Variadic<QubitType>:$in_qubits
     );
 
     let results = (outs
@@ -148,8 +148,8 @@ def UpdateWithCliffordOp : PauliFrame_Op<"update_with_clifford"> {
     }];
 
     let arguments = (ins
-        Variadic<QubitType>:$in_qubits,
-        CliffordGateAttr:$clifford_gate
+        CliffordGateAttr:$clifford_gate,
+        Variadic<QubitType>:$in_qubits
     );
 
     let results = (outs
@@ -223,9 +223,9 @@ def SetOp : PauliFrame_Op<"set"> {
     }];
 
     let arguments = (ins
-        Variadic<QubitType>:$in_qubits,
         I1:$x_parity,
-        I1:$z_parity
+        I1:$z_parity,
+        Variadic<QubitType>:$in_qubits
     );
 
     let results = (outs
