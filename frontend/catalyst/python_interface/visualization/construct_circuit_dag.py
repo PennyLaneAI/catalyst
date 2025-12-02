@@ -252,5 +252,7 @@ def _flatten_if_op(op: scf.IfOp) -> list[tuple[SSAValue | None, Region]]:
         flattened_op.extend(nested_flattened_op)
         return flattened_op
 
+    # No more nested IfOps, therefore append final region
+    # with no SSAValue
     flattened_op.extend([(None, else_region)])
     return flattened_op
