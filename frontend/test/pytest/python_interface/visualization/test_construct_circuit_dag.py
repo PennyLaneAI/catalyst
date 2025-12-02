@@ -23,15 +23,14 @@ pytestmark = pytest.mark.usefixtures("requires_xdsl")
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
 import pennylane as qml
-from xdsl.dialects import test
-from xdsl.dialects.builtin import ModuleOp
-from xdsl.ir.core import Block, Region
-
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from xdsl.dialects import test
+from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir.core import Block, Region
 
 
 class FakeDAGBuilder(DAGBuilder):
@@ -97,7 +96,9 @@ class FakeDAGBuilder(DAGBuilder):
         cluster_labels = []
         for cluster_data in self._clusters.values():
             if cluster_data["parent_cluster_uid"] == parent_cluster_uid:
-                cluster_label = cluster_data["cluster_label"] or cluster_data["node_label"]
+                cluster_label = (
+                    cluster_data["cluster_label"] or cluster_data["node_label"]
+                )
                 cluster_labels.append(cluster_label)
         return cluster_labels
 
@@ -154,7 +155,9 @@ class TestFakeDAGBuilder:
         builder = FakeDAGBuilder()
 
         # Cluster set-up
-        builder.add_cluster("c0", label="Company", cluster_uid=None)  # Add to base graph
+        builder.add_cluster(
+            "c0", label="Company", cluster_uid=None
+        )  # Add to base graph
         builder.add_cluster("c1", label="Marketing", cluster_uid="c0")
         builder.add_cluster("c2", label="Finance", cluster_uid="c0")
 
@@ -343,7 +346,7 @@ class TestForOp:
         utility.construct(module)
 
         assert re.search(
-            r"for arg\d in range\(0,3,1\)",
+            r"for \.\.\.",
             utility.dag_builder.get_child_clusters("my_workflow"),
         )
 
@@ -370,7 +373,7 @@ class TestForOp:
         child_clusters = utility.dag_builder.get_child_clusters("my_workflow")
         assert len(child_clusters) == 1
         assert re.search(
-            r"for arg\d in range\(0,5,2\)",
+            r"for \.\.\.",
             child_clusters,
         )
 
@@ -379,58 +382,8 @@ class TestForOp:
         child_clusters = utility.dag_builder.get_child_clusters(for_loop_label)
         assert len(child_clusters) == 1
         assert re.search(
-            r"for arg\d in range\(1,6,2\)",
+            r"for \.\.\.",
             child_clusters,
-        )
-
-    def test_dynamic_start_stop_step(self):
-        """Tests that dynamic start, stop, step variables can be displayed."""
-
-        dev = qml.device("null.qubit", wires=1)
-
-        @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
-        def step_dynamic(x):
-            for i in range(0, 3, x):
-                qml.H(0)
-
-        @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
-        def stop_dynamic(x):
-            for i in range(0, x, 1):
-                qml.H(0)
-
-        @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
-        def start_dynamic(x):
-            for i in range(x, 3, 1):
-                qml.H(0)
-
-        args = (1,)
-        utility = ConstructCircuitDAG(FakeDAGBuilder())
-
-        start_dynamic_module = start_dynamic(*args)
-        utility.construct(start_dynamic_module)
-        assert re.search(
-            r"for arg\d in range\(arg\d,3,1\)",
-            utility.dag_builder.get_child_clusters("my_workflow"),
-        )
-
-        stop_dynamic_module = stop_dynamic(*args)
-        utility.construct(stop_dynamic_module)
-        assert re.search(
-            r"for arg\d in range\(0,arg\d,1\)",
-            utility.dag_builder.get_child_clusters("my_workflow"),
-        )
-
-        step_dynamic_module = step_dynamic(*args)
-        utility.construct(step_dynamic_module)
-        assert re.search(
-            r"for arg\d in range\(0,3,arg\d\)",
-            utility.dag_builder.get_child_clusters("my_workflow"),
         )
 
 
@@ -508,6 +461,10 @@ class TestIfOp:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
+        assert "conditional" in utility.dag_builder.get_child_clusters("my_workflow")
+        assert "if ..." in utility.dag_builder.get_child_clusters("conditional")
+        assert "elif ..." in utility.dag_builder.get_child_clusters("conditional")
+        assert "else" in utility.dag_builder.get_child_clusters("conditional")
 
 class TestDeviceNode:
     """Tests that the device node is correctly visualized."""

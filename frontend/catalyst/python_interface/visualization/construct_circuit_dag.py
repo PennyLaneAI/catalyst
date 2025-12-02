@@ -86,18 +86,10 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _for_op(self, operation: scf.ForOp) -> None:
         """Handle an xDSL ForOp operation."""
-        lower_bound, upper_bound, step = (
-            resolve_constant_params(operation.lb),
-            resolve_constant_params(operation.ub),
-            resolve_constant_params(operation.step),
-        )
-
-        index_var_name = operation.body.blocks[0].args[0].name_hint
-
         uid = f"cluster_{id(operation)}"
         self.dag_builder.add_cluster(
             uid,
-            node_label=f"for {index_var_name} in range({lower_bound},{upper_bound},{step})",
+            node_label=f"for ...",
             label="",
             cluster_uid=self._cluster_uid_stack[-1],
         )
