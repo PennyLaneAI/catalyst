@@ -292,6 +292,11 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     mlir::Value c1 = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
     auto forOp = rewriter.create<mlir::scf::ForOp>(loc, c0, num_gates, c1, ValueRange{qbitIn});
 
+    // Add attribute to the for op to indicate the estimated iterations of the loop
+    auto estimatedRanges = static_cast<int64_t>(std::ceil(10 * std::log2(1 / epsilon)));
+    auto estimatedRangesAttr = rewriter.getI16IntegerAttr(estimatedRanges);
+    forOp->setAttr("estimated_iterations", estimatedRangesAttr);
+
     mlir::OpBuilder::InsertionGuard loopGuard(rewriter);
     rewriter.setInsertionPointToStart(forOp.getBody());
     mlir::Value iv = forOp.getInductionVar();
