@@ -62,15 +62,6 @@ def AdjointLoweringPass : Pass<"adjoint-lowering"> {
     ];
 }
 
-def AnnotateFunctionPass : Pass<"annotate-function"> {
-    let summary = "Annotate functions that contain a measurement operation.";
-
-    let dependentDialects = [
-        "catalyst::CatalystDialect",
-        "func::FuncDialect"
-    ];
-}
-
 def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let summary = "Given a qnode containing multiple tapes, split each tape into its own function.";
 }
@@ -82,8 +73,8 @@ def IonsDecompositionPass : Pass<"ions-decomposition"> {
     let summary = "Decompose the gates to the set {RX, RY, MS}";
 }
 
-def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
-    let summary = "Perform removal of chained operations that are self inverses.";
+def CancelInversesPass : Pass<"cancel-inverses"> {
+    let summary = "Perform removal of chained operations that are inverses.";
 }
 
 def MergeRotationsPass : Pass<"merge-rotations"> {

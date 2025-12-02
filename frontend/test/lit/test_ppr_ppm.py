@@ -38,7 +38,7 @@ def test_convert_clifford_to_ppr():
     Check that the original qnode is correctly kept and untransformed.
     """
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     @to_ppr
@@ -65,7 +65,7 @@ def test_commute_ppr():
     Ensure that the `qec.ppr` with pi/8 rotations are moved to the beginning of the circuit.
     """
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     @commute_ppr
@@ -83,10 +83,15 @@ def test_commute_ppr():
 
 
 # CHECK-LABEL: public @cir_commute_ppr
-# CHECK: qec.ppr ["X"](8)
-# CHECK: qec.ppr ["Z"](8)
-# CHECK: qec.ppr ["Z"](4)
-# CHECK: qec.ppr ["Z"](4)
+# CHECK: %0 = quantum.alloc( 2)
+# CHECK: %1 = quantum.extract %0[ 0]
+# CHECK: %2 = qec.ppr ["X"](8) %1
+# CHECK: %3 = qec.ppr ["Z"](4) %2
+# CHECK: %4 = qec.ppr ["X"](4) %3
+# CHECK: %5 = qec.ppr ["Z"](4) %4
+# CHECK: %6 = quantum.extract %0[ 1]
+# CHECK: %7 = qec.ppr ["Z"](8) %6
+# CHECK: %8 = qec.ppr ["Z"](4) %7
 test_commute_ppr()
 
 
@@ -96,7 +101,7 @@ def test_commute_ppr_max_pauli_size():
     The Pauli string should not be larger than max_pauli_size.
     """
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     @commute_ppr(max_pauli_size=2)
@@ -127,7 +132,7 @@ def test_merge_ppr_ppm():
     `qec.ppr` should be merged into `qec.ppm`, thus no `qec.ppr` should be left.
     """
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     @merge_ppr_ppm
@@ -155,7 +160,7 @@ def test_merge_ppr_ppm_max_pauli_size():
     The Pauli string should not be larger than max_pauli_size.
     """
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     @merge_ppr_ppm(max_pauli_size=1)
@@ -183,7 +188,7 @@ def test_ppr_to_ppm():
     Check that the `qec.ppr` is correctly decomposed into `qec.ppm`.
     """
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     device = qml.device("null.qubit", wires=2)
 
@@ -304,7 +309,7 @@ def test_clifford_to_ppm():
     the Pauli string can increase by one because of an additional auxiliary qubit.
     """
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_clifford_to_ppm_workflow():
@@ -358,7 +363,7 @@ def test_reduce_t_depth():
     Test the `reduce_t_depth` pass.
     """
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     @reduce_t_depth
@@ -384,8 +389,8 @@ def test_reduce_t_depth():
 # CHECK: qec.ppr ["X"](8)
 # CHECK: qec.ppr ["X"](8)
 # CHECK: qec.ppr ["Y", "X"](8)
-# CHECK: qec.ppr ["X"](8)
 # CHECK: qec.ppr ["X", "Y", "X"](8)
+# CHECK: qec.ppr ["X"](8)
 # CHECK: qec.ppr ["X", "X", "Y"](8)
 test_reduce_t_depth()
 
@@ -395,7 +400,7 @@ def test_ppr_to_mbqc():
     Test the `ppr_to_mbqc` pass.
     """
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     @ppr_to_mbqc
