@@ -35,7 +35,13 @@ from operator import is_not
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
-from catalyst.default_pipelines import get_enforce_runtime_invariants_stage
+from catalyst.default_pipelines import (
+    get_bufferization_stage,
+    get_convert_to_llvm_stage,
+    get_enforce_runtime_invariants_stage,
+    get_hlo_lowering_stage,
+    get_quantum_compilation_stage,
+)
 from catalyst.utils.exceptions import CompileError
 
 PipelineStage = Tuple[str, List[str]]
@@ -207,165 +213,6 @@ class CompileOptions:
         stages["BufferizationStage"] = get_bufferization_stage()
         stages["MLIRToLLVMDialectConversion"] = get_convert_to_llvm_stage()
         return list(stages.items())
-
-
-def get_quantum_compilation_stage(_options: CompileOptions) -> List[str]:
-    """Returns the list of passes that performs quantum compilation"""
-
-    user_transform_passes = [
-        # We want the invariant that transforms that generate multiple
-        # tapes will generate multiple qnodes. One for each tape.
-        # Split multiple tapes enforces that invariant.
-        "split-multiple-tapes",
-        # Run the transform sequence defined in the MLIR module
-        "builtin.module(apply-transform-sequence)",
-        # Nested modules are something that will be used in the future
-        # for making device specific transformations.
-        # Since at the moment, nothing in the runtime is using them
-        # and there is no lowering for them,
-        # we inline them to preserve the semantics. We may choose to
-        # keep inlining modules targeting the Catalyst runtime.
-        # But qnodes targeting other backends may choose to lower
-        # this into something else.
-        "inline-nested-module",
-        "lower-mitigation",
-        "adjoint-lowering",
-        "disable-assertion" if _options.disable_assertions else None,
-    ]
-    return list(filter(partial(is_not, None), user_transform_passes))
-
-
-def get_hlo_lowering_stage(_options: CompileOptions) -> List[str]:
-    """Returns the list of passes to lower StableHLO to upstream MLIR dialects."""
-    hlo_lowering = [
-        "canonicalize",
-        "func.func(chlo-legalize-to-stablehlo)",
-        "func.func(stablehlo-legalize-control-flow)",
-        "func.func(stablehlo-aggressive-simplification)",
-        "stablehlo-legalize-to-linalg",
-        "func.func(stablehlo-legalize-to-std)",
-        "func.func(stablehlo-legalize-sort)",
-        "stablehlo-convert-to-signless",
-        "canonicalize",
-        "scatter-lowering",
-        "hlo-custom-call-lowering",
-        "cse",
-        "func.func(linalg-detensorize{aggressive-mode})",
-        "detensorize-scf",
-        "detensorize-function-boundary",
-        "canonicalize",
-        "symbol-dce",
-    ]
-    return hlo_lowering
-
-
-def get_gradient_lowering_stage(_options: CompileOptions) -> List[str]:
-    """Returns the list of passes that performs gradient lowering"""
-
-    gradient_lowering = [
-        "annotate-invalid-gradient-functions",
-        "lower-gradients",
-    ]
-    return gradient_lowering
-
-
-def get_bufferization_stage(options: CompileOptions) -> List[str]:
-    """Returns the list of passes that performs bufferization"""
-
-    bufferization_options = """bufferize-function-boundaries
-        allow-return-allocs-from-loops
-        function-boundary-type-conversion=identity-layout-map
-        unknown-type-conversion=identity-layout-map""".replace(
-        "\n", " "
-    )
-    if options.async_qnodes:
-        bufferization_options += " copy-before-write"
-
-    bufferization = [
-        "inline",
-        "convert-tensor-to-linalg",  # tensor.pad
-        "convert-elementwise-to-linalg",  # Must be run before --one-shot-bufferize
-        "gradient-preprocess",
-        # "eliminate-empty-tensors",
-        # Keep eliminate-empty-tensors commented out until benchmarks use more structure
-        # and produce functions of reasonable size. Otherwise, eliminate-empty-tensors
-        # will consume a significant amount of compile time along with one-shot-bufferize.
-        ####################
-        "one-shot-bufferize{" + bufferization_options + "}",
-        ####################
-        "canonicalize",  # Remove dead memrefToTensorOp's
-        "gradient-postprocess",
-        # introduced during gradient-bufferize of callbacks
-        "func.func(buffer-hoisting)",
-        "func.func(buffer-loop-hoisting)",
-        # TODO: investigate re-adding this after new buffer dealloc pipeline
-        #       removed due to high stack memory use in nested structures
-        # "func.func(promote-buffers-to-stack)",
-        # TODO: migrate to new buffer deallocation "buffer-deallocation-pipeline"
-        "func.func(buffer-deallocation)",
-        "convert-arraylist-to-memref",
-        "convert-bufferization-to-memref",
-        "canonicalize",  # Must be after convert-bufferization-to-memref
-        # otherwise there are issues in lowering of dynamic tensors.
-        # "cse",
-        "cp-global-memref",
-    ]
-
-    return bufferization
-
-
-def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
-    """Returns the list of passes that lowers MLIR upstream dialects to LLVM Dialect"""
-
-    convert_to_llvm = [
-        "qnode-to-async-lowering" if options.async_qnodes else None,
-        "async-func-to-async-runtime" if options.async_qnodes else None,
-        "async-to-async-runtime" if options.async_qnodes else None,
-        "convert-async-to-llvm" if options.async_qnodes else None,
-        "expand-realloc",
-        "convert-gradient-to-llvm",
-        "memrefcpy-to-linalgcpy",
-        "func.func(convert-linalg-to-loops)",
-        "convert-scf-to-cf",
-        # This pass expands memref ops that modify the metadata of a memref (sizes, offsets,
-        # strides) into a sequence of easier to analyze constructs. In particular, this pass
-        # transforms ops into explicit sequence of operations that model the effect of this
-        # operation on the different metadata. This pass uses affine constructs to materialize
-        # these effects. Concretely, expanded-strided-metadata is used to decompose
-        # memref.subview as it has no lowering in -finalize-memref-to-llvm.
-        "expand-strided-metadata",
-        "lower-affine",
-        "arith-expand",  # some arith ops (ceildivsi) require expansion to be lowered to llvm
-        "convert-complex-to-standard",  # added for complex.exp lowering
-        "convert-complex-to-llvm",
-        "convert-math-to-llvm",
-        # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
-        "convert-math-to-libm",
-        "convert-arith-to-llvm",
-        "memref-to-llvm-tbaa",  # load and store are converted to llvm with tbaa tags
-        "finalize-memref-to-llvm{use-generic-functions}",
-        "convert-index-to-llvm",
-        "convert-catalyst-to-llvm",
-        "convert-quantum-to-llvm",
-        # There should be no identical code folding
-        # (`mergeIdenticalBlocks` in the MLIR source code)
-        # between convert-async-to-llvm and
-        # add-exception-handling.
-        # So, if there's a pass from the beginning
-        # of this list to here that does folding
-        # add-exception-handling will fail to add async.drop_ref
-        # correctly. See https://github.com/PennyLaneAI/catalyst/pull/995
-        "add-exception-handling" if options.async_qnodes else None,
-        "emit-catalyst-py-interface",
-        # Remove any dead casts as the final pass expects to remove all existing casts,
-        # but only those that form a loop back to the original type.
-        "canonicalize",
-        "reconcile-unrealized-casts",
-        "gep-inbounds",
-        "register-inactive-callback",
-    ]
-    return list(filter(partial(is_not, None), convert_to_llvm))
-
 
 def default_pipeline() -> PipelineStages:
     """Return the pipeline stages for default Catalyst workloads.
