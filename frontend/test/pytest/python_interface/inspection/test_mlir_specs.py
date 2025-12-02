@@ -134,7 +134,7 @@ class TestMLIRSpecs:
                 0,
                 make_static_resources(
                     operations={"RX": {1: 2}, "RZ": {1: 2}, "Hadamard": {1: 2}, "CNOT": {2: 2}},
-                    measurements={"probs(0 wires)": 1},
+                    measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
             ),
@@ -154,7 +154,7 @@ class TestMLIRSpecs:
                 0,
                 make_static_resources(
                     operations={"RX": {1: 2}, "RZ": {1: 2}, "Hadamard": {1: 2}, "CNOT": {2: 2}},
-                    measurements={"probs(0 wires)": 1},
+                    measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
             ),
@@ -162,7 +162,7 @@ class TestMLIRSpecs:
                 1,
                 make_static_resources(
                     operations={"RX": {1: 2}, "RZ": {1: 2}},
-                    measurements={"probs(0 wires)": 1},
+                    measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
             ),
@@ -170,7 +170,7 @@ class TestMLIRSpecs:
                 2,
                 make_static_resources(
                     operations={"RX": {1: 1}, "RZ": {1: 1}},
-                    measurements={"probs(0 wires)": 1},
+                    measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
             ),
@@ -203,17 +203,17 @@ class TestMLIRSpecs:
         expected = {
             "Before MLIR Passes (MLIR-0)": make_static_resources(
                 operations={"RX": {1: 2}, "RZ": {1: 2}, "Hadamard": {1: 2}, "CNOT": {2: 2}},
-                measurements={"probs(0 wires)": 1},
+                measurements={"probs(all wires)": 1},
                 num_allocs=2,
             ),
             "cancel-inverses (MLIR-1)": make_static_resources(
                 operations={"RX": {1: 2}, "RZ": {1: 2}},
-                measurements={"probs(0 wires)": 1},
+                measurements={"probs(all wires)": 1},
                 num_allocs=2,
             ),
             "merge-rotations (MLIR-2)": make_static_resources(
                 operations={"RX": {1: 1}, "RZ": {1: 1}},
-                measurements={"probs(0 wires)": 1},
+                measurements={"probs(all wires)": 1},
                 num_allocs=2,
             ),
         }
@@ -241,12 +241,12 @@ class TestMLIRSpecs:
         expected = {
             "Before MLIR Passes (MLIR-0)": make_static_resources(
                 operations={"RX": {1: 2}, "RZ": {1: 2}, "Hadamard": {1: 2}, "CNOT": {2: 2}},
-                measurements={"probs(0 wires)": 1},
+                measurements={"probs(all wires)": 1},
                 num_allocs=2,
             ),
             "merge-rotations (MLIR-2)": make_static_resources(
                 operations={"RX": {1: 1}, "RZ": {1: 1}},
-                measurements={"probs(0 wires)": 1},
+                measurements={"probs(all wires)": 1},
                 num_allocs=2,
             ),
         }
@@ -300,7 +300,7 @@ class TestMLIRSpecs:
 
         expected = make_static_resources(
             operations={"PauliX": {1: iters}},
-            measurements={"state(0 wires)": 1},
+            measurements={"state(all wires)": 1},
             num_allocs=2,
         )
 
@@ -340,7 +340,7 @@ class TestMLIRSpecs:
 
         expected = make_static_resources(
             operations={"PauliX": {1: 1}},
-            measurements={"state(0 wires)": 1},
+            measurements={"state(all wires)": 1},
             num_allocs=2,
         )
 
@@ -393,7 +393,7 @@ class TestMLIRSpecs:
 
         expected = make_static_resources(
             operations={"PauliX": {1: 1}},
-            measurements={"state(0 wires)": 1},
+            measurements={"state(all wires)": 1},
             num_allocs=2,
         )
 
@@ -438,7 +438,7 @@ class TestMLIRSpecs:
 
         expected = make_static_resources(
             operations={"PauliX": {1: 1}, "PauliZ": {1: 1}},
-            measurements={"state(0 wires)": 1},
+            measurements={"state(all wires)": 1},
             num_allocs=2,
         )
 
@@ -476,6 +476,26 @@ class TestMLIRSpecs:
         res = mlir_specs(circ, level=0)
         assert resources_equal(res, expected)
 
+    def test_stateprep(self):
+        """Test that StatePrep operations are handled correctly."""
+
+        @qml.qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=3), shots=10)
+        def circ():
+            qml.StatePrep(jnp.array([1, 0, 0, 0]), wires=[0, 1])
+            qml.Hadamard(wires=1)
+            qml.Hadamard(wires=2)
+            return qml.sample()
+
+        expected = make_static_resources(
+            operations={"StatePrep": {2: 1}, "Hadamard": {1: 2}},
+            measurements={"sample(all wires)": 1},
+            num_allocs=3,
+        )
+
+        res = mlir_specs(circ, level=0)
+        assert resources_equal(res, expected)
+
     def test_adjoint(self):
         """Test that adjoint operations are handled correctly."""
 
@@ -499,7 +519,7 @@ class TestMLIRSpecs:
                 "Adjoint(RZ)": {1: 1},
                 "T": {1: 1},
             },
-            measurements={"probs(0 wires)": 1},
+            measurements={"probs(all wires)": 1},
             num_allocs=2,
         )
 
@@ -563,7 +583,7 @@ class TestMLIRSpecsWithPLXPR(TestMLIRSpecs):
     use_plxpr = True
 
 
-# TODO: May want to separate some of these concerns into testing specs_collect directly
+# TODO: In the future, it would be good to add unit tests for specs_collector instead of just integration tests
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
