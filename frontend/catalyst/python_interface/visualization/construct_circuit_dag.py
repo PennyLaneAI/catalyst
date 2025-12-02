@@ -115,9 +115,11 @@ class ConstructCircuitDAG:
     def _state_op(self, op: quantum.StateOp) -> None:
         """Handler for the terminal state measurement operation."""
 
+        # Create PennyLane instance
         meas = xdsl_to_qml_measurement(op)
+
+        # Add node to current cluster 
         node_uid = f"node_{id(op)}"
-        # Build node on graph
         self.dag_builder.add_node(
             uid=node_uid,
             label=str(meas),
@@ -133,10 +135,12 @@ class ConstructCircuitDAG:
     ) -> None:
         """Handler for statistical measurement operations."""
 
+        # Create PennyLane instance
         obs_op = op.obs.owner
         meas = xdsl_to_qml_measurement(op, xdsl_to_qml_measurement(obs_op))
+
+        # Add node to current cluster 
         node_uid = f"node_{id(op)}"
-        # Build node on graph
         self.dag_builder.add_node(
             uid=node_uid,
             label=str(meas),
@@ -149,9 +153,11 @@ class ConstructCircuitDAG:
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
         """Handler for the single-qubit projective measurement operation."""
 
+        # Create PennyLane instance
         meas = xdsl_to_qml_measurement(op)
+
+        # Add node to current cluster 
         node_uid = f"node_{id(op)}"
-        # Build node on graph
         self.dag_builder.add_node(
             uid=node_uid,
             label=str(meas),
