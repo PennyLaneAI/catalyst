@@ -15,6 +15,7 @@
 #include "RTIO/IR/RTIODialect.h"
 #include "RTIO/IR/RTIOOps.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "llvm/ADT/TypeSwitch.h"
 
@@ -54,7 +55,7 @@ static ParseResult parseChannelTypeBody(AsmParser &parser, std::string &kind, Ar
 
             // After qualifiers, parse comma for channelId
             if (failed(parser.parseOptionalComma())) {
-                channelId = parser.getBuilder().getI64IntegerAttr(-1);
+                channelId = parser.getBuilder().getI64IntegerAttr(ShapedType::kDynamic);
                 return success();
             }
         }
@@ -62,23 +63,25 @@ static ParseResult parseChannelTypeBody(AsmParser &parser, std::string &kind, Ar
     }
     else {
         // No comma at all, no qualifiers and no channelId
-        channelId = parser.getBuilder().getI64IntegerAttr(-1);
+        channelId = parser.getBuilder().getI64IntegerAttr(ShapedType::kDynamic);
         return success();
     }
 
     // 3. Parse channelId: `?` or non-negative integer
     if (succeeded(parser.parseOptionalQuestion())) {
-        channelId = parser.getBuilder().getI64IntegerAttr(-1);
+        channelId = parser.getBuilder().getI64IntegerAttr(ShapedType::kDynamic);
         return success();
     }
 
     int64_t id;
-    if (failed(parser.parseInteger(id)))
+    if (failed(parser.parseInteger(id))) {
         return failure();
+    }
 
-    if (id < 0)
+    if (id < 0) {
         return parser.emitError(parser.getCurrentLocation(),
                                 "static channel ID must be non-negative");
+    }
 
     channelId = parser.getBuilder().getI64IntegerAttr(id);
     return success();
@@ -99,7 +102,7 @@ static void printChannelTypeBody(AsmPrinter &printer, StringRef kind, ArrayAttr 
         printer << "]";
     }
 
-    // 3. Print channelId if present (and not default -1)
+    // 3. Print channelId if present (and not default ShapedType::kDynamic)
     if (channelId) {
         int64_t id = channelId.getInt();
         if (id >= 0 || (qualifiers && !qualifiers.empty())) {
@@ -127,22 +130,15 @@ void catalyst::rtio::RTIODialect::initialize()
 #include "RTIO/IR/RTIOOpsTypes.cpp.inc"
         >();
 
+    addAttributes<
+#define GET_ATTRDEF_LIST
+#include "RTIO/IR/RTIOAttributes.cpp.inc"
+        >();
+
     addOperations<
 #define GET_OP_LIST
 #include "RTIO/IR/RTIOOps.cpp.inc"
         >();
-}
-
-// Not support any custom attributes yet, might be supported in the future
-Attribute catalyst::rtio::RTIODialect::parseAttribute(DialectAsmParser &parser, Type type) const
-{
-    parser.emitError(parser.getNameLoc(), "no dialect attributes are supported");
-    return {};
-}
-
-void catalyst::rtio::RTIODialect::printAttribute(Attribute attr, DialectAsmPrinter &printer) const
-{
-    llvm_unreachable("no dialect attributes are supported");
 }
 
 //===----------------------------------------------------------------------===//

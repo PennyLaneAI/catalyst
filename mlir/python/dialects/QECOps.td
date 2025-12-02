@@ -1,4 +1,4 @@
-// Copyright 2024 Xanadu Quantum Technologies Inc.
+// Copyright 2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,12 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#pragma once
 
-namespace catalyst {
-namespace quantum {
+#ifndef PYTHON_BINDINGS_QEC_OPS
+#define PYTHON_BINDINGS_QEC_OPS
 
-static constexpr const char *hasInvalidGradientOp = "catalyst.invalidGradientOperation";
+include "QEC/IR/QECDialect.td"
 
-} // namespace quantum
-} // namespace catalyst
+#endif

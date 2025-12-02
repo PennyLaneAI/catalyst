@@ -59,6 +59,18 @@ def use_capture():
         qml.capture.disable()
 
 
+@pytest.fixture(scope="function")
+def use_capture_dgraph():
+    """Enable capture and graph-decomposition before and disable them both after the test."""
+    qml.capture.enable()
+    qml.decomposition.enable_graph()
+    try:
+        yield
+    finally:
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
+
+
 @pytest.fixture(params=["capture", "no_capture"], scope="function")
 def use_both_frontend(request):
     """Runs the test once with capture enabled and once with it disabled."""
@@ -70,3 +82,9 @@ def use_both_frontend(request):
             qml.capture.disable()
     else:
         yield
+
+
+@pytest.fixture(scope="function")
+def requires_xdsl():
+    """Fixture that ensures xdsl is available. It skips the test if xdsl is not installed."""
+    pytest.importorskip("xdsl", reason="xdsl is not installed, skipping test")

@@ -118,82 +118,31 @@ func.func @sync_no_events() {
 
 // -----
 
-///////////////////////////////
-// Timeline-Based Operations //
-///////////////////////////////
-
-func.func @timeline_now() {
-    %t = rtio.now : i64
-    return
-}
-
-// -----
-
-func.func @timeline_at() {
-    %t = arith.constant 1000 : i64
-    %delay = arith.constant 500 : i64
-    %now = rtio.now : i64
-    rtio.at %t : i64
-    rtio.delay %delay : i64
-
-    // rewind to the start time
-    rtio.at %now : i64
-    return
-}
-
-// -----
-
-func.func @timeline_dalay() {
-    %delay = arith.constant 500 : i64
-    rtio.delay %delay : i64
-    return
-}
-
-// -----
-
-func.func @set_frequency_dds_good(%freq: f64) {
-    %ch = rtio.channel : !rtio.channel<"dds", 0>
-    rtio.set_frequency %ch, %freq : !rtio.channel<"dds", 0>, f64
-    return
-}
-
-
-// -----
-
-func.func @set_phase_dds_good(%phase: f64) {
-    %ch = rtio.channel : !rtio.channel<"dds", 0>
-    rtio.set_phase %ch, %phase : !rtio.channel<"dds", 0>, f64
-
-    return
-}
-
-// -----
-
-func.func @set_amplitude_dds_good(%amp: f64) {
-    %ch = rtio.channel : !rtio.channel<"dds", 0>
-    rtio.set_amplitude %ch, %amp : !rtio.channel<"dds", 0>, f64
-    return
-}
-
-// -----
-
-func.func @ttl_on_dds_good() {
-    %ch = rtio.channel : !rtio.channel<"dds", 0>
-    rtio.on %ch : !rtio.channel<"dds", 0>
-    return
-}
-
-// -----
-
-func.func @ttl_off_dds_good() {
-    %ch = rtio.channel : !rtio.channel<"dds", 0>
-    rtio.off %ch : !rtio.channel<"dds", 0>
-    return
-}
-
-// -----
-
 func.func @empty_good() {
     %empty = rtio.empty : !rtio.event
     return
+}
+
+// -----
+
+module @config_test attributes {
+    rtio.config = #rtio.config<{
+        config1 = 1 : i32,
+        config2 = "test",
+        nested = {a = 0 : i32, b = "test"}
+    }>
+} {
+    func.func @kernel() {
+        return
+    }
+}
+
+// -----
+
+module @empty_config attributes {
+    rtio.config = #rtio.config<{}>
+} {
+    func.func @kernel() {
+        return
+    }
 }

@@ -51,7 +51,7 @@ def circuit_aot_builder(dev):
 def has_catalyst_transforms(mlir):
     """Check in the MLIR if the transforms were scheduled"""
     return (
-        'transform.apply_registered_pass "remove-chained-self-inverse"' in mlir
+        'transform.apply_registered_pass "cancel-inverses"' in mlir
         and 'transform.apply_registered_pass "merge-rotations"' in mlir
     )
 
@@ -1088,9 +1088,7 @@ class TestCapture:
             return qml.expval(qml.PauliZ(0))
 
         capture_result = captured_circuit(0.1)
-        assert (
-            'transform.apply_registered_pass "remove-chained-self-inverse"' in captured_circuit.mlir
-        )
+        assert 'transform.apply_registered_pass "cancel-inverses"' in captured_circuit.mlir
 
         qml.capture.disable()
 
@@ -1258,7 +1256,7 @@ class TestCapture:
         # Catalyst 'cancel_inverses' should have been scheduled as a pass
         # whereas PL 'unitary_to_rot' should have been expanded
         capture_mlir = captured_inverses_unitary.mlir
-        assert 'transform.apply_registered_pass "remove-chained-self-inverse"' in capture_mlir
+        assert 'transform.apply_registered_pass "cancel-inverses"' in capture_mlir
         assert is_unitary_rotated(capture_mlir)
 
         # Case 2: During plxpr interpretation, first comes the PL transform
@@ -1273,7 +1271,7 @@ class TestCapture:
         # Both PL transforms should have been expaned and no Catalyst pass should have been
         # scheduled
         capture_mlir = captured_unitary_inverses.mlir
-        assert 'transform.apply_registered_pass "remove-chained-self-inverse"' not in capture_mlir
+        assert 'transform.apply_registered_pass "cancel-inverses"' not in capture_mlir
         assert 'quantum.custom "Hadamard"' not in capture_mlir
         assert is_unitary_rotated(capture_mlir)
 
@@ -1373,37 +1371,6 @@ class TestCapture:
             return qml.expval(qml.PauliZ(0))
 
         assert jnp.allclose(circuit(1.5, 2.5, 3.5), capture_result)
-
-    def test_transform_map_wires_workflow(self, backend):
-        """Test the integration for a circuit with a 'map_wires' transform."""
-
-        # Capture enabled
-
-        qml.capture.enable()
-
-        @qjit(target="mlir")
-        @partial(qml.map_wires, wire_map={0: 1})
-        @qml.qnode(qml.device(backend, wires=2))
-        def captured_circuit(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.PauliZ(0))
-
-        capture_result = captured_circuit(1.5)
-
-        assert is_wire_mapped(captured_circuit.mlir)
-
-        qml.capture.disable()
-
-        # Capture disabled
-
-        @qjit
-        @partial(qml.map_wires, wire_map={0: 1})
-        @qml.qnode(qml.device(backend, wires=2))
-        def circuit(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.PauliZ(0))
-
-        assert jnp.allclose(circuit(1.5), capture_result)
 
     def test_transform_single_qubit_fusion_workflow(self, backend):
         """Test the integration for a circuit with a 'single_qubit_fusion' transform."""
