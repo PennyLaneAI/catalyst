@@ -170,6 +170,7 @@ class ConstructCircuitDAG:
             # logical branches are treated as 'parallel'
             self._cluster_uid_stack.pop()
 
+        # Pop IfOp cluster before leaving this handler
         self._cluster_uid_stack.pop()
 
     # ============
