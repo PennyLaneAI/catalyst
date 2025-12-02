@@ -41,19 +41,15 @@ def resources_equal(
 
         # actual.device_name == expected.device_name TODO: Don't worry about this one for now
         assert actual.num_allocs == expected.num_allocs
-        assert len(actual.operations) == len(expected.operations)
-        assert len(actual.measurements) == len(expected.measurements)
 
-        for name, val in expected.operations.items():
-            assert name in actual.operations
-            for size, count in val.items():
-                assert size in actual.operations[name]
-                assert actual.operations[name][size] == count
+        assert dict(actual.operations) == expected.operations
+        assert dict(actual.measurements) == expected.measurements
 
-        for name, count in expected.measurements.items():
-            assert name in actual.measurements
-            assert actual.measurements[name] == count
+        # There should be no remaining unresolved function calls
+        assert sum(actual._unresolved_function_calls.values()) == 0
 
+        # Only check that expected function calls are a subset of actual function calls
+        #   Other random helper functions may be inserted by the compiler
         for name, count in expected.function_calls.items():
             assert name in actual.function_calls
             assert actual.function_calls[name] == count
@@ -574,6 +570,9 @@ class TestMLIRSpecs:
 
         res = mlir_specs(circ, level=1, args=(0,))
         assert resources_equal(res, expected)
+
+
+# TODO: Add a test that calls another function as a subroutine
 
 
 @pytest.mark.usefixtures("use_capture")

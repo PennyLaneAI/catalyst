@@ -65,11 +65,11 @@ def mlir_specs(
         """Callback function for gathering circuit specs."""
 
         pass_instance = previous_pass if previous_pass else next_pass
-        ops = specs_collect(module)
+        result = specs_collect(module)
 
         pass_name = pass_instance.name if hasattr(pass_instance, "name") else pass_instance
         cache[pass_level] = (
-            ops,
+            result,
             pass_name if pass_level else "Before MLIR Passes",
         )
 

@@ -360,8 +360,7 @@ def xdsl_to_qml_op_type(op, adjoint_mode: bool) -> str:
     }
 
     if op.name == "quantum.custom":
-        gate_cls = resolve_gate(op.properties.get("gate_name").data)
-        gate_name = gate_cls.__name__
+        gate_name = op.properties.get("gate_name").data
     elif op.name in name_map:
         gate_name = name_map[op.name]
     else:
@@ -455,12 +454,10 @@ def xdsl_to_qml_measurement_type(op, obs_op=None) -> str:
         gate_name = " @ ".join(ops_list)
 
     elif op.name == "quantum.namedobs":
-        gate_cls = resolve_gate(op.type.data.value)
-        gate_name = gate_cls.__name__
+        gate_name = op.type.data.value
 
     elif op.name in from_str_to_PL_measurement:
-        gate_cls = resolve_measurement(op.name)
-        gate_name = gate_cls.__name__
+        gate_name = op.name.split(".")[-1]
 
     else:
         raise NotImplementedError(f"Unsupported measurement/observable: {op.name}")
