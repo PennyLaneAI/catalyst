@@ -246,6 +246,7 @@ class ConstructCircuitDAG:
         # Loop through each branch and visualize as a cluster
         num_regions = len(flattened_if_op)
         for i, (condition_ssa, region) in enumerate(flattened_if_op):
+
             # Visualize with a cluster
             def _get_conditional_branch_label(i):
                 if i == 0:
