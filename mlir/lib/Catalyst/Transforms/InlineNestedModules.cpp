@@ -274,6 +274,7 @@ struct InlineNestedModule : public RewritePattern {
     {
     }
 
+    llvm::SmallSet<StringRef, 8> _externalFuncDeclNames;
     mutable llvm::SmallSet<StringRef, 8> alreadyInlinedFuncDeclNames;
 
     LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) const override
@@ -318,8 +319,6 @@ struct InlineNestedModule : public RewritePattern {
 
         return success();
     }
-
-    llvm::SmallSet<StringRef, 8> _externalFuncDeclNames;
 };
 
 struct SymbolReplacerPattern
