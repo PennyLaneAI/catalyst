@@ -295,19 +295,29 @@ struct InlineNestedModule : public RewritePattern {
         // Look for the func decls in the current qnode module
         // If it is a recorded external func decl, erase it if it already has been inlined.
         SmallVector<Operation *> _erasureWorklist;
-        op->walk([&](func::FuncOp f) {
-            StringRef funcName = f.getName();
-            if (f.isExternal() && _externalFuncDeclNames.contains(funcName)) {
-                if (_alreadyInlinedFuncDeclNames->contains(funcName)) {
-                    _erasureWorklist.push_back(f);
-                }
-                else {
-                    _alreadyInlinedFuncDeclNames->insert(funcName);
+        for (auto &region : op->getRegions()) {
+            for (auto &block : region.getBlocks()) {
+                for (auto &_op : block) {
+                    if (!isa<func::FuncOp>(_op)) {
+                        continue;
+                    }
+
+                    func::FuncOp f = cast<func::FuncOp>(_op);
+                    StringRef funcName = f.getName();
+                    if (f.isExternal() && _externalFuncDeclNames.contains(funcName)) {
+                        if (_alreadyInlinedFuncDeclNames->contains(funcName)) {
+                            _erasureWorklist.push_back(f);
+                        }
+                        else {
+                            _alreadyInlinedFuncDeclNames->insert(funcName);
+                        }
+                    }
                 }
             }
-        });
-        for (auto op : _erasureWorklist) {
-            rewriter.eraseOp(op);
+        }
+
+        for (auto _op : _erasureWorklist) {
+            rewriter.eraseOp(_op);
         }
 
         // Can't generalize getting a region other than the zero-th one.
