@@ -16,12 +16,11 @@
 
 from functools import singledispatchmethod
 
-from xdsl.dialects import builtin, func, scf
-from xdsl.ir import Block, Operation, Region
-
 from catalyst.python_interface.dialects import catalyst, quantum
 from catalyst.python_interface.inspection.xdsl_conversion import resolve_constant_params
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from xdsl.dialects import builtin, func, scf
+from xdsl.ir import Block, Operation, Region, SSAValue
 
 
 class ConstructCircuitDAG:
@@ -129,6 +128,8 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _if_op(self, operation: scf.IfOp):
         """Handles the scf.IfOp operation."""
+        flattened_if_op = _flatten_if_op(operation)
+
         uid = f"cluster_{id(operation)}"
         self.dag_builder.add_cluster(
             uid,
@@ -140,18 +141,30 @@ class ConstructCircuitDAG:
         self._cluster_uid_stack.append(uid)
 
         # Loop through each branch and visualize as a cluster
-        for i, branch in enumerate(operation.regions):
+        num_regions = len(flattened_if_op)
+        for i, (condition_ssa, region) in enumerate(flattened_if_op):
+
+            def _get_conditional_branch_label(i):
+                if i == 0:
+                    return "if ..."
+                elif i == num_regions - 1:
+                    return "else"
+                else:
+                    return "elif ..."
+
             uid = f"cluster_ifop_branch{i}_{id(operation)}"
             self.dag_builder.add_cluster(
                 uid,
-                node_label="if ..." if i == 0 else "else",
+                node_label=_get_conditional_branch_label(i),
                 label="",
+                style="dashed",
+                penwidth=1,
                 cluster_uid=self._cluster_uid_stack[-1],
             )
             self._cluster_uid_stack.append(uid)
 
             # Go recursively into the branch to process internals
-            self._visit_region(branch)
+            self._visit_region(region)
 
             # Pop branch cluster after processing to ensure
             # logical branches are treated as 'parallel'
@@ -228,3 +241,21 @@ class ConstructCircuitDAG:
             # If we hit a func.return operation we know we are leaving
             # the FuncOp's scope and so we can pop the ID off the stack.
             self._cluster_uid_stack.pop()
+
+
+def _flatten_if_op(op: scf.IfOp) -> list[tuple[SSAValue, Region]]:
+    """Recursively flattens a nested IfOp (if/elif/else chains)."""
+
+    condition_ssa: SSAValue = op.operands[0]
+    then_region, else_region = op.regions
+
+    flattened_op: list[tuple[SSAValue, Region]] = [(condition_ssa, then_region)]
+
+    # Peak into else region to see if there's another IfOp
+    else_block: Block = else_region.block
+    if isinstance(else_block.ops.last.prev_op, scf.IfOp):
+        nested_flattened_op = _flatten_if_op(else_block.ops.last.prev_op)
+        flattened_op.extend(nested_flattened_op)
+        return flattened_op
+
+    return flattened_op
