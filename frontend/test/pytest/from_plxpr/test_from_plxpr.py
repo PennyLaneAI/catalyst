@@ -179,6 +179,29 @@ class TestErrors:
         with pytest.raises(NotImplementedError, match="not yet supported"):
             from_plxpr(jaxpr)()
 
+    def test_unsupported_op(self):
+        """Test that a CompileError is raised when an unsupported op is encountered."""
+
+        dev = qml.device("lightning.qubit", wires=5)
+
+        @qml.qnode(dev)
+        def circuit():
+            qml.QROM(
+                bitstrings=["010", "111", "110", "000"],
+                control_wires=[0, 1],
+                target_wires=[2, 3, 4],
+                work_wires=[5, 6, 7],
+            )
+            return qml.state()
+
+        jaxpr = jax.make_jaxpr(circuit)()
+
+        with pytest.raises(
+            catalyst.utils.exceptions.CompileError,
+            match="Operation QROM with hyperparameters",
+        ):
+            from_plxpr(jaxpr)()
+
 
 class TestCatalystCompareJaxpr:
     """Test comparing catalyst and pennylane jaxpr for a variety of situations."""
