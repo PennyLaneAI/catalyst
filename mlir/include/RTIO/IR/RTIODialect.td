@@ -39,15 +39,7 @@ def RTIO_Dialect : Dialect {
     let name = "rtio";
     let cppNamespace = "::catalyst::rtio";
     let useDefaultTypePrinterParser = 1;
-    let useDefaultAttributePrinterParser = 0;
-
-    let extraClassDeclaration = [{
-        mlir::Attribute parseAttribute(mlir::DialectAsmParser &parser,
-                                       mlir::Type type) const override;
-
-        void printAttribute(mlir::Attribute attr,
-                            mlir::DialectAsmPrinter &printer) const override;
-    }];
+    let useDefaultAttributePrinterParser = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -163,6 +155,79 @@ def RTIOEventType : RTIO_Type<"Event", "event"> {
 
 class RTIO_Op<string mnemonic, list<Trait> traits = []> :
     Op<RTIO_Dialect, mnemonic, traits>;
+
+//===----------------------------------------------------------------------===//
+// RTIO Attributes
+//===----------------------------------------------------------------------===//
+
+class RTIO_Attr<string name, string attrMnemonic, list<Trait> traits = []>
+    : AttrDef<RTIO_Dialect, name, traits> {
+    let mnemonic = attrMnemonic;
+}
+
+def RTIOConfigAttr : RTIO_Attr<"Config", "config"> {
+    let summary = "A dictionary attribute for RTIO configuration";
+    let description = [{
+        A configuration attribute that wraps a DictionaryAttr for RTIO-specific metadata.
+        Can be used as a module-level attribute.
+
+        Example:
+        ```mlir
+        module @my_module attributes {
+            rtio.config = #rtio.config<{
+                config1 = 1 : i32,
+                config2 = "test",
+            }>
+        } {
+            // ...
+        }
+        ```
+    }];
+
+    let parameters = (ins
+        "mlir::DictionaryAttr":$dict
+    );
+
+    let assemblyFormat = "`<` $dict `>`";
+
+    let extraClassDeclaration = [{
+        /// The canonical attribute name for module-level config.
+        static llvm::StringRef getModuleAttrName() {
+            return "rtio.config";
+        }
+
+        /// Return the value for the given key, or null if not found.
+        mlir::Attribute get(llvm::StringRef key) const {
+            return getDict().get(key);
+        }
+        mlir::Attribute get(mlir::StringAttr key) const {
+            return getDict().get(key);
+        }
+
+        /// Return whether the config contains the given key.
+        bool contains(llvm::StringRef key) const {
+            return getDict().contains(key);
+        }
+        bool contains(mlir::StringAttr key) const {
+            return getDict().contains(key);
+        }
+
+        /// Return the specified named attribute if present.
+        std::optional<mlir::NamedAttribute> getNamed(llvm::StringRef key) const {
+            return getDict().getNamed(key);
+        }
+        std::optional<mlir::NamedAttribute> getNamed(mlir::StringAttr key) const {
+            return getDict().getNamed(key);
+        }
+
+        /// Support range iteration (delegates to DictionaryAttr).
+        using iterator = mlir::DictionaryAttr::iterator;
+        iterator begin() const { return getDict().begin(); }
+        iterator end() const { return getDict().end(); }
+        bool empty() const { return getDict().empty(); }
+        size_t size() const { return getDict().size(); }
+    }];
+}
 
 #endif // RTIO_DIALECT
 

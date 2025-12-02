@@ -197,3 +197,27 @@ func.func @empty_good() {
     %empty = rtio.empty : !rtio.event
     return
 }
+
+// -----
+
+module @config_test attributes {
+    rtio.config = #rtio.config<{
+        config1 = 1 : i32,
+        config2 = "test",
+        nested = {a = 0 : i32, b = "test"}
+    }>
+} {
+    func.func @kernel() {
+        return
+    }
+}
+
+// -----
+
+module @empty_config attributes {
+    rtio.config = #rtio.config<{}>
+} {
+    func.func @kernel() {
+        return
+    }
+}

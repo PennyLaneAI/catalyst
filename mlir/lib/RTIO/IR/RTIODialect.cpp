@@ -127,22 +127,15 @@ void catalyst::rtio::RTIODialect::initialize()
 #include "RTIO/IR/RTIOOpsTypes.cpp.inc"
         >();
 
+    addAttributes<
+#define GET_ATTRDEF_LIST
+#include "RTIO/IR/RTIOAttributes.cpp.inc"
+        >();
+
     addOperations<
 #define GET_OP_LIST
 #include "RTIO/IR/RTIOOps.cpp.inc"
         >();
-}
-
-// Not support any custom attributes yet, might be supported in the future
-Attribute catalyst::rtio::RTIODialect::parseAttribute(DialectAsmParser &parser, Type type) const
-{
-    parser.emitError(parser.getNameLoc(), "no dialect attributes are supported");
-    return {};
-}
-
-void catalyst::rtio::RTIODialect::printAttribute(Attribute attr, DialectAsmPrinter &printer) const
-{
-    llvm_unreachable("no dialect attributes are supported");
 }
 
 //===----------------------------------------------------------------------===//
