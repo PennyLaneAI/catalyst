@@ -104,7 +104,7 @@ void populateCliffordTSwitchCases(mlir::PatternRewriter &rewriter, mlir::Locatio
     // Populate Switch Cases
     assert(caseConfigs.size() == switchOp.getCases().size() &&
            "Mismatch in case config and case values");
-    for (size_t i = 0; i < caseConfigs.size(); ++i) {
+    for (size_t i = 0; i < caseConfigs.size(); i++) {
         const auto &config = caseConfigs[i];
         Region &caseRegion = switchOp.getCaseRegions()[i];
         caseRegion.push_back(new Block());
@@ -181,7 +181,7 @@ void populatePPRBasisSwitchCases(mlir::PatternRewriter &rewriter, mlir::Location
     pushSeries(yPauli);
     pushSeries(zPauli);
 
-    for (size_t i = 0; i < caseConfigs.size(); ++i) {
+    for (size_t i = 0; i < caseConfigs.size(); i++) {
         const auto &config = caseConfigs[i];
         Region &caseRegion = switchOp.getCaseRegions()[i];
         caseRegion.push_back(new Block());
@@ -303,7 +303,7 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     const int64_t numCases = pprBasis ? 19 : 10;
     SmallVector<int64_t> caseValues;
     caseValues.reserve(numCases);
-    for (int64_t i = 0; i < numCases; ++i) {
+    for (int64_t i = 0; i < numCases; i++) {
         caseValues.push_back(i);
     }
 
