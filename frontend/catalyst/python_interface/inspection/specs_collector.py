@@ -360,19 +360,23 @@ def _collect_region(
                 cond_warning=cond_warning,
                 adjoint_mode=adjoint_mode,
             )
-            try:
-                iters = count_static_loop_iterations(op)
+            if hasattr(op, "estimated_iterations"):            
+                try:
+                    iters = count_static_loop_iterations(op)
+                    body_ops.multiply_by_scalar(iters)
+                except NotImplementedError:
+                    # Unable to statically determine loop iterations
+                    if not loop_warning:
+                        warnings.warn(
+                            "Specs was unable to determine the number of loop iterations. "
+                            "The results will assume the loop runs only once. "
+                            "This may be fixed in some cases by inlining dynamic arguments.",
+                            UserWarning,
+                        )
+                    loop_warning = True
+            else:
+                iters = op.attributes.get("estimated_iterations").value.data
                 body_ops.multiply_by_scalar(iters)
-            except NotImplementedError:
-                # Unable to statically determine loop iterations
-                if not loop_warning:
-                    warnings.warn(
-                        "Specs was unable to determine the number of loop iterations. "
-                        "The results will assume the loop runs only once. "
-                        "This may be fixed in some cases by inlining dynamic arguments.",
-                        UserWarning,
-                    )
-                loop_warning = True
             resources.merge_with(body_ops)
             continue
 
