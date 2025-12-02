@@ -13,10 +13,9 @@
 # limitations under the License.
 """This file contains PennyLane's API for defining compiler passes."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from inspect import signature
-from types import UnionType
-from typing import ClassVar, Union, get_args, get_origin
+from typing import ClassVar, Union, UnionType, get_args, get_origin
 
 from xdsl.context import Context
 from xdsl.dialects import builtin
@@ -31,24 +30,19 @@ from xdsl.pattern_rewriter import (
 )
 
 
-def _update_type_hints(hint: type[Operation] | type[Operation]) -> Callable:
+def _update_type_hints(expected_types: Sequence[type[Operation]]) -> Callable:
     """Update the signature of a ``match_and_rewrite`` method to use the provided operation
     as the first argument's type hint."""
-    if get_origin(hint) in (Union, UnionType):
-        expected_types = get_args(hint)
-    else:
-        expected_types = (hint,)
 
     if not all(issubclass(e, Operation) for e in expected_types):
         raise TypeError(
             "Only Operation types or unions of Operation types can be used to "
             "register rewrite rules."
         )
+    hint = expected_types[0] if len(expected_types) == 1 else Union[*expected_types]
 
     def _update_match_and_rewrite(method: Callable) -> Callable:
         params = tuple(signature(method).parameters)
-        assert len(params) == 3 and params[0] == "self"
-
         # Update type hint of operation argument
         # TODO: Is it fine to mutate in-place or should we return a new function?
         op_arg_name = params[-2]
@@ -60,14 +54,14 @@ def _update_type_hints(hint: type[Operation] | type[Operation]) -> Callable:
 
 
 def _create_rewrite_pattern(
-    hint: type[Operation] | type[Operation], rewrite_rule: Callable
+    expected_types: Sequence[type[Operation]], rewrite_rule: Callable
 ) -> RewritePattern:
     """Given a rewrite rule defined as a function, create a ``RewritePattern`` which
     can be used with xDSL's pass API."""
 
     # pylint: disable=too-few-public-methods, arguments-differ
     class _RewritePattern(RewritePattern):
-        """Unnamed rewrite pattern for transforming a matched operation."""
+        """Anonymous rewrite pattern for transforming a matched operation."""
 
         _pass: PLModulePass
 
@@ -76,7 +70,7 @@ def _create_rewrite_pattern(
             super().__init__()
 
         @op_type_rewrite_pattern
-        @_update_type_hints(hint)
+        @_update_type_hints(expected_types)
         def match_and_rewrite(self, op: Operation, rewriter: PatternRewriter) -> None:
             rewrite_rule(self._pass, op, rewriter)
 
@@ -111,22 +105,39 @@ class PLModulePass(ModulePass):
 
     @classmethod
     def rewrite_rule(
-        cls, hint: type[Operation] | type[Operation]
-    ) -> Callable[[Operation, PatternRewriter], Callable]:
-        """Decorator to register a rewrite rule.
+        cls, rule: Callable[["PLModulePass", Operation, PatternRewriter], None]
+    ) -> None:
+        """Register a rewrite rule.
 
-        The rewrite rule must have the following signature:
+        The rewrite rule must type hint which operation is being rewritten. It must have
+        the following signature:
 
         .. code-block:: python
 
-            @PLModulePass.rewrite_rule(MyOperation)
+            @PLModulePass.rewrite_rule
             def rewrite_myop(self, op: MyOperation, rewriter: PatternRewriter) -> None:
+                ...
+
+        In the above example, the type hint for the second argument, which is ``op``,
+        is used to determine which xDSL operation is being matched. If not provided,
+        _all_ xDSL operations will be matched.
+
+        Additionally, the type hint can also contain a union of multiple operation types:
+
+        .. code-block:: python
+
+            @PLModulePass.rewrite_rule
+            def rewrite_myop(
+                self, op: MyOperation1 | MyOperation2 | MyOperation3, rewriter: PatternRewriter
+            ) -> None:
                 ...
 
         .. note::
 
             If a rewrite rule for the provided operation already exists, the old rule
-            will get overwritten.
+            will get overwritten. For rewrite rules that were annotated with a union of
+            multiple operation types, registered rewrite rules for all of the operations
+            in the union will be overwritten.
 
         Args:
             hint (type[Operation]): Operation class for which to register the rule
@@ -134,17 +145,26 @@ class PLModulePass(ModulePass):
         Returns:
             Callable: a decorator to register the rewrite rule with the ModulePass
         """
+        # xdsl.pattern_rewriter.op_type_rewrite_pattern was used as a reference to
+        # implement the type hint collection. Source:
+        # https://github.com/xdslproject/xdsl/blob/main/xdsl/pattern_rewriter.py
+        params = [param for param in signature(rule, eval_str=True).parameters.values()]
+        if len(params) != 3 or params[0].name != "self":
+            raise ValueError(
+                "The rewrite rule must have 3 arguments, with the first one being 'self'."
+            )
 
-        def decorator(rule: Callable[[Operation, PatternRewriter], None]) -> Callable:
-            rewrite_pattern = _create_rewrite_pattern(hint, rule)
-            cls._rewrite_patterns[hint] = rewrite_pattern
-            return rule
+        # If a type hint for the op we're trying to match isn't provided, match all ops
+        hint = Operation if params[-2] not in rule.__annotations__ else params[-2].annotation
+        expected_types = [hint] if get_origin(hint) in (Union, UnionType) else get_args(hint)
+        rewrite_pattern = _create_rewrite_pattern(expected_types, rule)
 
-        return decorator
+        for et in expected_types:
+            cls._rewrite_patterns[et] = rewrite_pattern
 
     @property
     def rewrite_rules(self):
-        r"""Dictionary of egistered rewrite rules. The keys are operations for which we have
+        r"""Dictionary of registered rewrite rules. The keys are operations for which we have
         registered rewrite rules, and the values are the corresponding ``RewritePattern``\ s."""
 
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:  # pylint: disable=unused-argument
