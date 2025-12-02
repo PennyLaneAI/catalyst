@@ -13,15 +13,12 @@
 # limitations under the License.
 """Unit tests for the ConstructCircuitDAG utility."""
 
+import re
 from unittest.mock import Mock
 
 import pytest
 
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
-
-from xdsl.dialects import test
-from xdsl.dialects.builtin import ModuleOp
-from xdsl.ir.core import Block, Region
 
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
@@ -30,7 +27,6 @@ from xdsl.dialects import test
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir.core import Block, Region
 
-from catalyst import measure
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
@@ -50,37 +46,84 @@ class FakeDAGBuilder(DAGBuilder):
         self._edges = []
         self._clusters = {}
 
-    def add_node(self, id, label, cluster_id=None, **attrs) -> None:
-        self._nodes[id] = {
-            "id": id,
+    def add_node(self, uid, label, cluster_uid=None, **attrs) -> None:
+        self._nodes[uid] = {
+            "uid": uid,
             "label": label,
-            "parent_cluster_id": cluster_id,
+            "parent_cluster_uid": "base" if cluster_uid is None else cluster_uid,
             "attrs": attrs,
         }
 
-    def add_edge(self, from_id: str, to_id: str, **attrs) -> None:
+    def add_edge(self, from_uid: str, to_uid: str, **attrs) -> None:
         self._edges.append(
             {
-                "from_id": from_id,
-                "to_id": to_id,
+                "from_uid": from_uid,
+                "to_uid": to_uid,
                 "attrs": attrs,
             }
         )
 
     def add_cluster(
         self,
-        id,
+        uid,
         node_label=None,
-        cluster_id=None,
+        cluster_uid=None,
         **attrs,
     ) -> None:
-        self._clusters[id] = {
-            "id": id,
+        self._clusters[uid] = {
+            "uid": uid,
             "node_label": node_label,
             "cluster_label": attrs.get("label"),
-            "parent_cluster_id": cluster_id,
+            "parent_cluster_uid": "base" if cluster_uid is None else cluster_uid,
             "attrs": attrs,
         }
+
+    def get_nodes_in_cluster(self, cluster_label: str) -> list[str]:
+        """
+        Returns a list of node labels that are direct children of the given cluster.
+        """
+        node_uids = []
+        cluster_uid = self.get_cluster_uid_by_label(cluster_label)
+        for node_data in self._nodes.values():
+            if node_data["parent_cluster_uid"] == cluster_uid:
+                node_uids.append(node_data["label"])
+        return node_uids
+
+    def get_child_clusters(self, parent_cluster_label: str) -> list[str]:
+        """
+        Returns a list of cluster labels that are direct children of the given parent cluster.
+        """
+        parent_cluster_uid = self.get_cluster_uid_by_label(parent_cluster_label)
+        cluster_labels = []
+        for cluster_data in self._clusters.values():
+            if cluster_data["parent_cluster_uid"] == parent_cluster_uid:
+                cluster_label = cluster_data["cluster_label"] or cluster_data["node_label"]
+                cluster_labels.append(cluster_label)
+        return cluster_labels
+
+    def get_node_uid_by_label(self, label: str) -> str | None:
+        """
+        Finds the ID of a node given its label.
+        Assumes labels are unique for testing purposes.
+        """
+        for id, node_data in self._nodes.items():
+            if node_data["label"] == label:
+                return id
+        return None
+
+    def get_cluster_uid_by_label(self, label: str) -> str | None:
+        """
+        Finds the ID of a cluster given its label.
+        Assumes cluster labels are unique for testing purposes.
+        """
+        # Work around for base graph
+        if label == "base":
+            return "base"
+        for id, cluster_data in self._clusters.items():
+            cluster_label = cluster_data["cluster_label"] or cluster_data["node_label"]
+            if cluster_label == label:
+                return id
+        return None
 
     @property
     def nodes(self):
@@ -101,13 +144,78 @@ class FakeDAGBuilder(DAGBuilder):
         return "graph"
 
 
+class TestFakeDAGBuilder:
+    """Test the FakeDAGBuilder to ensure helper functions work as intended."""
+
+    @pytest.fixture
+    def builder_with_data(self):
+        """Sets up an instance with a complex graph already built."""
+
+        builder = FakeDAGBuilder()
+
+        # Cluster set-up
+        builder.add_cluster("c0", label="Company", cluster_uid=None)  # Add to base graph
+        builder.add_cluster("c1", label="Marketing", cluster_uid="c0")
+        builder.add_cluster("c2", label="Finance", cluster_uid="c0")
+
+        # Node set-up
+        builder.add_node("n0", "CEO", cluster_uid="c0")
+        builder.add_node("n1", "Marketing Manager", cluster_uid="c1")
+        builder.add_node("n2", "Finance Manager", cluster_uid="c2")
+
+        return builder
+
+    # Test ID look up
+
+    def test_get_node_uid_by_label_success(self, builder_with_data):
+        assert builder_with_data.get_node_uid_by_label("Finance Manager") == "n2"
+        assert builder_with_data.get_node_uid_by_label("Marketing Manager") == "n1"
+        assert builder_with_data.get_node_uid_by_label("CEO") == "n0"
+
+    def test_get_node_uid_by_label_failure(self, builder_with_data):
+        assert builder_with_data.get_node_uid_by_label("Software Manager") is None
+
+    def test_get_cluster_uid_by_label_success(self, builder_with_data):
+        assert builder_with_data.get_cluster_uid_by_label("Finance") == "c2"
+        assert builder_with_data.get_cluster_uid_by_label("Marketing") == "c1"
+        assert builder_with_data.get_cluster_uid_by_label("Company") == "c0"
+
+    def test_get_cluster_uid_by_label_failure(self, builder_with_data):
+        assert builder_with_data.get_cluster_uid_by_label("Software") is None
+
+    # Test relationship probing
+
+    def test_node_heirarchy(self, builder_with_data):
+        finance_nodes = builder_with_data.get_nodes_in_cluster("Finance")
+        assert finance_nodes == ["Finance Manager"]
+
+        marketing_nodes = builder_with_data.get_nodes_in_cluster("Marketing")
+        assert marketing_nodes == ["Marketing Manager"]
+
+        company_nodes = builder_with_data.get_nodes_in_cluster("Company")
+        assert company_nodes == ["CEO"]
+
+    def test_cluster_heirarchy(self, builder_with_data):
+        clusters_in_finance = builder_with_data.get_child_clusters("Finance")
+        assert not clusters_in_finance
+
+        clusters_in_marketing = builder_with_data.get_child_clusters("Marketing")
+        assert not clusters_in_marketing
+
+        clusters_in_company = builder_with_data.get_child_clusters("Company")
+        assert {"Finance", "Marketing"} == set(clusters_in_company)
+
+        clusters_in_base = builder_with_data.get_child_clusters("base")
+        assert clusters_in_base == ["Company"]
+
+
 @pytest.mark.unit
 def test_dependency_injection():
     """Tests that relevant dependencies are injected."""
 
-    dag_builder = FakeDAGBuilder()
-    utility = ConstructCircuitDAG(dag_builder)
-    assert utility.dag_builder is dag_builder
+    mock_dag_builder = Mock(DAGBuilder)
+    utility = ConstructCircuitDAG(mock_dag_builder)
+    assert utility.dag_builder is mock_dag_builder
 
 
 @pytest.mark.unit
@@ -133,286 +241,265 @@ def test_does_not_mutate_module():
     assert str(module_op) == module_op_str_before
 
 
-class TestCreateStaticOperatorNodes:
-    """Tests that operators with static parameters can be created and visualized as nodes."""
+@pytest.mark.unit
+class TestFuncOpVisualization:
+    """Tests the visualization of FuncOps with bounding boxes"""
 
-    @pytest.mark.unit
-    @pytest.mark.parametrize("op", [qml.H(0), qml.X(0), qml.SWAP([0, 1])])
-    def test_custom_op(self, op):
-        """Tests that the CustomOp operation node can be created and visualized."""
-
-        # Build module with only a CustomOp
+    def test_standard_qnode(self):
+        """Tests that a standard QJIT'd QNode is visualized correctly"""
         dev = qml.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
-        def my_circuit():
-            qml.apply(op)
+        def my_workflow():
+            qml.H(0)
 
-        module = my_circuit()
+        module = my_workflow()
 
-        # Construct DAG
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        # sanity check
-        edges = utility.dag_builder.get_edges()
-        assert edges == []
-        clusters = utility.dag_builder.get_clusters()
-        assert clusters == {}
+        # Check labels we expected are there
+        graph_clusters = utility.dag_builder.clusters
+        all_cluster_labels = {info["cluster_label"] for info in graph_clusters.values()}
+        assert "my_workflow" in all_cluster_labels
 
-        # Ensure DAG only has one node
-        nodes = utility.dag_builder.get_nodes()
-        assert len(nodes) == 1
-        assert next(iter(nodes.values()))["label"] == str(op)
-        assert next(iter(nodes.values()))["cluster_id"] == "__base__"
+        # Check nesting is correct
+        # graph
+        # └── my_workflow
+
+        # Check my_workflow is nested under my_workflow
+        my_workflow_id = utility.dag_builder.get_cluster_uid_by_label("my_workflow")
+        assert graph_clusters[my_workflow_id]["parent_cluster_uid"] == "base"
+
+    def test_nested_qnodes(self):
+        """Tests that nested QJIT'd QNodes are visualized correctly"""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def my_qnode2():
+            qml.X(0)
+
+        @qml.qnode(dev)
+        def my_qnode1():
+            qml.H(0)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        def my_workflow():
+            my_qnode1()
+            my_qnode2()
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        graph_clusters = utility.dag_builder.clusters
+
+        # Check labels we expected are there as clusters
+        graph_clusters = utility.dag_builder.clusters
+        all_cluster_labels = {info["cluster_label"] for info in graph_clusters.values()}
+        assert "my_workflow" in all_cluster_labels
+        assert "my_qnode1" in all_cluster_labels
+        assert "my_qnode2" in all_cluster_labels
+
+        # Check nesting is correct
+        # graph
+        # └── my_workflow
+        #     ├── my_qnode1
+        #     └── my_qnode2
+
+        # Check my_workflow is under graph
+        my_workflow_id = utility.dag_builder.get_cluster_uid_by_label("my_workflow")
+        assert graph_clusters[my_workflow_id]["parent_cluster_uid"] == "base"
+
+        # Check both qnodes are under my_workflow
+        assert "my_qnode1" in utility.dag_builder.get_child_clusters("my_workflow")
+        assert "my_qnode2" in utility.dag_builder.get_child_clusters("my_workflow")
+
+
+class TestForOp:
+    """Tests that the for loop control flow can be visualized correctly."""
 
     @pytest.mark.unit
-    @pytest.mark.parametrize(
-        "op",
-        [
-            qml.GlobalPhase(0.5),
-            qml.GlobalPhase(0.5, wires=0),
-            qml.GlobalPhase(0.5, wires=[0, 1]),
-        ],
-    )
-    def test_global_phase_op(self, op):
-        """Test that GlobalPhase can be handled."""
+    def test_basic_example(self):
+        """Tests that the for loop cluster can be visualized correctly."""
 
         dev = qml.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
-        def my_circuit():
-            qml.apply(op)
+        def my_workflow():
+            for i in range(3):
+                qml.H(0)
 
-        module = my_circuit()
+        module = my_workflow()
 
-        # Construct DAG
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        # sanity check
-        edges = utility.dag_builder.get_edges()
-        assert edges == []
-        clusters = utility.dag_builder.get_clusters()
-        assert clusters == {}
-
-        # Ensure DAG only has one node
-        nodes = utility.dag_builder.get_nodes()
-        assert len(nodes) == 1
-        assert next(iter(nodes.values()))["label"] == str(op)
-        assert next(iter(nodes.values()))["cluster_id"] == "__base__"
+        assert "for ..." in utility.dag_builder.get_child_clusters("my_workflow")
 
     @pytest.mark.unit
-    def test_qubit_unitary_op(self):
-        """Test that QubitUnitary operations can be handled."""
+    def test_nested_loop(self):
+        """Tests that nested for loops are visualized correctly."""
+
         dev = qml.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
-        def my_circuit():
-            qml.QubitUnitary([[0, 1], [1, 0]], wires=0)
+        def my_workflow():
+            for i in range(0, 5, 2):
+                for j in range(1, 6, 2):
+                    qml.H(0)
 
-        module = my_circuit()
+        module = my_workflow()
 
-        # Construct DAG
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        # sanity check
-        edges = utility.dag_builder.get_edges()
-        assert edges == []
-        clusters = utility.dag_builder.get_clusters()
-        assert clusters == {}
+        # Check first for loop
+        assert "for ..." in utility.dag_builder.get_child_clusters("my_workflow")
 
-        # Ensure DAG only has one node
-        nodes = utility.dag_builder.get_nodes()
-        assert len(nodes) == 1
-        assert next(iter(nodes.values()))["label"] == str(
-            qml.QubitUnitary([[0, 1], [1, 0]], wires=0)
-        )
-        assert next(iter(nodes.values()))["cluster_id"] == "__base__"
+        # Check second for loop
+        assert "for ..." in utility.dag_builder.get_child_clusters("for ...")
+
+
+class TestWhileOp:
+    """Tests that the while loop control flow can be visualized correctly."""
 
     @pytest.mark.unit
-    def test_multi_rz_op(self):
-        """Test that MultiRZ operations can be handled."""
+    def test_basic_example(self):
+        """Test that the while loop is visualized correctly."""
         dev = qml.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
-        def my_circuit():
-            qml.MultiRZ(0.5, wires=[0])
+        def my_workflow():
+            counter = 0
+            while counter < 5:
+                qml.H(0)
+                counter += 1
 
-        module = my_circuit()
+        module = my_workflow()
 
-        # Construct DAG
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        # sanity check
-        edges = utility.dag_builder.get_edges()
-        assert edges == []
-        clusters = utility.dag_builder.get_clusters()
-        assert clusters == {}
-
-        # Ensure DAG only has one node
-        nodes = utility.dag_builder.get_nodes()
-        assert len(nodes) == 1
-        assert next(iter(nodes.values()))["label"] == str(qml.MultiRZ(0.5, wires=[0]))
-        assert next(iter(nodes.values()))["cluster_id"] == "__base__"
+        assert "while ..." in utility.dag_builder.get_child_clusters("my_workflow")
 
 
-class TestCreateStaticMeasurementNodes:
-    """Tests that measurements with static parameters can be created and visualized as nodes."""
+class TestIfOp:
+    """Tests that the conditional control flow can be visualized correctly."""
 
     @pytest.mark.unit
-    def test_state_op(self):
-        """Test that qml.state can be handled."""
+    def test_basic_example(self):
+        """Test that the conditional operation is visualized correctly."""
         dev = qml.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
-        def my_circuit():
-            return qml.state()
+        def my_workflow(x):
+            if x == 2:
+                qml.X(0)
+            else:
+                qml.Y(0)
 
-        module = my_circuit()
+        args = (1,)
+        module = my_workflow(*args)
 
-        # Construct DAG
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        # sanity check
-        edges = utility.dag_builder.get_edges()
-        assert edges == []
-        clusters = utility.dag_builder.get_clusters()
-        assert clusters == {}
-
-        # Ensure DAG only has one node
-        nodes = utility.dag_builder.get_nodes()
-        assert len(nodes) == 1
-        assert next(iter(nodes.values()))["label"] == str(qml.state())
-        assert next(iter(nodes.values()))["cluster_id"] == "__base__"
+        assert "conditional" in utility.dag_builder.get_child_clusters("my_workflow")
+        assert "if ..." in utility.dag_builder.get_child_clusters("conditional")
+        assert "else" in utility.dag_builder.get_child_clusters("conditional")
 
     @pytest.mark.unit
-    @pytest.mark.parametrize("meas_fn", [qml.expval, qml.var])
-    def test_expval_var_measurement_op(self, meas_fn):
-        """Test that statistical measurement operators can be captured as nodes."""
+    def test_if_elif_else_conditional(self):
+        """Test that the conditional operation is visualized correctly."""
         dev = qml.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
-        def my_circuit():
-            return meas_fn(qml.Z(0))
+        def my_workflow(x):
+            if x == 1:
+                qml.X(0)
+            elif x == 2:
+                qml.Y(0)
+            else:
+                qml.Z(0)
 
-        module = my_circuit()
+        args = (1,)
+        module = my_workflow(*args)
 
-        # Construct DAG
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        # sanity check
-        edges = utility.dag_builder.get_edges()
-        assert edges == []
-        clusters = utility.dag_builder.get_clusters()
-        assert clusters == {}
+        assert "conditional" in utility.dag_builder.get_child_clusters("my_workflow")
+        assert "if ..." in utility.dag_builder.get_child_clusters("conditional")
+        assert "elif ..." in utility.dag_builder.get_child_clusters("conditional")
+        assert "else" in utility.dag_builder.get_child_clusters("conditional")
 
-        # Ensure DAG only has one node
-        nodes = utility.dag_builder.get_nodes()
-        assert len(nodes) == 1
-        assert next(iter(nodes.values()))["label"] == str(meas_fn(qml.Z(0)))
-        assert next(iter(nodes.values()))["cluster_id"] == "__base__"
 
-    @pytest.mark.unit
-    def test_probs_measurement_op(self):
-        """Tests that the probs measurement function can be captured as a node."""
+class TestDeviceNode:
+    """Tests that the device node is correctly visualized."""
+
+    def test_standard_qnode(self):
+        """Tests that a standard setup works."""
+
         dev = qml.device("null.qubit", wires=1)
 
         @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
-        def my_circuit():
-            return qml.probs()
+        def my_workflow():
+            qml.H(0)
 
-        module = my_circuit()
+        module = my_workflow()
 
-        # Construct DAG
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        # sanity check
-        edges = utility.dag_builder.get_edges()
-        assert edges == []
-        clusters = utility.dag_builder.get_clusters()
-        assert clusters == {}
+        # Check that device node is within the my_workflow cluster
+        nodes_in_my_workflow = utility.dag_builder.get_nodes_in_cluster("my_workflow")
+        assert "NullQubit" in nodes_in_my_workflow
 
-        # Ensure DAG only has one node
-        nodes = utility.dag_builder.get_nodes()
-        assert len(nodes) == 1
-        assert next(iter(nodes.values()))["label"] == str(qml.probs())
-        assert next(iter(nodes.values()))["cluster_id"] == "__base__"
+    def test_nested_qnodes(self):
+        """Tests that nested QJIT'd QNodes are visualized correctly"""
 
-    @pytest.mark.unit
-    def test_sample_measurement_op(self):
-        """Tests that the sample measurement function can be captured as a node."""
-        dev = qml.device("null.qubit", wires=1)
+        dev1 = qml.device("null.qubit", wires=1)
+        dev2 = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev2)
+        def my_qnode2():
+            qml.X(0)
+
+        @qml.qnode(dev1)
+        def my_qnode1():
+            qml.H(0)
 
         @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
-        @qml.set_shots(10)
-        @qml.qnode(dev)
-        def my_circuit():
-            return qml.sample()
+        def my_workflow():
+            my_qnode1()
+            my_qnode2()
 
-        module = my_circuit()
+        module = my_workflow()
 
-        # Construct DAG
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        # sanity check
-        edges = utility.dag_builder.get_edges()
-        assert edges == []
-        clusters = utility.dag_builder.get_clusters()
-        assert clusters == {}
-
-        # Ensure DAG only has one node
-        nodes = utility.dag_builder.get_nodes()
-        assert len(nodes) == 1
-        assert next(iter(nodes.values()))["label"] == str(qml.sample())
-        assert next(iter(nodes.values()))["cluster_id"] == "__base__"
-
-    @pytest.mark.unit
-    def test_projective_measurement_op(self):
-        """Test that projective measurements can be captured as nodes."""
-        dev = qml.device("null.qubit", wires=1)
-
-        @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
-        def my_circuit():
-            measure(0)
-
-        module = my_circuit()
-
-        # Construct DAG
-        utility = ConstructCircuitDAG(FakeDAGBuilder())
-        utility.construct(module)
-
-        # sanity check
-        edges = utility.dag_builder.get_edges()
-        assert edges == []
-        clusters = utility.dag_builder.get_clusters()
-        assert clusters == {}
-
-        # Ensure DAG only has one node
-        nodes = utility.dag_builder.get_nodes()
-        assert len(nodes) == 1
-        assert "MidMeasure" in next(iter(nodes.values()))["label"]
-        assert next(iter(nodes.values()))["cluster_id"] == "__base__"
+        # Check that device node is within the my_workflow cluster
+        nodes_in_my_workflow = utility.dag_builder.get_nodes_in_cluster("my_qnode1")
+        assert "NullQubit" in nodes_in_my_workflow
+        nodes_in_my_workflow = utility.dag_builder.get_nodes_in_cluster("my_qnode2")
+        assert "LightningSimulator" in nodes_in_my_workflow
