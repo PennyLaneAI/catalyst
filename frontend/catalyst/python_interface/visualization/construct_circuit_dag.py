@@ -145,7 +145,7 @@ class ConstructCircuitDAG:
             label=str(meas),
             cluster_id=self._cluster_stack[-1],
         )
-        
+
     # =============
     # CONTROL FLOW
     # =============
@@ -194,6 +194,7 @@ class ConstructCircuitDAG:
             uid,
             node_label="",
             label="conditional",
+            fontsize=10,
             labeljust="l",
             cluster_uid=self._cluster_uid_stack[-1],
         )
