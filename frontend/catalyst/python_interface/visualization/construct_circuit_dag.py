@@ -16,12 +16,11 @@
 
 from functools import singledispatchmethod
 
-from xdsl.dialects import builtin, func, scf
-from xdsl.ir import Block, Operation, Region, SSAValue
-
 from catalyst.python_interface.dialects import catalyst, quantum
 from catalyst.python_interface.inspection.xdsl_conversion import resolve_constant_params
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from xdsl.dialects import builtin, func, scf
+from xdsl.ir import Block, Operation, Region, SSAValue
 
 
 class ConstructCircuitDAG:
@@ -233,14 +232,14 @@ class ConstructCircuitDAG:
             self._cluster_uid_stack.pop()
 
 
-def _flatten_if_op(op: scf.IfOp) -> list[tuple[SSAValue, Region]]:
+def _flatten_if_op(op: scf.IfOp) -> list[tuple[SSAValue | None, Region]]:
     """Recursively flattens a nested IfOp (if/elif/else chains)."""
 
     condition_ssa: SSAValue = op.operands[0]
     then_region, else_region = op.regions
 
     # Save condition SSA in case we want to visualize it eventually
-    flattened_op: list[tuple[SSAValue, Region]] = [(condition_ssa, then_region)]
+    flattened_op: list[tuple[SSAValue | None, Region]] = [(condition_ssa, then_region)]
 
     # Peak into else region to see if there's another IfOp
     else_block: Block = else_region.block
@@ -252,4 +251,5 @@ def _flatten_if_op(op: scf.IfOp) -> list[tuple[SSAValue, Region]]:
         flattened_op.extend(nested_flattened_op)
         return flattened_op
 
+    flattened_op.extend([(None, else_region)])
     return flattened_op
