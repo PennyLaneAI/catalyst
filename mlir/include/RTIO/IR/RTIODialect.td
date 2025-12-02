@@ -18,6 +18,7 @@
 include "mlir/IR/OpBase.td"
 include "mlir/IR/DialectBase.td"
 include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/BuiltinTypeInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // RTIO Dialect Definition
@@ -125,7 +126,7 @@ def RTIOChannelType : RTIO_Type<"Channel", "channel"> {
             if (!channelId) {
                 return false;
             }
-            return channelId.getInt() >= 0;
+            return channelId.getInt() != ShapedType::kDynamic;
         }
 
         bool isDynamic() const {

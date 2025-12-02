@@ -15,6 +15,7 @@
 #include "RTIO/IR/RTIODialect.h"
 #include "RTIO/IR/RTIOOps.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "llvm/ADT/TypeSwitch.h"
 
@@ -54,7 +55,7 @@ static ParseResult parseChannelTypeBody(AsmParser &parser, std::string &kind, Ar
 
             // After qualifiers, parse comma for channelId
             if (failed(parser.parseOptionalComma())) {
-                channelId = parser.getBuilder().getI64IntegerAttr(-1);
+                channelId = parser.getBuilder().getI64IntegerAttr(ShapedType::kDynamic);
                 return success();
             }
         }
@@ -62,13 +63,13 @@ static ParseResult parseChannelTypeBody(AsmParser &parser, std::string &kind, Ar
     }
     else {
         // No comma at all, no qualifiers and no channelId
-        channelId = parser.getBuilder().getI64IntegerAttr(-1);
+        channelId = parser.getBuilder().getI64IntegerAttr(ShapedType::kDynamic);
         return success();
     }
 
     // 3. Parse channelId: `?` or non-negative integer
     if (succeeded(parser.parseOptionalQuestion())) {
-        channelId = parser.getBuilder().getI64IntegerAttr(-1);
+        channelId = parser.getBuilder().getI64IntegerAttr(ShapedType::kDynamic);
         return success();
     }
 
@@ -99,7 +100,7 @@ static void printChannelTypeBody(AsmPrinter &printer, StringRef kind, ArrayAttr 
         printer << "]";
     }
 
-    // 3. Print channelId if present (and not default -1)
+    // 3. Print channelId if present (and not default ShapedType::kDynamic)
     if (channelId) {
         int64_t id = channelId.getInt();
         if (id >= 0 || (qualifiers && !qualifiers.empty())) {
