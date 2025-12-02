@@ -21,7 +21,7 @@ from xdsl.ir import Block, Operation, Region, SSAValue
 
 from catalyst.python_interface.dialects import catalyst, quantum
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
-from catalyst.python_interface.visualization.xdsl_conversion import (
+from catalyst.python_interface.inspection.xdsl_conversion import (
     xdsl_to_qml_measurement,
     xdsl_to_qml_op,
 )
