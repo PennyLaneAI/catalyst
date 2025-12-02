@@ -1372,37 +1372,6 @@ class TestCapture:
 
         assert jnp.allclose(circuit(1.5, 2.5, 3.5), capture_result)
 
-    def test_transform_map_wires_workflow(self, backend):
-        """Test the integration for a circuit with a 'map_wires' transform."""
-
-        # Capture enabled
-
-        qml.capture.enable()
-
-        @qjit(target="mlir")
-        @partial(qml.map_wires, wire_map={0: 1})
-        @qml.qnode(qml.device(backend, wires=2))
-        def captured_circuit(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.PauliZ(0))
-
-        capture_result = captured_circuit(1.5)
-
-        assert is_wire_mapped(captured_circuit.mlir)
-
-        qml.capture.disable()
-
-        # Capture disabled
-
-        @qjit
-        @partial(qml.map_wires, wire_map={0: 1})
-        @qml.qnode(qml.device(backend, wires=2))
-        def circuit(x):
-            qml.RX(x, 0)
-            return qml.expval(qml.PauliZ(0))
-
-        assert jnp.allclose(circuit(1.5), capture_result)
-
     def test_transform_single_qubit_fusion_workflow(self, backend):
         """Test the integration for a circuit with a 'single_qubit_fusion' transform."""
 

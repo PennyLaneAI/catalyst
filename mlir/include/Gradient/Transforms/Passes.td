@@ -73,4 +73,14 @@ def GradientConversionPass : Pass<"convert-gradient-to-llvm"> {
     ];
 }
 
+def AnnotateInvalidGradientFunctionsPass : Pass<"annotate-invalid-gradient-functions"> {
+    let summary = "Annotate functions that contain operations invalid for automatic gradient computation.";
+
+    let dependentDialects = [
+        "catalyst::CatalystDialect",
+        "func::FuncDialect",
+        "catalyst::quantum::QuantumDialect"
+    ];
+}
+
 #endif // GRADIENT_PASSES

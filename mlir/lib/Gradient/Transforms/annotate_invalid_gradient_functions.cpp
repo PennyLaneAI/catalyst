@@ -23,11 +23,11 @@
 
 #include "Catalyst/IR/CatalystOps.h"
 #include "Gradient/IR/GradientOps.h"
-#include "Quantum/Transforms/Patterns.h"
-#include "Quantum/Transforms/annotate_function.h"
+#include "Gradient/Transforms/annotate_invalid_gradient_functions.h"
+#include "stablehlo/dialect/StablehloOps.h"
 
 using namespace mlir;
-using namespace catalyst::quantum;
+using namespace catalyst::gradient;
 
 namespace {
 
@@ -40,7 +40,7 @@ bool invalidGradientOperation(FunctionOpInterface op)
 {
     ModuleOp mod = op->getParentOfType<ModuleOp>();
     auto res = op.walk([&](Operation *o) {
-        if (isa<MeasureOp>(o) || isa<catalyst::CustomCallOp>(o)) {
+        if (isa<catalyst::quantum::MeasureOp>(o) || isa<catalyst::CustomCallOp>(o)) {
             return WalkResult::interrupt();
         }
         else if (auto callbackCall = dyn_cast<catalyst::CallbackCallOp>(o)) {
@@ -176,13 +176,13 @@ LogicalResult PropagateAnnotationPattern::matchAndRewrite(FunctionOpInterface op
 } // namespace
 
 namespace catalyst {
-namespace quantum {
+namespace gradient {
 
-#define GEN_PASS_DEF_ANNOTATEFUNCTIONPASS
-#include "Quantum/Transforms/Passes.h.inc"
+#define GEN_PASS_DEF_ANNOTATEINVALIDGRADIENTFUNCTIONSPASS
+#include "Gradient/Transforms/Passes.h.inc"
 
-struct AnnotateFunctionPassVerified
-    : public PassWrapper<AnnotateFunctionPassVerified, OperationPass<>> {
+struct AnnotateInvalidGradientFunctionsPassVerified
+    : public PassWrapper<AnnotateInvalidGradientFunctionsPassVerified, OperationPass<>> {
     void runOnOperation() final
     {
         MLIRContext *context = &getContext();
@@ -197,14 +197,15 @@ struct AnnotateFunctionPassVerified
     }
 };
 
-struct AnnotateFunctionPass : impl::AnnotateFunctionPassBase<AnnotateFunctionPass> {
-    using AnnotateFunctionPassBase::AnnotateFunctionPassBase;
+struct AnnotateInvalidGradientFunctionsPass
+    : impl::AnnotateInvalidGradientFunctionsPassBase<AnnotateInvalidGradientFunctionsPass> {
+    using AnnotateInvalidGradientFunctionsPassBase::AnnotateInvalidGradientFunctionsPassBase;
 
     void runOnOperation() final
     {
         MLIRContext *ctx = &getContext();
         auto pm = mlir::PassManager::on<mlir::ModuleOp>(ctx);
-        pm.addPass(std::make_unique<AnnotateFunctionPassVerified>());
+        pm.addPass(std::make_unique<AnnotateInvalidGradientFunctionsPassVerified>());
         pm.enableVerifier(true);
         if (failed(pm.run(getOperation()))) {
             signalPassFailure();
@@ -212,5 +213,5 @@ struct AnnotateFunctionPass : impl::AnnotateFunctionPassBase<AnnotateFunctionPas
     }
 };
 
-} // namespace quantum
+} // namespace gradient
 } // namespace catalyst

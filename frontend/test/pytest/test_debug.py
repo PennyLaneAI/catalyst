@@ -249,7 +249,7 @@ class TestPrintStage:
         def func():
             return 0
 
-        print(get_compilation_stage(func, "HLOLoweringPass"))
+        print(get_compilation_stage(func, "HLOLoweringStage"))
 
         out, _ = capsys.readouterr()
         assert "@jit_func() -> tensor<i64>" in out
@@ -264,7 +264,7 @@ class TestPrintStage:
             return 0
 
         with pytest.raises(TypeError, match="needs to be a 'QJIT' object"):
-            print(get_compilation_stage(func, "HLOLoweringPass"))
+            print(get_compilation_stage(func, "HLOLoweringStage"))
 
 
 class TestCProgramGeneration:
@@ -350,29 +350,29 @@ class TestCProgramGeneration:
                 + "    %0 = stablehlo.multiply %x, %arg0 : tensor<f64>\n",
             ),
             (
-                "HLOLoweringPass",
+                "HLOLoweringStage",
                 "%0 = arith.mulf %extracted, %extracted : f64\n",
                 "%t = arith.mulf %extracted, %extracted : f64\n"
                 + "    %0 = arith.mulf %t, %extracted : f64\n",
             ),
             (
-                "QuantumCompilationPass",
+                "QuantumCompilationStage",
                 "%0 = arith.mulf %extracted, %extracted : f64\n",
                 "%t = arith.mulf %extracted, %extracted : f64\n"
                 + "    %0 = arith.mulf %t, %extracted : f64\n",
             ),
             (
-                "BufferizationPass",
+                "BufferizationStage",
                 "%2 = arith.mulf %1, %1 : f64",
                 "%t = arith.mulf %1, %1 : f64\n" + "    %2 = arith.mulf %t, %1 : f64\n",
             ),
             (
-                "MLIRToLLVMDialect",
+                "MLIRToLLVMDialectConversion",
                 "%5 = llvm.fmul %4, %4  : f64\n",
                 "%t = llvm.fmul %4, %4  : f64\n" + "    %5 = llvm.fmul %t, %4  : f64\n",
             ),
             (
-                "llvm_ir",
+                "LLVMIRTranslation",
                 "%5 = fmul double %4, %4\n",
                 "%t = fmul double %4, %4\n" + "%5 = fmul double %t, %4\n",
             ),
@@ -404,7 +404,7 @@ class TestCProgramGeneration:
         shutil.rmtree(str(jit_f.workspace), ignore_errors=True)
         assert old_result * data == new_result
 
-    @pytest.mark.parametrize("pass_name", ["HLOLoweringPass", "O2Opt", "Enzyme"])
+    @pytest.mark.parametrize("pass_name", ["HLOLoweringStage", "O2Opt", "Enzyme"])
     def test_modify_ir_file_generation(self, pass_name):
         """Test if recompilation rerun the same pass."""
 
