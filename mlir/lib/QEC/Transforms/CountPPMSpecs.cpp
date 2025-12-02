@@ -129,8 +129,8 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
         return true;
     }
 
-    bool isPPR(QECOpInterface op) { return isa<qec::PPRotationOp>(op.getOperation()); }
-    bool isPPM(QECOpInterface op) { return isa<qec::PPMeasurementOp>(op.getOperation()); }
+    bool isPPR(QECOpInterface op) { return isa<qec::PPRotationOp>(op); }
+    bool isPPM(QECOpInterface op) { return isa<qec::PPMeasurementOp>(op); }
 
     // Check if two ops have the same rotation kind.
     bool equalTypes(QECOpInterface lhsOp, QECOpInterface rhsOp)

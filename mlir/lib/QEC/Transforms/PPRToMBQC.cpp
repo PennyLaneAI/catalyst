@@ -137,7 +137,7 @@ void constructReverseCNOTLadder(SmallVector<Value> &qubits, ConversionPatternRew
 void constructKernelOperation(SmallVector<Value> &qubits, Value &measResult, QECOpInterface op,
                               ConversionPatternRewriter &rewriter)
 {
-    if (isa<PPMeasurementOp>(op.getOperation())) {
+    if (isa<PPMeasurementOp>(op)) {
         auto measOp = buildMeasurementOp(qubits[0], rewriter);
         measResult = measOp.getMres();
         qubits[0] = measOp.getOutQubit();
@@ -147,7 +147,7 @@ void constructKernelOperation(SmallVector<Value> &qubits, Value &measResult, QEC
         double rk = llvm::numbers::pi / (static_cast<double>(signedRk) / 2);
         qubits[0] = buildSingleQubitGate(qubits[0], "RZ", {rk}, rewriter).getOutQubits().front();
     }
-    else if (isa<PPRotationArbitraryOp>(op.getOperation())) {
+    else if (isa<PPRotationArbitraryOp>(op)) {
         op->emitError("Unsupported qec.ppr.arbitrary operation.");
     }
 }
