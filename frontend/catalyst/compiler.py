@@ -595,7 +595,8 @@ class Compiler:
             workspace: The workspace directory path
 
         Returns:
-            Callable or None: The callback function if intermediate saving is enabled, None otherwise
+            Callable or None: The callback function if intermediate saving is enabled, None
+            otherwise
         """
         if not (workspace and self.options.keep_intermediate >= KeepIntermediateLevel.CHANGED):
             return None
