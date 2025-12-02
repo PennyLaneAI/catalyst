@@ -32,6 +32,7 @@ from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
+from pennylane.capture.primitives import transform_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.measurements import CountsMP
 
@@ -814,6 +815,11 @@ def handle_adjoint_transform(
 
     # Return only the output values that match the plxpr output values
     return outvals
+
+
+@PLxPRToQuantumJaxprInterpreter.register_primitive(transform_prim)
+def _error_on_transform(*args, **kwargs):
+    raise NotImplementedError("transforms cannot currently be applied inside a QNode.")
 
 
 _special_op_bind_call = {

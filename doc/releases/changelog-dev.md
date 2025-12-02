@@ -82,6 +82,9 @@
   with capture-enabled compilation.
   [(#2215)](https://github.com/PennyLaneAI/catalyst/pull/2215)
 
+* An error is now raised if a transform is applied inside a QNode when program capture is enabled.
+  [(#2256)](https://github.com/PennyLaneAI/catalyst/pull/2256)
+
 * A new ``"changed"`` option has been added to the ``keep_intermediate`` parameter of 
   :func:`~.qjit`. This option saves intermediate IR files after each pass,
   but only when the IR is actually modified by the pass.

@@ -179,6 +179,21 @@ class TestErrors:
         with pytest.raises(NotImplementedError, match="not yet supported"):
             from_plxpr(jaxpr)()
 
+    def test_errors_transform_inside_qnode(self):
+        """Test that an error is raised if a transform is applied inside a transform."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.transforms.cancel_inverses
+        def c():
+            return qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(c)()
+
+        with pytest.raises(
+            NotImplementedError, match="transforms cannot currently be applied inside a QNode."
+        ):
+            from_plxpr(jaxpr)()
+
     def test_unsupported_op(self):
         """Test that a CompileError is raised when an unsupported op is encountered."""
 
