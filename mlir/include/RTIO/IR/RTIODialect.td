@@ -116,8 +116,8 @@ def RTIOChannelType : RTIO_Type<"Channel", "channel"> {
         }
 
         mlir::Attribute getQualifier(size_t index) const {
-            if (!getQualifiers() || index >= getQualifiers().size())
-                return nullptr;
+            assert(getQualifiers() && "qualifiers are not present");
+            assert(index < getQualifiers().size() && "index out of bounds");
             return getQualifiers()[index];
         }
 
