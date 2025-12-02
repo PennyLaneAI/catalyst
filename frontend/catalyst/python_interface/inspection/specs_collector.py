@@ -200,7 +200,7 @@ def handle_resource(
 
 @handle_resource.register
 def _(xdsl_op: MeasureOp) -> tuple[ResourceType, str]:
-    return ResourceType.MEASUREMENT, xdsl_to_qml_measurement_type(xdsl_op)
+    return ResourceType.MEASUREMENT, xdsl_to_qml_measurement_name(xdsl_op)
 
 
 @handle_resource.register
@@ -208,8 +208,8 @@ def _(
     xdsl_op: CountsOp | ExpvalOp | ProbsOp | SampleOp | StateOp | VarianceOp,
 ) -> tuple[ResourceType, str]:
     obs_op = xdsl_op.obs.owner
-    return ResourceType.MEASUREMENT, xdsl_to_qml_measurement_type(
-        xdsl_op, xdsl_to_qml_measurement_type(obs_op)
+    return ResourceType.MEASUREMENT, xdsl_to_qml_measurement_name(
+        xdsl_op, xdsl_to_qml_measurement_name(obs_op)
     )
 
 
@@ -462,7 +462,7 @@ def _collect_region(
                 if hasattr(op, "in_ctrl_qubits"):
                     n_qubits += len(op.in_ctrl_qubits)
 
-                resource = xdsl_to_qml_op_type(op, adjoint_mode=adjoint_mode)
+                resource = xdsl_to_qml_op_name(op, adjoint_mode=adjoint_mode)
 
                 resources.operations[resource][n_qubits] += 1
 

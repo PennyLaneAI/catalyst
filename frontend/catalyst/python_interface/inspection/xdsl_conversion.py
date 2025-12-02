@@ -341,11 +341,12 @@ def xdsl_to_qml_op(op) -> Operator:
     return _apply_adjoint_and_ctrls(gate, op)
 
 
-def xdsl_to_qml_op_type(op, adjoint_mode: bool) -> str:
-    """Convert an xDSL operation into a string representing a PennyLane class.
+def xdsl_to_qml_op_name(op, adjoint_mode: bool) -> str:
+    """Convert an xDSL operation into a string representing a PennyLane Operator.
 
     Args:
         op: The xDSL operation to convert.
+        adjoint_mode: If True, treat all non-adjoint gates as adjoint, and vice versa.
 
     Returns:
         A string representing the PennyLane operator.
@@ -423,11 +424,12 @@ def xdsl_to_qml_measurement(op, *args, **kwargs) -> MeasurementProcess | Operato
             raise NotImplementedError(f"Unsupported measurement/observable: {op.name}")
 
 
-def xdsl_to_qml_measurement_type(op, obs_op=None) -> str:
-    """Convert any xDSL measurement/observable operation into a string representing a PennyLane class.
+def xdsl_to_qml_measurement_name(op, obs_op=None) -> str:
+    """Convert any xDSL measurement/observable operation into a string representing a PennyLane measurement.
 
     Args:
         op: The xDSL measurement/observable operation to convert.
+        obs_op: An optional string representing the observable operation.
 
     Returns:
         A string representing the PennyLane measurement.
