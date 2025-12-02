@@ -38,8 +38,8 @@ def resources_equal(
         # actual.device_name == expected.device_name TODO: Don't worry about this one for now
         assert actual.num_allocs == expected.num_allocs
 
-        assert dict(actual.operations) == expected.operations
-        assert dict(actual.measurements) == expected.measurements
+        assert actual.operations == expected.operations
+        assert actual.measurements == expected.measurements
 
         # There should be no remaining unresolved function calls
         assert sum(actual._unresolved_function_calls.values()) == 0
