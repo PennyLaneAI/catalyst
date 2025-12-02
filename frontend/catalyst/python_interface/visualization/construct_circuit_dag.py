@@ -131,8 +131,7 @@ class ConstructCircuitDAG:
             )
             self._cluster_uid_stack.append(uid)
 
-        for region in operation.regions:
-            self._visit_region(region)
+        self._visit_block(operation.regions[0].blocks[0])
 
     @_visit_operation.register
     def _func_return(self, operation: func.ReturnOp) -> None:
