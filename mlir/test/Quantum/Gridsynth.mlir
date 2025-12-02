@@ -23,7 +23,7 @@
 // CLIFFORD-DAG:  [[C1:%.+]] = arith.constant 1 : index
 // CLIFFORD-DAG:  [[C0:%.+]] = arith.constant 0 : index
 // CLIFFORD:      [[NUM_GATES:%.+]] = call @rs_decomposition_get_size
-// CLIFFORD:      [[MEM:%.+]] = memref.alloca([[NUM_GATES]]) : memref<?xindex>
+// CLIFFORD:      [[MEM:%.+]] = memref.alloc([[NUM_GATES]]) : memref<?xindex>
 // CLIFFORD:      call @rs_decomposition_get_gates([[MEM]]
 // CLIFFORD:      [[PHASE:%.+]] = call @rs_decomposition_get_phase
 // CLIFFORD:      [[LOOP_RES:%.+]] = scf.for [[IV:%.+]] = [[C0]] to [[NUM_GATES]] step [[C1]] iter_args([[L_QBIT:%.+]] = [[ARG_QBIT]])
@@ -75,11 +75,12 @@
 // CLIFFORD:      }
 // CLIFFORD:      scf.yield [[SWITCH_RES]]
 // CLIFFORD:      }
+// CLIFFORD:      memref.dealloc [[MEM]]
 // CLIFFORD:      return [[LOOP_RES]], [[PHASE]] : !quantum.bit, f64
 
 // PPR-LABEL: func.func private @__catalyst_decompose_RZ_ppr_basis
 // PPR-SAME:  [[ARG_QBIT:%.+]]: !quantum.bit
-// PPR:       memref.alloca
+// PPR:       [[MEM:%.+]] = memref.alloc
 // PPR:       [[PHASE:%.+]] = call @rs_decomposition_get_phase
 // PPR:       [[LOOP_RES:%.+]] = scf.for {{.*}} iter_args([[LOOP_QBIT:%.+]] = [[ARG_QBIT]])
 // PPR:       scf.index_switch
@@ -158,6 +159,7 @@
 // PPR:         [[RES:%.+]] = qec.ppr ["Z"](-8) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
+// PPR:       memref.dealloc [[MEM]]
 // PPR:       return [[LOOP_RES]], [[PHASE]]
 
 // CHECK-LABEL: @test_rz_decomposition

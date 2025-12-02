@@ -247,20 +247,20 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     // Ensure or declare Get Size
     auto getSizeType =
         rewriter.getFunctionType({f64Type, f64Type, i1Type}, {rewriter.getIndexType()});
-    auto getSizeFunc =
-        catalyst::ensurefuncOrDeclare(rewriter, func, "rs_decomposition_get_size", getSizeType);
+    auto getSizeFunc = catalyst::ensureFunctionDeclaration<func::FuncOp>(
+        rewriter, func, "rs_decomposition_get_size", getSizeType);
 
     // Ensure or declare Get Gates
     auto rankedMemRefType =
         mlir::MemRefType::get({mlir::ShapedType::kDynamic}, rewriter.getIndexType());
     auto getGatesType = rewriter.getFunctionType({rankedMemRefType, f64Type, f64Type, i1Type}, {});
-    auto getGatesFunc =
-        catalyst::ensurefuncOrDeclare(rewriter, func, "rs_decomposition_get_gates", getGatesType);
+    auto getGatesFunc = catalyst::ensureFunctionDeclaration<func::FuncOp>(
+        rewriter, func, "rs_decomposition_get_gates", getGatesType);
 
     // Ensure or declare Get Phase
     auto getPhaseType = rewriter.getFunctionType({f64Type, f64Type, i1Type}, {f64Type});
-    auto getPhaseFunc =
-        catalyst::ensurefuncOrDeclare(rewriter, func, "rs_decomposition_get_phase", getPhaseType);
+    auto getPhaseFunc = catalyst::ensureFunctionDeclaration<func::FuncOp>(
+        rewriter, func, "rs_decomposition_get_phase", getPhaseType);
 
     // Parameters for compilation
     mlir::Value epsilonVal =
