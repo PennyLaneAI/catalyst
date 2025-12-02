@@ -284,8 +284,8 @@ class ConstructCircuitDAG:
         # Pop IfOp cluster before leaving this handler
         self._cluster_uid_stack.pop()
 
-        # Check what wires were affected
-        affected_wires = set(wire_map_before.keys())
+        # Check what wires were affected 
+        affected_wires: set[str | int] = set(wire_map_before.keys())
         for region_wire_map in region_wire_maps:
             affected_wires.update(region_wire_map.keys())
 
@@ -295,11 +295,11 @@ class ConstructCircuitDAG:
             all_nodes: set = set()
             for region_wire_map in region_wire_maps:
                 if not wire in region_wire_map:
-                    # Branch didn't touch this wire, so just use previous node
+                    # IfOp region didn't apply anything on this wire
+                    # so default to node before the IfOp
                     all_nodes.update(wire_map_before.get(wire, {}))
                 else:
                     all_nodes.update(region_wire_map.get(wire, {}))
-
                 final_wire_map[wire] = all_nodes
         self._wire_to_node_uids = final_wire_map
 
