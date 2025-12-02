@@ -62,15 +62,6 @@ def AdjointLoweringPass : Pass<"adjoint-lowering"> {
     ];
 }
 
-def AnnotateFunctionPass : Pass<"annotate-function"> {
-    let summary = "Annotate functions that contain a measurement operation.";
-
-    let dependentDialects = [
-        "catalyst::CatalystDialect",
-        "func::FuncDialect"
-    ];
-}
-
 def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let summary = "Given a qnode containing multiple tapes, split each tape into its own function.";
 }

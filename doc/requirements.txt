@@ -30,7 +30,6 @@ matplotlib==3.10.0
 lxml_html_clean
 
 # Pre-install PL development wheels
---extra-index-url https://test.pypi.org/simple/
-pennylane-lightning-kokkos==0.44.0-dev11
-pennylane-lightning==0.44.0-dev11
+pennylane-lightning-kokkos==0.44.0-dev16
+pennylane-lightning==0.44.0-dev16
 git+https://github.com/PennyLaneAI/pennylane.git@rs-decomp
