@@ -334,8 +334,64 @@ def _resolve_function_calls(
     return resources
 
 
+def _collect_operation(
+    resources: ResourcesResult, op: xdsl.ir.Operation, adjoint_mode: bool
+) -> None:
+    """Categorize and store a given xDSL operation within a ResourcesResult."""
+
+    resource_type, resource = handle_resource(op)
+
+    match resource_type:
+        case ResourceType.GATE:
+            n_qubits = 0
+            if hasattr(op, "in_qubits"):
+                n_qubits += len(op.in_qubits)
+            if hasattr(op, "in_ctrl_qubits"):
+                n_qubits += len(op.in_ctrl_qubits)
+
+            resource = xdsl_to_qml_op_name(op, adjoint_mode=adjoint_mode)
+
+            resources.operations[resource][n_qubits] += 1
+
+        case ResourceType.MEASUREMENT:
+            resources.measurements[resource] += 1
+
+        case ResourceType.QEC:
+            n_qubits = len(op.in_qubits) if hasattr(op, "in_qubits") else 0
+            resources.operations[resource][n_qubits] += 1
+
+        case ResourceType.METADATA:
+            # Parse out extra circuit information
+            handle_metadata(op, resources)
+
+        case ResourceType.OTHER:
+            if op.name in _SKIPPED_OPS:
+                return
+
+            if op.dialect_name() in _CUSTOM_DIALECT_NAMES:
+                # Unknown custom dialect op, warn the user
+                warnings.warn(
+                    f"Specs encountered an unknown operation '{op.name}' from the "
+                    f"'{op.dialect_name()}' dialect. Some resource data may be missing.",
+                    UserWarning,
+                )
+                return
+
+            resources.classical_instructions[resource] += 1
+
+        case ResourceType.FUNC_CALL:
+            resources.function_calls[resource] += 1
+            resources._unresolved_function_calls[resource] += 1
+
+        case _:
+            # Should be unreachable
+            raise NotImplementedError(
+                f"Unsupported resource type {resource_type} for resource {resource}."
+            )
+
+
 def _collect_region(
-    region, loop_warning=False, cond_warning=False, adjoint_mode=False
+    region, loop_warning: bool = False, cond_warning: bool = False, adjoint_mode: bool = False
 ) -> ResourcesResult:
     """Collect PennyLane ops and measurements from a region."""
 
@@ -452,55 +508,7 @@ def _collect_region(
             resources.merge_with(used_resources)
             continue
 
-        resource_type, resource = handle_resource(op)
-
-        match resource_type:
-            case ResourceType.GATE:
-                n_qubits = 0
-                if hasattr(op, "in_qubits"):
-                    n_qubits += len(op.in_qubits)
-                if hasattr(op, "in_ctrl_qubits"):
-                    n_qubits += len(op.in_ctrl_qubits)
-
-                resource = xdsl_to_qml_op_name(op, adjoint_mode=adjoint_mode)
-
-                resources.operations[resource][n_qubits] += 1
-
-            case ResourceType.MEASUREMENT:
-                resources.measurements[resource] += 1
-
-            case ResourceType.QEC:
-                n_qubits = len(op.in_qubits) if hasattr(op, "in_qubits") else 0
-                resources.operations[resource][n_qubits] += 1
-
-            case ResourceType.METADATA:
-                # Parse out extra circuit information
-                handle_metadata(op, resources)
-
-            case ResourceType.OTHER:
-                if op.name in _SKIPPED_OPS:
-                    continue
-
-                if op.dialect_name() in _CUSTOM_DIALECT_NAMES:
-                    # Unknown custom dialect op, warn the user
-                    warnings.warn(
-                        f"Specs encountered an unknown operation '{op.name}' from the "
-                        f"'{op.dialect_name()}' dialect. Some resource data may be missing.",
-                        UserWarning,
-                    )
-                    continue
-
-                resources.classical_instructions[resource] += 1
-
-            case ResourceType.FUNC_CALL:
-                resources.function_calls[resource] += 1
-                resources._unresolved_function_calls[resource] += 1
-
-            case _:
-                # Should be unreachable
-                raise NotImplementedError(
-                    f"Unsupported resource type {resource_type} for resource {resource}."
-                )
+        _collect_operation(resources, op, adjoint_mode=adjoint_mode)
 
     return resources
 
