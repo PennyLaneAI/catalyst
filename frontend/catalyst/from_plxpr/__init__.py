@@ -19,5 +19,4 @@ from catalyst.from_plxpr.from_plxpr import (
     from_plxpr,
     register_transform,
     trace_from_pennylane,
-    transforms_to_passes,
 )
