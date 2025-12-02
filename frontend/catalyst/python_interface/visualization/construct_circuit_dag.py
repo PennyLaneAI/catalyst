@@ -111,7 +111,7 @@ class ConstructCircuitDAG:
         label = operation.sym_name.data
         if "jit_" in operation.sym_name.data:
             num_qnodes = 0
-            for op in operation.walk():
+            for op in operation.body.ops:
                 if isinstance(op, catalyst.LaunchKernelOp):
                     num_qnodes += 1
             # Get everything after the jit_* prefix
