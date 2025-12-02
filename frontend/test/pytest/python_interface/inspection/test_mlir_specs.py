@@ -68,10 +68,9 @@ def make_static_resources(
     return res
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestMLIRSpecs:
     """Unit tests for the mlir_specs function in the Python Compiler inspection module."""
-
-    use_plxpr = False
 
     @pytest.fixture
     def simple_circuit(self):
@@ -165,7 +164,7 @@ class TestMLIRSpecs:
     def test_basic_passes(self, simple_circuit, level, expected):
         """Test that when passes are applied, the circuit resources are updated accordingly."""
 
-        if self.use_plxpr:
+        if qml.capture.enabled():
             simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
             simple_circuit = qml.transforms.merge_rotations(simple_circuit)
         else:
@@ -179,7 +178,7 @@ class TestMLIRSpecs:
     def test_basic_passes_level_all(self, simple_circuit):
         """Test that when passes are applied, the circuit resources are updated accordingly."""
 
-        if self.use_plxpr:
+        if qml.capture.enabled():
             simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
             simple_circuit = qml.transforms.merge_rotations(simple_circuit)
         else:
@@ -217,7 +216,7 @@ class TestMLIRSpecs:
     def test_basic_passes_multi_level(self, simple_circuit):
         """Test that when passes are applied, the circuit resources are updated accordingly."""
 
-        if self.use_plxpr:
+        if qml.capture.enabled():
             simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
             simple_circuit = qml.transforms.merge_rotations(simple_circuit)
         else:
@@ -540,7 +539,7 @@ class TestMLIRSpecs:
     def test_ppr(self):
         """Test that PPRs are handled correctly."""
 
-        if self.use_plxpr:
+        if qml.capture.enabled():
             pytest.xfail("plxpr currently incompatible to_ppr pass")
 
         pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
@@ -562,7 +561,7 @@ class TestMLIRSpecs:
         assert resources_equal(res, expected)
 
     def test_subroutine(self):
-        if not self.use_plxpr:
+        if not qml.capture.enabled():
             pytest.xfail("Subroutine requires plxpr to be enabled.")
 
         @catalyst.jax_primitives.subroutine
@@ -584,17 +583,6 @@ class TestMLIRSpecs:
 
         res = mlir_specs(circ, level=0)
         assert resources_equal(res, expected)
-
-
-@pytest.mark.usefixtures("use_capture")
-class TestMLIRSpecsWithPLXPR(TestMLIRSpecs):
-    """Unit tests for the mlir_specs function in the Python Compiler inspection module with
-    plxpr enabled."""
-
-    # NOTE: This class simply inherits all tests from TestMLIRSpecs with plxpr enabled. This causes
-    #   it to run the same exact tests, except with the class instance variables modified.
-
-    use_plxpr = True
 
 
 # TODO: In the future, it would be good to add unit tests for specs_collector instead of just
