@@ -71,6 +71,7 @@
 <h3>Improvements 🛠</h3>
 
 * An error is now raised if a transform is applied inside a QNode when program capture is enabled.
+  [(#2256)](https://github.com/PennyLaneAI/catalyst/pull/2256)
 
 * A new ``"changed"`` option has been added to the ``keep_intermediate`` parameter of 
   :func:`~.qjit`. This option saves intermediate IR files after each pass,
