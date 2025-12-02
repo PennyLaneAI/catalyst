@@ -182,15 +182,18 @@ class TestErrors:
     def test_errors_transform_inside_qnode(self):
         """Test that an error is raised if a transform is applied inside a transform."""
 
-        @qml.qnode(qml.device('lightning.qubit', wires=1))
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
         @qml.transforms.cancel_inverses
         def c():
             return qml.expval(qml.Z(0))
-        
+
         jaxpr = jax.make_jaxpr(c)()
 
-        with pytest.raises(NotImplementedError, match="transforms cannot currently be applied inside a QNode."):
+        with pytest.raises(
+            NotImplementedError, match="transforms cannot currently be applied inside a QNode."
+        ):
             from_plxpr(jaxpr)()
+
 
 class TestCatalystCompareJaxpr:
     """Test comparing catalyst and pennylane jaxpr for a variety of situations."""

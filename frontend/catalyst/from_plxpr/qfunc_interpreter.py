@@ -812,6 +812,7 @@ def handle_adjoint_transform(
 def _error_on_transform(*args, **kwargs):
     raise NotImplementedError("transforms cannot currently be applied inside a QNode.")
 
+
 _special_op_bind_call = {
     qml.QubitUnitary: _qubit_unitary_bind_call,
     qml.GlobalPhase: _gphase_bind_call,
