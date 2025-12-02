@@ -133,7 +133,8 @@ class ConstructCircuitDAG:
         self.dag_builder.add_cluster(
             uid,
             node_label="",
-            label="",
+            label="conditional",
+            labeljust="l",
             cluster_uid=self._cluster_uid_stack[-1],
         )
         self._cluster_uid_stack.append(uid)
@@ -143,7 +144,7 @@ class ConstructCircuitDAG:
             uid = f"cluster_ifop_branch{i}_{id(operation)}"
             self.dag_builder.add_cluster(
                 uid,
-                node_label=f"if ..." if i == 0 else "else",
+                node_label="if ..." if i == 0 else "else",
                 label="",
                 cluster_uid=self._cluster_uid_stack[-1],
             )
