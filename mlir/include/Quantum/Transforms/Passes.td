@@ -90,17 +90,17 @@ def GridsynthPass : Pass<"gridsynth"> {
     let summary = "Perform Ross-Selinger/Gridsynth decomposition.";
 
     let options = [Option<
-        "epsilon",
-        "epsilon",
-        "double",
-        default="1e-4",
-        desc="Maximum error tolerance for per-gate discretization.">, 
+        /*C++ var name=*/"epsilon",
+        /*CLI name=*/"epsilon",
+        /*Type=*/"double",
+       /*Default=*/"1e-4",
+       /*Description=*/"Maximum error tolerance for per-gate discretization.">, 
         Option<
-        "pprBasis",
-        "ppr-basis",
-        "bool",
-        default="false",
-        desc="Whether to decompose into the PPR basis set instead of the standard Clifford+T basis set.">,];
+        /*C++ var name=*/"pprBasis",
+        /*CLI name=*/"ppr-basis",
+        /*Type=*/"bool",
+        /*Default=*/"false",
+        /*Description=*/desc="Whether to decompose into the PPR basis set instead of the standard Clifford+T basis set.">,];
 
         let dependentDialects = [
         "memref::MemRefDialect",
