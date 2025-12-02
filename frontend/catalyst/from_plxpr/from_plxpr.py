@@ -32,6 +32,7 @@ from pennylane.capture.primitives import transform_prim
 from pennylane.transforms import cancel_inverses as pl_cancel_inverses
 from pennylane.transforms import commute_controlled as pl_commute_controlled
 from pennylane.transforms import decompose as pl_decompose
+from pennylane.transforms import gridsynth as pl_gridsynth
 from pennylane.transforms import merge_amplitude_embedding as pl_merge_amplitude_embedding
 from pennylane.transforms import merge_rotations as pl_merge_rotations
 from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
@@ -341,6 +342,7 @@ transforms_to_passes = {
     pl_merge_rotations: ("merge-rotations", False),
     pl_single_qubit_fusion: (None, False),
     pl_unitary_to_rot: (None, False),
+    pl_gridsynth: ("gridsynth", False),
 }
 
 
