@@ -245,6 +245,7 @@ def _flatten_if_op(op: scf.IfOp) -> list[tuple[SSAValue, Region]]:
     condition_ssa: SSAValue = op.operands[0]
     then_region, else_region = op.regions
 
+    # Save condition SSA in case we want to visualize it eventually
     flattened_op: list[tuple[SSAValue, Region]] = [(condition_ssa, then_region)]
 
     # Peak into else region to see if there's another IfOp
