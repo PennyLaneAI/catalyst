@@ -242,8 +242,7 @@ LogicalResult RenameFunctionsPattern::matchAndRewrite(Operation *child,
                 // We record these external func decls during the rename pattern.
                 // Then during the actual inlining stage, only the first occurance of the per-module
                 // func decls of these external decls should be inlined.
-                if (isa<func::FuncOp>(op)) {
-                    auto f = cast<func::FuncOp>(op);
+                if (auto f = dyn_cast<func::FuncOp>(op)) {
                     if (f.isExternal()) {
                         _externalFuncDeclNames->insert(f.getName());
                         continue;
