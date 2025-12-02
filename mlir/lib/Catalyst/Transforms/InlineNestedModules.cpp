@@ -268,14 +268,16 @@ LogicalResult RenameFunctionsPattern::matchAndRewrite(Operation *child,
 struct InlineNestedModule : public RewritePattern {
     /// This overload constructs a pattern that matches any operation type.
     InlineNestedModule(MLIRContext *context,
-                       const llvm::SmallSet<StringRef, 8> &externalFuncDeclNames)
+                       const llvm::SmallSet<StringRef, 8> &externalFuncDeclNames,
+                       llvm::SmallSet<StringRef, 8> *alreadyInlinedFuncDeclNames)
         : RewritePattern(MatchAnyOpTypeTag(), 1, context),
-          _externalFuncDeclNames(externalFuncDeclNames)
+          _externalFuncDeclNames(externalFuncDeclNames),
+          _alreadyInlinedFuncDeclNames(alreadyInlinedFuncDeclNames)
     {
     }
 
     llvm::SmallSet<StringRef, 8> _externalFuncDeclNames;
-    mutable llvm::SmallSet<StringRef, 8> alreadyInlinedFuncDeclNames;
+    llvm::SmallSet<StringRef, 8> *_alreadyInlinedFuncDeclNames;
 
     LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) const override
     {
@@ -296,11 +298,11 @@ struct InlineNestedModule : public RewritePattern {
         op->walk([&](func::FuncOp f) {
             StringRef funcName = f.getName();
             if (f.isExternal() && _externalFuncDeclNames.contains(funcName)) {
-                if (alreadyInlinedFuncDeclNames.contains(funcName)) {
+                if (_alreadyInlinedFuncDeclNames->contains(funcName)) {
                     _erasureWorklist.push_back(f);
                 }
                 else {
-                    alreadyInlinedFuncDeclNames.insert(funcName);
+                    _alreadyInlinedFuncDeclNames->insert(funcName);
                 }
             }
         });
@@ -483,7 +485,9 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         }
 
         RewritePatternSet inlineNested(context);
-        inlineNested.add<InlineNestedModule>(context, externalFuncDeclNames);
+        llvm::SmallSet<StringRef, 8> alreadyInlinedFuncDeclNames;
+        inlineNested.add<InlineNestedModule>(context, externalFuncDeclNames,
+                                             &alreadyInlinedFuncDeclNames);
         run = _stopAfterStep >= 3 || _stopAfterStep == 0;
         if (run && failed(applyPatternsGreedily(symbolTable, std::move(inlineNested), config))) {
             signalPassFailure();
