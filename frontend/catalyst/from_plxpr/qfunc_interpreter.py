@@ -35,6 +35,7 @@ from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measu
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.measurements import CountsMP
 
+from catalyst.device.op_support import is_lowering_compatible
 from catalyst.jax_extras import jaxpr_pad_consts
 from catalyst.jax_primitives import (
     AbstractQbit,
@@ -179,24 +180,16 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         if any(not qreg.is_qubit_mode() and qreg.expired for qreg in in_qregs + in_ctrl_qregs):
             raise CompileError(f"Deallocated qubits cannot be used, but used in {op.name}.")
 
-        _spacial_bind = False
         if (fn := _special_op_bind_call.get(type(op))) is not None:
             bind_fn = partial(fn, hyperparameters=op.hyperparameters)
-            _spacial_bind = True
         else:
+            # FIXME: Remove this after integrating
+            if not is_lowering_compatible(op):
+                raise CompileError(
+                    f"Operation {op.name} with hyperparameters {list(op.hyperparameters.keys())} "
+                    "is not compatible with quantum instructions."
+                )
             bind_fn = qinst_p.bind
-
-        if not _spacial_bind:
-            # raise an error if there are unsupported hyperparameters
-            # for the generic qinst_p bind call
-            # This is to avoid silent bugs where hyperparameters
-            # are simply ignored
-            for key in op.hyperparameters.keys():
-                if key not in _accepted_hyperparams:
-                    raise CompileError(
-                        f"Operation {op.name} has unsupported hyperparameter '{key}' "
-                        "for generic quantum instruction binding."
-                    )
 
         out_qubits = bind_fn(
             *[*in_qubits, *op.data, *in_ctrl_qubits, *control_values],
@@ -826,15 +819,4 @@ _special_op_bind_call = {
     qml.GlobalPhase: _gphase_bind_call,
     qml.PCPhase: _pcphase_bind_call,
     qml.PauliRot: _pauli_rot_bind_call,
-}
-
-# Accepted hyperparameters for quantum instructions bind calls
-_accepted_hyperparams = {
-    "num_wires",  # CNOT, etc.
-    "n_wires",  # Identity, etc.
-    "control_wires",  # CNOT, etc.
-    "control_values",  # CNOT, etc.
-    "work_wires",  # CNOT, etc.
-    "work_wire_type",  # CNOT, etc.
-    "base",  # CNOT, etc.
 }

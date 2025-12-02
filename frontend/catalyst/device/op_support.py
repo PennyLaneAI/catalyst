@@ -42,9 +42,9 @@ def is_supported(op: Operator, capabilities: DeviceCapabilities) -> bool:
 
 
 def is_lowering_compatible(op: Operator) -> bool:
-    """Check whether an operation is compatible with quantum instructions."""
+    """Check if an operation can be lowered to MLIR using JAX primitives."""
     # Exceptions for operations that are not quantum instructions but are allowed
-    if isinstance(op, qml.Snapshot):
+    if isinstance(op, (qml.Snapshot, qml.PCPhase, qml.MultiRZ)):
         return True
 
     # Accepted hyperparameters for quantum instructions bind calls
