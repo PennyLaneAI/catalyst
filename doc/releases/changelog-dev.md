@@ -6,8 +6,9 @@
   [(#2213)](https://github.com/PennyLaneAI/catalyst/pull/2213)
   [(#2229)](https://github.com/PennyLaneAI/catalyst/pull/2229)
   [(#2214)](https://github.com/PennyLaneAI/catalyst/pull/2214)
-  [(#2231)](https://github.com/PennyLaneAI/catalyst/pull/2231)
   [(#2246)](https://github.com/PennyLaneAI/catalyst/pull/2246)
+  [(#2231)](https://github.com/PennyLaneAI/catalyst/pull/2231)
+  [(#2234)](https://github.com/PennyLaneAI/catalyst/pull/2234)
   [(#2118)](https://github.com/PennyLaneAI/catalyst/pull/2218)
 
 * Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.

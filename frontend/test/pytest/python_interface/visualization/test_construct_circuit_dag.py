@@ -13,7 +13,6 @@
 # limitations under the License.
 """Unit tests for the ConstructCircuitDAG utility."""
 
-import re
 from unittest.mock import Mock
 
 import pytest
@@ -321,6 +320,61 @@ class TestFuncOpVisualization:
         assert "my_qnode2" in utility.dag_builder.get_child_clusters("my_workflow")
 
 
+class TestDeviceNode:
+    """Tests that the device node is correctly visualized."""
+
+    def test_standard_qnode(self):
+        """Tests that a standard setup works."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            qml.H(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # Check that device node is within the my_workflow cluster
+        nodes_in_my_workflow = utility.dag_builder.get_nodes_in_cluster("my_workflow")
+        assert "NullQubit" in nodes_in_my_workflow
+
+    def test_nested_qnodes(self):
+        """Tests that nested QJIT'd QNodes are visualized correctly"""
+
+        dev1 = qml.device("null.qubit", wires=1)
+        dev2 = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev2)
+        def my_qnode2():
+            qml.X(0)
+
+        @qml.qnode(dev1)
+        def my_qnode1():
+            qml.H(0)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        def my_workflow():
+            my_qnode1()
+            my_qnode2()
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # Check that device node is within the my_workflow cluster
+        nodes_in_my_workflow = utility.dag_builder.get_nodes_in_cluster("my_qnode1")
+        assert "NullQubit" in nodes_in_my_workflow
+        nodes_in_my_workflow = utility.dag_builder.get_nodes_in_cluster("my_qnode2")
+        assert "LightningSimulator" in nodes_in_my_workflow
+
+
 class TestForOp:
     """Tests that the for loop control flow can be visualized correctly."""
 
@@ -448,58 +502,3 @@ class TestIfOp:
         assert "if ..." in utility.dag_builder.get_child_clusters("conditional")
         assert "elif ..." in utility.dag_builder.get_child_clusters("conditional")
         assert "else" in utility.dag_builder.get_child_clusters("conditional")
-
-
-class TestDeviceNode:
-    """Tests that the device node is correctly visualized."""
-
-    def test_standard_qnode(self):
-        """Tests that a standard setup works."""
-
-        dev = qml.device("null.qubit", wires=1)
-
-        @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
-        def my_workflow():
-            qml.H(0)
-
-        module = my_workflow()
-
-        utility = ConstructCircuitDAG(FakeDAGBuilder())
-        utility.construct(module)
-
-        # Check that device node is within the my_workflow cluster
-        nodes_in_my_workflow = utility.dag_builder.get_nodes_in_cluster("my_workflow")
-        assert "NullQubit" in nodes_in_my_workflow
-
-    def test_nested_qnodes(self):
-        """Tests that nested QJIT'd QNodes are visualized correctly"""
-
-        dev1 = qml.device("null.qubit", wires=1)
-        dev2 = qml.device("lightning.qubit", wires=1)
-
-        @qml.qnode(dev2)
-        def my_qnode2():
-            qml.X(0)
-
-        @qml.qnode(dev1)
-        def my_qnode1():
-            qml.H(0)
-
-        @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        def my_workflow():
-            my_qnode1()
-            my_qnode2()
-
-        module = my_workflow()
-
-        utility = ConstructCircuitDAG(FakeDAGBuilder())
-        utility.construct(module)
-
-        # Check that device node is within the my_workflow cluster
-        nodes_in_my_workflow = utility.dag_builder.get_nodes_in_cluster("my_qnode1")
-        assert "NullQubit" in nodes_in_my_workflow
-        nodes_in_my_workflow = utility.dag_builder.get_nodes_in_cluster("my_qnode2")
-        assert "LightningSimulator" in nodes_in_my_workflow
