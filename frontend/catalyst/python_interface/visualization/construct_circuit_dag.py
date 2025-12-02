@@ -121,7 +121,7 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _if_op(self, operation: scf.IfOp):
         """Handles the scf.IfOp operation."""
-        flattened_if_op: list[tuple[SSAValue, Region]] = _flatten_if_op(operation)
+        flattened_if_op: list[tuple[SSAValue | None, Region]] = _flatten_if_op(operation)
 
         uid = f"cluster_{id(operation)}"
         self.dag_builder.add_cluster(
