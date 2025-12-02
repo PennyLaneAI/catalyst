@@ -68,8 +68,7 @@ const PipelineList pipelineList{
          "canonicalize",
          "symbol-dce",
      }},
-    {"gradient-lowering",
-     {"annotate-invalid-gradient-functions", "lower-gradients"}},
+    {"gradient-lowering", {"annotate-invalid-gradient-functions", "lower-gradients"}},
     {"bufferization-pipeline",
      {"inline",
       "convert-tensor-to-linalg",      // tensor.pad

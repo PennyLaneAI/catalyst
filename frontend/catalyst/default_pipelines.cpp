@@ -29,8 +29,7 @@ NB_MODULE(default_pipelines, m)
           "Returns the list of pass names for the Quantum Compilation stage.");
     m.def("get_hlo_lowering_stage", &catalyst::driver::getHLOLoweringStage,
           "Returns the list of pass names for the HLO Lowering stage.");
-    m.def("get_gradient_lowering_stage",
-          &catalyst::driver::getGradientLoweringStage,
+    m.def("get_gradient_lowering_stage", &catalyst::driver::getGradientLoweringStage,
           "Returns the list of pass names for the Gradient Lowering stage.");
     m.def("get_bufferization_stage", &catalyst::driver::getBufferizationStage,
           "Returns the list of pass names for the Bufferization stage.");
