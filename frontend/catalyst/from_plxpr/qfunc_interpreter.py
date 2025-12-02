@@ -808,7 +808,7 @@ def handle_adjoint_transform(
     return outvals
 
 
-@PLxPRToQuantumJaxprInterpreter.register_primitve(transform_prim)
+@PLxPRToQuantumJaxprInterpreter.register_primitive(transform_prim)
 def _error_on_transform(*args, **kwargs):
     raise NotImplementedError("transforms cannot currently be applied inside a QNode.")
 
