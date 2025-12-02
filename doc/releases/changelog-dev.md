@@ -70,7 +70,7 @@
 
 <h3>Improvements 🛠</h3>
 
-* A new ``"changed"`` option has been added to the ``keep_intermediate`` parameter of 
+* A new ``"changed"`` option has been added to the ``keep_intermediate`` parameter of
   :func:`~.qjit`. This option saves intermediate IR files after each pass,
   but only when the IR is actually modified by the pass.
   [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
@@ -132,9 +132,9 @@
 * The `--adjoint-lowering` pass can now handle PPR operations.
   [(#2227)](https://github.com/PennyLaneAI/catalyst/pull/2227)
 
-* Catalyst now supports Pauli product rotations with arbitrary or dynamic angles in the 
-  QEC dialect. This will allow :class:`qml.PauliRot` with arbitrary or dynamic angles, 
-  angles not known at compile time, to be lowered to the QEC dialect. This is implemented 
+* Catalyst now supports Pauli product rotations with arbitrary or dynamic angles in the
+  QEC dialect. This will allow :class:`qml.PauliRot` with arbitrary or dynamic angles,
+  angles not known at compile time, to be lowered to the QEC dialect. This is implemented
   as a new `qec.ppr.arbitrary` operation, which takes a Pauli product and an arbitrary or
   dynamic angle as input. The arbitrary angles are specified as a double in terms of radian.
   [(#2232)](https://github.com/PennyLaneAI/catalyst/pull/2232)
@@ -151,7 +151,7 @@
 
 * The MLIR pipeline ``enforce-runtime-invariants-pipeline`` has been renamed to
   ``quantum-compilation-pipeline`` and the old ``quantum-compilation-pipeline`` has been renamed to
-  ``gradient-lowering-pipeline``. Users who referenced these pipeline names directly would need to 
+  ``gradient-lowering-pipeline``. Users who referenced these pipeline names directly would need to
   update their code to use the new names.
   [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
 
@@ -277,7 +277,9 @@
 * Decouple the ion dialect from the quantum dialect to support the new RTIO compilation flow.
   The ion dialect now uses its own `!ion.qubit` type instead of depending on `!quantum.bit`.
   Conversion between qubits of quantum and ion dialects is handled via unrealized conversion casts.
+  And we support the compiling from ION dialect to RTIO dilalect.
   [(#2163)](https://github.com/PennyLaneAI/catalyst/pull/2163)
+  [(#2204)](https://github.com/PennyLaneAI/catalyst/pull/2204)
 
   For an example, quantum qubits are converted to ion qubits as follows:
   ```mlir
@@ -302,15 +304,15 @@
   of identities.
   [(#2192)](https://github.com/PennyLaneAI/catalyst/pull/2192)
 
-  * Renamed `annotate-function` pass to `annotate-invalid-gradient-functions` and move it to the 
+  * Renamed `annotate-function` pass to `annotate-invalid-gradient-functions` and move it to the
   gradient dialect and the `lower-gradients` compilation stage.
   [(#2241)](https://github.com/PennyLaneAI/catalyst/pull/2241)
 
   * Added support for PPRs to the :func:`~.passes.merge_rotations` pass to merge PPRs with
   equivalent angles, and cancelling of PPRs with opposite angles, or angles
-  that sum to identity. Also supports conditions on PPRs, merging when conditions are 
+  that sum to identity. Also supports conditions on PPRs, merging when conditions are
   identical and not merging otherwise.
-  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)	
+  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)
   [(#2245)](https://github.com/PennyLaneAI/catalyst/pull/2245)
   [(#2254)](https://github.com/PennyLaneAI/catalyst/pull/2254)
 
