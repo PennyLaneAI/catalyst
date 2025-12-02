@@ -126,7 +126,7 @@ def RTIOChannelType : RTIO_Type<"Channel", "channel"> {
             if (!channelId) {
                 return false;
             }
-            return channelId.getInt() != ShapedType::kDynamic;
+            return channelId.getInt() != mlir::ShapedType::kDynamic;
         }
 
         bool isDynamic() const {
