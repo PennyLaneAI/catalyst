@@ -13,21 +13,15 @@
 # limitations under the License.
 """Unit test module for the mlir_specs function in the Python Compiler inspection module."""
 
-
-import pytest
-
-pytestmark = pytest.mark.requires_xdsl
-
-# pylint: disable=wrong-import-position
 import jax.numpy as jnp
 import pennylane as qml
+import pytest
 
-# pylint: disable=wrong-import-position
 import catalyst
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface.inspection import ResourcesResult, mlir_specs
 
-# pylint: disable=implicit-str-concat, unnecessary-lambda
+pytestmark = pytest.mark.requires_xdsl
 
 
 def resources_equal(
@@ -567,18 +561,44 @@ class TestMLIRSpecs:
         res = mlir_specs(circ, level=1, args=(0,))
         assert resources_equal(res, expected)
 
+    def test_subroutine(self):
+        if not self.use_plxpr:
+            pytest.xfail("Subroutine requires plxpr to be enabled.")
 
-# TODO: Add a test that calls another function as a subroutine
+        @catalyst.jax_primitives.subroutine
+        def extra_function():
+            qml.Hadamard(wires=0)
+
+        @qml.qjit(autograph=True)
+        @qml.qnode(qml.device("null.qubit", wires=2))
+        def circ():
+            extra_function()
+            return qml.probs()
+
+        expected = make_static_resources(
+            operations={"Hadamard": {1: 1}},
+            measurements={"probs(all wires)": 1},
+            num_allocs=2,
+            function_calls={"extra_function": 1},
+        )
+
+        res = mlir_specs(circ, level=0)
+        assert resources_equal(res, expected)
 
 
 @pytest.mark.usefixtures("use_capture")
 class TestMLIRSpecsWithPLXPR(TestMLIRSpecs):
-    """Unit tests for the mlir_specs function in the Python Compiler inspection module with plxpr enabled."""
+    """Unit tests for the mlir_specs function in the Python Compiler inspection module with
+    plxpr enabled."""
+
+    # NOTE: This class simply inherits all tests from TestMLIRSpecs with plxpr enabled. This causes
+    #   it to run the same exact tests, except with the class instance variables modified.
 
     use_plxpr = True
 
 
-# TODO: In the future, it would be good to add unit tests for specs_collector instead of just integration tests
+# TODO: In the future, it would be good to add unit tests for specs_collector instead of just
+#   integration tests
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
