@@ -902,42 +902,18 @@ func.func public @half_compatible_qubits(%q1: !quantum.bit, %q2: !quantum.bit, %
 
 // -----
 
-// merge correctly when conditionals are present
+// Arbitrary Angle PPR (AAPPR) Tests
 
-// CHECK-LABEL: merge_conditionals
-func.func public @merge_conditionals(%q1: !quantum.bit, %q2: !quantum.bit, %arg0: i1) {
-    // CHECK: qec.ppr ["X", "Z"](4) {{%.+}}, {{%.+}} cond({{%.+}})
-    // CHECK-NOT: qec.ppr ["X", "Z"](8)
-    %0, %1 = qec.ppr ["X", "Z"](8) %q1, %q2 cond(%arg0): !quantum.bit, !quantum.bit
-    %2, %3 = qec.ppr ["X", "Z"](8) %0, %1 cond(%arg0): !quantum.bit, !quantum.bit
-    func.return
-}
+// simple AAPPR merge
 
-// -----
-
-// don't merge compatible Pauli words when conditionals differ
-
-// CHECK-LABEL: dont_merge_incompatible_conditionals
-func.func public @dont_merge_incompatible_conditionals(%q1: !quantum.bit, %q2: !quantum.bit, %arg0: i1, %arg1: i1) {
-    // CHECK-NOT: qec.ppr ["X", "Z"](4)
-    // CHECK: [[in:%.+]]:2 = qec.ppr ["X", "Z"](8) 
-    // CHECK: qec.ppr ["X", "Z"](8) [[in]]#0, [[in]]#1
-    %0:2 = qec.ppr ["X", "Z"](8) %q1, %q2 cond(%arg0): !quantum.bit, !quantum.bit
-    %1:2 = qec.ppr ["X", "Z"](8) %0#0, %0#1 cond(%arg1): !quantum.bit, !quantum.bit
-    func.return
-}
-
-// -----
-
-// don't merge PPRs with conditional PPRs
-
-// CHECK-LABEL: dont_merge_conditionals
-func.func public @dont_merge_conditionals(%q1: !quantum.bit, %q2: !quantum.bit, %arg0: i1) {
-    // CHECK-NOT: qec.ppr ["X", "Z"](4)
-    // CHECK: [[in:%.+]]:2 = qec.ppr ["X", "Z"](8)
-    // CHECK: qec.ppr ["X", "Z"](8) [[in]]#0, [[in]]#1
-    %0:2 = qec.ppr ["X", "Z"](8) %q1, %q2: !quantum.bit, !quantum.bit
-    %1:2 = qec.ppr ["X", "Z"](8) %0#0, %0#1 cond(%arg0): !quantum.bit, !quantum.bit
+// CHECK-LABEL: merge_Y
+func.func public @merge_Y(%q1: !quantum.bit) {
+    // CHECK: [[angle:%.+]] = arith.addf [[cst1]], [[cst2]]
+    // CHECK: qec.ppr.arbitrary ["Y"]([[angle]])
+    %0 = arith.constant 0.9 : f64
+    %1 = arith.constant 0.4 : f64
+    %2 = qec.ppr.arbitrary ["Y"](%0) %q1: !quantum.bit
+    %3 = qec.ppr.arbitrary ["Y"](%1) %2: !quantum.bit
     func.return
 }
 
