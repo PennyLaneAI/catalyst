@@ -32,7 +32,7 @@ from xdsl.pattern_rewriter import (
 
 
 def _update_type_hints(hint: type[Operation] | type[Operation]) -> Callable:
-    r"""Update the signature of a ``match_and_rewrite`` method to use the provided operation
+    """Update the signature of a ``match_and_rewrite`` method to use the provided operation
     as the first argument's type hint."""
     if get_origin(hint) in (Union, UnionType):
         expected_types = get_args(hint)
@@ -62,7 +62,7 @@ def _update_type_hints(hint: type[Operation] | type[Operation]) -> Callable:
 def _create_rewrite_pattern(
     hint: type[Operation] | type[Operation], rewrite_rule: Callable
 ) -> RewritePattern:
-    r"""Given a rewrite rule defined as a function, create a RewritePattern which
+    """Given a rewrite rule defined as a function, create a ``RewritePattern`` which
     can be used with xDSL's pass API."""
 
     # pylint: disable=too-few-public-methods, arguments-differ
@@ -84,22 +84,36 @@ def _create_rewrite_pattern(
 
 
 class PLModulePass(ModulePass):
-    r"""An xdsl ``ModulePass`` subclass for defining passes."""
+    """An xdsl ``ModulePass`` subclass for defining passes."""
 
     name: ClassVar[str]
-    recursive: bool
-    greedy: bool
     _rewrite_patterns: ClassVar[dict[Operation, RewritePattern]] = {}
 
     def __init__(self, recursive: bool = True, greedy: bool = False):
         self.recursive = recursive
         self.greedy = greedy
 
+    @property
+    def recursive(self):
+        """Whether or not the rewrite rules should be applied recursively. If ``True``,
+        the rewrite rules will be applied repeatedly until a steady-state is reached.
+        ``True`` by default.
+        """
+        return True
+
+    @property
+    def greedy(self):
+        """Whether or not the rewrite rules should be applied greedily. If ``True``,
+        each iteration of the rewrite rules' application (if ``recursive == True``)
+        will only apply the first rewrite rule that modifies the input module.
+        ``True`` by default."""
+        return True
+
     @classmethod
     def rewrite_rule(
         cls, hint: type[Operation] | type[Operation]
     ) -> Callable[[Operation, PatternRewriter], Callable]:
-        r"""Decorator to register a rewrite rule.
+        """Decorator to register a rewrite rule.
 
         The rewrite rule must have the following signature:
 
@@ -134,7 +148,7 @@ class PLModulePass(ModulePass):
         registered rewrite rules, and the values are the corresponding ``RewritePattern``\ s."""
 
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:  # pylint: disable=unused-argument
-        r"""Apply the transformation to the input module.
+        """Apply the transformation to the input module.
 
         If ``greedy`` is ``True``, the rewrite rules will be applied greedily, i.e., for each
         operation in the worklist, we will apply only the first rewrite rule that matches the
