@@ -145,7 +145,7 @@ class ConstructCircuitDAG:
             label=str(meas),
             cluster_id=self._cluster_stack[-1],
         )
-        
+
     # =============
     # CONTROL FLOW
     # =============
