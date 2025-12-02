@@ -44,24 +44,23 @@ def is_supported(op: Operator, capabilities: DeviceCapabilities) -> bool:
 def is_lowering_compatible(op: Operator) -> bool:
     """Check if an operation can be lowered to MLIR using JAX primitives."""
     # Exceptions for operations that are not quantum instructions but are allowed
+    # via custom lowering rules.
+    # TODO: Revisit this as more explicit ops will be added to Catalyst Compiler.
     if isinstance(op, (qml.Snapshot, qml.PCPhase, qml.MultiRZ)):
         return True
 
     # Accepted hyperparameters for quantum instructions bind calls
     _accepted_hyperparams = {
-        "num_wires",  # CNOT, etc.
-        "n_wires",  # Identity, etc.
-        "control_wires",  # CNOT, etc.
-        "control_values",  # CNOT, etc.
-        "work_wires",  # CNOT, etc.
-        "work_wire_type",  # CNOT, etc.
-        "base",  # CNOT, etc.
+        "base",
+        "n_wires",
+        "num_wires",
+        "control_wires",
+        "control_values",
+        "work_wires",
+        "work_wire_type",
     }
 
-    for hyperparam in op.hyperparameters:
-        if hyperparam not in _accepted_hyperparams:
-            return False
-    return True
+    return set(op.hyperparameters).issubset(_accepted_hyperparams)
 
 
 def _is_grad_recipe_same_as_catalyst(op):

@@ -70,11 +70,16 @@
 
 <h3>Improvements 🛠</h3>
 
-* Remove the hardcoded list of runtime operations in the frontend.
-  This will allow arbitrary PL gates to be represented without hyperparameters in MLIR.
-  For gates that do not have a QIR representation, a runtime error will be raised at execution.
-  Users can still decompose these gates via `qml.transforms.decompose`
-  when both capture and graph-decomposition are enabled.
+* The frontend no longer maintains a hardcoded list of runtime operations,
+  allowing arbitrary PennyLane gates with Quantum dialect-compatible
+  hyperparameters to be captured and represented in MLIR.
+  Users of the legacy compilation pipeline are unaffected,
+  as Catalyst continues to decompose unsupported gates
+  based on device capabilities before lowering to MLIR.
+  Gates that cannot be represented as MLIR operators will temporarily
+  raise a `CompileError` during program capture.
+  The long-term solution will integrate the new decomposition framework
+  with capture-enabled compilation.
   [(#2215)](https://github.com/PennyLaneAI/catalyst/pull/2215)
 
 * A new ``"changed"`` option has been added to the ``keep_intermediate`` parameter of 

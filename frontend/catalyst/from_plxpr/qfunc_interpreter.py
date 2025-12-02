@@ -183,7 +183,9 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         if (fn := _special_op_bind_call.get(type(op))) is not None:
             bind_fn = partial(fn, hyperparameters=op.hyperparameters)
         else:
-            # FIXME: Remove this after integrating
+            # TODO: Remove this after enabling the graph-based decomposition by default
+            # With graph enabled, all unsupported templates and operations will be decomposed
+            # away resulting the same behaviour with capture disabled in Catalyst.
             if not is_lowering_compatible(op):
                 raise CompileError(
                     f"Operation {op.name} with hyperparameters {list(op.hyperparameters.keys())} "

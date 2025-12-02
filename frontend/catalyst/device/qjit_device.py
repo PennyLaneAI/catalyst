@@ -164,7 +164,6 @@ def union_operations(
 ) -> Dict[str, OperatorProperties]:
     """Union of two sets of operator properties"""
     return {**a, **b}
-    # return {k: a[k] & b[k] for k in (a.keys() & b.keys())}
 
 
 def intersect_operations(
