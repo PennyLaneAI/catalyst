@@ -16,6 +16,7 @@
 
 #include <array>
 #include <cassert> // assert
+#include <cmath>
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -396,6 +397,66 @@ struct MergePPRRewritePattern : public OpRewritePattern<PPRotationOp> {
     }
 };
 
+struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbitraryOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(PPRotationArbitraryOp op,
+                                  PatternRewriter &rewriter) const override
+    {
+        ValueRange inQubits = op.getInQubits();
+        auto definingOp = inQubits[0].getDefiningOp();
+
+        if (!definingOp) {
+            return failure();
+        }
+
+        auto prevOp = dyn_cast<PPRotationArbitraryOp>(definingOp);
+
+        if (!prevOp) {
+            return failure();
+        }
+
+        // verify that prevOp agrees on all qubits, not just the first
+        for (auto qubit : inQubits) {
+            if (qubit.getDefiningOp() != prevOp) {
+                return failure();
+            }
+        }
+
+        // check same pauli strings
+        if (op.getPauliProduct() != prevOp.getPauliProduct()) {
+            return failure();
+        }
+
+        // check same conditionals
+        if (op.getCondition() != prevOp.getCondition()) {
+            return failure();
+        }
+
+        auto opRotation = op.getArbitraryAngle();
+        auto prevOpRotation = prevOp.getArbitraryAngle();
+
+        if (!opRotation || !prevOpRotation) {
+            return failure();
+        }
+
+        auto loc = op.getLoc();
+        // replace references to current op with prevOp
+        // create merged op
+        mlir::Value newAngleOp =
+            rewriter.create<arith::AddFOp>(loc, opRotation, prevOpRotation).getResult();
+
+        auto mergeOp = rewriter.create<PPRotationArbitraryOp>(
+            loc, op.getOutQubits().getTypes(), op.getPauliProduct(), newAngleOp,
+            prevOp.getInQubits(), op.getCondition());
+
+        rewriter.replaceOp(op, mergeOp);
+        rewriter.eraseOp(prevOp);
+
+        return success();
+    }
+};
+
 struct MergeMultiRZRewritePattern : public OpRewritePattern<MultiRZOp> {
     using OpRewritePattern<MultiRZOp>::OpRewritePattern;
 
@@ -442,6 +503,7 @@ void populateMergeRotationsPatterns(RewritePatternSet &patterns)
     patterns.add<MergeRotationsRewritePattern<CustomOp, CustomOp>>(patterns.getContext(), 1);
     patterns.add<MergeMultiRZRewritePattern>(patterns.getContext(), 1);
     patterns.add<MergePPRRewritePattern>(patterns.getContext(), 1);
+    patterns.add<MergePPRArbitraryRewritePattern>(patterns.getContext(), 1);
 }
 
 } // namespace quantum
