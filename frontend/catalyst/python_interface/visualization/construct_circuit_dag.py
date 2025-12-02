@@ -190,9 +190,6 @@ class ConstructCircuitDAG:
             shape="rectangle",
         )
 
-        for region in operation.regions:
-            self._visit_region(region)
-
     # =======================
     # FuncOp NESTING UTILITY
     # =======================
@@ -207,7 +204,7 @@ class ConstructCircuitDAG:
         label = operation.sym_name.data
         if "jit_" in operation.sym_name.data:
             num_qnodes = 0
-            for op in operation.walk():
+            for op in operation.body.ops:
                 if isinstance(op, catalyst.LaunchKernelOp):
                     num_qnodes += 1
             # Get everything after the jit_* prefix
@@ -227,8 +224,7 @@ class ConstructCircuitDAG:
             )
             self._cluster_uid_stack.append(uid)
 
-        for region in operation.regions:
-            self._visit_region(region)
+        self._visit_block(operation.regions[0].blocks[0])
 
     @_visit_operation.register
     def _func_return(self, operation: func.ReturnOp) -> None:
