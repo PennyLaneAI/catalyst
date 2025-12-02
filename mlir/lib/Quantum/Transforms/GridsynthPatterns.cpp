@@ -201,6 +201,98 @@ void populatePPRBasisSwitchCases(mlir::PatternRewriter &rewriter, mlir::Location
     rewriter.create<mlir::scf::YieldOp>(loc, qbitIn);
 }
 
+struct DecompositionExternalFuncs {
+    func::FuncOp getSize;
+    func::FuncOp getGates;
+    func::FuncOp getPhase;
+};
+
+DecompositionExternalFuncs getOrDeclareExternalFuncs(mlir::PatternRewriter &rewriter,
+                                                     mlir::func::FuncOp func)
+{
+    auto f64Type = rewriter.getF64Type();
+    auto i1Type = rewriter.getI1Type();
+    auto indexType = rewriter.getIndexType();
+    auto rankedMemRefType = mlir::MemRefType::get({mlir::ShapedType::kDynamic}, indexType);
+
+    // Ensure or declare Get Size: (f64, f64, i1) -> index
+    auto getSizeType = rewriter.getFunctionType({f64Type, f64Type, i1Type}, {indexType});
+    auto getSizeFunc = catalyst::ensureFunctionDeclaration<func::FuncOp>(
+        rewriter, func, "rs_decomposition_get_size", getSizeType);
+
+    // Ensure or declare Get Gates: (memref, f64, f64, i1) -> void
+    auto getGatesType = rewriter.getFunctionType({rankedMemRefType, f64Type, f64Type, i1Type}, {});
+    auto getGatesFunc = catalyst::ensureFunctionDeclaration<func::FuncOp>(
+        rewriter, func, "rs_decomposition_get_gates", getGatesType);
+
+    // Ensure or declare Get Phase: (f64, f64, i1) -> f64
+    auto getPhaseType = rewriter.getFunctionType({f64Type, f64Type, i1Type}, {f64Type});
+    auto getPhaseFunc = catalyst::ensureFunctionDeclaration<func::FuncOp>(
+        rewriter, func, "rs_decomposition_get_phase", getPhaseType);
+
+    return {getSizeFunc, getGatesFunc, getPhaseFunc};
+}
+
+/**
+ * @brief Builds the main loop that iterates over the gate sequence and applies the quantum gates.
+ */
+mlir::Value buildDecompositionLoop(mlir::PatternRewriter &rewriter, mlir::Location loc,
+                                   mlir::Value qbitIn, mlir::Value gatesMemref,
+                                   mlir::Value numGates, double epsilon, bool pprBasis)
+{
+    auto qbitType = catalyst::quantum::QubitType::get(rewriter.getContext());
+    mlir::Value c0 = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
+    mlir::Value c1 = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
+
+    // Create the scf.for loop over gate sequence indices
+    // The loop carries the Qubit as an argument
+    auto forOp = rewriter.create<mlir::scf::ForOp>(loc, c0, numGates, c1, ValueRange{qbitIn});
+
+    // Add attribute to the for op to indicate the estimated iterations of the loop
+    auto estimatedRanges = static_cast<int64_t>(std::ceil(10 * std::log2(1 / epsilon)));
+    auto estimatedRangesAttr = rewriter.getI16IntegerAttr(estimatedRanges);
+    forOp->setAttr("estimated_iterations", estimatedRangesAttr);
+
+    {
+        mlir::OpBuilder::InsertionGuard loopGuard(rewriter);
+        rewriter.setInsertionPointToStart(forOp.getBody());
+        mlir::Value iv = forOp.getInductionVar();
+        mlir::Value currentQbit = forOp.getRegionIterArg(0);
+
+        mlir::Value currentGateIndex =
+            rewriter.create<mlir::memref::LoadOp>(loc, gatesMemref, ValueRange{iv});
+
+        // 19 cases for PPR basis: Identity + (X, Y, Z) x (2, 4, 8) x (normal, adjoint)
+        // 10 cases for Clifford+T basis: {T, H T, S H T, I, X, Y, Z, H, S, adjS}
+        const int64_t numCases = pprBasis ? 19 : 10;
+        SmallVector<int64_t> caseValues;
+        caseValues.reserve(numCases);
+        for (int64_t i = 0; i < numCases; i++) {
+            caseValues.push_back(i);
+        }
+
+        // Create the switch operation inside the loop
+        mlir::DenseI64ArrayAttr caseValuesAttr = rewriter.getDenseI64ArrayAttr(caseValues);
+        auto switchOp = rewriter.create<mlir::scf::IndexSwitchOp>(
+            loc, mlir::TypeRange{qbitType}, currentGateIndex, caseValuesAttr, caseValues.size());
+
+        // Populate Switch Cases
+        if (pprBasis) {
+            populatePPRBasisSwitchCases(rewriter, loc, switchOp, currentQbit);
+        }
+        else {
+            populateCliffordTSwitchCases(rewriter, loc, switchOp, currentQbit);
+        }
+
+        // Yield the result of the switch op from the for loop
+        rewriter.setInsertionPointAfter(switchOp);
+        rewriter.create<mlir::scf::YieldOp>(loc, switchOp.getResults());
+    }
+
+    // Return the result of the loop (the final qubit state)
+    return forOp.getResult(0);
+}
+
 /**
  * @brief Gets or creates the RZ/PhaseShift decomposition function.
  * This function contains the loop and switch logic acting on a Qubit.
@@ -209,8 +301,7 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
                                                 mlir::PatternRewriter &rewriter, double epsilon,
                                                 bool pprBasis)
 {
-    const char *funcName =
-        pprBasis ? "__catalyst_decompose_RZ_ppr_basis" : "__catalyst_decompose_RZ";
+    StringRef funcName = pprBasis ? "__catalyst_decompose_RZ_ppr_basis" : "__catalyst_decompose_RZ";
 
     // Check if it exists
     auto func = module.lookupSymbol<mlir::func::FuncOp>(funcName);
@@ -234,6 +325,9 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     func = rewriter.create<mlir::func::FuncOp>(module.getLoc(), funcName, funcType);
     func.setPrivate();
 
+    // Get or declare external functions (GetSize, GetGates, GetPhase)
+    DecompositionExternalFuncs extFuncs = getOrDeclareExternalFuncs(rewriter, func);
+
     // Build function body
     auto *entryBlock = func.addEntryBlock();
     mlir::OpBuilder::InsertionGuard bodyGuard(rewriter);
@@ -242,25 +336,6 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
     mlir::Location loc = func.getLoc();
     mlir::Value qbitIn = entryBlock->getArgument(0);
     mlir::Value angle = entryBlock->getArgument(1);
-    auto i1Type = rewriter.getI1Type();
-
-    // Ensure or declare Get Size
-    auto getSizeType =
-        rewriter.getFunctionType({f64Type, f64Type, i1Type}, {rewriter.getIndexType()});
-    auto getSizeFunc = catalyst::ensureFunctionDeclaration<func::FuncOp>(
-        rewriter, func, "rs_decomposition_get_size", getSizeType);
-
-    // Ensure or declare Get Gates
-    auto rankedMemRefType =
-        mlir::MemRefType::get({mlir::ShapedType::kDynamic}, rewriter.getIndexType());
-    auto getGatesType = rewriter.getFunctionType({rankedMemRefType, f64Type, f64Type, i1Type}, {});
-    auto getGatesFunc = catalyst::ensureFunctionDeclaration<func::FuncOp>(
-        rewriter, func, "rs_decomposition_get_gates", getGatesType);
-
-    // Ensure or declare Get Phase
-    auto getPhaseType = rewriter.getFunctionType({f64Type, f64Type, i1Type}, {f64Type});
-    auto getPhaseFunc = catalyst::ensureFunctionDeclaration<func::FuncOp>(
-        rewriter, func, "rs_decomposition_get_phase", getPhaseType);
 
     // Parameters for compilation
     mlir::Value epsilonVal =
@@ -270,7 +345,7 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
 
     // Call GetSize
     auto callGetSizeOp = rewriter.create<mlir::func::CallOp>(
-        loc, getSizeFunc, mlir::ValueRange{angle, epsilonVal, pprBasisVal});
+        loc, extFuncs.getSize, mlir::ValueRange{angle, epsilonVal, pprBasisVal});
     mlir::Value num_gates = callGetSizeOp.getResult(0);
 
     // Call GetGates
@@ -281,63 +356,16 @@ mlir::func::FuncOp getOrCreateDecompositionFunc(mlir::ModuleOp module,
         rewriter.create<mlir::memref::AllocOp>(loc, gatesMemRefType, num_gates);
 
     rewriter.create<mlir::func::CallOp>(
-        loc, getGatesFunc, mlir::ValueRange{gatesMemref, angle, epsilonVal, pprBasisVal});
+        loc, extFuncs.getGates, mlir::ValueRange{gatesMemref, angle, epsilonVal, pprBasisVal});
 
     // Call GetPhase
     auto callGetPhaseOp = rewriter.create<mlir::func::CallOp>(
-        loc, getPhaseFunc, mlir::ValueRange{angle, epsilonVal, pprBasisVal});
+        loc, extFuncs.getPhase, mlir::ValueRange{angle, epsilonVal, pprBasisVal});
     mlir::Value runtimePhase = callGetPhaseOp.getResult(0);
 
-    // Create the scf.for loop over gate sequence indices
-    // The loop carries the Qubit as an argument
-    mlir::Value c0 = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
-    mlir::Value c1 = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
-    auto forOp = rewriter.create<mlir::scf::ForOp>(loc, c0, num_gates, c1, ValueRange{qbitIn});
-
-    // Add attribute to the for op to indicate the estimated iterations of the loop
-    auto estimatedRanges = static_cast<int64_t>(std::ceil(10 * std::log2(1 / epsilon)));
-    auto estimatedRangesAttr = rewriter.getI16IntegerAttr(estimatedRanges);
-    forOp->setAttr("estimated_iterations", estimatedRangesAttr);
-
-    mlir::OpBuilder::InsertionGuard loopGuard(rewriter);
-    rewriter.setInsertionPointToStart(forOp.getBody());
-    mlir::Value iv = forOp.getInductionVar();
-    mlir::Value currentQbit = forOp.getRegionIterArg(0);
-
-    mlir::Value currentGateIndex =
-        rewriter.create<mlir::memref::LoadOp>(loc, gatesMemref, ValueRange{iv});
-
-    // 19 cases for PPR basis:
-    //   Identity + (X, Y, Z) x (2, 4, 8) x (normal, adjoint)
-    // 10 cases for Clifford+T basis:
-    //   {T, H T, S H T, I, X, Y, Z, H, S, adjS}
-    const int64_t numCases = pprBasis ? 19 : 10;
-    SmallVector<int64_t> caseValues;
-    caseValues.reserve(numCases);
-    for (int64_t i = 0; i < numCases; i++) {
-        caseValues.push_back(i);
-    }
-
-    // Create the switch operation inside the loop
-    // Switch returns a Qubit
-    mlir::DenseI64ArrayAttr caseValuesAttr = rewriter.getDenseI64ArrayAttr(caseValues);
-    auto switchOp = rewriter.create<mlir::scf::IndexSwitchOp>(
-        loc, mlir::TypeRange{qbitType}, currentGateIndex, caseValuesAttr, caseValues.size());
-
-    // Populate Switch Cases
-    if (pprBasis) {
-        populatePPRBasisSwitchCases(rewriter, loc, switchOp, currentQbit);
-    }
-    else {
-        populateCliffordTSwitchCases(rewriter, loc, switchOp, currentQbit);
-    }
-
-    // Yield the result of the switch op from the for loop
-    rewriter.setInsertionPointAfter(switchOp);
-    rewriter.create<mlir::scf::YieldOp>(loc, switchOp.getResults());
-
-    rewriter.setInsertionPointAfter(forOp);
-    mlir::Value finalQbit = forOp.getResult(0);
+    // Build the Loop logic
+    mlir::Value finalQbit =
+        buildDecompositionLoop(rewriter, loc, qbitIn, gatesMemref, num_gates, epsilon, pprBasis);
 
     // Clean up heap memory
     rewriter.create<mlir::memref::DeallocOp>(loc, gatesMemref);
