@@ -27,7 +27,6 @@
 
 #define MAX_FACTORING_TRIALS 1000
 
-// Anonymous namespace for internal helper functions to avoid symbol pollution
 namespace {
 bool is_odd_multiple_of_pi_4(double angle)
 {
@@ -169,15 +168,15 @@ size_t rs_decomposition_get_size_0(double theta, double epsilon, bool ppr_basis)
 {
     if (ppr_basis) {
         auto result = eval_ross_algorithm_ppr(theta, epsilon);
-        return static_cast<int64_t>(result.first.size());
+        return result.first.size();
     }
     else {
         auto result = eval_ross_algorithm(theta, epsilon);
-        return static_cast<int64_t>(result.first.size());
+        return result.first.size();
     }
 }
 
-void rs_decomposition_get_gates_0(int64_t *data_allocated, int64_t *data_aligned, size_t offset,
+void rs_decomposition_get_gates_0(size_t *data_allocated, size_t *data_aligned, size_t offset,
                                   size_t size0, size_t stride0, double theta, double epsilon,
                                   bool ppr_basis)
 {
@@ -194,12 +193,12 @@ void rs_decomposition_get_gates_0(int64_t *data_allocated, int64_t *data_aligned
         const auto &gates = result.first;
 
         size_t s = gates.size();
-        if (static_cast<size_t>(gates_view.size()) < s) {
+        if (gates_view.size() < s) {
             std::cerr << "Error: memref allocated too small for PPR gates.\n";
             return;
         }
         for (size_t i = 0; i < s; ++i) {
-            gates_view(i) = static_cast<int64_t>(gates[i]);
+            gates_view(i) = static_cast<size_t>(gates[i]);
         }
     }
     else {
@@ -207,12 +206,12 @@ void rs_decomposition_get_gates_0(int64_t *data_allocated, int64_t *data_aligned
         const auto &gates = result.first;
 
         size_t s = gates.size();
-        if (static_cast<size_t>(gates_view.size()) < s) {
+        if (gates_view.size() < s) {
             std::cerr << "Error: memref allocated too small for Standard gates.\n";
             return;
         }
         for (size_t i = 0; i < s; ++i) {
-            gates_view(i) = static_cast<int64_t>(gates[i]);
+            gates_view(i) = static_cast<size_t>(gates[i]);
         }
     }
 }

@@ -20,16 +20,14 @@
 namespace RSDecomp::RossSelinger {
 using namespace RSDecomp::Rings;
 using namespace RSDecomp::CliffordData;
-// C++ Interface
 std::pair<std::vector<GateType>, double> eval_ross_algorithm(double angle, double epsilon);
 std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle, double epsilon);
 
-// C Interface (typically for MLIR/Python bindings)
 extern "C" {
 
-int64_t rs_decomposition_get_size_0(double theta, double epsilon, bool ppr_basis);
+size_t rs_decomposition_get_size_0(double theta, double epsilon, bool ppr_basis);
 
-void rs_decomposition_get_gates_0(int64_t *data_allocated, int64_t *data_aligned, size_t offset,
+void rs_decomposition_get_gates_0(size_t *data_allocated, size_t *data_aligned, size_t offset,
                                   size_t size0, size_t stride0, double theta, double epsilon,
                                   bool ppr_basis);
 
