@@ -42,6 +42,7 @@ from pennylane.measurements import (
     ExpectationMP,
     MeasurementProcess,
     ProbabilityMP,
+    SampleMP,
     StateMP,
     VarianceMP,
 )
@@ -1077,16 +1078,18 @@ def trace_quantum_measurements(
         if isinstance(output, MeasurementProcess):
 
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
-            if shots_obj.has_partitioned_shots and not isinstance(
-                output, qml.measurements.SampleMP
-            ):
+            if shots_obj.has_partitioned_shots and not isinstance(output, SampleMP):
                 raise NotImplementedError(
                     f"Measurement {type(output).__name__} does not support shot-vectors. "
                     "Use qml.sample() instead."
                 )
 
             if device.wires is None:
-                d_wires = num_qubits_p.bind()
+                # Automatic qubit management, need to query num qubits for shape-ful measurements
+                # Note: 2 ifs instead of `and` because the next case uses `is_dynamic_wires`, which
+                # asserts that it is not seeing `None`
+                if type(output) in [SampleMP, CountsMP, ProbabilityMP, StateMP]:
+                    d_wires = num_qubits_p.bind()
             elif catalyst.device.qjit_device.is_dynamic_wires(device.wires):
                 d_wires = num_qubits_p.bind()
             else:
@@ -1108,7 +1111,7 @@ def trace_quantum_measurements(
                     "(expval, var, probs, counts) on mid circuit measurements."
                 )
 
-            if isinstance(output, qml.measurements.SampleMP):
+            if isinstance(output, SampleMP):
 
                 if shots is None:  # needed for old device API only
                     raise ValueError(

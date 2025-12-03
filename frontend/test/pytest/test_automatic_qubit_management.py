@@ -28,10 +28,12 @@ In other words, the reference runs of automatic qubit management should be qjit 
 specified during device initialization, instead of non qjit runs.
 """
 
+import jax
 import numpy as np
 import pennylane as qml
+from jax import numpy as jnp
 
-from catalyst import qjit
+from catalyst import jacobian, qjit
 
 
 def test_partial_sample(backend):
@@ -151,3 +153,19 @@ def test_state(backend):
     ref, observed = (qjit(qml.qnode(dev)(circuit))() for dev in devices)
     assert ref.shape == observed.shape
     assert np.allclose(ref, observed)
+
+
+def test_gradient(backend):
+    """
+    Test that a circuit with automatic qubit management can be used with gradients.
+    """
+    dev = qml.device(backend)
+
+    @qjit
+    @qml.qnode(dev)
+    def circuit(params):
+        qml.RX(params[0], wires=1)
+        qml.RY(params[1], wires=2)
+        return qml.expval(qml.PauliZ(0))
+
+    assert jnp.allclose(jacobian(circuit)(jnp.array([0.37, 0.42])), jnp.zeros(2))

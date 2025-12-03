@@ -118,6 +118,13 @@ func.func @test_insert_canonicalize(%r1: !quantum.reg, %i: i64) -> !quantum.bit 
     return %4 : !quantum.bit
 }
 
+// CHECK-LABEL: test_num_qubits_dce
+func.func @test_num_qubits_dce() {
+    // CHECK-NOT: quantum.num_qubits
+    %n = quantum.num_qubits : i64
+    return
+}
+
 // CHECK-LABEL: test_hermitian_adjoint_canonicalize
 func.func @test_hermitian_adjoint_canonicalize() -> !quantum.bit {
     %0 = quantum.alloc( 1) : !quantum.reg
