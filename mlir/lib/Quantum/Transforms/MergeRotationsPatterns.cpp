@@ -23,7 +23,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
-#include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOps.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 #include "VerifyParentGateAnalysis.hpp"
@@ -351,6 +351,11 @@ struct MergePPRRewritePattern : public OpRewritePattern<PPRotationOp> {
 
         // check same pauli strings
         if (op.getPauliProduct() != prevOp.getPauliProduct()) {
+            return failure();
+        }
+
+        // check same conditionals
+        if (op.getCondition() != prevOp.getCondition()) {
             return failure();
         }
 
