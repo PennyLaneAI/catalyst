@@ -20,6 +20,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
+#include "QEC/IR/QECOps.h"
 #include "QEC/Utils/PauliStringWrapper.h"
 #include "QEC/Utils/QECLayer.h"
 #include "QEC/Utils/QECOpUtils.h"
@@ -63,6 +64,8 @@ std::pair<bool, QECOpInterface> checkCommutationAndFindMerge(QECOpInterface rhsO
         // Normalize to Pauli strings
         auto normalizedOps =
             normalizePPROps(lhsOp, rhsOp, lhsOp.getInQubits(), rhsOpInQubitsFromLhsOp);
+
+        // TODO: Handle PPRotationArbitraryOp properly
 
         if (!normalizedOps.first.commutes(normalizedOps.second)) {
             return std::pair(false, nullptr);
@@ -133,8 +136,11 @@ void moveOpToLayer(QECOpInterface rhsOp, QECLayer &rhsLayer, QECOpInterface merg
 // then just remove the `rhsOp` from the rhsLayer.
 void mergePPR(QECOpInterface rhsOp, QECLayer &rhsLayer, QECOpInterface mergeOp, IRRewriter &writer)
 {
-    int16_t signedRk = static_cast<int16_t>(mergeOp.getRotationKind());
-    mergeOp.setRotationKind(static_cast<uint16_t>(signedRk / 2));
+    auto mergeOpPprOp = dyn_cast<PPRotationOp>(mergeOp.getOperation());
+    assert(mergeOpPprOp != nullptr && "Op is not a PPRotationOp");
+
+    int16_t signedRk = static_cast<int16_t>(mergeOpPprOp.getRotationKind());
+    mergeOpPprOp.setRotationKind(static_cast<uint16_t>(signedRk / 2));
 
     rhsLayer.eraseOp(rhsOp);
     writer.replaceOp(rhsOp, rhsOp->getOperands());
