@@ -70,6 +70,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* Catalyst can now use the new `pass_name` property of pennylane transform objects. Passes can now
+  be created using `qml.transform(pass_name=pass_name)` instead of `PassPipelineWrapper`.
+  [(#2149](https://github.com/PennyLaneAI/catalyst/pull/2149)
+
 * A new ``"changed"`` option has been added to the ``keep_intermediate`` parameter of 
   :func:`~.qjit`. This option saves intermediate IR files after each pass,
   but only when the IR is actually modified by the pass.

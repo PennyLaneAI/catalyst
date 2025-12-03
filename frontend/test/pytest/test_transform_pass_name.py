@@ -50,7 +50,7 @@ def test_pass_before_tape_transform(backend):
     @tape_transform
     @my_pass
     @qml.qnode(qml.device(backend, wires=1))
-    def f(x): # pylint: disable=unused-argument
+    def f(x):  # pylint: disable=unused-argument
         return qml.state()
 
     with pytest.raises(ValueError, match="without a tape definition occurs before tape transform"):
