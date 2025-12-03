@@ -19,6 +19,5 @@ from .mbqc import MBQC
 from .qec import QEC
 from .quantum import Quantum
 from .stablehlo import StableHLO
-from .transform import Transform
 
-__all__ = ["Catalyst", "MBQC", "Quantum", "QEC", "StableHLO", "Transform"]
+__all__ = ["Catalyst", "MBQC", "Quantum", "QEC", "StableHLO"]

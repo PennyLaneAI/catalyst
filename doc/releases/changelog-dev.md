@@ -384,6 +384,10 @@
   [(#2245)](https://github.com/PennyLaneAI/catalyst/pull/2245)
   [(#2254)](https://github.com/PennyLaneAI/catalyst/pull/2254)
 
+  * Removed the `catalyst.python_interface.dialects.transform` module in favor of
+  using the `xdsl.dialects.transform` module directly.
+  [(#2261)](https://github.com/PennyLaneAI/catalyst/pull/2261)
+
 <h3>Documentation 📝</h3>
 
 * Added a "Unified Compiler Cookbook" RST file, along with tutorials, to `catalyst.python_interface.doc`,

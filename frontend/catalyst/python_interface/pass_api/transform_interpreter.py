@@ -31,7 +31,7 @@ from collections.abc import Callable
 
 from xdsl.context import Context
 from xdsl.dialects import builtin
-from xdsl.dialects.transform import NamedSequenceOp
+from xdsl.dialects.transform import ApplyRegisteredPassOp, NamedSequenceOp
 from xdsl.interpreter import Interpreter, PythonValues, impl, register_impls
 from xdsl.interpreters.transform import TransformFunctions
 from xdsl.parser import Parser
@@ -41,7 +41,6 @@ from xdsl.rewriter import Rewriter
 from xdsl.utils.exceptions import PassFailedException
 
 from catalyst.compiler import _quantum_opt
-from catalyst.python_interface.dialects.transform import ApplyRegisteredPassOp
 
 
 @register_impls
