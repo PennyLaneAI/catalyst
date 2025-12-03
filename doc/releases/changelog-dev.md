@@ -317,6 +317,15 @@
   [(#2245)](https://github.com/PennyLaneAI/catalyst/pull/2245)
   [(#2254)](https://github.com/PennyLaneAI/catalyst/pull/2254)
 
+
+  * Refactor QEC tablegen files to separate QEC operations into a new `QECOp.td` file
+  [(#2253](https://github.com/PennyLaneAI/catalyst/pull/2253)	
+
+
+  * Removed the `getRotationKind` and `setRotationKind` methods from 
+  the QEC interface `QECOpInterface` to simplify the interface.
+  [(#2250)](https://github.com/PennyLaneAI/catalyst/pull/2250)
+
 <h3>Documentation 📝</h3>
 
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.

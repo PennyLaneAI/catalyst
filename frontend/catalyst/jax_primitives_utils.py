@@ -178,6 +178,13 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=False):
     kwargs["effects"] = []
     kwargs["main_function"] = False
 
+    const_args = core.jaxpr_const_args(call_jaxpr.jaxpr)
+    const_arg_avals = [core.shaped_abstractify(c) for c in const_args]
+    num_const_args = len(const_arg_avals)
+
+    kwargs["in_avals"] = const_arg_avals + call_jaxpr.in_avals
+    kwargs["num_const_args"] = num_const_args
+
     func_op = mlir.lower_jaxpr_to_fun(**kwargs)
     if public:
         func_op.attributes["sym_visibility"] = ir.StringAttr.get("public")
