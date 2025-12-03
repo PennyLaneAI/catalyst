@@ -15,6 +15,6 @@
 #ifndef PYTHON_BINDINGS_QEC_OPS
 #define PYTHON_BINDINGS_QEC_OPS
 
-include "QEC/IR/QECDialect.td"
+include "QEC/IR/QECOps.td"
 
 #endif

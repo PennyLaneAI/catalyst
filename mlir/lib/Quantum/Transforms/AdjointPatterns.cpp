@@ -34,6 +34,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/IR/CatalystOps.h"
+#include "QEC/IR/QECOps.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
@@ -115,6 +116,9 @@ class AdjointGenerator {
             }
             else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
                 visitOperation(gate, builder);
+            }
+            else if (auto ppr = dyn_cast<qec::PPRotationOp>(op)) {
+                visitOperation(ppr, builder);
             }
             else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(&op)) {
                 BlockArgument regionArg = adjointOp.getRegion().getArgument(0);
@@ -269,6 +273,22 @@ class AdjointGenerator {
 
         for (const auto &[qubitResult, qubitOperand] :
              llvm::zip(clone.getQubitResults(), gate.getQubitOperands())) {
+            remappedValues.map(qubitOperand, qubitResult);
+        }
+    }
+
+    void visitOperation(qec::PPRotationOp ppr, OpBuilder &builder)
+    {
+        for (const auto &[qubitResult, qubitOperand] :
+             llvm::zip(ppr.getOutQubits(), ppr.getInQubits())) {
+            remappedValues.map(qubitOperand, remappedValues.lookup(qubitResult));
+        }
+
+        auto clone = cast<qec::PPRotationOp>(builder.clone(*ppr, remappedValues));
+        clone.setRotationKind(ppr.getRotationKind() * (-1));
+
+        for (const auto &[qubitResult, qubitOperand] :
+             llvm::zip(clone.getOutQubits(), ppr.getInQubits())) {
             remappedValues.map(qubitOperand, qubitResult);
         }
     }

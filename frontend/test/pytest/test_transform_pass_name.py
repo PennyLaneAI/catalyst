@@ -1,4 +1,4 @@
-# Copyright 2023 Xanadu Quantum Technologies Inc.
+# Copyright 2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ def test_pass_before_tape_transform(backend):
     @tape_transform
     @my_pass
     @qml.qnode(qml.device(backend, wires=1))
-    def f(x):
+    def f(x):  # pylint: disable=unused-argument
         return qml.state()
 
     with pytest.raises(ValueError, match="without a tape definition occurs before tape transform"):
@@ -76,5 +76,6 @@ def test_pass_after_tape_transform(backend):
         return qml.state()
 
     # check inverses canceled
-    assert 'quantum.custom "PauliX"()' not in c.mlir
-    assert 'transform.apply_registered_pass "my-pass"' in c.mlir
+    c_mlir = c.mlir
+    assert 'quantum.custom "PauliX"()' not in c_mlir
+    assert 'transform.apply_registered_pass "my-pass"' in c_mlir
