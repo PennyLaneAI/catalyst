@@ -70,6 +70,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* Catalyst can now use the new `pass_name` property of pennylane transform objects. Passes can now
+  be created using `qml.transform(pass_name=pass_name)` instead of `PassPipelineWrapper`.
+  [(#2149](https://github.com/PennyLaneAI/catalyst/pull/2149)
+
 * An error is now raised if a transform is applied inside a QNode when program capture is enabled.
   [(#2256)](https://github.com/PennyLaneAI/catalyst/pull/2256)
 
