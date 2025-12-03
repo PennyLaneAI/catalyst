@@ -71,9 +71,7 @@ def draw(qnode: QNode, *, level: None | int = None) -> Callable:
         collector = QMLCollector(module)
         ops, meas = collector.collect()
         tape = QuantumScript(ops, meas)
-        pass_name = (
-            pass_instance.name if hasattr(pass_instance, "name") else pass_instance
-        )
+        pass_name = pass_instance.name if hasattr(pass_instance, "name") else pass_instance
         cache[pass_level] = (
             tape.draw(show_matrices=False),
             pass_name if pass_level else "No transforms",
@@ -131,9 +129,7 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
         utility = ConstructCircuitDAG(PyDotDAGBuilder())
         utility.construct(module)
         svg_str = utility.dag_builder.graph.create_svg(prog="dot")
-        pass_name = (
-            pass_instance.name if hasattr(pass_instance, "name") else pass_instance
-        )
+        pass_name = pass_instance.name if hasattr(pass_instance, "name") else pass_instance
         cache[pass_level] = (
             svg_str,
             pass_name if pass_level else "No transforms",
