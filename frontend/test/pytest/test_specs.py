@@ -86,11 +86,6 @@ def test_complex(level):
 
     assert cat_specs["device_name"] == "lightning.qubit"
 
-    # Catalyst level specs should report the number of controls for multi-controlled gates
-    assert "2C(S)" in cat_specs["resources"].gate_types
-    cat_specs["resources"].gate_types["C(S)"] += cat_specs["resources"].gate_types["2C(S)"]
-    del cat_specs["resources"].gate_types["2C(S)"]
-
     # Catalyst will handle Adjoint(PauliY) == PauliY
     assert "CY" in cat_specs["resources"].gate_types
     cat_specs["resources"].gate_types["C(Adjoint(PauliY))"] = cat_specs["resources"].gate_types[
