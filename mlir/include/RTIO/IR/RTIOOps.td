@@ -61,7 +61,7 @@ def RTIOQubitToChannelOp : RTIO_Op<"qubit_to_channel"> {
         Example:
         ```mlir
         // Map ion qubit to dds channel with dynamic channel id
-        %ch = rtio.qubit_tos_channel %ion_qubit : !ion.qubit -> !rtio.channel<"dds", ?>
+        %ch = rtio.qubit_to_channel %ion_qubit : !ion.qubit -> !rtio.channel<"dds", ?>
         ```
 
         During the channel resolution stage, this operation will be replaced by a
