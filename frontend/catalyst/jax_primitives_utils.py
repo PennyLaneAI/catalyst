@@ -178,6 +178,13 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=False):
     kwargs["effects"] = []
     kwargs["main_function"] = False
 
+    const_args = core.jaxpr_const_args(call_jaxpr.jaxpr)
+    const_arg_avals = [core.shaped_abstractify(c) for c in const_args]
+    num_const_args = len(const_arg_avals)
+
+    kwargs["in_avals"] = const_arg_avals + call_jaxpr.in_avals
+    kwargs["num_const_args"] = num_const_args
+
     func_op = mlir.lower_jaxpr_to_fun(**kwargs)
     if public:
         func_op.attributes["sym_visibility"] = ir.StringAttr.get("public")
@@ -318,6 +325,16 @@ class NestedModule:
         self.ctx.module_context = self.old_module_context
 
 
+def _lowered_options(args, kwargs):
+    lowered_options = {}
+    for arg in args:
+        lowered_options[str(arg)] = get_mlir_attribute_from_pyval(True)
+    for option, value in kwargs.items():
+        mlir_option = str(option).replace("_", "-")
+        lowered_options[mlir_option] = get_mlir_attribute_from_pyval(value)
+    return lowered_options
+
+
 def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipeline):
     """Generate a transform module embedded in the current module and schedule
     the transformations in pipeline"""
@@ -364,11 +381,16 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
         with ir.InsertionPoint(bb_named_sequence):
             target = bb_named_sequence.arguments[0]
             for _pass in pipeline:
-                options = _pass.get_options()
+                if isinstance(_pass, qml.transforms.core.TransformContainer):
+                    options = _lowered_options(_pass.args, _pass.kwargs)
+                    name = _pass.pass_name
+                else:
+                    options = _pass.get_options()
+                    name = _pass.name
                 apply_registered_pass_op = ApplyRegisteredPassOp(
                     result=transform_mod_type,
                     target=target,
-                    pass_name=_pass.name,
+                    pass_name=name,
                     options=options,
                     dynamic_options={},
                 )
@@ -380,7 +402,7 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
                         is_xdsl_pass,
                     )
 
-                    if is_xdsl_pass(_pass.name):
+                    if is_xdsl_pass(name):
                         uses_xdsl_passes = True
                         apply_registered_pass_op.operation.attributes["catalyst.xdsl_pass"] = (
                             ir.UnitAttr.get()

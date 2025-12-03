@@ -105,21 +105,16 @@ static void printChannelTypeBody(AsmPrinter &printer, StringRef kind, ArrayAttr 
     // 3. Print channelId if present (and not default ShapedType::kDynamic)
     if (channelId) {
         int64_t id = channelId.getInt();
-        if (id >= 0 || (qualifiers && !qualifiers.empty())) {
-            printer << ", ";
-            if (id < 0) {
-                printer << "?";
-            }
-            else {
-                printer << id;
-            }
+        printer << ", ";
+        if (id >= 0) {
+            printer << id;
+        }
+        else {
+            printer << "?";
         }
     }
-    else {
-        if (qualifiers && !qualifiers.empty()) {
-            printer << ", ";
-        }
-        printer << "?";
+    else if (qualifiers && !qualifiers.empty()) {
+        printer << ", ?";
     }
 }
 
