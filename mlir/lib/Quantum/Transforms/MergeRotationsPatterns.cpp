@@ -457,9 +457,8 @@ struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbit
             return failure();
         }
 
-        auto loc = op.getLoc();
-        // replace references to current op with prevOp
         // create merged op
+        auto loc = op.getLoc();
         mlir::Value newAngleOp =
             rewriter.create<arith::AddFOp>(loc, opRotation, prevOpRotation).getResult();
 
@@ -467,6 +466,7 @@ struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbit
             loc, op.getOutQubits().getTypes(), op.getPauliProduct(), newAngleOp,
             prevOp.getInQubits(), op.getCondition());
 
+        // replace and erase old ops
         rewriter.replaceOp(op, mergeOp);
         rewriter.eraseOp(prevOp);
 
