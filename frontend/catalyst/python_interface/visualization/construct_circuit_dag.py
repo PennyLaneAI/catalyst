@@ -170,9 +170,14 @@ class ConstructCircuitDAG:
     def _for_op(self, operation: scf.ForOp) -> None:
         """Handle an xDSL ForOp operation."""
         uid = f"cluster_{id(operation)}"
+
+        # TODO: Extract from IR in future PR
+        iter_var = "..."
+        start, stop, step = "...", "...", "..."
+        label = f"for {iter_var} in range({start}, {stop}, {step})"
         self.dag_builder.add_cluster(
             uid,
-            node_label=f"for ...",
+            node_label=label,
             label="",
             cluster_uid=self._cluster_uid_stack[-1],
         )
@@ -275,31 +280,18 @@ class ConstructCircuitDAG:
     def _func_op(self, operation: func.FuncOp) -> None:
         """Visit a FuncOp Operation."""
 
-        # If this is the jit_* FuncOp, only draw if there's more than one qnode (launch kernel)
-        # This avoids redundant nested clusters: jit_my_circuit -> my_circuit -> ...
-        visualize = True
         label = operation.sym_name.data
         if "jit_" in operation.sym_name.data:
-            num_qnodes = 0
-            for op in operation.body.ops:
-                if isinstance(op, catalyst.LaunchKernelOp):
-                    num_qnodes += 1
-            # Get everything after the jit_* prefix
-            label = str(label).split("_", maxsplit=1)[-1]
-            if num_qnodes == 1:
-                visualize = False
+            label = "qjit"
 
-        if visualize:
-            uid = f"cluster_{id(operation)}"
-            parent_cluster_uid = (
-                None if self._cluster_uid_stack == [] else self._cluster_uid_stack[-1]
-            )
-            self.dag_builder.add_cluster(
-                uid,
-                label=label,
-                cluster_uid=parent_cluster_uid,
-            )
-            self._cluster_uid_stack.append(uid)
+        uid = f"cluster_{id(operation)}"
+        parent_cluster_uid = None if self._cluster_uid_stack == [] else self._cluster_uid_stack[-1]
+        self.dag_builder.add_cluster(
+            uid,
+            label=label,
+            cluster_uid=parent_cluster_uid,
+        )
+        self._cluster_uid_stack.append(uid)
 
         self._visit_block(operation.regions[0].blocks[0])
 
