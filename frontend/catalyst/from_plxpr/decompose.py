@@ -77,7 +77,6 @@ COMPILER_OPS_FOR_DECOMPOSITION: dict[str, tuple[int, int]] = {
     "PauliX": (1, 0),
     "PauliY": (1, 0),
     "PauliZ": (1, 0),
-    "PauliRot": (-1, 1),
     "PhaseShift": (1, 1),
     "PSWAP": (2, 1),
     "Rot": (1, 3),
