@@ -33,6 +33,7 @@ using namespace catalyst::qec;
 namespace catalyst {
 namespace qec {
 
+#define GEN_PASS_DECL_TLAYERREDUCTIONPASS
 #define GEN_PASS_DEF_TLAYERREDUCTIONPASS
 #include "QEC/Transforms/Passes.h.inc"
 
