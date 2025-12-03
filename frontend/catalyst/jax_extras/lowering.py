@@ -19,9 +19,10 @@ import logging
 import textwrap
 
 import jax
-from jax._src.dispatch import jaxpr_replicas
+from jax._src import core
 from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
+from jax._src.interpreters.pxla import _jaxpr_replicas as jaxpr_replicas
 from jax._src.sharding_impls import AxisEnv, ReplicaAxisContext
 from jax.extend.core import ClosedJaxpr
 from jax.interpreters.mlir import (
@@ -44,7 +45,11 @@ from catalyst.utils.patching import Patcher
 
 __all__ = ("jaxpr_to_mlir", "custom_lower_jaxpr_to_module")
 
-from catalyst.jax_extras.patches import _no_clean_up_dead_vars, get_aval2
+from catalyst.jax_extras.patches import (
+    _no_clean_up_dead_vars,
+    get_aval2,
+    patched_multi_broadcast_in_dim,
+)
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -67,6 +72,7 @@ def jaxpr_to_mlir(jaxpr, func_name, arg_names):
     with Patcher(
         (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
         (jax._src.core, "clean_up_dead_vars", _no_clean_up_dead_vars),
+        (jax._src.interpreters.mlir, "multi_broadcast_in_dim", patched_multi_broadcast_in_dim),
     ):
         nrep = jaxpr_replicas(jaxpr)
         effects = jax_ordered_effects.filter_in(jaxpr.effects)
@@ -141,6 +147,11 @@ def custom_lower_jaxpr_to_module(
         module_name = _module_name_regex.sub("_", module_name)
         ctx.module.operation.attributes["sym_name"] = ir.StringAttr.get(module_name)
 
+        const_args = core.jaxpr_const_args(jaxpr.jaxpr)
+        const_arg_avals = [core.shaped_abstractify(c) for c in const_args]
+        num_const_args = len(const_arg_avals)
+        in_avals = const_arg_avals + jaxpr.in_avals
+
         # Use main_function=False to preserve the function name (e.g., "jit_func")
         # instead of renaming it to "main"
         lower_jaxpr_to_fun(
@@ -148,6 +159,8 @@ def custom_lower_jaxpr_to_module(
             func_name,
             jaxpr,
             effects,
+            num_const_args=num_const_args,
+            in_avals=in_avals,
             main_function=False,
             replicated_args=replicated_args,
             arg_names=arg_names,
