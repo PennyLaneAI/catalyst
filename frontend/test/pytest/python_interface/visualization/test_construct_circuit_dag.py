@@ -262,6 +262,7 @@ class TestFuncOpVisualization:
         # Check labels we expected are there
         graph_clusters = utility.dag_builder.clusters
         all_cluster_labels = {info["cluster_label"] for info in graph_clusters.values()}
+        assert "qjit" in all_cluster_labels
         assert "my_workflow" in all_cluster_labels
 
         # Check nesting is correct
