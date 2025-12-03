@@ -124,8 +124,8 @@ def UpdateOp : PauliFrame_Op<"update"> {
     }];
 
     let arguments = (ins
-        I1:$x_parity,
-        I1:$z_parity,
+        I1Attr:$x_parity,
+        I1Attr:$z_parity,
         Variadic<QubitType>:$in_qubits
     );
 
@@ -223,8 +223,8 @@ def SetOp : PauliFrame_Op<"set"> {
     }];
 
     let arguments = (ins
-        I1:$x_parity,
-        I1:$z_parity,
+        I1Attr:$x_parity,
+        I1Attr:$z_parity,
         Variadic<QubitType>:$in_qubits
     );
 

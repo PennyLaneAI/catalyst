@@ -43,24 +43,20 @@ func.func @test_pauli_frame_read(%q0 : !quantum.bit) {
 // -----
 
 func.func @test_pauli_frame_update_single_qubit(%q0 : !quantum.bit) {
-    %0 = arith.constant 0 : i1
-    %1 = arith.constant 1 : i1
-    %q1 = pauli_frame.update [%0, %0] %q0 : !quantum.bit
-    %q2 = pauli_frame.update [%0, %1] %q1 : !quantum.bit
-    %q3 = pauli_frame.update [%1, %0] %q2 : !quantum.bit
-    %q4 = pauli_frame.update [%1, %1] %q3 : !quantum.bit
+    %q1 = pauli_frame.update [0, 0] %q0 : !quantum.bit
+    %q2 = pauli_frame.update [0, 1] %q1 : !quantum.bit
+    %q3 = pauli_frame.update [1, 0] %q2 : !quantum.bit
+    %q4 = pauli_frame.update [1, 1] %q3 : !quantum.bit
     func.return
 }
 
 // -----
 
 func.func @test_pauli_frame_update_multi_qubit(%q00 : !quantum.bit, %q10 : !quantum.bit) {
-    %0 = arith.constant 0 : i1
-    %1 = arith.constant 1 : i1
-    %q01, %q11 = pauli_frame.update [%0, %0] %q00, %q10 : !quantum.bit, !quantum.bit
-    %q02, %q12 = pauli_frame.update [%0, %1] %q01, %q11 : !quantum.bit, !quantum.bit
-    %q03, %q13 = pauli_frame.update [%1, %0] %q02, %q12 : !quantum.bit, !quantum.bit
-    %q04, %q14 = pauli_frame.update [%1, %1] %q03, %q13 : !quantum.bit, !quantum.bit
+    %q01, %q11 = pauli_frame.update [0, 0] %q00, %q10 : !quantum.bit, !quantum.bit
+    %q02, %q12 = pauli_frame.update [0, 1] %q01, %q11 : !quantum.bit, !quantum.bit
+    %q03, %q13 = pauli_frame.update [1, 0] %q02, %q12 : !quantum.bit, !quantum.bit
+    %q04, %q14 = pauli_frame.update [1, 1] %q03, %q13 : !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -90,23 +86,19 @@ func.func @test_pauli_frame_flush(%q0 : !quantum.bit) {
 // -----
 
 func.func @test_pauli_frame_set_single_qubit(%q0 : !quantum.bit) {
-    %0 = arith.constant 0 : i1
-    %1 = arith.constant 1 : i1
-    %q1 = pauli_frame.set [%0, %0] %q0 : !quantum.bit
-    %q2 = pauli_frame.set [%0, %1] %q1 : !quantum.bit
-    %q3 = pauli_frame.set [%1, %0] %q2 : !quantum.bit
-    %q4 = pauli_frame.set [%1, %1] %q3 : !quantum.bit
+    %q1 = pauli_frame.set [0, 0] %q0 : !quantum.bit
+    %q2 = pauli_frame.set [0, 1] %q1 : !quantum.bit
+    %q3 = pauli_frame.set [1, 0] %q2 : !quantum.bit
+    %q4 = pauli_frame.set [1, 1] %q3 : !quantum.bit
     func.return
 }
 
 // -----
 
 func.func @test_pauli_frame_set_multi_qubit(%q00 : !quantum.bit, %q10 : !quantum.bit) {
-    %0 = arith.constant 0 : i1
-    %1 = arith.constant 1 : i1
-    %q01, %q11 = pauli_frame.set [%0, %0] %q00, %q10 : !quantum.bit, !quantum.bit
-    %q02, %q12 = pauli_frame.set [%0, %1] %q01, %q11 : !quantum.bit, !quantum.bit
-    %q03, %q13 = pauli_frame.set [%1, %0] %q02, %q12 : !quantum.bit, !quantum.bit
-    %q04, %q14 = pauli_frame.set [%1, %1] %q03, %q13 : !quantum.bit, !quantum.bit
+    %q01, %q11 = pauli_frame.set [0, 0] %q00, %q10 : !quantum.bit, !quantum.bit
+    %q02, %q12 = pauli_frame.set [0, 1] %q01, %q11 : !quantum.bit, !quantum.bit
+    %q03, %q13 = pauli_frame.set [1, 0] %q02, %q12 : !quantum.bit, !quantum.bit
+    %q04, %q14 = pauli_frame.set [1, 1] %q03, %q13 : !quantum.bit, !quantum.bit
     func.return
 }
