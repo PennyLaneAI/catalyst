@@ -284,7 +284,7 @@ class ConstructCircuitDAG:
         # Pop IfOp cluster before leaving this handler
         self._cluster_uid_stack.pop()
 
-        # Check what wires were affected 
+        # Check what wires were affected
         affected_wires: set[str | int] = set(wire_map_before.keys())
         for region_wire_map in region_wire_maps:
             affected_wires.update(region_wire_map.keys())
@@ -370,7 +370,8 @@ class ConstructCircuitDAG:
             self._cluster_uid_stack.pop()
 
         # Clear seen wires as we are exiting a FuncOp (qnode)
-        self._wire_to_node_uids = defaultdict(set) 
+        self._wire_to_node_uids = defaultdict(set)
+
 
 def _flatten_if_op(op: scf.IfOp) -> list[tuple[SSAValue | None, Region]]:
     """Recursively flattens a nested IfOp (if/elif/else chains)."""
