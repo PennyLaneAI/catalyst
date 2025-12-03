@@ -36,7 +36,7 @@ namespace driver {
 // low-level messages, we might want to hide these.
 enum class Verbosity { Silent = 0, Urgent = 1, Debug = 2, All = 3 };
 
-enum SaveTemps { None, AfterPipeline, AfterPass };
+enum SaveTemps { None, AfterPipeline, AfterPassChanged, AfterPass };
 
 enum Action { OPT, Translate, LLC, All };
 
@@ -94,16 +94,35 @@ struct CompilerOutput {
     std::string outIR;
     std::string diagnosticMessages;
     PipelineOutputs pipelineOutputs;
-    size_t pipelineCounter = 0;
+    size_t globalPipelineCounter = 0; // Counter for root-level pipeline summary files
+    size_t passCounter = 0;           // Counter for passes within a pipeline folder
+    std::string currentStage = ".";   // Current compilation stage subdirectory
     /// if the compiler reach the pass specified by startAfterPass.
     bool isCheckpointFound;
 
-    // Gets the next pipeline dump file name, prefixed with number.
-    std::string nextPipelineDumpFilename(std::string pipelineName, std::string ext = ".mlir")
+    // Gets the next pass dump file name within a pipeline folder
+    std::string nextPassDumpFilename(std::string pipelineName, std::string ext = ".mlir")
     {
-        return std::filesystem::path(std::to_string(this->pipelineCounter++) + "_" + pipelineName)
+        return std::filesystem::path(currentStage) /
+               std::filesystem::path(std::to_string(this->passCounter++) + "_" + pipelineName)
+                   .replace_extension(ext);
+    };
+
+    // Gets the root-level pipeline summary file name
+    std::string nextPipelineSummaryFilename(std::string pipelineName, std::string ext = ".mlir")
+    {
+        return std::filesystem::path(std::to_string(this->globalPipelineCounter) + "_After" +
+                                     pipelineName)
             .replace_extension(ext);
     };
+
+    // Set the current compilation stage for organizing output files
+    void setStage(const std::string &stageName)
+    {
+        ++globalPipelineCounter;
+        currentStage = std::to_string(globalPipelineCounter) + "_" + stageName;
+        passCounter = 1;
+    }
 };
 
 }; // namespace driver

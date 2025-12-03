@@ -1,4 +1,4 @@
-# Copyright 2024 Xanadu Quantum Technologies Inc.
+# Copyright 2024-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -250,7 +250,7 @@ def test_disentangle_passes():
 
 def test_convert_clifford_to_ppr():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_convert_clifford_to_ppr_workflow():
@@ -280,7 +280,7 @@ def test_convert_clifford_to_ppr():
 
 def test_commute_ppr():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_commute_ppr_workflow():
@@ -314,7 +314,7 @@ def test_commute_ppr():
 
 def test_merge_ppr_ppm():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_merge_ppr_ppm_workflow():
@@ -343,7 +343,7 @@ def test_merge_ppr_ppm():
 
 def test_ppr_to_ppm_auto_corrected():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_ppr_to_ppm_workflow():
@@ -377,7 +377,7 @@ def test_ppr_to_ppm_auto_corrected():
 
 def test_ppr_to_ppm_inject_magic_state():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_ppr_to_ppm_workflow():
@@ -407,7 +407,7 @@ def test_ppr_to_ppm_inject_magic_state():
 
 def test_ppr_to_ppm_pauli_corrected():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_ppr_to_ppm_workflow():
@@ -440,7 +440,7 @@ def test_ppr_to_ppm_pauli_corrected():
 
 def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_convert_clifford_to_ppr_workflow():
@@ -497,9 +497,34 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
     assert ppm_specs_output["g_0"]["max_weight_pi8"] == 1
 
 
+@pytest.mark.usefixtures("use_capture")
+def test_merge_rotation_ppr():
+    """Test that the merge_rotation pass correctly merges PPRs."""
+
+    my_pipeline = [("pipe", ["quantum-compilation-stage"])]
+
+    @qml.qjit(pipelines=my_pipeline, target="mlir")
+    def test_merge_rotation_ppr_workflow():
+        @qml.transforms.merge_rotations  # have to use qml to be capture-compatible
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            qml.PauliRot(np.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
+            qml.PauliRot(np.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
+
+        return circuit()
+
+    ir = test_merge_rotation_ppr_workflow.mlir
+    ir_opt = test_merge_rotation_ppr_workflow.mlir_opt
+
+    assert 'transform.apply_registered_pass "merge-rotations"' in ir
+    assert "qec.ppr" in ir
+    assert 'qec.ppr ["X", "Y", "Z"](4)' not in ir_opt
+    assert 'qec.ppr ["X", "Y", "Z"](2)' in ir_opt
+
+
 def test_clifford_to_ppm():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_clifford_to_ppm_workflow():
