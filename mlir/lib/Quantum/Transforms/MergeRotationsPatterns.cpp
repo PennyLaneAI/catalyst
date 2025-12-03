@@ -324,16 +324,16 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
 
 bool matchingQubitsAndPaulis(PPRotationArbitraryOp op, PPRotationArbitraryOp parentOp)
 {
-    auto pauliProduct = op.getPauliProduct();
-    auto parentPauliProduct = parentOp.getPauliProduct();
+    // construct map
+    std::unordered_map<llvm::hash_code, Attribute> qubit_to_pauli;
+    for (auto [qubit, pauli] : llvm::zip(parentOp.getOutQubits(), parentOp.getPauliProduct())) {
+        qubit_to_pauli[hash_value(qubit)] = pauli;
+    }
 
-    for (auto [i, qubit] : llvm::enumerate(op.getInQubits())) {
-        for (auto [j, parentQubit] : llvm::enumerate(parentOp.getOutQubits())) {
-            if (qubit == parentQubit) {
-                if (pauliProduct[i] != parentPauliProduct[j]) {
-                    return false;
-                }
-            }
+    // check pairings
+    for (auto [qubit, pauli] : llvm::zip(op.getInQubits(), op.getPauliProduct())) {
+        if (qubit_to_pauli[hash_value(qubit)] != pauli) {
+            return false;
         }
     }
 
