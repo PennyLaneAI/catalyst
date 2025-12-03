@@ -43,35 +43,35 @@ class FakeDAGBuilder(DAGBuilder):
         self._edges = []
         self._clusters = {}
 
-    def add_node(self, id, label, cluster_id=None, **attrs) -> None:
-        self._nodes[id] = {
-            "id": id,
+    def add_node(self, uid, label, cluster_uid=None, **attrs) -> None:
+        self._nodes[uid] = {
+            "uid": uid,
             "label": label,
-            "parent_cluster_id": cluster_id,
+            "parent_cluster_uid": cluster_uid,
             "attrs": attrs,
         }
 
-    def add_edge(self, from_id: str, to_id: str, **attrs) -> None:
+    def add_edge(self, from_uid: str, to_uid: str, **attrs) -> None:
         self._edges.append(
             {
-                "from_id": from_id,
-                "to_id": to_id,
+                "from_uid": from_uid,
+                "to_uid": to_uid,
                 "attrs": attrs,
             }
         )
 
     def add_cluster(
         self,
-        id,
+        uid,
         node_label=None,
-        cluster_id=None,
+        cluster_uid=None,
         **attrs,
     ) -> None:
-        self._clusters[id] = {
-            "id": id,
+        self._clusters[uid] = {
+            "uid": uid,
             "node_label": node_label,
             "cluster_label": attrs.get("label"),
-            "parent_cluster_id": cluster_id,
+            "parent_cluster_uid": cluster_uid,
             "attrs": attrs,
         }
 
@@ -98,9 +98,9 @@ class FakeDAGBuilder(DAGBuilder):
 def test_dependency_injection():
     """Tests that relevant dependencies are injected."""
 
-    dag_builder = FakeDAGBuilder()
-    utility = ConstructCircuitDAG(dag_builder)
-    assert utility.dag_builder is dag_builder
+    mock_dag_builder = Mock(DAGBuilder)
+    utility = ConstructCircuitDAG(mock_dag_builder)
+    assert utility.dag_builder is mock_dag_builder
 
 
 @pytest.mark.unit
