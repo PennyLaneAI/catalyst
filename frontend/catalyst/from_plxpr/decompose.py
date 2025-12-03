@@ -78,7 +78,6 @@ COMPILER_OPS_FOR_DECOMPOSITION: dict[str, tuple[int, int]] = {
     "PauliY": (1, 0),
     "PauliZ": (1, 0),
     "PauliRot": (-1, 1),
-    "PauliMeasure": (-1, 1),
     "PhaseShift": (1, 1),
     "PSWAP": (2, 1),
     "Rot": (1, 3),
@@ -204,6 +203,9 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
             # Create decomposition rules for each operation in the solution
             # and compile them to Catalyst JAXPR decomposition rules
             for op, rule in self._decomp_graph_solution.items():
+                if op.op.name not in COMPILER_OPS_FOR_DECOMPOSITION:
+                    continue
+
                 # Get number of wires if exists
                 op_num_wires = op.op.params.get("num_wires", None)
                 if (
@@ -233,10 +235,13 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                     # In this case, we fall back to using the COMPILER_OPS_FOR_DECOMPOSITION
                     # dictionary to get the number of wires.
                     num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
+                    actual_num_wires = op_num_wires if num_wires == -1 else num_wires
+                    if actual_num_wires is None or actual_num_wires <= 0:
+                        continue
                     _create_decomposition_rule(
                         rule,
                         op_name=op.op.name,
-                        num_wires=num_wires,
+                        num_wires=actual_num_wires,
                         num_params=num_params,
                         requires_copy=num_wires == -1,
                         ag_enabled=self._ag_enabled,
