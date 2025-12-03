@@ -1048,7 +1048,7 @@ class TestCapture:
         assert jnp.allclose(circuit(0.1), capture_result)
 
     @pytest.mark.usefixtures("use_capture")
-    def test_pass_with_options(self, backend):
+    def test_pass_with_options_patch(self, backend):
         """Test the integration for a circuit with a pass that takes in options."""
 
         @qml.transform
@@ -1057,6 +1057,25 @@ class TestCapture:
             return
 
         register_transform(my_pass, "my-pass", False)
+
+        @qjit(target="mlir")
+        @partial(my_pass, my_option="my_option_value", my_other_option=False)
+        @qml.qnode(qml.device(backend, wires=1))
+        def captured_circuit():
+            return qml.expval(qml.PauliZ(0))
+
+        capture_mlir = captured_circuit.mlir
+        assert 'transform.apply_registered_pass "my-pass"' in capture_mlir
+        assert (
+            'with options = {"my-option" = "my_option_value", "my-other-option" = false}'
+            in capture_mlir
+        )
+
+    @pytest.mark.usefixtures("use_capture")
+    def test_pass_with_options(self, backend):
+        """Test the integration for a circuit with a pass that takes in options."""
+
+        my_pass = qml.transform(pass_name="my-pass")
 
         @qjit(target="mlir")
         @partial(my_pass, my_option="my_option_value", my_other_option=False)
