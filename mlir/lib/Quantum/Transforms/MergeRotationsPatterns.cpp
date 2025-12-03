@@ -453,10 +453,6 @@ struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbit
         auto opRotation = op.getArbitraryAngle();
         auto prevOpRotation = prevOp.getArbitraryAngle();
 
-        if (!opRotation || !prevOpRotation) {
-            return failure();
-        }
-
         // create merged op
         auto loc = op.getLoc();
         mlir::Value newAngleOp =
