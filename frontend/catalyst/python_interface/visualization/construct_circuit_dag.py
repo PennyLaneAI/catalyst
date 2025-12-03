@@ -16,12 +16,11 @@
 
 from functools import singledispatchmethod
 
-from xdsl.dialects import builtin, func, scf
-from xdsl.ir import Block, Operation, Region, SSAValue
-
 from catalyst.python_interface.dialects import catalyst, quantum
 from catalyst.python_interface.inspection.xdsl_conversion import resolve_constant_params
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from xdsl.dialects import builtin, func, scf
+from xdsl.ir import Block, Operation, Region, SSAValue
 
 
 class ConstructCircuitDAG:
@@ -88,9 +87,14 @@ class ConstructCircuitDAG:
     def _for_op(self, operation: scf.ForOp) -> None:
         """Handle an xDSL ForOp operation."""
         uid = f"cluster_{id(operation)}"
+
+        # TODO: Extract from IR in future PR
+        iter_var = "..."
+        start, stop, step = "...", "...", "..."
+        label = f"for {iter_var} in range({start}, {stop}, {step})"
         self.dag_builder.add_cluster(
             uid,
-            node_label=f"for ...",
+            node_label=label,
             label="",
             cluster_uid=self._cluster_uid_stack[-1],
         )
@@ -121,7 +125,9 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _if_op(self, operation: scf.IfOp):
         """Handles the scf.IfOp operation."""
-        flattened_if_op: list[tuple[SSAValue | None, Region]] = _flatten_if_op(operation)
+        flattened_if_op: list[tuple[SSAValue | None, Region]] = _flatten_if_op(
+            operation
+        )
 
         uid = f"cluster_{id(operation)}"
         self.dag_builder.add_cluster(
@@ -198,7 +204,9 @@ class ConstructCircuitDAG:
             label = "qjit"
 
         uid = f"cluster_{id(operation)}"
-        parent_cluster_uid = None if self._cluster_uid_stack == [] else self._cluster_uid_stack[-1]
+        parent_cluster_uid = (
+            None if self._cluster_uid_stack == [] else self._cluster_uid_stack[-1]
+        )
         self.dag_builder.add_cluster(
             uid,
             label=label,
