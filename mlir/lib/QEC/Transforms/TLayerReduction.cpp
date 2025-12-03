@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "QEC/IR/QECDialect.h"
 #define DEBUG_TYPE "reduce-t-depth"
 
 #include <vector>
@@ -21,6 +20,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
+#include "QEC/IR/QECOps.h"
 #include "QEC/Utils/PauliStringWrapper.h"
 #include "QEC/Utils/QECLayer.h"
 #include "QEC/Utils/QECOpUtils.h"
