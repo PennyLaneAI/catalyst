@@ -401,7 +401,9 @@ class TestForOp:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        assert "for ..." in utility.dag_builder.get_child_clusters("my_workflow")
+        assert "for ... in range(..., ..., ...)" in utility.dag_builder.get_child_clusters(
+            "my_workflow"
+        )
 
     @pytest.mark.unit
     def test_nested_loop(self):
@@ -423,10 +425,14 @@ class TestForOp:
         utility.construct(module)
 
         # Check first for loop
-        assert "for ..." in utility.dag_builder.get_child_clusters("my_workflow")
+        assert "for ... in range(..., ..., ...)" in utility.dag_builder.get_child_clusters(
+            "my_workflow"
+        )
 
         # Check second for loop
-        assert "for ..." in utility.dag_builder.get_child_clusters("for ...")
+        assert "for ... in range(..., ..., ...)" in utility.dag_builder.get_child_clusters(
+            "for ... in range(..., ..., ...)"
+        )
 
 
 class TestWhileOp:
