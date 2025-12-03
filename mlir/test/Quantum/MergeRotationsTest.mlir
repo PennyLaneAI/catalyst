@@ -1074,11 +1074,13 @@ func.func public @half_compatible_qubits(%q0: !quantum.bit, %q1: !quantum.bit, %
 // re-arranging qubits is ok as long as the pauli words are re-arranged too
 
 // CHECK-LABEL: mix_and_match
-func.func public @mix_and_match(%q0: !quantum.bit, %q1: !quantum.bit, %0: f64, %1: f64) {
+func.func public @mix_and_match(%z1: !quantum.bit, %y1: !quantum.bit, %0: f64, %1: f64, %2: f64) {
     // CHECK: [[angle:%.+]] = arith.addf
-    // CHECK: qec.ppr.arbitrary [{{.+}}]([[angle]])
-    %2:2 = qec.ppr.arbitrary ["Z", "Y"](%0) %q0, %q1: !quantum.bit, !quantum.bit
-    %3:2 = qec.ppr.arbitrary ["Y", "Z"](%1) %2#1, %2#0: !quantum.bit, !quantum.bit
+    // CHECK: [[zOut:%.+]], [[yOut:%.+]] = qec.ppr.arbitrary ["Z", "Y"]([[angle]]) %arg0, %arg1
+    // CHECK: qec.ppr.arbitrary ["Y", "X"]({{%.+}}) [[yOut]], [[zOut]]
+    %z2, %y2 = qec.ppr.arbitrary ["Z", "Y"](%0) %zIn, %yIn: !quantum.bit, !quantum.bit
+    %y3, %z3 = qec.ppr.arbitrary ["Y", "Z"](%1) %y2, %z2: !quantum.bit, !quantum.bit
+    %6:2 = qec.ppr.arbitrary ["Y", "X"](%2) %y3, %z3: !quantum.bit, !quantum.bit
     func.return
 }
 
