@@ -360,7 +360,7 @@ def _collect_region(
                 cond_warning=cond_warning,
                 adjoint_mode=adjoint_mode,
             )
-            if hasattr(op, "estimated_iterations"):            
+            if not hasattr(op, "estimated_iterations"):            
                 try:
                     iters = count_static_loop_iterations(op)
                     body_ops.multiply_by_scalar(iters)
