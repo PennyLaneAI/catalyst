@@ -2,8 +2,9 @@
 
 <h3>New features since last release</h3>
 
-* RTIO dialect is added to bypass the compilation flow from OpenAPL to ARTIQ’s LLVM IR. It is introduced to bridge the gap between ION dialect and ARTIQ’s LLVM IR. The design philosophy of RTIO dialect is primarily event-based. Every operation is asynchronous; sync behaviour occurs only via `rtio.sync` or `wait operand` in event operation.
+* RTIO dialect is added to bypass the compilation flow from OpenAPL to ARTIQ’s LLVM IR. It is introduced to bridge the gap between ION dialect and ARTIQ’s LLVM IR. The design philosophy of RTIO dialect is primarily event-based. Every operation is asynchronous; sync behaviour occurs only via `rtio.sync` or `wait operand` in event operation. And we now support the compiling from ION dialect to RTIO dilalect.
   [(#2185)](https://github.com/PennyLaneAI/catalyst/pull/2185)
+  [(#2204)](https://github.com/PennyLaneAI/catalyst/pull/2204)
 
 * Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
   [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
@@ -287,9 +288,7 @@
 * Decouple the ion dialect from the quantum dialect to support the new RTIO compilation flow.
   The ion dialect now uses its own `!ion.qubit` type instead of depending on `!quantum.bit`.
   Conversion between qubits of quantum and ion dialects is handled via unrealized conversion casts.
-  And we support the compiling from ION dialect to RTIO dilalect.
   [(#2163)](https://github.com/PennyLaneAI/catalyst/pull/2163)
-  [(#2204)](https://github.com/PennyLaneAI/catalyst/pull/2204)
 
   For an example, quantum qubits are converted to ion qubits as follows:
   ```mlir
