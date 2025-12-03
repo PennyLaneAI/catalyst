@@ -434,7 +434,7 @@ struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbit
         }
 
         // verify that prevOp agrees on all qubits, not just the first
-        for (auto qubit : inQubits) {
+        for (mlir::Value qubit : inQubits) {
             if (qubit.getDefiningOp() != prevOp) {
                 return failure();
             }
@@ -450,11 +450,11 @@ struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbit
             return failure();
         }
 
-        auto opRotation = op.getArbitraryAngle();
-        auto prevOpRotation = prevOp.getArbitraryAngle();
+        mlir::Value opRotation = op.getArbitraryAngle();
+        mlir::Value prevOpRotation = prevOp.getArbitraryAngle();
 
         // create merged op
-        auto loc = op.getLoc();
+        mlir::Location loc = op.getLoc();
         mlir::Value newAngleOp =
             rewriter.create<arith::AddFOp>(loc, opRotation, prevOpRotation).getResult();
 
