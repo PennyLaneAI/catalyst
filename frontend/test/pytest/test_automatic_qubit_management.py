@@ -28,7 +28,6 @@ In other words, the reference runs of automatic qubit management should be qjit 
 specified during device initialization, instead of non qjit runs.
 """
 
-import jax
 import numpy as np
 import pennylane as qml
 from jax import numpy as jnp

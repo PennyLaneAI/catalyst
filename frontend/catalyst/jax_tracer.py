@@ -1097,7 +1097,9 @@ def trace_quantum_measurements(
 
             m_wires = output.wires if output.wires else None
             obs_tracers, nqubits = trace_observables(output.obs, qrp, m_wires)
-            nqubits = d_wires if nqubits is None else nqubits
+            nqubits = (
+                d_wires if nqubits is None else nqubits
+            )  # pylint: disable=possibly-used-before-assignment
 
             using_compbasis = obs_tracers.primitive == compbasis_p
 
