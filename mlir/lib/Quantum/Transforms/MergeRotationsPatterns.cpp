@@ -421,7 +421,7 @@ struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbit
                                   PatternRewriter &rewriter) const override
     {
         ValueRange inQubits = op.getInQubits();
-        auto definingOp = inQubits[0].getDefiningOp();
+        Operation *definingOp = inQubits[0].getDefiningOp();
 
         if (!definingOp) {
             return failure();
