@@ -70,6 +70,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* Catalyst can now use the new `pass_name` property of pennylane transform objects. Passes can now
+  be created using `qml.transform(pass_name=pass_name)` instead of `PassPipelineWrapper`.
+  [(#2149](https://github.com/PennyLaneAI/catalyst/pull/2149)
+
 * An error is now raised if a transform is applied inside a QNode when program capture is enabled.
   [(#2256)](https://github.com/PennyLaneAI/catalyst/pull/2256)
 
@@ -316,6 +320,15 @@
   [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)	
   [(#2245)](https://github.com/PennyLaneAI/catalyst/pull/2245)
   [(#2254)](https://github.com/PennyLaneAI/catalyst/pull/2254)
+
+
+  * Refactor QEC tablegen files to separate QEC operations into a new `QECOp.td` file
+  [(#2253](https://github.com/PennyLaneAI/catalyst/pull/2253)	
+
+
+  * Removed the `getRotationKind` and `setRotationKind` methods from 
+  the QEC interface `QECOpInterface` to simplify the interface.
+  [(#2250)](https://github.com/PennyLaneAI/catalyst/pull/2250)
 
 <h3>Documentation 📝</h3>
 

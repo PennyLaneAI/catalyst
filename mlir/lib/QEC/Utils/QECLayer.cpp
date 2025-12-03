@@ -14,6 +14,7 @@
 
 #include "llvm/ADT/STLExtras.h"
 
+#include "QEC/IR/QECOps.h"
 #include "QEC/Utils/PauliStringWrapper.h"
 #include "QEC/Utils/QECLayer.h"
 #include "Quantum/IR/QuantumOps.h" // for quantum.extract op
