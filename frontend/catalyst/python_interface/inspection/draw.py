@@ -99,25 +99,7 @@ def draw(qnode: QNode, *, level: None | int = None) -> Callable:
 
 def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
     """
-    Draw the QNode at the specified level.
-
-    This function can be used to visualize the QNode at different stages of the transformation
-    pipeline when xDSL or Catalyst compilation passes are applied.
-    If the specified level is not available, the highest level will be used as a fallback.
-
-    The provided QNode is assumed to be decorated with compilation passes.
-    If no passes are applied, the original QNode is visualized.
-
-    Args:
-        qnode (.QNode): the input QNode that is to be visualized. The QNode is assumed to be
-            compiled with ``qjit``.
-        level (None | int): the level of transformation to visualize. If `None`, the final
-            level is visualized.
-
-
-    Returns:
-       ????
-
+    ???
     """
     cache: dict[int, tuple[str, str]] = _cache_store.setdefault(qnode, {})
 
@@ -128,10 +110,11 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
         # Process module to build DAG
         utility = ConstructCircuitDAG(PyDotDAGBuilder())
         utility.construct(module)
-        svg_str = utility.dag_builder.graph.create_svg(prog="dot")
+        # Store DAG in cache
+        image_bytes = utility.dag_builder.graph.create_png(prog="dot")
         pass_name = pass_instance.name if hasattr(pass_instance, "name") else pass_instance
         cache[pass_level] = (
-            svg_str,
+            image_bytes,
             pass_name if pass_level else "No transforms",
         )
 
@@ -143,22 +126,22 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
         if not cache:
             return None
 
-        # Retrieve the SVG string (or the high-DPI PNG string)
-        image_data = cache.get(level, cache[max(cache.keys())])[0]
+        # Retrieve Data (Fall back to highest level if 'level' is not found)
+        max_level = max(cache.keys())
+        image_bytes, pass_name = cache.get(level, cache[max_level])
 
-        if image_data.startswith(b"<?xml") or image_data.startswith(b"<svg"):
-            from IPython.display import HTML
+        # Render image bytes to matplotlib
+        sio = io.BytesIO()
+        sio.write(image_bytes)
+        sio.seek(0)
+        
+        img = mpimg.imread(sio)
 
-            return HTML(image_data.decode("utf-8"))  # Requires IPython.display.HTML
-        else:
-            sio = io.BytesIO()
-            sio.write(image_data)
-            sio.seek(0)
-            img = mpimg.imread(sio)
-
-            fig, ax = plt.subplots()
-            ax.imshow(img)
-            ax.set_axis_off()
-            return fig, ax
+        fig, ax = plt.subplots()
+        ax.imshow(img)
+        ax.set_axis_off()
+        ax.set_title(f"Level {level if level is not None else max_level}: {pass_name}", fontsize=10)
+        
+        return fig, ax
 
     return wrapper
