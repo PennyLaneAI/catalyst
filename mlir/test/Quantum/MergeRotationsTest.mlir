@@ -907,13 +907,149 @@ func.func public @half_compatible_qubits(%q1: !quantum.bit, %q2: !quantum.bit, %
 // simple AAPPR merge
 
 // CHECK-LABEL: merge_Y
-func.func public @merge_Y(%q1: !quantum.bit) {
-    // CHECK: [[angle:%.+]] = arith.addf [[cst1]], [[cst2]]
+func.func public @merge_Y(%q1: !quantum.bit, %0: f64, %1: f64) {
+    // CHECK: [[angle:%.+]] = arith.addf
     // CHECK: qec.ppr.arbitrary ["Y"]([[angle]])
-    %0 = arith.constant 0.9 : f64
-    %1 = arith.constant 0.4 : f64
     %2 = qec.ppr.arbitrary ["Y"](%0) %q1: !quantum.bit
     %3 = qec.ppr.arbitrary ["Y"](%1) %2: !quantum.bit
     func.return
 }
 
+// -----
+
+// multiple merges
+
+// CHECK-LABEL: merge_multi_Z
+func.func public @merge_multi_Z(%q1: !quantum.bit, %0: f64, %1: f64, %2: f64) {
+    // CHECK: [[angle:%.+]] = arith.addf
+    // CHECK: [[angle2:%.+]] = arith.addf
+    // CHECK: qec.ppr.arbitrary ["Z"]([[angle2]])
+    // CHECK-NOT: qec.ppr.arbitrary
+    %3 = qec.ppr.arbitrary ["Z"](%0) %q1: !quantum.bit
+    %4 = qec.ppr.arbitrary ["Z"](%1) %3: !quantum.bit
+    %5 = qec.ppr.arbitrary ["Z"](%2) %4: !quantum.bit
+    func.return
+}
+
+// -----
+
+// not merging when incompatible
+
+// CHECK-LABEL: dont_merge
+func.func public @dont_merge(%q1: !quantum.bit, %q2: !quantum.bit, %0: f64, %1: f64, %2: f64, %3: f64, %4: f64, %5: f64) {
+    // CHECK-NOT: arith.addf
+    // CHECK: qec.ppr.arbitrary ["Z", "X"]
+    // CHECK: qec.ppr.arbitrary ["Y", "X"]
+    // CHECK: qec.ppr.arbitrary ["Y", "Z"]
+    // CHECK: qec.ppr.arbitrary ["X", "Z"]
+    // CHECK: qec.ppr.arbitrary ["X", "Y"]
+    // CHECK: qec.ppr.arbitrary ["Z", "Y"]
+    %6:2 = qec.ppr.arbitrary ["Z", "X"](%0) %q1, %q2: !quantum.bit, !quantum.bit
+    %7:2 = qec.ppr.arbitrary ["Y", "X"](%1) %6#0, %6#1: !quantum.bit, !quantum.bit
+    %8:2 = qec.ppr.arbitrary ["Y", "Z"](%2) %7#0, %7#1: !quantum.bit, !quantum.bit
+    %9:2 = qec.ppr.arbitrary ["X", "Z"](%3) %8#0, %8#1: !quantum.bit, !quantum.bit
+    %10:2 = qec.ppr.arbitrary ["X", "Y"](%4) %9#0, %9#1: !quantum.bit, !quantum.bit
+    %11:2 = qec.ppr.arbitrary ["Z", "Y"](%5) %10#0, %10#1: !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// updating references
+
+// CHECK-LABEL: merge_correct_references
+func.func public @merge_correct_references(%q1: !quantum.bit, %0: f64, %1: f64, %2: f64, %3: f64) {
+    // CHECK-DAG: [[angle:%.+]] = arith.addf
+    // CHECK-DAG: [[in:%.+]] = qec.ppr.arbitrary ["X"]
+    // CHECK: [[out:%.+]] = qec.ppr.arbitrary ["Z"]([[angle]]) [[in]]
+    // CHECK: qec.ppr.arbitrary ["Y"]({{%.+}}) [[out]]
+    %4 = qec.ppr.arbitrary ["X"](%0) %q1: !quantum.bit
+    %5 = qec.ppr.arbitrary ["Z"](%1) %4: !quantum.bit
+    %6 = qec.ppr.arbitrary ["Z"](%2) %5: !quantum.bit
+    %7 = qec.ppr.arbitrary ["Y"](%3) %6: !quantum.bit
+    func.return
+}
+
+// -----
+
+// multi-qubit merge
+
+// CHECK-LABEL: merge_multi_XZY
+func.func public @merge_multi_XZY(%q1: !quantum.bit, %q2: !quantum.bit, %q3: !quantum.bit, %0: f64, %1: f64, %2: f64) {
+    // CHECK: [[angle1:%.+]] = arith.addf
+    // CHECK: [[angle2:%.+]] = arith.addf
+    // CHECK: qec.ppr.arbitrary ["X", "Z", "Y"]([[angle2]])
+    %3:3 = qec.ppr.arbitrary ["X", "Z", "Y"](%0) %q1, %q2, %q3: !quantum.bit, !quantum.bit, !quantum.bit
+    %4:3 = qec.ppr.arbitrary ["X", "Z", "Y"](%1) %3#0, %3#1, %3#2: !quantum.bit, !quantum.bit, !quantum.bit
+    %5:3 = qec.ppr.arbitrary ["X", "Z", "Y"](%2) %4#0, %4#1, %4#2: !quantum.bit, !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// merge through other ops
+
+// CHECK-LABEL: merge_through
+func.func public @merge_through(%q1: !quantum.bit, %q2: !quantum.bit, %0: f64, %1: f64) -> !quantum.bit {
+    // CHECK-DAG: [[angle:%.+]] = arith.addf
+    // CHECK-DAG: quantum.custom
+    // CHECK-DAG: qec.ppr.arbitrary ["X"]([[angle]])
+    %2 = qec.ppr.arbitrary ["X"](%0) %q1: !quantum.bit
+    %3 = quantum.custom "Hadamard"() %q2: !quantum.bit
+    %4 = qec.ppr.arbitrary ["X"](%1) %2: !quantum.bit
+    func.return %3: !quantum.bit
+}
+
+// ----- 
+
+// don't merge through other operations
+
+// CHECK-LABEL: mixed_operations
+func.func public @mixed_operations(%q1: !quantum.bit, %q2: !quantum.bit, %0: f64, %1: f64) {
+    // CHECK-NOT: arith.addf
+    // CHECK: qec.ppr.arbitrary ["Z", "X"]
+    // CHECK: quantum.custom
+    // CHECK: qec.ppr.arbitrary ["Z", "X"]
+    %2:2 = qec.ppr.arbitrary ["Z", "X"](%0) %q1, %q2: !quantum.bit, !quantum.bit
+    %3 = quantum.custom "Hadamard"() %2#1: !quantum.bit
+    %5:2 = qec.ppr.arbitrary ["Z", "X"](%1) %2#0, %3: !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// don't merge if only one qubit matches
+
+// CHECK-LABEL: half_compatible_qubits
+func.func public @half_compatible_qubits(%q1: !quantum.bit, %q2: !quantum.bit, %q3: !quantum.bit, %0: f64, %1: f64) {
+    // CHECK: qec.ppr.arbitrary ["X", "Z"]
+    %2:2 = qec.ppr.arbitrary ["X", "Z"](%0) %q1, %q2: !quantum.bit, !quantum.bit
+    %3:2 = qec.ppr.arbitrary ["X", "Z"](%1) %q3, %2#1 : !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// re-arranging qubits is ok as long as the pauli words are re-arranged too
+
+// CHECK-LABEL: mix_and_match
+func.func public @mix_and_match(%q1: !quantum.bit, %q2: !quantum.bit, %0: f64, %1: f64) {
+    // CHECK: [[angle:%.+]] = arith.addf
+    // CHECK: qec.ppr.arbitrary [{{.+}}]([[angle]])
+    %2:2 = qec.ppr.arbitrary ["Z", "Y"](%0) %q1, %q2: !quantum.bit, !quantum.bit
+    %3:2 = qec.ppr.arbitrary ["Y", "Z"](%1) %2#1, %2#0: !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// re-arranging qubits without re-arranging the pauli word is NOT okay
+
+// CHECK-LABEL: mix_dont_match
+func.func public @mix_dont_match(%q1: !quantum.bit, %q2: !quantum.bit, %0: f64, %1: f64) {
+    // CHECK: qec.ppr.arbitrary ["Y", "X"]
+    // CHECK: qec.ppr.arbitrary ["Y", "X"]
+    %2:2 = qec.ppr.arbitrary ["Y", "X"](%0) %q1, %q2: !quantum.bit, !quantum.bit
+    %3:2 = qec.ppr.arbitrary ["Y", "X"](%1) %2#1, %2#0: !quantum.bit, !quantum.bit
+    func.return
+}

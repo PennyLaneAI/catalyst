@@ -322,6 +322,24 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
     }
 };
 
+bool matchingQubitsAndPaulis(PPRotationArbitraryOp op, PPRotationArbitraryOp parentOp)
+{
+    auto pauliProduct = op.getPauliProduct();
+    auto parentPauliProduct = parentOp.getPauliProduct();
+
+    for (auto [i, qubit] : llvm::enumerate(op.getInQubits())) {
+        for (auto [j, parentQubit] : llvm::enumerate(parentOp.getOutQubits())) {
+            if (qubit == parentQubit) {
+                if (pauliProduct[i] != parentPauliProduct[j]) {
+                    return false;
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
 struct MergePPRRewritePattern : public OpRewritePattern<PPRotationOp> {
     using OpRewritePattern::OpRewritePattern;
 
@@ -422,8 +440,8 @@ struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbit
             }
         }
 
-        // check same pauli strings
-        if (op.getPauliProduct() != prevOp.getPauliProduct()) {
+        // check that the same pauli operators are applied to the same qubits
+        if (!matchingQubitsAndPaulis(op, prevOp)) {
             return failure();
         }
 
