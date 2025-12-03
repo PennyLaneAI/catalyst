@@ -15,11 +15,8 @@
 #pragma once
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
-#include <type_traits>
-
 using namespace mlir;
 
 namespace catalyst {
@@ -34,28 +31,28 @@ template <typename OpT, typename TypeT>
 OpT ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op, StringRef fnSymbol,
                               TypeT fnType)
 {
-    // 1. Lookup the symbol to see if it already exists
+    // Lookup the symbol to see if it already exists
     Operation *fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
 
     if (!fnDecl) {
-        // 2. If not found, insert it at the start of the Module
+        // If not found, insert it at the start of the Module
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         rewriter.setInsertionPointToStart(mod.getBody());
 
-        // 3. Create the specific function operation (LLVMFuncOp or FuncOp)
+        // Create the specific function operation (LLVMFuncOp or FuncOp)
         auto newFunc = rewriter.create<OpT>(op->getLoc(), fnSymbol, fnType);
 
-        // 4. Handle visibility differences:
+        // Handle visibility differences:
         // func::FuncOp usually requires explicit private visibility for runtime decls.
-        if constexpr (std::is_same_v<OpT, func::FuncOp>) {
+        if (isa<func::FuncOp>(newFunc)) {
             newFunc.setPrivate();
         }
 
         fnDecl = newFunc;
     }
     else {
-        // 5. Verify the existing symbol is the correct type
+        // Verify the existing symbol is the correct type
         assert(isa<OpT>(fnDecl) && "Existing symbol is not the expected operation type");
     }
 
