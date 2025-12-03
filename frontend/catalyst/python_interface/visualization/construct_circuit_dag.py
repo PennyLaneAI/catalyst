@@ -369,6 +369,8 @@ class ConstructCircuitDAG:
             # the FuncOp's scope and so we can pop the ID off the stack.
             self._cluster_uid_stack.pop()
 
+        # Clear seen wires as we are exiting a FuncOp (qnode)
+        self._wire_to_node_uids = defaultdict(set) 
 
 def _flatten_if_op(op: scf.IfOp) -> list[tuple[SSAValue | None, Region]]:
     """Recursively flattens a nested IfOp (if/elif/else chains)."""
