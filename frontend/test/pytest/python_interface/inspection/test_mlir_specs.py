@@ -18,7 +18,6 @@ import pennylane as qml
 import pytest
 
 import catalyst
-from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface.inspection import ResourcesResult, mlir_specs
 
 pytestmark = pytest.mark.requires_xdsl
@@ -94,7 +93,7 @@ class TestMLIRSpecs:
     def test_invalid_level_type(self, simple_circuit, level):
         """Test that requesting an invalid level type raises an error."""
 
-        simple_circuit = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(simple_circuit)
+        simple_circuit = qml.qjit()(simple_circuit)
 
         with pytest.raises(
             ValueError, match="The `level` argument must be an int, a tuple/list of ints, or 'all'."
@@ -105,7 +104,7 @@ class TestMLIRSpecs:
     def test_invalid_int_level(self, simple_circuit, level):
         """Test that requesting an invalid level raises an error."""
 
-        simple_circuit = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(simple_circuit)
+        simple_circuit = qml.qjit()(simple_circuit)
 
         with pytest.raises(
             ValueError, match=f"Requested specs level {level} not found in MLIR pass list."
@@ -128,7 +127,7 @@ class TestMLIRSpecs:
     def test_no_passes(self, simple_circuit, level, expected):
         """Test that if no passes are applied, the circuit resources are the original amount."""
 
-        simple_circuit = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(simple_circuit)
+        simple_circuit = qml.qjit()(simple_circuit)
         res = mlir_specs(simple_circuit, level=level)
         assert resources_equal(res, expected)
 
@@ -171,7 +170,7 @@ class TestMLIRSpecs:
             simple_circuit = catalyst.passes.cancel_inverses(simple_circuit)
             simple_circuit = catalyst.passes.merge_rotations(simple_circuit)
 
-        simple_circuit = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(simple_circuit)
+        simple_circuit = qml.qjit()(simple_circuit)
         res = mlir_specs(simple_circuit, level=level)
         assert resources_equal(res, expected)
 
@@ -203,7 +202,7 @@ class TestMLIRSpecs:
             ),
         }
 
-        simple_circuit = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(simple_circuit)
+        simple_circuit = qml.qjit()(simple_circuit)
         res = mlir_specs(simple_circuit, level="all")
 
         assert isinstance(res, dict)
@@ -236,7 +235,7 @@ class TestMLIRSpecs:
             ),
         }
 
-        simple_circuit = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(simple_circuit)
+        simple_circuit = qml.qjit()(simple_circuit)
         res = mlir_specs(simple_circuit, level=[0, 2])
 
         assert isinstance(res, dict)
@@ -289,7 +288,7 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        circ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()], autograph=autograph)(circ)
+        circ = qml.qjit(autograph=autograph)(circ)
         res = mlir_specs(circ, level=0)
         assert resources_equal(res, expected)
 
@@ -329,7 +328,7 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        circ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()], autograph=True)(circ)
+        circ = qml.qjit(autograph=True)(circ)
 
         with pytest.warns(
             UserWarning,
@@ -382,7 +381,7 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        circ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()], autograph=True)(circ)
+        circ = qml.qjit(autograph=True)(circ)
 
         with pytest.warns(
             UserWarning,
@@ -427,7 +426,7 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        circ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()], autograph=True)(circ)
+        circ = qml.qjit(autograph=True)(circ)
 
         with pytest.warns(
             UserWarning,
@@ -450,7 +449,7 @@ class TestMLIRSpecs:
             return qml.expval(qml.PauliZ(0))
 
         circ = qml.transforms.combine_global_phases(circ)
-        circ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(circ)
+        circ = qml.qjit()(circ)
 
         expected = make_static_resources(
             operations={"GlobalPhase": {0: 1}},
@@ -495,7 +494,7 @@ class TestMLIRSpecs:
             qml.adjoint(subroutine)()
             return qml.probs()
 
-        circ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(circ)
+        circ = qml.qjit()(circ)
 
         expected = make_static_resources(
             operations={
