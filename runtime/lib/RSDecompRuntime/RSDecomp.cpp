@@ -167,7 +167,7 @@ std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle
 // Extern C implementation
 extern "C" {
 
-size_t rs_decomposition_get_size_0(double theta, double epsilon, bool ppr_basis)
+size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis)
 {
     if (ppr_basis) {
         auto result = eval_ross_algorithm_ppr(theta, epsilon);
@@ -179,7 +179,25 @@ size_t rs_decomposition_get_size_0(double theta, double epsilon, bool ppr_basis)
     }
 }
 
-void rs_decomposition_get_gates_0(size_t *data_allocated, size_t *data_aligned, size_t offset,
+/**
+ * @brief Fills a pre-allocated memref with the gate sequence.
+ *
+ * This function signature matches the standard MLIR calling convention for
+ * a 1D memref (IndexType), which passes the struct fields as individual arguments.
+ * Note: I have tried to use `MemRefT` directly from Types.h, but ran into
+ * C++ ABI errors (on macOS) leading to segmentation faults. Thus, we manually unpack the memref
+ * here.
+ *
+ * @param data_allocated Pointer to allocated data
+ * @param data_aligned Pointer to aligned data
+ * @param offset Data offset
+ * @param size0 Size of dimension 0
+ * @param stride0 Stride of dimension 0
+ * @param theta Angle
+ * @param epsilon Error
+ * @param ppr_basis Whether to use PPR basis
+ */
+void rs_decomposition_get_gates(size_t *data_allocated, size_t *data_aligned, size_t offset,
                                   size_t size0, size_t stride0, double theta, double epsilon,
                                   bool ppr_basis)
 {
@@ -196,10 +214,8 @@ void rs_decomposition_get_gates_0(size_t *data_allocated, size_t *data_aligned, 
         const auto &gates = result.first;
 
         size_t s = gates.size();
-        if (gates_view.size() < s) {
-            std::cerr << "Error: memref allocated too small for PPR gates.\n";
-            return;
-        }
+        RT_FAIL_IF(gates_view.size() < s, "Error: memref allocated too small for PPR gates.\n")
+
         for (size_t i = 0; i < s; ++i) {
             gates_view(i) = static_cast<size_t>(gates[i]);
         }
@@ -209,17 +225,16 @@ void rs_decomposition_get_gates_0(size_t *data_allocated, size_t *data_aligned, 
         const auto &gates = result.first;
 
         size_t s = gates.size();
-        if (gates_view.size() < s) {
-            std::cerr << "Error: memref allocated too small for Standard gates.\n";
-            return;
-        }
+        RT_FAIL_IF(gates_view.size() < s, "Error: memref allocated too small for PPR gates.\n")
+
+        
         for (size_t i = 0; i < s; ++i) {
             gates_view(i) = static_cast<size_t>(gates[i]);
         }
     }
 }
 
-double rs_decomposition_get_phase_0(double theta, double epsilon, bool ppr_basis)
+double rs_decomposition_get_phase(double theta, double epsilon, bool ppr_basis)
 {
     if (ppr_basis) {
         return eval_ross_algorithm_ppr(theta, epsilon).second;
