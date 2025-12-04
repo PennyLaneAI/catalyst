@@ -63,6 +63,7 @@ class ConstructCircuitDAG:
         self._cluster_uid_stack: list[str] = []
         self._node_uid_counter: int = 0
         self._cluster_uid_counter: int = 0
+        self._wire_to_node_uids: dict[str | int, set[str]] = defaultdict(set)
 
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module.
