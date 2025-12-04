@@ -66,6 +66,11 @@ double ZSqrtTwo::to_double() const
     return static_cast<double>(a) + static_cast<double>(b) * M_SQRT2;
 }
 
+FLOAT_TYPE ZSqrtTwo::to_float() const
+{
+    return FLOAT_TYPE(a) + FLOAT_TYPE(b) * SQRT2;
+}
+
 ZSqrtTwo ZSqrtTwo::pow(INT_TYPE exponent) const
 {
     if (exponent < 0) {
@@ -87,8 +92,11 @@ ZSqrtTwo ZSqrtTwo::operator%(const ZSqrtTwo &other) const
 {
     INT_TYPE d = other.abs();
     ZSqrtTwo num = *this * other.adj2();
-    INT_TYPE q1 = std::nearbyint(static_cast<double>(num.a) / d);
-    INT_TYPE q2 = std::nearbyint(static_cast<double>(num.b) / d);
+    // Use boost multiprecision division and rounding
+    FLOAT_TYPE q1_float = FLOAT_TYPE(num.a) / FLOAT_TYPE(d);
+    FLOAT_TYPE q2_float = FLOAT_TYPE(num.b) / FLOAT_TYPE(d);
+    INT_TYPE q1 = boost::multiprecision::round(q1_float).template convert_to<INT_TYPE>();
+    INT_TYPE q2 = boost::multiprecision::round(q2_float).template convert_to<INT_TYPE>();
     ZSqrtTwo quotient(q1, q2);
     return *this - quotient * other;
 }
@@ -96,15 +104,19 @@ ZSqrtTwo ZSqrtTwo::operator%(const ZSqrtTwo &other) const
 std::optional<ZSqrtTwo> ZSqrtTwo::sqrt() const
 {
     const INT_TYPE d = this->abs();
-    const INT_TYPE r = std::sqrt(d);
+    INT_TYPE abs_d = d < 0 ? -d : d;
+    const INT_TYPE r = boost::multiprecision::sqrt(abs_d);
     if (r * r != d) {
         return std::nullopt;
     }
-    for (INT_TYPE s : {1, -1}) {
+    for (int s : {1, -1}) {
         INT_TYPE x_numerator = a + s * r;
         INT_TYPE y_numerator = a - s * r;
-        INT_TYPE x = std::sqrt(x_numerator / 2);
-        INT_TYPE y = std::sqrt(y_numerator / 4);
+        if (x_numerator < 0 || y_numerator < 0) continue;
+        INT_TYPE x_div = x_numerator / 2;
+        INT_TYPE y_div = y_numerator / 4;
+        INT_TYPE x = boost::multiprecision::sqrt(x_div);
+        INT_TYPE y = boost::multiprecision::sqrt(y_div);
         ZSqrtTwo zrt{x, y};
         if (zrt * zrt == *this) {
             return zrt;
@@ -219,12 +231,18 @@ std::pair<ZOmega, int> ZOmega::normalize()
 {
     int ix = 0;
     ZOmega res = *this;
+    INT_TYPE two(2);
     while (((res.a + res.c) % 2) == 0 && ((res.b + res.d) % 2) == 0) {
-        INT_TYPE a = floor_div(res.b - res.d, (INT_TYPE)2);
-        INT_TYPE b = floor_div(res.a + res.c, (INT_TYPE)2);
-        INT_TYPE c = floor_div(res.b + res.d, (INT_TYPE)2);
-        INT_TYPE d = floor_div(res.c - res.a, (INT_TYPE)2);
-        res = ZOmega(a, b, c, d);
+        // Evaluate expressions before passing to floor_div
+        INT_TYPE bd = res.b - res.d;
+        INT_TYPE ac = res.a + res.c;
+        INT_TYPE bd_sum = res.b + res.d;
+        INT_TYPE ca = res.c - res.a;
+        INT_TYPE new_a = floor_div(bd, two);
+        INT_TYPE new_b = floor_div(ac, two);
+        INT_TYPE new_c = floor_div(bd_sum, two);
+        INT_TYPE new_d = floor_div(ca, two);
+        res = ZOmega(new_a, new_b, new_c, new_d);
         ix += 1;
     }
     return {res, ix};
@@ -327,7 +345,7 @@ SO3Matrix::SO3Matrix(const DyadicMatrix &dy_mat) : dyadic_mat(dy_mat)
     normalize();
 }
 
-SO3Matrix::SO3Matrix(const std::array<std::array<ZSqrtTwo, 3>, 3> &mat, int k) : so3_mat(mat), k(k)
+SO3Matrix::SO3Matrix(const std::array<std::array<ZSqrtTwo, 3>, 3> &mat, INT_TYPE k) : so3_mat(mat), k(k)
 {
     normalize();
 }
@@ -395,7 +413,9 @@ std::array<std::array<int, 3>, 3> SO3Matrix::parity_mat() const
     std::array<std::array<int, 3>, 3> p_mat;
     for (std::size_t i = 0; i < 3; ++i) {
         for (std::size_t j = 0; j < 3; ++j) {
-            p_mat[i][j] = (so3_mat[i][j].a % 2 + 2) % 2;
+            // Explicit conversion for boost multiprecision
+            INT_TYPE val = (so3_mat[i][j].a % 2 + 2) % 2;
+            p_mat[i][j] = static_cast<int>(val);
         }
     }
     return p_mat;

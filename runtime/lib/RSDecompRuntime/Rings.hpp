@@ -15,6 +15,7 @@
 #pragma once
 
 #include <array>
+#include <boost/multiprecision/cpp_dec_float.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <cmath>
 #include <complex>
@@ -23,11 +24,26 @@
 
 namespace RSDecomp::Rings {
 
-const double LAMBDA = 1.0 + M_SQRT2;
-const std::complex<double> OMEGA = std::complex<double>(M_SQRT1_2, M_SQRT1_2);
+// Type aliases for arbitrary precision arithmetic
+// Using boost multiprecision for both integers and floats to handle
+// very small epsilon values (around 1e-6/7) where intermediate calculations
+// become too large for int128 and too small for doubles.
+using INT_TYPE = boost::multiprecision::cpp_int;
+using FLOAT_TYPE = boost::multiprecision::cpp_dec_float_50;
 
-using INT_TYPE = __int128;
-using MULTI_PREC_INT = boost::multiprecision::cpp_int;
+// Keep MULTI_PREC_INT as an alias for backwards compatibility
+using MULTI_PREC_INT = INT_TYPE;
+
+// Constants using FLOAT_TYPE for precision
+const FLOAT_TYPE SQRT2 = boost::multiprecision::sqrt(FLOAT_TYPE(2));
+const FLOAT_TYPE SQRT1_2 = FLOAT_TYPE(1) / SQRT2;
+const FLOAT_TYPE PI = boost::multiprecision::acos(FLOAT_TYPE(-1));
+const FLOAT_TYPE LAMBDA = FLOAT_TYPE(1) + SQRT2;
+
+// For complex operations, we still need std::complex<double> for compatibility
+// with external interfaces
+const double LAMBDA_D = 1.0 + M_SQRT2;
+const std::complex<double> OMEGA = std::complex<double>(M_SQRT1_2, M_SQRT1_2);
 
 struct ZOmega;
 struct ZOmega_multiprec;
@@ -56,6 +72,7 @@ struct ZSqrtTwo {
     INT_TYPE abs() const;
     ZSqrtTwo adj2() const;
     double to_double() const;
+    FLOAT_TYPE to_float() const;
     ZSqrtTwo pow(INT_TYPE exponent) const;
     std::optional<ZSqrtTwo> sqrt() const;
 
@@ -126,7 +143,7 @@ struct SO3Matrix {
     void from_dyadic_matrix(const DyadicMatrix &dy_mat);
 
     SO3Matrix(const DyadicMatrix &dy_mat);
-    SO3Matrix(const std::array<std::array<ZSqrtTwo, 3>, 3> &mat, int k = 0);
+    SO3Matrix(const std::array<std::array<ZSqrtTwo, 3>, 3> &mat, INT_TYPE k = 0);
 
     bool operator==(const SO3Matrix &other) const;
     std::array<std::array<int, 3>, 3> parity_mat() const;

@@ -699,7 +699,7 @@ class GridIterator {
                         double sol_imag = complx_sol.imag();
 
                         int k_ = k - kf;
-                        double k_div_2 = static_cast<double>(k_ / 2);
+                        double k_div_2 = static_cast<double>(k_) / 2.0;
                         double k_mod_2 = static_cast<double>(k_ % 2);
                         double denominator = std::pow(2.0, k_div_2) * std::pow(M_SQRT2, k_mod_2);
 

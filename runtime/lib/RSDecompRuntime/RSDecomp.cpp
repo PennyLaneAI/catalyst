@@ -52,9 +52,10 @@ std::pair<std::vector<GateType>, double> compute_raw_decomposition(double angle,
 
     ZOmega u(0, 0, 0, 1);
     ZOmega t(0, 0, 0, 0);
+    INT_TYPE k = 0;
 
     std::vector<GateType> decomposition;
-    DyadicMatrix dyd_mat(0, 0, 0, 0);
+    DyadicMatrix dyd_mat(ZOmega(0), ZOmega(0), ZOmega(0), ZOmega(0), INT_TYPE(0));
 
     if (is_odd_multiple_of_pi_4(angle)) {
         const double pi_over_4 = M_PI / 4.0;
@@ -100,7 +101,9 @@ std::pair<std::vector<GateType>, double> compute_raw_decomposition(double angle,
         GridProblem::GridIterator u_solutions(modified_angle + shift, epsilon, max_search_trials);
 
         for (const auto &[u_sol, k_val] : u_solutions) {
-            auto xi = ZSqrtTwo(std::pow(2, k_val)) - u_sol.norm().to_sqrt_two();
+            // Calculate 2^k_val as an INT_TYPE
+            INT_TYPE two_pow_k = INT_TYPE(1) << k_val;
+            auto xi = ZSqrtTwo(two_pow_k, 0) - u_sol.norm().to_sqrt_two();
             auto t_sol = NormSolver::solve_diophantine(xi, MAX_FACTORING_TRIALS);
 
             if (t_sol) {
@@ -111,7 +114,7 @@ std::pair<std::vector<GateType>, double> compute_raw_decomposition(double angle,
             }
         }
 
-        dyd_mat = DyadicMatrix(u, -t.conj(), t, u.conj(), k);
+        dyd_mat = DyadicMatrix(u, -t.conj(), t, u.conj(), INT_TYPE(k));
         SO3Matrix so3_mat(dyd_mat);
         auto normal_form_result = ma_normal_form(so3_mat);
         decomposition = normal_form_result.first;

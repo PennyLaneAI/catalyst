@@ -131,7 +131,7 @@ TEST_CASE("Test ross_selinger generic angles", "[RSDecomp][Ross Selinger]")
 
 TEST_CASE("Test ross_selinger pi/16 multiples", "[RSDecomp][Ross Selinger]")
 {
-    double tolerance = GENERATE(1e-2, 1e-3, 1e-4, 1e-5, 1e-6);
+    double tolerance = GENERATE(1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7);
     int angle_int = GENERATE(range(-70, 71));
     double angle = angle_int * M_PI / 16.0;
     CAPTURE(angle);

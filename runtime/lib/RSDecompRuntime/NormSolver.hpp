@@ -17,7 +17,6 @@
 #include <algorithm>
 #include <boost/multiprecision/miller_rabin.hpp>
 #include <cmath>
-#include <numeric>
 #include <optional>
 #include <random>
 #include <tuple>
@@ -38,36 +37,7 @@ std::optional<std::vector<ZSqrtTwo>> factorize_prime_zsqrt_two(INT_TYPE p);
 std::optional<ZOmega> factorize_prime_zomega(const ZSqrtTwo &x, INT_TYPE p);
 std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trials = 1000);
 
-/**
- * @brief Computes GCD for standard integers.
- */
-inline INT_TYPE gcd(INT_TYPE a, INT_TYPE b) { return std::gcd(a, b); }
 
-/**
- * @brief Computes GCD for elements in the Z[sqrt(2)] ring.
- */
-inline ZSqrtTwo gcd(ZSqrtTwo elem1, ZSqrtTwo elem2)
-{
-    while (elem2 != ZSqrtTwo(0, 0)) {
-        ZSqrtTwo temp = elem1 % elem2;
-        elem1 = elem2;
-        elem2 = temp;
-    }
-    return elem1;
-}
-
-/**
- * @brief Computes GCD for elements in the Z[omega] ring.
- */
-inline ZOmega gcd(ZOmega elem1, ZOmega elem2)
-{
-    while (elem2 != ZOmega(0, 0, 0, 0)) {
-        ZOmega temp = elem1 % elem2;
-        elem1 = elem2;
-        elem2 = temp;
-    }
-    return elem1;
-}
 
 // --- Number Theoretic Algorithms ---
 /**
@@ -101,7 +71,9 @@ inline INT_TYPE legendre_symbol(INT_TYPE a, INT_TYPE p)
         return *val_opt;
     }
 
-    INT_TYPE result = mod_pow(a, (p - 1) / 2, p);
+    // Use boost's powm for modular exponentiation with multiprecision integers
+    INT_TYPE exp = (p - 1) / 2;
+    INT_TYPE result = boost::multiprecision::powm(a, exp, p);
     cache.put(key, result);
     return result;
 }
@@ -115,7 +87,7 @@ inline std::optional<INT_TYPE> sqrt_modulo_p(INT_TYPE n, INT_TYPE p)
     if (a < 0)
         a += p;
     if (a == 0)
-        return 0;
+        return INT_TYPE(0);
     if (p == 2)
         return a;
     if (legendre_symbol(a, p) != 1 || p % 2 == 0)
@@ -128,33 +100,39 @@ inline std::optional<INT_TYPE> sqrt_modulo_p(INT_TYPE n, INT_TYPE p)
         s++;
     }
 
-    if (s == 1)
-        return mod_pow(a, (p + 1) / 4, p);
+    if (s == 1) {
+        INT_TYPE exp = (p + 1) / 4;
+        return boost::multiprecision::powm(a, exp, p);
+    }
 
     INT_TYPE z = 2;
     while (legendre_symbol(z, p) != p - 1)
         z++;
 
     INT_TYPE m = s;
-    INT_TYPE c = mod_pow(z, q, p);
-    INT_TYPE t = mod_pow(a, q, p);
-    INT_TYPE r = mod_pow(a, (q + 1) / 2, p);
+    INT_TYPE c = boost::multiprecision::powm(z, q, p);
+    INT_TYPE t = boost::multiprecision::powm(a, q, p);
+    INT_TYPE q_plus_1_div_2 = (q + 1) / 2;
+    INT_TYPE r = boost::multiprecision::powm(a, q_plus_1_div_2, p);
 
     while (t != 1) {
         int i = 0;
         INT_TYPE t2i = t;
         while (t2i != 1) {
-            t2i = mod_mul(t2i, t2i, p);
+            t2i = (t2i * t2i) % p;
             i++;
             if (i == m)
                 return std::nullopt;
         }
 
-        INT_TYPE b = mod_pow<INT_TYPE>(c, 1LL << (m - i - 1), p);
+        // Calculate 2^(m - i - 1) for the exponent
+        INT_TYPE m_minus_i_minus_1 = m - i - 1;
+        INT_TYPE exp_val = INT_TYPE(1) << static_cast<unsigned>(m_minus_i_minus_1);
+        INT_TYPE b = boost::multiprecision::powm(c, exp_val, p);
         m = i;
-        c = mod_mul(b, b, p);
-        t = mod_mul(t, c, p);
-        r = mod_mul(r, b, p);
+        c = (b * b) % p;
+        t = (t * c) % p;
+        r = (r * b) % p;
     }
 
     return r;
@@ -178,32 +156,48 @@ inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_tries)
         return std::nullopt;
     }
     if (n % 2 == 0) {
-        cache.put(cache_key, 2);
-        return 2;
+        cache.put(cache_key, INT_TYPE(2));
+        return INT_TYPE(2);
     }
 
-    static std::mt19937 gen(std::random_device{}());
+    static std::mt19937_64 gen(std::random_device{}());
 
     // max_tries is a copy (pass-by-value), so decrementing it is fine.
     // The original value is already stored in cache_key.
     while (max_tries-- > 0) {
-        std::uniform_int_distribution<INT_TYPE> distrib(1, n - 1);
-        INT_TYPE y = distrib(gen);
-        INT_TYPE c = distrib(gen);
-        INT_TYPE m = distrib(gen);
+        // For boost multiprecision, we use a different approach:
+        // Generate random numbers in a valid range using 64-bit generator
+        // and then use modulo to fit in range
+        auto random_in_range = [&](const INT_TYPE& max_val) -> INT_TYPE {
+            // For large numbers, generate multiple 64-bit chunks
+            INT_TYPE result = 0;
+            INT_TYPE temp_max = max_val;
+            while (temp_max > 0) {
+                result = (result << 64) | gen();
+                temp_max >>= 64;
+            }
+            return (result % max_val) + 1;
+        };
+
+        INT_TYPE n_minus_1 = n - 1;
+        INT_TYPE y = random_in_range(n_minus_1);
+        INT_TYPE c = random_in_range(n_minus_1);
+        INT_TYPE m = random_in_range(n_minus_1);
         INT_TYPE g = 1, r = 1, q = 1, x = y, xs;
 
         while (g == 1) {
             x = y;
-            for (int i = 0; i < r; ++i)
-                y = (mod_mul(y, y, n) + c) % n;
+            for (INT_TYPE i = 0; i < r; ++i)
+                y = ((y * y) % n + c) % n;
 
             INT_TYPE k = 0;
             while (k < r && g == 1) {
                 xs = y;
-                for (INT_TYPE i = 0; i < min(m, r - k); ++i) {
-                    y = (mod_mul(y, y, n) + c) % n;
-                    q = mod_mul(q, abs_val(x - y), n);
+                INT_TYPE loop_limit = min(m, r - k);
+                for (INT_TYPE i = 0; i < loop_limit; ++i) {
+                    y = ((y * y) % n + c) % n;
+                    INT_TYPE diff = x > y ? x - y : y - x;  // abs_val for unsigned-like behavior
+                    q = (q * diff) % n;
                 }
                 g = gcd(q, n);
                 k += m;
@@ -215,8 +209,9 @@ inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_tries)
             g = 1;
             y = xs;
             while (g == 1) {
-                y = (mod_mul(y, y, n) + c) % n;
-                g = gcd(std::abs(static_cast<long long>(x - y)), n);
+                y = ((y * y) % n + c) % n;
+                INT_TYPE diff = x > y ? x - y : y - x;
+                g = gcd(diff, n);
             }
         }
 
@@ -382,7 +377,8 @@ inline std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trial
         return std::nullopt;
 
     auto t2 = xi / s_val;
-    if (std::pow(t2.abs(), 2) != 1)
+    INT_TYPE t2_abs = t2.abs();
+    if (t2_abs * t2_abs != 1)
         return std::nullopt;
 
     auto t2_sqrt = t2.sqrt();

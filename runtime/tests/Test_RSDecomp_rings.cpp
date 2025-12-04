@@ -79,13 +79,13 @@ TEST_CASE("Test ZOmega class", "[RSDecomp][Rings]")
     CHECK(z1.d == 4);
 
     CHECK((z1 + z2) == ZOmega(6, 8, 10, 12));
-    CHECK((z2 + 10) == ZOmega(5, 6, 7, 18));
+    CHECK((z2 + ZOmega(10)) == ZOmega(5, 6, 7, 18));
 
-    CHECK((z2 + 2.0) == ZOmega(5, 6, 7, 10));
+    CHECK((z2 + ZOmega(2)) == ZOmega(5, 6, 7, 10));
     CHECK((z1 - z2) == ZOmega(-4, -4, -4, -4));
     CHECK((z1 * z2) == ZOmega(60, 56, 36, -2));
-    CHECK((z2 * 10) == ZOmega(50, 60, 70, 80));
-    CHECK((z2 * 2.0) == ZOmega(10, 12, 14, 16));
+    CHECK((z2 * INT_TYPE(10)) == ZOmega(50, 60, 70, 80));
+    CHECK((z2 * INT_TYPE(2)) == ZOmega(10, 12, 14, 16));
     REQUIRE_THROWS_WITH(z2 / 2, ContainsSubstring("Non-integer division result"));
     CHECK((ZOmega(2, 4, 6, 8) / 2) == z1);
 
@@ -121,7 +121,7 @@ TEST_CASE("Test DyadicMatrix class", "[RSDecomp][Rings]")
     ZOmega z2 = ZOmega(5, 6, 7, 8);
     DyadicMatrix m1{z1, z2, z1, z2};
 
-    CHECK(m1 * 2 == DyadicMatrix(z1 * 2, z2 * 2, z1 * 2, z2 * 2));
+    CHECK(m1 * ZOmega(2) == DyadicMatrix(z1 * INT_TYPE(2), z2 * INT_TYPE(2), z1 * INT_TYPE(2), z2 * INT_TYPE(2)));
 
     CHECK(m1.flatten() == std::array<ZOmega, 4>{z1, z2, z1, z2});
 

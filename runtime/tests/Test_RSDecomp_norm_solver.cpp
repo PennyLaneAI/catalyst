@@ -155,16 +155,18 @@ TEST_CASE("Test Solve Diophantine", "[RSDecomp][NormSolver]")
 
 TEST_CASE("Test Solve Diophantine Large", "[RSDecomp][NormSolver]")
 {
-    auto [u, t, k] = GENERATE(table<ZOmega, ZOmega, INT_TYPE>({
-        {ZOmega(-26687414, 10541729, 10614512, 40727366),
-         ZOmega(2332111, 20133911, -30805761, 23432014), 52},
-        // {ZOmega(-22067493351, 22078644868, 52098814989, 16270802723),
-        //  ZOmega(-21764478939, 70433513740, -5852668010, 4737137864), 73}
-        // This test can be enabled when we use Arbitrary Prec Ints in solve_diophantine
-        // double check after Utkarsh PR
+    auto [u, k] = GENERATE(table<ZOmega, INT_TYPE>({
+        {ZOmega(-26687414, 10541729, 10614512, 40727366), 52},
+        {ZOmega(-22067493351, 22078644868, 52098814989, 16270802723), 73}
     }));
 
-    auto xi = ZSqrtTwo(std::pow(2, k)) - u.norm().to_sqrt_two();
-    auto x = solve_diophantine(xi).value();
-    CHECK(x == t);
+    // Calculate 2^k as INT_TYPE
+    INT_TYPE two_pow_k = INT_TYPE(1) << static_cast<unsigned>(k);
+    auto xi = ZSqrtTwo(two_pow_k, 0) - u.norm().to_sqrt_two();
+    auto result = solve_diophantine(xi);
+    REQUIRE(result.has_value());
+    ZOmega x = result.value();
+    // Verify the solution satisfies the diophantine equation: x.conj() * x == xi
+    ZSqrtTwo x_norm = (x.conj() * x).to_sqrt_two();
+    CHECK(x_norm == xi);
 }

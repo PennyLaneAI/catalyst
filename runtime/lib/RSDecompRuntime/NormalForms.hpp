@@ -79,8 +79,10 @@ std::pair<std::vector<GateType>, double> ma_normal_form(SO3Matrix &op)
     }
 
     auto su2mat = op.dyadic_mat;
+    // Convert INT_TYPE k values to double for power calculation
+    double k_diff = static_cast<double>(static_cast<long long>(k - su2mat.k));
     auto g_angle =
-        -std::arg(su2mat.a.to_complex() / a.to_complex() * std::pow(M_SQRT2, k - su2mat.k));
+        -std::arg(su2mat.a.to_complex() / a.to_complex() * std::pow(M_SQRT2, k_diff));
     g_phase = g_angle / M_PI - g_phase;
 
     g_phase = std::fmod(g_phase, 2.0);

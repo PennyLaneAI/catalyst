@@ -83,8 +83,10 @@ struct GridOp {
 
     std::vector<double> flatten() const
     {
-        return {a[0] + a[1] / M_SQRT2, b[0] + b[1] / M_SQRT2, c[0] + c[1] / M_SQRT2,
-                d[0] + d[1] / M_SQRT2};
+        return {static_cast<double>(a[0]) + static_cast<double>(a[1]) / M_SQRT2,
+                static_cast<double>(b[0]) + static_cast<double>(b[1]) / M_SQRT2,
+                static_cast<double>(c[0]) + static_cast<double>(c[1]) / M_SQRT2,
+                static_cast<double>(d[0]) + static_cast<double>(d[1]) / M_SQRT2};
     }
 
     GridOp inverse() const
@@ -224,14 +226,14 @@ struct Ellipse {
         a = D[0];
         b = D[1];
         d = D[2];
-        z = 0.5 * std::log2(d / a) / std::log2(LAMBDA);
+        z = 0.5 * std::log2(d / a) / std::log2(LAMBDA_D);
         e = std::sqrt(a * d);
     }
 
-    static Ellipse from_region(double theta, double epsilon, INT_TYPE k = 0)
+    static Ellipse from_region(double theta, double epsilon, int k = 0)
     {
         double t = std::pow(epsilon, 2) / 2.0;
-        double scale = std::pow(2.0, k / 2.0);
+        double scale = std::pow(2.0, static_cast<double>(k) / 2.0);
         double a_val = scale * t;
         double b_val = scale * epsilon;
         double a2 = 1.0 / std::pow(a_val, 2);
@@ -372,20 +374,20 @@ struct EllipseState {
 
     EllipseState apply_grid_op(const GridOp &grid_op) const;
 
-    std::pair<EllipseState, INT_TYPE> apply_shift_op() const
+    std::pair<EllipseState, long long> apply_shift_op() const
     {
-        INT_TYPE k = static_cast<INT_TYPE>(std::floor((1.0 - bias()) / 2.0));
-        double pk_pow = std::pow(LAMBDA, k);
-        double nk_pow = std::pow(LAMBDA, -k);
+        long long k = static_cast<long long>(std::floor((1.0 - bias()) / 2.0));
+        double pk_pow = std::pow(LAMBDA_D, static_cast<double>(k));
+        double nk_pow = std::pow(LAMBDA_D, static_cast<double>(-k));
         Ellipse new_e1 = e1;
         Ellipse new_e2 = e2;
         new_e1.a *= pk_pow;
         new_e1.d *= nk_pow;
-        new_e1.z -= k;
+        new_e1.z -= static_cast<double>(k);
         new_e2.a *= nk_pow;
         new_e2.d *= pk_pow;
-        new_e2.z += k;
-        new_e2.b *= std::pow(-1, k);
+        new_e2.z += static_cast<double>(k);
+        new_e2.b *= std::pow(-1.0, static_cast<double>(k));
         return {EllipseState(new_e1, new_e2), k};
     }
 
@@ -394,7 +396,8 @@ struct EllipseState {
         if (!e1.positive_semi_definite() || !e2.positive_semi_definite()) {
             throw std::runtime_error("Ellipse is not positive semi-definite");
         }
-        INT_TYPE sign = 1, k = 0;
+        long long sign = 1;
+        long long k = 0;
         GridOp grid_op = GridOp::from_string("I");
         if (e2.b < 0) {
             grid_op = grid_op * GridOp::from_string("Z");
@@ -404,8 +407,8 @@ struct EllipseState {
             grid_op = grid_op * GridOp::from_string("X");
         }
         if (std::abs(bias()) > 2) {
-            INT_TYPE n = static_cast<INT_TYPE>(round((1.0 - sign * bias()) / 4.0));
-            grid_op = grid_op * GridOp::from_string("U").pow(n);
+            long long n = static_cast<long long>(round((1.0 - static_cast<double>(sign) * bias()) / 4.0));
+            grid_op = grid_op * GridOp::from_string("U").pow(INT_TYPE(n));
         }
         GridOp n_grid_op = GridOp::from_string("I");
         EllipseState new_state = this->apply_grid_op(grid_op);
@@ -440,7 +443,7 @@ struct EllipseState {
                 }
                 else if (current_e1.z >= 0.3 && current_e2.z >= 0.3) {
                     INT_TYPE n = static_cast<INT_TYPE>(max(
-                        1.0, std::floor(std::pow(LAMBDA, min(current_e1.z, current_e2.z)) / 2.0)));
+                        1.0, std::floor(std::pow(LAMBDA_D, min(current_e1.z, current_e2.z)) / 2.0)));
                     n_grid_op = n_grid_op * GridOp::from_string("A").pow(n);
                 }
                 else {
@@ -451,7 +454,7 @@ struct EllipseState {
                 if (current_e1.z >= -0.2 && current_e2.z >= -0.2) {
                     INT_TYPE n = static_cast<INT_TYPE>(max(
                         1.0,
-                        std::floor(std::pow(LAMBDA, min(current_e1.z, current_e2.z)) / M_SQRT2)));
+                        std::floor(std::pow(LAMBDA_D, min(current_e1.z, current_e2.z)) / M_SQRT2)));
                     n_grid_op = n_grid_op * GridOp::from_string("B").pow(n);
                 }
                 else {
@@ -460,7 +463,7 @@ struct EllipseState {
             }
         }
         if (k != 0) {
-            n_grid_op = n_grid_op.apply_shift_op(k);
+            n_grid_op = n_grid_op.apply_shift_op(INT_TYPE(k));
         }
         grid_op = grid_op * n_grid_op;
         return {grid_op, this->apply_grid_op(grid_op)};

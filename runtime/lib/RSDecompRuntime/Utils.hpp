@@ -66,16 +66,31 @@ template <typename T> inline T mod_pow(T base, T exp, T mod)
 
 template <typename T> inline T floor_div(T a, T b)
 {
-    if (b == 0) {
+    if (b == T(0)) {
         throw std::invalid_argument("Division by zero");
     }
     T q = a / b;
     T r = a % b;
-    if ((r != 0) && ((r < 0) != (b < 0))) {
-        q -= 1;
+    // Explicit comparison with T(0) for boost multiprecision compatibility
+    if ((r != T(0)) && ((r < T(0)) != (b < T(0)))) {
+        q -= T(1);
     }
     return q;
 }
+
+/**
+ * @brief Computes GCD for generic types supporting % and comparison with 0.
+ */
+template <typename T>
+T gcd(T a, T b) {
+    while (b != T(0)) {
+        T temp = a % b;
+        a = b;
+        b = temp;
+    }
+    return a;
+}
+
 template <typename Key, typename Value, size_t MaxSize> class lru_cache {
     static_assert(MaxSize > 0, "LRU cache MaxSize must be greater than 0");
 
