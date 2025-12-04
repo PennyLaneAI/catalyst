@@ -23,14 +23,15 @@ pytestmark = pytest.mark.usefixtures("requires_xdsl")
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
 import pennylane as qml
+from xdsl.dialects import test
+from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir.core import Block, Region
+
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
-from xdsl.dialects import test
-from xdsl.dialects.builtin import ModuleOp
-from xdsl.ir.core import Block, Region
 
 
 class FakeDAGBuilder(DAGBuilder):
@@ -491,7 +492,7 @@ class TestIfOp:
         @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
-        def my_workflow(x,y):
+        def my_workflow(x, y):
             if x == 1:
                 if y == 2:
                     qml.H(0)
@@ -501,7 +502,7 @@ class TestIfOp:
             else:
                 qml.Z(0)
 
-        args = (1,2)
+        args = (1, 2)
         module = my_workflow(*args)
 
         utility = ConstructCircuitDAG(FakeDAGBuilder())
