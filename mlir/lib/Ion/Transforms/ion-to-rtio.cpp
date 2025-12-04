@@ -706,36 +706,6 @@ LogicalResult CleanQuantumOps(func::FuncOp funcOp, MLIRContext *ctx)
     return success();
 }
 
-LogicalResult CanonicalizeKernelFunction(func::FuncOp funcOp, MLIRContext *ctx)
-{
-    RewritePatternSet patterns(ctx);
-    for (auto *dialect : ctx->getLoadedDialects()) {
-        dialect->getCanonicalizationPatterns(patterns);
-    }
-    for (RegisteredOperationName op : ctx->getRegisteredOperations()) {
-        op.getCanonicalizationPatterns(patterns, ctx);
-    }
-    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-        return failure();
-    }
-
-    IRRewriter rewriter(ctx);
-    DominanceInfo domInfo(funcOp);
-    eliminateCommonSubExpressions(rewriter, domInfo, funcOp);
-
-    return success();
-}
-
-LogicalResult ResolveChannelMapping(func::FuncOp funcOp, MLIRContext *ctx)
-{
-    RewritePatternSet patterns(ctx);
-    patterns.add<ResolveChannelMappingPattern>(ctx);
-    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
-        return failure();
-    }
-    return success();
-}
-
 //===----------------------------------------------------------------------===//
 // JSON to MLIR Attribute Conversion
 //===----------------------------------------------------------------------===//
@@ -932,10 +902,17 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         return success();
     }
 
-    LogicalResult PropagateEvents(func::FuncOp funcOp, MLIRContext *ctx)
+    LogicalResult FinalizeKernelFunction(func::FuncOp funcOp, MLIRContext *ctx)
     {
         RewritePatternSet patterns(ctx);
+        for (auto *dialect : ctx->getLoadedDialects()) {
+            dialect->getCanonicalizationPatterns(patterns);
+        }
+        for (RegisteredOperationName op : ctx->getRegisteredOperations()) {
+            op.getCanonicalizationPatterns(patterns, ctx);
+        }
         patterns.add<PropagateEventsPattern>(ctx);
+        patterns.add<ResolveChannelMappingPattern>(ctx);
         if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
             return failure();
         }
@@ -978,6 +955,8 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         OpBuilder builder(ctx);
 
         int globalCounter = 0;
+
+        // create a global memref for each quantum.alloc op
         funcOp.walk([&](quantum::AllocOp allocOp) {
             size_t numQubits = allocOp.getNqubitsAttr().value();
             auto memrefType =
@@ -1048,6 +1027,20 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         });
     }
 
+    // In ARTIQ's compilation flow, we need to drop the pulse with transition 0 from the protocol
+    void dropOnePulseFromProtocol(func::FuncOp funcOp)
+    {
+        SmallVector<ion::PulseOp> pulsesToErase;
+        funcOp.walk([&](ion::PulseOp pulseOp) {
+            if (pulseOp.getBeamAttr().getTransitionIndex().getInt() == 0) {
+                pulsesToErase.push_back(pulseOp);
+            }
+        });
+        for (auto pulseOp : pulsesToErase) {
+            pulseOp.erase();
+        }
+    }
+
     void runOnOperation() override
     {
         MLIRContext *ctx = &getContext();
@@ -1092,13 +1085,7 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
 
         // drop one of the pulse from the certain protocol
         // the way we handle the dropped pulse will be updated in the future
-        SmallVector<ion::PulseOp> pulsesToErase;
-        newQnodeFunc.walk([&](ion::PulseOp pulseOp) {
-            if (pulseOp.getBeamAttr().getTransitionIndex().getInt() == 0)
-                pulsesToErase.push_back(pulseOp);
-        });
-        for (auto pulseOp : pulsesToErase)
-            pulseOp.erase();
+        dropOnePulseFromProtocol(newQnodeFunc);
 
         // Construct mapping from qreg alloc and qreg extract to memref
         // In the later conversion, we use the mapping to construct the channel for rtio.pulse
@@ -1119,14 +1106,17 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
                                       qextractToMemrefMap, ctx)) ||
             failed(ParallelProtocolConversion(newQnodeFunc, target, typeConverter, ctx)) ||
             failed(SCFStructuralConversion(newQnodeFunc, target, typeConverter, ctx)) ||
-            failed(PropagateEvents(newQnodeFunc, ctx)) ||
-            failed(CleanQuantumOps(newQnodeFunc, ctx)) ||
-            failed(ResolveChannelMapping(newQnodeFunc, ctx)) ||
-            failed(CanonicalizeKernelFunction(newQnodeFunc, ctx))) {
+            failed(FinalizeKernelFunction(newQnodeFunc, ctx))) {
             newQnodeFunc->emitError("Failed to convert to rtio dialect");
             return signalPassFailure();
         }
 
+        if (failed(CleanQuantumOps(newQnodeFunc, ctx))) {
+            newQnodeFunc->emitError("Failed to clean quantum ops");
+            return signalPassFailure();
+        }
+
+        // remove other unused functions, only keep the kernel function
         for (auto funcOp : llvm::make_early_inc_range(module.getOps<func::FuncOp>())) {
             if (funcOp.getName().str() != newQnodeFunc.getName().str()) {
                 funcOp.erase();
