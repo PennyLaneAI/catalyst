@@ -514,20 +514,30 @@ class TestIfOp:
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
+        # cluster2 -> conditional (1)
+        #   cluster3 -> if
+        #       cluster4 -> conditional ()
+        #           cluster5 -> if
+        #           cluster6 -> else
+        #   cluster7 -> else
 
         # Check first conditional is a cluster within my_workflow
         assert clusters["cluster2"]["cluster_label"] == "conditional"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
 
-        # Check two clusters live within first conditional
+        # Check 'if' cluster of first conditional has another conditional
         assert clusters["cluster3"]["node_label"] == "if ..."
         assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
-        # first conditional's else
+
+        # Second conditional
+        assert clusters["cluster4"]["cluster_label"] == "conditional"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster3"
+        # Check 'if' and 'else' in second conditional
+        assert clusters["cluster5"]["node_label"] == "if ..."
+        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster4"
         assert clusters["cluster6"]["node_label"] == "else"
-        assert clusters["cluster6"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster6"]["parent_cluster_uid"] == "cluster4"
 
         # Check nested if / else is within the first if cluster
-        assert clusters["cluster4"]["node_label"] == "if ..."
-        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster3"
-        assert clusters["cluster5"]["node_label"] == "if ..."
-        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster3"
+        assert clusters["cluster7"]["node_label"] == "else"
+        assert clusters["cluster7"]["parent_cluster_uid"] == "cluster2"
