@@ -38,7 +38,11 @@ from catalyst.utils.exceptions import CompileError
 
 ### Test peephole pass decorators preserve functionality of circuits ###
 @pytest.mark.parametrize("theta", [42.42])
-def test_cancel_inverses_functionality(theta, backend):
+# should be able to get rid of catalyst.passes.cancel_inverses soon, but testing both for now.
+@pytest.mark.parametrize(
+    "cancel_inverses_version", (cancel_inverses, qml.transforms.cancel_inverses)
+)
+def test_cancel_inverses_functionality(theta, backend, cancel_inverses_version):
 
     def circuit(x):
         qml.RX(x, wires=0)
@@ -50,14 +54,17 @@ def test_cancel_inverses_functionality(theta, backend):
 
     customized_device = qml.device(backend, wires=1)
     qjitted_workflow = qjit(qml.QNode(circuit, customized_device))
-    optimized_workflow = qjit(cancel_inverses(qml.QNode(circuit, customized_device)))
+    optimized_workflow = qjit(cancel_inverses_version(qml.QNode(circuit, customized_device)))
 
     assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
     assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
 
 
 @pytest.mark.parametrize("theta", [42.42])
-def test_merge_rotation_functionality(theta, backend):
+@pytest.mark.parametrize(
+    "merge_rotations_version", (merge_rotations, qml.transforms.merge_rotations)
+)
+def test_merge_rotation_functionality(theta, backend, merge_rotations_version):
 
     def circuit(x):
         qml.RX(x, wires=0)
@@ -76,7 +83,7 @@ def test_merge_rotation_functionality(theta, backend):
 
     customized_device = qml.device(backend, wires=1)
     qjitted_workflow = qjit(qml.QNode(circuit, customized_device))
-    optimized_workflow = qjit(merge_rotations(qml.QNode(circuit, customized_device)))
+    optimized_workflow = qjit(merge_rotations_version(qml.QNode(circuit, customized_device)))
 
     assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
     assert np.allclose(reference_workflow(theta), optimized_workflow(theta))

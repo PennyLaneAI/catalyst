@@ -2243,6 +2243,7 @@ def _cond_lowering(
                     [mlir.ir_constant(c) for c in true_jaxpr.consts],  # is never hit in our tests
                     *flat_args_plus_consts,
                     dim_var_values=jax_ctx.dim_var_values,
+                    const_lowering=jax_ctx.const_lowering,
                 )
 
                 YieldOp(out)
@@ -2263,6 +2264,7 @@ def _cond_lowering(
                         [mlir.ir_constants(c) for c in otherwise_jaxpr.consts],
                         *flat_args_plus_consts,
                         dim_var_values=jax_ctx.dim_var_values,
+                        const_lowering=jax_ctx.const_lowering,
                     )
 
                     YieldOp(out)
@@ -2333,6 +2335,7 @@ def _switch_lowering(
                 [mlir.ir_constant(const) for const in branch_jaxpr.consts],
                 *flat_args_plus_consts,
                 dim_var_values=jax_ctx.dim_var_values,
+                const_lowering=jax_ctx.const_lowering,
             )
 
             YieldOp(out)
@@ -2348,6 +2351,7 @@ def _switch_lowering(
             [mlir.ir_constant(const) for const in branch_jaxpr.consts],
             *flat_args_plus_consts,
             dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
         )
 
         YieldOp(out)
@@ -2440,6 +2444,7 @@ def _while_loop_lowering(
             [mlir.ir_constants(c) for c in cond_jaxpr.consts],
             *params,
             dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
         )
 
         pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), pred, []).result
@@ -2461,6 +2466,7 @@ def _while_loop_lowering(
             [mlir.ir_constants(c) for c in cond_jaxpr.consts],
             *params,
             dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
         )
 
         YieldOp(out)
@@ -2591,6 +2597,7 @@ def _for_loop_lowering(
             [mlir.ir_constants(c) for c in body_jaxpr.consts],
             *loop_params,
             dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
         )
         YieldOp(out)
 
@@ -2720,6 +2727,7 @@ def _adjoint_lowering(
             [mlir.ir_constants(c) for c in jaxpr.consts],
             *list(chain(consts, cargs, adjoint_block.arguments)),
             dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
         )
 
         QYieldOp([out[-1]])
@@ -2734,7 +2742,7 @@ def _adjoint_lowering(
         def adjoint_pass_injector(_op: ir.Operation) -> ir.WalkResult:
             if _op.name == "transform.named_sequence":
                 with ir.InsertionPoint.at_block_begin(_op.regions[0].blocks[0]):
-                    adjoint_lowering_pass_op = ApplyRegisteredPassOp(
+                    ApplyRegisteredPassOp(
                         result=ir.OpaqueType.get("transform", 'op<"builtin.module">'),
                         target=_op.regions[0].blocks[0].arguments[0],  # just insert at beginning
                         pass_name="adjoint-lowering",

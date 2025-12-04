@@ -84,7 +84,9 @@ void createHloLoweringStage(OpPassManager &pm)
     LDoptions.aggressiveMode = true;
     pm.addNestedPass<mlir::func::FuncOp>(mlir::createLinalgDetensorizePass(LDoptions));
     pm.addPass(catalyst::createDetensorizeSCFPass());
+    pm.addPass(catalyst::createDetensorizeFunctionBoundaryPass());
     pm.addPass(mlir::createCanonicalizerPass());
+    pm.addPass(mlir::createSymbolDCEPass());
 }
 void createGradientLoweringStage(OpPassManager &pm)
 {
