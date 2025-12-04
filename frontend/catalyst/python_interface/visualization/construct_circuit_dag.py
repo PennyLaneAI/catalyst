@@ -302,9 +302,9 @@ class ConstructCircuitDAG:
                 if not wire in region_wire_map:
                     # IfOp region didn't apply anything on this wire
                     # so default to node before the IfOp
-                    all_nodes.update(wire_map_before.get(wire, {}))
+                    all_nodes.update(wire_map_before.get(wire, set()))
                 else:
-                    all_nodes.update(region_wire_map.get(wire, {}))
+                    all_nodes.update(region_wire_map.get(wire, set()))
                 final_wire_map[wire] = all_nodes
         self._wire_to_node_uids = final_wire_map
 
