@@ -23,7 +23,7 @@
  */
 extern "C" {
 
-size_t rs_decomposition_get_size_0(double theta, double epsilon, bool ppr_basis)
+size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis)
 {
     // This is a dummy implementation
     (void)theta;
@@ -51,7 +51,7 @@ size_t rs_decomposition_get_size_0(double theta, double epsilon, bool ppr_basis)
  * @param epsilon Error
  * @param ppr_basis Whether to use PPR basis
  */
-void rs_decomposition_get_gates_0([[maybe_unused]] size_t *data_allocated, size_t *data_aligned,
+void rs_decomposition_get_gates([[maybe_unused]] size_t *data_allocated, size_t *data_aligned,
                                   size_t offset, size_t size0, size_t stride0, double theta,
                                   double epsilon, bool ppr_basis)
 {
@@ -83,7 +83,7 @@ void rs_decomposition_get_gates_0([[maybe_unused]] size_t *data_allocated, size_
  * @param ppr_basis Whether to use PPR basis
  * @return double The global phase
  */
-double rs_decomposition_get_phase_0(double theta, double epsilon, bool ppr_basis)
+double rs_decomposition_get_phase(double theta, double epsilon, bool ppr_basis)
 {
     (void)theta;
     (void)epsilon;
