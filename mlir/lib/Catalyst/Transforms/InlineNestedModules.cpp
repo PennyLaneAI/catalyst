@@ -268,16 +268,22 @@ LogicalResult RenameFunctionsPattern::matchAndRewrite(Operation *child,
 struct InlineNestedModule : public RewritePattern {
     /// This overload constructs a pattern that matches any operation type.
     InlineNestedModule(MLIRContext *context,
-                       const llvm::SmallSet<StringRef, 8> &externalFuncDeclNames,
-                       llvm::SmallSet<StringRef, 8> *alreadyInlinedFuncDeclNames)
+                       const llvm::SmallSet<StringRef, 8> &externalFuncDeclNames)
         : RewritePattern(MatchAnyOpTypeTag(), 1, context),
-          _externalFuncDeclNames(externalFuncDeclNames),
-          _alreadyInlinedFuncDeclNames(alreadyInlinedFuncDeclNames)
+          _externalFuncDeclNames(externalFuncDeclNames)
     {
     }
 
     llvm::SmallSet<StringRef, 8> _externalFuncDeclNames;
-    llvm::SmallSet<StringRef, 8> *_alreadyInlinedFuncDeclNames;
+
+    // Note: mlir expects pattern objects to be const.
+    // In other words, repeated applications of a rewrite pattern should not have dependency on each
+    // other.
+    // This --inline-nested-module pass is breaking this assumption.
+    //
+    // TODO: refactor this pass to not use the pattern rewriter, but just raw logic in a
+    // `runOnOperation()`
+    mutable llvm::SmallSet<StringRef, 8> alreadyInlinedFuncDeclNames;
 
     LogicalResult matchAndRewrite(Operation *op, PatternRewriter &rewriter) const override
     {
@@ -296,21 +302,15 @@ struct InlineNestedModule : public RewritePattern {
         // If it is a recorded external func decl, erase it if it already has been inlined.
         SmallVector<Operation *> _erasureWorklist;
         for (auto &region : op->getRegions()) {
-            for (auto &block : region.getBlocks()) {
-                for (auto &_op : block) {
-                    if (!isa<func::FuncOp>(_op)) {
-                        continue;
+            auto funcOps = region.getOps<func::FuncOp>();
+            for (auto f : funcOps) {
+                StringRef funcName = f.getName();
+                if (f.isExternal() && _externalFuncDeclNames.contains(funcName)) {
+                    if (alreadyInlinedFuncDeclNames.contains(funcName)) {
+                        _erasureWorklist.push_back(f);
                     }
-
-                    func::FuncOp f = cast<func::FuncOp>(_op);
-                    StringRef funcName = f.getName();
-                    if (f.isExternal() && _externalFuncDeclNames.contains(funcName)) {
-                        if (_alreadyInlinedFuncDeclNames->contains(funcName)) {
-                            _erasureWorklist.push_back(f);
-                        }
-                        else {
-                            _alreadyInlinedFuncDeclNames->insert(funcName);
-                        }
+                    else {
+                        alreadyInlinedFuncDeclNames.insert(funcName);
                     }
                 }
             }
@@ -495,9 +495,7 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         }
 
         RewritePatternSet inlineNested(context);
-        llvm::SmallSet<StringRef, 8> alreadyInlinedFuncDeclNames;
-        inlineNested.add<InlineNestedModule>(context, externalFuncDeclNames,
-                                             &alreadyInlinedFuncDeclNames);
+        inlineNested.add<InlineNestedModule>(context, externalFuncDeclNames);
         run = _stopAfterStep >= 3 || _stopAfterStep == 0;
         if (run && failed(applyPatternsGreedily(symbolTable, std::move(inlineNested), config))) {
             signalPassFailure();
