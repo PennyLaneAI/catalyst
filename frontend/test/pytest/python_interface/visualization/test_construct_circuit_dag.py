@@ -516,8 +516,8 @@ class TestIfOp:
         # cluster2 -> conditional (1)
         #   cluster3 -> if
         #       cluster4 -> conditional ()
-        #           cluster5 -> if 
-        #           cluster6 -> else 
+        #           cluster5 -> if
+        #           cluster6 -> else
         #   cluster7 -> else
 
         # Check first conditional is a cluster within my_workflow
