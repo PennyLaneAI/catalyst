@@ -45,11 +45,12 @@ class ConstructCircuitDAG:
         self._cluster_uid_stack: list[str] = []
 
         # Use counter internally for UID
-        self._uid_counter = 0
+        self._uid_counter: int = 0
 
     def _reset(self) -> None:
         """Resets the instance."""
         self._cluster_uid_stack: list[str] = []
+        self._uid_counter: int = 0
 
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module.
