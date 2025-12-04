@@ -125,6 +125,17 @@ func.func @test_num_qubits_dce() {
     return
 }
 
+// CHECK-LABEL: test_num_qubits_no_cse
+func.func @test_num_qubits_no_cse() -> (i64, i64, !quantum.reg) {
+    // CHECK: quantum.num_qubits
+    // CHECK: quantum.alloc
+    // CHECK: quantum.num_qubits
+    %n1 = quantum.num_qubits : i64
+    %r = quantum.alloc(5) : !quantum.reg
+    %n2 = quantum.num_qubits : i64
+    return %n1, %n2, %r  : i64, i64, !quantum.reg
+}
+
 // CHECK-LABEL: test_hermitian_adjoint_canonicalize
 func.func @test_hermitian_adjoint_canonicalize() -> !quantum.bit {
     %0 = quantum.alloc( 1) : !quantum.reg
