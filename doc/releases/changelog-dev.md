@@ -197,6 +197,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Added missing `detensorize-function-boundary` and `symbol-dce` passes to `Pipelines.cpp`.
+  [(#2266)](https://github.com/PennyLaneAI/catalyst/pull/2266)
+
 * Fixes an issue where a heap-to-stack allocation conversion pass was causing SIGSEGV issues
   during program execution at runtime.
   [(#2172)](https://github.com/PennyLaneAI/catalyst/pull/2172)
@@ -354,6 +357,7 @@ Yushao Chen,
 Sengthai Heng,
 Jeffrey Kam,
 Christina Lee,
+Joseph Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Lee J. O'Riordan,
