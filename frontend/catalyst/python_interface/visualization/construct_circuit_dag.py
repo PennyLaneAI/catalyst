@@ -93,12 +93,13 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _for_op(self, operation: scf.ForOp) -> None:
         """Handle an xDSL ForOp operation."""
-        uid = f"cluster_{id(operation)}"
 
         # TODO: Extract from IR in future PR
         iter_var = "..."
         start, stop, step = "...", "...", "..."
         label = f"for {iter_var} in range({start}, {stop}, {step})"
+
+        uid = f"cluster{self._cluster_uid_counter}"
         self.dag_builder.add_cluster(
             uid,
             node_label=label,
@@ -106,6 +107,7 @@ class ConstructCircuitDAG:
             cluster_uid=self._cluster_uid_stack[-1],
         )
         self._cluster_uid_stack.append(uid)
+        self._cluster_uid_counter += 1
 
         for region in operation.regions:
             self._visit_region(region)
@@ -115,7 +117,7 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _while_op(self, operation: scf.WhileOp) -> None:
         """Handle an xDSL WhileOp operation."""
-        uid = f"cluster_{id(operation)}"
+        uid = f"cluster{self._cluster_uid_counter}"
         self.dag_builder.add_cluster(
             uid,
             node_label="while ...",
@@ -123,6 +125,7 @@ class ConstructCircuitDAG:
             cluster_uid=self._cluster_uid_stack[-1],
         )
         self._cluster_uid_stack.append(uid)
+        self._cluster_uid_counter += 1
 
         for region in operation.regions:
             self._visit_region(region)
@@ -134,7 +137,7 @@ class ConstructCircuitDAG:
         """Handles the scf.IfOp operation."""
         flattened_if_op: list[tuple[SSAValue | None, Region]] = _flatten_if_op(operation)
 
-        uid = f"cluster_{id(operation)}"
+        uid = f"cluster{self._cluster_uid_counter}"
         self.dag_builder.add_cluster(
             uid,
             node_label="",
@@ -144,6 +147,7 @@ class ConstructCircuitDAG:
             cluster_uid=self._cluster_uid_stack[-1],
         )
         self._cluster_uid_stack.append(uid)
+        self._cluster_uid_counter += 1
 
         # Loop through each branch and visualize as a cluster
         num_regions = len(flattened_if_op)
@@ -157,7 +161,7 @@ class ConstructCircuitDAG:
                 else:
                     return "elif ..."
 
-            uid = f"cluster_ifop_branch{i}_{id(operation)}"
+            uid = f"cluster{self._cluster_uid_counter}"
             self.dag_builder.add_cluster(
                 uid,
                 node_label=_get_conditional_branch_label(i),
@@ -167,6 +171,7 @@ class ConstructCircuitDAG:
                 cluster_uid=self._cluster_uid_stack[-1],
             )
             self._cluster_uid_stack.append(uid)
+            self._cluster_uid_counter += 1
 
             # Go recursively into the branch to process internals
             self._visit_region(region)
