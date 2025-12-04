@@ -15,8 +15,8 @@
 
 from unittest.mock import Mock
 
-from jax import util
 import pytest
+from jax import util
 
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
@@ -314,8 +314,8 @@ class TestForOp:
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
-        assert clusters['cluster2']['node_label'] == "for ... in range(..., ..., ...)"
-        assert clusters['cluster2']['parent_cluster_uid'] == "cluster1"
+        assert clusters["cluster2"]["node_label"] == "for ... in range(..., ..., ...)"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
 
     @pytest.mark.unit
     def test_nested_loop(self):
@@ -340,10 +340,10 @@ class TestForOp:
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
-        assert clusters['cluster2']['node_label'] == "for ... in range(..., ..., ...)"
-        assert clusters['cluster2']['parent_cluster_uid'] == "cluster1"
-        assert clusters['cluster3']['node_label'] == "for ... in range(..., ..., ...)"
-        assert clusters['cluster3']['parent_cluster_uid'] == "cluster2"
+        assert clusters["cluster2"]["node_label"] == "for ... in range(..., ..., ...)"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert clusters["cluster3"]["node_label"] == "for ... in range(..., ..., ...)"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
 
 
 class TestWhileOp:
@@ -372,8 +372,8 @@ class TestWhileOp:
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
-        assert clusters['cluster2']['node_label'] == "while ..."
-        assert clusters['cluster2']['parent_cluster_uid'] == "cluster1"
+        assert clusters["cluster2"]["node_label"] == "while ..."
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
 
 
 class TestIfOp:
@@ -404,14 +404,14 @@ class TestIfOp:
         # cluster0 -> qjit
         # cluster1 -> my_workflow
         # Check conditional is a cluster within cluster1 (my_workflow)
-        assert clusters['cluster2']['cluster_label'] == "conditional"
-        assert clusters['cluster2']['parent_cluster_uid'] == "cluster1"
+        assert clusters["cluster2"]["cluster_label"] == "conditional"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
 
         # Check three clusters live within cluster2 (conditional)
-        assert clusters['cluster3']['node_label'] == "if ..."
-        assert clusters['cluster3']['parent_cluster_uid'] == "cluster2"
-        assert clusters['cluster5']['node_label'] == "else"
-        assert clusters['cluster5']['parent_cluster_uid'] == "cluster2"
+        assert clusters["cluster3"]["node_label"] == "if ..."
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster5"]["node_label"] == "else"
+        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
 
     @pytest.mark.unit
     def test_if_elif_else_conditional(self):
@@ -440,13 +440,13 @@ class TestIfOp:
         # cluster0 -> qjit
         # cluster1 -> my_workflow
         # Check conditional is a cluster within my_workflow
-        assert clusters['cluster2']['cluster_label'] == "conditional"
-        assert clusters['cluster2']['parent_cluster_uid'] == "cluster1"
+        assert clusters["cluster2"]["cluster_label"] == "conditional"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
 
         # Check three clusters live within conditional
-        assert clusters['cluster3']['node_label'] == "if ..."
-        assert clusters['cluster3']['parent_cluster_uid'] == "cluster2"
-        assert clusters['cluster4']['node_label'] == "elif ..."
-        assert clusters['cluster4']['parent_cluster_uid'] == "cluster2"
-        assert clusters['cluster5']['node_label'] == "else"
-        assert clusters['cluster5']['parent_cluster_uid'] == "cluster2"
+        assert clusters["cluster3"]["node_label"] == "if ..."
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster4"]["node_label"] == "elif ..."
+        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster5"]["node_label"] == "else"
+        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
