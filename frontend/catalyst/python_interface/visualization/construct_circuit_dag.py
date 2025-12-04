@@ -204,15 +204,10 @@ class ConstructCircuitDAG:
     def _for_op(self, operation: scf.ForOp) -> None:
         """Handle an xDSL ForOp operation."""
 
-        # TODO: Extract from IR in future PR
-        iter_var = "..."
-        start, stop, step = "...", "...", "..."
-        label = f"for {iter_var} in range({start}, {stop}, {step})"
-
         uid = f"cluster{self._cluster_uid_counter}"
         self.dag_builder.add_cluster(
             uid,
-            node_label=label,
+            node_label="for loop",
             label="",
             cluster_uid=self._cluster_uid_stack[-1],
         )
@@ -230,7 +225,7 @@ class ConstructCircuitDAG:
         uid = f"cluster{self._cluster_uid_counter}"
         self.dag_builder.add_cluster(
             uid,
-            node_label="while ...",
+            node_label="while loop",
             label="",
             cluster_uid=self._cluster_uid_stack[-1],
         )
@@ -252,7 +247,6 @@ class ConstructCircuitDAG:
             uid,
             node_label="",
             label="conditional",
-            fontsize=10,
             labeljust="l",
             cluster_uid=self._cluster_uid_stack[-1],
         )
@@ -270,11 +264,11 @@ class ConstructCircuitDAG:
             # Visualize with a cluster
             def _get_conditional_branch_label(i):
                 if i == 0:
-                    return "if ..."
+                    return "if"
                 elif i == num_regions - 1:
                     return "else"
                 else:
-                    return "elif ..."
+                    return "elif"
 
             uid = f"cluster{self._cluster_uid_counter}"
             self.dag_builder.add_cluster(
