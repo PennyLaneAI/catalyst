@@ -539,5 +539,231 @@ class TestIfOp:
         assert clusters["cluster6"]["parent_cluster_uid"] == "cluster4"
 
         # Check nested if / else is within the first if cluster
-        assert clusters["cluster7"]["node_label"] == "else"
         assert clusters["cluster7"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster7"]["node_label"] == "else"
+
+
+class TestCreateStaticOperatorNodes:
+    """Tests that operators with static parameters can be created and visualized as nodes."""
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("op", [qml.H(0), qml.X(0), qml.SWAP([0, 1])])
+    def test_custom_op(self, op):
+        """Tests that the CustomOp operation node can be created and visualized."""
+
+        # Build module with only a CustomOp
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            qml.apply(op)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.get_nodes()
+        assert len(nodes) == 2  # Device node + operator
+
+        assert nodes["node1"]["label"] == str(op)
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize(
+        "op",
+        [
+            qml.GlobalPhase(0.5),
+            qml.GlobalPhase(0.5, wires=0),
+            qml.GlobalPhase(0.5, wires=[0, 1]),
+        ],
+    )
+    def test_global_phase_op(self, op):
+        """Test that GlobalPhase can be handled."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            qml.apply(op)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.get_nodes()
+        assert len(nodes) == 2  # Device node + operator
+
+        assert nodes["node1"]["label"] == str(op)
+
+    @pytest.mark.unit
+    def test_qubit_unitary_op(self):
+        """Test that QubitUnitary operations can be handled."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            qml.QubitUnitary([[0, 1], [1, 0]], wires=0)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.get_nodes()
+        assert len(nodes) == 2  # Device node + operator
+
+        assert nodes["node1"]["label"] == str(qml.QubitUnitary([[0, 1], [1, 0]], wires=0))
+
+    @pytest.mark.unit
+    def test_multi_rz_op(self):
+        """Test that MultiRZ operations can be handled."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            qml.MultiRZ(0.5, wires=[0])
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.get_nodes()
+        assert len(nodes) == 2  # Device node + operator
+
+        assert nodes["node1"]["label"] == str(qml.MultiRZ(0.5, wires=[0]))
+
+
+class TestCreateStaticMeasurementNodes:
+    """Tests that measurements with static parameters can be created and visualized as nodes."""
+
+    @pytest.mark.unit
+    def test_state_op(self):
+        """Test that qml.state can be handled."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            return qml.state()
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.get_nodes()
+        assert len(nodes) == 2  # Device node + operator
+
+        assert nodes["node1"]["label"] == str(qml.state())
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("meas_fn", [qml.expval, qml.var])
+    def test_expval_var_measurement_op(self, meas_fn):
+        """Test that statistical measurement operators can be captured as nodes."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            return meas_fn(qml.Z(0))
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        # Ensure DAG only has one node
+        nodes = utility.dag_builder.get_nodes()
+        assert len(nodes) == 2  # Device node + operator
+
+        assert nodes["node1"]["label"] == str(meas_fn(qml.Z(0)))
+
+    @pytest.mark.unit
+    def test_probs_measurement_op(self):
+        """Tests that the probs measurement function can be captured as a node."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            return qml.probs()
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.get_nodes()
+        assert len(nodes) == 2  # Device node + operator
+
+        assert nodes["node1"]["label"] == str(qml.probs())
+
+    @pytest.mark.unit
+    def test_sample_measurement_op(self):
+        """Tests that the sample measurement function can be captured as a node."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.set_shots(10)
+        @qml.qnode(dev)
+        def my_circuit():
+            return qml.sample()
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.get_nodes()
+        assert len(nodes) == 2  # Device node + operator
+
+        assert nodes["node1"]["label"] == str(qml.sample())
+
+    @pytest.mark.unit
+    def test_projective_measurement_op(self):
+        """Test that projective measurements can be captured as nodes."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            measure(0)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.get_nodes()
+        assert len(nodes) == 2  # Device node + operator
+
+        assert "MidMeasure" in nodes["node1"]["label"]
