@@ -767,3 +767,28 @@ class TestCreateStaticMeasurementNodes:
         assert len(nodes) == 2  # Device node + operator
 
         assert "MidMeasure" in nodes["node1"]["label"]
+
+class TestOperatorConnectivity:
+    """Tests that operators are properly connected."""
+
+    @pytest.mark.unit
+    def test_static_connection_within_cluster(self):
+        """Tests that connections can be made within the same cluster."""
+        pass
+
+    @pytest.mark.unit
+    def test_static_connection_through_clusters(self):
+        """Tests that connections can be made through nested clusters."""
+        pass
+
+    @pytest.mark.unit
+    def test_static_connection_through_conditional(self):
+        """Tests that connections through conditionals make sense."""
+        pass
+
+
+class TestTerminalMeasurementConnectivity:
+    """Test that terminal measurements connect properly."""
+
+    pass
+
