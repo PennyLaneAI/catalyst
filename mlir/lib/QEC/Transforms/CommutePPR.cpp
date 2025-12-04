@@ -15,7 +15,6 @@
 #define DEBUG_TYPE "commute-ppr"
 
 #include "mlir/Analysis/TopologicalSortUtils.h"
-#include "mlir/IR/Dominance.h"
 
 #include "QEC/IR/QECOpInterfaces.h"
 #include "QEC/IR/QECOps.h"
