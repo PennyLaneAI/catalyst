@@ -916,6 +916,11 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
             return failure();
         }
+
+        IRRewriter rewriter(ctx);
+        DominanceInfo domInfo(funcOp);
+        eliminateCommonSubExpressions(rewriter, domInfo, funcOp);
+
         return success();
     }
 
