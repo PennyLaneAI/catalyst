@@ -131,6 +131,7 @@ class ConstructCircuitDAG:
         """Handle func.return to exit FuncOp's cluster scope."""
 
         # NOTE: Skip first cluster as it is the "base" of the graph diagram.
+        # In our case, it is the `qjit` bounding box.
         if len(self._cluster_uid_stack) > 1:
             # If we hit a func.return operation we know we are leaving
             # the FuncOp's scope and so we can pop the ID off the stack.
