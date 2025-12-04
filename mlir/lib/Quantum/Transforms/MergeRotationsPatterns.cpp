@@ -322,24 +322,6 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
     }
 };
 
-bool matchingQubitsAndPaulis(PPRotationArbitraryOp op, PPRotationArbitraryOp parentOp)
-{
-    // construct map
-    llvm::DenseMap<mlir::Value, Attribute> qubit_to_pauli;
-    for (auto [qubit, pauli] : llvm::zip(parentOp.getOutQubits(), parentOp.getPauliProduct())) {
-        qubit_to_pauli[qubit] = pauli;
-    }
-
-    // check pairings
-    for (auto [qubit, pauli] : llvm::zip(op.getInQubits(), op.getPauliProduct())) {
-        if (qubit_to_pauli[qubit] != pauli) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 struct MergePPRRewritePattern : public OpRewritePattern<PPRotationOp> {
     using OpRewritePattern::OpRewritePattern;
 
@@ -420,51 +402,81 @@ struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbit
     LogicalResult matchAndRewrite(PPRotationArbitraryOp op,
                                   PatternRewriter &rewriter) const override
     {
-        ValueRange inQubits = op.getInQubits();
-        Operation *definingOp = inQubits[0].getDefiningOp();
+        ValueRange opInQubits = op.getInQubits();
 
+        Operation *definingOp = opInQubits[0].getDefiningOp();
         if (!definingOp) {
             return failure();
         }
 
-        auto prevOp = dyn_cast<PPRotationArbitraryOp>(definingOp);
-
-        if (!prevOp) {
+        auto parentOp = dyn_cast<PPRotationArbitraryOp>(definingOp);
+        if (!parentOp) {
             return failure();
         }
 
-        // verify that prevOp agrees on all qubits, not just the first
-        for (mlir::Value qubit : inQubits) {
-            if (qubit.getDefiningOp() != prevOp) {
+        // verify that parentOp is parent of all qubits
+        for (mlir::Value qubit : opInQubits) {
+            if (qubit.getDefiningOp() != parentOp) {
+                return failure();
+            }
+        }
+        ValueRange parentOpOutQubits = parentOp.getOutQubits();
+        if (parentOpOutQubits.size() != opInQubits.size()) {
+            return failure();
+        }
+
+        // When two rotations have permuted Pauli strings, we can still merge them, we just need to
+        // correctly re-map the inputs. This map stores the index of a qubit in parentOp's out
+        // qubits at the index it appears in op's in qubits.
+        uint16_t *inverse_permutation = (uint16_t *)malloc(opInQubits.size() * sizeof(uint16_t));
+        for (auto [i, parentQubit] : llvm::enumerate(parentOpOutQubits)) {
+            for (auto [j, opQubit] : llvm::enumerate(opInQubits)) {
+                if (parentQubit == opQubit) {
+                    inverse_permutation[j] = i;
+                }
+            }
+        }
+
+        // check Pauli + qubit pairings
+        mlir::ArrayAttr opPauliProduct = op.getPauliProduct();
+        mlir::ArrayAttr parentOpPauliProduct = parentOp.getPauliProduct();
+        for (size_t i = 0; i < opInQubits.size(); i++) {
+            if (opPauliProduct[i] != parentOpPauliProduct[inverse_permutation[i]]) {
                 return failure();
             }
         }
 
-        // check that the same pauli operators are applied to the same qubits
-        if (!matchingQubitsAndPaulis(op, prevOp)) {
+        // check same conditionals
+        mlir::Value opCondition = op.getCondition();
+        if (opCondition != parentOp.getCondition()) {
             return failure();
         }
 
-        // check same conditionals
-        if (op.getCondition() != prevOp.getCondition()) {
-            return failure();
-        }
+        mlir::Location loc = op.getLoc();
 
         mlir::Value opRotation = op.getArbitraryAngle();
-        mlir::Value prevOpRotation = prevOp.getArbitraryAngle();
-
-        // create merged op
-        mlir::Location loc = op.getLoc();
+        mlir::Value parentOpRotation = parentOp.getArbitraryAngle();
         mlir::Value newAngleOp =
-            rewriter.create<arith::AddFOp>(loc, opRotation, prevOpRotation).getResult();
+            rewriter.create<arith::AddFOp>(loc, opRotation, parentOpRotation).getResult();
 
-        auto mergeOp = rewriter.create<PPRotationArbitraryOp>(
-            loc, op.getOutQubits().getTypes(), op.getPauliProduct(), newAngleOp,
-            prevOp.getInQubits(), op.getCondition());
+        // We need to construct the Pauli string + inQubits for new op. The simplest way to ensure
+        // that permuted PPRs can merge correctly is to maintain output qubits order and permute
+        // input qubits
+        mlir::ValueRange parentOpInQubits = parentOp.getInQubits();
+        SmallVector<mlir::Value> newInQubits;
+        for (size_t i = 0; i < parentOpInQubits.size(); i++) {
+            newInQubits.push_back(parentOpInQubits[inverse_permutation[i]]);
+        }
+
+        auto mergeOp = rewriter.create<PPRotationArbitraryOp>(loc, parentOpOutQubits.getTypes(),
+                                                              opPauliProduct, newAngleOp,
+                                                              newInQubits, opCondition);
 
         // replace and erase old ops
         rewriter.replaceOp(op, mergeOp);
-        rewriter.eraseOp(prevOp);
+        rewriter.eraseOp(parentOp);
+
+        free(inverse_permutation);
 
         return success();
     }

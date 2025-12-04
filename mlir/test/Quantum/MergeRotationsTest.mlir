@@ -1074,13 +1074,17 @@ func.func public @half_compatible_qubits(%q0: !quantum.bit, %q1: !quantum.bit, %
 // re-arranging qubits is ok as long as the pauli words are re-arranged too
 
 // CHECK-LABEL: mix_and_match
-func.func public @mix_and_match(%z1: !quantum.bit, %y1: !quantum.bit, %0: f64, %1: f64, %2: f64) {
-    // CHECK: [[angle:%.+]] = arith.addf
-    // CHECK: [[zOut:%.+]], [[yOut:%.+]] = qec.ppr.arbitrary ["Z", "Y"]([[angle]]) %arg0, %arg1
-    // CHECK: qec.ppr.arbitrary ["Y", "X"]({{%.+}}) [[yOut]], [[zOut]]
-    %z2, %y2 = qec.ppr.arbitrary ["Z", "Y"](%0) %zIn, %yIn: !quantum.bit, !quantum.bit
-    %y3, %z3 = qec.ppr.arbitrary ["Y", "Z"](%1) %y2, %z2: !quantum.bit, !quantum.bit
-    %6:2 = qec.ppr.arbitrary ["Y", "X"](%2) %y3, %z3: !quantum.bit, !quantum.bit
+func.func public @mix_and_match(%z0: !quantum.bit, %y0: !quantum.bit, %0: f64, %1: f64, %2: f64, %3: f64) {
+    // think of X as placeholder here, they're necessary to prevent merging, but the other variable
+    // intended to match throughout the test, i.e. y0 -> X -> Y -> Y -> Y, never goes through a Z
+    // CHECK-DAG: [[res0:%.+]]:2 = qec.ppr.arbitrary ["Z", "X"]({{%.+}}) [[z0:%.+]], [[y0:%.+]]
+    // CHECK-DAG: [[angle:%.+]] = arith.addf
+    // CHECK: [[res1:%.+]]:2 = qec.ppr.arbitrary ["Y", "Z"]([[angle]]) [[res0]]#1, [[res0]]#0
+    // CHECK: [[res2:%.+]]:2 = qec.ppr.arbitrary ["Y", "X"]({{%.+}}) [[res1]]#0, [[res1]]#1
+    %z1, %y1 = qec.ppr.arbitrary ["Z", "X"](%0) %z0, %y0: !quantum.bit, !quantum.bit
+    %z2, %y2 = qec.ppr.arbitrary ["Z", "Y"](%1) %z1, %y1: !quantum.bit, !quantum.bit
+    %y3, %z3 = qec.ppr.arbitrary ["Y", "Z"](%2) %y2, %z2: !quantum.bit, !quantum.bit
+    %6:2 = qec.ppr.arbitrary ["Y", "X"](%3) %y3, %z3: !quantum.bit, !quantum.bit
     func.return
 }
 
