@@ -240,7 +240,7 @@ LogicalResult RenameFunctionsPattern::matchAndRewrite(Operation *child,
                 // We should not rename external function declarations, as they can be
                 // names required by other APIs.
                 // We record these external func decls during the rename pattern.
-                // Then during the actual inlining stage, only the first occurance of the per-module
+                // Then during the actual inlining stage, only the first occurrence of the per-module
                 // func decls of these external decls should be inlined.
                 if (auto f = dyn_cast<func::FuncOp>(op)) {
                     if (f.isExternal()) {
