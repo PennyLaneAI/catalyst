@@ -263,6 +263,11 @@
 
   This fix enables automatic qubit management to be used with gradients.
 
+
+* Fixed the :func:`~.passes.commute_ppr` pass incorrectly moving PPRs that live in
+  different blocks/regions.
+  [(#2260)](https://github.com/PennyLaneAI/catalyst/pull/2260)
+
 <h3>Internal changes ⚙️</h3>
 
 * Resource tracking now writes out at device destruction time instead of qubit deallocation

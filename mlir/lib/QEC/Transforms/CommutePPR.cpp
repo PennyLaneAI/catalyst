@@ -15,6 +15,7 @@
 #define DEBUG_TYPE "commute-ppr"
 
 #include "mlir/Analysis/TopologicalSortUtils.h"
+#include "mlir/IR/Dominance.h"
 
 #include "QEC/IR/QECOpInterfaces.h"
 #include "QEC/IR/QECOps.h"
@@ -132,7 +133,11 @@ void moveCliffordPastNonClifford(const PauliStringWrapper &lhsPauli,
 
     // Update the use of value in newRHSOperands
     for (unsigned i = 0; i < newRHSOperands.size(); i++) {
-        newRHSOperands[i].replaceAllUsesExcept(nonCliffordOp.getOutQubits()[i], nonCliffordOp);
+        newRHSOperands[i].replaceUsesWithIf(
+            nonCliffordOp.getOutQubits()[i], [&](OpOperand &operand) {
+                return operand.getOwner() != nonCliffordOp &&
+                       operand.getOwner()->getBlock() == lhs->getBlock();
+            });
     }
 
     rewriter.replaceOp(rhs, rhs.getInQubits());
