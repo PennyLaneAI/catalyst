@@ -429,12 +429,8 @@ struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbit
         // correctly re-map the inputs. This map stores the index of a qubit in parentOp's out
         // qubits at the index it appears in op's in qubits.
         uint16_t *inverse_permutation = (uint16_t *)malloc(opInQubits.size() * sizeof(uint16_t));
-        for (auto [i, parentQubit] : llvm::enumerate(parentOpOutQubits)) {
-            for (auto [j, opQubit] : llvm::enumerate(opInQubits)) {
-                if (parentQubit == opQubit) {
-                    inverse_permutation[j] = i;
-                }
-            }
+        for (auto [i, qubit] : llvm::enumerate(opInQubits)) {
+            inverse_permutation[i] = cast<mlir::OpResult>(qubit).getResultNumber();
         }
 
         // check Pauli + qubit pairings
