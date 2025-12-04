@@ -2,6 +2,9 @@
 
 <h3>New features since last release</h3>
 
+* RTIO dialect is added to bypass the compilation flow from OpenAPL to ARTIQ’s LLVM IR. It is introduced to bridge the gap between ION dialect and ARTIQ’s LLVM IR. The design philosophy of RTIO dialect is primarily event-based. Every operation is asynchronous; sync behaviour occurs only via `rtio.sync` or `wait operand` in event operation.
+  [(#2185)](https://github.com/PennyLaneAI/catalyst/pull/2185)
+
 * Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
   [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
 
@@ -77,7 +80,7 @@
 * An error is now raised if a transform is applied inside a QNode when program capture is enabled.
   [(#2256)](https://github.com/PennyLaneAI/catalyst/pull/2256)
 
-* A new ``"changed"`` option has been added to the ``keep_intermediate`` parameter of 
+* A new ``"changed"`` option has been added to the ``keep_intermediate`` parameter of
   :func:`~.qjit`. This option saves intermediate IR files after each pass,
   but only when the IR is actually modified by the pass.
   [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
@@ -139,9 +142,9 @@
 * The `--adjoint-lowering` pass can now handle PPR operations.
   [(#2227)](https://github.com/PennyLaneAI/catalyst/pull/2227)
 
-* Catalyst now supports Pauli product rotations with arbitrary or dynamic angles in the 
-  QEC dialect. This will allow :class:`qml.PauliRot` with arbitrary or dynamic angles, 
-  angles not known at compile time, to be lowered to the QEC dialect. This is implemented 
+* Catalyst now supports Pauli product rotations with arbitrary or dynamic angles in the
+  QEC dialect. This will allow :class:`qml.PauliRot` with arbitrary or dynamic angles,
+  angles not known at compile time, to be lowered to the QEC dialect. This is implemented
   as a new `qec.ppr.arbitrary` operation, which takes a Pauli product and an arbitrary or
   dynamic angle as input. The arbitrary angles are specified as a double in terms of radian.
   [(#2232)](https://github.com/PennyLaneAI/catalyst/pull/2232)
@@ -158,7 +161,7 @@
 
 * The MLIR pipeline ``enforce-runtime-invariants-pipeline`` has been renamed to
   ``quantum-compilation-pipeline`` and the old ``quantum-compilation-pipeline`` has been renamed to
-  ``gradient-lowering-pipeline``. Users who referenced these pipeline names directly would need to 
+  ``gradient-lowering-pipeline``. Users who referenced these pipeline names directly would need to
   update their code to use the new names.
   [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
 
@@ -193,6 +196,9 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Added missing `detensorize-function-boundary` and `symbol-dce` passes to `Pipelines.cpp`.
+  [(#2266)](https://github.com/PennyLaneAI/catalyst/pull/2266)
 
 * Fixes an issue where a heap-to-stack allocation conversion pass was causing SIGSEGV issues
   during program execution at runtime.
@@ -250,6 +256,12 @@
 * Fixed a bug where `qml.StatePrep` and `qml.BasisState` might be pushed after other
   gates, overwriting their effects.
   [(#2239)](https://github.com/PennyLaneAI/catalyst/pull/2239)
+
+* Fixed a bug where `quantum.num_qubits` operations are not properly removed during classical
+  processing of gradient transforms.
+  [(#2262)](https://github.com/PennyLaneAI/catalyst/pull/2262)
+
+  This fix enables automatic qubit management to be used with gradients.
 
 <h3>Internal changes ⚙️</h3>
 
@@ -309,24 +321,24 @@
   of identities.
   [(#2192)](https://github.com/PennyLaneAI/catalyst/pull/2192)
 
-  * Renamed `annotate-function` pass to `annotate-invalid-gradient-functions` and move it to the 
+  * Renamed `annotate-function` pass to `annotate-invalid-gradient-functions` and move it to the
   gradient dialect and the `lower-gradients` compilation stage.
   [(#2241)](https://github.com/PennyLaneAI/catalyst/pull/2241)
 
   * Added support for PPRs to the :func:`~.passes.merge_rotations` pass to merge PPRs with
   equivalent angles, and cancelling of PPRs with opposite angles, or angles
-  that sum to identity. Also supports conditions on PPRs, merging when conditions are 
+  that sum to identity. Also supports conditions on PPRs, merging when conditions are
   identical and not merging otherwise.
-  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)	
+  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)
   [(#2245)](https://github.com/PennyLaneAI/catalyst/pull/2245)
   [(#2254)](https://github.com/PennyLaneAI/catalyst/pull/2254)
 
 
   * Refactor QEC tablegen files to separate QEC operations into a new `QECOp.td` file
-  [(#2253](https://github.com/PennyLaneAI/catalyst/pull/2253)	
+  [(#2253](https://github.com/PennyLaneAI/catalyst/pull/2253)
 
 
-  * Removed the `getRotationKind` and `setRotationKind` methods from 
+  * Removed the `getRotationKind` and `setRotationKind` methods from
   the QEC interface `QECOpInterface` to simplify the interface.
   [(#2250)](https://github.com/PennyLaneAI/catalyst/pull/2250)
 
@@ -351,6 +363,7 @@ Yushao Chen,
 Sengthai Heng,
 Jeffrey Kam,
 Christina Lee,
+Joseph Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Lee J. O'Riordan,
