@@ -428,9 +428,9 @@ struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbit
         // When two rotations have permuted Pauli strings, we can still merge them, we just need to
         // correctly re-map the inputs. This map stores the index of a qubit in parentOp's out
         // qubits at the index it appears in op's in qubits.
-        uint16_t *inverse_permutation = (uint16_t *)malloc(opInQubits.size() * sizeof(uint16_t));
-        for (auto [i, qubit] : llvm::enumerate(opInQubits)) {
-            inverse_permutation[i] = cast<mlir::OpResult>(qubit).getResultNumber();
+        SmallVector<unsigned> inverse_permutation;
+        for (auto qubit : opInQubits) {
+            inverse_permutation.push_back(cast<mlir::OpResult>(qubit).getResultNumber());
         }
 
         // check Pauli + qubit pairings
@@ -471,8 +471,6 @@ struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbit
         // replace and erase old ops
         rewriter.replaceOp(op, mergeOp);
         rewriter.eraseOp(parentOp);
-
-        free(inverse_permutation);
 
         return success();
     }
