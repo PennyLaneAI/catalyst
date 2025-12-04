@@ -567,7 +567,7 @@ class TestCreateStaticOperatorNodes:
         utility.construct(module)
 
         # Ensure DAG only has one node
-        nodes = utility.dag_builder.get_nodes()
+        nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
         assert nodes["node1"]["label"] == str(op)
@@ -599,7 +599,7 @@ class TestCreateStaticOperatorNodes:
         utility.construct(module)
 
         # Ensure DAG only has one node
-        nodes = utility.dag_builder.get_nodes()
+        nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
         assert nodes["node1"]["label"] == str(op)
@@ -622,7 +622,7 @@ class TestCreateStaticOperatorNodes:
         utility.construct(module)
 
         # Ensure DAG only has one node
-        nodes = utility.dag_builder.get_nodes()
+        nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
         assert nodes["node1"]["label"] == str(qml.QubitUnitary([[0, 1], [1, 0]], wires=0))
@@ -645,7 +645,7 @@ class TestCreateStaticOperatorNodes:
         utility.construct(module)
 
         # Ensure DAG only has one node
-        nodes = utility.dag_builder.get_nodes()
+        nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
         assert nodes["node1"]["label"] == str(qml.MultiRZ(0.5, wires=[0]))
@@ -672,7 +672,7 @@ class TestCreateStaticMeasurementNodes:
         utility.construct(module)
 
         # Ensure DAG only has one node
-        nodes = utility.dag_builder.get_nodes()
+        nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
         assert nodes["node1"]["label"] == str(qml.state())
@@ -696,7 +696,7 @@ class TestCreateStaticMeasurementNodes:
         utility.construct(module)
 
         # Ensure DAG only has one node
-        nodes = utility.dag_builder.get_nodes()
+        nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
         assert nodes["node1"]["label"] == str(meas_fn(qml.Z(0)))
@@ -718,7 +718,7 @@ class TestCreateStaticMeasurementNodes:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        nodes = utility.dag_builder.get_nodes()
+        nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
         assert nodes["node1"]["label"] == str(qml.probs())
@@ -741,7 +741,7 @@ class TestCreateStaticMeasurementNodes:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        nodes = utility.dag_builder.get_nodes()
+        nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
         assert nodes["node1"]["label"] == str(qml.sample())
@@ -763,7 +763,7 @@ class TestCreateStaticMeasurementNodes:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        nodes = utility.dag_builder.get_nodes()
+        nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
         assert "MidMeasure" in nodes["node1"]["label"]
