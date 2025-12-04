@@ -137,7 +137,6 @@ class ConstructCircuitDAG:
             uid,
             node_label="",
             label="conditional",
-            fontsize=10,
             labeljust="l",
             cluster_uid=self._cluster_uid_stack[-1],
         )
