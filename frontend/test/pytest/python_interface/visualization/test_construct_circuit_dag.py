@@ -49,7 +49,7 @@ class FakeDAGBuilder(DAGBuilder):
         self._nodes[uid] = {
             "uid": uid,
             "label": label,
-            "parent_cluster_uid": cluster_uid, 
+            "parent_cluster_uid": cluster_uid,
             "attrs": attrs,
         }
 
@@ -156,12 +156,11 @@ class TestFuncOpVisualization:
 
         # Check qjit is nested under graph
         assert graph_clusters["cluster0"]["cluster_label"] == "qjit"
-        assert graph_clusters["cluster0"]["parent_cluster_uid"] is None 
+        assert graph_clusters["cluster0"]["parent_cluster_uid"] is None
 
         # Check that my_workflow is under qjit
         assert graph_clusters["cluster1"]["cluster_label"] == "my_workflow"
         assert graph_clusters["cluster1"]["parent_cluster_uid"] == "cluster0"
-
 
     def test_nested_qnodes(self):
         """Tests that nested QJIT'd QNodes are visualized correctly"""
@@ -189,7 +188,6 @@ class TestFuncOpVisualization:
 
         graph_clusters = utility.dag_builder.clusters
 
-
         # Check nesting is correct
         # graph
         # └── qjit
@@ -198,7 +196,7 @@ class TestFuncOpVisualization:
 
         # Check qjit is under graph
         assert graph_clusters["cluster0"]["cluster_label"] == "qjit"
-        assert graph_clusters["cluster0"]["parent_cluster_uid"] is None 
+        assert graph_clusters["cluster0"]["parent_cluster_uid"] is None
 
         # Check both qnodes are under my_workflow
         assert graph_clusters["cluster1"]["cluster_label"] == "my_qnode1"
