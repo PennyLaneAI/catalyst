@@ -1073,32 +1073,52 @@ func.func public @half_compatible_qubits(%q0: !quantum.bit, %q1: !quantum.bit, %
 
 // re-arranging qubits is ok as long as the pauli words are re-arranged too
 
-// CHECK-LABEL: mix_and_match
-func.func public @mix_and_match(%z0: !quantum.bit, %y0: !quantum.bit, %0: f64, %1: f64, %2: f64, %3: f64) {
-    // think of X as placeholder here, they're necessary to prevent merging, but the other variable
-    // intended to match throughout the test, i.e. y0 -> X -> Y -> Y -> Y, never goes through a Z
-    // CHECK-DAG: [[res0:%.+]]:2 = qec.ppr.arbitrary ["Z", "X"]({{%.+}}) [[z0:%.+]], [[y0:%.+]]
+// CHECK-LABEL: merge_permutations
+func.func public @merge_permutations(%z0: !quantum.bit, %y0: !quantum.bit, %0: f64, %1: f64, %2: f64, %3: f64) {
     // CHECK-DAG: [[angle:%.+]] = arith.addf
-    // CHECK: [[res1:%.+]]:2 = qec.ppr.arbitrary ["Y", "Z"]([[angle]]) [[res0]]#1, [[res0]]#0
-    // CHECK: [[res2:%.+]]:2 = qec.ppr.arbitrary ["Y", "X"]({{%.+}}) [[res1]]#0, [[res1]]#1
-    %z1, %y1 = qec.ppr.arbitrary ["Z", "X"](%0) %z0, %y0: !quantum.bit, !quantum.bit
-    %z2, %y2 = qec.ppr.arbitrary ["Z", "Y"](%1) %z1, %y1: !quantum.bit, !quantum.bit
-    %y3, %z3 = qec.ppr.arbitrary ["Y", "Z"](%2) %y2, %z2: !quantum.bit, !quantum.bit
-    %6:2 = qec.ppr.arbitrary ["Y", "X"](%3) %y3, %z3: !quantum.bit, !quantum.bit
+    // CHECK: qec.ppr.arbitrary ["Y", "Z"]([[angle]]) %arg1, %arg0
+    %z1, %y1 = qec.ppr.arbitrary ["Z", "Y"](%1) %z0, %y0: !quantum.bit, !quantum.bit
+    %y2, %z2 = qec.ppr.arbitrary ["Y", "Z"](%2) %y1, %z1: !quantum.bit, !quantum.bit
     func.return
 }
 
 // -----
 
-// re-arranging qubits without re-arranging the pauli word is NOT okay
+// check permutations with duplicate Pauli symbols
 
-// CHECK-LABEL: mix_dont_match
-func.func public @mix_dont_match(%q0: !quantum.bit, %q1: !quantum.bit, %0: f64, %1: f64) {
+// CHECK-LABEL: merge_permutations_with_duplicates
+func.func public @merge_permutations_with_duplicates(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit, %0: f64, %1: f64, %2:f64) {
+    // CHECK: [[angle:%.+]] = arith.addf
+    // CHECK: qec.ppr.arbitrary ["Y", "X", "X"]([[angle]]) %arg1, %arg2, %arg0
+    %3:3 = qec.ppr.arbitrary ["X", "Y", "X"](%0) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %4:3 = qec.ppr.arbitrary ["Y", "X", "X"](%1) %3#1, %3#2, %3#0: !quantum.bit, !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// re-arranging qubits without re-arranging the Pauli word is NOT okay
+
+// CHECK-LABEL: dont_merge_permutations_qubits
+func.func public @dont_merge_permutations_qubits(%q0: !quantum.bit, %q1: !quantum.bit, %0: f64, %1: f64) {
     // CHECK: qec.ppr.arbitrary ["Y", "X"]
     // CHECK: qec.ppr.arbitrary ["Y", "X"]
     %2:2 = qec.ppr.arbitrary ["Y", "X"](%0) %q0, %q1: !quantum.bit, !quantum.bit
     %3:2 = qec.ppr.arbitrary ["Y", "X"](%1) %2#1, %2#0: !quantum.bit, !quantum.bit
     func.return
+}
+
+// -----
+
+// re-arranging Pauli word without re-arranging qubits is not okay
+
+// CHECK-LABEL: dont_merge_permutations_pauli
+func.func public @dont_merge_permutations_pauli(%q0: !quantum.bit, %q1: !quantum.bit, %0: f64, %1: f64) {
+    // CHECK: qec.ppr.arbitrary ["Z", "Y"]
+    // CHECK: qec.ppr.arbitrary ["Y", "Z"]
+    %2:2 = qec.ppr.arbitrary ["Z", "Y"](%0) %q0, %q1: !quantum.bit, !quantum.bit
+    %3:2 = qec.ppr.arbitrary ["Y", "Z"](%1) %2#0, %2#1: !quantum.bit, !quantum.bit
+    return
 }
 
 // -----
