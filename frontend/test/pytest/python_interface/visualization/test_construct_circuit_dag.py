@@ -315,6 +315,7 @@ class TestForOp:
         # cluster0 -> qjit
         # cluster1 -> my_workflow
         assert clusters['cluster2']['node_label'] == "for ... in range(..., ..., ...)"
+        assert clusters['cluster2']['parent_cluster_uid'] == "cluster1"
 
     @pytest.mark.unit
     def test_nested_loop(self):
@@ -342,7 +343,7 @@ class TestForOp:
         assert clusters['cluster2']['node_label'] == "for ... in range(..., ..., ...)"
         assert clusters['cluster2']['parent_cluster_uid'] == "cluster1"
         assert clusters['cluster3']['node_label'] == "for ... in range(..., ..., ...)"
-        assert clusters['cluster3']['node_label'] == "cluster2"
+        assert clusters['cluster3']['parent_cluster_uid'] == "cluster2"
 
 
 class TestWhileOp:
@@ -372,6 +373,7 @@ class TestWhileOp:
         # cluster0 -> qjit
         # cluster1 -> my_workflow
         assert clusters['cluster2']['node_label'] == "while ..."
+        assert clusters['cluster2']['parent_cluster_uid'] == "cluster1"
 
 
 class TestIfOp:
