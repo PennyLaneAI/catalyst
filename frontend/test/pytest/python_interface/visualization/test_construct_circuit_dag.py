@@ -410,8 +410,8 @@ class TestIfOp:
         # Check three clusters live within cluster2 (conditional)
         assert clusters["cluster3"]["node_label"] == "if ..."
         assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
-        assert clusters["cluster5"]["node_label"] == "else"
-        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster4"]["node_label"] == "else"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
 
     @pytest.mark.unit
     def test_if_elif_else_conditional(self):
