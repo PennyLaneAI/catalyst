@@ -1085,11 +1085,7 @@ def trace_quantum_measurements(
                 )
 
             if device.wires is None:
-                # Automatic qubit management, need to query num qubits for shape-ful measurements
-                # Note: 2 ifs instead of `and` because the next case uses `is_dynamic_wires`, which
-                # asserts that it is not seeing `None`
-                if type(output) in [SampleMP, CountsMP, ProbabilityMP, StateMP]:
-                    d_wires = num_qubits_p.bind()
+                d_wires = num_qubits_p.bind()
             elif catalyst.device.qjit_device.is_dynamic_wires(device.wires):
                 d_wires = num_qubits_p.bind()
             else:
@@ -1097,7 +1093,6 @@ def trace_quantum_measurements(
 
             m_wires = output.wires if output.wires else None
             obs_tracers, nqubits = trace_observables(output.obs, qrp, m_wires)
-            # pylint: disable=possibly-used-before-assignment
             nqubits = d_wires if nqubits is None else nqubits
 
             using_compbasis = obs_tracers.primitive == compbasis_p
