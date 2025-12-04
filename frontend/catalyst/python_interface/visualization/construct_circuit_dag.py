@@ -48,9 +48,15 @@ class ConstructCircuitDAG:
         # Keep track of nesting clusters using a stack
         self._cluster_uid_stack: list[str] = []
 
+        # Use counter internally for UID
+        self._node_uid_counter: int = 0
+        self._cluster_uid_counter: int = 0
+
     def _reset(self) -> None:
         """Resets the instance."""
         self._cluster_uid_stack: list[str] = []
+        self._node_uid_counter: int = 0
+        self._cluster_uid_counter: int = 0
 
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module.
@@ -169,12 +175,13 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _for_op(self, operation: scf.ForOp) -> None:
         """Handle an xDSL ForOp operation."""
-        uid = f"cluster_{id(operation)}"
 
         # TODO: Extract from IR in future PR
         iter_var = "..."
         start, stop, step = "...", "...", "..."
         label = f"for {iter_var} in range({start}, {stop}, {step})"
+
+        uid = f"cluster{self._cluster_uid_counter}"
         self.dag_builder.add_cluster(
             uid,
             node_label=label,
@@ -182,6 +189,7 @@ class ConstructCircuitDAG:
             cluster_uid=self._cluster_uid_stack[-1],
         )
         self._cluster_uid_stack.append(uid)
+        self._cluster_uid_counter += 1
 
         for region in operation.regions:
             self._visit_region(region)
@@ -191,7 +199,7 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _while_op(self, operation: scf.WhileOp) -> None:
         """Handle an xDSL WhileOp operation."""
-        uid = f"cluster_{id(operation)}"
+        uid = f"cluster{self._cluster_uid_counter}"
         self.dag_builder.add_cluster(
             uid,
             node_label="while ...",
@@ -199,6 +207,7 @@ class ConstructCircuitDAG:
             cluster_uid=self._cluster_uid_stack[-1],
         )
         self._cluster_uid_stack.append(uid)
+        self._cluster_uid_counter += 1
 
         for region in operation.regions:
             self._visit_region(region)
@@ -210,7 +219,7 @@ class ConstructCircuitDAG:
         """Handles the scf.IfOp operation."""
         flattened_if_op: list[tuple[SSAValue | None, Region]] = _flatten_if_op(operation)
 
-        uid = f"cluster_{id(operation)}"
+        uid = f"cluster{self._cluster_uid_counter}"
         self.dag_builder.add_cluster(
             uid,
             node_label="",
@@ -220,6 +229,7 @@ class ConstructCircuitDAG:
             cluster_uid=self._cluster_uid_stack[-1],
         )
         self._cluster_uid_stack.append(uid)
+        self._cluster_uid_counter += 1
 
         # Loop through each branch and visualize as a cluster
         num_regions = len(flattened_if_op)
@@ -233,7 +243,7 @@ class ConstructCircuitDAG:
                 else:
                     return "elif ..."
 
-            uid = f"cluster_ifop_branch{i}_{id(operation)}"
+            uid = f"cluster{self._cluster_uid_counter}"
             self.dag_builder.add_cluster(
                 uid,
                 node_label=_get_conditional_branch_label(i),
@@ -243,6 +253,7 @@ class ConstructCircuitDAG:
                 cluster_uid=self._cluster_uid_stack[-1],
             )
             self._cluster_uid_stack.append(uid)
+            self._cluster_uid_counter += 1
 
             # Go recursively into the branch to process internals
             self._visit_region(region)
@@ -261,7 +272,7 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _device_init(self, operation: quantum.DeviceInitOp) -> None:
         """Handles the initialization of a quantum device."""
-        node_id = f"node_{id(operation)}"
+        node_id = f"node{self._node_uid_counter}"
         self.dag_builder.add_node(
             node_id,
             label=operation.device_name.data,
@@ -271,6 +282,7 @@ class ConstructCircuitDAG:
             penwidth=2,
             shape="rectangle",
         )
+        self._node_uid_counter += 1
 
     # =======================
     # FuncOp NESTING UTILITY
@@ -284,13 +296,14 @@ class ConstructCircuitDAG:
         if "jit_" in operation.sym_name.data:
             label = "qjit"
 
-        uid = f"cluster_{id(operation)}"
+        uid = f"cluster{self._cluster_uid_counter}"
         parent_cluster_uid = None if self._cluster_uid_stack == [] else self._cluster_uid_stack[-1]
         self.dag_builder.add_cluster(
             uid,
             label=label,
             cluster_uid=parent_cluster_uid,
         )
+        self._cluster_uid_counter += 1
         self._cluster_uid_stack.append(uid)
 
         self._visit_block(operation.regions[0].blocks[0])
@@ -300,8 +313,7 @@ class ConstructCircuitDAG:
         """Handle func.return to exit FuncOp's cluster scope."""
 
         # NOTE: Skip first cluster as it is the "base" of the graph diagram.
-        # If it is a multi-qnode workflow, it will represent the "workflow" function
-        # If it is a single qnode, it will represent the quantum function.
+        # In our case, it is the `qjit` bounding box.
         if len(self._cluster_uid_stack) > 1:
             # If we hit a func.return operation we know we are leaving
             # the FuncOp's scope and so we can pop the ID off the stack.
