@@ -90,7 +90,7 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _device_init(self, operation: quantum.DeviceInitOp) -> None:
         """Handles the initialization of a quantum device."""
-        node_id = f"device_node{self._uid_counter}"
+        node_id = f"device_node_{self._uid_counter}"
         self._uid_counter += 1
         self.dag_builder.add_node(
             node_id,
