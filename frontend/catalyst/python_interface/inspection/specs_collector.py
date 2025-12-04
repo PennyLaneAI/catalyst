@@ -24,7 +24,9 @@ from functools import partial, singledispatch
 
 import xdsl
 from xdsl.dialects import func
+from xdsl.dialects.builtin import ModuleOp
 from xdsl.dialects.scf import ForOp, IfOp, IndexSwitchOp, WhileOp
+from xdsl.ir import Region
 
 from catalyst.python_interface.dialects.catalyst import CallbackOp
 from catalyst.python_interface.dialects.mbqc import GraphStatePrepOp, MeasureInBasisOp
@@ -121,6 +123,9 @@ class ResourcesResult:
 
     def merge_with(self, other: "ResourcesResult", method: str = "sum") -> None:
         """Merge another ResourcesResult into this one."""
+
+        if not isinstance(other, ResourcesResult):
+            raise ValueError("Can only merge with another ResourcesResult.")
 
         if method == "max":
             merge_func = max
@@ -391,7 +396,10 @@ def _collect_operation(
 
 
 def _collect_region(
-    region, loop_warning: bool = False, cond_warning: bool = False, adjoint_mode: bool = False
+    region: Region,
+    loop_warning: bool = False,
+    cond_warning: bool = False,
+    adjoint_mode: bool = False,
 ) -> ResourcesResult:
     """Collect PennyLane ops and measurements from a region."""
 
@@ -513,7 +521,7 @@ def _collect_region(
     return resources
 
 
-def specs_collect(module) -> ResourcesResult:
+def specs_collect(module: ModuleOp) -> ResourcesResult:
     """Collect PennyLane resources from the module."""
 
     func_to_resources = {}
