@@ -283,10 +283,11 @@ class TestDeviceNode:
 
         # Assert null qubit device node is inside my_qnode2 cluster
         assert graph_clusters["cluster2"]["cluster_label"] == "my_qnode2"
-        assert graph_nodes["node1"]["parent_cluster_uid"] == "cluster2"
+        # NOTE: node1 is the qml.H(0) in my_qnode1
+        assert graph_nodes["node2"]["parent_cluster_uid"] == "cluster2"
 
         # Assert label is as expected
-        assert graph_nodes["node1"]["label"] == "LightningSimulator"
+        assert graph_nodes["node2"]["label"] == "LightningSimulator"
 
 
 class TestForOp:
