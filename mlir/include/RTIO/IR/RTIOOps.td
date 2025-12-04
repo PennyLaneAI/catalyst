@@ -46,7 +46,7 @@ def RTIOChannelOp : RTIO_Op<"channel", [Pure]> {
     let arguments = (ins);
     let results = (outs RTIOChannelType:$channel);
 
-    let hasCanonicalizeMethod = 1;
+    // let hasCanonicalizeMethod = 1;
 
     let assemblyFormat = [{
         attr-dict `:` type(results)
@@ -74,7 +74,7 @@ def RTIOQubitToChannelOp : RTIO_Op<"qubit_to_channel", [Pure]> {
     let arguments = (ins AnyType:$qubit);
     let results = (outs RTIOChannelType:$channel);
 
-    let hasCanonicalizeMethod = 1;
+    // let hasCanonicalizeMethod = 1;
 
     let assemblyFormat = [{
         $qubit attr-dict `:` type(operands) `->` type(results)

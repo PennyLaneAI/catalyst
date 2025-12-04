@@ -198,6 +198,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Added missing `detensorize-function-boundary` and `symbol-dce` passes to `Pipelines.cpp`.
+  [(#2266)](https://github.com/PennyLaneAI/catalyst/pull/2266)
+
 * Fixes an issue where a heap-to-stack allocation conversion pass was causing SIGSEGV issues
   during program execution at runtime.
   [(#2172)](https://github.com/PennyLaneAI/catalyst/pull/2172)
@@ -254,6 +257,12 @@
 * Fixed a bug where `qml.StatePrep` and `qml.BasisState` might be pushed after other
   gates, overwriting their effects.
   [(#2239)](https://github.com/PennyLaneAI/catalyst/pull/2239)
+
+* Fixed a bug where `quantum.num_qubits` operations are not properly removed during classical
+  processing of gradient transforms.
+  [(#2262)](https://github.com/PennyLaneAI/catalyst/pull/2262)
+
+  This fix enables automatic qubit management to be used with gradients.
 
 <h3>Internal changes ⚙️</h3>
 
@@ -355,6 +364,7 @@ Yushao Chen,
 Sengthai Heng,
 Jeffrey Kam,
 Christina Lee,
+Joseph Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Lee J. O'Riordan,

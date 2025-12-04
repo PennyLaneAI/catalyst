@@ -73,7 +73,7 @@ static ParseResult parseChannelTypeBody(AsmParser &parser, std::string &kind, Ar
         return success();
     }
 
-    int64_t id;
+    int64_t id = -1;
     if (failed(parser.parseInteger(id))) {
         return failure();
     }

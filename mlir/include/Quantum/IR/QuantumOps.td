@@ -125,7 +125,7 @@ def DeviceReleaseOp : Quantum_Op<"device_release"> {
     }];
 }
 
-def NumQubitsOp : Quantum_Op<"num_qubits"> {
+def NumQubitsOp : Quantum_Op<"num_qubits", [MemoryEffects<[MemRead]>]> {
     let summary = "Get the number of currently allocated qubits.";
 
     let results = (outs

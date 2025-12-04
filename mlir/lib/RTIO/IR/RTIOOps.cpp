@@ -34,43 +34,45 @@ LogicalResult RTIOSyncOp::verify()
     return success();
 }
 
-LogicalResult RTIOQubitToChannelOp::canonicalize(RTIOQubitToChannelOp op,
-                                                 mlir::PatternRewriter &rewriter)
-{
-    Block *currentBlock = op->getBlock();
-    Value qubit = op.getQubit();
-    Type channelType = op.getChannel().getType();
+// LogicalResult RTIOQubitToChannelOp::canonicalize(RTIOQubitToChannelOp op,
+//                                                  mlir::PatternRewriter &rewriter)
+// {
+//     Block *currentBlock = op->getBlock();
+//     Value qubit = op.getQubit();
+//     Type channelType = op.getChannel().getType();
 
-    // Try to find the same qubit_to_channel operation between [block->begin, op)
-    for (Operation &prevOp : llvm::make_range(currentBlock->begin(), op->getIterator())) {
-        if (auto prevQubitToChannel = dyn_cast<RTIOQubitToChannelOp>(&prevOp)) {
-            if (prevQubitToChannel.getQubit() == qubit &&
-                prevQubitToChannel.getChannel().getType() == channelType) {
-                rewriter.replaceOp(op, prevQubitToChannel.getChannel());
-                return success();
-            }
-        }
-    }
 
-    return failure();
-}
 
-LogicalResult RTIOChannelOp::canonicalize(RTIOChannelOp op, mlir::PatternRewriter &rewriter)
-{
-    Block *currentBlock = op->getBlock();
-    Value channel = op.getChannel();
-    Type channelType = channel.getType();
+//     // Try to find the same qubit_to_channel operation between [block->begin, op)
+//     for (Operation &prevOp : llvm::make_range(currentBlock->begin(), op->getIterator())) {
+//         if (auto prevQubitToChannel = dyn_cast<RTIOQubitToChannelOp>(&prevOp)) {
+//             if (prevQubitToChannel.getQubit() == qubit &&
+//                 prevQubitToChannel.getChannel().getType() == channelType) {
+//                 rewriter.replaceOp(op, prevQubitToChannel.getChannel());
+//                 return success();
+//             }
+//         }
+//     }
 
-    for (Operation &prevOp : llvm::make_range(currentBlock->begin(), op->getIterator())) {
-        if (auto prevChannelOp = dyn_cast<RTIOChannelOp>(&prevOp)) {
-            if (prevChannelOp.getChannel().getType() == channelType) {
-                rewriter.replaceOp(op, prevChannelOp.getChannel());
-                return success();
-            }
-        }
-    }
-    return failure();
-}
+//     return failure();
+// }
+
+// LogicalResult RTIOChannelOp::canonicalize(RTIOChannelOp op, mlir::PatternRewriter &rewriter)
+// {
+//     Block *currentBlock = op->getBlock();
+//     Value channel = op.getChannel();
+//     Type channelType = channel.getType();
+
+//     for (Operation &prevOp : llvm::make_range(currentBlock->begin(), op->getIterator())) {
+//         if (auto prevChannelOp = dyn_cast<RTIOChannelOp>(&prevOp)) {
+//             if (prevChannelOp.getChannel().getType() == channelType) {
+//                 rewriter.replaceOp(op, prevChannelOp.getChannel());
+//                 return success();
+//             }
+//         }
+//     }
+//     return failure();
+// }
 
 #define GET_OP_CLASSES
 #include "RTIO/IR/RTIOOps.cpp.inc"
