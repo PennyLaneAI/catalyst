@@ -44,6 +44,9 @@ class ConstructCircuitDAG:
         # Keep track of nesting clusters using a stack
         self._cluster_uid_stack: list[str] = []
 
+        # Use counter internally for UID
+        self._uid_counter = 0
+
     def _reset(self) -> None:
         """Resets the instance."""
         self._cluster_uid_stack: list[str] = []
@@ -86,7 +89,8 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _device_init(self, operation: quantum.DeviceInitOp) -> None:
         """Handles the initialization of a quantum device."""
-        node_id = f"node_{id(operation)}"
+        node_id = f"device_node{self._uid_counter}"
+        self._uid_counter += 1
         self.dag_builder.add_node(
             node_id,
             label=operation.device_name.data,
@@ -109,7 +113,8 @@ class ConstructCircuitDAG:
         if "jit_" in operation.sym_name.data:
             label = "qjit"
 
-        uid = f"cluster_{id(operation)}"
+        uid = f"funcop_cluster_{self._uid_counter}"
+        self._uid_counter += 1
         parent_cluster_uid = None if self._cluster_uid_stack == [] else self._cluster_uid_stack[-1]
         self.dag_builder.add_cluster(
             uid,
