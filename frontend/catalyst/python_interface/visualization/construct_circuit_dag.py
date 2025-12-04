@@ -131,8 +131,6 @@ class ConstructCircuitDAG:
         """Handle func.return to exit FuncOp's cluster scope."""
 
         # NOTE: Skip first cluster as it is the "base" of the graph diagram.
-        # If it is a multi-qnode workflow, it will represent the "workflow" function
-        # If it is a single qnode, it will represent the quantum function.
         if len(self._cluster_uid_stack) > 1:
             # If we hit a func.return operation we know we are leaving
             # the FuncOp's scope and so we can pop the ID off the stack.
