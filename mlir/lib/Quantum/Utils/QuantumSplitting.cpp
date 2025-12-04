@@ -22,7 +22,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/IR/CatalystOps.h"
-#include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOps.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/QuantumSplitting.h"
 

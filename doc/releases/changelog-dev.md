@@ -112,6 +112,13 @@
   working with xDSL. This includes a function that extracts the concrete value of scalar, constant SSA values.
   [(#8514)](https://github.com/PennyLaneAI/pennylane/pull/8514)
 
+* Catalyst can now use the new `pass_name` property of pennylane transform objects. Passes can now
+  be created using `qml.transform(pass_name=pass_name)` instead of `PassPipelineWrapper`.
+  [(#2149](https://github.com/PennyLaneAI/catalyst/pull/2149)
+
+* An error is now raised if a transform is applied inside a QNode when program capture is enabled.
+  [(#2256)](https://github.com/PennyLaneAI/catalyst/pull/2256)
+
 * A new ``"changed"`` option has been added to the ``keep_intermediate`` parameter of 
   :func:`~.qjit`. This option saves intermediate IR files after each pass,
   but only when the IR is actually modified by the pass.
@@ -387,6 +394,13 @@
   * Removed the `catalyst.python_interface.dialects.transform` module in favor of
   using the `xdsl.dialects.transform` module directly.
   [(#2261)](https://github.com/PennyLaneAI/catalyst/pull/2261)
+
+  * Refactor QEC tablegen files to separate QEC operations into a new `QECOp.td` file
+  [(#2253](https://github.com/PennyLaneAI/catalyst/pull/2253)	
+
+  * Removed the `getRotationKind` and `setRotationKind` methods from 
+  the QEC interface `QECOpInterface` to simplify the interface.
+  [(#2250)](https://github.com/PennyLaneAI/catalyst/pull/2250)
 
 <h3>Documentation 📝</h3>
 
