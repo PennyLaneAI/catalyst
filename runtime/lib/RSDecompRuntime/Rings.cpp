@@ -66,10 +66,7 @@ double ZSqrtTwo::to_double() const
     return static_cast<double>(a) + static_cast<double>(b) * M_SQRT2;
 }
 
-FLOAT_TYPE ZSqrtTwo::to_float() const
-{
-    return FLOAT_TYPE(a) + FLOAT_TYPE(b) * SQRT2;
-}
+FLOAT_TYPE ZSqrtTwo::to_float() const { return FLOAT_TYPE(a) + FLOAT_TYPE(b) * SQRT2; }
 
 ZSqrtTwo ZSqrtTwo::pow(INT_TYPE exponent) const
 {
@@ -112,7 +109,8 @@ std::optional<ZSqrtTwo> ZSqrtTwo::sqrt() const
     for (int s : {1, -1}) {
         INT_TYPE x_numerator = a + s * r;
         INT_TYPE y_numerator = a - s * r;
-        if (x_numerator < 0 || y_numerator < 0) continue;
+        if (x_numerator < 0 || y_numerator < 0)
+            continue;
         INT_TYPE x_div = x_numerator / 2;
         INT_TYPE y_div = y_numerator / 4;
         INT_TYPE x = boost::multiprecision::sqrt(x_div);
@@ -345,7 +343,8 @@ SO3Matrix::SO3Matrix(const DyadicMatrix &dy_mat) : dyadic_mat(dy_mat)
     normalize();
 }
 
-SO3Matrix::SO3Matrix(const std::array<std::array<ZSqrtTwo, 3>, 3> &mat, INT_TYPE k) : so3_mat(mat), k(k)
+SO3Matrix::SO3Matrix(const std::array<std::array<ZSqrtTwo, 3>, 3> &mat, INT_TYPE k)
+    : so3_mat(mat), k(k)
 {
     normalize();
 }

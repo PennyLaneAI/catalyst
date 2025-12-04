@@ -121,7 +121,8 @@ TEST_CASE("Test DyadicMatrix class", "[RSDecomp][Rings]")
     ZOmega z2 = ZOmega(5, 6, 7, 8);
     DyadicMatrix m1{z1, z2, z1, z2};
 
-    CHECK(m1 * ZOmega(2) == DyadicMatrix(z1 * INT_TYPE(2), z2 * INT_TYPE(2), z1 * INT_TYPE(2), z2 * INT_TYPE(2)));
+    CHECK(m1 * ZOmega(2) ==
+          DyadicMatrix(z1 * INT_TYPE(2), z2 * INT_TYPE(2), z1 * INT_TYPE(2), z2 * INT_TYPE(2)));
 
     CHECK(m1.flatten() == std::array<ZOmega, 4>{z1, z2, z1, z2});
 

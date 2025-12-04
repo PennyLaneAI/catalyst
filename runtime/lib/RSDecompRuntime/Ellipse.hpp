@@ -407,7 +407,8 @@ struct EllipseState {
             grid_op = grid_op * GridOp::from_string("X");
         }
         if (std::abs(bias()) > 2) {
-            long long n = static_cast<long long>(round((1.0 - static_cast<double>(sign) * bias()) / 4.0));
+            long long n =
+                static_cast<long long>(round((1.0 - static_cast<double>(sign) * bias()) / 4.0));
             grid_op = grid_op * GridOp::from_string("U").pow(INT_TYPE(n));
         }
         GridOp n_grid_op = GridOp::from_string("I");
@@ -442,8 +443,9 @@ struct EllipseState {
                     n_grid_op = n_grid_op * GridOp::from_string("K").adj2();
                 }
                 else if (current_e1.z >= 0.3 && current_e2.z >= 0.3) {
-                    INT_TYPE n = static_cast<INT_TYPE>(max(
-                        1.0, std::floor(std::pow(LAMBDA_D, min(current_e1.z, current_e2.z)) / 2.0)));
+                    INT_TYPE n = static_cast<INT_TYPE>(
+                        max(1.0,
+                            std::floor(std::pow(LAMBDA_D, min(current_e1.z, current_e2.z)) / 2.0)));
                     n_grid_op = n_grid_op * GridOp::from_string("A").pow(n);
                 }
                 else {

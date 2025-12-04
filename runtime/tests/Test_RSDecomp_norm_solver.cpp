@@ -155,10 +155,9 @@ TEST_CASE("Test Solve Diophantine", "[RSDecomp][NormSolver]")
 
 TEST_CASE("Test Solve Diophantine Large", "[RSDecomp][NormSolver]")
 {
-    auto [u, k] = GENERATE(table<ZOmega, INT_TYPE>({
-        {ZOmega(-26687414, 10541729, 10614512, 40727366), 52},
-        {ZOmega(-22067493351, 22078644868, 52098814989, 16270802723), 73}
-    }));
+    auto [u, k] = GENERATE(table<ZOmega, INT_TYPE>(
+        {{ZOmega(-26687414, 10541729, 10614512, 40727366), 52},
+         {ZOmega(-22067493351, 22078644868, 52098814989, 16270802723), 73}}));
 
     // Calculate 2^k as INT_TYPE
     INT_TYPE two_pow_k = INT_TYPE(1) << static_cast<unsigned>(k);

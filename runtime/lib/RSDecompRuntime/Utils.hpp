@@ -81,8 +81,8 @@ template <typename T> inline T floor_div(T a, T b)
 /**
  * @brief Computes GCD for generic types supporting % and comparison with 0.
  */
-template <typename T>
-T gcd(T a, T b) {
+template <typename T> T gcd(T a, T b)
+{
     while (b != T(0)) {
         T temp = a % b;
         a = b;

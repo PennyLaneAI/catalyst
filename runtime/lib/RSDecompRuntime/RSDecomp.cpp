@@ -198,8 +198,8 @@ size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis)
  * @param ppr_basis Whether to use PPR basis
  */
 void rs_decomposition_get_gates(size_t *data_allocated, size_t *data_aligned, size_t offset,
-                                  size_t size0, size_t stride0, double theta, double epsilon,
-                                  bool ppr_basis)
+                                size_t size0, size_t stride0, double theta, double epsilon,
+                                bool ppr_basis)
 {
     (void)data_allocated;
 
@@ -227,7 +227,6 @@ void rs_decomposition_get_gates(size_t *data_allocated, size_t *data_aligned, si
         size_t s = gates.size();
         RT_FAIL_IF(gates_view.size() < s, "Error: memref allocated too small for PPR gates.\n")
 
-        
         for (size_t i = 0; i < s; ++i) {
             gates_view(i) = static_cast<size_t>(gates[i]);
         }

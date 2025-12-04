@@ -37,8 +37,6 @@ std::optional<std::vector<ZSqrtTwo>> factorize_prime_zsqrt_two(INT_TYPE p);
 std::optional<ZOmega> factorize_prime_zomega(const ZSqrtTwo &x, INT_TYPE p);
 std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trials = 1000);
 
-
-
 // --- Number Theoretic Algorithms ---
 /**
  * @brief Probabilistic Miller-Rabin primality test.
@@ -168,7 +166,7 @@ inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_tries)
         // For boost multiprecision, we use a different approach:
         // Generate random numbers in a valid range using 64-bit generator
         // and then use modulo to fit in range
-        auto random_in_range = [&](const INT_TYPE& max_val) -> INT_TYPE {
+        auto random_in_range = [&](const INT_TYPE &max_val) -> INT_TYPE {
             // For large numbers, generate multiple 64-bit chunks
             INT_TYPE result = 0;
             INT_TYPE temp_max = max_val;
@@ -196,7 +194,7 @@ inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_tries)
                 INT_TYPE loop_limit = min(m, r - k);
                 for (INT_TYPE i = 0; i < loop_limit; ++i) {
                     y = ((y * y) % n + c) % n;
-                    INT_TYPE diff = x > y ? x - y : y - x;  // abs_val for unsigned-like behavior
+                    INT_TYPE diff = x > y ? x - y : y - x; // abs_val for unsigned-like behavior
                     q = (q * diff) % n;
                 }
                 g = gcd(q, n);
