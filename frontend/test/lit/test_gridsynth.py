@@ -45,8 +45,6 @@ def test_rz_registration():
         qml.RZ(x, wires=0)
         return qml.probs()
 
-    # CHECK-LABEL: test_rz_registration
-    print("test_rz_registration")
     # CHECK: transform.named_sequence @__transform_main
     # CHECK: transform.apply_registered_pass "gridsynth" with options = {{[{]}}"epsilon" = 1.000000e-02 : f64, "ppr-basis" = false{{[}]}}
     # CHECK-LABEL: func.func public @circuit
@@ -71,8 +69,9 @@ def test_rz_lowering():
         qml.RZ(x, wires=0)
         return qml.probs()
 
-    # CHECK-LABEL: test_rz_lowering
-    print("test_rz_lowering")
+    # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
+    # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
+    # CHECK-DAG:   func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
 
     # CHECK-LABEL: func.func private @__catalyst_decompose_RZ{{.*}}
     # CHECK:       scf.index_switch
@@ -103,8 +102,6 @@ def test_phaseshift_registration():
         qml.PhaseShift(x, wires=0)
         return qml.probs()
 
-    # CHECK-LABEL: test_phaseshift_registration
-    print("test_phaseshift_registration")
     # CHECK:       transform.apply_registered_pass "gridsynth"
     # CHECK-LABEL: func.func public @circuit
     # CHECK:       quantum.custom "PhaseShift"
@@ -128,8 +125,9 @@ def test_phaseshift_lowering():
         qml.PhaseShift(x, wires=0)
         return qml.probs()
 
-    # CHECK-LABEL: test_phaseshift_lowering
-    print("test_phaseshift_lowering")
+    # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
+    # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
+    # CHECK-DAG:   func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
 
     # CHECK-LABEL: func.func private @__catalyst_decompose_RZ{{.*}}
 
@@ -156,8 +154,6 @@ def test_ppr_registration():
         qml.RZ(x, wires=0)
         return qml.probs()
 
-    # CHECK-LABEL: test_ppr_registration
-    print("test_ppr_registration")
     # CHECK: transform.apply_registered_pass "gridsynth" with options = {{[{]}}"epsilon" = 1.000000e-02 : f64, "ppr-basis" = true{{[}]}}
     print(circuit.mlir)
 
@@ -179,8 +175,9 @@ def test_ppr_lowering():
         qml.RZ(x, wires=0)
         return qml.probs()
 
-    # CHECK-LABEL: test_ppr_lowering
-    print("test_ppr_lowering")
+    # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
+    # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
+    # CHECK-DAG:   func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
 
     # CHECK-LABEL: func.func private @__catalyst_decompose_RZ_ppr_basis{{.*}}
     # CHECK:       scf.index_switch
@@ -212,8 +209,9 @@ def test_capture_workflow_clifford():
         qml.RZ(x, wires=0)
         return qml.probs()
 
-    # CHECK-LABEL: test_capture_workflow_clifford
-    print("test_capture_workflow_clifford")
+    # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
+    # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
+    # CHECK-DAG:   func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
 
     # CHECK-LABEL: func.func private @__catalyst_decompose_RZ{{.*}}
     # CHECK:       scf.index_switch
@@ -247,8 +245,9 @@ def test_capture_workflow_ppr():
         qml.RZ(x, wires=0)
         return qml.probs()
 
-    # CHECK-LABEL: test_capture_workflow_ppr
-    print("test_capture_workflow_ppr")
+    # CHECK-DAG:   func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
+    # CHECK-DAG:   func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
+    # CHECK-DAG:   func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
 
     # CHECK-LABEL: func.func private @__catalyst_decompose_RZ_ppr_basis{{.*}}
     # CHECK:       scf.index_switch

@@ -13,6 +13,7 @@ set(LIBS
     MLIRMBQC
     MLIRMitigation
     MLIRIon
+    MLIRRTIO
 )
 
 add_llvm_executable(quantum-lsp-server quantum-lsp-server.cpp)
