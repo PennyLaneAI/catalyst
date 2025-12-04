@@ -45,12 +45,14 @@ class ConstructCircuitDAG:
         self._cluster_uid_stack: list[str] = []
 
         # Use counter internally for UID
-        self._uid_counter: int = 0
+        self._node_uid_counter: int = 0
+        self._cluster_uid_counter: int = 0
 
     def _reset(self) -> None:
         """Resets the instance."""
         self._cluster_uid_stack: list[str] = []
-        self._uid_counter: int = 0
+        self._node_uid_counter: int = 0
+        self._cluster_uid_counter: int = 0
 
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module.
@@ -90,8 +92,7 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _device_init(self, operation: quantum.DeviceInitOp) -> None:
         """Handles the initialization of a quantum device."""
-        node_id = f"device_node_{self._uid_counter}"
-        self._uid_counter += 1
+        node_id = f"node{self._node_uid_counter}"
         self.dag_builder.add_node(
             node_id,
             label=operation.device_name.data,
@@ -101,6 +102,7 @@ class ConstructCircuitDAG:
             penwidth=2,
             shape="rectangle",
         )
+        self._node_uid_counter += 1
 
     # =======================
     # FuncOp NESTING UTILITY
@@ -114,14 +116,14 @@ class ConstructCircuitDAG:
         if "jit_" in operation.sym_name.data:
             label = "qjit"
 
-        uid = f"funcop_cluster_{self._uid_counter}"
-        self._uid_counter += 1
+        uid = f"cluster{self._cluster_uid_counter}"
         parent_cluster_uid = None if self._cluster_uid_stack == [] else self._cluster_uid_stack[-1]
         self.dag_builder.add_cluster(
             uid,
             label=label,
             cluster_uid=parent_cluster_uid,
         )
+        self._cluster_uid_counter += 1
         self._cluster_uid_stack.append(uid)
 
         self._visit_block(operation.regions[0].blocks[0])
