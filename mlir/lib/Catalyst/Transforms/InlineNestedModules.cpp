@@ -274,7 +274,7 @@ struct InlineNestedModule : public RewritePattern {
     {
     }
 
-    llvm::SmallSet<StringRef, 8> _externalFuncDeclNames;
+    const llvm::SmallSet<StringRef, 8> &_externalFuncDeclNames;
 
     // Note: mlir expects pattern objects to be const.
     // In other words, repeated applications of a rewrite pattern should not have dependency on each
@@ -500,6 +500,9 @@ struct InlineNestedSymbolTablePass : PassWrapper<InlineNestedSymbolTablePass, Op
         if (run && failed(applyPatternsGreedily(symbolTable, std::move(inlineNested), config))) {
             signalPassFailure();
         }
+        // Clear the set of StringRefs, as some of the FuncOps where the strings come from have
+        // been erased. So we need to delete the now-invalid references to them.
+        externalFuncDeclNames.clear();
 
         mlir::DenseMap<SymbolRefAttr, SymbolRefAttr> old_to_new;
         for (auto &region : symbolTable->getRegions()) {
