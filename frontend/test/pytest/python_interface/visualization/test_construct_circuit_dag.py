@@ -279,11 +279,11 @@ class TestDeviceNode:
         assert graph_nodes["node0"]["parent_cluster_uid"] == "cluster1"
 
         # Assert label is as expected
-        assert graph_nodes["node0"]["label"] == "LightningSimulator"
+        assert graph_nodes["node0"]["label"] == "NullQubit"
 
         # Assert null qubit device node is inside my_qnode2 cluster
         assert graph_clusters["cluster2"]["cluster_label"] == "my_qnode2"
         assert graph_nodes["node1"]["parent_cluster_uid"] == "cluster2"
 
         # Assert label is as expected
-        assert graph_nodes["node1"]["label"] == "NullQubit"
+        assert graph_nodes["node1"]["label"] == "LightningSimulator"
