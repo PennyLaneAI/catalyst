@@ -247,6 +247,12 @@
   gates, overwriting their effects.
   [(#2239)](https://github.com/PennyLaneAI/catalyst/pull/2239)
 
+* Fixed a bug where `quantum.num_qubits` operations are not properly removed during classical
+  processing of gradient transforms.
+  [(#2262)](https://github.com/PennyLaneAI/catalyst/pull/2262)
+
+  This fix enables automatic qubit management to be used with gradients.
+
 <h3>Internal changes ⚙️</h3>
 
 * Resource tracking now writes out at device destruction time instead of qubit deallocation
