@@ -42,6 +42,7 @@ from pennylane.measurements import (
     ExpectationMP,
     MeasurementProcess,
     ProbabilityMP,
+    SampleMP,
     StateMP,
     VarianceMP,
 )
@@ -1078,9 +1079,7 @@ def trace_quantum_measurements(
         if isinstance(output, MeasurementProcess):
 
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
-            if shots_obj.has_partitioned_shots and not isinstance(
-                output, qml.measurements.SampleMP
-            ):
+            if shots_obj.has_partitioned_shots and not isinstance(output, SampleMP):
                 raise NotImplementedError(
                     f"Measurement {type(output).__name__} does not support shot-vectors. "
                     "Use qml.sample() instead."
@@ -1109,7 +1108,7 @@ def trace_quantum_measurements(
                     "(expval, var, probs, counts) on mid circuit measurements."
                 )
 
-            if isinstance(output, qml.measurements.SampleMP):
+            if isinstance(output, SampleMP):
 
                 if shots is None:  # needed for old device API only
                     raise ValueError(
