@@ -52,8 +52,8 @@ size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis)
  * @param ppr_basis Whether to use PPR basis
  */
 void rs_decomposition_get_gates([[maybe_unused]] size_t *data_allocated, size_t *data_aligned,
-                                  size_t offset, size_t size0, size_t stride0, double theta,
-                                  double epsilon, bool ppr_basis)
+                                size_t offset, size_t size0, size_t stride0, double theta,
+                                double epsilon, bool ppr_basis)
 {
     // This is the dummy gate sequence for testing
     std::vector<size_t> gates_data = {0, 2, 4, 6, 8, 1, 3, 5, 7, 9};
