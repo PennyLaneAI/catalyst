@@ -276,14 +276,14 @@ class TestDeviceNode:
         #     ├── my_qnode1: NullQubit
         #     └── my_qnode2: LightningSimulator
 
-        # Assert device node is inside my_workflow cluster
+        # Assert lightning.qubit device node is inside my_qnode1 cluster
         assert graph_clusters["cluster1"]["cluster_label"] == "my_qnode1"
         assert graph_nodes["node0"]["parent_cluster_uid"] == "cluster1"
 
         # Assert label is as expected
         assert graph_nodes["node0"]["label"] == "LightningSimulator"
 
-        # Assert device node is inside my_workflow cluster
+        # Assert null qubit device node is inside my_qnode2 cluster
         assert graph_clusters["cluster2"]["cluster_label"] == "my_qnode2"
         assert graph_nodes["node1"]["parent_cluster_uid"] == "cluster2"
 
