@@ -23,7 +23,7 @@
 #include "NormSolver.hpp"
 #include "NormalForms.hpp"
 #include "Rings.hpp"
-#include "RossSelinger.hpp"
+#include "RSDecomp.hpp"
 
 #define MAX_FACTORING_TRIALS 1000
 
