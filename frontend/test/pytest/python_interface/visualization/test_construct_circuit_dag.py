@@ -755,7 +755,7 @@ class TestCreateStaticMeasurementNodes:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_circuit():
-            measure(0)
+            qml.measure(0)
 
         module = my_circuit()
 
