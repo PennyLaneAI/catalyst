@@ -602,7 +602,7 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
-        assert nodes["node1"]["label"] == str(op)
+        assert nodes["node1"]["label"] == "GlobalPhase(0.5, wires=[])"
 
     @pytest.mark.unit
     def test_qubit_unitary_op(self):
