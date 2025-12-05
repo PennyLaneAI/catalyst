@@ -1087,7 +1087,7 @@ func.func public @merge_permutations(%z0: !quantum.bit, %y0: !quantum.bit, %0: f
 // check permutations with duplicate Pauli symbols
 
 // CHECK-LABEL: merge_permutations_with_duplicates
-func.func public @merge_permutations_with_duplicates(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit, %0: f64, %1: f64, %2:f64) {
+func.func public @merge_permutations_with_duplicates(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit, %0: f64, %1: f64) {
     // CHECK: [[angle:%.+]] = arith.addf
     // CHECK: qec.ppr.arbitrary ["Y", "X", "X"]([[angle]]) %arg1, %arg2, %arg0
     %3:3 = qec.ppr.arbitrary ["X", "Y", "X"](%0) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
