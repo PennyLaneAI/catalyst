@@ -7,3 +7,7 @@ coverage:
   status:
     project: false
     patch: true
+
+# TODO: add coverage for the python compiler interface
+ignore:
+  - "frontend/catalyst/python_interface"

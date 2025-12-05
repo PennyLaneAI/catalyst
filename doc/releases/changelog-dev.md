@@ -2,6 +2,98 @@
 
 <h3>New features since last release</h3>
 
+* Catalyst now features a unified compilation framework, which enables users and developers to design
+  and implement compilation passes in Python in addition to C++, on the same Catalyst IR. The Python
+  interface relies on the xDSL library to represent and manipulate programs (analogous to the MLIR library
+  in C++). As a result, transformations can be quickly prototyped, easily debugged, and dynamically integrated
+  into Catalyst without changes to the compiled Catalyst package. The new module is available under the
+  `catalyst.python_interface` namespace.
+  [(#2199)](https://github.com/PennyLaneAI/catalyst/pull/2199)
+
+  This functionality was originally developed as part of the PennyLane package, and has been migrated here.
+  For earlier development notes to the feature, please refer to the
+  [PennyLane release notes](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0).
+  In addition, the following changes have been made since the last release:
+
+  * Add an experimental `outline_state_evolution_pass` xDSL pass to `catalyst.python_interface.transforms`,
+    which moves all quantum gate operations to a private callable.
+    [(#8367)](https://github.com/PennyLaneAI/pennylane/pull/8367)
+
+  * A new experimental `split_non_commuting_pass` compiler pass has been added to
+    `catalyst.python_interface.transforms`. This pass splits quantum functions that
+    measure observables on the same wires into multiple function executions, where
+    each execution measures observables on different wires (using the "wires" grouping
+    strategy). The original function is replaced with calls to these generated functions,
+    and the results are combined appropriately.
+    [(#8531)](https://github.com/PennyLaneAI/pennylane/pull/8531)
+
+  * Add the `PCPhaseOp` operation to the xDSL Quantum dialect.
+    [(#8621)](https://github.com/PennyLaneAI/pennylane/pull/8621)
+
+  * Users can now apply xDSL passes without the need to pass the `pass_plugins` argument to
+    the `qjit` decorator.
+    [(#8572)](https://github.com/PennyLaneAI/pennylane/pull/8572)
+    [(#8573)](https://github.com/PennyLaneAI/pennylane/pull/8573)
+    [(#2169)](https://github.com/PennyLaneAI/catalyst/pull/2169)
+    [(#2183)](https://github.com/PennyLaneAI/catalyst/pull/2183)
+
+  * The :meth:`catalyst.python_interface.transforms.convert_to_mbqc_formalism_pass` now
+    supports :class:`~xdsl.dialects.scf.IndexSwitchOp` in IR and ignores regions that have no body.
+    [(#8632)](https://github.com/PennyLaneAI/pennylane/pull/8632)
+
+  * The `convert_to_mbqc_formalism` compilation pass now outlines the operations to represent a gate
+    in the MBQC formalism into subroutines in order to reduce the IR size for large programs.
+    [(#8619)](https://github.com/PennyLaneAI/pennylane/pull/8619)
+
+  * The :meth:`catalyst.python_interface.Compiler.run` method now accepts a string as input,
+    which is parsed and transformed with xDSL.
+    [(#8587)](https://github.com/PennyLaneAI/pennylane/pull/8587)
+
+  * An `is_xdsl_pass` function has been added to the `catalyst.python_interface.pass_api` module.
+    This function checks if a pass name corresponds to an xDSL implemented pass.
+    [(#8572)](https://github.com/PennyLaneAI/pennylane/pull/8572)
+
+  * A new `catalyst.python_interface.utils` submodule has been added, containing general-purpose utilities for
+    working with xDSL. This includes a function that extracts the concrete value of scalar, constant SSA values.
+    [(#8514)](https://github.com/PennyLaneAI/pennylane/pull/8514)
+
+  * The `catalyst.python_interface.visualization` module has been renamed to
+    `catalyst.python_interface.inspection`, and various utility functions within this module
+    have been streamlined.
+    [(#2237)](https://github.com/PennyLaneAI/catalyst/pull/2237)
+
+  * The experimental xDSL :func:`~catalyst.python_interface.transforms.measurements_from_samples_pass`
+    pass has been updated to support `shots` defined by an `arith.constant` operation.
+    [(#8460)](https://github.com/PennyLaneAI/pennylane/pull/8460)
+
+  * The experimental xDSL :func:`~catalyst.python_interface.transforms.diagonalize_measurements`
+    pass has been updated to fix a bug that included the wrong SSA value for final qubit insertion
+    and deallocation at the end of the circuit. A clear error is now also raised when there are
+    observables with overlapping wires.
+    [(#8383)](https://github.com/PennyLaneAI/pennylane/pull/8383)
+
+  * Fixes a bug in the constructor of the xDSL Quantum dialect's `QubitUnitaryOp` that
+    prevented an instance from being constructed.
+    [(#8456)](https://github.com/PennyLaneAI/pennylane/pull/8456)
+
+  * Removed the `catalyst.python_interface.dialects.transform` module in favor of
+    using the `xdsl.dialects.transform` module directly.
+    [(#2261)](https://github.com/PennyLaneAI/catalyst/pull/2261)
+
+  * Added a "Unified Compiler Cookbook" RST file, along with tutorials, to `catalyst.python_interface.doc`,
+    which provides a quickstart guide for getting started with xDSL and its integration with PennyLane and
+    Catalyst.
+    [(#8571)](https://github.com/PennyLaneAI/pennylane/pull/8571)
+
+  * xDSL passes are now automatically detected when using the `qjit` decorator.
+    This removes the need to pass the `pass_plugins` argument to the `qjit` decorator.
+    [(#2169)](https://github.com/PennyLaneAI/catalyst/pull/2169)
+    [(#2183)](https://github.com/PennyLaneAI/catalyst/pull/2183)
+
+  * The ``mlir_opt`` property now correctly handles xDSL passes by automatically
+    detecting when the Python compiler is being used and routing through it appropriately.
+    [(#2190)](https://github.com/PennyLaneAI/catalyst/pull/2190)
+
 * RTIO dialect is added to bypass the compilation flow from OpenAPL to ARTIQ’s LLVM IR. It is introduced to bridge the gap between ION dialect and ARTIQ’s LLVM IR. The design philosophy of RTIO dialect is primarily event-based. Every operation is asynchronous; sync behaviour occurs only via `rtio.sync` or `wait operand` in event operation.
   [(#2185)](https://github.com/PennyLaneAI/catalyst/pull/2185)
 
@@ -126,15 +218,6 @@
 
 * `qml.grad` and `qml.jacobian` can now be used with `qjit` when program capture is enabled.
   [(#2078)](https://github.com/PennyLaneAI/catalyst/pull/2078)
-
-* xDSL passes are now automatically detected when using the `qjit` decorator.
-  This removes the need to pass the `pass_plugins` argument to the `qjit` decorator.
-  [(#2169)](https://github.com/PennyLaneAI/catalyst/pull/2169)
-  [(#2183)](https://github.com/PennyLaneAI/catalyst/pull/2183)
-
-* The ``mlir_opt`` property now correctly handles xDSL passes by automatically
-  detecting when the Python compiler is being used and routing through it appropriately.
-  [(#2190)](https://github.com/PennyLaneAI/catalyst/pull/2190)
 
 * Dynamically allocated wires can now be passed into control flow and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
@@ -340,10 +423,8 @@
   [(#2245)](https://github.com/PennyLaneAI/catalyst/pull/2245)
   [(#2254)](https://github.com/PennyLaneAI/catalyst/pull/2254)
 
-
   * Refactor QEC tablegen files to separate QEC operations into a new `QECOp.td` file
   [(#2253](https://github.com/PennyLaneAI/catalyst/pull/2253)
-
 
   * Removed the `getRotationKind` and `setRotationKind` methods from
   the QEC interface `QECOpInterface` to simplify the interface.
