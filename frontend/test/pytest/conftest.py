@@ -87,7 +87,8 @@ def requires_xdsl():
     pytest.importorskip("xdsl_jax", reason="xdsl-jax is not installed, skipping test")
 
 
-def pytest_collection_modifyitems(items, config):
+def pytest_collection_modifyitems(items, config):  # pylint: disable=unused-argument
+    """Modify collected items as needed."""
     # Tests that do not have a specific suite marker are marked `core`
     for item in items:
         markers = {mark.name for mark in item.iter_markers()}
