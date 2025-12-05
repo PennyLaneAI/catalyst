@@ -27,6 +27,7 @@ from xdsl.dialects import test
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir.core import Block, Region
 
+from catalyst import measure
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
@@ -724,7 +725,15 @@ class TestCreateStaticMeasurementNodes:
         assert nodes["node1"]["label"] == str(qml.probs())
 
     @pytest.mark.unit
-    def test_sample_measurement_op(self):
+    @pytest.mark.parametrize(
+        "op",
+        [
+            qml.sample(),
+            qml.sample(wires=0),
+            qml.sample(wires=[0, 1]),
+        ],
+    )
+    def test_sample_measurement_op(self, op):
         """Tests that the sample measurement function can be captured as a node."""
         dev = qml.device("null.qubit", wires=1)
 
@@ -733,7 +742,7 @@ class TestCreateStaticMeasurementNodes:
         @qml.set_shots(10)
         @qml.qnode(dev)
         def my_circuit():
-            return qml.sample()
+            return op
 
         module = my_circuit()
 
@@ -744,7 +753,7 @@ class TestCreateStaticMeasurementNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
-        assert nodes["node1"]["label"] == "sample(wires=[])"
+        assert nodes["node1"]["label"] == str(op)
 
     @pytest.mark.unit
     def test_projective_measurement_op(self):
@@ -755,7 +764,7 @@ class TestCreateStaticMeasurementNodes:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_circuit():
-            qml.measure(0)
+            measure(0)
 
         module = my_circuit()
 

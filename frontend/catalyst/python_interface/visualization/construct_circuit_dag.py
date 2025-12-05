@@ -157,7 +157,7 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _statistical_measurement_ops(
         self,
-        op: quantum.ExpvalOp | quantum.VarianceOp | quantum.ProbsOp | quantum.SampleOp,
+        op: quantum.ExpvalOp | quantum.VarianceOp,
     ) -> None:
         """Handler for statistical measurement operations."""
 
@@ -179,6 +179,32 @@ class ConstructCircuitDAG:
         for wire in meas.wires:
             for seen_node in self._wire_to_node_uids[wire]:
                 self.dag_builder.add_edge(seen_node, node_uid)
+
+    @_visit_operation.register
+    def _sample_op(
+        self,
+        op: quantum.SampleOp | quantum.ProbsOp,
+    ) -> None:
+        """Handler for sample operations."""
+
+        # Create PennyLane instance
+        obs_op = op.obs.owner
+
+        # TODO: This doesn't logically make sense, but quantum.compbasis
+        # is obs_op and function below just pulls out the static wires
+        wires = xdsl_to_qml_measurement(obs_op)
+        meas = xdsl_to_qml_measurement(op, wires=None if wires == [] else wires)
+
+        # Add node to current cluster
+        node_uid = f"node{self._node_uid_counter}"
+        self.dag_builder.add_node(
+            uid=node_uid,
+            label=str(meas),
+            cluster_uid=self._cluster_uid_stack[-1],
+            fillcolor="lightpink",
+            color="lightpink3",
+        )
+        self._node_uid_counter += 1
 
     @_visit_operation.register
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
