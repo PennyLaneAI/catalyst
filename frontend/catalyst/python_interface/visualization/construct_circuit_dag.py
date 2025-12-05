@@ -14,8 +14,10 @@
 
 """Contains the ConstructCircuitDAG tool for constructing a DAG from an xDSL module."""
 
-from functools import singledispatchmethod
+from functools import singledispatch, singledispatchmethod
 
+from pennylane.measurements import MeasurementProcess
+from pennylane.operation import Operator
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region, SSAValue
 
@@ -107,8 +109,10 @@ class ConstructCircuitDAG:
         node_uid = f"node{self._node_uid_counter}"
         self.dag_builder.add_node(
             uid=node_uid,
-            label=str(qml_op),
+            label=get_label(qml_op),
             cluster_uid=self._cluster_uid_stack[-1],
+            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
+            shape="record",
         )
         self._node_uid_counter += 1
 
@@ -127,7 +131,7 @@ class ConstructCircuitDAG:
         node_uid = f"node{self._node_uid_counter}"
         self.dag_builder.add_node(
             uid=node_uid,
-            label=str(meas),
+            label=get_label(meas),
             cluster_uid=self._cluster_uid_stack[-1],
             fillcolor="lightpink",
             color="lightpink3",
@@ -149,7 +153,7 @@ class ConstructCircuitDAG:
         node_uid = f"node{self._node_uid_counter}"
         self.dag_builder.add_node(
             uid=node_uid,
-            label=str(meas),
+            label=get_label(meas),
             cluster_uid=self._cluster_uid_stack[-1],
             fillcolor="lightpink",
             color="lightpink3",
@@ -175,7 +179,7 @@ class ConstructCircuitDAG:
         node_uid = f"node{self._node_uid_counter}"
         self.dag_builder.add_node(
             uid=node_uid,
-            label=str(meas),
+            label=get_label(meas),
             cluster_uid=self._cluster_uid_stack[-1],
             fillcolor="lightpink",
             color="lightpink3",
@@ -193,7 +197,7 @@ class ConstructCircuitDAG:
         node_uid = f"node{self._node_uid_counter}"
         self.dag_builder.add_node(
             uid=node_uid,
-            label=str(meas),
+            label=get_label(meas),
             cluster_uid=self._cluster_uid_stack[-1],
         )
         self._node_uid_counter += 1
@@ -367,3 +371,26 @@ def _flatten_if_op(op: scf.IfOp) -> list[tuple[SSAValue | None, Region]]:
     # with no SSAValue
     flattened_op.extend([(None, else_region)])
     return flattened_op
+
+
+@singledispatch
+def get_label(op: Operator | MeasurementProcess) -> str:
+    """Gets the appropriate label for a PennyLane object."""
+    return str(op)
+
+
+@get_label.register
+def _operator(op: Operator) -> str:
+    """Returns the appropriate label for an xDSL operation."""
+    wires = list(op.wires.labels)
+    if wires == []:
+        wires_str = "all"
+    else:
+        wires_str = f"[{', '.join(map(str, wires))}]"
+    return f"<name> {op.name}|<wire> {wires_str}"
+
+
+@get_label.register
+def _mp(mp: MeasurementProcess) -> str:
+    """Returns the appropriate label for an xDSL operation."""
+    return str(mp)
