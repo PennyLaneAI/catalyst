@@ -26,13 +26,13 @@
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/CSE.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Ion/IR/IonDialect.h"
 #include "Ion/IR/IonOps.h"
-#include "Ion/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "RTIO/IR/RTIODialect.h"
@@ -786,6 +786,7 @@ FailureOr<rtio::ConfigAttr> loadDeviceDbAsConfig(MLIRContext *ctx, StringRef fil
 // Pass Implementation
 //===----------------------------------------------------------------------===//
 
+#define GEN_PASS_DECL_IONTORTIOPASS
 #define GEN_PASS_DEF_IONTORTIOPASS
 #include "Ion/Transforms/Passes.h.inc"
 
