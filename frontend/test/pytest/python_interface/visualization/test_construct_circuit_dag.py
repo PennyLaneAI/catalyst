@@ -563,9 +563,9 @@ class TestGetLabel:
 
         assert get_label(op) == f"<name> {op.name}|<wire> {wires_str}"
 
-    def test_global_phase_operator(self, op):
+    def test_global_phase_operator(self):
         """Tests against a GlobalPhase operator instance."""
-        assert get_label(qml.GlobalPhase(0.5)) == f"<name> {op.name}|<wire> all"
+        assert get_label(qml.GlobalPhase(0.5)) == f"<name> GlobalPhase|<wire> all"
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
@@ -648,7 +648,8 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
-        assert nodes["node1"]["label"] == get_label(op)
+        # Compiler throws out the wires and they get converted to wires=[] no matter what
+        assert nodes["node1"]["label"] == get_label(qml.GlobalPhase(0.5))
 
     @pytest.mark.unit
     def test_qubit_unitary_op(self):
