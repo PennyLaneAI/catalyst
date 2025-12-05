@@ -252,6 +252,45 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
+    def test_reprs_match(self):
+        """Test that when no transforms are applied to a typical circuit, the "Before Transform"
+        and "Before MLIR Passes" representations match."""
+
+        dev = qml.device("lightning.qubit", wires=4)
+
+        @qml.qnode(dev)
+        def circuit():
+            qml.StatePrep(jnp.array([0, 1]), wires=0)
+
+            qml.Hadamard(wires=0)
+            qml.CNOT(wires=[0, 1])
+
+            qml.GlobalPhase(jnp.pi / 4)
+            qml.MultiRZ(jnp.pi / 2, wires=[1, 2, 3])
+            qml.ctrl(qml.T, control=0)(wires=3)
+
+            qml.QubitUnitary(jnp.array([[1, 0], [0, 1j]]), wires=2)
+
+            coeffs = [0.2, -0.543]
+            obs = [qml.X(0) @ qml.Z(1), qml.Z(0) @ qml.Hadamard(2)]
+            ham = qml.ops.LinearCombination(coeffs, obs)
+
+            return (
+                qml.expval(qml.PauliZ(0)),
+                qml.expval(ham),
+                qml.probs(wires=[0, 1]),
+                qml.state(),
+            )
+
+        circuit = qjit(circuit)
+
+        specs_all = qml.specs(circuit, level="all")()
+
+        before_transforms = specs_all["resources"]["Before transforms"]
+        before_mlir = specs_all["resources"]["Before MLIR Passes (MLIR-0)"]
+
+        check_specs_resources_same(before_transforms, before_mlir)
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
