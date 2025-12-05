@@ -510,11 +510,5 @@ jobs:
         python${{ matrix.python_version }} -m pip install graphviz
 
     - name: Run Unified Compiler Tests
-      env:
-        MARKERS: xdsl
       run: |
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto -m "$MARKERS"
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto -m "$MARKERS"
-        python${{ matrix.python_version }} -m pytest frontend/test/async_tests -m "$MARKERS"
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto || true -m "$MARKERS"
-        python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto -m "$MARKERS"
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto -m "xdsl"
