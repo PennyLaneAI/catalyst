@@ -231,10 +231,10 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
         Type gradFnSignature = LLVM::LLVMFunctionType::get(
             LLVM::LLVMVoidType::get(ctx), IntegerType::get(ctx, 64), /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp cacheFnDecl =
-            catalyst::ensureFunctionDeclaration(rewriter, op, cacheFnName, cacheFnSignature);
-        LLVM::LLVMFuncOp gradFnDecl =
-            catalyst::ensureFunctionDeclaration(rewriter, op, gradFnName, gradFnSignature);
+        LLVM::LLVMFuncOp cacheFnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, cacheFnName, cacheFnSignature);
+        LLVM::LLVMFuncOp gradFnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, gradFnName, gradFnSignature);
 
         // Run the forward pass and cache the circuit.
         Value c_true = rewriter.create<LLVM::ConstantOp>(
@@ -358,7 +358,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         // way to do this is to append the number of scalar results to the name of the function.
         std::string autodiff_func_name =
             enzyme_autodiff_func_name + std::to_string(op.getNumResults());
-        LLVM::LLVMFuncOp backpropFnDecl = catalyst::ensureFunctionDeclaration(
+        LLVM::LLVMFuncOp backpropFnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
             rewriter, op, autodiff_func_name, backpropFnSignature);
 
         // The first argument to Enzyme is a function pointer of the function to be differentiated

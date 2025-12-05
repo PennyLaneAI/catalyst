@@ -31,6 +31,7 @@ from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 from pennylane.capture.primitives import transform_prim
 from pennylane.transforms import commute_controlled as pl_commute_controlled
 from pennylane.transforms import decompose as pl_decompose
+from pennylane.transforms import gridsynth as pl_gridsynth
 from pennylane.transforms import merge_amplitude_embedding as pl_merge_amplitude_embedding
 from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
@@ -338,6 +339,7 @@ transforms_to_passes = {
     pl_merge_amplitude_embedding: (None, True),
     pl_single_qubit_fusion: (None, False),
     pl_unitary_to_rot: (None, False),
+    pl_gridsynth: ("gridsynth", False),
 }
 
 

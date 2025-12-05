@@ -190,8 +190,8 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
 
             Type charPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
             Type qirSignature = LLVM::LLVMFunctionType::get(voidType, charPtrType);
-            LLVM::LLVMFuncOp fnDecl =
-                catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+            LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+                rewriter, op, qirName, qirSignature);
 
             StringRef stringValue = op.getConstVal().value();
             std::string symbolName = std::to_string(std::hash<std::string>()(stringValue.str()));
@@ -215,8 +215,8 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
             Type structPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
             SmallVector<Type> argTypes{structPtrType, IntegerType::get(ctx, 1)};
             Type qirSignature = LLVM::LLVMFunctionType::get(voidType, argTypes);
-            LLVM::LLVMFuncOp fnDecl =
-                catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+            LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+                rewriter, op, qirName, qirSignature);
 
             Value memref = op.getVal();
             MemRefType memrefType = cast<MemRefType>(memref.getType());
@@ -256,8 +256,8 @@ struct AssertionOpPattern : public OpConversionPattern<AssertionOp> {
         Type assertSignature = LLVM::LLVMFunctionType::get(voidType, argTypes);
 
         ModuleOp mod = op->getParentOfType<ModuleOp>();
-        LLVM::LLVMFuncOp assertFunc =
-            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, assertSignature);
+        LLVM::LLVMFuncOp assertFunc = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, assertSignature);
 
         Value assertionDescriptor = adaptor.getAssertion();
 
