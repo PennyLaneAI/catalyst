@@ -15,7 +15,8 @@
 import pytest
 
 # pylint: disable=wrong-import-position
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 
 import pennylane as qml
 

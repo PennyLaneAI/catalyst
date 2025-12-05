@@ -425,7 +425,8 @@ def xdsl_to_qml_measurement(op, *args, **kwargs) -> MeasurementProcess | Operato
 
 
 def xdsl_to_qml_measurement_name(op, obs_op=None) -> str:
-    """Convert any xDSL measurement/observable operation into a string representing a PennyLane measurement.
+    """Convert any xDSL measurement/observable operation into a string representing a PennyLane
+    measurement.
 
     Args:
         op: The xDSL measurement/observable operation to convert.

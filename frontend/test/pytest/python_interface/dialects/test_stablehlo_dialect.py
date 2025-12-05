@@ -16,7 +16,8 @@
 # pylint: disable=line-too-long
 import pytest
 
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 
 
 def test_all_unary_operations(run_filecheck):
