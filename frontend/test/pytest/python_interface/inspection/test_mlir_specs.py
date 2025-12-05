@@ -13,6 +13,8 @@
 # limitations under the License.
 """Unit test module for the mlir_specs function in the Python Compiler inspection module."""
 
+from functools import partial
+
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
@@ -583,6 +585,31 @@ class TestMLIRSpecs:
 
         res = mlir_specs(circ, level=0)
         assert resources_equal(res, expected)
+
+    @pytest.mark.usefixtures("use_capture_dgraph")
+    def test_graph_decomp(self):
+
+        @qml.register_resources({qml.H: 2, qml.CZ: 1})
+        def my_cnot(wires):
+            qml.H(wires=wires[1])
+            qml.CZ(wires=wires)
+            qml.H(wires=wires[1])
+
+        @qml.qjit
+        @partial(
+            qml.transforms.decompose,
+            gate_set={"H", "CZ", "GlobalPhase"},
+            alt_decomps={qml.CNOT: [my_cnot]},
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit():
+            qml.H(0)
+            qml.CNOT(wires=[0, 1])
+            return qml.state()
+
+        expected_resources = {"CZ": {2: 1}, "Hadamard": {1: 3}}
+        resources = mlir_specs(circuit, level=1)
+        assert resources.operations == expected_resources
 
 
 # TODO: In the future, it would be good to add unit tests for specs_collector instead of just
