@@ -519,14 +519,15 @@ class TestMLIRSpecs:
 
             coeffs = [0.2, -0.543]
             obs = [qml.X(0) @ qml.Z(1), qml.Z(i) @ qml.Hadamard(2)]
-            ham = qml.ops.LinearCombination(coeffs, obs)
+            ham1 = qml.Hamiltonian([1.0], [qml.Z(0) @ qml.Z(1)])
+            ham2 = qml.ops.LinearCombination(coeffs, obs)
 
-            return qml.expval(ham), qml.expval(qml.Z(i))
+            return qml.expval(ham1), qml.expval(ham2)
 
         expected = make_static_resources(
             operations={},
             measurements={
-                "expval(PauliZ)": 1,
+                "expval(Hamiltonian(PauliZ @ PauliZ))": 1,
                 "expval(Hamiltonian(PauliX @ PauliZ, PauliZ @ Hadamard))": 1,
             },
             num_allocs=2,
