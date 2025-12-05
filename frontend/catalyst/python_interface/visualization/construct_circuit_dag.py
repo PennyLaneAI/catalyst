@@ -137,7 +137,7 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _statistical_measurement_ops(
         self,
-        op: quantum.ExpvalOp | quantum.VarianceOp | quantum.ProbsOp,
+        op: quantum.ExpvalOp | quantum.VarianceOp,
     ) -> None:
         """Handler for statistical measurement operations."""
 
@@ -159,7 +159,7 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _sample_op(
         self,
-        op: quantum.SampleOp,
+        op: quantum.SampleOp | quantum.ProbsOp,
     ) -> None:
         """Handler for sample operations."""
 

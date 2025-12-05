@@ -27,6 +27,7 @@ from xdsl.dialects import test
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir.core import Block, Region
 
+from catalyst import measure
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
@@ -763,7 +764,7 @@ class TestCreateStaticMeasurementNodes:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_circuit():
-            qml.measure(0)
+            measure(0)
 
         module = my_circuit()
 
