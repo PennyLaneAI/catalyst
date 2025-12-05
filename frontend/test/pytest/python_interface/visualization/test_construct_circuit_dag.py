@@ -287,3 +287,256 @@ class TestDeviceNode:
 
         # Assert label is as expected
         assert graph_nodes["node1"]["label"] == "LightningSimulator"
+
+
+class TestForOp:
+    """Tests that the for loop control flow can be visualized correctly."""
+
+    @pytest.mark.unit
+    def test_basic_example(self):
+        """Tests that the for loop cluster can be visualized correctly."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            for i in range(3):
+                qml.H(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        assert clusters["cluster2"]["node_label"] == "for loop"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+
+    @pytest.mark.unit
+    def test_nested_loop(self):
+        """Tests that nested for loops are visualized correctly."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            for i in range(0, 5, 2):
+                for j in range(1, 6, 2):
+                    qml.H(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        assert clusters["cluster2"]["node_label"] == "for loop"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert clusters["cluster3"]["node_label"] == "for loop"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+
+
+class TestWhileOp:
+    """Tests that the while loop control flow can be visualized correctly."""
+
+    @pytest.mark.unit
+    def test_basic_example(self):
+        """Test that the while loop is visualized correctly."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            counter = 0
+            while counter < 5:
+                qml.H(0)
+                counter += 1
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        assert clusters["cluster2"]["node_label"] == "while loop"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+
+    @pytest.mark.unit
+    def test_nested_loop(self):
+        """Tests that nested while loops are visualized correctly."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            outer_counter = 0
+            inner_counter = 0
+            while outer_counter < 5:
+                while inner_counter < 6:
+                    qml.H(0)
+                    inner_counter += 1
+                outer_counter += 1
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        assert clusters["cluster2"]["node_label"] == "while loop"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert clusters["cluster3"]["node_label"] == "while loop"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+
+
+class TestIfOp:
+    """Tests that the conditional control flow can be visualized correctly."""
+
+    @pytest.mark.unit
+    def test_basic_example(self):
+        """Test that the conditional operation is visualized correctly."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow(x):
+            if x == 2:
+                qml.X(0)
+            else:
+                qml.Y(0)
+
+        args = (1,)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        # Check conditional is a cluster within cluster1 (my_workflow)
+        assert clusters["cluster2"]["cluster_label"] == "conditional"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+
+        # Check three clusters live within cluster2 (conditional)
+        assert clusters["cluster3"]["node_label"] == "if"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster4"]["node_label"] == "else"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
+
+    @pytest.mark.unit
+    def test_if_elif_else_conditional(self):
+        """Test that the conditional operation is visualized correctly."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow(x):
+            if x == 1:
+                qml.X(0)
+            elif x == 2:
+                qml.Y(0)
+            else:
+                qml.Z(0)
+
+        args = (1,)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        # Check conditional is a cluster within my_workflow
+        assert clusters["cluster2"]["cluster_label"] == "conditional"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+
+        # Check three clusters live within conditional
+        assert clusters["cluster3"]["node_label"] == "if"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster4"]["node_label"] == "elif"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster5"]["node_label"] == "else"
+        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
+
+    @pytest.mark.unit
+    def test_nested_conditionals(self):
+        """Tests that nested conditionals are visualized correctly."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow(x, y):
+            if x == 1:
+                if y == 2:
+                    qml.H(0)
+                else:
+                    qml.Z(0)
+                qml.X(0)
+            else:
+                qml.Z(0)
+
+        args = (1, 2)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+        clusters = utility.dag_builder.clusters
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        # cluster2 -> conditional (1)
+        #   cluster3 -> if
+        #       cluster4 -> conditional ()
+        #           cluster5 -> if
+        #           cluster6 -> else
+        #   cluster7 -> else
+
+        # Check first conditional is a cluster within my_workflow
+        assert clusters["cluster2"]["cluster_label"] == "conditional"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+
+        # Check 'if' cluster of first conditional has another conditional
+        assert clusters["cluster3"]["node_label"] == "if"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+
+        # Second conditional
+        assert clusters["cluster4"]["cluster_label"] == "conditional"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster3"
+        # Check 'if' and 'else' in second conditional
+        assert clusters["cluster5"]["node_label"] == "if"
+        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster4"
+        assert clusters["cluster6"]["node_label"] == "else"
+        assert clusters["cluster6"]["parent_cluster_uid"] == "cluster4"
+
+        # Check nested if / else is within the first if cluster
+        assert clusters["cluster7"]["node_label"] == "else"
+        assert clusters["cluster7"]["parent_cluster_uid"] == "cluster2"
