@@ -21,6 +21,7 @@ from jax import numpy as jnp
 from pennylane.measurements import Shots
 from pennylane.resource import CircuitSpecs, SpecsResources
 
+import catalyst
 from catalyst import qjit
 
 # pylint:disable = protected-access,attribute-defined-outside-init
@@ -144,7 +145,6 @@ class TestDeviceLevelSpecs:
         check_specs_same(cat_specs, pl_specs, skip_measurements=True)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestPassByPassSpecs:
     """Test qml.specs() pass-by-pass specs"""
 
@@ -166,11 +166,9 @@ class TestPassByPassSpecs:
 
         return circ
 
+    @pytest.mark.usefixtures("use_capture")
     def test_basic_passes_multi_level(self, simple_circuit):
         """Test that when passes are applied, the circuit resources are updated accordingly."""
-
-        if not qml.capture.enabled():
-            pytest.xfail("Catalyst transforms display twice when capture not enabled")
 
         simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
         simple_circuit = qml.transforms.merge_rotations(simple_circuit)
@@ -228,9 +226,6 @@ class TestPassByPassSpecs:
     def test_marker(self, simple_circuit):
         """Test that qml.marker can be used appropriately."""
 
-        if qml.capture.enabled():
-            pytest.xfail("qml.marker is not currently compatible with program capture")
-
         simple_circuit = partial(qml.marker, level="m0")(simple_circuit)
         simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
         simple_circuit = partial(qml.marker, level="m1")(simple_circuit)
@@ -270,6 +265,7 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_reprs_match(self):
         """Test that when no transforms are applied to a typical circuit, the "Before Transform"
         and "Before MLIR Passes" representations match."""
@@ -313,9 +309,6 @@ class TestPassByPassSpecs:
 
     def test_split_non_commuting(self):
         """Test that qml.transforms.split_non_commuting works as expected"""
-
-        if qml.capture.enabled():
-            pytest.xfail("split-non-commuting is not currently compatible with program capture")
 
         @qml.transforms.cancel_inverses
         @qml.transforms.split_non_commuting
@@ -384,6 +377,39 @@ class TestPassByPassSpecs:
                     ),
                 ],
             },
+        )
+
+        check_specs_same(actual, expected)
+
+    @pytest.mark.usefixtures("use_capture")
+    def test_subroutine(self):
+        dev = qml.device("lightning.qubit", wires=3)
+
+        @catalyst.jax_primitives.subroutine
+        def subroutine():
+            qml.Hadamard(wires=0)
+
+        @qml.qjit(autograph=True)
+        @qml.qnode(dev)
+        def circuit():
+
+            for _ in range(3):
+                subroutine()
+
+            return qml.probs()
+
+        actual = qml.specs(circuit, level=1)()
+        expected = CircuitSpecs(
+            device_name="lightning.qubit",
+            num_device_wires=3,
+            shots=Shots(None),
+            level=1,
+            resources=SpecsResources(
+                gate_types={"Hadamard": 3},
+                gate_sizes={1: 3},
+                measurements={"probs(all wires)": 1},
+                num_allocs=3,
+            ),
         )
 
         check_specs_same(actual, expected)
