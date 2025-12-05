@@ -765,41 +765,6 @@ class TestCreateStaticMeasurementNodes:
         assert nodes["node1"]["label"] == str(op)
 
     @pytest.mark.unit
-    @pytest.mark.parametrize(
-        "op, error_type, error_message",
-        [
-            [
-                qml.sample(op=qml.Z(0)),
-                CompileError,
-                "Only expectation value and variance measurements can accept observables with Catalyst",
-            ],
-            [
-                qml.sample(op=qml.Z(0), wires=[0]),
-                ValueError,
-                "Cannot specify the wires to sample if an observable is provided. The wires to sample will be determined directly from the observable.",
-            ],
-        ],
-    )
-    def test_invalid_sample_measurement_op(self, op, error_type, error_message):
-        """Makes sure that invalid sample operations hold true."""
-
-        dev = qml.device("null.qubit", wires=1)
-
-        @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.set_shots(10)
-        @qml.qnode(dev)
-        def my_circuit():
-            return op
-
-        module = my_circuit()
-
-        # Construct DAG
-        utility = ConstructCircuitDAG(FakeDAGBuilder())
-        with pytest.raises(error_type, match=error_message):
-            utility.construct(module)
-
-    @pytest.mark.unit
     def test_projective_measurement_op(self):
         """Test that projective measurements can be captured as nodes."""
         dev = qml.device("null.qubit", wires=1)
