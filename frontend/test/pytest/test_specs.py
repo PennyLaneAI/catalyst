@@ -282,13 +282,14 @@ class TestPassByPassSpecs:
                 qml.state(),
             )
 
-        circuit = qjit(circuit)
+        specs_device = qml.specs(circuit, level=0, compute_depth=False)()
+        specs_all = qml.specs(qjit(circuit), level="all")()
 
-        specs_all = qml.specs(circuit, level="all")()
-
+        regular_pl = specs_device["resources"]
         before_transforms = specs_all["resources"]["Before transforms"]
         before_mlir = specs_all["resources"]["Before MLIR Passes (MLIR-0)"]
 
+        check_specs_resources_same(regular_pl, before_transforms)
         check_specs_resources_same(before_transforms, before_mlir)
 
 
