@@ -466,6 +466,46 @@ def test_subroutine_and_loop(backend):
     assert np.allclose(expected, observed)
 
 
+@pytest.mark.usefixtures("use_capture")
+def test_subroutine_and_loop_multiple_args(backend):
+    """
+    Test passing dynamically allocated wires into a subroutine with loops and multiple arguments.
+    """
+
+    @subroutine
+    def flip(w1, w2, w3, theta):
+        @qml.for_loop(0, 2, 1)
+        def loop_rx(i, _theta):
+            qml.X(w1)
+            qml.Y(w2)
+            qml.Z(w3)
+            qml.ctrl(qml.RX, (w1, w2))(_theta, wires=0)
+            return jnp.sin(_theta)
+
+        _ = loop_rx(theta)
+
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit():
+        with qml.allocate(2) as q1:
+            with qml.allocate(3) as q2:
+                flip(q1[0], q1[1], q2[2], 1.23)
+
+        return qml.expval(qml.Z(0))
+
+    @qml.qnode(qml.device("default.qubit", wires=6))
+    def ref_circuit():
+        for i in range(2):
+            qml.X(0)
+            qml.Y(1)
+            qml.Z(2)
+            qml.ctrl(qml.RX, (0, 1))(1.23, wires=3)
+
+        return qml.expval(qml.Z(3))
+
+    assert np.allclose(circuit(), ref_circuit())
+
+
 def test_no_capture(backend):
     """
     Test error message when used without capture.
