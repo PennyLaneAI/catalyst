@@ -23,8 +23,8 @@ from collections import defaultdict
 from functools import partial, singledispatch
 
 import xdsl
-from xdsl.dialects import func
 from xdsl.dialects.builtin import ModuleOp
+from xdsl.dialects.func import CallOp, FuncOp
 from xdsl.dialects.scf import ForOp, IfOp, IndexSwitchOp, WhileOp
 from xdsl.ir import Region
 
@@ -56,7 +56,11 @@ from catalyst.python_interface.dialects.quantum import (
     StateOp,
     VarianceOp,
 )
-from catalyst.python_interface.inspection.xdsl_conversion import *
+from catalyst.python_interface.inspection.xdsl_conversion import (
+    count_static_loop_iterations,
+    xdsl_to_qml_measurement_name,
+    xdsl_to_qml_op_name,
+)
 
 # A list of all custom dialect names used by Catalyst for MLIR ops
 # Note that this isn't a complete list, just one where specs *must* support every op
@@ -132,7 +136,7 @@ class ResourcesResult:
         elif method == "min":
             merge_func = min
         elif method == "sum":
-            merge_func = lambda a, b: a + b
+            merge_func = lambda a, b: a + b  # pylint: disable=unnecessary-lambda
         else:
             raise ValueError(f"Unsupported merge method: '{method}'. Use 'sum', 'max', or 'min'.")
 
@@ -267,7 +271,7 @@ def _(_: PPMeasurementOp | SelectPPMeasurementOp) -> tuple[ResourceType, str]:
 
 @handle_resource.register
 def _(
-    xdsl_op: func.CallOp,
+    xdsl_op: CallOp,
 ) -> tuple[ResourceType, str]:
     # If these types are matched, parse them with the extra specs handler
     return ResourceType.FUNC_CALL, xdsl_op.callee.string_value()
@@ -321,7 +325,9 @@ def _resolve_function_calls(
     """
     resources = func_to_resources[func]
 
-    for called_func in list(resources._unresolved_function_calls.keys()):
+    for called_func in list(
+        resources._unresolved_function_calls.keys()
+    ):  # pylint: disable=protected-access
         count = resources._unresolved_function_calls.pop(called_func)
 
         if called_func not in func_to_resources:
@@ -461,8 +467,8 @@ def _collect_region(
         if isinstance(op, IfOp):
             if not cond_warning:
                 warnings.warn(
-                    "Specs was unable to determine the branch of a conditional or switch statement. "
-                    "The results will take the maximum resources across all possible branches.",
+                    "Specs was unable to determine the branch of a conditional or switch statement."
+                    " The results will take the maximum resources across all possible branches.",
                     UserWarning,
                 )
                 cond_warning = True
@@ -534,14 +540,14 @@ def specs_collect(module: ModuleOp) -> ResourcesResult:
             # Skip callback ops, which are not part of the quantum circuit itself
             continue
 
-        if not isinstance(func_op, func.FuncOp):
+        if not isinstance(func_op, FuncOp):
             raise ValueError("Expected FuncOp in module body.")
 
         if func_op.is_declaration:
             if not func_decl_warning:
                 warnings.warn(
-                    f"Specs encountered an external function declaration, and could not analyze its contents. "
-                    "Some resource data may be missing.",
+                    "Specs encountered an external function declaration, and could not analyze "
+                    "its contents. Some resource data may be missing.",
                     UserWarning,
                 )
                 func_decl_warning = True

@@ -28,6 +28,10 @@ pytestmark = pytest.mark.requires_xdsl
 def resources_equal(
     actual: ResourcesResult, expected: ResourcesResult, return_only: bool = False
 ) -> bool:
+    """
+    Check if two ResourcesResult objects are equal.
+    Ignores certain attributes (e.g. classical_instructions)
+    """
     try:
 
         # actual.device_name == expected.device_name TODO: Don't worry about this one for now
@@ -37,7 +41,9 @@ def resources_equal(
         assert actual.measurements == expected.measurements
 
         # There should be no remaining unresolved function calls
-        assert sum(actual._unresolved_function_calls.values()) == 0
+        assert (
+            sum(actual._unresolved_function_calls.values()) == 0
+        )  # pylint: disable=protected-access
 
         # Only check that expected function calls are a subset of actual function calls
         #   Other random helper functions may be inserted by the compiler
@@ -563,6 +569,7 @@ class TestMLIRSpecs:
         assert resources_equal(res, expected)
 
     def test_subroutine(self):
+        """Test that subroutines are handled correctly."""
         if not qml.capture.enabled():
             pytest.xfail("Subroutine requires plxpr to be enabled.")
 
@@ -588,6 +595,7 @@ class TestMLIRSpecs:
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_graph_decomp(self):
+        """Test that graph decomposition is handled correctly."""
 
         @qml.register_resources({qml.H: 2, qml.CZ: 1})
         def my_cnot(wires):

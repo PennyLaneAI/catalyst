@@ -49,7 +49,8 @@ def mlir_specs(
 
     if args or kwargs:
         warnings.warn(
-            "The `specs` function does not yet support dynamic arguments, so the results may not reflect information provided by the arguments.",
+            "The `specs` function does not yet support dynamic arguments, "
+            "so the results may not reflect information provided by the arguments.",
             UserWarning,
         )
 
