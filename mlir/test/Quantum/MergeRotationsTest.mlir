@@ -1074,11 +1074,11 @@ func.func public @half_compatible_qubits(%q0: !quantum.bit, %q1: !quantum.bit, %
 // re-arranging qubits is ok as long as the pauli words are re-arranged too
 
 // CHECK-LABEL: merge_permutations
-func.func public @merge_permutations(%z0: !quantum.bit, %y0: !quantum.bit, %0: f64, %1: f64, %2: f64, %3: f64) {
+func.func public @merge_permutations(%z0: !quantum.bit, %y0: !quantum.bit, %0: f64, %1: f64) {
     // CHECK-DAG: [[angle:%.+]] = arith.addf
     // CHECK: qec.ppr.arbitrary ["Y", "Z"]([[angle]]) %arg1, %arg0
-    %z1, %y1 = qec.ppr.arbitrary ["Z", "Y"](%1) %z0, %y0: !quantum.bit, !quantum.bit
-    %y2, %z2 = qec.ppr.arbitrary ["Y", "Z"](%2) %y1, %z1: !quantum.bit, !quantum.bit
+    %z1, %y1 = qec.ppr.arbitrary ["Z", "Y"](%0) %z0, %y0: !quantum.bit, !quantum.bit
+    %y2, %z2 = qec.ppr.arbitrary ["Y", "Z"](%1) %y1, %z1: !quantum.bit, !quantum.bit
     func.return
 }
 
