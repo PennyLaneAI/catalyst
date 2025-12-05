@@ -831,6 +831,7 @@ class TestCreateStaticMeasurementNodes:
 
         assert nodes["node1"]["label"] == get_label(op)
 
+
 class TestOperatorConnectivity:
     """Tests that operators are properly connected."""
 

@@ -131,24 +131,33 @@ class ConstructCircuitDAG:
         # Update affected wires to source from this node UID
         for wire in qml_op.wires:
             self._wire_to_node_uids[wire] = {node_uid}
-            
+
     @_visit_operation.register
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
         """Handler for the single-qubit projective measurement operation."""
 
         # Create PennyLane instance
-        meas = xdsl_to_qml_measurement(op)
+        qml_op = xdsl_to_qml_measurement(op)
 
         # Add node to current cluster
         node_uid = f"node{self._node_uid_counter}"
         self.dag_builder.add_node(
             uid=node_uid,
-            label=get_label(meas),
+            label=get_label(qml_op),
             cluster_uid=self._cluster_uid_stack[-1],
             # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
         )
         self._node_uid_counter += 1
+
+        # Search through previous ops found on current wires and connect
+        prev_ops = set.union(*(self._wire_to_node_uids[wire] for wire in qml_op.wires))
+        for prev_op in prev_ops:
+            self.dag_builder.add_edge(prev_op, node_uid)
+
+        # Update affected wires to source from this node UID
+        for wire in qml_op.wires:
+            self._wire_to_node_uids[wire] = {node_uid}
 
     # =====================
     # QUANTUM MEASUREMENTS
