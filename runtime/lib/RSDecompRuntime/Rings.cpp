@@ -66,8 +66,6 @@ double ZSqrtTwo::to_double() const
     return static_cast<double>(a) + static_cast<double>(b) * M_SQRT2;
 }
 
-FLOAT_TYPE ZSqrtTwo::to_float() const { return FLOAT_TYPE(a) + FLOAT_TYPE(b) * SQRT2; }
-
 ZSqrtTwo ZSqrtTwo::pow(INT_TYPE exponent) const
 {
     if (exponent < 0) {
@@ -187,10 +185,10 @@ bool ZOmega::parity() const { return (a + c) % 2 != 0; }
 
 ZOmega ZOmega::adj2() const { return ZOmega(-a, b, -c, d); }
 
-MULTI_PREC_INT ZOmega::abs() const
+INT_TYPE ZOmega::abs() const
 {
-    MULTI_PREC_INT first = a * a + b * b + c * c + d * d;
-    MULTI_PREC_INT second = a * b + b * c + c * d - d * a;
+    INT_TYPE first = a * a + b * b + c * c + d * d;
+    INT_TYPE second = a * b + b * c + c * d - d * a;
     return first * first - 2 * second * second;
 }
 
@@ -200,21 +198,19 @@ ZOmega ZOmega::norm() const { return (*this) * (*this).conj(); }
 
 ZOmega ZOmega::operator%(const ZOmega &other) const
 {
-    MULTI_PREC_INT d = other.abs();
-    ZOmega_multiprec other_multiprec{other};
-    ZOmega_multiprec other_conj_multiprec{other.conj()};
-    ZOmega_multiprec n = ZOmega_multiprec(*this) * other_conj_multiprec *
-                         ((other_multiprec * other_conj_multiprec).adj2());
+    INT_TYPE d = other.abs();
+    ZOmega other_z{other};
+    ZOmega other_conj_z{other.conj()};
+    ZOmega n = (*this) * other_conj_z * ((other_z * other_conj_z).adj2());
 
-    MULTI_PREC_INT na = floor_div((n.a + floor_div(d, (MULTI_PREC_INT)2)), d);
-    MULTI_PREC_INT nb = floor_div((n.b + floor_div(d, (MULTI_PREC_INT)2)), d);
-    MULTI_PREC_INT nc = floor_div((n.c + floor_div(d, (MULTI_PREC_INT)2)), d);
-    MULTI_PREC_INT nd = floor_div((n.d + floor_div(d, (MULTI_PREC_INT)2)), d);
+    INT_TYPE na = floor_div((n.a + floor_div(d, (INT_TYPE)2)), d);
+    INT_TYPE nb = floor_div((n.b + floor_div(d, (INT_TYPE)2)), d);
+    INT_TYPE nc = floor_div((n.c + floor_div(d, (INT_TYPE)2)), d);
+    INT_TYPE nd = floor_div((n.d + floor_div(d, (INT_TYPE)2)), d);
 
-    ZOmega_multiprec result = ZOmega_multiprec{na, nb, nc, nd} * other - ZOmega_multiprec{*this};
+    ZOmega result = ZOmega{na, nb, nc, nd} * other - (*this);
 
-    return ZOmega(result.a.convert_to<INT_TYPE>(), result.b.convert_to<INT_TYPE>(),
-                  result.c.convert_to<INT_TYPE>(), result.d.convert_to<INT_TYPE>());
+    return result;
 }
 
 ZSqrtTwo ZOmega::to_sqrt_two() const
@@ -244,34 +240,6 @@ std::pair<ZOmega, int> ZOmega::normalize()
         ix += 1;
     }
     return {res, ix};
-}
-
-// --- ZOmega_multiprec Method Implementations ---
-
-ZOmega_multiprec::ZOmega_multiprec(MULTI_PREC_INT a, MULTI_PREC_INT b, MULTI_PREC_INT c,
-                                   MULTI_PREC_INT d)
-    : a(a), b(b), c(c), d(d)
-{
-}
-
-ZOmega_multiprec::ZOmega_multiprec(ZOmega zomega)
-    : a(zomega.a), b(zomega.b), c(zomega.c), d(zomega.d)
-{
-}
-
-ZOmega_multiprec ZOmega_multiprec::operator*(const ZOmega_multiprec &other) const
-{
-    return ZOmega_multiprec(a * other.d + b * other.c + c * other.b + d * other.a,
-                            b * other.d + c * other.c + d * other.b - a * other.a,
-                            c * other.d + d * other.c - a * other.b - b * other.a,
-                            d * other.d - a * other.c - b * other.b - c * other.a);
-}
-
-ZOmega_multiprec ZOmega_multiprec::adj2() const { return ZOmega_multiprec(-a, b, -c, d); }
-
-ZOmega_multiprec ZOmega_multiprec::operator-(ZOmega_multiprec other) const
-{
-    return ZOmega_multiprec(a - other.a, b - other.b, c - other.c, d - other.d);
 }
 
 // --- DyadicMatrix Method Implementations ---

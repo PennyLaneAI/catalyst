@@ -24,29 +24,23 @@
 
 namespace RSDecomp::Rings {
 
-// Type aliases for arbitrary precision arithmetic
-// Using boost multiprecision for both integers and floats to handle
-// very small epsilon values (around 1e-6/7) where intermediate calculations
-// become too large for int128 and too small for doubles.
+// Note on multiprecision:
+// Multiprecision INTs are required to achieve down to epsilon ~ 1e-7
+// Beyond this, we need to make full use of multiprecision FLOATs as well
+// to avoid precision issues in intermediate calculations.
+// In the current implementation, we make minimal use of multiprecision FLOATs,
+// Only in the modulo calculation here. In the core Ellipse and GridSolver computation,
+// we are just using doubles for now.
+//
+// TODO: Extend multiprecision FLOAT usage in Ellipse and GridSolver computation
+// to allow even smaller epsilon values.
 using INT_TYPE = boost::multiprecision::cpp_int;
 using FLOAT_TYPE = boost::multiprecision::cpp_dec_float_50;
 
-// Keep MULTI_PREC_INT as an alias for backwards compatibility
-using MULTI_PREC_INT = INT_TYPE;
-
-// Constants using FLOAT_TYPE for precision
-const FLOAT_TYPE SQRT2 = boost::multiprecision::sqrt(FLOAT_TYPE(2));
-const FLOAT_TYPE SQRT1_2 = FLOAT_TYPE(1) / SQRT2;
-const FLOAT_TYPE PI = boost::multiprecision::acos(FLOAT_TYPE(-1));
-const FLOAT_TYPE LAMBDA = FLOAT_TYPE(1) + SQRT2;
-
-// For complex operations, we still need std::complex<double> for compatibility
-// with external interfaces
 const double LAMBDA_D = 1.0 + M_SQRT2;
 const std::complex<double> OMEGA = std::complex<double>(M_SQRT1_2, M_SQRT1_2);
 
 struct ZOmega;
-struct ZOmega_multiprec;
 struct ZSqrtTwo;
 struct DyadicMatrix;
 struct SO3Matrix;
@@ -72,7 +66,6 @@ struct ZSqrtTwo {
     INT_TYPE abs() const;
     ZSqrtTwo adj2() const;
     double to_double() const;
-    FLOAT_TYPE to_float() const;
     ZSqrtTwo pow(INT_TYPE exponent) const;
     std::optional<ZSqrtTwo> sqrt() const;
 
@@ -97,26 +90,12 @@ struct ZOmega {
     std::complex<double> to_complex() const;
     bool parity() const;
     ZOmega adj2() const;
-    MULTI_PREC_INT abs() const;
+    INT_TYPE abs() const;
     ZOmega conj() const;
     ZOmega norm() const;
 
     ZSqrtTwo to_sqrt_two() const;
     std::pair<ZOmega, int> normalize();
-};
-
-// This is a helper struct for high-precision ZOmega calculations
-// When we move to full arbitrary precision, this can be combined with
-// ZOmega
-struct ZOmega_multiprec {
-    MULTI_PREC_INT a, b, c, d;
-
-    ZOmega_multiprec(MULTI_PREC_INT a, MULTI_PREC_INT b, MULTI_PREC_INT c, MULTI_PREC_INT d);
-    ZOmega_multiprec(ZOmega zomega);
-
-    ZOmega_multiprec operator*(const ZOmega_multiprec &other) const;
-    ZOmega_multiprec adj2() const;
-    ZOmega_multiprec operator-(ZOmega_multiprec other) const;
 };
 
 struct DyadicMatrix {
