@@ -444,6 +444,9 @@ def _get_dynamically_allocated_qregs(plxpr_invals, qubit_index_recorder, init_qr
     dynalloced_qregs = []
     dynalloced_wire_global_indices = []
     for inval in plxpr_invals:
+        if not type(inval) in [int, DynamicJaxprTracer]:
+            # don't care about invals that won't be wire indices
+            continue
         if qubit_index_recorder.contains(inval) and qubit_index_recorder[inval] is not init_qreg:
             dyn_qreg = qubit_index_recorder[inval]
             dyn_qreg.insert_all_dangling_qubits()
