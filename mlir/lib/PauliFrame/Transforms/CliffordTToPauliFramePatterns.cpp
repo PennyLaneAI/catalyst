@@ -66,7 +66,21 @@ GateEnum hashGate(CustomOp op)
 // Gate-conversion functions
 //===----------------------------------------------------------------------===//
 
-// TODO
+/**
+ * @brief Helper function to the Clifford+T -> PauliFrame pattern for Pauli gates (I, X, Y, Z).
+ *
+ * Performs the following rewrite, for example, from:
+ *
+ *  %0 = ... : !quantum.bit
+ *  %1 = quantum.custom "X"() %0 : !quantum.bit  // or "I", "Y", "Z"
+ *  %2 = <op_that_consumes_qubit> %1 : ...
+ *
+ * to:
+ *
+ *   %0 = ... : !quantum.bit
+ *   %1 = pauli_frame.update[true, false] %0 : !quantum.bit  // and similar for other Pauli gates
+ *   %2 = <op_that_consumes_qubit> %1 : ...
+ */
 LogicalResult convertPauliGate(CustomOp op, PatternRewriter &rewriter, bool x_parity, bool z_parity)
 {
     auto loc = op->getLoc();
@@ -81,7 +95,22 @@ LogicalResult convertPauliGate(CustomOp op, PatternRewriter &rewriter, bool x_pa
     return success();
 }
 
-// TODO
+/**
+ * @brief Helper function to the Clifford+T -> PauliFrame pattern for Clifford gates (H, S, CNOT).
+ *
+ * Performs the following rewrite, for example, from:
+ *
+ *   %0 = ... : !quantum.bit
+ *   %1 = quantum.custom "Hadamard"() %0 : !quantum.bit
+ *   %2 = <op_that_consumes_qubit> %1 : ...
+ *
+ * to:
+ *
+ *   %0 = ... : !quantum.bit
+ *   %1 = pauli_frame.update_with_clifford[Hadamard] %0 : !quantum.bit
+ *   %2 = quantum.custom "Hadamard"() %1 : !quantum.bit
+ *   %3 = <op_that_consumes_qubit> %2 : ...
+ */
 LogicalResult convertCliffordGate(CustomOp op, PatternRewriter &rewriter, CliffordGate gate)
 {
     auto loc = op->getLoc();
@@ -95,7 +124,34 @@ LogicalResult convertCliffordGate(CustomOp op, PatternRewriter &rewriter, Cliffo
     return success();
 }
 
-// TODO
+/**
+ * @brief Helper function to the Clifford+T -> PauliFrame pattern for non-Clifford gates (T).
+ *
+ * Performs the following rewrite, for example, from:
+ *
+ *   %0 = ... : !quantum.bit
+ *   %1 = quantum.custom "T"() %0 : !quantum.bit
+ *   %2 = <op_that_consumes_qubit> %1 : ...
+ *
+ * to:
+ *
+ *   %0 = ... : !quantum.bit
+ *   %x_parity, %z_parity, %out_qubit = pauli_frame.flush %0 : i1, i1, !quantum.bit
+ *   %1 = scf.if %x_parity -> (!quantum.bit) {
+ *     %out_qubits_0 = quantum.custom "X"() %out_qubit : !quantum.bit
+ *     scf.yield %out_qubits_0 : !quantum.bit
+ *   } else {
+ *     scf.yield %out_qubit : !quantum.bit
+ *   }
+ *   %2 = scf.if %z_parity -> (!quantum.bit) {
+ *     %out_qubits_0 = quantum.custom "Z"() %1 : !quantum.bit
+ *     scf.yield %out_qubits_0 : !quantum.bit
+ *   } else {
+ *     scf.yield %1 : !quantum.bit
+ *   }
+ *   %3 = quantum.custom "T"() %2 : !quantum.bit
+ *   %4 = <op_that_consumes_qubit> %3 : ...
+ */
 LogicalResult convertNonCliffordGate(CustomOp op, PatternRewriter &rewriter)
 {
     auto loc = op->getLoc();
@@ -145,6 +201,9 @@ LogicalResult convertNonCliffordGate(CustomOp op, PatternRewriter &rewriter)
 // Clifford+T to Pauli Frame Patterns
 //===----------------------------------------------------------------------===//
 
+/**
+ * @brief Rewrite pattern for Clifford+T ops -> PauliFrame
+ */
 struct CliffordTToPauliFramePattern : public OpRewritePattern<CustomOp> {
     using OpRewritePattern::OpRewritePattern;
 
@@ -178,6 +237,21 @@ struct CliffordTToPauliFramePattern : public OpRewritePattern<CustomOp> {
     }
 };
 
+/**
+ * @brief Rewrite pattern for Pauli record initialization of a single qubit
+ *
+ * The Pauli records are initialized by inserting `pauli_frame.init` ops immediately after each
+ * single-qubit allocation op, `quantum.alloc_qb`, as follows, from:
+ *
+ *   %0 = quantum.alloc_qb : !quantum.bit
+ *   %1 = <op_that_consumes_qubit> %0 : ...
+ *
+ * to:
+ *
+ *   %0 = quantum.alloc_qb : !quantum.bit
+ *   %1 = pauli_frame.init %0
+ *   %2 = <op_that_consumes_qubit> %1 : ...
+ */
 struct InitPauliRecordQbitPattern : public OpRewritePattern<AllocQubitOp> {
     using OpRewritePattern::OpRewritePattern;
 
@@ -194,6 +268,21 @@ struct InitPauliRecordQbitPattern : public OpRewritePattern<AllocQubitOp> {
     }
 };
 
+/**
+ * @brief Rewrite pattern for Pauli record initialization of a quantum register
+ *
+ * The Pauli records are initialized by inserting `pauli_frame.init_qreg` ops immediately after each
+ * register allocation op, `quantum.alloc`, as follows, from:
+ *
+ *   %0 = quantum.alloc( 1) : !quantum.reg
+ *   %1 = <op_that_consumes_qreg> %0 : ...
+ *
+ * to:
+ *
+ *   %0 = quantum.alloc( 1) : !quantum.reg
+ *   %1 = pauli_frame.init_qreg %0 : !quantum.reg
+ *   %2 = <op_that_consumes_qreg> %1 : ...
+ */
 struct InitPauliRecordQregPattern : public OpRewritePattern<AllocOp> {
     using OpRewritePattern::OpRewritePattern;
 
@@ -210,6 +299,21 @@ struct InitPauliRecordQregPattern : public OpRewritePattern<AllocOp> {
     }
 };
 
+/**
+ * @brief Rewrite pattern for measurement corrections
+ *
+ * Measurement results are corrected by inserting `pauli_frame.correct_measurement` ops immediately
+ * after each computational-basis mid-circuit measurement op, `quantum.measure`, as follows, from:
+ *
+ *   %0 = ... : !quantum.bit
+ *   %mres, %1 = quantum.measure %0 : i1, !quantum.bit
+ *
+ * to:
+ *
+ *   %0 = ... : !quantum.bit
+ *   %mres, %1 = quantum.measure %0 : i1, !quantum.bit
+ *   %mres_1, %2 = pauli_frame.correct_measurement %mres, %1 : i1, !quantum.bit
+ */
 struct CorrectMeasurementPattern : public OpRewritePattern<MeasureOp> {
     using OpRewritePattern::OpRewritePattern;
 
