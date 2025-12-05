@@ -16,8 +16,8 @@
 
 from functools import singledispatchmethod
 
-from xdsl.dialects import SSAValue, builtin, func, scf
-from xdsl.ir import Block, Operation, Region
+from xdsl.dialects import builtin, func, scf
+from xdsl.ir import Block, Operation, Region, SSAValue
 
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
