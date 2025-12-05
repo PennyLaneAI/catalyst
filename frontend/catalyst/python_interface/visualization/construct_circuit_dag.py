@@ -157,7 +157,7 @@ class ConstructCircuitDAG:
         self._node_uid_counter += 1
 
     @_visit_operation.register
-    def _sample_op(
+    def _visit_sample_and_probs_ops(
         self,
         op: quantum.SampleOp | quantum.ProbsOp,
     ) -> None:
