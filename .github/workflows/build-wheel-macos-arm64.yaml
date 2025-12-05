@@ -166,9 +166,9 @@ jobs:
         lookup-only: True
 
     - name: Setup Python version
-      # There are multiple Python versions installed on the GitHub image, 3.11 - 3.12 is already
+      # There are multiple Python versions installed on the GitHub image, 3.11 - 3.14 is already
       # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
-      # 3.11 and 3.12. Make sure to consistently use the system versions.
+      # 3.11 and 3.14. Make sure to consistently use the system versions.
       run: |
         echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
 
@@ -474,7 +474,7 @@ jobs:
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1'
 
     - name: Install OQC client
-      if: matrix.python_version != '3.13'
+      if: ${{ !contains(fromJSON('["3.13", "3.14"]'), matrix.python_version) }}
       run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
 

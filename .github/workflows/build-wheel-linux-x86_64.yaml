@@ -493,7 +493,7 @@ jobs:
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>=1.31.0'
 
     - name: Install OQC client
-      if: matrix.python_version != '3.13'
+      if: ${{ !contains(fromJSON('["3.13", "3.14"]'), matrix.python_version) }}
       run: |
         python${{ matrix.python_version }} -m pip install oqc-qcaas-client
 
