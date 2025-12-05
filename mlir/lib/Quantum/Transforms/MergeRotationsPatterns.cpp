@@ -430,12 +430,12 @@ struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbit
         // qubits at the index it appears in op's in qubits.
         SmallVector<unsigned> inverse_permutation;
         for (auto qubit : opInQubits) {
-            inverse_permutation.push_back(cast<mlir::OpResult>(qubit).getResultNumber());
+            inverse_permutation.push_back(cast<OpResult>(qubit).getResultNumber());
         }
 
         // check Pauli + qubit pairings
-        mlir::ArrayAttr opPauliProduct = op.getPauliProduct();
-        mlir::ArrayAttr parentOpPauliProduct = parentOp.getPauliProduct();
+        ArrayAttr opPauliProduct = op.getPauliProduct();
+        ArrayAttr parentOpPauliProduct = parentOp.getPauliProduct();
         for (size_t i = 0; i < opInQubits.size(); i++) {
             if (opPauliProduct[i] != parentOpPauliProduct[inverse_permutation[i]]) {
                 return failure();
@@ -448,17 +448,17 @@ struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbit
             return failure();
         }
 
-        mlir::Location loc = op.getLoc();
+        Location loc = op.getLoc();
 
         mlir::Value opRotation = op.getArbitraryAngle();
         mlir::Value parentOpRotation = parentOp.getArbitraryAngle();
-        mlir::Value newAngleOp =
+        auto newAngleOp =
             rewriter.create<arith::AddFOp>(loc, opRotation, parentOpRotation).getResult();
 
         // We need to construct the Pauli string + inQubits for new op. The simplest way to ensure
         // that permuted PPRs can merge correctly is to maintain output qubits order and permute
         // input qubits
-        mlir::ValueRange parentOpInQubits = parentOp.getInQubits();
+        ValueRange parentOpInQubits = parentOp.getInQubits();
         SmallVector<mlir::Value> newInQubits;
         for (size_t i = 0; i < parentOpInQubits.size(); i++) {
             newInQubits.push_back(parentOpInQubits[inverse_permutation[i]]);
@@ -501,7 +501,7 @@ struct MergeMultiRZRewritePattern : public OpRewritePattern<MultiRZOp> {
         auto parentTheta = parentOp.getTheta();
         auto theta = op.getTheta();
 
-        mlir::Value sumParam = rewriter.create<arith::AddFOp>(loc, parentTheta, theta).getResult();
+        Value sumParam = rewriter.create<arith::AddFOp>(loc, parentTheta, theta).getResult();
 
         auto mergeOp = rewriter.create<MultiRZOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParam,
                                                   parentInQubits, nullptr, parentInCtrlQubits,

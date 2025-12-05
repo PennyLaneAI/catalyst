@@ -533,7 +533,7 @@ def test_merge_rotation_arbitrary_angle_ppr():
 
     @qml.qjit(pipelines=my_pipeline, target="mlir")
     def test_merge_rotation_ppr_workflow():
-        @qml.transforms.merge_rotations  # have to use qml to be capture-compatible
+        @qml.transforms.merge_rotations
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit(x, y):
             qml.PauliRot(x, pauli_word="ZY", wires=[0, 1])
