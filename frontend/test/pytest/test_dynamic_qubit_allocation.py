@@ -480,28 +480,30 @@ def test_subroutine_and_loop_multiple_args(backend):
             qml.Y(w2)
             qml.Z(w3)
             qml.ctrl(qml.RX, (w1, w2))(_theta, wires=0)
+            qml.ctrl(qml.RY, (w2, w3))(_theta, wires=1)
             return jnp.sin(_theta)
 
         _ = loop_rx(theta)
 
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
     def circuit():
         with qml.allocate(2) as q1:
             with qml.allocate(3) as q2:
                 flip(q1[0], q1[1], q2[2], 1.23)
 
-        return qml.expval(qml.Z(0))
+        return qml.probs(wires=[0, 1])
 
-    @qml.qnode(qml.device("default.qubit", wires=6))
+    @qml.qnode(qml.device("default.qubit", wires=7))
     def ref_circuit():
         for i in range(2):
             qml.X(0)
             qml.Y(1)
             qml.Z(2)
             qml.ctrl(qml.RX, (0, 1))(1.23, wires=3)
+            qml.ctrl(qml.RY, (1, 2))(1.23, wires=4)
 
-        return qml.expval(qml.Z(3))
+        return qml.probs(wires=[3, 4])
 
     assert np.allclose(circuit(), ref_circuit())
 
