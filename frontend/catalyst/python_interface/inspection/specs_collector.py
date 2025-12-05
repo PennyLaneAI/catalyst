@@ -198,6 +198,7 @@ class ResourcesResult:
 def handle_resource(
     xdsl_op: xdsl.ir.Operation,
 ) -> tuple[ResourceType, str] | tuple[None, None]:
+    """Handle an xDSL operation and categorize it into a resource type."""
     # Default handler for unsupported xDSL op types
     return ResourceType.OTHER, xdsl_op.name
 
@@ -292,6 +293,7 @@ def _(
 
 @singledispatch
 def handle_metadata(xdsl_op: xdsl.ir.Operation, resources: ResourcesResult) -> None:
+    """Handle a circuit metadata xDSL operation"""
     raise NotImplementedError(f"Unsupported xDSL op: {xdsl_op}")
 
 
@@ -506,10 +508,10 @@ def _collect_region(
                 adjoint_mode=adjoint_mode,
             )
 
-            for region in op.case_regions[1:]:
+            for inner_region in op.case_regions[1:]:
                 used_resources.merge_with(
                     _collect_region(
-                        region,
+                        inner_region,
                         loop_warning=loop_warning,
                         cond_warning=cond_warning,
                         adjoint_mode=adjoint_mode,
