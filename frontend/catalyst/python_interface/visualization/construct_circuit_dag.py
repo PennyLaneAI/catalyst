@@ -181,7 +181,7 @@ class ConstructCircuitDAG:
                 self.dag_builder.add_edge(seen_node, node_uid)
 
     @_visit_operation.register
-    def _sample_op(
+    def _visit_sample_and_probs_ops(
         self,
         op: quantum.SampleOp | quantum.ProbsOp,
     ) -> None:
