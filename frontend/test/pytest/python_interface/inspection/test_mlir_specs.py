@@ -22,7 +22,8 @@ import pytest
 import catalyst
 from catalyst.python_interface.inspection import ResourcesResult, mlir_specs
 
-pytestmark = pytest.mark.requires_xdsl
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 
 
 def resources_equal(
