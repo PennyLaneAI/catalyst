@@ -744,7 +744,7 @@ class TestCreateStaticMeasurementNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
-        assert nodes["node1"]["label"] == str(qml.sample())
+        assert nodes["node1"]["label"] == "sample(wires=[])"
 
     @pytest.mark.unit
     def test_projective_measurement_op(self):
