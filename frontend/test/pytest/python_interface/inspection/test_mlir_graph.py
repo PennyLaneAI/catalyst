@@ -19,6 +19,7 @@ import pytest
 
 # pylint: disable=wrong-import-position
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
+graphviz = pytest.importorskip("graphviz")
 
 import pennylane as qml
 

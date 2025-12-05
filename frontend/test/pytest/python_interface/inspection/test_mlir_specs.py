@@ -13,6 +13,8 @@
 # limitations under the License.
 """Unit test module for the mlir_specs function in the Python Compiler inspection module."""
 
+from functools import partial
+
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
@@ -93,7 +95,7 @@ class TestMLIRSpecs:
     def test_invalid_level_type(self, simple_circuit, level):
         """Test that requesting an invalid level type raises an error."""
 
-        simple_circuit = qml.qjit()(simple_circuit)
+        simple_circuit = qml.qjit(simple_circuit)
 
         with pytest.raises(
             ValueError, match="The `level` argument must be an int, a tuple/list of ints, or 'all'."
@@ -104,7 +106,7 @@ class TestMLIRSpecs:
     def test_invalid_int_level(self, simple_circuit, level):
         """Test that requesting an invalid level raises an error."""
 
-        simple_circuit = qml.qjit()(simple_circuit)
+        simple_circuit = qml.qjit(simple_circuit)
 
         with pytest.raises(
             ValueError, match=f"Requested specs level {level} not found in MLIR pass list."
@@ -127,7 +129,7 @@ class TestMLIRSpecs:
     def test_no_passes(self, simple_circuit, level, expected):
         """Test that if no passes are applied, the circuit resources are the original amount."""
 
-        simple_circuit = qml.qjit()(simple_circuit)
+        simple_circuit = qml.qjit(simple_circuit)
         res = mlir_specs(simple_circuit, level=level)
         assert resources_equal(res, expected)
 
@@ -170,7 +172,7 @@ class TestMLIRSpecs:
             simple_circuit = catalyst.passes.cancel_inverses(simple_circuit)
             simple_circuit = catalyst.passes.merge_rotations(simple_circuit)
 
-        simple_circuit = qml.qjit()(simple_circuit)
+        simple_circuit = qml.qjit(simple_circuit)
         res = mlir_specs(simple_circuit, level=level)
         assert resources_equal(res, expected)
 
@@ -202,7 +204,7 @@ class TestMLIRSpecs:
             ),
         }
 
-        simple_circuit = qml.qjit()(simple_circuit)
+        simple_circuit = qml.qjit(simple_circuit)
         res = mlir_specs(simple_circuit, level="all")
 
         assert isinstance(res, dict)
@@ -235,7 +237,7 @@ class TestMLIRSpecs:
             ),
         }
 
-        simple_circuit = qml.qjit()(simple_circuit)
+        simple_circuit = qml.qjit(simple_circuit)
         res = mlir_specs(simple_circuit, level=[0, 2])
 
         assert isinstance(res, dict)
@@ -449,7 +451,7 @@ class TestMLIRSpecs:
             return qml.expval(qml.PauliZ(0))
 
         circ = qml.transforms.combine_global_phases(circ)
-        circ = qml.qjit()(circ)
+        circ = qml.qjit(circ)
 
         expected = make_static_resources(
             operations={"GlobalPhase": {0: 1}},
@@ -494,7 +496,7 @@ class TestMLIRSpecs:
             qml.adjoint(subroutine)()
             return qml.probs()
 
-        circ = qml.qjit()(circ)
+        circ = qml.qjit(circ)
 
         expected = make_static_resources(
             operations={
@@ -519,14 +521,15 @@ class TestMLIRSpecs:
 
             coeffs = [0.2, -0.543]
             obs = [qml.X(0) @ qml.Z(1), qml.Z(i) @ qml.Hadamard(2)]
-            ham = qml.ops.LinearCombination(coeffs, obs)
+            ham1 = qml.Hamiltonian([1.0], [qml.Z(0) @ qml.Z(1)])
+            ham2 = qml.ops.LinearCombination(coeffs, obs)
 
-            return qml.expval(ham), qml.expval(qml.Z(i))
+            return qml.expval(ham1), qml.expval(ham2)
 
         expected = make_static_resources(
             operations={},
             measurements={
-                "expval(PauliZ)": 1,
+                "expval(Hamiltonian(PauliZ @ PauliZ))": 1,
                 "expval(Hamiltonian(PauliX @ PauliZ, PauliZ @ Hadamard))": 1,
             },
             num_allocs=2,
@@ -582,6 +585,31 @@ class TestMLIRSpecs:
 
         res = mlir_specs(circ, level=0)
         assert resources_equal(res, expected)
+
+    @pytest.mark.usefixtures("use_capture_dgraph")
+    def test_graph_decomp(self):
+
+        @qml.register_resources({qml.H: 2, qml.CZ: 1})
+        def my_cnot(wires):
+            qml.H(wires=wires[1])
+            qml.CZ(wires=wires)
+            qml.H(wires=wires[1])
+
+        @qml.qjit
+        @partial(
+            qml.transforms.decompose,
+            gate_set={"H", "CZ", "GlobalPhase"},
+            alt_decomps={qml.CNOT: [my_cnot]},
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit():
+            qml.H(0)
+            qml.CNOT(wires=[0, 1])
+            return qml.state()
+
+        expected_resources = {"CZ": {2: 1}, "Hadamard": {1: 3}}
+        resources = mlir_specs(circuit, level=1)
+        assert resources.operations == expected_resources
 
 
 # TODO: In the future, it would be good to add unit tests for specs_collector instead of just
