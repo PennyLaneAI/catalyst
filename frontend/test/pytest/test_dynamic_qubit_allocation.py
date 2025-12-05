@@ -447,11 +447,11 @@ def test_subroutine_and_loop(backend):
         """
 
         @qml.for_loop(0, 3, 1)
-        def loop_rx(i, _theta):
+        def loop(i, _theta):  # pylint: disable=unused-argument
             qml.X(wire)
             return jnp.sin(_theta)
 
-        _ = loop_rx(theta)
+        _ = loop(theta)
 
     @qjit
     @qml.qnode(qml.device(backend, wires=1))
@@ -475,7 +475,7 @@ def test_subroutine_and_loop_multiple_args(backend):
     @subroutine
     def flip(w1, w2, w3, theta):
         @qml.for_loop(0, 2, 1)
-        def loop_rx(i, _theta):
+        def loop(i, _theta):  # pylint: disable=unused-argument
             qml.X(w1)
             qml.Y(w2)
             qml.Z(w3)
@@ -483,7 +483,7 @@ def test_subroutine_and_loop_multiple_args(backend):
             qml.ctrl(qml.RY, (w2, w3))(_theta, wires=1)
             return jnp.sin(_theta)
 
-        _ = loop_rx(theta)
+        _ = loop(theta)
 
     @qjit
     @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -496,7 +496,7 @@ def test_subroutine_and_loop_multiple_args(backend):
 
     @qml.qnode(qml.device("default.qubit", wires=7))
     def ref_circuit():
-        for i in range(2):
+        for _ in range(2):
             qml.X(0)
             qml.Y(1)
             qml.Z(2)
