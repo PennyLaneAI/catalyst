@@ -22,6 +22,10 @@ pytestmark = pytest.mark.usefixtures("requires_xdsl")
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
 import pennylane as qml
+from xdsl.dialects import test
+from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir.core import Block, Region
+
 from catalyst import measure
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
@@ -30,9 +34,6 @@ from catalyst.python_interface.visualization.construct_circuit_dag import (
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 from catalyst.utils.exceptions import CompileError
-from xdsl.dialects import test
-from xdsl.dialects.builtin import ModuleOp
-from xdsl.ir.core import Block, Region
 
 
 class FakeDAGBuilder(DAGBuilder):
@@ -670,9 +671,7 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
-        assert nodes["node1"]["label"] == get_label(
-            qml.QubitUnitary([[0, 1], [1, 0]], wires=0)
-        )
+        assert nodes["node1"]["label"] == get_label(qml.QubitUnitary([[0, 1], [1, 0]], wires=0))
 
     @pytest.mark.unit
     def test_multi_rz_op(self):
