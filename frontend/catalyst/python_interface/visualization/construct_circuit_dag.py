@@ -55,7 +55,7 @@ class ConstructCircuitDAG:
         # Keys represent static (int) or dynamic wires (str)
         # Values represent the set of all node uids that are on that wire.
         self._wire_to_node_uids: dict[str | int, set[str]] = defaultdict(set)
-          
+
         # Use counter internally for UID
         self._node_uid_counter: int = 0
         self._cluster_uid_counter: int = 0

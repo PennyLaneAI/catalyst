@@ -831,6 +831,7 @@ class TestCreateStaticMeasurementNodes:
 
         assert "MidMeasure" in nodes["node1"]["label"]
 
+
 class TestOperatorConnectivity:
     """Tests that operators are properly connected."""
 
@@ -854,4 +855,3 @@ class TestTerminalMeasurementConnectivity:
     """Test that terminal measurements connect properly."""
 
     pass
-
