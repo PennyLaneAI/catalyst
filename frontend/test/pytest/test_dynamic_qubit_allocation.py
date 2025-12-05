@@ -486,7 +486,7 @@ def test_subroutine_and_loop_multiple_args(backend):
         _ = loop(theta)
 
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qml.qnode(qml.device(backend, wires=2))
     def circuit():
         with qml.allocate(2) as q1:
             with qml.allocate(3) as q2:
