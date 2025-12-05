@@ -38,12 +38,13 @@ def mlir_specs(
 
     Args:
         qnode (QNode): The (QJIT'd) qnode to get the specs for
-        level (int | tuple[int] | list[int] | "all"): The level of the MLIR pass to get the specs for
+        level (int | tuple[int] | list[int] | "all"): The MLIR pass level to get the specs for
         *args: Positional arguments to pass to the QNode
         **kwargs: Keyword arguments to pass to the QNode
 
     Returns:
-        ResourcesResult | dict[str, ResourcesResult]: The resources for the circuit at the specified level
+        ResourcesResult | dict[str, ResourcesResult]: The resources for the circuit at the
+          specified level
     """
     cache: dict[int, tuple[ResourcesResult, str]] = {}
 

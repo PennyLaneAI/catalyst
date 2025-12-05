@@ -41,9 +41,7 @@ def resources_equal(
         assert actual.measurements == expected.measurements
 
         # There should be no remaining unresolved function calls
-        assert (
-            sum(actual._unresolved_function_calls.values()) == 0
-        )  # pylint: disable=protected-access
+        assert sum(actual.unresolved_function_calls.values()) == 0
 
         # Only check that expected function calls are a subset of actual function calls
         #   Other random helper functions may be inserted by the compiler
@@ -66,6 +64,9 @@ def make_static_resources(
     device_name: str | None = None,
     num_allocs: int = 0,
 ) -> ResourcesResult:
+    """
+    Create a ResourcesResult object for testing against
+    """
     res = ResourcesResult()
     res.operations = operations or {}
     res.measurements = measurements or {}

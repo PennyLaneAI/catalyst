@@ -120,7 +120,7 @@ class ResourcesResult:
 
         self.classical_instructions: dict[str, int] = defaultdict(int)
         self.function_calls: dict[str, int] = defaultdict(int)
-        self._unresolved_function_calls: dict[str, int] = defaultdict(int)
+        self.unresolved_function_calls: dict[str, int] = defaultdict(int)
 
         self.device_name = None
         self.num_allocs = 0  # The total number of distinct qubits allocated in this region
@@ -136,7 +136,7 @@ class ResourcesResult:
         elif method == "min":
             merge_func = min
         elif method == "sum":
-            merge_func = lambda a, b: a + b  # pylint: disable=unnecessary-lambda
+            merge_func = lambda a, b: a + b  # pylint: disable=unnecessary-lambda-assignment
         else:
             raise ValueError(f"Unsupported merge method: '{method}'. Use 'sum', 'max', or 'min'.")
 
@@ -150,9 +150,9 @@ class ResourcesResult:
             self.classical_instructions[name] = merge_func(self.classical_instructions[name], count)
         for name, count in other.function_calls.items():
             self.function_calls[name] = merge_func(self.function_calls[name], count)
-        for name, count in other._unresolved_function_calls.items():
-            self._unresolved_function_calls[name] = merge_func(
-                self._unresolved_function_calls[name], count
+        for name, count in other.unresolved_function_calls.items():
+            self.unresolved_function_calls[name] = merge_func(
+                self.unresolved_function_calls[name], count
             )
 
         self.device_name = self.device_name or other.device_name
@@ -170,8 +170,8 @@ class ResourcesResult:
             self.classical_instructions[name] *= scalar
         for name in self.function_calls:
             self.function_calls[name] *= scalar
-        for name in self._unresolved_function_calls:
-            self._unresolved_function_calls[name] *= scalar
+        for name in self.unresolved_function_calls:
+            self.unresolved_function_calls[name] *= scalar
 
         # This is the number of allocations WITHIN this region, should be scaled
         self.num_allocs *= scalar
@@ -325,10 +325,8 @@ def _resolve_function_calls(
     """
     resources = func_to_resources[func]
 
-    for called_func in list(
-        resources._unresolved_function_calls.keys()
-    ):  # pylint: disable=protected-access
-        count = resources._unresolved_function_calls.pop(called_func)
+    for called_func in list(resources.unresolved_function_calls.keys()):
+        count = resources.unresolved_function_calls.pop(called_func)
 
         if called_func not in func_to_resources:
             # External function, cannot resolve
@@ -392,7 +390,7 @@ def _collect_operation(
 
         case ResourceType.FUNC_CALL:
             resources.function_calls[resource] += 1
-            resources._unresolved_function_calls[resource] += 1
+            resources.unresolved_function_calls[resource] += 1
 
         case _:
             # Should be unreachable
@@ -495,8 +493,8 @@ def _collect_region(
         if isinstance(op, IndexSwitchOp):
             if not cond_warning:
                 warnings.warn(
-                    "Specs was unable to determine the branch of a conditional or switch statement. "
-                    "The results will take the maximum resources across all possible branches.",
+                    "Specs was unable to determine the branch of a conditional or switch statement."
+                    " The results will take the maximum resources across all possible branches.",
                     UserWarning,
                 )
                 cond_warning = True
