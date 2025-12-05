@@ -116,6 +116,24 @@ class ConstructCircuitDAG:
         )
         self._node_uid_counter += 1
 
+    @_visit_operation.register
+    def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
+        """Handler for the single-qubit projective measurement operation."""
+
+        # Create PennyLane instance
+        meas = xdsl_to_qml_measurement(op)
+
+        # Add node to current cluster
+        node_uid = f"node{self._node_uid_counter}"
+        self.dag_builder.add_node(
+            uid=node_uid,
+            label=get_label(meas),
+            cluster_uid=self._cluster_uid_stack[-1],
+            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
+            shape="record",
+        )
+        self._node_uid_counter += 1
+
     # =====================
     # QUANTUM MEASUREMENTS
     # =====================
@@ -183,22 +201,6 @@ class ConstructCircuitDAG:
             cluster_uid=self._cluster_uid_stack[-1],
             fillcolor="lightpink",
             color="lightpink3",
-        )
-        self._node_uid_counter += 1
-
-    @_visit_operation.register
-    def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
-        """Handler for the single-qubit projective measurement operation."""
-
-        # Create PennyLane instance
-        meas = xdsl_to_qml_measurement(op)
-
-        # Add node to current cluster
-        node_uid = f"node{self._node_uid_counter}"
-        self.dag_builder.add_node(
-            uid=node_uid,
-            label=get_label(meas),
-            cluster_uid=self._cluster_uid_stack[-1],
         )
         self._node_uid_counter += 1
 

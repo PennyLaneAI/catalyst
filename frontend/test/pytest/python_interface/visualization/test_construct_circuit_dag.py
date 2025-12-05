@@ -697,6 +697,28 @@ class TestCreateStaticOperatorNodes:
 
         assert nodes["node1"]["label"] == get_label(qml.MultiRZ(0.5, wires=[0]))
 
+    @pytest.mark.unit
+    def test_projective_measurement_op(self):
+        """Test that projective measurements can be captured as nodes."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            measure(0)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + operator
+
+        assert nodes["node1"]["label"] == f"<name> MidMeasure|<wire> [0]"
+
 
 class TestCreateStaticMeasurementNodes:
     """Tests that measurements with static parameters can be created and visualized as nodes."""
@@ -808,25 +830,3 @@ class TestCreateStaticMeasurementNodes:
         assert len(nodes) == 2  # Device node + operator
 
         assert nodes["node1"]["label"] == get_label(op)
-
-    @pytest.mark.unit
-    def test_projective_measurement_op(self):
-        """Test that projective measurements can be captured as nodes."""
-        dev = qml.device("null.qubit", wires=1)
-
-        @xdsl_from_qjit
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(dev)
-        def my_circuit():
-            measure(0)
-
-        module = my_circuit()
-
-        # Construct DAG
-        utility = ConstructCircuitDAG(FakeDAGBuilder())
-        utility.construct(module)
-
-        nodes = utility.dag_builder.nodes
-        assert len(nodes) == 2  # Device node + operator
-
-        assert "MidMeasure" in nodes["node1"]["label"]
