@@ -33,6 +33,7 @@ from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from catalyst.utils.exceptions import CompileError
 
 
 class FakeDAGBuilder(DAGBuilder):
