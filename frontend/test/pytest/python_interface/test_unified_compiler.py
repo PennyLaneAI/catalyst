@@ -19,7 +19,8 @@ from dataclasses import dataclass
 # pylint: disable=wrong-import-position,line-too-long
 import pytest
 
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 
 import jax
 import pennylane as qml

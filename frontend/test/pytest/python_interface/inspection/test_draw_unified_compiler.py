@@ -16,7 +16,8 @@
 
 import pytest
 
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 
 # pylint: disable=wrong-import-position,unnecessary-lambda
 import jax

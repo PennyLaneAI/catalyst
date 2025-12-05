@@ -16,7 +16,8 @@
 # pylint: disable=line-too-long
 import pytest
 
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 
 
 def test_all_unary_operations(run_filecheck):
@@ -24,70 +25,70 @@ def test_all_unary_operations(run_filecheck):
     program = r"""
     // CHECK: %[[tf32:.*]] = "test.op"() : () -> tensor<f32>
     %tf32 = "test.op"() : () -> tensor<f32>
-    
+
     // CHECK: %[[tf64:.*]] = "test.op"() : () -> tensor<f64>
     %tf64 = "test.op"() : () -> tensor<f64>
-    
+
     // CHECK: %[[tcomplex:.*]] = "test.op"() : () -> tensor<complex<f32>>
     %tcomplex = "test.op"() : () -> tensor<complex<f32>>
-    
+
     // CHECK: %convert = "stablehlo.convert"(%[[tf32]]) : (tensor<f32>) -> tensor<f64>
     %convert = "stablehlo.convert"(%tf32) : (tensor<f32>) -> tensor<f64>
-    
+
     // CHECK: %cos = "stablehlo.cosine"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %cos = "stablehlo.cosine"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %exp = "stablehlo.exponential"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %exp = "stablehlo.exponential"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %exponential_minus_one = "stablehlo.exponential_minus_one"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %exponential_minus_one = "stablehlo.exponential_minus_one"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %floor = "stablehlo.floor"(%[[tf64]]) : (tensor<f64>) -> tensor<f64>
     %floor = "stablehlo.floor"(%tf64) : (tensor<f64>) -> tensor<f64>
-    
+
     // CHECK: %imag = "stablehlo.imag"(%[[tcomplex]]) : (tensor<complex<f32>>) -> tensor<f32>
     %imag = "stablehlo.imag"(%tcomplex) : (tensor<complex<f32>>) -> tensor<f32>
-    
+
     // CHECK: %is_finite = "stablehlo.is_finite"(%[[tf32]]) : (tensor<f32>) -> tensor<i1>
     %is_finite = "stablehlo.is_finite"(%tf32) : (tensor<f32>) -> tensor<i1>
-    
+
     // CHECK: %log = "stablehlo.log"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %log = "stablehlo.log"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %log_plus_one = "stablehlo.log_plus_one"(%[[tf64]]) : (tensor<f64>) -> tensor<f64>
     %log_plus_one = "stablehlo.log_plus_one"(%tf64) : (tensor<f64>) -> tensor<f64>
-    
+
     // CHECK: %logistic = "stablehlo.logistic"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %logistic = "stablehlo.logistic"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %negate = "stablehlo.negate"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %negate = "stablehlo.negate"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %real = "stablehlo.real"(%[[tcomplex]]) : (tensor<complex<f32>>) -> tensor<f32>
     %real = "stablehlo.real"(%tcomplex) : (tensor<complex<f32>>) -> tensor<f32>
-    
+
     // CHECK: %round_afz = "stablehlo.round_nearest_afz"(%[[tf64]]) : (tensor<f64>) -> tensor<f64>
     %round_afz = "stablehlo.round_nearest_afz"(%tf64) : (tensor<f64>) -> tensor<f64>
-    
+
     // CHECK: %round_even = "stablehlo.round_nearest_even"(%[[tf64]]) : (tensor<f64>) -> tensor<f64>
     %round_even = "stablehlo.round_nearest_even"(%tf64) : (tensor<f64>) -> tensor<f64>
-    
+
     // CHECK: %rsqrt = "stablehlo.rsqrt"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %rsqrt = "stablehlo.rsqrt"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %sign = "stablehlo.sign"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %sign = "stablehlo.sign"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %sin = "stablehlo.sine"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %sin = "stablehlo.sine"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %sqrt = "stablehlo.sqrt"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %sqrt = "stablehlo.sqrt"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %tan = "stablehlo.tan"(%[[tf64]]) : (tensor<f64>) -> tensor<f64>
     %tan = "stablehlo.tan"(%tf64) : (tensor<f64>) -> tensor<f64>
-    
+
     // CHECK: %tanh = "stablehlo.tanh"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %tanh = "stablehlo.tanh"(%tf32) : (tensor<f32>) -> tensor<f32>
     """
@@ -100,31 +101,31 @@ def test_all_binary_operations(run_filecheck):
     program = r"""
     // CHECK: %[[tf32_1:.*]] = "test.op"() : () -> tensor<f32>
     %tf32_1 = "test.op"() : () -> tensor<f32>
-    
+
     // CHECK: %[[tf32_2:.*]] = "test.op"() : () -> tensor<f32>
     %tf32_2 = "test.op"() : () -> tensor<f32>
-    
+
     // CHECK: %[[tf64_1:.*]] = "test.op"() : () -> tensor<f64>
     %tf64_1 = "test.op"() : () -> tensor<f64>
-    
+
     // CHECK: %[[tf64_2:.*]] = "test.op"() : () -> tensor<f64>
     %tf64_2 = "test.op"() : () -> tensor<f64>
 
     // CHECK: %complex = "stablehlo.complex"(%[[tf32_1]], %[[tf32_2]]) : (tensor<f32>, tensor<f32>) -> tensor<complex<f32>>
     %complex = "stablehlo.complex"(%tf32_1, %tf32_2) : (tensor<f32>, tensor<f32>) -> tensor<complex<f32>>
-    
+
     // CHECK: %divide = "stablehlo.divide"(%[[tf32_1]], %[[tf32_2]]) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     %divide = "stablehlo.divide"(%tf32_1, %tf32_2) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %maximum = "stablehlo.maximum"(%[[tf32_1]], %[[tf32_2]]) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     %maximum = "stablehlo.maximum"(%tf32_1, %tf32_2) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %minimum = "stablehlo.minimum"(%[[tf32_1]], %[[tf32_2]]) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     %minimum = "stablehlo.minimum"(%tf32_1, %tf32_2) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %power = "stablehlo.power"(%[[tf64_1]], %[[tf64_2]]) : (tensor<f64>, tensor<f64>) -> tensor<f64>
     %power = "stablehlo.power"(%tf64_1, %tf64_2) : (tensor<f64>, tensor<f64>) -> tensor<f64>
-    
+
     // CHECK: %remainder = "stablehlo.remainder"(%[[tf32_1]], %[[tf32_2]]) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     %remainder = "stablehlo.remainder"(%tf32_1, %tf32_2) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     """
@@ -146,10 +147,10 @@ def test_all_other_operations(run_filecheck):
 
     // CHECK: %clamp = "stablehlo.clamp"(%[[tf32]], %[[tf32]], %[[tf32]]) : (tensor<f32>, tensor<f32>, tensor<f32>) -> tensor<f32>
     %clamp = "stablehlo.clamp"(%tf32, %tf32, %tf32) : (tensor<f32>, tensor<f32>, tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %compare = stablehlo.compare EQ, %[[tf32]], %[[tf32]] : (tensor<f32>, tensor<f32>) -> tensor<i1>
     %compare = "stablehlo.compare"(%tf32, %tf32) {comparison_direction = #stablehlo<comparison_direction EQ>} : (tensor<f32>, tensor<f32>) -> tensor<i1>
-    
+
     // CHECK: %map = "stablehlo.map"(%[[tf32]], %[[tf32]]) ({
     // CHECK:   ^[[bb0:.*]](%arg0 : tensor<f32>, %arg1 : tensor<f32>):
     // CHECK:     %0 = "stablehlo.multiply"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
@@ -162,10 +163,10 @@ def test_all_other_operations(run_filecheck):
     }) {
       dimensions = array<i64: 0, 1>
     } : (tensor<f32>, tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %reduce_precision = "stablehlo.reduce_precision"(%[[tf64]]) {exponent_bits = 5 : i32, mantissa_bits = 10 : i32} : (tensor<f64>) -> tensor<f64>
     %reduce_precision = "stablehlo.reduce_precision"(%tf64) {exponent_bits = 5 : i32, mantissa_bits = 10 : i32} : (tensor<f64>) -> tensor<f64>
-    
+
     // CHECK: %select = "stablehlo.select"(%[[ti1]], %[[tf32]], %[[tf32]]) : (tensor<i1>, tensor<f32>, tensor<f32>) -> tensor<f32>
     %select = "stablehlo.select"(%ti1, %tf32, %tf32) : (tensor<i1>, tensor<f32>, tensor<f32>) -> tensor<f32>
 
@@ -181,7 +182,7 @@ def test_invalid_ir_shape_mismatch(run_filecheck):
     program = r"""
     %tf32_2x3 = "test.op"() : () -> tensor<2x3xf32>
     %tf64_3x2 = "test.op"() : () -> tensor<3x2xf64>
-    
+
     // This should fail verification due to shape mismatch
     %convert = "stablehlo.convert"(%tf32_2x3) : (tensor<2x3xf32>) -> tensor<3x2xf64>
     """
@@ -196,7 +197,7 @@ def test_invalid_ir_type_mismatch(run_filecheck):
     """Test that operations with type mismatches are properly rejected."""
     program = r"""
     %ti32 = "test.op"() : () -> tensor<2x3xi32>
-    
+
     // This should fail verification due to type mismatch (cosine expects float/complex)
     %cos = "stablehlo.cosine"(%ti32) : (tensor<2x3xi32>) -> tensor<2x3xi32>
     """
@@ -220,7 +221,7 @@ def test_invalid_ir_trait_verification_failure(run_filecheck):
     program = r"""
     %tf32_2x3 = "test.op"() : () -> tensor<2x3xf32>
     %tf64_3x2 = "test.op"() : () -> tensor<3x2xf64>
-    
+
     // This should fail verification due to shape mismatch between operands
     %complex = "stablehlo.complex"(%tf32_2x3, %tf64_3x2) : (tensor<2x3xf32>, tensor<3x2xf64>) -> tensor<2x3xcomplex<f32>>
     """
@@ -233,7 +234,7 @@ def test_invalid_ir_operand_result_shape_mismatch(run_filecheck):
     """Test that operations with operand vs result shape mismatches are properly rejected."""
     program = r"""
     %tf32_2x3 = "test.op"() : () -> tensor<2x3xf32>
-    
+
     // This should fail verification due to shape mismatch between operand and result
     %convert = "stablehlo.convert"(%tf32_2x3) : (tensor<2x3xf32>) -> tensor<3x2xf64>
     """
@@ -248,10 +249,10 @@ def test_control_flow_operations(run_filecheck):
     """Test the IfOp operation."""
     program = r"""
     // Test IfOp:
-    
+
     // CHECK:   %[[pred:.*]] = "test.op"() : () -> tensor<i1>
     %pred = "test.op"() : () -> tensor<i1>
-    
+
     // CHECK:   %[[result:.*]] = "stablehlo.if"(%[[pred]]) ({
     // CHECK:     "stablehlo.return"(%[[pred]]) : (tensor<i1>) -> ()
     // CHECK:   }, {
@@ -262,21 +263,21 @@ def test_control_flow_operations(run_filecheck):
     }, {
         "stablehlo.return"(%pred) : (tensor<i1>) -> ()
     }) : (tensor<i1>) -> tensor<i1>
-    
+
     // Test WhileOp:
 
     // CHECK:   %[[init_i:.*]] = "test.op"() : () -> tensor<i64>
     %init_i = "test.op"() : () -> tensor<i64>
-    
+
     // CHECK:   %[[init_sum:.*]] = "test.op"() : () -> tensor<i64>
     %init_sum = "test.op"() : () -> tensor<i64>
-    
+
     // CHECK:   %[[ten:.*]] = "test.op"() : () -> tensor<i64>
     %ten = "test.op"() : () -> tensor<i64>
-    
+
     // CHECK:   %[[one:.*]] = "test.op"() : () -> tensor<i64>
     %one = "test.op"() : () -> tensor<i64>
-    
+
     // CHECK:   %[[results:.*]], %[[results_1:.*]] = "stablehlo.while"(%[[init_i]], %[[init_sum]]) ({
     // CHECK:   ^{{.*}}(%[[arg0:.*]] : tensor<i64>, %[[arg1:.*]] : tensor<i64>):
     // CHECK:     %[[cond:.*]] = stablehlo.compare LT, %[[arg0]], %[[ten]] : (tensor<i64>, tensor<i64>) -> tensor<i1>
@@ -297,12 +298,12 @@ def test_control_flow_operations(run_filecheck):
       %new_i = "stablehlo.add"(%arg0, %one) : (tensor<i64>, tensor<i64>) -> tensor<i64>
       "stablehlo.return"(%new_i, %new_sum) : (tensor<i64>, tensor<i64>) -> ()
     }) : (tensor<i64>, tensor<i64>) -> (tensor<i64>, tensor<i64>)
-    
+
     // Test OptimizationBarrierOp:
 
     // CHECK:   %[[operand:.*]] = "test.op"() : () -> tensor<i1>
     %operand = "test.op"() : () -> tensor<i1>
-    
+
     // CHECK:   %[[result2:.*]] = "stablehlo.optimization_barrier"(%[[operand]]) : (tensor<i1>) -> tensor<i1>
     %result2 = "stablehlo.optimization_barrier"(%operand) : (tensor<i1>) -> tensor<i1>
     """
@@ -316,40 +317,40 @@ def test_data_movement_operations(run_filecheck):
     ////////////////// Setup test operations //////////////////
     // CHECK: %[[input1:.*]] = "test.op"() : () -> tensor<3x2xi64>
     %input1 = "test.op"() : () -> tensor<3x2xi64>
-    
+
     // CHECK: %[[input2:.*]] = "test.op"() : () -> tensor<1x2xi64>
     %input2 = "test.op"() : () -> tensor<1x2xi64>
-    
+
     // CHECK: %[[operand:.*]] = "test.op"() : () -> tensor<2x3x4x2xi32>
     %operand = "test.op"() : () -> tensor<2x3x4x2xi32>
-    
+
     // CHECK: %[[start_indices:.*]] = "test.op"() : () -> tensor<2x2x3x2xi64>
     %start_indices = "test.op"() : () -> tensor<2x2x3x2xi64>
-    
+
     // CHECK: %[[reshape_input:.*]] = "test.op"() : () -> tensor<2xf32>
     %reshape_input = "test.op"() : () -> tensor<2xf32>
-    
+
     // CHECK: %[[scatter_input:.*]] = "test.op"() : () -> tensor<2x3x4x2xi64>
     %scatter_input = "test.op"() : () -> tensor<2x3x4x2xi64>
-    
+
     // CHECK: %[[scatter_indices:.*]] = "test.op"() : () -> tensor<2x2x3x2xi64>
     %scatter_indices = "test.op"() : () -> tensor<2x2x3x2xi64>
-    
+
     // CHECK: %[[scatter_updates:.*]] = "test.op"() : () -> tensor<2x2x3x2x2xi64>
     %scatter_updates = "test.op"() : () -> tensor<2x2x3x2x2xi64>
-    
+
     // CHECK: %[[slice_input:.*]] = "test.op"() : () -> tensor<3x4xi64>
     %slice_input = "test.op"() : () -> tensor<3x4xi64>
-    
+
     // CHECK: %[[broadcast_input:.*]] = "test.op"() : () -> tensor<1x3xi32>
     %broadcast_input = "test.op"() : () -> tensor<1x3xi32>
-    
+
     ////////////////// Test ConcatenateOp //////////////////
     // CHECK: %concatenate = "stablehlo.concatenate"(%[[input1]], %[[input2]]) <{dimension = 0 : i64}> : (tensor<3x2xi64>, tensor<1x2xi64>) -> tensor<4x2xi64>
     %concatenate = "stablehlo.concatenate"(%input1, %input2) {dimension = 0 : i64} : (tensor<3x2xi64>, tensor<1x2xi64>) -> tensor<4x2xi64>
-    
+
     ////////////////// Test GatherOp //////////////////
-    // CHECK: %gather = "stablehlo.gather"(%[[operand]], %[[start_indices]]) 
+    // CHECK: %gather = "stablehlo.gather"(%[[operand]], %[[start_indices]])
     // CHECK-SAME: dimension_numbers = #stablehlo.gather<
     // CHECK-NEXT:   offset_dims = [3, 4],
     // CHECK-NEXT:   collapsed_slice_dims = [1],
@@ -369,13 +370,13 @@ def test_data_movement_operations(run_filecheck):
       slice_sizes = array<i64: 1, 1, 2, 2>,
       indices_are_sorted = false
     } : (tensor<2x3x4x2xi32>, tensor<2x2x3x2xi64>) -> tensor<2x2x3x2x2xi32>
-    
+
     ////////////////// Test ReshapeOp //////////////////
     // CHECK: %reshape = stablehlo.reshape %[[reshape_input]] : (tensor<2xf32>) -> tensor<1x2xf32>
     %reshape = "stablehlo.reshape"(%reshape_input) : (tensor<2xf32>) -> tensor<1x2xf32>
-    
+
     ////////////////// Test ScatterOp //////////////////
-    // CHECK: %scatter = "stablehlo.scatter"(%[[scatter_input]], %[[scatter_indices]], %[[scatter_updates]]) 
+    // CHECK: %scatter = "stablehlo.scatter"(%[[scatter_input]], %[[scatter_indices]], %[[scatter_updates]])
     // CHECK-SAME: scatter_dimension_numbers = #stablehlo.scatter<
     // CHECK-NEXT:   update_window_dims = [3, 4],
     // CHECK-NEXT:   inserted_window_dims = [1],
@@ -402,7 +403,7 @@ def test_data_movement_operations(run_filecheck):
       indices_are_sorted = false,
       unique_indices = false
     } : (tensor<2x3x4x2xi64>, tensor<2x2x3x2xi64>, tensor<2x2x3x2x2xi64>) -> tensor<2x3x4x2xi64>
-    
+
     ////////////////// Test SliceOp //////////////////
     // CHECK: %slice = "stablehlo.slice"(%[[slice_input]])
     // CHECK-SAME:   start_indices = array<i64: 1, 2>,
@@ -414,7 +415,7 @@ def test_data_movement_operations(run_filecheck):
       limit_indices = array<i64: 3, 4>,
       strides = array<i64: 1, 1>
     } : (tensor<3x4xi64>) -> tensor<2x2xi64>
-    
+
     ////////////////// Test BroadcastInDimOp //////////////////
     // CHECK: %broadcast = stablehlo.broadcast_in_dim %[[broadcast_input]], dims = [2, 1] : (tensor<1x3xi32>) -> tensor<2x3x2xi32>
     %broadcast = "stablehlo.broadcast_in_dim"(%broadcast_input) {broadcast_dimensions = array<i64: 2, 1>} : (tensor<1x3xi32>) -> tensor<2x3x2xi32>
