@@ -168,7 +168,7 @@ jobs:
     - name: Setup Python version
       # There are multiple Python versions installed on the GitHub image, 3.11 - 3.14 is already
       # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
-      # 3.11 and 3.14. Make sure to consistently use the system versions.
+      # 3.11 - 3.14. Make sure to consistently use the system versions.
       run: |
         echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
 
@@ -245,9 +245,9 @@ jobs:
         ref: ${{ inputs.branch || github.ref }}
 
     - name: Setup Python version
-      # There are multiple Python versions installed on the GitHub image, 3.11 - 3.12 is already
+      # There are multiple Python versions installed on the GitHub image, 3.11 - 3.14 is already
       # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
-      # 3.11 and 3.12. Make sure to consistently use the system versions.
+      # 3.11 - 3.14. Make sure to consistently use the system versions.
       run: |
         echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
 
@@ -458,9 +458,9 @@ jobs:
         path: ${{ github.workspace }}/standalone_plugin_wheel/wheel
 
     - name: Setup Python version
-      # There are multiple Python versions installed on the GitHub image, 3.11 - 3.12 is already
+      # There are multiple Python versions installed on the GitHub image, 3.11 - 3.14 is already
       # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
-      # 3.11 and 3.12. Make sure to consistently use the system versions.
+      # 3.11 - 3.14. Make sure to consistently use the system versions.
       run: |
         echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
 
