@@ -18,7 +18,6 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "QEC/IR/QECDialect.h"
 #include "QEC/Transforms/Patterns.h"
 
 using namespace llvm;
