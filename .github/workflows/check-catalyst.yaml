@@ -601,17 +601,6 @@ jobs:
       run: |
         make pytest TEST_BACKEND="lightning.kokkos"
 
-    - name: Install Unified Compiler Dependencies
-      run: |
-        python3 -m pip install xdsl~=0.55.0 xdsl-jax==0.1.1
-        # Install graphviz for testing the mlir-op-graph integration
-        sudo apt-get install -y graphviz
-        python3 -m pip install graphviz
-
-    - name: Run Unified Compiler Tests (backend=lightning.kokkos)
-      run: |
-        python3 -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto -m "xdsl"
-
   frontend-tests-openqasm-device:
     name: Frontend Tests (backend="openqasm3")
     needs: [constants, llvm, runtime, quantum, determine_runner]
