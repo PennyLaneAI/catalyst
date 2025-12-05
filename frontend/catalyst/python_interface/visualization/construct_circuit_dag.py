@@ -137,7 +137,7 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _statistical_measurement_ops(
         self,
-        op: quantum.ExpvalOp | quantum.VarianceOp | quantum.ProbsOp | quantum.SampleOp,
+        op: quantum.ExpvalOp | quantum.VarianceOp | quantum.ProbsOp,
     ) -> None:
         """Handler for statistical measurement operations."""
 
@@ -165,6 +165,9 @@ class ConstructCircuitDAG:
 
         # Create PennyLane instance
         obs_op = op.obs.owner
+
+        # TODO: This doesn't logically make sense, but quantum.compbasis
+        # is obs_op and function below just pulls out the static wires
         wires = xdsl_to_qml_measurement(obs_op)
         meas = xdsl_to_qml_measurement(op, wires=None if wires == [] else wires)
 
