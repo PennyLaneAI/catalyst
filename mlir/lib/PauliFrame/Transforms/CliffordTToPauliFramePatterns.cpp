@@ -178,6 +178,57 @@ struct CliffordTToPauliFramePattern : public OpRewritePattern<CustomOp> {
     }
 };
 
+struct InitPauliRecordQbitPattern : public OpRewritePattern<AllocQubitOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(AllocQubitOp op, PatternRewriter &rewriter) const override
+    {
+        auto loc = op->getLoc();
+        auto qubit = op.getQubit();
+
+        rewriter.setInsertionPointAfter(op);
+        InitOp initOp = rewriter.create<InitOp>(loc, qubit.getType(), qubit);
+
+        qubit.replaceAllUsesExcept(initOp.getOutQubits()[0], initOp);
+        return success();
+    }
+};
+
+struct InitPauliRecordQregPattern : public OpRewritePattern<AllocOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(AllocOp op, PatternRewriter &rewriter) const override
+    {
+        auto loc = op->getLoc();
+        auto qreg = op.getQreg();
+
+        rewriter.setInsertionPointAfter(op);
+        InitQregOp initQregOp = rewriter.create<InitQregOp>(loc, qreg.getType(), qreg);
+
+        qreg.replaceAllUsesExcept(initQregOp.getOutQreg(), initQregOp);
+        return success();
+    }
+};
+
+struct CorrectMeasurementPattern : public OpRewritePattern<MeasureOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(MeasureOp op, PatternRewriter &rewriter) const override
+    {
+        auto loc = op->getLoc();
+        auto mres = op.getMres();
+        auto outQubit = op.getOutQubit();
+
+        rewriter.setInsertionPointAfter(op);
+        CorrectMeasurementOp correctMeasOp = rewriter.create<CorrectMeasurementOp>(
+            loc, mres.getType(), outQubit.getType(), mres, outQubit);
+
+        mres.replaceAllUsesExcept(correctMeasOp.getOutMres(), correctMeasOp);
+        outQubit.replaceAllUsesExcept(correctMeasOp.getOutQubit(), correctMeasOp);
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -186,6 +237,9 @@ namespace pauli_frame {
 void populateCliffordTToPauliFramePatterns(RewritePatternSet &patterns)
 {
     patterns.add<CliffordTToPauliFramePattern>(patterns.getContext());
+    patterns.add<InitPauliRecordQbitPattern>(patterns.getContext());
+    patterns.add<InitPauliRecordQregPattern>(patterns.getContext());
+    patterns.add<CorrectMeasurementPattern>(patterns.getContext());
 }
 
 } // namespace pauli_frame
