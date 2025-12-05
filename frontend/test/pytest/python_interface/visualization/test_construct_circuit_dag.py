@@ -724,7 +724,15 @@ class TestCreateStaticMeasurementNodes:
         assert nodes["node1"]["label"] == str(qml.probs())
 
     @pytest.mark.unit
-    def test_sample_measurement_op(self):
+    @pytest.mark.parametrize(
+        "op",
+        [
+            qml.sample(),
+            qml.sample(wires=0),
+            qml.sample(wires=[0, 1]),
+        ],
+    )
+    def test_sample_measurement_op(self, op):
         """Tests that the sample measurement function can be captured as a node."""
         dev = qml.device("null.qubit", wires=1)
 
@@ -733,7 +741,7 @@ class TestCreateStaticMeasurementNodes:
         @qml.set_shots(10)
         @qml.qnode(dev)
         def my_circuit():
-            return qml.sample()
+            return op
 
         module = my_circuit()
 
@@ -744,7 +752,7 @@ class TestCreateStaticMeasurementNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
-        assert nodes["node1"]["label"] == "sample(wires=[])"
+        assert nodes["node1"]["label"] == str(op)
 
     @pytest.mark.unit
     def test_projective_measurement_op(self):
