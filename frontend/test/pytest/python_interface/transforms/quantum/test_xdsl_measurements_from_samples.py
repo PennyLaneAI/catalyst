@@ -21,7 +21,7 @@ from functools import partial
 import numpy as np
 import pytest
 
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
 xdsl = pytest.importorskip("xdsl")
 
 import pennylane as qml

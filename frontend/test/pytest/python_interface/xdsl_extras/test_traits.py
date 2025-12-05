@@ -19,7 +19,7 @@ from typing import TypeAlias
 import pytest
 
 # pylint: disable=wrong-import-position
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
 xdsl = pytest.importorskip("xdsl")
 
 from xdsl.dialects.builtin import AnyAttr, TensorType, f32, i32, i64

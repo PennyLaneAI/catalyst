@@ -25,7 +25,7 @@ FileCheck notation hint:
 
 import pytest
 
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
 xdsl = pytest.importorskip("xdsl")
 
 from catalyst.python_interface.transforms import (

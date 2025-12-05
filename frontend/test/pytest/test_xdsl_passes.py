@@ -32,7 +32,7 @@ from catalyst.utils.filesystem import Directory
 # pylint: disable=protected-access
 
 
-@pytest.mark.usefixtures("requires_xdsl")
+@pytest.mark.xdsl
 class TestHasXDSLPassesInTransformModules:
     """Test the has_xdsl_passes_in_transform_modules method and its exception handling."""
 
@@ -71,7 +71,7 @@ class TestHasXDSLPassesInTransformModules:
         assert compiler.has_xdsl_passes_in_transform_modules(module) is False
 
 
-@pytest.mark.usefixtures("requires_xdsl")
+@pytest.mark.xdsl
 class TestCreatePassSaveCallback:
     """Test the _create_xdsl_pass_save_callback method."""
 
@@ -161,7 +161,7 @@ class TestCreatePassSaveCallback:
             assert files[2] == "3_Pass3.mlir"
 
 
-@pytest.mark.usefixtures("requires_xdsl")
+@pytest.mark.xdsl
 class TestXDSLPassesIntegration:
     """Test the xDSL passes integration."""
 

@@ -19,7 +19,7 @@ from dataclasses import dataclass
 import pytest
 
 # pylint: disable=wrong-import-position,line-too-long
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
 xdsl = pytest.importorskip("xdsl")
 
 from xdsl import passes
