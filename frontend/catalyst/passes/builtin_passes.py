@@ -18,6 +18,8 @@ import copy
 import functools
 import json
 
+from pennylane import transform
+
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
 from catalyst.passes.pass_api import PassPipelineWrapper
 from catalyst.utils.exceptions import CompileError
@@ -599,7 +601,7 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
         return functools.partial(gridsynth, epsilon=epsilon, ppr_basis=ppr_basis)
 
     gridsynth_pass = {"gridsynth": {"epsilon": epsilon, "ppr_basis": ppr_basis}}
-    return PassPipelineWrapper(qnode, gridsynth_pass)
+    return transform(pass_name="gridsynth")(qnode, gridsynth_pass)
 
 
 def to_ppr(qnode):
