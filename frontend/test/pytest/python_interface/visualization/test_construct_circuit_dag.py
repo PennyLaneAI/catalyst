@@ -730,7 +730,7 @@ class TestCreateStaticMeasurementNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
-        assert nodes["node1"]["label"] == str(op) 
+        assert nodes["node1"]["label"] == str(op)
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
