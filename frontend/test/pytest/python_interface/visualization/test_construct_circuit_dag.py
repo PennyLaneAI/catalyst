@@ -267,6 +267,7 @@ class TestDeviceNode:
 
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
+
         graph_nodes = utility.dag_builder.nodes
         graph_clusters = utility.dag_builder.clusters
 

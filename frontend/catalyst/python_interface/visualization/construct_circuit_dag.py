@@ -17,7 +17,7 @@
 from functools import singledispatchmethod
 
 from xdsl.dialects import builtin, func, scf
-from xdsl.ir import Block, Operation, Region, SSAValue
+from xdsl.ir import Block, Operation, Region
 
 from catalyst.python_interface.dialects import catalyst, quantum
 from catalyst.python_interface.inspection.xdsl_conversion import (
