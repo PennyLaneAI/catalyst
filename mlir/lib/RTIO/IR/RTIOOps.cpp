@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "RTIO/IR/RTIOOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/PatternMatch.h"
+
+#include "RTIO/IR/RTIOOps.h"
 
 using namespace mlir;
 using namespace catalyst::rtio;

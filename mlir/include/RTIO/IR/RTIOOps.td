@@ -20,7 +20,7 @@ include "mlir/IR/BuiltinAttributes.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "RTIO/IR/RTIODialect.td"
 
-def RTIOChannelOp : RTIO_Op<"channel"> {
+def RTIOChannelOp : RTIO_Op<"channel", [Pure]> {
     let summary = "Define a channel";
     let description = [{
         The channel's identity (kind, qualifiers, and channel id) is
@@ -51,7 +51,7 @@ def RTIOChannelOp : RTIO_Op<"channel"> {
     }];
 }
 
-def RTIOQubitToChannelOp : RTIO_Op<"qubit_to_channel"> {
+def RTIOQubitToChannelOp : RTIO_Op<"qubit_to_channel", [Pure]> {
     let summary = "Map a qubit to an RTIO channel";
     let description = [{
         It's a temporary operation that will be lowered to a static `rtio.channel` operation during
