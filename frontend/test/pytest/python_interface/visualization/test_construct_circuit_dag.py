@@ -16,7 +16,6 @@
 from unittest.mock import Mock
 
 import pytest
-from jax import util
 
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
