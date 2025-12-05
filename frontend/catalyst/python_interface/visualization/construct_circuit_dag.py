@@ -156,7 +156,7 @@ class ConstructCircuitDAG:
 
         for seen_wire, seen_nodes in self._wire_to_node_uids.items():
             for seen_node in seen_nodes:
-                self.dag_builder.add_edge(seen_node, node_uid)
+                self.dag_builder.add_edge(seen_node, node_uid, color="lightpink3")
 
     @_visit_operation.register
     def _statistical_measurement_ops(
@@ -182,7 +182,7 @@ class ConstructCircuitDAG:
 
         for wire in meas.wires:
             for seen_node in self._wire_to_node_uids[wire]:
-                self.dag_builder.add_edge(seen_node, node_uid)
+                self.dag_builder.add_edge(seen_node, node_uid, color="lightpink3")
 
     @_visit_operation.register
     def _visit_sample_and_probs_ops(
@@ -209,6 +209,10 @@ class ConstructCircuitDAG:
             color="lightpink3",
         )
         self._node_uid_counter += 1
+
+        for wire in meas.wires:
+            for seen_node in self._wire_to_node_uids[wire]:
+                self.dag_builder.add_edge(seen_node, node_uid, color="lightpink3")
 
     @_visit_operation.register
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
