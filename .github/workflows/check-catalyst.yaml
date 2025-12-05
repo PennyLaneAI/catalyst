@@ -541,10 +541,8 @@ jobs:
         python3 -m pip install graphviz
 
     - name: Run Unified Compiler Tests
-      env:
-        MARKERS: xdsl
       run: |
-        python3 -m pytest frontend/test/pytest -n auto -m "$MARKERS"
+        python3 -m pytest frontend/test/pytest -n auto -m "xdsl"
 
   frontend-tests-lightning-kokkos:
     name: Frontend Tests (backend="lightning.kokkos")
@@ -611,10 +609,8 @@ jobs:
         python3 -m pip install graphviz
 
     - name: Run Unified Compiler Tests (backend=lightning.kokkos)
-      env:
-        MARKERS: xdsl
       run: |
-        python3 -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto -m "$MARKERS"
+        python3 -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto -m "xdsl"
 
   frontend-tests-openqasm-device:
     name: Frontend Tests (backend="openqasm3")

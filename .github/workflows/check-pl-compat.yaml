@@ -233,14 +233,10 @@ jobs:
 
     - name: Run Unified Compiler Tests
       if: steps.check_unified_compiler.outputs.unified_compiler_available == 'true'
-      env:
-        MARKERS: xdsl
       run: |
-        python3 -m pytest frontend/test/pytest -n auto -m "$MARKERS"
+        python3 -m pytest frontend/test/pytest -n auto -m "xdsl"
 
     - name: Run Unified Compiler Tests (Kokkos)
       if: steps.check_unified_compiler.outputs.unified_compiler_available == 'true'
-      env:
-        MARKERS: xdsl
       run: |
-        python3 -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto -m "$MARKERS"
+        python3 -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto -m "xdsl"
