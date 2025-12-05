@@ -19,6 +19,7 @@ import pytest
 
 # pylint: disable=wrong-import-position,line-too-long
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
+xdsl = pytest.importorskip("xdsl")
 
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, test

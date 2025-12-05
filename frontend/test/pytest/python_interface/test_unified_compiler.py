@@ -20,6 +20,7 @@ from dataclasses import dataclass
 import pytest
 
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
+xdsl = pytest.importorskip("xdsl")
 
 import jax
 import pennylane as qml

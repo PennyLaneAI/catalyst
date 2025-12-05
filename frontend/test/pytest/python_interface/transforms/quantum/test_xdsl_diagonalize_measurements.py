@@ -20,6 +20,7 @@ import numpy as np
 import pytest
 
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
+xdsl = pytest.importorskip("xdsl")
 
 import pennylane as qml
 

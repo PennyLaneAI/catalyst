@@ -17,6 +17,7 @@
 import pytest
 
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
+xdsl = pytest.importorskip("xdsl")
 
 
 def test_all_unary_operations(run_filecheck):

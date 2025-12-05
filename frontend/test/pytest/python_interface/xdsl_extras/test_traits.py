@@ -20,6 +20,7 @@ import pytest
 
 # pylint: disable=wrong-import-position
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
+xdsl = pytest.importorskip("xdsl")
 
 from xdsl.dialects.builtin import AnyAttr, TensorType, f32, i32, i64
 from xdsl.ir import Attribute
@@ -45,8 +46,6 @@ from catalyst.python_interface.xdsl_extras.traits import (
     SameOperandsAndResultShape,
     SameOperandsElementType,
 )
-
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
 AnyTensorType: TypeAlias = TensorType[Attribute]
 
