@@ -506,7 +506,7 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pip install xdsl~=0.55.0 xdsl-jax==0.1.1
         # Install graphviz for testing the mlir-op-graph integration
-        sudo apt-get install -y graphviz
+        brew install graphviz
         python${{ matrix.python_version }} -m pip install graphviz
 
     - name: Run Unified Compiler Tests
