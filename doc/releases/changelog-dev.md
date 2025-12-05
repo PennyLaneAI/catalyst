@@ -2,9 +2,18 @@
 
 <h3>New features since last release</h3>
 
-* The Unfied Compiler, which enables users to develop their own compilation passes using xDSL, has been
-  migrated to Catalyst. It is available under the `catalyst.python_interface` submodule.
+* Catalyst now features a unified compilation framework, which enables users and developers to design
+  and implement compilation passes in Python in addition to C++, on the same Catalyst IR. The Python
+  interface relies on the xDSL library to represent and manipulate programs (analogous to the MLIR library
+  in C++). As a result, transformations can be quickly prototyped, easily debugged, and dynamically integrated
+  into Catalyst without changes to the compiled Catalyst package. The new module is available under the
+  `catalyst.python_interface` namespace.
   [(#2199)](https://github.com/PennyLaneAI/catalyst/pull/2199)
+
+  This functionality was originally developed as part of the PennyLane package, and has been migrated here.
+  For earlier development notes to the feature, please refer to the
+  [PennyLane release notes](https://docs.pennylane.ai/en/stable/development/release_notes.html#release-0-43-0).
+  In addition, the following changes have been made since the last release:
 
   * Add an experimental `outline_state_evolution_pass` xDSL pass to `catalyst.python_interface.transforms`,
     which moves all quantum gate operations to a private callable.
