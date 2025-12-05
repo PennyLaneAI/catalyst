@@ -19,12 +19,14 @@ import pytest
 
 pytestmark = pytest.mark.usefixtures("requires_xdsl")
 
+# pylint: disable=wrong-import-position
+# This import needs to be after pytest in order to prevent ImportErrors
+import pennylane as qml
 from xdsl.dialects import test
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir.core import Block, Region
 
-# pylint: disable=wrong-import-position
-# This import needs to be after pytest in order to prevent ImportErrors
+from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
 )
@@ -124,3 +126,164 @@ def test_does_not_mutate_module():
 
     # Ensure not mutated
     assert str(module_op) == module_op_str_before
+
+
+@pytest.mark.unit
+class TestFuncOpVisualization:
+    """Tests the visualization of FuncOps with bounding boxes"""
+
+    def test_standard_qnode(self):
+        """Tests that a standard QJIT'd QNode is visualized correctly"""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            qml.H(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        graph_clusters = utility.dag_builder.clusters
+
+        # Check nesting is correct
+        # graph
+        # └── qjit
+        #     └── my_workflow
+
+        # Check qjit is nested under graph
+        assert graph_clusters["cluster0"]["cluster_label"] == "qjit"
+        assert graph_clusters["cluster0"]["parent_cluster_uid"] is None
+
+        # Check that my_workflow is under qjit
+        assert graph_clusters["cluster1"]["cluster_label"] == "my_workflow"
+        assert graph_clusters["cluster1"]["parent_cluster_uid"] == "cluster0"
+
+    def test_nested_qnodes(self):
+        """Tests that nested QJIT'd QNodes are visualized correctly"""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def my_qnode2():
+            qml.X(0)
+
+        @qml.qnode(dev)
+        def my_qnode1():
+            qml.H(0)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        def my_workflow():
+            my_qnode1()
+            my_qnode2()
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        graph_clusters = utility.dag_builder.clusters
+
+        # Check nesting is correct
+        # graph
+        # └── qjit
+        #     ├── my_qnode1
+        #     └── my_qnode2
+
+        # Check qjit is under graph
+        assert graph_clusters["cluster0"]["cluster_label"] == "qjit"
+        assert graph_clusters["cluster0"]["parent_cluster_uid"] is None
+
+        # Check both qnodes are under my_workflow
+        assert graph_clusters["cluster1"]["cluster_label"] == "my_qnode1"
+        assert graph_clusters["cluster1"]["parent_cluster_uid"] == "cluster0"
+
+        assert graph_clusters["cluster2"]["cluster_label"] == "my_qnode2"
+        assert graph_clusters["cluster2"]["parent_cluster_uid"] == "cluster0"
+
+
+class TestDeviceNode:
+    """Tests that the device node is correctly visualized."""
+
+    def test_standard_qnode(self):
+        """Tests that a standard setup works."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            qml.H(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        graph_nodes = utility.dag_builder.nodes
+        graph_clusters = utility.dag_builder.clusters
+
+        # Check nesting is correct
+        # graph
+        # └── qjit
+        #     └── my_workflow: NullQubit
+
+        # Assert device node is inside my_workflow cluster
+        assert graph_clusters["cluster1"]["cluster_label"] == "my_workflow"
+        assert graph_nodes["node0"]["parent_cluster_uid"] == "cluster1"
+
+        # Assert label is as expected
+        assert graph_nodes["node0"]["label"] == "NullQubit"
+
+    def test_nested_qnodes(self):
+        """Tests that nested QJIT'd QNodes are visualized correctly"""
+
+        dev1 = qml.device("null.qubit", wires=1)
+        dev2 = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev2)
+        def my_qnode2():
+            qml.X(0)
+
+        @qml.qnode(dev1)
+        def my_qnode1():
+            qml.H(0)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        def my_workflow():
+            my_qnode1()
+            my_qnode2()
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        graph_nodes = utility.dag_builder.nodes
+        graph_clusters = utility.dag_builder.clusters
+
+        # Check nesting is correct
+        # graph
+        # └── qjit
+        #     ├── my_qnode1: NullQubit
+        #     └── my_qnode2: LightningSimulator
+
+        # Assert lightning.qubit device node is inside my_qnode1 cluster
+        assert graph_clusters["cluster1"]["cluster_label"] == "my_qnode1"
+        assert graph_nodes["node0"]["parent_cluster_uid"] == "cluster1"
+
+        # Assert label is as expected
+        assert graph_nodes["node0"]["label"] == "NullQubit"
+
+        # Assert null qubit device node is inside my_qnode2 cluster
+        assert graph_clusters["cluster2"]["cluster_label"] == "my_qnode2"
+        assert graph_nodes["node1"]["parent_cluster_uid"] == "cluster2"
+
+        # Assert label is as expected
+        assert graph_nodes["node1"]["label"] == "LightningSimulator"
