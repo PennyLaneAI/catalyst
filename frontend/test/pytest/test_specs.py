@@ -37,29 +37,47 @@ def check_specs_header_same(
     assert actual["shots"] == expected["shots"]
 
 
-# TODO: Remove this method once feature pairty has been reached, and instead use `==` directly
+# TODO: Remove this method once feature parity has been reached, and instead use `==` directly
 def check_specs_resources_same(
-    actual_res: SpecsResources | dict[any, SpecsResources],
-    expected_res: SpecsResources | dict[any, SpecsResources],
+    actual_res: (
+        SpecsResources | list[SpecsResources] | dict[any, SpecsResources | list[SpecsResources]]
+    ),
+    expected_res: (
+        SpecsResources | list[SpecsResources] | dict[any, SpecsResources | list[SpecsResources]]
+    ),
     skip_measurements: bool = False,
 ) -> None:
     assert type(actual_res) == type(expected_res)
 
-    if not isinstance(actual_res, dict):
-        actual_res = {None: actual_res}
-        expected_res = {None: expected_res}
+    if isinstance(actual_res, list):
+        assert len(actual_res) == len(expected_res)
 
-    for res1, res2 in zip(actual_res.values(), expected_res.values()):
-        assert res1.gate_types == res2.gate_types
-        assert res1.gate_sizes == res2.gate_sizes
+        for r1, r2 in zip(actual_res, expected_res):
+            check_specs_resources_same(r1, r2, skip_measurements=skip_measurements)
+
+    elif isinstance(actual_res, dict):
+        assert len(actual_res) == len(expected_res)
+
+        for k in actual_res.keys():
+            assert k in expected_res
+            check_specs_resources_same(
+                actual_res[k], expected_res[k], skip_measurements=skip_measurements
+            )
+
+    elif isinstance(actual_res, SpecsResources):
+        assert actual_res.gate_types == expected_res.gate_types
+        assert actual_res.gate_sizes == expected_res.gate_sizes
 
         # TODO: Measurements are not yet supported in Catalyst device-level specs
         if not skip_measurements:
-            assert res1.measurements == res2.measurements
+            assert actual_res.measurements == expected_res.measurements
 
-        assert res1.num_allocs == res2.num_allocs
-        assert res1.depth == res2.depth
-        assert res1.num_gates == res2.num_gates
+        assert actual_res.num_allocs == expected_res.num_allocs
+        assert actual_res.depth == expected_res.depth
+        assert actual_res.num_gates == expected_res.num_gates
+
+    else:
+        raise ValueError("Invalid Type")
 
 
 def check_specs_same(actual: CircuitSpecs, expected: CircuitSpecs, skip_measurements: bool = False):
@@ -256,7 +274,7 @@ class TestPassByPassSpecs:
         """Test that when no transforms are applied to a typical circuit, the "Before Transform"
         and "Before MLIR Passes" representations match."""
 
-        dev = qml.device("lightning.qubit", wires=4)
+        dev = qml.device("lightning.qubit", wires=7)
 
         @qml.qnode(dev)
         def circuit():
@@ -268,6 +286,7 @@ class TestPassByPassSpecs:
             qml.GlobalPhase(jnp.pi / 4)
             qml.MultiRZ(jnp.pi / 2, wires=[1, 2, 3])
             qml.ctrl(qml.T, control=0)(wires=3)
+            qml.ctrl(op=qml.IsingXX(0.5, wires=[5, 6]), control=range(5), control_values=[1] * 5)
 
             qml.QubitUnitary(jnp.array([[1, 0], [0, 1j]]), wires=2)
 
@@ -283,7 +302,7 @@ class TestPassByPassSpecs:
             )
 
         specs_device = qml.specs(circuit, level=0, compute_depth=False)()
-        specs_all = qml.specs(qjit(circuit), level="all")()
+        specs_all = qml.specs(qjit(circuit), level="all", compute_depth=False)()
 
         regular_pl = specs_device["resources"]
         before_transforms = specs_all["resources"]["Before transforms"]
@@ -291,6 +310,83 @@ class TestPassByPassSpecs:
 
         check_specs_resources_same(regular_pl, before_transforms)
         check_specs_resources_same(before_transforms, before_mlir)
+
+    def test_split_non_commuting(self):
+        """Test that qml.transforms.split_non_commuting works as expected"""
+
+        if qml.capture.enabled():
+            pytest.xfail("split-non-commuting is not currently compatible with program capture")
+
+        @qml.transforms.cancel_inverses
+        @qml.transforms.split_non_commuting
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def circuit():
+            qml.H(0)
+            qml.X(0)
+            qml.X(0)
+            return qml.expval(qml.X(0)), qml.expval(qml.Y(0)), qml.expval(qml.Z(0))
+
+        actual = qml.specs(qjit(circuit), level=range(3))()
+        expected = CircuitSpecs(
+            device_name="null.qubit",
+            num_device_wires=3,
+            shots=Shots(None),
+            level=[
+                "Before transforms",
+                "split_non_commuting",
+                "cancel_inverses",
+            ],
+            resources={
+                "Before transforms": SpecsResources(
+                    gate_types={"Hadamard": 1, "PauliX": 2},
+                    gate_sizes={1: 3},
+                    measurements={"expval(PauliX)": 1, "expval(PauliY)": 1, "expval(PauliZ)": 1},
+                    num_allocs=1,
+                ),
+                "split_non_commuting": [
+                    SpecsResources(
+                        gate_types={"Hadamard": 1, "PauliX": 2},
+                        gate_sizes={1: 3},
+                        measurements={"expval(PauliX)": 1},
+                        num_allocs=1,
+                    ),
+                    SpecsResources(
+                        gate_types={"Hadamard": 1, "PauliX": 2},
+                        gate_sizes={1: 3},
+                        measurements={"expval(PauliY)": 1},
+                        num_allocs=1,
+                    ),
+                    SpecsResources(
+                        gate_types={"Hadamard": 1, "PauliX": 2},
+                        gate_sizes={1: 3},
+                        measurements={"expval(PauliZ)": 1},
+                        num_allocs=1,
+                    ),
+                ],
+                "cancel_inverses": [
+                    SpecsResources(
+                        gate_types={"Hadamard": 1},
+                        gate_sizes={1: 1},
+                        measurements={"expval(PauliX)": 1},
+                        num_allocs=1,
+                    ),
+                    SpecsResources(
+                        gate_types={"Hadamard": 1},
+                        gate_sizes={1: 1},
+                        measurements={"expval(PauliY)": 1},
+                        num_allocs=1,
+                    ),
+                    SpecsResources(
+                        gate_types={"Hadamard": 1},
+                        gate_sizes={1: 1},
+                        measurements={"expval(PauliZ)": 1},
+                        num_allocs=1,
+                    ),
+                ],
+            },
+        )
+
+        check_specs_same(actual, expected)
 
 
 if __name__ == "__main__":
