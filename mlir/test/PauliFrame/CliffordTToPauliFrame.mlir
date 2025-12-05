@@ -107,3 +107,56 @@ func.func @test_to_pauli_frame_correct_meas(%arg0 : !quantum.bit) -> (i1, !quant
     // CHECK: return [[mres2]], [[q2]]
     func.return %mres, %q : i1, !quantum.bit
 }
+
+// -----
+
+// COM: This program represents the following circuit:
+// COM: 0: ──H──X─╭●──T──┤↗├─┤
+// COM: 1: ──S──Z─╰X──Y──┤↗├─┤
+func.func @test_to_pauli_frame_integration() -> (i1, i1) {
+    // CHECK: quantum.alloc( 2) : !quantum.reg
+    // CHECK: pauli_frame.init_qreg {{%.+}} : !quantum.reg
+    %qreg = quantum.alloc( 2) : !quantum.reg
+    // CHECK: quantum.extract {{%.+}}[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: quantum.extract {{%.+}}[ 1] : !quantum.reg -> !quantum.bit
+    %q00 = quantum.extract %qreg[ 0] : !quantum.reg -> !quantum.bit
+    %q10 = quantum.extract %qreg[ 1] : !quantum.reg -> !quantum.bit
+    // CHECK: pauli_frame.update_with_clifford[ Hadamard] {{%.+}} : !quantum.bit
+    // CHECK: quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    %q01 = quantum.custom "Hadamard"() %q00 : !quantum.bit
+    // CHECK: pauli_frame.update_with_clifford[ S] {{%.+}} : !quantum.bit
+    // CHECK: quantum.custom "S"() {{%.+}} : !quantum.bit
+    %q11 = quantum.custom "S"() %q10 : !quantum.bit
+    // CHECK: pauli_frame.update[true, false] {{%.+}} : !quantum.bit
+    %q02 = quantum.custom "X"() %q01 : !quantum.bit
+    // CHECK: pauli_frame.update[false, true] {{%.+}} : !quantum.bit
+    %q12 = quantum.custom "Z"() %q11 : !quantum.bit
+    // CHECK: pauli_frame.update_with_clifford[ CNOT] {{%.+}}, {{%.+}} : !quantum.bit, !quantum.bit
+    // CHECK: quantum.custom "CNOT"() {{%.+}}, {{%.+}} : !quantum.bit, !quantum.bit
+    %q03, %q13 = quantum.custom "CNOT"() %q02, %q12 : !quantum.bit, !quantum.bit
+    // CHECK: pauli_frame.flush {{%.+}} : i1, i1, !quantum.bit
+    // CHECK: scf.if {{%.+}} -> (!quantum.bit) {
+    // CHECK:   quantum.custom "X"() {{%.+}} : !quantum.bit
+    // CHECK:   scf.yield {{%.+}} : !quantum.bit
+    // CHECK: } else {
+    // CHECK:   scf.yield {{%.+}} : !quantum.bit
+    // CHECK: }
+    // CHECK: scf.if {{%.+}} -> (!quantum.bit) {
+    // CHECK:   quantum.custom "Z"() {{%.+}} : !quantum.bit
+    // CHECK:   scf.yield {{%.+}} : !quantum.bit
+    // CHECK: } else {
+    // CHECK:   scf.yield {{%.+}} : !quantum.bit
+    // CHECK: }
+    // CHECK: quantum.custom "T"() {{%.+}} : !quantum.bit
+    %q04 = quantum.custom "T"() %q03 : !quantum.bit
+    // CHECK: pauli_frame.update[true, true] {{%.+}} : !quantum.bit
+    %q14 = quantum.custom "Y"() %q13 : !quantum.bit
+    // CHECK: quantum.measure {{%.+}} : i1, !quantum.bit
+    // CHECK: pauli_frame.correct_measurement {{%.+}}, {{%.+}} : i1, !quantum.bit
+    %mres0, %q05 = quantum.measure %q04 : i1, !quantum.bit
+    // CHECK: quantum.measure {{%.+}} : i1, !quantum.bit
+    // CHECK: pauli_frame.correct_measurement {{%.+}}, {{%.+}} : i1, !quantum.bit
+    %mres1, %q15 = quantum.measure %q14 : i1, !quantum.bit
+    // CHECK: return {{%.+}}, {{%.+}} : i1, i1
+    func.return %mres0, %mres1 : i1, i1
+}
