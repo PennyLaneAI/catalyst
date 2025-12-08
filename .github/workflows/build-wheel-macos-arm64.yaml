@@ -106,7 +106,7 @@ jobs:
         enableCrossOsArchive: True
 
     - name: Clone LLVM Submodule
-      if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+      #if: steps.cache-llvm-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v4
       with:
         repository: llvm/llvm-project
@@ -114,7 +114,7 @@ jobs:
         path: ${{ github.workspace }}/mlir/llvm-project
 
     - name: Patch LLVM Source
-      if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+      #if: steps.cache-llvm-source.outputs.cache-hit != 'true'
       run: |
         cd $GITHUB_WORKSPACE/mlir/llvm-project
         git apply $GITHUB_WORKSPACE/mlir/patches/llvm-bufferization-segfault.patch
@@ -178,7 +178,7 @@ jobs:
         python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
 
     - name: Build LLVM / MLIR
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      #if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         PYTHON=$(which python${{ matrix.python_version }}) \
         LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
@@ -188,7 +188,7 @@ jobs:
 
     - name: Save LLVM Build
       id: save-llvm-build
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      #if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
         path: ${{ github.workspace }}/llvm-build
@@ -259,22 +259,22 @@ jobs:
         python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML ninja delocate
         python${{ matrix.python_version }} -m pip install cmake'<4'
 
-    - name: Get Cached LLVM Source
-      id: cache-llvm-source
-      uses: actions/cache/restore@v4
-      with:
-        path: ${{ github.workspace }}/mlir/llvm-project
-        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
-        enableCrossOsArchive: True
-        fail-on-cache-miss: True
+    # - name: Get Cached LLVM Source
+    #   id: cache-llvm-source
+    #   uses: actions/cache/restore@v4
+    #   with:
+    #     path: ${{ github.workspace }}/mlir/llvm-project
+    #     key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+    #     enableCrossOsArchive: True
+    #     fail-on-cache-miss: True
 
-    - name: Get Cached LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache/restore@v4
-      with:
-        path: ${{ github.workspace }}/llvm-build
-        key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.primary_python_version }}-wheel-build
-        fail-on-cache-miss: True
+    # - name: Get Cached LLVM Build
+    #   id: cache-llvm-build
+    #   uses: actions/cache/restore@v4
+    #   with:
+    #     path: ${{ github.workspace }}/llvm-build
+    #     key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.primary_python_version }}-wheel-build
+    #     fail-on-cache-miss: True
 
     - name: Get Cached Stablehlo Source
       id: cache-stablehlo-source

@@ -54,16 +54,16 @@ jobs:
           sudo apt-get -y -q install ninja-build make cmake clang
           python3 -m pip install nanobind pybind11
 
-      - name: Get Cached LLVM Source
-        id: cache-llvm-source
-        uses: actions/cache/restore@v4
-        with:
-          path: mlir/llvm-project
-          key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
-          enableCrossOsArchive: true
+      # - name: Get Cached LLVM Source
+      #   id: cache-llvm-source
+      #   uses: actions/cache/restore@v4
+      #   with:
+      #     path: mlir/llvm-project
+      #     key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+      #     enableCrossOsArchive: true
 
       - name: Clone LLVM Submodule
-        if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+        #if: steps.cache-llvm-source.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: llvm/llvm-project
@@ -131,7 +131,7 @@ jobs:
         enableCrossOsArchive: true
 
     - name: Clone LLVM Submodule
-      if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+      #if: steps.cache-llvm-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v4
       with:
         repository: llvm/llvm-project
@@ -151,7 +151,7 @@ jobs:
         python-version: ${{needs.constants.outputs.primary_python_version}}
 
     - name: Install Deps
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      #if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
@@ -160,7 +160,7 @@ jobs:
         python3 -m pip install numpy pybind11 nanobind PyYAML
 
     - name: Build LLVM
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      #if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       # Note: Disable instrumentation for the mlir runtime support library,
       #       as user programs aren't instrumented.
       run: |
@@ -212,24 +212,24 @@ jobs:
         path: stablehlo-build
         key: ${{ runner.os }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-ci-build-${{ matrix.compiler }}-0
 
-    - name: Get Cached LLVM Source
-      id: cache-llvm-source
-      if: steps.cache-stablehlo.outputs.cache-hit != 'true'
-      uses: actions/cache@v4
-      with:
-        path: mlir/llvm-project
-        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
-        enableCrossOsArchive: true
-        fail-on-cache-miss: true
+    # - name: Get Cached LLVM Source
+    #   id: cache-llvm-source
+    #   if: steps.cache-stablehlo.outputs.cache-hit != 'true'
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: mlir/llvm-project
+    #     key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+    #     enableCrossOsArchive: true
+    #     fail-on-cache-miss: true
 
-    - name: Get Cached LLVM Build
-      id: cache-llvm-build
-      if: steps.cache-stablehlo.outputs.cache-hit != 'true'
-      uses: actions/cache@v4
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
-        fail-on-cache-miss: true
+    # - name: Get Cached LLVM Build
+    #   id: cache-llvm-build
+    #   if: steps.cache-stablehlo.outputs.cache-hit != 'true'
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: llvm-build
+    #     key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
+    #     fail-on-cache-miss: true
 
     - name: Install Deps
       if: steps.cache-stablehlo.outputs.cache-hit != 'true'
@@ -286,24 +286,24 @@ jobs:
         path: enzyme-build
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-ci-build-${{ matrix.compiler }}
 
-    - name: Get Cached LLVM Source
-      id: cache-llvm-source
-      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
-      uses: actions/cache@v4
-      with:
-        path: mlir/llvm-project
-        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
-        enableCrossOsArchive: true
-        fail-on-cache-miss: true
+    # - name: Get Cached LLVM Source
+    #   id: cache-llvm-source
+    #   if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: mlir/llvm-project
+    #     key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+    #     enableCrossOsArchive: true
+    #     fail-on-cache-miss: true
 
-    - name: Get Cached LLVM Build
-      id: cache-llvm-build
-      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
-      uses: actions/cache@v4
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
-        fail-on-cache-miss: true
+    # - name: Get Cached LLVM Build
+    #   id: cache-llvm-build
+    #   if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: llvm-build
+    #     key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
+    #     fail-on-cache-miss: true
 
     - name: Install Deps
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
@@ -345,22 +345,22 @@ jobs:
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install numpy nanobind pybind11
 
-    - name: Get Cached LLVM Source
-      id: cache-llvm-source
-      uses: actions/cache/restore@v4
-      with:
-        path: mlir/llvm-project
-        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
-        enableCrossOsArchive: true
-        fail-on-cache-miss: true
+    # - name: Get Cached LLVM Source
+    #   id: cache-llvm-source
+    #   uses: actions/cache/restore@v4
+    #   with:
+    #     path: mlir/llvm-project
+    #     key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+    #     enableCrossOsArchive: true
+    #     fail-on-cache-miss: true
 
-    - name: Get Cached LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache/restore@v4
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
-        fail-on-cache-miss: true
+    # - name: Get Cached LLVM Build
+    #   id: cache-llvm-build
+    #   uses: actions/cache/restore@v4
+    #   with:
+    #     path: llvm-build
+    #     key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
+    #     fail-on-cache-miss: true
 
     - name: Get Cached Stablehlo Source
       id: cache-stablehlo-source
@@ -475,13 +475,13 @@ jobs:
         python3 -m pip install oqc-qcaas-client
         make frontend
 
-    - name: Get Cached LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache@v4
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
-        fail-on-cache-miss: true
+    # - name: Get Cached LLVM Build
+    #   id: cache-llvm-build
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: llvm-build
+    #     key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
+    #     fail-on-cache-miss: true
 
     - name: Download Quantum Build Artifact
       uses: actions/download-artifact@v4
@@ -569,13 +569,13 @@ jobs:
         python3 -m pip install -r requirements.txt
         make frontend
 
-    - name: Get Cached LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache@v4
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
-        fail-on-cache-miss: true
+    # - name: Get Cached LLVM Build
+    #   id: cache-llvm-build
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: llvm-build
+    #     key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
+    #     fail-on-cache-miss: true
 
     - name: Download Quantum Build Artifact
       uses: actions/download-artifact@v4
@@ -631,13 +631,13 @@ jobs:
         python3 -m pip install -r requirements.txt
         make frontend
 
-    - name: Get Cached LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache@v4
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
-        fail-on-cache-miss: true
+    # - name: Get Cached LLVM Build
+    #   id: cache-llvm-build
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: llvm-build
+    #     key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
+    #     fail-on-cache-miss: true
 
     - name: Download Quantum Build Artifact
       uses: actions/download-artifact@v4
@@ -727,16 +727,16 @@ jobs:
           pip install numpy pybind11 amazon-braket-sdk PyYAML
           echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
-      - name: Get Cached LLVM Source
-        id: cache-llvm-source
-        uses: actions/cache@v4
-        with:
-          path: mlir/llvm-project
-          key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
-          enableCrossOsArchive: true
+      # - name: Get Cached LLVM Source
+      #   id: cache-llvm-source
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: mlir/llvm-project
+      #     key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+      #     enableCrossOsArchive: true
 
       - name: Clone LLVM Submodule
-        if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+        #if: steps.cache-llvm-source.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: llvm/llvm-project
