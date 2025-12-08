@@ -24,7 +24,6 @@ graphviz = pytest.importorskip("graphviz")
 
 import pennylane as qml
 
-from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface.inspection import generate_mlir_graph
 from catalyst.python_interface.transforms import (
     iterative_cancel_inverses_pass,
@@ -68,7 +67,7 @@ class TestMLIRGraph:
             return qml.state()
 
         if qjit:
-            _ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(_)
+            _ = qml.qjit(_)
 
         generate_mlir_graph(_)()
         assert collect_files(tmp_path) == {"QNode_level_0_no_transforms.svg"}
@@ -88,7 +87,7 @@ class TestMLIRGraph:
             return qml.state()
 
         if qjit:
-            _ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(_)
+            _ = qml.qjit(_)
 
         generate_mlir_graph(_)()
         assert_files(
@@ -113,7 +112,7 @@ class TestMLIRGraph:
             return qml.state()
 
         if qjit:
-            _ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(_)
+            _ = qml.qjit(_)
 
         generate_mlir_graph(_)(0.1, 0.2, 0, 1)
         assert_files(
@@ -138,7 +137,7 @@ class TestMLIRGraph:
             return qml.state()
 
         if qjit:
-            _ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(_)
+            _ = qml.qjit(_)
 
         generate_mlir_graph(_)(0.1, 0.2, 0, 1)
         assert_files(
@@ -164,7 +163,7 @@ class TestMLIRGraph:
             return qml.state()
 
         if qjit:
-            _ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(_)
+            _ = qml.qjit(_)
 
         generate_mlir_graph(_)(0.1, 0.2, 0, 1)
         assert_files(
