@@ -18,6 +18,11 @@
 #include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
+#include <cmath>
+#include <llvm/Support/LogicalResult.h>
+
+// #include <llvm/Support/Debug.h>
+// #define DEBUG_TYPE "to-ppr"
 
 using namespace mlir;
 using namespace catalyst;
@@ -233,6 +238,74 @@ LogicalResult convertMeasureOpToPPM(MeasureOp op, StringRef axis,
     return success();
 }
 
+LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewriter)
+{
+    auto loc = op.getLoc();
+
+    // Get defining angle
+    Value angle = op.getAngle();
+    ArrayAttr pauliProduct = op.getPauliProduct();
+    auto inQubits = op.getInQubits();
+    TypeRange outQubitTypes = op.getOutQubits().getType();
+
+    // Check if the angle is static (constant)
+    double angleDouble = 0.0;
+    bool isStatic = false;
+    auto defOp = angle.getDefiningOp();
+    if (defOp && defOp->hasTrait<OpTrait::ConstantLike>()) {
+        auto floatAttr = defOp->getAttrOfType<FloatAttr>("value");
+        if (floatAttr) {
+            angleDouble = floatAttr.getValueAsDouble();
+            isStatic = true;
+        }
+    }
+
+    // LLVM_DEBUG(llvm::dbgs() << "Angle is static: " << angleDouble << "\n");
+
+    if (isStatic) {
+        // LLVM_DEBUG(llvm::dbgs() << "Angle is static: " << angleDouble << "\n");
+        constexpr double PI = llvm::numbers::pi;
+        constexpr double TOLERANCE = 1e-9;
+
+        // Convert angle to rotation_kind: rotation_kind = angle * 8 / π
+        double rotationKindDouble = angleDouble * 8.0 / PI;
+
+        // Check if rotation_kind is close to an integer
+        double rounded = std::round(rotationKindDouble);
+        if (std::abs(rotationKindDouble - rounded) < TOLERANCE) {
+            // It's a multiple of π/8, use PPRotationOp
+            int64_t rotationKind = static_cast<int64_t>(rounded);
+
+            // Apply adjoint transformation if needed
+            if (op.getAdjoint()) {
+                rotationKind = -rotationKind;
+            }
+
+            // Create IntegerAttr for rotation_kind (I16Attr is signed, so this handles negative
+            // values correctly)
+            auto rotationKindAttr = rewriter.getI16IntegerAttr(static_cast<int16_t>(rotationKind));
+            auto pprOp = rewriter.create<PPRotationOp>(loc, outQubitTypes, pauliProduct,
+                                                       rotationKindAttr, inQubits);
+            rewriter.replaceOp(op, pprOp.getOutQubits());
+            return success();
+        }
+    }
+
+    // Use PPRotationArbitraryOp for non-static angles or angles that aren't multiples of π/8
+    // Apply adjoint transformation: if adjoint, negate the angle
+    Value arbitraryAngle = angle;
+    if (op.getAdjoint()) {
+        auto negOneAttr = rewriter.getF64FloatAttr(-1.0);
+        auto negOne = rewriter.create<arith::ConstantOp>(loc, angle.getType(), negOneAttr);
+        arbitraryAngle = rewriter.create<arith::MulFOp>(loc, angle.getType(), angle, negOne);
+    }
+
+    auto pprArbitraryOp = rewriter.create<PPRotationArbitraryOp>(loc, outQubitTypes, pauliProduct,
+                                                                 arbitraryAngle, inQubits);
+    rewriter.replaceOp(op, pprArbitraryOp.getOutQubits());
+    return success();
+}
+
 LogicalResult convertMeasureZ(MeasureOp op, ConversionPatternRewriter &rewriter)
 {
     return convertMeasureOpToPPM(op, "Z", rewriter);
@@ -278,6 +351,9 @@ struct QECOpLowering : public ConversionPattern {
             }
             }
         }
+        else if (auto originOp = dyn_cast_or_null<PauliRotOp>(op)) {
+            return convertPauliRotGate(originOp, rewriter);
+        }
         else if (auto originOp = dyn_cast_or_null<MeasureOp>(op)) {
             return convertMeasureZ(originOp, rewriter);
         }
@@ -287,6 +363,7 @@ struct QECOpLowering : public ConversionPattern {
 };
 
 using CustomOpLowering = QECOpLowering<quantum::CustomOp, qec::PPRotationOp>;
+using PauliRotOpLowering = QECOpLowering<quantum::PauliRotOp, qec::PPRotationOp>;
 using MeasureOpLowering = QECOpLowering<quantum::MeasureOp, qec::PPMeasurementOp>;
 
 } // namespace
@@ -294,9 +371,10 @@ using MeasureOpLowering = QECOpLowering<quantum::MeasureOp, qec::PPMeasurementOp
 namespace catalyst {
 namespace qec {
 
-void populateCliffordTToPPRPatterns(RewritePatternSet &patterns)
+void populateToPPRPatterns(RewritePatternSet &patterns)
 {
     patterns.add<CustomOpLowering>(patterns.getContext());
+    patterns.add<PauliRotOpLowering>(patterns.getContext());
     patterns.add<MeasureOpLowering>(patterns.getContext());
 }
 

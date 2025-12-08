@@ -71,7 +71,7 @@ def AvoidYMeasureOption : Option<
 //                               Passes
 //===----------------------------------------------------------------------===//
 
-def CliffordTToPPRPass : Pass<"to-ppr"> {
+def ToPPRPass : Pass<"to-ppr"> {
     let summary = "Convert quantum dialects to the QEC dialect.";
 
     let dependentDialects = [ "catalyst::qec::QECDialect" ];

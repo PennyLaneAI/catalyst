@@ -28,11 +28,11 @@ using namespace catalyst::qec;
 namespace catalyst {
 namespace qec {
 
-#define GEN_PASS_DEF_CLIFFORDTTOPPRPASS
+#define GEN_PASS_DEF_TOPPRPASS
 #include "QEC/Transforms/Passes.h.inc"
 
-struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {
-    using CliffordTToPPRPassBase::CliffordTToPPRPassBase;
+struct ToPPRPass : impl::ToPPRPassBase<ToPPRPass> {
+    using ToPPRPassBase::ToPPRPassBase;
 
     void runOnOperation() final
     {
@@ -47,7 +47,7 @@ struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {
         target.addLegalDialect<qec::QECDialect>();
 
         RewritePatternSet patterns(ctx);
-        populateCliffordTToPPRPatterns(patterns);
+        populateToPPRPatterns(patterns);
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             return signalPassFailure();
