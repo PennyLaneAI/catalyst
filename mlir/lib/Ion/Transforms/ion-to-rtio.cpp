@@ -32,6 +32,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Ion/IR/IonDialect.h"
+#include "Ion/IR/IonInfo.h"
 #include "Ion/IR/IonOps.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -169,104 +170,6 @@ Value awaitEvents(ArrayRef<Value> events, PatternRewriter &rewriter)
     auto eventType = rtio::EventType::get(rewriter.getContext());
     return rewriter.create<rtio::RTIOSyncOp>(rewriter.getUnknownLoc(), eventType, events);
 }
-
-// Helper class to store ion information
-class IonInfo {
-  private:
-    llvm::StringMap<double> levelEnergyMap;
-
-    struct TransitionInfo {
-        std::string level0;
-        std::string level1;
-        double einstein_a;
-        std::string multipole;
-    };
-    SmallVector<TransitionInfo> transitions;
-
-  public:
-    IonInfo(ion::IonOp op)
-    {
-        auto levelAttrs = op.getLevels();
-        auto transitionsAttr = op.getTransitions();
-
-        // Map from Level label to Energy value
-        for (auto levelAttr : levelAttrs) {
-            auto level = cast<LevelAttr>(levelAttr);
-            std::string label = level.getLabel().getValue().str();
-            double energy = level.getEnergy().getValueAsDouble();
-            levelEnergyMap[label] = energy;
-        }
-
-        // Store transition information
-        for (auto transitionAttr : transitionsAttr) {
-            auto transition = cast<TransitionAttr>(transitionAttr);
-            TransitionInfo info;
-            info.level0 = transition.getLevel_0().getValue().str();
-            info.level1 = transition.getLevel_1().getValue().str();
-            info.einstein_a = transition.getEinsteinA().getValueAsDouble();
-            info.multipole = transition.getMultipole().getValue().str();
-            transitions.push_back(info);
-        }
-    }
-
-    // Get energy of a level by label
-    std::optional<double> getLevelEnergy(StringRef label) const
-    {
-        auto it = levelEnergyMap.find(label.str());
-        if (it != levelEnergyMap.end()) {
-            return it->second;
-        }
-        return std::nullopt;
-    }
-
-    // Get level label of a transition by index
-    template <int IndexT>
-    std::optional<double> getTransitionLevelEnergy(size_t transitionIndex) const
-    {
-        static_assert(IndexT == 0 || IndexT == 1, "IndexT must be 0 or 1");
-
-        if (transitionIndex >= transitions.size()) {
-            return std::nullopt;
-        }
-
-        const auto &transition = transitions[transitionIndex];
-        if constexpr (IndexT == 0) {
-            return getLevelEnergy(transition.level0);
-        }
-        else {
-            return getLevelEnergy(transition.level1);
-        }
-    }
-
-    // Get energy difference of a transition (level1 energy - level0 energy)
-    std::optional<double> getTransitionEnergyDiff(size_t index) const
-    {
-        if (index >= transitions.size()) {
-            return std::nullopt;
-        }
-
-        auto energy0 = getTransitionLevelEnergy<0>(index);
-        auto energy1 = getTransitionLevelEnergy<1>(index);
-
-        if (energy0.has_value() && energy1.has_value()) {
-            return energy1.value() - energy0.value();
-        }
-
-        return std::nullopt;
-    }
-
-    // Get number of transitions
-    size_t getNumTransitions() const { return transitions.size(); }
-
-    // Get transition info by index
-    std::optional<TransitionInfo> getTransition(size_t index) const
-    {
-        if (index < transitions.size()) {
-            return transitions[index];
-        }
-        return std::nullopt;
-    }
-};
 
 } // namespace
 
