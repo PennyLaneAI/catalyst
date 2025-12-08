@@ -104,7 +104,8 @@ class TestGetConstantFromSSA:
         assert get_constant_from_ssa(val) is None
 
     def test_tensor_constant_stablehlo(self):
-        """Test that ``None`` is returned if the input is a tensor created by ``stablehlo.constant``."""
+        """Test that ``None`` is returned if the input is a tensor created by
+        ``stablehlo.constant``."""
         dense_attr = builtin.DenseIntOrFPElementsAttr.from_list(
             type=builtin.TensorType(element_type=builtin.Float64Type(), shape=(3,)),
             data=(1.0, 2.0, 3.0),
