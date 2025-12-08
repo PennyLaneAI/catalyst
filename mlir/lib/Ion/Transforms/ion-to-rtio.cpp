@@ -77,12 +77,12 @@ template <TraceMode ModeT, typename CallbackT>
 auto traceValueWithCallback(Value value, CallbackT &&callback)
 {
     WalkResult walkResult = WalkResult::advance();
-    std::queue<Value> visited;
-    visited.push(value);
+    std::queue<Value> worklist;
+    worklist.push(value);
 
-    while (!visited.empty()) {
-        Value value = visited.front();
-        visited.pop();
+    while (!worklist.empty()) {
+        Value value = worklist.front();
+        worklist.pop();
 
         if constexpr (std::is_same_v<std::invoke_result_t<CallbackT, Value>, WalkResult>) {
             if (callback(value).wasInterrupted()) {
@@ -101,13 +101,13 @@ auto traceValueWithCallback(Value value, CallbackT &&callback)
             if (auto forOp = dyn_cast<scf::ForOp>(parentOp)) {
                 unsigned argIndex = arg.getArgNumber();
                 Value iterArg = forOp.getInitArgs()[argIndex - 1];
-                visited.push(iterArg);
+                worklist.push(iterArg);
                 continue;
             }
             else if (auto parallelProtocolOp = dyn_cast<ion::ParallelProtocolOp>(parentOp)) {
                 unsigned argIndex = arg.getArgNumber();
                 Value inQubit = parallelProtocolOp.getInQubits()[argIndex];
-                visited.push(inQubit);
+                worklist.push(inQubit);
                 continue;
             }
             parentOp->emitError("Unsupported parent operation for block argument: ") << value;
@@ -122,40 +122,40 @@ auto traceValueWithCallback(Value value, CallbackT &&callback)
         if (auto forOp = dyn_cast<scf::ForOp>(defOp)) {
             unsigned resultIdx = llvm::cast<OpResult>(value).getResultNumber();
             BlockArgument iterArg = forOp.getRegionIterArg(resultIdx);
-            visited.push(iterArg);
+            worklist.push(iterArg);
         }
         else if (auto ifOp = dyn_cast<scf::IfOp>(defOp)) {
             unsigned resultIdx = llvm::cast<OpResult>(value).getResultNumber();
             Value thenValue = ifOp.thenYield().getOperand(resultIdx);
             Value elseValue = ifOp.elseYield().getOperand(resultIdx);
-            visited.push(thenValue);
-            visited.push(elseValue);
+            worklist.push(thenValue);
+            worklist.push(elseValue);
         }
         else if (auto parallelProtocolOp = dyn_cast<ion::ParallelProtocolOp>(defOp)) {
             unsigned resultIdx = llvm::cast<OpResult>(value).getResultNumber();
             Value inQubit = parallelProtocolOp.getInQubits()[resultIdx];
-            visited.push(inQubit);
+            worklist.push(inQubit);
         }
         else if (auto op = dyn_cast<mlir::UnrealizedConversionCastOp>(defOp)) {
-            visited.push(op.getInputs().front());
+            worklist.push(op.getInputs().front());
         }
         else if (auto op = dyn_cast<quantum::ExtractOp>(defOp)) {
-            visited.push(op.getQreg());
+            worklist.push(op.getQreg());
         }
         else if (auto op = dyn_cast<rtio::RTIOQubitToChannelOp>(defOp)) {
-            visited.push(op.getQubit());
+            worklist.push(op.getQubit());
         }
         else if (auto op = dyn_cast<quantum::InsertOp>(defOp)) {
             Value inQreg = op.getInQreg();
             Value qubit = op.getQubit();
             if constexpr (ModeT == TraceMode::Qreg) {
-                visited.push(inQreg);
+                worklist.push(inQreg);
             }
             else if constexpr (ModeT == TraceMode::Event) {
-                visited.push(qubit);
+                worklist.push(qubit);
                 // only trace qreg if it defined op is also come from insert op
                 if (llvm::isa_and_present<quantum::InsertOp>(inQreg.getDefiningOp())) {
-                    visited.push(inQreg);
+                    worklist.push(inQreg);
                 }
             }
         }
