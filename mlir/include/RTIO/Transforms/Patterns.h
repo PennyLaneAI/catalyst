@@ -14,16 +14,21 @@
 
 #pragma once
 
-#include "mlir/Pass/Pass.h"
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/Matchers.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Transforms/DialectConversion.h"
 
-#include "RTIO/IR/RTIODialect.h"
+#include "RTIO/IR/RTIOOps.h"
 
 namespace catalyst {
 namespace rtio {
-
-#define GEN_PASS_DECL
-#define GEN_PASS_REGISTRATION
-#include "RTIO/Transforms/Passes.h.inc"
+void populateRTIOToARTIQConversionPatterns(mlir::LLVMTypeConverter &typeConverter,
+                                           mlir::RewritePatternSet &patterns);
+void populateRTIORewritePatterns(mlir::RewritePatternSet &patterns);
+void populateRTIOSyncSimplifyPatterns(mlir::RewritePatternSet &patterns);
+void populateRTIOPulseDecomposePatterns(mlir::RewritePatternSet &patterns);
 
 } // namespace rtio
 } // namespace catalyst
