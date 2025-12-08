@@ -354,6 +354,7 @@ class TestConvertToMBQCFormalismPass:
                     %q2 = quantum.custom "S"() %qubits : !quantum.bit
                     scf.yield %q2 : !quantum.bit
                 }
+
                 return
             }
         """
