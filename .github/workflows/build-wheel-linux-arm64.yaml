@@ -101,7 +101,7 @@ jobs:
         enableCrossOsArchive: True
 
     - name: Clone LLVM Submodule
-      if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+      if: steps.cache-llvm-source.outputs.cache-hit != 'false'
       uses: actions/checkout@v4
       with:
         repository: llvm/llvm-project
@@ -109,14 +109,14 @@ jobs:
         path: ${{ github.workspace }}/mlir/llvm-project
 
     - name: Patch LLVM Source
-      if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+      if: steps.cache-llvm-source.outputs.cache-hit != 'false'
       run: |
         cd $GITHUB_WORKSPACE/mlir/llvm-project
         git apply $GITHUB_WORKSPACE/mlir/patches/llvm-bufferization-segfault.patch
         git apply $GITHUB_WORKSPACE/mlir/patches/llvm-nanobind.patch
 
     - name: Clone Stablehlo Submodule
-      if: steps.cache-stablehlo-source.outputs.cache-hit != 'true'
+      if: steps.cache-stablehlo-source.outputs.cache-hit != 'false'
       uses: actions/checkout@v4
       with:
         repository: openxla/stablehlo
@@ -124,7 +124,7 @@ jobs:
         path: ${{ github.workspace }}/mlir/stablehlo
 
     - name: Clone Enzyme Submodule
-      if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
+      if: steps.cache-enzyme-source.outputs.cache-hit != 'false'
       uses: actions/checkout@v4
       with:
         repository: EnzymeAD/Enzyme
@@ -132,7 +132,7 @@ jobs:
         path: ${{ github.workspace }}/mlir/Enzyme
 
     - name: Patch Enzyme Source
-      if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
+      if: steps.cache-enzyme-source.outputs.cache-hit != 'false'
       run: |
         cd $GITHUB_WORKSPACE/mlir/Enzyme
         git apply $GITHUB_WORKSPACE/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
@@ -163,9 +163,9 @@ jobs:
 
     - name: Install dependencies
       if: |
-        steps.cache-llvm-build.outputs.cache-hit != 'true' ||
-        steps.cache-stablehlo-build.outputs.cache-hit != 'true' ||
-        steps.cache-enzyme-build.outputs.cache-hit != 'true'
+        steps.cache-llvm-build.outputs.cache-hit != 'false' ||
+        steps.cache-stablehlo-build.outputs.cache-hit != 'false' ||
+        steps.cache-enzyme-build.outputs.cache-hit != 'false'
       run: |
         cat /etc/dnf.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/dnf.conf
         dnf update -y && dnf install -y libzstd-devel gcc-toolset-13
@@ -180,7 +180,7 @@ jobs:
         echo $PYTHON_BINS >> $GITHUB_PATH
 
     - name: Build LLVM / MLIR
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      if: steps.cache-llvm-build.outputs.cache-hit != 'false'
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
         PYTHON=$(which python${{ matrix.python_version }}) \
@@ -195,14 +195,14 @@ jobs:
 
     - name: Save LLVM Build
       id: save-llvm-build
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      if: steps.cache-llvm-build.outputs.cache-hit != 'false'
       uses: actions/cache/save@v4
       with:
         path: ${{ github.workspace }}/llvm-build
         key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
 
     - name: Build Stablehlo Dialect
-      if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'
+      if: steps.cache-stablehlo-build.outputs.cache-hit != 'false'
       run: |
         C_COMPILER=$(which gcc) \
         CXX_COMPILER=$(which g++) \
@@ -214,14 +214,14 @@ jobs:
 
     - name: Save Stablehlo Build
       id: save-stablehlo-build
-      if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'
+      if: steps.cache-stablehlo-build.outputs.cache-hit != 'false'
       uses: actions/cache/save@v4
       with:
         path: ${{ github.workspace }}/stablehlo-build
         key: ${{ matrix.container_img }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-wheel-build
 
     - name: Build Enzyme
-      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'false'
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
 
@@ -236,7 +236,7 @@ jobs:
 
     - name: Save Enzyme Build
       id: save-enzyme-build
-      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'false'
       uses: actions/cache/save@v4
       with:
         path: ${{ github.workspace }}/enzyme-build

@@ -106,7 +106,7 @@ jobs:
         enableCrossOsArchive: True
 
     - name: Clone LLVM Submodule
-      if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+      if: steps.cache-llvm-source.outputs.cache-hit != 'false'
       uses: actions/checkout@v4
       with:
         repository: llvm/llvm-project
@@ -114,14 +114,14 @@ jobs:
         path: ${{ github.workspace }}/mlir/llvm-project
 
     - name: Patch LLVM Source
-      if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+      if: steps.cache-llvm-source.outputs.cache-hit != 'false'
       run: |
         cd $GITHUB_WORKSPACE/mlir/llvm-project
         git apply $GITHUB_WORKSPACE/mlir/patches/llvm-bufferization-segfault.patch
         git apply $GITHUB_WORKSPACE/mlir/patches/llvm-nanobind.patch
 
     - name: Clone Stablehlo Submodule
-      if: steps.cache-stablehlo-source.outputs.cache-hit != 'true'
+      if: steps.cache-stablehlo-source.outputs.cache-hit != 'false'
       uses: actions/checkout@v4
       with:
         repository: openxla/stablehlo
@@ -129,7 +129,7 @@ jobs:
         path: ${{ github.workspace }}/mlir/stablehlo
 
     - name: Clone Enzyme Submodule
-      if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
+      if: steps.cache-enzyme-source.outputs.cache-hit != 'false'
       uses: actions/checkout@v4
       with:
         repository: EnzymeAD/Enzyme
@@ -137,7 +137,7 @@ jobs:
         path: ${{ github.workspace }}/mlir/Enzyme
 
     - name: Patch Enzyme Source
-      if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
+      if: steps.cache-enzyme-source.outputs.cache-hit != 'false'
       run: |
         cd $GITHUB_WORKSPACE/mlir/Enzyme
         git apply $GITHUB_WORKSPACE/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
@@ -178,7 +178,7 @@ jobs:
         python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
 
     - name: Build LLVM / MLIR
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      if: steps.cache-llvm-build.outputs.cache-hit != 'false'
       run: |
         PYTHON=$(which python${{ matrix.python_version }}) \
         LLVM_BUILD_DIR="$GITHUB_WORKSPACE/llvm-build" \
@@ -188,14 +188,14 @@ jobs:
 
     - name: Save LLVM Build
       id: save-llvm-build
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      if: steps.cache-llvm-build.outputs.cache-hit != 'false'
       uses: actions/cache/save@v4
       with:
         path: ${{ github.workspace }}/llvm-build
         key: ${{ runner.os }}-${{ runner.arch }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-wheel-build
 
     - name: Build Stablehlo Dialect
-      if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'
+      if: steps.cache-stablehlo-build.outputs.cache-hit != 'false'
       run: |
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         STABLEHLO_BUILD_DIR="$GITHUB_WORKSPACE/stablehlo-build" \
@@ -204,14 +204,14 @@ jobs:
 
     - name: Save Stablehlo Build
       id: save-stablehlo-build
-      if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'
+      if: steps.cache-stablehlo-build.outputs.cache-hit != 'false'
       uses: actions/cache/save@v4
       with:
         path: ${{ github.workspace }}/stablehlo-build
         key: ${{ runner.os }}-${{ runner.arch }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-wheel-build
 
     - name: Build Enzyme
-      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'false'
       run: |
         cmake -S mlir/Enzyme/enzyme -B $GITHUB_WORKSPACE/enzyme-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
@@ -223,7 +223,7 @@ jobs:
 
     - name: Save Enzyme Build
       id: save-enzyme-build
-      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'false'
       uses: actions/cache/save@v4
       with:
         path: ${{ github.workspace }}/enzyme-build
