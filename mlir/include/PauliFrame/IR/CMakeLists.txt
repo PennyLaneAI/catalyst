@@ -1,0 +1,10 @@
+add_mlir_dialect(PauliFrameOps pauli_frame)
+add_mlir_doc(PauliFrameDialect PauliFrameDialect PauliFrame/ -gen-dialect-doc -gen-op-doc)
+add_mlir_doc(PauliFrameOps PauliFrameOps PauliFrame/ -gen-op-doc)
+
+set(LLVM_TARGET_DEFINITIONS PauliFrameOps.td)
+mlir_tablegen(PauliFrameEnums.h.inc -gen-enum-decls)
+mlir_tablegen(PauliFrameEnums.cpp.inc -gen-enum-defs)
+mlir_tablegen(PauliFrameAttributes.h.inc -gen-attrdef-decls -attrdefs-dialect=pauli_frame)
+mlir_tablegen(PauliFrameAttributes.cpp.inc -gen-attrdef-defs -attrdefs-dialect=pauli_frame)
+add_public_tablegen_target(MLIRPauliFrameEnumsIncGen)
