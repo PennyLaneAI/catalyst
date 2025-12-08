@@ -717,7 +717,7 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
-        assert nodes["node1"]["label"] == f"<name> MidMeasure|<wire> [0]"
+        assert nodes["node1"]["label"] == f"<name> MidMeasureMP|<wire> [0]"
 
 
 class TestCreateStaticMeasurementNodes:
