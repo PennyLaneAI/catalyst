@@ -14,9 +14,6 @@
 
 #include <queue>
 
-#include "llvm/Support/JSON.h"
-#include "llvm/Support/MemoryBuffer.h"
-
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -31,6 +28,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "Catalyst/Utils/JSONUtils.h"
 #include "Ion/IR/IonDialect.h"
 #include "Ion/IR/IonInfo.h"
 #include "Ion/IR/IonOps.h"
@@ -611,80 +609,14 @@ LogicalResult CleanQuantumOps(func::FuncOp funcOp, MLIRContext *ctx)
     return success();
 }
 
-//===----------------------------------------------------------------------===//
-// JSON to MLIR Attribute Conversion
-//===----------------------------------------------------------------------===//
-
-/// Convert a JSON value to an MLIR Attribute
-Attribute jsonToAttribute(MLIRContext *ctx, const llvm::json::Value &json)
-{
-    if (auto str = json.getAsString()) {
-        return StringAttr::get(ctx, *str);
-    }
-    if (auto num = json.getAsInteger()) {
-        return IntegerAttr::get(IntegerType::get(ctx, 64), *num);
-    }
-    if (auto num = json.getAsNumber()) {
-        return FloatAttr::get(Float64Type::get(ctx), *num);
-    }
-    if (auto b = json.getAsBoolean()) {
-        return BoolAttr::get(ctx, *b);
-    }
-    if (auto arr = json.getAsArray()) {
-        SmallVector<Attribute> attrs;
-        for (const auto &elem : *arr) {
-            attrs.push_back(jsonToAttribute(ctx, elem));
-        }
-        return ArrayAttr::get(ctx, attrs);
-    }
-    if (auto *obj = json.getAsObject()) {
-        SmallVector<NamedAttribute> entries;
-        for (const auto &kv : *obj) {
-            StringRef key = kv.first;
-            entries.emplace_back(StringAttr::get(ctx, key), jsonToAttribute(ctx, kv.second));
-        }
-        // Sort entries by name for DictionaryAttr
-        llvm::sort(entries, [](const NamedAttribute &lhs, const NamedAttribute &rhs) {
-            return lhs.getName().getValue() < rhs.getName().getValue();
-        });
-        return DictionaryAttr::get(ctx, entries);
-    }
-    // null
-    return UnitAttr::get(ctx);
-}
-
 /// Load a JSON file and convert it to an rtio.config attribute
 FailureOr<rtio::ConfigAttr> loadDeviceDbAsConfig(MLIRContext *ctx, StringRef filePath)
 {
-    auto fileOrErr = llvm::MemoryBuffer::getFile(filePath);
-    if (!fileOrErr) {
+    auto dictAttr = loadJsonFileAsDict(ctx, filePath);
+    if (failed(dictAttr)) {
         return failure();
     }
-
-    auto json = llvm::json::parse((*fileOrErr)->getBuffer());
-    if (!json) {
-        llvm::errs() << "Failed to parse JSON: " << llvm::toString(json.takeError()) << "\n";
-        return failure();
-    }
-
-    auto *obj = json->getAsObject();
-    if (!obj) {
-        llvm::errs() << "Device DB JSON must be an object\n";
-        return failure();
-    }
-
-    // Convert JSON object to DictionaryAttr
-    SmallVector<NamedAttribute> entries;
-    for (const auto &kv : *obj) {
-        StringRef key = kv.first;
-        entries.emplace_back(StringAttr::get(ctx, key), jsonToAttribute(ctx, kv.second));
-    }
-    llvm::sort(entries, [](const NamedAttribute &lhs, const NamedAttribute &rhs) {
-        return lhs.getName().getValue() < rhs.getName().getValue();
-    });
-
-    auto dictAttr = DictionaryAttr::get(ctx, entries);
-    return rtio::ConfigAttr::get(ctx, dictAttr);
+    return rtio::ConfigAttr::get(ctx, *dictAttr);
 }
 
 //===----------------------------------------------------------------------===//
