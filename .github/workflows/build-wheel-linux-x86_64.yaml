@@ -157,12 +157,12 @@ jobs:
         git apply $GITHUB_WORKSPACE/mlir/patches/enzyme-nvvm-fabs-intrinsics.patch
 
     # Cache external project builds
-    - name: Restore LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache/restore@v4
-      with:
-        path: ${{ github.workspace }}/llvm-build
-        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-wheel-build
+    # - name: Restore LLVM Build
+    #   id: cache-llvm-build
+    #   uses: actions/cache/restore@v4
+    #   with:
+    #     path: ${{ github.workspace }}/llvm-build
+    #     key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-wheel-build
 
     - name: Check Stablehlo Build Cache
       id: cache-stablehlo-build
