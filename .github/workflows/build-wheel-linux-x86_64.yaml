@@ -95,13 +95,13 @@ jobs:
     # Cache external project sources
     # Note that these caches will not be the same as for our main check-catalyst action, since
     # GH doesn't support using caches across un-/containerized actions (those with `container_img`).
-    - name: Cache LLVM Source
-      id: cache-llvm-source
-      uses: actions/cache@v4
-      with:
-        path: ${{ github.workspace }}/mlir/llvm-project
-        key: llvm-${{ needs.constants.outputs.llvm_version }}-container-source
-        enableCrossOsArchive: True
+    # - name: Cache LLVM Source
+    #   id: cache-llvm-source
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: ${{ github.workspace }}/mlir/llvm-project
+    #     key: llvm-${{ needs.constants.outputs.llvm_version }}-container-source
+    #     enableCrossOsArchive: True
 
     - name: Cache Stablehlo Source
       id: cache-stablehlo-source
@@ -215,13 +215,13 @@ jobs:
         ENABLE_LLD=OFF \
         make llvm
 
-    - name: Save LLVM Build
-      id: save-llvm-build
-      #if: steps.cache-llvm-build.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
-      with:
-        path: ${{ github.workspace }}/llvm-build
-        key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
+    # - name: Save LLVM Build
+    #   id: save-llvm-build
+    #   #if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+    #   uses: actions/cache/save@v4
+    #   with:
+    #     path: ${{ github.workspace }}/llvm-build
+    #     key: ${{ matrix.container_img }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-wheel-build
 
     - name: Build Stablehlo Dialect
       if: steps.cache-stablehlo-build.outputs.cache-hit != 'true'

@@ -122,13 +122,13 @@ jobs:
     # Both the LLVM source and build folder are required for further dialect builds.
     # Caching is significantly faster than git cloning since LLVM is such a large repository.
 
-    - name: Cache LLVM Source
-      id: cache-llvm-source
-      uses: actions/cache@v4
-      with:
-        path: mlir/llvm-project
-        key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
-        enableCrossOsArchive: true
+    # - name: Cache LLVM Source
+    #   id: cache-llvm-source
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: mlir/llvm-project
+    #     key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+    #     enableCrossOsArchive: true
 
     - name: Clone LLVM Submodule
       #if: steps.cache-llvm-source.outputs.cache-hit != 'true'
@@ -138,12 +138,12 @@ jobs:
         ref: ${{ needs.constants.outputs.llvm_version }}
         path: mlir/llvm-project
 
-    - name: Cache LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache@v4
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
+    # - name: Cache LLVM Build
+    #   id: cache-llvm-build
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: llvm-build
+    #     key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
 
     - name: Set up Python # Ensure the "primary" python version is used
       uses: actions/setup-python@v5
