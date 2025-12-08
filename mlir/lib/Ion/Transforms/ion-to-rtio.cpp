@@ -54,21 +54,38 @@ FailureOr<rtio::ConfigAttr> loadDeviceDbAsConfig(MLIRContext *ctx, StringRef fil
     return rtio::ConfigAttr::get(ctx, *dictAttr);
 }
 
-/// Clean up quantum/ion related ops that are not needed after conversion
-LogicalResult cleanQuantumOps(func::FuncOp funcOp, MLIRContext *ctx)
+/// Clean up unused quantum/ion/memref/linalg/builtin operations after conversion
+/// Runs iteratively until no more ops can be erased
+void cleanupUnusedOps(func::FuncOp funcOp)
 {
-    funcOp.walk<WalkOrder::PostOrder>([](Operation *op) {
-        Dialect *dialect = op->getDialect();
-        if (!dialect || !isa<quantum::QuantumDialect, ion::IonDialect, memref::MemRefDialect,
-                             linalg::LinalgDialect>(dialect))
-            return;
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        SmallVector<Operation *> toErase;
+        funcOp.walk([&](Operation *op) {
+            Dialect *dialect = op->getDialect();
+            if (!dialect) {
+                return;
+            }
 
-        if (op->use_empty()) {
+            // Include BuiltinDialect for unrealized_conversion_cast
+            if (!isa<quantum::QuantumDialect, ion::IonDialect, memref::MemRefDialect,
+                     linalg::LinalgDialect, BuiltinDialect>(dialect)) {
+                return;
+            }
+
+            if (op->use_empty()) {
+                toErase.push_back(op);
+            }
+        });
+
+        for (Operation *op : toErase) {
             op->erase();
+            changed = true;
         }
-    });
-    return success();
+    }
 }
+
 } // namespace
 
 //===----------------------------------------------------------------------===//
@@ -205,6 +222,9 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
             return failure();
         }
+
+        // Clean up unused quantum/ion/memref/linalg/builtin ops after patterns
+        cleanupUnusedOps(funcOp);
 
         IRRewriter rewriter(ctx);
         DominanceInfo domInfo(funcOp);
@@ -402,11 +422,6 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
             failed(SCFStructuralConversion(newQnodeFunc, target, typeConverter, ctx)) ||
             failed(FinalizeKernelFunction(newQnodeFunc, ctx))) {
             newQnodeFunc->emitError("Failed to convert to rtio dialect");
-            return signalPassFailure();
-        }
-
-        if (failed(cleanQuantumOps(newQnodeFunc, ctx))) {
-            newQnodeFunc->emitError("Failed to clean quantum ops");
             return signalPassFailure();
         }
 
