@@ -110,6 +110,9 @@ LogicalResult convertPauliGate(CustomOp op, PatternRewriter &rewriter, bool x_pa
  *   %1 = pauli_frame.update_with_clifford[Hadamard] %0 : !quantum.bit
  *   %2 = quantum.custom "Hadamard"() %1 : !quantum.bit
  *   %3 = <op_that_consumes_qubit> %2 : ...
+ *
+ * Note that since H = H†, CNOT = CNOT†, and since the Pauli conjugation relations for S and S† are
+ * equivalent up to a global phase, we need not consider the adjoint parameter of the quantum gate.
  */
 LogicalResult convertCliffordGate(CustomOp op, PatternRewriter &rewriter, CliffordGate gate)
 {
