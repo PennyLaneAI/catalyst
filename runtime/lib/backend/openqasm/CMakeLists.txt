@@ -31,7 +31,7 @@ find_package(nanobind CONFIG REQUIRED)
 #
 # Also need NB_USE_SUBMODULE_DEPS flag to opt into nanobind's handling of tsl-robin-map dependency:
 #   https://github.com/wjakob/nanobind/pull/1212
-set(NB_USE_SUBMODULE_DEPS ON)
+#set(NB_USE_SUBMODULE_DEPS ON)
 nanobind_add_module(openqasm_python_module STABLE_ABI openqasm_python_module.cpp)
 
 # Use a consistant suffix ".so" rather than, e.g. ".abi3.so" (when using the Stable ABI) or

@@ -132,7 +132,7 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/mlir/llvm-project
         git apply $GITHUB_WORKSPACE/mlir/patches/llvm-bufferization-segfault.patch
-        git apply $GITHUB_WORKSPACE/mlir/patches/llvm-nanobind.patch
+        #git apply $GITHUB_WORKSPACE/mlir/patches/llvm-nanobind.patch
 
     - name: Clone Stablehlo Submodule
       if: steps.cache-stablehlo-source.outputs.cache-hit != 'true'
@@ -194,7 +194,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
+        python${{ matrix.python_version }} -m pip install numpy nanobind!=2.10.0 pybind11 PyYAML cmake ninja
         # Add cmake and ninja to the PATH env var
         PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
         echo $PYTHON_BINS >> $GITHUB_PATH
@@ -292,7 +292,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
+        python${{ matrix.python_version }} -m pip install numpy nanobind!=2.10.0 pybind11 PyYAML cmake ninja
         # Add cmake and ninja to the PATH env var
         PYTHON_BINS=$(find /opt/_internal/cpython-${{ matrix.python_version }}.*/bin -maxdepth 1 -type d | tr '\n' ':' | sed 's/:$//')
         echo $PYTHON_BINS >> $GITHUB_PATH

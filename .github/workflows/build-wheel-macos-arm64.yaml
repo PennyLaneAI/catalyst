@@ -118,7 +118,7 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/mlir/llvm-project
         git apply $GITHUB_WORKSPACE/mlir/patches/llvm-bufferization-segfault.patch
-        git apply $GITHUB_WORKSPACE/mlir/patches/llvm-nanobind.patch
+        #git apply $GITHUB_WORKSPACE/mlir/patches/llvm-nanobind.patch
 
     - name: Clone Stablehlo Submodule
       if: steps.cache-stablehlo-source.outputs.cache-hit != 'true'
@@ -175,7 +175,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML cmake ninja
+        python${{ matrix.python_version }} -m pip install numpy nanobind!=2.10.0 pybind11 PyYAML cmake ninja
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -256,7 +256,7 @@ jobs:
     # LAPACKE reference implementation. TODO: Look into how to upgrade beyond this limit.
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install numpy nanobind pybind11 PyYAML ninja delocate
+        python${{ matrix.python_version }} -m pip install numpy nanobind!=2.10.0 pybind11 PyYAML ninja delocate
         python${{ matrix.python_version }} -m pip install cmake'<4'
 
     - name: Get Cached LLVM Source
