@@ -63,7 +63,7 @@ jobs:
           enableCrossOsArchive: true
 
       - name: Clone LLVM Submodule
-        if: steps.cache-llvm-source.outputs.cache-hit != 'false'
+        if: steps.cache-llvm-source.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: llvm/llvm-project
@@ -131,7 +131,7 @@ jobs:
         enableCrossOsArchive: true
 
     - name: Clone LLVM Submodule
-      if: steps.cache-llvm-source.outputs.cache-hit != 'false'
+      if: steps.cache-llvm-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v4
       with:
         repository: llvm/llvm-project
@@ -151,7 +151,7 @@ jobs:
         python-version: ${{needs.constants.outputs.primary_python_version}}
 
     - name: Install Deps
-      if: steps.cache-llvm-build.outputs.cache-hit != 'false'
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
         sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
@@ -160,7 +160,7 @@ jobs:
         python3 -m pip install numpy pybind11 nanobind PyYAML
 
     - name: Build LLVM
-      if: steps.cache-llvm-build.outputs.cache-hit != 'false'
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       # Note: Disable instrumentation for the mlir runtime support library,
       #       as user programs aren't instrumented.
       run: |
@@ -198,7 +198,7 @@ jobs:
         enableCrossOsArchive: true
 
     - name: Clone Stablehlo Submodule
-      if: steps.cache-stablehlo-source.outputs.cache-hit != 'false'
+      if: steps.cache-stablehlo-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v4
       with:
         repository: openxla/stablehlo
@@ -214,7 +214,7 @@ jobs:
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
-      if: steps.cache-stablehlo.outputs.cache-hit != 'false'
+      if: steps.cache-stablehlo.outputs.cache-hit != 'true'
       uses: actions/cache@v4
       with:
         path: mlir/llvm-project
@@ -224,7 +224,7 @@ jobs:
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
-      if: steps.cache-stablehlo.outputs.cache-hit != 'false'
+      if: steps.cache-stablehlo.outputs.cache-hit != 'true'
       uses: actions/cache@v4
       with:
         path: llvm-build
@@ -232,12 +232,12 @@ jobs:
         fail-on-cache-miss: true
 
     - name: Install Deps
-      if: steps.cache-stablehlo.outputs.cache-hit != 'false'
+      if: steps.cache-stablehlo.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
         sudo apt-get install -y cmake ninja-build clang lld
     - name: Build Stablehlo Dialect
-      if: steps.cache-stablehlo.outputs.cache-hit != 'false'
+      if: steps.cache-stablehlo.outputs.cache-hit != 'true'
       run: |
         C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
         CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
@@ -272,7 +272,7 @@ jobs:
         enableCrossOsArchive: true
 
     - name: Clone Enzyme Submodule
-      if: steps.cache-enzyme-build.outputs.cache-hit != 'false'
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       uses: actions/checkout@v4
       with:
         repository: EnzymeAD/Enzyme
@@ -288,7 +288,7 @@ jobs:
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
-      if: steps.cache-enzyme-build.outputs.cache-hit != 'false'
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       uses: actions/cache@v4
       with:
         path: mlir/llvm-project
@@ -298,7 +298,7 @@ jobs:
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
-      if: steps.cache-enzyme-build.outputs.cache-hit != 'false'
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       uses: actions/cache@v4
       with:
         path: llvm-build
@@ -306,13 +306,13 @@ jobs:
         fail-on-cache-miss: true
 
     - name: Install Deps
-      if: steps.cache-enzyme-build.outputs.cache-hit != 'false'
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
         sudo apt-get install -y cmake ninja-build clang lld
 
     - name: Build Enzyme
-      if: steps.cache-enzyme-build.outputs.cache-hit != 'false'
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
         C_COMPILER=$(which ${{ needs.constants.outputs[format('c_compiler.{0}', matrix.compiler)] }}) \
         CXX_COMPILER=$(which ${{ needs.constants.outputs[format('cxx_compiler.{0}', matrix.compiler)] }}) \
@@ -736,7 +736,7 @@ jobs:
           enableCrossOsArchive: true
 
       - name: Clone LLVM Submodule
-        if: steps.cache-llvm-source.outputs.cache-hit != 'false'
+        if: steps.cache-llvm-source.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: llvm/llvm-project
