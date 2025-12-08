@@ -265,8 +265,8 @@ namespace rtio {
 void populateRTIOToARTIQConversionPatterns(LLVMTypeConverter &typeConverter,
                                            RewritePatternSet &patterns)
 {
-    patterns.add<SyncOpLowering, EmptyOpLowering, ChannelOpLowering,
-                 PulseOpLowering>(typeConverter, patterns.getContext());
+    patterns.add<SyncOpLowering, EmptyOpLowering, ChannelOpLowering, PulseOpLowering>(
+        typeConverter, patterns.getContext());
 }
 
 void populateRTIORewritePatterns(RewritePatternSet &patterns)

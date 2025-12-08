@@ -66,11 +66,9 @@ inline mlir::Value computeChannelDeviceAddr(mlir::OpBuilder &builder, mlir::Oper
     mlir::Value offset =
         builder.create<mlir::arith::ConstantOp>(loc, builder.getI32IntegerAttr(channelBase));
     mlir::Value sum = builder.create<mlir::arith::AddIOp>(loc, channelValue, offset);
-    mlir::Value shift =
-        builder.create<mlir::arith::ConstantOp>(loc, builder.getI32IntegerAttr(8));
+    mlir::Value shift = builder.create<mlir::arith::ConstantOp>(loc, builder.getI32IntegerAttr(8));
     return builder.create<mlir::arith::ShLIOp>(loc, sum, shift);
 }
 
 } // namespace rtio
 } // namespace catalyst
-
