@@ -729,9 +729,7 @@ class TestMeasurementsFromSamplesIntegration:
 
         assert expected_res == circuit_ref(), "Sanity check failed, is expected_res correct?"
 
-        circuit_compiled = qml.qjit(
-            measurements_from_samples_pass(circuit_ref)
-        )
+        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
 
         assert expected_res == circuit_compiled()
 
@@ -762,9 +760,7 @@ class TestMeasurementsFromSamplesIntegration:
         assert np.array_equal(
             expected_res, circuit_ref()
         ), "Sanity check failed, is expected_res correct?"
-        circuit_compiled = qml.qjit(
-            measurements_from_samples_pass(circuit_ref)
-        )
+        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
 
         assert np.array_equal(expected_res, circuit_compiled())
 
@@ -795,9 +791,7 @@ class TestMeasurementsFromSamplesIntegration:
         assert np.array_equal(
             expected_res, circuit_ref()
         ), "Sanity check failed, is expected_res correct?"
-        circuit_compiled = qml.qjit(
-            measurements_from_samples_pass(circuit_ref)
-        )
+        circuit_compiled = qml.qjit(measurements_from_samples_pass(circuit_ref))
 
         assert np.array_equal(expected_res, circuit_compiled())
 

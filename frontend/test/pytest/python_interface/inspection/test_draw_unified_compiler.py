@@ -90,9 +90,7 @@ class Testdraw:
         )
 
         if qjit:
-            transforms_circuit = qml.qjit(
-                transforms_circuit
-            )
+            transforms_circuit = qml.qjit(transforms_circuit)
 
         assert draw(transforms_circuit, level=level)() == expected
 
@@ -126,9 +124,7 @@ class Testdraw:
         )
 
         if qjit:
-            transforms_circuit = qml.qjit(
-                transforms_circuit
-            )
+            transforms_circuit = qml.qjit(transforms_circuit)
 
         assert draw(transforms_circuit, level=level)() == expected
 
@@ -161,9 +157,7 @@ class Testdraw:
             qml.transforms.merge_rotations(transforms_circuit)
         )
         if qjit:
-            transforms_circuit = qml.qjit(
-                transforms_circuit
-            )
+            transforms_circuit = qml.qjit(transforms_circuit)
 
         assert draw(transforms_circuit, level=level)() == expected
 
@@ -207,9 +201,7 @@ class Testdraw:
         """Test that if no passes are applied, the circuit is still visualized."""
 
         if qjit:
-            transforms_circuit = qml.qjit(
-                transforms_circuit
-            )
+            transforms_circuit = qml.qjit(transforms_circuit)
 
         assert draw(transforms_circuit, level=level)() == expected
 
