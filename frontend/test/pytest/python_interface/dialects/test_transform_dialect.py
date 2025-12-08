@@ -19,20 +19,19 @@ from dataclasses import dataclass
 import pytest
 
 # pylint: disable=wrong-import-position,line-too-long
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 
 from xdsl import passes
 from xdsl.context import Context
-from xdsl.dialects import builtin
+from xdsl.dialects import builtin, transform
 from xdsl.dialects.builtin import DictionaryAttr, IntegerAttr, i64
-from xdsl.dialects.transform import AnyOpType
+from xdsl.dialects.transform import AnyOpType, ApplyRegisteredPassOp
 from xdsl.passes import PassPipeline
 from xdsl.utils.exceptions import VerifyException
 from xdsl.utils.test_value import create_ssa_value
 
 from catalyst.python_interface.conversion import xdsl_from_docstring
-from catalyst.python_interface.dialects import transform
-from catalyst.python_interface.dialects.transform import ApplyRegisteredPassOp
 from catalyst.python_interface.pass_api import (
     ApplyTransformSequence,
     compiler_transform,
@@ -40,15 +39,19 @@ from catalyst.python_interface.pass_api import (
 
 
 def test_dict_options():
-    """Test ApplyRegisteredPassOp constructor with dict options."""
+    """Test ApplyRegisteredPassOp constructor with DictionaryAttr options."""
     target = create_ssa_value(AnyOpType())
-    options = {"option1": 1, "option2": True}
+    options = DictionaryAttr(
+        {"option1": IntegerAttr(1, i64), "option2": IntegerAttr.from_bool(True)}
+    )
 
     op = ApplyRegisteredPassOp("canonicalize", target, options)
 
     assert op.pass_name.data == "canonicalize"
     assert isinstance(op.options, DictionaryAttr)
-    assert op.options == DictionaryAttr({"option1": 1, "option2": True})
+    # Verify the values are correctly stored
+    assert op.options.data["option1"] == IntegerAttr(1, i64)
+    assert op.options.data["option2"] == IntegerAttr.from_bool(True)
     assert op.verify_() is None
 
 
@@ -83,10 +86,11 @@ def test_invalid_options():
     """Test ApplyRegisteredPassOp constructor with invalid options type."""
     target = create_ssa_value(AnyOpType())
 
+    op = ApplyRegisteredPassOp("canonicalize", target, "invalid_options")
     with pytest.raises(
-        VerifyException, match="invalid_options should be of base attribute dictionary"
+        VerifyException, match=r'"invalid_options" should be of base attribute dictionary'
     ):
-        ApplyRegisteredPassOp("canonicalize", target, "invalid_options").verify_()
+        op.verify_()
 
 
 def test_transform_dialect_filecheck(run_filecheck):
@@ -123,6 +127,7 @@ def test_integration_for_transform_interpreter(capsys):
             else:
                 print("hello world")
 
+    @xdsl_from_docstring
     def program():
         """
         builtin.module {
@@ -139,7 +144,7 @@ def test_integration_for_transform_interpreter(capsys):
     ctx.load_dialect(builtin.Builtin)
     ctx.load_dialect(transform.Transform)
 
-    mod = xdsl_from_docstring(program)
+    mod = program()
     pipeline = PassPipeline((ApplyTransformSequence(),))
     pipeline.apply(ctx, mod)
 
