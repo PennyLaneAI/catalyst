@@ -34,7 +34,7 @@ set(WRAPPER_SRC_FILES
 # Target the stable ABI for Python 3.12+, which reduces the number of binary wheels that must be
 # built (`STABLE_ABI` does nothing on older Python versions).
 #
-# Also need NB_USE_SUBMODULE_DEPS flag to circumvent searching for tsl-robin-map dependency:
+# Also need NB_USE_SUBMODULE_DEPS flag to opt into nanobind's handling of tsl-robin-map dependency:
 #   https://github.com/wjakob/nanobind/pull/1212
 set(NB_USE_SUBMODULE_DEPS ON)
 nanobind_add_module(wrapper STABLE_ABI ${WRAPPER_SRC_FILES})
