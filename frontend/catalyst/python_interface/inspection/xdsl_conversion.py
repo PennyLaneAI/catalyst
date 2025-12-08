@@ -449,8 +449,7 @@ def xdsl_to_qml_measurement_name(op, obs_op=None) -> str:
             gate_name = f"{len(op.qubits)} wires"
 
     elif op.name == "quantum.hamiltonian":
-        ops_list = [xdsl_to_qml_measurement_name(term.owner) for term in op.terms]
-        gate_name = f"Hamiltonian({', '.join(ops_list)})"
+        gate_name = f"Hamiltonian(num_terms={len(op.terms)})"
 
     elif op.name == "quantum.tensor":
         ops_list = [xdsl_to_qml_measurement_name(operand.owner) for operand in op.operands]

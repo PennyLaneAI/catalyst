@@ -48,6 +48,7 @@ def check_specs_resources_same(
     ),
     skip_measurements: bool = False,
 ) -> None:
+    """Helper function to check if 2 resources objects are the same"""
     assert type(actual_res) == type(expected_res)
 
     if isinstance(actual_res, list):
@@ -165,6 +166,24 @@ class TestPassByPassSpecs:
             return qml.probs()
 
         return circ
+
+    @pytest.mark.usefixtures("use_capture")
+    def test_invalid_levels(self, simple_circuit):
+        """Test that when passes are applied, the circuit resources are updated accordingly."""
+
+        no_passes = qjit(simple_circuit)
+        with pytest.raises(
+            check=ValueError,
+            match="The 'level' argument to qml.specs for QJIT'd QNodes must be "
+            "non-negative, got -1.",
+        ):
+            qml.specs(no_passes, level=-1)()
+
+        with pytest.raises(check=ValueError, match="Requested specs levels 2"):
+            qml.specs(no_passes, level=2)()
+
+        with pytest.raises(check=ValueError, match="Requested specs levels 2, 3"):
+            qml.specs(no_passes, level=[2, 3])()
 
     @pytest.mark.usefixtures("use_capture")
     def test_basic_passes_multi_level(self, simple_circuit):
@@ -286,13 +305,8 @@ class TestPassByPassSpecs:
 
             qml.QubitUnitary(jnp.array([[1, 0], [0, 1j]]), wires=2)
 
-            coeffs = [0.2, -0.543]
-            obs = [qml.X(0) @ qml.Z(1), qml.Z(0) @ qml.Hadamard(2)]
-            ham = qml.ops.LinearCombination(coeffs, obs)
-
             return (
                 qml.expval(qml.PauliZ(0)),
-                qml.expval(ham),
                 qml.probs(wires=[0, 1]),
                 qml.state(),
             )
@@ -306,6 +320,24 @@ class TestPassByPassSpecs:
 
         check_specs_resources_same(regular_pl, before_transforms)
         check_specs_resources_same(before_transforms, before_mlir)
+
+        @qml.qnode(dev)
+        def hamil_circ():
+            coeffs = [0.2, -0.543]
+            obs = [qml.X(0) @ qml.Z(1), qml.Z(0) @ qml.Hadamard(2)]
+            ham = qml.ops.LinearCombination(coeffs, obs)
+
+            return qml.expval(ham)
+
+        # Hamiltonian representation is slightly different
+        specs_device = qml.specs(hamil_circ, level=0, compute_depth=False)()
+        specs_all = qml.specs(qjit(hamil_circ), level="all", compute_depth=False)()
+
+        regular_pl = specs_device["resources"]
+        before_transforms = specs_all["resources"]["Before transforms"]
+
+        assert "num_terms=2" in next(iter(regular_pl.measurements.keys()))
+        assert "num_terms=2" in next(iter(before_transforms.measurements.keys()))
 
     def test_split_non_commuting(self):
         """Test that qml.transforms.split_non_commuting works as expected"""
@@ -383,6 +415,7 @@ class TestPassByPassSpecs:
 
     @pytest.mark.usefixtures("use_capture")
     def test_subroutine(self):
+        """Test qml.specs when there is a Catalyst subroutine"""
         dev = qml.device("lightning.qubit", wires=3)
 
         @catalyst.jax_primitives.subroutine
