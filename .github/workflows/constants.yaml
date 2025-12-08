@@ -67,7 +67,8 @@ jobs:
 
       - name: LLVM version
         id: llvm_version
-        run: echo "llvm_version=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+        #run: echo "llvm_version=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+        run: temp-llvm-PR2275
 
       - name: Stablehlo version
         id: stablehlo_version
