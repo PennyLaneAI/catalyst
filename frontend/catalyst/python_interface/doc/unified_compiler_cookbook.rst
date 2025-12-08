@@ -664,7 +664,7 @@ currently rely on JAX’s API to lower to MLIR. This has the special
 effect of lowering to a specific dialect called StableHLO, which is used
 to represent all arithmetic operations present in the program.
 
-nce lowered to MLIR, if any xDSL registered passes are detected, we pass the control over to 
+Once lowered to MLIR, if any xDSL registered passes are detected, we pass the control over to 
 the xDSL layer, which automatically detects and applies all xDSL transforms that were requested
 by the user.
 
