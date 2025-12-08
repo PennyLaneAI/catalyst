@@ -159,9 +159,7 @@ auto traceValueWithCallback(Value value, CallbackT &&callback)
         }
     }
 
-    if constexpr (std::is_same_v<std::invoke_result_t<CallbackT, Value>, WalkResult>) {
-        return walkResult;
-    }
+    return walkResult;
 }
 
 Value awaitEvents(ArrayRef<Value> events, PatternRewriter &rewriter)
