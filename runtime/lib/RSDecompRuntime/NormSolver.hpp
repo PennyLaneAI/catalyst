@@ -21,8 +21,8 @@
 #include <random>
 #include <tuple>
 
+#include "RSUtils.hpp"
 #include "Rings.hpp"
-#include "Utils.hpp"
 
 namespace RSDecomp::NormSolver {
 using namespace RSDecomp::Utils;
@@ -194,7 +194,7 @@ inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_tries)
                 INT_TYPE loop_limit = min(m, r - k);
                 for (INT_TYPE i = 0; i < loop_limit; ++i) {
                     y = ((y * y) % n + c) % n;
-                    INT_TYPE diff = x > y ? x - y : y - x; // abs_val for unsigned-like behavior
+                    INT_TYPE diff = x > y ? x - y : y - x;
                     q = (q * diff) % n;
                 }
                 g = gcd(q, n);
@@ -334,12 +334,10 @@ inline std::optional<ZOmega> factorize_prime_zomega(const ZSqrtTwo &x, INT_TYPE 
  */
 inline std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trials)
 {
-    // std::cout << "solving diophantine for xi: " << xi.a << " + " << xi.b << " sqrt(2)" <<
-    // std::endl;
     if (xi.a == 0 && xi.b == 0)
         return ZOmega(0, 0, 0, 0);
 
-    INT_TYPE p = xi.abs();
+    INT_TYPE p = xi.norm();
     if (p < 2)
         return std::nullopt;
 
@@ -356,7 +354,7 @@ inline std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trial
 
         for (const auto &eta : *primes_zsqrt_two_opt) {
             next_xi = next_xi * eta.adj2();
-            INT_TYPE next_ab = eta.abs();
+            INT_TYPE next_ab = eta.norm();
 
             if ((next_xi.a % next_ab == 0) && (next_xi.b % next_ab == 0)) {
                 next_xi = ZSqrtTwo(next_xi.a / next_ab, next_xi.b / next_ab);
@@ -369,13 +367,13 @@ inline std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trial
     }
 
     ZSqrtTwo s_val = (scale.conj() * scale).to_sqrt_two();
-    INT_TYPE s_abs = s_val.abs();
+    INT_TYPE s_abs = s_val.norm();
     ZSqrtTwo s_new = xi * s_val.adj2();
     if (s_new.a % s_abs != 0 || s_new.b % s_abs != 0)
         return std::nullopt;
 
     auto t2 = xi / s_val;
-    INT_TYPE t2_abs = t2.abs();
+    INT_TYPE t2_abs = t2.norm();
     if (t2_abs * t2_abs != 1)
         return std::nullopt;
 

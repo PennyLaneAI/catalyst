@@ -15,14 +15,21 @@
 #include <iostream>
 #include <numeric>
 
+#include "RSUtils.hpp"
 #include "Rings.hpp"
-#include "Utils.hpp"
 
 namespace RSDecomp::Rings {
 using namespace RSDecomp::Utils;
 
+// Note:
+// Definitions for most of the operations here are available in
+// https://arxiv.org/pdf/1212.6253 secion 3
+
 // --- ZSqrtTwo Method Implementations ---
 
+/**
+ * @brief Constru
+ */
 ZSqrtTwo::ZSqrtTwo(INT_TYPE a, INT_TYPE b) : a(a), b(b) {}
 
 ZSqrtTwo ZSqrtTwo::operator+(const ZSqrtTwo &other) const
@@ -42,22 +49,19 @@ ZSqrtTwo ZSqrtTwo::operator*(const ZSqrtTwo &other) const
 
 ZSqrtTwo ZSqrtTwo::operator*(INT_TYPE scalar) const { return ZSqrtTwo(a * scalar, b * scalar); }
 
-ZSqrtTwo ZSqrtTwo::operator/(ZSqrtTwo other) const { return (*this * other.adj2()) / other.abs(); }
+ZSqrtTwo ZSqrtTwo::operator/(ZSqrtTwo other) const { return (*this * other.adj2()) / other.norm(); }
 
 ZSqrtTwo ZSqrtTwo::operator/(INT_TYPE scalar) const
 {
-    if (scalar == 0) {
-        throw std::invalid_argument("Division by zero");
-    }
-    if (a % scalar != 0 || b % scalar != 0) {
-        throw std::invalid_argument("Non-integer division result");
-    }
+    RT_FAIL_IF(scalar == 0, "Division by zero");
+    RT_FAIL_IF(a % scalar != 0 || b % scalar != 0, "Non-integer division result");
     return ZSqrtTwo(a / scalar, b / scalar);
 }
 
 bool ZSqrtTwo::operator==(const ZSqrtTwo &other) const { return a == other.a && b == other.b; }
 
-INT_TYPE ZSqrtTwo::abs() const { return a * a - 2 * b * b; }
+// https://arxiv.org/pdf/1212.6253 Def 4
+INT_TYPE ZSqrtTwo::norm() const { return a * a - 2 * b * b; }
 
 ZSqrtTwo ZSqrtTwo::adj2() const { return ZSqrtTwo(a, -b); }
 
@@ -68,9 +72,7 @@ double ZSqrtTwo::to_double() const
 
 ZSqrtTwo ZSqrtTwo::pow(INT_TYPE exponent) const
 {
-    if (exponent < 0) {
-        throw std::invalid_argument("Negative exponent not supported for ZSqrtTwo");
-    }
+    RT_FAIL_IF(exponent < 0, "Negative exponent not supported for ZSqrtTwo");
     ZSqrtTwo result(1, 0);
     ZSqrtTwo base = *this;
     while (exponent > 0) {
@@ -83,22 +85,22 @@ ZSqrtTwo ZSqrtTwo::pow(INT_TYPE exponent) const
     return result;
 }
 
+// https://arxiv.org/pdf/1212.6253 remark 6
 ZSqrtTwo ZSqrtTwo::operator%(const ZSqrtTwo &other) const
 {
-    INT_TYPE d = other.abs();
+    INT_TYPE d = other.norm();
     ZSqrtTwo num = *this * other.adj2();
-    // Use boost multiprecision division and rounding
     FLOAT_TYPE q1_float = FLOAT_TYPE(num.a) / FLOAT_TYPE(d);
     FLOAT_TYPE q2_float = FLOAT_TYPE(num.b) / FLOAT_TYPE(d);
-    INT_TYPE q1 = boost::multiprecision::round(q1_float).template convert_to<INT_TYPE>();
-    INT_TYPE q2 = boost::multiprecision::round(q2_float).template convert_to<INT_TYPE>();
+    INT_TYPE q1 = boost::multiprecision::round(q1_float).convert_to<INT_TYPE>();
+    INT_TYPE q2 = boost::multiprecision::round(q2_float).convert_to<INT_TYPE>();
     ZSqrtTwo quotient(q1, q2);
     return *this - quotient * other;
 }
 
 std::optional<ZSqrtTwo> ZSqrtTwo::sqrt() const
 {
-    const INT_TYPE d = this->abs();
+    const INT_TYPE d = this->norm();
     INT_TYPE abs_d = d < 0 ? -d : d;
     const INT_TYPE r = boost::multiprecision::sqrt(abs_d);
     if (r * r != d) {
@@ -150,12 +152,9 @@ ZOmega ZOmega::operator*(INT_TYPE scalar) const
 
 ZOmega ZOmega::operator/(INT_TYPE scalar) const
 {
-    if (scalar == 0) {
-        throw std::invalid_argument("Division by zero");
-    }
-    if (a % scalar != 0 || b % scalar != 0 || c % scalar != 0 || d % scalar != 0) {
-        throw std::invalid_argument("Non-integer division result");
-    }
+    RT_FAIL_IF(scalar == 0, "Division by zero");
+    RT_FAIL_IF(a % scalar != 0 || b % scalar != 0 || c % scalar != 0 || d % scalar != 0,
+               "Non-integer division result");
     return ZOmega(a / scalar, b / scalar, c / scalar, d / scalar);
 }
 
@@ -218,7 +217,7 @@ ZSqrtTwo ZOmega::to_sqrt_two() const
     if ((c + a == 0) && (b == 0)) {
         return ZSqrtTwo(d, (c - a) / 2);
     }
-    throw std::invalid_argument("Invalid ZOmega for conversion to ZSqrtTwo");
+    RT_FAIL("Invalid ZOmega for conversion to ZSqrtTwo");
 }
 
 std::pair<ZOmega, int> ZOmega::normalize()
@@ -227,7 +226,6 @@ std::pair<ZOmega, int> ZOmega::normalize()
     ZOmega res = *this;
     INT_TYPE two(2);
     while (((res.a + res.c) % 2) == 0 && ((res.b + res.d) % 2) == 0) {
-        // Evaluate expressions before passing to floor_div
         INT_TYPE bd = res.b - res.d;
         INT_TYPE ac = res.a + res.c;
         INT_TYPE bd_sum = res.b + res.d;
@@ -380,7 +378,6 @@ std::array<std::array<int, 3>, 3> SO3Matrix::parity_mat() const
     std::array<std::array<int, 3>, 3> p_mat;
     for (std::size_t i = 0; i < 3; ++i) {
         for (std::size_t j = 0; j < 3; ++j) {
-            // Explicit conversion for boost multiprecision
             INT_TYPE val = (so3_mat[i][j].a % 2 + 2) % 2;
             p_mat[i][j] = static_cast<int>(val);
         }

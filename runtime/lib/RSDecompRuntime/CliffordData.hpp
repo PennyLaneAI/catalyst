@@ -44,10 +44,6 @@ enum class PPRGateType {
 
 using enum CliffordData::GateType;
 
-std::string_view gateTypeToString(GateType type);
-std::ostream &operator<<(std::ostream &os, GateType type);
-void printGateVector(const std::vector<GateType> &gates);
-
 extern const std::map<std::vector<GateType>, SO3Matrix> clifford_group_to_SO3;
 
 extern const std::unordered_map<GateType, std::pair<DyadicMatrix, double>> clifford_gates_to_SU2;

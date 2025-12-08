@@ -49,14 +49,17 @@ TEST_CASE("Test ZSqrtTwo class", "[RSDecomp][Rings]")
 
     CHECK(z1.to_double() == 1.0 + 2.0 * M_SQRT2);
 
+    CHECK(z1.norm() == -7);
+    CHECK(z2.norm() == -23);
+
     CHECK(z2.adj2() == ZSqrtTwo(3, -4));
     CHECK(z1.adj2() == ZSqrtTwo(1, -2));
 
-    CHECK(z1.abs() == -7);
-    CHECK(z2.abs() == -23);
+    CHECK(z1.to_double() == 1.0 + 2.0 * M_SQRT2);
 
     CHECK(z1.pow(0) == ZSqrtTwo(1, 0));
     CHECK(z1.pow(2) == ZSqrtTwo(9, 4));
+    CHECK(z1.pow(3) == ZSqrtTwo(25, 22));
 
     CHECK(z1.sqrt().has_value() == false);
     CHECK(z2.sqrt().has_value() == false);
@@ -81,7 +84,6 @@ TEST_CASE("Test ZOmega class", "[RSDecomp][Rings]")
     CHECK((z1 + z2) == ZOmega(6, 8, 10, 12));
     CHECK((z2 + ZOmega(10)) == ZOmega(5, 6, 7, 18));
 
-    CHECK((z2 + ZOmega(2)) == ZOmega(5, 6, 7, 10));
     CHECK((z1 - z2) == ZOmega(-4, -4, -4, -4));
     CHECK((z1 * z2) == ZOmega(60, 56, 36, -2));
     CHECK((z2 * INT_TYPE(10)) == ZOmega(50, 60, 70, 80));

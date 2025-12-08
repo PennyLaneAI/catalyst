@@ -14,14 +14,13 @@
 
 #pragma once
 
-#include <algorithm>
-#include <iostream>
+#include "Exception.hpp"
 #include <list>
 #include <map>
 #include <optional>
-#include <stdexcept>
-#include <string>
 
+// We define a lot of these utilities here to support multiprecision INTs and FLOATs, which cannot
+// use the std algorithms.
 namespace RSDecomp::Utils {
 template <typename T> inline T min(T x, T y) { return (x > y) ? y : x; }
 
@@ -29,49 +28,11 @@ template <typename T> inline T max(T x, T y) { return (x > y) ? x : y; }
 
 template <typename T> inline T abs_val(T x) { return (x < 0) ? -x : x; }
 
-template <typename T> inline T math_mod(T a, T n)
-{
-    if (n == 0) {
-        throw std::invalid_argument("Modulo by zero");
-    }
-    if (n < 0) {
-        n = -n;
-    }
-    T r = a % n;
-    return r < 0 ? r + n : r;
-}
-
-/**
- * @brief Performs modular multiplication (a * b) % mod
- */
-template <typename T> inline T mod_mul(T a, T b, T mod) { return (a * b) % mod; }
-
-/**
- * @brief Performs modular exponentiation (base^exp) % mod.
- *
- * If using Boost cpp_int, boost powm can be used instead.
- */
-template <typename T> inline T mod_pow(T base, T exp, T mod)
-{
-    T res = 1;
-    base %= mod;
-    while (exp > 0) {
-        if (exp % 2 == 1)
-            res = mod_mul(res, base, mod);
-        base = mod_mul(base, base, mod);
-        exp /= 2;
-    }
-    return res;
-}
-
 template <typename T> inline T floor_div(T a, T b)
 {
-    if (b == T(0)) {
-        throw std::invalid_argument("Division by zero");
-    }
+    RT_FAIL_IF(b == T(0), "Division by zero");
     T q = a / b;
     T r = a % b;
-    // Explicit comparison with T(0) for boost multiprecision compatibility
     if ((r != T(0)) && ((r < T(0)) != (b < T(0)))) {
         q -= T(1);
     }
@@ -91,6 +52,16 @@ template <typename T> T gcd(T a, T b)
     return a;
 }
 
+/**
+ * @brief Simple LRU (Least Recently Used) Cache implementation.
+ *
+ * This cache stores key-value pairs up to a maximum size. When the cache exceeds this size,
+ * the least recently used item is evicted.
+ *
+ * @tparam Key The type of the keys.
+ * @tparam Value The type of the values.
+ * @tparam MaxSize The maximum number of items the cache can hold.
+ */
 template <typename Key, typename Value, size_t MaxSize> class lru_cache {
     static_assert(MaxSize > 0, "LRU cache MaxSize must be greater than 0");
 
@@ -170,52 +141,3 @@ template <typename Key, typename Value, size_t MaxSize> class lru_cache {
 };
 
 } // namespace RSDecomp::Utils
-
-// helper printing function to be deleted
-
-inline std::ostream &operator<<(std::ostream &os, __int128_t value)
-{
-    if (value == 0) {
-        os << "0";
-        return os;
-    }
-    std::string str;
-    bool is_negative = false;
-    if (value < 0) {
-        is_negative = true;
-    }
-    while (value != 0) {
-        int digit;
-        if (is_negative) {
-            digit = -(value % 10);
-            value /= 10;
-        }
-        else {
-            digit = value % 10;
-            value /= 10;
-        }
-        str += (char)('0' + digit);
-    }
-    if (is_negative) {
-        str += '-';
-    }
-    std::reverse(str.begin(), str.end());
-    os << str;
-    return os;
-}
-
-inline std::ostream &operator<<(std::ostream &os, unsigned __int128 n)
-{
-    if (n == 0) {
-        os << "0";
-        return os;
-    }
-    std::string str;
-    while (n != 0) {
-        str += (char)('0' + (n % 10));
-        n /= 10;
-    }
-    std::reverse(str.begin(), str.end());
-    os << str;
-    return os;
-}

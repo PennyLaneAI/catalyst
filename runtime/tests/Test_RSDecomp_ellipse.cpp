@@ -84,4 +84,9 @@ TEST_CASE("Test GridOp class", "[RSDecomp][GridOp]")
     CHECK(state.e1 == state2.e1);
     CHECK(state.e2 == state2.e2);
     CHECK(state1.e1 == grid_op_B.apply_to_ellipse(e1));
+
+    REQUIRE_THROWS_WITH(GridOp({1, 0}, {0, 0}, {0, 0}, {0, 0}, true),
+                        ContainsSubstring("sum of a_0, b_0, c_0, d_0 must be even"));
+    REQUIRE_THROWS_WITH(GridOp({1, 0}, {1, 1}, {0, 0}, {0, 0}, true),
+                        ContainsSubstring("a_1, b_1, c_1, d_1 must have same parity"));
 }

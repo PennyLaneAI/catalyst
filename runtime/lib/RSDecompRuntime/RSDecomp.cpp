@@ -22,8 +22,8 @@
 #include "GridProblems.hpp"
 #include "NormSolver.hpp"
 #include "NormalForms.hpp"
-#include "Rings.hpp"
 #include "RSDecomp.hpp"
+#include "Rings.hpp"
 
 #define MAX_FACTORING_TRIALS 1000
 

@@ -24,7 +24,7 @@
 #include <map>
 
 #include "CliffordData.hpp"
-#include "RossSelinger.hpp"
+#include "RSDecomp.hpp"
 
 using namespace Catch::Matchers;
 using namespace RSDecomp::RossSelinger;

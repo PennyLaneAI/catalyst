@@ -57,9 +57,8 @@ inline int bbox_grid_points(const bbox &bbox)
     double y0_scaled = min(y_scale * current_y0, y_scale * current_y1);
     double y1_scaled = max(y_scale * current_y0, y_scale * current_y1);
 
-    if (x1_scaled - x0_scaled < 1.0 - M_SQRT2) {
-        throw std::runtime_error("Value should be larger than 1 - sqrt(2) for bbox");
-    }
+    RT_FAIL_IF(x1_scaled - x0_scaled < 1.0 - M_SQRT2,
+               "Value should be larger than 1 - sqrt(2) for bbox");
 
     double lower_bound_b = (x0_scaled - y1_scaled) / (2.0 * M_SQRT2);
     double upper_bound_b = (x1_scaled - y0_scaled) / (2.0 * M_SQRT2);
@@ -89,10 +88,8 @@ class one_dim_problem_solution_iterator {
             // Use the constraints x0 <= a + b * sqrt(2) <= x1 to obtain the bounds on a.
             double lower_bound_a = x0_scaled - b * M_SQRT2;
             double upper_bound_a = x1_scaled - b * M_SQRT2;
-
-            if (upper_bound_a - lower_bound_a >= 1.0) {
-                throw std::runtime_error("Scaled interval width for 'a' should be less than one.");
-            }
+            RT_FAIL_IF(upper_bound_a - lower_bound_a >= 1.0,
+                       "Scaled interval width for 'a' should be less than one.");
 
             // Check if the interval [lower_bound_a, upper_bound_a] contains exactly one integer.
             if (std::ceil(lower_bound_a) == std::floor(upper_bound_a)) {
@@ -179,9 +176,8 @@ class one_dim_problem_solution_iterator {
         y0_scaled = min(y_temp0, y_temp1);
         y1_scaled = max(y_temp0, y_temp1);
 
-        if (x1_scaled - x0_scaled < 1.0 - M_SQRT2) {
-            throw std::runtime_error("Scaled interval width should be larger than 1 - sqrt(2).");
-        }
+        RT_FAIL_IF(x1_scaled - x0_scaled < 1.0 - M_SQRT2,
+                   "Scaled interval width should be larger than 1 - sqrt(2).");
 
         // --- SETUP is complete. Now initialize the iteration state ---
 

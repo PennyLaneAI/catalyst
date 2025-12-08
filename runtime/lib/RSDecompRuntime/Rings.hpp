@@ -34,6 +34,7 @@ namespace RSDecomp::Rings {
 //
 // TODO: Extend multiprecision FLOAT usage in Ellipse and GridSolver computation
 // to allow even smaller epsilon values.
+
 using INT_TYPE = boost::multiprecision::cpp_int;
 using FLOAT_TYPE = boost::multiprecision::cpp_dec_float_50;
 
@@ -49,6 +50,11 @@ DyadicMatrix dyadic_matrix_mul(const DyadicMatrix &m1, const DyadicMatrix &m2);
 SO3Matrix so3_matrix_mul(const SO3Matrix &m1, const SO3Matrix &m2);
 ZOmega zomega_from_sqrt_pair(const ZSqrtTwo &alpha, const ZSqrtTwo &beta, const ZOmega &shift);
 
+/**
+ * @struct ZSqrtTwo
+ * @brief Represents an element of the ring Z[√2], i.e., numbers of the form a + b√2
+ *        where a and b are integers.
+ */
 struct ZSqrtTwo {
     INT_TYPE a, b;
 
@@ -63,7 +69,7 @@ struct ZSqrtTwo {
     bool operator==(const ZSqrtTwo &other) const;
     ZSqrtTwo operator%(const ZSqrtTwo &other) const;
 
-    INT_TYPE abs() const;
+    INT_TYPE norm() const;
     ZSqrtTwo adj2() const;
     double to_double() const;
     ZSqrtTwo pow(INT_TYPE exponent) const;
@@ -72,6 +78,11 @@ struct ZSqrtTwo {
     ZOmega to_omega() const;
 };
 
+/**
+ * @struct ZOmega
+ * @brief Represents an element of the ring Z[ω], i.e., numbers of the form
+ *        aω^3 + bω^2 + cω + d where a, b, c, d are integers and ω = e^(iπ/4).
+ */
 struct ZOmega {
     INT_TYPE a, b, c, d;
 
@@ -98,6 +109,18 @@ struct ZOmega {
     std::pair<ZOmega, int> normalize();
 };
 
+/**
+ * @struct DyadicMatrix
+ * @brief Represents the matrices over the ring D[ω], the ring of dyadic fractions adjointed with ω.
+ *
+ * The dyadic fractions D = Z[1/2] are defined as D={a / 2^k | a ∈ Z, k ∈ {N U 0}}.
+ *
+ * ZOmega represents a subset of D[ω], and therefore can be used to construct the elements of a
+ * DyadicMatrix, which is reprsented as:
+ * 1/2^k * [[a, b], [c, d]]
+ * where a, b, c, d ∈ D[ω] and k ∈ Z.
+ *
+ */
 struct DyadicMatrix {
     ZOmega a, b, c, d;
     INT_TYPE k;
@@ -113,6 +136,13 @@ struct DyadicMatrix {
     DyadicMatrix operator*(const ZOmega &scalar) const;
 };
 
+/**
+ * @struct SO3Matrix
+ * @brief Represents the SO(3) matrices over the ring D[√2], the ring of dyadic integers adjointed
+ * with √2.
+ *
+ * ZSqrtTwo represents a subset of this ring, and can be used to construct its elements.
+ */
 struct SO3Matrix {
     DyadicMatrix dyadic_mat{ZOmega(), ZOmega(), ZOmega(), ZOmega(), 0};
     std::array<std::array<ZSqrtTwo, 3>, 3> so3_mat;

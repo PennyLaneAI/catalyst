@@ -159,7 +159,6 @@ TEST_CASE("Test Solve Diophantine Large", "[RSDecomp][NormSolver]")
         {{ZOmega(-26687414, 10541729, 10614512, 40727366), 52},
          {ZOmega(-22067493351, 22078644868, 52098814989, 16270802723), 73}}));
 
-    // Calculate 2^k as INT_TYPE
     INT_TYPE two_pow_k = INT_TYPE(1) << static_cast<unsigned>(k);
     auto xi = ZSqrtTwo(two_pow_k, 0) - u.norm().to_sqrt_two();
     auto result = solve_diophantine(xi);

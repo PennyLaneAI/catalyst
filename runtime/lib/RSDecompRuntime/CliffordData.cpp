@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "CliffordData.hpp"
+#include "Exception.hpp"
 
 namespace RSDecomp::CliffordData {
 const std::map<std::vector<GateType>, SO3Matrix> clifford_group_to_SO3 = {
@@ -165,72 +166,13 @@ std::vector<PPRGateType> HSTtoPPR(const std::vector<GateType> &input_gates)
         }
 
         default:
-            throw std::runtime_error("Unknown GateType encountered.");
+            RT_FAIL("Unknown GateType encountered.");
         }
 
         i += 1; // Skip the single processed gate
     }
 
     return output_gates;
-}
-
-/**
- * HELPER FUNCTION TO BE DELETED
- */
-std::ostream &operator<<(std::ostream &os, GateType type)
-{
-    os << gateTypeToString(type);
-    return os;
-}
-
-/**
- * HELPER FUNCTION TO BE DELETED
- */
-std::string_view gateTypeToString(GateType type)
-{
-    switch (type) {
-    case GateType::I:
-        return "I";
-    case GateType::X:
-        return "X";
-    case GateType::Y:
-        return "Y";
-    case GateType::Z:
-        return "Z";
-    case GateType::H:
-        return "H";
-    case GateType::S:
-        return "S";
-    case GateType::Sd:
-        return "Sd";
-    case GateType::T:
-        return "T";
-    case GateType::HT:
-        return "H, T";
-    case GateType::SHT:
-        return "S, H, T";
-    default:
-        return "Unknown";
-    }
-}
-
-/**
- * HELPER FUNCTION TO BE DELETED
- */
-void printGateVector(const std::vector<GateType> &gates)
-{
-    std::cout << "[";
-    // Loop through the vector, printing each element
-    for (size_t i = 0; i < gates.size(); ++i) {
-        // Use our overloaded << operator
-        std::cout << gates[i];
-
-        // Add a comma and space, but not after the last element
-        if (i < gates.size() - 1) {
-            std::cout << ", ";
-        }
-    }
-    std::cout << "]" << std::endl;
 }
 
 } // namespace RSDecomp::CliffordData
