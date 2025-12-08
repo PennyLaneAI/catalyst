@@ -40,6 +40,7 @@
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
+#include "PauliFrame/IR/PauliFrameDialect.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
@@ -69,6 +70,7 @@ int main(int argc, char **argv)
     registry.insert<catalyst::gradient::GradientDialect>();
     registry.insert<catalyst::mbqc::MBQCDialect>();
     registry.insert<catalyst::mitigation::MitigationDialect>();
+    registry.insert<catalyst::pauli_frame::PauliFrameDialect>();
     registry.insert<catalyst::ion::IonDialect>();
     registry.insert<catalyst::rtio::RTIODialect>();
     registry.insert<mlir::stablehlo::StablehloDialect>();
