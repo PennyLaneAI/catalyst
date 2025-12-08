@@ -20,6 +20,7 @@ import pytest
 
 # pylint: disable=wrong-import-position
 pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 graphviz = pytest.importorskip("graphviz")
 
 if run(["which", "dot"]).returncode != 0:
