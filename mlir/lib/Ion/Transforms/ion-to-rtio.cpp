@@ -108,8 +108,7 @@ auto traceValueWithCallback(Value value, CallbackT &&callback)
                 worklist.push(inQubit);
                 continue;
             }
-            parentOp->emitError("Unsupported parent operation for block argument: ") << value;
-            llvm::reportFatalInternalError("Unsupported block argument");
+            return WalkResult::interrupt();
         }
 
         Operation *defOp = value.getDefiningOp();
@@ -364,7 +363,10 @@ struct ParallelProtocolToRTIOPattern : public OpConversionPattern<ion::ParallelP
                         return WalkResult::advance();
                     });
 
-                assert(index != nullptr && "index must not be null");
+                if (index == nullptr) {
+                    op->emitError("Failed to trace the channel index");
+                    return failure();
+                }
 
                 // update cache
                 for (Value value : chain) {
@@ -473,7 +475,11 @@ struct PulseToRTIOPattern : public OpConversionPattern<ion::PulseOp> {
             }
             return WalkResult::advance();
         });
-        assert(memrefLoadValue != nullptr && "memrefLoadValue must not be null");
+
+        if (memrefLoadValue == nullptr) {
+            op->emitError("Failed to trace the memref load value");
+            return failure();
+        }
 
         Value channel =
             rewriter.create<rtio::RTIOQubitToChannelOp>(loc, channelType, memrefLoadValue);
@@ -657,7 +663,7 @@ struct PropagateEventsPattern : public OpRewritePattern<UnrealizedConversionCast
 
         if (events.empty()) {
             op.emitError("No events found for cast op");
-            llvm::reportFatalInternalError("No events found for cast op");
+            return failure();
         }
 
         // Create a sync event from all collected events
