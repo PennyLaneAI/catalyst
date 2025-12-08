@@ -92,4 +92,3 @@ FailureOr<DictionaryAttr> loadJsonFileAsDict(MLIRContext *ctx, StringRef filePat
 }
 
 } // namespace catalyst
-
