@@ -1,0 +1,12 @@
+diff --git a/mlir/cmake/modules/AddMLIRPython.cmake b/mlir/cmake/modules/AddMLIRPython.cmake
+index f25595116ed..774f6f6d32a 100644
+--- a/mlir/cmake/modules/AddMLIRPython.cmake
++++ b/mlir/cmake/modules/AddMLIRPython.cmake
+@@ -748,6 +748,7 @@ function(add_mlir_python_extension libname extname)
+       ${ARG_SOURCES}
+     )
+   elseif(ARG_PYTHON_BINDINGS_LIBRARY STREQUAL "nanobind")
++    set(NB_USE_SUBMODULE_DEPS ON)
+     nanobind_add_module(${libname}
+       NB_DOMAIN ${MLIR_BINDINGS_PYTHON_NB_DOMAIN}
+       FREE_THREADED
