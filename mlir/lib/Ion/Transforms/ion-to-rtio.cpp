@@ -76,6 +76,9 @@ enum class TraceMode {
 template <TraceMode ModeT, typename CallbackT>
 auto traceValueWithCallback(Value value, CallbackT &&callback)
 {
+    static_assert(std::is_same_v<std::invoke_result_t<CallbackT, Value>, WalkResult>,
+                  "Callback must return WalkResult");
+
     WalkResult walkResult = WalkResult::advance();
     std::queue<Value> worklist;
     worklist.push(value);
@@ -84,14 +87,9 @@ auto traceValueWithCallback(Value value, CallbackT &&callback)
         Value value = worklist.front();
         worklist.pop();
 
-        if constexpr (std::is_same_v<std::invoke_result_t<CallbackT, Value>, WalkResult>) {
-            if (callback(value).wasInterrupted()) {
-                walkResult = WalkResult::interrupt();
-                continue;
-            }
-        }
-        else {
-            callback(value);
+        if (callback(value).wasInterrupted()) {
+            walkResult = WalkResult::interrupt();
+            continue;
         }
 
         if (auto arg = mlir::dyn_cast<BlockArgument>(value)) {
