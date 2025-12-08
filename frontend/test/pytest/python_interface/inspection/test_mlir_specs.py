@@ -13,16 +13,19 @@
 # limitations under the License.
 """Unit test module for the mlir_specs function in the Python Compiler inspection module."""
 
+import pytest
+
+# pylint: disable=wrong-import-position
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
+
 from functools import partial
 
 import jax.numpy as jnp
 import pennylane as qml
-import pytest
 
 import catalyst
 from catalyst.python_interface.inspection import ResourcesResult, mlir_specs
-
-pytestmark = pytest.mark.requires_xdsl
 
 
 def resources_equal(
