@@ -25,6 +25,7 @@ set(TEST_SUITES
     Catalyst
     Ion
     MBQC
+    PauliFrame
     cli
     QEC
     RTIO
