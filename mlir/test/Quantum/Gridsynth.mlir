@@ -16,14 +16,21 @@
 // RUN: quantum-opt --pass-pipeline="builtin.module(gridsynth{epsilon=0.01 ppr-basis=True})" --split-input-file %s | FileCheck %s --check-prefixes=CHECK,PPR
 
 
-// Test the defined decomposition function
+
+// COMMENT: Check that the external helpers are declared in the module
+
+// CHECK-DAG: func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
+// CHECK-DAG: func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
+// CHECK-DAG: func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
+
+// COMMENT: Test the defined decomposition function
 
 // CLIFFORD-LABEL: func.func private @__catalyst_decompose_RZ(
 // CLIFFORD-SAME: [[ARG_QBIT:%.+]]: !quantum.bit, [[ARG_ANGLE:%.+]]: f64)
 // CLIFFORD-DAG:  [[C1:%.+]] = arith.constant 1 : index
 // CLIFFORD-DAG:  [[C0:%.+]] = arith.constant 0 : index
 // CLIFFORD:      [[NUM_GATES:%.+]] = call @rs_decomposition_get_size
-// CLIFFORD:      [[MEM:%.+]] = memref.alloca([[NUM_GATES]]) : memref<?xindex>
+// CLIFFORD:      [[MEM:%.+]] = memref.alloc([[NUM_GATES]]) : memref<?xindex>
 // CLIFFORD:      call @rs_decomposition_get_gates([[MEM]]
 // CLIFFORD:      [[PHASE:%.+]] = call @rs_decomposition_get_phase
 // CLIFFORD:      [[LOOP_RES:%.+]] = scf.for [[IV:%.+]] = [[C0]] to [[NUM_GATES]] step [[C1]] iter_args([[L_QBIT:%.+]] = [[ARG_QBIT]])
@@ -75,11 +82,12 @@
 // CLIFFORD:      }
 // CLIFFORD:      scf.yield [[SWITCH_RES]]
 // CLIFFORD:      }
+// CLIFFORD:      memref.dealloc [[MEM]]
 // CLIFFORD:      return [[LOOP_RES]], [[PHASE]] : !quantum.bit, f64
 
 // PPR-LABEL: func.func private @__catalyst_decompose_RZ_ppr_basis
 // PPR-SAME:  [[ARG_QBIT:%.+]]: !quantum.bit
-// PPR:       memref.alloca
+// PPR:       [[MEM:%.+]] = memref.alloc
 // PPR:       [[PHASE:%.+]] = call @rs_decomposition_get_phase
 // PPR:       [[LOOP_RES:%.+]] = scf.for {{.*}} iter_args([[LOOP_QBIT:%.+]] = [[ARG_QBIT]])
 // PPR:       scf.index_switch
@@ -158,6 +166,7 @@
 // PPR:         [[RES:%.+]] = qec.ppr ["Z"](-8) [[LOOP_QBIT]]
 // PPR:         scf.yield [[RES]]
 // PPR:       }
+// PPR:       memref.dealloc [[MEM]]
 // PPR:       return [[LOOP_RES]], [[PHASE]]
 
 // CHECK-LABEL: @test_rz_decomposition
@@ -177,12 +186,13 @@ func.func @test_rz_decomposition(%arg0: !quantum.bit) -> !quantum.bit {
     return %q_out : !quantum.bit
 }
 
-// Check that the external helpers are declared in the module
+
+// -----
+
+// Check that the external helpers are declared in the module 
 // CHECK-DAG: func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
 // CHECK-DAG: func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
 // CHECK-DAG: func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
-
-// -----
 
 // CHECK-LABEL: @test_phaseshift_decomposition
 // CHECK-SAME: ([[Q_IN:%.+]]: !quantum.bit, [[PHI:%.+]]: f64)
@@ -202,10 +212,6 @@ func.func @test_phaseshift_decomposition(%arg0: !quantum.bit, %phi: f64) -> !qua
     return %q_out : !quantum.bit
 }
 
-// Check that the external helpers are declared in the module 
-// CHECK-DAG: func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
-// CHECK-DAG: func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
-// CHECK-DAG: func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
 
 // -----
 

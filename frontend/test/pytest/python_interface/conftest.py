@@ -18,9 +18,6 @@ from io import StringIO
 
 import pytest
 
-from catalyst.python_interface import Compiler, QuantumParser
-from catalyst.python_interface.conversion import parse_generic_to_xdsl_module
-
 deps_available = True
 
 try:
@@ -32,6 +29,9 @@ try:
     from xdsl.dialects import test
     from xdsl.passes import PassPipeline
     from xdsl.printer import Printer
+
+    from catalyst.python_interface import Compiler, QuantumParser
+    from catalyst.python_interface.conversion import parse_generic_to_xdsl_module
 
 except (ImportError, ModuleNotFoundError):
     deps_available = False

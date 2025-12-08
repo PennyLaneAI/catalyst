@@ -51,7 +51,6 @@ class PassDispatcher(TransformDispatcher):
 
 def compiler_transform(module_pass: ModulePass) -> PassDispatcher:
     """Wrapper function to register xDSL passes to use with QJIT-ed workflows."""
-
     dispatcher = PassDispatcher(module_pass)
 
     # Registration to map from plxpr primitive to pass

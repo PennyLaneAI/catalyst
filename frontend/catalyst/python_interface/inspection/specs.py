@@ -38,18 +38,20 @@ def mlir_specs(
 
     Args:
         qnode (QNode): The (QJIT'd) qnode to get the specs for
-        level (int | tuple[int] | list[int] | "all"): The level of the MLIR pass to get the specs for
+        level (int | tuple[int] | list[int] | "all"): The MLIR pass level to get the specs for
         *args: Positional arguments to pass to the QNode
         **kwargs: Keyword arguments to pass to the QNode
 
     Returns:
-        ResourcesResult | dict[str, ResourcesResult]: The resources for the circuit at the specified level
+        ResourcesResult | dict[str, ResourcesResult]: The resources for the circuit at the
+          specified level
     """
     cache: dict[int, tuple[ResourcesResult, str]] = {}
 
     if args or kwargs:
         warnings.warn(
-            "The `specs` function does not yet support dynamic arguments, so the results may not reflect information provided by the arguments.",
+            "The `specs` function does not yet support dynamic arguments, "
+            "so the results may not reflect information provided by the arguments.",
             UserWarning,
         )
 
@@ -65,11 +67,11 @@ def mlir_specs(
         """Callback function for gathering circuit specs."""
 
         pass_instance = previous_pass if previous_pass else next_pass
-        ops = specs_collect(module)
+        result = specs_collect(module)
 
         pass_name = pass_instance.name if hasattr(pass_instance, "name") else pass_instance
         cache[pass_level] = (
-            ops,
+            result,
             pass_name if pass_level else "Before MLIR Passes",
         )
 

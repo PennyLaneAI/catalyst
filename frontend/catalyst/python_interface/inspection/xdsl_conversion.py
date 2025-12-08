@@ -341,11 +341,12 @@ def xdsl_to_qml_op(op) -> Operator:
     return _apply_adjoint_and_ctrls(gate, op)
 
 
-def xdsl_to_qml_op_type(op, adjoint_mode: bool) -> str:
-    """Convert an xDSL operation into a string representing a PennyLane class.
+def xdsl_to_qml_op_name(op, adjoint_mode: bool) -> str:
+    """Convert an xDSL operation into a string representing a PennyLane Operator.
 
     Args:
         op: The xDSL operation to convert.
+        adjoint_mode: If True, treat all non-adjoint gates as adjoint, and vice versa.
 
     Returns:
         A string representing the PennyLane operator.
@@ -360,8 +361,7 @@ def xdsl_to_qml_op_type(op, adjoint_mode: bool) -> str:
     }
 
     if op.name == "quantum.custom":
-        gate_cls = resolve_gate(op.properties.get("gate_name").data)
-        gate_name = gate_cls.__name__
+        gate_name = op.properties.get("gate_name").data
     elif op.name in name_map:
         gate_name = name_map[op.name]
     else:
@@ -424,11 +424,13 @@ def xdsl_to_qml_measurement(op, *args, **kwargs) -> MeasurementProcess | Operato
             raise NotImplementedError(f"Unsupported measurement/observable: {op.name}")
 
 
-def xdsl_to_qml_measurement_type(op, obs_op=None) -> str:
-    """Convert any xDSL measurement/observable operation into a string representing a PennyLane class.
+def xdsl_to_qml_measurement_name(op, obs_op=None) -> str:
+    """Convert any xDSL measurement/observable operation into a string representing a PennyLane
+    measurement.
 
     Args:
         op: The xDSL measurement/observable operation to convert.
+        obs_op: An optional string representing the observable operation.
 
     Returns:
         A string representing the PennyLane measurement.
@@ -447,20 +449,18 @@ def xdsl_to_qml_measurement_type(op, obs_op=None) -> str:
             gate_name = f"{len(op.qubits)} wires"
 
     elif op.name == "quantum.hamiltonian":
-        ops_list = [xdsl_to_qml_measurement_type(term.owner) for term in op.terms]
+        ops_list = [xdsl_to_qml_measurement_name(term.owner) for term in op.terms]
         gate_name = f"Hamiltonian({', '.join(ops_list)})"
 
     elif op.name == "quantum.tensor":
-        ops_list = [xdsl_to_qml_measurement_type(operand.owner) for operand in op.operands]
+        ops_list = [xdsl_to_qml_measurement_name(operand.owner) for operand in op.operands]
         gate_name = " @ ".join(ops_list)
 
     elif op.name == "quantum.namedobs":
-        gate_cls = resolve_gate(op.type.data.value)
-        gate_name = gate_cls.__name__
+        gate_name = op.type.data.value
 
     elif op.name in from_str_to_PL_measurement:
-        gate_cls = resolve_measurement(op.name)
-        gate_name = gate_cls.__name__
+        gate_name = op.name.split(".")[-1]
 
     else:
         raise NotImplementedError(f"Unsupported measurement/observable: {op.name}")

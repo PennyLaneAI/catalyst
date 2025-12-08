@@ -42,6 +42,7 @@ from pennylane.measurements import (
     ExpectationMP,
     MeasurementProcess,
     ProbabilityMP,
+    SampleMP,
     StateMP,
     VarianceMP,
 )
@@ -713,7 +714,8 @@ def lower_jaxpr_to_mlir(jaxpr, func_name, arg_names):
     # JAX internally calls trace_to_jaxpr_dynamic2 during lowering of nested @jit primitives
     # (e.g., in jax.scipy.linalg.expm and jax.scipy.linalg.solve), which triggers two bugs:
     # 1. make_eqn signature changed to include out_tracers parameter
-    # 2. pjit_staging_rule creates JaxprEqn instead of TracingEqn (AssertionError at partial_eval.py:1790)
+    # 2. pjit_staging_rule creates JaxprEqn instead of TracingEqn
+    #   (AssertionError at partial_eval.py:1790)
     with transient_jax_config(
         {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
     ), Patcher(
@@ -1077,9 +1079,7 @@ def trace_quantum_measurements(
         if isinstance(output, MeasurementProcess):
 
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
-            if shots_obj.has_partitioned_shots and not isinstance(
-                output, qml.measurements.SampleMP
-            ):
+            if shots_obj.has_partitioned_shots and not isinstance(output, SampleMP):
                 raise NotImplementedError(
                     f"Measurement {type(output).__name__} does not support shot-vectors. "
                     "Use qml.sample() instead."
@@ -1108,7 +1108,7 @@ def trace_quantum_measurements(
                     "(expval, var, probs, counts) on mid circuit measurements."
                 )
 
-            if isinstance(output, qml.measurements.SampleMP):
+            if isinstance(output, SampleMP):
 
                 if shots is None:  # needed for old device API only
                     raise ValueError(

@@ -23,8 +23,10 @@ from collections import defaultdict
 from functools import partial, singledispatch
 
 import xdsl
-from xdsl.dialects import func
+from xdsl.dialects.builtin import ModuleOp
+from xdsl.dialects.func import CallOp, FuncOp
 from xdsl.dialects.scf import ForOp, IfOp, IndexSwitchOp, WhileOp
+from xdsl.ir import Region
 
 from catalyst.python_interface.dialects.catalyst import CallbackOp
 from catalyst.python_interface.dialects.mbqc import GraphStatePrepOp, MeasureInBasisOp
@@ -54,7 +56,11 @@ from catalyst.python_interface.dialects.quantum import (
     StateOp,
     VarianceOp,
 )
-from catalyst.python_interface.inspection.xdsl_conversion import *
+from catalyst.python_interface.inspection.xdsl_conversion import (
+    count_static_loop_iterations,
+    xdsl_to_qml_measurement_name,
+    xdsl_to_qml_op_name,
+)
 
 # A list of all custom dialect names used by Catalyst for MLIR ops
 # Note that this isn't a complete list, just one where specs *must* support every op
@@ -114,7 +120,7 @@ class ResourcesResult:
 
         self.classical_instructions: dict[str, int] = defaultdict(int)
         self.function_calls: dict[str, int] = defaultdict(int)
-        self._unresolved_function_calls: dict[str, int] = defaultdict(int)
+        self.unresolved_function_calls: dict[str, int] = defaultdict(int)
 
         self.device_name = None
         self.num_allocs = 0  # The total number of distinct qubits allocated in this region
@@ -122,12 +128,15 @@ class ResourcesResult:
     def merge_with(self, other: "ResourcesResult", method: str = "sum") -> None:
         """Merge another ResourcesResult into this one."""
 
+        if not isinstance(other, ResourcesResult):
+            raise ValueError("Can only merge with another ResourcesResult.")
+
         if method == "max":
             merge_func = max
         elif method == "min":
             merge_func = min
         elif method == "sum":
-            merge_func = lambda a, b: a + b
+            merge_func = lambda a, b: a + b  # pylint: disable=unnecessary-lambda-assignment
         else:
             raise ValueError(f"Unsupported merge method: '{method}'. Use 'sum', 'max', or 'min'.")
 
@@ -141,9 +150,9 @@ class ResourcesResult:
             self.classical_instructions[name] = merge_func(self.classical_instructions[name], count)
         for name, count in other.function_calls.items():
             self.function_calls[name] = merge_func(self.function_calls[name], count)
-        for name, count in other._unresolved_function_calls.items():
-            self._unresolved_function_calls[name] = merge_func(
-                self._unresolved_function_calls[name], count
+        for name, count in other.unresolved_function_calls.items():
+            self.unresolved_function_calls[name] = merge_func(
+                self.unresolved_function_calls[name], count
             )
 
         self.device_name = self.device_name or other.device_name
@@ -161,8 +170,8 @@ class ResourcesResult:
             self.classical_instructions[name] *= scalar
         for name in self.function_calls:
             self.function_calls[name] *= scalar
-        for name in self._unresolved_function_calls:
-            self._unresolved_function_calls[name] *= scalar
+        for name in self.unresolved_function_calls:
+            self.unresolved_function_calls[name] *= scalar
 
         # This is the number of allocations WITHIN this region, should be scaled
         self.num_allocs *= scalar
@@ -189,6 +198,7 @@ class ResourcesResult:
 def handle_resource(
     xdsl_op: xdsl.ir.Operation,
 ) -> tuple[ResourceType, str] | tuple[None, None]:
+    """Handle an xDSL operation and categorize it into a resource type."""
     # Default handler for unsupported xDSL op types
     return ResourceType.OTHER, xdsl_op.name
 
@@ -200,7 +210,7 @@ def handle_resource(
 
 @handle_resource.register
 def _(xdsl_op: MeasureOp) -> tuple[ResourceType, str]:
-    return ResourceType.MEASUREMENT, xdsl_to_qml_measurement_type(xdsl_op)
+    return ResourceType.MEASUREMENT, xdsl_to_qml_measurement_name(xdsl_op)
 
 
 @handle_resource.register
@@ -208,8 +218,8 @@ def _(
     xdsl_op: CountsOp | ExpvalOp | ProbsOp | SampleOp | StateOp | VarianceOp,
 ) -> tuple[ResourceType, str]:
     obs_op = xdsl_op.obs.owner
-    return ResourceType.MEASUREMENT, xdsl_to_qml_measurement_type(
-        xdsl_op, xdsl_to_qml_measurement_type(obs_op)
+    return ResourceType.MEASUREMENT, xdsl_to_qml_measurement_name(
+        xdsl_op, xdsl_to_qml_measurement_name(obs_op)
     )
 
 
@@ -262,7 +272,7 @@ def _(_: PPMeasurementOp | SelectPPMeasurementOp) -> tuple[ResourceType, str]:
 
 @handle_resource.register
 def _(
-    xdsl_op: func.CallOp,
+    xdsl_op: CallOp,
 ) -> tuple[ResourceType, str]:
     # If these types are matched, parse them with the extra specs handler
     return ResourceType.FUNC_CALL, xdsl_op.callee.string_value()
@@ -283,6 +293,7 @@ def _(
 
 @singledispatch
 def handle_metadata(xdsl_op: xdsl.ir.Operation, resources: ResourcesResult) -> None:
+    """Handle a circuit metadata xDSL operation"""
     raise NotImplementedError(f"Unsupported xDSL op: {xdsl_op}")
 
 
@@ -316,8 +327,8 @@ def _resolve_function_calls(
     """
     resources = func_to_resources[func]
 
-    for called_func in list(resources._unresolved_function_calls.keys()):
-        count = resources._unresolved_function_calls.pop(called_func)
+    for called_func in list(resources.unresolved_function_calls.keys()):
+        count = resources.unresolved_function_calls.pop(called_func)
 
         if called_func not in func_to_resources:
             # External function, cannot resolve
@@ -334,8 +345,67 @@ def _resolve_function_calls(
     return resources
 
 
+def _collect_operation(
+    resources: ResourcesResult, op: xdsl.ir.Operation, adjoint_mode: bool
+) -> None:
+    """Categorize and store a given xDSL operation within a ResourcesResult."""
+
+    resource_type, resource = handle_resource(op)
+
+    match resource_type:
+        case ResourceType.GATE:
+            n_qubits = 0
+            if hasattr(op, "in_qubits"):
+                n_qubits += len(op.in_qubits)
+            if hasattr(op, "in_ctrl_qubits"):
+                n_qubits += len(op.in_ctrl_qubits)
+
+            resource = xdsl_to_qml_op_name(op, adjoint_mode=adjoint_mode)
+
+            resources.operations[resource][n_qubits] += 1
+
+        case ResourceType.MEASUREMENT:
+            resources.measurements[resource] += 1
+
+        case ResourceType.QEC:
+            n_qubits = len(op.in_qubits) if hasattr(op, "in_qubits") else 0
+            resources.operations[resource][n_qubits] += 1
+
+        case ResourceType.METADATA:
+            # Parse out extra circuit information
+            handle_metadata(op, resources)
+
+        case ResourceType.OTHER:
+            if op.name in _SKIPPED_OPS:
+                return
+
+            if op.dialect_name() in _CUSTOM_DIALECT_NAMES:
+                # Unknown custom dialect op, warn the user
+                warnings.warn(
+                    f"Specs encountered an unknown operation '{op.name}' from the "
+                    f"'{op.dialect_name()}' dialect. Some resource data may be missing.",
+                    UserWarning,
+                )
+                return
+
+            resources.classical_instructions[resource] += 1
+
+        case ResourceType.FUNC_CALL:
+            resources.function_calls[resource] += 1
+            resources.unresolved_function_calls[resource] += 1
+
+        case _:
+            # Should be unreachable
+            raise NotImplementedError(
+                f"Unsupported resource type {resource_type} for resource {resource}."
+            )
+
+
 def _collect_region(
-    region, loop_warning=False, cond_warning=False, adjoint_mode=False
+    region: Region,
+    loop_warning: bool = False,
+    cond_warning: bool = False,
+    adjoint_mode: bool = False,
 ) -> ResourcesResult:
     """Collect PennyLane ops and measurements from a region."""
 
@@ -401,8 +471,8 @@ def _collect_region(
         if isinstance(op, IfOp):
             if not cond_warning:
                 warnings.warn(
-                    "Specs was unable to determine the branch of a conditional or switch statement. "
-                    "The results will take the maximum resources across all possible branches.",
+                    "Specs was unable to determine the branch of a conditional or switch statement."
+                    " The results will take the maximum resources across all possible branches.",
                     UserWarning,
                 )
                 cond_warning = True
@@ -429,8 +499,8 @@ def _collect_region(
         if isinstance(op, IndexSwitchOp):
             if not cond_warning:
                 warnings.warn(
-                    "Specs was unable to determine the branch of a conditional or switch statement. "
-                    "The results will take the maximum resources across all possible branches.",
+                    "Specs was unable to determine the branch of a conditional or switch statement."
+                    " The results will take the maximum resources across all possible branches.",
                     UserWarning,
                 )
                 cond_warning = True
@@ -442,10 +512,10 @@ def _collect_region(
                 adjoint_mode=adjoint_mode,
             )
 
-            for region in op.case_regions[1:]:
+            for inner_region in op.case_regions[1:]:
                 used_resources.merge_with(
                     _collect_region(
-                        region,
+                        inner_region,
                         loop_warning=loop_warning,
                         cond_warning=cond_warning,
                         adjoint_mode=adjoint_mode,
@@ -456,60 +526,12 @@ def _collect_region(
             resources.merge_with(used_resources)
             continue
 
-        resource_type, resource = handle_resource(op)
-
-        match resource_type:
-            case ResourceType.GATE:
-                n_qubits = 0
-                if hasattr(op, "in_qubits"):
-                    n_qubits += len(op.in_qubits)
-                if hasattr(op, "in_ctrl_qubits"):
-                    n_qubits += len(op.in_ctrl_qubits)
-
-                resource = xdsl_to_qml_op_type(op, adjoint_mode=adjoint_mode)
-
-                resources.operations[resource][n_qubits] += 1
-
-            case ResourceType.MEASUREMENT:
-                resources.measurements[resource] += 1
-
-            case ResourceType.QEC:
-                n_qubits = len(op.in_qubits) if hasattr(op, "in_qubits") else 0
-                resources.operations[resource][n_qubits] += 1
-
-            case ResourceType.METADATA:
-                # Parse out extra circuit information
-                handle_metadata(op, resources)
-
-            case ResourceType.OTHER:
-                if op.name in _SKIPPED_OPS:
-                    continue
-
-                if op.dialect_name() in _CUSTOM_DIALECT_NAMES:
-                    # Unknown custom dialect op, warn the user
-                    warnings.warn(
-                        f"Specs encountered an unknown operation '{op.name}' from the "
-                        f"'{op.dialect_name()}' dialect. Some resource data may be missing.",
-                        UserWarning,
-                    )
-                    continue
-
-                resources.classical_instructions[resource] += 1
-
-            case ResourceType.FUNC_CALL:
-                resources.function_calls[resource] += 1
-                resources._unresolved_function_calls[resource] += 1
-
-            case _:
-                # Should be unreachable
-                raise NotImplementedError(
-                    f"Unsupported resource type {resource_type} for resource {resource}."
-                )
+        _collect_operation(resources, op, adjoint_mode=adjoint_mode)
 
     return resources
 
 
-def specs_collect(module) -> ResourcesResult:
+def specs_collect(module: ModuleOp) -> ResourcesResult:
     """Collect PennyLane resources from the module."""
 
     func_to_resources = {}
@@ -522,14 +544,14 @@ def specs_collect(module) -> ResourcesResult:
             # Skip callback ops, which are not part of the quantum circuit itself
             continue
 
-        if not isinstance(func_op, func.FuncOp):
+        if not isinstance(func_op, FuncOp):
             raise ValueError("Expected FuncOp in module body.")
 
         if func_op.is_declaration:
             if not func_decl_warning:
                 warnings.warn(
-                    f"Specs encountered an external function declaration, and could not analyze its contents. "
-                    "Some resource data may be missing.",
+                    "Specs encountered an external function declaration, and could not analyze "
+                    "its contents. Some resource data may be missing.",
                     UserWarning,
                 )
                 func_decl_warning = True

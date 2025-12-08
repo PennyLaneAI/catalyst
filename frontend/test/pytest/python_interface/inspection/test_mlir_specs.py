@@ -13,47 +13,41 @@
 # limitations under the License.
 """Unit test module for the mlir_specs function in the Python Compiler inspection module."""
 
-
 import pytest
 
-pytestmark = pytest.mark.external
-
-pytest.importorskip("xdsl")
-pytest.importorskip("catalyst")
-pytest.importorskip("jax")
-
 # pylint: disable=wrong-import-position
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
+
+from functools import partial
+
 import jax.numpy as jnp
 import pennylane as qml
 
-# pylint: disable=wrong-import-position
 import catalyst
-from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface.inspection import ResourcesResult, mlir_specs
-
-# pylint: disable=implicit-str-concat, unnecessary-lambda
 
 
 def resources_equal(
     actual: ResourcesResult, expected: ResourcesResult, return_only: bool = False
 ) -> bool:
+    """
+    Check if two ResourcesResult objects are equal.
+    Ignores certain attributes (e.g. classical_instructions)
+    """
     try:
 
         # actual.device_name == expected.device_name TODO: Don't worry about this one for now
         assert actual.num_allocs == expected.num_allocs
-        assert len(actual.operations) == len(expected.operations)
-        assert len(actual.measurements) == len(expected.measurements)
 
-        for name, val in expected.operations.items():
-            assert name in actual.operations
-            for size, count in val.items():
-                assert size in actual.operations[name]
-                assert actual.operations[name][size] == count
+        assert actual.operations == expected.operations
+        assert actual.measurements == expected.measurements
 
-        for name, count in expected.measurements.items():
-            assert name in actual.measurements
-            assert actual.measurements[name] == count
+        # There should be no remaining unresolved function calls
+        assert sum(actual.unresolved_function_calls.values()) == 0
 
+        # Only check that expected function calls are a subset of actual function calls
+        #   Other random helper functions may be inserted by the compiler
         for name, count in expected.function_calls.items():
             assert name in actual.function_calls
             assert actual.function_calls[name] == count
@@ -73,6 +67,9 @@ def make_static_resources(
     device_name: str | None = None,
     num_allocs: int = 0,
 ) -> ResourcesResult:
+    """
+    Create a ResourcesResult object for testing against
+    """
     res = ResourcesResult()
     res.operations = operations or {}
     res.measurements = measurements or {}
@@ -82,10 +79,9 @@ def make_static_resources(
     return res
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestMLIRSpecs:
     """Unit tests for the mlir_specs function in the Python Compiler inspection module."""
-
-    use_plxpr = False
 
     @pytest.fixture
     def simple_circuit(self):
@@ -109,7 +105,7 @@ class TestMLIRSpecs:
     def test_invalid_level_type(self, simple_circuit, level):
         """Test that requesting an invalid level type raises an error."""
 
-        simple_circuit = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(simple_circuit)
+        simple_circuit = qml.qjit(simple_circuit)
 
         with pytest.raises(
             ValueError, match="The `level` argument must be an int, a tuple/list of ints, or 'all'."
@@ -120,7 +116,7 @@ class TestMLIRSpecs:
     def test_invalid_int_level(self, simple_circuit, level):
         """Test that requesting an invalid level raises an error."""
 
-        simple_circuit = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(simple_circuit)
+        simple_circuit = qml.qjit(simple_circuit)
 
         with pytest.raises(
             ValueError, match=f"Requested specs level {level} not found in MLIR pass list."
@@ -143,7 +139,7 @@ class TestMLIRSpecs:
     def test_no_passes(self, simple_circuit, level, expected):
         """Test that if no passes are applied, the circuit resources are the original amount."""
 
-        simple_circuit = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(simple_circuit)
+        simple_circuit = qml.qjit(simple_circuit)
         res = mlir_specs(simple_circuit, level=level)
         assert resources_equal(res, expected)
 
@@ -179,21 +175,21 @@ class TestMLIRSpecs:
     def test_basic_passes(self, simple_circuit, level, expected):
         """Test that when passes are applied, the circuit resources are updated accordingly."""
 
-        if self.use_plxpr:
+        if qml.capture.enabled():
             simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
             simple_circuit = qml.transforms.merge_rotations(simple_circuit)
         else:
             simple_circuit = catalyst.passes.cancel_inverses(simple_circuit)
             simple_circuit = catalyst.passes.merge_rotations(simple_circuit)
 
-        simple_circuit = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(simple_circuit)
+        simple_circuit = qml.qjit(simple_circuit)
         res = mlir_specs(simple_circuit, level=level)
         assert resources_equal(res, expected)
 
     def test_basic_passes_level_all(self, simple_circuit):
         """Test that when passes are applied, the circuit resources are updated accordingly."""
 
-        if self.use_plxpr:
+        if qml.capture.enabled():
             simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
             simple_circuit = qml.transforms.merge_rotations(simple_circuit)
         else:
@@ -218,7 +214,7 @@ class TestMLIRSpecs:
             ),
         }
 
-        simple_circuit = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(simple_circuit)
+        simple_circuit = qml.qjit(simple_circuit)
         res = mlir_specs(simple_circuit, level="all")
 
         assert isinstance(res, dict)
@@ -231,7 +227,7 @@ class TestMLIRSpecs:
     def test_basic_passes_multi_level(self, simple_circuit):
         """Test that when passes are applied, the circuit resources are updated accordingly."""
 
-        if self.use_plxpr:
+        if qml.capture.enabled():
             simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
             simple_circuit = qml.transforms.merge_rotations(simple_circuit)
         else:
@@ -251,7 +247,7 @@ class TestMLIRSpecs:
             ),
         }
 
-        simple_circuit = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(simple_circuit)
+        simple_circuit = qml.qjit(simple_circuit)
         res = mlir_specs(simple_circuit, level=[0, 2])
 
         assert isinstance(res, dict)
@@ -304,7 +300,7 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        circ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()], autograph=autograph)(circ)
+        circ = qml.qjit(autograph=autograph)(circ)
         res = mlir_specs(circ, level=0)
         assert resources_equal(res, expected)
 
@@ -344,7 +340,7 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        circ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()], autograph=True)(circ)
+        circ = qml.qjit(autograph=True)(circ)
 
         with pytest.warns(
             UserWarning,
@@ -397,7 +393,7 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        circ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()], autograph=True)(circ)
+        circ = qml.qjit(autograph=True)(circ)
 
         with pytest.warns(
             UserWarning,
@@ -442,7 +438,7 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        circ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()], autograph=True)(circ)
+        circ = qml.qjit(autograph=True)(circ)
 
         with pytest.warns(
             UserWarning,
@@ -465,7 +461,7 @@ class TestMLIRSpecs:
             return qml.expval(qml.PauliZ(0))
 
         circ = qml.transforms.combine_global_phases(circ)
-        circ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(circ)
+        circ = qml.qjit(circ)
 
         expected = make_static_resources(
             operations={"GlobalPhase": {0: 1}},
@@ -510,7 +506,7 @@ class TestMLIRSpecs:
             qml.adjoint(subroutine)()
             return qml.probs()
 
-        circ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(circ)
+        circ = qml.qjit(circ)
 
         expected = make_static_resources(
             operations={
@@ -535,14 +531,15 @@ class TestMLIRSpecs:
 
             coeffs = [0.2, -0.543]
             obs = [qml.X(0) @ qml.Z(1), qml.Z(i) @ qml.Hadamard(2)]
-            ham = qml.ops.LinearCombination(coeffs, obs)
+            ham1 = qml.Hamiltonian([1.0], [qml.Z(0) @ qml.Z(1)])
+            ham2 = qml.ops.LinearCombination(coeffs, obs)
 
-            return qml.expval(ham), qml.expval(qml.Z(i))
+            return qml.expval(ham1), qml.expval(ham2)
 
         expected = make_static_resources(
             operations={},
             measurements={
-                "expval(PauliZ)": 1,
+                "expval(Hamiltonian(PauliZ @ PauliZ))": 1,
                 "expval(Hamiltonian(PauliX @ PauliZ, PauliZ @ Hadamard))": 1,
             },
             num_allocs=2,
@@ -554,7 +551,7 @@ class TestMLIRSpecs:
     def test_ppr(self):
         """Test that PPRs are handled correctly."""
 
-        if self.use_plxpr:
+        if qml.capture.enabled():
             pytest.xfail("plxpr currently incompatible to_ppr pass")
 
         pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
@@ -575,15 +572,60 @@ class TestMLIRSpecs:
         res = mlir_specs(circ, level=1, args=(0,))
         assert resources_equal(res, expected)
 
+    def test_subroutine(self):
+        """Test that subroutines are handled correctly."""
+        if not qml.capture.enabled():
+            pytest.xfail("Subroutine requires plxpr to be enabled.")
 
-@pytest.mark.usefixtures("use_capture")
-class TestMLIRSpecsWithPLXPR(TestMLIRSpecs):
-    """Unit tests for the mlir_specs function in the Python Compiler inspection module with plxpr enabled."""
+        @catalyst.jax_primitives.subroutine
+        def extra_function():
+            qml.Hadamard(wires=0)
 
-    use_plxpr = True
+        @qml.qjit(autograph=True)
+        @qml.qnode(qml.device("null.qubit", wires=2))
+        def circ():
+            extra_function()
+            return qml.probs()
+
+        expected = make_static_resources(
+            operations={"Hadamard": {1: 1}},
+            measurements={"probs(all wires)": 1},
+            num_allocs=2,
+            function_calls={"extra_function": 1},
+        )
+
+        res = mlir_specs(circ, level=0)
+        assert resources_equal(res, expected)
+
+    @pytest.mark.usefixtures("use_capture_dgraph")
+    def test_graph_decomp(self):
+        """Test that graph decomposition is handled correctly."""
+
+        @qml.register_resources({qml.H: 2, qml.CZ: 1})
+        def my_cnot(wires):
+            qml.H(wires=wires[1])
+            qml.CZ(wires=wires)
+            qml.H(wires=wires[1])
+
+        @qml.qjit
+        @partial(
+            qml.transforms.decompose,
+            gate_set={"H", "CZ", "GlobalPhase"},
+            alt_decomps={qml.CNOT: [my_cnot]},
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit():
+            qml.H(0)
+            qml.CNOT(wires=[0, 1])
+            return qml.state()
+
+        expected_resources = {"CZ": {2: 1}, "Hadamard": {1: 3}}
+        resources = mlir_specs(circuit, level=1)
+        assert resources.operations == expected_resources
 
 
-# TODO: In the future, it would be good to add unit tests for specs_collector instead of just integration tests
+# TODO: In the future, it would be good to add unit tests for specs_collector instead of just
+#   integration tests
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
