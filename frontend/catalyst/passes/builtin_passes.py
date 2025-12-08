@@ -538,10 +538,9 @@ def ions_decomposition(qnode):  # pragma: nocover
 
 
 def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
-    """
-    Specify that the ``--gridsynth`` MLIR compiler pass to discretize
-    single-qubit RZ and PhaseShift gates into sequences of
-    Clifford+T gates using the Ross-Selinger Gridsynth algorithm.
+    R"""
+    A quantnum compilation pass to discretize
+    single-qubit RZ and PhaseShift gates into the Clifford+T basis or the PPR basis using the Ross-Selinger Gridsynth algorithm.
     Reference: https://arxiv.org/abs/1403.2975
 
 
@@ -551,11 +550,17 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
 
     Args:
         fn (QNode): the QNode to apply the gridsynth compiler pass to
-        epsilon (float): the maximum error tolerance for the per-gate discretization
-        ppr_basis (bool): whether to decompose directly to Pauli Product Rotations (PPRs) in QEC dialect
+        epsilon (float): The maximum permissible operator norm error per rotation gate. Defaults to ``1e-4``.
+        ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in QEC dialect. Defaults to ``False``
 
     Returns:
         :class:`QNode <pennylane.QNode>`
+
+    .. note::
+
+        The circuit generated from this pass with ``ppr_basis=True`` are currently not executable on any backend.
+        This pass is only for analysis with the ``null.qubit`` device and potential future execution
+        when a suitable backend is available.
 
     **Example**
 
@@ -564,36 +569,56 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
 
     .. code-block:: python
 
+        import pennylane as qml
+        from catalyst import qjit
         from catalyst.passes import gridsynth
 
-        dev = qml.device("lightning.qubit", wires=1)
+        pipe = [("pipe", ["quantum-compilation-stage"])]
 
-        @qjit(keep_intermediate=True)
+
+        @qjit(pipelines=pipe, target="mlir")
         @gridsynth
-        @qml.qnode(dev)
-        def circuit(x: float):
+        @qml.qnode(qml.device("null.qubit", wires=1))
+        def circuit():
             qml.RZ(x, wires=0)
-            return qml.expval(qml.PauliZ(0))
+            return qml.probs()
 
-    Example MLIR Representation:
+        >>> print(circuit.mlir_opt)
 
-    .. code-block:: mlir
-
-        module @circuit {
+        . . .
+        func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
+        func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
+        func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
+        func.func private @__catalyst_decompose_RZ_0(%arg0: !quantum.bit, %arg1: f64) -> (!quantum.bit, f64) {
             . . .
-            func.func private @rs_decomposition_get_phase_0(f64, f64, i1) -> f64
-            func.func private @rs_decomposition_get_gates_0(memref<?xindex>, f64, f64, i1)
-            func.func private @rs_decomposition_get_size_0(f64, f64, i1) -> index
-            func.func private @__catalyst_decompose_RZ_0(%arg0: !quantum.reg, %arg1: i64, %arg2: f64) -> (!quantum.reg, f64) {
-                . . .
-            }
-
-              func.func public @circuit_0(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode} {
-                . . .
-                %3:2 = call @__catalyst_decompose_RZ_0(%2, %c0_i64, %extracted) : (!quantum.reg, i64, f64) -> (!quantum.reg, f64)
+            %2 = scf.for %arg2 = %c0 to %0 step %c1 iter_args(%arg3 = %arg0) -> (!quantum.bit) {
+                %3 = memref.load %alloc[%arg2] : memref<?xindex>
+                %4 = scf.index_switch %3 -> !quantum.bit
+                case 0 {
+                    %out_qubits = quantum.custom "T"() %arg3 : !quantum.bit
+                    scf.yield %out_qubits : !quantum.bit
+                }
+                case 1 {
+                    %out_qubits = quantum.custom "Hadamard"() %arg3 : !quantum.bit
+                    %out_qubits_0 = quantum.custom "T"() %out_qubits : !quantum.bit
+                    scf.yield %out_qubits_0 : !quantum.bit
+                }
+                case 2 {
+                    %out_qubits = quantum.custom "S"() %arg3 : !quantum.bit
+                    %out_qubits_0 = quantum.custom "Hadamard"() %out_qubits : !quantum.bit
+                    %out_qubits_1 = quantum.custom "T"() %out_qubits_0 : !quantum.bit
+                    scf.yield %out_qubits_1 : !quantum.bit
+                }
                 . . .
             }
         }
+
+        func.func public @circuit_0(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode} {
+            . . .
+            %2:2 = call @__catalyst_decompose_RZ_0(%1, %extracted) : (!quantum.bit, f64) -> (!quantum.bit, f64)
+            . . .
+        }
+
 
 
     """
@@ -601,7 +626,7 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
         return functools.partial(gridsynth, epsilon=epsilon, ppr_basis=ppr_basis)
 
     gridsynth_pass = {"gridsynth": {"epsilon": epsilon, "ppr_basis": ppr_basis}}
-    return transform(pass_name="gridsynth")(qnode, gridsynth_pass)
+    return PassPipelineWrapper(qnode, gridsynth_pass)
 
 
 def to_ppr(qnode):
