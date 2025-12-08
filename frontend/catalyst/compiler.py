@@ -384,13 +384,13 @@ def to_mlir_opt(
     *args, stdin=None, options: Optional[CompileOptions] = None, using_python_compiler=False
 ):
     """echo ${input} | catalyst --tool=opt *args *opts -"""
-    # Check if we need to use Python compiler for xDSL passes
+    # Check if we need to use the Python interface for xDSL passes
     if using_python_compiler:
-        # Use Python compiler path for xDSL passes
+        # Use the Python interface path for xDSL passes
         # pylint: disable-next=import-outside-toplevel
-        from pennylane.compiler.python_compiler import Compiler as PythonCompiler
+        from catalyst.python_interface import Compiler as UnifiedCompiler
 
-        compiler = PythonCompiler()
+        compiler = UnifiedCompiler()
         stdin = compiler.run(stdin, callback=None)
 
     # These are the options that may affect compilation
@@ -548,7 +548,7 @@ class Compiler:
 
     @debug_logger
     def is_using_python_compiler(self, mlir_module=None):
-        """Returns true if we need the Python compiler path.
+        """Returns true if we need the Python interface path.
 
         This happens when:
         1. xDSL plugin is explicitly loaded (legacy), OR
@@ -594,7 +594,8 @@ class Compiler:
             workspace: The workspace directory path
 
         Returns:
-            Callable or None: The callback function if intermediate saving is enabled, None otherwise
+            Callable or None: The callback function if intermediate saving is enabled, None
+            otherwise
         """
         if not (workspace and self.options.keep_intermediate >= KeepIntermediateLevel.CHANGED):
             return None
@@ -606,7 +607,7 @@ class Compiler:
         os.makedirs(user_transform_dir, exist_ok=True)
 
         class SavePassIRCallback:
-            """Callback to save IR after each pass in python_compiler."""
+            """Callback to save IR after each pass in python_interface."""
 
             def __init__(self, transform_dir):
                 self.transform_dir = transform_dir
@@ -666,10 +667,10 @@ class Compiler:
             # We keep this module here to keep xDSL requirement optional
             # Only move this is it has been decided that xDSL is no longer optional.
             # pylint: disable-next=import-outside-toplevel
-            from pennylane.compiler.python_compiler import Compiler as PythonCompiler
+            from catalyst.python_interface import Compiler as UnifiedCompiler
 
             callback = self._create_xdsl_pass_save_callback(workspace)
-            compiler = PythonCompiler()
+            compiler = UnifiedCompiler()
             ir = compiler.run(ir, callback=callback)
 
         return self.run_from_ir(
