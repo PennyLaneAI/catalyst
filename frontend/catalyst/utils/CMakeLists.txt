@@ -36,7 +36,7 @@ set(WRAPPER_SRC_FILES
 #
 # Also need NB_USE_SUBMODULE_DEPS flag to opt into nanobind's handling of tsl-robin-map dependency:
 #   https://github.com/wjakob/nanobind/pull/1212
-set(NB_USE_SUBMODULE_DEPS ON)
+# set(NB_USE_SUBMODULE_DEPS ON)
 nanobind_add_module(wrapper STABLE_ABI ${WRAPPER_SRC_FILES})
 
 # Add the NumPy include directory to the library's include paths
