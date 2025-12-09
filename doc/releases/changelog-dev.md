@@ -221,6 +221,7 @@
 
 * Dynamically allocated wires can now be passed into control flow and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
+  [(#2268)](https://github.com/PennyLaneAI/catalyst/pull/2268)
 
 * The `--adjoint-lowering` pass can now handle PPR operations.
   [(#2227)](https://github.com/PennyLaneAI/catalyst/pull/2227)
