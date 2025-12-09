@@ -118,14 +118,14 @@ class TestDecomposition:
 
         @qml.qnode(dev)
         def circuit(theta: float):
-            qml.SingleExcitationPlus(theta, wires=[0, 1])
+            qml.OrbitalRotation(theta, wires=[0, 1, 2, 3])
             return qml.state()
 
         mlir = qjit(circuit, target="mlir").mlir
+        assert "SingleExcitation" in mlir
         assert "Hadamard" in mlir
-        assert "CNOT" in mlir
-        assert "RY" in mlir
-        assert "SingleExcitationPlus" not in mlir
+        assert "RX" in mlir
+        assert "OrbitalRotation" not in mlir
 
     def test_decompose_ops_to_unitary(self):
         """Test the decompose ops to unitary transform."""
