@@ -44,7 +44,7 @@ class FakeDAGBuilder(DAGBuilder):
 
     def __init__(self):
         self._nodes = {}
-        self._edges = []
+        self._edges = {}
         self._clusters = {}
 
     def add_node(self, uid, label, cluster_uid=None, **attrs) -> None:
@@ -56,13 +56,11 @@ class FakeDAGBuilder(DAGBuilder):
         }
 
     def add_edge(self, from_uid: str, to_uid: str, **attrs) -> None:
-        self._edges.append(
-            {
-                "from_uid": from_uid,
-                "to_uid": to_uid,
-                "attrs": attrs,
-            }
-        )
+        # O(1) look up
+        edge_key = (from_uid, to_uid)
+        self._edges[edge_key] = {
+            "attrs": attrs,
+        }
 
     def add_cluster(
         self,
@@ -979,17 +977,165 @@ class TestOperatorConnectivity:
     @pytest.mark.unit
     def test_static_connection_within_cluster(self):
         """Tests that connections can be made within the same cluster."""
-        pass
+
+        dev = qml.device("null.qubit", wires=3)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            qml.X(0)
+            qml.Z(1)
+            qml.Y(0)
+            qml.H(1)
+            qml.S(1)
+            qml.T(2)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliZ" in nodes["node2"]["label"]
+        assert "PauliY" in nodes["node3"]["label"]
+        assert "Hadamard" in nodes["node4"]["label"]
+        assert "S" in nodes["node5"]["label"]
+        assert "T" in nodes["node6"]["label"]
+
+        # Check edges
+        # X -> Y
+        # Z -> H -> S
+        # T
+        assert len(edges) == 3
+        assert ("node1", "node3") in edges
+        assert ("node2", "node4") in edges
+        assert ("node4", "node5") in edges
 
     @pytest.mark.unit
-    def test_static_connection_through_clusters(self):
-        """Tests that connections can be made through nested clusters."""
-        pass
+    def test_static_connection_through_for_loop(self):
+        """Tests that connections can be made through a for loop cluster."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            qml.X(0)
+            for i in range(3):
+                qml.Y(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+
+        # Check edges
+        #    for loop
+        # X ----------> Y
+        assert len(edges) == 1
+        assert ("node1", "node2") in edges
+
+    @pytest.mark.unit
+    def test_static_connection_through_while_loop(self):
+        """Tests that connections can be made through a while loop cluster."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            counter = 0
+            qml.X(0)
+            while counter < 5:
+                qml.Y(0)
+                counter += 1
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+
+        # Check edges
+        #    for loop
+        # X ----------> Y
+        assert len(edges) == 1
+        assert ("node1", "node2") in edges
 
     @pytest.mark.unit
     def test_static_connection_through_conditional(self):
         """Tests that connections through conditionals make sense."""
-        pass
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow(x):
+            qml.X(0)
+            qml.T(1)
+            if x == 1:
+                qml.RX(0, 0)
+                qml.S(1)
+            elif x == 2:
+                qml.RY(0, 0)
+            else:
+                qml.RZ(0, 0)
+            qml.H(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        # NOTE: depth first traversal hence T first then PauliX
+        assert "T" in nodes["node1"]["label"]
+        assert "PauliX" in nodes["node2"]["label"]
+        assert "RX" in nodes["node3"]["label"]
+        assert "S" in nodes["node4"]["label"]
+        assert "RY" in nodes["node5"]["label"]
+        assert "RZ" in nodes["node6"]["label"]
+        assert "Hadamard" in nodes["node7"]["label"]
+
+        # Check all edges
+        assert len(edges) == 7
+        assert ("node1", "node4") in edges
+        assert ("node2", "node3") in edges
+        assert ("node2", "node5") in edges
+        assert ("node2", "node6") in edges
+        assert ("node3", "node7") in edges
+        assert ("node5", "node7") in edges
+        assert ("node6", "node7") in edges
 
 
 class TestTerminalMeasurementConnectivity:
