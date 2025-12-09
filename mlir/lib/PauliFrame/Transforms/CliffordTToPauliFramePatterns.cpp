@@ -204,7 +204,7 @@ LogicalResult convertNonCliffordGate(CustomOp op, PatternRewriter &rewriter)
     auto outQubitTypes = op.getOutQubits().getTypes();
 
     if (outQubitTypes.size() > 1) {
-        op->emitError("Only single-qubit non-Clifford gates are supported");
+        op->emitError() << "Only single-qubit non-Clifford gates are supported";
         return failure();
     }
 
@@ -252,8 +252,9 @@ struct CliffordTToPauliFramePattern : public OpRewritePattern<CustomOp> {
         case GateEnum::T:
             return convertNonCliffordGate(op, rewriter);
         case GateEnum::Unknown: {
-            op->emitError(
-                "Unsupported gate. Supported gates: I, X, Y, Z, H, S, S†, T, T†, and CNOT");
+            op->emitError() << "Unsupported gate: '" << op.getGateName()
+                            << "'. Only Clifford+T gates are supported for Pauli frame conversion: "
+                            << "I, X, Y, Z, H, S, S†, T, T†, and CNOT";
             return failure();
         }
         }
@@ -385,7 +386,7 @@ struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<Measuremen
             qubits = ValueRange({qubit});
         }
         else {
-            obsOp->emitError() << "Unsupported observable op: " << obsOp->getName() << "\n";
+            obsOp->emitError() << "Unsupported observable op: " << obsOp->getName();
             return failure();
         }
 
