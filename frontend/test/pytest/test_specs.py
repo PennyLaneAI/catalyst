@@ -22,7 +22,7 @@ from catalyst import qjit
 # pylint:disable = protected-access,attribute-defined-outside-init
 
 
-# TODO: Remove this method once feature pairty has been reached, and instead use `==` directly
+# TODO: Remove this method once feature parity has been reached, and instead use `==` directly
 def check_specs_same(specs1, specs2):
     """Check that two specs dictionaries are the same."""
     assert specs1["device_name"] == specs2["device_name"]
