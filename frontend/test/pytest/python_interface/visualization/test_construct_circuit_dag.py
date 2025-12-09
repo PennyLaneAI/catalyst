@@ -540,13 +540,18 @@ class TestIfOp:
         assert clusters["cluster6"]["parent_cluster_uid"] == "cluster4"
 
         # Check nested if / else is within the first if cluster
-        assert clusters["cluster7"]["parent_cluster_uid"] == "cluster2"
         assert clusters["cluster7"]["node_label"] == "else"
+        assert clusters["cluster7"]["parent_cluster_uid"] == "cluster2"
 
     def test_nested_conditionals_with_quantum_ops(self):
         """Tests that nested conditionals are unflattend if quantum operations
         are present"""
 
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
         def my_workflow(x):
             if x == 1:
                 qml.X(0)
