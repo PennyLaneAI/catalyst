@@ -611,6 +611,7 @@ class TestIfOp:
         assert clusters["cluster8"]["parent_cluster_uid"] == "cluster6"
         assert clusters["cluster9"]["node_label"] == "else"
         assert clusters["cluster9"]["parent_cluster_uid"] == "cluster6"
+
 def test_nested_conditionals_with_nested_quantum_ops(self):
         """Tests that nested conditionals are unflattend if quantum operations
         are present but nested in other operations"""
