@@ -357,12 +357,16 @@ def _flatten_if_op(op: scf.IfOp) -> list[Region]:
     has_quantum_ops = False
     nested_if_op = None
     for op in else_block.ops:
+        if isinstance(op, scf.IfOp):
+            nested_if_op = op
+            # No need to walk this op as this will be
+            # recursively handled down below
+            continue
         for internal_op in op.walk():
-            if isinstance(internal_op, scf.IfOp):
-                nested_if_op = internal_op
-                break
-            if "quantum" in internal_op.name:
+            if type(internal_op) in quantum.Quantum.operations:
                 has_quantum_ops = True
+                # No need to check anything else
+                break
 
     if nested_if_op and not has_quantum_ops:
         # Recursively flatten any IfOps found in said block
