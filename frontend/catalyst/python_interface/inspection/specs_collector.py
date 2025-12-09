@@ -35,6 +35,7 @@ from catalyst.python_interface.dialects.qec import (
     PPMeasurementOp,
     PPRotationOp,
     PrepareStateOp,
+    PPRotationArbitraryOp,
     SelectPPMeasurementOp,
 )
 from catalyst.python_interface.dialects.quantum import (
@@ -259,6 +260,10 @@ def _(xdsl_op: PPRotationOp) -> tuple[ResourceType, str]:
         s = f"PPR-pi/{abs(xdsl_op.rotation_kind.value.data)}"
     return ResourceType.QEC, s
 
+
+@handle_resource.register
+def _(xdsl_op: PPRotationArbitraryOp) -> tuple[ResourceType, str]:
+    return ResourceType.QEC, "PPR-arbitrary"
 
 @handle_resource.register
 def _(_: PPMeasurementOp | SelectPPMeasurementOp) -> tuple[ResourceType, str]:
