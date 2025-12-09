@@ -18,6 +18,7 @@
 
 #include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOpInterfaces.h"
+#include "QEC/IR/QECOps.h"
 #include "Quantum/IR/QuantumDialect.h"
 
 namespace catalyst {

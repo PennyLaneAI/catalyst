@@ -21,7 +21,8 @@ from functools import partial
 import numpy as np
 import pytest
 
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 
 import pennylane as qml
 
@@ -613,7 +614,7 @@ class TestMeasurementsFromSamplesIntegration:
         @qml.qnode(dev, shots=shots)
         def circuit_ref():
             initial_op(wires=0)
-            return qml.counts(wires=0)
+            return qml.counts(wires=0, all_outcomes=True)
 
         assert np.array_equal(
             expected_res, circuit_ref()

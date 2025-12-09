@@ -19,7 +19,8 @@ from dataclasses import dataclass
 # pylint: disable=wrong-import-position,line-too-long
 import pytest
 
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 
 import jax
 import pennylane as qml
@@ -27,7 +28,7 @@ from jaxlib.mlir.ir import Module as jModule
 from pennylane.capture import enabled as capture_enabled
 from xdsl import passes
 from xdsl.context import Context
-from xdsl.dialects import builtin
+from xdsl.dialects import builtin, transform
 from xdsl.interpreters import Interpreter
 from xdsl.passes import PassPipeline
 
@@ -41,7 +42,6 @@ from catalyst.python_interface.conversion import (
     mlir_module,
     xdsl_from_docstring,
 )
-from catalyst.python_interface.dialects import transform
 from catalyst.python_interface.pass_api import (
     ApplyTransformSequence,
     TransformFunctionsExt,

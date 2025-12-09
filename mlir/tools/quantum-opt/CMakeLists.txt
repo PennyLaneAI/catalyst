@@ -22,8 +22,10 @@ set(LIBS
     mbqc-transforms
     MLIRMitigation
     mitigation-transforms
+    MLIRPauliFrame
     MLIRIon
     ion-transforms
+    MLIRRTIO
     MLIRCatalystTest
     MLIRCatalystUtils
     MLIRTestDialect
