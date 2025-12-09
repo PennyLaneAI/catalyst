@@ -221,6 +221,7 @@
 
 * Dynamically allocated wires can now be passed into control flow and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
+  [(#2268)](https://github.com/PennyLaneAI/catalyst/pull/2268)
 
 * The `--adjoint-lowering` pass can now handle PPR operations.
   [(#2227)](https://github.com/PennyLaneAI/catalyst/pull/2227)
@@ -345,6 +346,11 @@
   [(#2262)](https://github.com/PennyLaneAI/catalyst/pull/2262)
 
   This fix enables automatic qubit management to be used with gradients.
+
+
+* Fixed the :func:`~.passes.commute_ppr` pass incorrectly modifying operands of PPRs that live in
+  different blocks.
+  [(#2267)](https://github.com/PennyLaneAI/catalyst/pull/2267)
 
 * The `--inline-nested-module` pass no longer renames external function declarations.
   [(#2244)](https://github.com/PennyLaneAI/catalyst/pull/2244)
