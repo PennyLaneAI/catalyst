@@ -205,8 +205,7 @@ struct SimplifySyncPattern : public OpRewritePattern<RTIOSyncOp> {
                 if (event == other) {
                     return false;
                 }
-                DenseSet<Value> visited;
-                return canReach(event, other, visited);
+                return canReach(event, other);
             });
             if (!isRedundant) {
                 requiredEvents.push_back(event);
@@ -227,27 +226,41 @@ struct SimplifySyncPattern : public OpRewritePattern<RTIOSyncOp> {
     }
 
   private:
-    static bool canReach(Value target, Value from, DenseSet<Value> &visited)
+    // Check if target is reachable from 'from' by traversing event dependencies.
+    static bool canReach(Value target, Value from)
     {
         if (target == from) {
             return true;
         }
-        if (!visited.insert(from).second) {
-            return false;
-        }
 
-        Operation *defOp = from.getDefiningOp();
-        if (!defOp) {
-            return false;
-        }
+        DenseSet<Value> visited;
+        SmallVector<Value, 16> queue;
+        queue.push_back(from);
 
-        // TODO shouldn't use recursive call here
-        if (auto pulse = dyn_cast<RTIOPulseOp>(defOp)) {
-            return canReach(target, pulse.getWait(), visited);
-        }
-        else if (auto sync = dyn_cast<RTIOSyncOp>(defOp)) {
-            return llvm::any_of(sync.getEvents(),
-                                [&](Value ev) { return canReach(target, ev, visited); });
+        while (!queue.empty()) {
+            Value current = queue.pop_back_val();
+
+            if (current == target) {
+                return true;
+            }
+
+            if (!visited.insert(current).second) {
+                continue;
+            }
+
+            Operation *defOp = current.getDefiningOp();
+            if (!defOp) {
+                continue;
+            }
+
+            if (auto pulse = dyn_cast<RTIOPulseOp>(defOp)) {
+                queue.push_back(pulse.getWait());
+            }
+            else if (auto sync = dyn_cast<RTIOSyncOp>(defOp)) {
+                for (Value ev : sync.getEvents()) {
+                    queue.push_back(ev);
+                }
+            }
         }
         return false;
     }
