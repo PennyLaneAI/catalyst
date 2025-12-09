@@ -542,7 +542,7 @@ class TestIfOp:
         # Check nested if / else is within the first if cluster
         assert clusters["cluster7"]["parent_cluster_uid"] == "cluster2"
         assert clusters["cluster7"]["node_label"] == "else"
-        
+
     def test_nested_conditionals_with_quantum_ops(self):
         """Tests that nested conditionals are unflattend if quantum operations
         are present"""
@@ -606,6 +606,7 @@ class TestIfOp:
         assert clusters["cluster8"]["parent_cluster_uid"] == "cluster6"
         assert clusters["cluster9"]["node_label"] == "else"
         assert clusters["cluster9"]["parent_cluster_uid"] == "cluster6"
+
 
 class TestGetLabel:
     """Tests the get_label utility."""
