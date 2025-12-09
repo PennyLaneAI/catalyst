@@ -157,7 +157,7 @@ class ConstructCircuitDAG:
         self._node_uid_counter += 1
 
     @_visit_operation.register
-    def _statistical_measurement_ops(
+    def _expval_and_var_ops(
         self,
         op: quantum.ExpvalOp | quantum.VarianceOp,
     ) -> None:
@@ -179,7 +179,7 @@ class ConstructCircuitDAG:
         self._node_uid_counter += 1
 
     @_visit_operation.register
-    def _visit_sample_and_probs_ops(
+    def _sample_counts_probs_ops(
         self,
         op: quantum.SampleOp | quantum.ProbsOp,
     ) -> None:
