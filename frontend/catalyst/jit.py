@@ -582,7 +582,7 @@ class QJIT(CatalystCallable):
         """Obtain the MLIR representation after optimization"""
         if not self.mlir_module:
             return None
-        using_python_compiler = self.compiler.using_python_compiler(self.mlir_module)
+        using_python_compiler = self.compiler.is_using_python_compiler(self.mlir_module)
         stdin = self.mlir_module.operation.get_asm(
             print_generic_op_form=using_python_compiler,
             enable_debug_info=self.compile_options.use_nameloc,
