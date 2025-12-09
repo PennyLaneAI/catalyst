@@ -16,24 +16,20 @@
 from pathlib import Path
 from subprocess import run
 
-import pytest
-
-# pylint: disable=wrong-import-position
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-graphviz = pytest.importorskip("graphviz")
-
-if run(["/usr/bin/which", "dot"], check=False).returncode != 0:
-    pytest.skip(reason="Graphviz isn't installed.")
-
-
 import pennylane as qml
+import pytest
 
 from catalyst.python_interface.inspection import generate_mlir_graph
 from catalyst.python_interface.transforms import (
     iterative_cancel_inverses_pass,
     merge_rotations_pass,
 )
+
+pytestmark = pytest.mark.xdsl
+graphviz = pytest.importorskip("graphviz")
+
+if run(["/usr/bin/which", "dot"], check=False).returncode != 0:
+    pytest.skip(reason="Graphviz isn't installed.")
 
 
 @pytest.fixture(autouse=True)

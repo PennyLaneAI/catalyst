@@ -82,6 +82,8 @@ def parse_dep_versions():
     pattern_jax = re.compile(r"^jax=(\S+)", re.MULTILINE)
     pattern_pl = re.compile(r"^pennylane=(\S+)", re.MULTILINE)
     pattern_lq = re.compile(r"^lightning=(\S+)", re.MULTILINE)
+    pattern_xdsl = re.compile(r"^xdsl=(\S+)", re.MULTILINE)
+    pattern_xdsl_jax = re.compile(r"^xdsl_jax=(\S+)", re.MULTILINE)
 
     with open(".dep-versions", encoding="utf-8") as fin:
         lines = fin.read()
@@ -89,6 +91,8 @@ def parse_dep_versions():
         match_jax = pattern_jax.search(lines)
         match_pl = pattern_pl.search(lines)
         match_lq = pattern_lq.search(lines)
+        match_xdsl = pattern_xdsl.search(lines)
+        match_xdsl_jax = pattern_xdsl_jax.search(lines)
 
         if match_jax is not None:
             results["jax"] = match_jax.group(1)
@@ -99,6 +103,12 @@ def parse_dep_versions():
         if match_lq is not None:
             results["lightning"] = match_lq.group(1)
 
+        if match_xdsl is not None:
+            results["xdsl"] = match_xdsl.group(1)
+
+        if match_xdsl_jax is not None:
+            results["xdsl-jax"] = match_xdsl_jax.group(1)
+
     return results
 
 
@@ -106,6 +116,8 @@ dep_versions = parse_dep_versions()
 jax_version = dep_versions.get("jax")
 pl_version = dep_versions.get("pennylane")
 lq_version = dep_versions.get("lightning")
+xdsl_version = dep_versions.get("xdsl")
+xdsl_jax_version = dep_versions.get("xdsl-jax")
 
 pl_min_release = "0.43.0"
 lq_min_release = pl_min_release
@@ -120,6 +132,14 @@ if lq_version is not None:
 else:
     lightning_dep = f"pennylane-lightning>={lq_min_release}"
     kokkos_dep = ""
+if xdsl_version is not None:
+    xdsl_dep = f"xdsl=={xdsl_version}"
+else:
+    xdsl_dep = ""
+if xdsl_jax_version is not None:
+    xdsl_jax_dep = f"xdsl-jax=={xdsl_jax_version}"
+else:
+    xdsl_jax_dep = ""
 
 requirements = [
     pennylane_dep,
@@ -130,6 +150,8 @@ requirements = [
     "numpy!=2.0.0",
     "scipy-openblas32>=0.3.26",  # symbol and library name
     "diastatic-malt>=2.15.2",
+    xdsl_dep,
+    xdsl_jax_dep,
 ]
 
 entry_points = {
