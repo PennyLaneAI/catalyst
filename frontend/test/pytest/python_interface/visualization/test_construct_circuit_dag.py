@@ -611,7 +611,79 @@ class TestIfOp:
         assert clusters["cluster8"]["parent_cluster_uid"] == "cluster6"
         assert clusters["cluster9"]["node_label"] == "else"
         assert clusters["cluster9"]["parent_cluster_uid"] == "cluster6"
+def test_nested_conditionals_with_nested_quantum_ops(self):
+        """Tests that nested conditionals are unflattend if quantum operations
+        are present but nested in other operations"""
 
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow(x):
+            if x == 1:
+                qml.X(0)
+            elif x == 2:
+                qml.Y(0)
+            else:
+                for i in range(3):
+                    qml.Z(0)
+                if x == 3:
+                    qml.RX(0, 0)
+                elif x == 4:
+                    qml.RY(0, 0)
+                else:
+                    qml.RZ(0, 0)
+
+        args = (1,)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        #     node0 -> NullQubit
+        #     cluster2 -> conditional (1)
+        #       cluster3 -> if
+        #           node1 -> X(0)
+        #       cluster4 -> elif
+        #           node2 -> Y(0)
+        #       cluster5 -> else
+        #           cluster6 -> for loop
+        #               node3 -> Z(0)
+        #           cluster7 -> conditional (2)
+        #               cluster8 -> if
+        #                    node4 -> RX(0,0)
+        #               cluster9 -> elif
+        #                    node5 -> RY(0,0)
+        #               cluster10 -> else
+        #                    node6 -> RZ(0,0)
+
+        # check outer conditional (1)
+        assert clusters["cluster2"]["cluster_label"] == "conditional"
+        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert clusters["cluster3"]["node_label"] == "if"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster4"]["node_label"] == "elif"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster5"]["node_label"] == "else"
+        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
+
+        # Nested conditional (2) inside conditional (1)
+        assert clusters["cluster6"]["node_label"] == "for loop"
+        assert clusters["cluster6"]["parent_cluster_uid"] == "cluster5"
+
+        assert clusters["cluster7"]["cluster_label"] == "conditional"
+        assert clusters["cluster7"]["parent_cluster_uid"] == "cluster5"
+        assert clusters["cluster8"]["node_label"] == "if"
+        assert clusters["cluster8"]["parent_cluster_uid"] == "cluster7"
+        assert clusters["cluster9"]["node_label"] == "elif"
+        assert clusters["cluster9"]["parent_cluster_uid"] == "cluster7"
+        assert clusters["cluster10"]["node_label"] == "else"
+        assert clusters["cluster10"]["parent_cluster_uid"] == "cluster7"
 
 class TestGetLabel:
     """Tests the get_label utility."""
