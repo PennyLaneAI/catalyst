@@ -366,6 +366,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Integration tests for `qml.specs` have been updated to match the new output format introduced
+  in PennyLane.
+  [(#2255)](https://github.com/PennyLaneAI/catalyst/pull/2255)
+
 * Resource tracking now writes out at device destruction time instead of qubit deallocation
   time. The written resources will be the total amount of resources collected throughout the
   lifetime of the execution. For executions that split work between multiple functions,
