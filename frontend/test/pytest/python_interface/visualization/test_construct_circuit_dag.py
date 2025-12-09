@@ -509,7 +509,6 @@ class TestIfOp:
         utility.construct(module)
 
         clusters = utility.dag_builder.clusters
-        clusters = utility.dag_builder.clusters
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
