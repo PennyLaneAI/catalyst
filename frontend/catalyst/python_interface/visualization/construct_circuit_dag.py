@@ -249,7 +249,7 @@ def _flatten_if_op(op: scf.IfOp) -> list[tuple[SSAValue | None, Region]]:
                 break
             if "quantum" in internal_op.name:
                 has_quantum_ops = True
-        
+
     if nested_if_op and not has_quantum_ops:
         # Recursively flatten any IfOps found in said block
         nested_flattened_op = _flatten_if_op(nested_if_op)

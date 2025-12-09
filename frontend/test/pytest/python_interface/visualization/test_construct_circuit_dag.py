@@ -545,6 +545,7 @@ class TestIfOp:
         are present"""
 
         dev = qml.device("null.qubit", wires=1)
+
         @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
@@ -562,7 +563,7 @@ class TestIfOp:
                 else:
                     qml.RZ(0, 0)
 
-        args = (1, )
+        args = (1,)
         module = my_workflow(*args)
 
         utility = ConstructCircuitDAG(FakeDAGBuilder())
@@ -581,9 +582,9 @@ class TestIfOp:
         #       cluster5 -> else
         #           node3 -> Z(0)
         #           cluster6 -> conditional (2)
-        #               cluster7 -> if 
+        #               cluster7 -> if
         #                    node4 -> RX(0,0)
-        #               cluster8 -> elif 
+        #               cluster8 -> elif
         #                    node5 -> RY(0,0)
         #               cluster9 -> else
         #                    node6 -> RZ(0,0)
@@ -591,19 +592,19 @@ class TestIfOp:
         # check outer conditional (1)
         assert clusters["cluster2"]["cluster_label"] == "conditional"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
-        assert clusters["cluster3"]["cluster_label"] == "if"
+        assert clusters["cluster3"]["node_label"] == "if"
         assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
-        assert clusters["cluster4"]["cluster_label"] == "elif"
+        assert clusters["cluster4"]["node_label"] == "elif"
         assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
-        assert clusters["cluster5"]["cluster_label"] == "else"
+        assert clusters["cluster5"]["node_label"] == "else"
         assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
 
         # Nested conditional (2) inside conditional (1)
         assert clusters["cluster6"]["cluster_label"] == "conditional"
         assert clusters["cluster6"]["parent_cluster_uid"] == "cluster5"
-        assert clusters["cluster7"]["cluster_label"] == "if"
+        assert clusters["cluster7"]["node_label"] == "if"
         assert clusters["cluster7"]["parent_cluster_uid"] == "cluster6"
-        assert clusters["cluster8"]["cluster_label"] == "elif"
+        assert clusters["cluster8"]["node_label"] == "elif"
         assert clusters["cluster8"]["parent_cluster_uid"] == "cluster6"
-        assert clusters["cluster9"]["cluster_label"] == "else"
+        assert clusters["cluster9"]["node_label"] == "else"
         assert clusters["cluster9"]["parent_cluster_uid"] == "cluster6"
