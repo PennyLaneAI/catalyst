@@ -79,6 +79,7 @@ func.func @test_to_pauli_frame_non_clifford_gate(%arg0 : !quantum.bit) -> (!quan
 
 // -----
 
+// CHECK-LABEL: test_to_pauli_frame_init_qubit
 func.func @test_to_pauli_frame_init_qubit() -> !quantum.bit {
     // CHECK:      [[q1:%.+]] = quantum.alloc_qb
     // CHECK-NEXT: [[q2:%.+]] = pauli_frame.init [[q1]]
@@ -89,6 +90,7 @@ func.func @test_to_pauli_frame_init_qubit() -> !quantum.bit {
 
 // -----
 
+// CHECK-LABEL: test_to_pauli_frame_init_qreg
 func.func @test_to_pauli_frame_init_qreg() {
     // CHECK:      [[qreg1:%.+]] = quantum.alloc( 1)
     // CHECK-NEXT: [[qreg2:%.+]] = pauli_frame.init_qreg [[qreg1]]
@@ -100,6 +102,7 @@ func.func @test_to_pauli_frame_init_qreg() {
 
 // -----
 
+// CHECK-LABEL: test_to_pauli_frame_correct_meas
 func.func @test_to_pauli_frame_correct_meas(%arg0 : !quantum.bit) -> (i1, !quantum.bit) {
     // CHECK:      [[mres1:%.+]], [[q1:%.+]] = quantum.measure %arg0
     // CHECK-NEXT: [[mres2:%.+]], [[q2:%.+]] = pauli_frame.correct_measurement [[mres1]], [[q1]]
@@ -110,9 +113,112 @@ func.func @test_to_pauli_frame_correct_meas(%arg0 : !quantum.bit) -> (i1, !quant
 
 // -----
 
+// CHECK-LABEL: test_to_pauli_frame_sample_single_qubit
+func.func @test_to_pauli_frame_sample_single_qubit(%arg0 : !quantum.bit) -> tensor<1000x1xf64> {
+    // CHECK: [[xbit:%.+]], [[zbit:%.+]], [[q1:%.+]] = pauli_frame.flush %arg0
+    // CHECK: [[q2:%.+]] = scf.if [[xbit]]
+    // CHECK:   quantum.custom "X"() [[q1]]
+    // CHECK: else
+    // CHECK: [[q3:%.+]] = scf.if [[zbit]]
+    // CHECK:   quantum.custom "Z"() [[q2]]
+    // CHECK: else
+    // CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q3]] : !quantum.obs
+    // CHECK: [[samples:%.+]] = quantum.sample [[obs]]
+    %obs = quantum.compbasis qubits %arg0 : !quantum.obs
+    %samples = quantum.sample %obs : tensor<1000x1xf64>
+    // CHECK: return [[samples]]
+    func.return %samples : tensor<1000x1xf64>
+}
+
+// -----
+
+// CHECK-LABEL: test_to_pauli_frame_sample_two_qubits
+func.func @test_to_pauli_frame_sample_two_qubits(%arg0 : !quantum.bit, %arg1 : !quantum.bit) -> tensor<1000x2xf64> {
+    // CHECK: [[xbit0:%.+]], [[zbit0:%.+]], [[q00:%.+]] = pauli_frame.flush %arg0
+    // CHECK: [[q01:%.+]] = scf.if [[xbit0]]
+    // CHECK:   quantum.custom "X"() [[q00]]
+    // CHECK: else
+    // CHECK: [[q02:%.+]] = scf.if [[zbit0]]
+    // CHECK:   quantum.custom "Z"() [[q01]]
+    // CHECK: else
+    // CHECK: [[xbit1:%.+]], [[zbit1:%.+]], [[q10:%.+]] = pauli_frame.flush %arg1
+    // CHECK: [[q11:%.+]] = scf.if [[xbit1]]
+    // CHECK:   quantum.custom "X"() [[q10]]
+    // CHECK: else
+    // CHECK: [[q12:%.+]] = scf.if [[zbit]]
+    // CHECK:   quantum.custom "Z"() [[q11]]
+    // CHECK: else
+    // CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q02]], [[q12]] : !quantum.obs
+    // CHECK: [[samples:%.+]] = quantum.sample [[obs]]
+    %obs = quantum.compbasis qubits %arg0, %arg1 : !quantum.obs
+    %samples = quantum.sample %obs : tensor<1000x2xf64>
+    // CHECK: return [[samples]]
+    func.return %samples : tensor<1000x2xf64>
+}
+
+// -----
+
+// CHECK-LABEL: test_to_pauli_frame_counts_single_qubit
+func.func @test_to_pauli_frame_counts_single_qubit(%arg0 : !quantum.bit) -> tensor<2xi64> {
+    // CHECK: [[xbit:%.+]], [[zbit:%.+]], [[q1:%.+]] = pauli_frame.flush %arg0
+    // CHECK: [[q2:%.+]] = scf.if [[xbit]]
+    // CHECK:   quantum.custom "X"() [[q1]]
+    // CHECK: else
+    // CHECK: [[q3:%.+]] = scf.if [[zbit]]
+    // CHECK:   quantum.custom "Z"() [[q2]]
+    // CHECK: else
+    // CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q3]] : !quantum.obs
+    // CHECK: {{%.+}}, [[counts:%.+]] = quantum.counts [[obs]]
+    %obs = quantum.compbasis qubits %arg0 : !quantum.obs
+    %eigvals, %counts = quantum.counts %obs : tensor<2xf64>, tensor<2xi64>
+    // CHECK: return [[counts]]
+    func.return %counts : tensor<2xi64>
+}
+
+// -----
+
+// CHECK-LABEL: test_to_pauli_frame_expval_single_qubit
+func.func @test_to_pauli_frame_expval_single_qubit(%arg0 : !quantum.bit) -> tensor<2xi64> {
+    // CHECK: [[xbit:%.+]], [[zbit:%.+]], [[q1:%.+]] = pauli_frame.flush %arg0
+    // CHECK: [[q2:%.+]] = scf.if [[xbit]]
+    // CHECK:   quantum.custom "X"() [[q1]]
+    // CHECK: else
+    // CHECK: [[q3:%.+]] = scf.if [[zbit]]
+    // CHECK:   quantum.custom "Z"() [[q2]]
+    // CHECK: else
+    // CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q3]] : !quantum.obs
+    // CHECK: {{%.+}}, [[counts:%.+]] = quantum.counts [[obs]]
+    %obs = quantum.compbasis qubits %arg0 : !quantum.obs
+    %eigvals, %counts = quantum.counts %obs : tensor<2xf64>, tensor<2xi64>
+    // CHECK: return [[counts]]
+    func.return %counts : tensor<2xi64>
+}
+
+// -----
+
+// CHECK-LABEL: test_to_pauli_frame_probs_single_qubit
+func.func @test_to_pauli_frame_probs_single_qubit(%arg0 : !quantum.bit) -> tensor<2xf64> {
+    // CHECK: [[xbit:%.+]], [[zbit:%.+]], [[q1:%.+]] = pauli_frame.flush %arg0
+    // CHECK: [[q2:%.+]] = scf.if [[xbit]]
+    // CHECK:   quantum.custom "X"() [[q1]]
+    // CHECK: else
+    // CHECK: [[q3:%.+]] = scf.if [[zbit]]
+    // CHECK:   quantum.custom "Z"() [[q2]]
+    // CHECK: else
+    // CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q3]] : !quantum.obs
+    // CHECK: [[probs:%.+]] = quantum.probs [[obs]]
+    %obs = quantum.compbasis qubits %arg0 : !quantum.obs
+    %probs = quantum.probs %obs : tensor<2xf64>
+    // CHECK: return [[probs]]
+    func.return %probs : tensor<2xf64>
+}
+
+// -----
+
 // COM: This program represents the following circuit:
 // COM: 0: ──H──X─╭●──T──┤↗├─┤
 // COM: 1: ──S──Z─╰X──Y──┤↗├─┤
+// CHECK-LABEL: test_to_pauli_frame_integration
 func.func @test_to_pauli_frame_integration() -> (i1, i1) {
     // CHECK: quantum.alloc( 2) : !quantum.reg
     // CHECK: pauli_frame.init_qreg {{%.+}} : !quantum.reg

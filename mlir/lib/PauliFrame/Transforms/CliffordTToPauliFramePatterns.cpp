@@ -12,18 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Quantum/IR/QuantumDialect.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/SymbolTable.h"
+#define DEBUG_TYPE "to-pauli-frame"
 
-// #include "Catalyst/Utils/EnsureFunctionDeclaration.h"
-#include "PauliFrame/IR/PauliFrameOps.h"
-#include "PauliFrame/Transforms/Patterns.h"
-#include "Quantum/IR/QuantumOps.h"
+#include <concepts>
+
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/PatternMatch.h"
+#include <llvm/Support/Casting.h>
+#include <llvm/Support/Debug.h>
+#include <llvm/Support/LogicalResult.h>
+#include <llvm/Support/raw_ostream.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Location.h>
+#include <mlir/IR/Value.h>
+#include <mlir/IR/ValueRange.h>
+
+#include "PauliFrame/IR/PauliFrameOps.h"
+#include "PauliFrame/Transforms/Patterns.h"
+#include "Quantum/IR/QuantumDialect.h"
+#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 
@@ -35,6 +42,13 @@ using namespace catalyst::quantum;
 //===----------------------------------------------------------------------===//
 // Helper functions
 //===----------------------------------------------------------------------===//
+
+template <typename T>
+concept has_observable = requires(T obj) {
+    // 1. The expression obj.getObs() must be valid
+    // 2. The type returned by obj.getObs() must be exactly TypedValue<ObservableType>
+    { obj.getObs() } -> std::same_as<TypedValue<ObservableType>>;
+};
 
 enum class GateEnum { I, X, Y, Z, H, S, T, CNOT, Unknown };
 
@@ -60,6 +74,35 @@ GateEnum hashGate(CustomOp op)
         return GateEnum::CNOT;
     else
         return GateEnum::Unknown;
+}
+
+// Insert the ops that physically apply the Pauli X and Z gates and a flush op.
+// Applies the gates in the order X -> Z and returns the output qubit of the Z gate.
+OpResult insertPauliOpsAfterFlush(PatternRewriter &rewriter, Location loc, FlushOp flushOp)
+{
+    auto pauliXIfOp = rewriter.create<scf::IfOp>(
+        loc, flushOp.getXParity(),
+        [&](OpBuilder &builder, Location loc) { // then
+            auto pauliX = rewriter.create<CustomOp>(loc, "X", flushOp.getOutQubit());
+            builder.create<scf::YieldOp>(loc, pauliX.getOutQubits());
+        },
+        [&](OpBuilder &builder, Location loc) { // else
+            builder.create<scf::YieldOp>(loc, flushOp.getOutQubit());
+        });
+
+    auto pauliXOutQubit = pauliXIfOp->getResult(0);
+
+    auto pauliZIfOp = rewriter.create<scf::IfOp>(
+        loc, flushOp.getZParity(),
+        [&](OpBuilder &builder, Location loc) { // then
+            auto pauliZ = rewriter.create<CustomOp>(loc, "Z", pauliXOutQubit);
+            builder.create<scf::YieldOp>(loc, pauliZ.getOutQubits());
+        },
+        [&](OpBuilder &builder, Location loc) { // else
+            builder.create<scf::YieldOp>(loc, pauliXOutQubit);
+        });
+
+    return pauliZIfOp->getResult(0);
 }
 
 //===----------------------------------------------------------------------===//
@@ -171,29 +214,7 @@ LogicalResult convertNonCliffordGate(CustomOp op, PatternRewriter &rewriter)
     FlushOp flushOp = rewriter.create<FlushOp>(loc, rewriter.getI1Type(), rewriter.getI1Type(),
                                                outQubitType, inQubits[0]);
 
-    auto pauliXIfOp = rewriter.create<scf::IfOp>(
-        loc, flushOp.getXParity(),
-        [&](OpBuilder &builder, Location loc) { // then
-            auto pauliX = rewriter.create<CustomOp>(loc, "X", flushOp.getOutQubit());
-            builder.create<scf::YieldOp>(loc, pauliX.getOutQubits());
-        },
-        [&](OpBuilder &builder, Location loc) { // else
-            builder.create<scf::YieldOp>(loc, flushOp.getOutQubit());
-        });
-
-    auto pauliXOutQubit = pauliXIfOp->getResult(0);
-
-    auto pauliZIfOp = rewriter.create<scf::IfOp>(
-        loc, flushOp.getZParity(),
-        [&](OpBuilder &builder, Location loc) { // then
-            auto pauliZ = rewriter.create<CustomOp>(loc, "Z", pauliXOutQubit);
-            builder.create<scf::YieldOp>(loc, pauliZ.getOutQubits());
-        },
-        [&](OpBuilder &builder, Location loc) { // else
-            builder.create<scf::YieldOp>(loc, pauliXOutQubit);
-        });
-
-    auto pauliZOutQubit = pauliZIfOp->getResult(0);
+    auto pauliZOutQubit = insertPauliOpsAfterFlush(rewriter, loc, flushOp);
 
     op->setOperands(pauliZOutQubit);
 
@@ -336,6 +357,43 @@ struct CorrectMeasurementPattern : public OpRewritePattern<MeasureOp> {
     }
 };
 
+template <has_observable MeasurementProcessOp>
+struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<MeasurementProcessOp> {
+    using OpRewritePattern<MeasurementProcessOp>::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(MeasurementProcessOp op, PatternRewriter &rewriter) const override
+    {
+        auto loc = op->getLoc();
+
+        const auto obs = op.getObs();
+        if (!obs) {
+            op.emitError() << "Failed to flush Pauli record before terminal measurement process";
+            return failure();
+        }
+
+        const auto obsOp = obs.getDefiningOp();
+
+        auto compBasisOp = dyn_cast<ComputationalBasisOp>(obsOp);
+        if (!compBasisOp) {
+            obsOp->emitError() << "Only computational-basis observables are currently supported\n";
+            return failure();
+        }
+
+        // The flush op will be inserted before the compbasis op
+        rewriter.setInsertionPoint(compBasisOp);
+
+        const OperandRange qubits = compBasisOp.getQubits();
+
+        for (auto [idx, qubit] : llvm::enumerate(qubits)) {
+            auto flushOp = rewriter.create<FlushOp>(loc, rewriter.getI1Type(), rewriter.getI1Type(),
+                                                    qubit.getType(), qubit);
+            auto pauliZOutQubit = insertPauliOpsAfterFlush(rewriter, loc, flushOp);
+            compBasisOp.setOperand(idx, pauliZOutQubit);
+        }
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -347,6 +405,12 @@ void populateCliffordTToPauliFramePatterns(RewritePatternSet &patterns)
     patterns.add<InitPauliRecordQbitPattern>(patterns.getContext());
     patterns.add<InitPauliRecordQregPattern>(patterns.getContext());
     patterns.add<CorrectMeasurementPattern>(patterns.getContext());
+    patterns.add<FlushBeforeMeasurementProcessPattern<SampleOp>>(patterns.getContext());
+    patterns.add<FlushBeforeMeasurementProcessPattern<CountsOp>>(patterns.getContext());
+    // patterns.add<FlushBeforeMeasurementProcessPattern<ExpvalOp>>(patterns.getContext());    //
+    // FIXME patterns.add<FlushBeforeMeasurementProcessPattern<VarianceOp>>(patterns.getContext());
+    // // FIXME
+    patterns.add<FlushBeforeMeasurementProcessPattern<ProbsOp>>(patterns.getContext());
 }
 
 } // namespace pauli_frame
