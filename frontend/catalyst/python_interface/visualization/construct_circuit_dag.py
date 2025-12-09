@@ -137,7 +137,7 @@ class ConstructCircuitDAG:
         """Handler for the single-qubit projective measurement operation."""
 
         # Create PennyLane instance
-        qml_op = xdsl_to_qml_measurement(op)
+        meas = xdsl_to_qml_measurement(op)
 
         # Add node to current cluster
         node_uid = f"node{self._node_uid_counter}"
