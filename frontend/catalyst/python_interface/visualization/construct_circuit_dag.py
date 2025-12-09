@@ -394,5 +394,6 @@ def _operator(op: Operator) -> str:
         wires_str = "all"
     else:
         wires_str = f"[{', '.join(map(str, wires))}]"
+    # Using <...> lets us use ports (https://graphviz.org/doc/info/shapes.html#record)
     return f"<name> {op.name}|<wire> {wires_str}"
 
