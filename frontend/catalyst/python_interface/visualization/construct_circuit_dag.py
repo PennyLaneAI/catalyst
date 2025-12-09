@@ -103,7 +103,7 @@ class ConstructCircuitDAG:
     # ===================
 
     @_visit_operation.register
-    def _unitary(
+    def _gate_op(
         self,
         op: quantum.CustomOp | quantum.GlobalPhaseOp | quantum.QubitUnitaryOp | quantum.MultiRZOp,
     ) -> None:
@@ -464,10 +464,5 @@ def _operator(op: Operator) -> str:
         wires_str = "all"
     else:
         wires_str = f"[{', '.join(map(str, wires))}]"
+    # Using <...> lets us use ports (https://graphviz.org/doc/info/shapes.html#record)
     return f"<name> {op.name}|<wire> {wires_str}"
-
-
-@get_label.register
-def _mp(mp: MeasurementProcess) -> str:
-    """Returns the appropriate label for an xDSL operation."""
-    return str(mp)
