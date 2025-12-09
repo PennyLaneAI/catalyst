@@ -357,11 +357,21 @@ def _flatten_if_op(op: scf.IfOp) -> list[tuple[SSAValue | None, Region]]:
 
     # Peak into else region to see if there's another IfOp
     else_block: Block = else_region.block
-    # Completely relies on the structure that the second last operation
-    # will be an IfOp (seems to hold true)
-    if isinstance(else_block.ops.last.prev_op, scf.IfOp):
+
+    # Check to see if there are any nested quantum operations in the else block
+    has_quantum_ops = False
+    nested_if_op = None
+    for op in else_block.ops:
+        for internal_op in op.walk():
+            if isinstance(internal_op, scf.IfOp):
+                nested_if_op = internal_op
+                break
+            if "quantum" in internal_op.name:
+                has_quantum_ops = True
+
+    if nested_if_op and not has_quantum_ops:
         # Recursively flatten any IfOps found in said block
-        nested_flattened_op = _flatten_if_op(else_block.ops.last.prev_op)
+        nested_flattened_op = _flatten_if_op(nested_if_op)
         flattened_op.extend(nested_flattened_op)
         return flattened_op
 
