@@ -364,6 +364,10 @@
   contains function declarations to external APIs, the names of these declarations must
   stay unchanged. This change enables quantum passes to generate calls to external APIs.
 
+* Fixes a bug where Catalyst was incorrectly raising an error about a missing shots parameter
+  on devices that support analytical execution.
+  [(#2281)](https://github.com/PennyLaneAI/catalyst/pull/2281)
+
 <h3>Internal changes ⚙️</h3>
 
 * xDSL and xDSL-JAX are now dependencies of Catalyst.
