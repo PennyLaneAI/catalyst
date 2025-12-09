@@ -26,13 +26,16 @@ using namespace RSDecomp::CliffordData;
 
 TEST_CASE("Test MA normal form", "[RSDecomp][NormalForms]")
 {
+    // For this test, we construct the SO3 matrix, then test the decomposition
     std::vector<std::vector<GateType>> cl_list;
     for (const auto &key_value_pair : clifford_group_to_SO3) {
         cl_list.push_back(key_value_pair.first);
     }
 
+    // Corresponds to initial T
     bool a = GENERATE(true, false);
 
+    // Corresponds to sequence of HT and SHT
     std::vector<bool> b = GENERATE(values<std::vector<bool>>({
         {false, false, false, false, false}, // All false
         {true, true, true, true, true},      // All true
@@ -42,6 +45,7 @@ TEST_CASE("Test MA normal form", "[RSDecomp][NormalForms]")
         {true, true, false, false, true}     // Mixed
     }));
 
+    // Corresponds to final Clifford
     int c = GENERATE(range(0, 24));
 
     std::string b_str;

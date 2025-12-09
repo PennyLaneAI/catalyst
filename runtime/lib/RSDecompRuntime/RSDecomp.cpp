@@ -103,7 +103,7 @@ std::pair<std::vector<GateType>, double> compute_raw_decomposition(double angle,
         for (const auto &[u_sol, k_val] : u_solutions) {
             // Calculate 2^k_val as an INT_TYPE
             INT_TYPE two_pow_k = INT_TYPE(1) << k_val;
-            auto xi = ZSqrtTwo(two_pow_k, 0) - u_sol.norm().to_sqrt_two();
+            auto xi = ZSqrtTwo(two_pow_k, 0) - u_sol.norm2().to_sqrt_two();
             auto t_sol = NormSolver::solve_diophantine(xi, MAX_FACTORING_TRIALS);
 
             if (t_sol) {

@@ -22,35 +22,60 @@ namespace RSDecomp::Rings {
 using namespace RSDecomp::Utils;
 
 // Note:
-// Definitions for most of the operations here are available in
+// Definitions for most of the ring operations here are available in
 // https://arxiv.org/pdf/1212.6253 secion 3
+// and for parity calculations in
+// https://arxiv.org/pdf/1312.6584
 
 // --- ZSqrtTwo Method Implementations ---
 
 /**
- * @brief Constru
+ * @brief Constructor for ZSqrtTwo: a + b * sqrt(2)
  */
 ZSqrtTwo::ZSqrtTwo(INT_TYPE a, INT_TYPE b) : a(a), b(b) {}
 
+/**
+ * @brief Equality operator for ZSqrtTwo elements.
+ */
+bool ZSqrtTwo::operator==(const ZSqrtTwo &other) const { return a == other.a && b == other.b; }
+
+/**
+ * @brief Addition operator for ZSqrtTwo elements.
+ */
 ZSqrtTwo ZSqrtTwo::operator+(const ZSqrtTwo &other) const
 {
     return ZSqrtTwo(a + other.a, b + other.b);
 }
 
+/**
+ * @brief Subtraction operator for ZSqrtTwo elements.
+ */
 ZSqrtTwo ZSqrtTwo::operator-(const ZSqrtTwo &other) const
 {
     return ZSqrtTwo(a - other.a, b - other.b);
 }
 
+/**
+ * @brief Multiplication operator for ZSqrtTwo elements.
+ */
 ZSqrtTwo ZSqrtTwo::operator*(const ZSqrtTwo &other) const
 {
     return ZSqrtTwo(a * other.a + 2 * b * other.b, a * other.b + b * other.a);
 }
 
+/**
+ * @brief Scalar multiplication operator for ZSqrtTwo elements.
+ */
 ZSqrtTwo ZSqrtTwo::operator*(INT_TYPE scalar) const { return ZSqrtTwo(a * scalar, b * scalar); }
 
+/**
+ * @brief Division operator for ZSqrtTwo elements.
+ */
 ZSqrtTwo ZSqrtTwo::operator/(ZSqrtTwo other) const { return (*this * other.adj2()) / other.norm(); }
 
+/**
+ * @brief Division by scalar operator for ZSqrtTwo elements.
+ */
 ZSqrtTwo ZSqrtTwo::operator/(INT_TYPE scalar) const
 {
     RT_FAIL_IF(scalar == 0, "Division by zero");
@@ -58,18 +83,27 @@ ZSqrtTwo ZSqrtTwo::operator/(INT_TYPE scalar) const
     return ZSqrtTwo(a / scalar, b / scalar);
 }
 
-bool ZSqrtTwo::operator==(const ZSqrtTwo &other) const { return a == other.a && b == other.b; }
-
-// https://arxiv.org/pdf/1212.6253 Def 4
+/**
+ * @brief Computes the norm of the ZSqrtTwo element. (Definition 4, arXiv:1212.6253)
+ */
 INT_TYPE ZSqrtTwo::norm() const { return a * a - 2 * b * b; }
 
+/**
+ * @brief Computes the adjoint of the ZSqrtTwo element.
+ */
 ZSqrtTwo ZSqrtTwo::adj2() const { return ZSqrtTwo(a, -b); }
 
+/**
+ * @brief Converts the ZSqrtTwo element to a double.
+ */
 double ZSqrtTwo::to_double() const
 {
     return static_cast<double>(a) + static_cast<double>(b) * M_SQRT2;
 }
 
+/**
+ * @brief Computes the exponentiation of the ZSqrtTwo element.
+ */
 ZSqrtTwo ZSqrtTwo::pow(INT_TYPE exponent) const
 {
     RT_FAIL_IF(exponent < 0, "Negative exponent not supported for ZSqrtTwo");
@@ -85,7 +119,9 @@ ZSqrtTwo ZSqrtTwo::pow(INT_TYPE exponent) const
     return result;
 }
 
-// https://arxiv.org/pdf/1212.6253 remark 6
+/**
+ * @brief Computes the modulo of the ZSqrtTwo element. (Remark 6, arXiv:1212.6253)
+ */
 ZSqrtTwo ZSqrtTwo::operator%(const ZSqrtTwo &other) const
 {
     INT_TYPE d = other.norm();
@@ -98,6 +134,9 @@ ZSqrtTwo ZSqrtTwo::operator%(const ZSqrtTwo &other) const
     return *this - quotient * other;
 }
 
+/**
+ * @brief Computes the square root of the ZSqrtTwo element, if it exists.
+ */
 std::optional<ZSqrtTwo> ZSqrtTwo::sqrt() const
 {
     const INT_TYPE d = this->norm();
@@ -127,16 +166,55 @@ std::optional<ZSqrtTwo> ZSqrtTwo::sqrt() const
     return std::nullopt;
 }
 
+/**
+ * @brief Converts the ZSqrtTwo element to a ZOmega element.
+ */
 ZOmega ZSqrtTwo::to_omega() const { return ZOmega(-b, 0, b, a); }
 
 // --- ZOmega Method Implementations ---
 
+/**
+ * @brief Constructor for ZOmega: a*ω^3 + b*ω^2 + c*ω + d
+ */
 ZOmega::ZOmega(INT_TYPE a, INT_TYPE b, INT_TYPE c, INT_TYPE d) : a(a), b(b), c(c), d(d) {}
 
+/**
+ * @brief Constructor for ZOmega with only d specified.
+ */
 ZOmega::ZOmega(INT_TYPE d) : a(0), b(0), c(0), d(d) {}
 
+/**
+ * @brief Equality operator for ZOmega elements.
+ */
+bool ZOmega::operator==(const ZOmega &other) const
+{
+    return a == other.a && b == other.b && c == other.c && d == other.d;
+}
+
+/**
+ * @brief Addition operator for ZOmega elements.
+ */
+ZOmega ZOmega::operator+(const ZOmega &other) const
+{
+    return ZOmega(a + other.a, b + other.b, c + other.c, d + other.d);
+}
+
+/**
+ * @brief Subtraction operator for ZOmega elements.
+ */
+ZOmega ZOmega::operator-(const ZOmega &other) const
+{
+    return ZOmega(a - other.a, b - other.b, c - other.c, d - other.d);
+}
+
+/**
+ * @brief Negation operator for ZOmega elements.
+ */
 ZOmega ZOmega::operator-() const { return ZOmega(-a, -b, -c, -d); }
 
+/**
+ * @brief Multiplication operator for ZOmega elements.
+ */
 ZOmega ZOmega::operator*(const ZOmega &other) const
 {
     return ZOmega(a * other.d + b * other.c + c * other.b + d * other.a,
@@ -145,11 +223,17 @@ ZOmega ZOmega::operator*(const ZOmega &other) const
                   d * other.d - a * other.c - b * other.b - c * other.a);
 }
 
+/**
+ * @brief Scalar multiplication operator for ZOmega elements.
+ */
 ZOmega ZOmega::operator*(INT_TYPE scalar) const
 {
     return ZOmega(a * scalar, b * scalar, c * scalar, d * scalar);
 }
 
+/**
+ * @brief Division by scalar operator for ZOmega elements.
+ */
 ZOmega ZOmega::operator/(INT_TYPE scalar) const
 {
     RT_FAIL_IF(scalar == 0, "Division by zero");
@@ -158,21 +242,9 @@ ZOmega ZOmega::operator/(INT_TYPE scalar) const
     return ZOmega(a / scalar, b / scalar, c / scalar, d / scalar);
 }
 
-ZOmega ZOmega::operator+(const ZOmega &other) const
-{
-    return ZOmega(a + other.a, b + other.b, c + other.c, d + other.d);
-}
-
-ZOmega ZOmega::operator-(const ZOmega &other) const
-{
-    return ZOmega(a - other.a, b - other.b, c - other.c, d - other.d);
-}
-
-bool ZOmega::operator==(const ZOmega &other) const
-{
-    return a == other.a && b == other.b && c == other.c && d == other.d;
-}
-
+/**
+ * @brief Converts the ZOmega element to a complex number.
+ */
 std::complex<double> ZOmega::to_complex() const
 {
     return std::complex<double>(static_cast<double>(a) * std::pow(OMEGA, 3) +
@@ -180,24 +252,44 @@ std::complex<double> ZOmega::to_complex() const
                                 static_cast<double>(c) * OMEGA + static_cast<double>(d));
 }
 
+/**
+ * @brief Return the parity indicating structure of real and imaginary parts as a DyadicMatrix
+ * element.
+ */
 bool ZOmega::parity() const { return (a + c) % 2 != 0; }
 
+/**
+ * @brief Return the adjoint, i.e., the root-2 conjugate.
+ */
 ZOmega ZOmega::adj2() const { return ZOmega(-a, b, -c, d); }
 
-INT_TYPE ZOmega::abs() const
+/**
+ * @brief Computes the norm of the ZOmega element. (x^T x)^dot (x^T x) (Definition 4,
+ * arXiv:1212.6253) We call this norm4 to denote the fact that this is quartic.
+ */
+INT_TYPE ZOmega::norm4() const
 {
     INT_TYPE first = a * a + b * b + c * c + d * d;
     INT_TYPE second = a * b + b * c + c * d - d * a;
     return first * first - 2 * second * second;
 }
 
+/**
+ * @brief Computes the conjugate of the ZOmega element.
+ */
 ZOmega ZOmega::conj() const { return ZOmega(-c, -b, -a, d); }
 
-ZOmega ZOmega::norm() const { return (*this) * (*this).conj(); }
+/**
+ * @brief Computes the 'norm' of the ZOmega element.
+ */
+ZOmega ZOmega::norm2() const { return (*this) * (*this).conj(); }
 
+/**
+ * @brief Computes the modulo of the ZOmega element. (Remark 6, arXiv:1212.6253)
+ */
 ZOmega ZOmega::operator%(const ZOmega &other) const
 {
-    INT_TYPE d = other.abs();
+    INT_TYPE d = other.norm4();
     ZOmega other_z{other};
     ZOmega other_conj_z{other.conj()};
     ZOmega n = (*this) * other_conj_z * ((other_z * other_conj_z).adj2());
@@ -212,6 +304,9 @@ ZOmega ZOmega::operator%(const ZOmega &other) const
     return result;
 }
 
+/**
+ * @brief Converts the ZOmega element to a ZSqrtTwo element.
+ */
 ZSqrtTwo ZOmega::to_sqrt_two() const
 {
     if ((c + a == 0) && (b == 0)) {
@@ -220,6 +315,9 @@ ZSqrtTwo ZOmega::to_sqrt_two() const
     RT_FAIL("Invalid ZOmega for conversion to ZSqrtTwo");
 }
 
+/**
+ * @brief Normalize the ZOmega element and return the number of times 2 was factored out.
+ */
 std::pair<ZOmega, int> ZOmega::normalize()
 {
     int ix = 0;
@@ -242,6 +340,9 @@ std::pair<ZOmega, int> ZOmega::normalize()
 
 // --- DyadicMatrix Method Implementations ---
 
+/**
+ * @brief Constructor for DyadicMatrix.
+ */
 DyadicMatrix::DyadicMatrix(const ZOmega &a, const ZOmega &b, const ZOmega &c, const ZOmega &d,
                            INT_TYPE k)
     : a(a), b(b), c(c), d(d), k(k)
@@ -249,6 +350,9 @@ DyadicMatrix::DyadicMatrix(const ZOmega &a, const ZOmega &b, const ZOmega &c, co
     normalize();
 }
 
+/**
+ * @brief Reduce the k value of the dyadic matrix.
+ */
 void DyadicMatrix::normalize()
 {
     if (a == ZOmega(0) && b == ZOmega(0) && c == ZOmega(0) && d == ZOmega(0)) {
@@ -287,6 +391,9 @@ void DyadicMatrix::normalize()
     }
 }
 
+/**
+ * @brief Negation operator for DyadicMatrix elements.
+ */
 DyadicMatrix DyadicMatrix::operator-() const { return DyadicMatrix(-a, -b, -c, -d, k); }
 
 bool DyadicMatrix::operator==(const DyadicMatrix &other) const
@@ -294,8 +401,14 @@ bool DyadicMatrix::operator==(const DyadicMatrix &other) const
     return a == other.a && b == other.b && c == other.c && d == other.d && k == other.k;
 }
 
+/**
+ * @brief Flatten the DyadicMatrix into an array of ZOmega elements.
+ */
 std::array<ZOmega, 4> DyadicMatrix::flatten() const { return {a, b, c, d}; }
 
+/**
+ * @brief Scalar multiplication operator for DyadicMatrix elements.
+ */
 DyadicMatrix DyadicMatrix::operator*(const ZOmega &scalar) const
 {
     return DyadicMatrix(a * scalar, b * scalar, c * scalar, d * scalar, k);
@@ -303,18 +416,27 @@ DyadicMatrix DyadicMatrix::operator*(const ZOmega &scalar) const
 
 // --- SO3Matrix Method Implementations ---
 
+/**
+ * @brief Constructor for SO3Matrix from DyadicMatrix.
+ */
 SO3Matrix::SO3Matrix(const DyadicMatrix &dy_mat) : dyadic_mat(dy_mat)
 {
     from_dyadic_matrix(dy_mat);
     normalize();
 }
 
+/**
+ * @brief Constructor for SO3Matrix from matrix and k value.
+ */
 SO3Matrix::SO3Matrix(const std::array<std::array<ZSqrtTwo, 3>, 3> &mat, INT_TYPE k)
     : so3_mat(mat), k(k)
 {
     normalize();
 }
 
+/**
+ * @brief Helper function to construct for SO3Matrix from DyadicMatrix.
+ */
 void SO3Matrix::from_dyadic_matrix(const DyadicMatrix &dy_mat)
 {
     const auto &su2_elems = dy_mat.flatten();
@@ -368,11 +490,17 @@ void SO3Matrix::from_dyadic_matrix(const DyadicMatrix &dy_mat)
     this->k = current_k;
 }
 
+/**
+ * @brief Equality operator for SO3Matrix elements.
+ */
 bool SO3Matrix::operator==(const SO3Matrix &other) const
 {
     return so3_mat == other.so3_mat && k == other.k;
 }
 
+/**
+ * @brief Return the parity matrix of the SO3Matrix element.
+ */
 std::array<std::array<int, 3>, 3> SO3Matrix::parity_mat() const
 {
     std::array<std::array<int, 3>, 3> p_mat;
@@ -385,6 +513,9 @@ std::array<std::array<int, 3>, 3> SO3Matrix::parity_mat() const
     return p_mat;
 }
 
+/**
+ * @brief Return the parity vector of the SO3Matrix element.
+ */
 std::array<int, 3> SO3Matrix::parity_vec() const
 {
     auto p_mat = this->parity_mat();
@@ -395,12 +526,18 @@ std::array<int, 3> SO3Matrix::parity_vec() const
     return p_vec;
 }
 
+/**
+ * @brief Flatten the SO3Matrix into an array of ZSqrtTwo elements.
+ */
 std::array<ZSqrtTwo, 9> SO3Matrix::flatten() const
 {
     return {so3_mat[0][0], so3_mat[0][1], so3_mat[0][2], so3_mat[1][0], so3_mat[1][1],
             so3_mat[1][2], so3_mat[2][0], so3_mat[2][1], so3_mat[2][2]};
 }
 
+/**
+ * @brief Reduce the k value of the SO(3) matrix.
+ */
 void SO3Matrix::normalize()
 {
     auto elements = this->flatten();
@@ -430,17 +567,27 @@ void SO3Matrix::normalize()
 
 // --- Free Function Implementations ---
 
+/**
+ * @brief Return ZOmega element as A + 1j * B + shift, where A and B are ZSqrtTwo elements and shift
+ * is ZOmega element.
+ */
 ZOmega zomega_from_sqrt_pair(const ZSqrtTwo &alpha, const ZSqrtTwo &beta, const ZOmega &shift)
 {
     return ZOmega(beta.b - alpha.b, beta.a, beta.b + alpha.b, alpha.a) + shift;
 }
 
+/**
+ * @brief Multiply two DyadicMatrix .
+ */
 DyadicMatrix dyadic_matrix_mul(const DyadicMatrix &m1, const DyadicMatrix &m2)
 {
     return DyadicMatrix(m1.a * m2.a + m1.b * m2.c, m1.a * m2.b + m1.b * m2.d,
                         m1.c * m2.a + m1.d * m2.c, m1.c * m2.b + m1.d * m2.d, m1.k + m2.k);
 }
 
+/**
+ * @brief Multiply two SO3Matrix.
+ */
 SO3Matrix so3_matrix_mul(const SO3Matrix &m1, const SO3Matrix &m2)
 {
     std::array<std::array<ZSqrtTwo, 3>, 3> result_mat{};
@@ -459,7 +606,7 @@ SO3Matrix so3_matrix_mul(const SO3Matrix &m1, const SO3Matrix &m2)
 
 } // namespace RSDecomp::Rings
 
-// Helper print functions that can be deleted
+// FIXME: Helper print functions that can be deleted
 using namespace RSDecomp::Utils;
 std::ostream &operator<<(std::ostream &os, const RSDecomp::Rings::SO3Matrix &matrix)
 {

@@ -92,8 +92,8 @@ TEST_CASE("Test ZOmega class", "[RSDecomp][Rings]")
     CHECK((ZOmega(2, 4, 6, 8) / 2) == z1);
 
     CHECK((ZOmega(1283, 130, 3092, 3091) % ZOmega(44, 67, 91, 3)) == ZOmega(-24, -11, 10, 7));
-    CHECK(z1.abs() == 388);
-    CHECK(z2.abs() == 14788);
+    CHECK(z1.norm4() == 388);
+    CHECK(z2.norm4() == 14788);
 
     auto z1_complex = z1.to_complex();
     CHECK(z1_complex.real() == Catch::Approx(5.41421356237309).margin(tol));
@@ -111,7 +111,7 @@ TEST_CASE("Test ZOmega class", "[RSDecomp][Rings]")
     CHECK(z1_conj.to_complex().imag() == Catch::Approx(std::conj(z1_complex).imag()).margin(tol));
 
     CHECK(
-        z2.norm().to_complex().real() ==
+        z2.norm2().to_complex().real() ==
         Catch::Approx((std::abs(z2.to_complex()) * std::abs(z2.conj().to_complex()))).margin(tol));
 
     CHECK((z1 - ZOmega(2, 2, 2, 0)).to_sqrt_two() == ZSqrtTwo(4, 1));

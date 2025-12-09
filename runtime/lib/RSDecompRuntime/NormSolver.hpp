@@ -25,8 +25,10 @@
 #include "Rings.hpp"
 
 namespace RSDecomp::NormSolver {
+
 using namespace RSDecomp::Utils;
 using namespace RSDecomp::Rings;
+
 INT_TYPE legendre_symbol(INT_TYPE a, INT_TYPE p);
 bool primality_test(INT_TYPE n);
 std::optional<INT_TYPE> sqrt_modulo_p(INT_TYPE n, INT_TYPE p);

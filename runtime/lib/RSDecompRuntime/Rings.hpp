@@ -101,9 +101,9 @@ struct ZOmega {
     std::complex<double> to_complex() const;
     bool parity() const;
     ZOmega adj2() const;
-    INT_TYPE abs() const;
+    INT_TYPE norm4() const;
     ZOmega conj() const;
-    ZOmega norm() const;
+    ZOmega norm2() const;
 
     ZSqrtTwo to_sqrt_two() const;
     std::pair<ZOmega, int> normalize();
@@ -161,7 +161,7 @@ struct SO3Matrix {
 };
 
 } // namespace RSDecomp::Rings
-// Helper print functions that can be deleted
+// FIXME: Helper print functions that can be deleted
 std::ostream &operator<<(std::ostream &os, const RSDecomp::Rings::ZOmega &zomega);
 std::ostream &operator<<(std::ostream &os, const RSDecomp::Rings::ZSqrtTwo &zsqtwo);
 std::ostream &operator<<(std::ostream &os, const RSDecomp::Rings::SO3Matrix &matrix);

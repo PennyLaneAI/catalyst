@@ -12,13 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#pragma once
+
 #include "CliffordData.hpp"
 #include "Rings.hpp"
+
 namespace RSDecomp::NormalForms {
 using namespace RSDecomp::Rings;
 using RSDecomp::CliffordData::GateType;
 
-std::pair<std::vector<GateType>, double> ma_normal_form(SO3Matrix &op)
+/**
+ * @brief Decompose an SO(3) matrix into Matsumoto-Amano normal form.
+ *
+ *  A Matsumoto-Amano normal form - (T | ε) (HT | SHT)^* C, consists of a rightmost
+    Clifford operator, followed by any number of syllables of the form HT or SHT, followed by an
+    optional syllable T arXiv:1312.6584.
+ */
+std::pair<std::vector<GateType>, double> ma_normal_form(const SO3Matrix &op)
 {
     ZOmega a{0, 0, 0, 1};
     ZOmega c{0, 0, 0, 0};
@@ -79,7 +89,6 @@ std::pair<std::vector<GateType>, double> ma_normal_form(SO3Matrix &op)
     }
 
     auto su2mat = op.dyadic_mat;
-    // Convert INT_TYPE k values to double for power calculation
     double k_diff = static_cast<double>(static_cast<long long>(k - su2mat.k));
     auto g_angle = -std::arg(su2mat.a.to_complex() / a.to_complex() * std::pow(M_SQRT2, k_diff));
     g_phase = g_angle / M_PI - g_phase;

@@ -137,13 +137,13 @@ catch_discover_tests(runner_tests_mbqc_runtime)
 # RS Decomposition test suite
 add_executable(runner_tests_rsdecomp_runtime)
 target_sources(runner_tests_rsdecomp_runtime PRIVATE
-    Test_RSDecomp_utils.cpp
-    Test_RSDecomp_rings.cpp
-    Test_RSDecomp_ellipse.cpp
-    Test_RSDecomp_grid_problems.cpp
-    Test_RSDecomp_normal_forms.cpp
-    Test_RSDecomp_norm_solver.cpp
-    Test_RSDecomp_ross_selinger.cpp
+    Test_RSDecompUtils.cpp
+    Test_RSDecompRings.cpp
+    Test_RSDecompEllipse.cpp
+    Test_RSDecompGridProblems.cpp
+    Test_RSDecompNormalForms.cpp
+    Test_RSDecompNormSolver.cpp
+    Test_RSDecomp.cpp
 )
 target_link_libraries(runner_tests_rsdecomp_runtime PRIVATE
     Catch2WithMain

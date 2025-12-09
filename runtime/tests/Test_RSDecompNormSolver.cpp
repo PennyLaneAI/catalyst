@@ -160,7 +160,7 @@ TEST_CASE("Test Solve Diophantine Large", "[RSDecomp][NormSolver]")
          {ZOmega(-22067493351, 22078644868, 52098814989, 16270802723), 73}}));
 
     INT_TYPE two_pow_k = INT_TYPE(1) << static_cast<unsigned>(k);
-    auto xi = ZSqrtTwo(two_pow_k, 0) - u.norm().to_sqrt_two();
+    auto xi = ZSqrtTwo(two_pow_k, 0) - u.norm2().to_sqrt_two();
     auto result = solve_diophantine(xi);
     REQUIRE(result.has_value());
     ZOmega x = result.value();
