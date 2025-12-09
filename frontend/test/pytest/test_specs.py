@@ -458,6 +458,34 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
+    def test_ppr(self):
+        """Test that PPRs are handled correctly."""
+
+        pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+
+        @qml.qjit(pipelines=pipeline, target="mlir")
+        @catalyst.passes.to_ppr
+        @qml.qnode(qml.device("null.qubit", wires=2))
+        def circ():
+            qml.H(0)
+            qml.T(0)
+
+        expected = CircuitSpecs(
+            device_name="null.qubit",
+            num_device_wires=2,
+            shots=Shots(None),
+            level=2,
+            resources=SpecsResources(
+                gate_types={"PPR-pi/4": 3, "PPR-pi/8": 1},
+                gate_sizes={1: 4},
+                measurements={},
+                num_allocs=2,
+            ),
+        )
+
+        actual = qml.specs(circ, level=2)()
+        check_specs_same(actual, expected)
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
