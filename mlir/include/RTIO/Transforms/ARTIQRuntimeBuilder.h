@@ -18,7 +18,6 @@
 #pragma once
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/IR/Builders.h"
@@ -54,18 +53,19 @@ constexpr StringLiteral kernel = "__kernel__";
 
 namespace ARTIQHardwareConfig {
 constexpr double nanosecondPeriod = 1e-9;
-constexpr double ftwScaleFactor = 4.294967296; // 2^32 / 1e9
-constexpr double powScaleFactor = 65536.0;     // 2^16
-constexpr int32_t maxAmplitude = 0x3FFF;       // 14-bit max ASF
-constexpr int32_t profile0Instruction = 0x0E000000;
+constexpr double ftwScaleFactor = 4.294967296;      // 2^32 / 1e9
+constexpr double powScaleFactor = 65536.0;          // 2^16
+constexpr int32_t maxAmplitude = 0x3FFF;            // 14-bit max ASF
+constexpr int32_t profile7Instruction = 0x15000000; // 0x0E (Profile 0) + 7 = 0x15
 constexpr int64_t initSlackDelay = 125000;
 constexpr int64_t freqSetSlackDelay = 10000; // 1e-5s in mu
-constexpr int32_t spiDiv = 8;
+constexpr int32_t spiDiv = 2; // SPI divider: ARTIQ standard is div=2 for fast transfers
 constexpr int32_t spiLen8 = 8;
 constexpr int32_t spiLen32 = 32;
-constexpr int32_t spiFlagsKeepCS = 2;
-constexpr int32_t spiFlagsReleaseCS = 0;
+constexpr int32_t spiFlagsKeepCS = 8;     // SPI_CS_POLARITY (CS low to listen)
+constexpr int32_t spiFlagsReleaseCS = 10; // SPI_CS_POLARITY | SPI_END (CS high to release)
 constexpr int64_t ioUpdatePulseWidth = 8;
+constexpr int64_t refPeriodMu = 8; // RTIO reference period (Kasli = 8ns @ 125MHz RTIO clock)
 } // namespace ARTIQHardwareConfig
 
 //===----------------------------------------------------------------------===//
@@ -156,7 +156,16 @@ class ARTIQRuntimeBuilder {
         call.setTailCallKind(LLVM::TailCallKind::Tail);
     }
 
-    // Frequency setting
+    // Wait for SPI transmission to complete.
+    // ARTIQ formula: ref_period_mu * ((length + 1) * div + 1)
+    void waitForSpi(int32_t len, int32_t div)
+    {
+        int64_t duration =
+            ARTIQHardwareConfig::refPeriodMu * ((static_cast<int64_t>(len) + 1) * div + 1);
+        delayMu(constI64(duration));
+    }
+
+    // Frequency setting (continuous phase mode)
     Value setFrequency(Value channelId, Value freqHz, Value phaseTurns, Value amplitude)
     {
         ensureSetFrequencyFunc();
@@ -308,15 +317,19 @@ class ARTIQRuntimeBuilder {
         Block *entry = func.addEntryBlock(builder);
         builder.setInsertionPointToStart(entry);
 
+        // channelId here is the DDS channel index (0, 1, 2, 3) for the Urukul
         Value channelId = entry->getArgument(0);
         Value freqHz = entry->getArgument(1);
         Value phaseTurns = entry->getArgument(2);
         Value amplitude = entry->getArgument(3);
 
         // Get hardware configuration from module
-        auto [spiBaseAddr, csOffset, ioUpdateAddr] = getHardwareAddresses(module);
+        auto [spiBaseAddr, csBase, ioUpdateAddr] = getHardwareAddresses(module);
 
-        Value cs = builder.create<arith::AddIOp>(getLoc(), channelId, constI32(csOffset));
+        // CS calculation: csBase is the chip_select for ch0 (typically 4)
+        // For Urukul: ch0->CS=4, ch1->CS=5, ch2->CS=6, ch3->CS=7
+        // So CS = csBase + channelId
+        Value cs = builder.create<arith::AddIOp>(getLoc(), constI32(csBase), channelId);
         Value spiBase = constI32(spiBaseAddr);
         Value ioUpdate = constI32(ioUpdateAddr);
 
@@ -332,13 +345,15 @@ class ARTIQRuntimeBuilder {
         Value powRounded = builder.create<math::RoundOp>(getLoc(), powDouble);
         Value pow = builder.create<arith::FPToUIOp>(getLoc(), i32Ty, powRounded);
 
-        // SPI transfer: Write instruction (Profile 0 -> 0x0E)
+        // SPI Transfer: Write instruction to profile 7 (0x15)
         configSpi(spiBase, cs, constI32(ARTIQHardwareConfig::spiLen8),
                   constI32(ARTIQHardwareConfig::spiDiv),
                   constI32(ARTIQHardwareConfig::spiFlagsKeepCS));
-        rtioOutput(spiBase, constI32(ARTIQHardwareConfig::profile0Instruction));
+        rtioOutput(spiBase, constI32(ARTIQHardwareConfig::profile7Instruction));
+        // Wait for SPI transmission to complete
+        waitForSpi(ARTIQHardwareConfig::spiLen8, ARTIQHardwareConfig::spiDiv);
 
-        // Write amplitude + phase (high 32 bits)
+        // SPI Transfer: Write amplitude + phase (high 32 bits)
         // Convert amplitude (f64, 0.0~1.0) to ASF (i32, 0~0x3FFF)
         configSpi(spiBase, cs, constI32(ARTIQHardwareConfig::spiLen32),
                   constI32(ARTIQHardwareConfig::spiDiv),
@@ -350,14 +365,18 @@ class ARTIQRuntimeBuilder {
         Value asfShifted = builder.create<arith::ShLIOp>(getLoc(), asf, constI32(16));
         Value ampPhase = builder.create<arith::OrIOp>(getLoc(), asfShifted, pow);
         rtioOutput(spiBase, ampPhase);
+        // Wait for SPI transmission to complete
+        waitForSpi(ARTIQHardwareConfig::spiLen32, ARTIQHardwareConfig::spiDiv);
 
-        // Write FTW (low 32 bits)
+        // SPI Transfer: Write FTW (low 32 bits)
         configSpi(spiBase, cs, constI32(ARTIQHardwareConfig::spiLen32),
                   constI32(ARTIQHardwareConfig::spiDiv),
                   constI32(ARTIQHardwareConfig::spiFlagsReleaseCS));
         rtioOutput(spiBase, ftw);
+        // Wait for SPI transmission to complete
+        waitForSpi(ARTIQHardwareConfig::spiLen32, ARTIQHardwareConfig::spiDiv);
 
-        // IO Update pulse
+        // IO Update pulse: Toggle IO update TTL
         ttlOn(ioUpdate);
         delayMu(constI64(ARTIQHardwareConfig::ioUpdatePulseWidth));
         ttlOff(ioUpdate);
@@ -365,6 +384,11 @@ class ARTIQRuntimeBuilder {
         builder.create<LLVM::ReturnOp>(getLoc(), ValueRange{});
     }
 
+    /// Returns hardware addresses: (spiBaseAddr, csBase, ioUpdateAddr)
+    /// - spiBaseAddr: SPI RTIO address (channel << 8)
+    /// - csBase: Base chip_select value for ch0 (typically 4 for Urukul)
+    ///           Other channels use csBase + channelIndex (ch1=5, ch2=6, ch3=7)
+    /// - ioUpdateAddr: IO update TTL RTIO address (channel << 8)
     std::tuple<int32_t, int32_t, int32_t> getHardwareAddresses(ModuleOp module)
     {
         auto configAttr = module->getAttrOfType<ConfigAttr>(ConfigAttr::getModuleAttrName());
@@ -387,11 +411,13 @@ class ARTIQRuntimeBuilder {
         };
 
         int64_t spiChannel = getChannel({"device_db", "spi_urukul0", "arguments", "channel"});
-        int64_t csOffset = getChannel({"device_db", "urukul0_ch0", "arguments", "chip_select"});
+        // chip_select from urukul0_ch0 is the base CS (typically 4)
+        // ch0->CS=4, ch1->CS=5, ch2->CS=6, ch3->CS=7
+        int64_t csBase = getChannel({"device_db", "urukul0_ch0", "arguments", "chip_select"});
         int64_t ioUpdateChannel =
             getChannel({"device_db", "ttl_urukul0_io_update", "arguments", "channel"});
 
-        return {static_cast<int32_t>(spiChannel << 8), static_cast<int32_t>(csOffset),
+        return {static_cast<int32_t>(spiChannel << 8), static_cast<int32_t>(csBase),
                 static_cast<int32_t>(ioUpdateChannel << 8)};
     }
 };
