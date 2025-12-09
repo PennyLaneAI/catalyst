@@ -13,6 +13,7 @@
 # limitations under the License.
 """Unified Compiler API for integration of Catalyst with xDSL."""
 
+# pylint: disable=wrong-import-position
 from importlib.util import find_spec
 
 if not (find_spec("xdsl") and find_spec("xdsl_jax")):  # pragma: no cover
