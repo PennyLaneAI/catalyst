@@ -13,6 +13,14 @@
 # limitations under the License.
 """Unified Compiler API for integration of Catalyst with xDSL."""
 
+from importlib.util import find_spec
+
+if not (find_spec("xdsl") and find_spec("xdsl_jax")):  # pragma: no cover
+    raise RuntimeError(
+        "Using the Unified compiler framework requires xDSL and xDSL-JAX to be installed. "
+        "They can be installed by executing 'python -m pip install xdsl xdsl-jax'."
+    )
+
 from .compiler import Compiler
 from .inspection import QMLCollector, mlir_specs
 from .parser import QuantumParser
