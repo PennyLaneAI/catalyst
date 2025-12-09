@@ -379,7 +379,11 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
                 qnodeCounts++;
             }
         });
-        assert(qnodeCounts == 1 && "only one qnode function is allowed");
+
+        if (qnodeCounts != 1) {
+            getOperation()->emitError("only one qnode function is allowed");
+            return signalPassFailure();
+        }
 
         // collect all ion information for calculating frequency when converting ion.pulse
         SmallVector<IonInfo> ionInfos = getIonInfos();
@@ -389,7 +393,10 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
         }
 
         // currently, we only support one ion information
-        assert(ionInfos.size() == 1 && "only one ion information is allowed");
+        if (ionInfos.size() != 1) {
+            getOperation()->emitError("only one ion information is allowed");
+            return signalPassFailure();
+        }
         IonInfo &ionInfo = ionInfos.front();
 
         // clone qnode function as new kernel function
