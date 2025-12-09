@@ -686,6 +686,7 @@ class TestIfOp:
         assert clusters["cluster10"]["node_label"] == "else"
         assert clusters["cluster10"]["parent_cluster_uid"] == "cluster7"
 
+
 class TestGetLabel:
     """Tests the get_label utility."""
 
