@@ -19,13 +19,10 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
-#include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
 #include "mlir/Dialect/Func/Extensions/AllExtensions.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/InitAllDialects.h"
-#include "mlir/InitAllExtensions.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 
@@ -64,9 +61,9 @@ int main(int argc, char **argv)
 
     mlir::DialectRegistry registry;
     mlir::registerAllDialects(registry);
-    mlir::registerAllExtensions(registry);
     test::registerTestDialect(registry);
     mlir::stablehlo::registerAllDialects(registry);
+    mlir::func::registerAllExtensions(registry);
     registry.insert<catalyst::CatalystDialect>();
     registry.insert<catalyst::quantum::QuantumDialect>();
     registry.insert<catalyst::qec::QECDialect>();
