@@ -640,7 +640,7 @@ def _requires_shots(capabilities):
     Checks if a device capabilities requires shots.
 
     A device requires shots if all of its MPs are finite shots only.
-    Shots is not absolutely required is all MPs require it.
+    Shots is absolutely required if all MPs require it.
     """
     return all(
         ExecutionCondition.FINITE_SHOTS_ONLY in MP_conditions
