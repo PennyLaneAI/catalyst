@@ -373,22 +373,27 @@ struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<Measuremen
 
         const auto obsOp = obs.getDefiningOp();
 
-        auto compBasisOp = dyn_cast<ComputationalBasisOp>(obsOp);
-        if (!compBasisOp) {
-            obsOp->emitError() << "Only computational-basis observables are currently supported\n";
+        // The flush op will be inserted before the observable op
+        rewriter.setInsertionPoint(obsOp);
+
+        ValueRange qubits;
+        if (auto compBasisOp = dyn_cast<ComputationalBasisOp>(obsOp)) {
+            qubits = compBasisOp.getQubits();
+        }
+        else if (auto namedObsOp = dyn_cast<NamedObsOp>(obsOp)) {
+            auto qubit = namedObsOp.getQubit();
+            qubits = ValueRange({qubit});
+        }
+        else {
+            obsOp->emitError() << "Unsupported observable op: " << obsOp->getName() << "\n";
             return failure();
         }
-
-        // The flush op will be inserted before the compbasis op
-        rewriter.setInsertionPoint(compBasisOp);
-
-        const OperandRange qubits = compBasisOp.getQubits();
 
         for (auto [idx, qubit] : llvm::enumerate(qubits)) {
             auto flushOp = rewriter.create<FlushOp>(loc, rewriter.getI1Type(), rewriter.getI1Type(),
                                                     qubit.getType(), qubit);
             auto pauliZOutQubit = insertPauliOpsAfterFlush(rewriter, loc, flushOp);
-            compBasisOp.setOperand(idx, pauliZOutQubit);
+            obsOp->setOperand(idx, pauliZOutQubit);
         }
         return success();
     }
@@ -405,11 +410,10 @@ void populateCliffordTToPauliFramePatterns(RewritePatternSet &patterns)
     patterns.add<InitPauliRecordQbitPattern>(patterns.getContext());
     patterns.add<InitPauliRecordQregPattern>(patterns.getContext());
     patterns.add<CorrectMeasurementPattern>(patterns.getContext());
+    patterns.add<FlushBeforeMeasurementProcessPattern<ExpvalOp>>(patterns.getContext());
+    patterns.add<FlushBeforeMeasurementProcessPattern<VarianceOp>>(patterns.getContext());
     patterns.add<FlushBeforeMeasurementProcessPattern<SampleOp>>(patterns.getContext());
     patterns.add<FlushBeforeMeasurementProcessPattern<CountsOp>>(patterns.getContext());
-    // patterns.add<FlushBeforeMeasurementProcessPattern<ExpvalOp>>(patterns.getContext());    //
-    // FIXME patterns.add<FlushBeforeMeasurementProcessPattern<VarianceOp>>(patterns.getContext());
-    // // FIXME
     patterns.add<FlushBeforeMeasurementProcessPattern<ProbsOp>>(patterns.getContext());
 }
 

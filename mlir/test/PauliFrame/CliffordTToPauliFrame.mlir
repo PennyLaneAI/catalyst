@@ -113,6 +113,44 @@ func.func @test_to_pauli_frame_correct_meas(%arg0 : !quantum.bit) -> (i1, !quant
 
 // -----
 
+// CHECK-LABEL: test_to_pauli_frame_expval_single_qubit
+func.func @test_to_pauli_frame_expval_single_qubit(%arg0 : !quantum.bit) -> f64 {
+    // CHECK: [[xbit:%.+]], [[zbit:%.+]], [[q1:%.+]] = pauli_frame.flush %arg0
+    // CHECK: [[q2:%.+]] = scf.if [[xbit]]
+    // CHECK:   quantum.custom "X"() [[q1]]
+    // CHECK: else
+    // CHECK: [[q3:%.+]] = scf.if [[zbit]]
+    // CHECK:   quantum.custom "Z"() [[q2]]
+    // CHECK: else
+    // CHECK: [[obs:%.+]] = quantum.namedobs [[q3]]
+    // CHECK: [[res:%.+]] = quantum.expval [[obs]]
+    %obs = quantum.namedobs %arg0 [PauliZ] : !quantum.obs
+    %res = quantum.expval %obs : f64
+    // CHECK: return [[res]]
+    func.return %res : f64
+}
+
+// -----
+
+// CHECK-LABEL: test_to_pauli_frame_var_single_qubit
+func.func @test_to_pauli_frame_var_single_qubit(%arg0 : !quantum.bit) -> f64 {
+    // CHECK: [[xbit:%.+]], [[zbit:%.+]], [[q1:%.+]] = pauli_frame.flush %arg0
+    // CHECK: [[q2:%.+]] = scf.if [[xbit]]
+    // CHECK:   quantum.custom "X"() [[q1]]
+    // CHECK: else
+    // CHECK: [[q3:%.+]] = scf.if [[zbit]]
+    // CHECK:   quantum.custom "Z"() [[q2]]
+    // CHECK: else
+    // CHECK: [[obs:%.+]] = quantum.namedobs [[q3]]
+    // CHECK: [[res:%.+]] = quantum.var [[obs]]
+    %obs = quantum.namedobs %arg0 [PauliZ] : !quantum.obs
+    %res = quantum.var %obs : f64
+    // CHECK: return [[res]]
+    func.return %res : f64
+}
+
+// -----
+
 // CHECK-LABEL: test_to_pauli_frame_sample_single_qubit
 func.func @test_to_pauli_frame_sample_single_qubit(%arg0 : !quantum.bit) -> tensor<1000x1xf64> {
     // CHECK: [[xbit:%.+]], [[zbit:%.+]], [[q1:%.+]] = pauli_frame.flush %arg0
@@ -160,25 +198,6 @@ func.func @test_to_pauli_frame_sample_two_qubits(%arg0 : !quantum.bit, %arg1 : !
 
 // CHECK-LABEL: test_to_pauli_frame_counts_single_qubit
 func.func @test_to_pauli_frame_counts_single_qubit(%arg0 : !quantum.bit) -> tensor<2xi64> {
-    // CHECK: [[xbit:%.+]], [[zbit:%.+]], [[q1:%.+]] = pauli_frame.flush %arg0
-    // CHECK: [[q2:%.+]] = scf.if [[xbit]]
-    // CHECK:   quantum.custom "X"() [[q1]]
-    // CHECK: else
-    // CHECK: [[q3:%.+]] = scf.if [[zbit]]
-    // CHECK:   quantum.custom "Z"() [[q2]]
-    // CHECK: else
-    // CHECK: [[obs:%.+]] = quantum.compbasis qubits [[q3]] : !quantum.obs
-    // CHECK: {{%.+}}, [[counts:%.+]] = quantum.counts [[obs]]
-    %obs = quantum.compbasis qubits %arg0 : !quantum.obs
-    %eigvals, %counts = quantum.counts %obs : tensor<2xf64>, tensor<2xi64>
-    // CHECK: return [[counts]]
-    func.return %counts : tensor<2xi64>
-}
-
-// -----
-
-// CHECK-LABEL: test_to_pauli_frame_expval_single_qubit
-func.func @test_to_pauli_frame_expval_single_qubit(%arg0 : !quantum.bit) -> tensor<2xi64> {
     // CHECK: [[xbit:%.+]], [[zbit:%.+]], [[q1:%.+]] = pauli_frame.flush %arg0
     // CHECK: [[q2:%.+]] = scf.if [[xbit]]
     // CHECK:   quantum.custom "X"() [[q1]]
