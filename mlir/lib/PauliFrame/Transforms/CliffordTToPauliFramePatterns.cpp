@@ -12,18 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <mlir/IR/Operation.h>
+#include <mlir/Support/LLVM.h>
 #define DEBUG_TYPE "to-pauli-frame"
 
 #include <concepts>
 
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/IR/PatternMatch.h"
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/LogicalResult.h>
 #include <llvm/Support/raw_ostream.h>
+#include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Location.h>
+#include <mlir/IR/PatternMatch.h>
 #include <mlir/IR/Value.h>
 #include <mlir/IR/ValueRange.h>
 
@@ -43,13 +45,20 @@ using namespace catalyst::quantum;
 // Helper functions
 //===----------------------------------------------------------------------===//
 
+/**
+ * Concept for operations that have an observable operand (`obs`). This is generally used for
+ * operations representing measurement processes. This concept encapsulates the following
+ * requirements on type `T`:
+ *
+ *   1. The expression obj.getObs() must be valid
+ *   2. The type returned by obj.getObs() must be exactly TypedValue<ObservableType>
+ */
 template <typename T>
-concept has_observable = requires(T obj) {
-    // 1. The expression obj.getObs() must be valid
-    // 2. The type returned by obj.getObs() must be exactly TypedValue<ObservableType>
+concept OpWithObservable = requires(T obj) {
     { obj.getObs() } -> std::same_as<TypedValue<ObservableType>>;
 };
 
+// The supported Clifford+T gates
 enum class GateEnum { I, X, Y, Z, H, S, T, CNOT, Unknown };
 
 // Hash gate name to GateEnum
@@ -358,7 +367,7 @@ struct CorrectMeasurementPattern : public OpRewritePattern<MeasureOp> {
     }
 };
 
-template <has_observable MeasurementProcessOp>
+template <OpWithObservable MeasurementProcessOp>
 struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<MeasurementProcessOp> {
     using OpRewritePattern<MeasurementProcessOp>::OpRewritePattern;
 
