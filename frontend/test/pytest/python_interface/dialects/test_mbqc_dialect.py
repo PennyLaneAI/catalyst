@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit test module for pennylane/compiler/python_compiler/dialects/mbqc.py."""
+"""Unit tests for the xDSL MBQC dialect."""
 
 
 import pytest
 
 # pylint: disable=wrong-import-position,line-too-long
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, test

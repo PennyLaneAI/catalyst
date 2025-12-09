@@ -1,4 +1,4 @@
-# Copyright 2024 Xanadu Quantum Technologies Inc.
+# Copyright 2024-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,7 +38,11 @@ from catalyst.utils.exceptions import CompileError
 
 ### Test peephole pass decorators preserve functionality of circuits ###
 @pytest.mark.parametrize("theta", [42.42])
-def test_cancel_inverses_functionality(theta, backend):
+# should be able to get rid of catalyst.passes.cancel_inverses soon, but testing both for now.
+@pytest.mark.parametrize(
+    "cancel_inverses_version", (cancel_inverses, qml.transforms.cancel_inverses)
+)
+def test_cancel_inverses_functionality(theta, backend, cancel_inverses_version):
 
     def circuit(x):
         qml.RX(x, wires=0)
@@ -50,14 +54,17 @@ def test_cancel_inverses_functionality(theta, backend):
 
     customized_device = qml.device(backend, wires=1)
     qjitted_workflow = qjit(qml.QNode(circuit, customized_device))
-    optimized_workflow = qjit(cancel_inverses(qml.QNode(circuit, customized_device)))
+    optimized_workflow = qjit(cancel_inverses_version(qml.QNode(circuit, customized_device)))
 
     assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
     assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
 
 
 @pytest.mark.parametrize("theta", [42.42])
-def test_merge_rotation_functionality(theta, backend):
+@pytest.mark.parametrize(
+    "merge_rotations_version", (merge_rotations, qml.transforms.merge_rotations)
+)
+def test_merge_rotation_functionality(theta, backend, merge_rotations_version):
 
     def circuit(x):
         qml.RX(x, wires=0)
@@ -76,7 +83,7 @@ def test_merge_rotation_functionality(theta, backend):
 
     customized_device = qml.device(backend, wires=1)
     qjitted_workflow = qjit(qml.QNode(circuit, customized_device))
-    optimized_workflow = qjit(merge_rotations(qml.QNode(circuit, customized_device)))
+    optimized_workflow = qjit(merge_rotations_version(qml.QNode(circuit, customized_device)))
 
     assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
     assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
@@ -246,7 +253,7 @@ def test_disentangle_passes():
 
 def test_convert_clifford_to_ppr():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_convert_clifford_to_ppr_workflow():
@@ -276,7 +283,7 @@ def test_convert_clifford_to_ppr():
 
 def test_commute_ppr():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_commute_ppr_workflow():
@@ -310,7 +317,7 @@ def test_commute_ppr():
 
 def test_merge_ppr_ppm():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_merge_ppr_ppm_workflow():
@@ -339,7 +346,7 @@ def test_merge_ppr_ppm():
 
 def test_ppr_to_ppm_auto_corrected():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_ppr_to_ppm_workflow():
@@ -373,7 +380,7 @@ def test_ppr_to_ppm_auto_corrected():
 
 def test_ppr_to_ppm_inject_magic_state():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_ppr_to_ppm_workflow():
@@ -403,7 +410,7 @@ def test_ppr_to_ppm_inject_magic_state():
 
 def test_ppr_to_ppm_pauli_corrected():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_ppr_to_ppm_workflow():
@@ -436,7 +443,7 @@ def test_ppr_to_ppm_pauli_corrected():
 
 def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_convert_clifford_to_ppr_workflow():
@@ -493,9 +500,34 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
     assert ppm_specs_output["g_0"]["max_weight_pi8"] == 1
 
 
+@pytest.mark.usefixtures("use_capture")
+def test_merge_rotation_ppr():
+    """Test that the merge_rotation pass correctly merges PPRs."""
+
+    my_pipeline = [("pipe", ["quantum-compilation-stage"])]
+
+    @qml.qjit(pipelines=my_pipeline, target="mlir")
+    def test_merge_rotation_ppr_workflow():
+        @qml.transforms.merge_rotations  # have to use qml to be capture-compatible
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            qml.PauliRot(np.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
+            qml.PauliRot(np.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
+
+        return circuit()
+
+    ir = test_merge_rotation_ppr_workflow.mlir
+    ir_opt = test_merge_rotation_ppr_workflow.mlir_opt
+
+    assert 'transform.apply_registered_pass "merge-rotations"' in ir
+    assert "qec.ppr" in ir
+    assert 'qec.ppr ["X", "Y", "Z"](4)' not in ir_opt
+    assert 'qec.ppr ["X", "Y", "Z"](2)' in ir_opt
+
+
 def test_clifford_to_ppm():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_clifford_to_ppm_workflow():

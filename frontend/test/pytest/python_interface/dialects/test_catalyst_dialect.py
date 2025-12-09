@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit test module for pennylane/compiler/python_compiler/dialects/catalyst.py."""
+"""Unit test module for the xDSL Catalyst dialect."""
 
 import pytest
 
 # pylint: disable=wrong-import-position
 
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 
 from catalyst.python_interface.dialects import Catalyst
 

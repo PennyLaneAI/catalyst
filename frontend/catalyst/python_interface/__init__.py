@@ -11,16 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Python Compiler API for integration of Catalyst with xDSL."""
+"""Unified Compiler API for integration of Catalyst with xDSL."""
 
 from .compiler import Compiler
+from .inspection import QMLCollector, mlir_specs
 from .parser import QuantumParser
 from .pass_api import compiler_transform
-from .visualization import QMLCollector
 
 __all__ = [
     "Compiler",
     "compiler_transform",
     "QuantumParser",
     "QMLCollector",
+    "mlir_specs",
 ]

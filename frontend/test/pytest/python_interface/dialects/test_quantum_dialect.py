@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit test module for pennylane/compiler/python_compiler/dialects/quantum.py."""
-
+"""Unit tests for the xDSL Quantum dialect."""
 import pytest
 
 # pylint: disable=wrong-import-position
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 
 from xdsl.dialects.builtin import (
     I32,
@@ -29,7 +29,7 @@ from xdsl.dialects.builtin import (
     i1,
 )
 from xdsl.dialects.test import TestOp
-from xdsl.ir import AttributeCovT, OpResult
+from xdsl.ir import AttributeCovT, Block, Operation, OpResult, Region
 
 from catalyst.python_interface.dialects import Quantum
 from catalyst.python_interface.dialects.quantum import (
@@ -114,7 +114,10 @@ basis_state = create_ssa_value(TensorType(i1, shape=(8,)))
 state = create_ssa_value(TensorType(ComplexType(Float64Type()), shape=(16,)))
 
 expected_ops_init_kwargs = {
-    "AdjointOp": {"qreg": qreg, "region": (CustomOp(gate_name="CNOT", in_qubits=(q0, q1)),)},
+    "AdjointOp": {
+        "qreg": qreg,
+        "region": Region(Block((CustomOp(gate_name="CNOT", in_qubits=(q0, q1)),))),
+    },
     "AllocOp": {"nqubits": 3},
     "AllocQubitOp": {},
     "ComputationalBasisOp": {"operands": (q0, None), "result_types": (obs,)},
@@ -202,7 +205,10 @@ def test_only_existing_operations_are_expected():
 @pytest.mark.parametrize("op", all_ops)
 def test_operation_construction(op):
     """Test the constructors of operations in the Quantum dialect."""
-    kwargs = expected_ops_init_kwargs[op.__name__]
+    kwargs = {
+        k: v.clone() if isinstance(v, (Operation, Region)) else v
+        for k, v in expected_ops_init_kwargs[op.__name__].items()
+    }
     _ = op(**kwargs)
 
 

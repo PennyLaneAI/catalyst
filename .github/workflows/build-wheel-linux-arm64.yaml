@@ -501,3 +501,16 @@ jobs:
       if: env.BUILD_STANDALONE_PLUGIN == 'true'
       run: |
         python${{ matrix.python_version }} -m pytest standalone_plugin_wheel/standalone_plugin/test -n auto
+
+    - name: Install Unified Compiler Dependencies
+      run: |
+        python${{ matrix.python_version }} -m pip install xdsl~=0.55.0 xdsl-jax==0.1.1
+        # Install graphviz for testing the mlir-op-graph integration
+        sudo apt-get install -y graphviz
+        python${{ matrix.python_version }} -m pip install graphviz
+
+    - name: Run Unified Compiler Tests
+      run: |
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto -m "xdsl"
+
+

@@ -129,7 +129,7 @@ class DecomposeGraphStatePattern(RewritePattern):
         rewriter.replace_all_uses_with(graph_prep_op.results[0], qinsert_ops[-1].results[0])
 
         # Finally, erase the ops that have now been replaced with quantum ops
-        rewriter.erase_matched_op()
+        rewriter.erase_op(graph_prep_op)
 
         # Erase the constant op that returned the adjacency matrix only if it has no other uses
         if graph_prep_op.adj_matrix.uses.get_length() == 0:
@@ -173,7 +173,7 @@ class NullDecomposeGraphStatePattern(RewritePattern):
         rewriter.replace_all_uses_with(graph_prep_op.results[0], alloc_op.results[0])
 
         # Finally, erase the ops that have now been replaced with quantum ops
-        rewriter.erase_matched_op()
+        rewriter.erase_op(graph_prep_op)
 
         # Erase the constant op that returned the adjacency matrix only if it has no other uses
         if graph_prep_op.adj_matrix.uses.get_length() == 0:
