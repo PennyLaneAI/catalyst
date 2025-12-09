@@ -230,10 +230,9 @@ class PyDotDAGBuilder(DAGBuilder):
             node = Node(
                 node_uid,
                 label=node_label,
-                shape="rectangle",
-                style="dashed",
+                margin=0,
+                shape="plaintext",
                 fontname="Helvetica",
-                penwidth=2,
             )
             rank_subgraph.add_node(node)
             cluster.add_subgraph(rank_subgraph)
