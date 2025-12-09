@@ -28,7 +28,11 @@ from typing import Any, Dict, Optional
 
 import pennylane as qml
 from jax.interpreters.partial_eval import DynamicJaxprTracer
-from pennylane.devices.capabilities import DeviceCapabilities, OperatorProperties
+from pennylane.devices.capabilities import (
+    DeviceCapabilities,
+    ExecutionCondition,
+    OperatorProperties,
+)
 from pennylane.transforms import (
     diagonalize_measurements,
     split_non_commuting,
@@ -636,13 +640,9 @@ def _requires_shots(capabilities):
     Checks if a device capabilities requires shots.
 
     A device requires shots if all of its MPs are finite shots only.
-    If any of the MPs support modes other than finite shots, shots is not absolutely required.
+    Shots is not absolutely required is all MPs require it.
     """
-    for _, MP_condition_list in capabilities.measurement_processes.items():
-        if len(MP_condition_list) == 0:
-            # This device has an MP that has no constraints
-            # so shots is not required
-            return False
-        if any(not hasattr(condition, "FINITE_SHOTS_ONLY") for condition in MP_condition_list):
-            return False
-    return True
+    return all(
+        ExecutionCondition.FINITE_SHOTS_ONLY in MP_conditions
+        for _, MP_conditions in capabilities.measurement_processes.items()
+    )
