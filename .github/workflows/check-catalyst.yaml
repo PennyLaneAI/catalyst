@@ -533,6 +533,17 @@ jobs:
         MDD_BENCHMARK_PRECISION=1 \
         python3 -m pytest demos -k "tutorial_qft_arithmetics.ipynb" --nbmake
 
+    - name: Install Unified Compiler Dependencies
+      run: |
+        python3 -m pip install xdsl~=0.55.0 xdsl-jax==0.1.1
+        # Install graphviz for testing the mlir-op-graph integration
+        sudo apt-get install -y graphviz
+        python3 -m pip install graphviz
+
+    - name: Run Unified Compiler Tests
+      run: |
+        python3 -m pytest frontend/test/pytest -n auto -m "xdsl"
+
   frontend-tests-lightning-kokkos:
     name: Frontend Tests (backend="lightning.kokkos")
     needs: [constants, llvm, runtime, quantum, determine_runner]
