@@ -396,8 +396,3 @@ def _operator(op: Operator) -> str:
         wires_str = f"[{', '.join(map(str, wires))}]"
     return f"<name> {op.name}|<wire> {wires_str}"
 
-
-@get_label.register
-def _mp(mp: MeasurementProcess) -> str:
-    """Returns the appropriate label for an xDSL operation."""
-    return str(mp)
