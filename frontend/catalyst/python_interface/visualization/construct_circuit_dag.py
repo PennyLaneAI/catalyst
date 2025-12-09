@@ -151,12 +151,12 @@ class ConstructCircuitDAG:
         self._node_uid_counter += 1
 
         # Search through previous ops found on current wires and connect
-        prev_ops = set.union(*(self._wire_to_node_uids[wire] for wire in qml_op.wires))
+        prev_ops = set.union(*(self._wire_to_node_uids[wire] for wire in meas.wires))
         for prev_op in prev_ops:
             self.dag_builder.add_edge(prev_op, node_uid)
 
         # Update affected wires to source from this node UID
-        for wire in qml_op.wires:
+        for wire in meas.wires:
             self._wire_to_node_uids[wire] = {node_uid}
 
     # =====================
