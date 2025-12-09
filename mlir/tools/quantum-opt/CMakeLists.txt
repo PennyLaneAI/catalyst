@@ -8,7 +8,6 @@ set(LIBS
     ExternalStablehloLib
     MLIROptLib
     MLIRRegisterAllDialects
-    MLIRRegisterAllExtensions
     MLIRRegisterAllPasses
     MLIRCatalyst
     catalyst-transforms
