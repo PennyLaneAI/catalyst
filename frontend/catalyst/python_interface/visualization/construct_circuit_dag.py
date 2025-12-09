@@ -247,8 +247,6 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _if_op(self, operation: scf.IfOp):
         """Handles the scf.IfOp operation."""
-        flattened_if_op: list[Region] = _flatten_if_op(operation)
-
         uid = f"cluster{self._cluster_uid_counter}"
         self.dag_builder.add_cluster(
             uid,
@@ -261,6 +259,7 @@ class ConstructCircuitDAG:
         self._cluster_uid_counter += 1
 
         # Loop through each branch and visualize as a cluster
+        flattened_if_op: list[Region] = _flatten_if_op(operation)
         num_regions = len(flattened_if_op)
         for i, region in enumerate(flattened_if_op):
             node_label = "elif"
