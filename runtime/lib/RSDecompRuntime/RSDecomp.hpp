@@ -22,16 +22,17 @@ using namespace RSDecomp::Rings;
 using namespace RSDecomp::CliffordData;
 std::pair<std::vector<GateType>, double> eval_ross_algorithm(double angle, double epsilon);
 std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle, double epsilon);
+std::vector<PPRGateType> HSTtoPPR(const std::vector<GateType> &vector);
 
 extern "C" {
 
-size_t rs_decomposition_get_size_0(double theta, double epsilon, bool ppr_basis);
+size_t rs_decomposition_get_size(double theta, double epsilon, bool ppr_basis);
 
-void rs_decomposition_get_gates_0(size_t *data_allocated, size_t *data_aligned, size_t offset,
-                                  size_t size0, size_t stride0, double theta, double epsilon,
-                                  bool ppr_basis);
+void rs_decomposition_get_gates(size_t *data_allocated, size_t *data_aligned, size_t offset,
+                                size_t size0, size_t stride0, double theta, double epsilon,
+                                bool ppr_basis);
 
-double rs_decomposition_get_phase_0(double theta, double epsilon, bool ppr_basis);
+double rs_decomposition_get_phase(double theta, double epsilon, bool ppr_basis);
 
 } // extern "C"
 } // namespace RSDecomp::RossSelinger

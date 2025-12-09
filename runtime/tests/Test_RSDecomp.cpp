@@ -150,3 +150,99 @@ TEST_CASE("Test ross_selinger pi/16 multiples", "[RSDecomp][Ross Selinger]")
     residue_norm = std::sqrt(residue_norm);
     CHECK(residue_norm <= tolerance);
 }
+
+TEST_CASE("Test Zero Angle (Identity)", "[RSDecomp][Ross Selinger]")
+{
+    // An angle of 0.0 should result in Identity
+    auto result = eval_ross_algorithm(0.0, 1e-10);
+    const auto &gates = result.first;
+    double phase = result.second;
+
+    // Should effectively be Identity
+    std::vector<std::complex<double>> mat = matrix_from_decomp_result(gates);
+
+    // Apply global phase
+    std::complex<double> phase_factor = {std::cos(phase), -std::sin(phase)};
+    std::vector<std::complex<double>> global_phase_matrix = {phase_factor, 0.0, 0.0, phase_factor};
+    mat = multiply_matrices(global_phase_matrix, mat);
+
+    // Target is Identity
+    std::complex<double> one(1.0, 0.0);
+    std::complex<double> zero(0.0, 0.0);
+
+    CHECK(std::abs(mat[0] - one) < 1e-9);
+    CHECK(std::abs(mat[3] - one) < 1e-9);
+    CHECK(std::abs(mat[1] - zero) < 1e-9);
+    CHECK(std::abs(mat[2] - zero) < 1e-9);
+}
+
+TEST_CASE("Test HSTtoPPR Conversion Rules", "[RSDecomp][Ross Selinger]")
+{
+    // Rule: HT, HT -> X8, Z8
+    CHECK(HSTtoPPR({GateType::HT, GateType::HT}) ==
+          std::vector<PPRGateType>{PPRGateType::X8, PPRGateType::Z8});
+
+    // Rule: HT, SHT -> X4, X8, Z8
+    CHECK(HSTtoPPR({GateType::HT, GateType::SHT}) ==
+          std::vector<PPRGateType>{PPRGateType::X4, PPRGateType::X8, PPRGateType::Z8});
+
+    // Rule: SHT, HT -> Z4, X8, Z8
+    CHECK(HSTtoPPR({GateType::SHT, GateType::HT}) ==
+          std::vector<PPRGateType>{PPRGateType::Z4, PPRGateType::X8, PPRGateType::Z8});
+
+    // Rule: SHT, SHT -> Z4, X4, X8, Z8
+    CHECK(HSTtoPPR({GateType::SHT, GateType::SHT}) ==
+          std::vector<PPRGateType>{PPRGateType::Z4, PPRGateType::X4, PPRGateType::X8,
+                                   PPRGateType::Z8});
+
+    // Test Single Gate Mappings (Standard)
+    CHECK(HSTtoPPR({GateType::T}) == std::vector<PPRGateType>{PPRGateType::Z8});
+    CHECK(HSTtoPPR({GateType::S}) == std::vector<PPRGateType>{PPRGateType::Z4});
+    CHECK(HSTtoPPR({GateType::Z}) == std::vector<PPRGateType>{PPRGateType::Z2});
+
+    // H -> Z4, X4, Z4
+    CHECK(HSTtoPPR({GateType::H}) ==
+          std::vector<PPRGateType>{PPRGateType::Z4, PPRGateType::X4, PPRGateType::Z4});
+
+    // Test Edge Cases for Pair Lookahead
+    // Case: HT at the very end of the vector (no next gate to pair with)
+    // Should fallback to single HT expansion: X8, Z4, X4, Z4
+    CHECK(HSTtoPPR({GateType::HT}) == std::vector<PPRGateType>{PPRGateType::X8, PPRGateType::Z4,
+                                                               PPRGateType::X4, PPRGateType::Z4});
+
+    // Case: HT followed by a gate that doesn't form a pair (e.g. T)
+    std::vector<GateType> input_mixed = {GateType::HT, GateType::T};
+    std::vector<PPRGateType> expected_mixed = {
+        PPRGateType::X8, PPRGateType::Z4, PPRGateType::X4, PPRGateType::Z4, // HT
+        PPRGateType::Z8                                                     // T
+    };
+    CHECK(HSTtoPPR(input_mixed) == expected_mixed);
+}
+
+TEST_CASE("Test C-API Wrapper (Memref Interface)", "[RSDecomp][Ross Selinger]")
+{
+    double angle = M_PI / 4.0; // Decomposes to exactly T
+    double epsilon = 1e-5;
+
+    // Test Clifford+T Basis API
+    size_t size_std = rs_decomposition_get_size(angle, epsilon, false);
+    REQUIRE(size_std > 0);
+
+    std::vector<size_t> buffer_std(size_std);
+
+    // Simulate MemRef call
+    rs_decomposition_get_gates(nullptr, buffer_std.data(), 0, size_std, 1, angle, epsilon, false);
+
+    CHECK(buffer_std.size() == 1);
+    CHECK(static_cast<GateType>(buffer_std[0]) == GateType::T);
+
+    // Test PPR Basis API
+    size_t size_ppr = rs_decomposition_get_size(angle, epsilon, true);
+    REQUIRE(size_ppr > 0);
+
+    std::vector<size_t> buffer_ppr(size_ppr);
+    rs_decomposition_get_gates(nullptr, buffer_ppr.data(), 0, size_ppr, 1, angle, epsilon, true);
+
+    CHECK(buffer_ppr.size() == 1);
+    CHECK(static_cast<PPRGateType>(buffer_ppr[0]) == PPRGateType::Z8);
+}

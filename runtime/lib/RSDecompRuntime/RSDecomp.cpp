@@ -44,7 +44,15 @@ using namespace RSDecomp::Utils;
 using namespace RSDecomp::CliffordData;
 using namespace RSDecomp::NormalForms;
 
-std::pair<std::vector<GateType>, double> compute_raw_decomposition(double angle, double epsilon)
+/**
+ * @brief Core function to compute the Clifford+T decomposition using the Ross-Selinger algorithm.
+ * @param angle The target rotation angle.
+ * @param epsilon The desired approximation precision.
+ * @return A pair containing the sequence of GateType representing the decomposition and the global
+ * phase.
+ */
+std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double angle,
+                                                                          double epsilon)
 {
     ZOmega scale(0, 0, 0, 1);
     int max_search_trials = 10000;
@@ -136,7 +144,7 @@ std::pair<std::vector<GateType>, double> eval_ross_algorithm(double angle, doubl
         return *val_opt;
     }
 
-    auto result = compute_raw_decomposition(angle, epsilon);
+    auto result = compute_clifford_T_decomposition(angle, epsilon);
     ross_cache_std.put(key, result);
     return result;
 }
@@ -154,14 +162,124 @@ std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle
         return *val_opt;
     }
 
-    auto raw_result = compute_raw_decomposition(angle, epsilon);
+    auto clifford_T_result = compute_clifford_T_decomposition(angle, epsilon);
 
-    std::vector<PPRGateType> ppr_gates = HSTtoPPR(raw_result.first);
+    std::vector<PPRGateType> ppr_gates = HSTtoPPR(clifford_T_result.first);
 
-    PPRCacheValue result = {std::move(ppr_gates), raw_result.second};
+    PPRCacheValue result = {std::move(ppr_gates), clifford_T_result.second};
 
     ross_cache_ppr.put(key, result);
     return result;
+}
+
+/**
+ * @brief Converts a sequence of GateType in Clifford+T basis to PPR basis
+ * using predefined conversion rules.
+ * @param input_gates The input vector of GateType representing the Clifford+T sequence.
+ * @return std::vector<PPRGateType> The converted vector of PPRGateType
+ */
+
+std::vector<PPRGateType> HSTtoPPR(const std::vector<GateType> &input_gates)
+{
+    std::vector<PPRGateType> output_gates;
+    output_gates.reserve(input_gates.size());
+
+    size_t i = 0;
+    while (i < input_gates.size()) {
+        const GateType &current_gate = input_gates[i];
+        if ((current_gate == GateType::HT || current_gate == GateType::SHT) &&
+            (i + 1 < input_gates.size())) {
+            const GateType &next_gate = input_gates[i + 1];
+
+            // Rule: HT, HT -> X8, Z8
+            if (current_gate == GateType::HT && next_gate == GateType::HT) {
+                output_gates.push_back(PPRGateType::X8);
+                output_gates.push_back(PPRGateType::Z8);
+                i += 2; // Skip both processed gates
+                continue;
+            }
+
+            // Rule: HT, SHT -> X4, X8, Z8
+            if (current_gate == GateType::HT && next_gate == GateType::SHT) {
+                output_gates.push_back(PPRGateType::X4);
+                output_gates.push_back(PPRGateType::X8);
+                output_gates.push_back(PPRGateType::Z8);
+                i += 2;
+                continue;
+            }
+
+            // Rule: SHT, HT -> Z4, X8, Z8
+            if (current_gate == GateType::SHT && next_gate == GateType::HT) {
+                output_gates.push_back(PPRGateType::Z4);
+                output_gates.push_back(PPRGateType::X8);
+                output_gates.push_back(PPRGateType::Z8);
+                i += 2;
+                continue;
+            }
+
+            // Rule: SHT, SHT -> Z4, X4, X8, Z8
+            if (current_gate == GateType::SHT && next_gate == GateType::SHT) {
+                output_gates.push_back(PPRGateType::Z4);
+                output_gates.push_back(PPRGateType::X4);
+                output_gates.push_back(PPRGateType::X8);
+                output_gates.push_back(PPRGateType::Z8);
+                i += 2;
+                continue;
+            }
+        }
+
+        // If we're here, no pair rule was matched.
+        // We handle the 1-to-1 mappings.
+        switch (current_gate) {
+        case GateType::T:
+            output_gates.push_back(PPRGateType::Z8);
+            break;
+        case GateType::I:
+            output_gates.push_back(PPRGateType::I);
+            break;
+        case GateType::X:
+            output_gates.push_back(PPRGateType::X2);
+            break;
+        case GateType::Y:
+            output_gates.push_back(PPRGateType::Y2);
+            break;
+        case GateType::Z:
+            output_gates.push_back(PPRGateType::Z2);
+            break;
+        case GateType::H:
+            output_gates.push_back(PPRGateType::Z4);
+            output_gates.push_back(PPRGateType::X4);
+            output_gates.push_back(PPRGateType::Z4);
+            break;
+        case GateType::S:
+            output_gates.push_back(PPRGateType::Z4);
+            break;
+        case GateType::Sd:
+            output_gates.push_back(PPRGateType::adjZ4);
+            break;
+        case GateType::HT: {
+            output_gates.push_back(PPRGateType::X8);
+            output_gates.push_back(PPRGateType::Z4);
+            output_gates.push_back(PPRGateType::X4);
+            output_gates.push_back(PPRGateType::Z4);
+            break;
+        }
+        case GateType::SHT: {
+            output_gates.push_back(PPRGateType::adjY8);
+            output_gates.push_back(PPRGateType::adjX4);
+            output_gates.push_back(PPRGateType::Z4);
+            output_gates.push_back(PPRGateType::Z2);
+            break;
+        }
+
+        default:
+            RT_FAIL("Unknown GateType encountered.");
+        }
+
+        i += 1; // Skip the single processed gate
+    }
+
+    return output_gates;
 }
 
 // Extern C implementation

@@ -63,10 +63,6 @@ const DyadicMatrix HT_DATA({0, 0, 0, 1}, {0, 0, 0, 1}, {-1, 0, 0, 0}, {1, 0, 0, 
 
 const DyadicMatrix SHT_DATA({0, 0, 0, 1}, {0, -1, 0, 0}, {-1, 0, 0, 0}, {0, 0, 1, 0}, 1);
 
-// --- Step 2: Use these named variables in your map initialization ---
-
 extern const std::map<std::array<int, 3>, ParityTransformInfo> parity_transforms;
-
-std::vector<PPRGateType> HSTtoPPR(const std::vector<GateType> &vector);
 
 } // namespace RSDecomp::CliffordData
