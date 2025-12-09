@@ -24,7 +24,6 @@ xdsl = pytest.importorskip("xdsl")
 
 import pennylane as qml
 
-from catalyst.passes import apply_pass
 from catalyst.python_interface.transforms import (
     DiagonalizeFinalMeasurementsPass,
     diagonalize_final_measurements_pass,
