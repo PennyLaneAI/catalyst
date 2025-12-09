@@ -349,6 +349,7 @@ class ARTIQRuntimeBuilder {
         configSpi(spiBase, cs, constI32(ARTIQHardwareConfig::spiLen8),
                   constI32(ARTIQHardwareConfig::spiDiv),
                   constI32(ARTIQHardwareConfig::spiFlagsKeepCS));
+        delayMu(constI64(ARTIQHardwareConfig::refPeriodMu));
         rtioOutput(spiBase, constI32(ARTIQHardwareConfig::profile7Instruction));
         // Wait for SPI transmission to complete
         waitForSpi(ARTIQHardwareConfig::spiLen8, ARTIQHardwareConfig::spiDiv);
@@ -358,6 +359,7 @@ class ARTIQRuntimeBuilder {
         configSpi(spiBase, cs, constI32(ARTIQHardwareConfig::spiLen32),
                   constI32(ARTIQHardwareConfig::spiDiv),
                   constI32(ARTIQHardwareConfig::spiFlagsKeepCS));
+        delayMu(constI64(ARTIQHardwareConfig::refPeriodMu));
         Value asfScale = constF64(static_cast<double>(ARTIQHardwareConfig::maxAmplitude));
         Value asfDouble = builder.create<arith::MulFOp>(getLoc(), amplitude, asfScale);
         Value asfRounded = builder.create<math::RoundOp>(getLoc(), asfDouble);
@@ -372,6 +374,7 @@ class ARTIQRuntimeBuilder {
         configSpi(spiBase, cs, constI32(ARTIQHardwareConfig::spiLen32),
                   constI32(ARTIQHardwareConfig::spiDiv),
                   constI32(ARTIQHardwareConfig::spiFlagsReleaseCS));
+        delayMu(constI64(ARTIQHardwareConfig::refPeriodMu));
         rtioOutput(spiBase, ftw);
         // Wait for SPI transmission to complete
         waitForSpi(ARTIQHardwareConfig::spiLen32, ARTIQHardwareConfig::spiDiv);
