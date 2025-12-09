@@ -103,8 +103,7 @@ class ConstructCircuitDAG:
         self._cluster_uid_stack.append(uid)
         self._cluster_uid_counter += 1
 
-        for region in operation.regions:
-            self._visit_region(region)
+        self._visit_region(operation.regions[0])
 
         self._cluster_uid_stack.pop()
 
