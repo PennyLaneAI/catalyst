@@ -367,7 +367,7 @@
 <h3>Internal changes ⚙️</h3>
 
 * xDSL and xDSL-JAX are now dependencies of Catalyst.
-  [(#22__)](https://github.com/PennyLaneAI/catalyst/pull/22__)
+  [(#2282)](https://github.com/PennyLaneAI/catalyst/pull/2282)
 
 * Integration tests for `qml.specs` have been updated to match the new output format introduced
   in PennyLane.
