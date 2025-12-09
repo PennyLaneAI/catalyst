@@ -1081,7 +1081,7 @@ class TestOperatorConnectivity:
         assert "PauliY" in nodes["node2"]["label"]
 
         # Check edges
-        #    for loop
+        #    while loop
         # X ----------> Y
         assert len(edges) == 1
         assert ("node1", "node2") in edges
