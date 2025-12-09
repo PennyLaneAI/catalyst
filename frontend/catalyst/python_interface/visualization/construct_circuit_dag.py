@@ -128,7 +128,7 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _if_op(self, operation: scf.IfOp):
         """Handles the scf.IfOp operation."""
-        flattened_if_op: list[tuple[SSAValue | None, Region]] = _flatten_if_op(operation)
+        flattened_if_op: list[Region] = _flatten_if_op(operation)
 
         uid = f"cluster{self._cluster_uid_counter}"
         self.dag_builder.add_cluster(
@@ -143,7 +143,7 @@ class ConstructCircuitDAG:
 
         # Loop through each branch and visualize as a cluster
         num_regions = len(flattened_if_op)
-        for i, (condition_ssa, region) in enumerate(flattened_if_op):
+        for i, region in enumerate(flattened_if_op):
             node_label = "elif"
             if i == 0:
                 node_label = "if"
@@ -227,19 +227,15 @@ class ConstructCircuitDAG:
             self._cluster_uid_stack.pop()
 
 
-def _flatten_if_op(op: scf.IfOp) -> list[tuple[SSAValue | None, Region]]:
+def _flatten_if_op(op: scf.IfOp) -> list[Region]:
     """Recursively flattens a nested IfOp (if/elif/else chains)."""
 
-    condition_ssa: SSAValue = op.operands[0]
     then_region, else_region = op.regions
 
-    # Save condition SSA in case we want to visualize it eventually
-    flattened_op: list[tuple[SSAValue | None, Region]] = [(condition_ssa, then_region)]
-
-    # Peak into else region to see if there's another IfOp
-    else_block: Block = else_region.block
+    flattened_op: list[Region] = [then_region]
 
     # Check to see if there are any nested quantum operations in the else block
+    else_block: Block = else_region.block
     has_quantum_ops = False
     nested_if_op = None
     for op in else_block.ops:
@@ -252,11 +248,11 @@ def _flatten_if_op(op: scf.IfOp) -> list[tuple[SSAValue | None, Region]]:
 
     if nested_if_op and not has_quantum_ops:
         # Recursively flatten any IfOps found in said block
-        nested_flattened_op = _flatten_if_op(nested_if_op)
+        nested_flattened_op: list[Region] = _flatten_if_op(nested_if_op)
         flattened_op.extend(nested_flattened_op)
         return flattened_op
 
     # No more nested IfOps, therefore append final region
     # with no SSAValue
-    flattened_op.extend([(None, else_region)])
+    flattened_op.append(else_region)
     return flattened_op
