@@ -253,7 +253,7 @@ class TestCatalystIntegration:
 
         assert capture_enabled()
 
-        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qjit
         @hello_world_pass
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f(x):
@@ -271,7 +271,7 @@ class TestCatalystIntegration:
 
         assert not capture_enabled()
 
-        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qjit
         @apply_pass("hello-world")
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f(x):
@@ -290,7 +290,7 @@ class TestCatalystIntegration:
 
         assert capture_enabled()
 
-        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qjit
         @hello_world_pass
         @qml.transforms.cancel_inverses
         @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -311,7 +311,7 @@ class TestCatalystIntegration:
 
         assert not capture_enabled()
 
-        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qjit
         @apply_pass("hello-world")
         @catalyst_cancel_inverses
         @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -445,7 +445,7 @@ class TestCallbackIntegration:
             print("=== Between Pass ===")
             print(module)
 
-        @qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qml.qjit
         @iterative_cancel_inverses_pass
         @merge_rotations_pass
         @qml.qnode(qml.device("null.qubit", wires=2))
