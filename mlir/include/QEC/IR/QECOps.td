@@ -341,6 +341,21 @@ def PPRotationArbitraryOp : QEC_Op<"ppr.arbitrary", [AttrSizedOperandSegments]> 
             /*arbitrary_angle=*/ arbitrary_angle,
             /*in_qubits=*/ in_qubits,
             /*condition=*/ nullptr);
+        }]>,
+        // Convenience builder with ArrayRef<StringRef> with condition
+        OpBuilder<
+        (ins
+            "::mlir::TypeRange":$out_qubits,
+            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product,
+            "::mlir::Value":$arbitrary_angle,
+            "::mlir::ValueRange":$in_qubits
+        ),[{
+            PPRotationArbitraryOp::build($_builder, $_state,
+            /*out_qubits=*/ out_qubits,
+            /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product),
+            /*arbitrary_angle=*/ arbitrary_angle,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ nullptr);
         }]>
     ];
 

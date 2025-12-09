@@ -39,9 +39,10 @@ struct ToPPRPass : impl::ToPPRPassBase<ToPPRPass> {
         auto ctx = &getContext();
         ConversionTarget target(*ctx);
 
-        // Convert MeasureOp and CustomOp
+        // Convert MeasureOp, CustomOp, and PauliRotOp
         target.addIllegalOp<quantum::MeasureOp>();
         target.addIllegalOp<quantum::CustomOp>();
+        target.addIllegalOp<quantum::PauliRotOp>();
 
         // Conversion target is QECDialect
         target.addLegalDialect<qec::QECDialect>();

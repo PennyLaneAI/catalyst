@@ -13,16 +13,20 @@
 // limitations under the License.
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/TypeRange.h"
+#include "stablehlo/dialect/StablehloOps.h"
 
 #include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
 #include <cmath>
+#include <llvm/Support/Debug.h>
 #include <llvm/Support/LogicalResult.h>
+#include <optional>
 
-// #include <llvm/Support/Debug.h>
-// #define DEBUG_TYPE "to-ppr"
+#define DEBUG_TYPE "to-ppr"
 
 using namespace mlir;
 using namespace catalyst;
@@ -238,71 +242,131 @@ LogicalResult convertMeasureOpToPPM(MeasureOp op, StringRef axis,
     return success();
 }
 
+// Recursively resolve the constant parameter of a value and returns std::nullopt if not a constant.
+std::optional<double> resolveConstantValue(Value value)
+{
+    if (!value)
+        return std::nullopt;
+
+    auto *defOp = value.getDefiningOp();
+    if (!defOp)
+        return std::nullopt;
+
+    // Handle Tensor Dialect
+    if (auto extractOp = dyn_cast<tensor::ExtractOp>(defOp)) {
+        return resolveConstantValue(extractOp.getTensor());
+    }
+
+    // Handle Stablehlo Dialect
+    if (auto constOp = dyn_cast<stablehlo::ConstantOp>(defOp)) {
+        auto valueAttr = constOp.getValue();
+        if (auto denseFPAttr = dyn_cast<DenseFPElementsAttr>(valueAttr)) {
+            if (denseFPAttr.isSplat() || denseFPAttr.getNumElements() == 1) {
+                return denseFPAttr.getSplatValue<APFloat>().convertToDouble();
+            }
+        }
+        else if (auto denseIntAttr = dyn_cast<DenseIntElementsAttr>(valueAttr)) {
+            if (denseIntAttr.isSplat() || denseIntAttr.getNumElements() == 1) {
+                return static_cast<double>(denseIntAttr.getSplatValue<APInt>().getSExtValue());
+            }
+        }
+        return std::nullopt;
+    }
+    else if (auto convertOp = dyn_cast<stablehlo::ConvertOp>(defOp)) {
+        if (convertOp->getNumOperands() > 0) {
+            return resolveConstantValue(convertOp.getOperand());
+        }
+        return std::nullopt;
+    }
+    else if (auto broadcastInDimOp = dyn_cast<stablehlo::BroadcastInDimOp>(defOp)) {
+        if (broadcastInDimOp->getNumOperands() > 0) {
+            return resolveConstantValue(broadcastInDimOp.getOperand());
+        }
+        return std::nullopt;
+    }
+
+    // Handle Arith Dialect
+    if (auto constOp = dyn_cast<arith::ConstantOp>(defOp)) {
+        auto valueAttr = constOp.getValue();
+        if (auto floatAttr = dyn_cast<FloatAttr>(valueAttr)) {
+            return floatAttr.getValueAsDouble();
+        }
+        // Handle integer constants (convert to double)
+        if (auto intAttr = dyn_cast<IntegerAttr>(valueAttr)) {
+            return static_cast<double>(intAttr.getValue().getSExtValue());
+        }
+        // Handle DenseElementsAttr for rank-0 tensors
+        if (auto denseAttr = dyn_cast<DenseFPElementsAttr>(valueAttr)) {
+            if (denseAttr.isSplat() || denseAttr.getNumElements() == 1) {
+                return denseAttr.getSplatValue<APFloat>().convertToDouble();
+            }
+        }
+        if (auto denseAttr = dyn_cast<DenseIntElementsAttr>(valueAttr)) {
+            if (denseAttr.isSplat() || denseAttr.getNumElements() == 1) {
+                return static_cast<double>(denseAttr.getSplatValue<APInt>().getSExtValue());
+            }
+        }
+        return std::nullopt;
+    }
+    else if (auto indexCastOp = dyn_cast<arith::IndexCastOp>(defOp)) {
+        if (defOp->getNumOperands() > 0) {
+            return resolveConstantValue(defOp->getOperand(0));
+        }
+        return std::nullopt;
+    }
+    else if (auto addOp = dyn_cast<arith::AddFOp>(defOp)) {
+        double sum = 0.0;
+        for (auto operand : addOp.getOperands()) {
+            auto operandVal = resolveConstantValue(operand);
+            if (!operandVal.has_value())
+                return std::nullopt;
+            sum += operandVal.value();
+        }
+        return sum;
+    }
+    return std::nullopt;
+}
+
 LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewriter)
 {
     auto loc = op.getLoc();
 
-    // Get defining angle
-    Value angle = op.getAngle();
-    ArrayAttr pauliProduct = op.getPauliProduct();
+    auto angleValue = op.getAngle();
+    auto pauliProduct = op.getPauliProduct();
     auto inQubits = op.getInQubits();
-    TypeRange outQubitTypes = op.getOutQubits().getType();
+    auto outQubitTypes = op.getOutQubits().getType();
 
-    // Check if the angle is static (constant)
-    double angleDouble = 0.0;
-    bool isStatic = false;
-    auto defOp = angle.getDefiningOp();
-    if (defOp && defOp->hasTrait<OpTrait::ConstantLike>()) {
-        auto floatAttr = defOp->getAttrOfType<FloatAttr>("value");
-        if (floatAttr) {
-            angleDouble = floatAttr.getValueAsDouble();
-            isStatic = true;
-        }
-    }
+    auto angleOpt = resolveConstantValue(angleValue);
 
-    // LLVM_DEBUG(llvm::dbgs() << "Angle is static: " << angleDouble << "\n");
-
-    if (isStatic) {
-        // LLVM_DEBUG(llvm::dbgs() << "Angle is static: " << angleDouble << "\n");
+    if (angleOpt.has_value()) {
         constexpr double PI = llvm::numbers::pi;
+        constexpr double PPR_ANGLES[4] = {0, PI / 2, PI / 4, PI / 8};
         constexpr double TOLERANCE = 1e-9;
 
-        // Convert angle to rotation_kind: rotation_kind = angle * 8 / π
-        double rotationKindDouble = angleDouble * 8.0 / PI;
+        double angle = angleOpt.value();
+        angle = std::fmod(angle, PI);
 
-        // Check if rotation_kind is close to an integer
-        double rounded = std::round(rotationKindDouble);
-        if (std::abs(rotationKindDouble - rounded) < TOLERANCE) {
-            // It's a multiple of π/8, use PPRotationOp
-            int64_t rotationKind = static_cast<int64_t>(rounded);
-
-            // Apply adjoint transformation if needed
-            if (op.getAdjoint()) {
-                rotationKind = -rotationKind;
+        for (auto ppr_angle : PPR_ANGLES) {
+            if (std::abs(angle - ppr_angle) < TOLERANCE) {
+                auto rotationKind = static_cast<int64_t>(PI / angle);
+                if (op.getAdjoint()) {
+                    rotationKind = -rotationKind;
+                }
+                auto rotationKindAttr =
+                    rewriter.getI16IntegerAttr(static_cast<int16_t>(rotationKind));
+                auto pprOp = rewriter.create<PPRotationOp>(loc, outQubitTypes, pauliProduct,
+                                                           rotationKindAttr, inQubits);
+                rewriter.replaceOp(op, pprOp.getOutQubits());
+                return success();
             }
-
-            // Create IntegerAttr for rotation_kind (I16Attr is signed, so this handles negative
-            // values correctly)
-            auto rotationKindAttr = rewriter.getI16IntegerAttr(static_cast<int16_t>(rotationKind));
-            auto pprOp = rewriter.create<PPRotationOp>(loc, outQubitTypes, pauliProduct,
-                                                       rotationKindAttr, inQubits);
-            rewriter.replaceOp(op, pprOp.getOutQubits());
-            return success();
         }
     }
 
-    // Use PPRotationArbitraryOp for non-static angles or angles that aren't multiples of π/8
-    // Apply adjoint transformation: if adjoint, negate the angle
-    Value arbitraryAngle = angle;
-    if (op.getAdjoint()) {
-        auto negOneAttr = rewriter.getF64FloatAttr(-1.0);
-        auto negOne = rewriter.create<arith::ConstantOp>(loc, angle.getType(), negOneAttr);
-        arbitraryAngle = rewriter.create<arith::MulFOp>(loc, angle.getType(), angle, negOne);
-    }
-
+    // Angle is not static or not a multiple of π/8, consider this as an arbitrary angle PPR.
     auto pprArbitraryOp = rewriter.create<PPRotationArbitraryOp>(loc, outQubitTypes, pauliProduct,
-                                                                 arbitraryAngle, inQubits);
+                                                                 angleValue, inQubits);
     rewriter.replaceOp(op, pprArbitraryOp.getOutQubits());
+
     return success();
 }
 
