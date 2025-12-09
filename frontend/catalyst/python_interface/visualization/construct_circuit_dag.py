@@ -96,7 +96,7 @@ class ConstructCircuitDAG:
     # ===================
 
     @_visit_operation.register
-    def _unitary(
+    def _gate_op(
         self,
         op: quantum.CustomOp | quantum.GlobalPhaseOp | quantum.QubitUnitaryOp | quantum.MultiRZOp,
     ) -> None:
