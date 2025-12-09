@@ -347,6 +347,11 @@
 
   This fix enables automatic qubit management to be used with gradients.
 
+
+* Fixed the :func:`~.passes.commute_ppr` pass incorrectly modifying operands of PPRs that live in
+  different blocks.
+  [(#2267)](https://github.com/PennyLaneAI/catalyst/pull/2267)
+
 * The `--inline-nested-module` pass no longer renames external function declarations.
   [(#2244)](https://github.com/PennyLaneAI/catalyst/pull/2244)
 
