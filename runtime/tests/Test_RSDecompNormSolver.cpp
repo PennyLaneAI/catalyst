@@ -24,8 +24,6 @@
 using namespace Catch::Matchers;
 using namespace RSDecomp::NormSolver;
 
-// ADD GCD TESTS
-
 TEST_CASE("Test Factorization", "[RSDecomp][NormSolver]")
 {
     CHECK(prime_factorize(28) == std::nullopt); //  28 = 2^2 * 7 (7 is not included)
@@ -102,7 +100,6 @@ TEST_CASE("Test Factorize Prime ZOmega", "[RSDecomp][NormSolver]")
     }
 }
 
-// This is potentially flaky
 TEST_CASE("Test Primality Test", "[RSDecomp][NormSolver]")
 {
     CHECK(primality_test(2) == true);
@@ -114,6 +111,18 @@ TEST_CASE("Test Primality Test", "[RSDecomp][NormSolver]")
     CHECK(primality_test(7901) == true);
     CHECK(primality_test(41041) == false); // 7*11*13*41
     CHECK(primality_test(101 * 431) == false);
+}
+
+TEST_CASE("Test Legendre Symbol", "[RSDecomp][NormSolver]")
+{
+    CHECK(legendre_symbol(1, 3) == 1);
+    CHECK(legendre_symbol(2, 3) == 2);
+    CHECK(legendre_symbol(1, 5) == 1);
+    CHECK(legendre_symbol(4, 5) == 1);
+    CHECK(legendre_symbol(2, 5) == 4);
+    CHECK(legendre_symbol(3, 5) == 4);
+    CHECK(legendre_symbol(2, 7) == 1);
+    CHECK(legendre_symbol(25, 101) == 1);
 }
 
 TEST_CASE("Test Sqrt Modulo", "[RSDecomp][NormSolver]")
@@ -139,32 +148,50 @@ TEST_CASE("Test Sqrt Modulo", "[RSDecomp][NormSolver]")
 
 TEST_CASE("Test Solve Diophantine", "[RSDecomp][NormSolver]")
 {
-    auto [input, expected] = GENERATE(table<ZSqrtTwo, std::optional<ZOmega>>({
-        {ZSqrtTwo(0, 0), ZOmega(0, 0, 0, 0)},
-        {ZSqrtTwo(0, 1), std::nullopt},
-        {ZSqrtTwo(2, 1), ZOmega(0, 0, 1, 1)}, // Add more tests after Utkarsh update
-    }));
+    SECTION("Small Numbers")
+    {
+        // Columns: Input ZSqrtTwo, Expect Solution (bool)
+        auto [input, expect_solution] = GENERATE(table<ZSqrtTwo, bool>({{ZSqrtTwo(0, 0), true},
+                                                                        {ZSqrtTwo(0, 1), false},
+                                                                        {ZSqrtTwo(2, 1), true},
+                                                                        {ZSqrtTwo(2, -1), true},
+                                                                        {ZSqrtTwo(7, 0), false},
+                                                                        {ZSqrtTwo(23, 0), false},
+                                                                        {ZSqrtTwo(7, 2), true},
+                                                                        {ZSqrtTwo(17, 0), false},
+                                                                        {ZSqrtTwo(5, 2), true},
+                                                                        {ZSqrtTwo(13, 6), true}}));
 
-    CHECK(solve_diophantine(input) == expected);
-    if (expected.has_value()) {
-        ZOmega t = expected.value();
-        ZSqrtTwo t_norm = (t.conj() * t).to_sqrt_two();
-        CHECK(t_norm == input);
+        std::optional<ZOmega> result = solve_diophantine(input);
+
+        if (!expect_solution) {
+            CHECK_FALSE(result.has_value());
+        }
+        else {
+            REQUIRE(result.has_value());
+            ZOmega sol = result.value();
+            ZSqrtTwo sol_norm = (sol.conj() * sol).to_sqrt_two();
+            CHECK(sol_norm == input);
+        }
     }
-}
 
-TEST_CASE("Test Solve Diophantine Large", "[RSDecomp][NormSolver]")
-{
-    auto [u, k] = GENERATE(table<ZOmega, INT_TYPE>(
-        {{ZOmega(-26687414, 10541729, 10614512, 40727366), 52},
-         {ZOmega(-22067493351, 22078644868, 52098814989, 16270802723), 73}}));
+    SECTION("Large Numbers")
+    {
+        // Columns: "u" (used to generate input), "k" (power of 2 factor)
+        // These test cases are from the paper
+        auto [u, k] = GENERATE(table<ZOmega, INT_TYPE>(
+            {{ZOmega(-26687414, 10541729, 10614512, 40727366), 52},
+             {ZOmega(-22067493351, 22078644868, 52098814989, 16270802723), 73}}));
 
-    INT_TYPE two_pow_k = INT_TYPE(1) << static_cast<unsigned>(k);
-    auto xi = ZSqrtTwo(two_pow_k, 0) - u.norm2().to_sqrt_two();
-    auto result = solve_diophantine(xi);
-    REQUIRE(result.has_value());
-    ZOmega x = result.value();
-    // Verify the solution satisfies the diophantine equation: x.conj() * x == xi
-    ZSqrtTwo x_norm = (x.conj() * x).to_sqrt_two();
-    CHECK(x_norm == xi);
+        INT_TYPE two_pow_k = INT_TYPE(1) << static_cast<unsigned>(k);
+        ZSqrtTwo xi = ZSqrtTwo(two_pow_k, 0) - u.norm2().to_sqrt_two();
+
+        std::optional<ZOmega> result = solve_diophantine(xi);
+
+        REQUIRE(result.has_value());
+
+        ZOmega sol = result.value();
+        ZSqrtTwo sol_norm = (sol.conj() * sol).to_sqrt_two();
+        CHECK(sol_norm == xi);
+    }
 }
