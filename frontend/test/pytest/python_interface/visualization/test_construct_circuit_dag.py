@@ -671,7 +671,7 @@ class TestIfOp:
         assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
 
         # Nested conditional (2) inside conditional (1)
-        assert clusters["cluster6"]["cluster_label"] == "for loop"
+        assert clusters["cluster6"]["node_label"] == "for loop"
         assert clusters["cluster6"]["parent_cluster_uid"] == "cluster5"
 
         assert clusters["cluster7"]["cluster_label"] == "conditional"
