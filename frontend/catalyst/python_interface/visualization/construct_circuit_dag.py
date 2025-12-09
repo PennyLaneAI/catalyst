@@ -145,19 +145,16 @@ class ConstructCircuitDAG:
         # Loop through each branch and visualize as a cluster
         num_regions = len(flattened_if_op)
         for i, (condition_ssa, region) in enumerate(flattened_if_op):
-
-            def _get_conditional_branch_label(i):
-                if i == 0:
-                    return "if"
-                elif i == num_regions - 1:
-                    return "else"
-                else:
-                    return "elif"
+            node_label = "elif"
+            if i == 0:
+                node_label = "if"
+            elif i == num_regions - 1:
+                node_label = "else"
 
             uid = f"cluster{self._cluster_uid_counter}"
             self.dag_builder.add_cluster(
                 uid,
-                node_label=_get_conditional_branch_label(i),
+                node_label=node_label,
                 label="",
                 style="dashed",
                 penwidth=1,
