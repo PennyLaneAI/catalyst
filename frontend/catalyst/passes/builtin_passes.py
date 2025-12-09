@@ -549,7 +549,7 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
         The actual discretization is only performed during execution time.
 
     Args:
-        fn (QNode): the QNode to apply the gridsynth compiler pass to
+        qnode (QNode): the QNode to apply the gridsynth compiler pass to
         epsilon (float): The maximum permissible operator norm error per rotation gate. Defaults to ``1e-4``.
         ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in QEC dialect. Defaults to ``False``
 
@@ -559,7 +559,7 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
     .. note::
 
         The circuit generated from this pass with ``ppr_basis=True`` are currently not executable on any backend.
-        This pass is only for analysis with the ``null.qubit`` device and potential future execution
+        This is only for analysis with the ``null.qubit`` device and potential future execution
         when a suitable backend is available.
 
     **Example**
@@ -584,6 +584,10 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
             return qml.probs()
 
         >>> print(circuit.mlir_opt)
+
+    Example MLIR Representation:
+
+    .. code-block:: mlir
 
         . . .
         func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
