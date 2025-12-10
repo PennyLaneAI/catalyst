@@ -78,7 +78,7 @@ class DAGBuilder(ABC):
 
         Args:
             uid (str): Unique cluster ID to identify this cluster.
-            label (str | None): The text to display as a label on the cluster when rendered.
+            label (str | None): Optional text to display as a label on the cluster when rendered.
             cluster_uid (str | None): Optional unique ID of the cluster this cluster belongs to. If `None`, the cluster will be
                 placed on the base graph.
             **attrs (Any): Any additional styling keyword arguments.
