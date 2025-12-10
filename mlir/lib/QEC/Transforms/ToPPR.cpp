@@ -22,6 +22,7 @@
 #include "QEC/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
 #include <cmath>
+#include <iostream>
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/LogicalResult.h>
 #include <optional>
@@ -291,17 +292,15 @@ std::optional<double> resolveConstantValue(Value value)
         if (auto floatAttr = dyn_cast<FloatAttr>(valueAttr)) {
             return floatAttr.getValueAsDouble();
         }
-        // Handle integer constants (convert to double)
-        if (auto intAttr = dyn_cast<IntegerAttr>(valueAttr)) {
+        else if (auto intAttr = dyn_cast<IntegerAttr>(valueAttr)) {
             return static_cast<double>(intAttr.getValue().getSExtValue());
         }
-        // Handle DenseElementsAttr for rank-0 tensors
-        if (auto denseAttr = dyn_cast<DenseFPElementsAttr>(valueAttr)) {
+        else if (auto denseAttr = dyn_cast<DenseFPElementsAttr>(valueAttr)) {
             if (denseAttr.isSplat() || denseAttr.getNumElements() == 1) {
                 return denseAttr.getSplatValue<APFloat>().convertToDouble();
             }
         }
-        if (auto denseAttr = dyn_cast<DenseIntElementsAttr>(valueAttr)) {
+        else if (auto denseAttr = dyn_cast<DenseIntElementsAttr>(valueAttr)) {
             if (denseAttr.isSplat() || denseAttr.getNumElements() == 1) {
                 return static_cast<double>(denseAttr.getSplatValue<APInt>().getSExtValue());
             }
@@ -340,20 +339,30 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
 
     if (angleOpt.has_value()) {
         constexpr double PI = llvm::numbers::pi;
-        constexpr double PPR_ANGLES[4] = {0, PI / 2, PI / 4, PI / 8};
-        constexpr double TOLERANCE = 1e-9;
+        constexpr double SPECIFIC_ANGLES[4] = {PI / 2, PI / 4, PI / 8};
+        // We are choosing a very small tolerance to accomodate floating point precision issues.
+        // We choose this because it is a few bits away from the precision allowed by float 64
+        // and we assume the angles have magnitudes on the order of pi.
+        constexpr double TOLERANCE = 1e-12;
 
-        double angle = angleOpt.value();
-        angle = std::fmod(angle, PI);
+        auto paulirot_angle = angleOpt.value();
+        auto ppr_angle = paulirot_angle / 2;
 
-        for (auto ppr_angle : PPR_ANGLES) {
-            if (std::abs(angle - ppr_angle) < TOLERANCE) {
-                auto rotationKind = static_cast<int64_t>(PI / angle);
+        auto angle = std::fmod(ppr_angle, PI);
+
+        if (angle < TOLERANCE) {
+            // If the angle is 0, we can just erase the PauliRotOp.
+            rewriter.replaceOp(op, inQubits);
+            return success();
+        }
+
+        for (auto specific_angle : SPECIFIC_ANGLES) {
+            if (std::abs(angle - specific_angle) < TOLERANCE) {
+                auto rotationKind = static_cast<int64_t>(PI / specific_angle);
                 if (op.getAdjoint()) {
                     rotationKind = -rotationKind;
                 }
-                auto rotationKindAttr =
-                    rewriter.getI16IntegerAttr(static_cast<int16_t>(rotationKind));
+                auto rotationKindAttr = rewriter.getI16IntegerAttr(rotationKind);
                 auto pprOp = rewriter.create<PPRotationOp>(loc, outQubitTypes, pauliProduct,
                                                            rotationKindAttr, inQubits);
                 rewriter.replaceOp(op, pprOp.getOutQubits());
@@ -363,8 +372,16 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
     }
 
     // Angle is not static or not a multiple of π/8, consider this as an arbitrary angle PPR.
-    auto pprArbitraryOp = rewriter.create<PPRotationArbitraryOp>(loc, outQubitTypes, pauliProduct,
-                                                                 angleValue, inQubits);
+    // divide by 2 to get the ppr_angle
+    auto constResult =
+        rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(2.0)).getResult();
+    auto result = rewriter.create<arith::DivFOp>(loc, angleValue, constResult).getResult();
+    // auto result =
+    //     rewriter.create<arith::ConstantOp>(loc,
+    //     rewriter.getF64FloatAttr(double(2.0))).getResult();
+    auto pprArbitraryOp =
+        rewriter.create<PPRotationArbitraryOp>(loc, outQubitTypes, pauliProduct, result, inQubits);
+
     rewriter.replaceOp(op, pprArbitraryOp.getOutQubits());
 
     return success();

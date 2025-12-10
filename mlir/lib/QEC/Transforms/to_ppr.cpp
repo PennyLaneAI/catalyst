@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "to-ppr"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
@@ -42,10 +43,10 @@ struct ToPPRPass : impl::ToPPRPassBase<ToPPRPass> {
         // Convert MeasureOp, CustomOp, and PauliRotOp
         target.addIllegalOp<quantum::MeasureOp>();
         target.addIllegalOp<quantum::CustomOp>();
-        target.addIllegalOp<quantum::PauliRotOp>();
 
         // Conversion target is QECDialect
         target.addLegalDialect<qec::QECDialect>();
+        target.addLegalDialect<mlir::arith::ArithDialect>();
 
         RewritePatternSet patterns(ctx);
         populateToPPRPatterns(patterns);
