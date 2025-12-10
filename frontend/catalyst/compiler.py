@@ -381,11 +381,11 @@ def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
 
 
 def to_mlir_opt(
-    *args, stdin=None, options: Optional[CompileOptions] = None, using_unified_compiler=False
+    *args, stdin=None, options: Optional[CompileOptions] = None, using_python_compiler=False
 ):
     """echo ${input} | catalyst --tool=opt *args *opts -"""
     # Check if we need to use the Python interface for xDSL passes
-    if using_unified_compiler:
+    if using_python_compiler:
         # Use the Python interface path for xDSL passes
         # pylint: disable-next=import-outside-toplevel
         from catalyst.python_interface import Compiler as UnifiedCompiler
@@ -547,7 +547,7 @@ class Compiler:
             return False
 
     @debug_logger
-    def is_using_unified_compiler(self, mlir_module=None):
+    def is_using_python_compiler(self, mlir_module=None):
         """Returns true if we need the Python interface path.
 
         This happens when:
@@ -649,7 +649,7 @@ class Compiler:
         Returns:
             (str): filename of shared object
         """
-        using_python_compiler = self.is_using_unified_compiler(mlir_module)
+        using_python_compiler = self.is_using_python_compiler(mlir_module)
         workspace = args[0] if args else kwargs.get("workspace")
         module_name = str(mlir_module.operation.attributes["sym_name"]).replace('"', "")
         ir = mlir_module.operation.get_asm(
