@@ -18,7 +18,9 @@ from unittest.mock import MagicMock
 import pytest
 
 pydot = pytest.importorskip("pydot")
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 # pylint: disable=wrong-import-position
 from catalyst.python_interface.visualization.pydot_dag_builder import PyDotDAGBuilder
 

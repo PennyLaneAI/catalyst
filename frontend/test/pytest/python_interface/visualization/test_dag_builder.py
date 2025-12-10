@@ -17,7 +17,8 @@ from typing import Any
 
 import pytest
 
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
