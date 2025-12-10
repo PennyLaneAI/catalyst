@@ -230,7 +230,7 @@ class PyDotDAGBuilder(DAGBuilder):
             node = Node(
                 node_uid,
                 label=node_label,
-                margin="0",
+                margin=0,
                 shape="plaintext",
                 fontname="Helvetica",
             )
