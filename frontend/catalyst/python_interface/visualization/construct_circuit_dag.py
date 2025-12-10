@@ -153,6 +153,7 @@ class ConstructCircuitDAG:
                 uid,
                 label=cluster_label,
                 labeljust="l",
+                style="dashed",
                 cluster_uid=self._cluster_uid_stack[-1],
             )
             self._cluster_uid_stack.append(uid)
