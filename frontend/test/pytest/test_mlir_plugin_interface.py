@@ -94,16 +94,3 @@ def test_get_options():
         assert isinstance(options, dict)
         assert isinstance(options["option"], ir.BoolAttr)
         assert options["option"].value == True
-
-
-@pytest.mark.skip(reason="xdsl not installed in ci cd yet")
-def test_xdsl_plugin():
-    """Here, we just test that we are able to run."""
-
-    @catalyst.qjit
-    @catalyst.passes.apply_pass("catalyst_xdsl_plugin.cancel-inverses")
-    @qml.qnode(qml.device("null.qubit", wires=1))
-    def example():
-        return qml.state()
-
-    example()
