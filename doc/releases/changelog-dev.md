@@ -469,11 +469,6 @@
 
 <h3>Documentation 📝</h3>
 
-* Added a "Unified Compiler Cookbook" RST file, along with tutorials, to `catalyst.python_interface.doc`,
-  which provides a quickstart guide for getting started with xDSL and its integration with PennyLane and
-  Catalyst.
-  [(#8571)](https://github.com/PennyLaneAI/pennylane/pull/8571)
-
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
   [(#2136)](https://github.com/PennyLaneAI/catalyst/pull/2136)
 
