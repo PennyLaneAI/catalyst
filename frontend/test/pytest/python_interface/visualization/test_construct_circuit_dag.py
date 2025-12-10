@@ -1014,8 +1014,8 @@ class TestOperatorConnectivity:
         # Z -> H -> S
         # T
         assert len(edges) == 3
-        assert ("node1", "node3") in edges
-        assert ("node2", "node4") in edges
+        assert ("node1", "node2") in edges
+        assert ("node3", "node4") in edges
         assert ("node4", "node5") in edges
 
     @pytest.mark.unit
