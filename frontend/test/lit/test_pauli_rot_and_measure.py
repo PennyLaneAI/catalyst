@@ -35,7 +35,7 @@ def test_pauli_rot_lowering():
     dev = qml.device("null.qubit", wires=1)
 
     pipeline = [("pipe", ["quantum-compilation-stage"])]
-    
+
     @qjit(pipelines=pipeline, target="mlir")
     @qml.qnode(device=dev)
     def circuit():
@@ -88,7 +88,7 @@ def test_arbitrary_angle_pauli_rotations():
     def circuit():
         qml.PauliRot(0.42, "X", wires=0)
 
-    # CHECK: [[cst:%.+]] = arith.constant 4.200000e-01 : f64
+    # CHECK: [[cst:%.+]] = arith.constant 2.100000e-01 : f64
     # CHECK: [[q0:%.+]] = qec.ppr.arbitrary ["X"]([[cst]])
     print(circuit.mlir_opt)
     qml.capture.disable()
@@ -110,8 +110,10 @@ def test_dynamic_angle_pauli_rotations():
     def circuit(x: float):
         qml.PauliRot(x, "X", wires=0)
 
+    # CHECK: [[cst:%.+]] = arith.constant 2.000000e+00 : f64
     # CHECK: [[extracted:%.+]] = tensor.extract
-    # CHECK: [[q0:%.+]] = qec.ppr.arbitrary ["X"]([[extracted]])
+    # CHECK: [[div:%.+]] = arith.divf [[extracted]], [[cst]] : f64
+    # CHECK: [[q0:%.+]] = qec.ppr.arbitrary ["X"]([[div]])
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -160,8 +162,8 @@ def test_arbitrary_angle_multi_qubit_pauli_rotations():
         qml.PauliRot(0.42, "XZ", wires=[0, 1])
         qml.PauliRot(0.84, "YX", wires=[0, 1])
 
-    # CHECK: [[cst:%.+]] = arith.constant 8.400000e-01 : f64
-    # CHECK: [[cst_1:%.+]] = arith.constant 4.200000e-01 : f64
+    # CHECK: [[cst:%.+]] = arith.constant 4.200000e-01 : f64
+    # CHECK: [[cst_1:%.+]] = arith.constant 2.100000e-01 : f64
     # CHECK: [[q0:%.+]]:2 = qec.ppr.arbitrary ["X", "Z"]([[cst_1]])
     # CHECK: [[q1:%.+]]:2 = qec.ppr.arbitrary ["Y", "X"]([[cst]]) [[q0]]#0, [[q0]]#1
     print(circuit.mlir_opt)
@@ -185,10 +187,13 @@ def test_dynamic_angle_multi_qubit_pauli_rotations():
         qml.PauliRot(x, "XZ", wires=[0, 1])
         qml.PauliRot(x, "YX", wires=[0, 1])
 
+    # CHECK: [[cst:%.+]] = arith.constant 2.000000e+00 : f64
     # CHECK: [[extracted:%.+]] = tensor.extract
-    # CHECK: [[q0:%.+]]:2 = qec.ppr.arbitrary ["X", "Z"]([[extracted]])
+    # CHECK: [[div:%.+]] = arith.divf [[extracted]], [[cst]] : f64
+    # CHECK: [[q0:%.+]]:2 = qec.ppr.arbitrary ["X", "Z"]([[div]])
     # CHECK: [[extracted_1:%.+]] = tensor.extract
-    # CHECK: [[q1:%.+]]:2 = qec.ppr.arbitrary ["Y", "X"]([[extracted_1]]) [[q0]]#0, [[q0]]#1
+    # CHECK: [[div_1:%.+]] = arith.divf [[extracted_1]], [[cst]] : f64
+    # CHECK: [[q1:%.+]]:2 = qec.ppr.arbitrary ["Y", "X"]([[div_1]]) [[q0]]#0, [[q0]]#1
     print(circuit.mlir_opt)
     qml.capture.disable()
 

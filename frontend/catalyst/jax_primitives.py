@@ -1435,7 +1435,9 @@ def _unitary_lowering(
 # pauli rot operation
 #
 @pauli_rot_p.def_abstract_eval
-def _pauli_rot_abstract_eval(*qubits, angle=None, pauli_word=None, qubits_len=0, params_len=0, ctrl_len=0, adjoint=False):
+def _pauli_rot_abstract_eval(
+    *qubits, angle=None, pauli_word=None, qubits_len=0, params_len=0, ctrl_len=0, adjoint=False
+):
     # The signature here is: (using * to denote zero or more)
     # qubits*, ctrl_qubits*, ctrl_values*
     qubits = qubits[:qubits_len]
@@ -1479,7 +1481,7 @@ def _pauli_rot_lowering(
     angle = extract_scalar(angle, "PauliRot")
     assert ir.F64Type.isinstance(angle.type)
     assert pauli_word is not None
-    
+
     pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
 
     ctrl_values_i1 = []
@@ -1497,6 +1499,7 @@ def _pauli_rot_lowering(
         in_ctrl_qubits=ctrl_qubits,
         in_ctrl_values=ctrl_values_i1,
     ).results
+
 
 #
 # pauli measure operation
