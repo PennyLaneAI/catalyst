@@ -39,7 +39,7 @@ def test_initialization_defaults():
     # Ensure duplicated edges cannot be added
     assert dag_builder.graph.obj_dict["strict"] is True
     # Ensure edges are orthogonal 
-    assert dag_builder.graph.obj_dict["splines"] == "ortho" 
+    assert dag_builder.graph.obj_dict["attributes"]["splines"]== "ortho" 
 
 
 class TestExceptions:
