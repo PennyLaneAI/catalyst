@@ -415,7 +415,6 @@ def _meas(meas: MeasurementProcess) -> str:
 
     match meas:
         case ExpectationMP() | VarianceMP() | ProbabilityMP():
-            # Often includes an observable
             if meas.obs is not None:
                 obs_name = meas.obs.name
                 base_name = f"{base_name}({obs_name})"
