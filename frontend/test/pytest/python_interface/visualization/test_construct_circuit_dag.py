@@ -65,14 +65,13 @@ class FakeDAGBuilder(DAGBuilder):
     def add_cluster(
         self,
         uid,
-        node_label=None,
+        label=None,
         cluster_uid=None,
         **attrs,
     ) -> None:
         self._clusters[uid] = {
             "uid": uid,
-            "node_label": node_label,
-            "cluster_label": attrs.get("label"),
+            "label": label,
             "parent_cluster_uid": cluster_uid,
             "attrs": attrs,
         }
@@ -155,11 +154,11 @@ class TestFuncOpVisualization:
         #     └── my_workflow
 
         # Check qjit is nested under graph
-        assert graph_clusters["cluster0"]["cluster_label"] == "qjit"
+        assert graph_clusters["cluster0"]["label"] == "qjit"
         assert graph_clusters["cluster0"]["parent_cluster_uid"] is None
 
         # Check that my_workflow is under qjit
-        assert graph_clusters["cluster1"]["cluster_label"] == "my_workflow"
+        assert graph_clusters["cluster1"]["label"] == "my_workflow"
         assert graph_clusters["cluster1"]["parent_cluster_uid"] == "cluster0"
 
     def test_nested_qnodes(self):
@@ -195,14 +194,14 @@ class TestFuncOpVisualization:
         #     └── my_qnode2
 
         # Check qjit is under graph
-        assert graph_clusters["cluster0"]["cluster_label"] == "qjit"
+        assert graph_clusters["cluster0"]["label"] == "qjit"
         assert graph_clusters["cluster0"]["parent_cluster_uid"] is None
 
         # Check both qnodes are under my_workflow
-        assert graph_clusters["cluster1"]["cluster_label"] == "my_qnode1"
+        assert graph_clusters["cluster1"]["label"] == "my_qnode1"
         assert graph_clusters["cluster1"]["parent_cluster_uid"] == "cluster0"
 
-        assert graph_clusters["cluster2"]["cluster_label"] == "my_qnode2"
+        assert graph_clusters["cluster2"]["label"] == "my_qnode2"
         assert graph_clusters["cluster2"]["parent_cluster_uid"] == "cluster0"
 
 
@@ -234,7 +233,7 @@ class TestDeviceNode:
         #     └── my_workflow: NullQubit
 
         # Assert device node is inside my_workflow cluster
-        assert graph_clusters["cluster1"]["cluster_label"] == "my_workflow"
+        assert graph_clusters["cluster1"]["label"] == "my_workflow"
         assert graph_nodes["node0"]["parent_cluster_uid"] == "cluster1"
 
         # Assert label is as expected
@@ -275,14 +274,14 @@ class TestDeviceNode:
         #     └── my_qnode2: LightningSimulator
 
         # Assert lightning.qubit device node is inside my_qnode1 cluster
-        assert graph_clusters["cluster1"]["cluster_label"] == "my_qnode1"
+        assert graph_clusters["cluster1"]["label"] == "my_qnode1"
         assert graph_nodes["node0"]["parent_cluster_uid"] == "cluster1"
 
         # Assert label is as expected
         assert graph_nodes["node0"]["label"] == "NullQubit"
 
         # Assert null qubit device node is inside my_qnode2 cluster
-        assert graph_clusters["cluster2"]["cluster_label"] == "my_qnode2"
+        assert graph_clusters["cluster2"]["label"] == "my_qnode2"
         assert graph_nodes["node1"]["parent_cluster_uid"] == "cluster2"
 
         # Assert label is as expected
@@ -314,7 +313,7 @@ class TestForOp:
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
-        assert clusters["cluster2"]["node_label"] == "for loop"
+        assert clusters["cluster2"]["label"] == "for loop"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
 
     @pytest.mark.unit
@@ -340,9 +339,9 @@ class TestForOp:
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
-        assert clusters["cluster2"]["node_label"] == "for loop"
+        assert clusters["cluster2"]["label"] == "for loop"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
-        assert clusters["cluster3"]["node_label"] == "for loop"
+        assert clusters["cluster3"]["label"] == "for loop"
         assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
 
 
@@ -372,7 +371,7 @@ class TestWhileOp:
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
-        assert clusters["cluster2"]["node_label"] == "while loop"
+        assert clusters["cluster2"]["label"] == "while loop"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
 
     @pytest.mark.unit
@@ -402,9 +401,9 @@ class TestWhileOp:
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
-        assert clusters["cluster2"]["node_label"] == "while loop"
+        assert clusters["cluster2"]["label"] == "while loop"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
-        assert clusters["cluster3"]["node_label"] == "while loop"
+        assert clusters["cluster3"]["label"] == "while loop"
         assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
 
 
@@ -436,13 +435,13 @@ class TestIfOp:
         # cluster0 -> qjit
         # cluster1 -> my_workflow
         # Check conditional is a cluster within cluster1 (my_workflow)
-        assert clusters["cluster2"]["cluster_label"] == "conditional"
+        assert clusters["cluster2"]["label"] == "conditional"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
 
         # Check three clusters live within cluster2 (conditional)
-        assert clusters["cluster3"]["node_label"] == "if"
+        assert clusters["cluster3"]["label"] == "if"
         assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
-        assert clusters["cluster4"]["node_label"] == "else"
+        assert clusters["cluster4"]["label"] == "else"
         assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
 
     @pytest.mark.unit
@@ -472,15 +471,15 @@ class TestIfOp:
         # cluster0 -> qjit
         # cluster1 -> my_workflow
         # Check conditional is a cluster within my_workflow
-        assert clusters["cluster2"]["cluster_label"] == "conditional"
+        assert clusters["cluster2"]["label"] == "conditional"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
 
         # Check three clusters live within conditional
-        assert clusters["cluster3"]["node_label"] == "if"
+        assert clusters["cluster3"]["label"] == "if"
         assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
-        assert clusters["cluster4"]["node_label"] == "elif"
+        assert clusters["cluster4"]["label"] == "elif"
         assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
-        assert clusters["cluster5"]["node_label"] == "else"
+        assert clusters["cluster5"]["label"] == "else"
         assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
 
     @pytest.mark.unit
@@ -520,24 +519,24 @@ class TestIfOp:
         #   cluster7 -> else
 
         # Check first conditional is a cluster within my_workflow
-        assert clusters["cluster2"]["cluster_label"] == "conditional"
+        assert clusters["cluster2"]["label"] == "conditional"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
 
         # Check 'if' cluster of first conditional has another conditional
-        assert clusters["cluster3"]["node_label"] == "if"
+        assert clusters["cluster3"]["label"] == "if"
         assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
 
         # Second conditional
-        assert clusters["cluster4"]["cluster_label"] == "conditional"
+        assert clusters["cluster4"]["label"] == "conditional"
         assert clusters["cluster4"]["parent_cluster_uid"] == "cluster3"
         # Check 'if' and 'else' in second conditional
-        assert clusters["cluster5"]["node_label"] == "if"
+        assert clusters["cluster5"]["label"] == "if"
         assert clusters["cluster5"]["parent_cluster_uid"] == "cluster4"
-        assert clusters["cluster6"]["node_label"] == "else"
+        assert clusters["cluster6"]["label"] == "else"
         assert clusters["cluster6"]["parent_cluster_uid"] == "cluster4"
 
         # Check nested if / else is within the first if cluster
-        assert clusters["cluster7"]["node_label"] == "else"
+        assert clusters["cluster7"]["label"] == "else"
         assert clusters["cluster7"]["parent_cluster_uid"] == "cluster2"
 
     def test_nested_conditionals_with_quantum_ops(self):
@@ -590,23 +589,23 @@ class TestIfOp:
         #                    node6 -> RZ(0,0)
 
         # check outer conditional (1)
-        assert clusters["cluster2"]["cluster_label"] == "conditional"
+        assert clusters["cluster2"]["label"] == "conditional"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
-        assert clusters["cluster3"]["node_label"] == "if"
+        assert clusters["cluster3"]["label"] == "if"
         assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
-        assert clusters["cluster4"]["node_label"] == "elif"
+        assert clusters["cluster4"]["label"] == "elif"
         assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
-        assert clusters["cluster5"]["node_label"] == "else"
+        assert clusters["cluster5"]["label"] == "else"
         assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
 
         # Nested conditional (2) inside conditional (1)
-        assert clusters["cluster6"]["cluster_label"] == "conditional"
+        assert clusters["cluster6"]["label"] == "conditional"
         assert clusters["cluster6"]["parent_cluster_uid"] == "cluster5"
-        assert clusters["cluster7"]["node_label"] == "if"
+        assert clusters["cluster7"]["label"] == "if"
         assert clusters["cluster7"]["parent_cluster_uid"] == "cluster6"
-        assert clusters["cluster8"]["node_label"] == "elif"
+        assert clusters["cluster8"]["label"] == "elif"
         assert clusters["cluster8"]["parent_cluster_uid"] == "cluster6"
-        assert clusters["cluster9"]["node_label"] == "else"
+        assert clusters["cluster9"]["label"] == "else"
         assert clusters["cluster9"]["parent_cluster_uid"] == "cluster6"
 
     def test_nested_conditionals_with_nested_quantum_ops(self):
@@ -661,24 +660,24 @@ class TestIfOp:
         #                    node6 -> RZ(0,0)
 
         # check outer conditional (1)
-        assert clusters["cluster2"]["cluster_label"] == "conditional"
+        assert clusters["cluster2"]["label"] == "conditional"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
-        assert clusters["cluster3"]["node_label"] == "if"
+        assert clusters["cluster3"]["label"] == "if"
         assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
-        assert clusters["cluster4"]["node_label"] == "elif"
+        assert clusters["cluster4"]["label"] == "elif"
         assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
-        assert clusters["cluster5"]["node_label"] == "else"
+        assert clusters["cluster5"]["label"] == "else"
         assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
 
         # Nested conditional (2) inside conditional (1)
-        assert clusters["cluster6"]["node_label"] == "for loop"
+        assert clusters["cluster6"]["label"] == "for loop"
         assert clusters["cluster6"]["parent_cluster_uid"] == "cluster5"
 
-        assert clusters["cluster7"]["cluster_label"] == "conditional"
+        assert clusters["cluster7"]["label"] == "conditional"
         assert clusters["cluster7"]["parent_cluster_uid"] == "cluster5"
-        assert clusters["cluster8"]["node_label"] == "if"
+        assert clusters["cluster8"]["label"] == "if"
         assert clusters["cluster8"]["parent_cluster_uid"] == "cluster7"
-        assert clusters["cluster9"]["node_label"] == "elif"
+        assert clusters["cluster9"]["label"] == "elif"
         assert clusters["cluster9"]["parent_cluster_uid"] == "cluster7"
-        assert clusters["cluster10"]["node_label"] == "else"
+        assert clusters["cluster10"]["label"] == "else"
         assert clusters["cluster10"]["parent_cluster_uid"] == "cluster7"

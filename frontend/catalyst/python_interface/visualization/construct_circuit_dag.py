@@ -96,8 +96,7 @@ class ConstructCircuitDAG:
         uid = f"cluster{self._cluster_uid_counter}"
         self.dag_builder.add_cluster(
             uid,
-            node_label="for loop",
-            label="",
+            label="for loop",
             cluster_uid=self._cluster_uid_stack[-1],
         )
         self._cluster_uid_stack.append(uid)
@@ -113,8 +112,7 @@ class ConstructCircuitDAG:
         uid = f"cluster{self._cluster_uid_counter}"
         self.dag_builder.add_cluster(
             uid,
-            node_label="while loop",
-            label="",
+            label="while loop",
             cluster_uid=self._cluster_uid_stack[-1],
         )
         self._cluster_uid_stack.append(uid)
@@ -131,7 +129,6 @@ class ConstructCircuitDAG:
         uid = f"cluster{self._cluster_uid_counter}"
         self.dag_builder.add_cluster(
             uid,
-            node_label="",
             label="conditional",
             labeljust="l",
             cluster_uid=self._cluster_uid_stack[-1],
@@ -143,17 +140,16 @@ class ConstructCircuitDAG:
         flattened_if_op: list[Region] = _flatten_if_op(operation)
         num_regions = len(flattened_if_op)
         for i, region in enumerate(flattened_if_op):
-            node_label = "elif"
+            cluster_label = "elif"
             if i == 0:
-                node_label = "if"
+                cluster_label = "if"
             elif i == num_regions - 1:
-                node_label = "else"
+                cluster_label = "else"
 
             uid = f"cluster{self._cluster_uid_counter}"
             self.dag_builder.add_cluster(
                 uid,
-                node_label=node_label,
-                label="",
+                label=cluster_label,
                 style="dashed",
                 penwidth=1,
                 cluster_uid=self._cluster_uid_stack[-1],
