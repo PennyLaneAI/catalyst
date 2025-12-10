@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <mlir/IR/Operation.h>
-#include <mlir/Support/LLVM.h>
 #define DEBUG_TYPE "to-pauli-frame"
 
 #include <concepts>
@@ -135,6 +133,8 @@ OpResult insertPauliOpsAfterFlush(PatternRewriter &rewriter, Location loc, Flush
  */
 LogicalResult convertPauliGate(CustomOp op, PatternRewriter &rewriter, bool x_parity, bool z_parity)
 {
+    LLVM_DEBUG(llvm::dbgs() << "Applying Pauli frame protocol to Pauli gate: " << op.getGateName()
+                            << "\n");
     auto loc = op->getLoc();
     auto outQubitTypes = op.getOutQubits().getTypes();
     auto inQubits = op.getInQubits();
@@ -168,6 +168,8 @@ LogicalResult convertPauliGate(CustomOp op, PatternRewriter &rewriter, bool x_pa
  */
 LogicalResult convertCliffordGate(CustomOp op, PatternRewriter &rewriter, CliffordGate gate)
 {
+    LLVM_DEBUG(llvm::dbgs() << "Applying Pauli frame protocol to Clifford gate: "
+                            << op.getGateName() << "\n");
     auto loc = op->getLoc();
     auto outQubitTypes = op.getOutQubits().getTypes();
     auto inQubits = op.getInQubits();
@@ -209,6 +211,8 @@ LogicalResult convertCliffordGate(CustomOp op, PatternRewriter &rewriter, Cliffo
  */
 LogicalResult convertNonCliffordGate(CustomOp op, PatternRewriter &rewriter)
 {
+    LLVM_DEBUG(llvm::dbgs() << "Applying Pauli frame protocol to non-Clifford gate: "
+                            << op.getGateName() << "\n");
     auto loc = op->getLoc();
     auto outQubitTypes = op.getOutQubits().getTypes();
 
@@ -293,6 +297,7 @@ struct InitPauliRecordQbitPattern : public OpRewritePattern<AllocQubitOp> {
     {
         auto loc = op->getLoc();
         auto qubit = op.getQubit();
+        LLVM_DEBUG(llvm::dbgs() << "Initializing Pauli record of qubit: " << qubit << "\n");
 
         rewriter.setInsertionPointAfter(op);
         InitOp initOp = rewriter.create<InitOp>(loc, qubit.getType(), qubit);
@@ -324,6 +329,8 @@ struct InitPauliRecordQregPattern : public OpRewritePattern<AllocOp> {
     {
         auto loc = op->getLoc();
         auto qreg = op.getQreg();
+        LLVM_DEBUG(llvm::dbgs() << "Initializing Pauli records of qubits in register: " << qreg
+                                << "\n");
 
         rewriter.setInsertionPointAfter(op);
         InitQregOp initQregOp = rewriter.create<InitQregOp>(loc, qreg.getType(), qreg);
@@ -356,6 +363,9 @@ struct CorrectMeasurementPattern : public OpRewritePattern<MeasureOp> {
         auto loc = op->getLoc();
         auto mres = op.getMres();
         auto outQubit = op.getOutQubit();
+        LLVM_DEBUG(
+            llvm::dbgs() << "Applying Pauli frame protocol to correct measurement result of qubit: "
+                         << outQubit << "\n");
 
         rewriter.setInsertionPointAfter(op);
         CorrectMeasurementOp correctMeasOp = rewriter.create<CorrectMeasurementOp>(
@@ -373,6 +383,9 @@ struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<Measuremen
 
     LogicalResult matchAndRewrite(MeasurementProcessOp op, PatternRewriter &rewriter) const override
     {
+        LLVM_DEBUG(llvm::dbgs() << "Applying Pauli frame protocol to flush Pauli record before "
+                                   "terminal measurement process: "
+                                << op << "\n");
         auto loc = op->getLoc();
 
         const auto obs = op.getObs();
