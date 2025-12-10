@@ -692,17 +692,19 @@ class TestGetLabel:
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
-        "op", [qml.H(0), qml.QubitUnitary([[0, 1], [1, 0]], 0), qml.SWAP([0, 1])]
+        "op, expected_label",
+        [
+            (qml.H(0), "{<name> Hadamard | <wire> [0]}"),
+            (
+                qml.QubitUnitary([[0, 1], [1, 0]], 0),
+                "{<name> QubitUnitary | <wire> [0]}",
+            ),
+            (qml.SWAP([0, 1]), "{<name> SWAP | <wire> [0, 1]}"),
+        ],
     )
-    def test_standard_operator(self, op):
+    def test_standard_operator(self, op, label):
         """Tests against an operator instance."""
-        wires = list(op.wires.labels)
-        if wires == []:
-            wires_str = "all"
-        else:
-            wires_str = f"[{', '.join(map(str, wires))}]"
-
-        assert get_label(op) == f"<name> {op.name}|<wire> {wires_str}"
+        assert get_label(op) == label
 
     def test_global_phase_operator(self):
         """Tests against a GlobalPhase operator instance."""
@@ -710,23 +712,22 @@ class TestGetLabel:
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
-        "meas",
+        "meas, expected_label",
         [
-            qml.state(),
-            qml.expval(qml.Z(0)),
-            qml.var(qml.Z(0)),
-            qml.probs(),
-            qml.probs(wires=0),
-            qml.probs(wires=[0, 1]),
-            qml.sample(),
-            qml.sample(wires=0),
-            qml.sample(wires=[0, 1]),
+            (qml.state(), "{<name> state |<wire> all}"),
+            (qml.expval(qml.Z(0)), "{<name> expval (PauliZ) |<wire> [0]}"),
+            (qml.var(qml.Z(0)), "{<name> var (PauliZ) |<wire> [0]}"),
+            (qml.probs(), "{<name> probs |<wire> all}"),
+            (qml.probs(wires=0), "{<name> probs |<wire> [0]}"),
+            (qml.probs(wires=[0, 1]), "{<name> probs |<wire> [0, 1]}"),
+            (qml.sample(), "{<name> sample |<wire> all}"),
+            (qml.sample(wires=0), "{<name> sample |<wire> [0]}"),
+            (qml.sample(wires=[0, 1]), "{<name> sample |<wire> [0, 1]}"),
         ],
     )
-    def test_standard_measurement(self, meas):
+    def test_standard_measurement(self, meas, label):
         """Tests against an operator instance."""
-
-        assert get_label(meas) == str(meas)
+        assert get_label(meas) == label
 
 
 class TestCreateStaticOperatorNodes:
