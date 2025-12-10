@@ -254,6 +254,5 @@ def _flatten_if_op(op: scf.IfOp) -> list[Region]:
         return flattened_op
 
     # No more nested IfOps, therefore append final region
-    # with no SSAValue
     flattened_op.append(else_region)
     return flattened_op
