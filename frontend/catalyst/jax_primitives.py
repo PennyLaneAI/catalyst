@@ -96,6 +96,16 @@ with Patcher(
         ComputationalBasisOp,
         CountsOp,
         CustomOp,
+        PauliXOp,
+        PauliYOp,
+        PauliZOp,
+        HadamardOp,
+        SGateOp,
+        TGateOp,
+        CNOTOp,
+        RXOp,
+        RYOp,
+        RZOp,
         DeallocOp,
         DeallocQubitOp,
         DeviceInitOp,
@@ -1316,6 +1326,122 @@ def _qinst_lowering(
     name_attr = ir.StringAttr.get(op)
     name_str = str(name_attr)
     name_str = name_str.replace('"', "")
+
+    if name_str == "PauliX":
+        assert len(float_params) == 0, "PauliX takes no float parameters"
+        return PauliXOp(
+            out_qubits=[qubit.type for qubit in qubits],
+            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+            in_qubits=qubits,
+            in_ctrl_qubits=ctrl_qubits,
+            in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
+        ).results
+
+    if name_str == "PauliY":
+        assert len(float_params) == 0, "PauliY takes no float parameters"
+        return PauliYOp(
+            out_qubits=[qubit.type for qubit in qubits],
+            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+            in_qubits=qubits,
+            in_ctrl_qubits=ctrl_qubits,
+            in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
+        ).results
+
+    if name_str == "PauliZ":
+        assert len(float_params) == 0, "PauliZ takes no float parameters"
+        return PauliZOp(
+            out_qubits=[qubit.type for qubit in qubits],
+            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+            in_qubits=qubits,
+            in_ctrl_qubits=ctrl_qubits,
+            in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
+        ).results
+
+    if name_str == "Hadamard":
+        assert len(float_params) == 0, "Hadamard takes no float parameters"
+        return HadamardOp(
+            out_qubits=[qubit.type for qubit in qubits],
+            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+            in_qubits=qubits,
+            in_ctrl_qubits=ctrl_qubits,
+            in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
+        ).results
+
+    if name_str == "S":
+        assert len(float_params) == 0, "S takes no float parameters"
+        return SGateOp(
+            out_qubits=[qubit.type for qubit in qubits],
+            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+            in_qubits=qubits,
+            in_ctrl_qubits=ctrl_qubits,
+            in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
+        ).results
+
+    if name_str == "T":
+        assert len(float_params) == 0, "T takes no float parameters"
+        return TGateOp(
+            out_qubits=[qubit.type for qubit in qubits],
+            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+            in_qubits=qubits,
+            in_ctrl_qubits=ctrl_qubits,
+            in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
+        ).results
+
+    if name_str == "CNOT":
+        assert len(float_params) == 0, "CNOT takes no float parameters"
+        return CNOTOp(
+            out_qubits=[qubit.type for qubit in qubits],
+            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+            in_qubits=qubits,
+            in_ctrl_qubits=ctrl_qubits,
+            in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
+        ).results
+
+    if name_str == "RX":
+        assert len(float_params) == 1, "RX takes one float parameter"
+        float_param = float_params[0]
+        return RXOp(
+            out_qubits=[qubit.type for qubit in qubits],
+            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+            theta=float_param,
+            in_qubits=qubits,
+            in_ctrl_qubits=ctrl_qubits,
+            in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
+        ).results
+
+    if name_str == "RY":
+        assert len(float_params) == 1, "RY takes one float parameter"
+        float_param = float_params[0]
+        return RYOp(
+            out_qubits=[qubit.type for qubit in qubits],
+            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+            theta=float_param,
+            in_qubits=qubits,
+            in_ctrl_qubits=ctrl_qubits,
+            in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
+        ).results
+
+    if name_str == "RZ":
+        assert len(float_params) == 1, "RZ takes one float parameter"
+        float_param = float_params[0]
+        return RZOp(
+            out_qubits=[qubit.type for qubit in qubits],
+            out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+            theta=float_param,
+            in_qubits=qubits,
+            in_ctrl_qubits=ctrl_qubits,
+            in_ctrl_values=ctrl_values_i1,
+            adjoint=adjoint,
+        ).results
 
     if name_str == "MultiRZ":
         assert len(float_params) == 1, "MultiRZ takes one float parameter"

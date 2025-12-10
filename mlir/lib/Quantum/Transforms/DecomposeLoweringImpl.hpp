@@ -431,6 +431,45 @@ class CustomOpSignatureAnalyzer : public BaseSignatureAnalyzer {
     }
 };
 
+class RXOpSignatureAnalyzer : public BaseSignatureAnalyzer {
+  public:
+    RXOpSignatureAnalyzer() = delete;
+
+    RXOpSignatureAnalyzer(RXOp op, bool enableQregMode)
+        : BaseSignatureAnalyzer(op, op.getTheta(), op.getNonCtrlQubitOperands(),
+                                op.getCtrlQubitOperands(), op.getCtrlValueOperands(),
+                                op.getNonCtrlQubitResults(), op.getCtrlQubitResults(),
+                                enableQregMode)
+    {
+    }
+};
+
+class RYOpSignatureAnalyzer : public BaseSignatureAnalyzer {
+  public:
+    RYOpSignatureAnalyzer() = delete;
+
+    RYOpSignatureAnalyzer(RYOp op, bool enableQregMode)
+        : BaseSignatureAnalyzer(op, op.getTheta(), op.getNonCtrlQubitOperands(),
+                                op.getCtrlQubitOperands(), op.getCtrlValueOperands(),
+                                op.getNonCtrlQubitResults(), op.getCtrlQubitResults(),
+                                enableQregMode)
+    {
+    }
+};
+
+class RZOpSignatureAnalyzer : public BaseSignatureAnalyzer {
+  public:
+    RZOpSignatureAnalyzer() = delete;
+
+    RZOpSignatureAnalyzer(RZOp op, bool enableQregMode)
+        : BaseSignatureAnalyzer(op, op.getTheta(), op.getNonCtrlQubitOperands(),
+                                op.getCtrlQubitOperands(), op.getCtrlValueOperands(),
+                                op.getNonCtrlQubitResults(), op.getCtrlQubitResults(),
+                                enableQregMode)
+    {
+    }
+};
+
 class MultiRZOpSignatureAnalyzer : public BaseSignatureAnalyzer {
   public:
     MultiRZOpSignatureAnalyzer() = delete;
