@@ -712,8 +712,8 @@ class TestGetLabel:
         "meas, label",
         [
             (qml.state(), "<name> state|<wire> all"),
-            (qml.expval(qml.Z(0)), "<name> expval (PauliZ)|<wire> [0]"),
-            (qml.var(qml.Z(0)), "<name> var (PauliZ)|<wire> [0]"),
+            (qml.expval(qml.Z(0)), "<name> expval(PauliZ)|<wire> [0]"),
+            (qml.var(qml.Z(0)), "<name> var(PauliZ)|<wire> [0]"),
             (qml.probs(), "<name> probs|<wire> all"),
             (qml.probs(wires=0), "<name> probs|<wire> [0]"),
             (qml.probs(wires=[0, 1]), "<name> probs|<wire> [0, 1]"),
