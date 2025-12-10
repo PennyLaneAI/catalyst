@@ -300,20 +300,6 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* The experimental xDSL :func:`~catalyst.python_interface.transforms.measurements_from_samples_pass`
-  pass has been updated to support `shots` defined by an `arith.constant` operation.
-  [(#8460)](https://github.com/PennyLaneAI/pennylane/pull/8460)
-
-* The experimental xDSL :func:`~catalyst.python_interface.transforms.diagonalize_measurements`
-  pass has been updated to fix a bug that included the wrong SSA value for final qubit insertion
-  and deallocation at the end of the circuit. A clear error is now also raised when there are
-  observables with overlapping wires.
-  [(#8383)](https://github.com/PennyLaneAI/pennylane/pull/8383)
-
-* Fixes a bug in the constructor of the xDSL Quantum dialect's `QubitUnitaryOp` that
-  prevented an instance from being constructed.
-  [(#8456)](https://github.com/PennyLaneAI/pennylane/pull/8456)
-
 * Added missing `detensorize-function-boundary` and `symbol-dce` passes to `Pipelines.cpp`.
   [(#2266)](https://github.com/PennyLaneAI/catalyst/pull/2266)
 
