@@ -45,7 +45,7 @@ class PyDotDAGBuilder(DAGBuilder):
         strict digraph G {
         rankdir=TB;
         compound=true;
-        n0 [label="node 0", fontname=Helvetica, penwidth=2, shape=ellipse, style=filled, fillcolor=lightblue, color=lightblue4];
+        n0 [label="node 0", fontname=Helvetica, penwidth=3, shape=ellipse, style=filled, fillcolor=lightblue, color=lightblue4];
         subgraph cluster_c0 {
         fontname=Helvetica;
         penwidth=2;
@@ -53,7 +53,7 @@ class PyDotDAGBuilder(DAGBuilder):
         style=solid;
         }
 
-        n1 [label="node 1", fontname=Helvetica, penwidth=2, shape=ellipse, style=filled, fillcolor=lightblue, color=lightblue4, cluster_uid=c0];
+        n1 [label="node 1", fontname=Helvetica, penwidth=3, shape=ellipse, style=filled, fillcolor=lightblue, color=lightblue4, cluster_uid=c0];
         }
 
     """
@@ -70,9 +70,8 @@ class PyDotDAGBuilder(DAGBuilder):
         # - rankdir="TB": Set layout direction from Top to Bottom.
         # - compound="true": Allow edges to connect directly to clusters/subgraphs.
         # - strict=True: Prevent duplicate edges (e.g., A -> B added twice).
-        # - splines="ortho": Orthogonal edges
         self.graph: Dot = Dot(
-            graph_type="digraph", rankdir="TB", compound="true", strict=True, splines="ortho"
+            graph_type="digraph", rankdir="TB", compound="true", strict=True
         )
 
         # Use internal cache that maps cluster ID to actual pydot (Dot or Cluster) object
@@ -95,7 +94,7 @@ class PyDotDAGBuilder(DAGBuilder):
                 "style": "filled",
                 "fillcolor": "lightblue",
                 "color": "lightblue4",
-                "penwidth": 2,
+                "penwidth": 3,
             }
             if node_attrs is None
             else node_attrs
@@ -103,7 +102,7 @@ class PyDotDAGBuilder(DAGBuilder):
         self._default_edge_attrs: dict = (
             {
                 "color": "lightblue4",
-                "penwidth": 2,
+                "penwidth": 3,
             }
             if edge_attrs is None
             else edge_attrs
@@ -231,9 +230,10 @@ class PyDotDAGBuilder(DAGBuilder):
             node = Node(
                 node_uid,
                 label=node_label,
-                margin=0,
-                shape="plaintext",
+                shape="rectangle",
+                style="dashed",
                 fontname="Helvetica",
+                penwidth=2,
             )
             rank_subgraph.add_node(node)
             cluster.add_subgraph(rank_subgraph)
