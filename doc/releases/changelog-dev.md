@@ -184,48 +184,6 @@
 
 <h3>Improvements 🛠</h3>
 
-* Add an experimental `outline_state_evolution_pass` xDSL pass to `catalyst.python_interface.transforms`,
-  which moves all quantum gate operations to a private callable.
-  [(#8367)](https://github.com/PennyLaneAI/pennylane/pull/8367)
-
-* A new experimental `split_non_commuting_pass` compiler pass has been added to
-  `catalyst.python_interface.transforms`. This pass splits quantum functions that
-  measure observables on the same wires into multiple function executions, where
-  each execution measures observables on different wires (using the "wires" grouping
-  strategy). The original function is replaced with calls to these generated functions,
-  and the results are combined appropriately.
-  [(#8531)](https://github.com/PennyLaneAI/pennylane/pull/8531)
-
-* Add the `PCPhaseOp` operation to the xDSL Quantum dialect.
-  [(#8621)](https://github.com/PennyLaneAI/pennylane/pull/8621)
-
-* Users can now apply xDSL passes without the need to pass the `pass_plugins` argument to
-  the `qjit` decorator.
-  [(#8572)](https://github.com/PennyLaneAI/pennylane/pull/8572)
-  [(#8573)](https://github.com/PennyLaneAI/pennylane/pull/8573)
-  [(#2169)](https://github.com/PennyLaneAI/catalyst/pull/2169)
-  [(#2183)](https://github.com/PennyLaneAI/catalyst/pull/2183)
-
-* The :meth:`catalyst.python_interface.transforms.convert_to_mbqc_formalism_pass` now
-  supports :class:`~xdsl.dialects.scf.IndexSwitchOp` in IR and ignores regions that have no body.
-  [(#8632)](https://github.com/PennyLaneAI/pennylane/pull/8632)
-
-* The `convert_to_mbqc_formalism` compilation pass now outlines the operations to represent a gate
-  in the MBQC formalism into subroutines in order to reduce the IR size for large programs.
-  [(#8619)](https://github.com/PennyLaneAI/pennylane/pull/8619)
-
-* The :meth:`catalyst.python_interface.Compiler.run` method now accepts a string as input,
-  which is parsed and transformed with xDSL.
-  [(#8587)](https://github.com/PennyLaneAI/pennylane/pull/8587)
-
-* An `is_xdsl_pass` function has been added to the `catalyst.python_interface.pass_api` module.
-  This function checks if a pass name corresponds to an xDSL implemented pass.
-  [(#8572)](https://github.com/PennyLaneAI/pennylane/pull/8572)
-
-* A new `catalyst.python_interface.utils` submodule has been added, containing general-purpose utilities for
-  working with xDSL. This includes a function that extracts the concrete value of scalar, constant SSA values.
-  [(#8514)](https://github.com/PennyLaneAI/pennylane/pull/8514)
-
 * Catalyst can now use the new `pass_name` property of pennylane transform objects. Passes can now
   be created using `qml.transform(pass_name=pass_name)` instead of `PassPipelineWrapper`.
   [(#2149](https://github.com/PennyLaneAI/catalyst/pull/2149)
