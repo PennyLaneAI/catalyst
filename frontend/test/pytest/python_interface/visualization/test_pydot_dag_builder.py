@@ -333,27 +333,25 @@ class TestProperties:
         """Tests that clusters property works."""
 
         dag_builder = PyDotDAGBuilder()
-        dag_builder.add_cluster("0", "my_info_node", label="my_cluster", penwidth=10)
+        dag_builder.add_cluster("0", "my_cluster", penwidth=10)
 
         clusters = dag_builder.clusters
 
         dag_builder.add_cluster(
-            "1", "my_other_info_node", cluster_uid="0", label="my_nested_cluster"
+            "1", "my_nested_cluster", cluster_uid="0", 
         )
         clusters = dag_builder.clusters
         assert len(clusters) == 2
 
         assert len(clusters["0"]) == 5
         assert clusters["0"]["uid"] == "0"
-        assert clusters["0"]["cluster_label"] == "my_cluster"
-        assert clusters["0"]["node_label"] == "my_info_node"
+        assert clusters["0"]["label"] == "my_cluster"
         assert clusters["0"]["cluster_uid"] == None
         assert clusters["0"]["attrs"]["penwidth"] == 10
 
         assert len(clusters["1"]) == 5
         assert clusters["1"]["uid"] == "1"
-        assert clusters["1"]["cluster_label"] == "my_nested_cluster"
-        assert clusters["1"]["node_label"] == "my_other_info_node"
+        assert clusters["1"]["label"] == "my_nested_cluster"
         assert clusters["1"]["cluster_uid"] == "0"
 
 

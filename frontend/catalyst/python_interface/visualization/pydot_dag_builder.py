@@ -190,7 +190,7 @@ class PyDotDAGBuilder(DAGBuilder):
     def add_cluster(
         self,
         uid: str,
-        node_label: str | None = None,
+        label: str | None = None,
         cluster_uid: str | None = None,
         **attrs: Any,
     ) -> None:
@@ -201,7 +201,7 @@ class PyDotDAGBuilder(DAGBuilder):
 
         Args:
             uid (str): Unique cluster ID to identify this cluster.
-            node_label (str | None): The text to display on the information node within the cluster when rendered.
+            label (str | None): The text to display as a label on the cluster.
             cluster_uid (str | None): Optional unique ID of the cluster this cluster belongs to. If `None`, the cluster will be positioned on the base graph.
             **attrs (Any): Any additional styling keyword arguments.
 
@@ -213,31 +213,7 @@ class PyDotDAGBuilder(DAGBuilder):
 
         # Use ChainMap so you don't need to construct a new dictionary
         cluster_attrs: ChainMap = ChainMap(attrs, self._default_cluster_attrs)
-        cluster = Cluster(uid, **cluster_attrs)
-
-        # Puts the label in a node within the cluster.
-        # Ensures that any edges connecting nodes through the cluster
-        # boundary don't block the label.
-        # ┌───────────┐
-        # │ ┌───────┐ │
-        # │ │ label │ │
-        # │ └───────┘ │
-        # │           │
-        # └───────────┘
-        if node_label:
-            node_uid = f"{uid}_info_node"
-            rank_subgraph = Subgraph()
-            node = Node(
-                node_uid,
-                label=node_label,
-                shape="rectangle",
-                style="dashed",
-                fontname="Helvetica",
-                penwidth=2,
-            )
-            rank_subgraph.add_node(node)
-            cluster.add_subgraph(rank_subgraph)
-            cluster.add_node(node)
+        cluster = Cluster(uid, label=label, **cluster_attrs)
 
         # Record new cluster
         self._subgraph_cache[uid] = cluster
@@ -250,8 +226,7 @@ class PyDotDAGBuilder(DAGBuilder):
 
         self._clusters[uid] = {
             "uid": uid,
-            "cluster_label": cluster_attrs.get("label"),
-            "node_label": node_label,
+            "label": label,
             "cluster_uid": cluster_uid,
             "attrs": dict(cluster_attrs),
         }

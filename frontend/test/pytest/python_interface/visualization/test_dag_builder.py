@@ -33,20 +33,20 @@ def test_concrete_implementation_works():
 
         def add_node(
             self,
-            id: str,
+            uid: str,
             label: str,
             cluster_id: str | None = None,
             **attrs: Any,
         ) -> None:
             return
 
-        def add_edge(self, from_id: str, to_id: str, **attrs: Any) -> None:
+        def add_edge(self, from_uid: str, to_uid: str, **attrs: Any) -> None:
             return
 
         def add_cluster(
             self,
-            id: str,
-            node_label: str | None = None,
+            uid: str,
+            label: str | None = None,
             cluster_id: str | None = None,
             **attrs: Any,
         ) -> None:
