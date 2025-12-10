@@ -23,6 +23,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 
+#include "Catalyst/Utils/EnsureFunctionDeclaration.h"
 #include "RTIO/IR/RTIOOps.h" // For ConfigAttr
 
 namespace catalyst {
@@ -219,15 +220,8 @@ class ARTIQRuntimeBuilder {
 
     LLVM::LLVMFuncOp ensureFunc(StringRef name, LLVM::LLVMFunctionType funcTy)
     {
-        auto module = getModule();
-        if (auto func = module.lookupSymbol<LLVM::LLVMFuncOp>(name)) {
-            return func;
-        }
-
-        OpBuilder::InsertionGuard guard(builder);
-        builder.setInsertionPointToStart(module.getBody());
-        return builder.create<LLVM::LLVMFuncOp>(contextOp->getLoc(), name, funcTy,
-                                                LLVM::Linkage::External);
+        PatternRewriter rewriter = PatternRewriter(builder.getContext());
+        return catalyst::ensureFunctionDeclaration(rewriter, contextOp, name, funcTy);
     }
 
     void ensureSecToMuFunc()
