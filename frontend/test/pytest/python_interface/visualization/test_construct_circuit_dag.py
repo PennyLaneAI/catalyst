@@ -691,7 +691,7 @@ class TestGetLabel:
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
-        "op, expected_label",
+        "op, label",
         [
             (qml.H(0), "{<name> Hadamard | <wire> [0]}"),
             (
@@ -711,7 +711,7 @@ class TestGetLabel:
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
-        "meas, expected_label",
+        "meas, label",
         [
             (qml.state(), "{<name> state |<wire> all}"),
             (qml.expval(qml.Z(0)), "{<name> expval (PauliZ) |<wire> [0]}"),
