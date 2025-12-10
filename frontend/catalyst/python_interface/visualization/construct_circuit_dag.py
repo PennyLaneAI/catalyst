@@ -97,6 +97,7 @@ class ConstructCircuitDAG:
         self.dag_builder.add_cluster(
             uid,
             label="for loop",
+            labeljust="l",
             cluster_uid=self._cluster_uid_stack[-1],
         )
         self._cluster_uid_stack.append(uid)
@@ -113,6 +114,7 @@ class ConstructCircuitDAG:
         self.dag_builder.add_cluster(
             uid,
             label="while loop",
+            labeljust="l",
             cluster_uid=self._cluster_uid_stack[-1],
         )
         self._cluster_uid_stack.append(uid)
@@ -150,8 +152,7 @@ class ConstructCircuitDAG:
             self.dag_builder.add_cluster(
                 uid,
                 label=cluster_label,
-                style="dashed",
-                penwidth=1,
+                labeljust="l",
                 cluster_uid=self._cluster_uid_stack[-1],
             )
             self._cluster_uid_stack.append(uid)
