@@ -38,6 +38,8 @@ def test_initialization_defaults():
     assert dag_builder.graph.get_compound() == "true"
     # Ensure duplicated edges cannot be added
     assert dag_builder.graph.obj_dict["strict"] is True
+    # Ensure edges are orthogonal 
+    assert dag_builder.graph.obj_dict["splines"] == "ortho" 
 
 
 class TestExceptions:
@@ -343,13 +345,13 @@ class TestProperties:
         clusters = dag_builder.clusters
         assert len(clusters) == 2
 
-        assert len(clusters["0"]) == 5
+        assert len(clusters["0"]) == 4
         assert clusters["0"]["uid"] == "0"
         assert clusters["0"]["label"] == "my_cluster"
         assert clusters["0"]["cluster_uid"] == None
         assert clusters["0"]["attrs"]["penwidth"] == 10
 
-        assert len(clusters["1"]) == 5
+        assert len(clusters["1"]) == 4
         assert clusters["1"]["uid"] == "1"
         assert clusters["1"]["label"] == "my_nested_cluster"
         assert clusters["1"]["cluster_uid"] == "0"

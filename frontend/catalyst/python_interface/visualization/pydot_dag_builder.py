@@ -70,8 +70,9 @@ class PyDotDAGBuilder(DAGBuilder):
         # - rankdir="TB": Set layout direction from Top to Bottom.
         # - compound="true": Allow edges to connect directly to clusters/subgraphs.
         # - strict=True: Prevent duplicate edges (e.g., A -> B added twice).
+        # - splines="ortho": Edges connecting clusters are orthogonal
         self.graph: Dot = Dot(
-            graph_type="digraph", rankdir="TB", compound="true", strict=True
+            graph_type="digraph", rankdir="TB", compound="true", strict=True, splines="ortho"
         )
 
         # Use internal cache that maps cluster ID to actual pydot (Dot or Cluster) object
