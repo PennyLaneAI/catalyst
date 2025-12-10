@@ -89,6 +89,10 @@ struct PulseOpLowering : public OpConversionPattern<RTIOPulseOp> {
         Value channelAddr = computeChannelDeviceAddr(rewriter, op, adaptor.getChannel());
         Value durationMu = artiq.secToMu(adaptor.getDuration());
 
+        // Enforce minimum pulse duration to avoid 0 duratoin events
+        Value minDuration = artiq.constI64(ARTIQHardwareConfig::minTTLPulseMu);
+        durationMu = rewriter.create<arith::MaxSIOp>(op.getLoc(), durationMu, minDuration);
+
         artiq.ttlOn(channelAddr);
         artiq.delayMu(durationMu);
         artiq.ttlOff(channelAddr);
