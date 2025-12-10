@@ -16,10 +16,10 @@
 
 from functools import singledispatchmethod
 
-from xdsl.dialects import builtin, func
-from xdsl.ir import Block, Operation, Region
+from xdsl.dialects import builtin, func, scf
+from xdsl.ir import Block, Operation, Region, SSAValue
 
-from catalyst.python_interface.dialects import catalyst, quantum
+from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 
 
@@ -85,6 +85,90 @@ class ConstructCircuitDAG:
         for op in block.ops:
             self._visit_operation(op)
 
+    # =============
+    # CONTROL FLOW
+    # =============
+
+    @_visit_operation.register
+    def _for_op(self, operation: scf.ForOp) -> None:
+        """Handle an xDSL ForOp operation."""
+
+        uid = f"cluster{self._cluster_uid_counter}"
+        self.dag_builder.add_cluster(
+            uid,
+            label="for loop",
+            labeljust="l",
+            cluster_uid=self._cluster_uid_stack[-1],
+        )
+        self._cluster_uid_stack.append(uid)
+        self._cluster_uid_counter += 1
+
+        self._visit_region(operation.regions[0])
+
+        self._cluster_uid_stack.pop()
+
+    @_visit_operation.register
+    def _while_op(self, operation: scf.WhileOp) -> None:
+        """Handle an xDSL WhileOp operation."""
+        uid = f"cluster{self._cluster_uid_counter}"
+        self.dag_builder.add_cluster(
+            uid,
+            label="while loop",
+            labeljust="l",
+            cluster_uid=self._cluster_uid_stack[-1],
+        )
+        self._cluster_uid_stack.append(uid)
+        self._cluster_uid_counter += 1
+
+        for region in operation.regions:
+            self._visit_region(region)
+
+        self._cluster_uid_stack.pop()
+
+    @_visit_operation.register
+    def _if_op(self, operation: scf.IfOp):
+        """Handles the scf.IfOp operation."""
+        uid = f"cluster{self._cluster_uid_counter}"
+        self.dag_builder.add_cluster(
+            uid,
+            label="conditional",
+            labeljust="l",
+            cluster_uid=self._cluster_uid_stack[-1],
+        )
+        self._cluster_uid_stack.append(uid)
+        self._cluster_uid_counter += 1
+
+        # Loop through each branch and visualize as a cluster
+        flattened_if_op: list[Region] = _flatten_if_op(operation)
+        num_regions = len(flattened_if_op)
+        for i, region in enumerate(flattened_if_op):
+            cluster_label = "elif"
+            if i == 0:
+                cluster_label = "if"
+            elif i == num_regions - 1:
+                cluster_label = "else"
+
+            uid = f"cluster{self._cluster_uid_counter}"
+            self.dag_builder.add_cluster(
+                uid,
+                label=cluster_label,
+                labeljust="l",
+                style="dashed",
+                cluster_uid=self._cluster_uid_stack[-1],
+            )
+            self._cluster_uid_stack.append(uid)
+            self._cluster_uid_counter += 1
+
+            # Go recursively into the branch to process internals
+            self._visit_region(region)
+
+            # Pop branch cluster after processing to ensure
+            # logical branches are treated as 'parallel'
+            self._cluster_uid_stack.pop()
+
+        # Pop IfOp cluster before leaving this handler
+        self._cluster_uid_stack.pop()
+
     # ============
     # DEVICE NODE
     # ============
@@ -138,3 +222,37 @@ class ConstructCircuitDAG:
             # If we hit a func.return operation we know we are leaving
             # the FuncOp's scope and so we can pop the ID off the stack.
             self._cluster_uid_stack.pop()
+
+
+def _flatten_if_op(op: scf.IfOp) -> list[Region]:
+    """Recursively flattens a nested IfOp (if/elif/else chains)."""
+
+    then_region, else_region = op.regions
+
+    flattened_op: list[Region] = [then_region]
+
+    # Check to see if there are any nested quantum operations in the else block
+    else_block: Block = else_region.block
+    has_quantum_ops = False
+    nested_if_op = None
+    for op in else_block.ops:
+        if isinstance(op, scf.IfOp):
+            nested_if_op = op
+            # No need to walk this op as this will be
+            # recursively handled down below
+            continue
+        for internal_op in op.walk():
+            if type(internal_op) in quantum.Quantum.operations:
+                has_quantum_ops = True
+                # No need to check anything else
+                break
+
+    if nested_if_op and not has_quantum_ops:
+        # Recursively flatten any IfOps found in said block
+        nested_flattened_op: list[Region] = _flatten_if_op(nested_if_op)
+        flattened_op.extend(nested_flattened_op)
+        return flattened_op
+
+    # No more nested IfOps, therefore append final region
+    flattened_op.append(else_region)
+    return flattened_op
