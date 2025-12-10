@@ -17,7 +17,7 @@
 from collections import defaultdict
 from functools import singledispatch, singledispatchmethod
 
-from pennylane.measurements import MeasurementProcess
+from pennylane.measurements import ExpectationMP, MeasurementProcess, ProbabilityMP, VarianceMP
 from pennylane.operation import Operator
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region, SSAValue
@@ -458,7 +458,7 @@ def get_label(op: Operator | MeasurementProcess) -> str:
 
 @get_label.register
 def _operator(op: Operator) -> str:
-    """Returns the appropriate label for an xDSL operation."""
+    """Returns the appropriate label for PennyLane Operator"""
     wires = list(op.wires.labels)
     if wires == []:
         wires_str = "all"
@@ -466,3 +466,28 @@ def _operator(op: Operator) -> str:
         wires_str = f"[{', '.join(map(str, wires))}]"
     # Using <...> lets us use ports (https://graphviz.org/doc/info/shapes.html#record)
     return f"<name> {op.name}|<wire> {wires_str}"
+
+
+@get_label.register
+def _meas(meas: MeasurementProcess) -> str:
+    """Returns the appropriate label for a PennyLane MeasurementProcess using match/case."""
+
+    wires_str = list(meas.wires.labels)
+    if not wires_str:
+        wires_str = "all"
+    else:
+        wires_str = f"[{', '.join(map(str, wires_str))}]"
+
+    base_name = meas._shortname
+
+    match meas:
+        case ExpectationMP() | VarianceMP() | ProbabilityMP():
+            # Often includes an observable
+            if meas.obs is not None:
+                obs_name = meas.obs.name
+                base_name = f"{base_name}({obs_name})"
+
+        case _:
+            pass
+
+    return f"<name> {base_name}|<wire> {wires_str}"
