@@ -1167,8 +1167,8 @@ class TestTerminalMeasurementConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "T" in nodes["node1"]["label"]
-        assert "PauliX" in nodes["node2"]["label"]
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "T" in nodes["node2"]["label"]
         assert "probs" in nodes["node3"]["label"]
 
         # Check all edges
