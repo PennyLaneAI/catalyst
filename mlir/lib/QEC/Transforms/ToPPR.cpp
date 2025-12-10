@@ -372,13 +372,10 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
     }
 
     // Angle is not static or not a multiple of π/8, consider this as an arbitrary angle PPR.
-    // divide by 2 to get the ppr_angle
     auto constResult =
         rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(2.0)).getResult();
     auto result = rewriter.create<arith::DivFOp>(loc, angleValue, constResult).getResult();
-    // auto result =
-    //     rewriter.create<arith::ConstantOp>(loc,
-    //     rewriter.getF64FloatAttr(double(2.0))).getResult();
+
     auto pprArbitraryOp =
         rewriter.create<PPRotationArbitraryOp>(loc, outQubitTypes, pauliProduct, result, inQubits);
 
