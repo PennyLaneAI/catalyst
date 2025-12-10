@@ -24,8 +24,8 @@
 #include "mlir/Pass/Pass.h"
 
 #include "Catalyst/Utils/SCFUtils.h"
-#include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOpInterfaces.h"
+#include "QEC/IR/QECOps.h"
 #include "QEC/Utils/QECLayer.h"
 #include "QEC/Utils/QECOpUtils.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -39,6 +39,7 @@ using json = nlohmann::json;
 namespace catalyst {
 namespace qec {
 
+#define GEN_PASS_DECL_COUNTPPMSPECSPASS
 #define GEN_PASS_DEF_COUNTPPMSPECSPASS
 #include "QEC/Transforms/Passes.h.inc"
 
@@ -156,7 +157,11 @@ struct CountPPMSpecsPass : public impl::CountPPMSpecsPassBase<CountPPMSpecsPass>
             assert(!layer.empty() && "Layer is empty");
 
             auto op = layer.getOps().back();
-            int16_t absRk = std::abs(static_cast<int16_t>(op.getRotationKind()));
+
+            int16_t absRk = 0;
+            if (auto pprOp = dyn_cast<PPRotationOp>(op.getOperation())) {
+                absRk = std::abs(static_cast<int16_t>(pprOp.getRotationKind()));
+            }
             auto parentFuncOp = op->getParentOfType<func::FuncOp>();
             StringRef funcName = parentFuncOp.getName();
             llvm::StringSaver saver(stringAllocator);

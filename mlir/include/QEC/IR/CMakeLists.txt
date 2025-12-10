@@ -1,9 +1,10 @@
-add_mlir_dialect(QECDialect qec)
+add_mlir_dialect(QECOps qec)
 add_mlir_interface(QECOpInterfaces)
-add_mlir_doc(QECDialect QECDialect QEC/ -gen-dialect-doc -gen-op-doc)
+add_mlir_doc(QECDialect QECDialect QEC/ -gen-dialect-doc -dialect qec)
+add_mlir_doc(QECOps QECOps QEC/ -gen-op-doc)
 add_mlir_doc(QECOpInterfaces QECOpInterfaces QEC/ -gen-op-interface-docs)
 
-set(LLVM_TARGET_DEFINITIONS QECDialect.td)
+set(LLVM_TARGET_DEFINITIONS QECOps.td)
 mlir_tablegen(QECEnums.h.inc -gen-enum-decls)
 mlir_tablegen(QECEnums.cpp.inc -gen-enum-defs)
 mlir_tablegen(QECAttributes.h.inc -gen-attrdef-decls)

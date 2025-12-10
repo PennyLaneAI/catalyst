@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit test module for pennylane/compiler/python_compiler/dialects/stablehlo.py."""
+"""Unit test module for catalyst/python_interface/dialects/stablehlo.py."""
 # pylint: disable=line-too-long
 import pytest
 
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 
 
 def test_all_unary_operations(run_filecheck):

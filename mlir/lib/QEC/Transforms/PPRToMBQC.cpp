@@ -14,7 +14,7 @@
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 
-#include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
 #include "QEC/Utils/PauliStringWrapper.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -142,10 +142,13 @@ void constructKernelOperation(SmallVector<Value> &qubits, Value &measResult, QEC
         measResult = measOp.getMres();
         qubits[0] = measOp.getOutQubit();
     }
-    else {
-        int16_t signedRk = static_cast<int16_t>(op.getRotationKind());
+    else if (auto pprOp = dyn_cast<PPRotationOp>(op.getOperation())) {
+        int16_t signedRk = static_cast<int16_t>(pprOp.getRotationKind());
         double rk = llvm::numbers::pi / (static_cast<double>(signedRk) / 2);
         qubits[0] = buildSingleQubitGate(qubits[0], "RZ", {rk}, rewriter).getOutQubits().front();
+    }
+    else if (isa<PPRotationArbitraryOp>(op)) {
+        op->emitError("Unsupported qec.ppr.arbitrary operation.");
     }
 }
 

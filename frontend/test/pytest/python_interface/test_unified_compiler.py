@@ -19,7 +19,8 @@ from dataclasses import dataclass
 # pylint: disable=wrong-import-position,line-too-long
 import pytest
 
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 
 import jax
 import pennylane as qml
@@ -27,7 +28,7 @@ from jaxlib.mlir.ir import Module as jModule
 from pennylane.capture import enabled as capture_enabled
 from xdsl import passes
 from xdsl.context import Context
-from xdsl.dialects import builtin
+from xdsl.dialects import builtin, transform
 from xdsl.interpreters import Interpreter
 from xdsl.passes import PassPipeline
 
@@ -41,7 +42,6 @@ from catalyst.python_interface.conversion import (
     mlir_module,
     xdsl_from_docstring,
 )
-from catalyst.python_interface.dialects import transform
 from catalyst.python_interface.pass_api import (
     ApplyTransformSequence,
     TransformFunctionsExt,
@@ -261,7 +261,7 @@ def test_integration_for_transform_interpreter(capsys):
 
 
 class TestCatalystIntegration:
-    """Tests for integration of the Python compiler with Catalyst"""
+    """Tests for integration of the unified compiler with Catalyst"""
 
     @pytest.mark.usefixtures("use_capture")
     def test_integration_catalyst_no_passes_with_capture(self):
@@ -301,7 +301,7 @@ class TestCatalystIntegration:
 
         assert capture_enabled()
 
-        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qjit
         @hello_world_pass
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f(x):
@@ -319,7 +319,7 @@ class TestCatalystIntegration:
 
         assert not capture_enabled()
 
-        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qjit
         @apply_pass("hello-world")
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f(x):
@@ -333,12 +333,12 @@ class TestCatalystIntegration:
 
     @pytest.mark.usefixtures("use_capture")
     def test_integration_catalyst_mixed_passes_with_capture(self, capsys):
-        """Test that both Catalyst and Python compiler passes can be used with qjit
+        """Test that both MLIR and xDSL passes can be used with qjit
         when capture is enabled."""
 
         assert capture_enabled()
 
-        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qjit
         @hello_world_pass
         @qml.transforms.cancel_inverses
         @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -354,12 +354,12 @@ class TestCatalystIntegration:
         assert captured.out.strip() == "hello world"
 
     def test_integration_catalyst_mixed_passes_no_capture(self, capsys):
-        """Test that both Catalyst and Python compiler passes can be used with qjit
+        """Test that both MLIR and xDSL passes can be used with qjit
         when capture is disabled."""
 
         assert not capture_enabled()
 
-        @qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qjit
         @apply_pass("hello-world")
         @catalyst_cancel_inverses
         @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -495,7 +495,7 @@ class TestCallbackIntegration:
             print("=== Between Pass ===")
             print(module)
 
-        @qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qml.qjit
         @iterative_cancel_inverses_pass
         @merge_rotations_pass
         @qml.qnode(qml.device("null.qubit", wires=2))

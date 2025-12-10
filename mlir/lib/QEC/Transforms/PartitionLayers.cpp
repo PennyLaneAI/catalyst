@@ -26,6 +26,7 @@ using namespace catalyst::qec;
 namespace catalyst {
 namespace qec {
 
+#define GEN_PASS_DECL_PARTITIONLAYERSPASS
 #define GEN_PASS_DEF_PARTITIONLAYERSPASS
 #include "QEC/Transforms/Passes.h.inc"
 
