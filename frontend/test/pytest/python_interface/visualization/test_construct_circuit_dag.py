@@ -1003,8 +1003,8 @@ class TestOperatorConnectivity:
 
         # Check all nodes
         assert "PauliX" in nodes["node1"]["label"]
-        assert "PauliZ" in nodes["node2"]["label"]
-        assert "PauliY" in nodes["node3"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+        assert "PauliZ" in nodes["node3"]["label"]
         assert "Hadamard" in nodes["node4"]["label"]
         assert "S" in nodes["node5"]["label"]
         assert "T" in nodes["node6"]["label"]
@@ -1107,7 +1107,8 @@ class TestOperatorConnectivity:
                 qml.RZ(0, 0)
             qml.H(0)
 
-        module = my_workflow()
+        args = (1,)
+        module = my_workflow(*args)
 
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
