@@ -22,10 +22,6 @@ pytestmark = pytest.mark.usefixtures("requires_xdsl")
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
 import pennylane as qml
-from xdsl.dialects import test
-from xdsl.dialects.builtin import ModuleOp
-from xdsl.ir.core import Block, Region
-
 from catalyst import measure
 from catalyst.python_interface.conversion import xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
@@ -33,6 +29,9 @@ from catalyst.python_interface.visualization.construct_circuit_dag import (
     get_label,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from xdsl.dialects import test
+from xdsl.dialects.builtin import ModuleOp
+from xdsl.ir.core import Block, Region
 
 
 class FakeDAGBuilder(DAGBuilder):
@@ -811,7 +810,9 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
-        assert nodes["node1"]["label"] == get_label(qml.QubitUnitary([[0, 1], [1, 0]], wires=0))
+        assert nodes["node1"]["label"] == get_label(
+            qml.QubitUnitary([[0, 1], [1, 0]], wires=0)
+        )
 
     @pytest.mark.unit
     def test_multi_rz_op(self):
@@ -1142,4 +1143,36 @@ class TestOperatorConnectivity:
 class TestTerminalMeasurementConnectivity:
     """Test that terminal measurements connect properly."""
 
-    pass
+    @pytest.mark.parametrize("meas_fn", [qml.probs, qml.state])
+    def test_connect_all_wires(self, meas_fn):
+        """Tests connection to terminal measurements that operate on all wires."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            qml.X(0)
+            qml.T(1)
+            return meas_fn()
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "T" in nodes["node1"]["label"]
+        assert "PauliX" in nodes["node2"]["label"]
+        assert "probs" in nodes["node3"]["label"]
+
+        # Check all edges
+        assert len(edges) == 2
+        assert ("node1", "node3") in edges
+        assert ("node2", "node3") in edges
