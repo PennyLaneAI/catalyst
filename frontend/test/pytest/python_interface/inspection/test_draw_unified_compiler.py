@@ -11,18 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Unit test module for the draw function in the Python Compiler inspection module."""
+"""Unit test module for the draw function in the unified compiler inspection module."""
 
 
 import pytest
 
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 
 # pylint: disable=wrong-import-position,unnecessary-lambda
 import jax
 import pennylane as qml
 
-from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface.inspection import draw
 from catalyst.python_interface.transforms import (
     iterative_cancel_inverses_pass,
@@ -32,7 +32,7 @@ from catalyst.python_interface.transforms import (
 
 @pytest.mark.usefixtures("use_capture")
 class Testdraw:
-    """Unit tests for the draw function in the Python Compiler inspection module."""
+    """Unit tests for the draw function in the unified compiler inspection module."""
 
     @pytest.fixture
     def transforms_circuit(self):
@@ -90,9 +90,7 @@ class Testdraw:
         )
 
         if qjit:
-            transforms_circuit = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(
-                transforms_circuit
-            )
+            transforms_circuit = qml.qjit(transforms_circuit)
 
         assert draw(transforms_circuit, level=level)() == expected
 
@@ -126,9 +124,7 @@ class Testdraw:
         )
 
         if qjit:
-            transforms_circuit = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(
-                transforms_circuit
-            )
+            transforms_circuit = qml.qjit(transforms_circuit)
 
         assert draw(transforms_circuit, level=level)() == expected
 
@@ -161,9 +157,7 @@ class Testdraw:
             qml.transforms.merge_rotations(transforms_circuit)
         )
         if qjit:
-            transforms_circuit = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(
-                transforms_circuit
-            )
+            transforms_circuit = qml.qjit(transforms_circuit)
 
         assert draw(transforms_circuit, level=level)() == expected
 
@@ -207,9 +201,7 @@ class Testdraw:
         """Test that if no passes are applied, the circuit is still visualized."""
 
         if qjit:
-            transforms_circuit = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(
-                transforms_circuit
-            )
+            transforms_circuit = qml.qjit(transforms_circuit)
 
         assert draw(transforms_circuit, level=level)() == expected
 
@@ -376,7 +368,6 @@ class Testdraw:
 
         assert drawing == expected_drawing
 
-    @pytest.mark.jax
     @pytest.mark.parametrize(
         "ops, expected",
         [
@@ -487,7 +478,7 @@ class Testdraw:
     def adjoint_op_not_implemented(self):
         """Test that NotImplementedError is raised when AdjointOp is used."""
 
-        @qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qml.qjit
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit():
             qml.adjoint(qml.QubitUnitary)(jax.numpy.array([[0, 1], [1, 0]]), wires=[0])
@@ -499,7 +490,7 @@ class Testdraw:
     def test_cond_not_implemented(self):
         """Test that NotImplementedError is raised when cond is used."""
 
-        @qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qml.qjit
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
             m0 = qml.measure(0, reset=False, postselect=0)
@@ -512,7 +503,7 @@ class Testdraw:
     def test_for_loop_not_implemented(self):
         """Test that NotImplementedError is raised when for loop is used."""
 
-        @qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()], autograph=True)
+        @qml.qjit(autograph=True)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit():
             for _ in range(3):
@@ -525,7 +516,7 @@ class Testdraw:
     def test_while_loop_not_implemented(self):
         """Test that NotImplementedError is raised when while loop is used."""
 
-        @qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()], autograph=True)
+        @qml.qjit(autograph=True)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit():
             i = 0

@@ -247,7 +247,7 @@ clean-plugin:
 
 clean-dialect-docs:
 	@echo "clean dialect docs"
-	rm -rf $(DIALECTS_DOCS_BUILD_DIR)/docs
+	rm -rf $(DIALECTS_DOCS_BUILD_DIR)
 
 .PHONY: format
 format:

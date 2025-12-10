@@ -17,12 +17,16 @@
 
 include "mlir/IR/OpBase.td"
 
+//===----------------------------------------------------------------------===//
+// QEC Operation Interface
+//===----------------------------------------------------------------------===//
+
 def QECOpInterface : OpInterface<"QECOpInterface"> {
 
     let description = [{
         This interface provides a generic way to interact with instructions that are
-        considered QEC Operations. These are characterized by operating on zero
-        or more qubit values, and returning the same amount of qubit values.
+        considered QEC Operations. These are characterized by operating on one or more qubit values,
+        and returning the same amount of qubit values.
     }];
 
     let cppNamespace = "::catalyst::qec";
@@ -40,31 +44,15 @@ def QECOpInterface : OpInterface<"QECOpInterface"> {
         >,
         InterfaceMethod<
             /*desc=*/"Get the Pauli product for this operation.",
-            /*retTy=*/" ::mlir::ArrayAttr",
+            /*retTy=*/"::mlir::ArrayAttr",
             /*methodName=*/"getPauliProduct"
-        >,
-        InterfaceMethod<
-            /*desc=*/"Get the Pauli product for this operation.",
-            /*retTy=*/" ::mlir::ArrayAttr",
-            /*methodName=*/"getPauliProductAttr"
-        >,
-        InterfaceMethod<
-            /*desc=*/"Get the rotation kind for this operation.",
-            /*retTy=*/"uint16_t",
-            /*methodName=*/"getRotationKind"
         >,
         InterfaceMethod<
             /*desc=*/"Set the Pauli product for this operation.",
             /*retTy=*/"void",
-            /*methodName=*/"setPauliProductAttr", (ins " ::mlir::ArrayAttr":$attr)
-        >,
-        InterfaceMethod<
-            /*desc=*/"Set the rotation kind for this operation.",
-            /*retTy=*/"void",
-            /*methodName=*/"setRotationKind", (ins "uint16_t":$attrValue)
+            /*methodName=*/"setPauliProductAttr", (ins "const ::mlir::ArrayAttr&":$propValue)
         >
     ];
-
 
 }
 

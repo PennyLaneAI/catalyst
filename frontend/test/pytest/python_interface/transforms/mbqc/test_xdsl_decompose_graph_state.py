@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit and integration tests for the Python compiler `decompose-graph-state` transform.
+"""Unit and integration tests for the unified compiler `decompose-graph-state` transform.
 
 FileCheck notation hint:
 
@@ -25,7 +25,8 @@ FileCheck notation hint:
 
 import pytest
 
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 
 from catalyst.python_interface.transforms import (
     DecomposeGraphStatePass,

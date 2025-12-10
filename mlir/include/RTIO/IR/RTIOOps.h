@@ -1,4 +1,4 @@
-// Copyright 2024 Xanadu Quantum Technologies Inc.
+// Copyright 2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,12 +11,16 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 #pragma once
 
-namespace catalyst {
-namespace quantum {
+#include "RTIO/IR/RTIODialect.h"
+#include "mlir/Bytecode/BytecodeOpInterface.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
-static constexpr const char *hasInvalidGradientOp = "catalyst.invalidGradientOperation";
-
-} // namespace quantum
-} // namespace catalyst
+#define GET_ATTRDEF_CLASSES
+#include "RTIO/IR/RTIOAttributes.h.inc"
+#define GET_OP_CLASSES
+#include "RTIO/IR/RTIOOps.h.inc"

@@ -15,7 +15,8 @@
 import pytest
 
 # pylint: disable=wrong-import-position,line-too-long
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
 
 import pennylane as qml
 from pennylane.ftqc import RotXZX
@@ -342,7 +343,7 @@ class TestConvertToMBQCFormalismPass:
         """Test that the convert_to_mbqc_formalism_pass works correctly with a switch statement."""
         program = """
             func.func @test_func(%qubits: !quantum.bit, %l : index) {
-                %0 = scf.index_switch %l -> !quantum.bit 
+                %0 = scf.index_switch %l -> !quantum.bit
                 case 0 {
                     // CHECK-NOT: quantum.custom "Hadamard"()
                     %q1 = quantum.custom "Hadamard"() %qubits : !quantum.bit
@@ -353,7 +354,7 @@ class TestConvertToMBQCFormalismPass:
                     %q2 = quantum.custom "S"() %qubits : !quantum.bit
                     scf.yield %q2 : !quantum.bit
                 }
-                
+
                 return
             }
         """

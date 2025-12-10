@@ -20,7 +20,8 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from pennylane import ops
-from pennylane.measurements import expval, probs, sample, state, var
+from pennylane.ftqc.operations import RotXZX
+from pennylane.measurements import counts, expval, probs, sample, state, var
 from pennylane.operation import Operator
 from pennylane.ops import MidMeasure
 from pennylane.ops import __all__ as ops_all
@@ -81,7 +82,10 @@ from_str_to_PL_gate = {
     if inspect.isclass(getattr(ops, name, None)) and issubclass(getattr(ops, name), Operator)
 }
 
+from_str_to_PL_gate["RotXZX"] = RotXZX  # Include FTQC gates, not in primary module
+
 from_str_to_PL_measurement = {
+    "quantum.counts": counts,
     "quantum.state": state,
     "quantum.probs": probs,
     "quantum.sample": sample,
@@ -160,6 +164,9 @@ def resolve_constant_params(ssa: SSAValue) -> float | int:
 
     if isinstance(op, TensorExtractOp):
         return resolve_constant_params(op.tensor)
+
+    if not hasattr(op, "name"):
+        raise NotImplementedError(f"Cannot resolve parameters for operation: {op}")
 
     match op.name:
 
@@ -334,6 +341,49 @@ def xdsl_to_qml_op(op) -> Operator:
     return _apply_adjoint_and_ctrls(gate, op)
 
 
+def xdsl_to_qml_op_name(op, adjoint_mode: bool) -> str:
+    """Convert an xDSL operation into a string representing a PennyLane Operator.
+
+    Args:
+        op: The xDSL operation to convert.
+        adjoint_mode: If True, treat all non-adjoint gates as adjoint, and vice versa.
+
+    Returns:
+        A string representing the PennyLane operator.
+    """
+
+    name_map = {
+        "quantum.gphase": "GlobalPhase",
+        "quantum.multirz": "MultiRZ",
+        "quantum.set_basis_state": "BasisState",
+        "quantum.set_state": "StatePrep",
+        "quantum.unitary": "QubitUnitary",
+    }
+
+    if op.name == "quantum.custom":
+        gate_name = op.properties.get("gate_name").data
+    elif op.name in name_map:
+        gate_name = name_map[op.name]
+    else:
+        raise NotImplementedError(f"Unsupported gate: {op.name}")
+
+    is_adjoint = op.properties.get("adjoint") is not None
+    if adjoint_mode:
+        # Adjoint-mode means all non-adjoint gates are treated as adjoint, and vice versa
+        is_adjoint = not is_adjoint
+
+    if is_adjoint and not gate_name in ops.qubit.attributes.self_inverses:
+        gate_name = f"Adjoint({gate_name})"
+
+    if hasattr(op, "in_ctrl_qubits"):
+        n_ctrls = len(op.in_ctrl_qubits)
+        if n_ctrls == 1:
+            gate_name = f"C({gate_name})"
+        elif n_ctrls > 1:
+            gate_name = f"{n_ctrls}C({gate_name})"
+    return gate_name
+
+
 def xdsl_to_qml_measurement(op, *args, **kwargs) -> MeasurementProcess | Operator:
     """Convert any xDSL measurement/observable operation to a PennyLane object.
 
@@ -372,3 +422,50 @@ def xdsl_to_qml_measurement(op, *args, **kwargs) -> MeasurementProcess | Operato
 
         case _:
             raise NotImplementedError(f"Unsupported measurement/observable: {op.name}")
+
+
+def xdsl_to_qml_measurement_name(op, obs_op=None) -> str:
+    """Convert any xDSL measurement/observable operation into a string representing a PennyLane
+    measurement.
+
+    Args:
+        op: The xDSL measurement/observable operation to convert.
+        obs_op: An optional string representing the observable operation.
+
+    Returns:
+        A string representing the PennyLane measurement.
+    """
+
+    if op.name == "quantum.measure":
+        gate_name = "MidMeasure"
+
+    elif op.name == "quantum.compbasis":
+        # Defines a pseudo-observable to represent measurements in the computational basis
+        # Used within e.g. `probs()`
+        if len(op.qubits) == 0:
+            # No specified qubits means use all qubits
+            gate_name = "all wires"
+        else:
+            gate_name = f"{len(op.qubits)} wires"
+
+    elif op.name == "quantum.hamiltonian":
+        ops_list = [xdsl_to_qml_measurement_name(term.owner) for term in op.terms]
+        gate_name = f"Hamiltonian({', '.join(ops_list)})"
+
+    elif op.name == "quantum.tensor":
+        ops_list = [xdsl_to_qml_measurement_name(operand.owner) for operand in op.operands]
+        gate_name = " @ ".join(ops_list)
+
+    elif op.name == "quantum.namedobs":
+        gate_name = op.type.data.value
+
+    elif op.name in from_str_to_PL_measurement:
+        gate_name = op.name.split(".")[-1]
+
+    else:
+        raise NotImplementedError(f"Unsupported measurement/observable: {op.name}")
+
+    if obs_op != None:
+        gate_name = f"{gate_name}({obs_op})"
+
+    return gate_name
