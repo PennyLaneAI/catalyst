@@ -691,12 +691,12 @@ class TestGetLabel:
     @pytest.mark.parametrize(
         "op, label",
         [
-            (qml.H(0), "{<name> Hadamard | <wire> [0]}"),
+            (qml.H(0), "<name> Hadamard|<wire> [0]"),
             (
                 qml.QubitUnitary([[0, 1], [1, 0]], 0),
-                "{<name> QubitUnitary | <wire> [0]}",
+                "<name> QubitUnitary|<wire> [0]",
             ),
-            (qml.SWAP([0, 1]), "{<name> SWAP | <wire> [0, 1]}"),
+            (qml.SWAP([0, 1]), "<name> SWAP|<wire> [0, 1]"),
         ],
     )
     def test_standard_operator(self, op, label):
@@ -711,15 +711,15 @@ class TestGetLabel:
     @pytest.mark.parametrize(
         "meas, label",
         [
-            (qml.state(), "{<name> state |<wire> all}"),
-            (qml.expval(qml.Z(0)), "{<name> expval (PauliZ) |<wire> [0]}"),
-            (qml.var(qml.Z(0)), "{<name> var (PauliZ) |<wire> [0]}"),
-            (qml.probs(), "{<name> probs |<wire> all}"),
-            (qml.probs(wires=0), "{<name> probs |<wire> [0]}"),
-            (qml.probs(wires=[0, 1]), "{<name> probs |<wire> [0, 1]}"),
-            (qml.sample(), "{<name> sample |<wire> all}"),
-            (qml.sample(wires=0), "{<name> sample |<wire> [0]}"),
-            (qml.sample(wires=[0, 1]), "{<name> sample |<wire> [0, 1]}"),
+            (qml.state(), "<name> state|<wire> all"),
+            (qml.expval(qml.Z(0)), "<name> expval (PauliZ)|<wire> [0]"),
+            (qml.var(qml.Z(0)), "<name> var (PauliZ)|<wire> [0]"),
+            (qml.probs(), "<name> probs|<wire> all"),
+            (qml.probs(wires=0), "<name> probs|<wire> [0]"),
+            (qml.probs(wires=[0, 1]), "<name> probs|<wire> [0, 1]"),
+            (qml.sample(), "<name> sample|<wire> all"),
+            (qml.sample(wires=0), "<name> sample|<wire> [0]"),
+            (qml.sample(wires=[0, 1]), "<name> sample|<wire> [0, 1]"),
         ],
     )
     def test_standard_measurement(self, meas, label):
