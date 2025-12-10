@@ -399,25 +399,29 @@ struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<Measuremen
         // The flush op will be inserted before the observable op
         rewriter.setInsertionPoint(obsOp);
 
-        ValueRange qubits;
+        // Helper function to insert the flush operations per qubit operand of the observable op
+        auto insertFlushOpsPerQubit = [&](unsigned int idx, mlir::Value qubit) {
+            auto flushOp = rewriter.create<FlushOp>(loc, rewriter.getI1Type(), rewriter.getI1Type(),
+                                                    qubit.getType(), qubit);
+            auto pauliZOutQubit = insertPauliOpsAfterFlush(rewriter, loc, flushOp);
+            obsOp->setOperand(idx, pauliZOutQubit);
+        };
+
         if (auto compBasisOp = dyn_cast<ComputationalBasisOp>(obsOp)) {
-            qubits = compBasisOp.getQubits();
+            auto qubits = compBasisOp.getQubits();
+            for (auto [idx, qubit] : llvm::enumerate(qubits)) {
+                insertFlushOpsPerQubit(idx, qubit);
+            }
         }
         else if (auto namedObsOp = dyn_cast<NamedObsOp>(obsOp)) {
             auto qubit = namedObsOp.getQubit();
-            qubits = ValueRange({qubit});
+            insertFlushOpsPerQubit(0, qubit);
         }
         else {
             obsOp->emitError() << "Unsupported observable op: " << obsOp->getName();
             return failure();
         }
 
-        for (auto [idx, qubit] : llvm::enumerate(qubits)) {
-            auto flushOp = rewriter.create<FlushOp>(loc, rewriter.getI1Type(), rewriter.getI1Type(),
-                                                    qubit.getType(), qubit);
-            auto pauliZOutQubit = insertPauliOpsAfterFlush(rewriter, loc, flushOp);
-            obsOp->setOperand(idx, pauliZOutQubit);
-        }
         return success();
     }
 };
