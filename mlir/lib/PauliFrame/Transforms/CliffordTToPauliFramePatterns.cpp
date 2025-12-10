@@ -388,19 +388,19 @@ struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<Measuremen
                                 << op << "\n");
         auto loc = op->getLoc();
 
-        const auto obs = op.getObs();
+        auto obs = op.getObs();
         if (!obs) {
             op.emitError() << "Failed to flush Pauli record before terminal measurement process";
             return failure();
         }
 
-        const auto obsOp = obs.getDefiningOp();
+        auto obsOp = obs.getDefiningOp();
 
         // The flush op will be inserted before the observable op
         rewriter.setInsertionPoint(obsOp);
 
         // Helper function to insert the flush operations per qubit operand of the observable op
-        auto insertFlushOpsPerQubit = [&](unsigned int idx, mlir::Value qubit) {
+        auto insertFlushOpsPerQubit = [&](unsigned int idx, const Value qubit) {
             auto flushOp = rewriter.create<FlushOp>(loc, rewriter.getI1Type(), rewriter.getI1Type(),
                                                     qubit.getType(), qubit);
             auto pauliZOutQubit = insertPauliOpsAfterFlush(rewriter, loc, flushOp);
@@ -409,13 +409,12 @@ struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<Measuremen
 
         if (auto compBasisOp = dyn_cast<ComputationalBasisOp>(obsOp)) {
             auto qubits = compBasisOp.getQubits();
-            for (auto [idx, qubit] : llvm::enumerate(qubits)) {
+            for (const auto &[idx, qubit] : llvm::enumerate(qubits)) {
                 insertFlushOpsPerQubit(idx, qubit);
             }
         }
         else if (auto namedObsOp = dyn_cast<NamedObsOp>(obsOp)) {
-            auto qubit = namedObsOp.getQubit();
-            insertFlushOpsPerQubit(0, qubit);
+            insertFlushOpsPerQubit(0, namedObsOp.getQubit());
         }
         else {
             obsOp->emitError() << "Unsupported observable op: " << obsOp->getName();
