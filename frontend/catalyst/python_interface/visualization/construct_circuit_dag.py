@@ -14,12 +14,18 @@
 
 """Contains the ConstructCircuitDAG tool for constructing a DAG from an xDSL module."""
 
-from functools import singledispatchmethod
+from functools import singledispatch, singledispatchmethod
 
+from pennylane.measurements import ExpectationMP, MeasurementProcess, ProbabilityMP, VarianceMP
+from pennylane.operation import Operator
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region, SSAValue
 
 from catalyst.python_interface.dialects import quantum
+from catalyst.python_interface.inspection.xdsl_conversion import (
+    xdsl_to_qml_measurement,
+    xdsl_to_qml_op,
+)
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 
 
@@ -84,6 +90,125 @@ class ConstructCircuitDAG:
         """Visit an xDSL Block operation, dispatching handling for each contained Operation."""
         for op in block.ops:
             self._visit_operation(op)
+
+    # ===================
+    # QUANTUM OPERATIONS
+    # ===================
+
+    @_visit_operation.register
+    def _gate_op(
+        self,
+        op: quantum.CustomOp | quantum.GlobalPhaseOp | quantum.QubitUnitaryOp | quantum.MultiRZOp,
+    ) -> None:
+        """Generic handler for unitary gates."""
+
+        # Create PennyLane instance
+        qml_op = xdsl_to_qml_op(op)
+
+        # Add node to current cluster
+        node_uid = f"node{self._node_uid_counter}"
+        self.dag_builder.add_node(
+            uid=node_uid,
+            label=get_label(qml_op),
+            cluster_uid=self._cluster_uid_stack[-1],
+            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
+            shape="record",
+        )
+        self._node_uid_counter += 1
+
+    @_visit_operation.register
+    def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
+        """Handler for the single-qubit projective measurement operation."""
+
+        # Create PennyLane instance
+        meas = xdsl_to_qml_measurement(op)
+
+        # Add node to current cluster
+        node_uid = f"node{self._node_uid_counter}"
+        self.dag_builder.add_node(
+            uid=node_uid,
+            label=get_label(meas),
+            cluster_uid=self._cluster_uid_stack[-1],
+            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
+            shape="record",
+        )
+        self._node_uid_counter += 1
+
+    # =====================
+    # QUANTUM MEASUREMENTS
+    # =====================
+
+    @_visit_operation.register
+    def _state_op(self, op: quantum.StateOp) -> None:
+        """Handler for the terminal state measurement operation."""
+
+        # Create PennyLane instance
+        meas = xdsl_to_qml_measurement(op)
+
+        # Add node to current cluster
+        node_uid = f"node{self._node_uid_counter}"
+        self.dag_builder.add_node(
+            uid=node_uid,
+            label=get_label(meas),
+            cluster_uid=self._cluster_uid_stack[-1],
+            fillcolor="lightpink",
+            color="lightpink3",
+            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
+            shape="record",
+        )
+        self._node_uid_counter += 1
+
+    @_visit_operation.register
+    def _expval_and_var_ops(
+        self,
+        op: quantum.ExpvalOp | quantum.VarianceOp,
+    ) -> None:
+        """Handler for statistical measurement operations."""
+
+        # Create PennyLane instance
+        obs_op = op.obs.owner
+        meas = xdsl_to_qml_measurement(op, xdsl_to_qml_measurement(obs_op))
+
+        # Add node to current cluster
+        node_uid = f"node{self._node_uid_counter}"
+        self.dag_builder.add_node(
+            uid=node_uid,
+            label=get_label(meas),
+            cluster_uid=self._cluster_uid_stack[-1],
+            fillcolor="lightpink",
+            color="lightpink3",
+            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
+            shape="record",
+        )
+        self._node_uid_counter += 1
+
+    @_visit_operation.register
+    def _sample_counts_probs_ops(
+        self,
+        op: quantum.SampleOp | quantum.ProbsOp,
+    ) -> None:
+        """Handler for sample operations."""
+
+        # Create PennyLane instance
+        obs_op = op.obs.owner
+
+        # TODO: This doesn't logically make sense, but quantum.compbasis
+        # is obs_op and function below just pulls out the static wires
+        wires = xdsl_to_qml_measurement(obs_op)
+        meas = xdsl_to_qml_measurement(op, wires=None if wires == [] else wires)
+
+        # Add node to current cluster
+        node_uid = f"node{self._node_uid_counter}"
+        self.dag_builder.add_node(
+            uid=node_uid,
+            label=get_label(meas),
+            cluster_uid=self._cluster_uid_stack[-1],
+            fillcolor="lightpink",
+            color="lightpink3",
+            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
+            shape="record",
+        )
+        self._node_uid_counter += 1
 
     # =============
     # CONTROL FLOW
@@ -256,3 +381,45 @@ def _flatten_if_op(op: scf.IfOp) -> list[Region]:
     # No more nested IfOps, therefore append final region
     flattened_op.append(else_region)
     return flattened_op
+
+
+@singledispatch
+def get_label(op: Operator | MeasurementProcess) -> str:
+    """Gets the appropriate label for a PennyLane object."""
+    return str(op)
+
+
+@get_label.register
+def _operator(op: Operator) -> str:
+    """Returns the appropriate label for PennyLane Operator"""
+    wires = list(op.wires.labels)
+    if wires == []:
+        wires_str = "all"
+    else:
+        wires_str = f"[{', '.join(map(str, wires))}]"
+    # Using <...> lets us use ports (https://graphviz.org/doc/info/shapes.html#record)
+    return f"<name> {op.name}|<wire> {wires_str}"
+
+
+@get_label.register
+def _meas(meas: MeasurementProcess) -> str:
+    """Returns the appropriate label for a PennyLane MeasurementProcess using match/case."""
+
+    wires_str = list(meas.wires.labels)
+    if not wires_str:
+        wires_str = "all"
+    else:
+        wires_str = f"[{', '.join(map(str, wires_str))}]"
+
+    base_name = meas._shortname
+
+    match meas:
+        case ExpectationMP() | VarianceMP() | ProbabilityMP():
+            if meas.obs is not None:
+                obs_name = meas.obs.name
+                base_name = f"{base_name}({obs_name})"
+
+        case _:
+            pass
+
+    return f"<name> {base_name}|<wire> {wires_str}"
