@@ -613,18 +613,18 @@ def _func_lowering(ctx, *args, call_jaxpr, fn):
 # Decomp rule
 #
 @decomprule_p.def_abstract_eval
-def _decomposition_rule_abstract(*, pyfun, func_jaxpr, is_qreg=False, num_params=None):
+def _decomposition_rule_abstract(*, pyfun, func_jaxpr, is_qreg=False, num_params=None, **params):
     return ()
 
 
-def _decomposition_rule_lowering(ctx, *, pyfun, func_jaxpr, **_):
+def _decomposition_rule_lowering(ctx, *, pyfun, func_jaxpr, **params):
     """Lower a quantum decomposition rule into MLIR in a single step process.
     The step is the compilation of the definition of the function fn.
     """
 
     # Set the visibility of the decomposition rule to public
     # to avoid the elimination by the compiler
-    lower_callable(ctx, pyfun, func_jaxpr, public=True)
+    lower_callable(ctx, pyfun, func_jaxpr, public=True, **params)
     return ()
 
 

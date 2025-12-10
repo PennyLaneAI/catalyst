@@ -242,7 +242,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                         ag_enabled=self._ag_enabled,
                     )
                 elif not any(
-                    keyword in getattr(op.op, "name", "") for keyword in ("Adjoint", "Controlled")
+                    keyword in getattr(op.op, "name", "") for keyword in ("Adjoint", "Controlled", "TemporaryAND", "ChangeOpBasis", "Prod")
                 ):  # pragma: no cover
                     # Note that the graph-decomposition returns abstracted rules
                     # for Adjoint and Controlled operations, so we skip them here.
@@ -265,9 +265,7 @@ def _create_decomposition_rule(
     ag_enabled: bool = False,
 ):
     """Create a decomposition rule from a callable.
-
     See also: :func:`~.decomposition_rule`.
-
     Args:
         func (Callable): The decomposition function.
         op_name (str): The name of the operation to decompose.
