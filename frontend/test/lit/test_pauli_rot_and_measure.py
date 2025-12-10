@@ -29,6 +29,27 @@ from pennylane.ftqc.catalyst_pass_aliases import (
 from catalyst import qjit
 
 
+def test_pauli_rot_lowering():
+    """Test that qml.PauliRot is lowered to quantum.paulirot."""
+    qml.capture.enable()
+    dev = qml.device("null.qubit", wires=1)
+
+    pipeline = [("pipe", ["quantum-compilation-stage"])]
+    
+    @qjit(pipelines=pipeline, target="mlir")
+    @qml.qnode(device=dev)
+    def circuit():
+        qml.PauliRot(np.pi / 4, "X", wires=0)
+
+    # CHECK: [[cst:%.+]]  = arith.constant 0.78539816339744828
+    # CHECK: quantum.paulirot ["X"]([[cst]])
+    print(circuit.mlir_opt)
+    qml.capture.disable()
+
+
+test_pauli_rot_lowering()
+
+
 def test_single_qubit_pauli_rotations():
     """Test single qubit PauliRot"""
     qml.capture.enable()
@@ -37,6 +58,7 @@ def test_single_qubit_pauli_rotations():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.PauliRot(np.pi / 4, "X", wires=0)
@@ -61,6 +83,7 @@ def test_arbitrary_angle_pauli_rotations():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.PauliRot(0.42, "X", wires=0)
@@ -82,6 +105,7 @@ def test_dynamic_angle_pauli_rotations():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit(x: float):
         qml.PauliRot(x, "X", wires=0)
@@ -103,6 +127,7 @@ def test_multi_qubit_pauli_rotations():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.PauliRot(np.pi / 4, "XYZ", wires=[0, 1, 2])
@@ -129,6 +154,7 @@ def test_arbitrary_angle_multi_qubit_pauli_rotations():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.PauliRot(0.42, "XZ", wires=[0, 1])
@@ -153,6 +179,7 @@ def test_dynamic_angle_multi_qubit_pauli_rotations():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit(x: float):
         qml.PauliRot(x, "XZ", wires=[0, 1])
@@ -177,6 +204,7 @@ def test_single_qubit_pauli_measurements():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.pauli_measure("X", wires=0)
@@ -201,6 +229,7 @@ def test_multi_qubit_pauli_measurements():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.pauli_measure("XYZ", wires=[0, 1, 2])
@@ -225,6 +254,7 @@ def test_pauli_rot_and_measure_combined():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.PauliRot(np.pi / 4, "X", wires=0)
@@ -314,6 +344,7 @@ def test_merge_ppr_ppm():
 
     @qjit(pipelines=pipeline, target="mlir")
     @merge_ppr_ppm
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.PauliRot(np.pi / 2, "Z", wires=0)
@@ -337,6 +368,7 @@ def test_ppr_to_ppm():
     @qjit(pipelines=pipeline, target="mlir")
     @ppr_to_ppm
     @merge_ppr_ppm
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.PauliRot(np.pi / 2, "X", wires=0)
@@ -390,6 +422,7 @@ def test_pauli_rot_and_measure_with_cond():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.PauliRot(np.pi / 2, "Z", wires=0)
@@ -421,6 +454,7 @@ def test_pauli_rot_with_adjoint_region():
         qml.PauliRot(np.pi / 4, "XZ", wires=[0, 1])
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.PauliRot(np.pi / 2, "YX", wires=[0, 1])
@@ -445,6 +479,7 @@ def test_pauli_rot_with_adjoint_single_gate():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.adjoint(qml.PauliRot(np.pi / 2, "XZ", wires=[0, 1]))
