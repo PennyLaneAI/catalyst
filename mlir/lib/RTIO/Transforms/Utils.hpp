@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// Internal utilities for RTIO transforms. Not part of the public API.
-
 #pragma once
 
 #include "mlir/Dialect/Arith/IR/Arith.h"

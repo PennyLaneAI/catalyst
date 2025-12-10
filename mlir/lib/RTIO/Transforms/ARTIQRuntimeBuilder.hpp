@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// @file ARTIQRuntimeBuilder.h
-/// @brief Helper utilities for generating ARTIQ runtime function calls.
-
 #pragma once
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -66,7 +63,8 @@ constexpr int32_t spiLen32 = 32;
 constexpr int32_t spiFlagsKeepCS = 8;     // SPI_CS_POLARITY (CS low to listen)
 constexpr int32_t spiFlagsReleaseCS = 10; // SPI_CS_POLARITY | SPI_END (CS high to release)
 constexpr int64_t ioUpdatePulseWidth = 8;
-constexpr int64_t refPeriodMu = 8; // RTIO reference period (Kasli = 8ns @ 125MHz RTIO clock)
+constexpr int64_t refPeriodMu = 8;   // RTIO reference period (Kasli = 8ns @ 125MHz RTIO clock)
+constexpr int64_t minTTLPulseMu = 8; // Minimum TTL pulse duration to avoid 0 duration events
 } // namespace ARTIQHardwareConfig
 
 //===----------------------------------------------------------------------===//
@@ -421,3 +419,4 @@ class ARTIQRuntimeBuilder {
 
 } // namespace rtio
 } // namespace catalyst
+
