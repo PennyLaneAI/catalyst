@@ -384,15 +384,6 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* The `catalyst.python_interface.visualization` module has been renamed to
-  `catalyst.python_interface.inspection`, and various utility functions within this module
-  have been streamlined.
-  [(#2237)](https://github.com/PennyLaneAI/catalyst/pull/2237)
-
-* Migrated the `pennylane.compiler.python_compiler` submodule from PennyLane to Catalyst.
-  It is now accessible as `catalyst.python_interface`.
-  [(#2199)](https://github.com/PennyLaneAI/catalyst/pull/2199)
-
 * Integration tests for `qml.specs` have been updated to match the new output format introduced
   in PennyLane.
   [(#2255)](https://github.com/PennyLaneAI/catalyst/pull/2255)
