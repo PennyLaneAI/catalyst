@@ -249,7 +249,7 @@ def handle_vjp(self, *args, jaxpr, **kwargs):
     new_args = (*new_jaxpr.consts, *args)
     j = new_jaxpr.jaxpr
     new_j = j.replace(constvars=(), invars=j.constvars+j.invars)
-    return pl_jac_prim.bind(
+    return pl_vjp_prim.bind(
         *new_args, jaxpr=new_j, **kwargs
     )
 

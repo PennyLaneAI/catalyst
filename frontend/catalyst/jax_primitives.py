@@ -933,7 +933,7 @@ def _capture_vjp_lowering(ctx, *args, jaxpr, fn, method, argnums, h):
     """
     args = list(args)
     mlir_ctx = ctx.module_context.context
-    n_params = len(jaxpr.invars) + n_consts
+    n_params = len(jaxpr.invars)
     new_argnums = np.array(argnums)
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
