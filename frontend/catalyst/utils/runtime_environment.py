@@ -82,6 +82,12 @@ def get_cli_path() -> str:  # pragma: nocover
     if os.path.isfile(path):
         return path
 
+    # Check the old bin directory location, which in rare scenarios may still be used
+    # (e.g. the configuration after `make wheel` has been run).
+    path = os.path.join(package_root, "..", "bin", catalyst_cli)
+    if os.path.isfile(path):
+        return path
+
     raise RuntimeError(
         "Could not locate the Catalyst executable, please report this issue on GitHub."
     )
