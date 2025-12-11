@@ -37,23 +37,24 @@ from catalyst.jax_primitives import decomposition_rule
 # Helper to skip tests that fail due to PauliRot type annotation issue
 # TODO: Remove this once PennyLane fixes the PauliRot decomposition type annotations
 def skip_if_pauli_rot_issue(test_func):
-    """Wrapper to skip tests that fail due to PauliRot type annotation issues."""
+    # """Wrapper to skip tests that fail due to PauliRot type annotation issues."""
 
-    def wrapper():
-        try:
-            test_func()
-        except (ValueError, IndexError) as e:
-            error_msg = str(e)
-            if (
-                "Unsupported type annotation None for parameter pauli_word" in error_msg
-                or "Unsupported type annotation <class 'str'> for parameter pauli_word" in error_msg
-                or "index is out of bounds for axis" in error_msg
-            ):
-                print(f"# SKIPPED {test_func.__name__}: PauliRot type annotation issue")
-            else:
-                raise
+    # def wrapper():
+    #     try:
+    #         test_func()
+    #     except (ValueError, IndexError) as e:
+    #         error_msg = str(e)
+    #         if (
+    #             "Unsupported type annotation None for parameter pauli_word" in error_msg
+    #             or "Unsupported type annotation <class 'str'> for parameter pauli_word" in error_msg
+    #             or "index is out of bounds for axis" in error_msg
+    #         ):
+    #             print(f"# SKIPPED {test_func.__name__}: PauliRot type annotation issue")
+    #         else:
+    #             raise
 
-    return wrapper
+    # return wrapper
+    return test_func
 
 
 TEST_PATH = os.path.dirname(__file__)
