@@ -344,11 +344,12 @@ def _create_decomposition_rule(
             # We cover this when adding end-to-end tests for rules
             # in the MLIR PR.
             args.append(int)
+        elif pauli_word is not None and typ is str:
+            pass
         else:  # pragma: no cover
-            if pauli_word is None:
-                raise ValueError(
-                    f"Unsupported type annotation {typ} for parameter {name} in func {func}."
-                )
+            raise ValueError(
+                f"Unsupported type annotation {typ} for parameter {name} in func {func}."
+            )
 
     func_cp = make_def_copy(func) if requires_copy else func
 
