@@ -31,7 +31,7 @@ from xdsl.passes import PassPipeline
 from xdsl.utils.exceptions import VerifyException
 from xdsl.utils.test_value import create_ssa_value
 
-from catalyst.python_interface.conversion import xdsl_from_docstring
+from catalyst.python_interface.conversion import parse_generic_to_xdsl_module
 from catalyst.python_interface.pass_api import (
     ApplyTransformSequence,
     compiler_transform,
@@ -127,9 +127,7 @@ def test_integration_for_transform_interpreter(capsys):
             else:
                 print("hello world")
 
-    @xdsl_from_docstring
-    def program():
-        """
+    program = """
         builtin.module {
           builtin.module {
             transform.named_sequence @__transform_main(%arg0 : !transform.op<"builtin.module">) {
@@ -144,7 +142,7 @@ def test_integration_for_transform_interpreter(capsys):
     ctx.load_dialect(builtin.Builtin)
     ctx.load_dialect(transform.Transform)
 
-    mod = program()
+    mod = parse_generic_to_xdsl_module(program)
     pipeline = PassPipeline((ApplyTransformSequence(),))
     pipeline.apply(ctx, mod)
 
