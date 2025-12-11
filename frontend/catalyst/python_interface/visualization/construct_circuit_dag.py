@@ -17,12 +17,6 @@
 from collections import defaultdict
 from functools import singledispatch, singledispatchmethod
 
-from catalyst.python_interface.dialects import quantum
-from catalyst.python_interface.inspection.xdsl_conversion import (
-    xdsl_to_qml_measurement,
-    xdsl_to_qml_op,
-)
-from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 from pennylane.measurements import (
     ExpectationMP,
     MeasurementProcess,
@@ -32,6 +26,13 @@ from pennylane.measurements import (
 from pennylane.operation import Operator
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region, SSAValue
+
+from catalyst.python_interface.dialects import quantum
+from catalyst.python_interface.inspection.xdsl_conversion import (
+    xdsl_to_qml_measurement,
+    xdsl_to_qml_op,
+)
+from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 
 
 class ConstructCircuitDAG:
@@ -109,10 +110,7 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _gate_op(
         self,
-        op: quantum.CustomOp
-        | quantum.GlobalPhaseOp
-        | quantum.QubitUnitaryOp
-        | quantum.MultiRZOp,
+        op: quantum.CustomOp | quantum.GlobalPhaseOp | quantum.QubitUnitaryOp | quantum.MultiRZOp,
     ) -> None:
         """Generic handler for unitary gates."""
 
@@ -177,11 +175,13 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _measurements(
         self,
-        op: quantum.StateOp
-        | quantum.ExpvalOp
-        | quantum.VarianceOp
-        | quantum.SampleOp
-        | quantum.ProbsOp,
+        op: (
+            quantum.StateOp
+            | quantum.ExpvalOp
+            | quantum.VarianceOp
+            | quantum.SampleOp
+            | quantum.ProbsOp
+        ),
     ) -> None:
         """Handler for all quantum measurement operations."""
 
@@ -380,9 +380,7 @@ class ConstructCircuitDAG:
             label = "qjit"
 
         uid = f"cluster{self._cluster_uid_counter}"
-        parent_cluster_uid = (
-            None if self._cluster_uid_stack == [] else self._cluster_uid_stack[-1]
-        )
+        parent_cluster_uid = None if self._cluster_uid_stack == [] else self._cluster_uid_stack[-1]
         self.dag_builder.add_cluster(
             uid,
             label=label,
