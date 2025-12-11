@@ -1,19 +1,29 @@
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include(FetchContent)
+set(REQUIRED_BOOST_VERSION 1.74.0)
 
-set(BOOST_INCLUDE_LIBRARIES multiprecision random)
-set(BOOST_ENABLE_CMAKE ON)
+find_package(Boost ${REQUIRED_BOOST_VERSION} COMPONENTS multiprecision random QUIET)
 
-FetchContent_Declare(
-    Boost
-    URL https://github.com/boostorg/boost/releases/download/boost-1.89.0/boost-1.89.0-cmake.tar.xz
-    URL_HASH SHA256=67acec02d0d118b5de9eb441f5fb707b3a1cdd884be00ca24b9a73c995511f74
-    DOWNLOAD_EXTRACT_TIMESTAMP ON
-)
+if(Boost_FOUND)
+    message(STATUS "Found system Boost: ${Boost_VERSION}")
+else()
+    message(STATUS "Boost ${REQUIRED_BOOST_VERSION} not found on system. Fetching..." )
+    
+    include(FetchContent)
+    
+    set(BOOST_INCLUDE_LIBRARIES multiprecision random)
+    set(BOOST_ENABLE_CMAKE ON)
 
-FetchContent_MakeAvailable(Boost)
+    FetchContent_Declare(
+        Boost
+        URL https://github.com/boostorg/boost/releases/download/boost-1.89.0/boost-1.89.0-cmake.tar.xz
+        URL_HASH SHA256=67acec02d0d118b5de9eb441f5fb707b3a1cdd884be00ca24b9a73c995511f74
+        DOWNLOAD_EXTRACT_TIMESTAMP ON
+    )
+    
+    FetchContent_MakeAvailable(Boost)
+endif()
 
 add_library(rt_rsdecomp SHARED RSDecomp.cpp Rings.cpp CliffordData.cpp)
 
