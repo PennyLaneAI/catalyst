@@ -28,7 +28,6 @@ See here (link valid with xDSL 0.46): https://github.com/xdslproject/xdsl/blob/3
 
 import io
 from collections.abc import Callable
-from typing import Any
 
 from xdsl.context import Context
 from xdsl.dialects import builtin
