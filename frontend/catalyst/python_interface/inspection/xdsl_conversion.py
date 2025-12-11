@@ -17,9 +17,11 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable
+from itertools import compress
 from typing import TYPE_CHECKING
 
 from pennylane import ops
+from pennylane.capture import pause
 from pennylane.ftqc.operations import RotXZX
 from pennylane.measurements import counts, expval, probs, sample, state, var
 from pennylane.operation import Operator
@@ -29,7 +31,7 @@ from pennylane.ops import measure
 from xdsl.dialects.builtin import DenseIntOrFPElementsAttr, IntegerAttr, IntegerType
 from xdsl.dialects.scf import ForOp
 from xdsl.dialects.tensor import ExtractOp as TensorExtractOp
-from xdsl.ir import SSAValue
+from xdsl.ir import Block, SSAValue
 
 from catalyst.jit import QJIT, qjit
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
@@ -223,12 +225,16 @@ def dispatch_wires_extract(op: ExtractOp):
     return resolve_constant_wire(op.idx)  # used by xDSL
 
 
-def resolve_constant_wire(ssa: SSAValue) -> float | int:
+def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
     """Resolve the wire for the given SSA qubit."""
     if isinstance(ssa, IntegerAttr):  # Catalyst
         return ssa.value.data
 
     op = ssa.owner
+
+    if isinstance(op, Block):
+        arg_name = list(compress(op.args, map(lambda arg: arg is ssa, op.args)))[0]
+        return arg_name.name_hint
 
     match op:
 
@@ -302,41 +308,44 @@ def xdsl_to_qml_op(op) -> Operator:
     Returns:
         A PennyLane Operator.
     """
+    # Pause capture so we can allow strings (dynamic wires) as allowed wires
+    with pause():
+        match op.name:
 
-    match op.name:
+            case "quantum.gphase":
+                gate = ops.GlobalPhase(
+                    ssa_to_qml_params(op, single=True), wires=ssa_to_qml_wires(op)
+                )
 
-        case "quantum.gphase":
-            gate = ops.GlobalPhase(ssa_to_qml_params(op, single=True), wires=ssa_to_qml_wires(op))
+            case "quantum.unitary":
+                gate = ops.qubit.matrix_ops.QubitUnitary(
+                    U=jax.numpy.zeros(_tensor_shape_from_ssa(op.matrix)), wires=ssa_to_qml_wires(op)
+                )
 
-        case "quantum.unitary":
-            gate = ops.qubit.matrix_ops.QubitUnitary(
-                U=jax.numpy.zeros(_tensor_shape_from_ssa(op.matrix)), wires=ssa_to_qml_wires(op)
-            )
+            case "quantum.set_state":
+                gate = ops.qubit.state_preparation.StatePrep(
+                    state=jax.numpy.zeros(_tensor_shape_from_ssa(op.in_state)),
+                    wires=ssa_to_qml_wires(op),
+                )
 
-        case "quantum.set_state":
-            gate = ops.qubit.state_preparation.StatePrep(
-                state=jax.numpy.zeros(_tensor_shape_from_ssa(op.in_state)),
-                wires=ssa_to_qml_wires(op),
-            )
+            case "quantum.multirz":
+                gate = ops.qubit.parametric_ops_multi_qubit.MultiRZ(
+                    theta=_extract(op, "theta", resolve_constant_params, single=True),
+                    wires=ssa_to_qml_wires(op),
+                )
 
-        case "quantum.multirz":
-            gate = ops.qubit.parametric_ops_multi_qubit.MultiRZ(
-                theta=_extract(op, "theta", resolve_constant_params, single=True),
-                wires=ssa_to_qml_wires(op),
-            )
+            case "quantum.set_basis_state":
+                gate = ops.qubit.state_preparation.BasisState(
+                    state=jax.numpy.zeros(_tensor_shape_from_ssa(op.basis_state)),
+                    wires=ssa_to_qml_wires(op),
+                )
 
-        case "quantum.set_basis_state":
-            gate = ops.qubit.state_preparation.BasisState(
-                state=jax.numpy.zeros(_tensor_shape_from_ssa(op.basis_state)),
-                wires=ssa_to_qml_wires(op),
-            )
+            case "quantum.custom":
+                gate_cls = resolve_gate(op.properties.get("gate_name").data)
+                gate = gate_cls(*ssa_to_qml_params(op), wires=ssa_to_qml_wires(op))
 
-        case "quantum.custom":
-            gate_cls = resolve_gate(op.properties.get("gate_name").data)
-            gate = gate_cls(*ssa_to_qml_params(op), wires=ssa_to_qml_wires(op))
-
-        case _:
-            raise NotImplementedError(f"Unsupported gate: {op.name}")
+            case _:
+                raise NotImplementedError(f"Unsupported gate: {op.name}")
 
     return _apply_adjoint_and_ctrls(gate, op)
 
