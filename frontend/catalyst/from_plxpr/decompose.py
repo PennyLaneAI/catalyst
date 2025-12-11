@@ -340,10 +340,10 @@ def _create_decomposition_rule(
             # in the MLIR PR.
             args.append(int)
         else:  # pragma: no cover
-            # raise ValueError(
-            #     f"Unsupported type annotation {typ} for parameter {name} in func {func}."
-            # )
-            pass
+            if pauli_word is None:
+                raise ValueError(
+                    f"Unsupported type annotation {typ} for parameter {name} in func {func}."
+                )
 
     func_cp = make_def_copy(func) if requires_copy else func
 
