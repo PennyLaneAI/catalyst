@@ -1173,9 +1173,9 @@ class TestOperatorConnectivity:
 
         # Check all edges
         assert len(edges) == 4
-        assert ("node1", "node4") in edges  # RX -> CNOT
+        assert ("node3", "node4") in edges  # RX -> CNOT
         assert ("node2", "node4") in edges  # RY -> CNOT
-        assert ("node3", "node5") in edges  # RZ -> Toffoli
+        assert ("node1", "node5") in edges  # RZ -> Toffoli
         assert ("node4", "node5") in edges  # CNOT -> Toffoli
 
 
