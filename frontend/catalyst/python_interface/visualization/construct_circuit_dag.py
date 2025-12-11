@@ -224,6 +224,7 @@ class ConstructCircuitDAG:
             cluster_uid=self._cluster_uid_stack[-1],
             fillcolor="lightpink",
             color="lightpink3",
+            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
         )
         self._node_uid_counter += 1
