@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <boost/multiprecision/miller_rabin.hpp>
+#include <boost/random.hpp>
 #include <cmath>
 #include <optional>
 #include <random>
