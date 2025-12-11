@@ -52,20 +52,12 @@ inline mlir::Value computeChannelDeviceAddr(mlir::OpBuilder &builder, mlir::Oper
     }
     int64_t channelBase = mlir::cast<mlir::IntegerAttr>(current).getInt();
 
-    // Static channel
     llvm::APInt channelIdAPInt;
-    if (mlir::matchPattern(channelValue, mlir::m_ConstantInt(&channelIdAPInt))) {
-        int64_t channelId = channelIdAPInt.getSExtValue();
-        int32_t addr = static_cast<int32_t>((channelId + channelBase) << 8);
-        return builder.create<mlir::arith::ConstantOp>(loc, builder.getI32IntegerAttr(addr));
-    }
-
-    // Dynamic channel
-    mlir::Value offset =
-        builder.create<mlir::arith::ConstantOp>(loc, builder.getI32IntegerAttr(channelBase));
-    mlir::Value sum = builder.create<mlir::arith::AddIOp>(loc, channelValue, offset);
-    mlir::Value shift = builder.create<mlir::arith::ConstantOp>(loc, builder.getI32IntegerAttr(8));
-    return builder.create<mlir::arith::ShLIOp>(loc, sum, shift);
+    assert(mlir::matchPattern(channelValue, mlir::m_ConstantInt(&channelIdAPInt)) &&
+           "only static channels are supported");
+    int64_t channelId = channelIdAPInt.getSExtValue();
+    int32_t addr = static_cast<int32_t>((channelId + channelBase) << 8);
+    return builder.create<mlir::arith::ConstantOp>(loc, builder.getI32IntegerAttr(addr));
 }
 
 } // namespace rtio
