@@ -19,9 +19,10 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "RTIO/IR/RTIOOps.h"
-#include "RTIO/Transforms/ARTIQRuntimeBuilder.h"
 #include "RTIO/Transforms/Patterns.h"
-#include "Utils.h"
+
+#include "ARTIQRuntimeBuilder.hpp"
+#include "Utils.hpp"
 
 using namespace mlir;
 using namespace catalyst::rtio;
@@ -57,8 +58,8 @@ struct PulseOpLowering : public OpConversionPattern<RTIOPulseOp> {
                                     ConversionPatternRewriter &rewriter,
                                     ARTIQRuntimeBuilder &artiq) const
     {
-        ModuleOp module = op->getParentOfType<ModuleOp>();
-        auto setFreqFunc = module.lookupSymbol<LLVM::LLVMFuncOp>(ARTIQFuncNames::setFrequency);
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        auto setFreqFunc = mod.lookupSymbol<LLVM::LLVMFuncOp>(ARTIQFuncNames::setFrequency);
         if (!setFreqFunc) {
             return op->emitError("Cannot find ") << ARTIQFuncNames::setFrequency << " function";
         }

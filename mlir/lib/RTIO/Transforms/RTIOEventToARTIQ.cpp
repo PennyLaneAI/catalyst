@@ -28,10 +28,11 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "RTIO/IR/RTIOOps.h"
-#include "RTIO/Transforms/ARTIQRuntimeBuilder.h"
 #include "RTIO/Transforms/Passes.h"
 #include "RTIO/Transforms/Patterns.h"
-#include "Utils.h"
+
+#include "ARTIQRuntimeBuilder.hpp"
+#include "Utils.hpp"
 
 using namespace mlir;
 using namespace catalyst::rtio;

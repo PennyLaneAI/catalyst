@@ -36,8 +36,8 @@ inline mlir::Value computeChannelDeviceAddr(mlir::OpBuilder &builder, mlir::Oper
                                             mlir::Value channelValue)
 {
     mlir::Location loc = op->getLoc();
-    mlir::ModuleOp module = op->getParentOfType<mlir::ModuleOp>();
-    auto configAttr = module->getAttrOfType<ConfigAttr>(ConfigAttr::getModuleAttrName());
+    mlir::ModuleOp mod = op->getParentOfType<mlir::ModuleOp>();
+    auto configAttr = mod->getAttrOfType<ConfigAttr>(ConfigAttr::getModuleAttrName());
     assert(configAttr && "configAttr not found");
 
     // Get base channel from config
