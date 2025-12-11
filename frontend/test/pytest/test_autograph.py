@@ -27,6 +27,7 @@ import pytest
 from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
 from pennylane.capture.autograph.transformer import TRANSFORMER as capture_TRANSFORMER
+from pennylane import vjp
 
 from catalyst import AutoGraphError, debug, passes, qjit
 from catalyst.api_extensions import (
@@ -38,7 +39,6 @@ from catalyst.api_extensions import (
     jacobian,
     jvp,
     measure,
-    vjp,
     vmap,
     while_loop,
 )
@@ -396,6 +396,7 @@ class TestIntegration:
         assert check_cache(inner)
         assert fn(3) == tuple([jax.numpy.array(2.0), jax.numpy.array(6.0)])
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_vjp_wrapper(self):
         """Test conversion is happening succesfully on functions wrapped with 'vjp'."""
 
@@ -407,7 +408,8 @@ class TestIntegration:
             return vjp(inner, (x,), (1.0, 1.0))
 
         assert hasattr(fn.user_function, "ag_unconverted")
-        assert check_cache(inner)
+        if not qml.capture.enabled():
+            assert check_cache(inner)
         assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
         assert np.allclose(fn(3)[1], jnp.array(8.0))
 
