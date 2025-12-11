@@ -175,7 +175,7 @@ class ConstructCircuitDAG:
     # =====================
 
     @_visit_operation.register
-    def _handle_measurements(
+    def _measurements(
         self,
         op: quantum.StateOp
         | quantum.ExpvalOp
