@@ -1055,6 +1055,40 @@ class TestCtrl:
         assert "[1, 0]" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
+    def test_ctrl_operator_without_alias(self):
+        """Test that the ctrl of an operator instance that doesn't have an alias works."""
+
+        dev = qml.device("null.qubit", wires=2)
+
+        # NOTE: need to enable here to capture the ISWAP
+        qml.capture.enable()
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            qml.ctrl(qml.ISWAP([0,1]), control=2)
+            qml.ctrl(qml.ISWAP, control=2)([0,1])
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+        nodes = utility.dag_builder.nodes
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        assert "C(ISWAP)" in nodes["node1"]["label"]
+        assert "[2, 0, 1]" in nodes["node1"]["label"]
+        assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
+        assert "C(ISWAP)" in nodes["node2"]["label"]
+        assert "[2, 0, 1]" in nodes["node2"]["label"]
+        assert nodes["node2"]["parent_cluster_uid"] == "cluster1"
+
+        qml.capture.disable()
+
 
 class TestAdjoint:
     """Tests that the ctrl transform is visualized correctly."""
