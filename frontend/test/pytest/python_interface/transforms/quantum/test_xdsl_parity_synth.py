@@ -22,17 +22,19 @@ from numpy.testing import assert_allclose, assert_equal
 pytestmark = pytest.mark.external
 
 pytest.importorskip("xdsl")
-pytest.importorskip("catalyst")
+
+import pennylane as qml
+from pennylane.transforms.intermediate_reps import phase_polynomial
 
 # pylint: disable=wrong-import-position
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 
-import pennylane as qml
-from pennylane.compiler.python_compiler.transforms import ParitySynthPass, parity_synth
-from pennylane.compiler.python_compiler.transforms.quantum.parity_synth import (
-    _parity_network_synth,
+from catalyst.python_interface.transforms import (
+    ParitySynthPass,
+    parity_synth,
 )
-from pennylane.transforms.intermediate_reps import phase_polynomial
+from catalyst.python_interface.transforms.quantum.parity_synth import _parity_network_synth
+
 
 
 def assert_binary_matrix(matrix: np.ndarray):
