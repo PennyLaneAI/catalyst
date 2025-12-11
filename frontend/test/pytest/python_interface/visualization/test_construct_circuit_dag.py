@@ -1164,7 +1164,6 @@ class TestOperatorConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        # NOTE: depth first traversal hence T first then PauliX
         assert "RX" in nodes["node1"]["label"]
         assert "RY" in nodes["node2"]["label"]
         assert "RZ" in nodes["node3"]["label"]
@@ -1263,3 +1262,35 @@ class TestTerminalMeasurementConnectivity:
         assert ("node2", "node6") in edges
         assert ("node3", "node7") in edges
         assert ("node4", "node8") in edges
+
+    def test_multi_wire_connectivity(self):
+        """Ensures that multi wire connectivity holds."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            qml.X(0)
+            qml.Y(1)
+            return qml.probs(wires=[0,1])
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+        assert "probs" in nodes["node3"]["label"]
+
+        # Check all edges
+        assert len(edges) == 2
+        assert ("node1", "node3") in edges  
+        assert ("node2", "node3") in edges 
