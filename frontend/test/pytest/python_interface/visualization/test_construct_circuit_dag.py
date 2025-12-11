@@ -1170,7 +1170,7 @@ class TestTerminalMeasurementConnectivity:
         # Check all nodes
         assert "PauliX" in nodes["node1"]["label"]
         assert "T" in nodes["node2"]["label"]
-        assert "probs" in nodes["node3"]["label"]
+        assert meas_fn.__name__ in nodes["node3"]["label"]
 
         # Check all edges
         assert len(edges) == 2
