@@ -27,6 +27,7 @@ package_root = os.path.join(os.path.dirname(__file__), "..")
 # Default paths to dep libraries
 DEFAULT_LIB_PATHS = {
     "llvm": os.path.join(package_root, "..", "..", "mlir", "llvm-project", "build", "lib"),
+    "dialects": os.path.join(package_root, "..", "..", "mlir", "build", "lib"),
     "runtime": os.path.join(package_root, "..", "..", "runtime", "build", "lib"),
     "enzyme": os.path.join(package_root, "..", "..", "mlir", "Enzyme", "build", "Enzyme"),
     "oqc_runtime": os.path.join(package_root, "third_party", "oqc", "src", "build"),
@@ -54,13 +55,6 @@ def get_include_path():
     if INSTALLED:
         return os.path.join(package_root, "include")  # pragma: no cover
     return os.getenv("CATALYST_INCLUDE_DIRS", DEFAULT_INCLUDE_PATHS.get("mlir", ""))
-
-
-def get_bin_path(project, env_var):
-    """Get the library path."""
-    if INSTALLED:
-        return os.path.join(package_root, "..", "bin")  # pragma: no cover
-    return os.getenv(env_var, DEFAULT_BIN_PATHS.get(project, ""))
 
 
 def get_cli_path() -> str:  # pragma: nocover
