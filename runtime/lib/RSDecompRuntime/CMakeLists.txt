@@ -1,14 +1,14 @@
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(REQUIRED_BOOST_VERSION 1.74.0)
+set(MIN_BOOST_VERSION 1.74.0)
 
-find_package(Boost ${REQUIRED_BOOST_VERSION} COMPONENTS multiprecision random QUIET)
+find_package(Boost ${MIN_BOOST_VERSION} QUIET)
 
 if(Boost_FOUND)
     message(STATUS "Found system Boost: ${Boost_VERSION}")
 else()
-    message(STATUS "Boost ${REQUIRED_BOOST_VERSION} not found on system. Fetching..." )
+    message(STATUS "Boost >= ${MIN_BOOST_VERSION} not found on system. Fetching Boost 1.89.0...")
     
     include(FetchContent)
     
@@ -33,10 +33,6 @@ target_include_directories(rt_rsdecomp
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
 )
 
-target_link_libraries(rt_rsdecomp 
-    PUBLIC 
-    Boost::multiprecision
-    Boost::random
-)
+target_link_libraries(rt_rsdecomp PUBLIC Boost::headers)
 
 set_property(TARGET rt_rsdecomp PROPERTY POSITION_INDEPENDENT_CODE ON)
