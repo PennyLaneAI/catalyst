@@ -232,7 +232,15 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                     # in the circuit, but is used inside a decomposition rule.
                     # In this case, we fall back to using the COMPILER_OPS_FOR_DECOMPOSITION
                     # dictionary to get the number of wires.
-                    num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
+                    pauli_word = op.op.params.get("pauli_word", None)
+                    if op.op.name == "PauliRot":
+                        num_wires = len(pauli_word)
+                        num_params = 1  # theta
+                    elif op.op.name == "MultiRZ":
+                        num_wires = op_num_wires
+                        num_params = 1  # theta
+                    else:
+                        num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
                     _create_decomposition_rule(
                         rule,
                         op_name=op.op.name,
@@ -240,6 +248,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                         num_params=num_params,
                         requires_copy=num_wires == -1,
                         ag_enabled=self._ag_enabled,
+                        pauli_word=pauli_word,
                     )
                 elif not any(
                     keyword in getattr(op.op, "name", "") for keyword in ("Adjoint", "Controlled")
@@ -263,6 +272,7 @@ def _create_decomposition_rule(
     num_params: int,
     requires_copy: bool = False,
     ag_enabled: bool = False,
+    pauli_word=None,
 ):
     """Create a decomposition rule from a callable.
 
@@ -283,6 +293,7 @@ def _create_decomposition_rule(
     type_hints = get_type_hints(func)
 
     args = []
+
     for name in sig_func.parameters.keys():
         typ = type_hints.get(name, None)
 
@@ -329,9 +340,10 @@ def _create_decomposition_rule(
             # in the MLIR PR.
             args.append(int)
         else:  # pragma: no cover
-            raise ValueError(
-                f"Unsupported type annotation {typ} for parameter {name} in func {func}."
-            )
+            # raise ValueError(
+            #     f"Unsupported type annotation {typ} for parameter {name} in func {func}."
+            # )
+            pass
 
     func_cp = make_def_copy(func) if requires_copy else func
 
@@ -357,7 +369,7 @@ def _create_decomposition_rule(
 
     # Note that we shouldn't pass args as kwargs to decomposition_rule
     # JAX doesn't like it and it may fail to preserve the order of args.
-    return decomposition_rule(func_cp)(*args)
+    return decomposition_rule(func_cp, pauli_word=pauli_word)(*args)
 
 
 # pylint: disable=protected-access

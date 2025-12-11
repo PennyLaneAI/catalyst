@@ -427,7 +427,7 @@ def subroutine(func):
     return wrapper
 
 
-def decomposition_rule(func=None, *, is_qreg=True, num_params=0):
+def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None):
     """
     Denotes the creation of a quantum definition in the intermediate representation.
     """
@@ -439,9 +439,15 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0):
     if func is None:
         return functools.partial(decomposition_rule, is_qreg=is_qreg, num_params=num_params)
 
+    if pauli_word is not None:
+        func = functools.partial(func, pauli_word=pauli_word)
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
+        if pauli_word is not None:
+            jaxpr = jax.make_jaxpr(func)(theta=args[0], wires=args[1])
+        else:
+            jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
         decomprule_p.bind(pyfun=func, func_jaxpr=jaxpr, is_qreg=is_qreg, num_params=num_params)
 
     return wrapper
