@@ -121,6 +121,7 @@ coverage: test_runner
 	@echo "check C++ code coverage"
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
 	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_mbqc_runtime
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_rsdecomp_runtime
 ifeq ($(ENABLE_OPENQASM), ON)
 	$(ASAN_COMMAND) $(PY_ASAN_OPTIONS) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
 endif
