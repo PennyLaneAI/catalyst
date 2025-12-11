@@ -232,15 +232,14 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                     # in the circuit, but is used inside a decomposition rule.
                     # In this case, we fall back to using the COMPILER_OPS_FOR_DECOMPOSITION
                     # dictionary to get the number of wires.
+                    num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
                     pauli_word = op.op.params.get("pauli_word", None)
+
                     if op.op.name == "PauliRot":
                         num_wires = len(pauli_word)
-                        num_params = 1  # theta
                     elif op.op.name == "MultiRZ":
                         num_wires = op_num_wires
-                        num_params = 1  # theta
-                    else:
-                        num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
+
                     _create_decomposition_rule(
                         rule,
                         op_name=op.op.name,
@@ -256,7 +255,11 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                         "Adjoint",
                         "Controlled",
                         "TemporaryAND",
+<<<<<<< HEAD
                         "ChangeOpBasis",
+=======
+                        "ChangeBasisOp",
+>>>>>>> 0bab96b19 (Minor fixes)
                         "Prod",
                     )
                 ):  # pragma: no cover
@@ -279,7 +282,7 @@ def _create_decomposition_rule(
     num_params: int,
     requires_copy: bool = False,
     ag_enabled: bool = False,
-    pauli_word=None,
+    pauli_word: str | None = None,
 ):
     """Create a decomposition rule from a callable.
     See also: :func:`~.decomposition_rule`.

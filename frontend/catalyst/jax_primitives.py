@@ -444,7 +444,7 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         if pauli_word is not None:
-            jaxpr = jax.make_jaxpr(func)(theta=args[0], wires=args[1])
+            jaxpr = jax.make_jaxpr(func)(theta=args[0], wires=args[1], **kwargs)
         else:
             jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
         decomprule_p.bind(pyfun=func, func_jaxpr=jaxpr, is_qreg=is_qreg, num_params=num_params)
