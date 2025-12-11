@@ -28,6 +28,7 @@ See here (link valid with xDSL 0.46): https://github.com/xdslproject/xdsl/blob/3
 
 import io
 from collections.abc import Callable
+from typing import Any
 
 from xdsl.context import Context
 from xdsl.dialects import builtin
@@ -39,6 +40,7 @@ from xdsl.passes import ModulePass, PassPipeline
 from xdsl.printer import Printer
 from xdsl.rewriter import Rewriter
 from xdsl.utils.exceptions import PassFailedException
+from xdsl.utils.hints import isa
 
 from catalyst.compiler import _quantum_opt
 
@@ -84,12 +86,13 @@ class TransformFunctionsExt(TransformFunctions):
         """Try to run the pass in xDSL, if not found then run it in Catalyst."""
 
         pass_name = op.pass_name.data
+        pass_options = op.options.data
         module = args[0]
 
         # ---- xDSL path ----
         if pass_name in self.passes:
             pass_class = self.passes[pass_name]()
-            pass_instance = pass_class(**op.options.data)
+            pass_instance = pass_class(**pass_options)
             pipeline = PassPipeline((pass_instance,))
             self._pre_pass_callback(pass_instance, module)
             pipeline.apply(self.ctx, module)
@@ -99,10 +102,9 @@ class TransformFunctionsExt(TransformFunctions):
         # ---- Catalyst path ----
         buffer = io.StringIO()
         Printer(stream=buffer, print_generic_format=True).print_op(module)
-
-        schedule = f"--{pass_name}"
+        schedule = _create_schedule(pass_name, pass_options)
         self._pre_pass_callback(pass_name, module)
-        modified = _quantum_opt(schedule, "-mlir-print-op-generic", stdin=buffer.getvalue())
+        modified = _quantum_opt(*schedule, "-mlir-print-op-generic", stdin=buffer.getvalue())
 
         data = Parser(self.ctx, modified).parse_module()
         rewriter = Rewriter()
@@ -143,3 +145,36 @@ class TransformInterpreterPass(ModulePass):
         if self.callback:
             self.callback(None, op, None, pass_level=0)
         interpreter.call_op(schedule, (op,))
+
+
+def _create_schedule(pass_name: str, pass_options: dict[str, Any]) -> tuple[str, ...]:
+    """Create a pass schedule for applying an MLIR pass using the appropriate CLI command.
+
+    For a pass with options, the corresponding CLI command will be the following:
+
+    .. code-block::
+
+        --pass-pipeline "builtin.module(my-pass{opt0=val0 opt1=val1 ...})"
+    """
+    if not pass_options:
+        return (f"--{pass_name}",)
+
+    options = []
+    for opt, val in pass_options.items():
+        match type(val):
+            case builtin.IntegerAttr:
+                if isa(val, builtin.BoolAttr):
+                    val = "true" if val.value.data else "false"
+                else:
+                    val = val.value.data
+            case builtin.FloatAttr:
+                val = val.value.data
+            case builtin.StringAttr:
+                val = val.data
+            case _:
+                raise ValueError(f"Unsupported pass option {opt}: {val}.")
+
+        options.append(f"{opt}={val}")
+
+    cli_pass = f"builtin.module({pass_name}{{{" ".join(options)}}})"
+    return ("--pass-pipeline", cli_pass)
