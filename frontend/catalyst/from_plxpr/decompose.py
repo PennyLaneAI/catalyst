@@ -255,7 +255,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                         "Adjoint",
                         "Controlled",
                         "TemporaryAND",
-                        "ChangeBasisOp",
+                        "ChangeOpBasis",
                         "Prod",
                     )
                 ):  # pragma: no cover
