@@ -22,7 +22,6 @@ import pennylane as qml
 from pennylane.ftqc import RotXZX
 
 from catalyst.ftqc import mbqc_pipeline
-from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface.transforms import (
     OutlineStateEvolutionPass,
     convert_to_mbqc_formalism_pass,
@@ -147,10 +146,7 @@ class TestOutlineStateEvolutionPass:
         """Test outline_state_evolution_pass does not raise error for circuit with classical
         operations only."""
 
-        @qml.qjit(
-            target="mlir",
-            pass_plugins=[getXDSLPluginAbsolutePath()],
-        )
+        @qml.qjit(target="mlir")
         @outline_state_evolution_pass
         def circuit(x, y):
             return x * y + 5
@@ -165,10 +161,7 @@ class TestOutlineStateEvolutionPass:
         # the program is captured.
         dev = qml.device("null.qubit", wires=10)
 
-        @qml.qjit(
-            target="mlir",
-            pass_plugins=[getXDSLPluginAbsolutePath()],
-        )
+        @qml.qjit(target="mlir")
         @outline_state_evolution_pass
         @qml.qnode(dev)
         def circuit():
@@ -184,10 +177,7 @@ class TestOutlineStateEvolutionPass:
         """Test the outline_state_evolution_pass only."""
         dev = qml.device("lightning.qubit", wires=1000)
 
-        @qml.qjit(
-            target="mlir",
-            pass_plugins=[getXDSLPluginAbsolutePath()],
-        )
+        @qml.qjit(target="mlir")
         @outline_state_evolution_pass
         @qml.set_shots(1000)
         @qml.qnode(dev)
@@ -223,11 +213,7 @@ class TestOutlineStateEvolutionPass:
         on lightning.qubit."""
         dev = qml.device("lightning.qubit", wires=1000)
 
-        @qml.qjit(
-            target="mlir",
-            pass_plugins=[getXDSLPluginAbsolutePath()],
-            pipelines=mbqc_pipeline(),
-        )
+        @qml.qjit(target="mlir", pipelines=mbqc_pipeline())
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
         @outline_state_evolution_pass
@@ -273,11 +259,7 @@ class TestOutlineStateEvolutionPass:
         null.qubit."""
         dev = qml.device("null.qubit", wires=1000)
 
-        @qml.qjit(
-            target="mlir",
-            pass_plugins=[getXDSLPluginAbsolutePath()],
-            pipelines=mbqc_pipeline(),
-        )
+        @qml.qjit(target="mlir", pipelines=mbqc_pipeline())
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
         @measurements_from_samples_pass
@@ -323,11 +305,7 @@ class TestOutlineStateEvolutionPass:
         transform pipeline can be executed on null.qubit."""
         dev = qml.device("null.qubit", wires=1000)
 
-        @qml.qjit(
-            target="mlir",
-            pass_plugins=[getXDSLPluginAbsolutePath()],
-            pipelines=mbqc_pipeline(),
-        )
+        @qml.qjit(target="mlir", pipelines=mbqc_pipeline())
         @decompose_graph_state_pass
         @convert_to_mbqc_formalism_pass
         @measurements_from_samples_pass
@@ -367,10 +345,7 @@ class TestOutlineStateEvolutionPass:
             i = i + 1
             return i
 
-        @qml.qjit(
-            target="mlir",
-            pass_plugins=[getXDSLPluginAbsolutePath()],
-        )
+        @qml.qjit(target="mlir")
         @outline_state_evolution_pass
         @qml.qnode(dev)
         def circuit():
