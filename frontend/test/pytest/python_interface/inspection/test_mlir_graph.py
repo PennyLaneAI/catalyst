@@ -29,7 +29,7 @@ pytestmark = pytest.mark.xdsl
 graphviz = pytest.importorskip("graphviz")
 
 if which("dot") is None:
-    pytest.skip(reason="Graphviz isn't installed.")
+    pytest.skip(reason="Graphviz isn't installed.", allow_module_level=True)
 
 
 @pytest.fixture(autouse=True)
