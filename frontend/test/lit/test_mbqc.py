@@ -253,9 +253,9 @@ def test_pseudo_mbqc_workload():
         # CHECK: }
         m1 = qml.ftqc.cond_measure(
             m0,
-            partial(qml.ftqc.measure_arbitrary_basis, angle=rotation_angle),
-            partial(qml.ftqc.measure_arbitrary_basis, angle=-rotation_angle),
-        )(plane="XY", wires=1)
+            partial(qml.ftqc.measure_arbitrary_basis, angle=rotation_angle, plane="XY"),
+            partial(qml.ftqc.measure_arbitrary_basis, angle=-rotation_angle, plane="XY"),
+        )(wires=1)
 
         # Apply by-product correction
         # CHECK: stablehlo.xor {{.+}}, {{.+}} : tensor<i1>
