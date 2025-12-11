@@ -242,7 +242,14 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                         ag_enabled=self._ag_enabled,
                     )
                 elif not any(
-                    keyword in getattr(op.op, "name", "") for keyword in ("Adjoint", "Controlled", "TemporaryAND", "ChangeOpBasis", "Prod")
+                    keyword in getattr(op.op, "name", "")
+                    for keyword in (
+                        "Adjoint",
+                        "Controlled",
+                        "TemporaryAND",
+                        "ChangeOpBasis",
+                        "Prod",
+                    )
                 ):  # pragma: no cover
                     # Note that the graph-decomposition returns abstracted rules
                     # for Adjoint and Controlled operations, so we skip them here.

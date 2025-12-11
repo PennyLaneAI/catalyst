@@ -21,7 +21,6 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 import pennylane as qml
 from jax._src.sharding_impls import UNSPECIFIED
 from jax._src.tree_util import tree_flatten
