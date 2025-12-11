@@ -1144,6 +1144,7 @@ class TestOperatorConnectivity:
 
         dev = qml.device("null.qubit", wires=1)
 
+        @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_workflow():
@@ -1257,7 +1258,7 @@ class TestTerminalMeasurementConnectivity:
         assert "sample" in nodes["node8"]["label"]
 
         # Check all edges
-        assert len(edges) == 3
+        assert len(edges) == 4
         assert ("node1", "node5") in edges
         assert ("node2", "node6") in edges
         assert ("node3", "node7") in edges
@@ -1268,6 +1269,7 @@ class TestTerminalMeasurementConnectivity:
 
         dev = qml.device("null.qubit", wires=1)
 
+        @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_workflow():
