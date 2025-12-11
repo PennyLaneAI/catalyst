@@ -605,32 +605,3 @@ SO3Matrix so3_matrix_mul(const SO3Matrix &m1, const SO3Matrix &m2)
 }
 
 } // namespace RSDecomp::Rings
-
-// FIXME: Helper print functions that can be deleted
-using namespace RSDecomp::Utils;
-std::ostream &operator<<(std::ostream &os, const RSDecomp::Rings::SO3Matrix &matrix)
-{
-    os << "SO3Matrix(k=" << matrix.k << ", mat=[";
-    for (const auto &row : matrix.so3_mat) {
-        os << "[";
-        for (const auto &elem : row) {
-            os << "(" << elem.a << " + " << elem.b << "√2), ";
-        }
-        os << "], " << std::endl;
-    }
-    os << "])" << std::endl << std::endl;
-    return os;
-}
-
-std::ostream &operator<<(std::ostream &os, const RSDecomp::Rings::ZOmega &zomega)
-{
-    os << "ZOmega(" << zomega.a << " ω^3 + " << zomega.b << "ω^2 + " << zomega.c << "ω + "
-       << zomega.d << ")";
-    return os;
-}
-
-std::ostream &operator<<(std::ostream &os, const RSDecomp::Rings::ZSqrtTwo &zsqtwo)
-{
-    os << "ZSqrtTwo(" << zsqtwo.a << " + " << zsqtwo.b << "√2)";
-    return os;
-}

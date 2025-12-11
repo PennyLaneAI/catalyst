@@ -161,8 +161,3 @@ struct SO3Matrix {
 };
 
 } // namespace RSDecomp::Rings
-// FIXME: Helper print functions that can be deleted
-std::ostream &operator<<(std::ostream &os, const RSDecomp::Rings::ZOmega &zomega);
-std::ostream &operator<<(std::ostream &os, const RSDecomp::Rings::ZSqrtTwo &zsqtwo);
-std::ostream &operator<<(std::ostream &os, const RSDecomp::Rings::SO3Matrix &matrix);
-// end helper functions
