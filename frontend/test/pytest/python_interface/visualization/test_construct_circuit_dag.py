@@ -1176,3 +1176,42 @@ class TestTerminalMeasurementConnectivity:
         assert len(edges) == 2
         assert ("node1", "node3") in edges
         assert ("node2", "node3") in edges
+
+
+    def test_connect_specific_wires(self):
+        """Tests connection to terminal measurements that operate on specific wires."""
+
+        dev = qml.device("null.qubit", wires=5)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            qml.X(0)
+            qml.Y(1)
+            qml.Z(2)
+            return qml.expval(qml.Z(0)), qml.var(qml.Z(1)), qml.probs(wires=[2])
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+        assert "PauliZ" in nodes["node3"]["label"]
+        assert "expval" in nodes["node4"]["label"]
+        assert "var" in nodes["node5"]["label"]
+        assert "probs" in nodes["node6"]["label"]
+
+        # Check all edges
+        assert len(edges) == 3
+        assert ("node1", "node3") in edges
+        assert ("node2", "node4") in edges
+        assert ("node3", "node5") in edges
