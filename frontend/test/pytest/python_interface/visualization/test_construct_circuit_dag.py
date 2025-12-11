@@ -1067,8 +1067,8 @@ class TestCtrl:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_workflow():
-            qml.ctrl(qml.ISWAP([0,1]), control=2)
-            qml.ctrl(qml.ISWAP, control=2)([0,1])
+            qml.ctrl(qml.ISWAP([0, 1]), control=2)
+            qml.ctrl(qml.ISWAP, control=2)([0, 1])
 
         module = my_workflow()
 
