@@ -973,14 +973,88 @@ class TestCreateStaticMeasurementNodes:
 
         assert nodes["node1"]["label"] == get_label(op)
 
+
 class TestCtrl:
     """Tests that the ctrl transform is visualized correctly."""
 
     def test_ctrl_function(self):
         """Test that the ctrl of a function works."""
-        
+
+        dev = qml.device("null.qubit", wires=1)
+
+        def op():
+            return qml.H(0)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            qml.ctrl(op, control=1)()
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+        nodes = utility.dag_builder.nodes
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        assert "CH" in nodes["node1"]["label"]
+        assert "[1, 0]" in nodes["node1"]["label"]
+        assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
+
     def test_ctrl_operator_instance(self):
         """Test that the ctrl of an operator instance works."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            qml.ctrl(qml.H(0), control=1)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+        nodes = utility.dag_builder.nodes
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        assert "CH" in nodes["node1"]["label"]
+        assert "[1, 0]" in nodes["node1"]["label"]
+        assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
+
+    def test_ctrl_operator_type(self):
+        """Test that the ctrl of an operator instance works."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            qml.ctrl(qml.H)(0)
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        clusters = utility.dag_builder.clusters
+        nodes = utility.dag_builder.nodes
+
+        # cluster0 -> qjit
+        # cluster1 -> my_workflow
+        assert "CH" in nodes["node1"]["label"]
+        assert "[1, 0]" in nodes["node1"]["label"]
+        assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
+
 
 class TestAdjoint:
     """Tests that the ctrl transform is visualized correctly."""
@@ -1014,7 +1088,6 @@ class TestAdjoint:
         assert "Hadamard" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster2"
 
-        
     def test_adjoint_operator_instance(self):
         """Test that the adjoint of an operator instance works."""
 
