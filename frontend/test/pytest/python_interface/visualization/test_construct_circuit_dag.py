@@ -1165,9 +1165,9 @@ class TestOperatorConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "RX" in nodes["node1"]["label"]
-        assert "RY" in nodes["node2"]["label"]
-        assert "RZ" in nodes["node3"]["label"]
+        assert "RZ" in nodes["node1"]["label"]
+        assert "RX" in nodes["node2"]["label"]
+        assert "RY" in nodes["node3"]["label"]
         assert "CNOT" in nodes["node4"]["label"]
         assert "Toffoli" in nodes["node5"]["label"]
 
