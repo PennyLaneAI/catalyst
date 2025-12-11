@@ -17,17 +17,21 @@
 from collections import defaultdict
 from functools import singledispatch, singledispatchmethod
 
-from pennylane.measurements import ExpectationMP, MeasurementProcess, ProbabilityMP, VarianceMP
-from pennylane.operation import Operator
-from xdsl.dialects import builtin, func, scf
-from xdsl.ir import Block, Operation, Region, SSAValue
-
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.inspection.xdsl_conversion import (
     xdsl_to_qml_measurement,
     xdsl_to_qml_op,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from pennylane.measurements import (
+    ExpectationMP,
+    MeasurementProcess,
+    ProbabilityMP,
+    VarianceMP,
+)
+from pennylane.operation import Operator
+from xdsl.dialects import builtin, func, scf
+from xdsl.ir import Block, Operation, Region, SSAValue
 
 
 class ConstructCircuitDAG:
@@ -105,7 +109,10 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _gate_op(
         self,
-        op: quantum.CustomOp | quantum.GlobalPhaseOp | quantum.QubitUnitaryOp | quantum.MultiRZOp,
+        op: quantum.CustomOp
+        | quantum.GlobalPhaseOp
+        | quantum.QubitUnitaryOp
+        | quantum.MultiRZOp,
     ) -> None:
         """Generic handler for unitary gates."""
 
@@ -124,7 +131,9 @@ class ConstructCircuitDAG:
         self._node_uid_counter += 1
 
         # Search through previous ops found on current wires and connect
-        prev_ops = set.union(set(), *(self._wire_to_node_uids[wire] for wire in qml_op.wires))
+        prev_ops = set.union(
+            set(), *(self._wire_to_node_uids[wire] for wire in qml_op.wires)
+        )
         for prev_op in prev_ops:
             self.dag_builder.add_edge(prev_op, node_uid)
 
@@ -151,9 +160,11 @@ class ConstructCircuitDAG:
         self._node_uid_counter += 1
 
         # Search through previous ops found on current wires and connect
-        prev_ops = set.union(set(), *(self._wire_to_node_uids[wire] for wire in meas.wires))
-        for prev_op in prev_ops:
-            self.dag_builder.add_edge(prev_op, node_uid)
+        prev_node_uids = set.union(
+            set(), *(self._wire_to_node_uids[wire] for wire in meas.wires)
+        )
+        for prev_node_uid in prev_node_uids:
+            self.dag_builder.add_edge(prev_node_uid, node_uid)
 
         # Update affected wires to source from this node UID
         for wire in meas.wires:
@@ -164,41 +175,48 @@ class ConstructCircuitDAG:
     # =====================
 
     @_visit_operation.register
-    def _state_op(self, op: quantum.StateOp) -> None:
-        """Handler for the terminal state measurement operation."""
-
-        # Create PennyLane instance
-        meas = xdsl_to_qml_measurement(op)
-
-        # Add node to current cluster
-        node_uid = f"node{self._node_uid_counter}"
-        self.dag_builder.add_node(
-            uid=node_uid,
-            label=get_label(meas),
-            cluster_uid=self._cluster_uid_stack[-1],
-            fillcolor="lightpink",
-            color="lightpink3",
-            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
-            shape="record",
-        )
-        self._node_uid_counter += 1
-
-        for seen_wire, seen_nodes in self._wire_to_node_uids.items():
-            for seen_node in seen_nodes:
-                self.dag_builder.add_edge(seen_node, node_uid, color="lightpink3")
-
-    @_visit_operation.register
-    def _expval_and_var_ops(
+    def _handle_measurements(
         self,
-        op: quantum.ExpvalOp | quantum.VarianceOp,
+        op: quantum.StateOp
+        | quantum.ExpvalOp
+        | quantum.VarianceOp
+        | quantum.SampleOp
+        | quantum.ProbsOp,
     ) -> None:
-        """Handler for statistical measurement operations."""
+        """Handler for all quantum measurement operations."""
 
-        # Create PennyLane instance
-        obs_op = op.obs.owner
-        meas = xdsl_to_qml_measurement(op, xdsl_to_qml_measurement(obs_op))
+        prev_wires = []
+        meas = None
 
-        # Add node to current cluster
+        match op:
+            case quantum.StateOp():
+                meas = xdsl_to_qml_measurement(op)
+                # NOTE: state can only handle all wires
+                prev_wires = self._wire_to_node_uids.keys()
+
+            case quantum.ExpvalOp() | quantum.VarianceOp():
+                obs_op = op.obs.owner
+                meas = xdsl_to_qml_measurement(op, xdsl_to_qml_measurement(obs_op))
+                prev_wires = meas.wires.labels
+
+            case quantum.SampleOp() | quantum.ProbsOp():
+                obs_op = op.obs.owner
+
+                # TODO: This doesn't logically make sense, but quantum.compbasis
+                # is obs_op and function below just pulls out the static wires
+                wires = xdsl_to_qml_measurement(obs_op)
+                meas = xdsl_to_qml_measurement(op, wires=None if wires == [] else wires)
+
+                if wires == []:
+                    # If no wires specified, connect to all seen current wires
+                    prev_wires = self._wire_to_node_uids.keys()
+                else:
+                    # Use the specific wires from the observable
+                    prev_wires = wires
+
+            case _:
+                return
+
         node_uid = f"node{self._node_uid_counter}"
         self.dag_builder.add_node(
             uid=node_uid,
@@ -206,48 +224,14 @@ class ConstructCircuitDAG:
             cluster_uid=self._cluster_uid_stack[-1],
             fillcolor="lightpink",
             color="lightpink3",
-            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
         )
         self._node_uid_counter += 1
 
-        for wire in meas.wires:
-            for seen_node in self._wire_to_node_uids[wire]:
-                self.dag_builder.add_edge(seen_node, node_uid, color="lightpink3")
-
-    @_visit_operation.register
-    def _sample_counts_probs_ops(
-        self,
-        op: quantum.SampleOp | quantum.ProbsOp,
-    ) -> None:
-        """Handler for sample operations."""
-
-        # Create PennyLane instance
-        obs_op = op.obs.owner
-
-        # TODO: This doesn't logically make sense, but quantum.compbasis
-        # is obs_op and function below just pulls out the static wires
-        wires = xdsl_to_qml_measurement(obs_op)
-        meas = xdsl_to_qml_measurement(op, wires=None if wires == [] else wires)
-
-        # Add node to current cluster
-        node_uid = f"node{self._node_uid_counter}"
-        self.dag_builder.add_node(
-            uid=node_uid,
-            label=get_label(meas),
-            cluster_uid=self._cluster_uid_stack[-1],
-            fillcolor="lightpink",
-            color="lightpink3",
-            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
-            shape="record",
-        )
-        self._node_uid_counter += 1
-
-        if wires == []:
-            wires = list(self._wire_to_node_uids.keys())
-        for wire in wires:
-            for seen_node in self._wire_to_node_uids[wire]:
-                self.dag_builder.add_edge(seen_node, node_uid, color="lightpink3")
+        for wire in prev_wires:
+            if wire in self._wire_to_node_uids:
+                for seen_node in self._wire_to_node_uids[wire]:
+                    self.dag_builder.add_edge(seen_node, node_uid, color="lightpink3")
 
     # =============
     # CONTROL FLOW
@@ -395,7 +379,9 @@ class ConstructCircuitDAG:
             label = "qjit"
 
         uid = f"cluster{self._cluster_uid_counter}"
-        parent_cluster_uid = None if self._cluster_uid_stack == [] else self._cluster_uid_stack[-1]
+        parent_cluster_uid = (
+            None if self._cluster_uid_stack == [] else self._cluster_uid_stack[-1]
+        )
         self.dag_builder.add_cluster(
             uid,
             label=label,
