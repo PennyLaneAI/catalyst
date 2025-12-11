@@ -37,7 +37,6 @@
 
 using namespace mlir;
 using namespace catalyst::quantum;
-using namespace catalyst::qec;
 
 namespace {
 
@@ -142,8 +141,8 @@ void populatePPRBasisSwitchCases(PatternRewriter &rewriter, Location loc,
         // We need to cast back to uint16_t for the C++ builder signature
         uint16_t finalRotationArg = static_cast<uint16_t>(signedRotation);
 
-        auto pprOp = builder.create<PPRotationOp>(loc, pauliWord, finalRotationArg,
-                                                  ValueRange{currentQbit}, nullptr);
+        auto pprOp = builder.create<catalyst::qec::PPRotationOp>(loc, pauliWord, finalRotationArg,
+                                                                 ValueRange{currentQbit}, nullptr);
 
         return pprOp->getResult(0);
     };
@@ -433,18 +432,20 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
 
 // --- Rewrite Pattern for PPRotationArbitraryOp ---
 
-struct DecomposePPRArbitraryOpPattern : public OpRewritePattern<PPRotationArbitraryOp> {
-    using OpRewritePattern<PPRotationArbitraryOp>::OpRewritePattern;
+struct DecomposePPRArbitraryOpPattern
+    : public OpRewritePattern<catalyst::qec::PPRotationArbitraryOp> {
+    using OpRewritePattern<catalyst::qec::PPRotationArbitraryOp>::OpRewritePattern;
 
     const double epsilon;
     const bool pprBasis;
 
     DecomposePPRArbitraryOpPattern(MLIRContext *context, double epsilon, bool pprBasis)
-        : OpRewritePattern<PPRotationArbitraryOp>(context), epsilon(epsilon), pprBasis(pprBasis)
+        : OpRewritePattern<catalyst::qec::PPRotationArbitraryOp>(context), epsilon(epsilon),
+          pprBasis(pprBasis)
     {
     }
 
-    LogicalResult matchAndRewrite(PPRotationArbitraryOp op,
+    LogicalResult matchAndRewrite(catalyst::qec::PPRotationArbitraryOp op,
                                   PatternRewriter &rewriter) const override
     {
         if (op.getInQubits().size() != 1) {
