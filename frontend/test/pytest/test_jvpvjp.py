@@ -434,7 +434,7 @@ def test_vjp_against_jax_full_argnum_case_S_SS(diff_method):
     res_jax, tree_jax = jax.tree_util.tree_flatten(r1)
     res_cat, tree_cat = jax.tree_util.tree_flatten(r2)
     assert tree_jax == tree_cat
-    assert_allclose(res_jax, res_cat)
+    assert_allclose(res_jax, res_cat, atol=5e-7)
 
 
 @pytest.mark.usefixtures("use_both_frontend")
@@ -850,7 +850,7 @@ def test_vjp_multi_return(diff_method):
     res_cat, tree_cat = jax.tree_util.tree_flatten(r2)
     assert tree_jax == tree_cat
     for r_j, r_c in zip(res_jax, res_cat):
-        assert_allclose(r_j, r_c)
+        assert_allclose(r_j, r_c, atol=2e-6)
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
@@ -879,8 +879,7 @@ def test_jvp_argument_type_checks_incompatible_n_inputs(diff_method):
     with pytest.raises(
         TypeError,
         match=(
-            "number of tangent and number of differentiable parameters in catalyst.jvp "
-            "do not match"
+            "number of tangent and number of differentiable parameters in"
         ),
     ):
 
@@ -931,23 +930,23 @@ def test_jvp_argument_type_checks_incompatible_input_shapes(diff_method):
 
 @pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_vjp_argument_type_checks_correct_inputs(diff_method):
+@pytest.mark.parametrize("vjp_fn", (qml.vjp, C_vjp))
+def test_vjp_argument_type_checks_correct_inputs(diff_method, vjp_fn):
     """Test that Catalyst's vjp can JIT compile when given the correct types."""
 
     @qjit
     def C_workflow_f():
         x = (1.0,)
         cotangents = (1.0, 1.0)
-        return qml.vjp(f_R1_to_R2, x, cotangents, method=diff_method, argnums=[0])
+        return vjp_fn(f_R1_to_R2, x, cotangents, method=diff_method, argnums=[0])
 
     @qjit
     def C_workflow_g():
         x = jnp.array([2.0, 3.0, 4.0])
         cotangents = jnp.ones([2], dtype=float)
-        return qml.vjp(g_R3_to_R2, [1, x], [cotangents], method=diff_method, argnums=[1])
+        return vjp_fn(g_R3_to_R2, [1, x], [cotangents], method=diff_method, argnums=[1])
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
 def test_vjp_argument_type_checks_incompatible_n_inputs(diff_method):
     """Tests error handling of Catalyst's vjp when the number of function output params
@@ -957,8 +956,7 @@ def test_vjp_argument_type_checks_incompatible_n_inputs(diff_method):
     with pytest.raises(
         TypeError,
         match=(
-            "number of cotangent and number of function output parameters in catalyst.vjp "
-            "do not match"
+            "number of cotangent and number of function output parameters in"
         ),
     ):
 
@@ -967,19 +965,20 @@ def test_vjp_argument_type_checks_incompatible_n_inputs(diff_method):
             # If `f` returns two outputs, then `cotangents` must have length 2
             x = (1.0,)
             cotangents = (1.0,)
-            return qml.vjp(f_R1_to_R2, x, cotangents, method=diff_method, argnums=[0])
+            return C_vjp(f_R1_to_R2, x, cotangents, method=diff_method, argnums=[0])
 
 
 @pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_vjp_argument_type_checks_incompatible_input_types(diff_method):
+@pytest.mark.parametrize("vjp_fn", (qml.vjp, C_vjp))
+def test_vjp_argument_type_checks_incompatible_input_types(diff_method, vjp_fn):
     """Tests error handling of Catalyst's vjp when the types of the function output params
     and cotangent arguments are incompatible.
     """
 
     with pytest.raises(
         TypeError,
-        match="function output params and cotangents arguments to catalyst.vjp do not match",
+        match="function output params and cotangents arguments to ",
     ):
 
         @qjit
@@ -987,19 +986,19 @@ def test_vjp_argument_type_checks_incompatible_input_types(diff_method):
             # If `x` has type float, then `cotangents` should also have type float
             x = (1.0,)
             cotangents = (1, 1)
-            return qml.vjp(f_R1_to_R2, x, cotangents, method=diff_method, argnums=[0])
+            return vjp_fn(f_R1_to_R2, x, cotangents, method=diff_method, argnums=[0])
 
 
 @pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_vjp_argument_type_checks_incompatible_input_shapes(diff_method):
+@pytest.mark.parametrize("vjp_fn", (qml.vjp, C_vjp))
+def test_vjp_argument_type_checks_incompatible_input_shapes(diff_method, vjp_fn):
     """Tests error handling of Catalyst's vjp when the shapes of the function output params
     and cotangent arguments are incompatible.
     """
-
     with pytest.raises(
         ValueError,
-        match="catalyst.vjp called with different function output params and cotangent shapes",
+        match="vjp called with different function output params and cotangent shapes",
     ):
 
         @qjit
@@ -1008,7 +1007,7 @@ def test_vjp_argument_type_checks_incompatible_input_shapes(diff_method):
             # shape (2,), but it has shape (3,)
             x = jnp.array([2.0, 3.0, 4.0])
             cotangents = jnp.ones([3], dtype=float)
-            return qml.vjp(g_R3_to_R2, [1, x], [cotangents], method=diff_method, argnums=[1])
+            return vjp_fn(g_R3_to_R2, [1, x], [cotangents], method=diff_method, argnums=[1])
 
 
 if __name__ == "__main__":

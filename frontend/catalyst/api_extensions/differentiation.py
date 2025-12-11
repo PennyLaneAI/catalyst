@@ -27,6 +27,7 @@ import jax
 from jax._src.api import _dtype
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten
 from jax.api_util import debug_info
+import pennylane as qml
 from pennylane import QNode
 
 import catalyst
@@ -546,7 +547,8 @@ def vjp(f: Callable, params, cotangents, *, method=None, h=None, argnums=None):
     (Array([0.09983342, 0.04      , 0.02      ], dtype=float64),
      (Array([-0.43750208,  0.07      ], dtype=float64),))
     """
-
+    if qml.capture.enabled():
+        return qml.vjp(f, params, cotangents, method=method, h=h, argnums=argnums)
     def check_is_iterable(x, hint):
         if not isinstance(x, Iterable):
             raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
