@@ -1184,12 +1184,19 @@ class TestTerminalMeasurementConnectivity:
 
         @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
+        @qml.set_shots
         @qml.qnode(dev)
         def my_workflow():
             qml.X(0)
             qml.Y(1)
             qml.Z(2)
-            return qml.expval(qml.Z(0)), qml.var(qml.Z(1)), qml.probs(wires=[2])
+            qml.H(3)
+            return (
+                qml.expval(qml.Z(0)),
+                qml.var(qml.Z(1)),
+                qml.probs(wires=[2]),
+                qml.sample(wires=[3]),
+            )
 
         module = my_workflow()
 
@@ -1205,12 +1212,15 @@ class TestTerminalMeasurementConnectivity:
         assert "PauliX" in nodes["node1"]["label"]
         assert "PauliY" in nodes["node2"]["label"]
         assert "PauliZ" in nodes["node3"]["label"]
-        assert "expval" in nodes["node4"]["label"]
-        assert "var" in nodes["node5"]["label"]
-        assert "probs" in nodes["node6"]["label"]
+        assert "Hadamard" in nodes["node4"]["label"]
+        assert "expval" in nodes["node5"]["label"]
+        assert "var" in nodes["node6"]["label"]
+        assert "probs" in nodes["node7"]["label"]
+        assert "sample" in nodes["node8"]["label"]
 
         # Check all edges
         assert len(edges) == 3
-        assert ("node1", "node3") in edges
-        assert ("node2", "node4") in edges
-        assert ("node3", "node5") in edges
+        assert ("node1", "node5") in edges
+        assert ("node2", "node6") in edges
+        assert ("node3", "node7") in edges
+        assert ("node4", "node8") in edges
