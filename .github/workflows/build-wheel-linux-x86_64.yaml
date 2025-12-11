@@ -511,13 +511,11 @@ jobs:
         python${{ matrix.python_version }} -m pip install standalone_plugin_wheel/wheel/*.whl --no-deps
 
     - name: Run Python Pytest Tests
-      env:
-        SKIP_XDSL_TESTS: -m "not xdsl"
       run: |
         python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto "$SKIP_XDSL_TESTS"
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto -m "not xdsl"
         python${{ matrix.python_version }} -m pytest frontend/test/async_tests
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto "$SKIP_XDSL_TESTS" || true
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto -m "not xdsl" || true
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
 
     - name: Run Standalone Plugin Tests
