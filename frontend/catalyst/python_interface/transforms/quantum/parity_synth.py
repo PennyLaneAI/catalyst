@@ -200,6 +200,25 @@ def make_phase_polynomial(
 
     return parity_matrix % 2, np.array(parity_table).T % 2, angles, arith_ops
 
+def _cnot(i: int, j: int, inv_wire_map: dict[int, QubitType]):
+    """Create a CNOT operator acting on the qubits that map to wires ``i`` and ``j``
+    and update the wire map so that ``i`` and ``j`` point to the output qubits afterwards."""
+    cnot_op = CustomOp(
+        in_qubits=[inv_wire_map[i], inv_wire_map[j]],
+        gate_name="CNOT",
+        params=tuple(),
+    )
+    inv_wire_map[i] = cnot_op.out_qubits[0]
+    inv_wire_map[j] = cnot_op.out_qubits[1]
+    return cnot_op
+
+def _rz(wire: int, angle: SSAValue[builtin.Float64Type], inv_wire_map: dict[int, QubitType]):
+    """Create a CNOT operator acting on the qubit that maps to ``wire``
+    and update the wire map so that ``wire`` points to the output qubit afterwards."""
+    rz_op = CustomOp(in_qubits=[inv_wire_map[wire]], gate_name="RZ", params=(angle,))
+    inv_wire_map[wire] = rz_op.out_qubits[0]
+    return rz_op
+
 
 class ParitySynthPattern(pattern_rewriter.RewritePattern):
     """Rewrite pattern that applies ``ParitySynth`` to subcircuits that constitute
@@ -238,7 +257,7 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
         self.phase_polynomial_ops.append(op)
 
     @pattern_rewriter.op_type_rewrite_pattern
-    def match_and_rewrite(self, funcOp: func.FuncOp, rewriter: pattern_rewriter.PatternRewriter):
+    def match_and_rewrite(self, matchedOp: Operation, rewriter: pattern_rewriter.PatternRewriter):
         r"""Implementation of rewriting ``FuncOps`` that may contain phase poynomials
         with ``ParitySynth``.
 
@@ -260,43 +279,37 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
         as a non-phase-polynomial operation is encountered. Note that this makes the (size of the)
         rewritten phase polynomials dependent on the order in which we walk over the operations.
         """
-        for op in funcOp.body.walk():
-            if not isinstance(op, CustomOp):
-                # Non-quantum operation. Global phases are ignored as well.
-                continue
+        # The attribute is used so we don't transform the same op multiple times
+        if len(matchedOp.regions) == 0 or matchedOp.hasattr("parity_synth_done"):
+            return
 
-            gate_name = op.gate_name.data
-            if gate_name in valid_phase_polynomial_ops:
-                # Include op in phase polynomial ops and track its qubits
-                self._record_phase_poly_op(op)
-                continue
+        for region in matchedOp.regions:
+            for block in region.blocks:
+                for op in block.ops:
+                    if not isinstance(op, CustomOp):
+                        if len(op.regions) != 0:
+                            # Do phase polynomial rewriting up to this point
+                            self.rewrite_phase_polynomial(rewriter)
+                            # Rewrite regions of this operation
+                            # Creating a new PatternRewriter so its matched operation is `op`, not `matchedOp`
+                            # It might even make sense to create a new instance of `ParitySynthPattern`, but
+                            # I will leave that decision to you.
+                            self.match_and_rewrite(op, PatternRewriter(op))
+                            op.attributes["parity_synth_done"] = builtin.UnitAttr()
+                        continue
 
-            # not a phase polynomial op, so we activate rewriting of the phase polynomial
-            self.rewrite_phase_polynomial(rewriter)
+                    gate_name = op.gate_name.data
+                    if gate_name in valid_phase_polynomial_ops:
+                        # Include op in phase polynomial ops and track its qubits
+                        self._record_phase_poly_op(op)
+                        continue
 
-        # end of operations; rewrite terminal phase polynomial
-        self.rewrite_phase_polynomial(rewriter)
+                    # not a phase polynomial op, so we activate rewriting of the phase polynomial
+                    self.rewrite_phase_polynomial(rewriter)
 
-    @staticmethod
-    def _cnot(i: int, j: int, inv_wire_map: dict[int, QubitType]):
-        """Create a CNOT operator acting on the qubits that map to wires ``i`` and ``j``
-        and update the wire map so that ``i`` and ``j`` point to the output qubits afterwards."""
-        cnot_op = CustomOp(
-            in_qubits=[inv_wire_map[i], inv_wire_map[j]],
-            gate_name="CNOT",
-            params=tuple(),
-        )
-        inv_wire_map[i] = cnot_op.out_qubits[0]
-        inv_wire_map[j] = cnot_op.out_qubits[1]
-        return cnot_op
-
-    @staticmethod
-    def _rz(wire: int, angle: SSAValue[builtin.Float64Type], inv_wire_map: dict[int, QubitType]):
-        """Create a CNOT operator acting on the qubit that maps to ``wire``
-        and update the wire map so that ``wire`` points to the output qubit afterwards."""
-        rz_op = CustomOp(in_qubits=[inv_wire_map[wire]], gate_name="RZ", params=(angle,))
-        inv_wire_map[wire] = rz_op.out_qubits[0]
-        return rz_op
+                # end of operations; rewrite terminal phase polynomial
+                self.rewrite_phase_polynomial(rewriter)
+                matchedOp.attributes["parity_synth_done"] = builtin.UnitAttr()
 
     def rewrite_phase_polynomial(self, rewriter: pattern_rewriter.PatternRewriter):
         """Rewrite a single region of a circuit that represents a phase polynomial."""
@@ -364,8 +377,8 @@ class ParitySynthPass(passes.ModulePass):
     # pylint: disable=no-self-use
     def apply(self, _ctx: context.Context, module: builtin.ModuleOp) -> None:
         """Apply the ParitySynth pass."""
-        applier = pattern_rewriter.GreedyRewritePatternApplier([ParitySynthPattern()])
-        walker = pattern_rewriter.PatternRewriteWalker(applier, apply_recursively=False)
+        pattern = ParitySynthPattern()
+        walker = pattern_rewriter.PatternRewriteWalker(pattern, apply_recursively=False)
         walker.rewrite_module(module)
 
 
