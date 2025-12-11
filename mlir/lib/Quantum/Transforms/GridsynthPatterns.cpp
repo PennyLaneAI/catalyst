@@ -14,7 +14,6 @@
 
 #define DEBUG_TYPE "gridsynth-patterns"
 
-#include <cmath>
 #include <vector>
 
 #include "llvm/ADT/SmallVector.h"
