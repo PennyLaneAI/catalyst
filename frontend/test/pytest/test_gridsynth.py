@@ -22,35 +22,9 @@ import pytest
     "param",
     [-11.1, -7.7, -4.4, -2.2, -1.1, -0.3, -0.2, -0.1, 0.0, 0.1, 0.2, 0.3, 1.1, 2.2, 4.4, 7.7, 11.1],
 )
-@pytest.mark.parametrize("eps", [1e-2, 1e-3, 1e-4, 1e-5, 1e-6])
-def test_RZ_gridsynth(param, eps):
-    """Test that RZ gates are correctly decomposed using the gridsynth pass."""
-
-    qml.capture.enable()
-
-    dev = qml.device("lightning.qubit", wires=1)
-
-    @qml.qnode(dev)
-    def circuit(x: float):
-        qml.Hadamard(0)
-        qml.RZ(x, wires=0)
-        return qml.state()
-
-    expected = circuit(param)
-    gridsynthed_circuit = qml.transforms.gridsynth(circuit, epsilon=eps, ppr_basis=False)
-    qjitted_circuit = qml.qjit(gridsynthed_circuit)
-    result = qjitted_circuit(param)
-    qml.capture.disable()
-
-    assert qml.math.allclose(result, expected, atol=eps)
-
-
-@pytest.mark.parametrize(
-    "param",
-    [-11.1, -7.7, -4.4, -2.2, -1.1, -0.3, -0.2, -0.1, 0.0, 0.1, 0.2, 0.3, 1.1, 2.2, 4.4, 7.7, 11.1],
-)
-@pytest.mark.parametrize("eps", [1e-2, 1e-3, 1e-4, 1e-5, 1e-6])
-def test_PhaseShift_gridsynth(param, eps):
+@pytest.mark.parametrize("op", [qml.RZ, qml.PhaseShift])
+@pytest.mark.parametrize("eps", [1e-3, 1e-4, 1e-5, 1e-6])
+def test_PhaseShift_gridsynth(param, op, eps):
     """Test that PhaseShift gates are correctly decomposed using the gridsynth pass."""
 
     qml.capture.enable()
@@ -60,11 +34,11 @@ def test_PhaseShift_gridsynth(param, eps):
     @qml.qnode(dev)
     def circuit(x: float):
         qml.Hadamard(0)
-        qml.PhaseShift(x, wires=0)
+        op(x, wires=0)
         return qml.state()
 
     expected = circuit(param)
-    gridsynthed_circuit = qml.transforms.gridsynth(circuit, epsilon=eps, ppr_basis=False)
+    gridsynthed_circuit = qml.transforms.gridsynth(circuit, epsilon=eps)
     qjitted_circuit = qml.qjit(gridsynthed_circuit)
     result = qjitted_circuit(param)
     qml.capture.disable()
