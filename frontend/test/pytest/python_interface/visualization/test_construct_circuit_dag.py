@@ -1273,7 +1273,7 @@ class TestTerminalMeasurementConnectivity:
         def my_workflow():
             qml.X(0)
             qml.Y(1)
-            return qml.probs(wires=[0,1])
+            return qml.probs(wires=[0, 1])
 
         module = my_workflow()
 
@@ -1292,8 +1292,8 @@ class TestTerminalMeasurementConnectivity:
 
         # Check all edges
         assert len(edges) == 2
-        assert ("node1", "node3") in edges  
-        assert ("node2", "node3") in edges 
+        assert ("node1", "node3") in edges
+        assert ("node2", "node3") in edges
 
     def test_no_quantum_ops_before_measurement(self):
         """Tests a workflow with no quantum operations."""
@@ -1304,7 +1304,7 @@ class TestTerminalMeasurementConnectivity:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_empty_workflow():
-            return qml.expval(qml.Z(0)) # No gates
+            return qml.expval(qml.Z(0))
 
         module = my_empty_workflow()
         utility = ConstructCircuitDAG(FakeDAGBuilder())
