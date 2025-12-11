@@ -99,7 +99,7 @@ def lower_jaxpr(ctx, jaxpr, metadata=None, fn=None):
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
-def lower_callable(ctx, callable_, call_jaxpr, pipeline=(), metadata=None, public=False, **params):
+def lower_callable(ctx, callable_, call_jaxpr, pipeline=(), metadata=None, public=False):
     """Lowers _callable to MLIR.
 
     If callable_ is a qnode, then we will first create a module, then
