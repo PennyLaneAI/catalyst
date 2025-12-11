@@ -33,16 +33,16 @@ using namespace mlir;
 using namespace catalyst::quantum;
 using namespace catalyst::qec;
 
-static const mlir::StringSet<> fixedRotationsAndPhaseShiftsSet = {
+static const StringSet<> fixedRotationsAndPhaseShiftsSet = {
     "RX", "RY", "RZ", "PhaseShift", "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
-static const mlir::StringSet<> arbitraryRotationsSet = {"Rot", "CRot"};
+static const StringSet<> arbitraryRotationsSet = {"Rot", "CRot"};
 
 namespace {
 
-// convertOpParamsToValues: helper function for extracting CustomOp parameters as mlir::Values
-SmallVector<mlir::Value> convertOpParamsToValues(CustomOp &op, PatternRewriter &rewriter)
+// convertOpParamsToValues: helper function for extracting CustomOp parameters as Values
+SmallVector<Value> convertOpParamsToValues(CustomOp &op, PatternRewriter &rewriter)
 {
-    SmallVector<mlir::Value> values;
+    SmallVector<Value> values;
     auto params = op.getParams();
     for (auto param : params) {
         values.push_back(param);
@@ -53,7 +53,7 @@ SmallVector<mlir::Value> convertOpParamsToValues(CustomOp &op, PatternRewriter &
 // getStaticValuesOrNothing: helper function for extracting Rot or CRot parameters as:
 // - doubles, in case they are constant
 // - std::nullopt, otherwise
-std::array<std::optional<double>, 3> getStaticValuesOrNothing(const SmallVector<mlir::Value> values)
+std::array<std::optional<double>, 3> getStaticValuesOrNothing(const SmallVector<Value> values)
 {
     assert(values.size() == 3 && "found Rot or CRot operation should have exactly 3 parameters");
     auto staticValues = std::array<std::optional<double>, 3>{};
@@ -88,15 +88,14 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
         ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
 
         // Extract parameters of the op and its parent,
-        // promoting the parameters to mlir::Values if necessary
+        // promoting the parameters to Values if necessary
         auto parentParams = convertOpParamsToValues(parentOp, rewriter);
         auto params = convertOpParamsToValues(op, rewriter);
 
         auto loc = op.getLoc();
-        SmallVector<mlir::Value> sumParams;
+        SmallVector<Value> sumParams;
         for (auto [param, parentParam] : llvm::zip(params, parentParams)) {
-            mlir::Value sumParam =
-                rewriter.create<arith::AddFOp>(loc, parentParam, param).getResult();
+            Value sumParam = rewriter.create<arith::AddFOp>(loc, parentParam, param).getResult();
             sumParams.push_back(sumParam);
         }
         auto mergeOp = rewriter.create<CustomOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParams,
@@ -122,25 +121,25 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
         ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
 
         // Extract parameters of the op and its parent,
-        // promoting the parameters to mlir::Values if necessary
+        // promoting the parameters to Values if necessary
         auto parentParams = convertOpParamsToValues(parentOp, rewriter);
         auto params = convertOpParamsToValues(op, rewriter);
 
         // Parent params are ϕ1, θ1, and ω1
         // Params are ϕ2, θ2, and ω2
-        mlir::Value phi1 = parentParams[0];
-        mlir::Value theta1 = parentParams[1];
-        mlir::Value omega1 = parentParams[2];
-        mlir::Value phi2 = params[0];
-        mlir::Value theta2 = params[1];
-        mlir::Value omega2 = params[2];
+        Value phi1 = parentParams[0];
+        Value theta1 = parentParams[1];
+        Value omega1 = parentParams[2];
+        Value phi2 = params[0];
+        Value theta2 = params[1];
+        Value omega2 = params[2];
 
         auto [phi1Opt, theta1Opt, omega1Opt] = getStaticValuesOrNothing(parentParams);
         auto [phi2Opt, theta2Opt, omega2Opt] = getStaticValuesOrNothing(params);
 
-        mlir::Value phiF;
-        mlir::Value thetaF;
-        mlir::Value omegaF;
+        Value phiF;
+        Value thetaF;
+        Value omegaF;
 
         // TODO: should we use an epsilon for comparing doubles here?
         bool omega1IsZero = omega1Opt.has_value() && omega1Opt.value() == 0.0;
@@ -289,7 +288,7 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
             omegaF = rewriter.create<arith::SubFOp>(loc, alphaF, betaF);
         }
 
-        auto sumParams = SmallVector<mlir::Value>{phiF, thetaF, omegaF};
+        auto sumParams = SmallVector<Value>{phiF, thetaF, omegaF};
         auto mergeOp = rewriter.create<CustomOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParams,
                                                  parentInQubits, op.getGateName(), false,
                                                  parentInCtrlQubits, parentInCtrlValues);
@@ -501,7 +500,7 @@ struct MergeMultiRZRewritePattern : public OpRewritePattern<MultiRZOp> {
         auto parentTheta = parentOp.getTheta();
         auto theta = op.getTheta();
 
-        mlir::Value sumParam = rewriter.create<arith::AddFOp>(loc, parentTheta, theta).getResult();
+        Value sumParam = rewriter.create<arith::AddFOp>(loc, parentTheta, theta).getResult();
 
         auto mergeOp = rewriter.create<MultiRZOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParam,
                                                   parentInQubits, nullptr, parentInCtrlQubits,
