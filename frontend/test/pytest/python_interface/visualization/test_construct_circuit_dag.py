@@ -1177,7 +1177,6 @@ class TestTerminalMeasurementConnectivity:
         assert ("node1", "node3") in edges
         assert ("node2", "node3") in edges
 
-
     def test_connect_specific_wires(self):
         """Tests connection to terminal measurements that operate on specific wires."""
 
