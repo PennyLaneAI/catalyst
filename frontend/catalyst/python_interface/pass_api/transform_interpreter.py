@@ -176,5 +176,6 @@ def _create_schedule(pass_name: str, pass_options: dict[str, Any]) -> tuple[str,
 
         options.append(f"{opt}={val}")
 
-    cli_pass = f"builtin.module({pass_name}{{{" ".join(options)}}})"
+    cli_options = f"{{{" ".join(options)}}}"
+    cli_pass = f"builtin.module({pass_name}{cli_options})"
     return ("--pass-pipeline", cli_pass)
