@@ -1039,7 +1039,7 @@ class TestCtrl:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_workflow():
-            qml.ctrl(qml.H)(0)
+            qml.ctrl(qml.H, control=1)(0)
 
         module = my_workflow()
 
