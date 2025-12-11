@@ -1139,6 +1139,45 @@ class TestOperatorConnectivity:
         assert ("node5", "node7") in edges
         assert ("node6", "node7") in edges
 
+    def test_multi_wire_connectivity(self):
+        """Ensures that multi wire connectivity holds."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow():
+            qml.RX(0.1, 0)
+            qml.RY(0.2, 1)
+            qml.RZ(0.3, 2)
+            qml.CNOT(wires=[0, 1])
+            qml.Toffoli(wires=[1, 2, 0])
+
+        module = my_workflow()
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        # NOTE: depth first traversal hence T first then PauliX
+        assert "RX" in nodes["node1"]["label"]
+        assert "RY" in nodes["node2"]["label"]
+        assert "RZ" in nodes["node3"]["label"]
+        assert "CNOT" in nodes["node4"]["label"]
+        assert "Toffoli" in nodes["node5"]["label"]
+
+        # Check all edges
+        assert len(edges) == 4
+        assert ("node1", "node4") in edges  # RX -> CNOT
+        assert ("node2", "node4") in edges  # RY -> CNOT
+        assert ("node3", "node5") in edges  # RZ -> Toffoli
+        assert ("node4", "node5") in edges  # CNOT -> Toffoli
+
 
 class TestTerminalMeasurementConnectivity:
     """Test that terminal measurements connect properly."""
