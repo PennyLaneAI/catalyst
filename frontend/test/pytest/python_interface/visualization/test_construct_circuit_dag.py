@@ -1184,7 +1184,7 @@ class TestTerminalMeasurementConnectivity:
 
         @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
-        @qml.set_shots
+        @qml.set_shots(10)
         @qml.qnode(dev)
         def my_workflow():
             qml.X(0)
