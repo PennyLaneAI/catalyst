@@ -1055,13 +1055,11 @@ class TestCtrl:
         assert "[1, 0]" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
+    @pytest.mark.usefixtures("use_capture")
     def test_ctrl_operator_without_alias(self):
         """Test that the ctrl of an operator instance that doesn't have an alias works."""
 
         dev = qml.device("null.qubit", wires=2)
-
-        # NOTE: need to enable here to capture the ISWAP
-        qml.capture.enable()
 
         @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
@@ -1086,8 +1084,6 @@ class TestCtrl:
         assert "C(ISWAP)" in nodes["node2"]["label"]
         assert "[2, 0, 1]" in nodes["node2"]["label"]
         assert nodes["node2"]["parent_cluster_uid"] == "cluster1"
-
-        qml.capture.disable()
 
 
 class TestAdjoint:
