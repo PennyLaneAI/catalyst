@@ -75,7 +75,7 @@ def _loop_body_parity_network_synth(
 ) -> tuple[np.ndarray, list]:
     """Loop body function for ``_parity_network_synth``, the main subroutine of ``parity_synth``.
     The loop body corresponds to synthesizing one parity in the parity table ``P``, and updating
-    all relevant data accordingly. It is the ``for``-loop body in Algorithm 1
+    all relevant data accordingly. It is the ``while``-loop body in Algorithm 1
     in https://arxiv.org/abs/2104.00934.
 
     Args:
@@ -263,7 +263,7 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
 
         Args:
             funcOp (func.FuncOp): function containing the operations to rewrite.
-            rewriter (pattern_rewriter.PatternRewriter): Rewriter that executed operation erasure
+            rewriter (pattern_rewriter.PatternRewriter): Rewriter that executes operation erasure
                 and insertion.
 
         The logic of this implementation is centered around :attr:`~.rewrite_phase_polynomial`,
@@ -322,6 +322,9 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
             self._reset_vars()
             return
 
+        # Create an insertion point in the IR after the last phase polynomial op.
+        # Inserting newly created ops at this point and the removing the phase polynomial ops
+        # ensures that the newly synthesized phase polynomial is inserted in place of the old one
         insertion_point: InsertPoint = InsertPoint.after(self.phase_polynomial_ops[-1])
 
         # Mapping from integer-valued wire positions to qubits, corresponding to state before

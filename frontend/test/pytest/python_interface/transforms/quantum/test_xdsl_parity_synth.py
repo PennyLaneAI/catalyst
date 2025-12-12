@@ -37,7 +37,7 @@ from catalyst.python_interface.transforms.quantum.parity_synth import _parity_ne
 
 
 
-def assert_binary_matrix(matrix: np.ndarray):
+def validate_binary_matrix(matrix: np.ndarray):
     """Check that the input matrix is two-dimensional, integer-dtyped and
     only contains zeros and ones.
     """
@@ -59,7 +59,7 @@ EntrySpec = namedtuple("EntrySpec", ["parity_idx", "qubit_idx", "length"])
 
 
 class TestParityNetworkSynth:
-    """Tests for the synthesizing of a parity network with ``_parity_network_synth``."""
+    """Tests for the synthesis of a parity network with ``_parity_network_synth``."""
 
     @staticmethod
     def validate_circuit_entry(entry, expected: EntrySpec):
@@ -98,7 +98,7 @@ class TestParityNetworkSynth:
         assert isinstance(circuit, list) and len(circuit) == 1
         expected = EntrySpec(parity_idx=0, qubit_idx=idx, length=0)
         self.validate_circuit_entry(circuit[0], expected)
-        assert_binary_matrix(inv_synth_matrix)
+        validate_binary_matrix(inv_synth_matrix)
         assert_equal(I, inv_synth_matrix)
 
     @pytest.mark.parametrize(
@@ -125,7 +125,7 @@ class TestParityNetworkSynth:
             # that have been used already are deleted.
             expected = EntrySpec(parity_idx=0, qubit_idx=idx, length=0)
             self.validate_circuit_entry(entry, expected)
-        assert_binary_matrix(inv_synth_matrix)
+        validate_binary_matrix(inv_synth_matrix)
         assert_equal(I, inv_synth_matrix)
 
     @pytest.mark.parametrize(
@@ -220,7 +220,7 @@ class TestParityNetworkSynth:
         )
         # Compare phase parities and make sure that the inv_parity_matrix is valid
         assert_allclose(new_P @ new_angles, P @ angles)
-        assert_binary_matrix(inv_parity_matrix)
+        validate_binary_matrix(inv_parity_matrix)
         assert_equal((new_parity_matrix @ inv_parity_matrix) % 2, np.eye(n, dtype=int))
 
 
@@ -268,7 +268,7 @@ class TestParitySynthPass:
         run_filecheck(translate_program_to_xdsl(program), self.pipeline)
 
     def test_composable_cnots(self, run_filecheck):
-        """Test that two out of three CNOT gates are merged."""
+        """Test that two out of three CNOT gates are cancelled."""
         program = """
             func.func @test_func() {
                 %0 = INIT_QUBIT
