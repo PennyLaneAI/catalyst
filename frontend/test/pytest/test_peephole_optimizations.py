@@ -17,7 +17,7 @@
 import numpy as np
 import pennylane as qml
 import pytest
-import pennylane.ftqc.catalyst_pass_aliases as catalyst_passes
+from pennylane.ftqc.catalyst_pass_aliases import to_ppr as to_ppr_alias
 
 from catalyst import measure, pipeline, qjit
 from catalyst.passes import (
@@ -510,7 +510,7 @@ def test_merge_rotation_ppr():
     @qml.qjit(pipelines=my_pipeline, target="mlir")
     def test_merge_rotation_ppr_workflow():
         @qml.transforms.merge_rotations  # have to use qml to be capture-compatible
-        @catalyst_passes.to_ppr
+        @to_ppr_alias
         @qml.qnode(qml.device("lightning.qubit", wires=3))
         def circuit():
             qml.PauliRot(np.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
