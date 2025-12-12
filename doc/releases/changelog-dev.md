@@ -2,6 +2,16 @@
 
 <h3>New features since last release</h3>
 
+* Compiled programs can be visualized.
+  [(#2213)](https://github.com/PennyLaneAI/catalyst/pull/2213)
+  [(#2229)](https://github.com/PennyLaneAI/catalyst/pull/2229)
+  [(#2214)](https://github.com/PennyLaneAI/catalyst/pull/2214)
+  [(#2246)](https://github.com/PennyLaneAI/catalyst/pull/2246)
+  [(#2231)](https://github.com/PennyLaneAI/catalyst/pull/2231)
+  [(#2285)](https://github.com/PennyLaneAI/catalyst/pull/2285)
+  [(#2234)](https://github.com/PennyLaneAI/catalyst/pull/2234)
+  [(#2218)](https://github.com/PennyLaneAI/catalyst/pull/2218)
+
 * Catalyst now features a unified compilation framework, which enables users and developers to design
   and implement compilation passes in Python in addition to C++, on the same Catalyst IR. The Python
   interface relies on the xDSL library to represent and manipulate programs (analogous to the MLIR library
