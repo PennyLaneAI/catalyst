@@ -1415,7 +1415,6 @@ class TestOperatorConnectivity:
         assert ("node6", "node7") in edges
         assert edges[("node6", "node7")]["attrs"]["style"] == "dashed"
 
-
     def test_first_operator_is_dynamic(self):
         """Tests when the first operator is dynamic"""
 
@@ -1442,7 +1441,7 @@ class TestOperatorConnectivity:
         assert "Hadamard" in nodes["node1"]["label"]
 
         # Check all edges
-        assert len(edges) == 0 
+        assert len(edges) == 0
 
     def test_double_choke(self):
         """Tests when two dynamic operators are back to back"""
@@ -1474,11 +1473,12 @@ class TestOperatorConnectivity:
         assert "PauliZ" in nodes["node3"]["label"]
 
         # Check all edges
-        assert len(edges) == 2 
+        assert len(edges) == 2
 
         assert ("node1", "node2") in edges
         assert ("node2", "node3") in edges
         assert edges[("node2", "node3")]["attrs"]["style"] == "dashed"
+
 
 class TestTerminalMeasurementConnectivity:
     """Test that terminal measurements connect properly."""
