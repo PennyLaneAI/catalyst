@@ -237,7 +237,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
 
                     if op.op.name == "PauliRot":
                         num_wires = len(pauli_word)
-                    elif op.op.name == "MultiRZ":
+                    elif num_wires == -1:
                         num_wires = op_num_wires
 
                     _create_decomposition_rule(
