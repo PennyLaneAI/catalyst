@@ -243,65 +243,75 @@ class PulseScheduler {
                             DenseMap<int32_t, rtio::RTIOPulseOp> &channelBoundary,
                             SmallVector<rtio::RTIOPulseOp> &boundaryConsumers)
     {
+        if (channelPulses.size() > 1 && !channelBoundary.empty()) {
+            return createSyncEvent(channelLastPulse, channelBoundary, boundaryConsumers);
+        }
+        return collectNextEvents(channelLastPulse, channelBoundary, boundaryConsumers);
+    }
+
+    SmallVector<Value> createSyncEvent(DenseMap<int32_t, rtio::RTIOPulseOp> &channelLastPulse,
+                                       DenseMap<int32_t, rtio::RTIOPulseOp> &channelBoundary,
+                                       SmallVector<rtio::RTIOPulseOp> &boundaryConsumers)
+    {
+        // Collect events to sync
+        SmallVector<Value> eventsToSync;
+        for (auto &entry : channelLastPulse) {
+            rtio::RTIOPulseOp pulse = entry.second;
+            eventsToSync.push_back(pulse.getEvent());
+        }
+
+        auto anyPulse = channelLastPulse.begin()->second;
+        builder.setInsertionPointAfter(anyPulse);
+
+        auto eventType = rtio::EventType::get(builder.getContext());
+        Value syncEvent =
+            builder.create<rtio::RTIOSyncOp>(anyPulse.getLoc(), eventType, eventsToSync);
+
+        // Update boundaries and consumers
+        for (auto &[_, pulse] : channelBoundary) {
+            pulse.setWait(syncEvent);
+        }
+        for (auto pulse : boundaryConsumers) {
+            pulse.setWait(syncEvent);
+        }
+        for (auto &entry : channelLastPulse) {
+            rtio::RTIOPulseOp pulse = entry.second;
+            for (auto user : pulseConsumers[pulse]) {
+                auto userChannel = extractChannelId(user.getChannel());
+                if (!channelBoundary.count(userChannel) || channelBoundary[userChannel] != user) {
+                    if (user.getWait() == pulse.getEvent()) {
+                        user.setWait(syncEvent);
+                    }
+                }
+            }
+        }
+
+        return {syncEvent};
+    }
+
+    SmallVector<Value> collectNextEvents(DenseMap<int32_t, rtio::RTIOPulseOp> &channelLastPulse,
+                                         DenseMap<int32_t, rtio::RTIOPulseOp> &channelBoundary,
+                                         SmallVector<rtio::RTIOPulseOp> &boundaryConsumers)
+    {
         SmallVector<Value> nextEvents;
 
-        if (channelPulses.size() > 1 && !channelBoundary.empty()) {
-            // Collect events to sync
-            SmallVector<Value> eventsToSync;
-            for (auto &entry : channelLastPulse) {
-                rtio::RTIOPulseOp pulse = entry.second;
-                eventsToSync.push_back(pulse.getEvent());
-            }
-
-            auto anyPulse = channelLastPulse.begin()->second;
-            builder.setInsertionPointAfter(anyPulse);
-
-            auto eventType = rtio::EventType::get(builder.getContext());
-            Value syncEvent =
-                builder.create<rtio::RTIOSyncOp>(anyPulse.getLoc(), eventType, eventsToSync);
-
-            // Update boundaries and consumers
-            for (auto &[_, pulse] : channelBoundary) {
-                pulse.setWait(syncEvent);
-            }
-            for (auto pulse : boundaryConsumers) {
-                pulse.setWait(syncEvent);
-            }
-            for (auto &entry : channelLastPulse) {
-                rtio::RTIOPulseOp pulse = entry.second;
-                for (auto user : pulseConsumers[pulse]) {
-                    auto userChannel = extractChannelId(user.getChannel());
-                    if (!channelBoundary.count(userChannel) ||
-                        channelBoundary[userChannel] != user) {
-                        if (user.getWait() == pulse.getEvent()) {
-                            user.setWait(syncEvent);
-                        }
-                    }
-                }
-            }
-
-            nextEvents.push_back(syncEvent);
+        for (auto &entry : channelBoundary) {
+            rtio::RTIOPulseOp pulse = entry.second;
+            nextEvents.push_back(pulse.getWait());
         }
-        else {
-            // No sync needed
-            for (auto &entry : channelBoundary) {
-                rtio::RTIOPulseOp pulse = entry.second;
-                nextEvents.push_back(pulse.getWait());
+        if (!boundaryConsumers.empty() && !channelLastPulse.empty()) {
+            rtio::RTIOPulseOp firstPulse = channelLastPulse.begin()->second;
+            Value lastEvent = firstPulse.getEvent();
+            for (auto pulse : boundaryConsumers) {
+                pulse.setWait(lastEvent);
             }
-            if (!boundaryConsumers.empty() && !channelLastPulse.empty()) {
-                rtio::RTIOPulseOp firstPulse = channelLastPulse.begin()->second;
-                Value lastEvent = firstPulse.getEvent();
-                for (auto pulse : boundaryConsumers) {
-                    pulse.setWait(lastEvent);
-                }
-                nextEvents.push_back(lastEvent);
-            }
-            for (auto &entry : channelLastPulse) {
-                rtio::RTIOPulseOp pulse = entry.second;
-                for (auto *user : pulse.getEvent().getUsers()) {
-                    if (auto syncOp = dyn_cast<rtio::RTIOSyncOp>(user)) {
-                        nextEvents.push_back(syncOp.getSyncEvent());
-                    }
+            nextEvents.push_back(lastEvent);
+        }
+        for (auto &entry : channelLastPulse) {
+            rtio::RTIOPulseOp pulse = entry.second;
+            for (auto *user : pulse.getEvent().getUsers()) {
+                if (auto syncOp = dyn_cast<rtio::RTIOSyncOp>(user)) {
+                    nextEvents.push_back(syncOp.getSyncEvent());
                 }
             }
         }
