@@ -48,7 +48,6 @@ from catalyst.python_interface.dialects.quantum import (
     GlobalPhaseOp,
     MeasureOp,
     MultiRZOp,
-    PauliRotOp,
     ProbsOp,
     QubitUnitaryOp,
     SampleOp,
@@ -231,15 +230,7 @@ def _(
 
 @handle_resource.register
 def _(
-    _: (
-        CustomOp
-        | GlobalPhaseOp
-        | MultiRZOp
-        | PauliRotOp
-        | SetBasisStateOp
-        | SetStateOp
-        | QubitUnitaryOp
-    ),
+    _: CustomOp | GlobalPhaseOp | MultiRZOp | SetBasisStateOp | SetStateOp | QubitUnitaryOp,
 ) -> tuple[ResourceType, str]:
     return ResourceType.GATE, None
 
