@@ -41,7 +41,7 @@ PennyLane. However, some of PennyLane's features may not be fully supported yet,
 .. warning::
 
     Not all PennyLane devices currently work with Catalyst. Supported backend devices include
-    ``lightning.qubit``, ``lightning.kokkos``, ``lightning.gpu``, and ``braket.aws.qubit``. For
+    ``lightning.qubit``, ``lightning.kokkos``, ``lightning.amdgpu``, ``lightning.gpu``, and ``braket.aws.qubit``. For
     a full of supported devices, please see :doc:`/dev/devices`.
 
 PennyLane tapes are still used internally by Catalyst and you can express your circuits in the

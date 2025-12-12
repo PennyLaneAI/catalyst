@@ -464,6 +464,9 @@
 
 <h3>Documentation 📝</h3>
 
+* Added a new `lightning.amdgpu` runtime device.
+  [(#2283)](https://github.com/PennyLaneAI/catalyst/pull/2283)
+
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
   [(#2136)](https://github.com/PennyLaneAI/catalyst/pull/2136)
 
