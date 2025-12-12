@@ -364,7 +364,7 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
     return func;
 }
 
-// --- Rewrite Pattern ---
+// --- Rewrite Pattern for CustomOp (RZ/PhaseShift) ---
 
 struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
     using OpRewritePattern<CustomOp>::OpRewritePattern;
@@ -430,6 +430,73 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
     }
 };
 
+// --- Rewrite Pattern for PPRotationArbitraryOp ---
+
+struct DecomposePPRArbitraryOpPattern
+    : public OpRewritePattern<catalyst::qec::PPRotationArbitraryOp> {
+    using OpRewritePattern<catalyst::qec::PPRotationArbitraryOp>::OpRewritePattern;
+
+    const double epsilon;
+    const bool pprBasis;
+
+    DecomposePPRArbitraryOpPattern(MLIRContext *context, double epsilon, bool pprBasis)
+        : OpRewritePattern<catalyst::qec::PPRotationArbitraryOp>(context), epsilon(epsilon),
+          pprBasis(pprBasis)
+    {
+    }
+
+    LogicalResult matchAndRewrite(catalyst::qec::PPRotationArbitraryOp op,
+                                  PatternRewriter &rewriter) const override
+    {
+        if (op.getInQubits().size() != 1) {
+            return failure();
+        }
+
+        auto pauliProduct = op.getPauliProduct();
+        if (pauliProduct.size() != 1) {
+            return failure();
+        }
+        auto pauliStrAttr = llvm::dyn_cast<StringAttr>(pauliProduct[0]);
+        if (!pauliStrAttr || pauliStrAttr.getValue() != "Z") {
+            return failure();
+        }
+
+        if (op.getCondition()) {
+            return failure();
+        }
+
+        Value qbitOperand = op.getInQubits()[0];
+        Value angle = op.getArbitraryAngle();
+
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        Location loc = op.getLoc();
+
+        // PPR(theta, Z) = exp(i * theta * Z)
+        // RZ(phi)       = exp(-i * phi/2 * Z)
+        // phi = -2 * theta
+        Value cMinus2 = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(-2.0));
+        Value rzAngle = rewriter.create<arith::MulFOp>(loc, angle, cMinus2);
+
+        func::FuncOp decompFunc = getOrCreateDecompositionFunc(mod, rewriter, epsilon, pprBasis);
+
+        auto callDecompOp =
+            rewriter.create<func::CallOp>(loc, decompFunc, ValueRange{qbitOperand, rzAngle});
+
+        Value finalQbitResult = callDecompOp->getResult(0);
+        Value runtimePhase = callDecompOp.getResult(1);
+
+        NamedAttrList gphaseAttrs;
+        gphaseAttrs.append(
+            rewriter.getNamedAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 0})));
+        rewriter.create<GlobalPhaseOp>(loc, TypeRange{}, ValueRange{runtimePhase},
+                                       gphaseAttrs.getAttrs());
+
+        rewriter.replaceAllUsesWith(op->getResults(), finalQbitResult);
+        rewriter.eraseOp(op);
+        return success();
+    }
+};
+
 } // anonymous namespace
 
 namespace catalyst {
@@ -438,6 +505,7 @@ namespace quantum {
 void populateGridsynthPatterns(RewritePatternSet &patterns, double epsilon, bool pprBasis)
 {
     patterns.add<DecomposeCustomOpPattern>(patterns.getContext(), epsilon, pprBasis);
+    patterns.add<DecomposePPRArbitraryOpPattern>(patterns.getContext(), epsilon, pprBasis);
 }
 
 } // namespace quantum

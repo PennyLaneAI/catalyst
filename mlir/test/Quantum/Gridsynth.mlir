@@ -240,3 +240,44 @@ func.func @test_deduplication(%arg0: !quantum.bit) -> !quantum.bit {
     
     return %q2 : !quantum.bit
 }
+
+// -----
+
+// CHECK-LABEL: @test_ppr_arbitrary_z_decomposition
+// CHECK-SAME: ([[Q_IN:%.+]]: !quantum.bit, [[THETA:%.+]]: f64)
+func.func @test_ppr_arbitrary_z_decomposition(%arg0: !quantum.bit, %theta: f64) -> !quantum.bit {
+    
+    // CHECK: [[C_MINUS_2:%.+]] = arith.constant -2.0{{.*}} : f64
+    
+    // CHECK: [[PHI:%.+]] = arith.mulf [[THETA]], [[C_MINUS_2]]
+
+    // CLIFFORD: [[RES:%.+]]:2 = call @__catalyst_decompose_RZ([[Q_IN]], [[PHI]])
+    // PPR:      [[RES:%.+]]:2 = call @__catalyst_decompose_RZ_ppr_basis([[Q_IN]], [[PHI]])
+    
+    // CHECK: quantum.gphase([[RES]]#1)
+    
+    // CHECK: return [[RES]]#0 : !quantum.bit
+
+    %q_out = qec.ppr.arbitrary ["Z"](%theta) %arg0 : !quantum.bit
+    return %q_out : !quantum.bit
+}
+
+// -----
+
+// CHECK-LABEL: @test_ppr_arbitrary_ignored
+// CHECK-SAME: ([[Q_IN:%.+]]: !quantum.bit, [[THETA:%.+]]: f64)
+func.func @test_ppr_arbitrary_ignored(%arg0: !quantum.bit, %theta: f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+    
+    %c_true = arith.constant true
+
+    // CHECK: qec.ppr.arbitrary ["X"]
+    %q1 = qec.ppr.arbitrary ["X"](%theta) %arg0 : !quantum.bit
+
+    // CHECK: qec.ppr.arbitrary ["Z", "Z"]
+    %q2:2 = qec.ppr.arbitrary ["Z", "Z"](%theta) %q1, %q1 : !quantum.bit, !quantum.bit
+
+    // CHECK: qec.ppr.arbitrary ["Z"]{{.*}} cond
+    %q3 = qec.ppr.arbitrary ["Z"](%theta) %q2#0 cond(%c_true) : !quantum.bit
+
+    return %q1, %q2#1, %q3 : !quantum.bit, !quantum.bit, !quantum.bit
+}
