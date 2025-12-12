@@ -499,7 +499,7 @@ def _operator(op: Operator) -> str:
     else:
         wires_str = f"[{', '.join(map(str, wires))}]"
     # Using <...> lets us use ports (https://graphviz.org/doc/info/shapes.html#record)
-    return f"<name> {op.name}|<wire> {wires_str}"
+    return f"<name> {str(op).split('(')[0]}|<wire> {wires_str}"
 
 
 @get_label.register
