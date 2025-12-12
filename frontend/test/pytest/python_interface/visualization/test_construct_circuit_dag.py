@@ -954,7 +954,6 @@ class TestCreateStaticMeasurementNodes:
 class TestOperatorConnectivity:
     """Tests that operators are properly connected."""
 
-    
     def test_static_connection_within_cluster(self):
         """Tests that connections can be made within the same cluster."""
 
@@ -998,7 +997,6 @@ class TestOperatorConnectivity:
         assert ("node3", "node4") in edges
         assert ("node4", "node5") in edges
 
-    
     def test_static_connection_through_for_loop(self):
         """Tests that connections can be made through a for loop cluster."""
 
@@ -1031,7 +1029,6 @@ class TestOperatorConnectivity:
         assert len(edges) == 1
         assert ("node1", "node2") in edges
 
-    
     def test_static_connection_through_while_loop(self):
         """Tests that connections can be made through a while loop cluster."""
 
@@ -1066,7 +1063,6 @@ class TestOperatorConnectivity:
         assert len(edges) == 1
         assert ("node1", "node2") in edges
 
-    
     def test_static_connection_through_conditional(self):
         """Tests that connections through conditionals make sense."""
 
