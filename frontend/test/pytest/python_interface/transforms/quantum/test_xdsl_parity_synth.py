@@ -19,8 +19,6 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose, assert_equal
 
-pytestmark = pytest.mark.external
-
 pytest.importorskip("xdsl")
 
 import pennylane as qml
@@ -455,7 +453,7 @@ class TestParitySynthPass:
 
 
 # pylint: disable=too-few-public-methods
-@pytest.mark.usefixtures("enable_disable_plxpr")
+@pytest.mark.usefixtures("use_capture")
 class TestParitySynthIntegration:
     """Integration tests for the ParitySynthPass."""
 

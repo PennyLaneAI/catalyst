@@ -23,7 +23,7 @@ import networkx as nx
 import numpy as np
 from xdsl import context, passes, pattern_rewriter
 from xdsl.dialects import arith, builtin, func
-from xdsl.ir import SSAValue
+from xdsl.ir import Operation, SSAValue
 from xdsl.rewriter import InsertPoint
 
 from pennylane.transforms.intermediate_reps.rowcol import _rowcol_parity_matrix
@@ -280,7 +280,7 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
         rewritten phase polynomials dependent on the order in which we walk over the operations.
         """
         # The attribute is used so we don't transform the same op multiple times
-        if len(matchedOp.regions) == 0 or matchedOp.hasattr("parity_synth_done"):
+        if len(matchedOp.regions) == 0 or hasattr(matchedOp, "parity_synth_done"):
             return
 
         for region in matchedOp.regions:
@@ -350,13 +350,13 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
         # Apply the parity network part of the new circuit
         for idx, phase_wire, subcircuit in subcircuits:
             for i, j in subcircuit:
-                rewriter.insert_op(self._cnot(i, j, inv_wire_map), insertion_point)
+                rewriter.insert_op(_cnot(i, j, inv_wire_map), insertion_point)
 
-            rewriter.insert_op(self._rz(phase_wire, angles.pop(idx), inv_wire_map), insertion_point)
+            rewriter.insert_op(_rz(phase_wire, angles.pop(idx), inv_wire_map), insertion_point)
 
         # Apply the remaining parity matrix part of the new circuit
         for i, j in rowcol_circuit:
-            rewriter.insert_op(self._cnot(i, j, inv_wire_map), insertion_point)
+            rewriter.insert_op(_cnot(i, j, inv_wire_map), insertion_point)
 
         # Replace the output qubits of the old phase polynomial operations by the output qubits of
         # the new circuit
