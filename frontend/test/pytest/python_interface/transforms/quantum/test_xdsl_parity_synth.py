@@ -21,10 +21,9 @@ from numpy.testing import assert_allclose, assert_equal
 
 pytest.importorskip("xdsl")
 
+# pylint: disable=wrong-import-position
 import pennylane as qml
 from pennylane.transforms.intermediate_reps import phase_polynomial
-
-# pylint: disable=wrong-import-position
 from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 
 from catalyst.python_interface.transforms import (
@@ -192,10 +191,10 @@ class TestParityNetworkSynth:
         thetas = np.random.random(num_parities)
         # Make PL circuit
         circuit = sum(
-            [
+            (
                 [all_cnots[i] for i in sub_circuit] + [qml.RZ(x, j % n)]
                 for j, (sub_circuit, x) in enumerate(zip(cnots, thetas, strict=True))
-            ],
+            ),
             start=[],
         )
         # Compute IR
@@ -205,11 +204,11 @@ class TestParityNetworkSynth:
         # Synthesize parity network and compute new PL circuit from it
         new_circuit, inv_parity_matrix = _parity_network_synth(P)
         new_circuit = sum(
-            [
+            (
                 [qml.CNOT(_cnot) for _cnot in sub_circuit]
                 + [qml.RZ(angles_.pop(angle_idx), qubit_idx)]
                 for angle_idx, qubit_idx, sub_circuit in new_circuit
-            ],
+            ),
             start=[],
         )
         # Compute IR of new PL circuit
@@ -223,7 +222,8 @@ class TestParityNetworkSynth:
 
 
 def translate_program_to_xdsl(program):
-    """Translate an almost-xDSL-program into an xDSL program by replacing some shorthand notations."""
+    """Translate an almost-xDSL-program into an xDSL program
+    by replacing some shorthand notations."""
     new_lines = []
     for line in program.split("\n"):
         if "INIT_QUBIT" in line:

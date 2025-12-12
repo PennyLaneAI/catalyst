@@ -22,7 +22,7 @@ from itertools import product
 import networkx as nx
 import numpy as np
 from xdsl import context, passes, pattern_rewriter
-from xdsl.dialects import arith, builtin, func
+from xdsl.dialects import arith, builtin
 from xdsl.ir import Operation, SSAValue
 from xdsl.rewriter import InsertPoint
 
@@ -290,11 +290,9 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
                         if len(op.regions) != 0:
                             # Do phase polynomial rewriting up to this point
                             self.rewrite_phase_polynomial(rewriter)
-                            # Rewrite regions of this operation
-                            # Creating a new PatternRewriter so its matched operation is `op`, not `matchedOp`
-                            # It might even make sense to create a new instance of `ParitySynthPattern`, but
-                            # I will leave that decision to you.
-                            self.match_and_rewrite(op, PatternRewriter(op))
+                            # Rewrite regions of this operation; Creating a new PatternRewriter
+                            # so its matched operation is `op`, not `matchedOp`
+                            self.match_and_rewrite(op, pattern_rewriter.PatternRewriter(op))
                             op.attributes["parity_synth_done"] = builtin.UnitAttr()
                         continue
 
@@ -377,7 +375,6 @@ class ParitySynthPass(passes.ModulePass):
 
     name = "xdsl-parity-synth"
 
-    # pylint: disable=no-self-use
     def apply(self, _ctx: context.Context, module: builtin.ModuleOp) -> None:
         """Apply the ParitySynth pass."""
         pattern = ParitySynthPattern()
