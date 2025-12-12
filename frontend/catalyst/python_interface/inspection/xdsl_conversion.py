@@ -434,33 +434,34 @@ def xdsl_to_qml_measurement(op, *args, **kwargs) -> MeasurementProcess | Operato
         A PennyLane MeasurementProcess or Operator.
     """
 
-    match op.name:
-        case "quantum.measure":
-            postselect = op.postselect.value.data if op.postselect is not None else None
-            return MidMeasure([resolve_constant_wire(op.in_qubit)], postselect=postselect)
+    with conditional_pause(capture.pause):
+        match op.name:
+            case "quantum.measure":
+                postselect = op.postselect.value.data if op.postselect is not None else None
+                return MidMeasure([resolve_constant_wire(op.in_qubit)], postselect=postselect)
 
-        case "quantum.namedobs":
-            return resolve_gate(op.type.data.value)(wires=ssa_to_qml_wires_named(op))
+            case "quantum.namedobs":
+                return resolve_gate(op.type.data.value)(wires=ssa_to_qml_wires_named(op))
 
-        case "quantum.tensor":
-            return ops.op_math.prod(
-                *(xdsl_to_qml_measurement(operand.owner) for operand in op.operands)
-            )
+            case "quantum.tensor":
+                return ops.op_math.prod(
+                    *(xdsl_to_qml_measurement(operand.owner) for operand in op.operands)
+                )
 
-        case "quantum.hamiltonian":
-            coeffs = _extract(op, "coeffs", resolve_constant_params, single=True)
-            ops_list = [xdsl_to_qml_measurement(term.owner) for term in op.terms]
-            return ops.LinearCombination(coeffs, ops_list)
-        case "quantum.compbasis":
-            return _extract(op, "qubits", resolve_constant_wire)
+            case "quantum.hamiltonian":
+                coeffs = _extract(op, "coeffs", resolve_constant_params, single=True)
+                ops_list = [xdsl_to_qml_measurement(term.owner) for term in op.terms]
+                return ops.LinearCombination(coeffs, ops_list)
+            case "quantum.compbasis":
+                return _extract(op, "qubits", resolve_constant_wire)
 
-        case (
-            "quantum.state" | "quantum.probs" | "quantum.sample" | "quantum.expval" | "quantum.var"
-        ):
-            return resolve_measurement(op.name)(*args, **kwargs)
+            case (
+                "quantum.state" | "quantum.probs" | "quantum.sample" | "quantum.expval" | "quantum.var"
+            ):
+                return resolve_measurement(op.name)(*args, **kwargs)
 
-        case _:
-            raise NotImplementedError(f"Unsupported measurement/observable: {op.name}")
+            case _:
+                raise NotImplementedError(f"Unsupported measurement/observable: {op.name}")
 
 
 def xdsl_to_qml_measurement_name(op, obs_op=None) -> str:

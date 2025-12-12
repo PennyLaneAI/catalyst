@@ -154,16 +154,7 @@ class ConstructCircuitDAG:
         )
         self._node_uid_counter += 1
 
-        # Search through previous ops found on current wires and connect
-        prev_node_uids: set[str] = set.union(
-            set(), *(self._wire_to_node_uids[wire] for wire in meas.wires)
-        )
-        for prev_node_uid in prev_node_uids:
-            self.dag_builder.add_edge(prev_node_uid, node_uid)
-
-        # Update affected wires to source from this node UID
-        for wire in meas.wires:
-            self._wire_to_node_uids[wire] = {node_uid}
+        self._connect_op(meas, node_uid)
 
     # =====================
     # QUANTUM MEASUREMENTS
@@ -226,10 +217,9 @@ class ConstructCircuitDAG:
         )
         self._node_uid_counter += 1
 
-        for wire in prev_wires:
-            if wire in self._wire_to_node_uids:
-                for seen_node in self._wire_to_node_uids[wire]:
-                    self.dag_builder.add_edge(seen_node, node_uid, color="lightpink3")
+        for seen_nodes in self._wire_to_node_uids.values():
+            for seen_node in seen_nodes:
+                self.dag_builder.add_edge(seen_node, node_uid, color="lightpink3")
 
     # =============
     # CONTROL FLOW

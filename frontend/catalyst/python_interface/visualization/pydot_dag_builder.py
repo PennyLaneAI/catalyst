@@ -76,7 +76,7 @@ class PyDotDAGBuilder(DAGBuilder):
             rankdir="TB",
             compound="true",
             strict=True,
-            splines="ortho",
+            splines="polyline",
         )
 
         # Use internal cache that maps cluster ID to actual pydot (Dot or Cluster) object
