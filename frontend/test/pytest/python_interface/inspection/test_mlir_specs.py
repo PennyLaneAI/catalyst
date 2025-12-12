@@ -569,7 +569,7 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        res = mlir_specs(circ, level=1, args=(0,))
+        res = mlir_specs(circ, level=1)
         assert resources_equal(res, expected)
 
     def test_subroutine(self):
