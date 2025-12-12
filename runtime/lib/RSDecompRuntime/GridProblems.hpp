@@ -641,8 +641,7 @@ class two_dim_problem_solution_iterator {
 
     // Default constructor for the "end" iterator
     two_dim_problem_solution_iterator()
-        : original_state(Ellipse({1, 0, 1}), Ellipse({1, 0, 1})),
-          shifted_state(Ellipse({1, 0, 1}), Ellipse({1, 0, 1})), is_done(true)
+        : original_state(Ellipse(), Ellipse()), shifted_state(Ellipse(), Ellipse()), is_done(true)
     {
     }
 
@@ -934,11 +933,7 @@ class GridIterator {
     /**
      * @brief Default constructor. Creates an "end" iterator.
      */
-    GridIterator()
-        : iter_state(IterState::DONE), e1({1.0, 0.0, 1.0}, {0.0, 0.0}),
-          e2({1.0, 0.0, 1.0}, {0.0, 0.0})
-    {
-    }
+    GridIterator() : iter_state(IterState::DONE) {}
 
     /**
      * @brief Main constructor to start the iteration.
@@ -956,7 +951,7 @@ class GridIterator {
           e2({1.0, 0.0, 1.0}, {0.0, 0.0}) // Ellipse((1, 0, 1), (0, 0))
     {
 
-        // --- Warm start for an initial guess (from Python __iter__) ---
+        // --- Warm start for an initial guess ---
         // where 14 is kmin for 1e-3.
         k = std::min(kmin, 14);
         i_ = 6; // Give 6 trials for warm start.
