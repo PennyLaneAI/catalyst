@@ -21,7 +21,6 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 import pennylane as qml
 from jax._src.sharding_impls import UNSPECIFIED
 from jax._src.tree_util import tree_flatten
@@ -53,7 +52,6 @@ from catalyst.jax_primitives import (
     measure_p,
     namedobs_p,
     pauli_measure_p,
-    pauli_rot_arbitrary_p,
     pauli_rot_p,
     probs_p,
     qalloc_p,
@@ -363,29 +361,16 @@ def _pauli_rot_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint,
     wires = invals[:qubits_len]
     params = invals[qubits_len : qubits_len + params_len]
     pauli_word = hyperparameters["pauli_word"]
-    theta = params[0]  # This is a float or a tracer object
-
-    allowed_angles = [np.pi / 4, np.pi / 2, np.pi, -np.pi / 4, -np.pi / 2, -np.pi]
-    is_arbitrary = isinstance(
-        theta, jax._src.interpreters.partial_eval.DynamicJaxprTracer
-    ) or not np.any(np.isclose(theta, allowed_angles))
-
-    if is_arbitrary:
-        return pauli_rot_arbitrary_p.bind(
-            *[*wires, *params],
-            pauli_word=pauli_word,
-            qubits_len=qubits_len,
-            params_len=params_len,
-            adjoint=adjoint,
-        )
-    else:
-        return pauli_rot_p.bind(
-            *wires,
-            pauli_word=pauli_word,
-            theta=theta,
-            qubits_len=qubits_len,
-            adjoint=adjoint,
-        )
+    ctrl_wires = invals[qubits_len + params_len : qubits_len + params_len + ctrl_len]
+    ctrl_values = invals[qubits_len + params_len + ctrl_len :]
+    return pauli_rot_p.bind(
+        *[*wires, *params, *ctrl_wires, *ctrl_values],
+        pauli_word=pauli_word,
+        qubits_len=qubits_len,
+        params_len=params_len,
+        ctrl_len=ctrl_len,
+        adjoint=adjoint,
+    )
 
 
 # Mapping of special operations to their bind calls

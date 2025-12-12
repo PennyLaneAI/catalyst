@@ -13,11 +13,21 @@
 // limitations under the License.
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/TypeRange.h"
+#include "stablehlo/dialect/StablehloOps.h"
 
 #include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
+#include <cmath>
+#include <iostream>
+#include <llvm/Support/Debug.h>
+#include <llvm/Support/LogicalResult.h>
+#include <optional>
+
+#define DEBUG_TYPE "to-ppr"
 
 using namespace mlir;
 using namespace catalyst;
@@ -233,6 +243,147 @@ LogicalResult convertMeasureOpToPPM(MeasureOp op, StringRef axis,
     return success();
 }
 
+// Recursively resolve the constant parameter of a value and returns std::nullopt if not a constant.
+std::optional<double> resolveConstantValue(Value value)
+{
+    if (!value)
+        return std::nullopt;
+
+    auto *defOp = value.getDefiningOp();
+    if (!defOp)
+        return std::nullopt;
+
+    // Handle Tensor Dialect
+    if (auto extractOp = dyn_cast<tensor::ExtractOp>(defOp)) {
+        return resolveConstantValue(extractOp.getTensor());
+    }
+
+    // Handle Stablehlo Dialect
+    if (auto constOp = dyn_cast<stablehlo::ConstantOp>(defOp)) {
+        auto valueAttr = constOp.getValue();
+        if (auto denseFPAttr = dyn_cast<DenseFPElementsAttr>(valueAttr)) {
+            if (denseFPAttr.isSplat() || denseFPAttr.getNumElements() == 1) {
+                return denseFPAttr.getSplatValue<APFloat>().convertToDouble();
+            }
+        }
+        else if (auto denseIntAttr = dyn_cast<DenseIntElementsAttr>(valueAttr)) {
+            if (denseIntAttr.isSplat() || denseIntAttr.getNumElements() == 1) {
+                return static_cast<double>(denseIntAttr.getSplatValue<APInt>().getSExtValue());
+            }
+        }
+        return std::nullopt;
+    }
+    else if (auto convertOp = dyn_cast<stablehlo::ConvertOp>(defOp)) {
+        if (convertOp->getNumOperands() > 0) {
+            return resolveConstantValue(convertOp.getOperand());
+        }
+        return std::nullopt;
+    }
+    else if (auto broadcastInDimOp = dyn_cast<stablehlo::BroadcastInDimOp>(defOp)) {
+        if (broadcastInDimOp->getNumOperands() > 0) {
+            return resolveConstantValue(broadcastInDimOp.getOperand());
+        }
+        return std::nullopt;
+    }
+
+    // Handle Arith Dialect
+    if (auto constOp = dyn_cast<arith::ConstantOp>(defOp)) {
+        auto valueAttr = constOp.getValue();
+        if (auto floatAttr = dyn_cast<FloatAttr>(valueAttr)) {
+            return floatAttr.getValueAsDouble();
+        }
+        else if (auto intAttr = dyn_cast<IntegerAttr>(valueAttr)) {
+            return static_cast<double>(intAttr.getValue().getSExtValue());
+        }
+        else if (auto denseAttr = dyn_cast<DenseFPElementsAttr>(valueAttr)) {
+            if (denseAttr.isSplat() || denseAttr.getNumElements() == 1) {
+                return denseAttr.getSplatValue<APFloat>().convertToDouble();
+            }
+        }
+        else if (auto denseAttr = dyn_cast<DenseIntElementsAttr>(valueAttr)) {
+            if (denseAttr.isSplat() || denseAttr.getNumElements() == 1) {
+                return static_cast<double>(denseAttr.getSplatValue<APInt>().getSExtValue());
+            }
+        }
+        return std::nullopt;
+    }
+    else if (auto indexCastOp = dyn_cast<arith::IndexCastOp>(defOp)) {
+        if (defOp->getNumOperands() > 0) {
+            return resolveConstantValue(defOp->getOperand(0));
+        }
+        return std::nullopt;
+    }
+    else if (auto addOp = dyn_cast<arith::AddFOp>(defOp)) {
+        double sum = 0.0;
+        for (auto operand : addOp.getOperands()) {
+            auto operandVal = resolveConstantValue(operand);
+            if (!operandVal.has_value())
+                return std::nullopt;
+            sum += operandVal.value();
+        }
+        return sum;
+    }
+    return std::nullopt;
+}
+
+LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewriter)
+{
+    auto loc = op.getLoc();
+
+    auto angleValue = op.getAngle();
+    auto pauliProduct = op.getPauliProduct();
+    auto inQubits = op.getInQubits();
+    auto outQubitTypes = op.getOutQubits().getType();
+
+    auto angleOpt = resolveConstantValue(angleValue);
+
+    if (angleOpt.has_value()) {
+        constexpr double PI = llvm::numbers::pi;
+        constexpr double SPECIFIC_ANGLES[4] = {PI / 2, PI / 4, PI / 8};
+        // We are choosing a very small tolerance to accomodate floating point precision issues.
+        // We choose this because it is a few bits away from the precision allowed by float 64
+        // and we assume the angles have magnitudes on the order of pi.
+        constexpr double TOLERANCE = 1e-12;
+
+        auto paulirot_angle = angleOpt.value();
+        auto ppr_angle = paulirot_angle / 2;
+
+        auto angle = std::fmod(ppr_angle, PI);
+
+        if (angle < TOLERANCE) {
+            // If the angle is 0, we can just erase the PauliRotOp.
+            rewriter.replaceOp(op, inQubits);
+            return success();
+        }
+
+        for (auto specific_angle : SPECIFIC_ANGLES) {
+            if (std::abs(angle - specific_angle) < TOLERANCE) {
+                auto rotationKind = static_cast<int64_t>(PI / specific_angle);
+                if (op.getAdjoint()) {
+                    rotationKind = -rotationKind;
+                }
+                auto rotationKindAttr = rewriter.getI16IntegerAttr(rotationKind);
+                auto pprOp = rewriter.create<PPRotationOp>(loc, outQubitTypes, pauliProduct,
+                                                           rotationKindAttr, inQubits);
+                rewriter.replaceOp(op, pprOp.getOutQubits());
+                return success();
+            }
+        }
+    }
+
+    // Angle is not static or not a multiple of π/8, consider this as an arbitrary angle PPR.
+    auto constResult =
+        rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(2.0)).getResult();
+    auto result = rewriter.create<arith::DivFOp>(loc, angleValue, constResult).getResult();
+
+    auto pprArbitraryOp =
+        rewriter.create<PPRotationArbitraryOp>(loc, outQubitTypes, pauliProduct, result, inQubits);
+
+    rewriter.replaceOp(op, pprArbitraryOp.getOutQubits());
+
+    return success();
+}
+
 LogicalResult convertMeasureZ(MeasureOp op, ConversionPatternRewriter &rewriter)
 {
     return convertMeasureOpToPPM(op, "Z", rewriter);
@@ -278,6 +429,9 @@ struct QECOpLowering : public ConversionPattern {
             }
             }
         }
+        else if (auto originOp = dyn_cast_or_null<PauliRotOp>(op)) {
+            return convertPauliRotGate(originOp, rewriter);
+        }
         else if (auto originOp = dyn_cast_or_null<MeasureOp>(op)) {
             return convertMeasureZ(originOp, rewriter);
         }
@@ -287,6 +441,7 @@ struct QECOpLowering : public ConversionPattern {
 };
 
 using CustomOpLowering = QECOpLowering<quantum::CustomOp, qec::PPRotationOp>;
+using PauliRotOpLowering = QECOpLowering<quantum::PauliRotOp, qec::PPRotationOp>;
 using MeasureOpLowering = QECOpLowering<quantum::MeasureOp, qec::PPMeasurementOp>;
 
 } // namespace
@@ -294,9 +449,10 @@ using MeasureOpLowering = QECOpLowering<quantum::MeasureOp, qec::PPMeasurementOp
 namespace catalyst {
 namespace qec {
 
-void populateCliffordTToPPRPatterns(RewritePatternSet &patterns)
+void populateToPPRPatterns(RewritePatternSet &patterns)
 {
     patterns.add<CustomOpLowering>(patterns.getContext());
+    patterns.add<PauliRotOpLowering>(patterns.getContext());
     patterns.add<MeasureOpLowering>(patterns.getContext());
 }
 

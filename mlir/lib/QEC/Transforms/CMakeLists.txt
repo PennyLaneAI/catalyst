@@ -2,8 +2,8 @@ set(LIBRARY_NAME qec-transforms)
 
 
 file(GLOB SRC
-    CliffordTToPPR.cpp
-    clifford_t_to_ppr.cpp
+    ToPPR.cpp
+    to_ppr.cpp
     CommutePPR.cpp
     commute_ppr.cpp
     MergePPRIntoPPM.cpp
@@ -29,6 +29,7 @@ set(LIBS
     ${conversion_libs}
     MLIRQEC
     QECUtils
+    ExternalStablehloLib
 )
 
 set(DEPENDS

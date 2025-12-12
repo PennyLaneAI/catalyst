@@ -54,7 +54,7 @@ struct PPMCompilationPass : public impl::PPMCompilationPassBase<PPMCompilationPa
             target.addLegalDialect<qec::QECDialect>();
 
             RewritePatternSet patterns(ctx);
-            populateCliffordTToPPRPatterns(patterns);
+            populateToPPRPatterns(patterns);
 
             if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
                 return signalPassFailure();
