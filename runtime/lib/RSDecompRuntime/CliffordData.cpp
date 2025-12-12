@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "CliffordData.hpp"
-#include "Exception.hpp"
 
 namespace RSDecomp::CliffordData {
 const std::map<std::vector<GateType>, SO3Matrix> clifford_group_to_SO3 = {
