@@ -1055,7 +1055,6 @@ class TestCtrl:
         assert "[1, 0]" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
 
-    @pytest.mark.usefixtures("use_capture")
     def test_ctrl_operator_without_alias(self):
         """Test that the ctrl of an operator instance that doesn't have an alias works."""
 
@@ -1065,8 +1064,9 @@ class TestCtrl:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_workflow():
-            qml.ctrl(qml.ISWAP([0, 1]), control=2)
-            qml.ctrl(qml.ISWAP, control=2)([0, 1])
+            # Use two control wires so we avoid the CH alias
+            qml.ctrl(qml.H(0), control=[1, 2])
+            qml.ctrl(qml.H, control=[1, 2])(0)
 
         module = my_workflow()
 
@@ -1078,11 +1078,11 @@ class TestCtrl:
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
-        assert "C(ISWAP)" in nodes["node1"]["label"]
-        assert "[2, 0, 1]" in nodes["node1"]["label"]
+        assert "C(Hadamard)" in nodes["node1"]["label"]
+        assert "[1, 2, 0]" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster1"
-        assert "C(ISWAP)" in nodes["node2"]["label"]
-        assert "[2, 0, 1]" in nodes["node2"]["label"]
+        assert "C(Hadamard)" in nodes["node2"]["label"]
+        assert "[1, 2, 0]" in nodes["node2"]["label"]
         assert nodes["node2"]["parent_cluster_uid"] == "cluster1"
 
 
