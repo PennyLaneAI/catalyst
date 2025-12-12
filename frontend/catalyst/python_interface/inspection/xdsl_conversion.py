@@ -218,8 +218,8 @@ def count_static_loop_iterations(for_op: ForOp) -> int:
     lower_bound = resolve_constant_params(for_op.lb)
     upper_bound = resolve_constant_params(for_op.ub)
     step = resolve_constant_params(for_op.step)
-    if not all(isinstance(x, int) for x in [lower_bound, upper_bound,step]):
-        raise NotImplementedError
+    if not all(isinstance(x, int) for x in [lower_bound, upper_bound, step]):
+        raise NotImplementedError("Dynamic loop iterations (strings) are not supported.")
 
     if upper_bound <= lower_bound:
         return 0
