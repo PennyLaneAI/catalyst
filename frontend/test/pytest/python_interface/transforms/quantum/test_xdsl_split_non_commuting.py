@@ -12,18 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test module for the split non-commuting transform"""
-import pytest
-
-# pylint: disable=wrong-import-position
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
 
 import pennylane as qml
+import pytest
 
 from catalyst.python_interface.transforms import (
     SplitNonCommutingPass,
     split_non_commuting_pass,
 )
+
+pytestmark = pytest.mark.xdsl
 
 
 class TestSplitNonCommutingPass:

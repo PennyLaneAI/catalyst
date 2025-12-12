@@ -11,19 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Unit tests for xDSL utilities."""
+# pylint: disable=line-too-long
 
 import pytest
-
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
-# pylint: disable=wrong-import-position,line-too-long
 from xdsl.dialects import arith, builtin, tensor, test
 
 from catalyst.python_interface.dialects.stablehlo import ConstantOp as hloConstantOp
 from catalyst.python_interface.utils import get_constant_from_ssa
+
+pytestmark = pytest.mark.xdsl
 
 
 class TestGetConstantFromSSA:

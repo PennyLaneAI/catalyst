@@ -12,22 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test module for the draw function in the unified compiler inspection module."""
+# pylint: disable=unnecessary-lambda
 
-
-import pytest
-
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
-# pylint: disable=wrong-import-position,unnecessary-lambda
 import jax
 import pennylane as qml
+import pytest
 
 from catalyst.python_interface.inspection import draw
 from catalyst.python_interface.transforms import (
     iterative_cancel_inverses_pass,
     merge_rotations_pass,
 )
+
+pytestmark = pytest.mark.xdsl
 
 
 @pytest.mark.usefixtures("use_capture")

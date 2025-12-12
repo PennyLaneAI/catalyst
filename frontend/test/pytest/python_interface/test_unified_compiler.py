@@ -11,19 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Unit tests for the unified compiler's entry point."""
+# pylint: disable=line-too-long
 
 from dataclasses import dataclass
 
-# pylint: disable=wrong-import-position,line-too-long
-import pytest
-
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
 import jax
 import pennylane as qml
+import pytest
 from jaxlib.mlir.ir import Module as jModule
 from pennylane.capture import enabled as capture_enabled
 from xdsl import passes
@@ -53,6 +48,8 @@ from catalyst.python_interface.transforms import (
     iterative_cancel_inverses_pass,
     merge_rotations_pass,
 )
+
+pytestmark = pytest.mark.xdsl
 
 
 @dataclass(frozen=True)
