@@ -20,8 +20,7 @@ from collections.abc import Callable
 from itertools import compress
 from typing import TYPE_CHECKING
 
-from pennylane import ops
-from pennylane.capture import pause
+from pennylane import capture, ops
 from pennylane.ftqc.operations import RotXZX
 from pennylane.measurements import counts, expval, probs, sample, state, var
 from pennylane.operation import Operator
@@ -298,6 +297,19 @@ def ssa_to_qml_wires_named(op: NamedObsOp) -> int:
 ### xDSL ---> PennyLane Operators/Measurements conversion
 ############################################################
 
+import contextlib
+
+
+def conditional_pause(pause):
+    if capture.enabled():
+        return pause()
+
+    @contextlib.contextmanager
+    def dont_do_anything():
+        yield
+
+    return dont_do_anything()
+
 
 def xdsl_to_qml_op(op) -> Operator:
     """Convert an xDSL operation into a PennyLane Operator.
@@ -308,8 +320,9 @@ def xdsl_to_qml_op(op) -> Operator:
     Returns:
         A PennyLane Operator.
     """
-    # Pause capture so we can allow strings (dynamic wires) as allowed wires
-    with pause():
+    # Pause capture *only if active* so we can allow strings (dynamic wires) as allowed wires
+    with conditional_pause(capture.pause):
+
         match op.name:
 
             case "quantum.gphase":
