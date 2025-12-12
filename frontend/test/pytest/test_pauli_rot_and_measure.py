@@ -17,9 +17,9 @@
 import numpy as np
 import pennylane as qml
 import pytest
+from pennylane.ftqc.catalyst_pass_aliases import to_ppr
 
 from catalyst import qjit
-from pennylane.ftqc.catalyst_pass_aliases import to_ppr
 
 
 @pytest.mark.usefixtures("use_capture")

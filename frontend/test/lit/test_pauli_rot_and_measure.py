@@ -18,8 +18,6 @@
 
 import numpy as np
 import pennylane as qml
-
-from catalyst import qjit
 from pennylane.ftqc.catalyst_pass_aliases import (
     commute_ppr,
     merge_ppr_ppm,
@@ -27,6 +25,8 @@ from pennylane.ftqc.catalyst_pass_aliases import (
     ppr_to_ppm,
     to_ppr,
 )
+
+from catalyst import qjit
 
 
 def test_pauli_rot_lowering():
