@@ -1357,6 +1357,128 @@ class TestOperatorConnectivity:
         assert ("node1", "node5") in edges  # RZ -> Toffoli
         assert ("node4", "node5") in edges  # CNOT -> Toffoli
 
+    def test_dynamic_wire_connectivity(self):
+        """Tests standard scenario of interweaving static and dynamic operators."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow(x, y):
+            qml.X(0)
+            qml.Y(1)
+            qml.Z(2)
+            qml.H(x)
+            qml.S(0)
+            qml.T(2)
+            qml.H(x)
+
+        args = (1, 2)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "PauliZ" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+        assert "PauliX" in nodes["node3"]["label"]
+        assert "Hadamard" in nodes["node4"]["label"]
+        assert "T" in nodes["node5"]["label"]
+        assert "S" in nodes["node6"]["label"]
+        assert "Hadamard" in nodes["node7"]["label"]
+
+        # Check all edges
+        assert len(edges) == 7
+
+        # All static wires collapse into the dynamic hadamard (dashed edges)
+        assert ("node1", "node4") in edges
+        assert edges[("node1", "node4")]["attrs"]["style"] == "dashed"
+        assert ("node2", "node4") in edges
+        assert edges[("node2", "node4")]["attrs"]["style"] == "dashed"
+        assert ("node3", "node4") in edges
+        assert edges[("node3", "node4")]["attrs"]["style"] == "dashed"
+
+        # Hadamard then fans out to the static S and T
+        assert ("node4", "node5") in edges
+        assert ("node4", "node6") in edges
+
+        # Collapse again to the dynamic Hadamard
+        assert ("node5", "node7") in edges
+        assert edges[("node5", "node7")]["attrs"]["style"] == "dashed"
+        assert ("node6", "node7") in edges
+        assert edges[("node6", "node7")]["attrs"]["style"] == "dashed"
+
+
+    def test_first_operator_is_dynamic(self):
+        """Tests when the first operator is dynamic"""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow(x, y):
+            qml.H(x)
+
+        args = (1, 2)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "Hadamard" in nodes["node1"]["label"]
+
+        # Check all edges
+        assert len(edges) == 0 
+
+    def test_double_choke(self):
+        """Tests when two dynamic operators are back to back"""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow(x, y):
+            qml.X(0)
+            qml.Y(x)
+            qml.Z(y)
+
+        args = (1, 2)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+        assert "PauliZ" in nodes["node3"]["label"]
+
+        # Check all edges
+        assert len(edges) == 2 
+
+        assert ("node1", "node2") in edges
+        assert ("node2", "node3") in edges
+        assert edges[("node2", "node3")]["attrs"]["style"] == "dashed"
 
 class TestTerminalMeasurementConnectivity:
     """Test that terminal measurements connect properly."""
