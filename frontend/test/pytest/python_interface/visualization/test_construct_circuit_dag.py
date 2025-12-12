@@ -96,7 +96,6 @@ class FakeDAGBuilder(DAGBuilder):
         return "graph"
 
 
-@pytest.mark.unit
 def test_dependency_injection():
     """Tests that relevant dependencies are injected."""
 
@@ -105,7 +104,6 @@ def test_dependency_injection():
     assert utility.dag_builder is mock_dag_builder
 
 
-@pytest.mark.unit
 def test_does_not_mutate_module():
     """Test that the module is not mutated."""
 
@@ -128,7 +126,6 @@ def test_does_not_mutate_module():
     assert str(module_op) == module_op_str_before
 
 
-@pytest.mark.unit
 class TestFuncOpVisualization:
     """Tests the visualization of FuncOps with bounding boxes"""
 
@@ -293,7 +290,6 @@ class TestDeviceNode:
 class TestForOp:
     """Tests that the for loop control flow can be visualized correctly."""
 
-    @pytest.mark.unit
     def test_basic_example(self):
         """Tests that the for loop cluster can be visualized correctly."""
 
@@ -318,7 +314,6 @@ class TestForOp:
         assert clusters["cluster2"]["label"] == "for loop"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
 
-    @pytest.mark.unit
     def test_nested_loop(self):
         """Tests that nested for loops are visualized correctly."""
 
@@ -350,7 +345,6 @@ class TestForOp:
 class TestWhileOp:
     """Tests that the while loop control flow can be visualized correctly."""
 
-    @pytest.mark.unit
     def test_basic_example(self):
         """Test that the while loop is visualized correctly."""
         dev = qml.device("null.qubit", wires=1)
@@ -376,7 +370,6 @@ class TestWhileOp:
         assert clusters["cluster2"]["label"] == "while loop"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
 
-    @pytest.mark.unit
     def test_nested_loop(self):
         """Tests that nested while loops are visualized correctly."""
 
@@ -412,7 +405,6 @@ class TestWhileOp:
 class TestIfOp:
     """Tests that the conditional control flow can be visualized correctly."""
 
-    @pytest.mark.unit
     def test_basic_example(self):
         """Test that the conditional operation is visualized correctly."""
         dev = qml.device("null.qubit", wires=1)
@@ -446,7 +438,6 @@ class TestIfOp:
         assert clusters["cluster4"]["label"] == "else"
         assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
 
-    @pytest.mark.unit
     def test_if_elif_else_conditional(self):
         """Test that the conditional operation is visualized correctly."""
         dev = qml.device("null.qubit", wires=1)
@@ -484,7 +475,6 @@ class TestIfOp:
         assert clusters["cluster5"]["label"] == "else"
         assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
 
-    @pytest.mark.unit
     def test_nested_conditionals(self):
         """Tests that nested conditionals are visualized correctly."""
 
@@ -688,7 +678,6 @@ class TestIfOp:
 class TestGetLabel:
     """Tests the get_label utility."""
 
-    @pytest.mark.unit
     @pytest.mark.parametrize(
         "op, label",
         [
@@ -708,7 +697,6 @@ class TestGetLabel:
         """Tests against a GlobalPhase operator instance."""
         assert get_label(qml.GlobalPhase(0.5)) == f"<name> GlobalPhase|<wire> all"
 
-    @pytest.mark.unit
     @pytest.mark.parametrize(
         "meas, label",
         [
@@ -731,7 +719,6 @@ class TestGetLabel:
 class TestCreateStaticOperatorNodes:
     """Tests that operators with static parameters can be created and visualized as nodes."""
 
-    @pytest.mark.unit
     @pytest.mark.parametrize("op", [qml.H(0), qml.X(0), qml.SWAP([0, 1])])
     def test_custom_op(self, op):
         """Tests that the CustomOp operation node can be created and visualized."""
@@ -758,7 +745,6 @@ class TestCreateStaticOperatorNodes:
         # Make sure label has relevant info
         assert nodes["node1"]["label"] == get_label(op)
 
-    @pytest.mark.unit
     @pytest.mark.parametrize(
         "op",
         [
@@ -791,7 +777,6 @@ class TestCreateStaticOperatorNodes:
         # Compiler throws out the wires and they get converted to wires=[] no matter what
         assert nodes["node1"]["label"] == get_label(qml.GlobalPhase(0.5))
 
-    @pytest.mark.unit
     def test_qubit_unitary_op(self):
         """Test that QubitUnitary operations can be handled."""
         dev = qml.device("null.qubit", wires=1)
@@ -814,7 +799,6 @@ class TestCreateStaticOperatorNodes:
 
         assert nodes["node1"]["label"] == get_label(qml.QubitUnitary([[0, 1], [1, 0]], wires=0))
 
-    @pytest.mark.unit
     def test_multi_rz_op(self):
         """Test that MultiRZ operations can be handled."""
         dev = qml.device("null.qubit", wires=1)
@@ -837,7 +821,6 @@ class TestCreateStaticOperatorNodes:
 
         assert nodes["node1"]["label"] == get_label(qml.MultiRZ(0.5, wires=[0]))
 
-    @pytest.mark.unit
     def test_projective_measurement_op(self):
         """Test that projective measurements can be captured as nodes."""
         dev = qml.device("null.qubit", wires=1)
@@ -863,7 +846,6 @@ class TestCreateStaticOperatorNodes:
 class TestCreateStaticMeasurementNodes:
     """Tests that measurements with static parameters can be created and visualized as nodes."""
 
-    @pytest.mark.unit
     def test_state_op(self):
         """Test that qml.state can be handled."""
         dev = qml.device("null.qubit", wires=1)
@@ -886,7 +868,6 @@ class TestCreateStaticMeasurementNodes:
 
         assert nodes["node1"]["label"] == get_label(qml.state())
 
-    @pytest.mark.unit
     @pytest.mark.parametrize("meas_fn", [qml.expval, qml.var])
     def test_expval_var_measurement_op(self, meas_fn):
         """Test that statistical measurement operators can be captured as nodes."""
@@ -910,7 +891,6 @@ class TestCreateStaticMeasurementNodes:
 
         assert nodes["node1"]["label"] == get_label(meas_fn(qml.Z(0)))
 
-    @pytest.mark.unit
     @pytest.mark.parametrize(
         "op",
         [
@@ -940,7 +920,6 @@ class TestCreateStaticMeasurementNodes:
 
         assert nodes["node1"]["label"] == get_label(op)
 
-    @pytest.mark.unit
     @pytest.mark.parametrize(
         "op",
         [
