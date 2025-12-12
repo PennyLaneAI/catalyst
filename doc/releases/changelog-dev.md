@@ -2,7 +2,7 @@
 
 <h3>New features since last release</h3>
 
-* A new `gridsynth` pass is added to support Clifford+T decomopsition. This pass discretizes `RZ` and `PhaseShift` gates to either the Clifford+T basis or to the PPR basis. 
+* A new `gridsynth` pass is added to support Clifford+T decomopsition. This pass discretizes `RZ` and `PhaseShift` gates to either the Clifford+T basis or to the PPR basis. The pass also supports decomposing single-qubit arbitrary angle PPR in the Z basis.
   [(#2140)](https://github.com/PennyLaneAI/catalyst/pull/2140)
   [(#2166)](https://github.com/PennyLaneAI/catalyst/pull/2166)
   [(#2292)](https://github.com/PennyLaneAI/catalyst/pull/2292)
