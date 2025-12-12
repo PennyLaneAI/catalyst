@@ -23,7 +23,7 @@ import pytest
     [-11.1, -7.7, -4.4, -2.2, -1.1, -0.3, -0.2, -0.1, 0.0, 0.1, 0.2, 0.3, 1.1, 2.2, 4.4, 7.7, 11.1],
 )
 @pytest.mark.parametrize("op", [qml.RZ, qml.PhaseShift])
-@pytest.mark.parametrize("eps", [1e-3, 1e-4, 1e-5, 1e-6])
+@pytest.mark.parametrize("eps", [1e-3, 1e-4, 1e-5, 1e-6, 1e-7])
 def test_PhaseShift_gridsynth(param, op, eps):
     """Test that PhaseShift gates are correctly decomposed using the gridsynth pass."""
 
