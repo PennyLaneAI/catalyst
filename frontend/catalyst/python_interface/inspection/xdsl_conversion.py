@@ -159,9 +159,13 @@ def _apply_adjoint_and_ctrls(qml_op: Operator, xdsl_op) -> Operator:
 
 
 # pylint: disable=too-many-return-statements
-def resolve_constant_params(ssa: SSAValue) -> float | int:
+def resolve_constant_params(ssa: SSAValue) -> float | int | str:
     """Resolve a constant parameter SSA value to a Python float or int."""
     op = ssa.owner
+
+    if isinstance(op, Block):
+        arg_name = list(compress(op.args, map(lambda arg: arg is ssa, op.args)))[0]
+        return arg_name.name_hint
 
     if isinstance(op, TensorExtractOp):
         return resolve_constant_params(op.tensor)
@@ -170,6 +174,11 @@ def resolve_constant_params(ssa: SSAValue) -> float | int:
         raise NotImplementedError(f"Cannot resolve parameters for operation: {op}")
 
     match op.name:
+        case "tensor.from_elements":
+            return resolve_constant_params(op.operands[0])
+
+        case "arith.index_cast":
+            return resolve_constant_params(op.operands[0])
 
         case "arith.addf":
             return sum(resolve_constant_params(o) for o in op.operands)
@@ -236,6 +245,14 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
         return arg_name.name_hint
 
     match op:
+        case _ if op.name == "stablehlo.reshape":
+            return resolve_constant_wire(op.operands[0])
+
+        case _ if op.name == "tensor.from_elements":
+            return resolve_constant_wire(op.operands[0])
+
+        case _ if op.name == "arith.index_cast":
+            return resolve_constant_params(op.operands[0])
 
         case TensorExtractOp(tensor=tensor):
             return resolve_constant_wire(tensor)
@@ -322,9 +339,7 @@ def xdsl_to_qml_op(op) -> Operator:
     """
     # Pause capture *only if active* so we can allow strings (dynamic wires) as allowed wires
     with conditional_pause(capture.pause):
-
         match op.name:
-
             case "quantum.gphase":
                 gate = ops.GlobalPhase(
                     ssa_to_qml_params(op, single=True), wires=ssa_to_qml_wires(op)
@@ -332,7 +347,8 @@ def xdsl_to_qml_op(op) -> Operator:
 
             case "quantum.unitary":
                 gate = ops.qubit.matrix_ops.QubitUnitary(
-                    U=jax.numpy.zeros(_tensor_shape_from_ssa(op.matrix)), wires=ssa_to_qml_wires(op)
+                    U=jax.numpy.zeros(_tensor_shape_from_ssa(op.matrix)),
+                    wires=ssa_to_qml_wires(op),
                 )
 
             case "quantum.set_state":
@@ -417,7 +433,6 @@ def xdsl_to_qml_measurement(op, *args, **kwargs) -> MeasurementProcess | Operato
     """
 
     match op.name:
-
         case "quantum.measure":
             postselect = op.postselect.value.data if op.postselect is not None else None
             return MidMeasure([resolve_constant_wire(op.in_qubit)], postselect=postselect)

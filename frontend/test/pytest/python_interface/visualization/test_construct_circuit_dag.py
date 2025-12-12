@@ -859,6 +859,156 @@ class TestCreateStaticOperatorNodes:
 
         assert nodes["node1"]["label"] == f"<name> MidMeasureMP|<wire> [0]"
 
+class TestCreateDynamicOperatorNodes:
+    """Tests that operator nodes with dynamic parameters or wires can be created and visualized."""
+
+    def test_static_dynamic_mix(self):
+        """Tests that static and dynamic wires can both be used."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit(x):
+            qml.SWAP([0,x])
+
+        args = (1,)
+        module = my_circuit(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + SWAP 
+
+        assert nodes["node1"]["label"] ==  f"<name> SWAP|<wire> [0, arg0]"
+
+
+    def test_qnode_argument(self):
+        """Tests that qnode arguments can be used as wires."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit(x, y):
+            qml.H(x)
+            qml.X(y)
+
+        args = (1,2)
+        module = my_circuit(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + H + X 
+
+        assert nodes["node1"]["label"] ==  f"<name> Hadamard|<wire> [arg0]"
+        assert nodes["node2"]["label"] ==  f"<name> PauliX|<wire> [arg1]"
+
+    def test_for_loop_variable(self):
+        """Tests that for loop iteration variables can be used as wires."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            for i in range(3):
+                qml.H(i)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + H 
+
+        assert nodes["node1"]["label"] ==  f"<name> Hadamard|<wire> [arg0]"
+
+    def test_while_loop_variable(self):
+        """Tests that while loop variables can be used as wires."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            counter = 0
+            while counter < 5:
+                qml.H(counter)
+                counter += 1
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + H 
+
+        assert nodes["node1"]["label"] ==  f"<name> Hadamard|<wire> [arg0]"
+
+    def test_conditional_variable(self):
+        """Tests that conditional variables can be used."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit(x, y):
+            if x == y:
+                qml.H(x)
+
+        args = (1,2)
+        module = my_circuit(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + H 
+
+        assert nodes["node1"]["label"] ==  f"<name> Hadamard|<wire> [arg0]"
+
+    def test_through_clusters(self):
+        """Tests that dynamic wire labels can be accessed through clusters."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit(x):
+            for i in range(3):
+                qml.H(x)
+                qml.X(i)
+
+        args = (1,)
+        module = my_circuit(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + H + X
+
+        assert nodes["node1"]["label"] ==  f"<name> Hadamard|<wire> [arg0]"
+        assert nodes["node2"]["label"] ==  f"<name> PauliX|<wire> [arg1]"
+
 
 class TestCreateStaticMeasurementNodes:
     """Tests that measurements with static parameters can be created and visualized as nodes."""
