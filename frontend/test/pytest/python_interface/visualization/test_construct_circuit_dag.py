@@ -1134,9 +1134,10 @@ class TestCreateDynamicMeasurementNodes:
 
         @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
+        @qml.set_shots(10)
         @qml.qnode(dev)
         def my_circuit(x, y):
-            return qml.probs(wires=x), qml.expval(qml.Z(x)), qml.var(qml.X(y))
+            return qml.probs(wires=x), qml.expval(qml.Z(x)), qml.var(qml.X(y)), qml.sample(wires=x)
 
         args = (1, 2)
         module = my_circuit(*args)
@@ -1146,11 +1147,12 @@ class TestCreateDynamicMeasurementNodes:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
-        assert len(nodes) == 4  # Device node + probs + expval + var
+        assert len(nodes) == 5  # Device node + probs + expval + var + sample
 
         assert nodes["node1"]["label"] == f"<name> probs|<wire> [arg0]"
         assert nodes["node2"]["label"] == f"<name> expval(PauliZ)|<wire> [arg0]"
         assert nodes["node3"]["label"] == f"<name> var(PauliX)|<wire> [arg1]"
+        assert nodes["node4"]["label"] == f"<name> sample|<wire> [arg0]"
 
 
 class TestOperatorConnectivity:
