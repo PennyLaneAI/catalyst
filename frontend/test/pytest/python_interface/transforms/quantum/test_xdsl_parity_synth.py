@@ -29,7 +29,7 @@ from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 
 from catalyst.python_interface.transforms import (
     ParitySynthPass,
-    parity_synth,
+    parity_synth_pass,
 )
 from catalyst.python_interface.transforms.quantum.parity_synth import _parity_network_synth
 
@@ -462,7 +462,7 @@ class TestParitySynthIntegration:
         dev = qml.device("lightning.qubit", wires=2)
 
         @qml.qjit(target="mlir", pass_plugins=[getXDSLPluginAbsolutePath()])
-        @parity_synth
+        @parity_synth_pass
         @qml.qnode(dev)
         def circuit(x: float, y: float, z: float):
             # CHECK: [[phi:%.+]] = tensor.extract %arg0

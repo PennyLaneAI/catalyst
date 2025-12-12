@@ -36,7 +36,7 @@ from .quantum import (
     iterative_cancel_inverses_pass,
     measurements_from_samples_pass,
     merge_rotations_pass,
-    parity_synth,
+    parity_synth_pass,
     split_non_commuting_pass,
 )
 
@@ -53,7 +53,7 @@ __all__ = [
     "merge_rotations_pass",
     "MergeRotationsPass",
     "ParitySynthPass",
-    "parity_synth",
+    "parity_synth_pass",
     "split_non_commuting_pass",
     "SplitNonCommutingPass",
     # MBQC
