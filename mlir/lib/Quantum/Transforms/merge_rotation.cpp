@@ -55,6 +55,8 @@ struct MergeRotationsPass : impl::MergeRotationsPassBase<MergeRotationsPass> {
                                                                   &getContext());
         catalyst::qec::PPRotationOp::getCanonicalizationPatterns(patternsCanonicalization,
                                                                  &getContext());
+        catalyst::qec::PPRotationArbitraryOp::getCanonicalizationPatterns(patternsCanonicalization,
+                                                                          &getContext());
         if (failed(applyPatternsGreedily(module, std::move(patternsCanonicalization)))) {
             return signalPassFailure();
         }
