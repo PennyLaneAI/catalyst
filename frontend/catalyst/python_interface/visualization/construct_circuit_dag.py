@@ -217,8 +217,8 @@ class ConstructCircuitDAG:
         )
         self._node_uid_counter += 1
 
-        for seen_nodes in self._wire_to_node_uids.values():
-            for seen_node in seen_nodes:
+        for prev_wire in prev_wires:
+            for seen_node in self._wire_to_node_uids[prev_wire]:
                 self.dag_builder.add_edge(seen_node, node_uid, color="lightpink3")
 
     # =============

@@ -1614,3 +1614,42 @@ class TestTerminalMeasurementConnectivity:
         utility.construct(module)
 
         assert len(utility.dag_builder.edges) == 0
+
+    def test_terminal_measurement_dynamic(self):
+        """Tests that a terminal measurement on a dynamic wire connects properly."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow(x,y):
+            qml.X(0)
+            qml.Y(x)
+            qml.Z(y)
+            return qml.probs(wires=[0, x])
+
+        args = (1,2)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "X" in nodes["node1"]["label"]
+        assert "Y" in nodes["node2"]["label"]
+        assert "Z" in nodes["node3"]["label"]
+        assert "probs" in nodes["node4"]["label"]
+
+        # Check all edges
+        assert len(edges) == 3
+        assert ("node1", "node2") in edges
+        assert edges[("node1", "node2")]["attrs"]["style"] == "dashed"
+        assert ("node2", "node3") in edges
+        assert edges[("node2", "node3")]["attrs"]["style"] == "dashed"
+        assert ("node3", "node4") in edges
