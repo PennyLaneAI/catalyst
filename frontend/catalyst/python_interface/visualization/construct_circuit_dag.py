@@ -61,6 +61,9 @@ class ConstructCircuitDAG:
         # Values represent the set of all node uids that are on that wire.
         self._wire_to_node_uids: dict[str | int, set[str]] = defaultdict(set)
 
+        # Track which node UIDs are dynamic
+        self._dynamic_node_uids: set = set()
+
         # Use counter internally for UID
         self._node_uid_counter: int = 0
         self._cluster_uid_counter: int = 0
@@ -71,6 +74,7 @@ class ConstructCircuitDAG:
         self._node_uid_counter: int = 0
         self._cluster_uid_counter: int = 0
         self._wire_to_node_uids: dict[str | int, set[str]] = defaultdict(set)
+        self._dynamic_node_uids: set = set()
 
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module.
@@ -128,16 +132,7 @@ class ConstructCircuitDAG:
         )
         self._node_uid_counter += 1
 
-        # Search through previous ops found on current wires and connect
-        prev_node_uids: set[str] = set.union(
-            set(), *(self._wire_to_node_uids[wire] for wire in qml_op.wires)
-        )
-        for prev_node_uid in prev_node_uids:
-            self.dag_builder.add_edge(prev_node_uid, node_uid)
-
-        # Update affected wires to source from this node UID
-        for wire in qml_op.wires:
-            self._wire_to_node_uids[wire] = {node_uid}
+        self._connect_op(qml_op, node_uid)
 
     @_visit_operation.register
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
@@ -157,16 +152,7 @@ class ConstructCircuitDAG:
         )
         self._node_uid_counter += 1
 
-        # Search through previous ops found on current wires and connect
-        prev_node_uids: set[str] = set.union(
-            set(), *(self._wire_to_node_uids[wire] for wire in meas.wires)
-        )
-        for prev_node_uid in prev_node_uids:
-            self.dag_builder.add_edge(prev_node_uid, node_uid)
-
-        # Update affected wires to source from this node UID
-        for wire in meas.wires:
-            self._wire_to_node_uids[wire] = {node_uid}
+        self._connect_op(meas, node_uid)
 
     # =====================
     # QUANTUM MEASUREMENTS
@@ -229,10 +215,9 @@ class ConstructCircuitDAG:
         )
         self._node_uid_counter += 1
 
-        for wire in prev_wires:
-            if wire in self._wire_to_node_uids:
-                for seen_node in self._wire_to_node_uids[wire]:
-                    self.dag_builder.add_edge(seen_node, node_uid, color="lightpink3")
+        for prev_wire in prev_wires:
+            for seen_node in self._wire_to_node_uids[prev_wire]:
+                self.dag_builder.add_edge(seen_node, node_uid, color="lightpink3")
 
     # =============
     # CONTROL FLOW
@@ -405,6 +390,62 @@ class ConstructCircuitDAG:
         # Clear seen wires as we are exiting a FuncOp (qnode)
         self._wire_to_node_uids = defaultdict(set)
 
+    # =======================
+    # WIRE CONNECTIVITY
+    # =======================
+
+    def _connect_op(self, qml_op, node_uid: str):
+        # Record if it's a dynamic node for easy look-up
+        is_dynamic = any(not isinstance(wire, int) for wire in qml_op.wires)
+        if is_dynamic:
+            self._dynamic_node_uids.add(node_uid)
+
+        # Find all previous nodes to connect to
+        prev_uids: set = set()
+
+        if is_dynamic:
+            all_prev_uids = set().union(*self._wire_to_node_uids.values())
+
+            # Get only the static nodes from this set
+            only_dynamic_uids = all_prev_uids.issubset(self._dynamic_node_uids)
+            static_uids = set()
+            if not only_dynamic_uids:
+                static_uids = all_prev_uids - self._dynamic_node_uids
+
+            # If static nodes exist, connect only to them to avoid
+            # direct dynamic-to-dynamic links
+            if static_uids:
+                prev_uids.update(static_uids)
+            elif only_dynamic_uids:
+                prev_uids.update(all_prev_uids)
+        else:
+            # Standard connectivity of static operators
+            for wire in qml_op.wires:
+                prev_uids.update(self._wire_to_node_uids.get(wire, set()))
+
+            # Edge case when first operator is dynamic
+            if not prev_uids:
+                all_prev = set().union(*self._wire_to_node_uids.values())
+                prev_uids.update({uid for uid in all_prev if uid in self._dynamic_node_uids})
+
+        # Connect all previously seen operators
+        style = "dashed" if is_dynamic else "solid"
+        for p_uid in prev_uids:
+            self.dag_builder.add_edge(p_uid, node_uid, style=style)
+
+        if is_dynamic:
+            # Every wire now "flows" through this dynamic barrier (choke)
+            for wire in list(self._wire_to_node_uids.keys()):
+                self._wire_to_node_uids[wire] = {node_uid}
+            # Update if no nodes have been seen yet
+            if not self._wire_to_node_uids:
+                for wire in qml_op.wires:
+                    self._wire_to_node_uids[wire] = {node_uid}
+        else:
+            # Standard update for static wires
+            for wire in qml_op.wires:
+                self._wire_to_node_uids[wire] = {node_uid}
+
 
 def _flatten_if_op(op: scf.IfOp) -> list[Region]:
     """Recursively flattens a nested IfOp (if/elif/else chains)."""
@@ -455,7 +496,7 @@ def _operator(op: Operator) -> str:
     else:
         wires_str = f"[{', '.join(map(str, wires))}]"
     # Using <...> lets us use ports (https://graphviz.org/doc/info/shapes.html#record)
-    return f"<name> {op.name}|<wire> {wires_str}"
+    return f"<name> {str(op).split('(')[0]}|<wire> {wires_str}"
 
 
 @get_label.register
@@ -473,7 +514,7 @@ def _meas(meas: MeasurementProcess) -> str:
     match meas:
         case ExpectationMP() | VarianceMP() | ProbabilityMP():
             if meas.obs is not None:
-                obs_name = meas.obs.name
+                obs_name = str(meas.obs).split("(")[0]
                 base_name = f"{base_name}({obs_name})"
 
         case _:

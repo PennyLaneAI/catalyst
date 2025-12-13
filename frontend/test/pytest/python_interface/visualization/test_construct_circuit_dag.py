@@ -681,7 +681,7 @@ class TestGetLabel:
     @pytest.mark.parametrize(
         "op, label",
         [
-            (qml.H(0), "<name> Hadamard|<wire> [0]"),
+            (qml.H(0), "<name> H|<wire> [0]"),
             (
                 qml.QubitUnitary([[0, 1], [1, 0]], 0),
                 "<name> QubitUnitary|<wire> [0]",
@@ -701,8 +701,8 @@ class TestGetLabel:
         "meas, label",
         [
             (qml.state(), "<name> state|<wire> all"),
-            (qml.expval(qml.Z(0)), "<name> expval(PauliZ)|<wire> [0]"),
-            (qml.var(qml.Z(0)), "<name> var(PauliZ)|<wire> [0]"),
+            (qml.expval(qml.Z(0)), "<name> expval(Z)|<wire> [0]"),
+            (qml.var(qml.Z(0)), "<name> var(Z)|<wire> [0]"),
             (qml.probs(), "<name> probs|<wire> all"),
             (qml.probs(wires=0), "<name> probs|<wire> [0]"),
             (qml.probs(wires=[0, 1]), "<name> probs|<wire> [0, 1]"),
@@ -840,7 +840,157 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
-        assert nodes["node1"]["label"] == f"<name> MidMeasureMP|<wire> [0]"
+        assert nodes["node1"]["label"] == f"<name> MidMeasure|<wire> [0]"
+
+
+class TestCreateDynamicOperatorNodes:
+    """Tests that operator nodes with dynamic parameters or wires can be created and visualized."""
+
+    def test_static_dynamic_mix(self):
+        """Tests that static and dynamic wires can both be used."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit(x):
+            qml.SWAP([0, x])
+
+        args = (1,)
+        module = my_circuit(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + SWAP
+
+        assert nodes["node1"]["label"] == f"<name> SWAP|<wire> [0, arg0]"
+
+    def test_qnode_argument(self):
+        """Tests that qnode arguments can be used as wires."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit(x, y):
+            qml.H(x)
+            qml.X(y)
+
+        args = (1, 2)
+        module = my_circuit(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + H + X
+
+        assert nodes["node1"]["label"] == f"<name> H|<wire> [arg0]"
+        assert nodes["node2"]["label"] == f"<name> X|<wire> [arg1]"
+
+    def test_for_loop_variable(self):
+        """Tests that for loop iteration variables can be used as wires."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            for i in range(3):
+                qml.H(i)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + H
+
+        assert nodes["node1"]["label"] == f"<name> H|<wire> [arg0]"
+
+    def test_while_loop_variable(self):
+        """Tests that while loop variables can be used as wires."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            counter = 0
+            while counter < 5:
+                qml.H(counter)
+                counter += 1
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + H
+
+        assert nodes["node1"]["label"] == f"<name> H|<wire> [arg0]"
+
+    def test_conditional_variable(self):
+        """Tests that conditional variables can be used."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit(x, y):
+            if x == y:
+                qml.H(x)
+
+        args = (1, 2)
+        module = my_circuit(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + H
+
+        assert nodes["node1"]["label"] == f"<name> H|<wire> [arg0]"
+
+    def test_through_clusters(self):
+        """Tests that dynamic wire labels can be accessed through clusters."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit(x):
+            for i in range(3):
+                qml.H(x)
+                qml.X(i)
+
+        args = (1,)
+        module = my_circuit(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + H + X
+
+        assert nodes["node1"]["label"] == f"<name> H|<wire> [arg0]"
+        assert nodes["node2"]["label"] == f"<name> X|<wire> [arg1]"
 
 
 class TestCreateStaticMeasurementNodes:
@@ -951,6 +1101,60 @@ class TestCreateStaticMeasurementNodes:
         assert nodes["node1"]["label"] == get_label(op)
 
 
+class TestCreateDynamicMeasurementNodes:
+    """Tests that measurements on dynamic wires render correctly."""
+
+    def test_static_dynamic_mix(self):
+        """Tests that static and dynamic wires can both be used."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit(x):
+            return qml.probs(wires=[0, x])
+
+        args = (1,)
+        module = my_circuit(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + probs
+
+        assert nodes["node1"]["label"] == f"<name> probs|<wire> [0, arg0]"
+
+    def test_qnode_argument(self):
+        """Tests that qnode arguments can be used as wires."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.set_shots(10)
+        @qml.qnode(dev)
+        def my_circuit(x, y):
+            return qml.probs(wires=x), qml.expval(qml.Z(x)), qml.var(qml.X(y)), qml.sample(wires=x)
+
+        args = (1, 2)
+        module = my_circuit(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 5  # Device node + probs + expval + var + sample
+
+        assert nodes["node1"]["label"] == f"<name> probs|<wire> [arg0]"
+        assert nodes["node2"]["label"] == f"<name> expval(Z)|<wire> [arg0]"
+        assert nodes["node3"]["label"] == f"<name> var(X)|<wire> [arg1]"
+        assert nodes["node4"]["label"] == f"<name> sample|<wire> [arg0]"
+
+
 class TestOperatorConnectivity:
     """Tests that operators are properly connected."""
 
@@ -981,10 +1185,10 @@ class TestOperatorConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "PauliX" in nodes["node1"]["label"]
-        assert "PauliY" in nodes["node2"]["label"]
-        assert "PauliZ" in nodes["node3"]["label"]
-        assert "Hadamard" in nodes["node4"]["label"]
+        assert "X" in nodes["node1"]["label"]
+        assert "Y" in nodes["node2"]["label"]
+        assert "Z" in nodes["node3"]["label"]
+        assert "H" in nodes["node4"]["label"]
         assert "S" in nodes["node5"]["label"]
         assert "T" in nodes["node6"]["label"]
 
@@ -1020,8 +1224,8 @@ class TestOperatorConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "PauliX" in nodes["node1"]["label"]
-        assert "PauliY" in nodes["node2"]["label"]
+        assert "X" in nodes["node1"]["label"]
+        assert "Y" in nodes["node2"]["label"]
 
         # Check edges
         #    for loop
@@ -1054,8 +1258,8 @@ class TestOperatorConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "PauliX" in nodes["node1"]["label"]
-        assert "PauliY" in nodes["node2"]["label"]
+        assert "X" in nodes["node1"]["label"]
+        assert "Y" in nodes["node2"]["label"]
 
         # Check edges
         #    while loop
@@ -1095,14 +1299,14 @@ class TestOperatorConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        # NOTE: depth first traversal hence T first then PauliX
+        # NOTE: depth first traversal hence T first then X
         assert "T" in nodes["node1"]["label"]
-        assert "PauliX" in nodes["node2"]["label"]
+        assert "X" in nodes["node2"]["label"]
         assert "RX" in nodes["node3"]["label"]
         assert "S" in nodes["node4"]["label"]
         assert "RY" in nodes["node5"]["label"]
         assert "RZ" in nodes["node6"]["label"]
-        assert "Hadamard" in nodes["node7"]["label"]
+        assert "H" in nodes["node7"]["label"]
 
         # Check all edges
         assert len(edges) == 7
@@ -1153,6 +1357,128 @@ class TestOperatorConnectivity:
         assert ("node1", "node5") in edges  # RZ -> Toffoli
         assert ("node4", "node5") in edges  # CNOT -> Toffoli
 
+    def test_dynamic_wire_connectivity(self):
+        """Tests standard scenario of interweaving static and dynamic operators."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow(x, y):
+            qml.X(0)
+            qml.Y(1)
+            qml.Z(2)
+            qml.H(x)
+            qml.S(0)
+            qml.T(2)
+            qml.H(x)
+
+        args = (1, 2)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "Z" in nodes["node1"]["label"]
+        assert "Y" in nodes["node2"]["label"]
+        assert "X" in nodes["node3"]["label"]
+        assert "H" in nodes["node4"]["label"]
+        assert "T" in nodes["node5"]["label"]
+        assert "S" in nodes["node6"]["label"]
+        assert "H" in nodes["node7"]["label"]
+
+        # Check all edges
+        assert len(edges) == 7
+
+        # All static wires collapse into the dynamic hadamard (dashed edges)
+        assert ("node1", "node4") in edges
+        assert edges[("node1", "node4")]["attrs"]["style"] == "dashed"
+        assert ("node2", "node4") in edges
+        assert edges[("node2", "node4")]["attrs"]["style"] == "dashed"
+        assert ("node3", "node4") in edges
+        assert edges[("node3", "node4")]["attrs"]["style"] == "dashed"
+
+        # H then fans out to the static S and T
+        assert ("node4", "node5") in edges
+        assert ("node4", "node6") in edges
+
+        # Collapse again to the dynamic H
+        assert ("node5", "node7") in edges
+        assert edges[("node5", "node7")]["attrs"]["style"] == "dashed"
+        assert ("node6", "node7") in edges
+        assert edges[("node6", "node7")]["attrs"]["style"] == "dashed"
+
+    def test_first_operator_is_dynamic(self):
+        """Tests when the first operator is dynamic"""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow(x, y):
+            qml.H(x)
+
+        args = (1, 2)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "H" in nodes["node1"]["label"]
+
+        # Check all edges
+        assert len(edges) == 0
+
+    def test_double_choke(self):
+        """Tests when two dynamic operators are back to back"""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow(x, y):
+            qml.X(0)
+            qml.Y(x)
+            qml.Z(y)
+
+        args = (1, 2)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "X" in nodes["node1"]["label"]
+        assert "Y" in nodes["node2"]["label"]
+        assert "Z" in nodes["node3"]["label"]
+
+        # Check all edges
+        assert len(edges) == 2
+
+        assert ("node1", "node2") in edges
+        assert ("node2", "node3") in edges
+        assert edges[("node2", "node3")]["attrs"]["style"] == "dashed"
+
 
 class TestTerminalMeasurementConnectivity:
     """Test that terminal measurements connect properly."""
@@ -1182,7 +1508,7 @@ class TestTerminalMeasurementConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "PauliX" in nodes["node1"]["label"]
+        assert "X" in nodes["node1"]["label"]
         assert "T" in nodes["node2"]["label"]
         assert meas_fn.__name__ in nodes["node3"]["label"]
 
@@ -1223,10 +1549,10 @@ class TestTerminalMeasurementConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "PauliX" in nodes["node1"]["label"]
-        assert "PauliY" in nodes["node2"]["label"]
-        assert "PauliZ" in nodes["node3"]["label"]
-        assert "Hadamard" in nodes["node4"]["label"]
+        assert "X" in nodes["node1"]["label"]
+        assert "Y" in nodes["node2"]["label"]
+        assert "Z" in nodes["node3"]["label"]
+        assert "H" in nodes["node4"]["label"]
         assert "expval" in nodes["node5"]["label"]
         assert "var" in nodes["node6"]["label"]
         assert "probs" in nodes["node7"]["label"]
@@ -1263,8 +1589,8 @@ class TestTerminalMeasurementConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "PauliX" in nodes["node1"]["label"]
-        assert "PauliY" in nodes["node2"]["label"]
+        assert "X" in nodes["node1"]["label"]
+        assert "Y" in nodes["node2"]["label"]
         assert "probs" in nodes["node3"]["label"]
 
         # Check all edges
@@ -1288,3 +1614,42 @@ class TestTerminalMeasurementConnectivity:
         utility.construct(module)
 
         assert len(utility.dag_builder.edges) == 0
+
+    def test_terminal_measurement_dynamic(self):
+        """Tests that a terminal measurement on a dynamic wire connects properly."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow(x, y):
+            qml.X(0)
+            qml.Y(x)
+            qml.Z(y)
+            return qml.probs(wires=[0, x])
+
+        args = (1, 2)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        assert "X" in nodes["node1"]["label"]
+        assert "Y" in nodes["node2"]["label"]
+        assert "Z" in nodes["node3"]["label"]
+        assert "probs" in nodes["node4"]["label"]
+
+        # Check all edges
+        assert len(edges) == 3
+        assert ("node1", "node2") in edges
+        assert edges[("node1", "node2")]["attrs"]["style"] == "dashed"
+        assert ("node2", "node3") in edges
+        assert edges[("node2", "node3")]["attrs"]["style"] == "dashed"
+        assert ("node3", "node4") in edges
