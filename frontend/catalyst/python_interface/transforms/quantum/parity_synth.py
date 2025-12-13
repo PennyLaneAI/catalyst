@@ -200,6 +200,7 @@ def make_phase_polynomial(
 
     return parity_matrix % 2, np.array(parity_table).T % 2, angles, arith_ops
 
+
 def _cnot(i: int, j: int, inv_wire_map: dict[int, QubitType]):
     """Create a CNOT operator acting on the qubits that map to wires ``i`` and ``j``
     and update the wire map so that ``i`` and ``j`` point to the output qubits afterwards."""
@@ -211,6 +212,7 @@ def _cnot(i: int, j: int, inv_wire_map: dict[int, QubitType]):
     inv_wire_map[i] = cnot_op.out_qubits[0]
     inv_wire_map[j] = cnot_op.out_qubits[1]
     return cnot_op
+
 
 def _rz(wire: int, angle: SSAValue[builtin.Float64Type], inv_wire_map: dict[int, QubitType]):
     """Create a CNOT operator acting on the qubit that maps to ``wire``

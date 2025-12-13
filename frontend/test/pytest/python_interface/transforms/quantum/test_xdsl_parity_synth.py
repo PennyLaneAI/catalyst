@@ -33,7 +33,6 @@ from catalyst.python_interface.transforms import (
 from catalyst.python_interface.transforms.quantum.parity_synth import _parity_network_synth
 
 
-
 def validate_binary_matrix(matrix: np.ndarray):
     """Check that the input matrix is two-dimensional, integer-dtyped and
     only contains zeros and ones.
