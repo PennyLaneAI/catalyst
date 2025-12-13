@@ -103,6 +103,11 @@
     detecting when the Python compiler is being used and routing through it appropriately.
     [(#2190)](https://github.com/PennyLaneAI/catalyst/pull/2190)
 
+  * A new experimental `parity_synth_pass` compiler pass has been added to
+    `catalyst.python_interface.transforms`. This pass groups ``CNOT`` and ``RZ`` operators
+    into phase polynomials and re-synthesizes them into ``CNOT`` and ``RZ`` operators again.
+    [(#2294)](https://github.com/PennyLaneAI/catalyst/pull/2294)
+
 * Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
   [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
 
@@ -371,10 +376,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* RTIO dialect is added to bypass the compilation flow from OpenAPL to ARTIQ’s LLVM IR. It is 
-  introduced to bridge the gap between ION dialect and ARTIQ’s LLVM IR. The design philosophy 
-  of RTIO dialect is primarily event-based. Every operation is asynchronous; sync behaviour occurs 
-  only via `rtio.sync` or `wait operand` in event operation. And we now support the compiling from 
+* RTIO dialect is added to bypass the compilation flow from OpenAPL to ARTIQ’s LLVM IR. It is
+  introduced to bridge the gap between ION dialect and ARTIQ’s LLVM IR. The design philosophy
+  of RTIO dialect is primarily event-based. Every operation is asynchronous; sync behaviour occurs
+  only via `rtio.sync` or `wait operand` in event operation. And we now support the compiling from
   ION dialect to RTIO dilalect.
   [(#2185)](https://github.com/PennyLaneAI/catalyst/pull/2185)
   [(#2204)](https://github.com/PennyLaneAI/catalyst/pull/2204)
@@ -490,5 +495,6 @@ River McCubbin,
 Lee J. O'Riordan,
 Roberto Turrado,
 Paul Haochen Wang,
+David Wierichs,
 Jake Zaia,
 Hongsheng Zheng.
