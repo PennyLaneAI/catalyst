@@ -1623,13 +1623,13 @@ class TestTerminalMeasurementConnectivity:
         @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
-        def my_workflow(x,y):
+        def my_workflow(x, y):
             qml.X(0)
             qml.Y(x)
             qml.Z(y)
             return qml.probs(wires=[0, x])
 
-        args = (1,2)
+        args = (1, 2)
         module = my_workflow(*args)
 
         utility = ConstructCircuitDAG(FakeDAGBuilder())

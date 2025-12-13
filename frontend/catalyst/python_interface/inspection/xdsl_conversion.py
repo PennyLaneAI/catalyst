@@ -456,7 +456,11 @@ def xdsl_to_qml_measurement(op, *args, **kwargs) -> MeasurementProcess | Operato
                 return _extract(op, "qubits", resolve_constant_wire)
 
             case (
-                "quantum.state" | "quantum.probs" | "quantum.sample" | "quantum.expval" | "quantum.var"
+                "quantum.state"
+                | "quantum.probs"
+                | "quantum.sample"
+                | "quantum.expval"
+                | "quantum.var"
             ):
                 return resolve_measurement(op.name)(*args, **kwargs)
 

@@ -17,12 +17,6 @@
 from collections import defaultdict
 from functools import singledispatch, singledispatchmethod
 
-from catalyst.python_interface.dialects import quantum
-from catalyst.python_interface.inspection.xdsl_conversion import (
-    xdsl_to_qml_measurement,
-    xdsl_to_qml_op,
-)
-from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 from pennylane.measurements import (
     ExpectationMP,
     MeasurementProcess,
@@ -32,6 +26,13 @@ from pennylane.measurements import (
 from pennylane.operation import Operator
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region, SSAValue
+
+from catalyst.python_interface.dialects import quantum
+from catalyst.python_interface.inspection.xdsl_conversion import (
+    xdsl_to_qml_measurement,
+    xdsl_to_qml_op,
+)
+from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 
 
 class ConstructCircuitDAG:
@@ -113,10 +114,7 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _gate_op(
         self,
-        op: quantum.CustomOp
-        | quantum.GlobalPhaseOp
-        | quantum.QubitUnitaryOp
-        | quantum.MultiRZOp,
+        op: quantum.CustomOp | quantum.GlobalPhaseOp | quantum.QubitUnitaryOp | quantum.MultiRZOp,
     ) -> None:
         """Generic handler for unitary gates."""
 
@@ -367,9 +365,7 @@ class ConstructCircuitDAG:
             label = "qjit"
 
         uid = f"cluster{self._cluster_uid_counter}"
-        parent_cluster_uid = (
-            None if self._cluster_uid_stack == [] else self._cluster_uid_stack[-1]
-        )
+        parent_cluster_uid = None if self._cluster_uid_stack == [] else self._cluster_uid_stack[-1]
         self.dag_builder.add_cluster(
             uid,
             label=label,
@@ -430,9 +426,7 @@ class ConstructCircuitDAG:
             # Edge case when first operator is dynamic
             if not prev_uids:
                 all_prev = set().union(*self._wire_to_node_uids.values())
-                prev_uids.update(
-                    {uid for uid in all_prev if uid in self._dynamic_node_uids}
-                )
+                prev_uids.update({uid for uid in all_prev if uid in self._dynamic_node_uids})
 
         # Connect all previously seen operators
         style = "dashed" if is_dynamic else "solid"
@@ -520,7 +514,7 @@ def _meas(meas: MeasurementProcess) -> str:
     match meas:
         case ExpectationMP() | VarianceMP() | ProbabilityMP():
             if meas.obs is not None:
-                obs_name = str(meas.obs).split('(')[0]
+                obs_name = str(meas.obs).split("(")[0]
                 base_name = f"{base_name}({obs_name})"
 
         case _:
