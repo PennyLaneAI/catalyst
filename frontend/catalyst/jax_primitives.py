@@ -1442,12 +1442,20 @@ def _unitary_lowering(
 #
 @pauli_rot_p.def_abstract_eval
 def _pauli_rot_abstract_eval(
-    *qubits, angle=None, pauli_word=None, qubits_len=0, params_len=0, ctrl_len=0, adjoint=False
+    *qubits_and_ctrl_qubits,
+    angle=None,
+    pauli_word=None,
+    qubits_len=0,
+    params_len=0,
+    ctrl_len=0,
+    adjoint=False,
 ):
     # The signature here is: (using * to denote zero or more)
-    # qubits*, ctrl_qubits*, ctrl_values*
-    qubits = qubits[:qubits_len]
-    ctrl_qubits = qubits[-2 * ctrl_len : -ctrl_len]
+    # qubits*, params*, ctrl_qubits*, ctrl_values*
+    qubits = qubits_and_ctrl_qubits[:qubits_len]
+    params = qubits_and_ctrl_qubits[qubits_len : qubits_len + params_len]
+    ctrl_qubits = qubits_and_ctrl_qubits[-2 * ctrl_len : -ctrl_len]
+    ctrl_values = qubits_and_ctrl_qubits[-ctrl_len:]
     all_qubits = qubits + ctrl_qubits
     assert all(isinstance(qubit, AbstractQbit) for qubit in all_qubits)
     return (AbstractQbit(),) * (qubits_len + ctrl_len)
