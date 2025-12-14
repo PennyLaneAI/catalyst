@@ -1440,6 +1440,7 @@ def _unitary_lowering(
 #
 # pauli rot operation
 #
+# pylint: disable=unused-variable
 @pauli_rot_p.def_abstract_eval
 def _pauli_rot_abstract_eval(
     *qubits_and_ctrl_qubits,
