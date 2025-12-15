@@ -856,7 +856,6 @@ skip_if_pauli_rot_issue(test_decomposition_rule_name_adjoint)()
 
 
 # TODO: Reenable this once the underlying non-determinism issue is resolved'
-# pylint: disable=unused-function
 def test_decomposition_rule_name_ctrl():
     """Test decomposition rule with qml.ctrl."""
 
@@ -892,7 +891,6 @@ skip_if_pauli_rot_issue(test_decomposition_rule_name_ctrl)()
 
 
 # TODO: Reenable this once the underlying non-determinism issue is resolved
-# pylint: disable=unused-function
 def test_qft_decomposition():
     """Test the decomposition of the QFT"""
 
