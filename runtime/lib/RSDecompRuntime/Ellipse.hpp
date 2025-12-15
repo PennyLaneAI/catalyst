@@ -471,8 +471,8 @@ struct EllipseState {
     double bias() const { return e2.z - e1.z; }
 
     /**
-     * @brief Calculate the special grid operation for the state for reducing the skew (Lemma A.5,
-     * arXiv:1403.2975).
+     * @brief Calculate the special grid operation for the state for reducing the skew
+     * (Lemma A.5 (Step Lemma), arXiv:1403.2975).
      */
     GridOp skew_grid_op()
     {
@@ -497,19 +497,21 @@ struct EllipseState {
      */
     std::pair<EllipseState, INT_TYPE> apply_shift_op() const
     {
-        INT_TYPE k = INT_TYPE(std::floor((1.0 - bias()) / 2.0));
-        double pk_pow = std::pow(LAMBDA_D, static_cast<double>(k));
-        double nk_pow = std::pow(LAMBDA_D, static_cast<double>(-k));
+        double k = std::floor((1.0 - bias()) / 2.0);
+        double pk_pow = std::pow(LAMBDA_D, k);
+        double nk_pow = std::pow(LAMBDA_D, -k);
         Ellipse new_e1 = e1;
         Ellipse new_e2 = e2;
         new_e1.a *= pk_pow;
         new_e1.d *= nk_pow;
-        new_e1.z -= static_cast<double>(k);
+        new_e1.z -= k;
         new_e2.a *= nk_pow;
         new_e2.d *= pk_pow;
-        new_e2.z += static_cast<double>(k);
-        new_e2.b *= std::pow(-1.0, static_cast<double>(k));
-        return {EllipseState(new_e1, new_e2), k};
+        new_e2.z += k;
+        if (INT_TYPE(k) % 2 != 0) {
+            new_e2.b *= -1.0;
+        }
+        return {EllipseState(new_e1, new_e2), INT_TYPE(k)};
     }
 
     /**
@@ -519,7 +521,7 @@ struct EllipseState {
     {
         RT_FAIL_IF(!e1.positive_semi_definite() || !e2.positive_semi_definite(),
                    "Ellipse is not positive semi-definite.");
-        int sign = 1;
+        double sign = 1.0;
         INT_TYPE k = 0;
         GridOp grid_op = GridOp::from_string("I");
         if (e2.b < 0) {
@@ -530,8 +532,7 @@ struct EllipseState {
             grid_op = grid_op * GridOp::from_string("X");
         }
         if (std::abs(bias()) > 2) {
-            long long n =
-                static_cast<long long>(round((1.0 - static_cast<double>(sign) * bias()) / 4.0));
+            long long n = static_cast<long long>(round((1.0 - sign * bias()) / 4.0));
             grid_op = grid_op * GridOp::from_string("U").pow(INT_TYPE(n));
         }
         GridOp n_grid_op = GridOp::from_string("I");

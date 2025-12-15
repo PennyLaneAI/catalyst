@@ -124,7 +124,7 @@ class one_dim_problem_solution_iterator {
      */
     void find_next_solution()
     {
-        for (long b = b_current; b >= b_min; --b) {
+        for (long b = b_current; b >= b_min; b--) {
             // Use the constraints x0 <= a + b * sqrt(2) <= x1 to obtain the bounds on a.
             double lower_bound_a = x0_scaled - b * M_SQRT2;
             double upper_bound_a = x1_scaled - b * M_SQRT2;

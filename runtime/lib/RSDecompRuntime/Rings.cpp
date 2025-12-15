@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <iostream>
 #include <numeric>
 
 #include "RSUtils.hpp"
@@ -504,8 +503,8 @@ bool SO3Matrix::operator==(const SO3Matrix &other) const
 std::array<std::array<int, 3>, 3> SO3Matrix::parity_mat() const
 {
     std::array<std::array<int, 3>, 3> p_mat;
-    for (std::size_t i = 0; i < 3; ++i) {
-        for (std::size_t j = 0; j < 3; ++j) {
+    for (std::size_t i = 0; i < 3; i++) {
+        for (std::size_t j = 0; j < 3; j++) {
             INT_TYPE val = (so3_mat[i][j].a % 2 + 2) % 2;
             p_mat[i][j] = static_cast<int>(val);
         }
@@ -520,7 +519,7 @@ std::array<int, 3> SO3Matrix::parity_vec() const
 {
     auto p_mat = this->parity_mat();
     std::array<int, 3> p_vec;
-    for (std::size_t i = 0; i < 3; ++i) {
+    for (std::size_t i = 0; i < 3; i++) {
         p_vec[i] = std::accumulate(p_mat[i].begin(), p_mat[i].end(), 0);
     }
     return p_vec;
