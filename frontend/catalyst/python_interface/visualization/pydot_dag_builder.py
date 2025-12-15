@@ -70,7 +70,7 @@ class PyDotDAGBuilder(DAGBuilder):
         # - rankdir="TB": Set layout direction from Top to Bottom.
         # - compound="true": Allow edges to connect directly to clusters/subgraphs.
         # - strict=True: Prevent duplicate edges (e.g., A -> B added twice).
-        # - splines="ortho": Edges connecting clusters are orthogonal
+        # - splines="polyline": Edges connecting clusters are polylines
         self.graph: Dot = Dot(
             graph_type="digraph",
             rankdir="TB",
