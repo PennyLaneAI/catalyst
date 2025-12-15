@@ -469,15 +469,17 @@
 
   The ``lightning.amdgpu`` device is a specific instantiation of the ``lightning.kokkos`` backend, and supports the same features and operations as ``lightning.kokkos``. Pre-compiled wheels for ``lightning.amdgpu`` are available for MI300 series AMD GPUs. 
 
-  This device can be used for qjit workflows exactly as other devices compatible with Catalyst:
+  This device can be used within qjit'd workflows exactly as other devices compatible with Catalyst:
 
   ```python
-  @qjit
+  @qml.qjit
   @qml.qnode(qml.device('lightning.amdgpu', wires=2))
   def circuit():
     qml.Hadamard(0)
     return qml.state()
+  ```
 
+  ```pycon
   >>> circuit()
   [0.70710678+0.j 0.        +0.j 0.70710678+0.j 0.        +0.j]
   ```
