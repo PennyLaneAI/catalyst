@@ -398,14 +398,31 @@ class ConstructCircuitDAG:
         self._wire_to_node_uids = defaultdict(set)
 
     # =======================
-    # WIRE CONNECTIVITY
+    # NODE CONNECTIVITY
     # =======================
 
     def _connect(self, node: Operator | MeasurementProcess, node_uid: str, **edge_attrs):
+        """
+        Connects a new node to its previous nodes in the DAG and updates the wire mapping in place.
+        """
+
         # Record if it's a dynamic node for easy look-up
         is_dynamic = any(not isinstance(wire, int) for wire in node.wires)
         if is_dynamic:
             self._dynamic_node_uids.add(node_uid)
+
+        # Connect to all predecessors
+        prev_uids: set = self._get_previous_uids(node, is_dynamic)
+
+        style = "dashed" if is_dynamic else "solid"
+        for p_uid in prev_uids:
+            self.dag_builder.add_edge(p_uid, node_uid, style=style, **edge_attrs)
+
+        # Update the wire mapping
+        self._update_wire_mapping(node, node_uid, is_dynamic)
+
+    def _get_previous_uids(self, node: Operator | MeasurementProcess, is_dynamic: bool) -> set[str]:
+        """Helper function to get the set of previous node uids."""
 
         prev_uids: set = set()
 
@@ -429,18 +446,19 @@ class ConstructCircuitDAG:
         else:
             # Standard connectivity of static operators
             for wire in node.wires:
-                prev_uids.update(self._wire_to_node_uids.get(wire, set()))
+                prev_uids.update(self._wire_to_node_uids[wire])
 
             # Edge case when first operator is dynamic
             if not prev_uids:
                 all_prev = set().union(*self._wire_to_node_uids.values())
                 prev_uids.update({uid for uid in all_prev if uid in self._dynamic_node_uids})
 
-        # Connect all previously seen operators
-        style = "dashed" if is_dynamic else "solid"
-        for p_uid in prev_uids:
-            self.dag_builder.add_edge(p_uid, node_uid, style=style, **edge_attrs)
+        return prev_uids
 
+    def _update_wire_mapping(
+        self, node: Operator | MeasurementProcess, node_uid: str, is_dynamic: bool
+    ) -> None:
+        """Updates the wire mapping accordingly."""
         if isinstance(node, MeasurementProcess):
             # No need to update the wire mapping as these are terminal measuremnets
             return
