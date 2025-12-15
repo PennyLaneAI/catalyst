@@ -470,10 +470,10 @@ struct DecomposePPRArbitraryOpPattern
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         Location loc = op.getLoc();
 
-        // PPR(theta, Z) = exp(i * theta * Z)
+        // PPR(theta, Z) = exp(-i * theta * Z)
         // RZ(phi)       = exp(-i * phi/2 * Z)
-        // phi = -2 * theta
-        Value cMinus2 = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(-2.0));
+        // phi = 2 * theta
+        Value cMinus2 = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(2.0));
         Value rzAngle = rewriter.create<arith::MulFOp>(loc, angle, cMinus2);
 
         func::FuncOp decompFunc = getOrCreateDecompositionFunc(mod, rewriter, epsilon, pprBasis);

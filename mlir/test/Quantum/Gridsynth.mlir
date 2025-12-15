@@ -247,7 +247,7 @@ func.func @test_deduplication(%arg0: !quantum.bit) -> !quantum.bit {
 // CHECK-SAME: ([[Q_IN:%.+]]: !quantum.bit, [[THETA:%.+]]: f64)
 func.func @test_ppr_arbitrary_z_decomposition(%arg0: !quantum.bit, %theta: f64) -> !quantum.bit {
     
-    // CHECK: [[C_MINUS_2:%.+]] = arith.constant -2.0{{.*}} : f64
+    // CHECK: [[C_MINUS_2:%.+]] = arith.constant 2.0{{.*}} : f64
     
     // CHECK: [[PHI:%.+]] = arith.mulf [[THETA]], [[C_MINUS_2]]
 
