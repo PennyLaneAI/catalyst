@@ -1037,7 +1037,7 @@ class TestCreateStaticMeasurementNodes:
 
         # Ensure DAG only has one node
         nodes = utility.dag_builder.nodes
-        assert len(nodes) == 2  # Device node + operator
+        assert len(nodes) == 2  # Device node + measurement
 
         assert nodes["node1"]["label"] == get_label(meas_fn(qml.Z(0)))
 
@@ -1066,7 +1066,7 @@ class TestCreateStaticMeasurementNodes:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
-        assert len(nodes) == 2  # Device node + operator
+        assert len(nodes) == 2  # Device node + probs
 
         assert nodes["node1"]["label"] == get_label(op)
 
@@ -1096,7 +1096,7 @@ class TestCreateStaticMeasurementNodes:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
-        assert len(nodes) == 2  # Device node + operator
+        assert len(nodes) == 2  # Device node + sample
 
         assert nodes["node1"]["label"] == get_label(op)
 
