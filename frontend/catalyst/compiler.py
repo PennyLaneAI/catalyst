@@ -367,6 +367,19 @@ def _options_to_cli_flags(options):
     if options.async_qnodes:  # pragma: nocover
         extra_args += ["--async-qnodes"]
 
+    # ARTIQ cross-compilation flags
+    if options.artiq_config:
+        extra_args += ["--artiq"]
+        kernel_ld = options.artiq_config.get("kernel_ld", "")
+        if kernel_ld:
+            extra_args += [("--artiq-kernel-ld", kernel_ld)]
+        llc_path = options.artiq_config.get("llc_path", "")
+        if llc_path:
+            extra_args += [("--artiq-llc-path", llc_path)]
+        lld_path = options.artiq_config.get("lld_path", "")
+        if lld_path:
+            extra_args += [("--artiq-lld-path", lld_path)]
+
     return extra_args
 
 
@@ -483,16 +496,27 @@ class Compiler:
         else:
             out_IR = None
 
-        output = LinkerDriver.run(output_object_name, options=self.options)
-        output_object_name = str(pathlib.Path(output).absolute())
+        if self.options.artiq_config:
+            output_elf_name = os.path.join(str(workspace), f"{module_name}.elf")
+            output = str(pathlib.Path(output_elf_name).absolute())
 
-        # Clean up temporary files
-        if os.path.exists(tmp_infile_name):
-            os.remove(tmp_infile_name)
-        if os.path.exists(output_ir_name):
-            os.remove(output_ir_name)
+            if self.options.verbose:
+                print(f"[ARTIQ] Generated ELF: {output}", file=self.options.logfile)
 
-        return output_object_name, out_IR
+            # Clean up temporary input file
+            if os.path.exists(tmp_infile_name):
+                os.remove(tmp_infile_name)
+        else:
+            output = LinkerDriver.run(output_object_name, options=self.options)
+            output = str(pathlib.Path(output).absolute())
+
+            # Clean up temporary files
+            if os.path.exists(tmp_infile_name):
+                os.remove(tmp_infile_name)
+            if os.path.exists(output_ir_name):
+                os.remove(output_ir_name)
+
+        return output, out_IR
 
     def has_xdsl_passes_in_transform_modules(self, mlir_module):
         """Check if the MLIR module contains xDSL passes in transform dialect.

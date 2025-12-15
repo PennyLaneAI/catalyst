@@ -530,6 +530,13 @@ class QJIT(CatalystCallable):
         functools.update_wrapper(self, fn)
         self.original_function = fn
         self.compile_options = compile_options
+
+        # Extract artiq_config from device
+        if compile_options.artiq_config is None and isinstance(fn, qml.QNode):
+            device_artiq_config = getattr(fn.device, "artiq_config", None)
+            if device_artiq_config is not None:
+                compile_options.artiq_config = device_artiq_config
+
         self.compiler = Compiler(compile_options)
         self.fn_cache = CompilationCache(
             compile_options.static_argnums, compile_options.abstracted_axes
@@ -546,7 +553,11 @@ class QJIT(CatalystCallable):
         self.mlir_module = None
         self.out_type = None
         self.overwrite_ir = None
-        self.use_cwd_for_workspace = self.compile_options.keep_intermediate
+        # Use cwd for workspace if keep_intermediate is set or for ARTIQ targets
+        self.use_cwd_for_workspace = (
+            self.compile_options.keep_intermediate or self.compile_options.artiq_config
+        )
+        self._artiq_compiled = False  # Track if ARTIQ compilation has been done
 
         self.user_sig = get_type_annotations(fn)
         self._validate_configuration()
@@ -603,6 +614,10 @@ class QJIT(CatalystCallable):
 
         requires_promotion = self.jit_compile(args, **kwargs)
 
+        # For ARTIQ targets, compilation is complete, no execution needed
+        if self.compile_options.artiq_config:
+            return None
+
         # If we receive tracers as input, dispatch to the JAX integration.
         if any(isinstance(arg, jax.core.Tracer) for arg in tree_flatten(args)[0]):
             if self.jaxed_function is None:
@@ -631,6 +646,11 @@ class QJIT(CatalystCallable):
 
         if self.compile_options.target in ("binary",):
             self.compiled_function, _ = self.compile()
+
+            if self.compile_options.artiq_config:
+                self._artiq_compiled = True
+                return None
+
             self.fn_cache.insert(
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
@@ -656,6 +676,17 @@ class QJIT(CatalystCallable):
             bool: whether the provided arguments will require promotion to be used with the compiled
                   function
         """
+        # For ARTIQ targets, compile only once (skip if already compiled via AOT)
+        if self.compile_options.artiq_config:
+            if self._artiq_compiled:
+                return False
+            self.workspace = self._get_workspace()
+            self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
+            self.mlir_module = self.generate_ir()
+            self.compiled_function, _ = self.compile()
+            self._artiq_compiled = True
+            return False
+
         cached_fn, requires_promotion = self.fn_cache.lookup(args)
 
         if cached_fn is None:
@@ -795,6 +826,7 @@ class QJIT(CatalystCallable):
 
         Returns:
             Tuple[CompiledFunction, str]: the compilation result and LLVMIR
+            For ARTIQ targets, returns (elf_path, llvm_ir) instead.
         """
         # WARNING: assumption is that the first function is the entry point to the compiled program.
         entry_point_func = self.mlir_module.body.operations[0]
@@ -819,6 +851,12 @@ class QJIT(CatalystCallable):
             )
         else:
             shared_object, llvm_ir = self.compiler.run(self.mlir_module, self.workspace)
+
+        # We don't create a CompiledFunction for ARTIQ targets, just return the ELF path and LLVM IR
+        if self.compile_options.artiq_config:
+            print(f"[ARTIQ] Generated ELF: {shared_object}")
+            print(f"[ARTIQ] Object files saved in workspace: {self.workspace}")
+            return None, llvm_ir
 
         compiled_fn = CompiledFunction(
             shared_object, func_name, restype, self.out_type, self.compile_options
