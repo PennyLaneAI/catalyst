@@ -1193,10 +1193,13 @@ class TestOperatorConnectivity:
         assert "T" in nodes["node6"]["label"]
 
         # Check edges
-        # X -> Y
-        # Z -> H -> S
-        # T
-        assert len(edges) == 3
+        #           -> X -> Y
+        # NullQubit -> Z -> H -> S
+        #           -> T
+        assert len(edges) == 6
+        assert ("node0", "node1") in edges
+        assert ("node0", "node3") in edges
+        assert ("node0", "node6") in edges
         assert ("node1", "node2") in edges
         assert ("node3", "node4") in edges
         assert ("node4", "node5") in edges
@@ -1229,8 +1232,9 @@ class TestOperatorConnectivity:
 
         # Check edges
         #    for loop
-        # X ----------> Y
-        assert len(edges) == 1
+        # NullQubit -> X ----------> Y
+        assert len(edges) == 2
+        assert ("node0", "node1") in edges
         assert ("node1", "node2") in edges
 
     def test_static_connection_through_while_loop(self):
@@ -1263,8 +1267,9 @@ class TestOperatorConnectivity:
 
         # Check edges
         #    while loop
-        # X ----------> Y
-        assert len(edges) == 1
+        # NullQubit -> X ----------> Y
+        assert len(edges) == 2
+        assert ("node0", "node1") in edges
         assert ("node1", "node2") in edges
 
     def test_static_connection_through_conditional(self):
@@ -1309,7 +1314,9 @@ class TestOperatorConnectivity:
         assert "H" in nodes["node7"]["label"]
 
         # Check all edges
-        assert len(edges) == 7
+        assert len(edges) == 9
+        assert ("node0", "node1") in edges
+        assert ("node0", "node2") in edges
         assert ("node1", "node4") in edges
         assert ("node2", "node3") in edges
         assert ("node2", "node5") in edges
@@ -1351,7 +1358,10 @@ class TestOperatorConnectivity:
         assert "Toffoli" in nodes["node5"]["label"]
 
         # Check all edges
-        assert len(edges) == 4
+        assert len(edges) == 7
+        assert ("node0", "node1") in edges  # Device -> RZ
+        assert ("node0", "node2") in edges  # Device -> RX
+        assert ("node0", "node3") in edges  # Device -> RY
         assert ("node3", "node4") in edges  # RX -> CNOT
         assert ("node2", "node4") in edges  # RY -> CNOT
         assert ("node1", "node5") in edges  # RZ -> Toffoli
@@ -1395,9 +1405,12 @@ class TestOperatorConnectivity:
         assert "H" in nodes["node7"]["label"]
 
         # Check all edges
-        assert len(edges) == 7
+        assert len(edges) == 10
 
         # All static wires collapse into the dynamic hadamard (dashed edges)
+        assert ("node0", "node1") in edges
+        assert ("node0", "node2") in edges
+        assert ("node0", "node3") in edges
         assert ("node1", "node4") in edges
         assert edges[("node1", "node4")]["attrs"]["style"] == "dashed"
         assert ("node2", "node4") in edges
@@ -1441,7 +1454,8 @@ class TestOperatorConnectivity:
         assert "H" in nodes["node1"]["label"]
 
         # Check all edges
-        assert len(edges) == 0
+        assert len(edges) == 1
+        assert ("node0", "node1") in edges
 
     def test_double_choke(self):
         """Tests when two dynamic operators are back to back"""
@@ -1473,8 +1487,8 @@ class TestOperatorConnectivity:
         assert "Z" in nodes["node3"]["label"]
 
         # Check all edges
-        assert len(edges) == 2
-
+        assert len(edges) == 3
+        assert ("node0", "node1") in edges
         assert ("node1", "node2") in edges
         assert ("node2", "node3") in edges
         assert edges[("node2", "node3")]["attrs"]["style"] == "dashed"
@@ -1513,7 +1527,9 @@ class TestTerminalMeasurementConnectivity:
         assert meas_fn.__name__ in nodes["node3"]["label"]
 
         # Check all edges
-        assert len(edges) == 2
+        assert len(edges) == 4
+        assert ("node0", "node1") in edges
+        assert ("node0", "node2") in edges
         assert ("node1", "node3") in edges
         assert ("node2", "node3") in edges
 
@@ -1559,7 +1575,11 @@ class TestTerminalMeasurementConnectivity:
         assert "sample" in nodes["node8"]["label"]
 
         # Check all edges
-        assert len(edges) == 4
+        assert len(edges) == 8
+        assert ("node0", "node1") in edges
+        assert ("node0", "node2") in edges
+        assert ("node0", "node3") in edges
+        assert ("node0", "node4") in edges
         assert ("node1", "node5") in edges
         assert ("node2", "node6") in edges
         assert ("node3", "node7") in edges
@@ -1594,7 +1614,9 @@ class TestTerminalMeasurementConnectivity:
         assert "probs" in nodes["node3"]["label"]
 
         # Check all edges
-        assert len(edges) == 2
+        assert len(edges) == 4
+        assert ("node0", "node1") in edges
+        assert ("node0", "node2") in edges
         assert ("node1", "node3") in edges
         assert ("node2", "node3") in edges
 
@@ -1613,9 +1635,13 @@ class TestTerminalMeasurementConnectivity:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        assert len(utility.dag_builder.edges) == 0
+        edges = utility.dag_builder.edges
 
-    def test_terminal_measurement_static_dyn_mix(self):
+        assert len(edges) == 1
+        # Node0 = NullQubit
+        assert ("node0", "node1") in edges
+
+    def test_terminal_measurement_after_static_dyn_op_mix(self):
         """Tests that a terminal measurement on a mix of dynamic and static wires connects properly."""
 
         dev = qml.device("null.qubit", wires=1)
@@ -1647,7 +1673,8 @@ class TestTerminalMeasurementConnectivity:
         assert "probs" in nodes["node4"]["label"]
 
         # Check all edges
-        assert len(edges) == 3
+        assert len(edges) == 4
+        assert ("node0", "node1") in edges
         assert ("node1", "node2") in edges
         assert edges[("node1", "node2")]["attrs"]["style"] == "dashed"
         assert ("node2", "node3") in edges
@@ -1687,7 +1714,8 @@ class TestTerminalMeasurementConnectivity:
         assert "expval(Z)" in nodes["node4"]["label"]
 
         # Check all edges
-        assert len(edges) == 3
+        assert len(edges) == 4
+        assert ("node0", "node1") in edges
         assert ("node1", "node2") in edges
         assert ("node2", "node3") in edges
         assert edges[("node2", "node3")]["attrs"]["style"] == "dashed"
@@ -1724,7 +1752,8 @@ class TestTerminalMeasurementConnectivity:
         assert "expval(Z)" in nodes["node3"]["label"]
 
         # Check all edges
-        assert len(edges) == 2
+        assert len(edges) == 3
+        assert ("node0", "node1") in edges
         assert ("node1", "node2") in edges
         assert ("node2", "node3") in edges
         assert edges[("node2", "node3")]["attrs"]["style"] == "dashed"
@@ -1750,4 +1779,10 @@ class TestTerminalMeasurementConnectivity:
         nodes = utility.dag_builder.nodes
 
         # Check all edges
-        assert len(edges) == 0
+        # Node0 is NullQubit
+        assert len(edges) == 3
+        assert ("node0", "node1") in edges
+        assert edges[("node0", "node1")]["attrs"]["style"] == "dashed"
+        assert ("node0", "node2") in edges
+        assert ("node0", "node3") in edges
+        assert edges[("node0", "node3")]["attrs"]["style"] == "dashed"

@@ -221,6 +221,9 @@ class ConstructCircuitDAG:
         # Connect all previously seen operators
         if not meas.wires:
             all_prev_uids = set().union(*self._wire_to_node_uids.values())
+            # If previous nodes are device node + other stuff, don't connect to the device node.
+            if (device_uid := self._wire_to_node_uids["device"]) < all_prev_uids:
+                all_prev_uids -= device_uid
             for p_uid in all_prev_uids:
                 self.dag_builder.add_edge(p_uid, node_uid, style="dashed", color="lightpink3")
         else:
@@ -358,6 +361,8 @@ class ConstructCircuitDAG:
             shape="rectangle",
         )
         self._node_uid_counter += 1
+        self._dynamic_node_uids.add(node_id)
+        self._wire_to_node_uids["device"].add(node_id)
 
     # =======================
     # FuncOp NESTING UTILITY
