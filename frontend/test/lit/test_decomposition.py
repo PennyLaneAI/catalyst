@@ -888,7 +888,7 @@ def test_decomposition_rule_name_ctrl():
     qml.capture.disable()
 
 
-test_decomposition_rule_name_ctrl()
+skip_if_pauli_rot_issue(test_decomposition_rule_name_ctrl)()
 
 
 # TODO: Reenable this once the underlying non-determinism issue is resolved
@@ -925,7 +925,7 @@ def test_qft_decomposition():
     qml.capture.disable()
 
 
-test_qft_decomposition()
+skip_if_pauli_rot_issue(test_qft_decomposition)()
 
 
 def test_decompose_lowering_with_other_passes():
