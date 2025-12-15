@@ -24,8 +24,8 @@ pytest.importorskip("xdsl")
 # pylint: disable=wrong-import-position
 import pennylane as qml
 from pennylane.transforms.intermediate_reps import phase_polynomial
-from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 
+from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface.transforms import (
     ParitySynthPass,
     parity_synth_pass,

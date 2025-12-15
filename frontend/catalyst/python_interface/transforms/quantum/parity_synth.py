@@ -21,12 +21,11 @@ from itertools import product
 
 import networkx as nx
 import numpy as np
+from pennylane.transforms.intermediate_reps.rowcol import _rowcol_parity_matrix
 from xdsl import context, passes, pattern_rewriter
 from xdsl.dialects import arith, builtin
 from xdsl.ir import Operation, SSAValue
 from xdsl.rewriter import InsertPoint
-
-from pennylane.transforms.intermediate_reps.rowcol import _rowcol_parity_matrix
 
 from ...dialects.quantum import CustomOp, QubitType
 from ...pass_api import compiler_transform
