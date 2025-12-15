@@ -16,7 +16,9 @@
 
 from collections import defaultdict
 from functools import singledispatch, singledispatchmethod
+from typing import Any
 
+from pennylane import PauliRot
 from pennylane.measurements import (
     ExpectationMP,
     MeasurementProcess,
@@ -27,7 +29,7 @@ from pennylane.operation import Operator
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region, SSAValue
 
-from catalyst.python_interface.dialects import quantum
+from catalyst.python_interface.dialects import qec, quantum
 from catalyst.python_interface.inspection.xdsl_conversion import (
     xdsl_to_qml_measurement,
     xdsl_to_qml_op,
@@ -110,7 +112,13 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _gate_op(
         self,
-        op: quantum.CustomOp | quantum.GlobalPhaseOp | quantum.QubitUnitaryOp | quantum.MultiRZOp,
+        op: (
+            quantum.CustomOp
+            | quantum.GlobalPhaseOp
+            | quantum.QubitUnitaryOp
+            | quantum.MultiRZOp
+            | qec.PPRotationOp
+        ),
     ) -> None:
         """Generic handler for unitary gates."""
 
@@ -441,7 +449,7 @@ def _flatten_if_op(op: scf.IfOp) -> list[Region]:
 
 
 @singledispatch
-def get_label(op: Operator | MeasurementProcess) -> str:
+def get_label(op: Any) -> str:
     """Gets the appropriate label for a PennyLane object."""
     return str(op)
 
@@ -456,6 +464,14 @@ def _operator(op: Operator) -> str:
         wires_str = f"[{', '.join(map(str, wires))}]"
     # Using <...> lets us use ports (https://graphviz.org/doc/info/shapes.html#record)
     return f"<name> {op.name}|<wire> {wires_str}"
+
+
+@get_label.register
+def _ppr(op: PauliRot) -> str:
+    """Returns the appropriate label for PennyLane Operator"""
+    wires_str = f"[{', '.join(map(str, list(op.wires.labels)))}]"
+    # Using <...> lets us use ports (https://graphviz.org/doc/info/shapes.html#record)
+    return f"<name> R{op.hyperparameters['pauli_word']}|<wire> {wires_str}"
 
 
 @get_label.register
