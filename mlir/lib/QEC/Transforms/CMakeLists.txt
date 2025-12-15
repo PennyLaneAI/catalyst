@@ -29,7 +29,6 @@ set(LIBS
     ${conversion_libs}
     MLIRQEC
     QECUtils
-    ExternalStablehloLib
 )
 
 set(DEPENDS

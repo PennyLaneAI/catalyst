@@ -13,13 +13,12 @@
 // limitations under the License.
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/TypeRange.h"
-#include "stablehlo/dialect/StablehloOps.h"
 
 #include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
+#include "QEC/Utils/QECOpUtils.h"
 #include "Quantum/IR/QuantumOps.h"
 #include <cmath>
 #include <iostream>
@@ -243,89 +242,6 @@ LogicalResult convertMeasureOpToPPM(MeasureOp op, StringRef axis,
     return success();
 }
 
-// Recursively resolve the constant parameter of a value and returns std::nullopt if not a constant.
-std::optional<double> resolveConstantValue(Value value)
-{
-    if (!value)
-        return std::nullopt;
-
-    auto *defOp = value.getDefiningOp();
-    if (!defOp)
-        return std::nullopt;
-
-    // Handle Tensor Dialect
-    if (auto extractOp = dyn_cast<tensor::ExtractOp>(defOp)) {
-        return resolveConstantValue(extractOp.getTensor());
-    }
-
-    // Handle Stablehlo Dialect
-    if (auto constOp = dyn_cast<stablehlo::ConstantOp>(defOp)) {
-        auto valueAttr = constOp.getValue();
-        if (auto denseFPAttr = dyn_cast<DenseFPElementsAttr>(valueAttr)) {
-            if (denseFPAttr.isSplat() || denseFPAttr.getNumElements() == 1) {
-                return denseFPAttr.getSplatValue<APFloat>().convertToDouble();
-            }
-        }
-        else if (auto denseIntAttr = dyn_cast<DenseIntElementsAttr>(valueAttr)) {
-            if (denseIntAttr.isSplat() || denseIntAttr.getNumElements() == 1) {
-                return static_cast<double>(denseIntAttr.getSplatValue<APInt>().getSExtValue());
-            }
-        }
-        return std::nullopt;
-    }
-    else if (auto convertOp = dyn_cast<stablehlo::ConvertOp>(defOp)) {
-        if (convertOp->getNumOperands() > 0) {
-            return resolveConstantValue(convertOp.getOperand());
-        }
-        return std::nullopt;
-    }
-    else if (auto broadcastInDimOp = dyn_cast<stablehlo::BroadcastInDimOp>(defOp)) {
-        if (broadcastInDimOp->getNumOperands() > 0) {
-            return resolveConstantValue(broadcastInDimOp.getOperand());
-        }
-        return std::nullopt;
-    }
-
-    // Handle Arith Dialect
-    if (auto constOp = dyn_cast<arith::ConstantOp>(defOp)) {
-        auto valueAttr = constOp.getValue();
-        if (auto floatAttr = dyn_cast<FloatAttr>(valueAttr)) {
-            return floatAttr.getValueAsDouble();
-        }
-        else if (auto intAttr = dyn_cast<IntegerAttr>(valueAttr)) {
-            return static_cast<double>(intAttr.getValue().getSExtValue());
-        }
-        else if (auto denseAttr = dyn_cast<DenseFPElementsAttr>(valueAttr)) {
-            if (denseAttr.isSplat() || denseAttr.getNumElements() == 1) {
-                return denseAttr.getSplatValue<APFloat>().convertToDouble();
-            }
-        }
-        else if (auto denseAttr = dyn_cast<DenseIntElementsAttr>(valueAttr)) {
-            if (denseAttr.isSplat() || denseAttr.getNumElements() == 1) {
-                return static_cast<double>(denseAttr.getSplatValue<APInt>().getSExtValue());
-            }
-        }
-        return std::nullopt;
-    }
-    else if (auto indexCastOp = dyn_cast<arith::IndexCastOp>(defOp)) {
-        if (defOp->getNumOperands() > 0) {
-            return resolveConstantValue(defOp->getOperand(0));
-        }
-        return std::nullopt;
-    }
-    else if (auto addOp = dyn_cast<arith::AddFOp>(defOp)) {
-        double sum = 0.0;
-        for (auto operand : addOp.getOperands()) {
-            auto operandVal = resolveConstantValue(operand);
-            if (!operandVal.has_value())
-                return std::nullopt;
-            sum += operandVal.value();
-        }
-        return sum;
-    }
-    return std::nullopt;
-}
-
 LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewriter)
 {
     auto loc = op.getLoc();
@@ -339,7 +255,7 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
 
     if (angleOpt.has_value()) {
         constexpr double PI = llvm::numbers::pi;
-        constexpr double SPECIFIC_ANGLES[4] = {PI / 2, PI / 4, PI / 8};
+        constexpr double SPECIFIC_ANGLES[6] = {PI / 2, PI / 4, PI / 8, -PI / 8, -PI / 4, -PI / 2};
         // We are choosing a very small tolerance to accomodate floating point precision issues.
         // We choose this because it is a few bits away from the precision allowed by float 64
         // and we assume the angles have magnitudes on the order of pi.
@@ -358,9 +274,9 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
 
         for (auto specific_angle : SPECIFIC_ANGLES) {
             if (std::abs(angle - specific_angle) < TOLERANCE) {
-                auto rotationKind = static_cast<int64_t>(PI / specific_angle);
+                auto rotationKind = static_cast<int16_t>(PI / specific_angle);
                 if (op.getAdjoint()) {
-                    rotationKind = -rotationKind;
+                    rotationKind *= static_cast<int16_t>(-1);
                 }
                 auto rotationKindAttr = rewriter.getI16IntegerAttr(rotationKind);
                 auto pprOp = rewriter.create<PPRotationOp>(loc, outQubitTypes, pauliProduct,

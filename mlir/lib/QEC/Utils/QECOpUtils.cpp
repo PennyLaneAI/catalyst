@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "QEC/Utils/QECOpUtils.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "stablehlo/dialect/StablehloOps.h"
+
 #include "QEC/IR/QECOpInterfaces.h"
 #include "QEC/Utils/PauliStringWrapper.h"
+#include "QEC/Utils/QECOpUtils.h"
 
 namespace catalyst {
 namespace qec {
@@ -95,6 +99,180 @@ bool commutes(QECOpInterface rhsOp, QECOpInterface lhsOp)
     }
 
     return true;
+}
+
+// Recursively resolve the constant parameter of a value and returns std::nullopt if not a constant.
+std::optional<double> resolveConstantValue(Value value)
+{
+    if (!value)
+        return std::nullopt;
+
+    auto *defOp = value.getDefiningOp();
+    if (!defOp)
+        return std::nullopt;
+
+    // Handle Tensor Dialect
+    if (auto extractOp = dyn_cast<tensor::ExtractOp>(defOp)) {
+        return resolveConstantValue(extractOp.getTensor());
+    }
+
+    // Handle Stablehlo Dialect
+    if (auto constOp = dyn_cast<stablehlo::ConstantOp>(defOp)) {
+        auto valueAttr = constOp.getValue();
+        if (auto denseFPAttr = dyn_cast<DenseFPElementsAttr>(valueAttr)) {
+            if (denseFPAttr.isSplat() || denseFPAttr.getNumElements() == 1) {
+                return denseFPAttr.getSplatValue<APFloat>().convertToDouble();
+            }
+        }
+        else if (auto denseIntAttr = dyn_cast<DenseIntElementsAttr>(valueAttr)) {
+            if (denseIntAttr.isSplat() || denseIntAttr.getNumElements() == 1) {
+                return static_cast<double>(denseIntAttr.getSplatValue<APInt>().getSExtValue());
+            }
+        }
+        return std::nullopt;
+    }
+    else if (auto convertOp = dyn_cast<stablehlo::ConvertOp>(defOp)) {
+        if (convertOp->getNumOperands() > 0) {
+            return resolveConstantValue(convertOp.getOperand());
+        }
+        return std::nullopt;
+    }
+    else if (auto broadcastInDimOp = dyn_cast<stablehlo::BroadcastInDimOp>(defOp)) {
+        if (broadcastInDimOp->getNumOperands() > 0) {
+            return resolveConstantValue(broadcastInDimOp.getOperand());
+        }
+        return std::nullopt;
+    }
+
+    // Handle Arith Dialect
+    if (auto constOp = dyn_cast<arith::ConstantOp>(defOp)) {
+        auto valueAttr = constOp.getValue();
+        if (auto floatAttr = dyn_cast<FloatAttr>(valueAttr)) {
+            return floatAttr.getValueAsDouble();
+        }
+        else if (auto intAttr = dyn_cast<IntegerAttr>(valueAttr)) {
+            return static_cast<double>(intAttr.getValue().getSExtValue());
+        }
+        else if (auto denseAttr = dyn_cast<DenseFPElementsAttr>(valueAttr)) {
+            if (denseAttr.isSplat() || denseAttr.getNumElements() == 1) {
+                return denseAttr.getSplatValue<APFloat>().convertToDouble();
+            }
+        }
+        else if (auto denseAttr = dyn_cast<DenseIntElementsAttr>(valueAttr)) {
+            if (denseAttr.isSplat() || denseAttr.getNumElements() == 1) {
+                return static_cast<double>(denseAttr.getSplatValue<APInt>().getSExtValue());
+            }
+        }
+        return std::nullopt;
+    }
+    else if (auto indexCastOp = dyn_cast<arith::IndexCastOp>(defOp)) {
+        if (defOp->getNumOperands() > 0) {
+            return resolveConstantValue(defOp->getOperand(0));
+        }
+        return std::nullopt;
+    }
+
+    // Handle Arith Dialect Floating Point Operations
+    if (auto addOp = dyn_cast<arith::AddFOp>(defOp)) {
+        double sum = 0.0;
+        for (auto operand : addOp.getOperands()) {
+            auto operandVal = resolveConstantValue(operand);
+            if (!operandVal.has_value())
+                return std::nullopt;
+            sum += operandVal.value();
+        }
+        return sum;
+    }
+    else if (auto subOp = dyn_cast<arith::SubFOp>(defOp)) {
+        double difference = 0.0;
+        for (auto operand : subOp.getOperands()) {
+            auto operandVal = resolveConstantValue(operand);
+            if (!operandVal.has_value())
+                return std::nullopt;
+            difference -= operandVal.value();
+        }
+        return difference;
+    }
+    else if (auto mulOp = dyn_cast<arith::MulFOp>(defOp)) {
+        double product = 1.0;
+        for (auto operand : mulOp.getOperands()) {
+            auto operandVal = resolveConstantValue(operand);
+            if (!operandVal.has_value())
+                return std::nullopt;
+            product *= operandVal.value();
+        }
+        return product;
+    }
+    else if (auto divOp = dyn_cast<arith::DivFOp>(defOp)) {
+        double quotient = 1.0;
+        for (auto operand : divOp.getOperands()) {
+            auto operandVal = resolveConstantValue(operand);
+            if (!operandVal.has_value())
+                return std::nullopt;
+            quotient /= operandVal.value();
+        }
+        return quotient;
+    }
+    else if (auto negOp = dyn_cast<arith::NegFOp>(defOp)) {
+        auto operandVal = resolveConstantValue(negOp.getOperand());
+        if (!operandVal.has_value())
+            return std::nullopt;
+        return -operandVal.value();
+    }
+
+    // Handle Arith Dialect Integer Operations
+    if (auto addOp = dyn_cast<arith::AddIOp>(defOp)) {
+        int sum = 0;
+        for (auto operand : addOp.getOperands()) {
+            auto operandVal = resolveConstantValue(operand);
+            if (!operandVal.has_value())
+                return std::nullopt;
+            sum += operandVal.value();
+        }
+        return sum;
+    }
+    else if (auto subOp = dyn_cast<arith::SubIOp>(defOp)) {
+        int difference = 0;
+        for (auto operand : subOp.getOperands()) {
+            auto operandVal = resolveConstantValue(operand);
+            if (!operandVal.has_value())
+                return std::nullopt;
+            difference -= operandVal.value();
+        }
+        return difference;
+    }
+    else if (auto mulOp = dyn_cast<arith::MulIOp>(defOp)) {
+        int product = 1;
+        for (auto operand : mulOp.getOperands()) {
+            auto operandVal = resolveConstantValue(operand);
+            if (!operandVal.has_value())
+                return std::nullopt;
+            product *= operandVal.value();
+        }
+        return product;
+    }
+    else if (auto divOp = dyn_cast<arith::DivSIOp>(defOp)) {
+        int quotient = 1;
+        for (auto operand : divOp.getOperands()) {
+            auto operandVal = resolveConstantValue(operand);
+            if (!operandVal.has_value())
+                return std::nullopt;
+            quotient /= operandVal.value();
+        }
+        return quotient;
+    }
+    else if (auto divOp = dyn_cast<arith::DivUIOp>(defOp)) {
+        int quotient = 1;
+        for (auto operand : divOp.getOperands()) {
+            auto operandVal = resolveConstantValue(operand);
+            if (!operandVal.has_value())
+                return std::nullopt;
+            quotient /= operandVal.value();
+        }
+        return quotient;
+    }
+
+    return std::nullopt;
 }
 
 } // namespace qec
