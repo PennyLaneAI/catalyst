@@ -62,7 +62,7 @@ class ConstructCircuitDAG:
         self._wire_to_node_uids: dict[str | int, set[str]] = defaultdict(set)
 
         # Track which node UIDs are dynamic
-        self._dynamic_node_uids: set = set()
+        self._dynamic_node_uids: set[str] = set()
 
         # Use counter internally for UID
         self._node_uid_counter: int = 0
@@ -74,7 +74,7 @@ class ConstructCircuitDAG:
         self._node_uid_counter: int = 0
         self._cluster_uid_counter: int = 0
         self._wire_to_node_uids: dict[str | int, set[str]] = defaultdict(set)
-        self._dynamic_node_uids: set = set()
+        self._dynamic_node_uids: set[str] = set()
 
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module.
@@ -412,7 +412,7 @@ class ConstructCircuitDAG:
             self._dynamic_node_uids.add(node_uid)
 
         # Connect to all predecessors
-        prev_uids: set = self._get_previous_uids(node, is_dynamic)
+        prev_uids: set[str] = self._get_previous_uids(node, is_dynamic)
 
         style = "dashed" if is_dynamic else "solid"
         for p_uid in prev_uids:
@@ -424,7 +424,7 @@ class ConstructCircuitDAG:
     def _get_previous_uids(self, node: Operator | MeasurementProcess, is_dynamic: bool) -> set[str]:
         """Helper function to get the set of previous node uids."""
 
-        prev_uids: set = set()
+        prev_uids: set[str] = set()
 
         # Find all previous nodes to connect to
         if is_dynamic:
@@ -448,7 +448,7 @@ class ConstructCircuitDAG:
             for wire in node.wires:
                 prev_uids.update(self._wire_to_node_uids[wire])
 
-            # Edge case when first operator is dynamic
+            # NOTE: edge case when first operator is dynamic
             if not prev_uids:
                 all_prev = set().union(*self._wire_to_node_uids.values())
                 prev_uids.update({uid for uid in all_prev if uid in self._dynamic_node_uids})
