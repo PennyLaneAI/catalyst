@@ -447,16 +447,7 @@ struct DecomposePPRArbitraryOpPattern
     LogicalResult matchAndRewrite(catalyst::qec::PPRotationArbitraryOp op,
                                   PatternRewriter &rewriter) const override
     {
-        if (op.getInQubits().size() != 1) {
-            return failure();
-        }
-
-        auto pauliProduct = op.getPauliProduct();
-        if (pauliProduct.size() != 1) {
-            return failure();
-        }
-        auto pauliStrAttr = llvm::dyn_cast<StringAttr>(pauliProduct[0]);
-        if (!pauliStrAttr || pauliStrAttr.getValue() != "Z") {
+        if (op.getPauliProduct() != rewriter.getStrArrayAttr({"Z"})) {
             return failure();
         }
 
