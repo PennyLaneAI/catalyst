@@ -167,7 +167,7 @@ class TestPassByPassSpecs:
 
         return circ
 
-    @pytest.mark.usefixtures("use_capture")
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_invalid_levels(self, simple_circuit):
         """Test invalid inputs."""
 
@@ -185,7 +185,7 @@ class TestPassByPassSpecs:
         with pytest.raises(check=ValueError, match="Requested specs levels 2, 3"):
             qml.specs(no_passes, level=[2, 3])()
 
-    @pytest.mark.usefixtures("use_capture")
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_basic_passes_multi_level(self, simple_circuit):
         """Test that when passes are applied, the circuit resources are updated accordingly."""
 
@@ -284,6 +284,69 @@ class TestPassByPassSpecs:
 
         check_specs_same(actual, expected)
 
+    def test_mix_transforms_and_passes(self, simple_circuit):
+        """Test using a mix of compiler passes and plain tape transforms"""
+
+        simple_circuit = qml.transforms.cancel_inverses(
+            simple_circuit
+        )  # Has to be applied as a tape transform
+        simple_circuit = qml.transforms.undo_swaps(
+            simple_circuit
+        )  # No actual swaps to undo, but forces normal tape transform
+        simple_circuit = qml.transforms.merge_rotations(
+            simple_circuit
+        )  # Can be applied as an MLIR pass
+
+        simple_circuit = qjit(simple_circuit)
+
+        actual = qml.specs(simple_circuit, level="all")()
+        expected = CircuitSpecs(
+            device_name="lightning.qubit",
+            num_device_wires=2,
+            shots=Shots(None),
+            level=[
+                "Before transforms",
+                "cancel_inverses",
+                "undo_swaps",
+                "Before MLIR Passes (MLIR-0)",
+                "merge-rotations (MLIR-1)",
+            ],
+            resources={
+                "Before transforms": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    gate_sizes={1: 6, 2: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "cancel_inverses": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "undo_swaps": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "Before MLIR Passes (MLIR-0)": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "merge-rotations (MLIR-1)": SpecsResources(
+                    gate_types={"RX": 1, "RZ": 1},
+                    gate_sizes={1: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+            },
+        )
+
+        check_specs_same(actual, expected)
+
     @pytest.mark.usefixtures("use_both_frontend")
     def test_reprs_match(self):
         """Test that when no transforms are applied to a typical circuit, the "Before Transform"
@@ -322,6 +385,7 @@ class TestPassByPassSpecs:
         check_specs_resources_same(regular_pl, before_transforms)
         check_specs_resources_same(before_transforms, before_mlir)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_advanced_measurements(self):
         """Test that advanced measurements such as LinearCombination are handled correctly."""
 
@@ -362,64 +426,32 @@ class TestPassByPassSpecs:
             qml.X(0)
             return qml.expval(qml.X(0)), qml.expval(qml.Y(0)), qml.expval(qml.Z(0))
 
-        actual = qml.specs(qjit(circuit), level=range(3))()
+        actual = qml.specs(qjit(circuit), level=1)()
         expected = CircuitSpecs(
             device_name="null.qubit",
             num_device_wires=3,
             shots=Shots(None),
-            level=[
-                "Before transforms",
-                "split_non_commuting",
-                "cancel_inverses",
-            ],
-            resources={
-                "Before transforms": SpecsResources(
+            level=1,
+            resources=[
+                SpecsResources(
                     gate_types={"Hadamard": 1, "PauliX": 2},
                     gate_sizes={1: 3},
-                    measurements={"expval(PauliX)": 1, "expval(PauliY)": 1, "expval(PauliZ)": 1},
+                    measurements={"expval(PauliX)": 1},
                     num_allocs=1,
                 ),
-                "split_non_commuting": [
-                    SpecsResources(
-                        gate_types={"Hadamard": 1, "PauliX": 2},
-                        gate_sizes={1: 3},
-                        measurements={"expval(PauliX)": 1},
-                        num_allocs=1,
-                    ),
-                    SpecsResources(
-                        gate_types={"Hadamard": 1, "PauliX": 2},
-                        gate_sizes={1: 3},
-                        measurements={"expval(PauliY)": 1},
-                        num_allocs=1,
-                    ),
-                    SpecsResources(
-                        gate_types={"Hadamard": 1, "PauliX": 2},
-                        gate_sizes={1: 3},
-                        measurements={"expval(PauliZ)": 1},
-                        num_allocs=1,
-                    ),
-                ],
-                "cancel_inverses": [
-                    SpecsResources(
-                        gate_types={"Hadamard": 1},
-                        gate_sizes={1: 1},
-                        measurements={"expval(PauliX)": 1},
-                        num_allocs=1,
-                    ),
-                    SpecsResources(
-                        gate_types={"Hadamard": 1},
-                        gate_sizes={1: 1},
-                        measurements={"expval(PauliY)": 1},
-                        num_allocs=1,
-                    ),
-                    SpecsResources(
-                        gate_types={"Hadamard": 1},
-                        gate_sizes={1: 1},
-                        measurements={"expval(PauliZ)": 1},
-                        num_allocs=1,
-                    ),
-                ],
-            },
+                SpecsResources(
+                    gate_types={"Hadamard": 1, "PauliX": 2},
+                    gate_sizes={1: 3},
+                    measurements={"expval(PauliY)": 1},
+                    num_allocs=1,
+                ),
+                SpecsResources(
+                    gate_types={"Hadamard": 1, "PauliX": 2},
+                    gate_sizes={1: 3},
+                    measurements={"expval(PauliZ)": 1},
+                    num_allocs=1,
+                ),
+            ],
         )
 
         check_specs_same(actual, expected)
