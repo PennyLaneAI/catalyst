@@ -482,7 +482,7 @@
   [0.70710678+0.j 0.        +0.j 0.70710678+0.j 0.        +0.j]
   ```
 
-  See the [Lightning-AMDGPU documentation](https://docs.pennylane.ai/projects/lightning/en/latest/lightning_amdgpu/device.html) for more details and installation instructions
+  See the [Lightning-AMDGPU documentation](https://docs.pennylane.ai/projects/lightning/en/latest/lightning_amdgpu/device.html) for more details and installation instructions.
 
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
   [(#2136)](https://github.com/PennyLaneAI/catalyst/pull/2136)
