@@ -108,9 +108,6 @@
     detecting when the Python compiler is being used and routing through it appropriately.
     [(#2190)](https://github.com/PennyLaneAI/catalyst/pull/2190)
 
-* RTIO dialect is added to bypass the compilation flow from OpenAPL to ARTIQ’s LLVM IR. It is introduced to bridge the gap between ION dialect and ARTIQ’s LLVM IR. The design philosophy of RTIO dialect is primarily event-based. Every operation is asynchronous; sync behaviour occurs only via `rtio.sync` or `wait operand` in event operation.
-  [(#2185)](https://github.com/PennyLaneAI/catalyst/pull/2185)
-
 * Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
   [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
 
@@ -379,6 +376,14 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* RTIO dialect is added to bypass the compilation flow from OpenAPL to ARTIQ’s LLVM IR. It is 
+  introduced to bridge the gap between ION dialect and ARTIQ’s LLVM IR. The design philosophy 
+  of RTIO dialect is primarily event-based. Every operation is asynchronous; sync behaviour occurs 
+  only via `rtio.sync` or `wait operand` in event operation. And we now support the compiling from 
+  ION dialect to RTIO dilalect.
+  [(#2185)](https://github.com/PennyLaneAI/catalyst/pull/2185)
+  [(#2204)](https://github.com/PennyLaneAI/catalyst/pull/2204)
+
 * Integration tests for `qml.specs` have been updated to match the new output format introduced
   in PennyLane.
   [(#2255)](https://github.com/PennyLaneAI/catalyst/pull/2255)
@@ -473,6 +478,9 @@
 * Update `MLIR Plugins` documentation stating that plugins require adding passes via
   `--pass-pipeline`.
   [(#2168)](https://github.com/PennyLaneAI/catalyst/pull/2168)
+
+* Typos in docstring for `PPRotationArbitraryOp` and `PPRRotationOp` have been corrected.
+  [(#2297)](https://github.com/PennyLaneAI/catalyst/pull/2297)
 
 <h3>Contributors ✍️</h3>
 
