@@ -274,13 +274,12 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
 
         for (auto specific_angle : SPECIFIC_ANGLES) {
             if (std::abs(angle - specific_angle) < TOLERANCE) {
-                auto rotationKind = static_cast<int16_t>(PI / specific_angle);
+                int64_t rotationKind = static_cast<int64_t>(PI / specific_angle);
                 if (op.getAdjoint()) {
-                    rotationKind *= static_cast<int16_t>(-1);
+                    rotationKind = -rotationKind;
                 }
-                auto rotationKindAttr = rewriter.getI16IntegerAttr(rotationKind);
                 auto pprOp = rewriter.create<PPRotationOp>(loc, outQubitTypes, pauliProduct,
-                                                           rotationKindAttr, inQubits);
+                                                           rotationKind, inQubits);
                 rewriter.replaceOp(op, pprOp.getOutQubits());
                 return success();
             }

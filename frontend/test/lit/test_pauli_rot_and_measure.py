@@ -432,7 +432,7 @@ def test_pauli_rot_and_measure_with_cond():
     def circuit():
         qml.PauliRot(np.pi / 2, "Z", wires=0)
         m = qml.pauli_measure("Z", wires=0)
-        qml.cond(m, qml.PauliRot)(theta=np.pi / 2, pauli_word="Z", wires=0)
+        qml.cond(m, qml.PauliRot)(theta=np.pi / 2, wires=0, pauli_word="Z")
 
     # CHECK: qec.ppr ["Z"](4)
     # CHECK: qec.ppm ["Z"]
@@ -465,11 +465,9 @@ def test_pauli_rot_with_adjoint_region():
         qml.PauliRot(np.pi / 2, "YX", wires=[0, 1])
         qml.adjoint(f)()
 
-    # CHECK: transform.apply_registered_pass "adjoint-lowering"
     # CHECK: qec.ppr ["Y", "X"](4)
-    # CHECK: quantum.adjoint
-    # CHECK: qec.ppr ["X", "Z"](8)
-    print(circuit.mlir)
+    # CHECK: qec.ppr ["X", "Z"](-8)
+    print(circuit.mlir_opt)
     qml.capture.disable()
 
 
@@ -489,10 +487,8 @@ def test_pauli_rot_with_adjoint_single_gate():
     def circuit():
         qml.adjoint(qml.PauliRot(np.pi / 2, "XZ", wires=[0, 1]))
 
-    # CHECK-NOT: transform.apply_registered_pass "adjoint-lowering"
-    # CHECK-NOT: quantum.adjoint
     # CHECK: qec.ppr ["X", "Z"](-4)
-    print(circuit.mlir)
+    print(circuit.mlir_opt)
     qml.capture.disable()
 
 
