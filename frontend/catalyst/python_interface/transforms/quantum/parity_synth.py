@@ -243,7 +243,7 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
             raise ModuleNotFoundError(
                 "The packages networkx and galois are required to run the ParitySynth pass."
                 "You can install them via ``pip install networkx galois``."
-            ) from networkx_import_error # pylint: disable=used-before-assignment
+            ) from networkx_import_error  # pylint: disable=used-before-assignment
 
         super().__init__(*args, **kwargs)
         self._reset_vars()
