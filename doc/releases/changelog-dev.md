@@ -470,7 +470,7 @@
   [(#2168)](https://github.com/PennyLaneAI/catalyst/pull/2168)
 
 * A typo in docstring for `PPRotationArbitraryOp` and `PPRRotationOp` have been corrected.
-  [(#?)](https://github.com/PennyLaneAI/catalyst/pull/?)
+  [(#2297)](https://github.com/PennyLaneAI/catalyst/pull/2297)
 
 <h3>Contributors ✍️</h3>
 
