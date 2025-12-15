@@ -21,6 +21,7 @@ from itertools import product
 
 try:
     import networkx as nx
+
     has_networkx = True
 except ModuleNotFoundError as networkx_import_error:
     has_networkx = False
@@ -238,7 +239,7 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
     num_phase_polynomial_qubits: int
 
     def __init__(self, *args, **kwargs):
-        if not has_networkx:
+        if not has_networkx:  # pragma: no cover
             raise ModuleNotFoundError(
                 "The packages networkx and galois are required to run the ParitySynth pass."
                 "You can install them via ``pip install networkx galois``."
@@ -383,17 +384,20 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
 
 @dataclass(frozen=True)
 class ParitySynthPass(passes.ModulePass):
-    """Pass for applying ParitySynth to phase polynomials in a circuit.
+    r"""Pass for applying ParitySynth to phase polynomials in a circuit.
 
-    ParitySynth has been proposed by Vandaele et al. in `arXiv:<>`__
-    as a technique to synthesize `phase polynomials <comp-hub>`__
-    elementary quantum gates, namely ``CNOT`` and ``RZ``.
+    ParitySynth has been proposed by Vandaele et al. in `arXiv:<https://arxiv.org/abs/2104.00934>`__
+    as a technique to synthesize
+    `phase polynomials <https://pennylane.ai/compilation/phase-polynomial-intermediate-representation>`__
+    into elementary quantum gates, namely ``CNOT`` and ``RZ``.
 
     .. note::
 
         This pass requires the ``networkx`` package, which can be installed via
-        ``pip install networkx``. It also relies on RowCol to compile the parity matrix
-        left over after running ParitySynth itself. The implementation
+        ``pip install networkx``. It also relies on RowCol
+        (`docs<https://docs.pennylane.ai/en/stable/code/api/pennylane.transforms.rowcol.html>`__,
+        `compilation hub <https://pennylane.ai/compilation/rowcol-algorithm>`__)
+        to compile the parity matrix left over after running ParitySynth itself. The implementation
         of RowCol in turn makes use of the ``galois`` package, which thus
         needs to be installed as well, for example via ``pip install galois``.
 
@@ -443,7 +447,7 @@ class ParitySynthPass(passes.ModulePass):
     0: ─╭●───────────╭●───────────╭X───────────╭X─┤  State
     1: ─╰X──RZ(0.52)─╰X──RX(0.12)─╰●──RZ(0.20)─╰●─┤  State
 
-    Now we apply the ``parity_synth_pass`` to the circuit and quantum just-in-time compile
+    Now we apply the ``parity_synth_pass`` to the circuit and quantum just-in-time (qjit) compile
     the circuit into a reduced MLIR module:
 
     ```python

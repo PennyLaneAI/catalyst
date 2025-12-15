@@ -20,6 +20,8 @@ import pytest
 from numpy.testing import assert_allclose, assert_equal
 
 pytest.importorskip("xdsl")
+pytest.importorskip("networkx")
+pytest.importorskip("galois")
 
 # pylint: disable=wrong-import-position
 import pennylane as qml
