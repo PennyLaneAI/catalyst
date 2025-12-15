@@ -273,11 +273,14 @@ func.func @test_ppr_arbitrary_ignored(%arg0: !quantum.bit, %theta: f64) -> (!qua
     // CHECK: qec.ppr.arbitrary ["X"]
     %q1 = qec.ppr.arbitrary ["X"](%theta) %arg0 : !quantum.bit
 
+    // CHECK: qec.ppr.arbitrary ["Y"]
+    %q2 = qec.ppr.arbitrary ["Y"](%theta) %arg0 : !quantum.bit
+
     // CHECK: qec.ppr.arbitrary ["Z", "Z"]
-    %q2:2 = qec.ppr.arbitrary ["Z", "Z"](%theta) %q1, %q1 : !quantum.bit, !quantum.bit
+    %q3:2 = qec.ppr.arbitrary ["Z", "Z"](%theta) %q1, %q2 : !quantum.bit, !quantum.bit
 
     // CHECK: qec.ppr.arbitrary ["Z"]{{.*}} cond
-    %q3 = qec.ppr.arbitrary ["Z"](%theta) %q2#0 cond(%c_true) : !quantum.bit
+    %q4 = qec.ppr.arbitrary ["Z"](%theta) %q3#0 cond(%c_true) : !quantum.bit
 
-    return %q1, %q2#1, %q3 : !quantum.bit, !quantum.bit, !quantum.bit
+    return %q1, %q3#1, %q4 : !quantum.bit, !quantum.bit, !quantum.bit
 }

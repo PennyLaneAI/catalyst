@@ -424,8 +424,7 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
                                        gphaseAttrs.getAttrs());
 
         // Replace the RZ/PhaseShift op with the resulting qubit
-        rewriter.replaceAllUsesWith(op->getResults(), finalQbitResult);
-        rewriter.eraseOp(op);
+        rewriter.replaceOp(op, finalQbitResult);
         return success();
     }
 };
@@ -491,8 +490,7 @@ struct DecomposePPRArbitraryOpPattern
         rewriter.create<GlobalPhaseOp>(loc, TypeRange{}, ValueRange{runtimePhase},
                                        gphaseAttrs.getAttrs());
 
-        rewriter.replaceAllUsesWith(op->getResults(), finalQbitResult);
-        rewriter.eraseOp(op);
+        rewriter.replaceOp(op, finalQbitResult);
         return success();
     }
 };
