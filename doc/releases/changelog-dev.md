@@ -469,6 +469,9 @@
   `--pass-pipeline`.
   [(#2168)](https://github.com/PennyLaneAI/catalyst/pull/2168)
 
+* A typo in docstring for `PPRotationArbitraryOp` and `PPRRotationOp` have been corrected.
+  [(#?)](https://github.com/PennyLaneAI/catalyst/pull/?)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
