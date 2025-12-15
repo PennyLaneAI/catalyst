@@ -28,8 +28,8 @@ TEST_CASE("Test MA normal form", "[RSDecomp][NormalForms]")
 {
     // For this test, we construct the SO3 matrix, then test the decomposition
     std::vector<std::vector<GateType>> cl_list;
-    for (const auto &key_value_pair : clifford_group_to_SO3) {
-        cl_list.push_back(key_value_pair.first);
+    for (const auto &[gates, matrix] : clifford_group_to_SO3) {
+        cl_list.push_back(gates);
     }
 
     // Corresponds to initial T

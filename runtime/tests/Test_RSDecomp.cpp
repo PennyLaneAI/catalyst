@@ -112,12 +112,12 @@ TEST_CASE("Test ross_selinger generic angles", "[RSDecomp][Ross Selinger]")
     int angle_int = GENERATE(range(-70, 71));
     double angle = angle_int / 10.0;
     CAPTURE(angle);
-    auto decomp_result = eval_ross_algorithm(angle, tolerance);
-    const auto &gates_vector = decomp_result.first;
+
+    const auto [gates_vector, phase] = eval_ross_algorithm(angle, tolerance);
+
     std::vector<std::complex<double>> result_matrix;
     result_matrix = matrix_from_decomp_result(gates_vector);
 
-    double phase = decomp_result.second;
     std::complex<double> phase_factor = {std::cos(phase), -std::sin(phase)};
     std::vector<std::complex<double>> global_phase_matrix = {phase_factor, 0.0, 0.0, phase_factor};
     result_matrix = multiply_matrices(global_phase_matrix, result_matrix);
@@ -134,12 +134,12 @@ TEST_CASE("Test ross_selinger pi/16 multiples", "[RSDecomp][Ross Selinger]")
     int angle_int = GENERATE(range(-70, 71));
     double angle = angle_int * M_PI / 16.0;
     CAPTURE(angle);
-    auto decomp_result = eval_ross_algorithm(angle, tolerance);
-    const auto &gates_vector = decomp_result.first;
+
+    const auto [gates_vector, phase] = eval_ross_algorithm(angle, tolerance);
+
     std::vector<std::complex<double>> result_matrix;
     result_matrix = matrix_from_decomp_result(gates_vector);
 
-    double phase = decomp_result.second;
     std::complex<double> phase_factor = {std::cos(phase), -std::sin(phase)};
     std::vector<std::complex<double>> global_phase_matrix = {phase_factor, 0.0, 0.0, phase_factor};
     result_matrix = multiply_matrices(global_phase_matrix, result_matrix);
@@ -153,9 +153,7 @@ TEST_CASE("Test ross_selinger pi/16 multiples", "[RSDecomp][Ross Selinger]")
 TEST_CASE("Test Zero Angle (Identity)", "[RSDecomp][Ross Selinger]")
 {
     // An angle of 0.0 should result in Identity
-    auto result = eval_ross_algorithm(0.0, 1e-10);
-    const auto &gates = result.first;
-    double phase = result.second;
+    const auto [gates, phase] = eval_ross_algorithm(0.0, 1e-10);
 
     // Should effectively be Identity
     std::vector<std::complex<double>> mat = matrix_from_decomp_result(gates);

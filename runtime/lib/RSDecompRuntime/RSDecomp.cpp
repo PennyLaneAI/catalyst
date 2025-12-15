@@ -123,9 +123,7 @@ std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double
 
         dyd_mat = DyadicMatrix(u, -t.conj(), t, u.conj(), INT_TYPE(k));
         SO3Matrix so3_mat(dyd_mat);
-        auto normal_form_result = ma_normal_form(so3_mat);
-        decomposition = normal_form_result.first;
-        phase = normal_form_result.second;
+        std::tie(decomposition, phase) = ma_normal_form(so3_mat);
     }
     return {std::move(decomposition), phase};
 }
@@ -161,11 +159,11 @@ std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle
         return *val_opt;
     }
 
-    auto clifford_T_result = compute_clifford_T_decomposition(angle, epsilon);
+    auto [gates, phase] = compute_clifford_T_decomposition(angle, epsilon);
 
-    std::vector<PPRGateType> ppr_gates = HSTtoPPR(clifford_T_result.first);
+    std::vector<PPRGateType> ppr_gates = HSTtoPPR(gates);
 
-    PPRCacheValue result = {std::move(ppr_gates), clifford_T_result.second};
+    PPRCacheValue result = {std::move(ppr_gates), phase};
 
     ross_cache_ppr.put(key, result);
     return result;
@@ -329,9 +327,7 @@ void rs_decomposition_get_gates([[maybe_unused]] size_t *data_allocated, size_t 
     DataView<size_t, 1> gates_view(data_aligned, offset, sizes, strides);
 
     if (ppr_basis) {
-        auto result = eval_ross_algorithm_ppr(theta, epsilon);
-        const auto &gates = result.first;
-
+        const auto &[gates, phase] = eval_ross_algorithm_ppr(theta, epsilon);
         size_t s = gates.size();
         RT_FAIL_IF(gates_view.size() < s, "Error: memref allocated too small for PPR gates.\n")
 
@@ -340,8 +336,7 @@ void rs_decomposition_get_gates([[maybe_unused]] size_t *data_allocated, size_t 
         }
     }
     else {
-        auto result = eval_ross_algorithm(theta, epsilon);
-        const auto &gates = result.first;
+        const auto &[gates, phase] = eval_ross_algorithm(theta, epsilon);
 
         size_t s = gates.size();
         RT_FAIL_IF(gates_view.size() < s, "Error: memref allocated too small for PPR gates.\n")

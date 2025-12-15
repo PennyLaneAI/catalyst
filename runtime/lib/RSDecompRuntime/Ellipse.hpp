@@ -19,10 +19,8 @@
 #include "Rings.hpp"
 #include <array>
 #include <cmath>
-#include <stdexcept>
-#include <string>
+#include <string_view>
 #include <utility>
-#include <vector>
 
 namespace RSDecomp::GridProblem {
 
@@ -72,7 +70,7 @@ struct GridOp {
         return a == other.a && b == other.b && c == other.c && d == other.d;
     }
 
-    static GridOp from_string(const std::string &s);
+    static GridOp from_string(std::string_view s);
 
     /**
      * @brief Multiplies this GridOp with another GridOp.
@@ -131,7 +129,7 @@ struct GridOp {
     /**
      * @brief Flattens the GridOp into a vector of doubles. (Lemma 5.11, arXiv:1403.2975)
      */
-    std::vector<double> flatten() const
+    std::array<double, 4> flatten() const
     {
         return {static_cast<double>(a[0]) + static_cast<double>(a[1]) / M_SQRT2,
                 static_cast<double>(b[0]) + static_cast<double>(b[1]) / M_SQRT2,
@@ -191,7 +189,7 @@ struct GridOp {
  * @param s Supported string are: "I", "R", "A", "B", "K", "X", "Z". (Fig 6, arXiv:1403.2975).
  * @return The corresponding GridOp.
  */
-inline GridOp GridOp::from_string(const std::string &s)
+inline GridOp GridOp::from_string(std::string_view s)
 {
     if (s.empty()) {
         return GridOp({1, 0}, {0, 0}, {0, 0}, {1, 0}); // Default I
@@ -427,13 +425,14 @@ struct Ellipse {
      */
     Ellipse apply_grid_op(const GridOp &grid_op) const
     {
-        auto g = grid_op.flatten();
-        double ga = g[0], gb = g[1], gc = g[2], gd = g[3];
+        const auto [ga, gb, gc, gd] = grid_op.flatten();
+
         std::array<double, 3> D = {ga * ga * a + 2 * ga * gc * b + d * gc * gc,
                                    ga * gb * a + (ga * gd + gb * gc) * b + gc * gd * d,
                                    gb * gb * a + 2 * gb * gd * b + d * gd * gd};
-        auto g_inv = grid_op.inverse().flatten();
-        double gda = g_inv[0], gdb = g_inv[1], gdc = g_inv[2], gdd = g_inv[3];
+
+        const auto [gda, gdb, gdc, gdd] = grid_op.inverse().flatten();
+
         std::array<double, 2> new_p = {gda * p[0] + gdb * p[1], gdc * p[0] + gdd * p[1]};
         return Ellipse(D, new_p);
     }

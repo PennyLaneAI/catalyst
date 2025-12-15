@@ -42,10 +42,7 @@ std::pair<std::vector<GateType>, double> ma_normal_form(const SO3Matrix &op)
     auto parity_vec = so3_op.parity_vec();
 
     while (parity_vec != std::array<int, 3>{1, 1, 1}) {
-        CliffordData::ParityTransformInfo pt_info = CliffordData::parity_transforms.at(parity_vec);
-        auto so3_val = pt_info.so3_val;
-        auto op_gate = pt_info.op_gates;
-        auto op_phase = pt_info.op_phase;
+        const auto &[so3_val, op_gate, op_phase] = CliffordData::parity_transforms.at(parity_vec);
         so3_op = so3_matrix_mul(so3_val, so3_op);
 
         decomposition.insert(decomposition.end(), op_gate.begin(), op_gate.end());

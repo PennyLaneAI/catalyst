@@ -1,7 +1,7 @@
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library(rt_rsdecomp SHARED RSDecomp.cpp Rings.cpp CliffordData.cpp)
+add_library(rt_rsdecomp SHARED RSDecomp.cpp Rings.cpp)
 
 # This is the version tested and shipped with Ubuntu 24 apt.
 # Using older versions (e.g. 1.66 on rhel8 or 1.74 on Ubuntu 22)

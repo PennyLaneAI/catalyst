@@ -464,10 +464,7 @@ void SO3Matrix::from_dyadic_matrix(const DyadicMatrix &dy_mat)
         }
     }
 
-    const auto &a_ = z_sqrt2[0];
-    const auto &b_ = z_sqrt2[1];
-    const auto &c_ = z_sqrt2[2];
-    const auto &d_ = z_sqrt2[3];
+    const auto &[a_, b_, c_, d_] = z_sqrt2;
 
     so3_mat[0][0] =
         a_.first * d_.first + a_.second * d_.second + b_.first * c_.first + b_.second * c_.second;

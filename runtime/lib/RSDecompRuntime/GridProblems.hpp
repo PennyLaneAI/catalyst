@@ -31,6 +31,7 @@
 //
 // TODO: Rewrite this with C++20 Coroutines and C++23 Generators for significant simplification of
 // the state-machine logic.
+// TODO: Rewrite with base class for common iterator logic.
 
 namespace RSDecomp::GridProblem {
 using namespace RSDecomp::Rings;
@@ -50,16 +51,17 @@ inline int bbox_grid_points(const bbox &bbox)
     const double d_ = std::log2(LAMBDA_D);
     ZSqrtTwo l1(1, 1);
     ZSqrtTwo l2(-1, 1);
-    double d1 = bbox[1] - bbox[0];
-    double d2 = bbox[3] - bbox[2];
+    auto [x_min, x_max, y_min, y_max] = bbox;
+
+    double d1 = x_max - x_min;
+    double d2 = y_max - y_min;
 
     // Find the integer scaling factor for the x and y intervals, such that
     // \delta_{1/2} \cdot (\lambda - 1)^{k_{1/2}} < 1, where \lambda= 1/√2.
     int k1 = static_cast<int>(std::floor(std::log2(d1) / d_ + 1.0));
     int k2 = static_cast<int>(std::floor(std::log2(d2) / d_ + 1.0));
 
-    double current_x0 = bbox[0], current_x1 = bbox[1], current_y0 = bbox[2], current_y1 = bbox[3];
-
+    double current_x0 = x_min, current_x1 = x_max, current_y0 = y_min, current_y1 = y_max;
     // If y-interval is wider than x-interval, swap.
     if (std::abs(k1) > std::abs(k2)) {
         std::swap(k1, k2);
@@ -346,11 +348,11 @@ class upright_problem_solution_iterator {
             if (!inner_iter) {
                 const ZSqrtTwo &beta = **outer_iter;
                 try {
-                    auto xp1 = state.e1.x_points(beta.to_double());
-                    auto xp2 = state.e2.x_points(beta.adj2().to_double());
+                    auto [Ax0, Ax1] = state.e1.x_points(beta.to_double());
+                    auto [Bx0, Bx1] = state.e2.x_points(beta.adj2().to_double());
 
-                    if (xp1.second > xp1.first && xp2.second > xp2.first) {
-                        inner_iter.emplace(xp1.first, xp1.second, xp2.first, xp2.second);
+                    if (Ax1 > Ax0 && Bx1 > Bx0) {
+                        inner_iter.emplace(Ax0, Ax1, Bx0, Bx1);
                     }
                 }
                 catch (const std::runtime_error &) {
@@ -383,11 +385,11 @@ class upright_problem_solution_iterator {
             if (!inner_iter) {
                 const ZSqrtTwo &alpha = **outer_iter;
                 try {
-                    auto yp1 = state.e1.y_points(alpha.to_double());
-                    auto yp2 = state.e2.y_points(alpha.adj2().to_double());
+                    auto [Ay0, Ay1] = state.e1.y_points(alpha.to_double());
+                    auto [By0, By1] = state.e2.y_points(alpha.adj2().to_double());
 
-                    if (yp1.second > yp1.first && yp2.second > yp2.first) {
-                        inner_iter.emplace(yp1.first, yp1.second, yp2.first, yp2.second);
+                    if (Ay1 > Ay0 && By1 > By0) {
+                        inner_iter.emplace(Ay0, Ay1, By0, By1);
                     }
                 }
                 catch (const std::runtime_error &) {
@@ -597,16 +599,14 @@ class two_dim_problem_solution_iterator {
                     is_on_first_coset = false;
 
                     // Create the second upright iterator using the shifted state.
-                    auto bbox1 = shifted_state.e1.bounding_box();
-                    auto bbox2 = shifted_state.e2.bounding_box();
+                    auto [bb1_x0, bb1_x1, bb1_y0, bb1_y1] = shifted_state.e1.bounding_box();
+                    auto [bb2_x0, bb2_x1, bb2_y0, bb2_y1] = shifted_state.e2.bounding_box();
 
-                    // Apply offsets: bbox12 = tuple(bb_ - 1 / _SQRT2 ...) and bbox22 = ...
-                    bbox shifted_bbox1 = {
-                        bbox1[0] + shifted_state.e1.p[0], bbox1[1] + shifted_state.e1.p[0],
-                        bbox1[2] + shifted_state.e1.p[1], bbox1[3] + shifted_state.e1.p[1]};
-                    bbox shifted_bbox2 = {
-                        bbox2[0] + shifted_state.e2.p[0], bbox2[1] + shifted_state.e2.p[0],
-                        bbox2[2] + shifted_state.e2.p[1], bbox2[3] + shifted_state.e2.p[1]};
+                    auto [p1x, p1y] = shifted_state.e1.p;
+                    auto [p2x, p2y] = shifted_state.e2.p;
+
+                    bbox shifted_bbox1 = {bb1_x0 + p1x, bb1_x1 + p1x, bb1_y0 + p1y, bb1_y1 + p1y};
+                    bbox shifted_bbox2 = {bb2_x0 + p2x, bb2_x1 + p2x, bb2_y0 + p2y, bb2_y1 + p2y};
 
                     // Check if it is easier to solve problem for either of x-or-y-interval.
                     int num_x = bbox_grid_points(
@@ -952,6 +952,8 @@ class GridIterator {
     {
 
         // --- Warm start for an initial guess ---
+        // Values are obtained from PennyLane implementation
+        // https://github.com/PennyLaneAI/pennylane/blob/2fa8e910437ccded0fe600f415dcc5f7436db4a8/pennylane/ops/op_math/decompositions/grid_problems.py#L597
         // where 14 is kmin for 1e-3.
         k = std::min(kmin, 14);
         i_ = 6; // Give 6 trials for warm start.

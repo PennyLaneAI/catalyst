@@ -112,8 +112,8 @@ template <typename Key, typename Value, size_t MaxSize> class lru_cache {
         }
         else {
             if (cache_map.size() >= MaxSize) {
-                const auto &lru_item = cache_list.back();
-                cache_map.erase(lru_item.first);
+                const auto &[lru_key, lru_value] = cache_list.back();
+                cache_map.erase(lru_key);
                 cache_list.pop_back();
             }
             cache_list.push_front({key, value});
