@@ -26,6 +26,9 @@
 #include "RSUtils.hpp"
 #include "Rings.hpp"
 
+#define MAX_FACTORING_TRIALS 1000
+#define FACTORING_CACHE_SIZE 100000
+
 namespace RSDecomp::NormSolver {
 
 using namespace RSDecomp::Utils;
@@ -35,12 +38,12 @@ using namespace RSDecomp::Rings;
 INT_TYPE legendre_symbol(INT_TYPE a, INT_TYPE p);
 bool primality_test(INT_TYPE n);
 std::optional<INT_TYPE> sqrt_modulo_p(INT_TYPE n, INT_TYPE p);
-std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_tries = 1000);
-std::optional<std::vector<INT_TYPE>> prime_factorize(INT_TYPE n, int max_trials = 1000,
-                                                     bool z_sqrt_two = true);
+std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_trials = MAX_FACTORING_TRIALS);
+std::optional<std::vector<INT_TYPE>>
+prime_factorize(INT_TYPE n, int max_trials = MAX_FACTORING_TRIALS, bool z_sqrt_two = true);
 std::optional<std::vector<ZSqrtTwo>> factorize_prime_zsqrt_two(INT_TYPE p);
 std::optional<ZOmega> factorize_prime_zomega(const ZSqrtTwo &x, INT_TYPE p);
-std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trials = 1000);
+std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trials = MAX_FACTORING_TRIALS);
 
 // --- Number Theoretic Algorithms ---
 
@@ -54,7 +57,7 @@ std::optional<ZOmega> solve_diophantine(const ZSqrtTwo &xi, int max_trials = 100
  */
 inline bool primality_test(INT_TYPE n)
 {
-    static lru_cache<INT_TYPE, bool, 100000> cache;
+    static lru_cache<INT_TYPE, bool, FACTORING_CACHE_SIZE> cache;
     if (auto val_opt = cache.get(n); val_opt) {
         return *val_opt;
     }
@@ -82,7 +85,7 @@ inline bool primality_test(INT_TYPE n)
  */
 inline INT_TYPE legendre_symbol(INT_TYPE a, INT_TYPE p)
 {
-    static lru_cache<std::pair<INT_TYPE, INT_TYPE>, INT_TYPE, 100000> cache;
+    static lru_cache<std::pair<INT_TYPE, INT_TYPE>, INT_TYPE, FACTORING_CACHE_SIZE> cache;
     auto key = std::make_pair(a, p);
 
     if (auto val_opt = cache.get(key); val_opt) {
@@ -180,13 +183,13 @@ inline std::optional<INT_TYPE> sqrt_modulo_p(INT_TYPE n, INT_TYPE p)
  * Ref: https://doi.org/10.1007/BF01933190
  *
  * @param n The number to factor.
- * @param max_tries The maximum number of attempts to find a factor.
+ * @param max_trials The maximum number of attempts to find a factor.
  * @return An integer factor of n, or std::nullopt if no factors are found.
  */
-inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_tries)
+inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_trials)
 {
-    static lru_cache<std::pair<INT_TYPE, int>, std::optional<INT_TYPE>, 100000> cache;
-    auto cache_key = std::make_pair(n, max_tries);
+    static lru_cache<std::pair<INT_TYPE, int>, std::optional<INT_TYPE>, FACTORING_CACHE_SIZE> cache;
+    auto cache_key = std::make_pair(n, max_trials);
 
     if (auto val_opt = cache.get(cache_key); val_opt) {
         return *val_opt;
@@ -204,7 +207,7 @@ inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_tries)
     static boost::random::mt11213b gen(std::random_device{}());
 
     // Main loop: retry with different parameters on failure
-    while (max_tries-- > 0) {
+    while (max_trials-- > 0) {
         INT_TYPE n_minus_1 = n - 1;
         boost::random::uniform_int_distribution<INT_TYPE> dist(1, n_minus_1);
 
@@ -276,7 +279,8 @@ inline std::optional<INT_TYPE> integer_factorize(INT_TYPE n, int max_tries)
 inline std::optional<std::vector<INT_TYPE>> prime_factorize(INT_TYPE n, int max_trials,
                                                             bool z_sqrt_two)
 {
-    static lru_cache<std::tuple<INT_TYPE, int, bool>, std::optional<std::vector<INT_TYPE>>, 100000>
+    static lru_cache<std::tuple<INT_TYPE, int, bool>, std::optional<std::vector<INT_TYPE>>,
+                     FACTORING_CACHE_SIZE>
         cache;
     auto cache_key = std::make_tuple(n, max_trials, z_sqrt_two);
 

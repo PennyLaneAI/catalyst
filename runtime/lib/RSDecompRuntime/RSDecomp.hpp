@@ -15,7 +15,6 @@
 #pragma once
 
 #include "CliffordData.hpp"
-#include <cstdint>
 
 namespace RSDecomp::RossSelinger {
 using namespace RSDecomp::Rings;

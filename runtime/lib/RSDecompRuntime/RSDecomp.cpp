@@ -14,7 +14,6 @@
 
 #include <cassert>
 #include <cmath>
-#include <cstdint>
 #include <cstring>
 #include <vector>
 
@@ -25,7 +24,8 @@
 #include "RSDecomp.hpp"
 #include "Rings.hpp"
 
-#define MAX_FACTORING_TRIALS 1000
+#define MAX_SEARCH_TRIALS 10000
+#define ROSS_CACHE_SIZE 10000
 
 namespace {
 bool is_odd_multiple_of_pi_4(double angle)
@@ -55,7 +55,6 @@ std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double
                                                                           double epsilon)
 {
     ZOmega scale(0, 0, 0, 1);
-    int max_search_trials = 10000;
     double phase = 0.0;
 
     ZOmega u(0, 0, 0, 1);
@@ -106,7 +105,7 @@ std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double
             scale = ZOmega(0, -1, 0, 0); // b=-1
             break;
         }
-        GridProblem::GridIterator u_solutions(modified_angle + shift, epsilon, max_search_trials);
+        GridProblem::GridIterator u_solutions(modified_angle + shift, epsilon, MAX_SEARCH_TRIALS);
 
         for (const auto &[u_sol, k_val] : u_solutions) {
             // Calculate 2^k_val as an INT_TYPE
@@ -134,7 +133,7 @@ std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double
 // Cache for Standard Basis
 using StdCacheKey = std::tuple<double, double>;
 using StdCacheValue = std::pair<std::vector<GateType>, double>;
-static lru_cache<StdCacheKey, StdCacheValue, 10000> ross_cache_std;
+static lru_cache<StdCacheKey, StdCacheValue, ROSS_CACHE_SIZE> ross_cache_std;
 
 std::pair<std::vector<GateType>, double> eval_ross_algorithm(double angle, double epsilon)
 {
@@ -152,7 +151,7 @@ std::pair<std::vector<GateType>, double> eval_ross_algorithm(double angle, doubl
 // Cache for PPR Basis
 using PPRCacheKey = std::tuple<double, double>;
 using PPRCacheValue = std::pair<std::vector<PPRGateType>, double>;
-static lru_cache<PPRCacheKey, PPRCacheValue, 10000> ross_cache_ppr;
+static lru_cache<PPRCacheKey, PPRCacheValue, ROSS_CACHE_SIZE> ross_cache_ppr;
 
 std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle, double epsilon)
 {
@@ -258,6 +257,7 @@ std::vector<PPRGateType> HSTtoPPR(const std::vector<GateType> &input_gates)
             output_gates.push_back(PPRGateType::adjZ4);
             break;
         case GateType::HT: {
+            // Applied commutation rules via PPR playground
             output_gates.push_back(PPRGateType::X8);
             output_gates.push_back(PPRGateType::Z4);
             output_gates.push_back(PPRGateType::X4);
@@ -265,6 +265,7 @@ std::vector<PPRGateType> HSTtoPPR(const std::vector<GateType> &input_gates)
             break;
         }
         case GateType::SHT: {
+            // Applied commutation rules via PPR playground
             output_gates.push_back(PPRGateType::adjY8);
             output_gates.push_back(PPRGateType::adjX4);
             output_gates.push_back(PPRGateType::Z4);
@@ -351,6 +352,14 @@ void rs_decomposition_get_gates([[maybe_unused]] size_t *data_allocated, size_t 
     }
 }
 
+/**
+ * @brief Returns the global phase component of the decomposition.
+ *
+ * @param theta Angle
+ * @param epsilon Error
+ * @param ppr_basis Whether to use PPR basis
+ * @return double The global phase
+ */
 double rs_decomposition_get_phase(double theta, double epsilon, bool ppr_basis)
 {
     if (ppr_basis) {

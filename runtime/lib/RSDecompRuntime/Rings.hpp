@@ -19,7 +19,6 @@
 #include <boost/multiprecision/cpp_int.hpp>
 #include <cmath>
 #include <complex>
-#include <iostream>
 #include <optional>
 
 namespace RSDecomp::Rings {

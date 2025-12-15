@@ -19,7 +19,6 @@
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include <catch2/matchers/catch_matchers_vector.hpp>
 #include <complex>
-#include <cstdint>
 #include <cstdio>
 #include <map>
 
@@ -71,14 +70,14 @@ TEST_CASE("Test Matrix Multiplication", "[RSDecomp][Ross Selinger]")
         multiply_matrices(gate_type_to_matrix[GateType::T], gate_type_to_matrix[GateType::H]);
     auto expected_HT = gate_type_to_matrix[GateType::HT];
 
-    for (size_t i = 0; i < res_HT.size(); ++i) {
+    for (size_t i = 0; i < res_HT.size(); i++) {
         CHECK(res_HT[i].real() == Catch::Approx(expected_HT[i].real()));
         CHECK(res_HT[i].imag() == Catch::Approx(expected_HT[i].imag()));
     }
 
     auto res_SHT = multiply_matrices(res_HT, gate_type_to_matrix[GateType::S]);
     auto expected_SHT = gate_type_to_matrix[GateType::SHT];
-    for (size_t i = 0; i < res_SHT.size(); ++i) {
+    for (size_t i = 0; i < res_SHT.size(); i++) {
         CHECK(res_SHT[i].real() == Catch::Approx(expected_SHT[i].real()));
         CHECK(res_SHT[i].imag() == Catch::Approx(expected_SHT[i].imag()));
     }
@@ -91,7 +90,7 @@ TEST_CASE("Test matrix_from_decomp_result", "[RSDecomp][Ross Selinger]")
     auto result_matrix = matrix_from_decomp_result(decomp);
     auto expected_matrix = gate_type_to_matrix[GateType::HT];
 
-    for (size_t i = 0; i < result_matrix.size(); ++i) {
+    for (size_t i = 0; i < result_matrix.size(); i++) {
         CHECK(result_matrix[i].real() == Catch::Approx(expected_matrix[i].real()));
         CHECK(result_matrix[i].imag() == Catch::Approx(expected_matrix[i].imag()));
     }
@@ -101,7 +100,7 @@ TEST_CASE("Test matrix_from_decomp_result", "[RSDecomp][Ross Selinger]")
     result_matrix = matrix_from_decomp_result(decomp);
     expected_matrix = gate_type_to_matrix[GateType::SHT];
 
-    for (size_t i = 0; i < result_matrix.size(); ++i) {
+    for (size_t i = 0; i < result_matrix.size(); i++) {
         CHECK(result_matrix[i].real() == Catch::Approx(expected_matrix[i].real()));
         CHECK(result_matrix[i].imag() == Catch::Approx(expected_matrix[i].imag()));
     }
