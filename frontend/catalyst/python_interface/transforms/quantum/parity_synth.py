@@ -243,7 +243,7 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
             raise ModuleNotFoundError(
                 "The packages networkx and galois are required to run the ParitySynth pass."
                 "You can install them via ``pip install networkx galois``."
-            ) from networkx_import_error
+            ) from networkx_import_error # pylint: disable=used-before-assignment
 
         super().__init__(*args, **kwargs)
         self._reset_vars()
@@ -456,23 +456,26 @@ class ParitySynthPass(passes.ModulePass):
     mlir_module = compiler.run(circuit_qjit.mlir_module)
     ```
 
-    Looking at the compiled module, we find only five gates left in the program; the ``CNOT``\ s
+    Looking at the compiled module below, we find only five gates left in the program (note that
+    we reduced the output for the purpose of this example); the ``CNOT``\ s
     have been cancelled successfully. Note that for this circuit, ParitySynth is run twice; once
     for the first three gates and once for the last three gates. This is because ``RX`` is not
     a phase polynomial operation, so that it forms a boundary for the phase polynomial subcircuits
     that are re-synthesized by the pass.
 
-    >>> print(mlir_module)
+    >>> print(mlir_module) # The following output has manually be reduced for readability
     module @circuit {
-      func.func public @jit_circuit(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>) -> tensor<4xcomplex<f64>> attributes {llvm.emit_c_interface} {
-        %0 = "catalyst.launch_kernel"(%arg0, %arg1, %arg2) <{callee = @module_circuit::@circuit}> : (tensor<f64>, tensor<f64>, tensor<f64>) -> tensor<4xcomplex<f64>>
+      func.func public @jit_circuit([...]) -> tensor<4xcomplex<f64>> {
+        %0 = "catalyst.launch_kernel"(%arg0, %arg1, %arg2) <[...]> :
+            (tensor<f64>, tensor<f64>, tensor<f64>) -> tensor<4xcomplex<f64>>
         return %0 : tensor<4xcomplex<f64>>
       }
       module @module_circuit {
-        func.func public @circuit(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>) -> tensor<4xcomplex<f64>> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, parity_synth_done, qnode} {
+        func.func public @circuit(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>) ->
+            tensor<4xcomplex<f64>> attributes [...] {
           %c = stablehlo.constant dense<0> : tensor<i64>
           %0 = "tensor.extract"(%c) : (tensor<i64>) -> i64
-          "quantum.device"(%0) <{device_name = "LightningSimulator", kwargs = "{'mcmc': False, 'num_burnin': 0, 'kernel_name': None}", lib = "/Users/david.wierichs/venvs/paritysynth/lib/python3.12/site-packages/pennylane_lightning/liblightning_qubit_catalyst.dylib"}> : (i64) -> ()
+          "quantum.device"(%0) <[...]> : (i64) -> ()
           %c_0 = stablehlo.constant dense<2> : tensor<i64>
           %1 = "quantum.alloc"() <{nqubits_attr = 2 : i64}> : () -> !quantum.reg
           %2 = "tensor.extract"(%c) : (tensor<i64>) -> i64
@@ -481,19 +484,19 @@ class ParitySynthPass(passes.ModulePass):
           %4 = "tensor.extract"(%c_1) : (tensor<i64>) -> i64
           %5 = "quantum.extract"(%1, %4) : (!quantum.reg, i64) -> !quantum.bit
           %6 = "tensor.extract"(%arg0) : (tensor<f64>) -> f64
-          %7:2 = "quantum.custom"(%5, %3) <{gate_name = "CNOT", operandSegmentSizes = array<i32: 0, 2, 0, 0>, resultSegmentSizes = array<i32: 2, 0>}> : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
-          %8 = "quantum.custom"(%6, %7#1) <{gate_name = "RZ", operandSegmentSizes = array<i32: 1, 1, 0, 0>, resultSegmentSizes = array<i32: 1, 0>}> : (f64, !quantum.bit) -> !quantum.bit
-          %9:2 = "quantum.custom"(%7#0, %8) <{gate_name = "CNOT", operandSegmentSizes = array<i32: 0, 2, 0, 0>, resultSegmentSizes = array<i32: 2, 0>}> : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+          %7:2 = "quantum.custom"(%5, %3) <{gate_name = "CNOT", [...]> :[...]
+          %8 = "quantum.custom"(%6, %7#1) <{gate_name = "RZ", [...]> :[...]
+          %9:2 = "quantum.custom"(%7#0, %8) <{gate_name = "CNOT", [...]> : [...]
           %10 = "tensor.extract"(%arg1) : (tensor<f64>) -> f64
-          %11 = "quantum.custom"(%10, %9#0) <{gate_name = "RX", operandSegmentSizes = array<i32: 1, 1, 0, 0>, resultSegmentSizes = array<i32: 1, 0>}> : (f64, !quantum.bit) -> !quantum.bit
+          %11 = "quantum.custom"(%10, %9#0) <{gate_name = "RX", [...]> : [...]
           %12 = "tensor.extract"(%arg2) : (tensor<f64>) -> f64
-          %13 = "quantum.custom"(%12, %11) <{gate_name = "RZ", operandSegmentSizes = array<i32: 1, 1, 0, 0>, resultSegmentSizes = array<i32: 1, 0>}> : (f64, !quantum.bit) -> !quantum.bit
+          %13 = "quantum.custom"(%12, %11) <{gate_name = "RZ", [...]> : [...]
           %14 = "tensor.extract"(%c) : (tensor<i64>) -> i64
           %15 = "quantum.insert"(%1, %14, %9#1) : (!quantum.reg, i64, !quantum.bit) -> !quantum.reg
           %16 = "tensor.extract"(%c_1) : (tensor<i64>) -> i64
           %17 = "quantum.insert"(%15, %16, %13) : (!quantum.reg, i64, !quantum.bit) -> !quantum.reg
-          %18 = "quantum.compbasis"(%17) <{operandSegmentSizes = array<i32: 0, 1>}> : (!quantum.reg) -> !quantum.obs
-          %19 = "quantum.state"(%18) <{operandSegmentSizes = array<i32: 1, 0, 0>}> : (!quantum.obs) -> tensor<4xcomplex<f64>>
+          %18 = "quantum.compbasis"(%17) <[...]> : (!quantum.reg) -> !quantum.obs
+          %19 = "quantum.state"(%18) <[...]> : (!quantum.obs) -> tensor<4xcomplex<f64>>
           "quantum.dealloc"(%17) : (!quantum.reg) -> ()
           "quantum.device_release"() : () -> ()
           return %19 : tensor<4xcomplex<f64>>
