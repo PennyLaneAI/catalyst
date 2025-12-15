@@ -386,17 +386,23 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
 class ParitySynthPass(passes.ModulePass):
     r"""Pass for applying ParitySynth to phase polynomials in a circuit.
 
-    ParitySynth has been proposed by Vandaele et al. in `arXiv:<https://arxiv.org/abs/2104.00934>`__
+    ParitySynth has been proposed by Vandaele et al. in
+    `arXiv:2104.00934 <https://arxiv.org/abs/2104.00934>`__
     as a technique to synthesize
-    `phase polynomials <https://pennylane.ai/compilation/phase-polynomial-intermediate-representation>`__
+    `phase polynomials
+    <https://pennylane.ai/compilation/phase-polynomial-intermediate-representation>`__
     into elementary quantum gates, namely ``CNOT`` and ``RZ``.
+    For this, it synthesizes the
+    `parity table <https://pennylane.ai/compilation/parity-table>`__ of the phase polynomial,
+    and defers the remaining `parity matrix <>`__ synthesis to
+    `RowCol <https://pennylane.ai/compilation/rowcol-algorithm>`__.
 
     .. note::
 
         This pass requires the ``networkx`` package, which can be installed via
-        ``pip install networkx``. It also relies on RowCol
-        (`docs<https://docs.pennylane.ai/en/stable/code/api/pennylane.transforms.rowcol.html>`__,
-        `compilation hub <https://pennylane.ai/compilation/rowcol-algorithm>`__)
+        ``pip install networkx``. It also relies on
+        `qml.transforms.rowcol
+        <https://docs.pennylane.ai/en/stable/code/api/pennylane.transforms.rowcol.html>`__
         to compile the parity matrix left over after running ParitySynth itself. The implementation
         of RowCol in turn makes use of the ``galois`` package, which thus
         needs to be installed as well, for example via ``pip install galois``.
