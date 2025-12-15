@@ -378,9 +378,22 @@ struct Ellipse {
     std::pair<double, double> x_points(double y) const
     {
         double y_shifted = y - p[1];
-        double disc = y_shifted * y_shifted * (b * b - a * d) + a;
-        RT_FAIL_IF(disc < 0, "Point y is outside the ellipse");
-        double d0 = std::sqrt(disc);
+        double discriminant = y_shifted * y_shifted * (b * b - a * d) + a;
+
+        if (discriminant < 0) {
+            double det = determinant();
+            double y_extent = std::sqrt(a / det);
+            double y_min = p[1] - y_extent;
+            double y_max = p[1] + y_extent;
+
+            std::stringstream ss;
+            ss << "Cannot compute x_points: y=" << y << " is outside ellipse bounds [" << y_min
+               << ", " << y_max << "]";
+
+            RT_FAIL(ss.str().c_str());
+        }
+
+        double d0 = std::sqrt(discriminant);
         double x1 = (-b * y_shifted - d0) / a;
         double x2 = (-b * y_shifted + d0) / a;
         return {p[0] + x1, p[0] + x2};
@@ -392,9 +405,22 @@ struct Ellipse {
     std::pair<double, double> y_points(double x) const
     {
         double x_shifted = x - p[0];
-        double disc = (b * x_shifted) * (b * x_shifted) - d * (a * x_shifted * x_shifted - 1.0);
-        RT_FAIL_IF(disc < 0, "Point x is outside the ellipse");
-        double d0 = std::sqrt(disc);
+        double discriminant =
+            (b * x_shifted) * (b * x_shifted) - d * (a * x_shifted * x_shifted - 1.0);
+
+        if (discriminant < 0) {
+            double det = determinant();
+            double x_extent = std::sqrt(d / det);
+            double x_min = p[0] - x_extent;
+            double x_max = p[0] + x_extent;
+
+            std::stringstream ss;
+            ss << "Cannot compute y_points: x=" << x << " is outside ellipse bounds [" << x_min
+               << ", " << x_max << "]";
+            RT_FAIL(ss.str().c_str());
+        }
+
+        double d0 = std::sqrt(discriminant);
         double y1 = (-b * x_shifted - d0) / d;
         double y2 = (-b * x_shifted + d0) / d;
         return {p[1] + y1, p[1] + y2};
@@ -531,8 +557,8 @@ struct EllipseState {
             grid_op = grid_op * GridOp::from_string("X");
         }
         if (std::abs(bias()) > 2) {
-            long long n = static_cast<long long>(round((1.0 - sign * bias()) / 4.0));
-            grid_op = grid_op * GridOp::from_string("U").pow(INT_TYPE(n));
+            INT_TYPE n = INT_TYPE(round((1.0 - sign * bias()) / 4.0));
+            grid_op = grid_op * GridOp::from_string("U").pow(n);
         }
         GridOp n_grid_op = GridOp::from_string("I");
         EllipseState new_state = this->apply_grid_op(grid_op);

@@ -70,17 +70,17 @@ std::pair<std::vector<GateType>, double> compute_clifford_T_decomposition(double
         int normalized = ((units % 8) + 8) % 8;
 
         if (normalized & 4) {
-            decomposition.push_back(GateType::Z);
+            decomposition.emplace_back(GateType::Z);
         }
         if (normalized & 2) {
-            decomposition.push_back(GateType::S);
+            decomposition.emplace_back(GateType::S);
         }
         if (normalized & 1) {
-            decomposition.push_back(GateType::T);
+            decomposition.emplace_back(GateType::T);
         }
 
         if (decomposition.empty()) {
-            decomposition.push_back(GateType::I);
+            decomposition.emplace_back(GateType::I);
         }
 
         phase = static_cast<double>(units) * (M_PI / 8.0);
@@ -190,36 +190,36 @@ std::vector<PPRGateType> HSTtoPPR(const std::vector<GateType> &input_gates)
 
             // Rule: HT, HT -> X8, Z8
             if (current_gate == GateType::HT && next_gate == GateType::HT) {
-                output_gates.push_back(PPRGateType::X8);
-                output_gates.push_back(PPRGateType::Z8);
+                output_gates.emplace_back(PPRGateType::X8);
+                output_gates.emplace_back(PPRGateType::Z8);
                 i += 2; // Skip both processed gates
                 continue;
             }
 
             // Rule: HT, SHT -> X4, X8, Z8
             if (current_gate == GateType::HT && next_gate == GateType::SHT) {
-                output_gates.push_back(PPRGateType::X4);
-                output_gates.push_back(PPRGateType::X8);
-                output_gates.push_back(PPRGateType::Z8);
+                output_gates.emplace_back(PPRGateType::X4);
+                output_gates.emplace_back(PPRGateType::X8);
+                output_gates.emplace_back(PPRGateType::Z8);
                 i += 2;
                 continue;
             }
 
             // Rule: SHT, HT -> Z4, X8, Z8
             if (current_gate == GateType::SHT && next_gate == GateType::HT) {
-                output_gates.push_back(PPRGateType::Z4);
-                output_gates.push_back(PPRGateType::X8);
-                output_gates.push_back(PPRGateType::Z8);
+                output_gates.emplace_back(PPRGateType::Z4);
+                output_gates.emplace_back(PPRGateType::X8);
+                output_gates.emplace_back(PPRGateType::Z8);
                 i += 2;
                 continue;
             }
 
             // Rule: SHT, SHT -> Z4, X4, X8, Z8
             if (current_gate == GateType::SHT && next_gate == GateType::SHT) {
-                output_gates.push_back(PPRGateType::Z4);
-                output_gates.push_back(PPRGateType::X4);
-                output_gates.push_back(PPRGateType::X8);
-                output_gates.push_back(PPRGateType::Z8);
+                output_gates.emplace_back(PPRGateType::Z4);
+                output_gates.emplace_back(PPRGateType::X4);
+                output_gates.emplace_back(PPRGateType::X8);
+                output_gates.emplace_back(PPRGateType::Z8);
                 i += 2;
                 continue;
             }
@@ -229,45 +229,45 @@ std::vector<PPRGateType> HSTtoPPR(const std::vector<GateType> &input_gates)
         // We handle the 1-to-1 mappings.
         switch (current_gate) {
         case GateType::T:
-            output_gates.push_back(PPRGateType::Z8);
+            output_gates.emplace_back(PPRGateType::Z8);
             break;
         case GateType::I:
-            output_gates.push_back(PPRGateType::I);
+            output_gates.emplace_back(PPRGateType::I);
             break;
         case GateType::X:
-            output_gates.push_back(PPRGateType::X2);
+            output_gates.emplace_back(PPRGateType::X2);
             break;
         case GateType::Y:
-            output_gates.push_back(PPRGateType::Y2);
+            output_gates.emplace_back(PPRGateType::Y2);
             break;
         case GateType::Z:
-            output_gates.push_back(PPRGateType::Z2);
+            output_gates.emplace_back(PPRGateType::Z2);
             break;
         case GateType::H:
-            output_gates.push_back(PPRGateType::Z4);
-            output_gates.push_back(PPRGateType::X4);
-            output_gates.push_back(PPRGateType::Z4);
+            output_gates.emplace_back(PPRGateType::Z4);
+            output_gates.emplace_back(PPRGateType::X4);
+            output_gates.emplace_back(PPRGateType::Z4);
             break;
         case GateType::S:
-            output_gates.push_back(PPRGateType::Z4);
+            output_gates.emplace_back(PPRGateType::Z4);
             break;
         case GateType::Sd:
-            output_gates.push_back(PPRGateType::adjZ4);
+            output_gates.emplace_back(PPRGateType::adjZ4);
             break;
         case GateType::HT: {
             // Applied commutation rules via PPR playground
-            output_gates.push_back(PPRGateType::X8);
-            output_gates.push_back(PPRGateType::Z4);
-            output_gates.push_back(PPRGateType::X4);
-            output_gates.push_back(PPRGateType::Z4);
+            output_gates.emplace_back(PPRGateType::X8);
+            output_gates.emplace_back(PPRGateType::Z4);
+            output_gates.emplace_back(PPRGateType::X4);
+            output_gates.emplace_back(PPRGateType::Z4);
             break;
         }
         case GateType::SHT: {
             // Applied commutation rules via PPR playground
-            output_gates.push_back(PPRGateType::adjY8);
-            output_gates.push_back(PPRGateType::adjX4);
-            output_gates.push_back(PPRGateType::Z4);
-            output_gates.push_back(PPRGateType::Z2);
+            output_gates.emplace_back(PPRGateType::adjY8);
+            output_gates.emplace_back(PPRGateType::adjX4);
+            output_gates.emplace_back(PPRGateType::Z4);
+            output_gates.emplace_back(PPRGateType::Z2);
             break;
         }
 

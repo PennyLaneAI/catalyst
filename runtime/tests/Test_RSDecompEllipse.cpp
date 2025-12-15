@@ -40,8 +40,8 @@ TEST_CASE("Test Ellipse class", "[RSDecomp][Ellipse]")
     CHECK(e.y_points(5) == std::make_pair(5.0, 5.0));
     CHECK(e.uprightness() == 0.7853981633974483);
 
-    REQUIRE_THROWS_WITH(e.x_points(24), ContainsSubstring("is outside the ellipse"));
-    REQUIRE_THROWS_WITH(e.y_points(24), ContainsSubstring("is outside the ellipse"));
+    REQUIRE_THROWS_WITH(e.x_points(24), ContainsSubstring("Cannot compute x_points:"));
+    REQUIRE_THROWS_WITH(e.y_points(24), ContainsSubstring("Cannot compute y_points:"));
 }
 
 TEST_CASE("Test EllipseState class", "[RSDecomp][EllipseState]")

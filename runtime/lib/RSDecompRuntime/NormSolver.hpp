@@ -290,7 +290,7 @@ inline std::optional<std::vector<INT_TYPE>> prime_factorize(INT_TYPE n, int max_
 
     std::vector<INT_TYPE> factors;
     std::vector<INT_TYPE> stack;
-    stack.push_back(n);
+    stack.emplace_back(n);
 
     while (!stack.empty()) {
         INT_TYPE p = stack.back();
@@ -307,7 +307,7 @@ inline std::optional<std::vector<INT_TYPE>> prime_factorize(INT_TYPE n, int max_
                 cache.put(cache_key, std::nullopt);
                 return std::nullopt;
             }
-            factors.push_back(p);
+            factors.emplace_back(p);
             continue;
         }
 
@@ -326,8 +326,8 @@ inline std::optional<std::vector<INT_TYPE>> prime_factorize(INT_TYPE n, int max_
         }
 
         // Push factor and its complement onto the stack
-        stack.push_back(*factor_opt);
-        stack.push_back(p / *factor_opt);
+        stack.emplace_back(*factor_opt);
+        stack.emplace_back(p / *factor_opt);
     }
 
     std::sort(factors.begin(), factors.end());

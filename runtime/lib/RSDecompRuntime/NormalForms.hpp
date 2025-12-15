@@ -74,7 +74,7 @@ std::pair<std::vector<GateType>, double> ma_normal_form(const SO3Matrix &op)
     for (const auto &[clifford_ops, clifford_so3] : CliffordData::clifford_group_to_SO3) {
         if (clifford_so3 == so3_op) {
             for (const auto &clf_op : clifford_ops) {
-                decomposition.push_back(clf_op);
+                decomposition.emplace_back(clf_op);
                 auto [su2, gp] = CliffordData::clifford_gates_to_SU2.at(clf_op);
                 a = su2.a * a + su2.b * c;
                 c = su2.c * a + su2.d * c;
@@ -86,8 +86,7 @@ std::pair<std::vector<GateType>, double> ma_normal_form(const SO3Matrix &op)
     }
 
     auto su2mat = op.dyadic_mat;
-    double k_diff = static_cast<double>(static_cast<long long>(k - su2mat.k));
-    auto g_angle = -std::arg(su2mat.a.to_complex() / a.to_complex() * std::pow(M_SQRT2, k_diff));
+    auto g_angle = -std::arg(su2mat.a.to_complex() / a.to_complex());
     g_phase = g_angle / M_PI - g_phase;
 
     g_phase = std::fmod(g_phase, 2.0);

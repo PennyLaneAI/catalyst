@@ -490,12 +490,12 @@ class upright_problem_solution_iterator {
 
             one_dim_problem_solution_iterator alpha_gen(Ax0, Ax1, Bx0, Bx1);
             for (const auto &alpha : alpha_gen) {
-                alpha_solutions_cache.push_back(alpha);
+                alpha_solutions_cache.emplace_back(alpha);
             }
 
             one_dim_problem_solution_iterator beta_gen(Ay0, Ay1, By0, By1);
             for (const auto &beta : beta_gen) {
-                beta_solutions_cache.push_back(beta);
+                beta_solutions_cache.emplace_back(beta);
             }
         }
 
@@ -844,8 +844,8 @@ class GridIterator {
                             }
                             else if (dot_prod >= t_) {
                                 // Fallback solution collection
-                                int_s.push_back(scaled_sol);
-                                init_k.push_back(k_);
+                                int_s.emplace_back(scaled_sol);
+                                init_k.emplace_back(k_);
                             }
                         }
                     } // end while(inner_iter)
@@ -878,9 +878,9 @@ class GridIterator {
                 if (main_loop_idx >= max_trials) {
                     iter_state = IterState::FALLBACK;
                     fallback_idx = 0;
-                    // Add standard fallback ZOmega(d=1) -> ZOmega(0,0,0,1)
-                    int_s.push_back(ZOmega(0, 0, 0, 1));
-                    init_k.push_back(0);
+                    // Add standard fallback
+                    int_s.emplace_back(0, 0, 0, 1); // ZOmega(d=1)
+                    init_k.emplace_back(0);
                     continue; // Go to FALLBACK state
                 }
 
@@ -900,8 +900,8 @@ class GridIterator {
                     // Corresponds to Python's `except (ValueError, ZeroDivisionError): break`
                     iter_state = IterState::FALLBACK;
                     fallback_idx = 0;
-                    int_s.push_back(ZOmega(0, 0, 0, 1));
-                    init_k.push_back(0);
+                    int_s.emplace_back(0, 0, 0, 1); // ZOmega(d=1)
+                    init_k.emplace_back(0);
                     continue; // Go to FALLBACK state
                 }
 
