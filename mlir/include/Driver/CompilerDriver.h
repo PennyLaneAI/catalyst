@@ -82,9 +82,9 @@ struct CompilerOptions {
 
     /// ARTIQ cross-compilation settings
     bool artiqEnabled = false;
-    std::string artiqKernelLd;  // Path to ARTIQ kernel.ld linker script
-    std::string artiqLlcPath;   // Path to llc
-    std::string artiqLldPath;   // Path to ld.lld
+    std::string artiqKernelLd; // Path to ARTIQ kernel.ld linker script
+    std::string artiqLlcPath;  // Path to llc
+    std::string artiqLldPath;  // Path to ld.lld
 
     /// Get the destination of the object file at the end of compilation.
     std::string getObjectFile() const
