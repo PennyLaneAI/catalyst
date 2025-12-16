@@ -394,7 +394,7 @@ def test_pauli_rot_and_measure_with_cond():
     @qjit(pipelines=pipeline, target="mlir")
     @qml.qnode(device=dev)
     def circuit():
-        partial(qml.PauliRot, pauli_word="Z")(np.pi / 2, "Z", wires=0)
+        partial(qml.PauliRot, pauli_word="Z")(np.pi / 2, wires=0)
         m = qml.pauli_measure("Z", wires=0)
         qml.cond(m, partial(qml.PauliRot, pauli_word="Z"))(theta=np.pi / 2, wires=0)
 
