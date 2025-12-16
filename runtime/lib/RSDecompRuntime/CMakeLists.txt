@@ -28,15 +28,18 @@ else()
     set(BOOST_INCLUDE_LIBRARIES multiprecision random)
     set(BOOST_ENABLE_CMAKE ON)
 
+    # Note: Need to use .xz version from github (or for newer require -cmake.tar.gz), as
+    # normal release from boost website do not include required cmake files.
     FetchContent_Declare(
         Boost
-        URL https://archives.boost.io/release/1.89.0/source/boost_1_89_0.tar.bz2
-        URL_HASH SHA256=85a33fa22621b4f314f8e85e1a5e2a9363d22e4f4992925d4bb3bc631b5a0c7a
+        URL https://github.com/boostorg/boost/releases/download/boost-1.84.0/boost-1.84.0.tar.xz
+        URL_MD5 893b5203b862eb9bbd08553e24ff146a
         DOWNLOAD_EXTRACT_TIMESTAMP ON
     )
-
+    
     FetchContent_MakeAvailable(Boost)
 
+    target_link_libraries(rt_rsdecomp PUBLIC Boost::random Boost::multiprecision)
 endif()
 
 target_include_directories(rt_rsdecomp
