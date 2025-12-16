@@ -292,6 +292,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Update `catalyst.python_interface.inspection.xdsl_conversion.get_mlir_module` to
+  no longer explicitly use the xDSL pass plugin.
+  [(#2303)](https://github.com/PennyLaneAI/catalyst/pull/2303)
+
 * Added missing `detensorize-function-boundary` and `symbol-dce` passes to `Pipelines.cpp`.
   [(#2266)](https://github.com/PennyLaneAI/catalyst/pull/2266)
 
@@ -518,6 +522,7 @@ Joseph Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Lee J. O'Riordan,
+Andrija Paurevic,
 Roberto Turrado,
 Paul Haochen Wang,
 Jake Zaia,
