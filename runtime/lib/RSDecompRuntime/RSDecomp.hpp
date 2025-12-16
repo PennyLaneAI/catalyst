@@ -21,7 +21,7 @@ using namespace RSDecomp::Rings;
 using namespace RSDecomp::CliffordData;
 std::pair<std::vector<GateType>, double> eval_ross_algorithm(double angle, double epsilon);
 std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle, double epsilon);
-std::vector<PPRGateType> HSTtoPPR(const std::vector<GateType> &vector);
+std::vector<PPRGateType> HST_to_PPR(const std::vector<GateType> &vector);
 
 extern "C" {
 

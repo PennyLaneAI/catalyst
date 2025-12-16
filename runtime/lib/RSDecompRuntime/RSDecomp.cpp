@@ -161,7 +161,7 @@ std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle
 
     auto [gates, phase] = compute_clifford_T_decomposition(angle, epsilon);
 
-    std::vector<PPRGateType> ppr_gates = HSTtoPPR(gates);
+    std::vector<PPRGateType> ppr_gates = HST_to_PPR(gates);
 
     PPRCacheValue result = {std::move(ppr_gates), phase};
 
@@ -170,112 +170,111 @@ std::pair<std::vector<PPRGateType>, double> eval_ross_algorithm_ppr(double angle
 }
 
 /**
+ * @brief Try to convert a pair of gates for HST_to_PPR
+ * @return true if a pair rule matched and was appended; false otherwise.
+ */
+bool try_append_pair_expansion(std::vector<PPRGateType> &out, GateType current, GateType next)
+{
+    // We only care if the first gate is HT or SHT
+    if (current != GateType::HT && current != GateType::SHT) {
+        return false;
+    }
+
+    // Rule: HT, HT -> X8, Z8
+    if (current == GateType::HT && next == GateType::HT) {
+        out.insert(out.end(), {PPRGateType::X8, PPRGateType::Z8});
+        return true;
+    }
+
+    // Rule: HT, SHT -> X4, X8, Z8
+    if (current == GateType::HT && next == GateType::SHT) {
+        out.insert(out.end(), {PPRGateType::X4, PPRGateType::X8, PPRGateType::Z8});
+        return true;
+    }
+
+    // Rule: SHT, HT -> Z4, X8, Z8
+    if (current == GateType::SHT && next == GateType::HT) {
+        out.insert(out.end(), {PPRGateType::Z4, PPRGateType::X8, PPRGateType::Z8});
+        return true;
+    }
+
+    // Rule: SHT, SHT -> Z4, X4, X8, Z8
+    if (current == GateType::SHT && next == GateType::SHT) {
+        out.insert(out.end(), {PPRGateType::Z4, PPRGateType::X4, PPRGateType::X8, PPRGateType::Z8});
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * @brief Convert single gate for HST_to_PPR
+ */
+void append_single_gate_expansion(std::vector<PPRGateType> &out, GateType gate)
+{
+    switch (gate) {
+    case GateType::T:
+        out.emplace_back(PPRGateType::Z8);
+        break;
+    case GateType::I:
+        out.emplace_back(PPRGateType::I);
+        break;
+    case GateType::X:
+        out.emplace_back(PPRGateType::X2);
+        break;
+    case GateType::Y:
+        out.emplace_back(PPRGateType::Y2);
+        break;
+    case GateType::Z:
+        out.emplace_back(PPRGateType::Z2);
+        break;
+    case GateType::H:
+        out.insert(out.end(), {PPRGateType::Z4, PPRGateType::X4, PPRGateType::Z4});
+        break;
+    case GateType::S:
+        out.emplace_back(PPRGateType::Z4);
+        break;
+    case GateType::Sd:
+        out.emplace_back(PPRGateType::adjZ4);
+        break;
+    case GateType::HT:
+        // Applied commutation rules via PPR playground
+        out.insert(out.end(), {PPRGateType::X8, PPRGateType::Z4, PPRGateType::X4, PPRGateType::Z4});
+        break;
+    case GateType::SHT:
+        // Applied commutation rules via PPR playground
+        out.insert(out.end(),
+                   {PPRGateType::adjY8, PPRGateType::adjX4, PPRGateType::Z4, PPRGateType::Z2});
+        break;
+    default:
+        RT_FAIL("Unknown GateType encountered.");
+    }
+}
+
+/**
  * @brief Converts a sequence of GateType in Clifford+T basis to PPR basis
  * using predefined conversion rules.
  * @param input_gates The input vector of GateType representing the Clifford+T sequence.
  * @return std::vector<PPRGateType> The converted vector of PPRGateType
  */
-
-std::vector<PPRGateType> HSTtoPPR(const std::vector<GateType> &input_gates)
+std::vector<PPRGateType> HST_to_PPR(const std::vector<GateType> &input_gates)
 {
     std::vector<PPRGateType> output_gates;
-    output_gates.reserve(input_gates.size());
+    output_gates.reserve(input_gates.size() * 2);
 
     size_t i = 0;
     while (i < input_gates.size()) {
-        const GateType &current_gate = input_gates[i];
-        if ((current_gate == GateType::HT || current_gate == GateType::SHT) &&
-            (i + 1 < input_gates.size())) {
-            const GateType &next_gate = input_gates[i + 1];
-
-            // Rule: HT, HT -> X8, Z8
-            if (current_gate == GateType::HT && next_gate == GateType::HT) {
-                output_gates.emplace_back(PPRGateType::X8);
-                output_gates.emplace_back(PPRGateType::Z8);
-                i += 2; // Skip both processed gates
-                continue;
-            }
-
-            // Rule: HT, SHT -> X4, X8, Z8
-            if (current_gate == GateType::HT && next_gate == GateType::SHT) {
-                output_gates.emplace_back(PPRGateType::X4);
-                output_gates.emplace_back(PPRGateType::X8);
-                output_gates.emplace_back(PPRGateType::Z8);
-                i += 2;
-                continue;
-            }
-
-            // Rule: SHT, HT -> Z4, X8, Z8
-            if (current_gate == GateType::SHT && next_gate == GateType::HT) {
-                output_gates.emplace_back(PPRGateType::Z4);
-                output_gates.emplace_back(PPRGateType::X8);
-                output_gates.emplace_back(PPRGateType::Z8);
-                i += 2;
-                continue;
-            }
-
-            // Rule: SHT, SHT -> Z4, X4, X8, Z8
-            if (current_gate == GateType::SHT && next_gate == GateType::SHT) {
-                output_gates.emplace_back(PPRGateType::Z4);
-                output_gates.emplace_back(PPRGateType::X4);
-                output_gates.emplace_back(PPRGateType::X8);
-                output_gates.emplace_back(PPRGateType::Z8);
-                i += 2;
+        // Try to consume a pair
+        if (i + 1 < input_gates.size()) {
+            if (try_append_pair_expansion(output_gates, input_gates[i], input_gates[i + 1])) {
+                i += 2; // Consumed two gates
                 continue;
             }
         }
 
-        // If we're here, no pair rule was matched.
-        // We handle the 1-to-1 mappings.
-        switch (current_gate) {
-        case GateType::T:
-            output_gates.emplace_back(PPRGateType::Z8);
-            break;
-        case GateType::I:
-            output_gates.emplace_back(PPRGateType::I);
-            break;
-        case GateType::X:
-            output_gates.emplace_back(PPRGateType::X2);
-            break;
-        case GateType::Y:
-            output_gates.emplace_back(PPRGateType::Y2);
-            break;
-        case GateType::Z:
-            output_gates.emplace_back(PPRGateType::Z2);
-            break;
-        case GateType::H:
-            output_gates.emplace_back(PPRGateType::Z4);
-            output_gates.emplace_back(PPRGateType::X4);
-            output_gates.emplace_back(PPRGateType::Z4);
-            break;
-        case GateType::S:
-            output_gates.emplace_back(PPRGateType::Z4);
-            break;
-        case GateType::Sd:
-            output_gates.emplace_back(PPRGateType::adjZ4);
-            break;
-        case GateType::HT: {
-            // Applied commutation rules via PPR playground
-            output_gates.emplace_back(PPRGateType::X8);
-            output_gates.emplace_back(PPRGateType::Z4);
-            output_gates.emplace_back(PPRGateType::X4);
-            output_gates.emplace_back(PPRGateType::Z4);
-            break;
-        }
-        case GateType::SHT: {
-            // Applied commutation rules via PPR playground
-            output_gates.emplace_back(PPRGateType::adjY8);
-            output_gates.emplace_back(PPRGateType::adjX4);
-            output_gates.emplace_back(PPRGateType::Z4);
-            output_gates.emplace_back(PPRGateType::Z2);
-            break;
-        }
-
-        default:
-            RT_FAIL("Unknown GateType encountered.");
-        }
-
-        i += 1; // Skip the single processed gate
+        // Fallback to consuming a single gate
+        append_single_gate_expansion(output_gates, input_gates[i]);
+        i += 1; // Consumed one gate
     }
 
     return output_gates;

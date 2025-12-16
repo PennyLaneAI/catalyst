@@ -173,39 +173,39 @@ TEST_CASE("Test Zero Angle (Identity)", "[RSDecomp][Ross Selinger]")
     CHECK(std::abs(mat[2] - zero) < 1e-9);
 }
 
-TEST_CASE("Test HSTtoPPR Conversion Rules", "[RSDecomp][Ross Selinger]")
+TEST_CASE("Test HST_to_PPR Conversion Rules", "[RSDecomp][Ross Selinger]")
 {
     // Rule: HT, HT -> X8, Z8
-    CHECK(HSTtoPPR({GateType::HT, GateType::HT}) ==
+    CHECK(HST_to_PPR({GateType::HT, GateType::HT}) ==
           std::vector<PPRGateType>{PPRGateType::X8, PPRGateType::Z8});
 
     // Rule: HT, SHT -> X4, X8, Z8
-    CHECK(HSTtoPPR({GateType::HT, GateType::SHT}) ==
+    CHECK(HST_to_PPR({GateType::HT, GateType::SHT}) ==
           std::vector<PPRGateType>{PPRGateType::X4, PPRGateType::X8, PPRGateType::Z8});
 
     // Rule: SHT, HT -> Z4, X8, Z8
-    CHECK(HSTtoPPR({GateType::SHT, GateType::HT}) ==
+    CHECK(HST_to_PPR({GateType::SHT, GateType::HT}) ==
           std::vector<PPRGateType>{PPRGateType::Z4, PPRGateType::X8, PPRGateType::Z8});
 
     // Rule: SHT, SHT -> Z4, X4, X8, Z8
-    CHECK(HSTtoPPR({GateType::SHT, GateType::SHT}) ==
+    CHECK(HST_to_PPR({GateType::SHT, GateType::SHT}) ==
           std::vector<PPRGateType>{PPRGateType::Z4, PPRGateType::X4, PPRGateType::X8,
                                    PPRGateType::Z8});
 
     // Test Single Gate Mappings (Standard)
-    CHECK(HSTtoPPR({GateType::T}) == std::vector<PPRGateType>{PPRGateType::Z8});
-    CHECK(HSTtoPPR({GateType::S}) == std::vector<PPRGateType>{PPRGateType::Z4});
-    CHECK(HSTtoPPR({GateType::Z}) == std::vector<PPRGateType>{PPRGateType::Z2});
+    CHECK(HST_to_PPR({GateType::T}) == std::vector<PPRGateType>{PPRGateType::Z8});
+    CHECK(HST_to_PPR({GateType::S}) == std::vector<PPRGateType>{PPRGateType::Z4});
+    CHECK(HST_to_PPR({GateType::Z}) == std::vector<PPRGateType>{PPRGateType::Z2});
 
     // H -> Z4, X4, Z4
-    CHECK(HSTtoPPR({GateType::H}) ==
+    CHECK(HST_to_PPR({GateType::H}) ==
           std::vector<PPRGateType>{PPRGateType::Z4, PPRGateType::X4, PPRGateType::Z4});
 
     // Test Edge Cases for Pair Lookahead
     // Case: HT at the very end of the vector (no next gate to pair with)
     // Should fallback to single HT expansion: X8, Z4, X4, Z4
-    CHECK(HSTtoPPR({GateType::HT}) == std::vector<PPRGateType>{PPRGateType::X8, PPRGateType::Z4,
-                                                               PPRGateType::X4, PPRGateType::Z4});
+    CHECK(HST_to_PPR({GateType::HT}) == std::vector<PPRGateType>{PPRGateType::X8, PPRGateType::Z4,
+                                                                 PPRGateType::X4, PPRGateType::Z4});
 
     // Case: HT followed by a gate that doesn't form a pair (e.g. T)
     std::vector<GateType> input_mixed = {GateType::HT, GateType::T};
@@ -213,7 +213,7 @@ TEST_CASE("Test HSTtoPPR Conversion Rules", "[RSDecomp][Ross Selinger]")
         PPRGateType::X8, PPRGateType::Z4, PPRGateType::X4, PPRGateType::Z4, // HT
         PPRGateType::Z8                                                     // T
     };
-    CHECK(HSTtoPPR(input_mixed) == expected_mixed);
+    CHECK(HST_to_PPR(input_mixed) == expected_mixed);
 }
 
 TEST_CASE("Test C-API Wrapper (Memref Interface)", "[RSDecomp][Ross Selinger]")
