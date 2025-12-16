@@ -120,7 +120,7 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
 
     @wraps(qnode)
     def wrapper(*args, **kwargs):
-        mlir_module = _get_mlir_module(qnode, args, kwargs)
+        mlir_module = get_mlir_module(qnode, args, kwargs)
         Compiler.run(mlir_module, callback=_draw_callback)
 
         if not cache:
