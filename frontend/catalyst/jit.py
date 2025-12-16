@@ -852,7 +852,7 @@ class QJIT(CatalystCallable):
         else:
             shared_object, llvm_ir = self.compiler.run(self.mlir_module, self.workspace)
 
-        # We don't create a CompiledFunction for ARTIQ targets, just return the ELF path and LLVM IR
+        # We don't create a CompiledFunction for ARTIQ targets, just return it with None
         if self.compile_options.artiq_config:
             print(f"[ARTIQ] Generated ELF: {shared_object}")
             print(f"[ARTIQ] Object files saved in workspace: {self.workspace}")
