@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose, assert_equal
 
-pytest.mark.xdsl
+pytestmark = pytest.mark.xdsl
 pytest.importorskip("xdsl")
 pytest.importorskip("networkx")
 pytest.importorskip("galois")
