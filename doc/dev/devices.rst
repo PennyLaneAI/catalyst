@@ -39,6 +39,14 @@ Supported backend devices include:
       `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_kokkos/lightning_kokkos.toml>`__
       for natively supported instructions.
 
+  * - ``lightning.amdgpu``
+
+    - A fast state-vector qubit simulator based on the ``lightning.kokkos`` device to give maximum performance on AMD GPUs. See the
+      `Lightning-AMDGPU documentation <https://docs.pennylane.ai/projects/lightning/en/latest/lightning_amdgpu/device.html>`__
+      for more details, as well as its
+      `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_kokkos/lightning_kokkos.toml>`__ 
+      (shared with ``lightning.kokkos``) for natively supported instructions.
+
   * - ``lightning.gpu``
 
     - A fast state-vector qubit simulator based on the `NVIDIA cuQuantum SDK <https://developer.nvidia.com/cuquantum-sdk>`__
