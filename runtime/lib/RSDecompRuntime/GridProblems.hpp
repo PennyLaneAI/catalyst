@@ -146,7 +146,6 @@ class one_dim_problem_solution_iterator {
                     // Check if the consecutive solutions are within the desired bounds.
                     if (x0_scaled <= alpha && alpha <= x1_scaled && y0_scaled <= beta &&
                         beta <= y1_scaled) {
-
                         // A valid (a, b) has been found.
 
                         // Undo the scaling to obtain the solution.
@@ -465,7 +464,6 @@ class upright_problem_solution_iterator {
                                       const ZOmega &shift_in)
         : state(state_in), shift(shift_in)
     {
-
         double Ax0 = bbox1[0], Ax1 = bbox1[1], Ay0 = bbox1[2], Ay1 = bbox1[3];
         double Bx0 = bbox2[0], Bx1 = bbox2[1], By0 = bbox2[2], By1 = bbox2[3];
 
@@ -657,7 +655,6 @@ class two_dim_problem_solution_iterator {
           shifted_state(state.e1.offset(-1.0 / M_SQRT2), state.e2.offset(1.0 / M_SQRT2)),
           is_on_first_coset(true), num_points(num_points)
     {
-
         // --- Setup for the first coset (potential_sols1) ---
         auto bbox1_orig = original_state.e1.bounding_box();
         auto bbox2_orig = original_state.e2.bounding_box();
@@ -950,7 +947,6 @@ class GridIterator {
           e1({1.0, 0.0, 1.0}, {0.0, 0.0}),
           e2({1.0, 0.0, 1.0}, {0.0, 0.0}) // Ellipse((1, 0, 1), (0, 0))
     {
-
         // --- Warm start for an initial guess ---
         // Values are obtained from PennyLane implementation
         // https://github.com/PennyLaneAI/pennylane/blob/2fa8e910437ccded0fe600f415dcc5f7436db4a8/pennylane/ops/op_math/decompositions/grid_problems.py#L597

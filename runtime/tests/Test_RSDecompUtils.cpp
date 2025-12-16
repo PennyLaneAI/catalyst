@@ -149,7 +149,6 @@ TEST_CASE("LRU Eviction Logic", "[LRUCache]")
 
 TEST_CASE("LRU Cache Edge Cases", "[LRUCache]")
 {
-
     SECTION("Cache with MaxSize 1")
     {
         lru_cache<int, int, 1> tiny_cache;
