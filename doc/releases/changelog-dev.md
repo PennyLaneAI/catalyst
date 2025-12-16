@@ -11,6 +11,11 @@
   [(#2285)](https://github.com/PennyLaneAI/catalyst/pull/2285)
   [(#2234)](https://github.com/PennyLaneAI/catalyst/pull/2234)
   [(#2218)](https://github.com/PennyLaneAI/catalyst/pull/2218)
+  
+* A new `gridsynth` pass is added to support Clifford+T decomopsition. This pass discretizes `RZ` and `PhaseShift` gates to either the Clifford+T basis or to the PPR basis. The pass also supports decomposing single-qubit arbitrary angle PPR in the Z basis.
+  [(#2140)](https://github.com/PennyLaneAI/catalyst/pull/2140)
+  [(#2166)](https://github.com/PennyLaneAI/catalyst/pull/2166)
+  [(#2292)](https://github.com/PennyLaneAI/catalyst/pull/2292)
 
 * Catalyst now features a unified compilation framework, which enables users and developers to design
   and implement compilation passes in Python in addition to C++, on the same Catalyst IR. The Python
@@ -297,6 +302,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Update `catalyst.python_interface.inspection.xdsl_conversion.get_mlir_module` to
+  no longer explicitly use the xDSL pass plugin.
+  [(#2303)](https://github.com/PennyLaneAI/catalyst/pull/2303)
+
 * Added missing `detensorize-function-boundary` and `symbol-dce` passes to `Pipelines.cpp`.
   [(#2266)](https://github.com/PennyLaneAI/catalyst/pull/2266)
 
@@ -523,6 +532,7 @@ Joseph Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Lee J. O'Riordan,
+Andrija Paurevic,
 Roberto Turrado,
 Paul Haochen Wang,
 Jake Zaia,
