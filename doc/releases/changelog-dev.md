@@ -469,6 +469,28 @@
 
 <h3>Documentation 📝</h3>
 
+* A new statevector simulator ``lightning.amdgpu`` has been added for optimized performance on AMD GPUs. 
+  [(#2283)](https://github.com/PennyLaneAI/catalyst/pull/2283)
+
+  The ``lightning.amdgpu`` device is a specific instantiation of the ``lightning.kokkos`` backend, supporting the same features and operations as ``lightning.kokkos``, with pre-compiled wheels for ``lightning.amdgpu`` available on PyPI for easy installation to use on MI300 series AMD GPUs. 
+
+  This device can be used within qjit'd workflows exactly as other devices compatible with Catalyst:
+
+  ```python
+  @qml.qjit
+  @qml.qnode(qml.device('lightning.amdgpu', wires=2))
+  def circuit():
+    qml.Hadamard(0)
+    return qml.state()
+  ```
+
+  ```pycon
+  >>> circuit()
+  [0.70710678+0.j 0.        +0.j 0.70710678+0.j 0.        +0.j]
+  ```
+
+  See the [Lightning-AMDGPU documentation](https://docs.pennylane.ai/projects/lightning/en/latest/lightning_amdgpu/device.html) for more details and installation instructions.
+
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
   [(#2136)](https://github.com/PennyLaneAI/catalyst/pull/2136)
 
