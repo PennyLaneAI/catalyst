@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable
+from copy import copy
 from typing import TYPE_CHECKING
 
 from pennylane import ops
@@ -32,7 +33,6 @@ from xdsl.dialects.tensor import ExtractOp as TensorExtractOp
 from xdsl.ir import SSAValue
 
 from catalyst.jit import QJIT, qjit
-from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 
 from ..dialects.quantum import (
     CustomOp,
@@ -64,13 +64,13 @@ def get_mlir_module(qnode: QNode | QJIT, args, kwargs) -> ModuleOp:
         return qnode.mlir_module
 
     if isinstance(qnode, QJIT):
-        compile_options = qnode.compile_options
+        # Copy as to not mutate compile_options
+        compile_options = copy(qnode.compile_options)
         compile_options.autograph = False  # Autograph has already been applied for `user_function`
-        compile_options.pass_plugins.add(getXDSLPluginAbsolutePath())
 
         jitted_qnode = QJIT(qnode.user_function, compile_options)
     else:
-        jitted_qnode = qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(qnode)
+        jitted_qnode = qjit(qnode)
 
     jitted_qnode.jit_compile(args, **kwargs)
     return jitted_qnode.mlir_module
