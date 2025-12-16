@@ -65,6 +65,7 @@ def get_mlir_module(qnode: QNode | QJIT, args, kwargs) -> ModuleOp:
         return qnode.mlir_module
 
     if isinstance(qnode, QJIT):
+        # Copy as to not mutate CompileOptions
         compile_options = copy(qnode.compile_options)
         compile_options.autograph = False  # Autograph has already been applied for `user_function`
 
