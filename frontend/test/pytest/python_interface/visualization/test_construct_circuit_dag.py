@@ -1156,12 +1156,12 @@ class TestOperatorConnectivity:
 
         # Check all edges
         assert len(edges) == 6
-        assert ("node2", "node4") in edges # X -> Z
-        assert ("node2", "node5") in edges # X -> RZ
-        assert ("node2", "node6") in edges # X -> H
-        assert ("node5", "node6") in edges # RZ -> H
-        assert ("node4", "node6") in edges # Z -> H
-        assert ("node1", "node3") in edges # T -> Y
+        assert ("node2", "node4") in edges  # X -> Z
+        assert ("node2", "node5") in edges  # X -> RZ
+        assert ("node2", "node6") in edges  # X -> H
+        assert ("node5", "node6") in edges  # RZ -> H
+        assert ("node4", "node6") in edges  # Z -> H
+        assert ("node1", "node3") in edges  # T -> Y
 
     def test_multi_wire_connectivity(self):
         """Ensures that multi wire connectivity holds."""
