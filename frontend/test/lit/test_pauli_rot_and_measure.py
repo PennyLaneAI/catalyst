@@ -16,6 +16,8 @@
 
 """Test Pauli rotations and Pauli measurements with FTQC device."""
 
+from functools import partial
+
 import numpy as np
 import pennylane as qml
 from pennylane.ftqc.catalyst_pass_aliases import (
@@ -392,9 +394,9 @@ def test_pauli_rot_and_measure_with_cond():
     @qjit(pipelines=pipeline, target="mlir")
     @qml.qnode(device=dev)
     def circuit():
-        qml.PauliRot(np.pi / 2, "Z", wires=0)
+        partial(qml.PauliRot, pauli_word="Z")(np.pi / 2, "Z", wires=0)
         m = qml.pauli_measure("Z", wires=0)
-        qml.cond(m, qml.PauliRot)(theta=np.pi / 2, pauli_word="Z", wires=0)
+        qml.cond(m, partial(qml.PauliRot, pauli_word="Z"))(theta=np.pi / 2, wires=0)
 
     # CHECK: qec.ppr ["Z"](4)
     # CHECK: qec.ppm ["Z"]
