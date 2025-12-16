@@ -48,7 +48,7 @@ weights = np.random.random(size=shape)
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{\s*}} programsize: {{[0-9]+}} lines
 # CHECK-NEXT: [DIAGNOSTICS] Running generate_ir
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{\s*}} programsize: {{[0-9]+}} lines
-# CHECK:      [DIAGNOSTICS] Running compile
+# CHECK-NEXT: [DIAGNOSTICS] Running compile
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms{{\s*}} programsize: {{[0-9]+}} lines
 # CHECK-NEXT: [DIAGNOSTICS] Running run
 # CHECK-SAME:   walltime: {{[0-9\.]+}} ms{{\s*}} cputime: {{[0-9\.]+}} ms
