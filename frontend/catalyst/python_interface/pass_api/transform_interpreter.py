@@ -177,7 +177,7 @@ def _create_schedule(pass_ops: Sequence[ApplyRegisteredPassOp]) -> list[str]:
         cli_options = []
         for opt, val in pass_options.items():
             cli_options.append(f"{opt}={_get_cli_option_from_attr(val)}")
-        cli_options = f"{{{' '.join(cli_options)}}}"
+        cli_options = " ".join(cli_options)
 
         cli_pass = f"--{pass_name}={cli_options}"
         schedule.append(cli_pass)
@@ -186,8 +186,8 @@ def _create_schedule(pass_ops: Sequence[ApplyRegisteredPassOp]) -> list[str]:
 
 
 def _get_cli_option_from_attr(val: Attribute) -> Any:
-    """Convert an xDSL attribute corresponding to a pass option into a valid
-    CLI option."""
+    """Convert an xDSL attribute corresponding to a pass option value into a valid
+    CLI option value."""
     cli_val = None
 
     match val:
@@ -200,6 +200,13 @@ def _get_cli_option_from_attr(val: Attribute) -> Any:
             cli_val = val.value.data
         case builtin.StringAttr():
             cli_val = val.data
+        case builtin.ArrayAttr():
+            cli_val = ",".join([_get_cli_option_from_attr(attr) for attr in val.data])
+        case builtin.DictionaryAttr():
+            mapping = []
+            for k, v in val.data.items():
+                mapping.append(f"{k}={_get_cli_option_from_attr(v)}")
+            cli_val = f"{{{' '.join(mapping)}}}"
         case _:
             raise ValueError(f"Unsupported option type {val}.")
 
