@@ -66,11 +66,7 @@ class Compiler:
         # xmod is modified in place
         xmod = parser.parse_module()
         pipeline = PassPipeline((ApplyTransformSequence(callback=callback),))
-        print(xmod)
         pipeline.apply(ctx, xmod)
-        print("\n\n\n\nApplied pipeline\n\n\n\n")
-        print(xmod)
-
 
         # Convert back to string
         buffer = io.StringIO()
@@ -82,7 +78,6 @@ class Compiler:
                 jctx.allow_unregistered_dialects = True
                 jctx.append_dialect_registry(mlir.upstream_dialects)
                 stablehlo.register_dialect(jctx)  # pylint: disable=no-member
-                #print(buffer.getvalue())
                 newmod: jaxModule = jaxModule.parse(buffer.getvalue())
             return newmod
         return buffer.getvalue()

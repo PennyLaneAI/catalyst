@@ -505,11 +505,11 @@ class TestParitySynthIntegration:
             # CHECK: quantum.custom "RZ"([[theta]])
             # CHECK: quantum.custom "CNOT"()
             # CHECK-NOT: quantum.custom
-            qml.CNOT((0, 1)) # Can simplify this first triple due to static wires
+            qml.CNOT((0, 1))  # Can simplify this first triple due to static wires
             qml.RZ(x, 0)
             qml.CNOT((0, 1))
             qml.RX(y, w0)
-            qml.CNOT((w1, 0)) # Can not simplify this second triple due to dynamic wires
+            qml.CNOT((w1, 0))  # Can not simplify this second triple due to dynamic wires
             qml.RZ(z, w1)
             qml.CNOT((w1, 0))
             return qml.state()
