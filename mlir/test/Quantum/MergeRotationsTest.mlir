@@ -1159,3 +1159,32 @@ func.func public @dont_merge_mixed(%q0: !quantum.bit, %0: f64, %1: f64, %b0: i1)
     %3 = qec.ppr.arbitrary ["X"](%1) %2: !quantum.bit
     func.return
 }
+
+// -----
+
+// merge with known angles
+
+// CHECK-LABEL: merge_const_angles
+func.func public @merge_const_angles(%q0: !quantum.bit) {
+    // CHECK: [[newAngle:%.+]] = arith.constant 2.000000e+00 : f64
+    // CHECK: qec.ppr.arbitrary ["Y"]([[newAngle]])
+    %0 = arith.constant 0.420000e+00 : f64
+    %1 = arith.constant 1.580000e+00 : f64
+    %2 = qec.ppr.arbitrary ["Y"](%0) %q0: !quantum.bit
+    %3 = qec.ppr.arbitrary ["Y"](%1) %2: !quantum.bit
+    func.return
+}
+
+// -----
+
+// merge known angle with unknown angle
+
+// CHECK-LABEL: merge_const_var
+func.func public @merge_const_var(%q0: !quantum.bit, %0: f64) {
+    // CHECK: [[newAngle:%.+]] = arith.addf
+    // CHECK: qec.ppr.arbitrary ["Z"]([[newAngle]])
+    %1 = arith.constant 0.000420e+00 : f64
+    %2 = qec.ppr.arbitrary ["Z"](%0) %q0: !quantum.bit
+    %3 = qec.ppr.arbitrary ["Z"](%1) %2: !quantum.bit
+    func.return
+}
