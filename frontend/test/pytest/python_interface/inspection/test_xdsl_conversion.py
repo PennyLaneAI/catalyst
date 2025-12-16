@@ -67,7 +67,7 @@ class TestGetMLIRModule:
         assert isinstance(module, Module)
 
     def test_compile_options_not_mutated(self):
-        """Ensures that the QJIT'd qnode's compile options are not mutatable."""
+        """Ensures that the QJIT'd qnode's compile options are not mutable."""
         dev = qml.device("lightning.qubit", wires=1)
 
         @qml.qjit(autograph=True)
