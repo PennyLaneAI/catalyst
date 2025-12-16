@@ -36,6 +36,12 @@ if TYPE_CHECKING:
     from pennylane.typing import Callable
     from pennylane.workflow.qnode import QNode
 
+HAS_MATPLOTLIB = True
+try:
+    import matplotlib
+except ModuleNotFoundError:
+    HAS_MATPLOTLIB = False
+
 # TODO: This caching mechanism should be improved,
 # because now it relies on a mutable global state
 _cache_store: dict[Callable, dict[int, tuple[str, str]]] = {}
@@ -102,6 +108,11 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
     """
     ???plz halp Isaac???
     """
+    if not HAS_MATPLOTLIB:
+        raise ImportError(
+            "The `draw_graph` functionality requires `matplotlib` to be installed. Please install `matplotlib` with `pip install matplotlib`."
+        )
+
     cache: dict[int, tuple[str, str]] = _cache_store.setdefault(qnode, {})
 
     def _draw_callback(previous_pass, module: ModuleOp, next_pass, pass_level: int = 0):

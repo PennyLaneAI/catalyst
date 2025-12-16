@@ -19,12 +19,18 @@ from typing import Any
 
 from .dag_builder import DAGBuilder
 
-has_pydot = True
+HAS_PYDOT = True
 try:
     import pydot
     from pydot import Cluster, Dot, Edge, Graph, Node, Subgraph
 except ImportError:
-    has_pydot = False
+    HAS_PYDOT = False
+
+from shutil import which
+
+HAS_GRAPHVIZ = True
+if which("dot") is None:
+    HAS_GRAPHVIZ = False
 
 
 class PyDotDAGBuilder(DAGBuilder):
@@ -65,6 +71,12 @@ class PyDotDAGBuilder(DAGBuilder):
         edge_attrs: dict | None = None,
         cluster_attrs: dict | None = None,
     ) -> None:
+        if not HAS_GRAPHVIZ:
+            raise ImportError("The `Graphviz` package is not found. Please install it by following the instructions found here for your system: https://graphviz.org/download/")
+        if not HAS_PYDOT:
+            raise ImportError("The `pydot` package is not found. Please install with `pip install pydot`.")
+
+
         # Initialize the pydot graph:
         # - graph_type="digraph": Create a directed graph (edges have arrows).
         # - rankdir="TB": Set layout direction from Top to Bottom.
