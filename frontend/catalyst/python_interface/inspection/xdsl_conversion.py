@@ -47,9 +47,9 @@ from ..dialects.quantum import (
 )
 
 if TYPE_CHECKING:
+    from jaxlib.mlir._mlir_libs._mlir.ir import Module
     from pennylane.measurements import MeasurementProcess
     from pennylane.workflow.qnode import QNode
-    from xdsl.dialects.builtin import ModuleOp
 
 has_jax = True
 try:
@@ -58,7 +58,7 @@ except ImportError:
     has_jax = False
 
 
-def get_mlir_module(qnode: QNode | QJIT, args, kwargs) -> ModuleOp:
+def get_mlir_module(qnode: QNode | QJIT, args, kwargs) -> Module:
     """Ensure the QNode is compiled and return its MLIR module."""
     if hasattr(qnode, "mlir_module") and qnode.mlir_module is not None:
         return qnode.mlir_module
