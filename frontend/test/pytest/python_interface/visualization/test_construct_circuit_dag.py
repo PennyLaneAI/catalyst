@@ -16,6 +16,7 @@
 from unittest.mock import Mock
 
 import pytest
+import jax
 
 pytestmark = pytest.mark.xdsl
 xdsl = pytest.importorskip("xdsl")
@@ -791,7 +792,7 @@ class TestCreateStaticOperatorNodes:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_circuit():
-            qml.QubitUnitary([[0, 1], [1, 0]], wires=0)
+            qml.QubitUnitary(jax.numpy.array([[0, 1], [1, 0]]), wires=0)
 
         module = my_circuit()
 
@@ -831,11 +832,16 @@ class TestCreateStaticOperatorNodes:
         """Test that projective measurements can be captured as nodes."""
         dev = qml.device("null.qubit", wires=1)
 
+        if qml.capture.enabled():
+            fn = qml.measure
+        else:
+            fn = measure
+
         @xdsl_from_qjit
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_circuit():
-            measure(0)
+            fn(0)
 
         module = my_circuit()
 
@@ -1050,14 +1056,14 @@ class TestCreateStaticMeasurementNodes:
         assert nodes["node1"]["label"] == get_label(meas_fn(qml.Z(0)))
 
     @pytest.mark.parametrize(
-        "op",
+        "kwargs",
         [
-            qml.probs(),
-            qml.probs(wires=0),
-            qml.probs(wires=[0, 1]),
+            {},
+            {"wires": 0},
+            {"wires":[0, 1]},
         ],
     )
-    def test_probs_measurement_op(self, op):
+    def test_probs_measurement_op(self, kwargs):
         """Tests that the probs measurement function can be captured as a node."""
         dev = qml.device("null.qubit", wires=1)
 
@@ -1065,7 +1071,7 @@ class TestCreateStaticMeasurementNodes:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_circuit():
-            return op
+            return qml.probs(**kwargs) 
 
         module = my_circuit()
 
@@ -1076,17 +1082,17 @@ class TestCreateStaticMeasurementNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + probs
 
-        assert nodes["node1"]["label"] == get_label(op)
+        assert nodes["node1"]["label"] == get_label(qml.probs(**kwargs))
 
     @pytest.mark.parametrize(
-        "op",
+        "kwargs",
         [
-            qml.sample(),
-            qml.sample(wires=0),
-            qml.sample(wires=[0, 1]),
+            {},
+            {"wires": 0},
+            {"wires":[0, 1]},
         ],
     )
-    def test_valid_sample_measurement_op(self, op):
+    def test_valid_sample_measurement_op(self, kwargs):
         """Tests that the sample measurement function can be captured as a node."""
         dev = qml.device("null.qubit", wires=1)
 
@@ -1095,7 +1101,7 @@ class TestCreateStaticMeasurementNodes:
         @qml.set_shots(10)
         @qml.qnode(dev)
         def my_circuit():
-            return op
+            return qml.sample(**kwargs) 
 
         module = my_circuit()
 
@@ -1106,7 +1112,7 @@ class TestCreateStaticMeasurementNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + sample
 
-        assert nodes["node1"]["label"] == get_label(op)
+        assert nodes["node1"]["label"] == get_label(qml.sample(**kwargs))
 
 
 @pytest.mark.usefixtures("use_both_frontend")
