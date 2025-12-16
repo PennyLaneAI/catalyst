@@ -17,8 +17,8 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable
-from itertools import compress
 from copy import deepcopy
+from itertools import compress
 from typing import TYPE_CHECKING
 
 from pennylane import capture, ops
