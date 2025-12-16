@@ -134,14 +134,14 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
         sio = io.BytesIO()
         sio.write(image_bytes)
         sio.seek(0)
-        
+
         img = mpimg.imread(sio)
 
         fig, ax = plt.subplots()
         ax.imshow(img)
         ax.set_axis_off()
         ax.set_title(f"Level {level if level is not None else max_level}: {pass_name}", fontsize=10)
-        
+
         return fig, ax
 
     return wrapper
