@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 from pennylane.tape import QuantumScript
+from xdsl.dialects.builtin import ModuleOp
 
 from catalyst.python_interface.compiler import Compiler
 
@@ -103,7 +104,7 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
     """
     cache: dict[int, tuple[str, str]] = _cache_store.setdefault(qnode, {})
 
-    def _draw_callback(previous_pass, module, next_pass, pass_level=0):
+    def _draw_callback(previous_pass, module: ModuleOp, next_pass, pass_level: int = 0):
         """Callback function for circuit drawing."""
 
         pass_instance = previous_pass if previous_pass else next_pass
@@ -111,6 +112,7 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
         utility = ConstructCircuitDAG(PyDotDAGBuilder())
         utility.construct(module)
         # Store DAG in cache
+        utility.dag_builder.graph.set_dpi(300)
         image_bytes = utility.dag_builder.graph.create_png(prog="dot")
         pass_name = pass_instance.name if hasattr(pass_instance, "name") else pass_instance
         cache[pass_level] = (
@@ -140,8 +142,11 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
         fig, ax = plt.subplots()
         ax.imshow(img)
         ax.set_axis_off()
-        ax.set_title(f"Level {level if level is not None else max_level}: {pass_name}", fontsize=10)
-
+        ax.set_title(
+            f"Level {level if level is not None else max_level}: {pass_name}",
+            fontsize=10,
+        )
+        fig.set_dpi(300)
         return fig, ax
 
     return wrapper
