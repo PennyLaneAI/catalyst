@@ -76,6 +76,7 @@ from catalyst.compiler import CompileOptions
 from catalyst.debug.assertion import debug_assert
 from catalyst.jit import QJIT, qjit
 from catalyst.passes.pass_api import pipeline
+from catalyst.python_interface.inspection.draw import draw_graph
 from catalyst.utils.exceptions import (
     AutoGraphError,
     CompileError,

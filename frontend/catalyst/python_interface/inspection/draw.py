@@ -100,7 +100,7 @@ def draw(qnode: QNode, *, level: None | int = None) -> Callable:
 
 def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
     """
-    ???
+    ???plz halp Isaac???
     """
     cache: dict[int, tuple[str, str]] = _cache_store.setdefault(qnode, {})
 
@@ -113,6 +113,7 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
         utility.construct(module)
         # Store DAG in cache
         utility.dag_builder.graph.set_dpi(300)
+        # TODO: Update DAGBuilder to abstract away extracting image bytes
         image_bytes = utility.dag_builder.graph.create_png(prog="dot")
         pass_name = pass_instance.name if hasattr(pass_instance, "name") else pass_instance
         cache[pass_level] = (
@@ -128,11 +129,9 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
         if not cache:
             return None
 
-        # Retrieve Data (Fall back to highest level if 'level' is not found)
         max_level = max(cache.keys())
-        image_bytes, pass_name = cache.get(level, cache[max_level])
+        image_bytes, _ = cache.get(level, cache[max_level])
 
-        # Render image bytes to matplotlib
         sio = io.BytesIO()
         sio.write(image_bytes)
         sio.seek(0)
@@ -142,10 +141,6 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
         fig, ax = plt.subplots()
         ax.imshow(img)
         ax.set_axis_off()
-        ax.set_title(
-            f"Level {level if level is not None else max_level}: {pass_name}",
-            fontsize=10,
-        )
         fig.set_dpi(300)
         return fig, ax
 
