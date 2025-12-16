@@ -126,6 +126,7 @@ def test_does_not_mutate_module():
     assert str(module_op) == module_op_str_before
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestFuncOpVisualization:
     """Tests the visualization of FuncOps with bounding boxes"""
 
@@ -203,6 +204,7 @@ class TestFuncOpVisualization:
         assert graph_clusters["cluster2"]["parent_cluster_uid"] == "cluster0"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestDeviceNode:
     """Tests that the device node is correctly visualized."""
 
@@ -287,6 +289,7 @@ class TestDeviceNode:
         assert graph_nodes["node2"]["label"] == "LightningSimulator"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestForOp:
     """Tests that the for loop control flow can be visualized correctly."""
 
@@ -342,6 +345,7 @@ class TestForOp:
         assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestWhileOp:
     """Tests that the while loop control flow can be visualized correctly."""
 
@@ -402,6 +406,7 @@ class TestWhileOp:
         assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestIfOp:
     """Tests that the conditional control flow can be visualized correctly."""
 
@@ -716,6 +721,7 @@ class TestGetLabel:
         assert get_label(meas) == label
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestCreateStaticOperatorNodes:
     """Tests that operators with static parameters can be created and visualized as nodes."""
 
@@ -843,6 +849,7 @@ class TestCreateStaticOperatorNodes:
         assert nodes["node1"]["label"] == f"<name> MidMeasure|<wire> [0]"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestCreateDynamicOperatorNodes:
     """Tests that operator nodes with dynamic parameters or wires can be created and visualized."""
 
@@ -993,6 +1000,7 @@ class TestCreateDynamicOperatorNodes:
         assert nodes["node2"]["label"] == f"<name> X|<wire> [arg1]"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestCreateStaticMeasurementNodes:
     """Tests that measurements with static parameters can be created and visualized as nodes."""
 
@@ -1101,6 +1109,7 @@ class TestCreateStaticMeasurementNodes:
         assert nodes["node1"]["label"] == get_label(op)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestCreateDynamicMeasurementNodes:
     """Tests that measurements on dynamic wires render correctly."""
 
@@ -1155,6 +1164,7 @@ class TestCreateDynamicMeasurementNodes:
         assert nodes["node4"]["label"] == f"<name> sample|<wire> [arg0]"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestOperatorConnectivity:
     """Tests that operators are properly connected."""
 
@@ -1185,12 +1195,21 @@ class TestOperatorConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "X" in nodes["node1"]["label"]
-        assert "Y" in nodes["node2"]["label"]
-        assert "Z" in nodes["node3"]["label"]
-        assert "H" in nodes["node4"]["label"]
-        assert "S" in nodes["node5"]["label"]
-        assert "T" in nodes["node6"]["label"]
+        # NOTE: Order of nodes isn't the same with/without capture
+        if qml.capture.enabled():
+            assert "X" in nodes["node1"]["label"]
+            assert "Z" in nodes["node2"]["label"]
+            assert "Y" in nodes["node3"]["label"]
+            assert "H" in nodes["node4"]["label"]
+            assert "S" in nodes["node5"]["label"]
+            assert "T" in nodes["node6"]["label"]
+        else:
+            assert "X" in nodes["node1"]["label"]
+            assert "Y" in nodes["node2"]["label"]
+            assert "Z" in nodes["node3"]["label"]
+            assert "H" in nodes["node4"]["label"]
+            assert "S" in nodes["node5"]["label"]
+            assert "T" in nodes["node6"]["label"]
 
         # Check edges
         #           -> X -> Y
@@ -1198,10 +1217,18 @@ class TestOperatorConnectivity:
         #           -> T
         assert len(edges) == 6
         assert ("node0", "node1") in edges
-        assert ("node0", "node3") in edges
+        if qml.capture.enabled():
+            assert ("node0", "node2") in edges
+        else:
+            assert ("node0", "node3") in edges
         assert ("node0", "node6") in edges
-        assert ("node1", "node2") in edges
-        assert ("node3", "node4") in edges
+
+        if qml.capture.enabled():
+            assert ("node1", "node3") in edges
+            assert ("node2", "node4") in edges
+        else:
+            assert ("node1", "node2") in edges
+            assert ("node3", "node4") in edges
         assert ("node4", "node5") in edges
 
     def test_static_connection_through_for_loop(self):
@@ -1545,6 +1572,7 @@ class TestOperatorConnectivity:
         assert edges[("node2", "node3")]["attrs"]["style"] == "dashed"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestTerminalMeasurementConnectivity:
     """Test that terminal measurements connect properly."""
 
