@@ -785,7 +785,7 @@ func.func public @dont_cancel(%q1: !quantum.bit) {
 
 // -----
 
-// merge through other ops
+// merge through ops on other wires
 
 // CHECK-LABEL: merge_through
 func.func public @merge_through(%q1: !quantum.bit, %q2: !quantum.bit) -> !quantum.bit {
