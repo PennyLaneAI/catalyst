@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable
-from copy import copy
+from copy import deepcopy
 from typing import TYPE_CHECKING
 
 from pennylane import ops
@@ -64,8 +64,8 @@ def get_mlir_module(qnode: QNode | QJIT, args, kwargs) -> Module:
         return qnode.mlir_module
 
     if isinstance(qnode, QJIT):
-        # Copy as to not mutate compile_options
-        compile_options = copy(qnode.compile_options)
+        # Deep copy as to not mutate compile_options
+        compile_options = deepcopy(qnode.compile_options)
         compile_options.autograph = False  # Autograph has already been applied for `user_function`
 
         jitted_qnode = QJIT(qnode.user_function, compile_options)

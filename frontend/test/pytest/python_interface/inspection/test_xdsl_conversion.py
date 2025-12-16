@@ -12,10 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test module for the utilities in xdsl_conversion.py"""
+
 import pytest
+from pennylane.capture import autograph
+
+from catalyst.jit import CompileOptions
 
 pytestmark = pytest.mark.xdsl
 xdsl = pytest.importorskip("xdsl")
+from unittest.mock import MagicMock, Mock
+
 import pennylane as qml
 from jaxlib.mlir._mlir_libs._mlir.ir import Module
 
@@ -62,3 +68,19 @@ class TestGetMLIRModule:
 
         module = get_mlir_module(my_workflow, (1,), {})
         assert isinstance(module, Module)
+
+    def test_compile_options_not_mutated(self):
+        """Ensures that the QJIT'd qnode's compile options are not mutatable."""
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qjit(autograph=True)
+        @qml.qnode(dev)
+        def my_workflow(angle, wires=None):
+            qml.RX(angle, wires)
+            return qml.expval(qml.Z(0))
+
+        assert my_workflow.compile_options.autograph is True
+
+        _ = get_mlir_module(my_workflow, (3.14,), {"wires": [0]})
+
+        assert my_workflow.compile_options.autograph is True
