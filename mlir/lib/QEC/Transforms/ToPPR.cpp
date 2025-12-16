@@ -13,20 +13,12 @@
 // limitations under the License.
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/TypeRange.h"
 
 #include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
 #include "QEC/Utils/QECOpUtils.h"
 #include "Quantum/IR/QuantumOps.h"
-#include <cmath>
-#include <iostream>
-#include <llvm/Support/Debug.h>
-#include <llvm/Support/LogicalResult.h>
-#include <optional>
-
-#define DEBUG_TYPE "to-ppr"
 
 using namespace mlir;
 using namespace catalyst;
