@@ -33,8 +33,8 @@ from xdsl.dialects import arith, builtin
 from xdsl.ir import Operation, SSAValue
 from xdsl.rewriter import InsertPoint
 
-from ...dialects.quantum import CustomOp, QubitType, InsertOp, ExtractOp
-from ...pass_api import compiler_transform
+from catalyst.python_interface.dialects.quantum import CustomOp, QubitType, InsertOp, ExtractOp
+from catalyst.python_interface.pass_api import compiler_transform
 
 ### xDSL-agnostic part
 
@@ -519,7 +519,7 @@ class ParitySynthPass(passes.ModulePass):
 
     """
 
-    name = "xdsl-parity-synth"
+    name = "parity-synth"
 
     def apply(self, _ctx: context.Context, module: builtin.ModuleOp) -> None:
         """Apply the ParitySynth pass."""
