@@ -192,22 +192,34 @@ def _get_cli_option_from_attr(val: Attribute) -> Any:
 
     match val:
         case builtin.IntegerAttr():
-            if isa(val, builtin.BoolAttr):
+            if _is_bool_attr(val):
+                # Python booleans' repr is capitalized so we use strings
                 cli_val = "true" if val.value.data else "false"
             else:
                 cli_val = val.value.data
+
         case builtin.FloatAttr():
             cli_val = val.value.data
+
         case builtin.StringAttr():
             cli_val = val.data
+
         case builtin.ArrayAttr():
             cli_val = ",".join([_get_cli_option_from_attr(attr) for attr in val.data])
+
         case builtin.DictionaryAttr():
             mapping = []
             for k, v in val.data.items():
                 mapping.append(f"{k}={_get_cli_option_from_attr(v)}")
             cli_val = f"{{{' '.join(mapping)}}}"
+
         case _:
             raise ValueError(f"Unsupported option type {val}.")
 
     return cli_val
+
+
+def _is_bool_attr(val: builtin.IntegerAttr) -> bool:
+    """Check if an IntegerAttr corresponds to a boolean by checking its width."""
+    # Boolean attributes will be of Integer type with bitwidth == 1
+    return isinstance(val.type, builtin.IntegerType) and val.type.width.data == 1
