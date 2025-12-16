@@ -14,7 +14,7 @@
 """Unit test module for the MLIR graph generation in the Unified Compiler visualization module."""
 
 from pathlib import Path
-from subprocess import run
+from shutil import which
 
 import pytest
 
@@ -23,9 +23,8 @@ pytestmark = pytest.mark.xdsl
 xdsl = pytest.importorskip("xdsl")
 graphviz = pytest.importorskip("graphviz")
 
-if run(["/usr/bin/which", "dot"], check=False).returncode != 0:
+if which("dot") is None:
     pytest.skip(reason="Graphviz isn't installed.")
-
 
 import pennylane as qml
 
