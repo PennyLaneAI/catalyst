@@ -767,161 +767,182 @@ class GridIterator {
     size_t fallback_idx = 0;
 
     /**
+     * @brief Phase 1: Iterates through trivial guesses.
+     * @return true if a solution was found (yield), false if we should transition state.
+     */
+    bool run_guessing_phase()
+    {
+        // Solutions for the trivial cases.
+        while (guess_idx < guess_solutions.size()) {
+            const ZOmega &sol = guess_solutions[guess_idx];
+            guess_idx++; // Advance for next time
+
+            std::complex<double> complx_sol = sol.to_complex();
+            double dot_prod = zval.first * complx_sol.real() + zval.second * complx_sol.imag();
+
+            double norm_zsqrt_two = std::abs(sol.norm2().to_sqrt_two().to_double());
+
+            // Check if solution is within bounds (<= 1) and meets target.
+            if (norm_zsqrt_two <= 1.0) {
+                if (dot_prod >= target) {
+                    current_solution = {sol, 0};
+                    return true; // Found a solution
+                }
+            }
+        }
+        // Guesses exhausted, move to main loop
+        iter_state = IterState::MAIN_LOOP;
+        main_loop_idx = 0;    // The *first* trial to run is 0
+        two_dim_iter.reset(); // Ensure inner iterator is clear
+        return false;
+    }
+
+    /**
+     * @brief Phase 2: The main loop.
+     * Corresponds to: for ix in range(self.max_trials):
+     * @return true if a solution was found, false if we need to loop/transition.
+     */
+    bool run_main_loop_phase()
+    {
+        // Do we have an active inner iterator? If so, try to drain it.
+        // Corresponds to: for solution in potential_solutions:
+        if (two_dim_iter) {
+            while (*two_dim_iter != two_dim_iter->end()) {
+                ZOmega solution = **two_dim_iter;
+                ++(*two_dim_iter); // Advance inner iterator
+
+                // Normalize the solution and obtain the scaling exponent of sqrt(2).
+                auto [scaled_sol, kf] = (grid_op * solution).normalize();
+
+                std::complex<double> complx_sol = scaled_sol.to_complex();
+                double sol_real = complx_sol.real();
+                double sol_imag = complx_sol.imag();
+
+                // Update the scaling exponent of sqrt(2).
+                int k_ = k - kf;
+
+                // Calculate dot product adjusted for scaling
+                double k_div_2 = static_cast<double>(k_) / 2.0;
+                double k_mod_2 = static_cast<double>(k_ % 2);
+                double denominator = std::pow(2.0, k_div_2) * std::pow(M_SQRT2, k_mod_2);
+
+                double dot_prod = (zval.first * sol_real + zval.second * sol_imag) / denominator;
+
+                // Check if the solution follows the constraints of the target-region.
+                double norm_zsqrt_two = std::abs(scaled_sol.norm2().to_sqrt_two().to_double());
+
+                if (norm_zsqrt_two <= std::pow(2.0, k_)) {
+                    if (dot_prod >= target) {
+                        current_solution = {scaled_sol, k_};
+                        return true; // Found a solution, exit
+                    }
+                    else if (dot_prod >= t_) {
+                        // Fallback solution collection
+                        int_s.emplace_back(scaled_sol);
+                        init_k.emplace_back(k_);
+                    }
+                }
+            } // end while(inner_iter)
+
+            // Inner iterator is exhausted. Reset it.
+            two_dim_iter.reset();
+
+            // Run the "end of loop" logic (Logic to update k, e_, t_)
+            if (main_loop_idx == i_) {
+                k = std::max(kmin, k + 1);
+                e_ = epsilon;
+                t_ = t_ / 10.0;
+
+                auto [en_, _] = Ellipse::from_region(theta, e_, kmin).normalize();
+                grid_op = EllipseState(en_, e2).skew_grid_op();
+            }
+            else {
+                k = k + 1;
+            }
+            e1 = Ellipse::from_region(theta, e_, k);
+
+            // Advance the main loop index
+            main_loop_idx++;
+        }
+
+        // We need a new inner iterator (either it's the first time,
+        // or the previous one was just exhausted).
+
+        // Check if we're done *before* creating a new one.
+        if (main_loop_idx >= max_trials) {
+            iter_state = IterState::FALLBACK;
+            fallback_idx = 0;
+            // Add standard fallback
+            int_s.emplace_back(0, 0, 0, 1); // ZOmega(d=1)
+            init_k.emplace_back(0);
+            return false; // Go to FALLBACK state
+        }
+
+        // Create the inner iterator for the *current* main_loop_idx
+        try {
+            // Update the radius of the unit disk.
+            double radius = std::pow(2.0, -k);
+            Ellipse e2_({radius, 0.0, radius}, {0.0, 0.0});
+
+            // Apply the grid operation to the state and solve the two-dimensional grid
+            // problem.
+            EllipseState state = EllipseState(e1, e2_).apply_grid_op(grid_op);
+
+            two_dim_iter.emplace(state);
+        }
+        catch (const std::exception &e) {
+            // Corresponds to Python's `except (ValueError, ZeroDivisionError): break`
+            iter_state = IterState::FALLBACK;
+            fallback_idx = 0;
+            int_s.emplace_back(0, 0, 0, 1); // ZOmega(d=1)
+            init_k.emplace_back(0);
+            return false; // Go to FALLBACK state
+        }
+
+        // Loop again. The next pass will enter `if (two_dim_iter)`
+        // and start processing the iterator we just made.
+        return false;
+    }
+
+    /**
+     * @brief Phase 3: Returns fallback solutions collected during main loop.
+     * @return true if solution yielded, false if finished.
+     */
+    bool run_fallback_phase()
+    {
+        if (fallback_idx < int_s.size()) {
+            current_solution = {int_s[fallback_idx], init_k[fallback_idx]};
+            fallback_idx++;
+            return true; // Found a solution, exit
+        }
+
+        // Fallback exhausted
+        iter_state = IterState::DONE;
+        return false;
+    }
+
+    /**
      * @brief Private helper to find the next valid solution.
      * This is the core state machine of the iterator.
      */
     void find_next_solution()
     {
         while (true) {
-            if (iter_state == IterState::GUESSING) {
-                // --- Phase 1: Guessing ---
-                // Solutions for the trivial cases.
-                while (guess_idx < guess_solutions.size()) {
-                    const ZOmega &sol = guess_solutions[guess_idx];
-                    guess_idx++; // Advance for next time
-
-                    std::complex<double> complx_sol = sol.to_complex();
-                    double dot_prod =
-                        zval.first * complx_sol.real() + zval.second * complx_sol.imag();
-
-                    double norm_zsqrt_two = std::abs(sol.norm2().to_sqrt_two().to_double());
-
-                    // Check if solution is within bounds (<= 1) and meets target.
-                    if (norm_zsqrt_two <= 1.0) {
-                        if (dot_prod >= target) {
-                            current_solution = {sol, 0};
-                            return; // Found a solution, exit
-                        }
-                    }
-                }
-                // Guesses exhausted, move to main loop
-                iter_state = IterState::MAIN_LOOP;
-                main_loop_idx = 0;    // The *first* trial to run is 0
-                two_dim_iter.reset(); // Ensure inner iterator is clear
-                continue;             // Re-enter the while(true) to start the MAIN_LOOP
-            }
-
-            if (iter_state == IterState::MAIN_LOOP) {
-                // --- Phase 2: Main Loop ---
-                // Corresponds to: for ix in range(self.max_trials):
-
-                // Do we have an active inner iterator? If so, try to drain it.
-                // Corresponds to: for solution in potential_solutions:
-                if (two_dim_iter) {
-                    while (*two_dim_iter != two_dim_iter->end()) {
-                        ZOmega solution = **two_dim_iter;
-                        ++(*two_dim_iter); // Advance inner iterator
-
-                        // Normalize the solution and obtain the scaling exponent of sqrt(2).
-                        auto [scaled_sol, kf] = (grid_op * solution).normalize();
-
-                        std::complex<double> complx_sol = scaled_sol.to_complex();
-                        double sol_real = complx_sol.real();
-                        double sol_imag = complx_sol.imag();
-
-                        // Update the scaling exponent of sqrt(2).
-                        int k_ = k - kf;
-
-                        // Calculate dot product adjusted for scaling
-                        double k_div_2 = static_cast<double>(k_) / 2.0;
-                        double k_mod_2 = static_cast<double>(k_ % 2);
-                        double denominator = std::pow(2.0, k_div_2) * std::pow(M_SQRT2, k_mod_2);
-
-                        double dot_prod =
-                            (zval.first * sol_real + zval.second * sol_imag) / denominator;
-
-                        // Check if the solution follows the constraints of the target-region.
-                        double norm_zsqrt_two =
-                            std::abs(scaled_sol.norm2().to_sqrt_two().to_double());
-
-                        if (norm_zsqrt_two <= std::pow(2.0, k_)) {
-                            if (dot_prod >= target) {
-                                current_solution = {scaled_sol, k_};
-                                return; // Found a solution, exit
-                            }
-                            else if (dot_prod >= t_) {
-                                // Fallback solution collection
-                                int_s.emplace_back(scaled_sol);
-                                init_k.emplace_back(k_);
-                            }
-                        }
-                    } // end while(inner_iter)
-
-                    // Inner iterator is exhausted. Reset it.
-                    two_dim_iter.reset();
-
-                    // Run the "end of loop" logic (Logic to update k, e_, t_)
-                    if (main_loop_idx == i_) {
-                        k = std::max(kmin, k + 1);
-                        e_ = epsilon;
-                        t_ = t_ / 10.0;
-
-                        auto [en_, _] = Ellipse::from_region(theta, e_, kmin).normalize();
-                        grid_op = EllipseState(en_, e2).skew_grid_op();
-                    }
-                    else {
-                        k = k + 1;
-                    }
-                    e1 = Ellipse::from_region(theta, e_, k);
-
-                    // Advance the main loop index
-                    main_loop_idx++;
-                }
-
-                // We need a new inner iterator (either it's the first time,
-                // or the previous one was just exhausted).
-
-                // Check if we're done *before* creating a new one.
-                if (main_loop_idx >= max_trials) {
-                    iter_state = IterState::FALLBACK;
-                    fallback_idx = 0;
-                    // Add standard fallback
-                    int_s.emplace_back(0, 0, 0, 1); // ZOmega(d=1)
-                    init_k.emplace_back(0);
-                    continue; // Go to FALLBACK state
-                }
-
-                // Create the inner iterator for the *current* main_loop_idx
-                try {
-                    // Update the radius of the unit disk.
-                    double radius = std::pow(2.0, -k);
-                    Ellipse e2_({radius, 0.0, radius}, {0.0, 0.0});
-
-                    // Apply the grid operation to the state and solve the two-dimensional grid
-                    // problem.
-                    EllipseState state = EllipseState(e1, e2_).apply_grid_op(grid_op);
-
-                    two_dim_iter.emplace(state);
-                }
-                catch (const std::exception &e) {
-                    // Corresponds to Python's `except (ValueError, ZeroDivisionError): break`
-                    iter_state = IterState::FALLBACK;
-                    fallback_idx = 0;
-                    int_s.emplace_back(0, 0, 0, 1); // ZOmega(d=1)
-                    init_k.emplace_back(0);
-                    continue; // Go to FALLBACK state
-                }
-
-                // Loop again. The next pass will enter `if (two_dim_iter)`
-                // and start processing the iterator we just made.
-                continue;
-            }
-
-            if (iter_state == IterState::FALLBACK) {
-                // --- Phase 3: Fallback ---
-                // for s, k in zip(int_s + [ZOmega(d=1)], init_k + [0]):
-                if (fallback_idx < int_s.size()) {
-                    current_solution = {int_s[fallback_idx], init_k[fallback_idx]};
-                    fallback_idx++;
-                    return; // Found a solution, exit
-                }
-
-                // Fallback exhausted
-                iter_state = IterState::DONE;
-            }
-
-            if (iter_state == IterState::DONE) {
-                return; // Stay in DONE state
+            switch (iter_state) {
+            case IterState::GUESSING:
+                if (run_guessing_phase())
+                    return;
+                break;
+            case IterState::MAIN_LOOP:
+                if (run_main_loop_phase())
+                    return;
+                break;
+            case IterState::FALLBACK:
+                if (run_fallback_phase())
+                    return;
+                break;
+            case IterState::DONE:
+                return;
             }
         }
     }
