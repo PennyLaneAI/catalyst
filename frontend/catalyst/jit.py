@@ -649,7 +649,7 @@ class QJIT(CatalystCallable):
 
             if self.compile_options.artiq_config:
                 self._artiq_compiled = True
-                return None
+                return
 
             self.fn_cache.insert(
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
