@@ -26,8 +26,8 @@ import pennylane as qml
 import pytest
 from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
-from pennylane.capture.autograph.transformer import TRANSFORMER as capture_TRANSFORMER
 from pennylane import vjp
+from pennylane.capture.autograph.transformer import TRANSFORMER as capture_TRANSFORMER
 
 from catalyst import AutoGraphError, debug, passes, qjit
 from catalyst.api_extensions import (

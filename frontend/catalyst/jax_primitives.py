@@ -957,6 +957,7 @@ def _capture_vjp_lowering(ctx, *args, jaxpr, fn, method, argnums, h):
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
 
+
 #
 # zne
 #

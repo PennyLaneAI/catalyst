@@ -24,10 +24,10 @@ import numbers
 from typing import Callable, Iterable, List, Optional, Union
 
 import jax
+import pennylane as qml
 from jax._src.api import _dtype
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten
 from jax.api_util import debug_info
-import pennylane as qml
 from pennylane import QNode
 
 import catalyst
@@ -549,6 +549,7 @@ def vjp(f: Callable, params, cotangents, *, method=None, h=None, argnums=None):
     """
     if qml.capture.enabled():
         return qml.vjp(f, params, cotangents, method=method, h=h, argnums=argnums)
+
     def check_is_iterable(x, hint):
         if not isinstance(x, Iterable):
             raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")

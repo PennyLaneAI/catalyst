@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test JVP/VJP operation lowering"""
-
+# pylint: disable=too-many-lines
 from typing import TypeVar
 
 import jax
@@ -578,7 +578,6 @@ def test_vjp_against_jax_full_argnum_case_TT_TT(diff_method):
         assert_allclose(r_j, r_c)
 
 
-
 @pytest.mark.parametrize("diff_method", diff_methods)
 def test_jvpvjp_argument_checks(diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
@@ -782,7 +781,9 @@ def test_vjp_pytrees_args(diff_method):
     @qjit
     def C_workflowA():
         ct2 = [1.0, 1.0]
-        return qml.vjp(f, [{"res1": 0.1, "res2": 0.2}, 0.3], ct2, method=diff_method, argnums=[0, 1])
+        return qml.vjp(
+            f, [{"res1": 0.1, "res2": 0.2}, 0.3], ct2, method=diff_method, argnums=[0, 1]
+        )
 
     @jax.jit
     def J_workflow():
@@ -810,7 +811,9 @@ def test_VJP_pytrees_args_and_return(diff_method):
     @qjit
     def C_workflowA():
         ct2 = [1.0, {"res": 1.0}, 1.0]
-        return qml.vjp(f, [{"res1": 0.1, "res2": 0.2}, 0.3], ct2, method=diff_method, argnums=[0, 1])
+        return qml.vjp(
+            f, [{"res1": 0.1, "res2": 0.2}, 0.3], ct2, method=diff_method, argnums=[0, 1]
+        )
 
     @jax.jit
     def J_workflow():
@@ -878,9 +881,7 @@ def test_jvp_argument_type_checks_incompatible_n_inputs(diff_method):
 
     with pytest.raises(
         TypeError,
-        match=(
-            "number of tangent and number of differentiable parameters in"
-        ),
+        match=("number of tangent and number of differentiable parameters in"),
     ):
 
         @qjit
@@ -955,9 +956,7 @@ def test_vjp_argument_type_checks_incompatible_n_inputs(diff_method):
 
     with pytest.raises(
         TypeError,
-        match=(
-            "number of cotangent and number of function output parameters in"
-        ),
+        match=("number of cotangent and number of function output parameters in"),
     ):
 
         @qjit
