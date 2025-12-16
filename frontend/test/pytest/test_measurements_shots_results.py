@@ -657,9 +657,7 @@ class TestOtherMeasurements:
 
         # qml.counts
         qml.capture.disable()  # cant execute with counts with program capture
-        for r, e in zip(
-            result[1][0], expected(x, lambda: qml.counts(all_outcomes=True))
-        ):
+        for r, e in zip(result[1][0], expected(x, lambda: qml.counts(all_outcomes=True))):
             assert format(int(r), "02b") == e
         assert sum(result[1][1]) == 10000
         assert result[1][0].dtype == np.int64
