@@ -358,7 +358,6 @@ class ConstructCircuitDAG:
             fillcolor="grey",
             color="black",
             penwidth=2,
-            shape="rectangle",
         )
         self._node_uid_counter += 1
         self._dynamic_node_uids.add(node_id)
