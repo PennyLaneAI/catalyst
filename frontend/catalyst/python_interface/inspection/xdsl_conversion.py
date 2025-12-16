@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import copy
 import inspect
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -64,9 +65,8 @@ def get_mlir_module(qnode: QNode | QJIT, args, kwargs) -> ModuleOp:
         return qnode.mlir_module
 
     if isinstance(qnode, QJIT):
-        compile_options = qnode.compile_options
+        compile_options = copy.copy(qnode.compile_options)
         compile_options.autograph = False  # Autograph has already been applied for `user_function`
-        compile_options.pass_plugins.add(getXDSLPluginAbsolutePath())
 
         jitted_qnode = QJIT(qnode.user_function, compile_options)
     else:
