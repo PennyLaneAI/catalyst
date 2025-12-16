@@ -726,8 +726,7 @@ class TestGetLabel:
 class TestCreateStaticOperatorNodes:
     """Tests that operators with static parameters can be created and visualized as nodes."""
 
-    @pytest.mark.parametrize("op", [qml.H(0), qml.X(0), qml.SWAP([0, 1])])
-    def test_custom_op(self, op):
+    def test_custom_op(self):
         """Tests that the CustomOp operation node can be created and visualized."""
 
         # Build module with only a CustomOp
@@ -737,7 +736,8 @@ class TestCreateStaticOperatorNodes:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_circuit():
-            qml.apply(op)
+            qml.H(0)
+            qml.SWAP([0,1])
 
         module = my_circuit()
 
@@ -747,20 +747,21 @@ class TestCreateStaticOperatorNodes:
 
         # Ensure DAG only has one node
         nodes = utility.dag_builder.nodes
-        assert len(nodes) == 2  # Device node + operator
+        assert len(nodes) == 3  # Device node + operators
 
         # Make sure label has relevant info
-        assert nodes["node1"]["label"] == get_label(op)
+        assert nodes["node1"]["label"] == get_label(qml.H(0))
+        assert nodes["node2"]["label"] == get_label(qml.SWAP([0,1]))
 
     @pytest.mark.parametrize(
-        "op",
+        "kwargs",
         [
-            qml.GlobalPhase(0.5),
-            qml.GlobalPhase(0.5, wires=0),
-            qml.GlobalPhase(0.5, wires=[0, 1]),
+            {},
+            {"wires":0},
+            {"wires":[0,1]},
         ],
     )
-    def test_global_phase_op(self, op):
+    def test_global_phase_op(self, kwargs):
         """Test that GlobalPhase can be handled."""
 
         dev = qml.device("null.qubit", wires=1)
@@ -769,7 +770,7 @@ class TestCreateStaticOperatorNodes:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_circuit():
-            qml.apply(op)
+            qml.GlobalPhase(0.5, **kwargs)
 
         module = my_circuit()
 
