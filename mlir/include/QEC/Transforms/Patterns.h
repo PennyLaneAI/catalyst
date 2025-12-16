@@ -32,5 +32,6 @@ void populateDecomposeNonCliffordPPRPatterns(mlir::RewritePatternSet &,
                                              DecomposeMethod decomposeMethod, bool avoidYMeasure);
 void populateDecomposeCliffordPPRPatterns(mlir::RewritePatternSet &, bool avoidYMeasure);
 void populatePPRToMBQCPatterns(mlir::RewritePatternSet &);
+void populateDecomposeArbitraryPPRPatterns(mlir::RewritePatternSet &);
 } // namespace qec
 } // namespace catalyst

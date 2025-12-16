@@ -293,7 +293,7 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def PPRotationArbitraryOp : QEC_Op<"ppr.arbitrary", [AttrSizedOperandSegments]> {
+def PPRotationArbitraryOp : QEC_Op<"ppr.arbitrary", [QECOpInterface, AttrSizedOperandSegments]> {
     let summary = "Pauli Product Rotation with arbitrary angle.";
     let description = [{
         The PPRotationArbitraryOp represents a Pauli product rotation operation with an arbitrary angle.
@@ -325,6 +325,22 @@ def PPRotationArbitraryOp : QEC_Op<"ppr.arbitrary", [AttrSizedOperandSegments]> 
     let results = (outs
         Variadic<QubitType>:$out_qubits
     );
+
+    let builders = [
+        OpBuilder<
+        (ins
+            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product,
+            "::mlir::Value":$arbitrary_angle,
+            "::mlir::ValueRange":$in_qubits
+        ),[{
+            PPRotationArbitraryOp::build($_builder, $_state,
+            /*out_qubits=*/ mlir::TypeRange(in_qubits),
+            /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product),
+            /*arbitrary_angle=*/ arbitrary_angle,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ nullptr);
+        }]>,
+    ];
 
     let assemblyFormat = [{
         $pauli_product `(` $arbitrary_angle `)` $in_qubits attr-dict (`cond` `(` $condition^ `)`)? `:` type($out_qubits)

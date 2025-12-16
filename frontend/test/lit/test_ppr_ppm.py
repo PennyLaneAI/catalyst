@@ -23,6 +23,7 @@ import pennylane as qml
 from catalyst import measure, qjit
 from catalyst.passes import (
     commute_ppr,
+    decompose_arbitrary_ppr,
     merge_ppr_ppm,
     ppm_compilation,
     ppr_to_mbqc,
@@ -428,3 +429,29 @@ def test_ppr_to_mbqc():
 # CHECK-NOT: qec.ppm
 # CHECK: quantum.measure
 test_ppr_to_mbqc()
+
+
+def test_decompose_arbitrary_ppr():
+    """
+    Test the `decompose_arbitrary_ppr` pass.
+    """
+
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    @decompose_arbitrary_ppr
+    @to_ppr
+    @qml.qnode(qml.device("null.qubit", wires=2))
+    def test_decompose_arbitrary_ppr_workflow():
+        qml.PauliRot(0.123, pauli_word="X", wires=0)
+
+    print(test_decompose_arbitrary_ppr_workflow.mlir_opt)
+
+    # CHECK-NOT: qec.ppr ["Z"](2)
+    # CHECK_TURNOFF: qec.prepare  plus
+    # CHECK_TURNOFF: qec.ppm ["X", "Z"]
+    # CHECK_TURNOFF: qec.ppr ["X"](2)
+    # CHECK_TURNOFF: qec.ppr.arbitrary ["Z"]
+    # CHECK_TURNOFF: qec.ppm ["X"]
+    # CHECK_TURNOFF: qec.ppr ["X"](2)
+    # CHECK_TURNOFF: quantum.dealloc_qb

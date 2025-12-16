@@ -1285,3 +1285,16 @@ def ppr_to_mbqc(qnode):
 
     """
     return PassPipelineWrapper(qnode, "ppr-to-mbqc")
+
+
+def decompose_arbitrary_ppr(qnode):
+    R"""
+    Specify that the MLIR compiler pass for decomposing arbitrary PPR operations to arbitrary PPR with Z basis will be applied.
+
+    Args:
+        qnode (QNode): QNode to apply the pass to.
+
+    Returns:
+        ~.QNode
+    """
+    return PassPipelineWrapper(qnode, "decompose-arbitrary-ppr")
