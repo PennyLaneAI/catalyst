@@ -1359,14 +1359,16 @@ class TestOperatorConnectivity:
         # Check all nodes
         # NOTE: depth first traversal hence T first then PauliX
         assert "T" in nodes["node1"]["label"]
-        assert "PauliX" in nodes["node2"]["label"]
-        assert "PauliY" in nodes["node3"]["label"]
-        assert "PauliZ" in nodes["node4"]["label"]
+        assert "X" in nodes["node2"]["label"]
+        assert "Y" in nodes["node3"]["label"]
+        assert "Z" in nodes["node4"]["label"]
         assert "RZ" in nodes["node5"]["label"]
-        assert "Hadamard" in nodes["node6"]["label"]
+        assert "H" in nodes["node6"]["label"]
 
         # Check all edges
-        assert len(edges) == 6
+        assert len(edges) == 8
+        assert ("node0", "node1")
+        assert ("node0", "node2")
         assert ("node2", "node4") in edges  # X -> Z
         assert ("node2", "node5") in edges  # X -> RZ
         assert ("node2", "node6") in edges  # X -> H
