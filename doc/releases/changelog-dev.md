@@ -287,6 +287,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Update `get_mlir_module` to no longer use `getXDSLPluginAbsolutePath`.
+  [(#2303)](https://github.com/PennyLaneAI/catalyst/pull/2303)
+
 * Added missing `detensorize-function-boundary` and `symbol-dce` passes to `Pipelines.cpp`.
   [(#2266)](https://github.com/PennyLaneAI/catalyst/pull/2266)
 
