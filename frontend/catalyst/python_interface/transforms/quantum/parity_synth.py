@@ -33,7 +33,7 @@ from xdsl.dialects import arith, builtin
 from xdsl.ir import Operation, SSAValue
 from xdsl.rewriter import InsertPoint
 
-from catalyst.python_interface.dialects.quantum import CustomOp, QubitType, InsertOp, ExtractOp
+from catalyst.python_interface.dialects.quantum import CustomOp, ExtractOp, InsertOp, QubitType
 from catalyst.python_interface.pass_api import compiler_transform
 
 ### xDSL-agnostic part
