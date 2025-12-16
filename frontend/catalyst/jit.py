@@ -826,7 +826,7 @@ class QJIT(CatalystCallable):
 
         Returns:
             Tuple[CompiledFunction, str]: the compilation result and LLVMIR
-            For ARTIQ targets, returns (elf_path, llvm_ir) instead.
+            For ARTIQ targets, returns (None, llvm_ir) instead.
         """
         # WARNING: assumption is that the first function is the entry point to the compiled program.
         entry_point_func = self.mlir_module.body.operations[0]
