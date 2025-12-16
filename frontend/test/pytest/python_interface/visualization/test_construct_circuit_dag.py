@@ -1114,6 +1114,55 @@ class TestOperatorConnectivity:
         assert ("node5", "node7") in edges
         assert ("node6", "node7") in edges
 
+    def test_static_connection_through_nested_conditional(self):
+        """Tests that connections through nested conditionals make sense."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow(x):
+            qml.X(0)
+            qml.T(1)
+            if x == 1:
+                if x == 3:
+                    qml.Y(1)
+                else:
+                    qml.Z(0)
+            else:
+                qml.RZ(0, 0)
+            qml.H(0)
+
+        args = (1,)
+        module = my_workflow(*args)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # node0 -> NullQubit
+
+        # Check all nodes
+        # NOTE: depth first traversal hence T first then PauliX
+        assert "T" in nodes["node1"]["label"]
+        assert "PauliX" in nodes["node2"]["label"]
+        assert "PauliY" in nodes["node3"]["label"]
+        assert "PauliZ" in nodes["node4"]["label"]
+        assert "RZ" in nodes["node5"]["label"]
+        assert "Hadamard" in nodes["node6"]["label"]
+
+        # Check all edges
+        assert len(edges) == 6
+        assert ("node2", "node4") in edges  # X -> Z
+        assert ("node2", "node5") in edges  # X -> RZ
+        assert ("node2", "node6") in edges  # X -> H
+        assert ("node5", "node6") in edges  # RZ -> H
+        assert ("node4", "node6") in edges  # Z -> H
+        assert ("node1", "node3") in edges  # T -> Y
+
     def test_multi_wire_connectivity(self):
         """Ensures that multi wire connectivity holds."""
 

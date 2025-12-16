@@ -12,6 +12,11 @@
   [(#2234)](https://github.com/PennyLaneAI/catalyst/pull/2234)
   [(#2218)](https://github.com/PennyLaneAI/catalyst/pull/2218)
   [(#2260)](https://github.com/PennyLaneAI/catalyst/pull/2260)
+  
+* A new `gridsynth` pass is added to support Clifford+T decomopsition. This pass discretizes `RZ` and `PhaseShift` gates to either the Clifford+T basis or to the PPR basis. The pass also supports decomposing single-qubit arbitrary angle PPR in the Z basis.
+  [(#2140)](https://github.com/PennyLaneAI/catalyst/pull/2140)
+  [(#2166)](https://github.com/PennyLaneAI/catalyst/pull/2166)
+  [(#2292)](https://github.com/PennyLaneAI/catalyst/pull/2292)
 
 * Catalyst now features a unified compilation framework, which enables users and developers to design
   and implement compilation passes in Python in addition to C++, on the same Catalyst IR. The Python
@@ -298,6 +303,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Update `catalyst.python_interface.inspection.xdsl_conversion.get_mlir_module` to
+  no longer explicitly use the xDSL pass plugin.
+  [(#2303)](https://github.com/PennyLaneAI/catalyst/pull/2303)
+
 * Added missing `detensorize-function-boundary` and `symbol-dce` passes to `Pipelines.cpp`.
   [(#2266)](https://github.com/PennyLaneAI/catalyst/pull/2266)
 
@@ -475,6 +484,28 @@
 
 <h3>Documentation 📝</h3>
 
+* A new statevector simulator ``lightning.amdgpu`` has been added for optimized performance on AMD GPUs. 
+  [(#2283)](https://github.com/PennyLaneAI/catalyst/pull/2283)
+
+  The ``lightning.amdgpu`` device is a specific instantiation of the ``lightning.kokkos`` backend, supporting the same features and operations as ``lightning.kokkos``, with pre-compiled wheels for ``lightning.amdgpu`` available on PyPI for easy installation to use on MI300 series AMD GPUs. 
+
+  This device can be used within qjit'd workflows exactly as other devices compatible with Catalyst:
+
+  ```python
+  @qml.qjit
+  @qml.qnode(qml.device('lightning.amdgpu', wires=2))
+  def circuit():
+    qml.Hadamard(0)
+    return qml.state()
+  ```
+
+  ```pycon
+  >>> circuit()
+  [0.70710678+0.j 0.        +0.j 0.70710678+0.j 0.        +0.j]
+  ```
+
+  See the [Lightning-AMDGPU documentation](https://docs.pennylane.ai/projects/lightning/en/latest/lightning_amdgpu/device.html) for more details and installation instructions.
+
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
   [(#2136)](https://github.com/PennyLaneAI/catalyst/pull/2136)
 
@@ -484,6 +515,9 @@
 * Update `MLIR Plugins` documentation stating that plugins require adding passes via
   `--pass-pipeline`.
   [(#2168)](https://github.com/PennyLaneAI/catalyst/pull/2168)
+
+* Typos in docstring for `PPRotationArbitraryOp` and `PPRRotationOp` have been corrected.
+  [(#2297)](https://github.com/PennyLaneAI/catalyst/pull/2297)
 
 <h3>Contributors ✍️</h3>
 
@@ -499,6 +533,7 @@ Joseph Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Lee J. O'Riordan,
+Andrija Paurevic,
 Roberto Turrado,
 Paul Haochen Wang,
 Jake Zaia,
