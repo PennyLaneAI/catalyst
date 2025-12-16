@@ -101,7 +101,7 @@ bool commutes(QECOpInterface rhsOp, QECOpInterface lhsOp)
     return true;
 }
 
-std::optional<double> handleConstantValueAttr(mlir::Attribute valueAttr)
+std::optional<double> handleConstantValueAttr(Attribute valueAttr)
 {
     if (auto floatAttr = dyn_cast<FloatAttr>(valueAttr)) {
         return floatAttr.getValueAsDouble();
@@ -128,7 +128,7 @@ std::optional<double> resolveConstantValue(Value value)
     if (!value)
         return std::nullopt;
 
-    auto *defOp = value.getDefiningOp();
+    Operation *defOp = value.getDefiningOp();
     if (!defOp)
         return std::nullopt;
 
@@ -139,7 +139,7 @@ std::optional<double> resolveConstantValue(Value value)
 
     // Handle Stablehlo Dialect
     if (auto constOp = dyn_cast<stablehlo::ConstantOp>(defOp)) {
-        auto valueAttr = constOp.getValue();
+        Attribute valueAttr = constOp.getValue();
         return handleConstantValueAttr(valueAttr);
     }
     else if (auto convertOp = dyn_cast<stablehlo::ConvertOp>(defOp)) {
@@ -157,7 +157,7 @@ std::optional<double> resolveConstantValue(Value value)
 
     // Handle Arith Dialect
     if (auto constOp = dyn_cast<arith::ConstantOp>(defOp)) {
-        auto valueAttr = constOp.getValue();
+        Attribute valueAttr = constOp.getValue();
         return handleConstantValueAttr(valueAttr);
     }
     else if (auto indexCastOp = dyn_cast<arith::IndexCastOp>(defOp)) {
@@ -167,8 +167,8 @@ std::optional<double> resolveConstantValue(Value value)
         return std::nullopt;
     }
     else if (auto addOp = dyn_cast<arith::AddFOp>(defOp)) {
-        auto lhs = resolveConstantValue(addOp.getLhs());
-        auto rhs = resolveConstantValue(addOp.getRhs());
+        std::optional<double> lhs = resolveConstantValue(addOp.getLhs());
+        std::optional<double> rhs = resolveConstantValue(addOp.getRhs());
         if (lhs.has_value() && rhs.has_value()) {
             return lhs.value() + rhs.value();
         }

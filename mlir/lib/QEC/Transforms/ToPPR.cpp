@@ -85,15 +85,15 @@ void applyAdjointIfNeeded(GateConversion &gateConversion, CustomOp op)
 void applySingleQubitConversion(CustomOp op, const ArrayRef<GateConversion> &gateConversions,
                                 ConversionPatternRewriter &rewriter)
 {
-    auto loc = op->getLoc();
-    auto types = op.getOutQubits().getType();
+    Location loc = op->getLoc();
+    TypeRange types = op.getOutQubits().getType();
     ValueRange inQubits = op.getInQubits();
     PPRotationOp pprOp;
 
     for (auto gateConversion : gateConversions) {
         applyAdjointIfNeeded(gateConversion, op);
 
-        auto pauliProduct = rewriter.getStrArrayAttr(gateConversion.pauliOperators);
+        ArrayAttr pauliProduct = rewriter.getStrArrayAttr(gateConversion.pauliOperators);
         pprOp = rewriter.create<PPRotationOp>(loc, types, pauliProduct, gateConversion.rotationKind,
                                               inQubits);
         inQubits = pprOp.getOutQubits();
