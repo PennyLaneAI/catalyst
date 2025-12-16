@@ -1290,8 +1290,8 @@ def ppr_to_mbqc(qnode):
 def decompose_arbitrary_ppr(qnode):
     R"""
     Specify that the MLIR compiler pass for decomposing arbitrary Pauli product rotations (PPR)
-    operations will be applied. This will decompose into the circuit that includes arbitrary 
-    PPR with Z basis.
+    operations will be applied. This will decompose into a collection of PPRs, PPMs and 
+    a single-qubit arbitrary PPR in the Z basis.
 
     For details, see the Figure 13(d) of [Active volume](https://arxiv.org/abs/2211.15465).
 

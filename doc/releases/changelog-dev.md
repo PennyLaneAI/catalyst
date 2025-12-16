@@ -173,7 +173,8 @@
   ```
 
   * A new :func:`~catalyst.passes.decompose_arbitrary_ppr` pass has been added to the `catalyst.passes` module.
-    This pass decomposes arbitrary PPR operations to arbitrary PPR with Z basis.
+    This will decompose into a collection of PPRs, PPMs and a single-qubit arbitrary PPR 
+    in the Z basis.
     [(#2304)](https://github.com/PennyLaneAI/catalyst/pull/2304)
 
     ```python
