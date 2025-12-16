@@ -540,87 +540,132 @@ struct EllipseState {
     }
 
     /**
-     * @brief Reduce the skew of the state. (Section A.6, arXiv:1403.2975).
+     * @brief Phase 1 for reduce_skew (Remark A.20, arXiv:1403.2975).
+     */
+    GridOp reduce_skew_apply_symmetry_and_coarse_bias() const
+    {
+        GridOp op = GridOp::from_string("I");
+        double sign = 1.0;
+
+        if (e2.b < 0) {
+            op = op * GridOp::from_string("Z");
+        }
+
+        if ((e1.z + e2.z) < 0) {
+            sign = -1.0;
+            op = op * GridOp::from_string("X");
+        }
+
+        if (std::abs(bias()) > 2) {
+            INT_TYPE n = INT_TYPE(std::round((1.0 - sign * bias()) / 4.0));
+            op = op * GridOp::from_string("U").pow(n);
+        }
+        return op;
+    }
+
+    /**
+     * @brief Phase 2 for reduce_skew
+     *
+     * @param state The state to be shifted (will be modified in place).
+     * @return A pair containing:
+     * - The GridOp applied (Z or X).
+     * - The integer shift amount `k` (needed to adjust the final operator).
+     */
+    std::pair<GridOp, INT_TYPE> reduce_skew_apply_shift_lemma(EllipseState &state) const
+    {
+        INT_TYPE k = 0;
+        GridOp op = GridOp::from_string("I");
+
+        if (std::abs(state.bias()) > 1) {
+            // Apply the shift defined in Lemma A.1 / A.8
+            auto shift_result = state.apply_shift_op();
+            state = shift_result.first;
+            k = shift_result.second;
+
+            // Re-apply symmetries if the shift disrupted the canonical form
+            if (state.e2.b < 0) {
+                GridOp z_op = GridOp::from_string("Z");
+                state = state.apply_grid_op(z_op);
+                op = op * z_op;
+            }
+            if ((state.e1.z + state.e2.z) < 0) {
+                GridOp x_op = GridOp::from_string("X");
+                state = state.apply_grid_op(x_op);
+                op = op * x_op;
+            }
+        }
+        return {op, k};
+    }
+
+    /**
+     * @brief Phase 3 for reduce_skew
+     *
+     * Selects the specific grid operator (R, K, A, or B) to reduce the skew
+     */
+    static GridOp reduce_skew_select_operator(const Ellipse &e1, const Ellipse &e2)
+    {
+        if (-0.8 <= e1.z && e1.z <= 0.8 && -0.8 <= e2.z && e2.z <= 0.8) {
+            return GridOp::from_string("R");
+        }
+
+        if (e1.b >= 0) {
+            if (e1.z <= 0.3 && e2.z >= 0.8) {
+                return GridOp::from_string("K");
+            }
+            if (e1.z >= 0.8 && e2.z <= 0.3) {
+                return GridOp::from_string("K").adj2();
+            }
+            if (e1.z >= 0.3 && e2.z >= 0.3) {
+                INT_TYPE n = static_cast<INT_TYPE>(
+                    std::max(1.0, std::floor(std::pow(LAMBDA_D, std::min(e1.z, e2.z)) / 2.0)));
+                return GridOp::from_string("A").pow(n);
+            }
+            RT_FAIL("Skew couldn't be reduced (Case A/K failed)");
+        }
+
+        if (e1.z >= -0.2 && e2.z >= -0.2) {
+            INT_TYPE n = static_cast<INT_TYPE>(
+                std::max(1.0, std::floor(std::pow(LAMBDA_D, std::min(e1.z, e2.z)) / M_SQRT2)));
+            return GridOp::from_string("B").pow(n);
+        }
+
+        RT_FAIL("Skew couldn't be reduced (Case B failed)");
+    }
+
+    /**
+     * @brief Reduces the skew of the state (Implementation of the Step Lemma).
+     *
+     * This method guarantees a reduction in skew for states with skew > 15.
+     * It follows the algorithm in Section A.6 of arXiv:1403.2975 by:
+     * 1. Applying symmetries Remark A.20.
+     * 2. Applying the Shift Lemma.
+     * 3. Applying the specific Geometric Lemma (R, K, A, B).
      */
     std::pair<GridOp, EllipseState> reduce_skew()
     {
         RT_FAIL_IF(!e1.positive_semi_definite() || !e2.positive_semi_definite(),
                    "Ellipse is not positive semi-definite.");
-        double sign = 1.0;
-        INT_TYPE k = 0;
-        GridOp grid_op = GridOp::from_string("I");
-        if (e2.b < 0) {
-            grid_op = grid_op * GridOp::from_string("Z");
-        }
-        if ((e1.z + e2.z) < 0) {
-            sign *= -1;
-            grid_op = grid_op * GridOp::from_string("X");
-        }
-        if (std::abs(bias()) > 2) {
-            INT_TYPE n = INT_TYPE(round((1.0 - sign * bias()) / 4.0));
-            grid_op = grid_op * GridOp::from_string("U").pow(n);
-        }
-        GridOp n_grid_op = GridOp::from_string("I");
-        EllipseState new_state = this->apply_grid_op(grid_op);
-        if (std::abs(new_state.bias()) > 1) {
-            auto shift_result = new_state.apply_shift_op();
-            new_state = shift_result.first;
-            k = shift_result.second;
-            if (new_state.e2.b < 0) {
-                GridOp grid_op_z = GridOp::from_string("Z");
-                new_state = new_state.apply_grid_op(grid_op_z);
-                n_grid_op = n_grid_op * grid_op_z;
-            }
-            if ((new_state.e1.z + new_state.e2.z) < 0) {
-                GridOp grid_op_x = GridOp::from_string("X");
-                new_state = new_state.apply_grid_op(grid_op_x);
-                n_grid_op = n_grid_op * grid_op_x;
-            }
-        }
-        Ellipse current_e1 = new_state.e1;
-        Ellipse current_e2 = new_state.e2;
-        if (-0.8 <= current_e1.z && current_e1.z <= 0.8 && -0.8 <= current_e2.z &&
-            current_e2.z <= 0.8) {
-            n_grid_op = n_grid_op * GridOp::from_string("R");
-        }
-        else {
-            if (current_e1.b >= 0) {
-                if (current_e1.z <= 0.3 && current_e2.z >= 0.8) {
-                    n_grid_op = n_grid_op * GridOp::from_string("K");
-                }
-                else if (current_e1.z >= 0.8 && current_e2.z <= 0.3) {
-                    n_grid_op = n_grid_op * GridOp::from_string("K").adj2();
-                }
-                else if (current_e1.z >= 0.3 && current_e2.z >= 0.3) {
-                    INT_TYPE n = static_cast<INT_TYPE>(
-                        max(1.0,
-                            std::floor(std::pow(LAMBDA_D, min(current_e1.z, current_e2.z)) / 2.0)));
-                    n_grid_op = n_grid_op * GridOp::from_string("A").pow(n);
-                }
-                else {
-                    RT_FAIL("Skew couldn't be reduced for the state");
-                }
-            }
-            else {
-                if (current_e1.z >= -0.2 && current_e2.z >= -0.2) {
-                    INT_TYPE n = static_cast<INT_TYPE>(max(
-                        1.0,
-                        std::floor(std::pow(LAMBDA_D, min(current_e1.z, current_e2.z)) / M_SQRT2)));
-                    n_grid_op = n_grid_op * GridOp::from_string("B").pow(n);
-                }
-                else {
-                    RT_FAIL("Skew couldn't be reduced for the state");
-                }
-            }
-        }
+
+        GridOp total_op = reduce_skew_apply_symmetry_and_coarse_bias();
+        EllipseState working_state = this->apply_grid_op(total_op);
+
+        auto [shift_adj_op, k] = reduce_skew_apply_shift_lemma(working_state);
+
+        GridOp local_op = shift_adj_op;
+
+        GridOp geometric_op = reduce_skew_select_operator(working_state.e1, working_state.e2);
+
+        local_op = local_op * geometric_op;
+
         if (k != 0) {
-            n_grid_op = n_grid_op.apply_shift_op(k);
+            local_op = local_op.apply_shift_op(k);
         }
-        grid_op = grid_op * n_grid_op;
-        return {grid_op, this->apply_grid_op(grid_op)};
+
+        total_op = total_op * local_op;
+
+        return {total_op, this->apply_grid_op(total_op)};
     }
 };
-
 // --- Implementations requiring full class definitions ---
 
 /**

@@ -30,14 +30,13 @@ else()
 
     FetchContent_Declare(
         Boost
-        URL https://github.com/boostorg/boost/releases/download/boost-1.89.0/boost-1.89.0-cmake.tar.xz
-        URL_HASH SHA256=67acec02d0d118b5de9eb441f5fb707b3a1cdd884be00ca24b9a73c995511f74
+        URL https://archives.boost.io/release/1.89.0/source/boost_1_89_0.tar.bz2
+        URL_HASH SHA256=85a33fa22621b4f314f8e85e1a5e2a9363d22e4f4992925d4bb3bc631b5a0c7a
         DOWNLOAD_EXTRACT_TIMESTAMP ON
     )
 
     FetchContent_MakeAvailable(Boost)
 
-    target_link_libraries(rt_rsdecomp PUBLIC Boost::multiprecision Boost::random)
 endif()
 
 target_include_directories(rt_rsdecomp
