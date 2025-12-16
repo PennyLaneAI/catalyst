@@ -292,9 +292,14 @@
 
 <h3>Bug fixes 🐛</h3>
 
+<<<<<<< mlxd/fix_cond_measure_test
+* Updated tests and PennyLane dependency pin to follow changes introduced by [PennyLaneAI/pennylane#8290](https://github.com/PennyLaneAI/pennylane/pull/8290).
+  [(#2286)](https://github.com/PennyLaneAI/catalyst/pull/2286)
+=======
 * Update `catalyst.python_interface.inspection.xdsl_conversion.get_mlir_module` to
   no longer explicitly use the xDSL pass plugin.
   [(#2303)](https://github.com/PennyLaneAI/catalyst/pull/2303)
+>>>>>>> main
 
 * Added missing `detensorize-function-boundary` and `symbol-dce` passes to `Pipelines.cpp`.
   [(#2266)](https://github.com/PennyLaneAI/catalyst/pull/2266)
