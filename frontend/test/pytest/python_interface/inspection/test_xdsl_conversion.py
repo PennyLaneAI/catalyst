@@ -14,9 +14,6 @@
 """Unit test module for the utilities in xdsl_conversion.py"""
 
 import pytest
-from pennylane.capture import autograph
-
-from catalyst.jit import CompileOptions
 
 pytestmark = pytest.mark.xdsl
 xdsl = pytest.importorskip("xdsl")
@@ -25,6 +22,7 @@ from unittest.mock import MagicMock, Mock
 import pennylane as qml
 from jaxlib.mlir._mlir_libs._mlir.ir import Module
 
+from catalyst.jit import CompileOptions
 from catalyst.python_interface.inspection.xdsl_conversion import get_mlir_module
 
 
