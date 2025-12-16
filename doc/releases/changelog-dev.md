@@ -2,6 +2,11 @@
 
 <h3>New features since last release</h3>
 
+* A new `gridsynth` pass is added to support Clifford+T decomopsition. This pass discretizes `RZ` and `PhaseShift` gates to either the Clifford+T basis or to the PPR basis. The pass also supports decomposing single-qubit arbitrary angle PPR in the Z basis.
+  [(#2140)](https://github.com/PennyLaneAI/catalyst/pull/2140)
+  [(#2166)](https://github.com/PennyLaneAI/catalyst/pull/2166)
+  [(#2292)](https://github.com/PennyLaneAI/catalyst/pull/2292)
+
 * Catalyst now features a unified compilation framework, which enables users and developers to design
   and implement compilation passes in Python in addition to C++, on the same Catalyst IR. The Python
   interface relies on the xDSL library to represent and manipulate programs (analogous to the MLIR library
