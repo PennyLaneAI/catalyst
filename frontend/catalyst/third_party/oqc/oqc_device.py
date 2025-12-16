@@ -19,7 +19,7 @@ import platform
 from typing import Optional
 
 from pennylane.devices import Device, ExecutionConfig
-from pennylane.transforms.core import TransformProgram
+from pennylane.transforms.core import CompilePipeline
 
 try:
     from qcaas_client.client import OQCClient  # pylint: disable=unused-import
@@ -69,7 +69,7 @@ class OQCDevice(Device):
         if execution_config is None:
             execution_config = ExecutionConfig()
 
-        transform_program = TransformProgram()
+        transform_program = CompilePipeline()
         # TODO: Add transforms (check wires, check shots, no sample, only commuting measurements,
         # measurement from counts)
         return transform_program, execution_config

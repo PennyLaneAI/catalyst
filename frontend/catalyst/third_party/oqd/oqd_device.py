@@ -23,7 +23,7 @@ from typing import Optional
 import platform
 
 from pennylane.devices import Device, ExecutionConfig
-from pennylane.transforms.core import TransformProgram
+from pennylane.transforms.core import CompilePipeline
 from catalyst.compiler import get_lib_path
 
 BACKENDS = ["default"]
@@ -130,7 +130,7 @@ class OQDDevice(Device):
         if execution_config is None:
             execution_config = ExecutionConfig()
 
-        transform_program = TransformProgram()
+        transform_program = CompilePipeline()
 
         return transform_program, execution_config
 
