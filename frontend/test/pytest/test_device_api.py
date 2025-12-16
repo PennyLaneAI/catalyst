@@ -15,6 +15,7 @@
 import pennylane as qml
 import pytest
 from pennylane.devices import NullQubit
+from pennylane.devices.capabilities import DeviceCapabilities, ExecutionCondition
 
 from catalyst import qjit
 from catalyst.device import QJITDevice, get_device_capabilities, qjit_device
@@ -113,6 +114,36 @@ def test_qjit_device_measurements(shots, mocker):
     circuit()
 
     assert spy.spy_return.measurement_processes == expected_measurements
+
+
+@pytest.mark.parametrize(
+    "MPs, requires_shots",
+    [
+        (
+            {
+                "StateMP": [ExecutionCondition.ANALYTIC_MODE_ONLY],
+                "CountsMP": [ExecutionCondition.FINITE_SHOTS_ONLY],
+            },
+            False,
+        ),
+        (
+            {
+                "SampleMP": [
+                    ExecutionCondition.FINITE_SHOTS_ONLY,
+                    ExecutionCondition.TERMS_MUST_COMMUTE,
+                ],
+                "CountsMP": [ExecutionCondition.FINITE_SHOTS_ONLY],
+            },
+            True,
+        ),
+    ],
+)
+def test_device_requires_shots(MPs, requires_shots):
+    """Test that shots requirement is properly inferred from capabilities"""
+    # Construct a mock DeviceCapabilities object.
+    # Don't care about non MP capabilities, so just use default values.
+    caps = DeviceCapabilities(measurement_processes=MPs)
+    assert qjit_device._requires_shots(caps) == requires_shots
 
 
 def test_simple_circuit():
