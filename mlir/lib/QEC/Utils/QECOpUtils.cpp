@@ -101,6 +101,27 @@ bool commutes(QECOpInterface rhsOp, QECOpInterface lhsOp)
     return true;
 }
 
+std::optional<double> handleConstantValueAttr(mlir::Attribute valueAttr)
+{
+    if (auto floatAttr = dyn_cast<FloatAttr>(valueAttr)) {
+        return floatAttr.getValueAsDouble();
+    }
+    else if (auto intAttr = dyn_cast<IntegerAttr>(valueAttr)) {
+        return static_cast<double>(intAttr.getValue().getSExtValue());
+    }
+    else if (auto denseFPAttr = dyn_cast<DenseFPElementsAttr>(valueAttr)) {
+        if (denseFPAttr.isSplat() || denseFPAttr.getNumElements() == 1) {
+            return denseFPAttr.getSplatValue<APFloat>().convertToDouble();
+        }
+    }
+    else if (auto denseIntAttr = dyn_cast<DenseIntElementsAttr>(valueAttr)) {
+        if (denseIntAttr.isSplat() || denseIntAttr.getNumElements() == 1) {
+            return static_cast<double>(denseIntAttr.getSplatValue<APInt>().getSExtValue());
+        }
+    }
+    return std::nullopt;
+}
+
 // Recursively resolve the constant parameter of a value and returns std::nullopt if not a constant.
 std::optional<double> resolveConstantValue(Value value)
 {
@@ -119,17 +140,7 @@ std::optional<double> resolveConstantValue(Value value)
     // Handle Stablehlo Dialect
     if (auto constOp = dyn_cast<stablehlo::ConstantOp>(defOp)) {
         auto valueAttr = constOp.getValue();
-        if (auto denseFPAttr = dyn_cast<DenseFPElementsAttr>(valueAttr)) {
-            if (denseFPAttr.isSplat() || denseFPAttr.getNumElements() == 1) {
-                return denseFPAttr.getSplatValue<APFloat>().convertToDouble();
-            }
-        }
-        else if (auto denseIntAttr = dyn_cast<DenseIntElementsAttr>(valueAttr)) {
-            if (denseIntAttr.isSplat() || denseIntAttr.getNumElements() == 1) {
-                return static_cast<double>(denseIntAttr.getSplatValue<APInt>().getSExtValue());
-            }
-        }
-        return std::nullopt;
+        return handleConstantValueAttr(valueAttr);
     }
     else if (auto convertOp = dyn_cast<stablehlo::ConvertOp>(defOp)) {
         if (convertOp->getNumOperands() > 0) {
@@ -147,23 +158,7 @@ std::optional<double> resolveConstantValue(Value value)
     // Handle Arith Dialect
     if (auto constOp = dyn_cast<arith::ConstantOp>(defOp)) {
         auto valueAttr = constOp.getValue();
-        if (auto floatAttr = dyn_cast<FloatAttr>(valueAttr)) {
-            return floatAttr.getValueAsDouble();
-        }
-        else if (auto intAttr = dyn_cast<IntegerAttr>(valueAttr)) {
-            return static_cast<double>(intAttr.getValue().getSExtValue());
-        }
-        else if (auto denseAttr = dyn_cast<DenseFPElementsAttr>(valueAttr)) {
-            if (denseAttr.isSplat() || denseAttr.getNumElements() == 1) {
-                return denseAttr.getSplatValue<APFloat>().convertToDouble();
-            }
-        }
-        else if (auto denseAttr = dyn_cast<DenseIntElementsAttr>(valueAttr)) {
-            if (denseAttr.isSplat() || denseAttr.getNumElements() == 1) {
-                return static_cast<double>(denseAttr.getSplatValue<APInt>().getSExtValue());
-            }
-        }
-        return std::nullopt;
+        return handleConstantValueAttr(valueAttr);
     }
     else if (auto indexCastOp = dyn_cast<arith::IndexCastOp>(defOp)) {
         if (defOp->getNumOperands() > 0) {
@@ -171,17 +166,13 @@ std::optional<double> resolveConstantValue(Value value)
         }
         return std::nullopt;
     }
-
-    // Handle Arith Dialect Floating Point Operations
-    if (auto addOp = dyn_cast<arith::AddFOp>(defOp)) {
-        double sum = 0.0;
-        for (auto operand : addOp.getOperands()) {
-            auto operandVal = resolveConstantValue(operand);
-            if (!operandVal.has_value())
-                return std::nullopt;
-            sum += operandVal.value();
+    else if (auto addOp = dyn_cast<arith::AddFOp>(defOp)) {
+        auto lhs = resolveConstantValue(addOp.getLhs());
+        auto rhs = resolveConstantValue(addOp.getRhs());
+        if (lhs.has_value() && rhs.has_value()) {
+            return lhs.value() + rhs.value();
         }
-        return sum;
+        return std::nullopt;
     }
 
     return std::nullopt;
