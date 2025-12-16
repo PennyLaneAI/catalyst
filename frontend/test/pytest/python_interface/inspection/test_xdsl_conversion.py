@@ -18,6 +18,7 @@ import pytest
 pytestmark = pytest.mark.xdsl
 xdsl = pytest.importorskip("xdsl")
 
+# pylint: disable=wrong-import-position
 import pennylane as qml
 from jaxlib.mlir._mlir_libs._mlir.ir import Module
 
