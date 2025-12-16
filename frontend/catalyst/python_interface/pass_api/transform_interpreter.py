@@ -28,6 +28,7 @@ See here (link valid with xDSL 0.46): https://github.com/xdslproject/xdsl/blob/3
 
 import io
 from collections.abc import Callable
+from typing import Sequence
 
 from xdsl.context import Context
 from xdsl.dialects import builtin
@@ -101,7 +102,7 @@ class TransformFunctionsExt(TransformFunctions):
         # ---- Catalyst path ----
         buffer = io.StringIO()
         Printer(stream=buffer, print_generic_format=True).print_op(module)
-        schedule = _create_schedule(op)
+        schedule = _create_schedule([op])
         self._pre_pass_callback(pass_name, module)
         modified = _quantum_opt(*schedule, "-mlir-print-op-generic", stdin=buffer.getvalue())
 
@@ -146,24 +147,41 @@ class TransformInterpreterPass(ModulePass):
         interpreter.call_op(schedule, (op,))
 
 
-def _create_schedule(op: ApplyRegisteredPassOp) -> tuple[str, ...]:
-    """Create a pass schedule for applying an MLIR pass using the appropriate CLI command.
+def _create_schedule(pass_ops: Sequence[ApplyRegisteredPassOp]) -> list[str]:
+    """Create a pass schedule for applying MLIR pass via CLI flags.
 
-    For a pass with options, the corresponding CLI command will be the following:
+    For a pass with options, the corresponding CLI flag will be the following:
 
     .. code-block::
 
-        --pass-pipeline "builtin.module(my-pass{opt0=val0 opt1=val1 ...})"
+        --my-pass="arg1=val1 arg2=val2 ..."
+
+    Args:
+        pass_ops (Sequence[xdsl.dialects.transform.ApplyRegisteredPassOp]): The
+            passes to schedule
+
+    Returns:
+        list[str]: A list containing strings that correspond to the CLI flags
+        for the specified passes
     """
-    pass_name = op.pass_name.data
-    pass_options = op.options
+    schedule: list[str] = []
 
-    if not pass_options:
-        return (f"--{pass_name}",)
+    for op in pass_ops:
+        pass_name = op.pass_name.data
+        pass_options = op.options
 
-    cli_options = _get_cli_option_from_attr(pass_options)
-    cli_pass = f"builtin.module({pass_name}{cli_options})"
-    return ("--pass-pipeline", cli_pass)
+        if not pass_options.data:
+            schedule.append(f"--{pass_name}")
+            continue
+
+        # pass_options is a DictionaryAttr, which will be contained inside curly
+        # braces {...}. For pass options, we do not want the curly braces, which
+        # is why we remove the first and last characters from the options string
+        cli_options = _get_cli_option_from_attr(pass_options)[1:-1]
+        cli_pass = f"--{pass_name}='{cli_options}'"
+        schedule.append(cli_pass)
+
+    return schedule
 
 
 def _get_cli_option_from_attr(val: Attribute) -> str:
