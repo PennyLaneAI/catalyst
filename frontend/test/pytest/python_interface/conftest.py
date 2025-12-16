@@ -137,6 +137,7 @@ def _run_filecheck_qjit_impl(qjit_fn, verify=False):
 
     checks = _get_filecheck_directives(qjit_fn)
     compiler = Compiler()
+    #print(qjit_fn.mlir_module)
     mlir_module = compiler.run(qjit_fn.mlir_module)
 
     # The following is done because ``mlir_module`` will be in the generic syntax, and

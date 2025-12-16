@@ -33,7 +33,7 @@ from xdsl.dialects import arith, builtin
 from xdsl.ir import Operation, SSAValue
 from xdsl.rewriter import InsertPoint
 
-from ...dialects.quantum import CustomOp, QubitType
+from ...dialects.quantum import CustomOp, QubitType, InsertOp, ExtractOp
 from ...pass_api import compiler_transform
 
 ### xDSL-agnostic part
@@ -299,18 +299,17 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
         for region in matchedOp.regions:
             for block in region.blocks:
                 for op in block.ops:
-                    if not isinstance(op, CustomOp):
+                    is_insert_extract = isinstance(op, (InsertOp, ExtractOp))
+                    if not (is_insert_extract or isinstance(op, CustomOp)):
                         if len(op.regions) != 0:
                             # Do phase polynomial rewriting up to this point
                             self.rewrite_phase_polynomial(rewriter)
                             # Rewrite regions of this operation; Creating a new PatternRewriter
                             # so its matched operation is `op`, not `matchedOp`
                             self.match_and_rewrite(op, pattern_rewriter.PatternRewriter(op))
-                            op.attributes["parity_synth_done"] = builtin.UnitAttr()
                         continue
 
-                    gate_name = op.gate_name.data
-                    if gate_name in valid_phase_polynomial_ops:
+                    if not is_insert_extract and op.gate_name.data in valid_phase_polynomial_ops:
                         # Include op in phase polynomial ops and track its qubits
                         self._record_phase_poly_op(op)
                         continue

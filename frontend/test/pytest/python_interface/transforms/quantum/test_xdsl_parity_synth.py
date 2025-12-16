@@ -486,6 +486,35 @@ class TestParitySynthIntegration:
 
         run_filecheck_qjit(circuit)
 
+    def test_qjit_with_dynamic_allocation(self, run_filecheck_qjit):
+        """Test that the ParitySynthPass works correctly with qjit and dynamic wires but can
+        not simplify across dynamic wires."""
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qjit(target="mlir", pass_plugins=[getXDSLPluginAbsolutePath()])
+        @parity_synth_pass
+        @qml.qnode(dev)
+        def circuit(x: float, y: float, z: float, w0: int, w1: int):
+            # CHECK: [[phi:%.+]] = tensor.extract %arg0
+            # CHECK: quantum.custom "RZ"([[phi]])
+            # CHECK: [[omega:%.+]] = tensor.extract %arg1
+            # CHECK: quantum.custom "RX"([[omega]])
+            # CHECK: quantum.custom "CNOT"()
+            # CHECK: [[theta:%.+]] = tensor.extract %arg2
+            # CHECK: quantum.custom "RZ"([[theta]])
+            # CHECK: quantum.custom "CNOT"()
+            # CHECK-NOT: quantum.custom
+            qml.CNOT((0, 1)) # Can simplify this first triple due to static wires
+            qml.RZ(x, 0)
+            qml.CNOT((0, 1))
+            qml.RX(y, w0)
+            qml.CNOT((w1, 0)) # Can not simplify this second triple due to dynamic wires
+            qml.RZ(z, w1)
+            qml.CNOT((w1, 0))
+            return qml.state()
+
+        run_filecheck_qjit(circuit)
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
