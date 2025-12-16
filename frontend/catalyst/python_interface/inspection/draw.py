@@ -27,8 +27,8 @@ from pennylane.tape import QuantumScript
 from catalyst.python_interface.compiler import Compiler
 
 from .collector import QMLCollector
-from .construct_circuit_dag import ConstructCircuitDAG
-from .pydot_dag_builder import PyDotDAGBuilder
+from ..visualization.construct_circuit_dag import ConstructCircuitDAG
+from ..visualization.pydot_dag_builder import PyDotDAGBuilder
 from .xdsl_conversion import get_mlir_module
 
 if TYPE_CHECKING:
