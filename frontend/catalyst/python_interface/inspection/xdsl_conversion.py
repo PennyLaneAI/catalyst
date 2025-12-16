@@ -250,6 +250,14 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
         case _ if op.name == "stablehlo.reshape":
             return resolve_constant_wire(op.operands[0])
 
+        case _ if op.name == "stablehlo.add":
+            x, y = (resolve_constant_wire(op.operands[0]), resolve_constant_wire(op.operands[1]))
+            return str(x) + " + " + str(y)
+
+        case _ if op.name == "stablehlo.subtract":
+            x, y = (resolve_constant_wire(op.operands[0]), resolve_constant_wire(op.operands[1]))
+            return str(x) + " - " + str(y)
+
         case _ if op.name == "tensor.from_elements":
             return resolve_constant_wire(op.operands[0])
 
