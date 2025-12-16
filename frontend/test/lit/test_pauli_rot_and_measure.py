@@ -401,7 +401,7 @@ def test_pauli_rot_and_measure_with_cond():
     # CHECK: [[q0:%.+]] = qec.ppr ["Z"](4)
     # CHECK: qec.ppm ["Z"]
     # CHECK: scf.if
-    # CHECK: qec.ppr ["Z"](4)
+    # CHECK: qec.ppr.arbitrary ["Z"]
     # CHECK: scf.yield
     # CHECK: else
     # CHECK: scf.yield
