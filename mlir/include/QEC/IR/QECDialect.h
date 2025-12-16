@@ -14,31 +14,23 @@
 
 #pragma once
 
-#include "mlir/Bytecode/BytecodeOpInterface.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
-#include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Interfaces/ControlFlowInterfaces.h"
-#include "mlir/Interfaces/SideEffectInterfaces.h"
-
-#include "QEC/IR/QECOpInterfaces.h"
 
 //===----------------------------------------------------------------------===//
 // QEC dialect declarations.
 //===----------------------------------------------------------------------===//
 
-#include "QEC/IR/QECDialectDialect.h.inc"
+#include "QEC/IR/QECOpsDialect.h.inc"
 
 //===----------------------------------------------------------------------===//
 // QEC type declarations.
 //===----------------------------------------------------------------------===//
 
 #define GET_TYPEDEF_CLASSES
-#include "QEC/IR/QECDialectTypes.h.inc"
+#include "QEC/IR/QECOpsTypes.h.inc"
 
 //===----------------------------------------------------------------------===//
-// QEC enum definitions.
+// QEC enum declarations.
 //===----------------------------------------------------------------------===//
 
 #include "QEC/IR/QECEnums.h.inc"
@@ -49,10 +41,3 @@
 
 #define GET_ATTRDEF_CLASSES
 #include "QEC/IR/QECAttributes.h.inc"
-
-//===----------------------------------------------------------------------===//
-// QEC ops declarations.
-//===----------------------------------------------------------------------===//
-
-#define GET_OP_CLASSES
-#include "QEC/IR/QECDialect.h.inc"

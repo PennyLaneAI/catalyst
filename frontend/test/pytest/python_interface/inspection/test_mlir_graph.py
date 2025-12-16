@@ -14,15 +14,21 @@
 """Unit test module for the MLIR graph generation in the Unified Compiler visualization module."""
 
 from pathlib import Path
+from subprocess import run
 
 import pytest
 
 # pylint: disable=wrong-import-position
-pytestmark = pytest.mark.usefixtures("requires_xdsl")
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
+graphviz = pytest.importorskip("graphviz")
+
+if run(["/usr/bin/which", "dot"], check=False).returncode != 0:
+    pytest.skip(reason="Graphviz isn't installed.")
+
 
 import pennylane as qml
 
-from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface.inspection import generate_mlir_graph
 from catalyst.python_interface.transforms import (
     iterative_cancel_inverses_pass,
@@ -66,7 +72,7 @@ class TestMLIRGraph:
             return qml.state()
 
         if qjit:
-            _ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(_)
+            _ = qml.qjit(_)
 
         generate_mlir_graph(_)()
         assert collect_files(tmp_path) == {"QNode_level_0_no_transforms.svg"}
@@ -86,7 +92,7 @@ class TestMLIRGraph:
             return qml.state()
 
         if qjit:
-            _ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(_)
+            _ = qml.qjit(_)
 
         generate_mlir_graph(_)()
         assert_files(
@@ -111,7 +117,7 @@ class TestMLIRGraph:
             return qml.state()
 
         if qjit:
-            _ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(_)
+            _ = qml.qjit(_)
 
         generate_mlir_graph(_)(0.1, 0.2, 0, 1)
         assert_files(
@@ -136,7 +142,7 @@ class TestMLIRGraph:
             return qml.state()
 
         if qjit:
-            _ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(_)
+            _ = qml.qjit(_)
 
         generate_mlir_graph(_)(0.1, 0.2, 0, 1)
         assert_files(
@@ -162,7 +168,7 @@ class TestMLIRGraph:
             return qml.state()
 
         if qjit:
-            _ = qml.qjit(pass_plugins=[getXDSLPluginAbsolutePath()])(_)
+            _ = qml.qjit(_)
 
         generate_mlir_graph(_)(0.1, 0.2, 0, 1)
         assert_files(

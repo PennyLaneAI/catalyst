@@ -434,7 +434,7 @@ class ExpvalAndVarPattern(MeasurementsFromSamplesPattern):
         rewriter.replace_op(op_to_replace, postprocessing_func_call_op)
 
         # Finally, erase the expval/var op and its associated observable op
-        rewriter.erase_matched_op()
+        rewriter.erase_op(matched_op)
         rewriter.erase_op(observable_op)
 
 

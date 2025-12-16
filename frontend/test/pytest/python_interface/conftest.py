@@ -18,9 +18,6 @@ from io import StringIO
 
 import pytest
 
-from catalyst.python_interface import Compiler, QuantumParser
-from catalyst.python_interface.conversion import parse_generic_to_xdsl_module
-
 deps_available = True
 
 try:
@@ -32,6 +29,9 @@ try:
     from xdsl.dialects import test
     from xdsl.passes import PassPipeline
     from xdsl.printer import Printer
+
+    from catalyst.python_interface import Compiler, QuantumParser
+    from catalyst.python_interface.conversion import parse_generic_to_xdsl_module
 
 except (ImportError, ModuleNotFoundError):
     deps_available = False
@@ -184,7 +184,7 @@ def run_filecheck_qjit():
             # Test that the merge_rotations_pass works as expected when used with `qjit`
             dev = qml.device("lightning.qubit", wires=2)
 
-            @qml.qjit(target="mlir", pass_plugins=[getXDSLPluginAbsolutePath()])
+            @qml.qjit(target="mlir")
             @merge_rotations_pass
             @qml.qnode(dev)
             def circuit(x: float, y: float):

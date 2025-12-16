@@ -473,9 +473,6 @@ jobs:
         # macOS requirements.txt
         python3 -m pip install cuda-quantum==0.6.0
         python3 -m pip install oqc-qcaas-client
-        # Install graphviz for testing the mlir-op-graph integration
-        sudo apt-get install -y graphviz
-        python3 -m pip install graphviz
         make frontend
 
     - name: Get Cached LLVM Build
@@ -536,6 +533,17 @@ jobs:
         MDD_BENCHMARK_PRECISION=1 \
         python3 -m pytest demos -k "tutorial_qft_arithmetics.ipynb" --nbmake
 
+    - name: Install Unified Compiler Dependencies
+      run: |
+        python3 -m pip install xdsl~=0.55.0 xdsl-jax==0.1.1
+        # Install graphviz for testing the mlir-op-graph integration
+        sudo apt-get install -y graphviz
+        python3 -m pip install graphviz
+
+    - name: Run Unified Compiler Tests
+      run: |
+        python3 -m pytest frontend/test/pytest -n auto -m "xdsl"
+
   frontend-tests-lightning-kokkos:
     name: Frontend Tests (backend="lightning.kokkos")
     needs: [constants, llvm, runtime, quantum, determine_runner]
@@ -559,9 +567,6 @@ jobs:
         sudo apt-get install -y libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        # Install graphviz for testing the mlir-op-graph integration
-        sudo apt-get install -y graphviz
-        python3 -m pip install graphviz
         make frontend
 
     - name: Get Cached LLVM Build
