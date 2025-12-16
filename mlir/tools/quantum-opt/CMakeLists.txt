@@ -26,6 +26,7 @@ set(LIBS
     MLIRIon
     ion-transforms
     MLIRRTIO
+    rtio-transforms
     MLIRCatalystTest
     MLIRCatalystUtils
     MLIRTestDialect
