@@ -60,8 +60,8 @@ class TestGetMLIRModule:
 
         @qml.qjit
         @qml.qnode(dev)
-        def my_workflow(x):
-            qml.X(0)
+        def my_workflow(wire):
+            qml.X(wire)
 
         module = get_mlir_module(my_workflow, (1,), {})
         assert isinstance(module, Module)
