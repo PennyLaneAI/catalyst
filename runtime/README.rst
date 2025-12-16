@@ -31,7 +31,8 @@ The directory is structured as follows:
     The core modules of the runtime are structured into ``lib/capi`` and ``lib/backend``.
     `lib/capi <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/capi>`_  implements the semantics for
     QIR instructions lowered to our custom runtime. `lib/backend <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/backend>`_
-    contains implementations of the ``QuantumDevice`` API for backend simulators.
+    contains implementations of the ``QuantumDevice`` API for backend simulators. An additional module
+    `lib/RSDecompRuntime` implements the runtime component of the Ross-Selinger Gridsynth algorithm for decomposing single-qubit RZ and PhaseShift gates, which is used by the `gridsynth` compilation pass.
 
 - `tests <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/tests>`_:
     A collection of C++ tests for modules and methods in the runtime.
