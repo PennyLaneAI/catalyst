@@ -60,44 +60,6 @@ from catalyst.utils.runtime_environment import get_lib_path
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
-RUNTIME_OPERATIONS = [
-    "CNOT",
-    "ControlledPhaseShift",
-    "CRot",
-    "CRX",
-    "CRY",
-    "CRZ",
-    "CSWAP",
-    "CY",
-    "CZ",
-    "Hadamard",
-    "Identity",
-    "IsingXX",
-    "IsingXY",
-    "IsingYY",
-    "IsingZZ",
-    "SingleExcitation",
-    "DoubleExcitation",
-    "ISWAP",
-    "MultiRZ",
-    "PauliX",
-    "PauliY",
-    "PauliZ",
-    "PCPhase",
-    "PhaseShift",
-    "PSWAP",
-    "QubitUnitary",
-    "Rot",
-    "RX",
-    "RY",
-    "RZ",
-    "S",
-    "SWAP",
-    "T",
-    "Toffoli",
-    "GlobalPhase",
-]
-
 RUNTIME_OBSERVABLES = [
     "Identity",
     "PauliX",
@@ -112,12 +74,6 @@ RUNTIME_OBSERVABLES = [
 ]
 
 RUNTIME_MPS = ["ExpectationMP", "SampleMP", "VarianceMP", "CountsMP", "StateMP", "ProbabilityMP"]
-
-# The runtime interface does not care about specific gate properties, so set them all to True.
-RUNTIME_OPERATIONS = {
-    op: OperatorProperties(invertible=True, controllable=True, differentiable=True)
-    for op in RUNTIME_OPERATIONS
-}
 
 RUNTIME_OBSERVABLES = {
     obs: OperatorProperties(invertible=True, controllable=True, differentiable=True)
@@ -227,9 +183,8 @@ def get_qjit_device_capabilities(target_capabilities: DeviceCapabilities) -> Dev
     qjit_capabilities = deepcopy(target_capabilities)
 
     # Intersection of gates and observables supported by the device and by Catalyst runtime.
-    qjit_capabilities.operations = intersect_operations(
-        target_capabilities.operations, RUNTIME_OPERATIONS
-    )
+    qjit_capabilities.operations = target_capabilities.operations
+
     qjit_capabilities.observables = intersect_operations(
         target_capabilities.observables, RUNTIME_OBSERVABLES
     )
