@@ -38,7 +38,7 @@ from pennylane.transforms import (
     split_non_commuting,
     split_to_single_terms,
 )
-from pennylane.transforms.core import TransformProgram
+from pennylane.transforms.core import CompilePipeline
 
 from catalyst.device.decomposition import (
     catalyst_decompose,
@@ -360,7 +360,7 @@ class QJITDevice(qml.devices.Device):
                 describing parameters of the execution.
 
         Returns:
-            TransformProgram: A transform program that when called returns QuantumTapes that can be
+            CompilePipeline: A transform program that when called returns QuantumTapes that can be
                 compiled for the backend, and a postprocessing function to be called on the results
             ExecutionConfig: configuration with unset specifications filled in if relevant.
 
@@ -373,7 +373,7 @@ class QJITDevice(qml.devices.Device):
             execution_config = qml.devices.ExecutionConfig()
         _, config = self.original_device.preprocess(execution_config)
 
-        program = TransformProgram()
+        program = CompilePipeline()
 
         # During preprocessing, we now have info on whether the user is requesting execution
         # with shots.
@@ -432,7 +432,7 @@ class QJITDevice(qml.devices.Device):
         return program, config
 
     def _measurement_transform_program(self, capabilities):
-        measurement_program = TransformProgram()
+        measurement_program = CompilePipeline()
         if isinstance(self.original_device, SoftwareQQPP):
             return measurement_program
 
