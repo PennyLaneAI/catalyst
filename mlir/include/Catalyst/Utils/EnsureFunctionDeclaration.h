@@ -12,16 +12,51 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#pragma once
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
 using namespace mlir;
 
 namespace catalyst {
 
-// When lowering custom dialects to the llvm dialect, we will generate calls to runtime CAPI
-// functions. This utility function will generate declarations for the CAPI functions in the llvm
-// dialect IR.
-LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op,
-                                           StringRef fnSymbol, Type fnType);
+// When lowering custom dialects, we often need to generate calls to runtime CAPI functions.
+// This utility function generates declarations for these functions if they do not exist.
+//
+// It supports both:
+// 1. LLVM::LLVMFuncOp (for LLVM dialect lowering)
+// 2. func::FuncOp (for standard MLIR lowering, marks visibility as private)
+template <typename OpT, typename TypeT>
+OpT ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op, StringRef fnSymbol,
+                              TypeT fnType)
+{
+    // Lookup the symbol to see if it already exists
+    Operation *fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
+
+    if (!fnDecl) {
+        // If not found, insert it at the start of the Module
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+        rewriter.setInsertionPointToStart(mod.getBody());
+
+        // Create the specific function operation (LLVMFuncOp or FuncOp)
+        auto newFunc = rewriter.create<OpT>(op->getLoc(), fnSymbol, fnType);
+
+        // Handle visibility differences:
+        // func::FuncOp usually requires explicit private visibility for runtime decls.
+        if (isa<func::FuncOp>(newFunc)) {
+            newFunc.setPrivate();
+        }
+
+        fnDecl = newFunc;
+    }
+    else {
+        // Verify the existing symbol is the correct type
+        assert(isa<OpT>(fnDecl) && "Existing symbol is not the expected operation type");
+    }
+
+    return cast<OpT>(fnDecl);
+}
 
 } // namespace catalyst
