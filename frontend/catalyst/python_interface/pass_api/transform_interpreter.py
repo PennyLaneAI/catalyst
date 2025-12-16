@@ -27,8 +27,8 @@ See here (link valid with xDSL 0.46): https://github.com/xdslproject/xdsl/blob/3
 """
 
 import io
-from collections.abc import Callable
-from typing import Sequence
+from collections.abc import Callable, Sequence
+from typing import Any
 
 from xdsl.context import Context
 from xdsl.dialects import builtin
@@ -168,45 +168,39 @@ def _create_schedule(pass_ops: Sequence[ApplyRegisteredPassOp]) -> list[str]:
 
     for op in pass_ops:
         pass_name = op.pass_name.data
-        pass_options = op.options
+        pass_options = op.options.data
 
-        if not pass_options.data:
+        if not pass_options:
             schedule.append(f"--{pass_name}")
             continue
 
-        # pass_options is a DictionaryAttr, which will be contained inside curly
-        # braces {...}. For pass options, we do not want the curly braces, which
-        # is why we remove the first and last characters from the options string
-        cli_options = _get_cli_option_from_attr(pass_options)[1:-1]
-        cli_pass = f"--{pass_name}='{cli_options}'"
+        cli_options = []
+        for opt, val in pass_options.items():
+            cli_options.append(f"{opt}={_get_cli_option_from_attr(val)}")
+        cli_options = f"{{{' '.join(cli_options)}}}"
+
+        cli_pass = f"--{pass_name}={cli_options}"
         schedule.append(cli_pass)
 
     return schedule
 
 
-def _get_cli_option_from_attr(val: Attribute) -> str:
+def _get_cli_option_from_attr(val: Attribute) -> Any:
     """Convert an xDSL attribute corresponding to a pass option into a valid
     CLI option."""
     cli_val = None
 
-    match type(val):
-        case builtin.IntegerAttr:
+    match val:
+        case builtin.IntegerAttr():
             if isa(val, builtin.BoolAttr):
                 cli_val = "true" if val.value.data else "false"
             else:
                 cli_val = val.value.data
-        case builtin.FloatAttr:
+        case builtin.FloatAttr():
             cli_val = val.value.data
-        case builtin.StringAttr:
+        case builtin.StringAttr():
             cli_val = val.data
-        case builtin.ArrayAttr:
-            cli_val = tuple(_get_cli_option_from_attr(v) for v in val.data)
-        case builtin.DictionaryAttr:
-            inner_opts = []
-            for k, v in val.data.items():
-                inner_opts.append(f"{k}={_get_cli_option_from_attr(v)}")
-            cli_val = f"{{{' '.join(inner_opts)}}}"
         case _:
             raise ValueError(f"Unsupported option type {val}.")
 
-    return str(cli_val)
+    return cli_val
