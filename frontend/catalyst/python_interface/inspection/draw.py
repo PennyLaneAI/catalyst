@@ -106,7 +106,57 @@ def draw(qnode: QNode, *, level: None | int = None) -> Callable:
 
 def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
     """
-    ???plz halp Isaac???
+    Visualize QNodes as graphs, showing wire flow through quantum operations, program structure, and
+    pass-by-pass impacts on compiled programs.
+
+    .. note::
+
+        The ``draw_graph`` function requires installaion of
+        `Graphviz <https://graphviz.org/download/>` and the
+        `pydot <https://pypi.org/project/pydot/>` software package. Please consult the links
+        provided for installation instructions.
+
+    .. warning::
+
+        This feature must be used in tandem with PennyLane's program capture, enabled with
+        :func:`pennylane.capture.enable`.
+
+    Args:
+        qnode (.QNode): the input QNode that is to be visualized. The QNode is assumed to be
+            compiled with ``qjit``.
+        level (None | int): the level of transformation to visualize. If ``None``, the final
+            level is visualized. # what are default options?
+
+    Returns:
+        # halp
+
+    **Example**
+
+    The ``draw_graph`` function visualizes QNodes in a similar manner as
+    `view-op-graph in traditional MLIR <https://mlir.llvm.org/docs/Passes/#-view-op-graph>`, which
+    leverages `Graphviz <https://graphviz.org/download/>` to show data-flow in compiled programs.
+
+    Using ``draw_graph`` requires a qjit'd QNode and a ``level`` argument, which denotes the
+    cumulative set of applied compilation transforms (in the order they appear) to be applied and
+    visualized.
+
+    .. code-block::
+
+        import pennylane as qml
+        import catalyst
+
+        qml.capture.enable()
+
+        @qml.qjit
+        @qml.transforms.merge_rotations
+        @qml.transforms.cancel_inverses
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def circuit(x, y):
+            # TODO
+
+    >>> x, y = # TODO
+    >>> print(catalyst.draw_graph)(x, y)
+
     """
     if not HAS_MATPLOTLIB:
         raise ImportError(
