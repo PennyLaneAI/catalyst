@@ -241,8 +241,8 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
     def __init__(self, *args, **kwargs):
         if not has_networkx:  # pragma: no cover
             raise ModuleNotFoundError(
-                "The packages networkx and galois are required to run the ParitySynth pass."
-                "You can install them via ``pip install networkx galois``."
+                "The package networkx is required to run the ParitySynth pass."
+                "You can install it via ``pip install networkx``."
             ) from networkx_import_error  # pylint: disable=used-before-assignment
 
         super().__init__(*args, **kwargs)
@@ -299,8 +299,16 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
         for region in matchedOp.regions:
             for block in region.blocks:
                 for op in block.ops:
+                    # This loop body does one of three things:
+                    # 1. If ``op`` is neither a ``CustomOp`` nor an (InsertOp/ExtractOp),
+                    #    recurse on the regions of ``op`` but otherwise do nothing.
+                    # 2. If ``op`` is a ``CustomOp`` that is not a phase polynomial operation
+                    #    (RZ/CNOT), or an (InsertOp/ExtractOp), trigger rewrite_phase_polynomial
+                    # 3. If ``op`` is a ``CustomOp`` that is a phase polynomial operation
+                    #    (RZ/CNOT), record ``op`` to the aggregated phase polynomial subcircuit.
                     is_insert_extract = isinstance(op, (InsertOp, ExtractOp))
                     if not (is_insert_extract or isinstance(op, CustomOp)):
+                        # Case 1: do "nothing", just recurse on op.regions
                         if len(op.regions) != 0:
                             # Do phase polynomial rewriting up to this point
                             self.rewrite_phase_polynomial(rewriter)
@@ -310,11 +318,11 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
                         continue
 
                     if not is_insert_extract and op.gate_name.data in valid_phase_polynomial_ops:
-                        # Include op in phase polynomial ops and track its qubits
+                        # Case 2: Include op in phase polynomial ops and track its qubits
                         self._record_phase_poly_op(op)
                         continue
 
-                    # not a phase polynomial op, so we activate rewriting of the phase polynomial
+                    # Case 3: not a phase polynomial op, so we trigger rewriting
                     self.rewrite_phase_polynomial(rewriter)
 
                 # end of operations; rewrite terminal phase polynomial
@@ -397,16 +405,14 @@ class ParitySynthPass(passes.ModulePass):
 parity_synth_pass = compiler_transform(ParitySynthPass)
 parity_synth_pass.__doc__ = r"""Pass for applying ParitySynth to phase polynomials in a circuit.
 
-ParitySynth has been proposed by Vandaele et al. in
-`arXiv:2104.00934 <https://arxiv.org/abs/2104.00934>`__
-as a technique to synthesize
+ParitySynth has been proposed by Vandaele et al. in `arXiv:2104.00934
+<https://arxiv.org/abs/2104.00934>`__ as a technique to synthesize
 `phase polynomials
 <https://pennylane.ai/compilation/phase-polynomial-intermediate-representation>`__
-into elementary quantum gates, namely ``CNOT`` and ``RZ``.
-For this, it synthesizes the
+into elementary quantum gates, namely ``CNOT`` and ``RZ``. For this, it synthesizes the
 `parity table <https://pennylane.ai/compilation/parity-table>`__ of the phase polynomial,
-and defers the remaining `parity matrix <>`__ synthesis to
-`RowCol <https://pennylane.ai/compilation/rowcol-algorithm>`__.
+and defers the remaining `parity matrix <>`__ synthesis to `RowCol
+<https://pennylane.ai/compilation/rowcol-algorithm>`__.
 
 .. note::
 
@@ -432,28 +438,28 @@ In the following, we apply the pass to a simple quantum circuit that has optimiz
 potential in terms of commuting gates that can be interchanged to unlock a cancellation of
 a self-inverse gate (``CNOT``) with itself. Concretely, the circuit is:
 
-```python
-import pennylane as qml
-from catalyst.python_interface import Compiler
-from catalyst.python_interface.transforms import parity_synth_pass
+.. code-block:: python
 
-qml.capture.enable()
-dev = qml.device("lightning.qubit", wires=2)
+    import pennylane as qml
+    from catalyst.python_interface import Compiler
+    from catalyst.python_interface.transforms import parity_synth_pass
 
-@qml.qjit(target="mlir")
-@parity_synth_pass
-@qml.qnode(dev)
-def circuit(x: float, y: float, z: float):
-    qml.CNOT((0, 1))
-    qml.RZ(x, 1)
-    qml.CNOT((0, 1))
-    qml.RX(y, 1)
-    qml.CNOT((1, 0))
-    qml.RZ(z, 1)
-    qml.CNOT((1, 0))
-    return qml.state()
+    qml.capture.enable()
+    dev = qml.device("lightning.qubit", wires=2)
 
-```
+    @qml.qjit(target="mlir")
+    @parity_synth_pass
+    @qml.qnode(dev)
+    def circuit(x: float, y: float, z: float):
+        qml.CNOT((0, 1))
+        qml.RZ(x, 1)
+        qml.CNOT((0, 1))
+        qml.RX(y, 1)
+        qml.CNOT((1, 0))
+        qml.RZ(z, 1)
+        qml.CNOT((1, 0))
+        return qml.state()
+
 We can draw the circuit and observe the last ``RZ`` gate to be wrapped in a pair of ``CNOT``
 gates that commute with it:
 
@@ -464,11 +470,11 @@ gates that commute with it:
 Now we apply the ``parity_synth_pass`` to the circuit and quantum just-in-time (qjit) compile
 the circuit into a reduced MLIR module:
 
-```python
-circuit_qjit = qml.qjit(parity_synth_pass(circuit), autograph=True, target="mlir")
-compiler = Compiler()
-mlir_module = compiler.run(circuit_qjit.mlir_module)
-```
+.. code-block:: python
+
+    circuit_qjit = qml.qjit(parity_synth_pass(circuit), autograph=True, target="mlir")
+    compiler = Compiler()
+    mlir_module = compiler.run(circuit_qjit.mlir_module)
 
 Looking at the compiled module below, we find only five gates left in the program (note that
 we reduced the output for the purpose of this example); the ``CNOT``\ s
