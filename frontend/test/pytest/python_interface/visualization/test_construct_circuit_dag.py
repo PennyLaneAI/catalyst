@@ -2039,7 +2039,7 @@ class TestAdjoint:
         # cluster1 -> my_workflow
         assert clusters["cluster2"]["label"] == "adjoint"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
-        assert "Hadamard" in nodes["node1"]["label"]
+        assert "H" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster2"
 
     def test_adjoint_operator_instance(self):
@@ -2091,5 +2091,5 @@ class TestAdjoint:
         # cluster1 -> my_workflow
         assert clusters["cluster2"]["label"] == "adjoint"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
-        assert "Hadamard" in nodes["node1"]["label"]
+        assert "H" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster2"

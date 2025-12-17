@@ -24,6 +24,7 @@ from pennylane.measurements import (
     VarianceMP,
 )
 from pennylane.operation import Operator
+from pennylane.ops.op_math import Adjoint, Controlled
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region, SSAValue
 
@@ -555,7 +556,12 @@ def _operator(op: Operator) -> str:
     else:
         wires_str = f"[{', '.join(map(str, wires))}]"
     # Using <...> lets us use ports (https://graphviz.org/doc/info/shapes.html#record)
-    return f"<name> {str(op).split('(')[0]}|<wire> {wires_str}"
+    if hasattr(op, "base"):
+        # TODO: Simplify if controlled or adjoint
+        name_str = op.name
+    else:
+        name_str = str(op).rsplit("(")[0]
+    return f"<name> {name_str}|<wire> {wires_str}"
 
 
 @get_label.register
