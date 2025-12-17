@@ -33,7 +33,7 @@ from xdsl.dialects import arith, builtin
 from xdsl.ir import Operation, SSAValue
 from xdsl.rewriter import InsertPoint
 
-from catalyst.python_interface.dialects.quantum import CustomOp, ExtractOp, InsertOp, QubitType
+from catalyst.python_interface.dialects.quantum import CustomOp, InsertOp, QubitType
 from catalyst.python_interface.pass_api import compiler_transform
 
 ### xDSL-agnostic part
@@ -242,7 +242,7 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
         if not has_networkx:  # pragma: no cover
             raise ModuleNotFoundError(
                 "The package networkx is required to run the ParitySynth pass."
-                "You can install it via ``pip install networkx``."
+                "You can install it via 'pip install networkx'."
             ) from networkx_import_error  # pylint: disable=used-before-assignment
 
         super().__init__(*args, **kwargs)
@@ -300,14 +300,13 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
             for block in region.blocks:
                 for op in block.ops:
                     # This loop body does one of three things:
-                    # 1. If ``op`` is neither a ``CustomOp`` nor an (InsertOp/ExtractOp),
+                    # 1. If ``op`` is neither a ``CustomOp`` nor an InsertOp,
                     #    recurse on the regions of ``op`` but otherwise do nothing.
                     # 2. If ``op`` is a ``CustomOp`` that is not a phase polynomial operation
-                    #    (RZ/CNOT), or an (InsertOp/ExtractOp), trigger rewrite_phase_polynomial
+                    #    (RZ/CNOT), or an InsertOp, trigger rewrite_phase_polynomial
                     # 3. If ``op`` is a ``CustomOp`` that is a phase polynomial operation
                     #    (RZ/CNOT), record ``op`` to the aggregated phase polynomial subcircuit.
-                    is_insert_extract = isinstance(op, (InsertOp, ExtractOp))
-                    if not (is_insert_extract or isinstance(op, CustomOp)):
+                    if not isinstance(op, (CustomOp, InsertOp)):
                         # Case 1: do "nothing", just recurse on op.regions
                         if len(op.regions) != 0:
                             # Do phase polynomial rewriting up to this point
@@ -317,7 +316,7 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
                             self.match_and_rewrite(op, pattern_rewriter.PatternRewriter(op))
                         continue
 
-                    if not is_insert_extract and op.gate_name.data in valid_phase_polynomial_ops:
+                    if isinstance(op, CustomOp) and op.gate_name.data in valid_phase_polynomial_ops:
                         # Case 2: Include op in phase polynomial ops and track its qubits
                         self._record_phase_poly_op(op)
                         continue
@@ -339,6 +338,7 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
             # Phase polynomials of length 1 are left untouched. Reset internal state
             self._reset_vars()
             return
+        print(f"{[op.gate_name.data for op in self.phase_polynomial_ops]}")
 
         # Create an insertion point in the IR after the last phase polynomial op.
         # Inserting newly created ops at this point and the removing the phase polynomial ops
@@ -411,8 +411,8 @@ ParitySynth has been proposed by Vandaele et al. in `arXiv:2104.00934
 <https://pennylane.ai/compilation/phase-polynomial-intermediate-representation>`__
 into elementary quantum gates, namely ``CNOT`` and ``RZ``. For this, it synthesizes the
 `parity table <https://pennylane.ai/compilation/parity-table>`__ of the phase polynomial,
-and defers the remaining `parity matrix <>`__ synthesis to `RowCol
-<https://pennylane.ai/compilation/rowcol-algorithm>`__.
+and defers the remaining `parity matrix <https://pennylane.ai/compilation/parity-matrix>`__
+synthesis to `RowCol <https://pennylane.ai/compilation/rowcol-algorithm>`__.
 
 .. note::
 
@@ -427,9 +427,9 @@ pass works on circuits containing any operations, it is recommended to maximize 
 subcircuits that represent phase polynomials (i.e. consist of ``CNOT`` and ``RZ`` gates) to
 enhance the effectiveness of the pass. This might be possible through decomposition or
 re-ordering of commuting gates.
-Note that nested regions are synthesized independently, i.e., region boundaries are always
-treated as boundaries of phase polynomial subcircuits.
-Similarly, dynamic wires create boundaries around the operations using them, causing separation
+Note that nested regions, such as nested functions and control flow function bodies, are
+synthesized independently, i.e., region boundaries are always treated as boundaries of phase
+polynomial subcircuits. Similarly, dynamic wires create boundaries around the operations using them, causing separation
 of phase polynomial operations into multiple subcircuits.
 
 **Example**
@@ -483,7 +483,7 @@ for the first three gates and once for the last three gates. This is because ``R
 a phase polynomial operation, so that it forms a boundary for the phase polynomial subcircuits
 that are re-synthesized by the pass.
 
->>> print(mlir_module) # The following output has manually be reduced for readability
+>>> print(mlir_module) # The following output has manually been reduced for readability
 module @circuit {
   func.func public @jit_circuit([...]) -> tensor<4xcomplex<f64>> {
     %0 = "catalyst.launch_kernel"(%arg0, %arg1, %arg2) <[...]> :

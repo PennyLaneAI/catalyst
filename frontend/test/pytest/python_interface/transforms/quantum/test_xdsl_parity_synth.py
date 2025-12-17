@@ -22,7 +22,6 @@ from numpy.testing import assert_allclose, assert_equal
 pytestmark = pytest.mark.xdsl
 pytest.importorskip("xdsl")
 pytest.importorskip("networkx")
-pytest.importorskip("galois")
 
 # pylint: disable=wrong-import-position
 import pennylane as qml
@@ -463,8 +462,6 @@ class TestParitySynthIntegration:
         """Test that the ParitySynthPass works correctly with qjit."""
         dev = qml.device("lightning.qubit", wires=2)
 
-        @qml.qjit(target="mlir", pass_plugins=[getXDSLPluginAbsolutePath()])
-        @parity_synth_pass
         @qml.qnode(dev)
         def circuit(x: float, y: float, z: float):
             # CHECK: [[phi:%.+]] = tensor.extract %arg0
@@ -485,36 +482,104 @@ class TestParitySynthIntegration:
             qml.CNOT((1, 0))
             return qml.state()
 
-        run_filecheck_qjit(circuit)
+        raw_circuit = qml.qjit(circuit)
+        compiled_circuit = qml.qjit(
+            parity_synth_pass(circuit), target="mlir", pass_plugins=[getXDSLPluginAbsolutePath()]
+        )
+
+        run_filecheck_qjit(compiled_circuit)
+        args = (0.6, 0.2, -1.8)
+        assert np.allclose(raw_circuit(*args), compiled_circuit(*args))
 
     def test_qjit_with_dynamic_allocation(self, run_filecheck_qjit):
         """Test that the ParitySynthPass works correctly with qjit and dynamic wires but can
         not simplify across dynamic wires."""
-        dev = qml.device("lightning.qubit", wires=2)
+        dev = qml.device("lightning.qubit", wires=4)
 
-        @qml.qjit(target="mlir", pass_plugins=[getXDSLPluginAbsolutePath()])
-        @parity_synth_pass
         @qml.qnode(dev)
         def circuit(x: float, y: float, z: float, w0: int, w1: int):
+            # Can simplify this first triple due to static wires
             # CHECK: [[phi:%.+]] = tensor.extract %arg0
             # CHECK: quantum.custom "RZ"([[phi]])
+            qml.CNOT((0, 1))
+            qml.RZ(x, 0)
+            qml.CNOT((0, 1))
+
             # CHECK: [[omega:%.+]] = tensor.extract %arg1
             # CHECK: quantum.custom "RX"([[omega]])
+            qml.RX(y, w0)
+
+            # Can not simplify this second triple due to dynamic wires
             # CHECK: quantum.custom "CNOT"()
             # CHECK: [[theta:%.+]] = tensor.extract %arg2
             # CHECK: quantum.custom "RZ"([[theta]])
             # CHECK: quantum.custom "CNOT"()
-            # CHECK-NOT: quantum.custom
-            qml.CNOT((0, 1))  # Can simplify this first triple due to static wires
-            qml.RZ(x, 0)
-            qml.CNOT((0, 1))
-            qml.RX(y, w0)
-            qml.CNOT((w1, 0))  # Can not simplify this second triple due to dynamic wires
+            qml.CNOT((w1, 0))
             qml.RZ(z, w1)
             qml.CNOT((w1, 0))
+
+            # Purely static wire section
+            # Note how the classical processing is in original order
+            # while the quantum instructions are scrambled in order
+            # CHECK: [[phi_1:%.+]] = tensor.extract %arg0
+            # CHECK: [[phi_2:%.+]] = tensor.extract %arg0
+            # CHECK: [[phi_3:%.+]] = tensor.extract %arg0
+            # CHECK: [[omega_1:%.+]] = tensor.extract %arg1
+            # CHECK: [[omega_2:%.+]] = tensor.extract %arg1
+            # CHECK: quantum.custom "RZ"([[phi_1]])
+            # CHECK: quantum.custom "RZ"([[phi_2]])
+            # CHECK: quantum.custom "RZ"([[omega_1]])
+            # CHECK: quantum.custom "RZ"([[omega_2]])
+            # CHECK: quantum.custom "CNOT"()
+            # CHECK: quantum.custom "CNOT"()
+            # CHECK: quantum.custom "RZ"([[phi_3]])
+            # CHECK: quantum.custom "CNOT"()
+            # CHECK: quantum.custom "CNOT"()
+            # This last CNOT is inserted by rowcol
+            # CHECK: quantum.custom "CNOT"()
+            qml.RZ(x, 0)
+            qml.RZ(x, 1)
+            qml.CNOT([0, 1])
+            qml.CNOT([1, 2])
+            qml.RZ(x, 2)
+            qml.CNOT([1, 2])
+            qml.CNOT([0, 1])
+            qml.RZ(y, 0)
+            qml.RZ(y, 1)
+
+            # Purely dynamic wire section
+            # CHECK: [[phi_4:%.+]] = tensor.extract %arg0
+            # CHECK: quantum.custom "RZ"([[phi_4]])
+            qml.RZ(x, w0)
+            # CHECK: [[phi_5:%.+]] = tensor.extract %arg0
+            # CHECK: quantum.custom "RZ"([[phi_5]])
+            # CHECK: quantum.custom "CNOT"()
+            qml.RZ(x, w1)
+            qml.CNOT([w0, w1])
+            # CHECK: [[theta_1:%.+]] = tensor.extract %arg2
+            # CHECK: quantum.custom "RZ"([[theta_1]])
+            # CHECK: quantum.custom "CNOT"()
+            qml.RZ(z, w0)
+            qml.CNOT([w0, w1])
+            # CHECK: [[omega_3:%.+]] = tensor.extract %arg1
+            # CHECK: quantum.custom "RZ"([[omega_3]])
+            qml.RZ(y, w0)
+            # CHECK: [[omega_4:%.+]] = tensor.extract %arg1
+            # CHECK: quantum.custom "RZ"([[omega_4]])
+            qml.RZ(y, w1)
+            # CHECK-NOT: quantum.custom
+
             return qml.state()
 
-        run_filecheck_qjit(circuit)
+        raw_circuit = qml.qjit(circuit)
+        compiled_circuit = qml.qjit(
+            parity_synth_pass(circuit), target="mlir", pass_plugins=[getXDSLPluginAbsolutePath()]
+        )
+
+        run_filecheck_qjit(compiled_circuit)
+        args = (0.6, 0.2, -1.8)
+        for wires in [(0, 1), (0, 2), (2, 3)]:
+            assert np.allclose(raw_circuit(*args, *wires), compiled_circuit(*args, *wires))
 
 
 if __name__ == "__main__":

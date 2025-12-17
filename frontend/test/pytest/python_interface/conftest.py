@@ -119,7 +119,7 @@ def _get_filecheck_directives(qjit_fn):
     filecheck_directives = []
     for line in src.splitlines():
         line = line.strip()
-        if line[0] != "#":
+        if not line or line[0] != "#":
             continue
 
         line = line[1:].strip()
@@ -157,7 +157,16 @@ def _run_filecheck_qjit_impl(qjit_fn, verify=False):
     )
 
     exit_code = matcher.run()
-    assert exit_code == 0, f"filecheck failed with exit code {exit_code}"
+
+    if exit_code != 0:
+        for l in str(xdsl_module).split("\n"):
+            if "quantum.custom" in l:
+                print("\033[31m" + l + "\033[0m")
+            else:
+                print(l)
+        raise AssertionError(
+            f"filecheck failed with exit code {exit_code}. See the checked xdsl_module above."
+        )
 
 
 @pytest.fixture(scope="function")
