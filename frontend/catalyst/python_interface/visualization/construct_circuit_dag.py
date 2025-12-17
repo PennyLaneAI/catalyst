@@ -360,6 +360,8 @@ class ConstructCircuitDAG:
             penwidth=2,
         )
         self._node_uid_counter += 1
+        # NOTE: Consider the device node as dynamic
+        # as any wire can source from it
         self._dynamic_node_uids.add(node_id)
         self._wire_to_node_uids["device"].add(node_id)
 
@@ -442,7 +444,7 @@ class ConstructCircuitDAG:
                 static_uids = all_prev_uids - self._dynamic_node_uids
 
             # If static nodes exist, connect only to them to avoid
-            # direct dynamic-to-dynamic links
+            # unnecessary dynamic-to-dynamic connections
             if static_uids:
                 prev_uids.update(static_uids)
             elif only_dynamic_uids:

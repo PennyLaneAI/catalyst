@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import inspect
 from collections.abc import Callable
 from copy import deepcopy
@@ -57,6 +58,18 @@ try:
     import jax
 except ImportError:
     has_jax = False
+
+
+def conditional_pause(pause):
+    """Will only pause capture if it is enabled."""
+    if capture.enabled():
+        return pause()
+
+    @contextlib.contextmanager
+    def dont_do_anything():
+        yield
+
+    return dont_do_anything()
 
 
 def get_mlir_module(qnode: QNode | QJIT, args, kwargs) -> Module:
@@ -323,19 +336,6 @@ def ssa_to_qml_wires_named(op: NamedObsOp) -> int:
 ############################################################
 ### xDSL ---> PennyLane Operators/Measurements conversion
 ############################################################
-
-import contextlib
-
-
-def conditional_pause(pause):
-    if capture.enabled():
-        return pause()
-
-    @contextlib.contextmanager
-    def dont_do_anything():
-        yield
-
-    return dont_do_anything()
 
 
 def xdsl_to_qml_op(op) -> Operator:
