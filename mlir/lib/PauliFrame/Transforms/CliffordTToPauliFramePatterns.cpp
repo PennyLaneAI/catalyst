@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <mlir/IR/Operation.h>
+#include <optional>
 #define DEBUG_TYPE "to-pauli-frame"
 
 #include <concepts>
@@ -102,6 +104,21 @@ OpResult insertPauliOpsAfterFlush(PatternRewriter &rewriter, Location loc, Flush
         });
 
     return pauliZIfOp->getResult(0);
+}
+
+std::optional<FlushOp> getFlushOpAppliedToQubit(const Value qubit)
+{
+    LLVM_DEBUG(llvm::dbgs() << "Qubit: " << qubit << "\n");
+
+    for (const auto &use : qubit.getUses()) {
+        auto *owner = use.getOwner();
+        LLVM_DEBUG(llvm::dbgs() << " -> qubit user: " << *owner << "\n");
+        if (auto flushOp = llvm::dyn_cast<FlushOp>(owner)) {
+            LLVM_DEBUG(llvm::dbgs() << " -> this is a flush op" << "\n");
+            return flushOp;
+        }
+    }
+    return std::nullopt;
 }
 
 //===----------------------------------------------------------------------===//
@@ -390,10 +407,25 @@ struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<Measuremen
 
         // Helper function to insert the flush operations per qubit operand of the observable op
         auto insertFlushOpsPerQubit = [&](unsigned int idx, const Value qubit) {
-            auto flushOp = rewriter.create<FlushOp>(loc, rewriter.getI1Type(), rewriter.getI1Type(),
-                                                    qubit.getType(), qubit);
-            auto pauliZOutQubit = insertPauliOpsAfterFlush(rewriter, loc, flushOp);
-            obsOp->setOperand(idx, pauliZOutQubit);
+            auto flushOp = getFlushOpAppliedToQubit(qubit);
+            if (!flushOp) {
+                auto flushOp = rewriter.create<FlushOp>(
+                    loc, rewriter.getI1Type(), rewriter.getI1Type(), qubit.getType(), qubit);
+                auto pauliZOutQubit = insertPauliOpsAfterFlush(rewriter, loc, flushOp);
+                obsOp->setOperand(idx, pauliZOutQubit);
+            }
+            else {
+                // Get output qubit of Pauli Z op after the flush
+                auto z_parity = flushOp->getZParity();
+                for (const auto &use : z_parity.getUses()) {
+                    auto *owner = use.getOwner();
+                    if (auto pauliZIfOp = llvm::dyn_cast<scf::IfOp>(owner)) {
+                        auto pauliZOutQubit = pauliZIfOp.getResult(0);
+                        obsOp->setOperand(idx, pauliZOutQubit);
+                        break;
+                    }
+                }
+            }
         };
 
         if (auto compBasisOp = dyn_cast<ComputationalBasisOp>(obsOp)) {

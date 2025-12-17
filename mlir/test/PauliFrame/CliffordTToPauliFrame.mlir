@@ -285,3 +285,31 @@ func.func @test_to_pauli_frame_integration() -> (i1, i1) {
     // CHECK: return {{%.+}}, {{%.+}} : i1, i1
     func.return %mres0, %mres1 : i1, i1
 }
+
+// -----
+
+// COM: This test checks that we correctly handle programs with multiple compbasis observables
+// COM: acting on the same qubit and ensure that we only flush the Pauli record for this qubit once.
+// CHECK-LABEL: test_to_pauli_frame_multiple_compbasis_obs
+func.func @test_to_pauli_frame_multiple_compbasis_obs(%arg0 : !quantum.bit) -> () {
+    // CHECK: [[q0:%.+]] = quantum.custom "Hadamard"()
+    %q0 = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+    // CHECK: pauli_frame.flush [[q0]]
+    // CHECK: scf.if {{%.+}} -> (!quantum.bit) {
+    // CHECK:   quantum.custom "X"()
+    // CHECK: }
+    // CHECK: [[q1:%.+]] = scf.if {{%.+}} -> (!quantum.bit) {
+    // CHECK:   quantum.custom "Z"()
+    // CHECK: }
+    // CHECK: [[obs0:%.+]] = quantum.compbasis qubits [[q1]] : !quantum.obs
+    // CHECK: quantum.sample [[obs0]] : tensor<1000x1xf64>
+    %obs0 = quantum.compbasis qubits %q0 : !quantum.obs
+    %samples = quantum.sample %obs0 : tensor<1000x1xf64>
+    // CHECK-NOT: pauli_frame.flush
+    // CHECK: [[obs1:%.+]] = quantum.compbasis qubits [[q1]] : !quantum.obs
+    // CHECK: quantum.probs [[obs1]] : tensor<2xf64>
+    %obs1 = quantum.compbasis qubits %q0 : !quantum.obs
+    %probs = quantum.probs %obs1 : tensor<2xf64>
+    // CHECK: return
+    func.return
+}
