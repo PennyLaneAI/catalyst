@@ -120,7 +120,7 @@ class ConstructCircuitDAG:
     @singledispatchmethod
     def _visit_operation(self, operation: Operation) -> None:
         """Visit an xDSL Operation. Default to visiting each region contained in the operation."""
-        self._visualize(operation)
+        self._visualize_operation(operation)
 
         for region in operation.regions:
             self._visit_region(region)
@@ -140,7 +140,7 @@ class ConstructCircuitDAG:
     # ===================
 
     @singledispatchmethod
-    def _visualize(self, op: Operation) -> None:
+    def _visualize_operation(self, op: Operation) -> None:
         # NOTE: Currently only visualizing "quantum" operations
         if op.dialect_name() not in {"quantum", "qec", "mbqc"}:
             return
@@ -148,7 +148,7 @@ class ConstructCircuitDAG:
         if not isinstance(op, _SKIPPED_OPS):
             raise ValueError(f"Visualization for operation `{op.name}` is not supported.")
 
-    @_visualize.register
+    @_visualize_operation.register
     def _gate_op(
         self,
         op: (
@@ -178,7 +178,7 @@ class ConstructCircuitDAG:
 
         self._connect(qml_op, node_uid)
 
-    @_visualize.register
+    @_visualize_operation.register
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
         """Handler for the single-qubit projective measurement operation."""
 
@@ -202,7 +202,7 @@ class ConstructCircuitDAG:
     # QUANTUM MEASUREMENTS
     # =====================
 
-    @_visualize.register
+    @_visualize_operation.register
     def _measurements(
         self,
         op: (
@@ -277,7 +277,7 @@ class ConstructCircuitDAG:
     # ADJOINT
     # =============
 
-    @_visualize.register
+    @_visualize_operation.register
     def _adjoint(self, operation: quantum.AdjointOp) -> None:
         """Handle a PennyLane adjoint operation."""
 
@@ -413,7 +413,7 @@ class ConstructCircuitDAG:
     # DEVICE NODE
     # ============
 
-    @_visualize.register
+    @_visualize_operation.register
     def _device_init(self, operation: quantum.DeviceInitOp) -> None:
         """Handles the initialization of a quantum device."""
         node_id = f"node{self._node_uid_counter}"
