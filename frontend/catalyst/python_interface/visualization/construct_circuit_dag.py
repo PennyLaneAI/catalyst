@@ -444,7 +444,7 @@ class ConstructCircuitDAG:
                 static_uids = all_prev_uids - self._dynamic_node_uids
 
             # If static nodes exist, connect only to them to avoid
-            # direct dynamic-to-dynamic links
+            # unnecessary dynamic-to-dynamic connections
             if static_uids:
                 prev_uids.update(static_uids)
             elif only_dynamic_uids:
