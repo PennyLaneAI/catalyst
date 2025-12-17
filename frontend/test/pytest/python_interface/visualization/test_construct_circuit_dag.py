@@ -1367,8 +1367,8 @@ class TestOperatorConnectivity:
 
         # Check all edges
         assert len(edges) == 8
-        assert ("node0", "node1")
-        assert ("node0", "node2")
+        assert ("node0", "node1") in edges
+        assert ("node0", "node2") in edges
         assert ("node2", "node4") in edges  # X -> Z
         assert ("node2", "node5") in edges  # X -> RZ
         assert ("node2", "node6") in edges  # X -> H
