@@ -39,6 +39,7 @@ from catalyst.passes.builtin_passes import (
     decompose_arbitrary_ppr,
     disentangle_cnot,
     disentangle_swap,
+    gridsynth,
     ions_decomposition,
     merge_ppr_ppm,
     merge_rotations,
@@ -52,6 +53,7 @@ from catalyst.passes.builtin_passes import (
 from catalyst.passes.pass_api import Pass, PassPlugin, apply_pass, apply_pass_plugin
 
 __all__ = (
+    "gridsynth",
     "to_ppr",
     "commute_ppr",
     "ppr_to_ppm",
