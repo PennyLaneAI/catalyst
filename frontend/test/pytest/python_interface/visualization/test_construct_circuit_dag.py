@@ -1896,7 +1896,7 @@ class TestTerminalMeasurementConnectivity:
         assert ("node0", "node2") in edges
         assert ("node0", "node3") in edges
         assert edges[("node0", "node3")]["attrs"]["style"] == "dashed"
-        
+
 
 class TestCtrl:
     """Tests that the ctrl transform is visualized correctly."""
