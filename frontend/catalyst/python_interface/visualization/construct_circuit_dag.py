@@ -476,7 +476,7 @@ def _flatten_if_op(op: scf.IfOp) -> list[Region]:
 
 
 @singledispatch
-def get_label(op: Any) -> str:
+def get_label(op: Operator | MeasurementProcess) -> str:
     """Gets the appropriate label for a PennyLane object."""
     return str(op)
 
