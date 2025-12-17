@@ -992,6 +992,32 @@ class TestCreateDynamicOperatorNodes:
         assert nodes["node1"]["label"] == f"<name> H|<wire> [arg0]"
         assert nodes["node2"]["label"] == f"<name> X|<wire> [arg1]"
 
+    def test_visualize_pythonic_operators(self):
+        """Tests that we can use operators like +,-,%"""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow(x):
+            qml.RX(x % 3, wires=x % 3)
+            qml.RY(x - 3, wires=x - 3)
+            qml.RZ(x + 3, wires=x + 3)
+
+        args = (1,)
+        module = my_workflow(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 4  # Device node + ops
+
+        assert nodes["node1"]["label"] == f"<name> RX|<wire> [arg5 % 3]"
+        assert nodes["node2"]["label"] == f"<name> RY|<wire> [arg5 - 3]"
+        assert nodes["node3"]["label"] == f"<name> RZ|<wire> [arg5 + 3]"
+
 
 class TestCreateStaticMeasurementNodes:
     """Tests that measurements with static parameters can be created and visualized as nodes."""
@@ -1137,7 +1163,12 @@ class TestCreateDynamicMeasurementNodes:
         @qml.set_shots(10)
         @qml.qnode(dev)
         def my_circuit(x, y):
-            return qml.probs(wires=x), qml.expval(qml.Z(x)), qml.var(qml.X(y)), qml.sample(wires=x)
+            return (
+                qml.probs(wires=x),
+                qml.expval(qml.Z(x)),
+                qml.var(qml.X(y)),
+                qml.sample(wires=x),
+            )
 
         args = (1, 2)
         module = my_circuit(*args)
@@ -1153,6 +1184,30 @@ class TestCreateDynamicMeasurementNodes:
         assert nodes["node2"]["label"] == f"<name> expval(Z)|<wire> [arg0]"
         assert nodes["node3"]["label"] == f"<name> var(X)|<wire> [arg1]"
         assert nodes["node4"]["label"] == f"<name> sample|<wire> [arg0]"
+
+    def test_visualize_pythonic_operators_on_meas(self):
+        """Tests that we can use operators like +,-,%"""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.set_shots(3)
+        @qml.qnode(dev)
+        def my_workflow(x):
+            return qml.probs(wires=[x % 3, x - 3, x + 3]), qml.sample(wires=[x % 3, x - 3, x + 3])
+
+        args = (1,)
+        module = my_workflow(*args)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + meas
+
+        assert nodes["node1"]["label"] == f"<name> probs|<wire> [arg5 % 3, arg5 - 3, arg5 + 3]"
+        assert nodes["node2"]["label"] == f"<name> sample|<wire> [arg5 % 3, arg5 - 3, arg5 + 3]"
 
 
 class TestOperatorConnectivity:
