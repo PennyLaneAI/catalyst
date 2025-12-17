@@ -233,6 +233,13 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                     # In this case, we fall back to using the COMPILER_OPS_FOR_DECOMPOSITION
                     # dictionary to get the number of wires.
                     num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
+                    pauli_word = op.op.params.get("pauli_word", None)
+
+                    if op.op.name in ("PauliRot", "PauliMeasure"):
+                        num_wires = len(pauli_word)
+                    elif num_wires == -1 and op_num_wires is not None:
+                        num_wires = op_num_wires
+
                     _create_decomposition_rule(
                         rule,
                         op_name=op.op.name,
@@ -240,9 +247,17 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                         num_params=num_params,
                         requires_copy=num_wires == -1,
                         ag_enabled=self._ag_enabled,
+                        pauli_word=pauli_word,
                     )
                 elif not any(
-                    keyword in getattr(op.op, "name", "") for keyword in ("Adjoint", "Controlled")
+                    keyword in getattr(op.op, "name", "")
+                    for keyword in (
+                        "Adjoint",
+                        "Controlled",
+                        "TemporaryAND",
+                        "ChangeOpBasis",
+                        "Prod",
+                    )
                 ):  # pragma: no cover
                     # Note that the graph-decomposition returns abstracted rules
                     # for Adjoint and Controlled operations, so we skip them here.
@@ -263,11 +278,10 @@ def _create_decomposition_rule(
     num_params: int,
     requires_copy: bool = False,
     ag_enabled: bool = False,
+    pauli_word: str | None = None,
 ):
     """Create a decomposition rule from a callable.
-
     See also: :func:`~.decomposition_rule`.
-
     Args:
         func (Callable): The decomposition function.
         op_name (str): The name of the operation to decompose.
@@ -283,6 +297,7 @@ def _create_decomposition_rule(
     type_hints = get_type_hints(func)
 
     args = []
+
     for name in sig_func.parameters.keys():
         typ = type_hints.get(name, None)
 
@@ -328,6 +343,8 @@ def _create_decomposition_rule(
             # We cover this when adding end-to-end tests for rules
             # in the MLIR PR.
             args.append(int)
+        elif pauli_word is not None and typ is str:
+            pass
         else:  # pragma: no cover
             raise ValueError(
                 f"Unsupported type annotation {typ} for parameter {name} in func {func}."
@@ -357,7 +374,7 @@ def _create_decomposition_rule(
 
     # Note that we shouldn't pass args as kwargs to decomposition_rule
     # JAX doesn't like it and it may fail to preserve the order of args.
-    return decomposition_rule(func_cp)(*args)
+    return decomposition_rule(func_cp, pauli_word=pauli_word)(*args)
 
 
 # pylint: disable=protected-access

@@ -564,6 +564,45 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
     let hasVerifier = 1;
 }
 
+def PauliWord : TypedArrayAttrBase<StrAttr, "A product of Pauli operators, aka a Pauli word.">;
+
+def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
+                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+    let summary = "Apply a Pauli Product Rotation";
+    let description = [{
+        The `quantum.paulirot` operation applies a rotation around a Pauli product
+        operator to the state-vector. 
+        The arguments are the rotation angle `angle`, a string representing the
+        Pauli product operator, and a set of qubits the operation acts on.
+        Note that this operation is currently not excutable. There isn't a valid 
+        lowering path to the LLVM IR.
+    }];
+
+    let arguments = (ins
+        F64:$angle,
+        PauliWord:$pauli_product,
+        Variadic<QubitType>:$in_qubits,
+        UnitAttr:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        $pauli_product `(` $angle `)` $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+    
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getAllParams() {
+            return getODSOperands(getParamOperandIdx());
+        }
+    }];
+}
+
 def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
     let summary = "Global Phase.";
 

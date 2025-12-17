@@ -55,8 +55,8 @@ struct MeasureInBasisOpPattern : public OpConversionPattern<MeasureInBasisOp> {
         Type fnSignature =
             LLVM::LLVMFunctionType::get(conv->convertType(ResultType::get(ctx)), argSignatures);
 
-        LLVM::LLVMFuncOp fnDecl =
-            catalyst::ensureFunctionDeclaration(rewriter, op, fnName, fnSignature);
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, fnName, fnSignature);
 
         // Extract the integer value for the plane attribute from its enum
         const auto planeValueInt = static_cast<uint32_t>(op.getPlane());
