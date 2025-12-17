@@ -17,7 +17,6 @@
 from collections import defaultdict
 from functools import singledispatch, singledispatchmethod
 
-from jax.core import Value
 from pennylane.measurements import (
     ExpectationMP,
     MeasurementProcess,
