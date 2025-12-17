@@ -152,7 +152,14 @@ class ConstructCircuitDAG:
     @_visualize.register
     def _gate_op(
         self,
-        op: quantum.CustomOp | quantum.GlobalPhaseOp | quantum.QubitUnitaryOp | quantum.MultiRZOp,
+        op: (
+            quantum.CustomOp
+            | quantum.GlobalPhaseOp
+            | quantum.QubitUnitaryOp
+            | quantum.MultiRZOp
+            | quantum.SetBasisStateOp
+            | quantum.SetStateOp
+        ),
     ) -> None:
         """Generic handler for unitary gates."""
 
