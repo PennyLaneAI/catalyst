@@ -1338,6 +1338,7 @@ class TestTerminalMeasurementConnectivity:
 
         assert len(utility.dag_builder.edges) == 0
 
+
 class TestCtrl:
     """Tests that the ctrl transform is visualized correctly."""
 
