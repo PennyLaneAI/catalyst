@@ -266,6 +266,10 @@ class TestTransformFunctionsExt:
         assert f"--test-options-pass{cl_options}" in captured_cmd
 
 
+# TODO: Add tests for xdsl->pyval conversion
+# Also, maybe move the conversion functions to utils folder
+
+
 class TestTransformInterpreterPass:
     """Unit tests for the TransformInterpreterPass."""
 
