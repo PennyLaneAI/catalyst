@@ -436,10 +436,10 @@ def test_pauli_rot_and_measure_with_cond():
         m = qml.pauli_measure("Z", wires=0)
         qml.cond(m, partial(qml.PauliRot, pauli_word="Z"))(theta=np.pi / 2, wires=0)
 
-    # CHECK: qec.ppr ["Z"](4)
+    # CHECK: [[q0:%.+]] = qec.ppr ["Z"](4)
     # CHECK: qec.ppm ["Z"]
     # CHECK: scf.if
-    # CHECK: qec.ppr ["Z"](4)
+    # CHECK: qec.ppr.arbitrary ["Z"]
     # CHECK: scf.yield
     # CHECK: else
     # CHECK: scf.yield
