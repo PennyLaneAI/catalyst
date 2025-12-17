@@ -1943,6 +1943,7 @@ class TestTerminalMeasurementConnectivity:
         assert edges[("node0", "node3")]["attrs"]["style"] == "dashed"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestCtrl:
     """Tests that the ctrl transform is visualized correctly."""
 
@@ -2055,6 +2056,7 @@ class TestCtrl:
         assert nodes["node2"]["parent_cluster_uid"] == "cluster1"
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestAdjoint:
     """Tests that the ctrl transform is visualized correctly."""
 
