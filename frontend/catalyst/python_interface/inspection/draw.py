@@ -111,7 +111,7 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
 
     .. note::
 
-        The ``draw_graph`` function requires installaion of
+        The ``draw_graph`` function requires installation of
         `Graphviz <https://graphviz.org/download/>` and the
         `pydot <https://pypi.org/project/pydot/>` software package. Please consult the links
         provided for installation instructions.
