@@ -381,10 +381,7 @@ struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<Measuremen
         auto loc = op->getLoc();
 
         auto obs = op.getObs();
-        if (!obs) {
-            op.emitError() << "Failed to flush Pauli record before terminal measurement process";
-            return failure();
-        }
+        assert(obs && "invalid measurement process op: missing observable operand");
 
         auto obsOp = obs.getDefiningOp();
 
