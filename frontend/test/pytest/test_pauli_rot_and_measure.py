@@ -41,6 +41,27 @@ def test_pauli_rot_lowering():
 
 
 @pytest.mark.usefixtures("use_capture")
+def test_pauli_rot_lowering_with_ctrl_qubits():
+    """Test that Pauli rotation with control qubits is converted to qec.ppr.
+    Note that control PauliRot is currently not supported by the to_ppr pass.
+    """
+    pipe = [("pipe", ["quantum-compilation-stage"])]
+
+    @qjit(pipelines=pipe, target="mlir")
+    def test_pauli_rot_lowering_with_ctrl_qubits_workflow():
+
+        @qml.qnode(qml.device("null.qubit", wires=2))
+        def f():
+            qml.ctrl(qml.PauliRot(np.pi / 4, "X", wires=0), control=1)
+
+        return f()
+
+    optimized_ir = test_pauli_rot_lowering_with_ctrl_qubits_workflow.mlir_opt
+    assert "quantum.paulirot" in optimized_ir
+    assert "ctrls" in optimized_ir
+
+
+@pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_to_ppr():
     """Test that Pauli rotation is converted to qec.ppr."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
