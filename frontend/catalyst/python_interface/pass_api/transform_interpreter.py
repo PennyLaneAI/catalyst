@@ -91,7 +91,8 @@ class TransformFunctionsExt(TransformFunctions):
         # ---- xDSL path ----
         if pass_name in self.passes:
             pass_class = self.passes[pass_name]()
-            pass_instance = pass_class(**op.options.data)
+            options = _get_pyvals_from_xdsl_attr(op.options)
+            pass_instance = pass_class(**options)
             pipeline = PassPipeline((pass_instance,))
             self._pre_pass_callback(pass_instance, module)
             pipeline.apply(self.ctx, module)
@@ -146,6 +147,36 @@ class TransformInterpreterPass(ModulePass):
         interpreter.call_op(schedule, (op,))
 
 
+def _get_pyvals_from_xdsl_attr(attr: Attribute) -> Any:
+    """Get a Python value from an xDSL attribute."""
+    val = None
+
+    match attr:
+        case builtin.IntegerAttr():
+            if _is_bool_attr(attr):
+                # Python booleans' repr is capitalized so we use strings
+                val = bool(attr.value.data)
+            else:
+                val = attr.value.data
+
+        case builtin.FloatAttr():
+            val = attr.value.data
+
+        case builtin.StringAttr():
+            val = attr.data
+
+        case builtin.ArrayAttr():
+            val = tuple(_get_pyvals_from_xdsl_attr(_attr) for _attr in attr.data)
+
+        case builtin.DictionaryAttr():
+            val = {k: _get_pyvals_from_xdsl_attr(v) for k, v in attr.data.items()}
+
+        case _:  # pragma: no cover
+            raise ValueError(f"{attr} cannot be converted to a Python value.")
+
+    return val
+
+
 def _create_schedule(pass_ops: Sequence[ApplyRegisteredPassOp]) -> list[str]:
     """Create a pass schedule for applying MLIR pass via CLI flags.
 
@@ -184,36 +215,36 @@ def _create_schedule(pass_ops: Sequence[ApplyRegisteredPassOp]) -> list[str]:
     return schedule
 
 
-def _get_cli_option_from_attr(val: Attribute) -> Any:
+def _get_cli_option_from_attr(attr: Attribute) -> Any:
     """Convert an xDSL attribute corresponding to a pass option value into a valid
     CLI option value."""
     cli_val = None
 
-    match val:
+    match attr:
         case builtin.IntegerAttr():
-            if _is_bool_attr(val):
+            if _is_bool_attr(attr):
                 # Python booleans' repr is capitalized so we use strings
-                cli_val = "true" if val.value.data else "false"
+                cli_val = "true" if attr.value.data else "false"
             else:
-                cli_val = val.value.data
+                cli_val = attr.value.data
 
         case builtin.FloatAttr():
-            cli_val = val.value.data
+            cli_val = attr.value.data
 
         case builtin.StringAttr():
-            cli_val = val.data
+            cli_val = attr.data
 
         case builtin.ArrayAttr():
-            cli_val = ",".join([str(_get_cli_option_from_attr(attr)) for attr in val.data])
+            cli_val = ",".join([str(_get_cli_option_from_attr(attr)) for attr in attr.data])
 
         case builtin.DictionaryAttr():
             mapping = []
-            for k, v in val.data.items():
+            for k, v in attr.data.items():
                 mapping.append(f"{k}={_get_cli_option_from_attr(v)}")
             cli_val = f"{{{' '.join(mapping)}}}"
 
-        case _:
-            raise ValueError(f"Unsupported option type {val}.")
+        case _:  # pragma: no cover
+            raise ValueError(f"Unsupported option type {attr}.")
 
     return cli_val
 
