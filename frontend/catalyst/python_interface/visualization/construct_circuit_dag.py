@@ -54,8 +54,6 @@ _SKIPPED_QUANTUM_OPS = (
     quantum.NamedObsOp,
     quantum.NumQubitsOp,
     quantum.PCPhaseOp,
-    quantum.SetBasisStateOp,
-    quantum.SetStateOp,
     quantum.TensorOp,
     quantum.YieldOp,
 )
@@ -123,7 +121,6 @@ class ConstructCircuitDAG:
     @singledispatchmethod
     def _visit_operation(self, operation: Operation) -> None:
         """Visit an xDSL Operation. Default to visiting each region contained in the operation."""
-
         self._visualize(operation)
 
         for region in operation.regions:
@@ -146,11 +143,11 @@ class ConstructCircuitDAG:
     @singledispatchmethod
     def _visualize(self, op: Operation) -> None:
         # NOTE: Currently only visualizing "quantum" operations
-        if op.dialect_name not in {"quantum", "qec", "mbqc"}:
+        if op.dialect_name() not in {"quantum", "qec", "mbqc"}:
             return
         _SKIPPED_OPS = (_SKIPPED_QUANTUM_OPS, _SKIPPED_QEC_OPS, _SKIPPED_MBQC_OPS)
         if not isinstance(op, _SKIPPED_OPS):
-            raise ValueError(f"Visualization for operation {op.name} is not supported.")
+            raise ValueError(f"Visualization for operation `{op.name}` is not supported.")
 
     @_visualize.register
     def _gate_op(
