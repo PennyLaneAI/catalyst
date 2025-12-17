@@ -1206,8 +1206,12 @@ class TestCreateDynamicMeasurementNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 3  # Device node + meas
 
-        assert nodes["node1"]["label"] == f"<name> probs|<wire> [(arg5 % 3), (arg5 - 3), (arg5 + 3)]"
-        assert nodes["node2"]["label"] == f"<name> sample|<wire> [(arg5 % 3), (arg5 - 3), (arg5 + 3)]"
+        assert (
+            nodes["node1"]["label"] == f"<name> probs|<wire> [(arg5 % 3), (arg5 - 3), (arg5 + 3)]"
+        )
+        assert (
+            nodes["node2"]["label"] == f"<name> sample|<wire> [(arg5 % 3), (arg5 - 3), (arg5 + 3)]"
+        )
 
 
 class TestOperatorConnectivity:
