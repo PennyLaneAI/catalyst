@@ -203,6 +203,38 @@ class ConstructCircuitDAG:
         for wire in wires:
             self._wire_to_node_uids[wire] = {node_uid}
 
+    @_visit_operation.register
+    def _ppm(self, op: qec.PPMeasurementOp) -> None:
+        """Handler for the PPM operation."""
+
+        wires = ssa_to_qml_wires(op)
+        if wires == []:
+            wires_str = "all"
+        else:
+            wires_str = f"[{', '.join(map(str, wires))}]"
+
+        # Add node to current cluster
+        node_uid = f"node{self._node_uid_counter}"
+        self.dag_builder.add_node(
+            uid=node_uid,
+            label=f"<name> PPM|<wire> {wires_str}",
+            cluster_uid=self._cluster_uid_stack[-1],
+            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
+            shape="record",
+        )
+        self._node_uid_counter += 1
+
+        # Search through previous ops found on current wires and connect
+        prev_node_uids: set[str] = set.union(
+            set(), *(self._wire_to_node_uids[wire] for wire in wires)
+        )
+        for prev_node_uid in prev_node_uids:
+            self.dag_builder.add_edge(prev_node_uid, node_uid)
+
+        # Update affected wires to source from this node UID
+        for wire in wires:
+            self._wire_to_node_uids[wire] = {node_uid}
+
     # =====================
     # QUANTUM MEASUREMENTS
     # =====================
