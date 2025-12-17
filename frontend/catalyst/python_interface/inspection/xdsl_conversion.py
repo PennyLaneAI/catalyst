@@ -282,7 +282,6 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
 
     match op:
         case _ if op.name == "func.call":
-            print(op)
             if op.callee.string_value() == "remainder":
                 x = resolve_constant_params(op.operands[0])
                 y = resolve_constant_params(op.operands[1])
