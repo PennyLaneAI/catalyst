@@ -11,15 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Test the constraints defined within the xdsl_extras module."""
 
 import pytest
-
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
-# pylint: disable=wrong-import-position
 from xdsl.context import Context
 from xdsl.dialects import builtin, test
 from xdsl.dialects.builtin import MemRefType, TensorType, TupleType, i1, i32
@@ -41,6 +35,8 @@ from catalyst.python_interface.xdsl_extras import (
     NestedTupleOfConstraint,
     TensorConstraint,
 )
+
+pytestmark = pytest.mark.xdsl
 
 
 @pytest.fixture(scope="module", name="my_dialect")

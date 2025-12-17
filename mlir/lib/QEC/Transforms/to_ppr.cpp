@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "to-ppr"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
@@ -28,26 +29,27 @@ using namespace catalyst::qec;
 namespace catalyst {
 namespace qec {
 
-#define GEN_PASS_DEF_CLIFFORDTTOPPRPASS
+#define GEN_PASS_DEF_TOPPRPASS
 #include "QEC/Transforms/Passes.h.inc"
 
-struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {
-    using CliffordTToPPRPassBase::CliffordTToPPRPassBase;
+struct ToPPRPass : impl::ToPPRPassBase<ToPPRPass> {
+    using ToPPRPassBase::ToPPRPassBase;
 
     void runOnOperation() final
     {
         auto ctx = &getContext();
         ConversionTarget target(*ctx);
 
-        // Convert MeasureOp and CustomOp
+        // Convert MeasureOp, CustomOp, and PauliRotOp
         target.addIllegalOp<quantum::MeasureOp>();
         target.addIllegalOp<quantum::CustomOp>();
 
         // Conversion target is QECDialect
         target.addLegalDialect<qec::QECDialect>();
+        target.addLegalDialect<mlir::arith::ArithDialect>();
 
         RewritePatternSet patterns(ctx);
-        populateCliffordTToPPRPatterns(patterns);
+        populateToPPRPatterns(patterns);
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             return signalPassFailure();
