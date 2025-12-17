@@ -11,13 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Unit test module for catalyst/python_interface/dialects/stablehlo.py."""
 # pylint: disable=line-too-long
+
 import pytest
 
 pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
 
 
 def test_all_unary_operations(run_filecheck):
