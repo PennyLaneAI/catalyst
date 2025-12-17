@@ -2,6 +2,11 @@
 
 <h3>New features since last release</h3>
 
+* A new `gridsynth` pass is added to support Clifford+T decomopsition. This pass discretizes `RZ` and `PhaseShift` gates to either the Clifford+T basis or to the PPR basis. The pass also supports decomposing single-qubit arbitrary angle PPR in the Z basis.
+  [(#2140)](https://github.com/PennyLaneAI/catalyst/pull/2140)
+  [(#2166)](https://github.com/PennyLaneAI/catalyst/pull/2166)
+  [(#2292)](https://github.com/PennyLaneAI/catalyst/pull/2292)
+
 * Catalyst now features a unified compilation framework, which enables users and developers to design
   and implement compilation passes in Python in addition to C++, on the same Catalyst IR. The Python
   interface relies on the xDSL library to represent and manipulate programs (analogous to the MLIR library
@@ -114,7 +119,7 @@
 * Catalyst can now compile circuits that are directly expressed in terms of Pauli product rotation
   (PPR) and Pauli product measurement (PPM) operations: :class:`~.PauliRot` and
   :func:`~.pauli_measure`, respectively. This support enables research and development
-  spurred from `A Game of Surface Codes (arXiv1808.02892) <https://arxiv.org/pdf/1808.02892>`_.
+  spurred from [A Game of Surface Codes (arXiv1808.02892)](https://arxiv.org/pdf/1808.02892).
   [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
   [(#2233)](https://github.com/PennyLaneAI/catalyst/pull/2233)
 
@@ -292,6 +297,14 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Updated tests and PennyLane dependency pin to follow changes introduced by
+  [PennyLaneAI/pennylane#8290](https://github.com/PennyLaneAI/pennylane/pull/8290).
+  [(#2286)](https://github.com/PennyLaneAI/catalyst/pull/2286)
+
+* Update `catalyst.python_interface.inspection.xdsl_conversion.get_mlir_module` to
+  no longer explicitly use the xDSL pass plugin.
+  [(#2303)](https://github.com/PennyLaneAI/catalyst/pull/2303)
+
 * Added missing `detensorize-function-boundary` and `symbol-dce` passes to `Pipelines.cpp`.
   [(#2266)](https://github.com/PennyLaneAI/catalyst/pull/2266)
 
@@ -375,6 +388,9 @@
   [(#2281)](https://github.com/PennyLaneAI/catalyst/pull/2281)
 
 <h3>Internal changes ⚙️</h3>
+
+* Python 3.14 is now officially supported. Added the forward capability with Python 3.14.
+  [(#2271)](https://github.com/PennyLaneAI/catalyst/pull/2271)
 
 * RTIO dialect is added to bypass the compilation flow from OpenAPL to ARTIQ’s LLVM IR. It is
   introduced to bridge the gap between ION dialect and ARTIQ’s LLVM IR. The design philosophy
@@ -518,6 +534,7 @@ Joseph Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Lee J. O'Riordan,
+Andrija Paurevic,
 Roberto Turrado,
 Paul Haochen Wang,
 David Wierichs,
