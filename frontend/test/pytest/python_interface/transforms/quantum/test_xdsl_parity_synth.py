@@ -27,7 +27,6 @@ pytest.importorskip("networkx")
 import pennylane as qml
 from pennylane.transforms.intermediate_reps import phase_polynomial
 
-from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface.transforms import (
     ParitySynthPass,
     parity_synth_pass,
@@ -483,9 +482,7 @@ class TestParitySynthIntegration:
             return qml.state()
 
         raw_circuit = qml.qjit(circuit)
-        compiled_circuit = qml.qjit(
-            parity_synth_pass(circuit), target="mlir", pass_plugins=[getXDSLPluginAbsolutePath()]
-        )
+        compiled_circuit = qml.qjit(parity_synth_pass(circuit), target="mlir")
 
         run_filecheck_qjit(compiled_circuit)
         args = (0.6, 0.2, -1.8)
@@ -572,9 +569,7 @@ class TestParitySynthIntegration:
             return qml.state()
 
         raw_circuit = qml.qjit(circuit)
-        compiled_circuit = qml.qjit(
-            parity_synth_pass(circuit), target="mlir", pass_plugins=[getXDSLPluginAbsolutePath()]
-        )
+        compiled_circuit = qml.qjit(parity_synth_pass(circuit), target="mlir")
 
         run_filecheck_qjit(compiled_circuit)
         args = (0.6, 0.2, -1.8)

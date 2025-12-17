@@ -338,7 +338,6 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
             # Phase polynomials of length 1 are left untouched. Reset internal state
             self._reset_vars()
             return
-        print(f"{[op.gate_name.data for op in self.phase_polynomial_ops]}")
 
         # Create an insertion point in the IR after the last phase polynomial op.
         # Inserting newly created ops at this point and the removing the phase polynomial ops
