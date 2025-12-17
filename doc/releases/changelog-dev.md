@@ -11,6 +11,7 @@
   [(#2285)](https://github.com/PennyLaneAI/catalyst/pull/2285)
   [(#2234)](https://github.com/PennyLaneAI/catalyst/pull/2234)
   [(#2218)](https://github.com/PennyLaneAI/catalyst/pull/2218)
+  [(#2260)](https://github.com/PennyLaneAI/catalyst/pull/2260)
   [(#2287)](https://github.com/PennyLaneAI/catalyst/pull/2287)
   
 * A new `gridsynth` pass is added to support Clifford+T decomopsition. This pass discretizes `RZ` and `PhaseShift` gates to either the Clifford+T basis or to the PPR basis. The pass also supports decomposing single-qubit arbitrary angle PPR in the Z basis.
@@ -305,14 +306,12 @@
 
 <h3>Bug fixes 🐛</h3>
 
-<<<<<<< mlxd/fix_cond_measure_test
 * Updated tests and PennyLane dependency pin to follow changes introduced by [PennyLaneAI/pennylane#8290](https://github.com/PennyLaneAI/pennylane/pull/8290).
   [(#2286)](https://github.com/PennyLaneAI/catalyst/pull/2286)
-=======
+  
 * Update `catalyst.python_interface.inspection.xdsl_conversion.get_mlir_module` to
   no longer explicitly use the xDSL pass plugin.
   [(#2303)](https://github.com/PennyLaneAI/catalyst/pull/2303)
->>>>>>> main
 
 * Added missing `detensorize-function-boundary` and `symbol-dce` passes to `Pipelines.cpp`.
   [(#2266)](https://github.com/PennyLaneAI/catalyst/pull/2266)
