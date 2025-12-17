@@ -28,6 +28,7 @@ from typing import TypeAlias
 from xdsl.dialects.builtin import (
     I32,
     I64,
+    ArrayAttr,
     ComplexType,
     Float64Type,
     FloatAttr,
@@ -143,6 +144,7 @@ class NamedObservableAttr(EnumAttribute[NamedObservable], SpacedOpaqueSyntaxAttr
 QubitSSAValue: TypeAlias = SSAValue[QubitType]
 QuregSSAValue: TypeAlias = SSAValue[QuregType]
 ObservableSSAValue: TypeAlias = SSAValue[ObservableType]
+PauliWord: TypeAlias = ArrayAttr[StringAttr]
 
 
 @irdl_op_definition
@@ -178,7 +180,7 @@ class AllocOp(IRDLOperation):
     name = "quantum.alloc"
 
     assembly_format = """
-           `(` ($nqubits^):($nqubits_attr)? `)` attr-dict `:` type(results)
+        `(` ($nqubits^):($nqubits_attr)? `)` attr-dict `:` type(results)
     """
 
     nqubits = opt_operand_def(i64)
@@ -207,7 +209,7 @@ class AllocQubitOp(IRDLOperation):
 
     name = "quantum.alloc_qb"
 
-    assembly_format = """attr-dict `:` type(results)"""
+    assembly_format = "attr-dict `:` type(results)"
 
     qubit = result_def(QubitType)
 
@@ -358,9 +360,7 @@ class DeallocOp(IRDLOperation):
 
     name = "quantum.dealloc"
 
-    assembly_format = """
-        $qreg attr-dict `:` type(operands)
-    """
+    assembly_format = "$qreg attr-dict `:` type(operands)"
 
     qreg = operand_def(QuregType)
 
@@ -374,7 +374,7 @@ class DeallocQubitOp(IRDLOperation):
 
     name = "quantum.dealloc_qb"
 
-    assembly_format = """$qubit attr-dict `:` type(operands)"""
+    assembly_format = "$qubit attr-dict `:` type(operands)"
 
     qubit = operand_def(QubitType)
 
@@ -439,7 +439,7 @@ class ExtractOp(IRDLOperation):
     name = "quantum.extract"
 
     assembly_format = """
-           $qreg `[` ($idx^):($idx_attr)? `]` attr-dict `:` type($qreg) `->` type(results)
+        $qreg `[` ($idx^):($idx_attr)? `]` attr-dict `:` type($qreg) `->` type(results)
     """
 
     qreg = operand_def(QuregType)
@@ -490,12 +490,12 @@ class GlobalPhaseOp(IRDLOperation):
     name = "quantum.gphase"
 
     assembly_format = """
-           `(` $params `)` 
-           attr-dict 
-           ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  
-           ( `ctrlvals` `(` $in_ctrl_values^ `)` )? 
-           `:` type(results)
-       """
+        `(` $params `)` 
+        attr-dict 
+        ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  
+        ( `ctrlvals` `(` $in_ctrl_values^ `)` )? 
+        `:` type(results)
+    """
 
     irdl_options = [AttrSizedOperandSegments(as_property=True), ParsePropInAttrDict()]
 
@@ -598,7 +598,7 @@ class InsertOp(IRDLOperation):
     name = "quantum.insert"
 
     assembly_format = """
-           $in_qreg `[` ($idx^):($idx_attr)? `]` `,` $qubit attr-dict `:` type($in_qreg) `,` type($qubit)
+        $in_qreg `[` ($idx^):($idx_attr)? `]` `,` $qubit attr-dict `:` type($in_qreg) `,` type($qubit)
     """
 
     in_qreg = operand_def(QuregType)
@@ -776,6 +776,45 @@ class NumQubitsOp(IRDLOperation):
     """
 
     num_qubits = result_def(i64)
+
+
+@irdl_op_definition
+class PauliRotOp(IRDLOperation):
+    """Apply a Pauli Product Rotation."""
+
+    name = "quantum.paulirot"
+
+    assembly_format = """
+        $pauli_product `(` $angle `)` $in_qubits
+        (`adj` $adjoint^)?
+        attr-dict
+        ( `ctrls` `(` $in_ctrl_qubits^ `)` )?
+        ( `ctrlvals` `(` $in_ctrl_values^ `)` )?
+        `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+    """
+
+    irdl_options = [
+        AttrSizedOperandSegments(as_property=True),
+        AttrSizedResultSegments(as_property=True),
+    ]
+
+    angle = operand_def(Float64Type())
+
+    pauli_product = prop_def(PauliWord)
+
+    in_qubits = var_operand_def(QubitType)
+
+    adjoint = opt_prop_def(UnitAttr)
+
+    in_ctrl_qubits = var_operand_def(QubitType)
+
+    in_ctrl_values = var_operand_def(i1)
+
+    out_qubits = var_result_def(QubitType)
+
+    out_ctrl_qubits = var_result_def(QubitType)
+
+    traits = traits_def(NoMemoryEffect())
 
 
 @irdl_op_definition
@@ -1050,9 +1089,7 @@ class TensorOp(IRDLOperation):
 
     name = "quantum.tensor"
 
-    assembly_format = """
-        $terms attr-dict `:` type(results)
-    """
+    assembly_format = "$terms attr-dict `:` type(results)"
 
     terms = var_operand_def(ObservableType)
 
@@ -1065,9 +1102,7 @@ class VarianceOp(IRDLOperation):
 
     name = "quantum.var"
 
-    assembly_format = """
-        $obs attr-dict `:` type(results)
-    """
+    assembly_format = "$obs attr-dict `:` type(results)"
 
     obs = operand_def(ObservableType)
 
@@ -1083,9 +1118,7 @@ class YieldOp(IRDLOperation):
 
     name = "quantum.yield"
 
-    assembly_format = """
-        attr-dict ($retvals^ `:` type($retvals))?
-    """
+    assembly_format = "attr-dict ($retvals^ `:` type($retvals))?"
 
     retvals = var_operand_def(QuregType)
 
