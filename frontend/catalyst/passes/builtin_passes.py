@@ -542,8 +542,7 @@ def to_ppr(qnode):
     .. note::
 
         For improved integration with the PennyLane frontend, including inspectability with
-        :func:`pennylane.specs`, please use :func:`pennylane.transforms.to_ppr` with program capture
-        enabled (:func:`pennylane.capture.enable`).
+        :func:`pennylane.specs`, please use :func:`pennylane.transforms.to_ppr`.
 
     Clifford gates are defined as :math:`\exp(-{iP\tfrac{\pi}{4}})`, where :math:`P` is a Pauli word.
     Non-Clifford gates are defined as :math:`\exp(-{iP\tfrac{\pi}{8}})`.
@@ -627,8 +626,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
     .. note::
 
         For improved integration with the PennyLane frontend, including inspectability with
-        :func:`pennylane.specs`, please use :func:`pennylane.transforms.commute_ppr` with program
-        capture enabled (:func:`pennylane.capture.enable`).
+        :func:`pennylane.specs`, please use :func:`pennylane.transforms.commute_ppr`.
 
     For more information on PPRs, check out the
     `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
@@ -729,8 +727,7 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     .. note::
 
         For improved integration with the PennyLane frontend, including inspectability with
-        :func:`pennylane.specs`, please use :func:`pennylane.transforms.merge_ppr_ppm` with program
-        capture enabled (:func:`pennylane.capture.enable`).
+        :func:`pennylane.specs`, please use :func:`pennylane.transforms.merge_ppr_ppm`.
 
     For more information on PPRs and PPMs, check out
     the `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
@@ -821,8 +818,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
     .. note::
 
         For improved integration with the PennyLane frontend, including inspectability with
-        :func:`pennylane.specs`, please use :func:`pennylane.transforms.ppr_to_ppm` with program
-        capture enabled (:func:`pennylane.capture.enable`).
+        :func:`pennylane.specs`, please use :func:`pennylane.transforms.ppr_to_ppm`.
 
     This pass is used to decompose both non-Clifford and Clifford PPRs into PPMs. The non-Clifford
     PPRs (:math:`\theta = \tfrac{\pi}{8}`) are decomposed first, then Clifford PPRs
@@ -914,8 +910,7 @@ def ppm_compilation(
     .. note::
 
         For improved integration with the PennyLane frontend, including inspectability with
-        :func:`pennylane.specs`, please use :func:`pennylane.transforms.ppm_compilation` with
-        program capture enabled (:func:`pennylane.capture.enable`).
+        :func:`pennylane.specs`, please use :func:`pennylane.transforms.ppm_compilation`.
 
     This pass combines multiple sub-passes:
 
