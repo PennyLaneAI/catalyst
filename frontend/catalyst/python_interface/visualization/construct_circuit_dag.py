@@ -16,7 +16,6 @@
 
 from collections import defaultdict
 from functools import singledispatch, singledispatchmethod
-from typing import Any
 
 from pennylane.measurements import (
     ExpectationMP,
