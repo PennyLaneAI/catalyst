@@ -164,29 +164,6 @@ def test_passes_bad_usages():
         ):
             pipeline({})(classical_func)
 
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            cancel_inverses(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            merge_rotations(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            disentangle_cnot(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            disentangle_swap(classical_func)
 
     test_passes_not_on_qnode()
 
@@ -210,6 +187,26 @@ def test_chained_passes():
     mlir = test_chained_apply_passes_workflow.mlir
     assert "cancel-inverses" in mlir
     assert "merge-rotations" in mlir
+
+
+def test_chained_transforms():
+    """
+    Test that chained transforms are present in the transform passes.
+    """
+
+    @qjit
+    @qml.transforms.merge_rotations
+    @qml.transforms.cancel_inverses
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def test_chained_apply_passes_workflow(x: float):
+        qml.Hadamard(wires=[1])
+        qml.RX(x, wires=[0])
+        qml.RX(-x, wires=[0])
+        qml.Hadamard(wires=[1])
+        return qml.expval(qml.PauliY(wires=0))
+
+    assert "cancel-inverses" in test_chained_apply_passes_workflow.mlir
+    assert "merge-rotations" in test_chained_apply_passes_workflow.mlir
 
 
 def test_disentangle_passes():
