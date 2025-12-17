@@ -51,7 +51,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install ninja-build make cmake clang
+          sudo apt-get -y -q install ninja-build make cmake clang libboost-all-dev
           python3 -m pip install nanobind pybind11
 
       - name: Get Cached LLVM Source
@@ -706,7 +706,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install cmake ninja-build
+          sudo apt-get -y -q install cmake ninja-build libboost-all-dev
           python3 -m pip install nanobind pybind11
 
       - name: Install lcov # Manually install lcov_1.15-1_all

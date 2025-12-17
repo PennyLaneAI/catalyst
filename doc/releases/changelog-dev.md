@@ -2,6 +2,11 @@
 
 <h3>New features since last release</h3>
 
+* A new `gridsynth` pass is added to support Clifford+T decomopsition. This pass discretizes `RZ` and `PhaseShift` gates to either the Clifford+T basis or to the PPR basis. The pass also supports decomposing single-qubit arbitrary angle PPR in the Z basis.
+  [(#2140)](https://github.com/PennyLaneAI/catalyst/pull/2140)
+  [(#2166)](https://github.com/PennyLaneAI/catalyst/pull/2166)
+  [(#2292)](https://github.com/PennyLaneAI/catalyst/pull/2292)
+
 * Catalyst now features a unified compilation framework, which enables users and developers to design
   and implement compilation passes in Python in addition to C++, on the same Catalyst IR. The Python
   interface relies on the xDSL library to represent and manipulate programs (analogous to the MLIR library
@@ -287,6 +292,13 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Updated tests and PennyLane dependency pin to follow changes introduced by [PennyLaneAI/pennylane#8290](https://github.com/PennyLaneAI/pennylane/pull/8290).
+  [(#2286)](https://github.com/PennyLaneAI/catalyst/pull/2286)
+
+* Update `catalyst.python_interface.inspection.xdsl_conversion.get_mlir_module` to
+  no longer explicitly use the xDSL pass plugin.
+  [(#2303)](https://github.com/PennyLaneAI/catalyst/pull/2303)
+
 * Added missing `detensorize-function-boundary` and `symbol-dce` passes to `Pipelines.cpp`.
   [(#2266)](https://github.com/PennyLaneAI/catalyst/pull/2266)
 
@@ -374,10 +386,13 @@
 * xDSL and xDSL-JAX are now dependencies of Catalyst.
   [(#2282)](https://github.com/PennyLaneAI/catalyst/pull/2282)
 
-* RTIO dialect is added to bypass the compilation flow from OpenAPL to ARTIQ’s LLVM IR. It is 
-  introduced to bridge the gap between ION dialect and ARTIQ’s LLVM IR. The design philosophy 
-  of RTIO dialect is primarily event-based. Every operation is asynchronous; sync behaviour occurs 
-  only via `rtio.sync` or `wait operand` in event operation. And we now support the compiling from 
+* Python 3.14 is now officially supported. Added the forward capability with Python 3.14.
+  [(#2271)](https://github.com/PennyLaneAI/catalyst/pull/2271)
+
+* RTIO dialect is added to bypass the compilation flow from OpenAPL to ARTIQ’s LLVM IR. It is
+  introduced to bridge the gap between ION dialect and ARTIQ’s LLVM IR. The design philosophy
+  of RTIO dialect is primarily event-based. Every operation is asynchronous; sync behaviour occurs
+  only via `rtio.sync` or `wait operand` in event operation. And we now support the compiling from
   ION dialect to RTIO dilalect.
   [(#2185)](https://github.com/PennyLaneAI/catalyst/pull/2185)
   [(#2204)](https://github.com/PennyLaneAI/catalyst/pull/2204)
@@ -467,10 +482,10 @@
 
 <h3>Documentation 📝</h3>
 
-* A new statevector simulator ``lightning.amdgpu`` has been added for optimized performance on AMD GPUs. 
+* A new statevector simulator ``lightning.amdgpu`` has been added for optimized performance on AMD GPUs.
   [(#2283)](https://github.com/PennyLaneAI/catalyst/pull/2283)
 
-  The ``lightning.amdgpu`` device is a specific instantiation of the ``lightning.kokkos`` backend, supporting the same features and operations as ``lightning.kokkos``, with pre-compiled wheels for ``lightning.amdgpu`` available on PyPI for easy installation to use on MI300 series AMD GPUs. 
+  The ``lightning.amdgpu`` device is a specific instantiation of the ``lightning.kokkos`` backend, supporting the same features and operations as ``lightning.kokkos``, with pre-compiled wheels for ``lightning.amdgpu`` available on PyPI for easy installation to use on MI300 series AMD GPUs.
 
   This device can be used within qjit'd workflows exactly as other devices compatible with Catalyst:
 
@@ -517,6 +532,7 @@ Mehrdad Malekmohammadi,
 River McCubbin,
 Lee J. O'Riordan,
 Mudit Pandey,
+Andrija Paurevic,
 Roberto Turrado,
 Paul Haochen Wang,
 Jake Zaia,
