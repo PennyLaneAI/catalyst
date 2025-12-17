@@ -1412,7 +1412,7 @@ def decompose_arbitrary_ppr(qnode):
 
         print(circuit.mlir_opt)
 
-    Example MLIR excerpt (structure only):
+    Example MLIR output:
 
     .. code-block:: mlir
         ...
