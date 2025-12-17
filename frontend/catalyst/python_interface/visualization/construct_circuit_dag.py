@@ -235,6 +235,28 @@ class ConstructCircuitDAG:
                     self.dag_builder.add_edge(seen_node, node_uid, color="lightpink3")
 
     # =============
+    # ADJOINT
+    # =============
+
+    @_visit_operation.register
+    def _adjoint(self, operation: quantum.AdjointOp) -> None:
+        """Handle a PennyLane adjoint operation."""
+
+        uid = f"cluster{self._cluster_uid_counter}"
+        self.dag_builder.add_cluster(
+            uid,
+            label="adjoint",
+            labeljust="l",
+            cluster_uid=self._cluster_uid_stack[-1],
+        )
+        self._cluster_uid_stack.append(uid)
+        self._cluster_uid_counter += 1
+
+        self._visit_region(operation.regions[0])
+
+        self._cluster_uid_stack.pop()
+
+    # =============
     # CONTROL FLOW
     # =============
 
