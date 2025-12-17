@@ -565,7 +565,8 @@ def to_ppr(qnode):
     ``qml.Z``,
     ``qml.adjoint(qml.S)``,
     ``qml.adjoint(qml.T)``,
-    ``qml.CNOT``, and
+    ``qml.CNOT``,
+    ``qml.PauliRot``, and
     ``catalyst.measure``.
 
     Args:
@@ -853,7 +854,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
         from catalyst import qjit, measure
         from catalyst.passes import to_ppr, commute_ppr, merge_ppr_ppm, ppr_to_ppm
 
-        pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+        pipeline = [("pipe", ["quantum-compilation-stage"])]
 
         @qjit(pipelines=pipeline, target="mlir")
         @to_ppr
@@ -956,7 +957,7 @@ def ppm_compilation(
         from catalyst import qjit, measure
         from catalyst.passes import ppm_compilation
 
-        pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+        pipeline = [("pipe", ["quantum-compilation-stage"])]
         method = "clifford-corrected"
 
         @qjit(pipelines=pipeline, target="mlir")
