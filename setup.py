@@ -147,7 +147,9 @@ entry_points = {
         "cuda_quantum.ops = catalyst.api_extensions",
         "cuda_quantum.qjit = catalyst.third_party.cuda:cudaqjit",
     ],
-    "catalyst.passes_resolution": ["catalyst_xdsl_plugin.passes = catalyst.passes.xdsl_plugin"],
+    "xdsl.universe": [
+        "catalyst-xdsl-universe = catalyst.python_interface.xdsl_universe:XDSL_UNIVERSE"
+    ],
 }
 
 classifiers = [
@@ -161,6 +163,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3 :: Only",
 ]
 

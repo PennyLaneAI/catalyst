@@ -27,4 +27,4 @@ target_compile_options(QECUtils PRIVATE
     -fexceptions     # Enable exceptions
 )
 
-target_link_libraries(QECUtils PRIVATE libstim)
+target_link_libraries(QECUtils PRIVATE libstim ExternalStablehloLib)

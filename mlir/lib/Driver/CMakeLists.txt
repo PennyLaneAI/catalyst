@@ -44,6 +44,8 @@ set(LIBS
     mitigation-transforms
     MLIRIon
     ion-transforms
+    MLIRRTIO
+    rtio-transforms
     MLIRCatalystTest
     ${ENZYME_LIB}
 )
