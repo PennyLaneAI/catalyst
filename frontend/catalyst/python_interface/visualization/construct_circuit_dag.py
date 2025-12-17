@@ -360,6 +360,8 @@ class ConstructCircuitDAG:
             penwidth=2,
         )
         self._node_uid_counter += 1
+        # NOTE: Consider the device node as dynamic
+        # as any wire can source from it
         self._dynamic_node_uids.add(node_id)
         self._wire_to_node_uids["device"].add(node_id)
 
