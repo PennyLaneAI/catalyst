@@ -214,14 +214,14 @@ def resolve_constant_params(ssa: SSAValue) -> float | int | str:
                 resolve_constant_params(op.operands[0]),
                 resolve_constant_params(op.operands[1]),
             )
-            return str(x) + " + " + str(y)
+            return f"({x} + {y})"
 
         case "stablehlo.subtract":
             x, y = (
                 resolve_constant_params(op.operands[0]),
                 resolve_constant_params(op.operands[1]),
             )
-            return str(x) + " - " + str(y)
+            return f"({x} - {y})"
 
         case "stablehlo.constant":
             return _extract_dense_constant_value(op)
@@ -286,7 +286,7 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
             if op.callee.string_value() == "remainder":
                 x = resolve_constant_params(op.operands[0])
                 y = resolve_constant_params(op.operands[1])
-                return f"{x} % {y}"
+                return f"({x} % {y})"
             raise NotImplementedError(f"Function call to {op.callee} not supported")
 
         case _ if op.name == "stablehlo.reshape":
@@ -294,11 +294,11 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
 
         case _ if op.name == "stablehlo.add":
             x, y = (resolve_constant_wire(op.operands[0]), resolve_constant_wire(op.operands[1]))
-            return f"{x} + {y}"
+            return f"({x} + {y})"
 
         case _ if op.name == "stablehlo.subtract":
             x, y = (resolve_constant_wire(op.operands[0]), resolve_constant_wire(op.operands[1]))
-            return f"{x} - {y}"
+            return f"({x} - {y})"
 
         case _ if op.name == "tensor.from_elements":
             return resolve_constant_wire(op.operands[0])
