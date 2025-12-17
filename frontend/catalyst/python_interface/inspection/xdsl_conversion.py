@@ -33,7 +33,7 @@ from xdsl.dialects.tensor import ExtractOp as TensorExtractOp
 from xdsl.ir import SSAValue
 
 from catalyst.jit import QJIT, qjit
-from catalyst.python_interface.dialects.qec import PPRotationOp, PPMeasurementOp
+from catalyst.python_interface.dialects.qec import PPMeasurementOp, PPRotationOp
 
 from ..dialects.quantum import (
     CustomOp,
