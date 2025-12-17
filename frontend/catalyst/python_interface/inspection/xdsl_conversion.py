@@ -337,16 +337,6 @@ def xdsl_to_qml_op(op) -> Operator:
             gate_cls = resolve_gate(op.properties.get("gate_name").data)
             gate = gate_cls(*ssa_to_qml_params(op), wires=ssa_to_qml_wires(op))
 
-        case "qec.ppr":
-            gate_cls = ops.qubit.parametric_ops_multi_qubit.PauliRot
-            theta = jax.numpy.pi / abs(op.rotation_kind.value.data)
-            pauli_word = []
-            for string_attr in op.pauli_product.data:
-                pauli_word.append(str(string_attr).replace('"', ""))
-            pauli_word = "".join(pauli_word)
-            print(pauli_word)
-            gate = gate_cls(theta=theta, pauli_word=pauli_word, wires=ssa_to_qml_wires(op))
-
         case _:
             raise NotImplementedError(f"Unsupported gate: {op.name}")
 
