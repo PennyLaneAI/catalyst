@@ -219,7 +219,8 @@ class ARTIQRuntimeBuilder {
     LLVM::LLVMFuncOp ensureFunc(StringRef name, LLVM::LLVMFunctionType funcTy)
     {
         PatternRewriter rewriter = PatternRewriter(builder.getContext());
-        return catalyst::ensureFunctionDeclaration(rewriter, contextOp, name, funcTy);
+        return catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(rewriter, contextOp, name,
+                                                                     funcTy);
     }
 
     void ensureSecToMuFunc()
