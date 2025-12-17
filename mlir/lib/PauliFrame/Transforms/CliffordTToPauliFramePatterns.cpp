@@ -16,16 +16,17 @@
 
 #include <concepts>
 
-#include <llvm/Support/Casting.h>
-#include <llvm/Support/Debug.h>
-#include <llvm/Support/LogicalResult.h>
-#include <llvm/Support/raw_ostream.h>
-#include <mlir/Dialect/SCF/IR/SCF.h>
-#include <mlir/IR/Builders.h>
-#include <mlir/IR/Location.h>
-#include <mlir/IR/PatternMatch.h>
-#include <mlir/IR/Value.h>
-#include <mlir/IR/ValueRange.h>
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/LogicalResult.h"
+#include "llvm/Support/raw_ostream.h"
+
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
 
 #include "PauliFrame/IR/PauliFrameOps.h"
 #include "PauliFrame/Transforms/Patterns.h"
@@ -62,25 +63,16 @@ enum class GateEnum { I, X, Y, Z, H, S, T, CNOT, Unknown };
 // Hash gate name to GateEnum
 GateEnum hashGate(CustomOp op)
 {
-    auto gateName = op.getGateName();
-    if (gateName == "Identity" || gateName == "I")
-        return GateEnum::I;
-    else if (gateName == "PauliX" || gateName == "X")
-        return GateEnum::X;
-    else if (gateName == "PauliY" || gateName == "Y")
-        return GateEnum::Y;
-    else if (gateName == "PauliZ" || gateName == "Z")
-        return GateEnum::Z;
-    else if (gateName == "H" || gateName == "Hadamard")
-        return GateEnum::H;
-    else if (gateName == "S")
-        return GateEnum::S;
-    else if (gateName == "T")
-        return GateEnum::T;
-    else if (gateName == "CNOT")
-        return GateEnum::CNOT;
-    else
-        return GateEnum::Unknown;
+    return llvm::StringSwitch<GateEnum>(op.getGateName())
+        .Cases("Identity", "I", GateEnum::I)
+        .Cases("PauliX", "X", GateEnum::X)
+        .Cases("PauliY", "Y", GateEnum::Y)
+        .Cases("PauliZ", "Z", GateEnum::Z)
+        .Cases("H", "Hadamard", GateEnum::H)
+        .Case("S", GateEnum::S)
+        .Case("T", GateEnum::T)
+        .Case("CNOT", GateEnum::CNOT)
+        .Default(GateEnum::Unknown);
 }
 
 // Insert the ops that physically apply the Pauli X and Z gates and a flush op.
@@ -271,7 +263,7 @@ struct CliffordTToPauliFramePattern : public OpRewritePattern<CustomOp> {
             return failure();
         }
         }
-        return success();
+        llvm_unreachable("unhandled gate");
     }
 };
 
