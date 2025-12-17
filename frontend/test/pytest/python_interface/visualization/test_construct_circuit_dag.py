@@ -15,8 +15,8 @@
 
 from unittest.mock import Mock
 
-import pytest
 import jax
+import pytest
 
 pytestmark = pytest.mark.xdsl
 xdsl = pytest.importorskip("xdsl")
@@ -737,7 +737,7 @@ class TestCreateStaticOperatorNodes:
         @qml.qnode(dev)
         def my_circuit():
             qml.H(0)
-            qml.SWAP([0,1])
+            qml.SWAP([0, 1])
 
         module = my_circuit()
 
@@ -751,14 +751,14 @@ class TestCreateStaticOperatorNodes:
 
         # Make sure label has relevant info
         assert nodes["node1"]["label"] == get_label(qml.H(0))
-        assert nodes["node2"]["label"] == get_label(qml.SWAP([0,1]))
+        assert nodes["node2"]["label"] == get_label(qml.SWAP([0, 1]))
 
     @pytest.mark.parametrize(
         "kwargs",
         [
             {},
-            {"wires":0},
-            {"wires":[0,1]},
+            {"wires": 0},
+            {"wires": [0, 1]},
         ],
     )
     def test_global_phase_op(self, kwargs):
@@ -1061,7 +1061,7 @@ class TestCreateStaticMeasurementNodes:
         [
             {},
             {"wires": 0},
-            {"wires":[0, 1]},
+            {"wires": [0, 1]},
         ],
     )
     def test_probs_measurement_op(self, kwargs):
@@ -1072,7 +1072,7 @@ class TestCreateStaticMeasurementNodes:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_circuit():
-            return qml.probs(**kwargs) 
+            return qml.probs(**kwargs)
 
         module = my_circuit()
 
@@ -1090,7 +1090,7 @@ class TestCreateStaticMeasurementNodes:
         [
             {},
             {"wires": 0},
-            {"wires":[0, 1]},
+            {"wires": [0, 1]},
         ],
     )
     def test_valid_sample_measurement_op(self, kwargs):
@@ -1102,7 +1102,7 @@ class TestCreateStaticMeasurementNodes:
         @qml.set_shots(10)
         @qml.qnode(dev)
         def my_circuit():
-            return qml.sample(**kwargs) 
+            return qml.sample(**kwargs)
 
         module = my_circuit()
 
