@@ -1379,7 +1379,6 @@ class TestCtrl:
         @qml.qnode(dev)
         def my_workflow():
             qml.ctrl(qml.H(0), control=1)
-Expand commentComment on line R996Resolved
 
         module = my_workflow()
 
