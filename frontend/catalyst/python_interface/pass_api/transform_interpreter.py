@@ -204,7 +204,7 @@ def _get_cli_option_from_attr(val: Attribute) -> Any:
             cli_val = val.data
 
         case builtin.ArrayAttr():
-            cli_val = ",".join([_get_cli_option_from_attr(attr) for attr in val.data])
+            cli_val = ",".join([str(_get_cli_option_from_attr(attr)) for attr in val.data])
 
         case builtin.DictionaryAttr():
             mapping = []

@@ -55,18 +55,21 @@ def _get_xdsl_attr_from_pyval(val) -> Attribute:
 
 
 def create_apply_registered_pass_op(
-    pass_name, options: dict[str, Any], in_mod: SSAValue[transform.OperationType] | None = None
+    pass_name,
+    options: dict[str, Any] | None = None,
+    in_mod: SSAValue[transform.OperationType] | None = None,
 ) -> transform.ApplyRegisteredPassOp:
     """Create an ApplyRegisteredPassOp using the provided pass name and
     pass options."""
+    options = options or {}
+    in_mod = (
+        in_mod or test.TestOp(result_types=(transform.OperationType("builtin.module"),)).results[0]
+    )
+
     lowered_options = {}
     for arg, value in options.items():
         option_key = str(arg).replace("_", "-")
         lowered_options[option_key] = _get_xdsl_attr_from_pyval(value)
-
-    in_mod = (
-        in_mod or test.TestOp(result_types=(transform.OperationType("builtin.module"),)).results[0]
-    )
 
     pass_op = transform.ApplyRegisteredPassOp.create(
         properties={
@@ -74,7 +77,7 @@ def create_apply_registered_pass_op(
             "options": builtin.DictionaryAttr(lowered_options),
         },
         operands=(in_mod,),
-        result_types=(transform.OperationType(in_mod.operation),),
+        result_types=(transform.OperationType(in_mod.type.operation),),
     )
     return pass_op
 
@@ -119,21 +122,67 @@ class TestCreateSchedule:
 
     def test_pass_no_options(self):
         """Test that passes with no options are parsed correctly."""
+        pass_op = create_apply_registered_pass_op("test-pass")
+        schedule = _create_schedule([pass_op])
+        assert len(schedule) == 1
+        assert schedule[0] == "--test-pass"
 
     def test_pass_basic_options(self):
         """Test that passes with basic options (int, float, bool, string) are parsed correctly."""
+        pass_op = create_apply_registered_pass_op(
+            "test-pass",
+            options={"int-opt": 1, "float-opt": 1.5, "bool-opt": False, "str-opt": "test_string"},
+        )
+        schedule = _create_schedule([pass_op])
+        assert len(schedule) == 1
+        assert (
+            schedule[0] == "--test-pass=int-opt=1 float-opt=1.5 bool-opt=false str-opt=test_string"
+        )
 
     def test_pass_array_options(self):
         """Test that passes with array options are parsed correctly."""
+        pass_op = create_apply_registered_pass_op("test-pass", options={"list-opt": (1, 2, 3, 4)})
+        schedule = _create_schedule([pass_op])
+        assert len(schedule) == 1
+        assert schedule[0] == "--test-pass=list-opt=1,2,3,4"
 
     def test_pass_dict_options(self):
         """Test that passes with dict options are parsed correctly."""
+        pass_op = create_apply_registered_pass_op(
+            "test-pass", options={"dict-opt": {"a": 1, "b": 2, "c": 3, "d": 4}}
+        )
+        schedule = _create_schedule([pass_op])
+        assert len(schedule) == 1
+        assert schedule[0] == "--test-pass=dict-opt={a=1 b=2 c=3 d=4}"
 
     def test_pass_nested_container_options(self):
         """Test that passes with options that are nested containers are parsed correctly."""
+        pass_op = create_apply_registered_pass_op(
+            "test-pass",
+            options={
+                "list-opt": ({"a": 1, "b": 2}, {"c": 1.5}, {"d": False, "e": True}),
+                "dict-opt": {"f": (1, 2), "g": 1},
+            },
+        )
+        schedule = _create_schedule([pass_op])
+        assert len(schedule) == 1
+        assert (
+            schedule[0]
+            == "--test-pass=list-opt={a=1 b=2},{c=1.5},{d=false e=true} dict-opt={f=1,2 g=1}"
+        )
 
     def test_multiple_passes(self):
         """Test that scheduling multiple passes works correctly."""
+        pass_op1 = create_apply_registered_pass_op("test-pass1")
+        pass_op2 = create_apply_registered_pass_op("test-pass2", options={"int-opt": 1})
+        pass_op3 = create_apply_registered_pass_op(
+            "test-pass3", options={"list-opt": (False, True, False)}
+        )
+        schedule = _create_schedule([pass_op1, pass_op2, pass_op3])
+        assert len(schedule) == 3
+        assert schedule[0] == "--test-pass1"
+        assert schedule[1] == "--test-pass2=int-opt=1"
+        assert schedule[2] == "--test-pass3=list-opt=false,true,false"
 
 
 class TestTransformFunctionsExt:
