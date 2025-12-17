@@ -24,9 +24,8 @@ from pennylane.measurements import (
     VarianceMP,
 )
 from pennylane.operation import Operator
-from pennylane.ops.op_math import Adjoint, Controlled
 from xdsl.dialects import builtin, func, scf
-from xdsl.ir import Block, Operation, Region, SSAValue
+from xdsl.ir import Block, Operation, Region
 
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.inspection.xdsl_conversion import (
