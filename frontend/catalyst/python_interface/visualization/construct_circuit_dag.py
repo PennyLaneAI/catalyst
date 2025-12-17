@@ -17,6 +17,7 @@
 from collections import defaultdict
 from functools import singledispatch, singledispatchmethod
 
+from jax.core import Value
 from pennylane.measurements import (
     ExpectationMP,
     MeasurementProcess,
@@ -28,12 +29,40 @@ from pennylane.ops.op_math import Adjoint, Controlled
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region, SSAValue
 
-from catalyst.python_interface.dialects import quantum
+from catalyst.python_interface.dialects import mbqc, qec, quantum
 from catalyst.python_interface.inspection.xdsl_conversion import (
     xdsl_to_qml_measurement,
     xdsl_to_qml_op,
 )
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+
+# Defines a set of operations from the quantum dialect
+# that are not to be visualized (at the moment)
+_SKIPPED_QUANTUM_OPS = (
+    quantum.AllocOp,
+    quantum.AllocQubitOp,
+    quantum.ComputationalBasisOp,
+    quantum.CountsOp,
+    quantum.DeallocOp,
+    quantum.DeallocQubitOp,
+    quantum.DeviceReleaseOp,
+    quantum.ExtractOp,
+    quantum.FinalizeOp,
+    quantum.HamiltonianOp,
+    quantum.HermitianOp,
+    quantum.InitializeOp,
+    quantum.InsertOp,
+    quantum.NamedObsOp,
+    quantum.NumQubitsOp,
+    quantum.PCPhaseOp,
+    quantum.SetBasisStateOp,
+    quantum.SetStateOp,
+    quantum.TensorOp,
+    quantum.YieldOp,
+)
+# NOTE: These are unsupported operations to visualize
+_SKIPPED_QEC_OPS = ()
+_SKIPPED_MBQC_OPS = ()
 
 
 class ConstructCircuitDAG:
@@ -95,6 +124,9 @@ class ConstructCircuitDAG:
     @singledispatchmethod
     def _visit_operation(self, operation: Operation) -> None:
         """Visit an xDSL Operation. Default to visiting each region contained in the operation."""
+
+        self._visualize(operation)
+
         for region in operation.regions:
             self._visit_region(region)
 
@@ -112,7 +144,16 @@ class ConstructCircuitDAG:
     # QUANTUM OPERATIONS
     # ===================
 
-    @_visit_operation.register
+    @singledispatchmethod
+    def _visualize(self, op: Operation) -> None:
+        # NOTE: Currently only visualizing "quantum" operations
+        if op.dialect_name not in {"quantum", "qec", "mbqc"}:
+            return
+        _SKIPPED_OPS = (_SKIPPED_QUANTUM_OPS, _SKIPPED_QEC_OPS, _SKIPPED_MBQC_OPS)
+        if not isinstance(op, _SKIPPED_OPS):
+            raise ValueError(f"Visualization for operation {op.name} is not supported.")
+
+    @_visualize.register
     def _gate_op(
         self,
         op: quantum.CustomOp | quantum.GlobalPhaseOp | quantum.QubitUnitaryOp | quantum.MultiRZOp,
@@ -135,7 +176,7 @@ class ConstructCircuitDAG:
 
         self._connect(qml_op, node_uid)
 
-    @_visit_operation.register
+    @_visualize.register
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
         """Handler for the single-qubit projective measurement operation."""
 
@@ -159,7 +200,7 @@ class ConstructCircuitDAG:
     # QUANTUM MEASUREMENTS
     # =====================
 
-    @_visit_operation.register
+    @_visualize.register
     def _measurements(
         self,
         op: (
@@ -234,7 +275,7 @@ class ConstructCircuitDAG:
     # ADJOINT
     # =============
 
-    @_visit_operation.register
+    @_visualize.register
     def _adjoint(self, operation: quantum.AdjointOp) -> None:
         """Handle a PennyLane adjoint operation."""
 
@@ -370,7 +411,7 @@ class ConstructCircuitDAG:
     # DEVICE NODE
     # ============
 
-    @_visit_operation.register
+    @_visualize.register
     def _device_init(self, operation: quantum.DeviceInitOp) -> None:
         """Handles the initialization of a quantum device."""
         node_id = f"node{self._node_uid_counter}"
