@@ -1085,9 +1085,9 @@ class TestCreateDynamicOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 4  # Device node + ops
 
-        assert nodes["node1"]["label"] == f"<name> RX|<wire> [arg5 % 3]"
-        assert nodes["node2"]["label"] == f"<name> RY|<wire> [arg5 - 3]"
-        assert nodes["node3"]["label"] == f"<name> RZ|<wire> [arg5 + 3]"
+        assert nodes["node1"]["label"] == f"<name> RX|<wire> [(arg5 % 3)]"
+        assert nodes["node2"]["label"] == f"<name> RY|<wire> [(arg5 - 3)]"
+        assert nodes["node3"]["label"] == f"<name> RZ|<wire> [(arg5 + 3)]"
 
 
 @pytest.mark.usefixtures("use_both_frontend")
@@ -1279,8 +1279,8 @@ class TestCreateDynamicMeasurementNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 3  # Device node + meas
 
-        assert nodes["node1"]["label"] == f"<name> probs|<wire> [arg5 % 3, arg5 - 3, arg5 + 3]"
-        assert nodes["node2"]["label"] == f"<name> sample|<wire> [arg5 % 3, arg5 - 3, arg5 + 3]"
+        assert nodes["node1"]["label"] == f"<name> probs|<wire> [(arg5 % 3), (arg5 - 3), (arg5 + 3)]"
+        assert nodes["node2"]["label"] == f"<name> sample|<wire> [(arg5 % 3), (arg5 - 3), (arg5 + 3)]"
 
 
 @pytest.mark.usefixtures("use_both_frontend")
