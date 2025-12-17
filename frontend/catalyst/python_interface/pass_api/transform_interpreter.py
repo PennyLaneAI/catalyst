@@ -41,7 +41,6 @@ from xdsl.passes import ModulePass, PassPipeline
 from xdsl.printer import Printer
 from xdsl.rewriter import Rewriter
 from xdsl.utils.exceptions import PassFailedException
-from xdsl.utils.hints import isa
 
 from catalyst.compiler import _quantum_opt
 
