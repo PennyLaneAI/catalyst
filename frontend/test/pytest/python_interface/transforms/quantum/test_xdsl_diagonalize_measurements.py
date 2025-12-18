@@ -13,21 +13,16 @@
 # limitations under the License.
 """Unit test module for the xDSL implementation of the diagonalize_final_measurements pass"""
 
-
-# pylint: disable=wrong-import-position
-
 import numpy as np
-import pytest
-
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
 import pennylane as qml
+import pytest
 
 from catalyst.python_interface.transforms import (
     DiagonalizeFinalMeasurementsPass,
     diagonalize_final_measurements_pass,
 )
+
+pytestmark = pytest.mark.xdsl
 
 
 class TestDiagonalizeFinalMeasurementsPass:
