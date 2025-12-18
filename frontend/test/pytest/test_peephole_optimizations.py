@@ -535,6 +535,7 @@ def test_merge_rotation_arbitrary_angle_ppr():
     @qml.qjit(pipelines=my_pipeline, target="mlir")
     def test_merge_rotation_ppr_workflow():
         @qml.transforms.merge_rotations
+        @to_ppr_alias
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit(x, y):
             qml.PauliRot(x, pauli_word="ZY", wires=[0, 1])
@@ -546,11 +547,11 @@ def test_merge_rotation_arbitrary_angle_ppr():
     ir_opt = test_merge_rotation_ppr_workflow.mlir_opt
 
     assert 'transform.apply_registered_pass "merge-rotations"' in ir
-    assert "qec.ppr.arbitrary" in ir
+    assert "qec.ppr.arbitrary" not in ir
     assert "arith.addf" not in ir
 
     assert "arith.addf" in ir_opt
-    assert 'qec.ppr.arbitrary ["Z", "Y"]' in ir_opt
+    assert ir_opt.count('qec.ppr.arbitrary ["Z", "Y"]') == 1
 
 
 def test_clifford_to_ppm():
