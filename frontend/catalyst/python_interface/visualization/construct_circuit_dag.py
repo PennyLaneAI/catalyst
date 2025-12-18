@@ -111,7 +111,13 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _gate_op(
         self,
-        op: quantum.CustomOp | quantum.GlobalPhaseOp | quantum.QubitUnitaryOp | quantum.MultiRZOp,
+        op: (
+            quantum.CustomOp
+            | quantum.GlobalPhaseOp
+            | quantum.QubitUnitaryOp
+            | quantum.MultiRZOp
+            | quantum.PauliRotOp
+        ),
     ) -> None:
         """Generic handler for unitary gates."""
 
@@ -174,10 +180,7 @@ class ConstructCircuitDAG:
         """Handler for the PPR operation."""
 
         wires = ssa_to_qml_wires(op)
-        if wires == []:
-            wires_str = "all"
-        else:
-            wires_str = f"[{', '.join(map(str, wires))}]"
+        wires_str = f"[{', '.join(map(str, wires))}]"
         denominator = abs(op.rotation_kind.value.data)
 
         # Add node to current cluster
@@ -185,6 +188,35 @@ class ConstructCircuitDAG:
         self.dag_builder.add_node(
             uid=node_uid,
             label=f"<name> PPR-π/{denominator}|<wire> {wires_str}",
+            cluster_uid=self._cluster_uid_stack[-1],
+            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
+            shape="record",
+        )
+        self._node_uid_counter += 1
+
+        # Search through previous ops found on current wires and connect
+        prev_node_uids: set[str] = set.union(
+            set(), *(self._wire_to_node_uids[wire] for wire in wires)
+        )
+        for prev_node_uid in prev_node_uids:
+            self.dag_builder.add_edge(prev_node_uid, node_uid)
+
+        # Update affected wires to source from this node UID
+        for wire in wires:
+            self._wire_to_node_uids[wire] = {node_uid}
+
+    @_visit_operation.register
+    def _ppr_arbitrary(self, op: qec.PPRotationArbitraryOp) -> None:
+        """Handler for the arbitrary PPR operation."""
+
+        wires = ssa_to_qml_wires(op)
+        wires_str = f"[{', '.join(map(str, wires))}]"
+
+        # Add node to current cluster
+        node_uid = f"node{self._node_uid_counter}"
+        self.dag_builder.add_node(
+            uid=node_uid,
+            label=f"<name> PPR|<wire> {wires_str}",
             cluster_uid=self._cluster_uid_stack[-1],
             # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",

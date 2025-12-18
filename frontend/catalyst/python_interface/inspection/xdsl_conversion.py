@@ -33,7 +33,11 @@ from xdsl.dialects.tensor import ExtractOp as TensorExtractOp
 from xdsl.ir import SSAValue
 
 from catalyst.jit import QJIT, qjit
-from catalyst.python_interface.dialects.qec import PPMeasurementOp, PPRotationOp
+from catalyst.python_interface.dialects.qec import (
+    PPMeasurementOp,
+    PPRotationArbitraryOp,
+    PPRotationOp,
+)
 
 from ..dialects.quantum import (
     CustomOp,
@@ -42,6 +46,7 @@ from ..dialects.quantum import (
     MeasureOp,
     MultiRZOp,
     NamedObsOp,
+    PauliRotOp,
     QubitUnitaryOp,
     SetBasisStateOp,
     SetStateOp,
@@ -170,7 +175,6 @@ def resolve_constant_params(ssa: SSAValue) -> float | int:
         raise NotImplementedError(f"Cannot resolve parameters for operation: {op}")
 
     match op.name:
-
         case "arith.addf":
             return sum(resolve_constant_params(o) for o in op.operands)
 
@@ -232,7 +236,6 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int:
     op = ssa.owner
 
     match op:
-
         case TensorExtractOp(tensor=tensor):
             return resolve_constant_wire(tensor)
 
@@ -250,6 +253,8 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int:
             | MultiRZOp()
             | SetBasisStateOp()
             | PPRotationOp()
+            | PPRotationArbitraryOp()
+            | PauliRotOp()
         ):
             all_qubits = list(getattr(op, "in_qubits", [])) + list(
                 getattr(op, "in_ctrl_qubits", [])
@@ -306,13 +311,24 @@ def xdsl_to_qml_op(op) -> Operator:
     """
 
     match op.name:
+        case "quantum.paulirot":
+            pw = []
+            for str_attr in op.pauli_product.data:
+                pw.append(str(str_attr).replace('"', ""))
+            pw = "".join(pw)
+            gate = ops.PauliRot(
+                theta=_extract(op, "angle", resolve_constant_params, single=True),
+                pauli_word=pw,
+                wires=ssa_to_qml_wires(op),
+            )
 
         case "quantum.gphase":
             gate = ops.GlobalPhase(ssa_to_qml_params(op, single=True), wires=ssa_to_qml_wires(op))
 
         case "quantum.unitary":
             gate = ops.qubit.matrix_ops.QubitUnitary(
-                U=jax.numpy.zeros(_tensor_shape_from_ssa(op.matrix)), wires=ssa_to_qml_wires(op)
+                U=jax.numpy.zeros(_tensor_shape_from_ssa(op.matrix)),
+                wires=ssa_to_qml_wires(op),
             )
 
         case "quantum.set_state":
@@ -397,7 +413,6 @@ def xdsl_to_qml_measurement(op, *args, **kwargs) -> MeasurementProcess | Operato
     """
 
     match op.name:
-
         case "quantum.measure":
             postselect = op.postselect.value.data if op.postselect is not None else None
             return MidMeasure([resolve_constant_wire(op.in_qubit)], postselect=postselect)
