@@ -15,6 +15,12 @@
   `catalyst.python_interface` namespace.
   [(#2199)](https://github.com/PennyLaneAI/catalyst/pull/2199)
 
+  * Add the `PauliRotOp` operation to the xDSL Quantum dialect.
+    [(#2307)](https://github.com/PennyLaneAI/catalyst/pull/2307)
+
+  * Add the `PPRotationArbitraryOp` to the xDSL QEC dialect.
+    [(#2307)](https://github.com/PennyLaneAI/catalyst/pull/2307)
+
   * An xDSL `Universe` containing all custom xDSL dialects and passes has been registered as an entry point,
     allowing usage of PennyLane's dialects and passes with xDSL's command-line tools.
     [(#2208)](https://github.com/PennyLaneAI/catalyst/pull/2208)
@@ -180,6 +186,28 @@
     )
   }
   ```
+
+  * A new :func:`~catalyst.passes.decompose_arbitrary_ppr` pass has been added to the `catalyst.passes` module.
+    This will decompose an arbitrary angle PPR into a collection of PPRs, PPMs and
+    a single-qubit arbitrary PPR in the Z basis.
+    [(#2304)](https://github.com/PennyLaneAI/catalyst/pull/2304)
+
+    ```python
+      import pennylane as qml
+      from catalyst import qjit, measure
+      from catalyst.passes import decompose_arbitrary_ppr, to_ppr
+
+      @qjit(pipelines=[("pipe", ["quantum-compilation-stage"])], target="mlir")
+      @decompose_arbitrary_ppr
+      @to_ppr
+      @qml.qnode(qml.device("null.qubit", wires=3))
+      def circuit():
+          qml.PauliRot(0.123, pauli_word="XXY", wires=[0, 1, 2])
+          return
+
+      print(circuit.mlir_opt)
+    ```
+
 
 <h3>Improvements 🛠</h3>
 

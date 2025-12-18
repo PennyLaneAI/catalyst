@@ -141,4 +141,8 @@ def PPRToMBQCPass : Pass<"ppr-to-mbqc"> {
     let summary = "Convert PPR/PPM operations to MBQC operations.";
 }
 
+def DecomposeArbitraryPPRPass : Pass<"decompose-arbitrary-ppr"> {
+    let summary = "Decompose an arbitrary angle PPR into a collection of PPRs, PPMs and a single-qubit arbitrary PPR in the Z basis.";
+}
+
 #endif // QEC_PASSES
