@@ -147,36 +147,6 @@ class TransformInterpreterPass(ModulePass):
         interpreter.call_op(schedule, (op,))
 
 
-def _get_pyvals_from_xdsl_attr(attr: Attribute) -> Any:
-    """Get a Python value from an xDSL attribute."""
-    val = None
-
-    match attr:
-        case builtin.IntegerAttr():
-            if _is_bool_attr(attr):
-                # Python booleans' repr is capitalized so we use strings
-                val = bool(attr.value.data)
-            else:
-                val = attr.value.data
-
-        case builtin.FloatAttr():
-            val = attr.value.data
-
-        case builtin.StringAttr():
-            val = attr.data
-
-        case builtin.ArrayAttr():
-            val = tuple(_get_pyvals_from_xdsl_attr(_attr) for _attr in attr.data)
-
-        case builtin.DictionaryAttr():
-            val = {k: _get_pyvals_from_xdsl_attr(v) for k, v in attr.data.items()}
-
-        case _:  # pragma: no cover
-            raise ValueError(f"{attr} cannot be converted to a Python value.")
-
-    return val
-
-
 def _create_schedule(pass_ops: Sequence[ApplyRegisteredPassOp]) -> list[str]:
     """Create a pass schedule for applying MLIR pass via CLI flags.
 
@@ -222,8 +192,9 @@ def _get_cli_option_from_attr(attr: Attribute) -> Any:
 
     match attr:
         case builtin.IntegerAttr():
-            if _is_bool_attr(attr):
-                # Python booleans' repr is capitalized so we use strings
+            # Booleans are represented as integer attributes with a bitwidth of 1
+            if isinstance(attr.type, builtin.IntegerType) and attr.type.width.data == 1:
+                # Python boolean's repr is capitalized so we use strings
                 cli_val = "true" if attr.value.data else "false"
             else:
                 cli_val = attr.value.data
@@ -247,9 +218,3 @@ def _get_cli_option_from_attr(attr: Attribute) -> Any:
             raise ValueError(f"Unsupported option type {attr}.")
 
     return cli_val
-
-
-def _is_bool_attr(val: builtin.IntegerAttr) -> bool:
-    """Check if an IntegerAttr corresponds to a boolean by checking its width."""
-    # Boolean attributes will be of Integer type with bitwidth == 1
-    return isinstance(val.type, builtin.IntegerType) and val.type.width.data == 1

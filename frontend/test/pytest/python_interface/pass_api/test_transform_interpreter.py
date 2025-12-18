@@ -152,6 +152,81 @@ class TestCreateSchedule:
         assert schedule[2] == "--test-pass3=list-opt=false,true,false"
 
 
+class OptionsPass(ModulePass):
+    """ModulePass for testing pass options."""
+
+    name = "options-pass"
+
+    def __init__(self, **options):
+        self.options = options
+
+    def apply(self, ctx, op):  # pylint: disable=unused-argument
+        print(f"Applying options-pass with options {self.options}")
+        return op
+
+
+class TestTransformFunctionsExt:
+    """Unit tests for the TransformFunctionsExt interpreter."""
+
+    @pytest.mark.parametrize(
+        "pass_options", [{}, {"a": 1, "b": 1.5, "c": (1, 2, 3, 4), "d": "string-input"}]
+    )
+    def test_xdsl_pass(self, pass_options, capsys):
+        """Test that interpreting an xDSL pass works correctly."""
+        ctx = Context()
+        ctx.load_dialect(builtin.Builtin)
+        ctx.load_dialect(transform.Transform)
+
+        fns = TransformFunctionsExt(ctx, passes={"options-pass": lambda: OptionsPass})
+        pass_op = create_apply_registered_pass_op(pass_name="options-pass", options=pass_options)
+
+        mod = builtin.ModuleOp([])
+        outs = fns.run_apply_registered_pass_op(None, pass_op, (mod,))
+        assert outs.values[0] is mod
+        captured = capsys.readouterr()
+        assert captured.out.strip() == f"Applying options-pass with options {pass_options}"
+
+    @pytest.mark.parametrize(
+        "pass_options, cl_options",
+        [
+            ({}, ""),
+            (
+                {"a": 1, "b": 1.5, "c": (1, 2, 3, 4), "d": "string-input"},
+                "=a=1 b=1.5 c=1,2,3,4 d=string-input",
+            ),
+        ],
+    )
+    def test_mlir_pass(self, pass_options, cl_options, mocker):
+        """Test that interpreting an MLIR pass works correctly."""
+        # The passes dict is empty, so when we're interpreting the pass it will be assumed to
+        # be an MLIR pass
+        ctx = Context()
+        ctx.load_dialect(builtin.Builtin)
+        ctx.load_dialect(transform.Transform)
+
+        fns = TransformFunctionsExt(ctx, passes={})
+        pass_op = create_apply_registered_pass_op(pass_name="options-pass", options=pass_options)
+        captured_cmd = None
+
+        def dummy_subprocess_run(cmd, input=None, **__):
+            nonlocal captured_cmd
+            captured_cmd = subprocess.list2cmdline(cmd)
+            return MagicMock(args=cmd, stdout=input, returncode=0)
+
+        mocker.patch("subprocess.run", side_effect=dummy_subprocess_run)
+
+        mod = builtin.ModuleOp([])
+        # This is just a silly step needed because the interpreter assumes that we're transforming
+        # a nested module, so `mod` needs to have a parent op to work correctly
+        _ = builtin.ModuleOp([mod])
+        _ = fns.run_apply_registered_pass_op(None, pass_op, (mod,))
+
+        assert captured_cmd is not None
+        # args = list(filter(lambda arg: arg.startswith("--"), captured_cmd.split(" ")))
+        # assert f"--options-pass{cl_options}" in args
+        assert f"--options-pass{cl_options}" in captured_cmd
+
+
 def create_named_sequence_op(
     pass_names: list[str],
     pass_options: list[dict[str, Any]],
@@ -185,85 +260,6 @@ def create_test_module(
     named_sequence_op = create_named_sequence_op(pass_names, pass_options)
     module = builtin.ModuleOp([named_sequence_op])
     return module
-
-
-class OptionsTestPass(ModulePass):
-    """ModulePass for testing pass options."""
-
-    name = "test-options-pass"
-
-    def __init__(self, **options):
-        self.options = options
-
-    def apply(self, ctx, op):  # pylint: disable=unused-argument
-        print(f"Applying test-options-pass with options {self.options}")
-        return op
-
-
-class TestTransformFunctionsExt:
-    """Unit tests for the TransformFunctionsExt interpreter."""
-
-    @pytest.mark.parametrize(
-        "pass_options", [{}, {"a": 1, "b": 1.5, "c": (1, 2, 3, 4), "d": "string-input"}]
-    )
-    def test_xdsl_pass(self, pass_options, capsys):
-        """Test that interpreting an xDSL pass works correctly."""
-        ctx = Context()
-        ctx.load_dialect(builtin.Builtin)
-        ctx.load_dialect(transform.Transform)
-
-        fns = TransformFunctionsExt(ctx, passes={"test-options-pass": lambda: OptionsTestPass})
-        pass_op = create_apply_registered_pass_op(
-            pass_name="test-options-pass", options=pass_options
-        )
-
-        mod = builtin.ModuleOp([])
-        outs = fns.run_apply_registered_pass_op(None, pass_op, (mod,))
-        assert outs.values[0] is mod
-        captured = capsys.readouterr()
-        assert captured.out.strip() == f"Applying test-options-pass with options {pass_options}"
-
-    @pytest.mark.parametrize(
-        "pass_options, cl_options",
-        [
-            ({}, ""),
-            (
-                {"a": 1, "b": 1.5, "c": (1, 2, 3, 4), "d": "string-input"},
-                "=a=1 b=1.5 c=1,2,3,4 d=string-input",
-            ),
-        ],
-    )
-    def test_mlir_pass(self, pass_options, cl_options, mocker):
-        """Test that interpreting an MLIR pass works correctly."""
-        # The passes dict is empty, so when we're interpreting the pass it will be assumed to
-        # be an MLIR pass
-        ctx = Context()
-        ctx.load_dialect(builtin.Builtin)
-        ctx.load_dialect(transform.Transform)
-
-        fns = TransformFunctionsExt(ctx, passes={})
-        pass_op = create_apply_registered_pass_op(
-            pass_name="test-options-pass", options=pass_options
-        )
-        captured_cmd = None
-
-        def dummy_subprocess_run(cmd, input=None, **__):
-            nonlocal captured_cmd
-            captured_cmd = subprocess.list2cmdline(cmd)
-            return MagicMock(args=cmd, stdout=input, returncode=0)
-
-        mocker.patch("subprocess.run", side_effect=dummy_subprocess_run)
-
-        mod = builtin.ModuleOp([])
-        # This is just a silly step needed because the interpreter assumes that we're transforming
-        # a nested module, so `mod` needs to have a parent op to work correctly
-        _ = builtin.ModuleOp([mod])
-        outs = fns.run_apply_registered_pass_op(None, pass_op, (mod,))
-
-        assert captured_cmd is not None
-        # args = list(filter(lambda arg: arg.startswith("--"), captured_cmd.split(" ")))
-        # assert f"--test-options-pass{cl_options}" in args
-        assert f"--test-options-pass{cl_options}" in captured_cmd
 
 
 # TODO: Add tests for xdsl->pyval conversion
