@@ -108,15 +108,22 @@
     detecting when the Python compiler is being used and routing through it appropriately.
     [(#2190)](https://github.com/PennyLaneAI/catalyst/pull/2190)
 
+  * A new experimental `parity_synth_pass` compiler pass has been added to
+    `catalyst.python_interface.transforms`. This pass groups ``CNOT`` and ``RZ`` operators
+    into phase polynomials and re-synthesizes them into ``CNOT`` and ``RZ`` operators again.
+    [(#2294)](https://github.com/PennyLaneAI/catalyst/pull/2294)
+
 * Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
   [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
 
 * Catalyst can now compile circuits that are directly expressed in terms of Pauli product rotation
   (PPR) and Pauli product measurement (PPM) operations: :class:`~.PauliRot` and
   :func:`~.pauli_measure`, respectively. This support enables research and development
-  spurred from `A Game of Surface Codes (arXiv1808.02892) <https://arxiv.org/pdf/1808.02892>`_.
+  spurred from [A Game of Surface Codes (arXiv1808.02892)](https://arxiv.org/pdf/1808.02892).
   [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
   [(#2233)](https://github.com/PennyLaneAI/catalyst/pull/2233)
+  [(#2284)](https://github.com/PennyLaneAI/catalyst/pull/2284)
+
 
   :class:`~.PauliRot` and :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes
   for PPR-PPM compilation, which includes :func:`catalyst.passes.to_ppr`,
@@ -314,14 +321,13 @@
 
 <h3>Bug fixes 🐛</h3>
 
-<<<<<<< mlxd/fix_cond_measure_test
-* Updated tests and PennyLane dependency pin to follow changes introduced by [PennyLaneAI/pennylane#8290](https://github.com/PennyLaneAI/pennylane/pull/8290).
+* Updated tests and PennyLane dependency pin to follow changes introduced by
+  [PennyLaneAI/pennylane#8290](https://github.com/PennyLaneAI/pennylane/pull/8290).
   [(#2286)](https://github.com/PennyLaneAI/catalyst/pull/2286)
-=======
+
 * Update `catalyst.python_interface.inspection.xdsl_conversion.get_mlir_module` to
   no longer explicitly use the xDSL pass plugin.
   [(#2303)](https://github.com/PennyLaneAI/catalyst/pull/2303)
->>>>>>> main
 
 * Added missing `detensorize-function-boundary` and `symbol-dce` passes to `Pipelines.cpp`.
   [(#2266)](https://github.com/PennyLaneAI/catalyst/pull/2266)
@@ -407,10 +413,16 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* RTIO dialect is added to bypass the compilation flow from OpenAPL to ARTIQ’s LLVM IR. It is 
-  introduced to bridge the gap between ION dialect and ARTIQ’s LLVM IR. The design philosophy 
-  of RTIO dialect is primarily event-based. Every operation is asynchronous; sync behaviour occurs 
-  only via `rtio.sync` or `wait operand` in event operation. And we now support the compiling from 
+* xDSL and xDSL-JAX are now dependencies of Catalyst.
+  [(#2282)](https://github.com/PennyLaneAI/catalyst/pull/2282)
+
+* Python 3.14 is now officially supported. Added the forward capability with Python 3.14.
+  [(#2271)](https://github.com/PennyLaneAI/catalyst/pull/2271)
+
+* RTIO dialect is added to bypass the compilation flow from OpenAPL to ARTIQ’s LLVM IR. It is
+  introduced to bridge the gap between ION dialect and ARTIQ’s LLVM IR. The design philosophy
+  of RTIO dialect is primarily event-based. Every operation is asynchronous; sync behaviour occurs
+  only via `rtio.sync` or `wait operand` in event operation. And we now support the compiling from
   ION dialect to RTIO dilalect.
   [(#2185)](https://github.com/PennyLaneAI/catalyst/pull/2185)
   [(#2204)](https://github.com/PennyLaneAI/catalyst/pull/2204)
@@ -479,13 +491,14 @@
   gradient dialect and the `lower-gradients` compilation stage.
   [(#2241)](https://github.com/PennyLaneAI/catalyst/pull/2241)
 
-  * Added support for PPRs to the :func:`~.passes.merge_rotations` pass to merge PPRs with
-  equivalent angles, and cancelling of PPRs with opposite angles, or angles
-  that sum to identity. Also supports conditions on PPRs, merging when conditions are
-  identical and not merging otherwise.
-  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)
+  * Added support for PPRs and arbitrary angle PPRs to the :func:`~.passes.merge_rotations` pass.
+  This pass now merges PPRs with equivalent angles, and cancels PPRs with opposite angles, or
+  angles that sum to identity when the angles are known. The pass also supports conditions on PPRs,
+  merging when conditions are identical and not merging otherwise.
+  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)	
   [(#2245)](https://github.com/PennyLaneAI/catalyst/pull/2245)
   [(#2254)](https://github.com/PennyLaneAI/catalyst/pull/2254)
+  [(#2258)](https://github.com/PennyLaneAI/catalyst/pull/2258)
 
   * Refactor QEC tablegen files to separate QEC operations into a new `QECOp.td` file
   [(#2253](https://github.com/PennyLaneAI/catalyst/pull/2253)
@@ -500,10 +513,10 @@
 
 <h3>Documentation 📝</h3>
 
-* A new statevector simulator ``lightning.amdgpu`` has been added for optimized performance on AMD GPUs. 
+* A new statevector simulator ``lightning.amdgpu`` has been added for optimized performance on AMD GPUs.
   [(#2283)](https://github.com/PennyLaneAI/catalyst/pull/2283)
 
-  The ``lightning.amdgpu`` device is a specific instantiation of the ``lightning.kokkos`` backend, supporting the same features and operations as ``lightning.kokkos``, with pre-compiled wheels for ``lightning.amdgpu`` available on PyPI for easy installation to use on MI300 series AMD GPUs. 
+  The ``lightning.amdgpu`` device is a specific instantiation of the ``lightning.kokkos`` backend, supporting the same features and operations as ``lightning.kokkos``, with pre-compiled wheels for ``lightning.amdgpu`` available on PyPI for easy installation to use on MI300 series AMD GPUs.
 
   This device can be used within qjit'd workflows exactly as other devices compatible with Catalyst:
 
@@ -549,8 +562,10 @@ Joseph Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Lee J. O'Riordan,
+Mudit Pandey,
 Andrija Paurevic,
 Roberto Turrado,
 Paul Haochen Wang,
+David Wierichs,
 Jake Zaia,
 Hongsheng Zheng.
