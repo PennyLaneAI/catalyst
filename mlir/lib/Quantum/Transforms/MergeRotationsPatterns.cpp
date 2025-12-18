@@ -397,7 +397,7 @@ struct MergePPRRewritePattern : public OpRewritePattern<PPRotationOp> {
         // We need to construct the Pauli string + inQubits for new op. The simplest way to ensure
         // that permuted PPRs can merge correctly is to maintain output qubits order and permute
         // input qubits
-        SmallVector<mlir::Value> newInQubits;
+        SmallVector<Value> newInQubits;
         for (size_t i = 0; i < parentOpInQubits.size(); i++) {
             newInQubits.push_back(parentOpInQubits[inverse_permutation[i]]);
         }
@@ -431,7 +431,7 @@ struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbit
         }
 
         // verify that parentOp is parent of all qubits
-        for (mlir::Value qubit : opInQubits) {
+        for (Value qubit : opInQubits) {
             if (qubit.getDefiningOp() != parentOp) {
                 return failure();
             }
@@ -459,15 +459,15 @@ struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbit
         }
 
         // check same conditionals
-        mlir::Value opCondition = op.getCondition();
+        Value opCondition = op.getCondition();
         if (opCondition != parentOp.getCondition()) {
             return failure();
         }
 
         Location loc = op.getLoc();
 
-        mlir::Value opRotation = op.getArbitraryAngle();
-        mlir::Value parentOpRotation = parentOp.getArbitraryAngle();
+        Value opRotation = op.getArbitraryAngle();
+        Value parentOpRotation = parentOp.getArbitraryAngle();
         auto newAngleOp =
             rewriter.create<arith::AddFOp>(loc, opRotation, parentOpRotation).getResult();
 
@@ -475,7 +475,7 @@ struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbit
         // that permuted PPRs can merge correctly is to maintain output qubits order and permute
         // input qubits
         ValueRange parentOpInQubits = parentOp.getInQubits();
-        SmallVector<mlir::Value> newInQubits;
+        SmallVector<Value> newInQubits;
         for (size_t i = 0; i < parentOpInQubits.size(); i++) {
             newInQubits.push_back(parentOpInQubits[inverse_permutation[i]]);
         }
