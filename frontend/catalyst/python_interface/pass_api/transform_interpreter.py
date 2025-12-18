@@ -108,8 +108,7 @@ class TransformFunctionsExt(TransformFunctions):
         modified = _quantum_opt(*schedule, "-mlir-print-op-generic", stdin=buffer.getvalue())
 
         data = Parser(self.ctx, modified).parse_module()
-        rewriter = Rewriter()
-        rewriter.replace_op(module, data)
+        Rewriter.replace_op(module, data)
         self._post_pass_callback(pass_name, data)
         return (data,)
 

@@ -17,18 +17,24 @@ import subprocess
 from typing import Any
 from unittest.mock import MagicMock
 
+import pennylane as qml
 import pytest
 from xdsl.context import Context
-from xdsl.dialects import builtin, test, transform
+from xdsl.dialects import builtin, func, test, transform
 from xdsl.interpreter import Interpreter
 from xdsl.ir import Attribute, Block, Region, SSAValue
 from xdsl.passes import ModulePass
 
+from catalyst import qjit
+from catalyst.python_interface import QuantumParser
+from catalyst.python_interface.conversion import xdsl_from_qjit
+from catalyst.python_interface.dialects.quantum import CustomOp
 from catalyst.python_interface.pass_api.transform_interpreter import (
     TransformFunctionsExt,
     TransformInterpreterPass,
     _create_schedule,
 )
+from catalyst.python_interface.transforms import merge_rotations_pass
 
 pytestmark = pytest.mark.xdsl
 
@@ -79,7 +85,7 @@ def create_apply_registered_pass_op(
             "options": builtin.DictionaryAttr(lowered_options),
         },
         operands=(in_mod,),
-        result_types=(transform.OperationType(in_mod.type.operation),),
+        result_types=(transform.OperationType("builtin.module"),),
     )
     return pass_op
 
@@ -189,7 +195,7 @@ class TestTransformFunctionsExt:
     @pytest.mark.parametrize(
         "pass_options, cl_options",
         [
-            ({}, ""),
+            ({}, " "),
             (
                 {"a": 1, "b": 1.5, "c": (1, 2, 3, 4), "d": "string-input"},
                 "=a=1 b=1.5 c=1,2,3,4 d=string-input",
@@ -223,8 +229,6 @@ class TestTransformFunctionsExt:
         _ = fns.run_apply_registered_pass_op(Interpreter(module=mod), pass_op, (mod,))
 
         assert captured_cmd is not None
-        # args = list(filter(lambda arg: arg.startswith("--"), captured_cmd.split(" ")))
-        # assert f"--options-pass{cl_options}" in args
         assert f"--options-pass{cl_options}" in captured_cmd
 
 
@@ -239,7 +243,7 @@ def create_named_sequence_op(
     ops: list[transform.ApplyRegisteredPassOp] = []
 
     for pass_name, options in zip(pass_names, pass_options):
-        pass_op = create_apply_registered_pass_op(pass_name, in_mod, options)
+        pass_op = create_apply_registered_pass_op(pass_name, options=options, in_mod=in_mod)
         ops.append(pass_op)
         in_mod = pass_op.results[0]
     ops.append(transform.YieldOp())
@@ -248,7 +252,9 @@ def create_named_sequence_op(
     named_sequence_region = Region(named_sequence_block)
     named_sequence_op = transform.NamedSequenceOp(
         sym_name=TransformInterpreterPass.entry_point,
-        function_type=[transform.OperationType("builtin.module"), ()],
+        function_type=builtin.FunctionType.from_lists(
+            inputs=[transform.OperationType("builtin.module")], outputs=[]
+        ),
         body=named_sequence_region,
     )
     return named_sequence_op
@@ -259,21 +265,98 @@ def create_test_module(
 ) -> builtin.ModuleOp:
     """Create a module containing a NamedSequenceOp with the provided passes."""
     named_sequence_op = create_named_sequence_op(pass_names, pass_options)
-    module = builtin.ModuleOp([named_sequence_op])
-    return module
-
-
-# TODO: Add tests for xdsl->pyval conversion
-# Also, maybe move the conversion functions to utils folder
+    # In an integrated setting, a module corresponding to a QNode will have another module containing
+    # the NamedSequenceOp. The QNode module will be inside another module, which is usually the main
+    # workflow entry point.
+    inner_module = builtin.ModuleOp([builtin.ModuleOp([named_sequence_op])])
+    _ = builtin.ModuleOp([inner_module])
+    return inner_module
 
 
 class TestTransformInterpreterPass:
     """Unit tests for the TransformInterpreterPass."""
 
-    def test_interpret_named_sequence(self):
+    def test_interpret_named_sequence(self, mocker, capsys):
         """Test that a NamedSequenceOp can be interpreted correctly when it contains
         both xDSL and MLIR passes."""
+        pass_names = ["options-pass", "mlir-pass1", "options-pass", "mlir-pass2"]
+        pass_options = [{}, {"a": 1, "b": "foo"}, {"c": (1, 2, 3), "d": False}, {}]
+        mod = create_test_module(pass_names, pass_options)
 
+        captured_cmds = []
+        num_calls = 0
+
+        def mock_subprocess_run(cmd, **kwargs):
+            """Mock implementation of subprocess.run"""
+            nonlocal captured_cmds
+            nonlocal num_calls
+            captured_cmds.append(subprocess.list2cmdline(cmd))
+            num_calls += 1
+            return MagicMock(args=cmd, stdout=kwargs.get("input", ""), returncode=0)
+
+        mocker.patch("subprocess.run", side_effect=mock_subprocess_run)
+
+        _pass = TransformInterpreterPass(
+            passes={"options-pass": lambda: OptionsPass}, callback=None
+        )
+        ctx = Context()
+        ctx.load_dialect(builtin.Builtin)
+        ctx.load_dialect(transform.Transform)
+        _pass.apply(ctx, mod)
+
+        # Assert that xDSL passes were applied correctly
+        captured = capsys.readouterr()
+        assert captured.out.strip().split("\n") == [
+            f"Applying options-pass with options {pass_options[0]}",
+            f"Applying options-pass with options {pass_options[2]}",
+        ]
+
+        # Assert that MLIR passes were applied correctly
+        assert len(captured_cmds) == 2
+        assert "--mlir-pass1=a=1 b=foo" in captured_cmds[0]
+        # We check that there is a space after the pass name to check that no options were specified
+        assert "--mlir-pass2 " in captured_cmds[1]
+
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_qjit_with_passes_interpreted_correctly(self):
         """Test that applying the TransformInterpreter to a qjitted qnode's
         module correctly transforms it."""
+
+        dev = qml.device("null.qubit", wires=4)
+
+        @xdsl_from_qjit
+        @qjit
+        # merge_rotations_pass dispatches to an xDSL pass
+        @merge_rotations_pass
+        # qml.transforms.cancel_inverses dispatches to an MLIR pass
+        @qml.transforms.cancel_inverses
+        @qml.qnode(dev)
+        def circuit():
+            qml.RX(1.5, 0)
+            qml.RX(1.5, 0)
+            qml.X(1)
+            qml.X(1)
+            return qml.state()
+
+        mod = circuit()
+        qnode_mod = [op for op in mod.body.ops if isinstance(op, builtin.ModuleOp)][0]
+        _pass = TransformInterpreterPass(
+            passes={merge_rotations_pass.name: lambda: merge_rotations_pass.module_pass},
+            callback=None,
+        )
+        ctx = Context(allow_unregistered=True)
+        _ = QuantumParser(ctx, "")  # This loads necessary dialects into the context
+        # The Xs will be cancelled, and the RXs will be merged, so there should only be
+        # one RX remaining. We need to find the qnode module again because the original
+        # can be replaced by the pass
+        _pass.apply(ctx, qnode_mod)
+
+        qnode_mod = [op for op in mod.body.ops if isinstance(op, builtin.ModuleOp)][0]
+        qnode_fn = [op for op in qnode_mod.body.ops if isinstance(op, func.FuncOp)][0]
+        custom_ops = [op for op in qnode_fn.body.ops if isinstance(op, CustomOp)]
+        assert len(custom_ops) == 1
+        assert custom_ops[0].gate_name.data == "RX"
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

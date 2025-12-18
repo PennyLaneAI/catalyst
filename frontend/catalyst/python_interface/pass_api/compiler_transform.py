@@ -46,7 +46,7 @@ class PassDispatcher(TransformDispatcher):
         self.module_pass = module_pass
         self.name = module_pass.name
         tape_transform = _create_null_transform(self.name)
-        super().__init__(tape_transform)
+        super().__init__(tape_transform, pass_name=module_pass.name)
 
 
 def compiler_transform(module_pass: ModulePass) -> PassDispatcher:
