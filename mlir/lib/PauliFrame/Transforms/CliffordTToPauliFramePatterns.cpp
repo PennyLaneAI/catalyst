@@ -211,10 +211,8 @@ LogicalResult convertNonCliffordGate(CustomOp op, PatternRewriter &rewriter)
     auto loc = op->getLoc();
     auto outQubitTypes = op.getOutQubits().getTypes();
 
-    if (outQubitTypes.size() > 1) {
-        op->emitError() << "Only single-qubit non-Clifford gates are supported";
-        return failure();
-    }
+    assert(outQubitTypes.size() == 1 &&
+           "only single-qubit non-Clifford gates are supported (i.e. T gates)");
 
     auto outQubitType = outQubitTypes[0];
     auto inQubits = op.getInQubits();
