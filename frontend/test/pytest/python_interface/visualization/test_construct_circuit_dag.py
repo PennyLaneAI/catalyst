@@ -744,7 +744,7 @@ class TestGetLabel:
     @pytest.mark.parametrize(
         "op, label",
         [
-            (qml.H(0), "<name> H|<wire> [0]"),
+            (qml.H(0), "<name> Hadamard|<wire> [0]"),
             (
                 qml.QubitUnitary([[0, 1], [1, 0]], 0),
                 "<name> QubitUnitary|<wire> [0]",
@@ -764,8 +764,8 @@ class TestGetLabel:
         "meas, label",
         [
             (qml.state(), "<name> state|<wire> all"),
-            (qml.expval(qml.Z(0)), "<name> expval(Z)|<wire> [0]"),
-            (qml.var(qml.Z(0)), "<name> var(Z)|<wire> [0]"),
+            (qml.expval(qml.Z(0)), "<name> expval(PauliZ)|<wire> [0]"),
+            (qml.var(qml.Z(0)), "<name> var(PauliZ)|<wire> [0]"),
             (qml.probs(), "<name> probs|<wire> all"),
             (qml.probs(wires=0), "<name> probs|<wire> [0]"),
             (qml.probs(wires=[0, 1]), "<name> probs|<wire> [0, 1]"),
@@ -910,7 +910,38 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
-        assert nodes["node1"]["label"] == f"<name> MidMeasure|<wire> [0]"
+        assert nodes["node1"]["label"] == f"<name> MidMeasureMP|<wire> [0]"
+
+    @pytest.mark.skipif(not qml.capture.enabled(), reason="Only works with capture enabled.")
+    def test_complex_measurements(self):
+        """Tests that complex measurements can be created."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True)
+        @qml.qnode(dev)
+        def my_workflow():
+            coeffs = [0.2, -0.543]
+            obs = [qml.X(0) @ qml.Z(1), qml.Z(0) @ qml.Hadamard(2)]
+            ham = qml.ops.LinearCombination(coeffs, obs)
+
+            return (
+                qml.expval(ham),
+                qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)),
+            )
+
+        module = my_workflow()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + measurements
+
+        assert nodes["node1"]["label"] == f"<name> LinearCombination|<wire> [0, 1, 2]"
+        assert nodes["node2"]["label"] == f"<name> Prod|<wire> [0, 1]"
 
 
 @pytest.mark.usefixtures("use_both_frontend")
@@ -962,8 +993,8 @@ class TestCreateDynamicOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 3  # Device node + H + X
 
-        assert nodes["node1"]["label"] == f"<name> H|<wire> [arg0]"
-        assert nodes["node2"]["label"] == f"<name> X|<wire> [arg1]"
+        assert nodes["node1"]["label"] == f"<name> Hadamard|<wire> [arg0]"
+        assert nodes["node2"]["label"] == f"<name> PauliX|<wire> [arg1]"
 
     def test_for_loop_variable(self):
         """Tests that for loop iteration variables can be used as wires."""
@@ -986,7 +1017,7 @@ class TestCreateDynamicOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + H
 
-        assert nodes["node1"]["label"] == f"<name> H|<wire> [arg0]"
+        assert nodes["node1"]["label"] == f"<name> Hadamard|<wire> [arg0]"
 
     def test_while_loop_variable(self):
         """Tests that while loop variables can be used as wires."""
@@ -1011,7 +1042,7 @@ class TestCreateDynamicOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + H
 
-        assert nodes["node1"]["label"] == f"<name> H|<wire> [arg0]"
+        assert nodes["node1"]["label"] == f"<name> Hadamard|<wire> [arg0]"
 
     def test_conditional_variable(self):
         """Tests that conditional variables can be used."""
@@ -1035,7 +1066,7 @@ class TestCreateDynamicOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + H
 
-        assert nodes["node1"]["label"] == f"<name> H|<wire> [arg0]"
+        assert nodes["node1"]["label"] == f"<name> Hadamard|<wire> [arg0]"
 
     def test_through_clusters(self):
         """Tests that dynamic wire labels can be accessed through clusters."""
@@ -1060,8 +1091,8 @@ class TestCreateDynamicOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 3  # Device node + H + X
 
-        assert nodes["node1"]["label"] == f"<name> H|<wire> [arg0]"
-        assert nodes["node2"]["label"] == f"<name> X|<wire> [arg1]"
+        assert nodes["node1"]["label"] == f"<name> Hadamard|<wire> [arg0]"
+        assert nodes["node2"]["label"] == f"<name> PauliX|<wire> [arg1]"
 
     def test_visualize_pythonic_operators(self):
         """Tests that we can use operators like +,-,%"""
@@ -1254,8 +1285,8 @@ class TestCreateDynamicMeasurementNodes:
         assert len(nodes) == 5  # Device node + probs + expval + var + sample
 
         assert nodes["node1"]["label"] == f"<name> probs|<wire> [arg0]"
-        assert nodes["node2"]["label"] == f"<name> expval(Z)|<wire> [arg0]"
-        assert nodes["node3"]["label"] == f"<name> var(X)|<wire> [arg1]"
+        assert nodes["node2"]["label"] == f"<name> expval(PauliZ)|<wire> [arg0]"
+        assert nodes["node3"]["label"] == f"<name> var(PauliX)|<wire> [arg1]"
         assert nodes["node4"]["label"] == f"<name> sample|<wire> [arg0]"
 
     def test_visualize_pythonic_operators_on_meas(self):
@@ -1320,17 +1351,17 @@ class TestOperatorConnectivity:
         # Check all nodes
         # NOTE: Order of nodes isn't the same with/without capture
         if qml.capture.enabled():
-            assert "X" in nodes["node1"]["label"]
-            assert "Z" in nodes["node2"]["label"]
-            assert "Y" in nodes["node3"]["label"]
-            assert "H" in nodes["node4"]["label"]
+            assert "PauliX" in nodes["node1"]["label"]
+            assert "PauliZ" in nodes["node2"]["label"]
+            assert "PauliY" in nodes["node3"]["label"]
+            assert "Hadamard" in nodes["node4"]["label"]
             assert "S" in nodes["node5"]["label"]
             assert "T" in nodes["node6"]["label"]
         else:
-            assert "X" in nodes["node1"]["label"]
-            assert "Y" in nodes["node2"]["label"]
-            assert "Z" in nodes["node3"]["label"]
-            assert "H" in nodes["node4"]["label"]
+            assert "PauliX" in nodes["node1"]["label"]
+            assert "PauliY" in nodes["node2"]["label"]
+            assert "PauliZ" in nodes["node3"]["label"]
+            assert "Hadamard" in nodes["node4"]["label"]
             assert "S" in nodes["node5"]["label"]
             assert "T" in nodes["node6"]["label"]
 
@@ -1377,8 +1408,8 @@ class TestOperatorConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "X" in nodes["node1"]["label"]
-        assert "Y" in nodes["node2"]["label"]
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
 
         # Check edges
         #    for loop
@@ -1412,8 +1443,8 @@ class TestOperatorConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "X" in nodes["node1"]["label"]
-        assert "Y" in nodes["node2"]["label"]
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
 
         # Check edges
         #    while loop
@@ -1452,15 +1483,15 @@ class TestOperatorConnectivity:
         nodes = utility.dag_builder.nodes
 
         expected_edges = (
-            ("NullQubit", "X"),
+            ("NullQubit", "PauliX"),
             ("NullQubit", "T"),
             ("T", "S"),
-            ("X", "RX"),
-            ("X", "RY"),
-            ("X", "RZ"),
-            ("RX", "H"),
-            ("RY", "H"),
-            ("RZ", "H"),
+            ("PauliX", "RX"),
+            ("PauliXX", "RY"),
+            ("PauliXX", "RZ"),
+            ("RX", "Hadamard"),
+            ("RY", "Hadamard"),
+            ("RZ", "Hadamard"),
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
@@ -1494,14 +1525,14 @@ class TestOperatorConnectivity:
         nodes = utility.dag_builder.nodes
 
         expected_edges = (
-            ("NullQubit", "X"),
+            ("NullQubit", "PauliX"),
             ("NullQubit", "T"),
             ("T", "Y"),
-            ("X", "H"),
-            ("X", "RZ"),
-            ("X", "Z"),
-            ("RZ", "H"),
-            ("Z", "H"),
+            ("PauliX", "Hadamard"),
+            ("PauliX", "RZ"),
+            ("PauliX", "PauliZ"),
+            ("RZ", "Hadamard"),
+            ("PauliZ", "Hadamard"),
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
@@ -1566,16 +1597,16 @@ class TestOperatorConnectivity:
         nodes = utility.dag_builder.nodes
 
         expected_edges = (
-            ("NullQubit", "X"),
-            ("NullQubit", "Y"),
-            ("NullQubit", "Z"),
+            ("NullQubit", "PauliX"),
+            ("NullQubit", "PauliY"),
+            ("NullQubit", "PauliZ"),
             # choke into the dynamic hadamard
-            ("X", "H", {"style": "dashed"}),
-            ("Y", "H", {"style": "dashed"}),
-            ("Z", "H", {"style": "dashed"}),
+            ("PauliX", "Hadamard", {"style": "dashed"}),
+            ("PauliY", "Hadamard", {"style": "dashed"}),
+            ("PauliZ", "Hadamard", {"style": "dashed"}),
             # fan out to static ops
-            ("H", "S"),
-            ("H", "T"),
+            ("Hadamard", "S"),
+            ("Hadamard", "T"),
             # choke again
             ("S", "RY", {"style": "dashed"}),
             ("T", "RY", {"style": "dashed"}),
@@ -1605,7 +1636,7 @@ class TestOperatorConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "H" in nodes["node1"]["label"]
+        assert "Hadamard" in nodes["node1"]["label"]
 
         # Check all edges
         assert len(edges) == 1
@@ -1636,9 +1667,9 @@ class TestOperatorConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "X" in nodes["node1"]["label"]
-        assert "Y" in nodes["node2"]["label"]
-        assert "Z" in nodes["node3"]["label"]
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+        assert "PauliZ" in nodes["node3"]["label"]
 
         # Check all edges
         assert len(edges) == 3
@@ -1677,7 +1708,7 @@ class TestTerminalMeasurementConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "X" in nodes["node1"]["label"]
+        assert "PauliX" in nodes["node1"]["label"]
         assert "T" in nodes["node2"]["label"]
         assert meas_fn.__name__ in nodes["node3"]["label"]
 
@@ -1720,10 +1751,10 @@ class TestTerminalMeasurementConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "X" in nodes["node1"]["label"]
-        assert "Y" in nodes["node2"]["label"]
-        assert "Z" in nodes["node3"]["label"]
-        assert "H" in nodes["node4"]["label"]
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+        assert "PauliZ" in nodes["node3"]["label"]
+        assert "Hadamard" in nodes["node4"]["label"]
         assert "expval" in nodes["node5"]["label"]
         assert "var" in nodes["node6"]["label"]
         assert "probs" in nodes["node7"]["label"]
@@ -1764,8 +1795,8 @@ class TestTerminalMeasurementConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "X" in nodes["node1"]["label"]
-        assert "Y" in nodes["node2"]["label"]
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
         assert "probs" in nodes["node3"]["label"]
 
         # Check all edges
@@ -1822,9 +1853,9 @@ class TestTerminalMeasurementConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "X" in nodes["node1"]["label"]
-        assert "Y" in nodes["node2"]["label"]
-        assert "Z" in nodes["node3"]["label"]
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+        assert "PauliZ" in nodes["node3"]["label"]
         assert "probs" in nodes["node4"]["label"]
 
         # Check all edges
@@ -1863,10 +1894,10 @@ class TestTerminalMeasurementConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "X" in nodes["node1"]["label"]
-        assert "Y" in nodes["node2"]["label"]
-        assert "H" in nodes["node3"]["label"]
-        assert "expval(Z)" in nodes["node4"]["label"]
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+        assert "Hadamard" in nodes["node3"]["label"]
+        assert "expval(PauliZ)" in nodes["node4"]["label"]
 
         # Check all edges
         assert len(edges) == 4
@@ -1902,9 +1933,9 @@ class TestTerminalMeasurementConnectivity:
         # node0 -> NullQubit
 
         # Check all nodes
-        assert "X" in nodes["node1"]["label"]
-        assert "Y" in nodes["node2"]["label"]
-        assert "expval(Z)" in nodes["node3"]["label"]
+        assert "PauliX" in nodes["node1"]["label"]
+        assert "PauliY" in nodes["node2"]["label"]
+        assert "expval(PauliZ)" in nodes["node3"]["label"]
 
         # Check all edges
         assert len(edges) == 3
@@ -2086,7 +2117,7 @@ class TestAdjoint:
         # cluster1 -> my_workflow
         assert clusters["cluster2"]["label"] == "adjoint"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
-        assert "H" in nodes["node1"]["label"]
+        assert "Hadamard" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster2"
 
     def test_adjoint_operator_instance(self):
@@ -2138,5 +2169,5 @@ class TestAdjoint:
         # cluster1 -> my_workflow
         assert clusters["cluster2"]["label"] == "adjoint"
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
-        assert "H" in nodes["node1"]["label"]
+        assert "Hadamard" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster2"

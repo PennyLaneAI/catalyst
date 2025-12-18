@@ -555,12 +555,7 @@ def _operator(op: Operator) -> str:
     else:
         wires_str = f"[{', '.join(map(str, wires))}]"
     # Using <...> lets us use ports (https://graphviz.org/doc/info/shapes.html#record)
-    if hasattr(op, "base"):
-        # TODO: Simplify if controlled or adjoint
-        name_str = op.name
-    else:
-        name_str = str(op).rsplit("(")[0]
-    return f"<name> {name_str}|<wire> {wires_str}"
+    return f"<name> {op.name}|<wire> {wires_str}"
 
 
 @get_label.register
@@ -578,7 +573,7 @@ def _meas(meas: MeasurementProcess) -> str:
     match meas:
         case ExpectationMP() | VarianceMP() | ProbabilityMP():
             if meas.obs is not None:
-                obs_name = str(meas.obs).split("(")[0]
+                obs_name = meas.obs.name
                 base_name = f"{base_name}({obs_name})"
 
         case _:
