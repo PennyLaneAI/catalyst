@@ -36,5 +36,5 @@ pennylane-lightning-kokkos
 amazon-braket-pennylane-plugin>1.27.1; python_version < "3.14"
 xdsl
 xdsl-jax
-pydot # Graph visualization requirement
+pydot # Graph visualization backend requirement
 matplotlib # Graph visualization frontend requirement
