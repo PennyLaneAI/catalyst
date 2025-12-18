@@ -252,7 +252,6 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                 # to deal with decomposition of symbolic operations at PLxPR.
                 raise ValueError(f"Could not capture {op} without the number of wires.")
 
-
     def interpret_measurement(self, measurement: "qml.measurement.MeasurementProcess"):
         """Interpret a measurement process instance.
 
