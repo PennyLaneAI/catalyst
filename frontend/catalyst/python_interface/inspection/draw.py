@@ -59,14 +59,13 @@ def draw(qnode: QNode, *, level: None | int = None) -> Callable:
     If no passes are applied, the original QNode is visualized.
 
     Args:
-        qnode (.QNode): the input QNode that is to be visualized. The QNode is assumed to be
+        qnode (QNode): the input QNode that is to be visualized. The QNode is assumed to be
             compiled with ``qjit``.
-        level (None | int): the level of transformation to visualize. If `None`, the final
+        level (int | None): the level of transformation to visualize. If `None`, the final
             level is visualized.
 
-
     Returns:
-        Callable: A wrapper function that visualizes the QNode at the specified level.
+        fn (Callable): A wrapper function that visualizes the QNode at the specified level.
 
     """
     cache: dict[int, tuple[str, str]] = _cache_store.setdefault(qnode, {})
@@ -104,7 +103,7 @@ def draw(qnode: QNode, *, level: None | int = None) -> Callable:
     return wrapper
 
 
-def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
+def draw_graph(qnode: QNode, *, level: int | None = None) -> Callable:
     """
     Visualize QNodes as graphs, showing wire flow through quantum operations, program structure, and
     pass-by-pass impacts on compiled programs.
@@ -122,13 +121,13 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
         :func:`pennylane.capture.enable`.
 
     Args:
-        qnode (.QNode): the input QNode that is to be visualized. The QNode is assumed to be
+        qnode (QNode): The input QNode that is to be visualized. The QNode is assumed to be
             compiled with ``qjit``.
-        level (None | int): the level of transformation to visualize. If ``None``, the final
+        level (int | None): The level of transformation to visualize. If ``None``, the final
             level is visualized. # what are default options?
 
     Returns:
-        Callable: A function that has the same argument signature as the compiled ``qnode``.
+        fn (Callable): A function that has the same argument signature as the compiled ``qnode``.
             When called, the function will return the graph as a tuple of
             (``matplotlib.figure.Figure``, ``matplotlib.axes._axes.Axes``).
 
