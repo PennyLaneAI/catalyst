@@ -267,7 +267,7 @@ class TestMLIRSpecs:
 
         with pytest.raises(
             ValueError,
-            match="The provided `qnode` argument does not appear to be a valid QJIT compiled QNode.",
+            match="The provided `qnode` argument does not appear to be a valid QJIT compiled QNode."
         ):
             mlir_specs(not_a_qnode, level=0)
 
@@ -278,12 +278,13 @@ class TestMLIRSpecs:
 
         @qml.qjit
         @qml.qnode(dev)
-        def circ(x):
+        def circ(wire):
             qml.X(0)
+            qml.X(wire)
 
         res = mlir_specs(circ, 0, 1)
         expected = make_static_resources(
-            operations={"PauliX": {1: 1}},
+            operations={"PauliX": {1: 2}},
             measurements={},
             num_allocs=1,
         )
