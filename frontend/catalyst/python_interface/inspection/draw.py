@@ -26,8 +26,8 @@ from pennylane.tape import QuantumScript
 from xdsl.dialects.builtin import ModuleOp
 
 from catalyst.jit import QJIT
-from catalyst.python_interface.compiler import Compiler
 from catalyst.passes.pass_api import PassPipelineWrapper
+from catalyst.python_interface.compiler import Compiler
 
 from ..visualization.construct_circuit_dag import ConstructCircuitDAG
 from ..visualization.pydot_dag_builder import PyDotDAGBuilder
