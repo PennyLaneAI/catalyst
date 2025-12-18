@@ -488,8 +488,8 @@
   operations for interacting with an external Pauli frame tracking library.
   [(#2188)](https://github.com/PennyLaneAI/catalyst/pull/2188)
 
-* A new `to-pauli-frame` compilation pass has been added, which applies the Pauli frame tracking protocols to
-  a Clifford+T program.
+* A new `to-pauli-frame` compilation pass has been added, which applies the Pauli frame tracking
+  protocols to a Clifford+T program.
   [(#2269)](https://github.com/PennyLaneAI/catalyst/pull/2269)
 
 <h3>Documentation 📝</h3>
