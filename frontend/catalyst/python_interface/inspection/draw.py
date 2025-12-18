@@ -67,7 +67,8 @@ def draw(qnode: QNode, *, level: None | int = None) -> Callable:
             level is visualized.
 
     Returns:
-        fn (Callable): A wrapper function that visualizes the QNode at the specified level.
+        Callable:
+            A wrapper function that visualizes the QNode at the specified level.
 
     """
     cache: dict[int, tuple[str, str]] = _cache_store.setdefault(qnode, {})
