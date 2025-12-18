@@ -195,7 +195,7 @@ jobs:
 
     - name: Run Frontend Tests (Kokkos)
       run: |
-        make pytest TEST_BACKEND="lightning.kokkos"
+        make pytest TEST_BACKEND="lightning.kokkos" XDSL_TESTS=OFF
 
     - name: Run Frontend Tests (Braket)
       run: |

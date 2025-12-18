@@ -51,7 +51,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install ninja-build make cmake clang
+          sudo apt-get -y -q install ninja-build make cmake clang libboost-all-dev
           python3 -m pip install nanobind pybind11
 
       - name: Get Cached LLVM Source
@@ -473,6 +473,9 @@ jobs:
         # macOS requirements.txt
         python3 -m pip install cuda-quantum==0.6.0
         python3 -m pip install oqc-qcaas-client
+        # Install graphviz for testing the mlir-op-graph integration
+        sudo apt-get install -y graphviz
+        python3 -m pip install graphviz
         make frontend
 
     - name: Get Cached LLVM Build
@@ -588,7 +591,8 @@ jobs:
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
-        make pytest TEST_BACKEND="lightning.kokkos"
+        # Don't run xDSL tests
+        make pytest TEST_BACKEND="lightning.kokkos" XDSL_TESTS=OFF
 
   frontend-tests-openqasm-device:
     name: Frontend Tests (backend="openqasm3")
@@ -702,7 +706,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get -y -q install cmake ninja-build
+          sudo apt-get -y -q install cmake ninja-build libboost-all-dev
           python3 -m pip install nanobind pybind11
 
       - name: Install lcov # Manually install lcov_1.15-1_all
