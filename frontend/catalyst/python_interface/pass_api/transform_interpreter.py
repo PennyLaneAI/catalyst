@@ -43,6 +43,7 @@ from xdsl.rewriter import Rewriter
 from xdsl.utils.exceptions import PassFailedException
 
 from catalyst.compiler import _quantum_opt
+from catalyst.python_interface.utils import get_pyval_from_xdsl_attr
 
 
 @register_impls
@@ -91,7 +92,7 @@ class TransformFunctionsExt(TransformFunctions):
         # ---- xDSL path ----
         if pass_name in self.passes:
             pass_class = self.passes[pass_name]()
-            options = _get_pyvals_from_xdsl_attr(op.options)
+            options = get_pyval_from_xdsl_attr(op.options)
             pass_instance = pass_class(**options)
             pipeline = PassPipeline((pass_instance,))
             self._pre_pass_callback(pass_instance, module)

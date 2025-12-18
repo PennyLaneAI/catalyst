@@ -21,14 +21,13 @@ import pytest
 from xdsl.context import Context
 from xdsl.dialects import builtin, test, transform
 from xdsl.ir import Attribute, Block, Region, SSAValue
-from xdsl.passes import ModulePass, PassPipeline
+from xdsl.passes import ModulePass
 
 from catalyst.python_interface.pass_api.transform_interpreter import (
     TransformFunctionsExt,
     TransformInterpreterPass,
     _create_schedule,
 )
-from catalyst.python_interface.transforms import MergeRotationsPass
 
 pytestmark = pytest.mark.xdsl
 
@@ -208,12 +207,13 @@ class TestTransformFunctionsExt:
         pass_op = create_apply_registered_pass_op(pass_name="options-pass", options=pass_options)
         captured_cmd = None
 
-        def dummy_subprocess_run(cmd, input=None, **__):
+        def mock_subprocess_run(cmd, **kwargs):
+            """Mock implementation of subprocess.run"""
             nonlocal captured_cmd
             captured_cmd = subprocess.list2cmdline(cmd)
-            return MagicMock(args=cmd, stdout=input, returncode=0)
+            return MagicMock(args=cmd, stdout=kwargs.get("input", ""), returncode=0)
 
-        mocker.patch("subprocess.run", side_effect=dummy_subprocess_run)
+        mocker.patch("subprocess.run", side_effect=mock_subprocess_run)
 
         mod = builtin.ModuleOp([])
         # This is just a silly step needed because the interpreter assumes that we're transforming

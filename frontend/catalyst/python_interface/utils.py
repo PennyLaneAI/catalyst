@@ -87,7 +87,7 @@ def get_constant_from_ssa(value: SSAValue) -> Number | None:
     return None
 
 
-def _get_pyvals_from_xdsl_attr(attr: Attribute) -> Any:
+def get_pyval_from_xdsl_attr(attr: Attribute) -> Any:
     """Get a Python value from an xDSL attribute."""
     val = None
 
@@ -106,10 +106,10 @@ def _get_pyvals_from_xdsl_attr(attr: Attribute) -> Any:
             val = attr.data
 
         case ArrayAttr():
-            val = tuple(_get_pyvals_from_xdsl_attr(_attr) for _attr in attr.data)
+            val = tuple(get_pyval_from_xdsl_attr(_attr) for _attr in attr.data)
 
         case DictionaryAttr():
-            val = {k: _get_pyvals_from_xdsl_attr(v) for k, v in attr.data.items()}
+            val = {k: get_pyval_from_xdsl_attr(v) for k, v in attr.data.items()}
 
         case _:  # pragma: no cover
             raise ValueError(f"{attr} cannot be converted to a Python value.")
