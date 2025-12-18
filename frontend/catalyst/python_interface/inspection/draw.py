@@ -131,9 +131,10 @@ def draw_graph(qnode: QNode, *, level: int | None = None) -> Callable:
             The level of transformation to visualize. If ``None``, the final level is visualized.
 
     Returns:
-        Callable: A function that has the same argument signature as the compiled QNode. When
-          called, the function will return the graph as a tuple of (``matplotlib.figure.Figure``,
-          ``matplotlib.axes._axes.Axes``).
+        Callable:
+            A function that has the same argument signature as the compiled QNode.
+            When called, the function will return the graph as a tuple of (``matplotlib.figure.Figure``,
+            ``matplotlib.axes._axes.Axes``).
 
     Raises:
         VisualizationError:
