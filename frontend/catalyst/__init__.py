@@ -176,6 +176,7 @@ __all__ = (
     "debug_assert",
     "CompileOptions",
     "debug",
+    "draw_graph",
     "passes",
     "pipeline",
     *_api_extension_list,
