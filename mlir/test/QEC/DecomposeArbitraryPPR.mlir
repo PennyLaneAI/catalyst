@@ -16,6 +16,7 @@
 
 func.func @test_arb_ppr_to_arb_z_0(%q1 : !quantum.bit, %q2 : !quantum.bit){
 
+    // CHECK-LABEL: @test_arb_ppr_to_arb_z_0
     // CHECK: ([[Q0:%.+]]: !quantum.bit, [[Q1:%.+]]: !quantum.bit)
 
     // CHECK: [[C:%.+]] = arith.constant 1.230000e-01 : f64
@@ -37,6 +38,7 @@ func.func @test_arb_ppr_to_arb_z_0(%q1 : !quantum.bit, %q2 : !quantum.bit){
 
 func.func @test_arb_ppr_to_arb_z_1(%q1 : !quantum.bit, %q2 : !quantum.bit, %angle : f64){
 
+    // CHECK-LABEL: @test_arb_ppr_to_arb_z_1
     // CHECK: ({{.*}} [[ANGLE:%.+]]: f64)
     
     // CHECK: quantum.alloc_qb
@@ -68,6 +70,7 @@ func.func @test_arb_ppr_to_arb_z_1(%q1 : !quantum.bit, %q2 : !quantum.bit, %angl
 // Single-qubit Pauli-Z PPR should not be decomposed.
 func.func @test_arb_ppr_to_arb_z_2(%q1: !quantum.bit, %angle : f64){
 
+    // CHECK-LABEL: @test_arb_ppr_to_arb_z_2
     // CHECK: ([[Q1:%.+]]: !quantum.bit, [[ANGLE:%.+]]: f64)
     // CHECK: qec.ppr.arbitrary ["Z"]([[ANGLE]]) [[Q1]]
     %Q1 = qec.ppr.arbitrary ["Z"](%angle) %q1 : !quantum.bit
