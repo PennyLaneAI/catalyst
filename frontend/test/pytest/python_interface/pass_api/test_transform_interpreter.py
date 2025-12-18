@@ -20,6 +20,7 @@ from unittest.mock import MagicMock
 import pytest
 from xdsl.context import Context
 from xdsl.dialects import builtin, test, transform
+from xdsl.interpreter import Interpreter
 from xdsl.ir import Attribute, Block, Region, SSAValue
 from xdsl.passes import ModulePass
 
@@ -180,7 +181,7 @@ class TestTransformFunctionsExt:
         pass_op = create_apply_registered_pass_op(pass_name="options-pass", options=pass_options)
 
         mod = builtin.ModuleOp([])
-        outs = fns.run_apply_registered_pass_op(None, pass_op, (mod,))
+        outs = fns.run_apply_registered_pass_op(Interpreter(module=mod), pass_op, (mod,))
         assert outs.values[0] is mod
         captured = capsys.readouterr()
         assert captured.out.strip() == f"Applying options-pass with options {pass_options}"
@@ -197,12 +198,12 @@ class TestTransformFunctionsExt:
     )
     def test_mlir_pass(self, pass_options, cl_options, mocker):
         """Test that interpreting an MLIR pass works correctly."""
-        # The passes dict is empty, so when we're interpreting the pass it will be assumed to
-        # be an MLIR pass
         ctx = Context()
         ctx.load_dialect(builtin.Builtin)
         ctx.load_dialect(transform.Transform)
 
+        # The passes dict is empty, so when we're interpreting the pass it will be assumed to
+        # be an MLIR pass
         fns = TransformFunctionsExt(ctx, passes={})
         pass_op = create_apply_registered_pass_op(pass_name="options-pass", options=pass_options)
         captured_cmd = None
@@ -219,7 +220,7 @@ class TestTransformFunctionsExt:
         # This is just a silly step needed because the interpreter assumes that we're transforming
         # a nested module, so `mod` needs to have a parent op to work correctly
         _ = builtin.ModuleOp([mod])
-        _ = fns.run_apply_registered_pass_op(None, pass_op, (mod,))
+        _ = fns.run_apply_registered_pass_op(Interpreter(module=mod), pass_op, (mod,))
 
         assert captured_cmd is not None
         # args = list(filter(lambda arg: arg.startswith("--"), captured_cmd.split(" ")))
