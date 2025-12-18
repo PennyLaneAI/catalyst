@@ -313,3 +313,60 @@ func.func @test_to_pauli_frame_multiple_compbasis_obs(%arg0 : !quantum.bit) -> (
     // CHECK: return
     func.return
 }
+
+// -----
+
+// COM: This test checks that we correctly handle programs with multiple namedobs observables
+// COM: acting on the same qubit and ensure that we only flush the Pauli record for this qubit once.
+// CHECK-LABEL: test_to_pauli_frame_multiple_namedobs
+func.func @test_to_pauli_frame_multiple_namedobs(%arg0 : !quantum.bit) -> () {
+    // CHECK: [[q0:%.+]] = quantum.custom "Hadamard"()
+    %q0 = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+    // CHECK: pauli_frame.flush [[q0]]
+    // CHECK: scf.if {{%.+}} -> (!quantum.bit) {
+    // CHECK:   quantum.custom "X"()
+    // CHECK: }
+    // CHECK: [[q1:%.+]] = scf.if {{%.+}} -> (!quantum.bit) {
+    // CHECK:   quantum.custom "Z"()
+    // CHECK: }
+    // CHECK: [[obs0:%.+]] = quantum.namedobs [[q1]][ PauliZ] : !quantum.obs
+    // CHECK: quantum.expval [[obs0]]
+    %obs0 = quantum.namedobs %q0 [PauliZ] : !quantum.obs
+    %expval = quantum.expval %obs0 : f64
+    // CHECK-NOT: pauli_frame.flush
+    // CHECK: [[obs1:%.+]] = quantum.namedobs [[q1]][ PauliZ] : !quantum.obs
+    // CHECK: quantum.var [[obs1]]
+    %obs1 = quantum.namedobs %q0 [PauliZ] : !quantum.obs
+    %var = quantum.var %obs1 : f64
+    // CHECK: return
+    func.return
+}
+
+// -----
+
+// COM: This test checks that we correctly handle programs with multiple observable types (compbasis
+// COM: and namedobs) acting on the same qubit and ensure that we only flush the Pauli record for
+// COM: this qubit once.
+// CHECK-LABEL: test_to_pauli_frame_multiple_obs_types
+func.func @test_to_pauli_frame_multiple_obs_types(%arg0 : !quantum.bit) -> () {
+    // CHECK: [[q0:%.+]] = quantum.custom "Hadamard"()
+    %q0 = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+    // CHECK: pauli_frame.flush [[q0]]
+    // CHECK: scf.if {{%.+}} -> (!quantum.bit) {
+    // CHECK:   quantum.custom "X"()
+    // CHECK: }
+    // CHECK: [[q1:%.+]] = scf.if {{%.+}} -> (!quantum.bit) {
+    // CHECK:   quantum.custom "Z"()
+    // CHECK: }
+    // CHECK: [[obs0:%.+]] = quantum.compbasis qubits [[q1]] : !quantum.obs
+    // CHECK: quantum.sample [[obs0]] : tensor<1000x1xf64>
+    %obs0 = quantum.compbasis qubits %q0 : !quantum.obs
+    %samples = quantum.sample %obs0 : tensor<1000x1xf64>
+    // CHECK-NOT: pauli_frame.flush
+    // CHECK: [[obs1:%.+]] = quantum.namedobs [[q1]][ PauliZ] : !quantum.obs
+    // CHECK: quantum.var [[obs1]]
+    %obs1 = quantum.namedobs %q0 [PauliZ] : !quantum.obs
+    %var = quantum.var %obs1 : f64
+    // CHECK: return
+    func.return
+}
