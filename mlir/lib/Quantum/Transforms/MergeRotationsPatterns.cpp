@@ -33,16 +33,16 @@ using namespace mlir;
 using namespace catalyst::quantum;
 using namespace catalyst::qec;
 
-static const mlir::StringSet<> fixedRotationsAndPhaseShiftsSet = {
+static const StringSet<> fixedRotationsAndPhaseShiftsSet = {
     "RX", "RY", "RZ", "PhaseShift", "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
-static const mlir::StringSet<> arbitraryRotationsSet = {"Rot", "CRot"};
+static const StringSet<> arbitraryRotationsSet = {"Rot", "CRot"};
 
 namespace {
 
-// convertOpParamsToValues: helper function for extracting CustomOp parameters as mlir::Values
-SmallVector<mlir::Value> convertOpParamsToValues(CustomOp &op, PatternRewriter &rewriter)
+// convertOpParamsToValues: helper function for extracting CustomOp parameters as Values
+SmallVector<Value> convertOpParamsToValues(CustomOp &op, PatternRewriter &rewriter)
 {
-    SmallVector<mlir::Value> values;
+    SmallVector<Value> values;
     auto params = op.getParams();
     for (auto param : params) {
         values.push_back(param);
@@ -53,7 +53,7 @@ SmallVector<mlir::Value> convertOpParamsToValues(CustomOp &op, PatternRewriter &
 // getStaticValuesOrNothing: helper function for extracting Rot or CRot parameters as:
 // - doubles, in case they are constant
 // - std::nullopt, otherwise
-std::array<std::optional<double>, 3> getStaticValuesOrNothing(const SmallVector<mlir::Value> values)
+std::array<std::optional<double>, 3> getStaticValuesOrNothing(const SmallVector<Value> values)
 {
     assert(values.size() == 3 && "found Rot or CRot operation should have exactly 3 parameters");
     auto staticValues = std::array<std::optional<double>, 3>{};
@@ -88,15 +88,14 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
         ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
 
         // Extract parameters of the op and its parent,
-        // promoting the parameters to mlir::Values if necessary
+        // promoting the parameters to Values if necessary
         auto parentParams = convertOpParamsToValues(parentOp, rewriter);
         auto params = convertOpParamsToValues(op, rewriter);
 
         auto loc = op.getLoc();
-        SmallVector<mlir::Value> sumParams;
+        SmallVector<Value> sumParams;
         for (auto [param, parentParam] : llvm::zip(params, parentParams)) {
-            mlir::Value sumParam =
-                rewriter.create<arith::AddFOp>(loc, parentParam, param).getResult();
+            Value sumParam = rewriter.create<arith::AddFOp>(loc, parentParam, param).getResult();
             sumParams.push_back(sumParam);
         }
         auto mergeOp = rewriter.create<CustomOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParams,
@@ -122,25 +121,25 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
         ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
 
         // Extract parameters of the op and its parent,
-        // promoting the parameters to mlir::Values if necessary
+        // promoting the parameters to Values if necessary
         auto parentParams = convertOpParamsToValues(parentOp, rewriter);
         auto params = convertOpParamsToValues(op, rewriter);
 
         // Parent params are ϕ1, θ1, and ω1
         // Params are ϕ2, θ2, and ω2
-        mlir::Value phi1 = parentParams[0];
-        mlir::Value theta1 = parentParams[1];
-        mlir::Value omega1 = parentParams[2];
-        mlir::Value phi2 = params[0];
-        mlir::Value theta2 = params[1];
-        mlir::Value omega2 = params[2];
+        Value phi1 = parentParams[0];
+        Value theta1 = parentParams[1];
+        Value omega1 = parentParams[2];
+        Value phi2 = params[0];
+        Value theta2 = params[1];
+        Value omega2 = params[2];
 
         auto [phi1Opt, theta1Opt, omega1Opt] = getStaticValuesOrNothing(parentParams);
         auto [phi2Opt, theta2Opt, omega2Opt] = getStaticValuesOrNothing(params);
 
-        mlir::Value phiF;
-        mlir::Value thetaF;
-        mlir::Value omegaF;
+        Value phiF;
+        Value thetaF;
+        Value omegaF;
 
         // TODO: should we use an epsilon for comparing doubles here?
         bool omega1IsZero = omega1Opt.has_value() && omega1Opt.value() == 0.0;
@@ -289,7 +288,7 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
             omegaF = rewriter.create<arith::SubFOp>(loc, alphaF, betaF);
         }
 
-        auto sumParams = SmallVector<mlir::Value>{phiF, thetaF, omegaF};
+        auto sumParams = SmallVector<Value>{phiF, thetaF, omegaF};
         auto mergeOp = rewriter.create<CustomOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParams,
                                                  parentInQubits, op.getGateName(), false,
                                                  parentInCtrlQubits, parentInCtrlValues);
@@ -396,6 +395,86 @@ struct MergePPRRewritePattern : public OpRewritePattern<PPRotationOp> {
     }
 };
 
+struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbitraryOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(PPRotationArbitraryOp op,
+                                  PatternRewriter &rewriter) const override
+    {
+        ValueRange opInQubits = op.getInQubits();
+
+        Operation *definingOp = opInQubits[0].getDefiningOp();
+        if (!definingOp) {
+            return failure();
+        }
+
+        auto parentOp = dyn_cast<PPRotationArbitraryOp>(definingOp);
+        if (!parentOp) {
+            return failure();
+        }
+
+        // verify that parentOp is parent of all qubits
+        for (mlir::Value qubit : opInQubits) {
+            if (qubit.getDefiningOp() != parentOp) {
+                return failure();
+            }
+        }
+        ValueRange parentOpOutQubits = parentOp.getOutQubits();
+        if (parentOpOutQubits.size() != opInQubits.size()) {
+            return failure();
+        }
+
+        // When two rotations have permuted Pauli strings, we can still merge them, we just need to
+        // correctly re-map the inputs. This map stores the index of a qubit in parentOp's out
+        // qubits at the index it appears in op's in qubits.
+        SmallVector<unsigned> inverse_permutation;
+        for (auto qubit : opInQubits) {
+            inverse_permutation.push_back(cast<OpResult>(qubit).getResultNumber());
+        }
+
+        // check Pauli + qubit pairings
+        ArrayAttr opPauliProduct = op.getPauliProduct();
+        ArrayAttr parentOpPauliProduct = parentOp.getPauliProduct();
+        for (size_t i = 0; i < opInQubits.size(); i++) {
+            if (opPauliProduct[i] != parentOpPauliProduct[inverse_permutation[i]]) {
+                return failure();
+            }
+        }
+
+        // check same conditionals
+        mlir::Value opCondition = op.getCondition();
+        if (opCondition != parentOp.getCondition()) {
+            return failure();
+        }
+
+        Location loc = op.getLoc();
+
+        mlir::Value opRotation = op.getArbitraryAngle();
+        mlir::Value parentOpRotation = parentOp.getArbitraryAngle();
+        auto newAngleOp =
+            rewriter.create<arith::AddFOp>(loc, opRotation, parentOpRotation).getResult();
+
+        // We need to construct the Pauli string + inQubits for new op. The simplest way to ensure
+        // that permuted PPRs can merge correctly is to maintain output qubits order and permute
+        // input qubits
+        ValueRange parentOpInQubits = parentOp.getInQubits();
+        SmallVector<mlir::Value> newInQubits;
+        for (size_t i = 0; i < parentOpInQubits.size(); i++) {
+            newInQubits.push_back(parentOpInQubits[inverse_permutation[i]]);
+        }
+
+        auto mergeOp = rewriter.create<PPRotationArbitraryOp>(loc, parentOpOutQubits.getTypes(),
+                                                              opPauliProduct, newAngleOp,
+                                                              newInQubits, opCondition);
+
+        // replace and erase old ops
+        rewriter.replaceOp(op, mergeOp);
+        rewriter.eraseOp(parentOp);
+
+        return success();
+    }
+};
+
 struct MergeMultiRZRewritePattern : public OpRewritePattern<MultiRZOp> {
     using OpRewritePattern<MultiRZOp>::OpRewritePattern;
 
@@ -421,7 +500,7 @@ struct MergeMultiRZRewritePattern : public OpRewritePattern<MultiRZOp> {
         auto parentTheta = parentOp.getTheta();
         auto theta = op.getTheta();
 
-        mlir::Value sumParam = rewriter.create<arith::AddFOp>(loc, parentTheta, theta).getResult();
+        Value sumParam = rewriter.create<arith::AddFOp>(loc, parentTheta, theta).getResult();
 
         auto mergeOp = rewriter.create<MultiRZOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParam,
                                                   parentInQubits, nullptr, parentInCtrlQubits,
@@ -442,6 +521,7 @@ void populateMergeRotationsPatterns(RewritePatternSet &patterns)
     patterns.add<MergeRotationsRewritePattern<CustomOp, CustomOp>>(patterns.getContext(), 1);
     patterns.add<MergeMultiRZRewritePattern>(patterns.getContext(), 1);
     patterns.add<MergePPRRewritePattern>(patterns.getContext(), 1);
+    patterns.add<MergePPRArbitraryRewritePattern>(patterns.getContext(), 1);
 }
 
 } // namespace quantum

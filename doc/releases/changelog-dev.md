@@ -469,13 +469,14 @@
   gradient dialect and the `lower-gradients` compilation stage.
   [(#2241)](https://github.com/PennyLaneAI/catalyst/pull/2241)
 
-  * Added support for PPRs to the :func:`~.passes.merge_rotations` pass to merge PPRs with
-  equivalent angles, and cancelling of PPRs with opposite angles, or angles
-  that sum to identity. Also supports conditions on PPRs, merging when conditions are
-  identical and not merging otherwise.
-  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)
+  * Added support for PPRs and arbitrary angle PPRs to the :func:`~.passes.merge_rotations` pass.
+  This pass now merges PPRs with equivalent angles, and cancels PPRs with opposite angles, or
+  angles that sum to identity when the angles are known. The pass also supports conditions on PPRs,
+  merging when conditions are identical and not merging otherwise.
+  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)	
   [(#2245)](https://github.com/PennyLaneAI/catalyst/pull/2245)
   [(#2254)](https://github.com/PennyLaneAI/catalyst/pull/2254)
+  [(#2258)](https://github.com/PennyLaneAI/catalyst/pull/2258)
 
   * Refactor QEC tablegen files to separate QEC operations into a new `QECOp.td` file
   [(#2253](https://github.com/PennyLaneAI/catalyst/pull/2253)
