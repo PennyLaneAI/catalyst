@@ -130,6 +130,8 @@ requirements = [
     "numpy!=2.0.0",
     "scipy-openblas32>=0.3.26",  # symbol and library name
     "diastatic-malt>=2.15.2",
+    "xdsl==0.55.4",
+    "xdsl-jax==0.1.1",
 ]
 
 entry_points = {
