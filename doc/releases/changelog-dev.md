@@ -19,7 +19,6 @@
     pass options from being used correctly.
     [(#2289)](https://github.com/PennyLaneAI/catalyst/pull/2289)
 
-
   * Add the `PauliRotOp` operation to the xDSL Quantum dialect.
     [(#2307)](https://github.com/PennyLaneAI/catalyst/pull/2307)
 
