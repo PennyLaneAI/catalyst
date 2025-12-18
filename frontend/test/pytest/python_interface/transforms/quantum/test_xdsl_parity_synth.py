@@ -19,11 +19,6 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose, assert_equal
 
-pytestmark = pytest.mark.xdsl
-pytest.importorskip("xdsl")
-pytest.importorskip("networkx")
-
-# pylint: disable=wrong-import-position
 import pennylane as qml
 from pennylane.transforms.intermediate_reps import phase_polynomial
 
@@ -32,6 +27,9 @@ from catalyst.python_interface.transforms import (
     parity_synth_pass,
 )
 from catalyst.python_interface.transforms.quantum.parity_synth import _parity_network_synth
+
+pytestmark = pytest.mark.xdsl
+pytest.importorskip("networkx")
 
 
 def validate_binary_matrix(matrix: np.ndarray):
