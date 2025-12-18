@@ -250,6 +250,7 @@ QEC = Dialect(
         FabricateOp,
         LayerOp,
         PPMeasurementOp,
+        PPRotationArbitraryOp,
         PPRotationOp,
         PrepareStateOp,
         SelectPPMeasurementOp,
