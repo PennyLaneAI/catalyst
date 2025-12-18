@@ -267,7 +267,8 @@ class TestMLIRSpecs:
 
         with pytest.raises(
             ValueError,
-            match="The provided `qnode` argument does not appear to be a valid QJIT compiled QNode."
+            match="The provided `qnode` argument does not appear to be a valid QJIT "
+            "compiled QNode.",
         ):
             mlir_specs(not_a_qnode, level=0)
 
