@@ -441,11 +441,6 @@ class ConstructCircuitDAG:
     # =======================
 
     @_visit_operation.register
-    def _call_op(self, operation: func.CallOp) -> None:
-        """Visit a CallOp operation."""
-        raise VisualizationError("Calls to subroutines are not yet supported.")
-
-    @_visit_operation.register
     def _func_op(self, operation: func.FuncOp) -> None:
         """Visit a FuncOp Operation."""
 
