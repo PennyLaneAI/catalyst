@@ -260,7 +260,13 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     if not isinstance(level, (int, type(None))):
         raise TypeError("The `level` argument must be an integer or `None`.")
 
-    if not isinstance(qnode, QJIT):
+    if not isinstance(qnode, QJIT) or (
+        not isinstance(qnode.original_function, QNode)
+        and not (
+            isinstance(qnode.original_function, PassPipelineWrapper)
+            and isinstance(qnode.original_qnode, QNode)
+        )
+    ):
         raise TypeError(
             "The circuit must be a qjit compiled qnode. Please apply the `qml.qjit` function to your qnode."
         )
