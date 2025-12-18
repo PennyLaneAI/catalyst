@@ -457,6 +457,9 @@
   operations for interacting with an external Pauli frame tracking library.
   [(#2188)](https://github.com/PennyLaneAI/catalyst/pull/2188)
 
+* Remove duplicate code for canonicalization and verification of Pauli Product Rotation operations.
+  [(#?)](https://github.com/PennyLaneAI/catalyst/pull/?)
+
 <h3>Documentation 📝</h3>
 
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
