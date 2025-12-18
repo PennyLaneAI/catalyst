@@ -29,7 +29,6 @@ from xdsl.ir.core import Block, Region
 
 from catalyst import measure
 from catalyst.python_interface.conversion import xdsl_from_qjit
-from catalyst.python_interface.inspection.draw import draw_graph
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
     get_label,
@@ -1535,41 +1534,3 @@ class TestAdjoint:
         assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
         assert "Hadamard" in nodes["node1"]["label"]
         assert nodes["node1"]["parent_cluster_uid"] == "cluster2"
-
-
-@pytest.mark.usefixtures("use_both_frontend")
-class TestFrontend:
-    """Tests the draw_graph frontend."""
-
-    @pytest.mark.parametrize(
-        "unsupported_level",
-        (
-            [0],
-            [0, 1],
-            (0,),
-            (0, 1),
-            slice(0, 2),
-        ),
-    )
-    def test_unsupported_levels(self, unsupported_level):
-        """Tests proper handling of the level argument."""
-
-        @qml.qjit(autograph=True, target="mlir")
-        @qml.qnode(qml.device("null.qubit", wires=2))
-        def qjit_qnode():
-            qml.H(0)
-            return qml.expval(qml.Z(0))
-
-        with pytest.raises(TypeError, match="The `level` argument must be an integer or `None`"):
-            _ = draw_graph(qjit_qnode, level=unsupported_level)()
-
-    def test_unsupported_qnode(self):
-        """Tests that only qjit'd qnodes are allowed to be visualized."""
-
-        @qml.qnode(qml.device("null.qubit", wires=2))
-        def qnode():
-            qml.H(0)
-            return qml.expval(qml.Z(0))
-
-        with pytest.raises(TypeError, match="The circuit must be a qjit compiled qnode"):
-            _ = draw_graph(qnode)()
