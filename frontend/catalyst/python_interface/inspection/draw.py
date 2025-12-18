@@ -110,36 +110,37 @@ def draw_graph(qnode: QNode, *, level: int | None = None) -> Callable:
 
     .. note::
 
-        The ``draw_graph`` function requires installation of
+        The ``draw_graph`` function visualizes QNodes in a similar manner as
+        `view-op-graph in traditional MLIR <https://mlir.llvm.org/docs/Passes/#-view-op-graph>`_,
+        which leverages `Graphviz <https://graphviz.org/download/>`_ to show data-flow in compiled
+        programs.
+
+        As such, use of ``draw_graph`` requires installation of
         `Graphviz <https://graphviz.org/download/>`_ and the
         `pydot <https://pypi.org/project/pydot/>`_ software package. Please consult the links
         provided for installation instructions.
 
-    .. warning::
-
-        This feature must be used in tandem with PennyLane's program capture, enabled with
-        :func:`pennylane.capture.enable`.
+        Additionally, it is recommended to use ``draw_graph`` with PennyLane's program capture
+        (enabled with :func:`pennylane.capture.enable`).
 
     Args:
-        qnode (QNode): The input QNode that is to be visualized. The QNode is assumed to be
-            compiled with ``qjit``.
-        level (int | None): The level of transformation to visualize. If ``None``, the final
-            level is visualized. # what are default options?
+        qnode (QNode):
+            The input QNode that is to be visualized. The QNode is assumed to be compiled with
+            qjit.
+        level (int | None):
+            The level of transformation to visualize. If ``None``, the final level is visualized.
 
     Returns:
-        fn (Callable): A function that has the same argument signature as the compiled ``qnode``.
-            When called, the function will return the graph as a tuple of
-            (``matplotlib.figure.Figure``, ``matplotlib.axes._axes.Axes``).
+        Callable: A function that has the same argument signature as the compiled QNode. When
+          called, the function will return the graph as a tuple of (``matplotlib.figure.Figure``,
+          ``matplotlib.axes._axes.Axes``).
 
     Raises:
-        VisualizationError: If the circuit contains operations that cannot be
-            converted to a graphical representation.
+        VisualizationError:
+            If the circuit contains operations that cannot be converted to a graphical
+            representation.
 
     **Example**
-
-    The ``draw_graph`` function visualizes QNodes in a similar manner as
-    `view-op-graph in traditional MLIR <https://mlir.llvm.org/docs/Passes/#-view-op-graph>`_, which
-    leverages `Graphviz <https://graphviz.org/download/>`_ to show data-flow in compiled programs.
 
     Using ``draw_graph`` requires a qjit'd QNode and a ``level`` argument, which denotes the
     cumulative set of applied compilation transforms (in the order they appear) to be applied and
@@ -156,20 +157,44 @@ def draw_graph(qnode: QNode, *, level: int | None = None) -> Callable:
         @qml.transforms.merge_rotations
         @qml.transforms.cancel_inverses
         @qml.qnode(qml.device("null.qubit", wires=3))
-        def circuit(x, y):
-            # TODO
+        def circuit():
+            qml.H(0)
+            qml.T(1)
+            qml.H(0)
+            qml.RX(0.1, wires=0)
+            qml.RX(0.2, wires=0)
+            return qml.expval(qml.X(0))
 
-    >>> x, y = # TODO
-    >>> print(catalyst.draw_graph(circuit)(x, y))
+    With ``level=0``, the graphical visualization will display the program as if no transforms are
+    applied:
+
+    >>> print(catalyst.draw_graph(circuit, level=0)())
+    (<Figure size 640x480 with 1 Axes>, <Axes: >)
+
+    .. figure:: ../../../doc/_static/catalyst-draw-graph-level0-example.png
+        :width: 35%
+        :alt: Graphical representation of circuit with level=0
+        :align: left
+
+    With ``level=2``, both :func:`~.passes.merge_rotations` and :func:`~.passes.cancel_inverses`
+    will be applied, resulting in the two Hadamards cancelling and the two rotations merging:
+
+    >>> print(catalyst.draw_graph(circuit, level=2)())
+    (<Figure size 640x480 with 1 Axes>, <Axes: >)
+
+    .. figure:: ../../../doc/_static/catalyst-draw-graph-level2-example.png
+        :width: 35%
+        :alt: Graphical representation of circuit with level=2
+        :align: left
 
     .. details::
         :title: Usage Details
 
         **Visualizing Control Flow**
 
-        The ``draw_graph`` function can be used to visualize control flow that generates program structure.
-        In order to do this, we need to turn on ``autograph``, which allows this structure to be captured
-        in the program IR. Consider the following circuit,
+        The ``draw_graph`` function can be used to visualize control flow, resulting in a scalable
+        representation that preserves program structure. In order to do this, turn on ``autograph``
+        at the ``qjit`` level, which allows this structure to be captured in the program IR:
 
         .. code-block::
 
@@ -187,20 +212,25 @@ def draw_graph(qnode: QNode, *, level: int | None = None) -> Callable:
                 return qml.probs()
 
         >>> print(catalyst.draw_graph(circuit)())
+        (<Figure size 640x480 with 1 Axes>, <Axes: >)
 
-        As you can see, the program structure is preserved in the figure allowing a more compact visualization
-        of the circuit.
+        .. figure:: ../../../doc/_static/catalyst-draw-graph-control-flow-example.png
+            :width: 35%
+            :alt: Graphical representation of circuit with control flow
+            :align: left
+
+        As one can see, the program structure is preserved in the figure.
 
         **Visualizing Dynamic Circuits**
 
-        Circuits can depend on parameters that are not known at compile time resulting in conventional
-        visualization tools to fail. Consider the following circuit,
+        Circuits can depend on parameters that are not known at compile time, which result in
+        conventional visualization tools failing. Consider the following circuit.
 
         .. code-block::
 
             @qml.qjit
-            @qml.qnode(dev)
-            def circuit(x,y):
+            @qml.qnode(qml.device("null.qubit", wires=3))
+            def circuit(x, y):
                 qml.X(0)
                 qml.Y(1)
                 qml.Z(2)
@@ -210,51 +240,15 @@ def draw_graph(qnode: QNode, *, level: int | None = None) -> Callable:
                 qml.H(x)
                 return qml.expval(qml.Z(y))
 
-        Clearly, the two ``qml.H`` gates act on wires that are dynamic. In order to preserve qubit data flow,
-        each dynamic operator acts as a "choke" point acting as a barrier to all currently active wires.
-        To visualize this clearly, we use dashed lines to represent a dynamic dependency and solid lines for static
-        values.
+        The two ``qml.H`` gates act on wires that are dynamic. In order to preserve qubit data flow,
+        each dynamic operator acts as a "choke point" to all currently active wires. To visualize
+        this clearly, we use dashed lines to represent a dynamic dependency and solid lines for
+        static/known values:
 
-        **Visualizing Transformations**
+        >>> x, y = 1, 0
+        >>> print(catalyst.draw_graph(circuit)(x, y))
 
-        This tool, along with the ``level`` argument can be used to step through and visualize the circuit at
-        various stages in a transformation pipeline.
-
-        Consider the following circuit that has two transformations applied to it:
-
-        .. code-block::
-
-            import pennylane as qml
-            import catalyst
-
-            qml.capture.enable()
-
-            @qml.qjit
-            @qml.transforms.merge_rotations
-            @qml.transforms.cancel_inverses
-            @qml.qnode(qml.device("null.qubit", wires=3))
-            def circuit():
-                qml.RX(1, 0)
-                qml.H(0)
-                qml.H(0)
-                qml.RX(1, 0)
-                return qml.expval(qml.Z(0))
-
-        If we don't provide a ``level`` value, it will visualize the circuit after all transformations are applied,
-
-        >>> print(catalyst.draw_graph(circuit)())
-
-        We can clearly see that the `qml.H` gates cancelled and the two `qml.RX` gates merged together.
-
-        Now if we provide ``level=0``, we can visualize the circuit before any transformations took place.
-
-        >>> print(catalyst.draw_graph(circuit, level=0)())
-
-        Similarly, we can step through with ``level=1`` and ``level=2`` to see how the circuit changes with our transformations,
-
-        >>> print(catalyst.draw_graph(circuit, level=1)())
-
-        >>> print(catalyst.draw_graph(circuit, level=2)())
+        TODO!!!
     """
     if not HAS_MATPLOTLIB:
         raise ImportError(
