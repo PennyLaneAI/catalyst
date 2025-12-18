@@ -161,8 +161,101 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
             # TODO
 
     >>> x, y = # TODO
-    >>> print(catalyst.draw_graph)(x, y)
+    >>> print(catalyst.draw_graph(circuit)(x, y))
 
+    .. details::
+        :title: Usage Details
+
+        **Visualizing Control Flow**
+
+        The ``draw_graph`` function can be used to visualize control flow that generates program structure.
+        In order to do this, we need to turn on ``autograph``, which allows this structure to be captured
+        in the program IR. Consider the following circuit,
+
+        .. code-block::
+
+            @qml.qjit(autograph=True)
+            @qml.qnode(qml.device("null.qubit", wires=3))
+            def circuit():
+                qml.H(0)
+                for i in range(3):
+                    if i == 1:
+                        qml.X(0)
+                    elif i == 2:
+                        qml.Y(0)
+                    else:
+                        qml.Z(0)
+                return qml.probs()
+
+        >>> print(catalyst.draw_graph(circuit)())
+
+        As you can see, the program structure is preserved in the figure allowing a more compact visualization
+        of the circuit.
+
+        **Visualizing Dynamic Circuits**
+
+        Circuits can depend on parameters that are not known at compile time resulting in conventional
+        visualization tools to fail. Consider the following circuit,
+
+        .. code-block::
+
+            @qml.qjit
+            @qml.qnode(dev)
+            def circuit(x,y):
+                qml.X(0)
+                qml.Y(1)
+                qml.Z(2)
+                qml.H(x) # 'x' is a dynamic wire index
+                qml.S(0)
+                qml.T(2)
+                qml.H(x)
+                return qml.expval(qml.Z(y))
+
+        Clearly, the two ``qml.H`` gates act on wires that are dynamic. In order to preserve qubit data flow,
+        each dynamic operator acts as a "choke" point acting as a barrier to all currently active wires.
+        To visualize this clearly, we use dashed lines to represent a dynamic dependency and solid lines for static
+        values.
+
+        **Visualizing Transformations**
+
+        This tool, along with the ``level`` argument can be used to step through and visualize the circuit at
+        various stages in a transformation pipeline.
+
+        Consider the following circuit that has two transformations applied to it:
+
+        .. code-block::
+
+            import pennylane as qml
+            import catalyst
+
+            qml.capture.enable()
+
+            @qml.qjit
+            @qml.transforms.merge_rotations
+            @qml.transforms.cancel_inverses
+            @qml.qnode(qml.device("null.qubit", wires=3))
+            def circuit():
+                qml.RX(1, 0)
+                qml.H(0)
+                qml.H(0)
+                qml.RX(1, 0)
+                return qml.expval(qml.Z(0))
+
+        If we don't provide a ``level`` value, it will visualize the circuit after all transformations are applied,
+
+        >>> print(catalyst.draw_graph(circuit)())
+
+        We can clearly see that the `qml.H` gates cancelled and the two `qml.RX` gates merged together.
+
+        Now if we provide ``level=0``, we can visualize the circuit before any transformations took place.
+
+        >>> print(catalyst.draw_graph(circuit, level=0)())
+
+        Similarly, we can step through with ``level=1`` and ``level=2`` to see how the circuit changes with our transformations,
+
+        >>> print(catalyst.draw_graph(circuit, level=1)())
+
+        >>> print(catalyst.draw_graph(circuit, level=2)())
     """
     if not HAS_MATPLOTLIB:
         raise ImportError(
