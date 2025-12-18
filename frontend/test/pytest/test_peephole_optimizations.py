@@ -611,6 +611,36 @@ def test_clifford_to_ppm():
     assert ppm_specs_output["g_0"]["logical_qubits"] == 2
 
 
+@pytest.mark.usefixtures("use_capture")
+def test_decompose_arbitrary_ppr():
+    """
+    Test the `decompose_arbitrary_ppr` pass.
+    """
+
+    my_pipeline = [("pipe", ["quantum-compilation-stage"])]
+
+    @qml.qjit(pipelines=my_pipeline, target="mlir")
+    def test_decompose_arbitrary_ppr_workflow():
+        @qml.transform(pass_name="decompose-arbitrary-ppr")
+        @qml.transform(pass_name="to-ppr")
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            qml.PauliRot(0.123, pauli_word="XYZ", wires=[0, 1, 2])
+
+        return circuit()
+
+    ir = test_decompose_arbitrary_ppr_workflow.mlir
+    ir_opt = test_decompose_arbitrary_ppr_workflow.mlir_opt
+
+    print(ir_opt)
+
+    assert 'transform.apply_registered_pass "decompose-arbitrary-ppr"' in ir
+    assert 'qec.ppr.arbitrary ["X", "Y", "Z"]' not in ir_opt
+    assert 'qec.ppm ["X", "Y", "Z", "Z"]' in ir_opt
+    assert 'qec.ppr.arbitrary ["Z"]' in ir_opt
+    assert 'qec.ppr ["X", "Y", "Z"](2)' in ir_opt
+
+
 class TestPPMSpecsErrors:
     """Test if errors are caught when calling ppm_specs"""
 

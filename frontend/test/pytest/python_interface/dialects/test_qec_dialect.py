@@ -26,6 +26,7 @@ expected_ops_names = {
     "FabricateOp": "qec.fabricate",
     "LayerOp": "qec.layer",
     "PPMeasurementOp": "qec.ppm",
+    "PPRotationArbitraryOp": "qec.ppr.arbitrary",
     "PPRotationOp": "qec.ppr",
     "PrepareStateOp": "qec.prepare",
     "SelectPPMeasurementOp": "qec.select.ppm",
@@ -66,6 +67,9 @@ def test_assembly_format(run_filecheck):
     // CHECK: [[QUBIT:%.+]] = "test.op"() : () -> !quantum.bit
     %qubit = "test.op"() : () -> !quantum.bit
 
+    // CHECK: [[PARAM:%.+]] = "test.op"() : () -> f64
+    %param = "test.op"() : () -> f64
+
     // CHECK: [[COND:%.+]] = "test.op"() : () -> i1
     %cond = "test.op"() : () -> i1
 
@@ -74,6 +78,9 @@ def test_assembly_format(run_filecheck):
 
     // CHECK: [[PREPARED:%.+]] = qec.prepare zero [[QUBIT]] : !quantum.bit
     %prepared = qec.prepare zero %qubit : !quantum.bit
+
+    // CHECK: [[ROTATED_ARB:%.+]] = qec.ppr.arbitrary ["X", "Y", "Z"]([[PARAM]]) [[QUBIT]] : !quantum.bit
+    %rotated_arb = qec.ppr.arbitrary ["X", "Y", "Z"](%param) %qubit : !quantum.bit
 
     // CHECK: [[ROTATED:%.+]] = qec.ppr ["X", "I", "Z"](4) [[QUBIT]] : !quantum.bit
     %rotated = qec.ppr ["X", "I", "Z"](4) %qubit : !quantum.bit
