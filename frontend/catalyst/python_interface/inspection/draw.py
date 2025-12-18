@@ -138,8 +138,8 @@ def draw_graph(qnode: QNode, *, level: int | None = None) -> Callable:
     **Example**
 
     The ``draw_graph`` function visualizes QNodes in a similar manner as
-    `view-op-graph in traditional MLIR <https://mlir.llvm.org/docs/Passes/#-view-op-graph>`, which
-    leverages `Graphviz <https://graphviz.org/download/>` to show data-flow in compiled programs.
+    `view-op-graph in traditional MLIR <https://mlir.llvm.org/docs/Passes/#-view-op-graph>`_, which
+    leverages `Graphviz <https://graphviz.org/download/>`_ to show data-flow in compiled programs.
 
     Using ``draw_graph`` requires a qjit'd QNode and a ``level`` argument, which denotes the
     cumulative set of applied compilation transforms (in the order they appear) to be applied and
