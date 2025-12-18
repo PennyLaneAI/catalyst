@@ -18,12 +18,13 @@
 
 # pylint: disable=line-too-long
 
+import numpy as np
+
 import pennylane as qml
 
 from catalyst import measure, qjit
 from catalyst.passes import (
     commute_ppr,
-    decompose_arbitrary_ppr,
     merge_ppr_ppm,
     ppm_compilation,
     ppr_to_mbqc,
@@ -436,22 +437,29 @@ def test_decompose_arbitrary_ppr():
     Test the `decompose_arbitrary_ppr` pass.
     """
 
+    qml.capture.enable()
+
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
-    @decompose_arbitrary_ppr
-    @to_ppr
-    @qml.qnode(qml.device("null.qubit", wires=2))
+    @qml.transform(pass_name="decompose-arbitrary-ppr")
+    @qml.transform(pass_name="to-ppr")
+    @qml.qnode(qml.device("null.qubit", wires=3))
     def test_decompose_arbitrary_ppr_workflow():
-        qml.PauliRot(0.123, pauli_word="X", wires=0)
+        qml.PauliRot(np.pi / 4, pauli_word="Y", wires=0)
+        qml.PauliRot(0.123, pauli_word="XYZ", wires=[0, 1, 2])
 
     print(test_decompose_arbitrary_ppr_workflow.mlir_opt)
+    qml.capture.disable()
 
-    # CHECK-NOT: qec.ppr ["Z"](2)
-    # CHECK_TURNOFF: qec.prepare  plus
-    # CHECK_TURNOFF: qec.ppm ["X", "Z"]
-    # CHECK_TURNOFF: qec.ppr ["X"](2)
-    # CHECK_TURNOFF: qec.ppr.arbitrary ["Z"]
-    # CHECK_TURNOFF: qec.ppm ["X"]
-    # CHECK_TURNOFF: qec.ppr ["X"](2)
-    # CHECK_TURNOFF: quantum.dealloc_qb
+
+# CHECK: qec.ppr ["Y"](8)
+# CHECK-NOT: qec.ppr ["Z"](2)
+# CHECK: qec.prepare  plus
+# CHECK: qec.ppm ["X", "Y", "Z", "Z"]
+# CHECK: qec.ppr ["X"](2)
+# CHECK: qec.ppr.arbitrary ["Z"]
+# CHECK: qec.ppm ["X"]
+# CHECK: qec.ppr ["X", "Y", "Z"](2)
+# CHECK: quantum.dealloc_qb
+test_decompose_arbitrary_ppr()
