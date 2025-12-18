@@ -458,7 +458,7 @@
   [(#2188)](https://github.com/PennyLaneAI/catalyst/pull/2188)
 
 * Remove duplicate code for canonicalization and verification of Pauli Product Rotation operations.
-  [(#?)](https://github.com/PennyLaneAI/catalyst/pull/?)
+  [(#2313)](https://github.com/PennyLaneAI/catalyst/pull/2313)
 
 <h3>Documentation 📝</h3>
 
