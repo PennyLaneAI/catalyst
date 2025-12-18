@@ -61,6 +61,9 @@ _SKIPPED_QEC_OPS = ()
 _SKIPPED_MBQC_OPS = ()
 
 
+class VisualizationError(Exception): ...
+
+
 class ConstructCircuitDAG:
     """Utility tool following the director pattern to build a DAG representation of a compiled quantum program.
 
@@ -146,7 +149,9 @@ class ConstructCircuitDAG:
             return
         _SKIPPED_OPS = (_SKIPPED_QUANTUM_OPS, _SKIPPED_QEC_OPS, _SKIPPED_MBQC_OPS)
         if not isinstance(op, _SKIPPED_OPS):
-            raise ValueError(f"Visualization for operation `{op.name}` is not supported.")
+            raise VisualizationError(
+                f"Visualization for operation `{op.name}` is not yet supported."
+            )
 
     @_visualize_operation.register
     def _gate_op(
