@@ -11,14 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Unit tests for the xDSL Quantum dialect."""
+
 import pytest
-
-# pylint: disable=wrong-import-position
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
 from xdsl.dialects.builtin import (
     I32,
     ComplexType,
@@ -39,6 +34,8 @@ from catalyst.python_interface.dialects.quantum import (
     QubitType,
     QuregType,
 )
+
+pytestmark = pytest.mark.xdsl
 
 all_ops = list(Quantum.operations)
 all_attrs = list(Quantum.attributes)
