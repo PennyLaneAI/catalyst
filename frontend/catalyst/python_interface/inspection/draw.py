@@ -18,13 +18,14 @@ from __future__ import annotations
 import io
 import warnings
 from functools import wraps
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Type
 
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 from pennylane.tape import QuantumScript
 from xdsl.dialects.builtin import ModuleOp
 
+from catalyst.jit import QJIT
 from catalyst.python_interface.compiler import Compiler
 
 from ..visualization.construct_circuit_dag import ConstructCircuitDAG
@@ -103,7 +104,7 @@ def draw(qnode: QNode, *, level: None | int = None) -> Callable:
     return wrapper
 
 
-def draw_graph(qnode: QNode, *, level: int | None = None) -> Callable:
+def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     """
     Visualize QNodes as graphs, showing wire flow through quantum operations, program structure, and
     pass-by-pass impacts on compiled programs.
@@ -124,7 +125,7 @@ def draw_graph(qnode: QNode, *, level: int | None = None) -> Callable:
         (enabled with :func:`pennylane.capture.enable`).
 
     Args:
-        qnode (QNode):
+        qnode (QJIT):
             The input QNode that is to be visualized. The QNode is assumed to be compiled with
             qjit.
         level (int | None):
@@ -256,6 +257,14 @@ def draw_graph(qnode: QNode, *, level: int | None = None) -> Callable:
             "The `draw_graph` functionality requires `matplotlib` to be installed. Please install `matplotlib` with `pip install matplotlib`."
         )
 
+    if not isinstance(level, (int, type(None))):
+        raise TypeError("The `level` argument must be an integer or `None`.")
+
+    if not isinstance(qnode, QJIT):
+        raise TypeError(
+            "The circuit must be a qjit compiled qnode. Please apply the `qml.qjit` function to your qnode."
+        )
+
     cache: dict[int, tuple[str, str]] = _cache_store.setdefault(qnode, {})
 
     def _draw_callback(previous_pass, module: ModuleOp, next_pass, pass_level: int = 0):
@@ -286,10 +295,10 @@ def draw_graph(qnode: QNode, *, level: int | None = None) -> Callable:
         max_level = max(cache.keys())
         image_bytes, _ = cache.get(level, cache[max_level])
 
+        # Create virtual image in RAM
         sio = io.BytesIO()
         sio.write(image_bytes)
         sio.seek(0)
-
         img = mpimg.imread(sio)
 
         fig, ax = plt.subplots()
