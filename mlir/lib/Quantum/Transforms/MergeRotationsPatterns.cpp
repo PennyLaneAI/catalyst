@@ -376,7 +376,7 @@ struct MergePPRRewritePattern : public OpRewritePattern<PPRotationOp> {
 
         int16_t opRotation = static_cast<int16_t>(op.getRotationKind());
         int16_t parentOpRotation = static_cast<int16_t>(parentOp.getRotationKind());
-        
+
         if (std::abs(opRotation) != std::abs(parentOpRotation)) {
             return failure();
         }
@@ -392,7 +392,6 @@ struct MergePPRRewritePattern : public OpRewritePattern<PPRotationOp> {
             return success();
         }
 
-
         Location loc = op.getLoc();
 
         // We need to construct the Pauli string + inQubits for new op. The simplest way to ensure
@@ -403,7 +402,8 @@ struct MergePPRRewritePattern : public OpRewritePattern<PPRotationOp> {
             newInQubits.push_back(parentOpInQubits[inverse_permutation[i]]);
         }
 
-        auto mergeOp = rewriter.create<PPRotationOp>(loc, parentOpOutQubits.getTypes(), opPauliProduct, newAngle, newInQubits, opCondition);
+        auto mergeOp = rewriter.create<PPRotationOp>(
+            loc, parentOpOutQubits.getTypes(), opPauliProduct, newAngle, newInQubits, opCondition);
 
         rewriter.replaceOp(op, mergeOp);
         rewriter.eraseOp(parentOp);
