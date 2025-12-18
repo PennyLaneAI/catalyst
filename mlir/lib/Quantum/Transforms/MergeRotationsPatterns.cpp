@@ -321,59 +321,14 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
     }
 };
 
-struct MergePPRRewritePattern : public OpRewritePattern<PPRotationOp> {
-    using OpRewritePattern::OpRewritePattern;
+template <typename ParentOpType, typename OpType>
+struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
+    using OpRewritePattern<OpType>::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override
+    LogicalResult finishMatchAndRewritePPRotation(OpType op, ParentOpType parentOp, Location loc,
+                                                  ValueRange newInQubits,
+                                                  PatternRewriter &rewriter) const
     {
-        // NOTE: a bit unorthodox, but we find the *second* PPR in a pair, since it's easier to
-        // look backwards by checking inQubits.getDefiningOp
-        ValueRange opInQubits = op.getInQubits();
-
-        Operation *definingOp = opInQubits[0].getDefiningOp();
-        if (!definingOp) {
-            return failure();
-        }
-
-        auto parentOp = dyn_cast<PPRotationOp>(definingOp);
-        if (!parentOp) {
-            return failure();
-        }
-
-        // verify that parentOp agrees on all qubits, not just the first
-        for (Value qubit : opInQubits) {
-            if (qubit.getDefiningOp() != parentOp) {
-                return failure();
-            }
-        }
-        ValueRange parentOpOutQubits = parentOp.getOutQubits();
-        if (parentOpOutQubits.size() != opInQubits.size()) {
-            return failure();
-        }
-
-        // When two rotations have permuted Pauli strings, we can still merge them, we just need to
-        // correctly re-map the inputs. This map stores the index of a qubit in parentOp's out
-        // qubits at the index it appears in op's in qubits.
-        SmallVector<unsigned> inverse_permutation;
-        for (auto qubit : opInQubits) {
-            inverse_permutation.push_back(cast<OpResult>(qubit).getResultNumber());
-        }
-
-        // check Pauli + qubit pairings
-        ArrayAttr opPauliProduct = op.getPauliProduct();
-        ArrayAttr parentOpPauliProduct = parentOp.getPauliProduct();
-        for (size_t i = 0; i < opInQubits.size(); i++) {
-            if (opPauliProduct[i] != parentOpPauliProduct[inverse_permutation[i]]) {
-                return failure();
-            }
-        }
-
-        // check same conditionals
-        Value opCondition = op.getCondition();
-        if (opCondition != parentOp.getCondition()) {
-            return failure();
-        }
-
         int16_t opRotation = static_cast<int16_t>(op.getRotationKind());
         int16_t parentOpRotation = static_cast<int16_t>(parentOp.getRotationKind());
 
@@ -384,59 +339,67 @@ struct MergePPRRewritePattern : public OpRewritePattern<PPRotationOp> {
         int16_t newAngle = opRotation / 2;
 
         // remove identity operations
-        ValueRange parentOpInQubits = parentOp.getInQubits();
         if (opRotation == -parentOpRotation || std::abs(newAngle) == 1) {
-            rewriter.replaceOp(op, parentOpInQubits);
+            rewriter.replaceOp(op, parentOp.getInQubits());
             rewriter.eraseOp(parentOp);
 
             return success();
         }
 
-        Location loc = op.getLoc();
-
-        // We need to construct the Pauli string + inQubits for new op. The simplest way to ensure
-        // that permuted PPRs can merge correctly is to maintain output qubits order and permute
-        // input qubits
-        SmallVector<Value> newInQubits;
-        for (size_t i = 0; i < parentOpInQubits.size(); i++) {
-            newInQubits.push_back(parentOpInQubits[inverse_permutation[i]]);
-        }
-
-        auto mergeOp = rewriter.create<PPRotationOp>(
-            loc, parentOpOutQubits.getTypes(), opPauliProduct, newAngle, newInQubits, opCondition);
+        auto mergeOp = rewriter.create<PPRotationOp>(loc, parentOp.getOutQubits().getTypes(),
+                                                     op.getPauliProduct(), newAngle, newInQubits,
+                                                     op.getCondition());
 
         rewriter.replaceOp(op, mergeOp);
         rewriter.eraseOp(parentOp);
-
         return success();
     }
-};
 
-struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbitraryOp> {
-    using OpRewritePattern::OpRewritePattern;
-
-    LogicalResult matchAndRewrite(PPRotationArbitraryOp op,
-                                  PatternRewriter &rewriter) const override
+    LogicalResult finishMatchAndRewritePPRotationArbitrary(OpType op, ParentOpType parentOp,
+                                                           Location loc, ValueRange newInQubits,
+                                                           PatternRewriter &rewriter) const
     {
+        Value opRotation = op.getArbitraryAngle();
+        Value parentOpRotation = parentOp.getArbitraryAngle();
+        auto newAngle =
+            rewriter.create<arith::AddFOp>(loc, opRotation, parentOpRotation).getResult();
+
+        auto mergeOp = rewriter.create<PPRotationArbitraryOp>(
+            loc, parentOp.getOutQubits().getTypes(), op.getPauliProduct(), newAngle, newInQubits,
+            op.getCondition());
+
+        rewriter.replaceOp(op, mergeOp);
+        rewriter.eraseOp(parentOp);
+        return success();
+    }
+
+    LogicalResult matchAndRewrite(OpType op, PatternRewriter &rewriter) const override
+    {
+        // NOTE: a bit unorthodox, but we find the *second* PPR in a pair, since it's easier to
+        // look backwards by checking inQubits.getDefiningOp
         ValueRange opInQubits = op.getInQubits();
+        ArrayAttr opPauliProduct = op.getPauliProduct();
+        Value opCondition = op.getCondition();
 
         Operation *definingOp = opInQubits[0].getDefiningOp();
         if (!definingOp) {
             return failure();
         }
 
-        auto parentOp = dyn_cast<PPRotationArbitraryOp>(definingOp);
+        auto parentOp = dyn_cast<ParentOpType>(definingOp);
         if (!parentOp) {
             return failure();
         }
+        ValueRange parentOpInQubits = parentOp.getInQubits();
+        ValueRange parentOpOutQubits = parentOp.getOutQubits();
+        ArrayAttr parentOpPauliProduct = parentOp.getPauliProduct();
 
-        // verify that parentOp is parent of all qubits
+        // verify that parentOp agrees on all qubits, not just the first
         for (Value qubit : opInQubits) {
             if (qubit.getDefiningOp() != parentOp) {
                 return failure();
             }
         }
-        ValueRange parentOpOutQubits = parentOp.getOutQubits();
         if (parentOpOutQubits.size() != opInQubits.size()) {
             return failure();
         }
@@ -445,13 +408,11 @@ struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbit
         // correctly re-map the inputs. This map stores the index of a qubit in parentOp's out
         // qubits at the index it appears in op's in qubits.
         SmallVector<unsigned> inverse_permutation;
-        for (auto qubit : opInQubits) {
+        for (Value qubit : opInQubits) {
             inverse_permutation.push_back(cast<OpResult>(qubit).getResultNumber());
         }
 
         // check Pauli + qubit pairings
-        ArrayAttr opPauliProduct = op.getPauliProduct();
-        ArrayAttr parentOpPauliProduct = parentOp.getPauliProduct();
         for (size_t i = 0; i < opInQubits.size(); i++) {
             if (opPauliProduct[i] != parentOpPauliProduct[inverse_permutation[i]]) {
                 return failure();
@@ -459,36 +420,29 @@ struct MergePPRArbitraryRewritePattern : public OpRewritePattern<PPRotationArbit
         }
 
         // check same conditionals
-        Value opCondition = op.getCondition();
         if (opCondition != parentOp.getCondition()) {
             return failure();
         }
 
         Location loc = op.getLoc();
 
-        Value opRotation = op.getArbitraryAngle();
-        Value parentOpRotation = parentOp.getArbitraryAngle();
-        auto newAngleOp =
-            rewriter.create<arith::AddFOp>(loc, opRotation, parentOpRotation).getResult();
-
         // We need to construct the Pauli string + inQubits for new op. The simplest way to ensure
         // that permuted PPRs can merge correctly is to maintain output qubits order and permute
         // input qubits
-        ValueRange parentOpInQubits = parentOp.getInQubits();
         SmallVector<Value> newInQubits;
         for (size_t i = 0; i < parentOpInQubits.size(); i++) {
             newInQubits.push_back(parentOpInQubits[inverse_permutation[i]]);
         }
 
-        auto mergeOp = rewriter.create<PPRotationArbitraryOp>(loc, parentOpOutQubits.getTypes(),
-                                                              opPauliProduct, newAngleOp,
-                                                              newInQubits, opCondition);
+        if constexpr (std::is_same_v<OpType, PPRotationOp>) {
+            return finishMatchAndRewritePPRotation(op, parentOp, loc, newInQubits, rewriter);
+        }
+        else {
+            return finishMatchAndRewritePPRotationArbitrary(op, parentOp, loc, newInQubits,
+                                                            rewriter);
+        }
 
-        // replace and erase old ops
-        rewriter.replaceOp(op, mergeOp);
-        rewriter.eraseOp(parentOp);
-
-        return success();
+        return failure();
     }
 };
 
@@ -537,8 +491,9 @@ void populateMergeRotationsPatterns(RewritePatternSet &patterns)
 {
     patterns.add<MergeRotationsRewritePattern<CustomOp, CustomOp>>(patterns.getContext(), 1);
     patterns.add<MergeMultiRZRewritePattern>(patterns.getContext(), 1);
-    patterns.add<MergePPRRewritePattern>(patterns.getContext(), 1);
-    patterns.add<MergePPRArbitraryRewritePattern>(patterns.getContext(), 1);
+    patterns.add<MergePPRRewritePattern<PPRotationOp, PPRotationOp>>(patterns.getContext(), 1);
+    patterns.add<MergePPRRewritePattern<PPRotationArbitraryOp, PPRotationArbitraryOp>>(
+        patterns.getContext(), 1);
 }
 
 } // namespace quantum
