@@ -23,7 +23,7 @@ starting from the catalyst/mlir/include/Quantum/IR/QuantumOps.td file in the cat
 # pylint: disable=too-many-lines
 
 from collections.abc import Sequence
-from typing import TypeAlias
+from typing import ClassVar, TypeAlias
 
 from xdsl.dialects.builtin import (
     I32,
@@ -83,6 +83,7 @@ from xdsl.traits import (
     ReturnLike,
     SingleBlockImplicitTerminator,
 )
+from xdsl.utils.hints import isa
 
 from catalyst.python_interface.xdsl_extras import MemRefConstraint, TensorConstraint
 
@@ -793,6 +794,8 @@ class PauliRotOp(IRDLOperation):
         `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     """
 
+    VALID_PAULIS: ClassVar[tuple[str]] = ("X", "Y", "Z", "I")
+
     irdl_options = [
         AttrSizedOperandSegments(as_property=True),
         AttrSizedResultSegments(as_property=True),
@@ -815,6 +818,59 @@ class PauliRotOp(IRDLOperation):
     out_ctrl_qubits = var_result_def(QubitType)
 
     traits = traits_def(NoMemoryEffect())
+
+    # pylint: disable=too-many-arguments
+    def __init__(
+        self,
+        *,
+        angle: SSAValue[Float64Type],
+        pauli_product: PauliWord | str | Sequence[str],
+        in_qubits: QubitSSAValue | Operation | Sequence[QubitSSAValue | Operation],
+        in_ctrl_qubits: (
+            QubitSSAValue | Operation | Sequence[QubitSSAValue | Operation] | None
+        ) = None,
+        in_ctrl_values: (
+            SSAValue[IntegerType]
+            | Operation
+            | Sequence[SSAValue[IntegerType]]
+            | Sequence[Operation]
+            | None
+        ) = None,
+        adjoint: UnitAttr | bool = False,
+    ):
+        in_ctrl_qubits = () if in_ctrl_qubits is None else in_ctrl_qubits
+        in_ctrl_values = () if in_ctrl_values is None else in_ctrl_values
+
+        if not isinstance(in_qubits, Sequence):
+            in_qubits = (in_qubits,)
+        if not isinstance(in_ctrl_qubits, Sequence):
+            in_ctrl_qubits = (in_ctrl_qubits,)
+        if not isinstance(in_ctrl_values, Sequence):
+            in_ctrl_values = (in_ctrl_values,)
+
+        out_qubits = tuple(QubitType() for _ in in_qubits)
+        out_ctrl_qubits = tuple(QubitType() for _ in in_ctrl_qubits)
+
+        if not isa(pauli_product, PauliWord):
+            pauli_product = ArrayAttr([StringAttr(c) for c in pauli_product])
+
+        properties = {"adjoint": UnitAttr()} if adjoint else {}
+        properties["pauli_product"] = pauli_product
+
+        super().__init__(
+            operands=(angle, in_qubits, in_ctrl_qubits, in_ctrl_values),
+            result_types=(out_qubits, out_ctrl_qubits),
+            properties=properties,
+        )
+
+    def verify_(self):
+        """Verify that the definition of the operation is correct."""
+        if len(self.pauli_product) != len(self.in_qubits):
+            raise ValueError("The length of the Pauli word must match the number of qubits")
+
+        for p in self.pauli_product.data:
+            if p.data not in self.VALID_PAULIS:
+                raise ValueError(f"{p} is not a valid Pauli operator.")
 
 
 @irdl_op_definition
@@ -1150,6 +1206,7 @@ Quantum = Dialect(
         MultiRZOp,
         NamedObsOp,
         NumQubitsOp,
+        PauliRotOp,
         PCPhaseOp,
         ProbsOp,
         QubitUnitaryOp,
