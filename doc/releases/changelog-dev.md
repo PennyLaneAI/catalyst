@@ -391,6 +391,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* xDSL and xDSL-JAX are now dependencies of Catalyst.
+  [(#2282)](https://github.com/PennyLaneAI/catalyst/pull/2282)
+
 * Python 3.14 is now officially supported. Added the forward capability with Python 3.14.
   [(#2271)](https://github.com/PennyLaneAI/catalyst/pull/2271)
 
@@ -536,6 +539,7 @@ Joseph Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Lee J. O'Riordan,
+Mudit Pandey,
 Andrija Paurevic,
 Roberto Turrado,
 Paul Haochen Wang,
