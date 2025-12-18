@@ -15,6 +15,12 @@
   `catalyst.python_interface` namespace.
   [(#2199)](https://github.com/PennyLaneAI/catalyst/pull/2199)
 
+  * Add the `PauliRotOp` operation to the xDSL Quantum dialect.
+    [(#2307)](https://github.com/PennyLaneAI/catalyst/pull/2307)
+
+  * Add the `PPRotationArbitraryOp` to the xDSL QEC dialect.
+    [(#2307)](https://github.com/PennyLaneAI/catalyst/pull/2307)
+
   * An xDSL `Universe` containing all custom xDSL dialects and passes has been registered as an entry point,
     allowing usage of PennyLane's dialects and passes with xDSL's command-line tools.
     [(#2208)](https://github.com/PennyLaneAI/catalyst/pull/2208)
