@@ -17,12 +17,14 @@ from __future__ import annotations
 
 import io
 import warnings
+from collections.abc import Callable
 from functools import wraps
-from typing import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING
 
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 from pennylane.tape import QuantumScript
+from pennylane.workflow.qnode import QNode
 from xdsl.dialects.builtin import ModuleOp
 
 from catalyst.jit import QJIT
@@ -33,10 +35,6 @@ from ..visualization.construct_circuit_dag import ConstructCircuitDAG
 from ..visualization.pydot_dag_builder import PyDotDAGBuilder
 from .collector import QMLCollector
 from .xdsl_conversion import get_mlir_module
-
-if TYPE_CHECKING:
-    from pennylane.typing import Callable
-    from pennylane.workflow.qnode import QNode
 
 HAS_MATPLOTLIB = True
 try:
