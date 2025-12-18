@@ -111,7 +111,7 @@ def get_pyval_from_xdsl_attr(attr: Attribute) -> Any:
         case DictionaryAttr():
             val = {k: get_pyval_from_xdsl_attr(v) for k, v in attr.data.items()}
 
-        case _:  # pragma: no cover
+        case _:
             raise ValueError(f"{attr} cannot be converted to a Python value.")
 
     return val
