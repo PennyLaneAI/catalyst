@@ -16,10 +16,9 @@ from collections import namedtuple
 from itertools import product
 
 import numpy as np
+import pennylane as qml
 import pytest
 from numpy.testing import assert_allclose, assert_equal
-
-import pennylane as qml
 from pennylane.transforms.intermediate_reps import phase_polynomial
 
 from catalyst.python_interface.transforms import (
