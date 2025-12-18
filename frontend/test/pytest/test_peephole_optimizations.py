@@ -526,6 +526,34 @@ def test_merge_rotation_ppr():
     assert 'qec.ppr ["X", "Y", "Z"](2)' in ir_opt
 
 
+@pytest.mark.usefixtures("use_capture")
+def test_merge_rotation_arbitrary_angle_ppr():
+    """Test that the merge_rotation pass correctly merges arbtirary angle PPRs."""
+
+    my_pipeline = [("pipe", ["quantum-compilation-stage"])]
+
+    @qml.qjit(pipelines=my_pipeline, target="mlir")
+    def test_merge_rotation_ppr_workflow():
+        @qml.transforms.merge_rotations
+        @to_ppr_alias
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x, y):
+            qml.PauliRot(x, pauli_word="ZY", wires=[0, 1])
+            qml.PauliRot(y, pauli_word="ZY", wires=[0, 1])
+
+        return circuit(2.6, 0.3)
+
+    ir = test_merge_rotation_ppr_workflow.mlir
+    ir_opt = test_merge_rotation_ppr_workflow.mlir_opt
+
+    assert 'transform.apply_registered_pass "merge-rotations"' in ir
+    assert "qec.ppr.arbitrary" not in ir
+    assert "arith.addf" not in ir
+
+    assert "arith.addf" in ir_opt
+    assert ir_opt.count('qec.ppr.arbitrary ["Z", "Y"]') == 1
+
+
 def test_clifford_to_ppm():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]

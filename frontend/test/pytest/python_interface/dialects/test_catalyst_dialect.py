@@ -11,17 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Unit test module for the xDSL Catalyst dialect."""
 
 import pytest
 
-# pylint: disable=wrong-import-position
+from catalyst.python_interface.dialects import Catalyst
 
 pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
-from catalyst.python_interface.dialects import Catalyst
 
 all_ops = list(Catalyst.operations)
 all_attrs = list(Catalyst.attributes)
