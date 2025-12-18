@@ -15,16 +15,19 @@
 # pylint: disable=unnecessary-lambda
 
 import jax
-import pennylane as qml
 import pytest
+
+pytestmark = pytest.mark.xdsl
+xdsl = pytest.importorskip("xdsl")
+import matplotlib
+import numpy as np
+import pennylane as qml
 
 from catalyst.python_interface.inspection import draw, draw_graph
 from catalyst.python_interface.transforms import (
     iterative_cancel_inverses_pass,
     merge_rotations_pass,
 )
-
-pytestmark = pytest.mark.xdsl
 
 
 @pytest.mark.usefixtures("use_capture")
@@ -571,6 +574,50 @@ class TestDrawGraph:
 
         with pytest.raises(TypeError, match="The circuit must be a qjit compiled qnode"):
             _ = draw_graph(qnode)()
+
+    def test_return_types(self):
+        """Tests the return types of the function."""
+
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(qml.device("null.qubit", wires=2))
+        def qjit_qnode():
+            qml.H(0)
+            return qml.expval(qml.Z(0))
+
+        fig, axes = draw_graph(qjit_qnode)()
+        assert isinstance(fig, matplotlib.figure.Figure)
+        assert isinstance(axes, matplotlib.axes._axes.Axes)
+
+    def test_level_does_something(self):
+        """Tests that the level argument produces two different images."""
+
+        @qml.qjit
+        @qml.transforms.merge_rotations
+        @qml.transforms.cancel_inverses
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def circuit():
+            qml.H(0)
+            qml.T(1)
+            qml.H(0)
+            qml.RX(0.1, wires=0)
+            qml.RX(0.2, wires=0)
+            return qml.expval(qml.X(0))
+
+        _, cancel_inverses_ax = draw_graph(circuit, level=1)()
+        _, merge_rotations_ax = draw_graph(circuit, level=2)()
+
+        _, all_transforms_ax1 = draw_graph(circuit, level=3)()
+        _, all_transforms_ax2 = draw_graph(circuit, level=None)()
+
+        assert np.array_equal(
+            all_transforms_ax1.get_images()[0].get_array(),
+            all_transforms_ax2.get_images()[0].get_array(),
+        )
+
+        assert not np.array_equal(
+            cancel_inverses_ax.get_images()[0].get_array(),
+            merge_rotations_ax.get_images()[0].get_array(),
+        )
 
 
 if __name__ == "__main__":
