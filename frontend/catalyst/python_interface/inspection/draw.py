@@ -208,7 +208,6 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
         fig, ax = plt.subplots()
         ax.imshow(img)
         ax.set_axis_off()
-        fig.set_dpi(300)
         return fig, ax
 
     return wrapper
