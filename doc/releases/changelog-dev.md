@@ -108,13 +108,18 @@
     detecting when the Python compiler is being used and routing through it appropriately.
     [(#2190)](https://github.com/PennyLaneAI/catalyst/pull/2190)
 
+  * A new experimental `parity_synth_pass` compiler pass has been added to
+    `catalyst.python_interface.transforms`. This pass groups ``CNOT`` and ``RZ`` operators
+    into phase polynomials and re-synthesizes them into ``CNOT`` and ``RZ`` operators again.
+    [(#2294)](https://github.com/PennyLaneAI/catalyst/pull/2294)
+
 * Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
   [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
 
 * Catalyst can now compile circuits that are directly expressed in terms of Pauli product rotation
   (PPR) and Pauli product measurement (PPM) operations: :class:`~.PauliRot` and
   :func:`~.pauli_measure`, respectively. This support enables research and development
-  spurred from `A Game of Surface Codes (arXiv1808.02892) <https://arxiv.org/pdf/1808.02892>`_.
+  spurred from [A Game of Surface Codes (arXiv1808.02892)](https://arxiv.org/pdf/1808.02892).
   [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
   [(#2233)](https://github.com/PennyLaneAI/catalyst/pull/2233)
   [(#2284)](https://github.com/PennyLaneAI/catalyst/pull/2284)
@@ -294,7 +299,8 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* Updated tests and PennyLane dependency pin to follow changes introduced by [PennyLaneAI/pennylane#8290](https://github.com/PennyLaneAI/pennylane/pull/8290).
+* Updated tests and PennyLane dependency pin to follow changes introduced by
+  [PennyLaneAI/pennylane#8290](https://github.com/PennyLaneAI/pennylane/pull/8290).
   [(#2286)](https://github.com/PennyLaneAI/catalyst/pull/2286)
 
 * Update `catalyst.python_interface.inspection.xdsl_conversion.get_mlir_module` to
@@ -541,5 +547,6 @@ Mudit Pandey,
 Andrija Paurevic,
 Roberto Turrado,
 Paul Haochen Wang,
+David Wierichs,
 Jake Zaia,
 Hongsheng Zheng.
