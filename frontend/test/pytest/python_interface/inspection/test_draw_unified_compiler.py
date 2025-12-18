@@ -546,6 +546,7 @@ class TestDrawGraph:
             (0,),
             (0, 1),
             slice(0, 2),
+            "cancel-inverses",
         ),
     )
     def test_unsupported_levels(self, unsupported_level):
