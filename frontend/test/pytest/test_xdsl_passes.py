@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Unit tests for xDSL pass-related functionality in the Compiler class.
 """
+# pylint: disable=protected-access
 
 import os
 import pathlib
@@ -28,8 +28,6 @@ from catalyst import qjit
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.pipelines import KeepIntermediateLevel
 from catalyst.utils.filesystem import Directory
-
-# pylint: disable=protected-access
 
 
 @pytest.mark.xdsl
