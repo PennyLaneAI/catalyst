@@ -174,6 +174,8 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
         return jax.tree_util.tree_unflatten(struct, data)
 
     def cleanup(self):
+        """Cleanup after interpretation."""
+
         # Solve the decomposition graph to get the decomposition rules
         # for all the captured operations
         # I know it's a bit hacky to do this here, but it's the only
@@ -251,19 +253,6 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                 # We use MLIR AdjointOp and ControlledOp primitives
                 # to deal with decomposition of symbolic operations at PLxPR.
                 raise ValueError(f"Could not capture {op} without the number of wires.")
-
-    def interpret_measurement(self, measurement: "qml.measurement.MeasurementProcess"):
-        """Interpret a measurement process instance.
-
-        Args:
-            measurement (MeasurementProcess): a measurement instance.
-
-        See also :meth:`~.interpret_measurement_eqn`.
-
-        """
-
-        data, struct = jax.tree_util.tree_flatten(measurement)
-        return jax.tree_util.tree_unflatten(struct, data)
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
