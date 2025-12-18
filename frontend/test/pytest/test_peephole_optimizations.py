@@ -22,7 +22,6 @@ from catalyst import measure, pipeline, qjit
 from catalyst.passes import (
     cancel_inverses,
     commute_ppr,
-    decompose_arbitrary_ppr,
     disentangle_cnot,
     disentangle_swap,
     merge_ppr_ppm,
