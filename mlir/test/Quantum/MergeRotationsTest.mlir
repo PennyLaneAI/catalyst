@@ -943,6 +943,63 @@ func.func public @dont_merge_conditionals(%q1: !quantum.bit, %q2: !quantum.bit, 
 
 // -----
 
+// re-arranging qubits is ok as long as the pauli words are re-arranged too
+
+// CHECK-LABEL: merge_permutations
+func.func public @merge_permutations(%z0: !quantum.bit, %y0: !quantum.bit) {
+    // CHECK: ([[zIn:%.+]]: !quantum.bit, [[yIn:%.+]]: !quantum.bit)
+    // CHECK-NOT: qec.ppr ["Z", "Y"]
+    // CHECK-NOT: qec.ppr ["Y", "Z"](4)
+    // CHECK: qec.ppr ["Y", "Z"](2) [[yIn]], [[zIn]]
+    %z1, %y1 = qec.ppr ["Z", "Y"](4) %z0, %y0: !quantum.bit, !quantum.bit
+    %y2, %z2 = qec.ppr ["Y", "Z"](4) %y1, %z1: !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// check permutations with duplicate Pauli symbols
+
+// CHECK-LABEL: merge_permutations_with_duplicates
+func.func public @merge_permutations_with_duplicates(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) {
+    // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit)
+    // CHECK-NOT: qec.ppr ["X", "Y", "X"]
+    // CHECK-NOT: qec.ppr ["Y", "X", "X"](8)
+    // CHECK: qec.ppr ["Y", "X", "X"](4) [[q1]], [[q2]], [[q0]]
+    %3:3 = qec.ppr ["X", "Y", "X"](8) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %4:3 = qec.ppr ["Y", "X", "X"](8) %3#1, %3#2, %3#0: !quantum.bit, !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// re-arranging qubits without re-arranging the Pauli word is NOT okay
+
+// CHECK-LABEL: dont_merge_permutations_qubits
+func.func public @dont_merge_permutations_qubits(%q0: !quantum.bit, %q1: !quantum.bit) {
+    // CHECK: qec.ppr ["Y", "X"](8)
+    // CHECK: qec.ppr ["Y", "X"](8)
+    %2:2 = qec.ppr ["Y", "X"](8) %q0, %q1: !quantum.bit, !quantum.bit
+    %3:2 = qec.ppr ["Y", "X"](8) %2#1, %2#0: !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// re-arranging Pauli word without re-arranging qubits is not okay
+
+// CHECK-LABEL: dont_merge_permutations_pauli
+func.func public @dont_merge_permutations_pauli(%q0: !quantum.bit, %q1: !quantum.bit) {
+    // CHECK: qec.ppr ["Z", "Y"](2)
+    // CHECK: qec.ppr ["Y", "Z"](2)
+    %2:2 = qec.ppr ["Z", "Y"](2) %q0, %q1: !quantum.bit, !quantum.bit
+    %3:2 = qec.ppr ["Y", "Z"](2) %2#0, %2#1: !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+
 // Arbitrary Angle PPR Tests
 
 // simple merge

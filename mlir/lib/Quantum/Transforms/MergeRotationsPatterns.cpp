@@ -328,68 +328,85 @@ struct MergePPRRewritePattern : public OpRewritePattern<PPRotationOp> {
     {
         // NOTE: a bit unorthodox, but we find the *second* PPR in a pair, since it's easier to
         // look backwards by checking inQubits.getDefiningOp
-        ValueRange inQubits = op.getInQubits();
-        auto definingOp = inQubits[0].getDefiningOp();
+        ValueRange opInQubits = op.getInQubits();
 
+        Operation *definingOp = opInQubits[0].getDefiningOp();
         if (!definingOp) {
             return failure();
         }
 
-        auto prevOp = dyn_cast<PPRotationOp>(definingOp);
-
-        if (!prevOp) {
+        auto parentOp = dyn_cast<PPRotationOp>(definingOp);
+        if (!parentOp) {
             return failure();
         }
 
-        // verify that prevOp agrees on all qubits, not just the first
-        for (auto qubit : inQubits) {
-            if (qubit.getDefiningOp() != prevOp) {
+        // verify that parentOp agrees on all qubits, not just the first
+        for (Value qubit : opInQubits) {
+            if (qubit.getDefiningOp() != parentOp) {
+                return failure();
+            }
+        }
+        ValueRange parentOpOutQubits = parentOp.getOutQubits();
+        if (parentOpOutQubits.size() != opInQubits.size()) {
+            return failure();
+        }
+
+        // When two rotations have permuted Pauli strings, we can still merge them, we just need to
+        // correctly re-map the inputs. This map stores the index of a qubit in parentOp's out
+        // qubits at the index it appears in op's in qubits.
+        SmallVector<unsigned> inverse_permutation;
+        for (auto qubit : opInQubits) {
+            inverse_permutation.push_back(cast<OpResult>(qubit).getResultNumber());
+        }
+
+        // check Pauli + qubit pairings
+        ArrayAttr opPauliProduct = op.getPauliProduct();
+        ArrayAttr parentOpPauliProduct = parentOp.getPauliProduct();
+        for (size_t i = 0; i < opInQubits.size(); i++) {
+            if (opPauliProduct[i] != parentOpPauliProduct[inverse_permutation[i]]) {
                 return failure();
             }
         }
 
-        // check same pauli strings
-        if (op.getPauliProduct() != prevOp.getPauliProduct()) {
-            return failure();
-        }
-
         // check same conditionals
-        if (op.getCondition() != prevOp.getCondition()) {
+        Value opCondition = op.getCondition();
+        if (opCondition != parentOp.getCondition()) {
             return failure();
         }
 
         int16_t opRotation = static_cast<int16_t>(op.getRotationKind());
-        int16_t prevOpRotation = static_cast<int16_t>(prevOp.getRotationKind());
-
-        // cancel inverse operations
-        if (opRotation == -prevOpRotation) {
-            // erase in reverse to avoid use issues
-            ValueRange originalQubits = prevOp.getInQubits();
-            rewriter.replaceOp(op, originalQubits);
-            rewriter.eraseOp(prevOp);
-
-            return success();
-        }
-
-        if (opRotation != prevOpRotation) {
+        int16_t parentOpRotation = static_cast<int16_t>(parentOp.getRotationKind());
+        
+        if (std::abs(opRotation) != std::abs(parentOpRotation)) {
             return failure();
         }
 
         int16_t newAngle = opRotation / 2;
 
-        // newAngle of 1 indicates denominator of 1
-        if (newAngle != 1 and newAngle != -1) {
-            // "replace" the operation by changing the rotationKind
-            prevOp.setRotationKind(newAngle);
+        // remove identity operations
+        ValueRange parentOpInQubits = parentOp.getInQubits();
+        if (opRotation == -parentOpRotation || std::abs(newAngle) == 1) {
+            rewriter.replaceOp(op, parentOpInQubits);
+            rewriter.eraseOp(parentOp);
 
-            // replace references to current op with prevOp
-            rewriter.replaceOp(op, prevOp);
+            return success();
         }
-        else {
-            ValueRange originalQubits = prevOp.getInQubits();
-            rewriter.replaceOp(op, originalQubits);
-            rewriter.eraseOp(prevOp);
+
+
+        Location loc = op.getLoc();
+
+        // We need to construct the Pauli string + inQubits for new op. The simplest way to ensure
+        // that permuted PPRs can merge correctly is to maintain output qubits order and permute
+        // input qubits
+        SmallVector<mlir::Value> newInQubits;
+        for (size_t i = 0; i < parentOpInQubits.size(); i++) {
+            newInQubits.push_back(parentOpInQubits[inverse_permutation[i]]);
         }
+
+        auto mergeOp = rewriter.create<PPRotationOp>(loc, parentOpOutQubits.getTypes(), opPauliProduct, newAngle, newInQubits, opCondition);
+
+        rewriter.replaceOp(op, mergeOp);
+        rewriter.eraseOp(parentOp);
 
         return success();
     }
