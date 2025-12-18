@@ -128,12 +128,12 @@ def draw_graph(qnode: QNode, *, level: None | int = None) -> Callable:
             level is visualized. # what are default options?
 
     Returns:
-        Callable: A function that has the same argument signature as the compiled ``qnode``. 
-            When called, the function will return the graph as a tuple of 
-            (``matplotlib.figure.Figure``, ``matplotlib.axes._axes.Axes``). 
+        Callable: A function that has the same argument signature as the compiled ``qnode``.
+            When called, the function will return the graph as a tuple of
+            (``matplotlib.figure.Figure``, ``matplotlib.axes._axes.Axes``).
 
     Raises:
-        VisualizationError: If the circuit contains operations that cannot be 
+        VisualizationError: If the circuit contains operations that cannot be
             converted to a graphical representation.
 
     **Example**
