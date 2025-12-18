@@ -1382,8 +1382,9 @@ def ppr_to_mbqc(qnode):
     """
     return PassPipelineWrapper(qnode, "ppr-to-mbqc")
 
-
-def decompose_arbitrary_ppr(qnode):
+# This pass is already covered via applying by pass
+# `qml.transform(pass_name="decompose-arbitrary-ppr")` in Pennylane.
+def decompose_arbitrary_ppr(qnode): # pragma: nocover
     R"""
     Specify that the MLIR compiler pass for decomposing arbitrary Pauli product rotations (PPR)
     operations will be applied. This will decompose into a collection of PPRs, PPMs and
