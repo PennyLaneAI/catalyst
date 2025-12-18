@@ -15,7 +15,6 @@
 # pylint: disable=line-too-long
 
 import pytest
-from numpy import round
 from xdsl.dialects import arith, builtin, tensor, test
 
 from catalyst.python_interface.dialects.stablehlo import ConstantOp as hloConstantOp
