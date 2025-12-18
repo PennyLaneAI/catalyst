@@ -34,6 +34,12 @@ from catalyst.python_interface.transforms import (
     merge_rotations_pass,
 )
 
+pytestmark = pytest.mark.xdsl
+graphviz = pytest.importorskip("graphviz")
+
+if which("dot") is None:
+    pytest.skip(reason="Graphviz isn't installed.", allow_module_level=True)
+
 
 @pytest.fixture(autouse=True)
 def _chdir_tmp(monkeypatch, tmp_path: Path):
