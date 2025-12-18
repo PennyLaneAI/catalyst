@@ -90,7 +90,7 @@ class TestCreateSchedule:
     def test_pass_no_options(self):
         """Test that passes with no options are parsed correctly."""
         pass_op = create_apply_registered_pass_op("test-pass")
-        schedule = _create_schedule([pass_op])
+        schedule = _create_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert schedule[0] == "--test-pass"
 
@@ -100,7 +100,7 @@ class TestCreateSchedule:
             "test-pass",
             options={"int-opt": 1, "float-opt": 1.5, "bool-opt": False, "str-opt": "test_string"},
         )
-        schedule = _create_schedule([pass_op])
+        schedule = _create_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert (
             schedule[0] == "--test-pass=int-opt=1 float-opt=1.5 bool-opt=false str-opt=test_string"
@@ -109,7 +109,7 @@ class TestCreateSchedule:
     def test_pass_array_options(self):
         """Test that passes with array options are parsed correctly."""
         pass_op = create_apply_registered_pass_op("test-pass", options={"list-opt": (1, 2, 3, 4)})
-        schedule = _create_schedule([pass_op])
+        schedule = _create_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert schedule[0] == "--test-pass=list-opt=1,2,3,4"
 
@@ -118,7 +118,7 @@ class TestCreateSchedule:
         pass_op = create_apply_registered_pass_op(
             "test-pass", options={"dict-opt": {"a": 1, "b": 2, "c": 3, "d": 4}}
         )
-        schedule = _create_schedule([pass_op])
+        schedule = _create_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert schedule[0] == "--test-pass=dict-opt={a=1 b=2 c=3 d=4}"
 
@@ -131,7 +131,7 @@ class TestCreateSchedule:
                 "dict-opt": {"f": (1, 2), "g": 1},
             },
         )
-        schedule = _create_schedule([pass_op])
+        schedule = _create_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert (
             schedule[0]
@@ -145,7 +145,7 @@ class TestCreateSchedule:
         pass_op3 = create_apply_registered_pass_op(
             "test-pass3", options={"list-opt": (False, True, False)}
         )
-        schedule = _create_schedule([pass_op1, pass_op2, pass_op3])
+        schedule = _create_schedule(pass_ops=[pass_op1, pass_op2, pass_op3])
         assert len(schedule) == 3
         assert schedule[0] == "--test-pass1"
         assert schedule[1] == "--test-pass2=int-opt=1"
