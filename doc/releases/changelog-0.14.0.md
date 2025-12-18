@@ -653,6 +653,9 @@
 * Adding the measurement type into the MLIR assembly format for `qec.ppm` and `qec.select.ppm`
   [(#2347)](https://github.com/PennyLaneAI/catalyst/pull/2347)
 
+* Remove duplicate code for canonicalization and verification of Pauli Product Rotation operations.
+  [(#2313)](https://github.com/PennyLaneAI/catalyst/pull/2313)
+
 <h3>Documentation 📝</h3>
 
 * A new statevector simulator ``lightning.amdgpu`` has been added for optimized performance on AMD GPUs.
