@@ -19,7 +19,6 @@
 # pylint: disable=line-too-long
 
 import numpy as np
-
 import pennylane as qml
 
 from catalyst import measure, qjit

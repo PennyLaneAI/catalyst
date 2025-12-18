@@ -582,6 +582,7 @@ def test_clifford_to_ppm():
 
     assert ppm_specs_output["g_0"]["logical_qubits"] == 2
 
+
 @pytest.mark.usefixtures("use_capture")
 def test_decompose_arbitrary_ppr():
     """
@@ -602,7 +603,7 @@ def test_decompose_arbitrary_ppr():
 
     ir = test_decompose_arbitrary_ppr_workflow.mlir
     ir_opt = test_decompose_arbitrary_ppr_workflow.mlir_opt
-    
+
     print(ir_opt)
 
     assert 'transform.apply_registered_pass "decompose-arbitrary-ppr"' in ir
