@@ -237,7 +237,7 @@ class ConstructCircuitDAG:
         node_uid = f"node{self._node_uid_counter}"
         self.dag_builder.add_node(
             uid=node_uid,
-            label=f"<name> PPR-{pw}|<wire> {wires_str}",
+            label=f"<name> PPR-{pw} (φ)|<wire> {wires_str}",
             cluster_uid=self._cluster_uid_stack[-1],
             # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
