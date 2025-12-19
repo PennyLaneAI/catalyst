@@ -16,10 +16,12 @@
 
 #include <concepts>
 #include <optional>
+#include <string>
 
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/LogicalResult.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -258,13 +260,15 @@ struct CliffordTToPauliFramePattern : public OpRewritePattern<CustomOp> {
         case GateEnum::T:
             return convertNonCliffordGate(op, rewriter);
         case GateEnum::Unknown: {
-            op->emitError() << "Unsupported gate: '" << op.getGateName()
-                            << "'. Only Clifford+T gates are supported for Pauli frame conversion: "
+            op->emitError() << "Unsupported gate: '" << op.getGateName() << "'. "
+                            << "Only Clifford+T gates are supported for Pauli frame conversion: "
                             << "I, X, Y, Z, H, S, S†, T, T†, and CNOT";
-            return failure();
         }
         }
-        llvm_unreachable("unhandled gate");
+        std::string msg =
+            llvm::formatv("failed to apply Pauli frame tracking protocols: unsupported gate: {0}",
+                          op.getGateName().data());
+        llvm_unreachable(msg.c_str());
     }
 };
 
@@ -471,7 +475,10 @@ struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<Measuremen
         }
         else {
             obsOp->emitError() << "Unsupported observable op: " << obsOp->getName();
-            return failure();
+            std::string msg = llvm::formatv(
+                "failed to apply Pauli frame tracking protocols: unsupported observable: {0}",
+                obsOp->getName());
+            llvm_unreachable(msg.c_str());
         }
 
         return success();
