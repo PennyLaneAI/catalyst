@@ -358,7 +358,7 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
             getNonIdentityIndicesAndReplaceIdentityQubitUses(op, rewriter);
 
         // get parent op
-        Operation *definingOp = opInQubits[0].getDefiningOp();
+        Operation *definingOp = opInQubits[opNonIdentityIndices[0]].getDefiningOp();
         if (!definingOp) {
             return failure();
         }

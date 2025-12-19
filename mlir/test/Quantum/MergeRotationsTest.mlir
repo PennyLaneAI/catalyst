@@ -1014,12 +1014,12 @@ func.func public @permutation_results(%q0: !quantum.bit, %q1: !quantum.bit, %q2:
 
 // ignore identity qubits when considering equivalence
 
-// CHECK-LABEL: permute_ignore_identity
-func.func public @permute_ignore_identity(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) {
-    // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit)
+// CHECK-LABEL: permute_ignore_identity_parent_op
+func.func public @permute_ignore_identity_parent_op(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit, %q3: !quantum.bit) {
+    // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit, [[q3:%.+]])
     // CHECK: qec.ppr ["Z", "X"](2) [[q2]], [[q0]]
     %0:3 = qec.ppr ["X", "I", "Z"](4) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
-    %1:3 = qec.ppr ["I", "Z", "X"](4) %0#1, %0#2, %0#0: !quantum.bit, !quantum.bit, !quantum.bit
+    %1:3 = qec.ppr ["I", "Z", "X"](4) %q3, %0#2, %0#0: !quantum.bit, !quantum.bit, !quantum.bit
     func.return
 }
 
