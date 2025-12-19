@@ -19,6 +19,7 @@ import io
 import warnings
 from collections.abc import Callable
 from functools import wraps
+from shutil import which
 from typing import TYPE_CHECKING
 
 import matplotlib.image as mpimg
@@ -41,6 +42,16 @@ try:
     import matplotlib
 except ModuleNotFoundError:
     HAS_MATPLOTLIB = False
+
+HAS_PYDOT = True
+try:
+    import pydot
+except ModuleNotFoundError:
+    HAS_PYDOT = False
+
+HAS_GRAPHVIZ = True
+if which("dot") is None:
+    HAS_GRAPHVIZ = False
 
 # TODO: This caching mechanism should be improved,
 # because now it relies on a mutable global state
@@ -106,7 +117,7 @@ def draw(qnode: QNode, *, level: None | int = None) -> Callable:
 
 def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     """
-    Visualize QNodes as graphs, showing wire flow through quantum operations, program structure, and
+    Visualize a single QJIT compiled QNode, showing wire flow through quantum operations, program structure, and
     pass-by-pass impacts on compiled programs.
 
     .. note::
@@ -256,6 +267,14 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         raise ImportError(
             "The `draw_graph` functionality requires `matplotlib` to be installed. Please install `matplotlib` with `pip install matplotlib`."
         )
+    if not HAS_GRAPHVIZ:
+        raise ImportError(
+            "The `Graphviz` package is not found. Please install it  for your system by following the instructions found here: https://graphviz.org/download/"
+        )
+    if not HAS_PYDOT:
+        raise ImportError(
+            "The `pydot` package is not found. Please install with `pip install pydot`."
+        )
 
     if not isinstance(level, (int, type(None))):
         raise TypeError("The `level` argument must be an integer or `None`.")
@@ -283,10 +302,10 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         # Store DAG in cache
         # utility.dag_builder.graph.set_dpi(300)
         # TODO: Update DAGBuilder to abstract away extracting image bytes
-        image_bytes = utility.dag_builder.graph.create_png()
+        dot_string = utility.dag_builder.to_string()
         pass_name = pass_instance.name if hasattr(pass_instance, "name") else pass_instance
         cache[pass_level] = (
-            image_bytes,
+            dot_string,
             pass_name if pass_level else "No transforms",
         )
 
@@ -299,7 +318,10 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
             return None
 
         max_level = max(cache.keys())
-        image_bytes, _ = cache.get(level, cache[max_level])
+        dot_string, _ = cache.get(level, cache[max_level])
+        # TODO:  Remove dependency on PyDot
+        graph = pydot.graph_from_dot_data(dot_string)[0]
+        image_bytes = graph.create_png()
 
         # Create virtual image in RAM
         sio = io.BytesIO()

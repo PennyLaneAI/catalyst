@@ -588,8 +588,8 @@ class TestDrawGraph:
         assert isinstance(fig, matplotlib.figure.Figure)
         assert isinstance(axes, matplotlib.axes._axes.Axes)
 
-    def test_level_does_something(self):
-        """Tests that the level argument produces two different images."""
+    def test_transforms_step_through(self):
+        """Tests that the level argument controls transformations step through."""
 
         @qml.qjit
         @qml.transforms.merge_rotations
@@ -603,21 +603,34 @@ class TestDrawGraph:
             qml.RX(0.2, wires=0)
             return qml.expval(qml.X(0))
 
-        _, cancel_inverses_ax = draw_graph(circuit, level=1)()
-        _, merge_rotations_ax = draw_graph(circuit, level=2)()
+        _ = draw_graph(circuit)()
 
-        _, all_transforms_ax1 = draw_graph(circuit, level=3)()
-        _, all_transforms_ax2 = draw_graph(circuit, level=None)()
+        # NOTE: hacky work around but lets me probe the graph
+        from catalyst.python_interface.inspection.draw import _cache_store
 
-        assert np.array_equal(
-            all_transforms_ax1.get_images()[0].get_array(),
-            all_transforms_ax2.get_images()[0].get_array(),
-        )
+        cache = _cache_store[circuit]
 
-        assert not np.array_equal(
-            cancel_inverses_ax.get_images()[0].get_array(),
-            merge_rotations_ax.get_images()[0].get_array(),
-        )
+        no_transforms = cache[0][0]
+        cancel_inverses = cache[1][0]
+        merge_rotations = cache[2][0]
+
+        # Check no transforms
+        assert no_transforms.count("<name> Hadamard|<wire> [0]") == 2
+        assert no_transforms.count("<name> T|<wire> [1]") == 1
+        assert no_transforms.count("<name> RX|<wire> [0]") == 2
+        assert no_transforms.count("expval(PauliX)") == 1
+
+        # Cancel inverses
+        assert cancel_inverses.count("<name> Hadamard|<wire> [0]") == 0
+        assert cancel_inverses.count("<name> T|<wire> [1]") == 1
+        assert cancel_inverses.count("<name> RX|<wire> [0]") == 2
+        assert cancel_inverses.count("expval(PauliX)") == 1
+
+        # Merge rotations
+        assert merge_rotations.count("<name> Hadamard|<wire> [0]") == 0
+        assert merge_rotations.count("<name> T|<wire> [1]") == 1
+        assert merge_rotations.count("<name> RX|<wire> [0]") == 1
+        assert merge_rotations.count("expval(PauliX)") == 1
 
 
 if __name__ == "__main__":
