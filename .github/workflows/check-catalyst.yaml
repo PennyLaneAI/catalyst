@@ -477,7 +477,7 @@ jobs:
 
     - name: Install PennyLane branch
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@capture-vjp
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@capture-jvp
 
 
     - name: Get Cached LLVM Build
@@ -576,7 +576,7 @@ jobs:
 
     - name: Install PennyLane branch
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@capture-vjp
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@capture-jvp
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -642,7 +642,7 @@ jobs:
 
     - name: Install PennyLane branch
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@capture-vjp
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@capture-jvp
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
