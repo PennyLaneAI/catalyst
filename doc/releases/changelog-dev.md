@@ -211,6 +211,18 @@
 
 <h3>Improvements 🛠</h3>
 
+* The frontend no longer maintains a hardcoded list of runtime operations,
+  allowing arbitrary PennyLane gates with Quantum dialect-compatible
+  hyperparameters to be captured and represented in MLIR.
+  Users of the legacy compilation pipeline are unaffected,
+  as Catalyst continues to decompose unsupported gates
+  based on device capabilities before lowering to MLIR.
+  Gates that cannot be represented as MLIR operators will temporarily
+  raise a `CompileError` during program capture.
+  The long-term solution will integrate the new decomposition framework
+  with capture-enabled compilation.
+  [(#2215)](https://github.com/PennyLaneAI/catalyst/pull/2215)
+
 * Catalyst can now use the new `pass_name` property of pennylane transform objects. Passes can now
   be created using `qml.transform(pass_name=pass_name)` instead of `PassPipelineWrapper`.
   [(#2149](https://github.com/PennyLaneAI/catalyst/pull/2149)

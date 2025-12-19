@@ -42,6 +42,7 @@ from catalyst.device.op_support import (
     is_controllable,
     is_differentiable,
     is_invertible,
+    is_lowering_compatible,
     is_supported,
 )
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
@@ -227,7 +228,7 @@ def catalyst_acceptance(
         if match and is_controllable(op.base, capabilities):
             return match
 
-    elif is_supported(op, capabilities):
+    elif is_supported(op, capabilities) and is_lowering_compatible(op):
         return op.name
 
     return None

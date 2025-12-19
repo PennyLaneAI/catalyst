@@ -457,3 +457,33 @@ def test_two_qnodes_with_different_passes_in_one_workflow():
 
 
 test_two_qnodes_with_different_passes_in_one_workflow()
+
+
+def test_capture_custom_op():
+    """Test capture of a custom op"""
+
+    dev = qml.device("lightning.qubit", wires=2)
+
+    class MuCustomOp(qml.operation.Operator):
+        """A custom operator for testing."""
+
+        def __init__(self, theta, wires):
+            """Initialize the custom operator."""
+            super().__init__(theta, wires=wires)
+
+    qml.capture.enable()
+
+    @qml.qjit(target="mlir")
+    @qml.qnode(dev)
+    def circuit():
+        # CHECK: [[QUBIT_1:%.+]] = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+        # CHECK-NEXT: [[QUBIT_2:%.+]] = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+        # CHECK-NEXT: {{%.+}} = quantum.custom "MuCustomOp"({{%.+}}) [[QUBIT_1]], [[QUBIT_2]] : !quantum.bit, !quantum.bit
+        MuCustomOp(0.5, wires=[0, 1])
+        return qml.state()
+
+    print(circuit.mlir)
+    qml.capture.disable()
+
+
+test_capture_custom_op()
