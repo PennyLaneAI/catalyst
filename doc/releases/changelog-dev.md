@@ -431,6 +431,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update references to `TransformProgram` with `CompilePipeline`
+  [(#2314)](https://github.com/PennyLaneAI/catalyst/pull/2314)
+
 * xDSL and xDSL-JAX are now dependencies of Catalyst.
   [(#2282)](https://github.com/PennyLaneAI/catalyst/pull/2282)
 
