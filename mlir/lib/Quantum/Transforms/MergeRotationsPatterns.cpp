@@ -357,6 +357,11 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
         SmallVector<int16_t> opNonIdentityIndices =
             getNonIdentityIndicesAndReplaceIdentityQubitUses(op, rewriter);
 
+        // leave identity op as cleanup for canonicalization
+        if (opNonIdentityIndices.size() == 0) {
+            return failure();
+        }
+
         // get parent op
         Operation *definingOp = opInQubits[opNonIdentityIndices[0]].getDefiningOp();
         if (!definingOp) {
