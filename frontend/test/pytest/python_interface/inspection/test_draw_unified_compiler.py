@@ -584,10 +584,10 @@ class TestDrawGraph:
             qml.H(0)
             return qml.expval(qml.Z(0))
 
-        #from unittest.mock import patch
+        # from unittest.mock import patch
 
-        ## Mock out the creation of the PNG 
-        #with patch("pydot.Dot.create_png") as mock_create_png:
+        ## Mock out the creation of the PNG
+        # with patch("pydot.Dot.create_png") as mock_create_png:
         #    # Creates a simple 1x1 pixel transparent image https://en.wikipedia.org/wiki/PNG
         #    mock_create_png.return_value = (
         #        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00"
