@@ -176,7 +176,7 @@ class ConstructCircuitDAG:
             self._wire_to_node_uids[wire] = {node_uid}
 
     @_visit_operation.register
-    def _ppr(self, op: qec.PPRotationOp) -> None:
+    def _ppr(self, op: qec.PPRotationOp | qec.PPRotationArbitraryOp) -> None:
         """Handler for the PPR operation."""
 
         # Create label
@@ -186,18 +186,22 @@ class ConstructCircuitDAG:
         for str_attr in op.pauli_product.data:
             pw.append(str(str_attr).replace('"', ""))
         pw = "".join(pw)
-        denominator = abs(op.rotation_kind.value.data)
-        label = f"<name> PPR-{pw} (π/{denominator})|<wire> {wires_str}"
 
-        # Get color
         attrs = {}
-        match denominator:
-            case 2:
-                attrs["fillcolor"] = "#D9D9D9"
-            case 4:
-                attrs["fillcolor"] = "#F5BD70"
-            case 8:
-                attrs["fillcolor"] = "#E3FFA1"
+        if hasattr(op, "rotation_kind"):
+            denominator = abs(op.rotation_kind.value.data)
+            angle = f"π/{denominator}"
+            match denominator:
+                case 2:
+                    attrs["fillcolor"] = "#D9D9D9"
+                case 4:
+                    attrs["fillcolor"] = "#F5BD70"
+                case 8:
+                    attrs["fillcolor"] = "#E3FFA1"
+        else:
+            angle = "φ"
+            attrs["fillcolor"] = "#E3FFA1"
+        label = f"<name> PPR-{pw} ({angle})|<wire> {wires_str}"
 
         # Add node to current cluster
         node_uid = f"node{self._node_uid_counter}"
@@ -208,40 +212,6 @@ class ConstructCircuitDAG:
             # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
             **attrs,
-        )
-        self._node_uid_counter += 1
-
-        # Search through previous ops found on current wires and connect
-        prev_node_uids: set[str] = set.union(
-            set(), *(self._wire_to_node_uids[wire] for wire in wires)
-        )
-        for prev_node_uid in prev_node_uids:
-            self.dag_builder.add_edge(prev_node_uid, node_uid)
-
-        # Update affected wires to source from this node UID
-        for wire in wires:
-            self._wire_to_node_uids[wire] = {node_uid}
-
-    @_visit_operation.register
-    def _ppr_arbitrary(self, op: qec.PPRotationArbitraryOp) -> None:
-        """Handler for the arbitrary PPR operation."""
-
-        wires = ssa_to_qml_wires(op)
-        wires_str = f"[{', '.join(map(str, wires))}]"
-        pw = []
-        for str_attr in op.pauli_product.data:
-            pw.append(str(str_attr).replace('"', ""))
-        pw = "".join(pw)
-
-        # Add node to current cluster
-        node_uid = f"node{self._node_uid_counter}"
-        self.dag_builder.add_node(
-            uid=node_uid,
-            label=f"<name> PPR-{pw} (φ)|<wire> {wires_str}",
-            cluster_uid=self._cluster_uid_stack[-1],
-            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
-            shape="record",
-            fillcolor="#E3FFA1",
         )
         self._node_uid_counter += 1
 
