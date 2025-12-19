@@ -584,16 +584,18 @@ class TestDrawGraph:
             qml.H(0)
             return qml.expval(qml.Z(0))
 
-        from unittest.mock import patch
+        #from unittest.mock import patch
 
-        with patch("pydot.Dot.create_png") as mock_create:
-            mock_create.return_value = (
-                b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00"
-                b"\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9c"
-                b"c\x00\x01\x00\x00\x05\x00\x01\r\n\x2e\xe4\x00\x00\x00\x00IEND\xaeB`\x82"
-            )
+        ## Mock out the creation of the PNG 
+        #with patch("pydot.Dot.create_png") as mock_create_png:
+        #    # Creates a simple 1x1 pixel transparent image https://en.wikipedia.org/wiki/PNG
+        #    mock_create_png.return_value = (
+        #        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00"
+        #        b"\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9c"
+        #        b"c\x00\x01\x00\x00\x05\x00\x01\r\n\x2e\xe4\x00\x00\x00\x00IEND\xaeB`\x82"
+        #    )
 
-            fig, axes = draw_graph(qjit_qnode)()
+        fig, axes = draw_graph(qjit_qnode)()
 
         assert isinstance(fig, matplotlib.figure.Figure)
         assert isinstance(axes, matplotlib.axes._axes.Axes)
