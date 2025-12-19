@@ -1025,6 +1025,19 @@ func.func public @permute_ignore_identity_parent_op(%q0: !quantum.bit, %q1: !qua
 
 // -----
 
+// verify identity qubits are passed through
+
+// CHECK-LABEL: pass_identity_qubits
+func.func public @pass_identity_qubits(%q0: !quantum.bit, %q1: !quantum.bit) -> !quantum.bit {
+    // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit)
+    // CHECK: return [[q0]]
+    %0:2 = qec.ppr ["I", "X"](4) %q0, %q1: !quantum.bit, !quantum.bit
+    %1:2 = qec.ppr ["X", "I"](4) %0#1, %0#0: !quantum.bit, !quantum.bit
+    func.return %1#1: !quantum.bit
+}
+
+// -----
+
 // merge different size pprs when removing identities makes them compatible
 
 // CHECK-LABEL: identity_agnostic_sizing
