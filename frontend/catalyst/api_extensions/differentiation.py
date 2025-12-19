@@ -21,7 +21,7 @@ of gradients, jacobians, jacobian-vector products, and more.
 import copy
 import functools
 import numbers
-from typing import Callable, Iterable, List, Optional, Union
+from typing import Callable, Sequence, List, Optional, Union
 
 import jax
 import pennylane as qml
@@ -442,12 +442,12 @@ def jvp(f: Callable, params, tangents, *, method=None, h=None, argnums=None):
     (Array(0.78766064, dtype=float64), Array(-0.7011436, dtype=float64))
     """
 
-    def check_is_iterable(x, hint):
-        if not isinstance(x, Iterable):
-            raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
+    def check_is_Sequence(x, hint):
+        if not isinstance(x, Sequence):
+            raise ValueError(f"vjp '{hint}' argument must be a Sequence, not {type(x)}")
 
-    check_is_iterable(params, "params")
-    check_is_iterable(tangents, "tangents")
+    check_is_Sequence(params, "params")
+    check_is_Sequence(tangents, "tangents")
 
     if EvaluationContext.is_tracing():
         scalar_out = False
@@ -550,12 +550,12 @@ def vjp(f: Callable, params, cotangents, *, method=None, h=None, argnums=None):
     if qml.capture.enabled():
         return qml.vjp(f, params, cotangents, method=method, h=h, argnums=argnums)
 
-    def check_is_iterable(x, hint):
-        if not isinstance(x, Iterable):
-            raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
+    def check_is_Sequence(x, hint):
+        if not isinstance(x, Sequence):
+            raise ValueError(f"vjp '{hint}' argument must be a Sequence, not {type(x)}")
 
-    check_is_iterable(params, "params")
-    check_is_iterable(cotangents, "cotangents")
+    check_is_Sequence(params, "params")
+    check_is_Sequence(cotangents, "cotangents")
 
     if EvaluationContext.is_tracing():
         scalar_out = False
