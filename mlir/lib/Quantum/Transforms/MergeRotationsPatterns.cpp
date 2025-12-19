@@ -368,10 +368,7 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
 
         // get parent op
         Operation *definingOp = opInQubits[opNonIdentityIndices[0]].getDefiningOp();
-        if (!definingOp) {
-            return failure();
-        }
-        auto parentOp = dyn_cast<ParentOpType>(definingOp);
+        auto parentOp = dyn_cast_or_null<ParentOpType>(definingOp);
         if (!parentOp) {
             return failure();
         }
