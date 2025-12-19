@@ -15,6 +15,12 @@
   `catalyst.python_interface` namespace.
   [(#2199)](https://github.com/PennyLaneAI/catalyst/pull/2199)
 
+  * Add the `PauliRotOp` operation to the xDSL Quantum dialect.
+    [(#2307)](https://github.com/PennyLaneAI/catalyst/pull/2307)
+
+  * Add the `PPRotationArbitraryOp` to the xDSL QEC dialect.
+    [(#2307)](https://github.com/PennyLaneAI/catalyst/pull/2307)
+
   * An xDSL `Universe` containing all custom xDSL dialects and passes has been registered as an entry point,
     allowing usage of PennyLane's dialects and passes with xDSL's command-line tools.
     [(#2208)](https://github.com/PennyLaneAI/catalyst/pull/2208)
@@ -514,6 +520,10 @@
 * A new `PauliFrame` dialect has been added. This dialect includes a set of abstractions and
   operations for interacting with an external Pauli frame tracking library.
   [(#2188)](https://github.com/PennyLaneAI/catalyst/pull/2188)
+
+* A new `to-pauli-frame` compilation pass has been added, which applies the Pauli frame tracking
+  protocols to a Clifford+T program.
+  [(#2269)](https://github.com/PennyLaneAI/catalyst/pull/2269)
 
 <h3>Documentation 📝</h3>
 
