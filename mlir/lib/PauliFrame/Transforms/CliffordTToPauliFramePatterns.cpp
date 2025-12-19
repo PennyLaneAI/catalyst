@@ -174,7 +174,7 @@ LogicalResult convertCliffordGate(CustomOp op, PatternRewriter &rewriter, Cliffo
     UpdateWithCliffordOp updateOp =
         rewriter.create<UpdateWithCliffordOp>(loc, outQubitTypes, gate, inQubits);
 
-    op->setOperands(updateOp->getResults());
+    rewriter.modifyOpInPlace(op, [&] { op->setOperands(updateOp->getResults()); });
     return success();
 }
 
@@ -224,7 +224,7 @@ LogicalResult convertNonCliffordGate(CustomOp op, PatternRewriter &rewriter)
 
     auto pauliZOutQubit = insertPauliOpsAfterFlush(rewriter, loc, flushOp);
 
-    op->setOperands(pauliZOutQubit);
+    rewriter.modifyOpInPlace(op, [&] { op->setOperands(pauliZOutQubit); });
 
     return success();
 }
@@ -455,12 +455,12 @@ struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<Measuremen
                 auto flushOp = rewriter.create<FlushOp>(
                     loc, rewriter.getI1Type(), rewriter.getI1Type(), qubit.getType(), qubit);
                 auto pauliZOutQubit = insertPauliOpsAfterFlush(rewriter, loc, flushOp);
-                obsOp->setOperand(idx, pauliZOutQubit);
+                rewriter.modifyOpInPlace(obsOp, [&] { obsOp->setOperand(idx, pauliZOutQubit); });
             }
             else {
                 // Get output qubit of Pauli Z op after the flush
                 auto pauliZOutQubit = getOutputQubitOfPauliZAfterFlush(flushOp.value());
-                obsOp->setOperand(idx, pauliZOutQubit);
+                rewriter.modifyOpInPlace(obsOp, [&] { obsOp->setOperand(idx, pauliZOutQubit); });
             }
         };
 
