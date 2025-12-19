@@ -179,6 +179,7 @@ class ConstructCircuitDAG:
     def _ppr(self, op: qec.PPRotationOp) -> None:
         """Handler for the PPR operation."""
 
+        # Create label
         wires = ssa_to_qml_wires(op)
         wires_str = f"[{', '.join(map(str, wires))}]"
         pw = []
@@ -186,15 +187,27 @@ class ConstructCircuitDAG:
             pw.append(str(str_attr).replace('"', ""))
         pw = "".join(pw)
         denominator = abs(op.rotation_kind.value.data)
+        label = f"<name> PPR-{pw} (π/{denominator})|<wire> {wires_str}"
+
+        # Get color
+        attrs = {}
+        match denominator:
+            case 2:
+                attrs["fillcolor"] = "#D9D9D9"
+            case 4:
+                attrs["fillcolor"] = "#F5BD70"
+            case 8:
+                attrs["fillcolor"] = "#E3FFA1"
 
         # Add node to current cluster
         node_uid = f"node{self._node_uid_counter}"
         self.dag_builder.add_node(
             uid=node_uid,
-            label=f"<name> PPR-{pw} (π/{denominator})|<wire> {wires_str}",
+            label=label,
             cluster_uid=self._cluster_uid_stack[-1],
             # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
+            **attrs,
         )
         self._node_uid_counter += 1
 
@@ -228,6 +241,7 @@ class ConstructCircuitDAG:
             cluster_uid=self._cluster_uid_stack[-1],
             # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
+            fillcolor="#E3FFA1",
         )
         self._node_uid_counter += 1
 
@@ -260,6 +274,7 @@ class ConstructCircuitDAG:
             cluster_uid=self._cluster_uid_stack[-1],
             # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
+            fillcolor="#70B3F5",
         )
         self._node_uid_counter += 1
 

@@ -865,7 +865,9 @@ class TestCreateStaticOperatorNodes:
         assert len(nodes) == 3  # Device node + operator
 
         assert nodes["node1"]["label"] == f"<name> PPM|<wire> [0]"
+        assert nodes["node1"]["attrs"]["fillcolor"] == "#70B3F5"
         assert nodes["node2"]["label"] == f"<name> PPM|<wire> [0, 1]"
+        assert nodes["node2"]["attrs"]["fillcolor"] == "#70B3F5"
 
     @pytest.mark.usefixtures("use_capture")
     def test_ppr(self):
@@ -876,6 +878,7 @@ class TestCreateStaticOperatorNodes:
         @qml.transform(pass_name="to-ppr")
         @qml.qnode(qml.device("null.qubit", wires=3))
         def cir():
+            qml.PauliRot(jax.numpy.pi, pauli_word="YZ", wires=[0, 1])
             qml.PauliRot(jax.numpy.pi / 4, pauli_word="X", wires=[0])
             qml.PauliRot(jax.numpy.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
 
@@ -886,10 +889,14 @@ class TestCreateStaticOperatorNodes:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
-        assert len(nodes) == 3  # Device node + operator
+        assert len(nodes) == 4  # Device node + operator
 
-        assert nodes["node1"]["label"] == f"<name> PPR-X (π/8)|<wire> [0]"
-        assert nodes["node2"]["label"] == f"<name> PPR-XYZ (π/4)|<wire> [0, 1, 2]"
+        assert nodes["node1"]["label"] == f"<name> PPR-YZ (π/2)|<wire> [0, 1]"
+        assert nodes["node1"]["attrs"]["fillcolor"] == "#D9D9D9"
+        assert nodes["node2"]["label"] == f"<name> PPR-X (π/8)|<wire> [0]"
+        assert nodes["node2"]["attrs"]["fillcolor"] == "#E3FFA1"
+        assert nodes["node3"]["label"] == f"<name> PPR-XYZ (π/4)|<wire> [0, 1, 2]"
+        assert nodes["node3"]["attrs"]["fillcolor"] == "#F5BD70"
 
     @pytest.mark.usefixtures("use_capture")
     def test_ppr_arbitary(self):
@@ -916,7 +923,9 @@ class TestCreateStaticOperatorNodes:
         assert len(nodes) == 3  # Device node + operator
 
         assert nodes["node1"]["label"] == f"<name> PPR-X|<wire> [0]"
+        assert nodes["node1"]["attrs"]["fillcolor"] == "#E3FFA1"
         assert nodes["node2"]["label"] == f"<name> PPR-XYZ|<wire> [0, 1, 2]"
+        assert nodes["node2"]["attrs"]["fillcolor"] == "#E3FFA1"
 
     @pytest.mark.usefixtures("use_capture")
     def test_pauli_rot(self):
