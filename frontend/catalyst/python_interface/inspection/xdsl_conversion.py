@@ -277,7 +277,7 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
     op = ssa.owner
 
     if isinstance(op, Block):
-        arg_name = list(compress(op.args, map(lambda arg: arg is ssa, op.args)))[0]
+        arg_name = next(compress(op.args, map(lambda arg: arg is ssa, op.args)))
         return arg_name.name_hint
 
     match op:
