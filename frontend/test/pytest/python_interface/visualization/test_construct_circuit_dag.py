@@ -852,8 +852,7 @@ class TestCreateStaticOperatorNodes:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_circuit():
-            # NOTE: This requires pauli_word is used as a kwarg?
-            qml.pauli_measure(pauli_word="X", wires=[0])
+            qml.pauli_measure("X", wires=[0])
             qml.pauli_measure(pauli_word="XY", wires=[0, 1])
 
         module = my_circuit()
