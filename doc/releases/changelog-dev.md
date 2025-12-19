@@ -523,6 +523,9 @@
 
 <h3>Documentation 📝</h3>
 
+* A clarification was made in the :doc:`Sharp Bits page <../dev/sharp_bits>` for the behaviour of 
+  :func:`qml.allocate <~.allocate>` when used with Catalyst.
+
 * A new statevector simulator ``lightning.amdgpu`` has been added for optimized performance on AMD GPUs.
   [(#2283)](https://github.com/PennyLaneAI/catalyst/pull/2283)
 
