@@ -1286,9 +1286,8 @@ Currently, however, this is not the case for the following functionalities.
   behaves differently when Catalyst is present or not. In particular:
 
   - The ``state`` and ``restored`` keyword arguments of ``qml.allocate()`` are
-    ignored in Catalyst. There is no need to request wires in the zero state, 
-    nor is there a need to keep track of whether wires were restored to the zero 
-    state or not.
+    ignored in Catalyst. The reason is that the only supported mode is to always allocate in the
+    zero state.
 
   - Related to the above point, in PennyLane, dynamic wire allocations do not 
     increase the total number of wires used in the circuit. This is because
