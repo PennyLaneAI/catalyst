@@ -512,6 +512,7 @@
   [(#2245)](https://github.com/PennyLaneAI/catalyst/pull/2245)
   [(#2254)](https://github.com/PennyLaneAI/catalyst/pull/2254)
   [(#2258)](https://github.com/PennyLaneAI/catalyst/pull/2258)
+  [(#2311)](https://github.com/PennyLaneAI/catalyst/pull/2311)
 
   * Refactor QEC tablegen files to separate QEC operations into a new `QECOp.td` file
   [(#2253](https://github.com/PennyLaneAI/catalyst/pull/2253)
