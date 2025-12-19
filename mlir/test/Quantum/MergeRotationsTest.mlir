@@ -1002,12 +1002,12 @@ func.func public @dont_merge_permutations_pauli(%q0: !quantum.bit, %q1: !quantum
 // ensure correct result assignments
 
 // CHECK-LABEL: permutation_results
-func.func public @permutation_results(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
-    // CHECK: [[result:%.+]]:2 = qec.ppr ["Z", "X"](2)
-    // CHECK: return [[result]]#0, [[result]]#1
-    %0:2 = qec.ppr ["X", "Z"](4) %q0, %q1: !quantum.bit, !quantum.bit
-    %1:2 = qec.ppr ["Z", "X"](4) %0#1, %0#0: !quantum.bit, !quantum.bit
-    func.return %1#0, %1#1 : !quantum.bit, !quantum.bit
+func.func public @permutation_results(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+    // CHECK: [[result:%.+]]:3 = qec.ppr ["Z", "X", "Y"](2)
+    // CHECK: return [[result]]#1, [[result]]#0, [[result]]#2
+    %0:3 = qec.ppr ["X", "Z", "Y"](4) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %1:3 = qec.ppr ["Z", "X", "Y"](4) %0#1, %0#0, %0#2: !quantum.bit, !quantum.bit, !quantum.bit
+    func.return %1#1, %1#0, %1#2: !quantum.bit, !quantum.bit, !quantum.bit
 }
 
 // -----
