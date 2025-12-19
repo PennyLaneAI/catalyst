@@ -173,101 +173,86 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
         data, struct = jax.tree_util.tree_flatten(op)
         return jax.tree_util.tree_unflatten(struct, data)
 
-    def interpret_measurement(self, measurement: "qml.measurement.MeasurementProcess"):
-        """Interpret a measurement process instance.
+    def cleanup(self):
+        """Cleanup after interpretation."""
 
-        Args:
-            measurement (MeasurementProcess): a measurement instance.
+        # Solve the decomposition graph to get the decomposition rules
+        # for all the captured operations
+        # I know it's a bit hacky to do this here, but it's the only
+        # place where we can be sure that we have seen all operations
+        # in the circuit before the measurement.
+        # TODO: Find a better way to do this.
+        self._decomp_graph_solution = _solve_decomposition_graph(
+            self._operations,
+            self._gate_set,
+            fixed_decomps=self._fixed_decomps,
+            alt_decomps=self._alt_decomps,
+        )
 
-        See also :meth:`~.interpret_measurement_eqn`.
+        # Create decomposition rules for each operation in the solution
+        # and compile them to Catalyst JAXPR decomposition rules
+        for op, rule in self._decomp_graph_solution.items():
+            # Get number of wires if exists
+            op_num_wires = op.op.params.get("num_wires", None)
+            if (
+                o := next(
+                    (
+                        o
+                        for o in self._operations
+                        if o.name == op.op.name and len(o.wires) == op_num_wires
+                    ),
+                    None,
+                )
+            ) is not None:
+                num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
+                _create_decomposition_rule(
+                    rule,
+                    op_name=op.op.name,
+                    num_wires=len(o.wires),
+                    num_params=num_params,
+                    requires_copy=num_wires == -1,
+                    ag_enabled=self._ag_enabled,
+                )
+            elif op.op.name in COMPILER_OPS_FOR_DECOMPOSITION:
+                # In this part, we need to handle the case where an operation in
+                # the decomposition graph solution is not in the captured operations.
+                # This can happen if the operation is not directly called
+                # in the circuit, but is used inside a decomposition rule.
+                # In this case, we fall back to using the COMPILER_OPS_FOR_DECOMPOSITION
+                # dictionary to get the number of wires.
+                num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
+                pauli_word = op.op.params.get("pauli_word", None)
 
-        """
+                if op.op.name in ("PauliRot", "PauliMeasure"):
+                    num_wires = len(pauli_word)
+                elif num_wires == -1 and op_num_wires is not None:
+                    num_wires = op_num_wires
 
-        # If we haven't captured and compiled the decomposition rules yet,
-        if not self._captured:
-            # Capture the current operations and mark as captured
-            self._captured = True
-
-            # Solve the decomposition graph to get the decomposition rules
-            # for all the captured operations
-            # I know it's a bit hacky to do this here, but it's the only
-            # place where we can be sure that we have seen all operations
-            # in the circuit before the measurement.
-            # TODO: Find a better way to do this.
-            self._decomp_graph_solution = _solve_decomposition_graph(
-                self._operations,
-                self._gate_set,
-                fixed_decomps=self._fixed_decomps,
-                alt_decomps=self._alt_decomps,
-            )
-
-            # Create decomposition rules for each operation in the solution
-            # and compile them to Catalyst JAXPR decomposition rules
-            for op, rule in self._decomp_graph_solution.items():
-                # Get number of wires if exists
-                op_num_wires = op.op.params.get("num_wires", None)
-                if (
-                    o := next(
-                        (
-                            o
-                            for o in self._operations
-                            if o.name == op.op.name and len(o.wires) == op_num_wires
-                        ),
-                        None,
-                    )
-                ) is not None:
-                    num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
-                    _create_decomposition_rule(
-                        rule,
-                        op_name=op.op.name,
-                        num_wires=len(o.wires),
-                        num_params=num_params,
-                        requires_copy=num_wires == -1,
-                        ag_enabled=self._ag_enabled,
-                    )
-                elif op.op.name in COMPILER_OPS_FOR_DECOMPOSITION:
-                    # In this part, we need to handle the case where an operation in
-                    # the decomposition graph solution is not in the captured operations.
-                    # This can happen if the operation is not directly called
-                    # in the circuit, but is used inside a decomposition rule.
-                    # In this case, we fall back to using the COMPILER_OPS_FOR_DECOMPOSITION
-                    # dictionary to get the number of wires.
-                    num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
-                    pauli_word = op.op.params.get("pauli_word", None)
-
-                    if op.op.name in ("PauliRot", "PauliMeasure"):
-                        num_wires = len(pauli_word)
-                    elif num_wires == -1 and op_num_wires is not None:
-                        num_wires = op_num_wires
-
-                    _create_decomposition_rule(
-                        rule,
-                        op_name=op.op.name,
-                        num_wires=num_wires,
-                        num_params=num_params,
-                        requires_copy=num_wires == -1,
-                        ag_enabled=self._ag_enabled,
-                        pauli_word=pauli_word,
-                    )
-                elif not any(
-                    keyword in getattr(op.op, "name", "")
-                    for keyword in (
-                        "Adjoint",
-                        "Controlled",
-                        "TemporaryAND",
-                        "ChangeOpBasis",
-                        "Prod",
-                    )
-                ):  # pragma: no cover
-                    # Note that the graph-decomposition returns abstracted rules
-                    # for Adjoint and Controlled operations, so we skip them here.
-                    # These abstracted rules cannot be captured and lowered.
-                    # We use MLIR AdjointOp and ControlledOp primitives
-                    # to deal with decomposition of symbolic operations at PLxPR.
-                    raise ValueError(f"Could not capture {op} without the number of wires.")
-
-        data, struct = jax.tree_util.tree_flatten(measurement)
-        return jax.tree_util.tree_unflatten(struct, data)
+                _create_decomposition_rule(
+                    rule,
+                    op_name=op.op.name,
+                    num_wires=num_wires,
+                    num_params=num_params,
+                    requires_copy=num_wires == -1,
+                    ag_enabled=self._ag_enabled,
+                    pauli_word=pauli_word,
+                )
+            elif not any(
+                keyword in getattr(op.op, "name", "")
+                for keyword in (
+                    "Adjoint",
+                    "Controlled",
+                    "TemporaryAND",
+                    "ChangeOpBasis",
+                    "Prod",
+                )
+            ):  # pragma: no cover
+                # Note that the graph-decomposition returns abstracted rules
+                # for Adjoint and Controlled operations, so we skip them here.
+                # These abstracted rules cannot be captured and lowered.
+                # We use MLIR AdjointOp and ControlledOp primitives
+                # to deal with decomposition of symbolic operations at PLxPR.
+                raise ValueError(f"Could not capture {op} without the number of wires.")
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments

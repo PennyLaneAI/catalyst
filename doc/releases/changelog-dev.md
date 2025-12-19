@@ -419,6 +419,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* `DecompRuleInterpreter` now solves the graph and adds decompositions rules in the `cleanup` method
+  instead of during the first call to `interpret_measurement`.
+  [(#2312)](https://github.com/PennyLaneAI/catalyst/pull/2312)
+
 * Update references to `TransformProgram` with `CompilePipeline`
   [(#2314)](https://github.com/PennyLaneAI/catalyst/pull/2314)
 
