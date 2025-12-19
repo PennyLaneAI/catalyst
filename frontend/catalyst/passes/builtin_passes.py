@@ -1402,11 +1402,12 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
 
         import pennylane as qml
         from catalyst import qjit, measure
-        from catalyst.passes import decompose_arbitrary_ppr, to_ppr
+
+        qml.capture.enable()
 
         @qjit(pipelines=[("pipe", ["quantum-compilation-stage"])], target="mlir")
-        @decompose_arbitrary_ppr
-        @to_ppr
+        @qml.transform(pass_name="qec.decompose-arbitrary-ppr")
+        @qml.transform(pass_name="to-ppr")
         @qml.qnode(qml.device("null.qubit", wires=3))
         def circuit():
             qml.PauliRot(0.123, pauli_word="XXY", wires=[0, 1, 2])
