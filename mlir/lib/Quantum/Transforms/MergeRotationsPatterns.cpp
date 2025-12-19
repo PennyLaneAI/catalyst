@@ -325,98 +325,98 @@ template <typename ParentOpType, typename OpType>
 struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
     using OpRewritePattern<OpType>::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(OpType op, PatternRewriter &rewriter) const override
+    SmallVector<int16_t>
+    getNonIdentityIndicesAndReplaceIdentityQubitUses(OpType op, PatternRewriter &rewriter) const
     {
-        // NOTE: a bit unorthodox, but we find the *second* PPR in a pair, since it's easier to
-        // look backwards by checking inQubits.getDefiningOp
-        ValueRange opInQubits = op.getInQubits();
-        ValueRange opOutQubits = op.getOutQubits();
-        ArrayAttr opPauliProduct = op.getPauliProduct();
-        Value opCondition = op.getCondition();
-
-        // we only need to consider qubits with non-identity Paulis
         SmallVector<int16_t> opNonIdentityIndices;
-        SmallVector<Value> opNonIdentityOutQubits;
-        for (auto [i, pauli] : llvm::enumerate(opPauliProduct)) {
+        ValueRange opOutQubits = op.getOutQubits();
+        ValueRange opInQubits = op.getInQubits();
+        for (auto [i, pauli] : llvm::enumerate(op.getPauliProduct())) {
             if (auto pauliChar = dyn_cast<StringAttr>(pauli)) {
                 if (pauliChar.getValue() != "I") {
                     opNonIdentityIndices.push_back(i);
-                    opNonIdentityOutQubits.push_back(opOutQubits[i]);
                 }
                 else {
                     rewriter.replaceAllUsesWith(opOutQubits[i], opInQubits[i]);
                 }
             }
         }
+        return opNonIdentityIndices;
+    }
 
+    LogicalResult matchAndRewrite(OpType op, PatternRewriter &rewriter) const override
+    {
+        // NOTE: a bit unorthodox, but we find the *second* PPR in a pair, since it's easier to
+        // look backwards by checking inQubits.getDefiningOp
+
+        // collect info on op
+        ValueRange opInQubits = op.getInQubits();
+        ValueRange opOutQubits = op.getOutQubits();
+        ArrayAttr opPauliProduct = op.getPauliProduct();
+        Value opCondition = op.getCondition();
+        SmallVector<int16_t> opNonIdentityIndices =
+            getNonIdentityIndicesAndReplaceIdentityQubitUses(op, rewriter);
+
+        // get parent op
         Operation *definingOp = opInQubits[0].getDefiningOp();
         if (!definingOp) {
             return failure();
         }
-
         auto parentOp = dyn_cast<ParentOpType>(definingOp);
         if (!parentOp) {
             return failure();
         }
 
+        // collect info on parent op
         ValueRange parentOpInQubits = parentOp.getInQubits();
         ValueRange parentOpOutQubits = parentOp.getOutQubits();
         ArrayAttr parentOpPauliProduct = parentOp.getPauliProduct();
+        SmallVector<int16_t> parentOpNonIdentityIndices =
+            getNonIdentityIndicesAndReplaceIdentityQubitUses(parentOp, rewriter);
 
-        SmallVector<int16_t> parentOpNonIdentityIndices;
-        for (auto [i, pauli] : llvm::enumerate(parentOpPauliProduct)) {
-            if (auto pauliChar = dyn_cast<StringAttr>(pauli)) {
-                if (pauliChar.getValue() != "I") {
-                    parentOpNonIdentityIndices.push_back(i);
-                }
-                else {
-                    rewriter.replaceAllUsesWith(parentOpOutQubits[i], parentOpInQubits[i]);
-                }
-            }
-        }
-
-        // verify that parentOp agrees on all qubits with non-identity Paulis
-        for (int16_t i : opNonIdentityIndices) {
-            if (opInQubits[i].getDefiningOp() != parentOp) {
-                return failure();
-            }
+        // check compatible conditionals
+        if (opCondition != parentOp.getCondition()) {
+            return failure();
         }
 
         // When two rotations have permuted Pauli strings, we can still merge them, we just need to
         // correctly re-map the inputs. This map stores the index of a qubit in parentOp's out
         // qubits at the index it appears in op's in qubits.
+        // Also collect non-identity qubits for replacement after mergeOp creation
+        SmallVector<Value> opNonIdentityOutQubits;
         std::unordered_map<int16_t, int16_t> inversePermutation;
         for (int16_t i : opNonIdentityIndices) {
-            inversePermutation[i] = (cast<OpResult>(opInQubits[i]).getResultNumber());
-        }
+            Value qubit = opInQubits[i];
 
-        // check Pauli + qubit pairings
-        for (int16_t i : opNonIdentityIndices) {
-            if (opPauliProduct[i] != parentOpPauliProduct[inversePermutation[i]]) {
+            // verify that qubit agrees on parent op
+            if (qubit.getDefiningOp() != parentOp) {
                 return failure();
             }
+
+            inversePermutation[i] = cast<OpResult>(qubit).getResultNumber();
+
+            opNonIdentityOutQubits.push_back(opOutQubits[i]);
         }
 
-        // check same conditionals
-        if (opCondition != parentOp.getCondition()) {
-            return failure();
-        }
-
-        Location loc = op.getLoc();
-
-        // We need to construct the Pauli string + inQubits for new op. The simplest way to ensure
-        // that permuted PPRs can merge correctly is to maintain output qubits order and permute
-        // input qubits
+        // collect values for merged op and perform compatibility checks
         SmallVector<Value> newInQubitsItems;
         SmallVector<Attribute> newPauliProductItems;
         for (int16_t i : opNonIdentityIndices) {
+            // check Pauli + qubit pairings
+            if (opPauliProduct[i] != parentOpPauliProduct[inversePermutation[i]]) {
+                return failure();
+            }
+
             newInQubitsItems.push_back(parentOpInQubits[inversePermutation[i]]);
             newPauliProductItems.push_back(parentOpPauliProduct[inversePermutation[i]]);
         }
 
+        // cast collected vectors to correct types
         ArrayAttr newPauliProduct = rewriter.getArrayAttr(newPauliProductItems);
         ValueRange newInQubits = ValueRange(newInQubitsItems);
 
+        // create merged op
+        Location loc = op.getLoc();
         ValueRange mergeOpValues;
         if constexpr (std::is_same_v<OpType, PPRotationOp>) {
             int16_t opRotation = static_cast<int16_t>(op.getRotationKind());
@@ -433,12 +433,15 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
                 mergeOpValues = parentOp.getInQubits();
             }
             else {
-                auto mergeOp = rewriter.create<PPRotationOp>(loc, newPauliProduct, newAngle,
-                                                             newInQubits, op.getCondition());
+                auto mergeOp = rewriter.create<PPRotationOp>(loc,
+                                                             /*pauli_product=*/newPauliProduct,
+                                                             /*rotationKind=*/newAngle,
+                                                             /*in_qubits=*/newInQubits,
+                                                             /*condition=*/op.getCondition());
                 mergeOpValues = mergeOp.getOutQubits();
             }
         }
-        else {
+        else if constexpr (std::is_same_v<OpType, PPRotationArbitraryOp>) {
             Value opRotation = op.getArbitraryAngle();
             Value parentOpRotation = parentOp.getArbitraryAngle();
             auto newAngle =
@@ -451,6 +454,9 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
                                                                   /*condition=*/op.getCondition());
 
             mergeOpValues = mergeOp.getOutQubits();
+        }
+        else {
+            return failure();
         }
 
         // replace non-identity qubits
