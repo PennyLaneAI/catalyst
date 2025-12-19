@@ -254,7 +254,6 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int:
             | SetBasisStateOp()
             | PPRotationOp()
             | PPRotationArbitraryOp()
-            | PPMeasurementOp()
             | PauliRotOp()
         ):
             all_qubits = list(getattr(op, "in_qubits", [])) + list(
