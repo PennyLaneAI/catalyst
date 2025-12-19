@@ -335,7 +335,6 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
         Value opCondition = op.getCondition();
 
         // we only need to consider qubits with non-identity Paulis
-        printf("op non-identity indices:\n");
         SmallVector<int16_t> opNonIdentityIndices;
         SmallVector<Value> opNonIdentityOutQubits;
         for (auto [i, pauli] : llvm::enumerate(opPauliProduct)) {
@@ -343,14 +342,12 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
                 if (pauliChar.getValue() != "I") {
                     opNonIdentityIndices.push_back(i);
                     opNonIdentityOutQubits.push_back(opOutQubits[i]);
-                    printf("%lu,", i);
                 }
                 else {
                     rewriter.replaceAllUsesWith(opOutQubits[i], opInQubits[i]);
                 }
             }
         }
-        printf("\n");
 
         Operation *definingOp = opInQubits[0].getDefiningOp();
         if (!definingOp) {
@@ -367,24 +364,20 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
         ArrayAttr parentOpPauliProduct = parentOp.getPauliProduct();
 
         SmallVector<int16_t> parentOpNonIdentityIndices;
-        printf("parentOp non-identity indices:\n");
         for (auto [i, pauli] : llvm::enumerate(parentOpPauliProduct)) {
             if (auto pauliChar = dyn_cast<StringAttr>(pauli)) {
                 if (pauliChar.getValue() != "I") {
                     parentOpNonIdentityIndices.push_back(i);
-                    printf("%lu,", i);
                 }
                 else {
                     rewriter.replaceAllUsesWith(parentOpOutQubits[i], parentOpInQubits[i]);
                 }
             }
         }
-        printf("\n");
 
         // verify that parentOp agrees on all qubits with non-identity Paulis
         for (int16_t i : opNonIdentityIndices) {
             if (opInQubits[i].getDefiningOp() != parentOp) {
-                printf("failed at defining op\n");
                 return failure();
             }
         }
@@ -395,14 +388,11 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
         std::unordered_map<int16_t, int16_t> inversePermutation;
         for (int16_t i : opNonIdentityIndices) {
             inversePermutation[i] = (cast<OpResult>(opInQubits[i]).getResultNumber());
-            printf("op in-qubit %hd corresponds to parentOp out-qubit %u\n", i,
-                   inversePermutation[i]);
         }
 
         // check Pauli + qubit pairings
         for (int16_t i : opNonIdentityIndices) {
             if (opPauliProduct[i] != parentOpPauliProduct[inversePermutation[i]]) {
-                printf("failed at pauli matching with indices %hd, %u\n", i, inversePermutation[i]);
                 return failure();
             }
         }
@@ -413,13 +403,6 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
         }
 
         Location loc = op.getLoc();
-
-        printf("about to split\n");
-        printf("non-identity op indices:\n");
-        for (int i : opNonIdentityIndices) {
-            printf("%d,", i);
-        }
-        printf("\n");
 
         // We need to construct the Pauli string + inQubits for new op. The simplest way to ensure
         // that permuted PPRs can merge correctly is to maintain output qubits order and permute
