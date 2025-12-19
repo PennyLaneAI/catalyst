@@ -325,23 +325,30 @@ template <typename ParentOpType, typename OpType>
 struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
     using OpRewritePattern<OpType>::OpRewritePattern;
 
-    SmallVector<int16_t>
-    getNonIdentityIndicesAndReplaceIdentityQubitUses(OpType op, PatternRewriter &rewriter) const
+    SmallVector<int16_t> getNonIdentityIndices(OpType op) const
     {
-        ValueRange opOutQubits = op.getOutQubits();
-        ValueRange opInQubits = op.getInQubits();
         SmallVector<int16_t> opNonIdentityIndices;
         for (auto [i, pauli] : llvm::enumerate(op.getPauliProduct())) {
             if (auto pauliChar = cast<StringAttr>(pauli)) {
                 if (pauliChar.getValue() != "I") {
                     opNonIdentityIndices.push_back(i);
                 }
-                else {
+            }
+        }
+        return opNonIdentityIndices;
+    }
+
+    void replaceIdentityQubitUses(OpType op, PatternRewriter &rewriter) const
+    {
+        ValueRange opOutQubits = op.getOutQubits();
+        ValueRange opInQubits = op.getInQubits();
+        for (auto [i, pauli] : llvm::enumerate(op.getPauliProduct())) {
+            if (auto pauliChar = cast<StringAttr>(pauli)) {
+                if (pauliChar.getValue() == "I") {
                     rewriter.replaceAllUsesWith(opOutQubits[i], opInQubits[i]);
                 }
             }
         }
-        return opNonIdentityIndices;
     }
 
     LogicalResult matchAndRewrite(OpType op, PatternRewriter &rewriter) const override
@@ -354,8 +361,7 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
         ValueRange opOutQubits = op.getOutQubits();
         ArrayAttr opPauliProduct = op.getPauliProduct();
         Value opCondition = op.getCondition();
-        SmallVector<int16_t> opNonIdentityIndices =
-            getNonIdentityIndicesAndReplaceIdentityQubitUses(op, rewriter);
+        SmallVector<int16_t> opNonIdentityIndices = getNonIdentityIndices(op);
 
         // leave identity op as cleanup for canonicalization
         if (opNonIdentityIndices.size() == 0) {
@@ -375,7 +381,6 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
         // collect info on parent op
         ValueRange parentOpInQubits = parentOp.getInQubits();
         ArrayAttr parentOpPauliProduct = parentOp.getPauliProduct();
-        getNonIdentityIndicesAndReplaceIdentityQubitUses(parentOp, rewriter);
 
         // check compatible conditionals
         if (opCondition != parentOp.getCondition()) {
@@ -460,7 +465,8 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
                                    .getOutQubits();
         }
 
-        // replace non-identity qubits
+        replaceIdentityQubitUses(op, rewriter);
+        replaceIdentityQubitUses(parentOp, rewriter);
         rewriter.replaceAllUsesWith(opNonIdentityOutQubits, mergeOpOutQubits);
         rewriter.eraseOp(op);
         rewriter.eraseOp(parentOp);
