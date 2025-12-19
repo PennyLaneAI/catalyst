@@ -1049,6 +1049,15 @@ func.func public @identity_agnostic_sizing(%q0: !quantum.bit, %q1: !quantum.bit,
     func.return
 }
 
+func.func public @dont_merge_superset(%q0: !quantum.bit, %q1: !quantum.bit) {
+    // CHECK: qec.ppr ["X", "Y"](4)
+    // CHECK: qec.ppr ["X"](4)
+    %0:2 = qec.ppr ["X", "Y"](4) %q0, %q1 : !quantum.bit, !quantum.bit
+    %1 = qec.ppr ["X"](4) %0#0 : !quantum.bit
+
+    func.return
+}
+
 
 // Arbitrary Angle PPR Tests
 
@@ -1327,3 +1336,4 @@ func.func public @merge_const_var(%q0: !quantum.bit, %0: f64) {
     %3 = qec.ppr.arbitrary ["Z"](%1) %2: !quantum.bit
     func.return
 }
+

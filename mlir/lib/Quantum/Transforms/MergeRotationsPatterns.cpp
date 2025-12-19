@@ -382,6 +382,11 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
             return failure();
         }
 
+        // same number of non-identity qubits
+        if (opNonIdentityIndices.size() != getNonIdentityIndices(parentOp).size()) {
+            return failure();
+        }
+
         // When two rotations have permuted Pauli strings, we can still merge them, we just need to
         // correctly re-map the inputs. This map stores the index of a qubit in parentOp's out
         // qubits at the index it appears in op's in qubits.
