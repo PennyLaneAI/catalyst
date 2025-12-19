@@ -864,9 +864,9 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 3  # Device node + operator
 
-        assert nodes["node1"]["label"] == f"<name> PPM|<wire> [0]"
+        assert nodes["node1"]["label"] == f"<name> PPM-X|<wire> [0]"
         assert nodes["node1"]["attrs"]["fillcolor"] == "#70B3F5"
-        assert nodes["node2"]["label"] == f"<name> PPM|<wire> [0, 1]"
+        assert nodes["node2"]["label"] == f"<name> PPM-XY|<wire> [0, 1]"
         assert nodes["node2"]["attrs"]["fillcolor"] == "#70B3F5"
 
     @pytest.mark.usefixtures("use_capture")
