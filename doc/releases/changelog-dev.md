@@ -415,7 +415,7 @@
 
 * `DecompRuleInterpreter` now solves the graph and adds decompositions rules in the `cleanup` method
   instead of during the first call to `interpret_measurement`.
-  [(#2312](https://github.com/PennyLaneAI/catalyst/pull/2312)
+  [(#2312)](https://github.com/PennyLaneAI/catalyst/pull/2312)
 
 * xDSL and xDSL-JAX are now dependencies of Catalyst.
   [(#2282)](https://github.com/PennyLaneAI/catalyst/pull/2282)
