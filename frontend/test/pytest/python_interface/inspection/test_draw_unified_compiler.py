@@ -576,7 +576,7 @@ class TestDrawGraph:
             _ = draw_graph(qnode)()
 
     def test_return_types(self):
-        """Tests the return types of the function."""
+        """Tests the return types of the function without crashing CI."""
 
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(qml.device("null.qubit", wires=2))
@@ -584,7 +584,17 @@ class TestDrawGraph:
             qml.H(0)
             return qml.expval(qml.Z(0))
 
-        fig, axes = draw_graph(qjit_qnode)()
+        from unittest.mock import patch
+
+        with patch("pydot.Dot.create_png") as mock_create:
+            mock_create.return_value = (
+                b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00"
+                b"\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9c"
+                b"c\x00\x01\x00\x00\x05\x00\x01\r\n\x2e\xe4\x00\x00\x00\x00IEND\xaeB`\x82"
+            )
+
+            fig, axes = draw_graph(qjit_qnode)()
+
         assert isinstance(fig, matplotlib.figure.Figure)
         assert isinstance(axes, matplotlib.axes._axes.Axes)
 
