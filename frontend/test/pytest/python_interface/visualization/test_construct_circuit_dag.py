@@ -889,8 +889,8 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 3  # Device node + operator
 
-        assert nodes["node1"]["label"] == f"<name> PPR-π/8|<wire> [0]"
-        assert nodes["node2"]["label"] == f"<name> PPR-π/4|<wire> [0, 1, 2]"
+        assert nodes["node1"]["label"] == f"<name> PPR-X (π/8)|<wire> [0]"
+        assert nodes["node2"]["label"] == f"<name> PPR-XYZ (π/4)|<wire> [0, 1, 2]"
 
     @pytest.mark.usefixtures("use_capture")
     def test_ppr_arbitary(self):
@@ -916,8 +916,8 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 3  # Device node + operator
 
-        assert nodes["node1"]["label"] == f"<name> PPR|<wire> [0]"
-        assert nodes["node2"]["label"] == f"<name> PPR|<wire> [0, 1, 2]"
+        assert nodes["node1"]["label"] == f"<name> PPR-X|<wire> [0]"
+        assert nodes["node2"]["label"] == f"<name> PPR-XYZ|<wire> [0, 1, 2]"
 
     @pytest.mark.usefixtures("use_capture")
     def test_pauli_rot(self):

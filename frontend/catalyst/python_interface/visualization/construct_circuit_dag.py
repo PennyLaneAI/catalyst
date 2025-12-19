@@ -181,13 +181,17 @@ class ConstructCircuitDAG:
 
         wires = ssa_to_qml_wires(op)
         wires_str = f"[{', '.join(map(str, wires))}]"
+        pw = []
+        for str_attr in op.pauli_product.data:
+            pw.append(str(str_attr).replace('"', ""))
+        pw = "".join(pw)
         denominator = abs(op.rotation_kind.value.data)
 
         # Add node to current cluster
         node_uid = f"node{self._node_uid_counter}"
         self.dag_builder.add_node(
             uid=node_uid,
-            label=f"<name> PPR-π/{denominator}|<wire> {wires_str}",
+            label=f"<name> PPR-{pw} (π/{denominator})|<wire> {wires_str}",
             cluster_uid=self._cluster_uid_stack[-1],
             # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
@@ -211,12 +215,16 @@ class ConstructCircuitDAG:
 
         wires = ssa_to_qml_wires(op)
         wires_str = f"[{', '.join(map(str, wires))}]"
+        pw = []
+        for str_attr in op.pauli_product.data:
+            pw.append(str(str_attr).replace('"', ""))
+        pw = "".join(pw)
 
         # Add node to current cluster
         node_uid = f"node{self._node_uid_counter}"
         self.dag_builder.add_node(
             uid=node_uid,
-            label=f"<name> PPR|<wire> {wires_str}",
+            label=f"<name> PPR-{pw}|<wire> {wires_str}",
             cluster_uid=self._cluster_uid_stack[-1],
             # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
