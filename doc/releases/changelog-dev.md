@@ -191,7 +191,7 @@
     This will decompose an arbitrary angle PPR into a collection of PPRs, PPMs and
     a single-qubit arbitrary PPR in the Z basis.
     [(#2304)](https://github.com/PennyLaneAI/catalyst/pull/2304)
-    [(#?)](https://github.com/PennyLaneAI/catalyst/pull/?)
+    [(#2318)](https://github.com/PennyLaneAI/catalyst/pull/2318)
 
     ```python
       import pennylane as qml
