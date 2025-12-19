@@ -281,9 +281,9 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         utility = ConstructCircuitDAG(PyDotDAGBuilder())
         utility.construct(module)
         # Store DAG in cache
-        utility.dag_builder.graph.set_dpi(300)
+        # utility.dag_builder.graph.set_dpi(300)
         # TODO: Update DAGBuilder to abstract away extracting image bytes
-        image_bytes = utility.dag_builder.graph.create_png(prog="dot")
+        image_bytes = utility.dag_builder.graph.create_png()
         pass_name = pass_instance.name if hasattr(pass_instance, "name") else pass_instance
         cache[pass_level] = (
             image_bytes,
