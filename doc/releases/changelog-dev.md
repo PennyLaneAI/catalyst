@@ -197,18 +197,16 @@
 
   ```python
   import pennylane as qml
-  from catalyst import qjit, measure
-  from catalyst.passes import decompose_arbitrary_ppr, to_ppr
-  
+
   qml.capture.enable()
 
   @qml.qjit(pipelines=[("pipe", ["quantum-compilation-stage"])], target="mlir")
-  @qml.transform(pass_name="decompose-arbitrary-ppr")
+  @qml.transforms.decompose_arbitrary_ppr
   @qml.transforms.to_ppr
   @qml.qnode(qml.device("null.qubit", wires=3))
   def circuit():
       qml.PauliRot(0.123, pauli_word="XXY", wires=[0, 1, 2])
-      return 
+      return
   ```
 
   ```pycon
