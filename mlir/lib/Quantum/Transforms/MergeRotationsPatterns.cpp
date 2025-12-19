@@ -329,10 +329,9 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
     {
         SmallVector<int16_t> opNonIdentityIndices;
         for (auto [i, pauli] : llvm::enumerate(op.getPauliProduct())) {
-            if (auto pauliChar = cast<StringAttr>(pauli)) {
-                if (pauliChar.getValue() != "I") {
-                    opNonIdentityIndices.push_back(i);
-                }
+            StringRef pauliChar = cast<StringAttr>(pauli).getValue();
+            if (pauliChar != "I") {
+                opNonIdentityIndices.push_back(i);
             }
         }
         return opNonIdentityIndices;
@@ -343,10 +342,9 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
         ValueRange opOutQubits = op.getOutQubits();
         ValueRange opInQubits = op.getInQubits();
         for (auto [i, pauli] : llvm::enumerate(op.getPauliProduct())) {
-            if (auto pauliChar = cast<StringAttr>(pauli)) {
-                if (pauliChar.getValue() == "I") {
-                    rewriter.replaceAllUsesWith(opOutQubits[i], opInQubits[i]);
-                }
+            StringRef pauliChar = cast<StringAttr>(pauli).getValue();
+            if (pauliChar == "I") {
+                rewriter.replaceAllUsesWith(opOutQubits[i], opInQubits[i]);
             }
         }
     }
