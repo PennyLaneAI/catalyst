@@ -844,6 +844,31 @@ class TestCreateStaticOperatorNodes:
         assert nodes["node1"]["label"] == f"<name> MidMeasureMP|<wire> [0]"
 
     @pytest.mark.usefixtures("use_capture")
+    def test_ppm(self):
+        """Test that PPMs can be captured as nodes."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            # NOTE: This requires pauli_word is used as a kwarg?
+            qml.pauli_measure(pauli_word="X", wires=[0])
+            qml.pauli_measure(pauli_word="XY", wires=[0, 1])
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + operator
+
+        assert nodes["node1"]["label"] == f"<name> PPM|<wire> [0]"
+        assert nodes["node2"]["label"] == f"<name> PPM|<wire> [0, 1]"
+
+    @pytest.mark.usefixtures("use_capture")
     def test_ppr(self):
         """Tests that a PPR node can be created."""
         pipe = [("pipe", ["quantum-compilation-stage"])]

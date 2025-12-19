@@ -254,6 +254,7 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int:
             | SetBasisStateOp()
             | PPRotationOp()
             | PPRotationArbitraryOp()
+            | PPMeasurementOp()
             | PauliRotOp()
         ):
             all_qubits = list(getattr(op, "in_qubits", [])) + list(
@@ -267,6 +268,11 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int:
         case MeasureOp(in_qubit=in_qubit):
             return resolve_constant_wire(in_qubit)
 
+        case PPMeasurementOp():
+            # NOTE: This branch is needed to cover two PPMs in a row
+            # subtract one as the first ssa index is the result,
+            # %res, %q0, ... = qec.ppm [PAULI_WORD] %q0, ...
+            return resolve_constant_wire(op.operands[ssa.index - 1])
         case _:
             raise NotImplementedError(f"Cannot resolve wire for op: {op}")
 
