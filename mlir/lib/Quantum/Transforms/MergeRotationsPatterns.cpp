@@ -328,11 +328,11 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
     SmallVector<int16_t>
     getNonIdentityIndicesAndReplaceIdentityQubitUses(OpType op, PatternRewriter &rewriter) const
     {
-        SmallVector<int16_t> opNonIdentityIndices;
         ValueRange opOutQubits = op.getOutQubits();
         ValueRange opInQubits = op.getInQubits();
+        SmallVector<int16_t> opNonIdentityIndices;
         for (auto [i, pauli] : llvm::enumerate(op.getPauliProduct())) {
-            if (auto pauliChar = dyn_cast<StringAttr>(pauli)) {
+            if (auto pauliChar = cast<StringAttr>(pauli)) {
                 if (pauliChar.getValue() != "I") {
                     opNonIdentityIndices.push_back(i);
                 }
@@ -420,7 +420,7 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
 
         // create merged op
         Location loc = op.getLoc();
-        ValueRange mergeOpValues;
+        ValueRange mergeOpOutQubits;
         if constexpr (std::is_same_v<OpType, PPRotationOp>) {
             int16_t opRotation = static_cast<int16_t>(op.getRotationKind());
             int16_t parentOpRotation = static_cast<int16_t>(parentOp.getRotationKind());
@@ -433,15 +433,16 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
 
             // remove identity operations
             if (opRotation == -parentOpRotation || std::abs(newAngle) == 1) {
-                mergeOpValues = parentOp.getInQubits();
+                mergeOpOutQubits = parentOpInQubits;
             }
             else {
-                auto mergeOp = rewriter.create<PPRotationOp>(loc,
+                mergeOpOutQubits = rewriter
+                                       .create<PPRotationOp>(loc,
                                                              /*pauli_product=*/newPauliProduct,
                                                              /*rotationKind=*/newAngle,
                                                              /*in_qubits=*/newInQubits,
-                                                             /*condition=*/op.getCondition());
-                mergeOpValues = mergeOp.getOutQubits();
+                                                             /*condition=*/opCondition)
+                                       .getOutQubits();
             }
         }
         else if constexpr (std::is_same_v<OpType, PPRotationArbitraryOp>) {
@@ -450,20 +451,17 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
             auto newAngle =
                 rewriter.create<arith::AddFOp>(loc, opRotation, parentOpRotation).getResult();
 
-            auto mergeOp = rewriter.create<PPRotationArbitraryOp>(loc,
+            mergeOpOutQubits = rewriter
+                                   .create<PPRotationArbitraryOp>(loc,
                                                                   /*pauli_product=*/newPauliProduct,
                                                                   /*arbitrary_angle=*/newAngle,
                                                                   /*in_qubits=*/newInQubits,
-                                                                  /*condition=*/op.getCondition());
-
-            mergeOpValues = mergeOp.getOutQubits();
-        }
-        else {
-            return failure();
+                                                                  /*condition=*/opCondition)
+                                   .getOutQubits();
         }
 
         // replace non-identity qubits
-        rewriter.replaceAllUsesWith(opNonIdentityOutQubits, mergeOpValues);
+        rewriter.replaceAllUsesWith(opNonIdentityOutQubits, mergeOpOutQubits);
         rewriter.eraseOp(op);
         rewriter.eraseOp(parentOp);
 
