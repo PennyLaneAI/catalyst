@@ -29,6 +29,7 @@ from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 from pennylane.capture.primitives import transform_prim
+from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
 from pennylane.transforms import commute_controlled as pl_commute_controlled
 from pennylane.transforms import decompose as pl_decompose
 from pennylane.transforms import gridsynth as pl_gridsynth
@@ -228,15 +229,27 @@ class WorkflowInterpreter(PlxprInterpreter):
 
 
 @WorkflowInterpreter.register_primitive(pl_jac_prim)
-def handle_grad(self, *args, jaxpr, n_consts, **kwargs):
+def handle_grad(self, *args, jaxpr, **kwargs):
     """Translate a grad equation."""
-    f = partial(copy(self).eval, jaxpr, args[:n_consts])
-    new_jaxpr = jax.make_jaxpr(f)(*args[n_consts:])
+    f = partial(copy(self).eval, jaxpr, [])
+    new_jaxpr = jax.make_jaxpr(f)(*args)
 
-    new_args = (*new_jaxpr.consts, *args[n_consts:])
-    return pl_jac_prim.bind(
-        *new_args, jaxpr=new_jaxpr.jaxpr, n_consts=len(new_jaxpr.consts), **kwargs
-    )
+    new_args = (*new_jaxpr.consts, *args)
+    j = new_jaxpr.jaxpr
+    new_j = j.replace(constvars=(), invars=j.constvars + j.invars)
+    return pl_jac_prim.bind(*new_args, jaxpr=new_j, **kwargs)
+
+
+@WorkflowInterpreter.register_primitive(pl_vjp_prim)
+def handle_vjp(self, *args, jaxpr, **kwargs):
+    """Translate a grad equation."""
+    f = partial(copy(self).eval, jaxpr, [])
+    new_jaxpr = jax.make_jaxpr(f)(*args[: -len(jaxpr.outvars)])
+
+    new_args = (*new_jaxpr.consts, *args)
+    j = new_jaxpr.jaxpr
+    new_j = j.replace(constvars=(), invars=j.constvars + j.invars)
+    return pl_vjp_prim.bind(*new_args, jaxpr=new_j, **kwargs)
 
 
 # pylint: disable=unused-argument, too-many-arguments

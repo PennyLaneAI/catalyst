@@ -26,21 +26,13 @@ import pennylane as qml
 import pytest
 from jax.errors import TracerBoolConversionError
 from numpy.testing import assert_allclose
+from pennylane import adjoint, cond, ctrl, for_loop, grad, jacobian, jvp, while_loop, vjp
 from pennylane.capture.autograph.transformer import TRANSFORMER as capture_TRANSFORMER
 
 from catalyst import AutoGraphError, debug, passes, qjit
 from catalyst.api_extensions import (
-    adjoint,
-    cond,
-    ctrl,
-    for_loop,
-    grad,
-    jacobian,
-    jvp,
     measure,
-    vjp,
     vmap,
-    while_loop,
 )
 from catalyst.autograph import autograph_source, disable_autograph, run_autograph
 from catalyst.autograph.transformer import TRANSFORMER
@@ -396,18 +388,22 @@ class TestIntegration:
         assert check_cache(inner)
         assert fn(3) == tuple([jax.numpy.array(2.0), jax.numpy.array(6.0)])
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_vjp_wrapper(self):
         """Test conversion is happening succesfully on functions wrapped with 'vjp'."""
 
         def inner(x):
-            return 2 * x, x**2
+            if x > 0:
+                return 2 * x, x**2
+            return 4*x, x**8
 
         @qjit(autograph=True)
         def fn(x: float):
             return vjp(inner, (x,), (1.0, 1.0))
 
         assert hasattr(fn.user_function, "ag_unconverted")
-        assert check_cache(inner)
+        if not qml.capture.enabled():
+            assert check_cache(inner)
         assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
         assert np.allclose(fn(3)[1], jnp.array(8.0))
 
