@@ -999,6 +999,30 @@ func.func public @dont_merge_permutations_pauli(%q0: !quantum.bit, %q1: !quantum
 
 // -----
 
+// ignore identity qubits when considering equivalence
+
+// CHECK-LABEL: permute_ignore_identity
+func.func public @permute_ignore_identity(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) {
+    // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit)
+    // CHECK: qec.ppr ["Z", "X"](2) [[q2]], [[q0]]
+    %0:3 = qec.ppr ["X", "I", "Z"](4) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %1:3 = qec.ppr ["I", "Z", "X"](4) %0#1, %0#2, %0#0: !quantum.bit, !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// merge different size pprs when removing identities makes them compatible
+
+// CHECK-LABEL: identity_agnostic_sizing
+func.func public @identity_agnostic_sizing(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) {
+    // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit)
+    // CHECK: qec.ppr ["Y", "Z"](4) [[q2]], [[q0]]
+    %0:3 = qec.ppr ["Z", "I", "Y"](8) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %1:2 = qec.ppr ["Y", "Z"](8) %0#2, %0#0: !quantum.bit, !quantum.bit
+    func.return
+}
+
 
 // Arbitrary Angle PPR Tests
 
@@ -1176,6 +1200,38 @@ func.func public @dont_merge_permutations_pauli(%q0: !quantum.bit, %q1: !quantum
     %2:2 = qec.ppr.arbitrary ["Z", "Y"](%0) %q0, %q1: !quantum.bit, !quantum.bit
     %3:2 = qec.ppr.arbitrary ["Y", "Z"](%1) %2#0, %2#1: !quantum.bit, !quantum.bit
     return
+}
+
+// -----
+
+// ignore identity qubits when considering equivalence
+
+// CHECK-LABEL: permute_ignore_identity
+func.func public @permute_ignore_identity(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) {
+    // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit)
+    // CHECK: [[angle:%.+]] = arith.constant 5.0
+    // CHECK: qec.ppr.arbitrary ["Z", "X"]([[angle]]) [[q2]], [[q0]]
+    %0 = arith.constant 0.8 : f64
+    %1 = arith.constant 4.2 : f64
+    %2:3 = qec.ppr.arbitrary ["X", "I", "Z"](%0) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %3:3 = qec.ppr.arbitrary ["I", "Z", "X"](%1) %2#1, %2#2, %2#0: !quantum.bit, !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// merge different size pprs when removing identities makes them compatible
+
+// CHECK-LABEL: identity_agnostic_sizing
+func.func public @identity_agnostic_sizing(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) {
+    // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit)
+    // CHECK: [[angle:%.+]] = arith.constant
+    // CHECK: qec.ppr.arbitrary ["Y", "Z"]([[angle]]) [[q2]], [[q0]]
+    %0 = arith.constant 0.2 : f64    
+    %1 = arith.constant 0.7 : f64
+    %2:3 = qec.ppr.arbitrary ["Z", "I", "Y"](%0) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %3:2 = qec.ppr.arbitrary ["Y", "Z"](%1) %2#2, %2#0: !quantum.bit, !quantum.bit
+    func.return
 }
 
 // -----

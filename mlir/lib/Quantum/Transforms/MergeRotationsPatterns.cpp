@@ -325,61 +325,32 @@ template <typename ParentOpType, typename OpType>
 struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
     using OpRewritePattern<OpType>::OpRewritePattern;
 
-    LogicalResult finishMatchAndRewritePPRotation(OpType op, ParentOpType parentOp, Location loc,
-                                                  ValueRange newInQubits,
-                                                  PatternRewriter &rewriter) const
-    {
-        int16_t opRotation = static_cast<int16_t>(op.getRotationKind());
-        int16_t parentOpRotation = static_cast<int16_t>(parentOp.getRotationKind());
-
-        if (std::abs(opRotation) != std::abs(parentOpRotation)) {
-            return failure();
-        }
-
-        int16_t newAngle = opRotation / 2;
-
-        // remove identity operations
-        if (opRotation == -parentOpRotation || std::abs(newAngle) == 1) {
-            rewriter.replaceOp(op, parentOp.getInQubits());
-            rewriter.eraseOp(parentOp);
-
-            return success();
-        }
-
-        auto mergeOp = rewriter.create<PPRotationOp>(loc, parentOp.getOutQubits().getTypes(),
-                                                     op.getPauliProduct(), newAngle, newInQubits,
-                                                     op.getCondition());
-
-        rewriter.replaceOp(op, mergeOp);
-        rewriter.eraseOp(parentOp);
-        return success();
-    }
-
-    LogicalResult finishMatchAndRewritePPRotationArbitrary(OpType op, ParentOpType parentOp,
-                                                           Location loc, ValueRange newInQubits,
-                                                           PatternRewriter &rewriter) const
-    {
-        Value opRotation = op.getArbitraryAngle();
-        Value parentOpRotation = parentOp.getArbitraryAngle();
-        auto newAngle =
-            rewriter.create<arith::AddFOp>(loc, opRotation, parentOpRotation).getResult();
-
-        auto mergeOp = rewriter.create<PPRotationArbitraryOp>(
-            loc, parentOp.getOutQubits().getTypes(), op.getPauliProduct(), newAngle, newInQubits,
-            op.getCondition());
-
-        rewriter.replaceOp(op, mergeOp);
-        rewriter.eraseOp(parentOp);
-        return success();
-    }
-
     LogicalResult matchAndRewrite(OpType op, PatternRewriter &rewriter) const override
     {
         // NOTE: a bit unorthodox, but we find the *second* PPR in a pair, since it's easier to
         // look backwards by checking inQubits.getDefiningOp
         ValueRange opInQubits = op.getInQubits();
+        ValueRange opOutQubits = op.getOutQubits();
         ArrayAttr opPauliProduct = op.getPauliProduct();
         Value opCondition = op.getCondition();
+
+        // we only need to consider qubits with non-identity Paulis
+        printf("op non-identity indices:\n");
+        SmallVector<int16_t> opNonIdentityIndices;
+        SmallVector<Value> opNonIdentityOutQubits;
+        for (auto [i, pauli] : llvm::enumerate(opPauliProduct)) {
+            if (auto pauliChar = dyn_cast<StringAttr>(pauli)) {
+                if (pauliChar.getValue() != "I") {
+                    opNonIdentityIndices.push_back(i);
+                    opNonIdentityOutQubits.push_back(opOutQubits[i]);
+                    printf("%lu,", i);
+                }
+                else {
+                    rewriter.replaceAllUsesWith(opOutQubits[i], opInQubits[i]);
+                }
+            }
+        }
+        printf("\n");
 
         Operation *definingOp = opInQubits[0].getDefiningOp();
         if (!definingOp) {
@@ -390,31 +361,48 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
         if (!parentOp) {
             return failure();
         }
+
         ValueRange parentOpInQubits = parentOp.getInQubits();
         ValueRange parentOpOutQubits = parentOp.getOutQubits();
         ArrayAttr parentOpPauliProduct = parentOp.getPauliProduct();
 
-        // verify that parentOp agrees on all qubits, not just the first
-        for (Value qubit : opInQubits) {
-            if (qubit.getDefiningOp() != parentOp) {
-                return failure();
+        SmallVector<int16_t> parentOpNonIdentityIndices;
+        printf("parentOp non-identity indices:\n");
+        for (auto [i, pauli] : llvm::enumerate(parentOpPauliProduct)) {
+            if (auto pauliChar = dyn_cast<StringAttr>(pauli)) {
+                if (pauliChar.getValue() != "I") {
+                    parentOpNonIdentityIndices.push_back(i);
+                    printf("%lu,", i);
+                }
+                else {
+                    rewriter.replaceAllUsesWith(parentOpOutQubits[i], parentOpInQubits[i]);
+                }
             }
         }
-        if (parentOpOutQubits.size() != opInQubits.size()) {
-            return failure();
+        printf("\n");
+
+        // verify that parentOp agrees on all qubits with non-identity Paulis
+        for (int16_t i : opNonIdentityIndices) {
+            if (opInQubits[i].getDefiningOp() != parentOp) {
+                printf("failed at defining op\n");
+                return failure();
+            }
         }
 
         // When two rotations have permuted Pauli strings, we can still merge them, we just need to
         // correctly re-map the inputs. This map stores the index of a qubit in parentOp's out
         // qubits at the index it appears in op's in qubits.
-        SmallVector<unsigned> inverse_permutation;
-        for (Value qubit : opInQubits) {
-            inverse_permutation.push_back(cast<OpResult>(qubit).getResultNumber());
+        std::unordered_map<int16_t, int16_t> inversePermutation;
+        for (int16_t i : opNonIdentityIndices) {
+            inversePermutation[i] = (cast<OpResult>(opInQubits[i]).getResultNumber());
+            printf("op in-qubit %hd corresponds to parentOp out-qubit %u\n", i,
+                   inversePermutation[i]);
         }
 
         // check Pauli + qubit pairings
-        for (size_t i = 0; i < opInQubits.size(); i++) {
-            if (opPauliProduct[i] != parentOpPauliProduct[inverse_permutation[i]]) {
+        for (int16_t i : opNonIdentityIndices) {
+            if (opPauliProduct[i] != parentOpPauliProduct[inversePermutation[i]]) {
+                printf("failed at pauli matching with indices %hd, %u\n", i, inversePermutation[i]);
                 return failure();
             }
         }
@@ -426,23 +414,68 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
 
         Location loc = op.getLoc();
 
+        printf("about to split\n");
+        printf("non-identity op indices:\n");
+        for (int i : opNonIdentityIndices) {
+            printf("%d,", i);
+        }
+        printf("\n");
+
         // We need to construct the Pauli string + inQubits for new op. The simplest way to ensure
         // that permuted PPRs can merge correctly is to maintain output qubits order and permute
         // input qubits
-        SmallVector<Value> newInQubits;
-        for (size_t i = 0; i < parentOpInQubits.size(); i++) {
-            newInQubits.push_back(parentOpInQubits[inverse_permutation[i]]);
+        SmallVector<Value> newInQubitsItems;
+        SmallVector<Attribute> newPauliProductItems;
+        for (int16_t i : opNonIdentityIndices) {
+            newInQubitsItems.push_back(parentOpInQubits[inversePermutation[i]]);
+            newPauliProductItems.push_back(parentOpPauliProduct[inversePermutation[i]]);
         }
 
+        ArrayAttr newPauliProduct = rewriter.getArrayAttr(newPauliProductItems);
+        ValueRange newInQubits = ValueRange(newInQubitsItems);
+
+        ValueRange mergeOpValues;
         if constexpr (std::is_same_v<OpType, PPRotationOp>) {
-            return finishMatchAndRewritePPRotation(op, parentOp, loc, newInQubits, rewriter);
+            int16_t opRotation = static_cast<int16_t>(op.getRotationKind());
+            int16_t parentOpRotation = static_cast<int16_t>(parentOp.getRotationKind());
+
+            if (std::abs(opRotation) != std::abs(parentOpRotation)) {
+                return failure();
+            }
+
+            int16_t newAngle = opRotation / 2;
+
+            // remove identity operations
+            if (opRotation == -parentOpRotation || std::abs(newAngle) == 1) {
+                mergeOpValues = parentOp.getInQubits();
+            }
+            else {
+                auto mergeOp = rewriter.create<PPRotationOp>(loc, newPauliProduct, newAngle,
+                                                             newInQubits, op.getCondition());
+                mergeOpValues = mergeOp.getOutQubits();
+            }
         }
         else {
-            return finishMatchAndRewritePPRotationArbitrary(op, parentOp, loc, newInQubits,
-                                                            rewriter);
+            Value opRotation = op.getArbitraryAngle();
+            Value parentOpRotation = parentOp.getArbitraryAngle();
+            auto newAngle =
+                rewriter.create<arith::AddFOp>(loc, opRotation, parentOpRotation).getResult();
+
+            auto mergeOp = rewriter.create<PPRotationArbitraryOp>(loc,
+                                                                  /*pauli_product=*/newPauliProduct,
+                                                                  /*arbitrary_angle=*/newAngle,
+                                                                  /*in_qubits=*/newInQubits,
+                                                                  /*condition=*/op.getCondition());
+
+            mergeOpValues = mergeOp.getOutQubits();
         }
 
-        return failure();
+        // replace non-identity qubits
+        rewriter.replaceAllUsesWith(opNonIdentityOutQubits, mergeOpValues);
+        rewriter.eraseOp(op);
+        rewriter.eraseOp(parentOp);
+
+        return success();
     }
 };
 
