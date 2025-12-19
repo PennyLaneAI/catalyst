@@ -19,6 +19,7 @@ import pytest
 
 pytestmark = pytest.mark.xdsl
 xdsl = pytest.importorskip("xdsl")
+import jax
 
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
@@ -28,7 +29,7 @@ from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir.core import Block, Region
 
 from catalyst import measure
-from catalyst.python_interface.conversion import xdsl_from_qjit
+from catalyst.python_interface.conversion import parse_generic_to_xdsl_module, xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
     get_label,
@@ -841,6 +842,82 @@ class TestCreateStaticOperatorNodes:
         assert len(nodes) == 2  # Device node + operator
 
         assert nodes["node1"]["label"] == f"<name> MidMeasureMP|<wire> [0]"
+
+    @pytest.mark.usefixtures("use_capture")
+    def test_ppr(self):
+        """Tests that a PPR node can be created."""
+        pipe = [("pipe", ["quantum-compilation-stage"])]
+
+        @qml.qjit(pipelines=pipe, target="mlir")
+        @qml.transform(pass_name="to-ppr")
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def cir():
+            qml.PauliRot(jax.numpy.pi / 4, pauli_word="X", wires=[0])
+            qml.PauliRot(jax.numpy.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
+
+        module = parse_generic_to_xdsl_module(cir.mlir_opt)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + operator
+
+        assert nodes["node1"]["label"] == f"<name> PPR-π/8|<wire> [0]"
+        assert nodes["node2"]["label"] == f"<name> PPR-π/4|<wire> [0, 1, 2]"
+
+    @pytest.mark.usefixtures("use_capture")
+    def test_ppr_arbitary(self):
+        """Tests that a PPR node can be created."""
+
+        pipe = [("pipe", ["quantum-compilation-stage"])]
+
+        @qml.qjit(pipelines=pipe, target="mlir")
+        @qml.transform(pass_name="to-ppr")
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def cir():
+            # NOTE: use angle != pi / <something>
+            # to get an qec.ppr.arbitary in the IR
+            qml.PauliRot(1.0, pauli_word="X", wires=[0])
+            qml.PauliRot(1.0, pauli_word="XYZ", wires=[0, 1, 2])
+
+        module = parse_generic_to_xdsl_module(cir.mlir_opt)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + operator
+
+        assert nodes["node1"]["label"] == f"<name> PPR|<wire> [0]"
+        assert nodes["node2"]["label"] == f"<name> PPR|<wire> [0, 1, 2]"
+
+    @pytest.mark.usefixtures("use_capture")
+    def test_pauli_rot(self):
+        """Tests that a PauliRot node can be created."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            qml.PauliRot(0.5, "X", wires=0)
+            qml.PauliRot(1.5, "XYZ", wires=[0, 1, 2])
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + operator
+
+        assert nodes["node1"]["label"] == f"<name> PauliRot|<wire> [0]"
+        assert nodes["node2"]["label"] == f"<name> PauliRot|<wire> [0, 1, 2]"
 
 
 class TestCreateStaticMeasurementNodes:
