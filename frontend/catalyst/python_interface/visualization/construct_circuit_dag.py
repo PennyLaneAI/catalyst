@@ -338,12 +338,6 @@ class ConstructCircuitDAG:
 
             # Update branch wire maps
             if self._wire_to_node_uids != wire_map_before:
-                # Get what changed
-                # wire_map_delta = {
-                #    wire: uids
-                #    for wire, uids in self._wire_to_node_uids.items()
-                #    if uids != wire_map_before.get(wire, set())
-                # }
                 region_wire_maps.append(self._wire_to_node_uids)
 
             # Pop branch cluster after processing to ensure
@@ -353,16 +347,16 @@ class ConstructCircuitDAG:
         # Pop IfOp cluster before leaving this handler
         self._cluster_uid_stack.pop()
 
-        # Check what wires were affected
+        # Default to all wires seen before the conditional
         affected_wires: set[str | int] = set(wire_map_before.keys())
+        # Update affected wires with specific wires seen during branches
         for region_wire_map in region_wire_maps:
             affected_wires.update(region_wire_map.keys())
 
         # Update state to be the union of all branch wire maps
-        final_wire_map = defaultdict(set)
+        final_wire_map: dict[str | int, set[str]] = defaultdict(set)
         for wire in affected_wires:
-            all_nodes: set = set()
-
+            all_nodes: set[str] = set()
             for region_wire_map in region_wire_maps:
                 if wire in region_wire_map:
                     all_nodes.update(region_wire_map.get(wire, set()))
@@ -372,6 +366,10 @@ class ConstructCircuitDAG:
                     all_nodes.update(wire_map_before.get(wire, set()))
             final_wire_map[wire] = all_nodes
         self._wire_to_node_uids = final_wire_map
+        # If the dynamic nodes before the conditional are a strict subset of the final wire map
+        # get rid of them to enforce proper data flow choking
+        if wire_map_before.get("dyn_wire", set()) < self._wire_to_node_uids.get("dyn_wire", set()):
+            self._wire_to_node_uids["dyn_wire"] -= wire_map_before.get("dyn_wire", set())
 
     # ============
     # DEVICE NODE
@@ -475,6 +473,10 @@ class ConstructCircuitDAG:
         # Get all nodes seen on static wires
         for wire in node.wires:
             prev_uids.update(self._wire_to_node_uids.get(wire, set()))
+
+        if len(self._wire_to_node_uids.get("dyn_wire", set())) > 1:
+            # Operator is most likely after a conditional with dynamic branches
+            prev_uids.update(self._wire_to_node_uids.get("dyn_wire"))
 
         # NOTE: Edge case if all operators before this static one are dynamic
         if not prev_uids:
