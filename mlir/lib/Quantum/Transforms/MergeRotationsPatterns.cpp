@@ -370,8 +370,7 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
         // collect info on parent op
         ValueRange parentOpInQubits = parentOp.getInQubits();
         ArrayAttr parentOpPauliProduct = parentOp.getPauliProduct();
-        SmallVector<int16_t> parentOpNonIdentityIndices =
-            getNonIdentityIndicesAndReplaceIdentityQubitUses(parentOp, rewriter);
+        getNonIdentityIndicesAndReplaceIdentityQubitUses(parentOp, rewriter);
 
         // check compatible conditionals
         if (opCondition != parentOp.getCondition()) {
