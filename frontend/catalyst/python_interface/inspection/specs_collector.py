@@ -416,6 +416,7 @@ def _collect_operation(
             )
 
 
+# pylint: disable=too-many-branches
 def _collect_region(
     region: Region,
     loop_warning: bool = False,

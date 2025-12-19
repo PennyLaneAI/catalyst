@@ -13,7 +13,6 @@
 # limitations under the License.
 """Unit test module for the mlir_specs function in the Python Compiler inspection module."""
 
-from ast import Not
 from functools import partial
 
 import jax.numpy as jnp
