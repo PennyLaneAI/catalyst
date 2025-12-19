@@ -1348,42 +1348,19 @@ class TestOperatorConnectivity:
 
         # node0 -> NullQubit
 
-        # Check all nodes
-        # NOTE: Order of nodes isn't the same with/without capture
-        if qml.capture.enabled():
-            assert "PauliX" in nodes["node1"]["label"]
-            assert "PauliZ" in nodes["node2"]["label"]
-            assert "PauliY" in nodes["node3"]["label"]
-            assert "Hadamard" in nodes["node4"]["label"]
-            assert "S" in nodes["node5"]["label"]
-            assert "T" in nodes["node6"]["label"]
-        else:
-            assert "PauliX" in nodes["node1"]["label"]
-            assert "PauliY" in nodes["node2"]["label"]
-            assert "PauliZ" in nodes["node3"]["label"]
-            assert "Hadamard" in nodes["node4"]["label"]
-            assert "S" in nodes["node5"]["label"]
-            assert "T" in nodes["node6"]["label"]
-
         # Check edges
         #           -> X -> Y
         # NullQubit -> Z -> H -> S
         #           -> T
-        assert len(edges) == 6
-        assert ("node0", "node1") in edges
-        if qml.capture.enabled():
-            assert ("node0", "node2") in edges
-        else:
-            assert ("node0", "node3") in edges
-        assert ("node0", "node6") in edges
-
-        if qml.capture.enabled():
-            assert ("node1", "node3") in edges
-            assert ("node2", "node4") in edges
-        else:
-            assert ("node1", "node2") in edges
-            assert ("node3", "node4") in edges
-        assert ("node4", "node5") in edges
+        expected_edges = (
+            ("NullQubit", "PauliX"),
+            ("NullQubit", "PauliZ"),
+            ("NullQubit", "T"),
+            ("PauliX", "PauliY"),
+            ("PauliZ", "Hadamard"),
+            ("Hadamard", "S"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
 
     def test_static_connection_through_for_loop(self):
         """Tests that connections can be made through a for loop cluster."""
@@ -1397,6 +1374,7 @@ class TestOperatorConnectivity:
             qml.X(0)
             for i in range(3):
                 qml.Y(0)
+            qml.Z(0)
 
         module = my_workflow()
 
@@ -1412,11 +1390,14 @@ class TestOperatorConnectivity:
         assert "PauliY" in nodes["node2"]["label"]
 
         # Check edges
-        #    for loop
-        # NullQubit -> X ----------> Y
-        assert len(edges) == 2
-        assert ("node0", "node1") in edges
-        assert ("node1", "node2") in edges
+        #                   for loop
+        # NullQubit -> X ----> Y ----> Z
+        expected_edges = (
+            ("NullQubit", "PauliX"),
+            ("PauliX", "PauliY"),
+            ("PauliY", "PauliZ"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
 
     def test_static_connection_through_while_loop(self):
         """Tests that connections can be made through a while loop cluster."""
@@ -1432,6 +1413,7 @@ class TestOperatorConnectivity:
             while counter < 5:
                 qml.Y(0)
                 counter += 1
+            qml.Z(0)
 
         module = my_workflow()
 
@@ -1447,11 +1429,14 @@ class TestOperatorConnectivity:
         assert "PauliY" in nodes["node2"]["label"]
 
         # Check edges
-        #    while loop
-        # NullQubit -> X ----------> Y
-        assert len(edges) == 2
-        assert ("node0", "node1") in edges
-        assert ("node1", "node2") in edges
+        #                    while loop
+        # NullQubit -> X ------> Y ------> Z
+        expected_edges = (
+            ("NullQubit", "PauliX"),
+            ("PauliX", "PauliY"),
+            ("PauliY", "PauliZ"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
 
     def test_static_connection_through_conditional(self):
         """Tests that connections through conditionals make sense."""
@@ -1677,6 +1662,184 @@ class TestOperatorConnectivity:
         assert ("node1", "node2") in edges
         assert ("node2", "node3") in edges
         assert edges[("node2", "node3")]["attrs"]["style"] == "dashed"
+
+    def test_complex_connectivity_for_loop(self):
+        """Tests a complicated connectivity through a for loop."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow(a, b):
+            qml.X(a)
+            for i in range(3):
+                qml.H(0)
+                qml.Y(i)
+            qml.S(0)
+            qml.Z(b)
+
+        module = my_workflow(1, 2)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX", {"style": "dashed"}),
+            ("PauliX", "Hadamard"),
+            ("Hadamard", "PauliY", {"style": "dashed"}),
+            ("PauliY", "S"),
+            ("S", "PauliZ", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_complex_connectivity_while_loop(self):
+        """Tests a complicated connectivity through a while loop."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_workflow(a, b):
+            qml.X(a)
+            counter = 0
+            while counter < 5:
+                qml.H(0)
+                qml.Y(counter)
+                counter += 1
+            qml.S(0)
+            qml.Z(b)
+
+        module = my_workflow(1, 2)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX", {"style": "dashed"}),
+            ("PauliX", "Hadamard"),
+            ("Hadamard", "PauliY", {"style": "dashed"}),
+            ("PauliY", "S"),
+            ("S", "PauliZ", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_basic_dynamic_conditional(self):
+        """Tests a basic example of a conditional with dynamic wires."""
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def my_workflow(a, b, c):
+            qml.H(0)
+            if a == 2:
+                qml.X(a)
+            elif a == b:
+                qml.Y(c)
+            else:
+                qml.Z(c)
+            qml.S(0)
+
+        module = my_workflow(1, 2, 3)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "Hadamard"),
+            ("Hadamard", "PauliX", {"style": "dashed"}),
+            ("Hadamard", "PauliY", {"style": "dashed"}),
+            ("Hadamard", "PauliZ", {"style": "dashed"}),
+            ("PauliX", "S"),
+            ("PauliY", "S"),
+            ("PauliZ", "S"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_complex_connectivity_if_elif_else(self):
+        """Tests that complex connectivity can go through a conditional."""
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def my_workflow(a, b, c):
+            qml.X(a)
+            if a == 2:
+                qml.H(0)
+                qml.Y(1)
+            elif a == b:
+                qml.T(c)
+            else:
+                qml.Z(b)
+            qml.S(0)
+            qml.RZ(0, b)
+
+        module = my_workflow(1, 2, 3)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX", {"style": "dashed"}),
+            ("PauliX", "Hadamard"),
+            ("PauliX", "PauliY"),
+            ("PauliX", "T", {"style": "dashed"}),
+            ("PauliX", "PauliZ", {"style": "dashed"}),
+            ("Hadamard", "S"),
+            ("T", "S"),
+            ("PauliZ", "S"),
+            ("S", "RZ", {"style": "dashed"}),
+            ("PauliY", "RZ", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_complex_connectivity_nested_if(self):
+        """Tests that complex connectivity can go through a conditional."""
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def my_workflow(a, b):
+            qml.X(a)
+            if a == 2:
+                qml.H(0)
+                if b == 2:
+                    qml.RX(0, 0)
+                qml.Y(1)
+            qml.S(0)
+            return qml.probs()
+
+        module = my_workflow(1, 2)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX", {"style": "dashed"}),
+            ("PauliX", "Hadamard"),
+            ("Hadamard", "RX"),
+            ("RX", "S"),
+            ("PauliX", "PauliY"),
+            ("PauliY", "probs", {"style": "dashed"}),
+            ("S", "probs", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
 
 
 @pytest.mark.usefixtures("use_both_frontend")

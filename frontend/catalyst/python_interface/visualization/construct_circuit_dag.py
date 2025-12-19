@@ -15,6 +15,7 @@
 """Contains the ConstructCircuitDAG tool for constructing a DAG from an xDSL module."""
 
 from collections import defaultdict
+from copy import deepcopy
 from functools import singledispatch, singledispatchmethod
 
 from pennylane.measurements import (
@@ -221,9 +222,9 @@ class ConstructCircuitDAG:
         # Connect all previously seen operators
         if not meas.wires:
             all_prev_uids = set().union(*self._wire_to_node_uids.values())
-            # If previous nodes are device node + other stuff, don't connect to the device node.
-            if (device_uid := self._wire_to_node_uids["device"]) < all_prev_uids:
-                all_prev_uids -= device_uid
+            # If previous nodes are dyn_wire node + other stuff, don't connect to the dyn_wire node.
+            if (dyn_node_uids := self._wire_to_node_uids["dyn_wire"]) < all_prev_uids:
+                all_prev_uids -= dyn_node_uids
             for p_uid in all_prev_uids:
                 self.dag_builder.add_edge(p_uid, node_uid, style="dashed", color="lightpink3")
         else:
@@ -305,7 +306,7 @@ class ConstructCircuitDAG:
         self._cluster_uid_counter += 1
 
         # Save wires state before all of the branches
-        wire_map_before = self._wire_to_node_uids.copy()
+        wire_map_before = deepcopy(self._wire_to_node_uids)
         region_wire_maps: list[dict[int | str, set[str]]] = []
 
         # Loop through each branch and visualize as a cluster
@@ -330,13 +331,19 @@ class ConstructCircuitDAG:
             self._cluster_uid_counter += 1
 
             # Make fresh wire map before going into region
-            self._wire_to_node_uids = wire_map_before.copy()
+            self._wire_to_node_uids = deepcopy(wire_map_before)
 
             # Go recursively into the branch to process internals
             self._visit_region(region)
 
             # Update branch wire maps
             if self._wire_to_node_uids != wire_map_before:
+                # Get what changed
+                # wire_map_delta = {
+                #    wire: uids
+                #    for wire, uids in self._wire_to_node_uids.items()
+                #    if uids != wire_map_before.get(wire, set())
+                # }
                 region_wire_maps.append(self._wire_to_node_uids)
 
             # Pop branch cluster after processing to ensure
@@ -355,14 +362,15 @@ class ConstructCircuitDAG:
         final_wire_map = defaultdict(set)
         for wire in affected_wires:
             all_nodes: set = set()
+
             for region_wire_map in region_wire_maps:
-                if not wire in region_wire_map:
+                if wire in region_wire_map:
+                    all_nodes.update(region_wire_map.get(wire, set()))
+                else:
                     # IfOp region didn't apply anything on this wire
                     # so default to node before the IfOp
                     all_nodes.update(wire_map_before.get(wire, set()))
-                else:
-                    all_nodes.update(region_wire_map.get(wire, set()))
-                final_wire_map[wire] = all_nodes
+            final_wire_map[wire] = all_nodes
         self._wire_to_node_uids = final_wire_map
 
     # ============
@@ -385,7 +393,7 @@ class ConstructCircuitDAG:
         # NOTE: Consider the device node as dynamic
         # as any wire can source from it
         self._dynamic_node_uids.add(node_id)
-        self._wire_to_node_uids["device"].add(node_id)
+        self._wire_to_node_uids["dyn_wire"].add(node_id)
 
     # =======================
     # FuncOp NESTING UTILITY
@@ -454,32 +462,25 @@ class ConstructCircuitDAG:
 
         prev_uids: set[str] = set()
 
-        # Find all previous nodes to connect to
+        ## PROCESS DYNAMIC NODES
+
         if is_dynamic:
             # Get all previously seen node uids
-            all_prev_uids = set().union(*self._wire_to_node_uids.values())
+            all_active = set().union(*self._wire_to_node_uids.values())
+            static_nodes = all_active - self._dynamic_node_uids
+            return static_nodes if static_nodes else all_active
 
-            # Filter out all dynamic uids first
-            only_dynamic_uids = all_prev_uids.issubset(self._dynamic_node_uids)
-            static_uids = set()
-            if not only_dynamic_uids:
-                static_uids = all_prev_uids - self._dynamic_node_uids
+        ## PROCESS STATIC NODES
 
-            # If static nodes exist, connect only to them to avoid
-            # unnecessary dynamic-to-dynamic connections
-            if static_uids:
-                prev_uids.update(static_uids)
-            elif only_dynamic_uids:
-                prev_uids.update(all_prev_uids)
-        else:
-            # Standard connectivity of static operators
-            for wire in node.wires:
-                prev_uids.update(self._wire_to_node_uids[wire])
+        # Get all nodes seen on static wires
+        for wire in node.wires:
+            prev_uids.update(self._wire_to_node_uids.get(wire, set()))
 
-            # NOTE: edge case when first operator is dynamic
-            if not prev_uids:
-                all_prev = set().union(*self._wire_to_node_uids.values())
-                prev_uids.update({uid for uid in all_prev if uid in self._dynamic_node_uids})
+        # NOTE: Edge case if all operators before this static one are dynamic
+        if not prev_uids:
+            for wire, uids in self._wire_to_node_uids.items():
+                if not isinstance(wire, int):
+                    prev_uids.update(uids)
 
         return prev_uids
 
