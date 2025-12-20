@@ -1841,6 +1841,37 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
+    def test_complex_connectivity_conditional_dynamic_branching(self):
+        """Tests that complex connectivity can go through a conditional."""
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def my_workflow(x, y):
+            qml.X(x)
+            if x == y:
+                qml.Y(0)
+            else:
+                qml.Z(x)
+            qml.H(y)
+
+        module = my_workflow(1, 2)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX", {"style": "dashed"}),
+            ("PauliX", "PauliY"),
+            ("PauliX", "PauliZ", {"style": "dashed"}),
+            ("PauliY", "Hadamard", {"style": "dashed"}),
+            ("PauliZ", "Hadamard", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
 
 @pytest.mark.usefixtures("use_both_frontend")
 class TestTerminalMeasurementConnectivity:

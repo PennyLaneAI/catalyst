@@ -452,6 +452,10 @@ class ConstructCircuitDAG:
         for p_uid in prev_uids:
             self.dag_builder.add_edge(p_uid, node_uid, style=style, **edge_attrs)
 
+        # No need to update the wire mapping as these are terminal measuremnets
+        if isinstance(node, MeasurementProcess):
+            return
+
         # Update the wire mapping
         self._update_wire_mapping(node, node_uid, is_dynamic)
 
@@ -490,9 +494,6 @@ class ConstructCircuitDAG:
         self, node: Operator | MeasurementProcess, node_uid: str, is_dynamic: bool
     ) -> None:
         """Updates the wire mapping accordingly."""
-        if isinstance(node, MeasurementProcess):
-            # No need to update the wire mapping as these are terminal measuremnets
-            return
 
         if is_dynamic:
             # Every wire now "flows" through this dynamic barrier (choke)
