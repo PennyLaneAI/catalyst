@@ -179,15 +179,10 @@ class ConstructCircuitDAG:
             case quantum.StateOp():
                 meas = xdsl_to_qml_measurement(op)
                 # NOTE: state can only handle all wires
-                prev_wires = self._wire_to_node_uids.keys()
 
             case quantum.ExpvalOp() | quantum.VarianceOp():
                 obs_op = op.obs.owner
                 meas = xdsl_to_qml_measurement(op, xdsl_to_qml_measurement(obs_op))
-                prev_wires = meas.wires.labels
-
-                if any(isinstance(w, str) for w in meas.obs.wires):
-                    prev_wires = self._wire_to_node_uids.keys()
 
             case quantum.SampleOp() | quantum.ProbsOp():
                 obs_op = op.obs.owner
@@ -196,13 +191,6 @@ class ConstructCircuitDAG:
                 # is obs_op and function below just pulls out the static wires
                 wires = xdsl_to_qml_measurement(obs_op)
                 meas = xdsl_to_qml_measurement(op, wires=None if wires == [] else wires)
-
-                if wires == []:
-                    # If no wires specified, connect to all seen current wires
-                    prev_wires = self._wire_to_node_uids.keys()
-                else:
-                    # Use the specific wires from the observable
-                    prev_wires = wires
 
             case _:
                 return
