@@ -160,7 +160,6 @@ def assert_dag_structure(nodes, edges, expected_edges):
     ), f"Expected {len(expected_edges)} edges, got {len(edges)}."
 
     for edge in expected_edges:
-
         start_name, end_name = edge[0], edge[1]
         u_start = name_to_uid.get(start_name, start_name)
         u_end = name_to_uid.get(end_name, end_name)
@@ -492,14 +491,14 @@ class TestIfOp:
         # cluster0 -> qjit
         # cluster1 -> my_workflow
         # Check conditional is a cluster within cluster1 (my_workflow)
-        assert clusters["cluster2"]["label"] == "conditional"
-        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert clusters["conditional_cluster2"]["label"] == "conditional"
+        assert clusters["conditional_cluster2"]["parent_cluster_uid"] == "cluster1"
 
         # Check three clusters live within cluster2 (conditional)
         assert clusters["cluster3"]["label"] == "if"
-        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "conditional_cluster2"
         assert clusters["cluster4"]["label"] == "else"
-        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "conditional_cluster2"
 
     def test_if_elif_else_conditional(self):
         """Test that the conditional operation is visualized correctly."""
@@ -527,16 +526,16 @@ class TestIfOp:
         # cluster0 -> qjit
         # cluster1 -> my_workflow
         # Check conditional is a cluster within my_workflow
-        assert clusters["cluster2"]["label"] == "conditional"
-        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert clusters["conditional_cluster2"]["label"] == "conditional"
+        assert clusters["conditional_cluster2"]["parent_cluster_uid"] == "cluster1"
 
         # Check three clusters live within conditional
         assert clusters["cluster3"]["label"] == "if"
-        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "conditional_cluster2"
         assert clusters["cluster4"]["label"] == "elif"
-        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "conditional_cluster2"
         assert clusters["cluster5"]["label"] == "else"
-        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster5"]["parent_cluster_uid"] == "conditional_cluster2"
 
     def test_nested_conditionals(self):
         """Tests that nested conditionals are visualized correctly."""
@@ -574,25 +573,25 @@ class TestIfOp:
         #   cluster7 -> else
 
         # Check first conditional is a cluster within my_workflow
-        assert clusters["cluster2"]["label"] == "conditional"
-        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert clusters["conditional_cluster2"]["label"] == "conditional"
+        assert clusters["conditional_cluster2"]["parent_cluster_uid"] == "cluster1"
 
         # Check 'if' cluster of first conditional has another conditional
         assert clusters["cluster3"]["label"] == "if"
-        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "conditional_cluster2"
 
         # Second conditional
-        assert clusters["cluster4"]["label"] == "conditional"
-        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster3"
+        assert clusters["conditional_cluster4"]["label"] == "conditional"
+        assert clusters["conditional_cluster4"]["parent_cluster_uid"] == "cluster3"
         # Check 'if' and 'else' in second conditional
         assert clusters["cluster5"]["label"] == "if"
-        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster4"
+        assert clusters["cluster5"]["parent_cluster_uid"] == "conditional_cluster4"
         assert clusters["cluster6"]["label"] == "else"
-        assert clusters["cluster6"]["parent_cluster_uid"] == "cluster4"
+        assert clusters["cluster6"]["parent_cluster_uid"] == "conditional_cluster4"
 
         # Check nested if / else is within the first if cluster
         assert clusters["cluster7"]["label"] == "else"
-        assert clusters["cluster7"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster7"]["parent_cluster_uid"] == "conditional_cluster2"
 
     def test_nested_conditionals_with_quantum_ops(self):
         """Tests that nested conditionals are unflattend if quantum operations
@@ -644,24 +643,24 @@ class TestIfOp:
         #                    node6 -> RZ(0,0)
 
         # check outer conditional (1)
-        assert clusters["cluster2"]["label"] == "conditional"
-        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert clusters["conditional_cluster2"]["label"] == "conditional"
+        assert clusters["conditional_cluster2"]["parent_cluster_uid"] == "cluster1"
         assert clusters["cluster3"]["label"] == "if"
-        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "conditional_cluster2"
         assert clusters["cluster4"]["label"] == "elif"
-        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "conditional_cluster2"
         assert clusters["cluster5"]["label"] == "else"
-        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster5"]["parent_cluster_uid"] == "conditional_cluster2"
 
         # Nested conditional (2) inside conditional (1)
-        assert clusters["cluster6"]["label"] == "conditional"
-        assert clusters["cluster6"]["parent_cluster_uid"] == "cluster5"
+        assert clusters["conditional_cluster6"]["label"] == "conditional"
+        assert clusters["conditional_cluster6"]["parent_cluster_uid"] == "cluster5"
         assert clusters["cluster7"]["label"] == "if"
-        assert clusters["cluster7"]["parent_cluster_uid"] == "cluster6"
+        assert clusters["cluster7"]["parent_cluster_uid"] == "conditional_cluster6"
         assert clusters["cluster8"]["label"] == "elif"
-        assert clusters["cluster8"]["parent_cluster_uid"] == "cluster6"
+        assert clusters["cluster8"]["parent_cluster_uid"] == "conditional_cluster6"
         assert clusters["cluster9"]["label"] == "else"
-        assert clusters["cluster9"]["parent_cluster_uid"] == "cluster6"
+        assert clusters["cluster9"]["parent_cluster_uid"] == "conditional_cluster6"
 
     def test_nested_conditionals_with_nested_quantum_ops(self):
         """Tests that nested conditionals are unflattend if quantum operations
@@ -715,27 +714,27 @@ class TestIfOp:
         #                    node6 -> RZ(0,0)
 
         # check outer conditional (1)
-        assert clusters["cluster2"]["label"] == "conditional"
-        assert clusters["cluster2"]["parent_cluster_uid"] == "cluster1"
+        assert clusters["conditional_cluster2"]["label"] == "conditional"
+        assert clusters["conditional_cluster2"]["parent_cluster_uid"] == "cluster1"
         assert clusters["cluster3"]["label"] == "if"
-        assert clusters["cluster3"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster3"]["parent_cluster_uid"] == "conditional_cluster2"
         assert clusters["cluster4"]["label"] == "elif"
-        assert clusters["cluster4"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster4"]["parent_cluster_uid"] == "conditional_cluster2"
         assert clusters["cluster5"]["label"] == "else"
-        assert clusters["cluster5"]["parent_cluster_uid"] == "cluster2"
+        assert clusters["cluster5"]["parent_cluster_uid"] == "conditional_cluster2"
 
         # Nested conditional (2) inside conditional (1)
         assert clusters["cluster6"]["label"] == "for loop"
         assert clusters["cluster6"]["parent_cluster_uid"] == "cluster5"
 
-        assert clusters["cluster7"]["label"] == "conditional"
-        assert clusters["cluster7"]["parent_cluster_uid"] == "cluster5"
+        assert clusters["conditional_cluster7"]["label"] == "conditional"
+        assert clusters["conditional_cluster7"]["parent_cluster_uid"] == "cluster5"
         assert clusters["cluster8"]["label"] == "if"
-        assert clusters["cluster8"]["parent_cluster_uid"] == "cluster7"
+        assert clusters["cluster8"]["parent_cluster_uid"] == "conditional_cluster7"
         assert clusters["cluster9"]["label"] == "elif"
-        assert clusters["cluster9"]["parent_cluster_uid"] == "cluster7"
+        assert clusters["cluster9"]["parent_cluster_uid"] == "conditional_cluster7"
         assert clusters["cluster10"]["label"] == "else"
-        assert clusters["cluster10"]["parent_cluster_uid"] == "cluster7"
+        assert clusters["cluster10"]["parent_cluster_uid"] == "conditional_cluster7"
 
 
 class TestGetLabel:
@@ -1728,6 +1727,74 @@ class TestOperatorConnectivity:
             ("Hadamard", "PauliY", {"style": "dashed"}),
             ("PauliY", "S"),
             ("S", "PauliZ", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_basic_static_conditional(self):
+        """Tests a basic static example of a conditional."""
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def my_workflow(a):
+            if a == 2:
+                qml.X(0)
+            elif a == 3:
+                qml.Y(0)
+            else:
+                qml.Z(0)
+            qml.H(a)
+
+        module = my_workflow(1)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX"),
+            ("NullQubit", "PauliY"),
+            ("NullQubit", "PauliZ"),
+            ("PauliX", "Hadamard", {"style": "dashed"}),
+            ("PauliY", "Hadamard", {"style": "dashed"}),
+            ("PauliZ", "Hadamard", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
+    def test_basic_static_conditional_in_between_dynamic(self):
+        """Tests a basic static example of a conditional."""
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def my_workflow(a, b):
+            qml.S(b)
+            if a == 2:
+                qml.X(0)
+            elif a == 3:
+                qml.Y(0)
+            else:
+                qml.Z(0)
+            qml.H(a)
+
+        module = my_workflow(1, 2)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "S", {"style": "dashed"}),
+            ("S", "PauliX"),
+            ("S", "PauliY"),
+            ("S", "PauliZ"),
+            ("PauliX", "Hadamard", {"style": "dashed"}),
+            ("PauliY", "Hadamard", {"style": "dashed"}),
+            ("PauliZ", "Hadamard", {"style": "dashed"}),
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
