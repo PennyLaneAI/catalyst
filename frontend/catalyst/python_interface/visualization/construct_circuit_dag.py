@@ -56,7 +56,6 @@ class ConstructCircuitDAG:
 
         # Keep track of nesting clusters using a stack
         self._cluster_uid_stack: list[str] = []
-        self._last_cluster_visited: str ="" 
 
         # Create a map of wire to node uid
         # Keys represent static (int) or dynamic wires (str)
@@ -251,7 +250,7 @@ class ConstructCircuitDAG:
 
         self._visit_region(operation.regions[0])
 
-        self._last_cluster_visited = self._cluster_uid_stack.pop()
+        self._cluster_uid_stack.pop()
 
     # =============
     # CONTROL FLOW
@@ -273,7 +272,7 @@ class ConstructCircuitDAG:
 
         self._visit_region(operation.regions[0])
 
-        self._last_cluster_visited = self._cluster_uid_stack.pop()
+        self._cluster_uid_stack.pop()
 
     @_visit_operation.register
     def _while_op(self, operation: scf.WhileOp) -> None:
@@ -291,12 +290,12 @@ class ConstructCircuitDAG:
         for region in operation.regions:
             self._visit_region(region)
 
-        self._last_cluster_visited = self._cluster_uid_stack.pop()
+        self._cluster_uid_stack.pop()
 
     @_visit_operation.register
     def _if_op(self, operation: scf.IfOp):
         """Handles the scf.IfOp operation."""
-        uid = f"conditional_cluster{self._cluster_uid_counter}"
+        uid = f"cluster{self._cluster_uid_counter}"
         self.dag_builder.add_cluster(
             uid,
             label="conditional",
@@ -343,10 +342,10 @@ class ConstructCircuitDAG:
 
             # Pop branch cluster after processing to ensure
             # logical branches are treated as 'parallel'
-            self._last_cluster_visited = self._cluster_uid_stack.pop()
+            self._cluster_uid_stack.pop()
 
         # Pop IfOp cluster before leaving this handler
-        self._last_cluster_visited = self._cluster_uid_stack.pop()
+        self._cluster_uid_stack.pop()
 
         # Default to all wires seen before the conditional
         affected_wires: set[str | int] = set(wire_map_before.keys())
@@ -389,7 +388,10 @@ class ConstructCircuitDAG:
             penwidth=2,
         )
         self._node_uid_counter += 1
-        self._wire_to_node_uids["device"].add(node_id)
+        # NOTE: Consider the device node as dynamic
+        # as any wire can source from it
+        self._dynamic_node_uids.add(node_id)
+        self._wire_to_node_uids["dyn_wire"].add(node_id)
 
     # =======================
     # FuncOp NESTING UTILITY
@@ -424,7 +426,7 @@ class ConstructCircuitDAG:
         if len(self._cluster_uid_stack) > 1:
             # If we hit a func.return operation we know we are leaving
             # the FuncOp's scope and so we can pop the ID off the stack.
-            self._last_cluster_visited = self._cluster_uid_stack.pop()
+            self._cluster_uid_stack.pop()
 
         # Clear seen wires as we are exiting a FuncOp (qnode)
         self._wire_to_node_uids = defaultdict(set)
@@ -445,9 +447,10 @@ class ConstructCircuitDAG:
 
         # Connect to all predecessors
         prev_uids: set[str] = self._get_previous_uids(node, is_dynamic)
+
         style = "dashed" if is_dynamic else "solid"
-        for prev_uid in prev_uids:
-            self.dag_builder.add_edge(prev_uid, node_uid, style=style, **edge_attrs)
+        for p_uid in prev_uids:
+            self.dag_builder.add_edge(p_uid, node_uid, style=style, **edge_attrs)
 
         # No need to update the wire mapping as these are terminal measuremnets
         if isinstance(node, MeasurementProcess):
@@ -464,15 +467,10 @@ class ConstructCircuitDAG:
         ## PROCESS DYNAMIC NODES
 
         if is_dynamic:
-            # Get all active wires
-            all_active = set().union(*self._wire_to_node_uids.values()) - {"node0"}
-            if not all_active:
-                all_active = {"node0"}
-
-            # If there's a mixture of static and dynamic, choose static to not connect
-            # redundant dynamic to dynamic.
+            # Get all previously seen node uids
+            all_active = set().union(*self._wire_to_node_uids.values())
             static_nodes = all_active - self._dynamic_node_uids
-            return static_nodes if static_nodes and "conditional" not in self._last_cluster_visited else all_active
+            return static_nodes if static_nodes else all_active
 
         ## PROCESS STATIC NODES
 
