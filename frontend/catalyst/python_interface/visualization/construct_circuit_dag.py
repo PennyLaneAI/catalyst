@@ -25,6 +25,7 @@ from pennylane.measurements import (
     VarianceMP,
 )
 from pennylane.operation import Operator
+from scipy.constants import dyn
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region
 
@@ -342,9 +343,6 @@ class ConstructCircuitDAG:
             # logical branches are treated as 'parallel'
             self._cluster_uid_stack.pop()
 
-        # Pop IfOp cluster before leaving this handler
-        self._last_cluster_uid = self._cluster_uid_stack.pop()
-
         # Default to all wires seen before the conditional
         affected_wires: set[str | int] = set()
         # Update affected wires with specific wires seen during branches
@@ -366,6 +364,17 @@ class ConstructCircuitDAG:
 
         if before_dyn and before_dyn < current_dyn:
             final_wire_map["dyn_wire"] -= before_dyn
+
+        def count_conditional_strings(list_of_strings):
+            return sum(1 for s in list_of_strings if "conditional" in s)
+
+        if before_dyn == current_dyn and count_conditional_strings(self._cluster_uid_stack) == 1:
+            # Nothing dynamic encountered
+            final_wire_map["dyn_wire"] = set()
+
+        print(before_dyn, current_dyn)
+        # Pop IfOp cluster before leaving this handler
+        self._last_cluster_uid = self._cluster_uid_stack.pop()
 
         self._wire_to_node_uids = final_wire_map
 
@@ -441,7 +450,9 @@ class ConstructCircuitDAG:
             self._dynamic_node_uids.add(node_uid)
 
         # Connect to all predecessors
+        print(node, self._wire_to_node_uids)
         prev_uids: set[str] = self._get_previous_uids(node, is_dynamic)
+        print(node, prev_uids)
 
         style = "dashed" if is_dynamic else "solid"
         for p_uid in prev_uids:
@@ -485,6 +496,8 @@ class ConstructCircuitDAG:
 
         device_node_uid: set[str] = self._wire_to_node_uids.get("device", set())
         dyn_wires: set[str] = self._wire_to_node_uids.get("dyn_wire", set())
+        if prev_uids and dyn_wires and "conditional" in self._last_cluster_uid:
+            prev_uids.update(dyn_wires)
 
         if not prev_uids or len(dyn_wires) > 1:
             # First time seeing this static wire.
@@ -503,6 +516,7 @@ class ConstructCircuitDAG:
 
         if is_dynamic:
             # Every wire now "flows" through this dynamic barrier (choke)
+            self._wire_to_node_uids.pop("device", set())
             seen_wires = list(self._wire_to_node_uids.keys())
             for wire in seen_wires:
                 self._wire_to_node_uids[wire] = {node_uid}
@@ -511,6 +525,7 @@ class ConstructCircuitDAG:
             # Standard update for static wires
             for wire in node.wires:
                 self._wire_to_node_uids[wire] = {node_uid}
+
             if len(self._wire_to_node_uids["dyn_wire"]) > 1:
                 self._wire_to_node_uids["dyn_wire"] = set()
 
