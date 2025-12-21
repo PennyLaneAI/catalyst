@@ -526,7 +526,7 @@ class ConstructCircuitDAG:
             for wire in node.wires:
                 self._wire_to_node_uids[wire] = {node_uid}
 
-            if len(self._wire_to_node_uids["dyn_wire"]) > 1:
+            if "conditional" in self._last_cluster_uid:
                 self._wire_to_node_uids["dyn_wire"] = set()
 
 
