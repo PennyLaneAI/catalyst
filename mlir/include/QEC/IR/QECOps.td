@@ -369,7 +369,22 @@ def PPRotationArbitraryOp : QEC_Op<"ppr.arbitrary", [QECOpInterface, AttrSizedOp
             /*arbitrary_angle=*/ arbitrary_angle,
             /*in_qubits=*/ in_qubits,
             /*condition=*/ nullptr);
-        }]>
+        }]>,
+        // Convenience builder with no type range
+        OpBuilder<
+        (ins
+            "::mlir::ArrayAttr":$pauli_product,
+            "::mlir::Value":$arbitrary_angle,
+            "::mlir::ValueRange":$in_qubits,
+            "::mlir::Value":$condition
+        ),[{
+            PPRotationArbitraryOp::build($_builder, $_state,
+            /*out_qubits=*/ mlir::TypeRange(in_qubits),
+            /*pauli_product=*/ pauli_product,
+            /*arbitrary_angle=*/ arbitrary_angle,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ condition);
+        }]>,
     ];
 
     let assemblyFormat = [{

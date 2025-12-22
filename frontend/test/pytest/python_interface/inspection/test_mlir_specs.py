@@ -258,6 +258,39 @@ class TestMLIRSpecs:
         ):
             mlir_specs(simple_circuit, level=[0, 3])
 
+    def test_not_qnode(self):
+        """Test that a malformed QNode raises an error."""
+
+        def not_a_qnode():
+            pass
+
+        with pytest.raises(
+            ValueError,
+            match="The provided `qnode` argument does not appear to be a valid QJIT "
+            "compiled QNode.",
+        ):
+            mlir_specs(not_a_qnode, level=0)
+
+    def test_malformed_qnode(self):
+        """Test that a QNode without measurements can still be collected."""
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qjit
+        @qml.qnode(dev)
+        def circ(wire):
+            qml.X(0)
+            qml.X(wire)
+
+        res = mlir_specs(circ, 0, 1)
+        expected = make_static_resources(
+            operations={"PauliX": {1: 2}},
+            measurements={},
+            num_allocs=1,
+        )
+
+        assert resources_equal(res, expected)
+
     @pytest.mark.parametrize(
         "pl_ctrl_flow, iters, autograph",
         [
@@ -535,8 +568,8 @@ class TestMLIRSpecs:
         expected = make_static_resources(
             operations={},
             measurements={
-                "expval(Hamiltonian(PauliZ @ PauliZ))": 1,
-                "expval(Hamiltonian(PauliX @ PauliZ, PauliZ @ Hadamard))": 1,
+                "expval(Hamiltonian(num_terms=1))": 1,
+                "expval(Hamiltonian(num_terms=2))": 1,
             },
             num_allocs=2,
         )
@@ -566,7 +599,7 @@ class TestMLIRSpecs:
             num_allocs=2,
         )
 
-        res = mlir_specs(circ, level=1, args=(0,))
+        res = mlir_specs(circ, level=1)
         assert resources_equal(res, expected)
 
     def test_subroutine(self):

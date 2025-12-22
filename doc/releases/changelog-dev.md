@@ -420,6 +420,13 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* `DecompRuleInterpreter` now solves the graph and adds decompositions rules in the `cleanup` method
+  instead of during the first call to `interpret_measurement`.
+  [(#2312)](https://github.com/PennyLaneAI/catalyst/pull/2312)
+
+* Update references to `TransformProgram` with `CompilePipeline`
+  [(#2314)](https://github.com/PennyLaneAI/catalyst/pull/2314)
+
 * xDSL and xDSL-JAX are now dependencies of Catalyst.
   [(#2282)](https://github.com/PennyLaneAI/catalyst/pull/2282)
 
@@ -506,6 +513,7 @@
   [(#2245)](https://github.com/PennyLaneAI/catalyst/pull/2245)
   [(#2254)](https://github.com/PennyLaneAI/catalyst/pull/2254)
   [(#2258)](https://github.com/PennyLaneAI/catalyst/pull/2258)
+  [(#2311)](https://github.com/PennyLaneAI/catalyst/pull/2311)
 
   * Refactor QEC tablegen files to separate QEC operations into a new `QECOp.td` file
   [(#2253](https://github.com/PennyLaneAI/catalyst/pull/2253)
