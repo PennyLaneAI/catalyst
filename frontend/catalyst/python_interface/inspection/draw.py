@@ -206,8 +206,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         **Visualizing Control Flow**
 
         The ``draw_graph`` function can be used to visualize control flow, resulting in a scalable
-        representation that preserves program structure. In order to do this, turn on ``autograph``
-        at the ``qjit`` level, which allows this structure to be captured in the program IR:
+        representation that preserves program structure:
 
         .. code-block::
 
