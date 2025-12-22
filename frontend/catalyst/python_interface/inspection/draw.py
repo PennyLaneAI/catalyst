@@ -133,7 +133,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         provided for installation instructions.
 
         Additionally, it is recommended to use ``draw_graph`` with PennyLane's program capture
-        (enabled with :func:`pennylane.capture.enable`).
+        enabled (see :func:`qml.capture.enable <pennylane.capture.enable>`).
 
     Args:
         qnode (QJIT):
