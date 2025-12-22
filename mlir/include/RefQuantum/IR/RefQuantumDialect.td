@@ -17,12 +17,14 @@
 
 include "mlir/IR/DialectBase.td"
 include "mlir/IR/OpBase.td"
+include "mlir/IR/AttrTypeBase.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // RefQuantum dialect definition.
 //===----------------------------------------------------------------------===//
 
-def RefQuantum_Dialect : Dialect {
+def RefQuantumDialect : Dialect {
     let summary = "Reference semantics quantum dialect.";
     let description = [{
         Here are words
@@ -56,7 +58,7 @@ def RefQuantum_Dialect : Dialect {
 
 /// Uncomment the lines below if defining types for the RefQuantum dialect
 // class RefQuantum_Type<string name, string typeMnemonic, list<Trait> traits = []>
-//         : TypeDef<RefQuantum_Dialect, name, traits> {
+//         : TypeDef<RefQuantumDialect, name, traits> {
 //     let mnemonic = typeMnemonic;
 // }
 
@@ -66,7 +68,7 @@ def RefQuantum_Dialect : Dialect {
 //===----------------------------------------------------------------------===//
 
 class RefQuantum_Op<string mnemonic, list<Trait> traits = []> :
-        Op<RefQuantum_Dialect, mnemonic, traits>;
+        Op<RefQuantumDialect, mnemonic, traits>;
 
 
 #endif // REF_QUANTUM_DIALECT

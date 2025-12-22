@@ -14,10 +14,39 @@
 
 #pragma once
 
+#include <optional>
+
+#include "llvm/ADT/StringRef.h"
+
+// #include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Dialect.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/PatternMatch.h"
+// #include "mlir/Interfaces/ControlFlowInterfaces.h"
+#include "mlir/Support/LogicalResult.h"
+
 // TODO: is it dependent on the regular quantum dialect?
 // #include "Quantum/IR/QuantumDialect.h"
 
 #include "RefQuantum/IR/RefQuantumDialect.h"
+#include "RefQuantum/IR/RefQuantumInterfaces.h"
+
+//===----------------------------------------------------------------------===//
+// RefQuantum trait declarations.
+//===----------------------------------------------------------------------===//
+
+namespace mlir {
+namespace OpTrait {
+
+template <typename ConcreteType>
+class UnitaryTrait : public TraitBase<ConcreteType, UnitaryTrait> {};
+
+template <typename ConcreteType>
+class HermitianTrait : public TraitBase<ConcreteType, HermitianTrait> {};
+
+} // namespace OpTrait
+} // namespace mlir
 
 //===----------------------------------------------------------------------===//
 // RefQuantum ops declarations.

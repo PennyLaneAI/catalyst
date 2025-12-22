@@ -1,0 +1,44 @@
+// Copyright 2025 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Test basic parsing.
+//
+// RUN: quantum-opt --split-input-file --verify-diagnostics %s
+
+func.func @test_custom_op(%w0: i64, %w1: i64, %w2: i64, %w3: i64, %param0: f64, %param1: f64) {
+
+    // Basic
+    ref_quantum.custom "Hadamard"() %w0 : i64
+    ref_quantum.custom "CNOT"() %w0, %w1 : i64, i64
+
+    // With params
+    ref_quantum.custom "RX"(%param0) %w0 : i64
+    ref_quantum.custom "Rot"(%param0, %param1, %param1) %w0 : i64
+
+    // With adjoint
+    ref_quantum.custom "PauliX"() %w0 adj : i64
+    ref_quantum.custom "CNOT"() %w0, %w1 adj : i64, i64
+
+    // With control
+    %true = llvm.mlir.constant (1 : i1) :i1
+    %false = llvm.mlir.constant (0 : i1) :i1
+    ref_quantum.custom "PauliZ"() %w0 ctrls (%w1) ctrlvals (%true) : i64 ctrls i64
+    ref_quantum.custom "RY"(%param0) %w0 ctrls (%w1) ctrlvals (%true) : i64 ctrls i64
+    ref_quantum.custom "SWAP"() %w0, %w1 ctrls (%w2, %w3) ctrlvals (%true, %false) : i64, i64 ctrls i64, i64
+
+    // With params, control and adjoint altogether
+    ref_quantum.custom "Rot"(%param0, %param1, %param1) %w0, %w1 adj ctrls (%w2, %w3) ctrlvals (%true, %false) : i64, i64 ctrls i64, i64
+
+    return
+}

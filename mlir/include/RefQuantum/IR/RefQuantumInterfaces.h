@@ -12,30 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/OpImplementation.h"
-#include "llvm/ADT/StringSet.h"
-#include "llvm/ADT/TypeSwitch.h"
+#pragma once
 
-#include "RefQuantum/IR/RefQuantumDialect.h"
-#include "RefQuantum/IR/RefQuantumOps.h"
+#include <vector>
 
-using namespace mlir;
-using namespace catalyst::ref_quantum;
+#include "mlir/IR/OpDefinition.h"
 
 //===----------------------------------------------------------------------===//
-// RefQuantum op definitions.
+// RefQuantum interface declarations.
 //===----------------------------------------------------------------------===//
 
-#include "RefQuantum/IR/RefQuantumEnums.cpp.inc"
-
-#define GET_OP_CLASSES
-#include "RefQuantum/IR/RefQuantumOps.cpp.inc"
-
-//===----------------------------------------------------------------------===//
-// RefQuantum op verifiers.
-//===----------------------------------------------------------------------===//
-
-namespace catalyst::ref_quantum {
-
-} // namespace catalyst::ref_quantum
+#include "RefQuantum/IR/RefQuantumInterfaces.h.inc"

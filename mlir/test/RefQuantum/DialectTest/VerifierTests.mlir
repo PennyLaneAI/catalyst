@@ -1,0 +1,61 @@
+// Copyright 2025 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Test verifiers.
+//
+// RUN: quantum-opt --split-input-file --verify-diagnostics %s
+
+// -----
+
+func.func @test_controlled1(%w0: i64, %w1: i64) {
+    %true = llvm.mlir.constant (1 : i1) :i1
+    // expected-error@+1 {{number of controlling wires in input (1) and controlling values (2) must be the same}}
+    ref_quantum.custom "PauliZ"() %w0 ctrls (%w1) ctrlvals (%true, %true) : i64 ctrls i64
+    return
+}
+
+// -----
+
+func.func @test_controlled2(%w0: i64) {
+    %true = llvm.mlir.constant (1 : i1) :i1
+    // expected-error@+1 {{number of controlling wires in input (0) and controlling values (1) must be the same}}
+    ref_quantum.custom "PauliZ"() %w0 ctrls () ctrlvals (%true) : i64
+    return
+}
+
+// -----
+
+func.func @test_controlled3(%w0: i64, %w1: i64) {
+    %true = llvm.mlir.constant (1 : i1) :i1
+    // expected-error@+1 {{number of controlling wires in input (1) and controlling values (0) must be the same}}
+    ref_quantum.custom "PauliZ"() %w0 ctrls (%w1) ctrlvals () : i64 ctrls i64
+    return
+}
+
+// -----
+
+func.func @test_duplicate_wires1(%w0: i64) {
+	// expected-error@+1 {{all wires on a quantum gate must be distinct (including controls)}}
+    ref_quantum.custom "CNOT"() %w0, %w0 : i64, i64
+    return
+}
+
+// -----
+
+func.func @test_duplicate_wires2(%w0: i64) {
+	%true = llvm.mlir.constant (1 : i1) :i1
+	// expected-error@+1 {{all wires on a quantum gate must be distinct (including controls)}}
+    ref_quantum.custom "PauliX"() %w0 ctrls (%w0) ctrlvals (%true) : i64 ctrls i64
+    return
+}
