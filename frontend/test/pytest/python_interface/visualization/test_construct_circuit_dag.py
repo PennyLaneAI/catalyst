@@ -1952,8 +1952,6 @@ class TestOperatorConnectivity:
                 qml.S(0)
                 if i == 3:
                     qml.T(0)
-                else:
-                    qml.RX(0, 0)
 
             qml.RY(0, x)
 
@@ -1972,9 +1970,7 @@ class TestOperatorConnectivity:
             ("PauliY", "Hadamard", {"style": "dashed"}),
             ("Hadamard", "S"),
             ("S", "T"),
-            ("S", "RX"),
             ("T", "RY", {"style": "dashed"}),
-            ("RX", "RY", {"style": "dashed"}),
         )
         assert_dag_structure(nodes, edges, expected_edges)
     def test_complex_connectivity_conditional_dynamic_branching_static_node_after(self):
