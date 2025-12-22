@@ -306,7 +306,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         pass_name = pass_instance.name if hasattr(pass_instance, "name") else pass_instance
         cache[pass_level] = (
             dot_string,
-            pass_name if pass_level else "No transforms",
+            pass_name if pass_level else "Before MLIR Passes",
         )
 
     @wraps(qnode)
