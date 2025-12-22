@@ -265,7 +265,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     """
     if not HAS_MATPLOTLIB:
         raise ImportError(
-            "The `draw_graph` functionality requires `matplotlib` to be installed. Please install `matplotlib` with `pip install matplotlib`."
+            "The draw_graph functionality requires matplotlib to be installed. You can install matplotlib via pip install matplotlib."
         )
     if not HAS_GRAPHVIZ:
         raise ImportError(
