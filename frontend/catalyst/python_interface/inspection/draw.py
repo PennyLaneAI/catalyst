@@ -324,9 +324,9 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         max_level = max(cache.keys())
         dot_string, _ = cache.get(level, cache[max_level])
         # TODO:  Remove dependency on PyDot
+        (graph,) = pydot.graph_from_dot_data(dot_string)
         try:
-            graph = pydot.graph_from_dot_data(dot_string)[0]
-            image_bytes = graph.create_png()
+            image_bytes = graph.create(prog="dot", format="png")
         except Exception as e:
             raise RuntimeError(
                 "Failed to render graph. Ensure Graphviz is installed and 'dot' is in your PATH. "
