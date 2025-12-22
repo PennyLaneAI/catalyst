@@ -318,13 +318,11 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         mlir_module = get_mlir_module(qnode, args, kwargs)
         Compiler.run(mlir_module, callback=_draw_callback)
 
-        if not cache:
-            return None
-
         max_level = max(cache.keys())
         dot_string, _ = cache.get(level, cache[max_level])
         # TODO:  Remove dependency on PyDot
         (graph,) = pydot.graph_from_dot_data(dot_string)
+
         try:
             image_bytes = graph.create(prog="dot", format="png")
         except Exception as e:
@@ -333,13 +331,9 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
                 f"Original error: {e}"
             ) from e
 
-        # Create virtual image in RAM
-        sio = io.BytesIO()
-        sio.write(image_bytes)
-        sio.seek(0)
-        img = mpimg.imread(sio)
-
         fig, ax = plt.subplots()
+
+        img = mpimg.imread(io.BytesIO(image_bytes), format="png")
         ax.imshow(img)
         ax.set_axis_off()
         return fig, ax

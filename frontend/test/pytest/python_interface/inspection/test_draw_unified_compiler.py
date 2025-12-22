@@ -644,6 +644,33 @@ class TestDrawGraph:
         assert merge_rotations.count("<name> RX|<wire> [0]") == 1
         assert merge_rotations.count("expval(PauliX)") == 1
 
+    def test_empty_passpipeline(self):
+        """Tests that it works with an empty pass pipeline."""
+
+        @qml.qjit
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def circuit():
+            qml.H(0)
+            qml.T(1)
+            qml.H(0)
+            qml.RX(0.1, wires=0)
+            qml.RX(0.2, wires=0)
+            return qml.expval(qml.X(0))
+
+        _ = draw_graph(circuit)()
+
+        # NOTE: hacky work around but lets me probe the graph
+        from catalyst.python_interface.inspection.draw import _cache_store
+
+        cache = _cache_store[circuit]
+        assert len(cache) == 1
+        graph = cache[0][0]
+
+        assert graph.count("<name> Hadamard|<wire> [0]") == 2
+        assert graph.count("<name> T|<wire> [1]") == 1
+        assert graph.count("<name> RX|<wire> [0]") == 2
+        assert graph.count("expval(PauliX)") == 1
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
