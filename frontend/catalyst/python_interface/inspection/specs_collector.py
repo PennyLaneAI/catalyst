@@ -446,7 +446,10 @@ def _collect_region(
                 cond_warning=cond_warning,
                 adjoint_mode=adjoint_mode,
             )
-            if not "estimated_iterations" in op.attributes:
+            if "estimated_iterations" in op.attributes:
+                iters = op.attributes.get("estimated_iterations").value.data
+                body_ops.multiply_by_scalar(iters)
+            else:
                 try:
                     iters = count_static_loop_iterations(op)
                     body_ops.multiply_by_scalar(iters)
@@ -460,9 +463,6 @@ def _collect_region(
                             UserWarning,
                         )
                     loop_warning = True
-            else:
-                iters = op.attributes.get("estimated_iterations").value.data
-                body_ops.multiply_by_scalar(iters)
             resources.merge_with(body_ops)
             continue
 
