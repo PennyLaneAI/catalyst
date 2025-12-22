@@ -24,11 +24,12 @@ import pytest
 from jax.tree_util import tree_flatten
 from pennylane import exceptions
 from pennylane.transforms.dynamic_one_shot import fill_in_value
+from pennylane import measure
 
 import catalyst
 from catalyst import CompileError, cond, grad
 from catalyst import jvp as C_jvp
-from catalyst import measure, qjit, value_and_grad
+from catalyst import qjit, value_and_grad
 from catalyst import vjp as C_vjp
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
@@ -38,24 +39,6 @@ from catalyst import vjp as C_vjp
 
 class TestMidCircuitMeasurement:
     """Tests for mid-circuit behaviour."""
-
-    def test_pl_measure(self, backend):
-        """Test PL measure."""
-
-        def circuit():
-            return qml.measure(0)
-
-        with pytest.raises(CompileError, match="Must use 'measure' from Catalyst"):
-            qjit(qml.qnode(qml.device(backend, wires=1))(circuit))()
-
-    def test_measure_outside_qjit(self):
-        """Test measure outside qjit."""
-
-        def circuit():
-            return measure(0)
-
-        with pytest.raises(CompileError, match="can only be used from within @qjit"):
-            circuit()
 
     def test_measure_outside_qnode(self):
         """Test measure outside qnode."""
