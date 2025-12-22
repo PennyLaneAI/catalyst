@@ -36,10 +36,6 @@ def resources_equal(
 
         # actual.device_name == expected.device_name TODO: Don't worry about this one for now
         assert actual.num_allocs == expected.num_allocs
-        print("-------------------------------- actual --------------------------------")
-        print(actual.operations)
-        print("-------------------------------- expected --------------------------------")
-        print(expected.operations)
         assert actual.operations == expected.operations
         assert actual.measurements == expected.measurements
 
