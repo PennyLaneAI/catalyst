@@ -36,7 +36,6 @@ def resources_equal(
 
         # actual.device_name == expected.device_name TODO: Don't worry about this one for now
         assert actual.num_allocs == expected.num_allocs
-
         assert actual.operations == expected.operations
         assert actual.measurements == expected.measurements
 
@@ -581,20 +580,21 @@ class TestMLIRSpecs:
     def test_ppr(self):
         """Test that PPRs are handled correctly."""
 
-        if qml.capture.enabled():
-            pytest.xfail("plxpr currently incompatible with to_ppr pass")
+        if not qml.capture.enabled():
+            pytest.xfail("to_ppr requires plxpr to be enabled to lower PauliRot")
 
         pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
         @qml.qjit(pipelines=pipeline, target="mlir")
-        @catalyst.passes.to_ppr
+        @qml.transform(pass_name="to-ppr")
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circ():
             qml.H(0)
             qml.T(0)
+            qml.PauliRot(0.1234, pauli_word="Z", wires=0)
 
         expected = make_static_resources(
-            operations={"PPR-pi/4": {1: 3}, "PPR-pi/8": {1: 1}},
+            operations={"PPR-pi/4": {1: 3}, "PPR-pi/8": {1: 1}, "PPR-Phi": {1: 1}},
             measurements={},
             num_allocs=2,
         )
