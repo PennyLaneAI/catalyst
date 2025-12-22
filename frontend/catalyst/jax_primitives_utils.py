@@ -399,6 +399,10 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
                 try:
                     # pylint: disable=import-outside-toplevel
                     from catalyst.python_interface.pass_api import is_xdsl_pass
+
+                    # catalyst.python_interface.xdsl_universe collects all transforms in
+                    # catalyst.python_interface.transforms, so importing from that file
+                    # updates the global xDSL transforms registry.
                     from catalyst.python_interface.xdsl_universe import XDSL_UNIVERSE as _
 
                     if is_xdsl_pass(name):
