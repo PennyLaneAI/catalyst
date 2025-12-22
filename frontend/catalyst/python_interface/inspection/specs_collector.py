@@ -272,7 +272,7 @@ def _(xdsl_op: PPRotationOp) -> tuple[ResourceType, str]:
 
 @handle_resource.register
 def _(xdsl_op: PPRotationArbitraryOp) -> tuple[ResourceType, str]:
-    return ResourceType.QEC, "PPR-arbitrary"
+    return ResourceType.QEC, "PPR-Phi"
 
 
 @handle_resource.register

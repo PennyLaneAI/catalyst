@@ -565,7 +565,7 @@ class TestMLIRSpecs:
             qml.PauliRot(0.1234, pauli_word="Z", wires=0)
 
         expected = make_static_resources(
-            operations={"PPR-pi/4": {1: 3}, "PPR-pi/8": {1: 1}, "PPR-arbitrary": {1: 1}},
+            operations={"PPR-pi/4": {1: 3}, "PPR-pi/8": {1: 1}, "PPR-Phi": {1: 1}},
             measurements={},
             num_allocs=2,
         )
