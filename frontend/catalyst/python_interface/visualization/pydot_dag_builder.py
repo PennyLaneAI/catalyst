@@ -83,6 +83,8 @@ class PyDotDAGBuilder(DAGBuilder):
         # - compound="true": Allow edges to connect directly to clusters/subgraphs.
         # - strict=True: Prevent duplicate edges (e.g., A -> B added twice).
         # - splines="polyline": Edges connecting clusters are polyline
+
+        # NOTE: splines="ortho" have an open issue on graphviz: https://gitlab.com/graphviz/graphviz/-/issues/1408
         self.graph: Dot = Dot(
             graph_type="digraph", rankdir="TB", compound="true", strict=True, splines="polyline"
         )
