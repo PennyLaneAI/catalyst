@@ -1937,6 +1937,46 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
+    def test_complex_connectivity_conditional_inside_control_flow(self):
+        """Tests the interaction with conditional inside of control flow"""
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def my_workflow(x, y):
+            qml.X(0)
+            qml.Y(1)
+            qml.H(x) 
+            
+            for i in range(3):
+                qml.S(0)
+                if i == 3:
+                    qml.T(0)
+                else:
+                    qml.RX(0, 0)
+
+            qml.RY(0, x)
+
+        module = my_workflow(1, 2)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX"),
+            ("NullQubit", "PauliY"),
+            ("PauliX", "Hadamard", {"style": "dashed"}),
+            ("PauliY", "Hadamard", {"style": "dashed"}),
+            ("Hadamard", "S"),
+            ("S", "T"),
+            ("S", "RX"),
+            ("T", "RY", {"style": "dashed"}),
+            ("RX", "RY", {"style": "dashed"}),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
     def test_complex_connectivity_conditional_dynamic_branching_static_node_after(self):
         """Tests that complex connectivity can go through a conditional."""
 
