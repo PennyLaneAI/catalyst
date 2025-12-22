@@ -260,8 +260,12 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
 
         >>> x, y = 1, 0
         >>> print(catalyst.draw_graph(circuit)(x, y))
+        (<Figure size 640x480 with 1 Axes>, <Axes: >)
 
-        TODO!!!
+        .. figure:: ../../../doc/_static/catalyst-draw-graph-dynamic-wire-example.png
+            :width: 35%
+            :alt: Graphical representation of circuit with control flow
+            :align: left
     """
     if not HAS_MATPLOTLIB:
         raise ImportError(
