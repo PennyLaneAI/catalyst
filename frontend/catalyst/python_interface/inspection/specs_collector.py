@@ -33,6 +33,7 @@ from catalyst.python_interface.dialects.mbqc import GraphStatePrepOp, MeasureInB
 from catalyst.python_interface.dialects.qec import (
     FabricateOp,
     PPMeasurementOp,
+    PPRotationArbitraryOp,
     PPRotationOp,
     PrepareStateOp,
     SelectPPMeasurementOp,
@@ -48,6 +49,7 @@ from catalyst.python_interface.dialects.quantum import (
     GlobalPhaseOp,
     MeasureOp,
     MultiRZOp,
+    PauliRotOp,
     ProbsOp,
     QubitUnitaryOp,
     SampleOp,
@@ -230,7 +232,15 @@ def _(
 
 @handle_resource.register
 def _(
-    _: CustomOp | GlobalPhaseOp | MultiRZOp | SetBasisStateOp | SetStateOp | QubitUnitaryOp,
+    _: (
+        CustomOp
+        | GlobalPhaseOp
+        | MultiRZOp
+        | SetBasisStateOp
+        | SetStateOp
+        | QubitUnitaryOp
+        | PauliRotOp
+    ),
 ) -> tuple[ResourceType, str]:
     return ResourceType.GATE, None
 
@@ -258,6 +268,11 @@ def _(xdsl_op: PPRotationOp) -> tuple[ResourceType, str]:
     else:
         s = f"PPR-pi/{abs(xdsl_op.rotation_kind.value.data)}"
     return ResourceType.QEC, s
+
+
+@handle_resource.register
+def _(xdsl_op: PPRotationArbitraryOp) -> tuple[ResourceType, str]:
+    return ResourceType.QEC, "PPR-Phi"
 
 
 @handle_resource.register
@@ -401,6 +416,7 @@ def _collect_operation(
             )
 
 
+# pylint: disable=too-many-branches
 def _collect_region(
     region: Region,
     loop_warning: bool = False,
@@ -430,19 +446,23 @@ def _collect_region(
                 cond_warning=cond_warning,
                 adjoint_mode=adjoint_mode,
             )
-            try:
-                iters = count_static_loop_iterations(op)
+            if "estimated_iterations" in op.attributes:
+                iters = op.attributes.get("estimated_iterations").value.data
                 body_ops.multiply_by_scalar(iters)
-            except NotImplementedError:
-                # Unable to statically determine loop iterations
-                if not loop_warning:
-                    warnings.warn(
-                        "Specs was unable to determine the number of loop iterations. "
-                        "The results will assume the loop runs only once. "
-                        "This may be fixed in some cases by inlining dynamic arguments.",
-                        UserWarning,
-                    )
-                loop_warning = True
+            else:
+                try:
+                    iters = count_static_loop_iterations(op)
+                    body_ops.multiply_by_scalar(iters)
+                except NotImplementedError:
+                    # Unable to statically determine loop iterations
+                    if not loop_warning:
+                        warnings.warn(
+                            "Specs was unable to determine the number of loop iterations. "
+                            "The results will assume the loop runs only once. "
+                            "This may be fixed in some cases by inlining dynamic arguments.",
+                            UserWarning,
+                        )
+                    loop_warning = True
             resources.merge_with(body_ops)
             continue
 
