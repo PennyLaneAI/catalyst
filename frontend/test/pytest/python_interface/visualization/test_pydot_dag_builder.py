@@ -40,8 +40,8 @@ def test_initialization_defaults():
     assert dag_builder.graph.get_compound() == "true"
     # Ensure duplicated edges cannot be added
     assert dag_builder.graph.obj_dict["strict"] is True
-    # Ensure edges are orthogonal 
-    assert dag_builder.graph.obj_dict["attributes"]["splines"]== "ortho" 
+    # Ensure edges are correct
+    assert dag_builder.graph.obj_dict["attributes"]["splines"]== "polyline" 
 
 
 class TestExceptions:
