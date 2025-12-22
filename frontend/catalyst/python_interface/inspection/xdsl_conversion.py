@@ -434,6 +434,7 @@ def xdsl_to_qml_op_name(op, adjoint_mode: bool) -> str:
         "quantum.set_basis_state": "BasisState",
         "quantum.set_state": "StatePrep",
         "quantum.unitary": "QubitUnitary",
+        "quantum.paulirot": "PauliRot",
     }
 
     if op.name == "quantum.custom":

@@ -943,6 +943,122 @@ func.func public @dont_merge_conditionals(%q1: !quantum.bit, %q2: !quantum.bit, 
 
 // -----
 
+// re-arranging qubits is ok as long as the pauli words are re-arranged too
+
+// CHECK-LABEL: merge_permutations
+func.func public @merge_permutations(%z0: !quantum.bit, %y0: !quantum.bit) {
+    // CHECK: ([[zIn:%.+]]: !quantum.bit, [[yIn:%.+]]: !quantum.bit)
+    // CHECK-NOT: qec.ppr ["Z", "Y"]
+    // CHECK-NOT: qec.ppr ["Y", "Z"](4)
+    // CHECK: qec.ppr ["Y", "Z"](2) [[yIn]], [[zIn]]
+    %z1, %y1 = qec.ppr ["Z", "Y"](4) %z0, %y0: !quantum.bit, !quantum.bit
+    %y2, %z2 = qec.ppr ["Y", "Z"](4) %y1, %z1: !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// check permutations with duplicate Pauli symbols
+
+// CHECK-LABEL: merge_permutations_with_duplicates
+func.func public @merge_permutations_with_duplicates(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) {
+    // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit)
+    // CHECK-NOT: qec.ppr ["X", "Y", "X"]
+    // CHECK-NOT: qec.ppr ["Y", "X", "X"](8)
+    // CHECK: qec.ppr ["Y", "X", "X"](4) [[q1]], [[q2]], [[q0]]
+    %3:3 = qec.ppr ["X", "Y", "X"](8) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %4:3 = qec.ppr ["Y", "X", "X"](8) %3#1, %3#2, %3#0: !quantum.bit, !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// re-arranging qubits without re-arranging the Pauli word is NOT okay
+
+// CHECK-LABEL: dont_merge_permutations_qubits
+func.func public @dont_merge_permutations_qubits(%q0: !quantum.bit, %q1: !quantum.bit) {
+    // CHECK: qec.ppr ["Y", "X"](8)
+    // CHECK: qec.ppr ["Y", "X"](8)
+    %2:2 = qec.ppr ["Y", "X"](8) %q0, %q1: !quantum.bit, !quantum.bit
+    %3:2 = qec.ppr ["Y", "X"](8) %2#1, %2#0: !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// re-arranging Pauli word without re-arranging qubits is not okay
+
+// CHECK-LABEL: dont_merge_permutations_pauli
+func.func public @dont_merge_permutations_pauli(%q0: !quantum.bit, %q1: !quantum.bit) {
+    // CHECK: qec.ppr ["Z", "Y"](2)
+    // CHECK: qec.ppr ["Y", "Z"](2)
+    %2:2 = qec.ppr ["Z", "Y"](2) %q0, %q1: !quantum.bit, !quantum.bit
+    %3:2 = qec.ppr ["Y", "Z"](2) %2#0, %2#1: !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// ensure correct result assignments
+
+// CHECK-LABEL: permutation_results
+func.func public @permutation_results(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+    // CHECK: [[result:%.+]]:3 = qec.ppr ["Z", "X", "Y"](2)
+    // CHECK: return [[result]]#1, [[result]]#0, [[result]]#2
+    %0:3 = qec.ppr ["X", "Z", "Y"](4) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %1:3 = qec.ppr ["Z", "X", "Y"](4) %0#1, %0#0, %0#2: !quantum.bit, !quantum.bit, !quantum.bit
+    func.return %1#1, %1#0, %1#2: !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// ignore identity qubits when considering equivalence
+
+// CHECK-LABEL: permute_ignore_identity_parent_op
+func.func public @permute_ignore_identity_parent_op(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit, %q3: !quantum.bit) {
+    // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit, [[q3:%.+]])
+    // CHECK: qec.ppr ["Z", "X"](2) [[q2]], [[q0]]
+    %0:3 = qec.ppr ["X", "I", "Z"](4) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %1:3 = qec.ppr ["I", "Z", "X"](4) %q3, %0#2, %0#0: !quantum.bit, !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// verify identity qubits are passed through
+
+// CHECK-LABEL: pass_identity_qubits
+func.func public @pass_identity_qubits(%q0: !quantum.bit, %q1: !quantum.bit) -> !quantum.bit {
+    // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit)
+    // CHECK: return [[q0]]
+    %0:2 = qec.ppr ["I", "X"](4) %q0, %q1: !quantum.bit, !quantum.bit
+    %1:2 = qec.ppr ["X", "I"](4) %0#1, %0#0: !quantum.bit, !quantum.bit
+    func.return %1#1: !quantum.bit
+}
+
+// -----
+
+// merge different size pprs when removing identities makes them compatible
+
+// CHECK-LABEL: identity_agnostic_sizing
+func.func public @identity_agnostic_sizing(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) {
+    // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit)
+    // CHECK: qec.ppr ["Y", "Z"](4) [[q2]], [[q0]]
+    %0:3 = qec.ppr ["Z", "I", "Y"](8) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %1:2 = qec.ppr ["Y", "Z"](8) %0#2, %0#0: !quantum.bit, !quantum.bit
+    func.return
+}
+
+func.func public @dont_merge_superset(%q0: !quantum.bit, %q1: !quantum.bit) {
+    // CHECK: qec.ppr ["X", "Y"](4)
+    // CHECK: qec.ppr ["X"](4)
+    %0:2 = qec.ppr ["X", "Y"](4) %q0, %q1 : !quantum.bit, !quantum.bit
+    %1 = qec.ppr ["X"](4) %0#0 : !quantum.bit
+
+    func.return
+}
+
+
 // Arbitrary Angle PPR Tests
 
 // simple merge
@@ -1123,6 +1239,38 @@ func.func public @dont_merge_permutations_pauli(%q0: !quantum.bit, %q1: !quantum
 
 // -----
 
+// ignore identity qubits when considering equivalence
+
+// CHECK-LABEL: permute_ignore_identity
+func.func public @permute_ignore_identity(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) {
+    // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit)
+    // CHECK: [[angle:%.+]] = arith.constant 5.0
+    // CHECK: qec.ppr.arbitrary ["Z", "X"]([[angle]]) [[q2]], [[q0]]
+    %0 = arith.constant 0.8 : f64
+    %1 = arith.constant 4.2 : f64
+    %2:3 = qec.ppr.arbitrary ["X", "I", "Z"](%0) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %3:3 = qec.ppr.arbitrary ["I", "Z", "X"](%1) %2#1, %2#2, %2#0: !quantum.bit, !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+// merge different size pprs when removing identities makes them compatible
+
+// CHECK-LABEL: identity_agnostic_sizing
+func.func public @identity_agnostic_sizing(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) {
+    // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit)
+    // CHECK: [[angle:%.+]] = arith.constant
+    // CHECK: qec.ppr.arbitrary ["Y", "Z"]([[angle]]) [[q2]], [[q0]]
+    %0 = arith.constant 0.2 : f64    
+    %1 = arith.constant 0.7 : f64
+    %2:3 = qec.ppr.arbitrary ["Z", "I", "Y"](%0) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %3:2 = qec.ppr.arbitrary ["Y", "Z"](%1) %2#2, %2#0: !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
 // check equivalent conditions are merged
 
 // CHECK-LABEL: merge_condition
@@ -1188,3 +1336,4 @@ func.func public @merge_const_var(%q0: !quantum.bit, %0: f64) {
     %3 = qec.ppr.arbitrary ["Z"](%1) %2: !quantum.bit
     func.return
 }
+
