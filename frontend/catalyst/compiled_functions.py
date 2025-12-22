@@ -406,7 +406,7 @@ class CompilationCache:
         self.abstracted_axes = abstracted_axes
         self.cache = {}
 
-    def get_function_status_and_key(self, args):
+    def get_function_status_and_key(self, args, kwargs):
         """Check if the provided arguments match an existing function in the cache. The cache
         status of the function is returned as a compilation action:
          - no match: requires compilation
@@ -414,7 +414,8 @@ class CompilationCache:
          - full match: skip promotion
 
         Args:
-            args: arguments to match to existing functions
+            args (Iterable): arguments to match to existing functions
+            kwargs (Iterable): keyword arguments to match existing functions
 
         Returns:
             TypeCompatibility
@@ -423,7 +424,9 @@ class CompilationCache:
         if not self.cache:
             return TypeCompatibility.NEEDS_COMPILATION, None
 
-        flat_runtime_sig, treedef, static_args = get_decomposed_signature(args, self.static_argnums)
+        flat_runtime_sig, treedef, static_args = get_decomposed_signature(
+            args + tuple(kwargs.values()), self.static_argnums
+        )
         key = CacheKey(treedef, static_args)
         if key not in self.cache:
             return TypeCompatibility.NEEDS_COMPILATION, None
@@ -433,18 +436,19 @@ class CompilationCache:
         action = typecheck_signatures(entry.signature, runtime_signature, self.abstracted_axes)
         return action, key
 
-    def lookup(self, args):
+    def lookup(self, args, kwargs):
         """Get a function (if present) that matches the provided argument signature. Also computes
         whether promotion is necessary.
 
         Args:
             args (Iterable): the arguments to match to existing functions
+            kwargs (Iterable): the keyword arguments to match existing functions
 
         Returns:
             CacheEntry | None: the matched cache entry
             bool: whether the matched entry requires argument promotion
         """
-        action, key = self.get_function_status_and_key(args)
+        action, key = self.get_function_status_and_key(args, kwargs)
 
         if action == TypeCompatibility.NEEDS_COMPILATION:
             return None, None
@@ -454,18 +458,20 @@ class CompilationCache:
             assert action == TypeCompatibility.CAN_SKIP_PROMOTION
             return self.cache[key], False
 
-    def insert(self, fn, args, out_treedef, workspace):
+    def insert(self, fn, args_and_kwargs, out_treedef, workspace):
         """Inserts the provided function into the cache.
 
         Args:
             fn (CompiledFunction): compilation result
-            args (Iterable): arguments to determine cache key and additional metadata from
+            args_and_kwargs (Iterable): arguments to determine cache key and additional metadata from
             out_treedef (PyTreeDef): the output shape of the function
             workspace (Directory): directory where compilation artifacts are stored
         """
         assert isinstance(fn, CompiledFunction)
 
-        flat_signature, treedef, static_args = get_decomposed_signature(args, self.static_argnums)
+        flat_signature, treedef, static_args = get_decomposed_signature(
+            args_and_kwargs, self.static_argnums
+        )
         signature = tree_unflatten(treedef, flat_signature)
 
         key = CacheKey(treedef, static_args)

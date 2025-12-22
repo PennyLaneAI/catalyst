@@ -137,11 +137,11 @@ def filter_static_args(args, static_argnums):
     return tuple(args[idx] for idx in range(len(args)) if idx not in static_argnums)
 
 
-def split_static_args(args, static_argnums):
+def split_static_args(args_and_kwargs, static_argnums):
     """Split arguments into static and dynamic values using the provided index list.
 
     Args:
-        args (Iterable): arguments to a compiled function
+        args_and_kwargs (Iterable): arguments to a compiled function
         static_argnums (Iterable[int]): indices to split on
 
     Returns:
@@ -149,7 +149,7 @@ def split_static_args(args, static_argnums):
         Tuple: static arguments
     """
     dynamic_args, static_args = [], []
-    for i, arg in enumerate(args):
+    for i, arg in enumerate(args_and_kwargs):
         if i in static_argnums:
             static_args.append(arg)
         else:
@@ -212,13 +212,13 @@ def merge_static_args(signature, args, static_argnums):
     return tuple(merged_sig)
 
 
-def get_decomposed_signature(args, static_argnums):
+def get_decomposed_signature(args_and_kwargs, static_argnums):
     """Decompose function arguments into dynamic and static arguments, where the dynamic arguments
     are further processed into abstract values and PyTree metadata. All values returned by this
     function are hashable.
 
     Args:
-        args (Iterable): arguments to a compiled function
+        args_and_kwargs (Iterable): arguments to a compiled function
         static_argnums (Iterable[int]): indices to split on
 
     Returns:
@@ -226,7 +226,7 @@ def get_decomposed_signature(args, static_argnums):
         PyTreeDef: dynamic argument PyTree metadata
         Tuple[Any]: static argument values
     """
-    dynamic_args, static_args = split_static_args(args, static_argnums)
+    dynamic_args, static_args = split_static_args(args_and_kwargs, static_argnums)
     flat_dynamic_args, treedef = tree_flatten(dynamic_args)
     flat_signature = get_abstract_signature(flat_dynamic_args)
 
