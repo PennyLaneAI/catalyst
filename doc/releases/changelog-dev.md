@@ -16,9 +16,7 @@
   [(#2287)](https://github.com/PennyLaneAI/catalyst/pull/2287)
   [(#2243)](https://github.com/PennyLaneAI/catalyst/pull/2243)
 
-  Using :func:`~.draw_graph` requires a qjit'd QNode and a ``level`` argument, which denotes the
-  cumulative set of applied compilation transforms (in the order they appear) to be applied and
-  visualized. Consider the following circuit:
+  Consider the following circuit:
 
   ```python
   import pennylane as qml
@@ -27,6 +25,8 @@
   qml.capture.enable()
 
   @qml.qjit(autograph=True)
+  @qml.transforms.cancel_inverses
+  @qml.transforms.merge_rotations
   @qml.qnode(qml.device("null.qubit", wires=3))
   def circuit(x, y):
       qml.X(0)
@@ -35,9 +35,13 @@
       
       for i in range(3):
           qml.S(0)
+          qml.RX(0.1, wires=1)
+          qml.RX(0.2, wires=1)
+
           if i == 3:
               qml.T(0)
           else:
+              qml.H(0)
               qml.H(0)
 
       qml.H(x)
@@ -45,14 +49,26 @@
       return qml.expval(qml.Z(y))
   ```
 
+  The circuit structure (``for`` loop and conditional branches) along with the dynamicism can be 
+  succinctly represented with :func:`~.draw_graph`.
+
   ```pycon
-  >>> print(catalyst.draw_graph(circuit, level=0)())
+  >>> print(catalyst.draw_graph(circuit)())
   (<Figure size 640x480 with 1 Axes>, <Axes: >)
   ```
   ![Graphical representation of circuit with dynamicism and structure](../../doc/_static/catalyst-draw-graph-changelog-0.14-example.png)
 
+  By default, all compilation passes specified will be applied and visualized. However, 
+  :func:`~.draw_graph` can be used with the ``level`` argument to inspect compilation pass impacts, 
+  where the ``level`` value denotes the cumulative set of applied compilation transforms (in the 
+  order they appear) to be applied and visualized. With ``level=1``, drawing the above circuit will 
+  apply the ``merge_rotation`` transform only:
 
-
+  ```pycon
+  >>> print(catalyst.draw_graph(circuit, level=1)())
+  (<Figure size 640x480 with 1 Axes>, <Axes: >)
+  ```
+  ![Graphical representation of circuit with dynamicism and structure](../../doc/_static/catalyst-draw-graph-changelog-0.14-level-example.png)
 
   The :func:`~.draw_graph` function visualizes QNodes in a similar manner as
   `view-op-graph in traditional MLIR <https://mlir.llvm.org/docs/Passes/#-view-op-graph>`_,
