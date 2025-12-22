@@ -1946,8 +1946,8 @@ class TestOperatorConnectivity:
         def my_workflow(x, y):
             qml.X(0)
             qml.Y(1)
-            qml.H(x) 
-            
+            qml.H(x)
+
             for i in range(3):
                 qml.S(0)
                 if i == 3:
@@ -1973,6 +1973,7 @@ class TestOperatorConnectivity:
             ("T", "RY", {"style": "dashed"}),
         )
         assert_dag_structure(nodes, edges, expected_edges)
+
     def test_complex_connectivity_conditional_dynamic_branching_static_node_after(self):
         """Tests that complex connectivity can go through a conditional."""
 

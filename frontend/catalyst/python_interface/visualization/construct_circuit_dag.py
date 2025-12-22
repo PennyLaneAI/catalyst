@@ -345,6 +345,13 @@ class ConstructCircuitDAG:
                 # as the static ones become dynamic since conditionals are blocking
                 before_dyn = wire_map_before.get("dyn_wire", set())
                 current_dyn = self._wire_to_node_uids["dyn_wire"]
+                print(
+                    self._wire_to_node_uids,
+                    wire_map_before,
+                    before_dyn,
+                    current_dyn,
+                    sep="\n",
+                )
                 if current_dyn != before_dyn and len(self._wire_to_node_uids) > 1:
                     self._wire_to_node_uids["dyn_wire"] = set()
                 region_wire_maps.append(self._wire_to_node_uids)
@@ -492,7 +499,6 @@ class ConstructCircuitDAG:
 
             # If we just exited a conditional (and are not in one currently)
             # We need to connect to everything seen so far as all branches are a possibility.
-            print(self._cluster_uid_stack, self._last_cluster_uid)
             if (
                 "conditional" in self._last_cluster_uid
                 and sum(1 for s in self._cluster_uid_stack if "conditional" in s) == 0
@@ -537,11 +543,12 @@ class ConstructCircuitDAG:
             self._wire_to_node_uids.pop("device", set())
 
             # Get all seen wires and update to point to this dynamic node
-            seen_wires = list(self._wire_to_node_uids.keys())
-            for wire in seen_wires:
-                self._wire_to_node_uids[wire] = {node_uid}
+            # seen_wires = list(self._wire_to_node_uids.keys())
+            # for wire in seen_wires:
+            #    self._wire_to_node_uids[wire] = {node_uid}
 
             # Update last seen dynamic wire
+            self._wire_to_node_uids.clear()
             self._wire_to_node_uids["dyn_wire"] = {node_uid}
         else:
             # Standard update for static wires
