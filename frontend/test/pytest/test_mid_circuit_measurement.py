@@ -22,9 +22,8 @@ import numpy as np
 import pennylane as qml
 import pytest
 from jax.tree_util import tree_flatten
-from pennylane import exceptions
+from pennylane import exceptions, measure
 from pennylane.transforms.dynamic_one_shot import fill_in_value
-from pennylane import measure
 
 import catalyst
 from catalyst import CompileError, cond, grad
