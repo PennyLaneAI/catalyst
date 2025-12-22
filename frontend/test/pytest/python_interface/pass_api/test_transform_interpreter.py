@@ -114,9 +114,9 @@ class TestCreateSchedule:
         )
         schedule = _create_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
-        assert (
-            schedule[0]
-            == "--test-pass=int-opt=1 float-opt=1.5 bool-opt=false str-opt='test_string' str-opt-with-spaces='foo bar'"
+        assert schedule[0] == (
+            "--test-pass=int-opt=1 float-opt=1.5 bool-opt=false str-opt='test_string' "
+            "str-opt-with-spaces='foo bar'"
         )
 
     def test_pass_array_options(self):
@@ -174,6 +174,7 @@ class OptionsPass(ModulePass):
         self.options = options
 
     def apply(self, ctx, op):  # pylint: disable=unused-argument
+        """Apply the pass."""
         print(f"Applying options-pass with options {self.options}")
         return op
 
@@ -272,9 +273,9 @@ def create_test_module(
 ) -> builtin.ModuleOp:
     """Create a module containing a NamedSequenceOp with the provided passes."""
     named_sequence_op = create_named_sequence_op(pass_names, pass_options)
-    # In an integrated setting, a module corresponding to a QNode will have another module containing
-    # the NamedSequenceOp. The QNode module will be inside another module, which is usually the main
-    # workflow entry point.
+    # In an integrated setting, a module corresponding to a QNode will have another module
+    # containing the NamedSequenceOp. The QNode module will be inside another module, which
+    # is usually the main workflow entry point.
     inner_module = builtin.ModuleOp([builtin.ModuleOp([named_sequence_op])])
     _ = builtin.ModuleOp([inner_module])
     return inner_module
