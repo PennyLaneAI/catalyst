@@ -39,6 +39,15 @@ from catalyst import vjp as C_vjp
 class TestMidCircuitMeasurement:
     """Tests for mid-circuit behaviour."""
 
+    def test_measure_outside_qjit(self):
+        """Test measure outside qjit."""
+
+        def circuit():
+            return catalyst.measure(0)
+
+        with pytest.raises(CompileError, match="can only be used from within @qjit"):
+            circuit()
+
     def test_measure_outside_qnode(self):
         """Test measure outside qnode."""
 
