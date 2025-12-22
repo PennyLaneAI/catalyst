@@ -1833,6 +1833,35 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
+    def test_connectivity_through_simple_if(self):
+        """Tests that a simple if can be visualized."""
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def my_workflow(a):
+            qml.H(0)
+            if a == 2:
+                qml.X(a)
+                qml.Y(0)
+            qml.Z(0)
+
+        module = my_workflow(1)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "Hadamard"),
+            ("Hadamard", "PauliX", {"style": "dashed"}),
+            ("PauliX", "PauliY"),
+            ("PauliY", "PauliZ"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
     def test_complex_connectivity_if_elif_else(self):
         """Tests that complex connectivity can go through a conditional."""
 

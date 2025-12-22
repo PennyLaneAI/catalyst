@@ -69,7 +69,7 @@ class ConstructCircuitDAG:
         # Use counter internally for UID
         self._node_uid_counter: int = 0
         self._cluster_uid_counter: int = 0
-        self._last_cluster_uid = ""
+        self._last_cluster_uid: str = ""
 
     def _reset(self) -> None:
         """Resets the instance."""
@@ -78,6 +78,7 @@ class ConstructCircuitDAG:
         self._cluster_uid_counter: int = 0
         self._wire_to_node_uids: dict[str | int, set[str]] = defaultdict(set)
         self._dynamic_node_uids: set[str] = set()
+        self._last_cluster_uid: str = ""
 
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module.
@@ -291,6 +292,8 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _if_op(self, operation: scf.IfOp):
         """Handles the scf.IfOp operation."""
+
+        # Create cluster for IfOp
         uid = f"conditional_cluster{self._cluster_uid_counter}"
         self.dag_builder.add_cluster(
             uid,
@@ -303,9 +306,10 @@ class ConstructCircuitDAG:
 
         # Save wires state before all of the branches
         wire_map_before = deepcopy(self._wire_to_node_uids)
+
         # If we have a dynamic wire pop the device
-        if "dyn_wire" in wire_map_before:
-            wire_map_before.pop("device", set())
+        # if "dyn_wire" in wire_map_before:
+        #    wire_map_before.pop("device", set())
         region_wire_maps: list[dict[int | str, set[str]]] = []
 
         # Loop through each branch and visualize as a cluster
@@ -337,15 +341,20 @@ class ConstructCircuitDAG:
 
             # Update branch wire maps
             if self._wire_to_node_uids != wire_map_before:
+                # If branch has dynamic and static wires, remove the dynamic nodes
+                # as the static ones become dynamic since conditionals are blocking
+                before_dyn = wire_map_before.get("dyn_wire", set())
+                current_dyn = self._wire_to_node_uids["dyn_wire"]
+                if current_dyn != before_dyn and len(self._wire_to_node_uids) > 1:
+                    self._wire_to_node_uids["dyn_wire"] = set()
                 region_wire_maps.append(self._wire_to_node_uids)
 
             # Pop branch cluster after processing to ensure
             # logical branches are treated as 'parallel'
             self._cluster_uid_stack.pop()
 
-        # Default to all wires seen before the conditional
-        affected_wires: set[str | int] = set()
         # Update affected wires with specific wires seen during branches
+        affected_wires: set[str | int] = set()
         for region_wire_map in region_wire_maps:
             affected_wires.update(region_wire_map.keys())
 
@@ -361,18 +370,18 @@ class ConstructCircuitDAG:
         # the old ones from before are useless
         before_dyn = wire_map_before.get("dyn_wire", set())
         current_dyn = final_wire_map["dyn_wire"]
-
         if before_dyn and before_dyn < current_dyn:
             final_wire_map["dyn_wire"] -= before_dyn
 
-        def count_conditional_strings(list_of_strings):
-            return sum(1 for s in list_of_strings if "conditional" in s)
-
-        if before_dyn == current_dyn and count_conditional_strings(self._cluster_uid_stack) == 1:
-            # Nothing dynamic encountered
+        # If we went through a single conditional and no dynamic wires were
+        # encountered, clear the dynamic wires from before as the cluster should be
+        # blocking
+        if (
+            before_dyn == current_dyn
+            and sum(1 for s in self._cluster_uid_stack if "conditional" in s) == 1
+        ):
             final_wire_map["dyn_wire"] = set()
 
-        print(before_dyn, current_dyn)
         # Pop IfOp cluster before leaving this handler
         self._last_cluster_uid = self._cluster_uid_stack.pop()
 
@@ -449,20 +458,18 @@ class ConstructCircuitDAG:
         if is_dynamic:
             self._dynamic_node_uids.add(node_uid)
 
-        # Connect to all predecessors
-        print(node, self._wire_to_node_uids)
+        # Get all predecessor nodes
         prev_uids: set[str] = self._get_previous_uids(node, is_dynamic)
-        print(node, prev_uids)
 
+        # Connect to all predecessors
         style = "dashed" if is_dynamic else "solid"
         for p_uid in prev_uids:
             self.dag_builder.add_edge(p_uid, node_uid, style=style, **edge_attrs)
 
-        # No need to update the wire mapping as these are terminal measuremnets
+        # Update wire mappings for future nodes
         if isinstance(node, MeasurementProcess):
+            # No need to update wire mappings for MPs as they are terminal
             return
-
-        # Update the wire mapping
         self._update_wire_mapping(node, node_uid, is_dynamic)
 
     def _get_previous_uids(self, node: Operator | MeasurementProcess, is_dynamic: bool) -> set[str]:
@@ -475,17 +482,25 @@ class ConstructCircuitDAG:
         if is_dynamic:
             # Get all previously seen node uids
             all_active = set().union(*self._wire_to_node_uids.values())
+
+            # Edge case for if *only* last seen node was the device
             if all_active == {"node0"}:
                 return all_active
-            # Now that we have a dynamic wire, we don't need the device node anymore
+
+            # Encountered a dynamic node, so the device node no longers needs to be here
             device_node = self._wire_to_node_uids.pop("device", set())
-            static_nodes = all_active - self._dynamic_node_uids - device_node
+
+            # If we just exited a conditional (and are not in one currently)
+            # We need to connect to everything seen so far as all branches are a possibility.
+            print(self._cluster_uid_stack, self._last_cluster_uid)
             if (
                 "conditional" in self._last_cluster_uid
-                and "conditional" not in self._cluster_uid_stack[-1]
+                and sum(1 for s in self._cluster_uid_stack if "conditional" in s) == 0
             ):
-                # after a conditional, conditionals are blocking
                 return all_active - device_node
+
+            # Otherwise, just connect to static nodes
+            static_nodes = all_active - self._dynamic_node_uids - device_node
             return static_nodes if static_nodes else all_active
 
         ## PROCESS STATIC NODES
@@ -495,15 +510,18 @@ class ConstructCircuitDAG:
             prev_uids.update(self._wire_to_node_uids.get(wire, set()))
 
         device_node_uid: set[str] = self._wire_to_node_uids.get("device", set())
-        dyn_wires: set[str] = self._wire_to_node_uids.get("dyn_wire", set())
-        if prev_uids and dyn_wires and "conditional" in self._last_cluster_uid:
-            prev_uids.update(dyn_wires)
+        dyn_wire_node_uids: set[str] = self._wire_to_node_uids.get("dyn_wire", set())
 
-        if not prev_uids or len(dyn_wires) > 1:
-            # First time seeing this static wire.
-            # Connect to last seen dynamic wire OR device
-            if dyn_wires:
-                prev_uids.update(dyn_wires)
+        # If we just exited a conditional, we will also need to connect to the last seen
+        # dynamic nodes as they could be a possibility
+        if prev_uids and dyn_wire_node_uids and "conditional" in self._last_cluster_uid:
+            prev_uids.update(dyn_wire_node_uids)
+
+        # First time seeing this static wire.
+        # Connect to last seen dynamic wire OR device
+        if not prev_uids or len(dyn_wire_node_uids) > 1:
+            if dyn_wire_node_uids:
+                prev_uids.update(dyn_wire_node_uids)
             else:
                 prev_uids.update(device_node_uid)
 
@@ -517,15 +535,22 @@ class ConstructCircuitDAG:
         if is_dynamic:
             # Every wire now "flows" through this dynamic barrier (choke)
             self._wire_to_node_uids.pop("device", set())
+
+            # Get all seen wires and update to point to this dynamic node
             seen_wires = list(self._wire_to_node_uids.keys())
             for wire in seen_wires:
                 self._wire_to_node_uids[wire] = {node_uid}
+
+            # Update last seen dynamic wire
             self._wire_to_node_uids["dyn_wire"] = {node_uid}
         else:
             # Standard update for static wires
             for wire in node.wires:
                 self._wire_to_node_uids[wire] = {node_uid}
 
+            # If we just exited a conditional, update to have
+            # no dynamic wires as the conditional cluster acts as
+            # a dynamic barrier
             if "conditional" in self._last_cluster_uid:
                 self._wire_to_node_uids["dyn_wire"] = set()
 
