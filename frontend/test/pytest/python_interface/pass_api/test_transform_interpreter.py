@@ -104,12 +104,19 @@ class TestCreateSchedule:
         """Test that passes with basic options (int, float, bool, string) are parsed correctly."""
         pass_op = create_apply_registered_pass_op(
             "test-pass",
-            options={"int-opt": 1, "float-opt": 1.5, "bool-opt": False, "str-opt": "test_string"},
+            options={
+                "int-opt": 1,
+                "float-opt": 1.5,
+                "bool-opt": False,
+                "str-opt": "test_string",
+                "str-opt-with-spaces": "foo bar",
+            },
         )
         schedule = _create_schedule(pass_ops=[pass_op])
         assert len(schedule) == 1
         assert (
-            schedule[0] == "--test-pass=int-opt=1 float-opt=1.5 bool-opt=false str-opt=test_string"
+            schedule[0]
+            == "--test-pass=int-opt=1 float-opt=1.5 bool-opt=false str-opt='test_string' str-opt-with-spaces='foo bar'"
         )
 
     def test_pass_array_options(self):
@@ -198,7 +205,7 @@ class TestTransformFunctionsExt:
             ({}, " "),
             (
                 {"a": 1, "b": 1.5, "c": (1, 2, 3, 4), "d": "string-input"},
-                "=a=1 b=1.5 c=1,2,3,4 d=string-input",
+                "=a=1 b=1.5 c=1,2,3,4 d='string-input'",
             ),
         ],
     )
@@ -313,7 +320,7 @@ class TestTransformInterpreterPass:
 
         # Assert that MLIR passes were applied correctly
         assert len(captured_cmds) == 2
-        assert "--mlir-pass1=a=1 b=foo" in captured_cmds[0]
+        assert "--mlir-pass1=a=1 b='foo'" in captured_cmds[0]
         # We check that there is a space after the pass name to check that no options were specified
         assert "--mlir-pass2 " in captured_cmds[1]
 

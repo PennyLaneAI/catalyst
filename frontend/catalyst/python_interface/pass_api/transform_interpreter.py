@@ -154,7 +154,7 @@ def _create_schedule(pass_ops: Sequence[ApplyRegisteredPassOp]) -> list[str]:
 
     .. code-block::
 
-        --my-pass="arg1=val1 arg2=val2 ..."
+        "--my-pass=arg1=val1 arg2=val2 ..."
 
     Args:
         pass_ops (Sequence[xdsl.dialects.transform.ApplyRegisteredPassOp]): The
@@ -203,7 +203,7 @@ def _get_cli_option_from_attr(attr: Attribute) -> Any:
             cli_val = attr.value.data
 
         case builtin.StringAttr():
-            cli_val = attr.data
+            cli_val = f"'{attr.data}'"
 
         case builtin.ArrayAttr():
             cli_val = ",".join([str(_get_cli_option_from_attr(attr)) for attr in attr.data])
