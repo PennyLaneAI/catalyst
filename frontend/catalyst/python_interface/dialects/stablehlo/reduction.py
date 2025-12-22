@@ -66,7 +66,7 @@ class ReduceOp(IRDLOperation):
     result = var_result_def(HLO_Tensor)
     body = region_def("single_block")
 
-    irdl_options = [SameVariadicOperandSize()]
+    irdl_options = (SameVariadicOperandSize(),)
 
     traits = traits_def(
         RecursiveMemoryEffect(),
