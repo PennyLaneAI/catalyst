@@ -30,12 +30,11 @@ from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir.core import Block, Region
 
 from catalyst import measure
-from catalyst.python_interface.conversion import xdsl_from_qjit
+from catalyst.python_interface.conversion import parse_generic_to_xdsl_module, xdsl_from_qjit
 from catalyst.python_interface.visualization.construct_circuit_dag import (
     ConstructCircuitDAG,
     get_label,
 )
-from catalyst.python_interface.conversion import parse_generic_to_xdsl_module, xdsl_from_qjit
 from catalyst.python_interface.visualization.dag_builder import DAGBuilder
 
 
@@ -911,7 +910,7 @@ class TestCreateStaticOperatorNodes:
         assert len(nodes) == 2  # Device node + operator
 
         assert nodes["node1"]["label"] == f"<name> MidMeasureMP|<wire> [0]"
-        
+
     @pytest.mark.usefixtures("use_capture")
     def test_ppm(self):
         """Test that PPMs can be captured as nodes."""

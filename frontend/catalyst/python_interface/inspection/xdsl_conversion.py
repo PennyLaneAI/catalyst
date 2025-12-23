@@ -388,7 +388,7 @@ def xdsl_to_qml_op(op) -> Operator:
 
     Returns:
         A PennyLane Operator.
-    """ 
+    """
     # Pause capture *only if active* so we can allow strings (dynamic wires) as allowed wires
     with conditional_pause(capture.pause):
         match op.name:
