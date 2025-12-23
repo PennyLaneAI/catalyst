@@ -17,6 +17,7 @@
 from collections import defaultdict
 from copy import deepcopy
 from functools import singledispatch, singledispatchmethod
+from typing import Sequence
 
 from pennylane.measurements import (
     ExpectationMP,
@@ -28,8 +29,9 @@ from pennylane.operation import Operator
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region
 
-from catalyst.python_interface.dialects import mbqc, qec, quantum
+from catalyst.python_interface.dialects import qec, quantum
 from catalyst.python_interface.inspection.xdsl_conversion import (
+    ssa_to_qml_wires,
     xdsl_to_qml_measurement,
     xdsl_to_qml_op,
 )
@@ -179,6 +181,7 @@ class ConstructCircuitDAG:
             | quantum.MultiRZOp
             | quantum.SetBasisStateOp
             | quantum.SetStateOp
+            | quantum.PauliRotOp
         ),
     ) -> None:
         """Generic handler for unitary gates."""
@@ -197,7 +200,7 @@ class ConstructCircuitDAG:
         )
         self._node_uid_counter += 1
 
-        self._connect(qml_op, node_uid)
+        self._connect(qml_op.wires, node_uid)
 
     @_visualize_operation.register
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
@@ -217,7 +220,77 @@ class ConstructCircuitDAG:
         )
         self._node_uid_counter += 1
 
-        self._connect(meas, node_uid)
+        self._connect(meas.wires, node_uid)
+
+    @_visit_operation.register
+    def _ppr(self, op: qec.PPRotationOp | qec.PPRotationArbitraryOp) -> None:
+        """Handler for the PPR operation."""
+
+        # Create label
+        wires = ssa_to_qml_wires(op)
+        wires_str = f"[{', '.join(map(str, wires))}]"
+        pw = []
+        for str_attr in op.pauli_product.data:
+            pw.append(str(str_attr).replace('"', ""))
+        pw = "".join(pw)
+
+        attrs = {}
+        if hasattr(op, "rotation_kind"):
+            denominator = abs(op.rotation_kind.value.data)
+            angle = f"π/{denominator}"
+            match denominator:
+                case 2:
+                    attrs["fillcolor"] = "#D9D9D9"
+                case 4:
+                    attrs["fillcolor"] = "#F5BD70"
+                case 8:
+                    attrs["fillcolor"] = "#E3FFA1"
+        else:
+            angle = "φ"
+            attrs["fillcolor"] = "#E3FFA1"
+        label = f"<name> PPR-{pw} ({angle})|<wire> {wires_str}"
+
+        # Add node to current cluster
+        node_uid = f"node{self._node_uid_counter}"
+        self.dag_builder.add_node(
+            uid=node_uid,
+            label=label,
+            cluster_uid=self._cluster_uid_stack[-1],
+            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
+            shape="record",
+            **attrs,
+        )
+        self._node_uid_counter += 1
+
+        self._connect(wires, node_uid)
+
+    @_visit_operation.register
+    def _ppm(self, op: qec.PPMeasurementOp) -> None:
+        """Handler for the PPM operation."""
+
+        wires = ssa_to_qml_wires(op)
+        if wires == []:
+            wires_str = "all"
+        else:
+            wires_str = f"[{', '.join(map(str, wires))}]"
+        pw = []
+        for str_attr in op.pauli_product.data:
+            pw.append(str(str_attr).replace('"', ""))
+        pw = "".join(pw)
+
+        # Add node to current cluster
+        node_uid = f"node{self._node_uid_counter}"
+        self.dag_builder.add_node(
+            uid=node_uid,
+            label=f"<name> PPM-{pw}|<wire> {wires_str}",
+            cluster_uid=self._cluster_uid_stack[-1],
+            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
+            shape="record",
+            fillcolor="#70B3F5",
+        )
+        self._node_uid_counter += 1
+
+        self._connect(wires, node_uid)
 
     # =====================
     # QUANTUM MEASUREMENTS
@@ -296,7 +369,7 @@ class ConstructCircuitDAG:
             for p_uid in all_prev_uids:
                 self.dag_builder.add_edge(p_uid, node_uid, style="dashed", color="lightpink3")
         else:
-            self._connect(meas, node_uid, color="lightpink3")
+            self._connect(meas.wires, node_uid, is_terminal_measurement=True, color="lightpink3")
 
     # =============
     # ADJOINT
@@ -526,18 +599,20 @@ class ConstructCircuitDAG:
     # NODE CONNECTIVITY
     # =======================
 
-    def _connect(self, node: Operator | MeasurementProcess, node_uid: str, **edge_attrs):
+    def _connect(
+        self, wires: Sequence, node_uid: str, is_terminal_measurement: bool = False, **edge_attrs
+    ):
         """
         Connects a new node to its previous nodes in the DAG and updates the wire mapping in place.
         """
 
         # Record if it's a dynamic node for easy look-up
-        is_dynamic = any(not isinstance(wire, int) for wire in node.wires)
+        is_dynamic = any(not isinstance(wire, int) for wire in wires)
         if is_dynamic:
             self._dynamic_node_uids.add(node_uid)
 
         # Get all predecessor nodes
-        prev_uids: set[str] = self._get_previous_uids(node, is_dynamic)
+        prev_uids: set[str] = self._get_previous_uids(wires, is_dynamic)
 
         # Connect to all predecessors
         style = "dashed" if is_dynamic else "solid"
@@ -545,13 +620,13 @@ class ConstructCircuitDAG:
             self.dag_builder.add_edge(p_uid, node_uid, style=style, **edge_attrs)
 
         # Update wire mappings for future nodes
-        if isinstance(node, MeasurementProcess):
+        if is_terminal_measurement:
             # No need to update wire mappings for MPs as they are terminal
             return
 
-        self._update_wire_mapping(node, node_uid, is_dynamic)
+        self._update_wire_mapping(wires, node_uid, is_dynamic)
 
-    def _get_previous_uids(self, node: Operator | MeasurementProcess, is_dynamic: bool) -> set[str]:
+    def _get_previous_uids(self, wires: Sequence, is_dynamic: bool) -> set[str]:
         """Helper function to get the set of previous node uids."""
 
         prev_uids: set[str] = set()
@@ -587,7 +662,7 @@ class ConstructCircuitDAG:
         #######################
 
         # Get all nodes seen on these static wires
-        for wire in node.wires:
+        for wire in wires:
             prev_uids.update(self._wire_to_node_uids.get(wire, set()))
 
         # First time seeing this static wire
@@ -640,9 +715,7 @@ class ConstructCircuitDAG:
 
         return prev_uids
 
-    def _update_wire_mapping(
-        self, node: Operator | MeasurementProcess, node_uid: str, is_dynamic: bool
-    ) -> None:
+    def _update_wire_mapping(self, wires: Sequence, node_uid: str, is_dynamic: bool) -> None:
         """Updates the wire mapping accordingly."""
 
         if is_dynamic:
@@ -651,7 +724,7 @@ class ConstructCircuitDAG:
             self._wire_to_node_uids["dyn_wire"] = {node_uid}
         else:
             # Standard update for static wires
-            for wire in node.wires:
+            for wire in wires:
                 self._wire_to_node_uids[wire] = {node_uid}
 
             # If we just exited a conditional, update to have
