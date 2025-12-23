@@ -28,7 +28,6 @@ from catalyst.python_interface.transforms import (
 from catalyst.python_interface.transforms.quantum.parity_synth import _parity_network_synth
 
 pytestmark = pytest.mark.xdsl
-# pytest.importorskip("networkx")
 
 
 def validate_binary_matrix(matrix: np.ndarray):
