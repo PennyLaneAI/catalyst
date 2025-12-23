@@ -22,8 +22,6 @@ from functools import wraps
 from shutil import which
 from typing import TYPE_CHECKING
 
-import matplotlib.image as mpimg
-import matplotlib.pyplot as plt
 from pennylane.tape import QuantumScript
 from pennylane.workflow.qnode import QNode
 from xdsl.dialects.builtin import ModuleOp
@@ -32,15 +30,14 @@ from catalyst.jit import QJIT
 from catalyst.passes.pass_api import PassPipelineWrapper
 from catalyst.python_interface.compiler import Compiler
 
-from ..visualization.construct_circuit_dag import ConstructCircuitDAG
-from ..visualization.pydot_dag_builder import PyDotDAGBuilder
 from .collector import QMLCollector
 from .specs import StopCompilation
 from .xdsl_conversion import get_mlir_module
 
 HAS_MATPLOTLIB = True
 try:
-    import matplotlib
+    import matplotlib.image as mpimg
+    import matplotlib.pyplot as plt
 except ModuleNotFoundError:
     HAS_MATPLOTLIB = False
 
@@ -53,6 +50,9 @@ except ModuleNotFoundError:
 HAS_GRAPHVIZ = True
 if which("dot") is None:
     HAS_GRAPHVIZ = False
+
+from ..visualization.construct_circuit_dag import ConstructCircuitDAG
+from ..visualization.pydot_dag_builder import PyDotDAGBuilder
 
 # TODO: This caching mechanism should be improved,
 # because now it relies on a mutable global state
