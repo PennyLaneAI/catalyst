@@ -686,7 +686,7 @@ class TestDrawGraph:
             qml.RX(0.2, wires=0)
             return qml.expval(qml.X(0))
 
-        # Show me after cancel_inverses transform
+        # Show circuit after cancel_inverses transform
         _ = draw_graph(circuit, level=1)()
 
         # NOTE: hacky work around but lets me probe the graph
