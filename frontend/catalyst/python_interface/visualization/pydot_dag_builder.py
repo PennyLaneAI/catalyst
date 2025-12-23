@@ -99,9 +99,7 @@ class PyDotDAGBuilder(DAGBuilder):
         self._edges: list[dict[str, Any]] = []
         self._clusters: dict[str, dict[str, Any]] = {}
 
-        _default_attrs: dict = (
-            {"fontname": "Helvetica", "penwidth": 2} if attrs is None else attrs
-        )
+        _default_attrs: dict = {"fontname": "Helvetica"} if attrs is None else attrs
         self._default_node_attrs: dict = (
             {
                 **_default_attrs,
@@ -117,6 +115,7 @@ class PyDotDAGBuilder(DAGBuilder):
         self._default_edge_attrs: dict = (
             {
                 "color": "lightblue4",
+                "arrowsize": 0.5,
                 "penwidth": 3,
             }
             if edge_attrs is None
@@ -127,6 +126,7 @@ class PyDotDAGBuilder(DAGBuilder):
                 **_default_attrs,
                 "shape": "rectangle",
                 "style": "solid",
+                "penwidth": 2,
             }
             if cluster_attrs is None
             else cluster_attrs
@@ -185,11 +185,11 @@ class PyDotDAGBuilder(DAGBuilder):
             ValueError: Destination is not found in the graph.
 
         """
-        if from_uid == to_uid:
+        if from_uid.split(":")[0] == to_uid.split(":")[0]:
             raise ValueError("Edges must connect two unique IDs.")
-        if from_uid not in self.nodes:
+        if from_uid.split(":")[0] not in self.nodes:
             raise ValueError("Source is not found in the graph.")
-        if to_uid not in self.nodes:
+        if to_uid.split(":")[0] not in self.nodes:
             raise ValueError("Destination is not found in the graph.")
 
         # Use ChainMap so you don't need to construct a new dictionary
