@@ -686,9 +686,7 @@ class TestDrawGraph:
             return qml.expval(qml.X(0))
 
         # Show circuit after cancel_inverses transform
-        _ = draw_graph(circuit, level=1)()
-
-        drawer = draw_graph(circuit)
+        drawer = draw_graph(circuit, level=1)
         _ = drawer()
         cache = drawer._cache
         assert len(cache) == 2
