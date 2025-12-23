@@ -64,7 +64,8 @@ _SKIPPED_QEC_OPS = ()
 _SKIPPED_MBQC_OPS = ()
 
 
-class VisualizationError(Exception): ...
+class VisualizationError(Exception):
+    pass
 
 
 class ConstructCircuitDAG:
