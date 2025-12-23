@@ -222,7 +222,7 @@ class ConstructCircuitDAG:
             else:
                 # Case 2: Wire map is "device" + other stuff
                 device_node_uid: set[str] = self._wire_to_node_uids.get("device", set())
-                all_active = set().union(*self._wire_to_node_uids.values()) - device_node_uid
+                all_active = set(self._wire_to_node_uids.values()) - device_node_uid
 
                 # If we just exited a conditional (and are not in a nested one currently)
                 # We need to connect to everything seen so far as all branches are a possibility.
