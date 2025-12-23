@@ -57,8 +57,17 @@ _SKIPPED_QUANTUM_OPS = (
     quantum.TensorOp,
     quantum.YieldOp,
 )
-# NOTE: These are unsupported operations to visualize
-_SKIPPED_QEC_OPS = ()
+# Handlers for PPRs and PPMs are defined
+# but not sure how to visualize these yet
+_SKIPPED_QEC_OPS = (
+    qec.FabricateOp,
+    qec.LayerOp,
+    qec.PrepareStateOp,
+    qec.SelectPPMeasurementOp,
+    qec.YieldOp,
+)
+# Any MBQC operation encountered will raise a
+# VisualizationError
 _SKIPPED_MBQC_OPS = ()
 
 
