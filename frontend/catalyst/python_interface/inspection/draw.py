@@ -147,7 +147,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         Callable:
             A function that has the same argument signature as the compiled QNode.
             When called, the function will return the graph as a tuple of (``matplotlib.figure.Figure``,
-            ``matplotlib.axes._axes.Axes``).
+            ``matplotlib.axes._axes.Axes``) pairs.
 
     Raises:
         VisualizationError:
