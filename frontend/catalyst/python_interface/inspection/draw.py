@@ -281,7 +281,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         )
 
     if not isinstance(level, (int, type(None))):
-        raise TypeError("The `level` argument must be an integer or `None`.")
+        raise TypeError("The 'level' argument must be an integer or 'None'.")
 
     max_level = None
     if isinstance(level, int):
