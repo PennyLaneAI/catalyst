@@ -59,7 +59,7 @@ from ..visualization.pydot_dag_builder import PyDotDAGBuilder
 _cache_store: dict[Callable, dict[int, tuple[str, str]]] = {}
 
 
-def draw(qnode: QNode, *, level: None | int = None) -> Callable:
+def draw(qnode: QNode, *, level: int | None = None) -> Callable:
     """
     Draw the QNode at the specified level.
 
