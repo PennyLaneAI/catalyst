@@ -118,7 +118,7 @@ def draw(qnode: QNode, *, level: int | None = None) -> Callable:
 
 def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     """
-    Visualize a single QJIT compiled QNode, showing wire flow through quantum operations, 
+    Visualize a single QJIT compiled QNode, showing wire flow through quantum operations,
     program structure, and pass-by-pass impacts on compiled programs.
 
     .. note::
