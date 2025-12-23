@@ -671,6 +671,45 @@ class TestDrawGraph:
         assert graph.count("<name> RX|<wire> [0]") == 2
         assert graph.count("expval(PauliX)") == 1
 
+    def test_early_callback_exit(self):
+        """Tests that unnecessary callbacks aren't performend."""
+
+        @qml.qjit
+        @qml.transforms.merge_rotations
+        @qml.transforms.cancel_inverses
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def circuit():
+            qml.H(0)
+            qml.T(1)
+            qml.H(0)
+            qml.RX(0.1, wires=0)
+            qml.RX(0.2, wires=0)
+            return qml.expval(qml.X(0))
+
+        # Show me after cancel_inverses transform
+        _ = draw_graph(circuit, level=1)()
+
+        # NOTE: hacky work around but lets me probe the graph
+        from catalyst.python_interface.inspection.draw import _cache_store
+
+        cache = _cache_store[circuit]
+        assert len(cache) == 2
+
+        no_transforms = cache[0][0]
+        cancel_inverses = cache[1][0]
+
+        # Check no transforms
+        assert no_transforms.count("<name> Hadamard|<wire> [0]") == 2
+        assert no_transforms.count("<name> T|<wire> [1]") == 1
+        assert no_transforms.count("<name> RX|<wire> [0]") == 2
+        assert no_transforms.count("expval(PauliX)") == 1
+
+        # Cancel inverses
+        assert cancel_inverses.count("<name> Hadamard|<wire> [0]") == 0
+        assert cancel_inverses.count("<name> T|<wire> [1]") == 1
+        assert cancel_inverses.count("<name> RX|<wire> [0]") == 2
+        assert cancel_inverses.count("expval(PauliX)") == 1
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

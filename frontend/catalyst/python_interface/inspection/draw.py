@@ -35,6 +35,7 @@ from catalyst.python_interface.compiler import Compiler
 from ..visualization.construct_circuit_dag import ConstructCircuitDAG
 from ..visualization.pydot_dag_builder import PyDotDAGBuilder
 from .collector import QMLCollector
+from .specs import StopCompilation
 from .xdsl_conversion import get_mlir_module
 
 HAS_MATPLOTLIB = True
@@ -282,6 +283,10 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     if not isinstance(level, (int, type(None))):
         raise TypeError("The `level` argument must be an integer or `None`.")
 
+    max_level = None
+    if isinstance(level, int):
+        max_level = level
+
     if not isinstance(qnode, QJIT) or (
         not isinstance(qnode.original_function, QNode)
         and not (
@@ -312,10 +317,18 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
             pass_name if pass_level else "Before MLIR Passes",
         )
 
+        if max_level is not None and pass_level >= max_level:
+            raise StopCompilation("Stopping compilation after reaching max visualization level.")
+
     @wraps(qnode)
     def wrapper(*args, **kwargs):
         mlir_module = get_mlir_module(qnode, args, kwargs)
-        Compiler.run(mlir_module, callback=_draw_callback)
+        try:
+            Compiler.run(mlir_module, callback=_draw_callback)
+        except StopCompilation:
+            # We use StopCompilation to interrupt the compilation once we reach
+            # the desired level
+            pass
 
         max_level = max(cache.keys())
         dot_string, _ = cache.get(level, cache[max_level])
