@@ -2579,7 +2579,6 @@ class TestCtrl:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        clusters = utility.dag_builder.clusters
         nodes = utility.dag_builder.nodes
 
         # cluster0 -> qjit
@@ -2604,7 +2603,6 @@ class TestCtrl:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        clusters = utility.dag_builder.clusters
         nodes = utility.dag_builder.nodes
 
         # cluster0 -> qjit
@@ -2629,7 +2627,6 @@ class TestCtrl:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        clusters = utility.dag_builder.clusters
         nodes = utility.dag_builder.nodes
 
         # cluster0 -> qjit
@@ -2656,7 +2653,6 @@ class TestCtrl:
         utility = ConstructCircuitDAG(FakeDAGBuilder())
         utility.construct(module)
 
-        clusters = utility.dag_builder.clusters
         nodes = utility.dag_builder.nodes
 
         # cluster0 -> qjit
