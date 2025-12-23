@@ -228,7 +228,7 @@ class ConstructCircuitDAG:
                 # We need to connect to everything seen so far as all branches are a possibility.
                 exited_conditional_cluster = (
                     "conditional" in self._last_cluster_uid
-                    and sum(1 for s in self._cluster_uid_stack if "conditional" in s) == 0
+                    and not any("conditional" in s for s in self._cluster_uid_stack)
                 )
                 if exited_conditional_cluster:
                     all_prev_uids = all_active
