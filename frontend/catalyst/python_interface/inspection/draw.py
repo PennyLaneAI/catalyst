@@ -118,8 +118,8 @@ def draw(qnode: QNode, *, level: int | None = None) -> Callable:
 
 def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     """
-    Visualize a single QJIT compiled QNode, showing wire flow through quantum operations, program structure, and
-    pass-by-pass impacts on compiled programs.
+    Visualize a single QJIT compiled QNode, showing wire flow through quantum operations, 
+    program structure, and pass-by-pass impacts on compiled programs.
 
     .. note::
 
@@ -269,11 +269,13 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     """
     if not HAS_MATPLOTLIB:
         raise ImportError(
-            "The draw_graph functionality requires matplotlib to be installed. You can install matplotlib via 'pip install matplotlib'."
+            "The draw_graph functionality requires matplotlib to be installed. "
+            "You can install matplotlib via 'pip install matplotlib'."
         )
     if not HAS_GRAPHVIZ:
         raise ImportError(
-            "The Graphviz package is not found. Please install it  for your system by following the instructions found here: https://graphviz.org/download/"
+            "The Graphviz package is not found. Please install itfor your system by "
+            "following the instructions found here: https://graphviz.org/download/"
         )
     if not HAS_PYDOT:
         raise ImportError(
@@ -295,7 +297,8 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         )
     ):
         raise TypeError(
-            "The circuit must be a qjit compiled qnode. Please apply the `qml.qjit` function to your qnode."
+            "The circuit must be a qjit compiled qnode. "
+            "Please apply the `qml.qjit` function to your qnode."
         )
 
     cache: dict[int, tuple[str, str]] = {}
