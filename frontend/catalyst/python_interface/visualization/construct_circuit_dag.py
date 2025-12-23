@@ -573,7 +573,9 @@ class ConstructCircuitDAG:
         # We don't want the RX in the final else condition to connect to the H(x)
 
         after_conditional_cluster = "conditional" in self._last_cluster_uid
-        inside_final_else_condition = "conditional" in self._cluster_uid_stack[-2]
+        inside_final_else_condition = False
+        if len(self._cluster_uid_stack) > 2:
+            inside_final_else_condition = "conditional" in self._cluster_uid_stack[-2]
         if (
             "dyn_wire" in self._wire_to_node_uids
             and after_conditional_cluster
