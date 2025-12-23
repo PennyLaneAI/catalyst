@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2022-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ class TestLoopToJaxpr:
                       i:bool[] = lt g 10:i64[]
                     in (i,) }
                   cond_nconsts=0
-                  nimplicit=0
+                  num_implicit_inputs=0
                   preserve_dimensions=True
                 ] 0:i64[] a
               in (b, c) }
@@ -72,7 +72,7 @@ class TestLoopToJaxpr:
                       h:i64[] = add f 1:i64[]
                     in (h, g) }
                   body_nconsts=0
-                  nimplicit=0
+                  num_implicit_inputs=0
                   preserve_dimensions=True
                 ] 0:i64[] b 1:i64[] 0:i64[] 0:i64[] a
               in (c, d) }

@@ -46,7 +46,7 @@ static const std::string RESOURCE_NAMES[] = {"PauliX",
 
 static void ApplyGates(ResourceTracker &tracker)
 {
-    if (tracker.GetNumWires() < 3) {
+    if (tracker.GetMaxWires() < 3) {
         FAIL_CHECK("ApplyGates requires at least 3 wires to operate");
     }
 
@@ -73,20 +73,24 @@ TEST_CASE("Test Resource Tracker Reset", "[resourcetracking]")
 
     CHECK(tracker.GetFilename() == "");
     CHECK(tracker.GetNumGates() == 0);
-    CHECK(tracker.GetNumWires() == 0);
+    CHECK(tracker.GetMaxWires() == 0);
+    CHECK(tracker.GetTotalAllocations() == 0);
     CHECK(tracker.GetDepth() == 0);
     CHECK(tracker.GetComputeDepth() == false);
 
     tracker.SetResourcesFilename("foo.json");
     tracker.SetComputeDepth(true);
-    tracker.SetMaxWires(10);
+    for (size_t i = 0; i < 10; i++) {
+        tracker.AllocateQubit(i);
+    }
     tracker.NamedOperation("PauliX", false, {0}, {});
     tracker.NamedOperation("CNOT", false, {0, 1}, {});
 
     // Check that values are truly dirty
     CHECK(tracker.GetFilename() == "foo.json");
     CHECK(tracker.GetNumGates() != 0);
-    CHECK(tracker.GetNumWires() != 0);
+    CHECK(tracker.GetMaxWires() != 0);
+    CHECK(tracker.GetTotalAllocations() != 0);
     CHECK(tracker.GetDepth() != 0);
     CHECK(tracker.GetComputeDepth() == true);
 
@@ -94,7 +98,8 @@ TEST_CASE("Test Resource Tracker Reset", "[resourcetracking]")
 
     // Ensure reset cleans values back to original
     CHECK(tracker.GetNumGates() == 0);
-    CHECK(tracker.GetNumWires() == 0);
+    CHECK(tracker.GetMaxWires() == 0);
+    CHECK(tracker.GetTotalAllocations() == 0);
     CHECK(tracker.GetDepth() == 0);
     // Filename and whether to compute depth should not be reset
     CHECK(tracker.GetFilename() == "foo.json");
@@ -104,23 +109,35 @@ TEST_CASE("Test Resource Tracker Reset", "[resourcetracking]")
 TEST_CASE("Test Resource Tracker Wires", "[resourcetracking]")
 {
     ResourceTracker tracker;
-    CHECK(tracker.GetNumWires() == 0);
+    CHECK(tracker.GetMaxWires() == 0);
+    CHECK(tracker.GetTotalAllocations() == 0);
 
     // Call SetMaxWires with various different values
-    tracker.SetMaxWires(0);
-    CHECK(tracker.GetNumWires() == 0);
-    tracker.SetMaxWires(5);
-    CHECK(tracker.GetNumWires() == 5);
-    tracker.SetMaxWires(3);
-    CHECK(tracker.GetNumWires() == 5);
-    tracker.SetMaxWires(10);
-    CHECK(tracker.GetNumWires() == 10);
+    tracker.AllocateQubit(0);
+    CHECK(tracker.GetMaxWires() == 1);
+    CHECK(tracker.GetTotalAllocations() == 1);
+    tracker.ReleaseQubit(0);
+    CHECK(tracker.GetMaxWires() == 1);
+    CHECK(tracker.GetTotalAllocations() == 1);
+
+    for (size_t i = 1; i <= 4; i++) {
+        tracker.AllocateQubit(i);
+    }
+    CHECK(tracker.GetMaxWires() == 4);
+    CHECK(tracker.GetTotalAllocations() == 5);
+    for (size_t i = 5; i <= 9; i++) {
+        tracker.AllocateQubit(i);
+    }
+    CHECK(tracker.GetMaxWires() == 9);
+    CHECK(tracker.GetTotalAllocations() == 10);
 }
 
 TEST_CASE("Test Resource Tracker Gate Types", "[resourcetracking]")
 {
     ResourceTracker tracker;
-    tracker.SetMaxWires(5);
+    for (size_t i = 0; i < 5; i++) {
+        tracker.AllocateQubit(i);
+    }
     CHECK(tracker.GetNumGates() == 0);
     for (const auto &name : RESOURCE_NAMES) {
         CHECK(tracker.GetNumGates(name) == 0);
@@ -147,8 +164,9 @@ TEST_CASE("Test Resource Tracker Gate Sizes", "[resourcetracking]")
     ResourceTracker tracker;
     CHECK(tracker.GetNumGates() == 0);
 
-    CHECK_THROWS(tracker.NamedOperation("PauliX", false, {10})); // Exceeds max wires of 0
-    tracker.SetMaxWires(5);
+    for (size_t i = 0; i < 5; i++) {
+        tracker.AllocateQubit(i);
+    }
 
     CHECK(tracker.GetNumGatesBySize(0) == 0);
     CHECK(tracker.GetNumGatesBySize(1) == 0);
@@ -169,7 +187,10 @@ TEST_CASE("Test Resource Tracker Gate Sizes", "[resourcetracking]")
 TEST_CASE("Test Resource Tracker Depth", "[resourcetracking]")
 {
     ResourceTracker tracker;
-    tracker.SetMaxWires(5);
+    for (size_t i = 0; i < 5; i++) {
+        tracker.AllocateQubit(i);
+    }
+
     CHECK(tracker.GetComputeDepth() == false);
     CHECK(tracker.GetDepth() == 0);
 
@@ -179,7 +200,9 @@ TEST_CASE("Test Resource Tracker Depth", "[resourcetracking]")
     // Enable depth tracking and test
     tracker.Reset();
     tracker.SetComputeDepth(true);
-    tracker.SetMaxWires(5);
+    for (size_t i = 0; i < 5; i++) {
+        tracker.AllocateQubit(i);
+    }
     CHECK(tracker.GetComputeDepth() == true);
     CHECK(tracker.GetDepth() == 0);
 
@@ -203,15 +226,49 @@ TEST_CASE("Test Resource Tracker Depth", "[resourcetracking]")
     tracker.NamedOperation("CNOT", false, {1, 2});
     CHECK(tracker.GetDepth() == 7);
 
+    // Check that deallocating qubits doesn't erase depth
+    for (size_t i = 0; i < 5; i++) {
+        tracker.ReleaseQubit(i);
+    }
+    CHECK(tracker.GetDepth() == 7);
+
     // Check that reset works as expected
     tracker.Reset();
     CHECK(tracker.GetDepth() == 0); // Should be reset
 
     tracker.SetComputeDepth(false);
-    tracker.SetMaxWires(5);
+    for (size_t i = 0; i < 5; i++) {
+        tracker.AllocateQubit(i);
+    }
 
     tracker.NamedOperation("PauliX", false, {0});
     CHECK(tracker.GetDepth() == 0); // Should not change if depth tracking disabled
+}
+
+TEST_CASE("Test Resource Tracker Runtime Checks", "[resourcetracking]")
+{
+    ResourceTracker tracker;
+    tracker.SetComputeDepth(true);
+    for (size_t i = 0; i < 5; i++) {
+        tracker.AllocateQubit(i);
+    }
+
+    CHECK(tracker.GetNumGatesBySize(0) == 0);
+    CHECK(tracker.GetNumGatesBySize(1) == 0);
+    CHECK(tracker.GetNumGatesBySize(2) == 0);
+    CHECK(tracker.GetNumGatesBySize(3) == 0);
+    CHECK(tracker.GetNumGatesBySize(4) == 0);
+    CHECK(tracker.GetDepth() == 0);
+
+    // Exceeds max wires, should throw and fail to increase depth, gate counts
+    CHECK_THROWS(tracker.NamedOperation("PauliX", false, {10}));
+
+    CHECK(tracker.GetNumGatesBySize(0) == 0);
+    CHECK(tracker.GetNumGatesBySize(1) == 0);
+    CHECK(tracker.GetNumGatesBySize(2) == 0);
+    CHECK(tracker.GetNumGatesBySize(3) == 0);
+    CHECK(tracker.GetNumGatesBySize(4) == 0);
+    CHECK(tracker.GetDepth() == 0);
 }
 
 TEST_CASE("Test Resource Tracker Printing", "[resourcetracking]")
@@ -229,15 +286,20 @@ TEST_CASE("Test Resource Tracker Printing", "[resourcetracking]")
     tracker.SetComputeDepth(true);
     CHECK(tracker.GetFilename() == "");
     CHECK(tracker.GetNumGates() == 0);
-    CHECK(tracker.GetNumWires() == 0);
+    CHECK(tracker.GetMaxWires() == 0);
+    CHECK(tracker.GetTotalAllocations() == 0);
 
-    tracker.SetMaxWires(4);
-    CHECK(tracker.GetNumWires() == 4);
+    for (size_t i = 0; i < 4; i++) {
+        tracker.AllocateQubit(i);
+    }
+    CHECK(tracker.GetMaxWires() == 4);
+    CHECK(tracker.GetTotalAllocations() == 4);
 
     ApplyGates(tracker);
 
     CHECK(tracker.GetNumGates() == 10);
-    CHECK(tracker.GetNumWires() == 4);
+    CHECK(tracker.GetMaxWires() == 4);
+    CHECK(tracker.GetTotalAllocations() == 4);
 
     // Capture resources usage
     tracker.PrintResourceUsageToFile(resource_file_w);
@@ -291,21 +353,27 @@ TEST_CASE("Test Resource Tracker WriteOut", "[resourcetracking]")
     ResourceTracker tracker;
     CHECK(tracker.GetFilename() == "");
     CHECK(tracker.GetNumGates() == 0);
-    CHECK(tracker.GetNumWires() == 0);
+    CHECK(tracker.GetMaxWires() == 0);
+    CHECK(tracker.GetTotalAllocations() == 0);
 
-    tracker.SetMaxWires(4);
-    CHECK(tracker.GetNumWires() == 4);
+    for (size_t i = 0; i < 4; i++) {
+        tracker.AllocateQubit(i);
+    }
+    CHECK(tracker.GetMaxWires() == 4);
+    CHECK(tracker.GetTotalAllocations() == 4);
 
     ApplyGates(tracker);
 
     CHECK(tracker.GetNumGates() == 10);
-    CHECK(tracker.GetNumWires() == 4);
+    CHECK(tracker.GetMaxWires() == 4);
+    CHECK(tracker.GetTotalAllocations() == 4);
 
     // Check that writing out the normal way resets
     tracker.WriteOut();
 
     CHECK(tracker.GetNumGates() == 0);
-    CHECK(tracker.GetNumWires() == 0);
+    CHECK(tracker.GetMaxWires() == 0);
+    CHECK(tracker.GetTotalAllocations() == 0);
 
     std::string filename = tracker.GetFilename();
     CHECK(filename != "");
@@ -324,6 +392,9 @@ TEST_CASE("Test Resource Tracker WriteOut", "[resourcetracking]")
 
         // For general data lines, check that the correct number is found
         if (line.find("num_wires") != std::string::npos) {
+            CHECK(line.find("4") != std::string::npos);
+        }
+        if (line.find("total_allocations") != std::string::npos) {
             CHECK(line.find("4") != std::string::npos);
         }
         if (line.find("num_gates") != std::string::npos) {
@@ -347,6 +418,7 @@ TEST_CASE("Test Resource Tracker WriteOut", "[resourcetracking]")
 
     // Ensure all expected fields were present
     CHECK(full_json.find("num_wires") != std::string::npos);
+    CHECK(full_json.find("total_allocations") != std::string::npos);
     CHECK(full_json.find("num_gates") != std::string::npos);
     CHECK(full_json.find("depth") != std::string::npos);
     CHECK(full_json.find("gate_types") != std::string::npos);
@@ -354,4 +426,26 @@ TEST_CASE("Test Resource Tracker WriteOut", "[resourcetracking]")
     for (const auto &name : RESOURCE_NAMES) {
         CHECK(full_json.find(name) != std::string::npos);
     }
+}
+
+TEST_CASE("Test Resource Tracker SetState Operations", "[resourcetracking]")
+{
+    ResourceTracker tracker;
+    tracker.SetComputeDepth(true);
+    for (size_t i = 0; i < 5; i++) {
+        tracker.AllocateQubit(i);
+    }
+    CHECK(tracker.GetNumGates() == 0);
+    CHECK(tracker.GetNumGates("StatePrep") == 0);
+    CHECK(tracker.GetNumGates("BasisState") == 0);
+
+    tracker.SetState({0});
+    tracker.SetBasisState({0, 1, 2});
+    CHECK(tracker.GetNumGates() == 2);
+    CHECK(tracker.GetNumGates("StatePrep") == 1);
+    CHECK(tracker.GetNumGates("BasisState") == 1);
+
+    CHECK(tracker.GetNumGatesBySize(1) == 1);
+    CHECK(tracker.GetNumGatesBySize(3) == 1);
+    CHECK(tracker.GetDepth() == 2);
 }

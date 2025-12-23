@@ -135,7 +135,7 @@ class TestShotVector:
 
         @qjit
         @qml.set_shots(((3, 4),))
-        @qml.qnode(dev, mcm_method="sigle-branch-statistics")
+        @qml.qnode(dev, mcm_method="single-branch-statistics")
         def circuit():
             qml.Hadamard(0)
             return {

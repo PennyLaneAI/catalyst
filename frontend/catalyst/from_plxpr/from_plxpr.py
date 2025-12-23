@@ -28,18 +28,18 @@ from jax.extend.linear_util import wrap_init
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
-from pennylane.ops.functions.map_wires import _map_wires_transform as pl_map_wires
-from pennylane.transforms import cancel_inverses as pl_cancel_inverses
+from pennylane.capture.primitives import transform_prim
 from pennylane.transforms import commute_controlled as pl_commute_controlled
 from pennylane.transforms import decompose as pl_decompose
+from pennylane.transforms import gridsynth as pl_gridsynth
 from pennylane.transforms import merge_amplitude_embedding as pl_merge_amplitude_embedding
-from pennylane.transforms import merge_rotations as pl_merge_rotations
 from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
+from catalyst.jax_extras.patches import patched_make_eqn
 from catalyst.jax_primitives import (
     device_init_p,
     device_release_p,
@@ -47,13 +47,71 @@ from catalyst.jax_primitives import (
     qdealloc_p,
     quantum_kernel_p,
 )
-from catalyst.passes.pass_api import Pass
+from catalyst.utils.patching import Patcher
 
 from .qfunc_interpreter import PLxPRToQuantumJaxprInterpreter
 from .qubit_handler import (
     QubitHandler,
     QubitIndexRecorder,
 )
+
+
+def _tuple_to_slice(t):
+    """Convert a tuple representation of a slice back to a slice object.
+
+    JAX converts slice objects to tuples for hashability in jaxpr parameters.
+    This function converts them back to slice objects for use with indexing.
+
+    Args:
+        t: Either a slice object (returned as-is) or a tuple (start, stop, step)
+
+    Returns:
+        slice: A slice object
+    """
+    assert (
+        isinstance(t, tuple) and len(t) == 3
+    ), "Please only use _tuple_to_slice on a tuple of length 3!"
+    return slice(*t)
+
+
+def _is_dict_like_tuple(t):
+    """Checks if a tuple t is structured like a list of (key, value) pairs."""
+    return isinstance(t, tuple) and all(isinstance(item, tuple) and len(item) == 2 for item in t)
+
+
+def _tuple_to_dict(t):
+    """
+    Recursively converts JAX-hashable tuple representations back to dicts,
+    and list-like tuples back to lists.
+
+    Args:
+        t: The item to convert. Can be a dict, a tuple, or a scalar.
+
+    Returns:
+        The converted dict, list, or the original scalar value.
+    """
+
+    if not isinstance(t, (dict, tuple, list)):
+        return t
+
+    if isinstance(t, dict):  # pragma: no cover
+        return {k: _tuple_to_dict(v) for k, v in t.items()}
+
+    if isinstance(t, list):  # pragma: no cover
+        return [_tuple_to_dict(item) for item in t]
+
+    if isinstance(t, tuple):
+
+        # A. Dict-like tuple: Convert to dict, then recurse on values
+        if _is_dict_like_tuple(t):
+            # This handles the main (key, value) pair structure
+            return {key: _tuple_to_dict(value) for key, value in t}
+
+        # B. List-like tuple: Convert to list, then recurse on elements
+        else:
+            return [_tuple_to_dict(item) for item in t]
+
+    return t  # pragma: no cover
 
 
 def _get_device_kwargs(device) -> dict:
@@ -132,7 +190,19 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
         in (b,) }
 
     """
-    return jax.make_jaxpr(partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts))
+
+    original_fn = partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts)
+
+    # pylint: disable=import-outside-toplevel
+    from jax._src.interpreters.partial_eval import DynamicJaxprTrace
+
+    def wrapped_fn(*args, **kwargs):
+        with Patcher(
+            (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
+        ):
+            return jax.make_jaxpr(original_fn)(*args, **kwargs)
+
+    return wrapped_fn
 
 
 class WorkflowInterpreter(PlxprInterpreter):
@@ -198,17 +268,25 @@ def handle_qnode(
 
     graph_succeeded = False
     if self.requires_decompose_lowering:
+        # Determine if autograph is enabled in the qnode
+        # If so, we need to enable it in the decomposition rules as well
+        # TODO: enable autograph per decomposition rule instead of globally
+        ag_enabled = getattr(qnode, "ag_module", None) is not None
+
         closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
             inner_jaxpr=closed_jaxpr.jaxpr,
             consts=closed_jaxpr.consts,
             tkwargs=self.decompose_tkwargs,
             ncargs=non_const_args,
+            ag_enabled=ag_enabled,
         )
 
         # Fallback to the legacy decomposition if the graph-based decomposition failed
         if not graph_succeeded:
             # Remove the decompose-lowering pass from the pipeline
-            self._pass_pipeline = [p for p in self._pass_pipeline if p.name != "decompose-lowering"]
+            self._pass_pipeline = [
+                p for p in self._pass_pipeline if p.pass_name != "decompose-lowering"
+            ]
             closed_jaxpr = _apply_compiler_decompose_to_plxpr(
                 inner_jaxpr=closed_jaxpr.jaxpr,
                 consts=closed_jaxpr.consts,
@@ -256,119 +334,117 @@ def handle_qnode(
 # otherwise their value will be None. The second value indicates if the transform
 # requires decomposition to be supported by Catalyst.
 transforms_to_passes = {
-    pl_cancel_inverses: ("remove-chained-self-inverse", False),
     pl_commute_controlled: (None, False),
     pl_decompose: (None, False),
-    pl_map_wires: (None, False),
     pl_merge_amplitude_embedding: (None, True),
-    pl_merge_rotations: ("merge-rotations", False),
     pl_single_qubit_fusion: (None, False),
     pl_unitary_to_rot: (None, False),
+    pl_gridsynth: ("gridsynth", False),
 }
 
 
-# pylint: disable-next=redefined-outer-name
 def register_transform(pl_transform, pass_name, decomposition):
     """Register pennylane transforms and their conversion to Catalyst transforms"""
+    transforms_to_passes[pl_transform] = (pass_name, decomposition)
 
-    # pylint: disable=too-many-arguments
-    @WorkflowInterpreter.register_primitive(pl_transform._primitive)
-    def handle_transform(
-        self,
-        *args,
-        args_slice,
-        consts_slice,
-        inner_jaxpr,
-        targs_slice,
-        tkwargs,
-        catalyst_pass_name=pass_name,
-        requires_decomposition=decomposition,
-        pl_plxpr_transform=pl_transform._plxpr_transform,
+
+def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs):
+    if not self.requires_decompose_lowering:
+        self.requires_decompose_lowering = True
+    else:
+        raise NotImplementedError("Multiple decomposition transforms are not yet supported.")
+
+    next_eval = copy(self)
+    # Update the decompose_gateset to be used by the quantum kernel primitive
+    # TODO: we originally wanted to treat decompose_gateset as a queue of
+    # gatesets to be used by the decompose-lowering pass at MLIR
+    # but this requires a C++ implementation of the graph-based decomposition
+    # which doesn't exist yet.
+    next_eval.decompose_tkwargs = tkwargs
+
+    # Note. We don't perform the compiler-specific decomposition here
+    # to be able to support multiple decomposition transforms
+    # and collect all the required gatesets
+    # as well as being able to support other transforms in between.
+
+    # The compiler specific transformation will be performed
+    # in the qnode handler.
+
+    # Add the decompose-lowering pass to the start of the pipeline
+    t = qml.transform(pass_name="decompose-lowering")
+    pass_container = qml.transforms.core.TransformContainer(t)
+    next_eval._pass_pipeline.insert(0, pass_container)
+
+    # We still need to construct and solve the graph based on
+    # the current jaxpr based on the current gateset
+    # but we don't rewrite the jaxpr at this stage.
+
+    # gds_interpreter = DecompRuleInterpreter(*targs, **tkwargs)
+
+    # def gds_wrapper(*args):
+    #     return gds_interpreter.eval(inner_jaxpr, consts, *args)
+
+    # final_jaxpr = jax.make_jaxpr(gds_wrapper)(*args)
+    # return self.eval(final_jaxpr.jaxpr, consts, *non_const_args)
+    return next_eval.eval(inner_jaxpr, consts, *non_const_args)
+
+
+# pylint: disable=too-many-arguments
+@WorkflowInterpreter.register_primitive(transform_prim)
+def handle_transform(
+    self,
+    *args,
+    args_slice,
+    consts_slice,
+    inner_jaxpr,
+    targs_slice,
+    tkwargs,
+    transform,
+):
+    """Handle the conversion from plxpr to Catalyst jaxpr for a
+    PL transform."""
+    consts = args[_tuple_to_slice(consts_slice)]
+    non_const_args = args[_tuple_to_slice(args_slice)]
+    targs = args[_tuple_to_slice(targs_slice)]
+    tkwargs = _tuple_to_dict(tkwargs)
+
+    # If the transform is a decomposition transform
+    # and the graph-based decomposition is enabled
+    if (
+        hasattr(transform._plxpr_transform, "__name__")
+        and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
+        and qml.decomposition.enabled_graph()
     ):
-        """Handle the conversion from plxpr to Catalyst jaxpr for a
-        PL transform."""
-        consts = args[consts_slice]
-        non_const_args = args[args_slice]
-        targs = args[targs_slice]
+        return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs)
 
-        # If the transform is a decomposition transform
-        # and the graph-based decomposition is enabled
-        if (
-            hasattr(pl_plxpr_transform, "__name__")
-            and pl_plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
-            and qml.decomposition.enabled_graph()
-        ):
-            if not self.requires_decompose_lowering:
-                self.requires_decompose_lowering = True
-            else:
-                raise NotImplementedError(
-                    "Multiple decomposition transforms are not yet supported."
-                )
+    catalyst_pass_name = transform.pass_name
+    if catalyst_pass_name is None:
+        catalyst_pass_name = transforms_to_passes.get(transform, (None,))[0]
+    if catalyst_pass_name is None:
+        # Use PL's ExpandTransformsInterpreter to expand this and any embedded
+        # transform according to PL rules. It works by overriding the primitive
+        # registration, making all embedded transforms follow the PL rules
+        # from now on, hence ignoring the Catalyst pass conversion
+        def wrapper(*args):
+            return ExpandTransformsInterpreter().eval(inner_jaxpr, consts, *args)
 
-            next_eval = copy(self)
-            # Update the decompose_gateset to be used by the quantum kernel primitive
-            # TODO: we originally wanted to treat decompose_gateset as a queue of
-            # gatesets to be used by the decompose-lowering pass at MLIR
-            # but this requires a C++ implementation of the graph-based decomposition
-            # which doesn't exist yet.
-            next_eval.decompose_tkwargs = tkwargs
-
-            # Note. We don't perform the compiler-specific decomposition here
-            # to be able to support multiple decomposition transforms
-            # and collect all the required gatesets
-            # as well as being able to support other transforms in between.
-
-            # The compiler specific transformation will be performed
-            # in the qnode handler.
-
-            # Add the decompose-lowering pass to the start of the pipeline
-            next_eval._pass_pipeline.insert(0, Pass("decompose-lowering"))
-
-            # We still need to construct and solve the graph based on
-            # the current jaxpr based on the current gateset
-            # but we don't rewrite the jaxpr at this stage.
-
-            # gds_interpreter = DecompRuleInterpreter(*targs, **tkwargs)
-
-            # def gds_wrapper(*args):
-            #     return gds_interpreter.eval(inner_jaxpr, consts, *args)
-
-            # final_jaxpr = jax.make_jaxpr(gds_wrapper)(*args)
-            # return self.eval(final_jaxpr.jaxpr, consts, *non_const_args)
-            return next_eval.eval(inner_jaxpr, consts, *non_const_args)
-
-        if catalyst_pass_name is None:
-            # Use PL's ExpandTransformsInterpreter to expand this and any embedded
-            # transform according to PL rules. It works by overriding the primitive
-            # registration, making all embedded transforms follow the PL rules
-            # from now on, hence ignoring the Catalyst pass conversion
-            def wrapper(*args):
-                return ExpandTransformsInterpreter().eval(inner_jaxpr, consts, *args)
-
-            unravelled_jaxpr = jax.make_jaxpr(wrapper)(*non_const_args)
-            final_jaxpr = pl_plxpr_transform(
-                unravelled_jaxpr.jaxpr, unravelled_jaxpr.consts, targs, tkwargs, *non_const_args
+        unravelled_jaxpr = jax.make_jaxpr(wrapper)(*non_const_args)
+        final_jaxpr = transform._plxpr_transform(
+            unravelled_jaxpr.jaxpr, unravelled_jaxpr.consts, targs, tkwargs, *non_const_args
+        )
+        if transforms_to_passes[transform][1]:
+            final_jaxpr = pl_decompose._plxpr_transform(
+                final_jaxpr.jaxpr, final_jaxpr.consts, targs, tkwargs, *non_const_args
             )
 
-            if requires_decomposition:
-                final_jaxpr = pl_decompose._plxpr_transform(
-                    final_jaxpr.jaxpr, final_jaxpr.consts, targs, tkwargs, *non_const_args
-                )
+        return copy(self).eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
 
-            return copy(self).eval(final_jaxpr.jaxpr, final_jaxpr.consts, *non_const_args)
-
-        # Apply the corresponding Catalyst pass counterpart
-        next_eval = copy(self)
-        next_eval._pass_pipeline.insert(0, Pass(catalyst_pass_name, *targs, **tkwargs))
-        return next_eval.eval(inner_jaxpr, consts, *non_const_args)
-
-
-# This is our registration factory for PL transforms. The loop below iterates
-# across the map above and generates a custom handler for each transform.
-# In order to ensure early binding, we pass the PL plxpr transform and the
-# Catalyst pass as arguments whose default values are set by the loop.
-for pl_transform, (pass_name, decomposition) in transforms_to_passes.items():
-    register_transform(pl_transform, pass_name, decomposition)
+    # Apply the corresponding Catalyst pass counterpart
+    next_eval = copy(self)
+    t = qml.transform(pass_name=catalyst_pass_name)
+    bound_pass = qml.transforms.core.TransformContainer(t, args=targs, kwargs=tkwargs)
+    next_eval._pass_pipeline.insert(0, bound_pass)
+    return next_eval.eval(inner_jaxpr, consts, *non_const_args)
 
 
 # pylint: disable=too-many-positional-arguments
@@ -403,7 +479,34 @@ def trace_from_pennylane(
         Tuple[Any]: the dynamic argument signature
     """
 
-    with transient_jax_config({"jax_dynamic_shapes": True}):
+    # pylint: disable=import-outside-toplevel
+    import jax._src.interpreters.partial_eval as pe
+    from jax._src.interpreters.partial_eval import DynamicJaxprTrace
+    from jax._src.lax import lax
+    from jax._src.pjit import jit_p
+
+    from catalyst.jax_extras.patches import (
+        get_aval2,
+        patched_drop_unused_vars,
+        patched_dyn_shape_staging_rule,
+        patched_pjit_staging_rule,
+    )
+    from catalyst.utils.patching import DictPatchWrapper
+
+    with transient_jax_config(
+        {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
+    ), Patcher(
+        (pe, "_drop_unused_vars", patched_drop_unused_vars),
+        (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
+        (lax, "_dyn_shape_staging_rule", patched_dyn_shape_staging_rule),
+        (
+            jax._src.pjit,  # pylint: disable=protected-access
+            "pjit_staging_rule",
+            patched_pjit_staging_rule,
+        ),
+        (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
+        (pe, "get_aval", get_aval2),
+    ):
 
         make_jaxpr_kwargs = {
             "static_argnums": static_argnums,
@@ -475,7 +578,7 @@ def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=Non
     return final_jaxpr
 
 
-def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs):
+def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs, ag_enabled):
     """Collect and compile graph solutions for a given JAXPR.
 
     This function uses the DecompRuleInterpreter to evaluate
@@ -490,12 +593,13 @@ def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs):
         consts (list): The constants used in the JAXPR.
         tkwargs (list): The keyword arguments of the decompose transform.
         ncargs (list): Non-constant arguments for the JAXPR.
+        ag_enabled (bool): Whether to enable autograph in the decomposition rules.
 
     Returns:
         ClosedJaxpr: The decomposed JAXPR.
         bool: A flag indicating whether the graph-based decomposition was successful.
     """
-    gds_interpreter = DecompRuleInterpreter(**tkwargs)
+    gds_interpreter = DecompRuleInterpreter(ag_enabled=ag_enabled, **tkwargs)
 
     def gds_wrapper(*args):
         return gds_interpreter.eval(inner_jaxpr, consts, *args)

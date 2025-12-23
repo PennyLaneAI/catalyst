@@ -901,6 +901,24 @@ class TestDefaultAvailableIR:
         assert g.mlir_opt
         assert "__catalyst__qis" in g.mlir_opt
 
+    @pytest.mark.usefixtures("use_capture", "requires_xdsl")
+    def test_mlir_opt_using_xdsl_passes(self, backend):
+        """Test mlir opt using xDSL passes."""
+        # pylint: disable-next=import-outside-toplevel
+        from catalyst.python_interface.transforms import iterative_cancel_inverses_pass
+
+        @qjit
+        @iterative_cancel_inverses_pass
+        @qml.qnode(qml.device(backend, wires=1))
+        def f():
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=0)
+            return qml.state()
+
+        mlir_opt = f.mlir_opt
+        assert mlir_opt
+        assert not "__catalyst__qis__Hadamard" in mlir_opt
+
     def test_jaxpr_target(self, backend):
         """Test no mlir is generated for jaxpr target."""
 

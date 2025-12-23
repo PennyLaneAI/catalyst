@@ -166,9 +166,9 @@ jobs:
         lookup-only: True
 
     - name: Setup Python version
-      # There are multiple Python versions installed on the GitHub image, 3.11 - 3.12 is already
+      # There are multiple Python versions installed on the GitHub image, 3.11 - 3.14 is already
       # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
-      # 3.11 and 3.12. Make sure to consistently use the system versions.
+      # 3.11 - 3.14. Make sure to consistently use the system versions.
       run: |
         echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
 
@@ -218,7 +218,7 @@ jobs:
               -DENZYME_STATIC_LIB=ON \
               -DCMAKE_CXX_VISIBILITY_PRESET=default
 
-        cmake --build $GITHUB_WORKSPACE/enzyme-build --target EnzymeStatic-21
+        cmake --build $GITHUB_WORKSPACE/enzyme-build --target EnzymeStatic-22
 
     - name: Save Enzyme Build
       id: save-enzyme-build
@@ -245,9 +245,9 @@ jobs:
         ref: ${{ inputs.branch || github.ref }}
 
     - name: Setup Python version
-      # There are multiple Python versions installed on the GitHub image, 3.11 - 3.12 is already
+      # There are multiple Python versions installed on the GitHub image, 3.11 - 3.14 is already
       # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
-      # 3.11 and 3.12. Make sure to consistently use the system versions.
+      # 3.11 - 3.14. Make sure to consistently use the system versions.
       run: |
         echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
 
@@ -328,7 +328,7 @@ jobs:
               -DENABLE_OQD=OFF \
               -DMLIR_INCLUDE_DIRS="$GITHUB_WORKSPACE/mlir/llvm-project/mlir/include"
 
-        cmake --build $GITHUB_WORKSPACE/runtime-build --target rt_capi rtd_openqasm rtd_null_qubit
+        cmake --build $GITHUB_WORKSPACE/runtime-build --target rt_capi rt_rsdecomp rtd_openqasm rtd_null_qubit
 
     - name: Error log on failure
       if: failure() && steps.runtime-build.outcome == 'failure'
@@ -458,15 +458,18 @@ jobs:
         path: ${{ github.workspace }}/standalone_plugin_wheel/wheel
 
     - name: Setup Python version
-      # There are multiple Python versions installed on the GitHub image, 3.11 - 3.12 is already
+      # There are multiple Python versions installed on the GitHub image, 3.11 - 3.14 is already
       # available under /Library/Frameworks/Python.framework/Versions/, but homebrew also provides
-      # 3.11 and 3.12. Make sure to consistently use the system versions.
+      # 3.11 - 3.14. Make sure to consistently use the system versions.
       run: |
         echo /Library/Frameworks/Python.framework/Versions/${{ matrix.python_version }}/bin >> $GITHUB_PATH
 
     - name: Install Python dependencies
       run: |
         python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock
+        # Install graphviz for testing the mlir-op-graph integration
+        brew install graphviz
+        python${{ matrix.python_version }} -m pip install graphviz
 
     - name: Install PennyLane Plugins
       run: |
@@ -474,9 +477,11 @@ jobs:
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>1.27.1'
 
     - name: Install OQC client
-      if: matrix.python_version != '3.13'
       run: |
-        python${{ matrix.python_version }} -m pip install oqc-qcaas-client
+        python_minor=$(echo "${{ matrix.python_version }}" | cut -d. -f2)
+        if [ "$python_minor" -lt 13 ]; then
+          python${{ matrix.python_version }} -m pip install oqc-qcaas-client
+        fi
 
     - name: Install Catalyst
       run: |
@@ -491,9 +496,9 @@ jobs:
     - name: Run Python Pytest Tests
       run: |
         python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto -m "not xdsl"
         python${{ matrix.python_version }} -m pytest frontend/test/async_tests
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto || true
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto -m "not xdsl" || true
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
 
     - name: Run Standalone Plugin Tests

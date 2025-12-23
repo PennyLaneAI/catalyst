@@ -886,7 +886,6 @@ def test_ps_probs(backend):
     assert np.allclose(result, reference)
 
 
-@pytest.mark.xfail(reason="Issue #1571 https://github.com/PennyLaneAI/catalyst/issues/1571")
 @pytest.mark.parametrize("gate_n_inputs", [(qml.CRX, [1]), (qml.CRot, [1, 2, 3])])
 def test_ps_four_term_rule(backend, gate_n_inputs):
     """Operations with the 4-term shift rule need to be decomposed to be differentiated."""
@@ -1598,7 +1597,6 @@ def test_non_parametrized_circuit(backend, diff_method):
     assert np.allclose(qjit(qml.grad(cost))(1.1), 0.0)
 
 
-@pytest.mark.xfail(reason="The verifier currently doesn't distinguish between active/inactive ops")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_adj_qubitunitary(inp, backend):
     """Test the adjoint method."""
@@ -1644,7 +1642,6 @@ def test_preprocessing_outside_qnode(inp, backend):
     assert np.allclose(g(inp), h(inp))
 
 
-@pytest.mark.xfail(reason="Need PR 332.")
 def test_gradient_slice(backend):
     """Test the differentation when the qnode generates memref with non identity layout."""
     n_wires = 5

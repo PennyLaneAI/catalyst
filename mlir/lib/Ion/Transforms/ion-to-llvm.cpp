@@ -39,13 +39,13 @@ struct IonTypeConverter : public LLVMTypeConverter {
     {
         addConversion([&](IonType type) { return convertIonType(type); });
         addConversion([&](PulseType type) { return convertPulseType(type); });
-        addConversion([&](catalyst::quantum::QubitType type) { return convertQubitType(type); });
+        addConversion([&](QubitType type) { return convertIonQubitType(type); });
     }
 
   private:
     Type convertIonType(Type mlirType) { return LLVM::LLVMPointerType::get(&getContext()); }
     Type convertPulseType(Type mlirType) { return LLVM::LLVMPointerType::get(&getContext()); }
-    Type convertQubitType(Type mlirType) { return LLVM::LLVMPointerType::get(&getContext()); }
+    Type convertIonQubitType(Type mlirType) { return LLVM::LLVMPointerType::get(&getContext()); }
 };
 
 struct IonConversionPass : impl::IonConversionPassBase<IonConversionPass> {
@@ -61,7 +61,6 @@ struct IonConversionPass : impl::IonConversionPassBase<IonConversionPass> {
 
         LLVMConversionTarget target(*context);
         target.addIllegalDialect<catalyst::ion::IonDialect>();
-        target.addLegalDialect<catalyst::quantum::QuantumDialect>();
         target.addLegalDialect<mlir::func::FuncDialect>();
         target.addLegalDialect<arith::ArithDialect>();
         target.addLegalDialect<scf::SCFDialect>();

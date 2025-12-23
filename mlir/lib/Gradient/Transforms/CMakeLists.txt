@@ -11,6 +11,7 @@ file(GLOB SRC
     gradient_lowering.cpp
     ConversionPatterns.cpp
     gradient_to_llvm.cpp
+    annotate_invalid_gradient_functions.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
@@ -24,6 +25,7 @@ set(LIBS
     GradientUtils
     MLIRQuantum
     QuantumUtils
+    ExternalStablehloLib
 )
 
 set(DEPENDS

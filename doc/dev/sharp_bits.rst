@@ -1303,49 +1303,18 @@ Currently, however, this is not the case for the following functionalities.
     of the initial ones. This will cause a performance difference, specifically in
     memory usage, when using dynamic wire allocations with and without Catalyst.
 
-  - Wires allocated outside of an MLIR region cannot be used inside the region. 
-    This includes control flow (``if`` statements, ``for`` loops and ``while`` loops),
-    ``qml.adjoint()``, and subroutines. For example,
+  - Dynamically allocated wires cannot be used in quantum adjoints yet.
 
   .. code-block:: python
 
     qml.capture.enable()
 
-    @qjit(autograph=True)
-    @qml.qnode(qml.device("lightning.qubit", wires=3))
-    def circuit(c):
-
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit():
         with qml.allocate(1) as q:
-            if c:
-                qml.X(q[0])
-            else:
-                qml.Z(q[0])
+            qml.adjoint(qml.X)(wires=q[0])
+        return qml.probs(wires=[0])
 
-        return qml.probs(wires=[0, 1, 2])
-
-  >>> print(circuit(True))
-  NotImplementedError: Dynamically allocated wires in a parent scope cannot be 
-  used in a child scope yet. Please consider dynamical allocation inside the 
-  child scope.
-
-  A workaround is to move the allocations into the regions themselves:
-
-  .. code-block:: python
-
-    qml.capture.enable()
-
-    @qjit(autograph=True)
-    @qml.qnode(qml.device("lightning.qubit", wires=3))
-    def circuit(c):
-
-        if c:
-            with qml.allocate(1) as q:
-                qml.X(q[0])
-        else:
-            with qml.allocate(1) as q:
-                qml.Z(q[0])
-
-        return qml.probs(wires=[0, 1, 2])
-
-  >>> print(circuit(True))
-  [1. 0. 0. 0. 0. 0. 0. 0.]
+  >>> print(circuit())
+    NotImplementedError: Dynamically allocated wires cannot be used in quantum adjoints yet.

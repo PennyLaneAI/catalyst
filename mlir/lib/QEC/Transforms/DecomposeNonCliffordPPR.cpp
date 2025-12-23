@@ -22,7 +22,7 @@
 
 #include "Quantum/IR/QuantumOps.h"
 
-#include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/PPRDecomposeUtils.h"
 #include "QEC/Transforms/Patterns.h"
 #include "QEC/Utils/PauliStringWrapper.h"
@@ -34,7 +34,7 @@ using namespace catalyst::quantum;
 namespace {
 
 // Return the magic state or complex conjugate of the magic state
-LogicalInitKind getMagicState(QECOpInterface op)
+LogicalInitKind getMagicState(PPRotationOp op)
 {
     int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
     if (rotationKind > 0) {

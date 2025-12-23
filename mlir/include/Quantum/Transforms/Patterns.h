@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2022-2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,9 +26,10 @@
 namespace catalyst {
 namespace quantum {
 
+void populateGridsynthPatterns(mlir::RewritePatternSet &patterns, double epsilon, bool pprBasis);
 void populateQIRConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &, bool);
 void populateAdjointPatterns(mlir::RewritePatternSet &);
-void populateSelfInversePatterns(mlir::RewritePatternSet &);
+void populateCancelInversesPatterns(mlir::RewritePatternSet &);
 void populateMergeRotationsPatterns(mlir::RewritePatternSet &);
 void populateIonsDecompositionPatterns(mlir::RewritePatternSet &);
 void populateDecomposeLoweringPatterns(mlir::RewritePatternSet &,

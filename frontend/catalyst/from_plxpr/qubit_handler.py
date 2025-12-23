@@ -68,8 +68,6 @@ Therefore, the two central questions we wish to answer is:
    qubit SSA values on its wires?
 """
 
-import textwrap
-
 from catalyst.jax_extras import DynamicJaxprTracer
 from catalyst.jax_primitives import AbstractQbit, AbstractQreg, qextract_p, qinsert_p
 from catalyst.utils.exceptions import CompileError
@@ -422,21 +420,6 @@ def get_in_qubit_values(
         if not qubit_index_recorder.contains(w):
             # First time the global wire index w is encountered
             # Need to extract from fallback qreg
-            # TODO: this can now only be from the global qreg, because right now in from_plxpr
-            # conversion, subscopes (control flow, adjoint, ...) can only take in the global
-            # qreg as the final scope argument. They cannot take an arbitrary number of qreg
-            # values yet.
-            # Supporting multiple registers requires refactoring the from_plxpr conversion's
-            # implementation.
-            if is_dynamically_allocated_wire(w):
-                raise NotImplementedError(
-                    textwrap.dedent(
-                        """
-                    Dynamically allocated wires in a parent scope cannot be used in a child
-                    scope yet. Please consider dynamical allocation inside the child scope.
-                    """
-                    )
-                )
             in_qubits.append(fallback_qreg[fallback_qreg.global_index_to_local_index(w)])
             in_qregs.append(fallback_qreg)
 
@@ -446,3 +429,29 @@ def get_in_qubit_values(
             in_qubits.append(in_qreg[in_qreg.global_index_to_local_index(w)])
 
     return in_qregs, in_qubits
+
+
+def _get_dynamically_allocated_qregs(plxpr_invals, qubit_index_recorder, init_qreg):
+    """
+    Get the potential dynamically allocated register values that are visible to a jaxpr.
+
+    Note that dynamically allocated wires have their qreg tracer's id as the global wire index
+    so the sub jaxpr takes that id in as a "const" (if it is one; as opposed to tracers),
+    since it is closure from the target wire of gates/measurements/...
+
+    We need to remove that const, so we also let this util return these global indices.
+    """
+    dynalloced_qregs = []
+    dynalloced_wire_global_indices = []
+    for inval in plxpr_invals:
+        if not type(inval) in [int, DynamicJaxprTracer]:
+            # don't care about invals that won't be wire indices
+            continue
+        if qubit_index_recorder.contains(inval) and qubit_index_recorder[inval] is not init_qreg:
+            dyn_qreg = qubit_index_recorder[inval]
+            dyn_qreg.insert_all_dangling_qubits()
+            dynalloced_qregs.append(dyn_qreg)
+            if isinstance(inval, int):
+                dynalloced_wire_global_indices.append(inval)
+
+    return dynalloced_qregs, dynalloced_wire_global_indices

@@ -1,4 +1,4 @@
-# Copyright 2024 Xanadu Quantum Technologies Inc.
+# Copyright 2024-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 import numpy as np
 import pennylane as qml
 import pytest
+from pennylane.ftqc.catalyst_pass_aliases import to_ppr as to_ppr_alias
 
 from catalyst import measure, pipeline, qjit
 from catalyst.passes import (
@@ -38,7 +39,11 @@ from catalyst.utils.exceptions import CompileError
 
 ### Test peephole pass decorators preserve functionality of circuits ###
 @pytest.mark.parametrize("theta", [42.42])
-def test_cancel_inverses_functionality(theta, backend):
+# should be able to get rid of catalyst.passes.cancel_inverses soon, but testing both for now.
+@pytest.mark.parametrize(
+    "cancel_inverses_version", (cancel_inverses, qml.transforms.cancel_inverses)
+)
+def test_cancel_inverses_functionality(theta, backend, cancel_inverses_version):
 
     def circuit(x):
         qml.RX(x, wires=0)
@@ -50,14 +55,17 @@ def test_cancel_inverses_functionality(theta, backend):
 
     customized_device = qml.device(backend, wires=1)
     qjitted_workflow = qjit(qml.QNode(circuit, customized_device))
-    optimized_workflow = qjit(cancel_inverses(qml.QNode(circuit, customized_device)))
+    optimized_workflow = qjit(cancel_inverses_version(qml.QNode(circuit, customized_device)))
 
     assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
     assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
 
 
 @pytest.mark.parametrize("theta", [42.42])
-def test_merge_rotation_functionality(theta, backend):
+@pytest.mark.parametrize(
+    "merge_rotations_version", (merge_rotations, qml.transforms.merge_rotations)
+)
+def test_merge_rotation_functionality(theta, backend, merge_rotations_version):
 
     def circuit(x):
         qml.RX(x, wires=0)
@@ -76,7 +84,7 @@ def test_merge_rotation_functionality(theta, backend):
 
     customized_device = qml.device(backend, wires=1)
     qjitted_workflow = qjit(qml.QNode(circuit, customized_device))
-    optimized_workflow = qjit(merge_rotations(qml.QNode(circuit, customized_device)))
+    optimized_workflow = qjit(merge_rotations_version(qml.QNode(circuit, customized_device)))
 
     assert np.allclose(reference_workflow(theta), qjitted_workflow(theta))
     assert np.allclose(reference_workflow(theta), optimized_workflow(theta))
@@ -199,8 +207,9 @@ def test_chained_passes():
         qml.Hadamard(wires=[1])
         return qml.expval(qml.PauliY(wires=0))
 
-    assert "remove-chained-self-inverse" in test_chained_apply_passes_workflow.mlir
-    assert "merge-rotations" in test_chained_apply_passes_workflow.mlir
+    mlir = test_chained_apply_passes_workflow.mlir
+    assert "cancel-inverses" in mlir
+    assert "merge-rotations" in mlir
 
 
 def test_disentangle_passes():
@@ -245,7 +254,7 @@ def test_disentangle_passes():
 
 def test_convert_clifford_to_ppr():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_convert_clifford_to_ppr_workflow():
@@ -275,7 +284,7 @@ def test_convert_clifford_to_ppr():
 
 def test_commute_ppr():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_commute_ppr_workflow():
@@ -309,7 +318,7 @@ def test_commute_ppr():
 
 def test_merge_ppr_ppm():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_merge_ppr_ppm_workflow():
@@ -338,7 +347,7 @@ def test_merge_ppr_ppm():
 
 def test_ppr_to_ppm_auto_corrected():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_ppr_to_ppm_workflow():
@@ -355,16 +364,9 @@ def test_ppr_to_ppm_auto_corrected():
 
         return f()
 
-    assert (
-        'transform.apply_registered_pass "decompose-non-clifford-ppr"'
-        in test_ppr_to_ppm_workflow.mlir
-    )
-    assert (
-        'transform.apply_registered_pass "decompose-clifford-ppr"' in test_ppr_to_ppm_workflow.mlir
-    )
+    assert 'transform.apply_registered_pass "ppr-to-ppm"' in test_ppr_to_ppm_workflow.mlir
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
-    assert 'transform.apply_registered_pass "decompose-non-clifford-ppr"' not in optimized_ir
-    assert 'transform.apply_registered_pass "decompose-clifford-ppr"' not in optimized_ir
+    assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
     assert "quantum.alloc_qb" in optimized_ir
     assert "qec.fabricate  magic" in optimized_ir
     assert "qec.select.ppm" in optimized_ir
@@ -379,7 +381,7 @@ def test_ppr_to_ppm_auto_corrected():
 
 def test_ppr_to_ppm_inject_magic_state():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_ppr_to_ppm_workflow():
@@ -396,16 +398,9 @@ def test_ppr_to_ppm_inject_magic_state():
 
         return f()
 
-    assert (
-        'transform.apply_registered_pass "decompose-non-clifford-ppr"'
-        in test_ppr_to_ppm_workflow.mlir
-    )
-    assert (
-        'transform.apply_registered_pass "decompose-clifford-ppr"' in test_ppr_to_ppm_workflow.mlir
-    )
+    assert 'transform.apply_registered_pass "ppr-to-ppm"' in test_ppr_to_ppm_workflow.mlir
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
-    assert 'transform.apply_registered_pass "decompose-non-clifford-ppr"' not in optimized_ir
-    assert 'transform.apply_registered_pass "decompose-clifford-ppr"' not in optimized_ir
+    assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
     ppm_specs_output = ppm_specs(test_ppr_to_ppm_workflow)
     assert ppm_specs_output["f_0"]["num_of_ppm"] == 20
@@ -416,7 +411,7 @@ def test_ppr_to_ppm_inject_magic_state():
 
 def test_ppr_to_ppm_pauli_corrected():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_ppr_to_ppm_workflow():
@@ -433,16 +428,9 @@ def test_ppr_to_ppm_pauli_corrected():
 
         return f()
 
-    assert (
-        'transform.apply_registered_pass "decompose-non-clifford-ppr"'
-        in test_ppr_to_ppm_workflow.mlir
-    )
-    assert (
-        'transform.apply_registered_pass "decompose-clifford-ppr"' in test_ppr_to_ppm_workflow.mlir
-    )
+    assert 'transform.apply_registered_pass "ppr-to-ppm"' in test_ppr_to_ppm_workflow.mlir
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
-    assert 'transform.apply_registered_pass "decompose-non-clifford-ppr"' not in optimized_ir
-    assert 'transform.apply_registered_pass "decompose-clifford-ppr"' not in optimized_ir
+    assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
     assert (
         "qec.select.ppm" in optimized_ir
     )  # Make sure we use the select PPM to implement the reactive measurement
@@ -456,7 +444,7 @@ def test_ppr_to_ppm_pauli_corrected():
 
 def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_convert_clifford_to_ppr_workflow():
@@ -513,9 +501,62 @@ def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
     assert ppm_specs_output["g_0"]["max_weight_pi8"] == 1
 
 
+@pytest.mark.usefixtures("use_capture")
+def test_merge_rotation_ppr():
+    """Test that the merge_rotation pass correctly merges PPRs."""
+
+    my_pipeline = [("pipe", ["quantum-compilation-stage"])]
+
+    @qml.qjit(pipelines=my_pipeline, target="mlir")
+    def test_merge_rotation_ppr_workflow():
+        @qml.transforms.merge_rotations  # have to use qml to be capture-compatible
+        @to_ppr_alias
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            qml.PauliRot(np.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
+            qml.PauliRot(np.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
+
+        return circuit()
+
+    ir = test_merge_rotation_ppr_workflow.mlir
+    ir_opt = test_merge_rotation_ppr_workflow.mlir_opt
+
+    assert 'transform.apply_registered_pass "merge-rotations"' in ir
+    assert 'qec.ppr ["X", "Y", "Z"](4)' not in ir_opt
+    assert 'qec.ppr ["X", "Y", "Z"](2)' in ir_opt
+
+
+@pytest.mark.usefixtures("use_capture")
+def test_merge_rotation_arbitrary_angle_ppr():
+    """Test that the merge_rotation pass correctly merges arbtirary angle PPRs."""
+
+    my_pipeline = [("pipe", ["quantum-compilation-stage"])]
+
+    @qml.qjit(pipelines=my_pipeline, target="mlir")
+    def test_merge_rotation_ppr_workflow():
+        @qml.transforms.merge_rotations
+        @to_ppr_alias
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x, y):
+            qml.PauliRot(x, pauli_word="ZY", wires=[0, 1])
+            qml.PauliRot(y, pauli_word="ZY", wires=[0, 1])
+
+        return circuit(2.6, 0.3)
+
+    ir = test_merge_rotation_ppr_workflow.mlir
+    ir_opt = test_merge_rotation_ppr_workflow.mlir_opt
+
+    assert 'transform.apply_registered_pass "merge-rotations"' in ir
+    assert "qec.ppr.arbitrary" not in ir
+    assert "arith.addf" not in ir
+
+    assert "arith.addf" in ir_opt
+    assert ir_opt.count('qec.ppr.arbitrary ["Z", "Y"]') == 1
+
+
 def test_clifford_to_ppm():
 
-    pipe = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+    pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     def test_clifford_to_ppm_workflow():
@@ -568,6 +609,36 @@ def test_clifford_to_ppm():
     assert ppm_specs_output["f_0"]["max_weight_pi2"] == 2
 
     assert ppm_specs_output["g_0"]["logical_qubits"] == 2
+
+
+@pytest.mark.usefixtures("use_capture")
+def test_decompose_arbitrary_ppr():
+    """
+    Test the `decompose_arbitrary_ppr` pass.
+    """
+
+    my_pipeline = [("pipe", ["quantum-compilation-stage"])]
+
+    @qml.qjit(pipelines=my_pipeline, target="mlir")
+    def test_decompose_arbitrary_ppr_workflow():
+        @qml.transform(pass_name="decompose-arbitrary-ppr")
+        @qml.transform(pass_name="to-ppr")
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            qml.PauliRot(0.123, pauli_word="XYZ", wires=[0, 1, 2])
+
+        return circuit()
+
+    ir = test_decompose_arbitrary_ppr_workflow.mlir
+    ir_opt = test_decompose_arbitrary_ppr_workflow.mlir_opt
+
+    print(ir_opt)
+
+    assert 'transform.apply_registered_pass "decompose-arbitrary-ppr"' in ir
+    assert 'qec.ppr.arbitrary ["X", "Y", "Z"]' not in ir_opt
+    assert 'qec.ppm ["X", "Y", "Z", "Z"]' in ir_opt
+    assert 'qec.ppr.arbitrary ["Z"]' in ir_opt
+    assert 'qec.ppr ["X", "Y", "Z"](2)' in ir_opt
 
 
 class TestPPMSpecsErrors:

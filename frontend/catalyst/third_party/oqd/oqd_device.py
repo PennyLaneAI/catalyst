@@ -22,8 +22,8 @@ trapped-ion quantum computer device.
 from typing import Optional
 import platform
 
+from pennylane import CompilePipeline
 from pennylane.devices import Device, ExecutionConfig
-from pennylane.transforms.core import TransformProgram
 from catalyst.compiler import get_lib_path
 
 BACKENDS = ["default"]
@@ -47,10 +47,10 @@ def OQDDevicePipeline(device, qubit, gate):
         (
             "device-agnostic-pipeline",
             [
-                "enforce-runtime-invariants-pipeline",
-                "hlo-lowering-pipeline",
-                "quantum-compilation-pipeline",
-                "bufferization-pipeline",
+                "quantum-compilation-stage",
+                "hlo-lowering-stage",
+                "gradient-lowering-stage",
+                "bufferization-stage",
             ],
         ),
         (
@@ -69,9 +69,9 @@ def OQDDevicePipeline(device, qubit, gate):
             ],
         ),
         (
-            "llvm-dialect-lowering-pipeline",
+            "llvm-dialect-lowering-stage",
             [
-                "llvm-dialect-lowering-pipeline",
+                "llvm-dialect-lowering-stage",
             ],
         ),
     ]
@@ -130,9 +130,7 @@ class OQDDevice(Device):
         if execution_config is None:
             execution_config = ExecutionConfig()
 
-        transform_program = TransformProgram()
-
-        return transform_program, execution_config
+        return CompilePipeline(), execution_config
 
     def execute(self, circuits, execution_config):
         """Python execution is not supported."""

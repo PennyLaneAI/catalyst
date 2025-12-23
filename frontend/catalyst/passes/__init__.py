@@ -29,15 +29,17 @@ as load and run external MLIR passes from plugins.
     Instead, these compiler passes are applied at the MLIR level, which occurs
     outside of Python during compile time. To inspect the compiled MLIR from
     Catalyst, use :func:`~.get_compilation_stage` with
-    ``stage="QuantumCompilationPass"``.
+    ``stage="QuantumCompilationStage"``.
 
 """
 
 from catalyst.passes.builtin_passes import (
     cancel_inverses,
     commute_ppr,
+    decompose_arbitrary_ppr,
     disentangle_cnot,
     disentangle_swap,
+    gridsynth,
     ions_decomposition,
     merge_ppr_ppm,
     merge_rotations,
@@ -51,21 +53,23 @@ from catalyst.passes.builtin_passes import (
 from catalyst.passes.pass_api import Pass, PassPlugin, apply_pass, apply_pass_plugin
 
 __all__ = (
+    "gridsynth",
     "to_ppr",
     "commute_ppr",
+    "ppr_to_ppm",
+    "merge_ppr_ppm",
+    "ppm_compilation",
+    "ppm_specs",
+    "reduce_t_depth",
+    "decompose_arbitrary_ppr",
     "cancel_inverses",
+    "merge_rotations",
     "disentangle_cnot",
     "disentangle_swap",
-    "ppm_specs",
     "ions_decomposition",
-    "merge_rotations",
-    "Pass",
-    "PassPlugin",
+    "ppr_to_mbqc",
     "apply_pass",
     "apply_pass_plugin",
-    "merge_ppr_ppm",
-    "ppr_to_ppm",
-    "ppm_compilation",
-    "reduce_t_depth",
-    "ppr_to_mbqc",
+    "Pass",
+    "PassPlugin",
 )

@@ -1459,10 +1459,6 @@ class TestAdjointConstructorDifferentCallableTypes:
         assert tape[1].data == (y,)
         assert tape[2].data == (x,)
 
-    @pytest.mark.xfail(
-        reason="Because the inner adjoint is not called it looks like the generic "
-        "callable case to the outer adjoint (which then doesn't inherit from PL)."
-    )
     def test_nested_adjoint(self):
         """Test the adjoint transform on an adjoint transform."""
         x = 4.321

@@ -22,13 +22,13 @@ import numpy as np
 import pennylane as qml
 import pytest
 from jax.tree_util import tree_flatten
-from pennylane import exceptions
+from pennylane import exceptions, measure
 from pennylane.transforms.dynamic_one_shot import fill_in_value
 
 import catalyst
 from catalyst import CompileError, cond, grad
 from catalyst import jvp as C_jvp
-from catalyst import measure, qjit, value_and_grad
+from catalyst import qjit, value_and_grad
 from catalyst import vjp as C_vjp
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
@@ -39,20 +39,11 @@ from catalyst import vjp as C_vjp
 class TestMidCircuitMeasurement:
     """Tests for mid-circuit behaviour."""
 
-    def test_pl_measure(self, backend):
-        """Test PL measure."""
-
-        def circuit():
-            return qml.measure(0)
-
-        with pytest.raises(CompileError, match="Must use 'measure' from Catalyst"):
-            qjit(qml.qnode(qml.device(backend, wires=1))(circuit))()
-
     def test_measure_outside_qjit(self):
         """Test measure outside qjit."""
 
         def circuit():
-            return measure(0)
+            return catalyst.measure(0)
 
         with pytest.raises(CompileError, match="can only be used from within @qjit"):
             circuit()
@@ -324,7 +315,8 @@ class TestMidCircuitMeasurement:
         assert spy.call_count == 1
 
     @pytest.mark.xfail(
-        reason="Midcircuit measurements with sampling is unseeded and hence this test is flaky"
+        reason="Midcircuit measurements with sampling is unseeded and hence this test is flaky",
+        strict=False,
     )
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
     @pytest.mark.parametrize("mcm_method", [None, "one-shot"])
@@ -849,9 +841,10 @@ class TestDynamicOneShotIntegration:
 
     def test_dynamic_one_shot_with_classical_return_values(self):
         """Test classical return values with one-shot"""
-        dev = qml.device("lightning.qubit", wires=1, shots=12)
+        dev = qml.device("lightning.qubit", wires=1)
 
         @qjit
+        @qml.set_shots(12)
         @qml.qnode(dev, mcm_method="one-shot")
         def circuit():
             qml.Hadamard(0)

@@ -1,4 +1,4 @@
-# Copyright 2024 Xanadu Quantum Technologies Inc.
+# Copyright 2024-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -63,6 +63,7 @@ from catalyst.jax_extras.tracing import (
     new_inner_tracer,
     output_type_to_tracers,
     sort_eqns,
+    switch_expansion_strategy,
     trace_to_jaxpr,
     transient_jax_config,
     tree_flatten,

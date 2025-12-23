@@ -637,7 +637,7 @@ class TestOtherMeasurements:
             )
 
         @qml.set_shots(shots=10000)
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device("lightning.qubit", wires=2), static_argnums=(1,))
         def expected(x, measurement_fn):
             qml.RY(x, wires=0)
             return measurement_fn()
@@ -646,14 +646,12 @@ class TestOtherMeasurements:
         result = all_measurements(x)
 
         # qml.sample
-        assert result[0].shape == expected(x, measurement_fn=lambda: qml.sample(wires=[0, 1])).shape
+        assert result[0].shape == expected(x, lambda: qml.sample(wires=[0, 1])).shape
         assert result[0].dtype == np.int64
 
         # qml.counts
         qml.capture.disable()  # cant execute with counts with program capture
-        for r, e in zip(
-            result[1][0], expected(x, measurement_fn=lambda: qml.counts(all_outcomes=True))
-        ):
+        for r, e in zip(result[1][0], expected(x, lambda: qml.counts(all_outcomes=True))):
             assert format(int(r), "02b") == e
         assert sum(result[1][1]) == 10000
         assert result[1][0].dtype == np.int64
@@ -661,7 +659,7 @@ class TestOtherMeasurements:
         # qml.expval
         assert np.allclose(
             result[2],
-            expected(x, measurement_fn=lambda: qml.expval(qml.PauliZ(0))),
+            expected(x, lambda: qml.expval(qml.PauliZ(0))),
             atol=tol_stochastic,
             rtol=tol_stochastic,
         )
@@ -669,7 +667,7 @@ class TestOtherMeasurements:
         # qml.var
         assert np.allclose(
             result[3],
-            expected(x, measurement_fn=lambda: qml.var(qml.PauliZ(0))),
+            expected(x, lambda: qml.var(qml.PauliZ(0))),
             atol=tol_stochastic,
             rtol=tol_stochastic,
         )
@@ -677,7 +675,7 @@ class TestOtherMeasurements:
         # qml.probs
         assert np.allclose(
             result[4],
-            expected(x, measurement_fn=lambda: qml.probs(wires=[0, 1])),
+            expected(x, lambda: qml.probs(wires=[0, 1])),
             atol=tol_stochastic,
             rtol=tol_stochastic,
         )

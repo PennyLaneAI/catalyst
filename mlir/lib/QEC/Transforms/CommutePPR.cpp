@@ -16,8 +16,8 @@
 
 #include "mlir/Analysis/TopologicalSortUtils.h"
 
-#include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOpInterfaces.h"
+#include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
 #include "QEC/Utils/PauliStringWrapper.h"
 
@@ -132,10 +132,20 @@ void moveCliffordPastNonClifford(const PauliStringWrapper &lhsPauli,
 
     // Update the use of value in newRHSOperands
     for (unsigned i = 0; i < newRHSOperands.size(); i++) {
-        newRHSOperands[i].replaceAllUsesExcept(nonCliffordOp.getOutQubits()[i], nonCliffordOp);
+        newRHSOperands[i].replaceUsesWithIf(
+            nonCliffordOp.getOutQubits()[i], [&](OpOperand &operand) {
+                return operand.getOwner() != nonCliffordOp &&
+                       operand.getOwner()->getBlock() == lhs->getBlock();
+            });
     }
 
     rewriter.replaceOp(rhs, rhs.getInQubits());
+
+    auto startItr = lhs->getIterator();
+    auto endItr = std::next(nonCliffordOp->getIterator());
+    llvm::iterator_range<Block::iterator> itr = llvm::make_range(startItr, endItr);
+
+    sortTopologically(nonCliffordOp->getBlock(), itr);
 }
 
 struct CommutePPR : public OpRewritePattern<PPRotationOp> {
@@ -156,7 +166,6 @@ struct CommutePPR : public OpRewritePattern<PPRotationOp> {
             // Handle commuting case
             if (normCliffordPPR.commutes(normNonCliffordPPR)) {
                 moveCliffordPastNonClifford(normCliffordPPR, normNonCliffordPPR, nullptr, rewriter);
-                sortTopologically(op->getBlock());
                 return success();
             }
 
@@ -171,7 +180,6 @@ struct CommutePPR : public OpRewritePattern<PPRotationOp> {
 
             moveCliffordPastNonClifford(normCliffordPPR, normNonCliffordPPR, &commutedResult,
                                         rewriter);
-            sortTopologically(op->getBlock());
             return success();
         });
     }

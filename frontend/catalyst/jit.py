@@ -36,7 +36,6 @@ from catalyst.compiled_functions import CompilationCache, CompiledFunction
 from catalyst.compiler import CompileOptions, Compiler, canonicalize, to_llvmir, to_mlir_opt
 from catalyst.debug.instruments import instrument
 from catalyst.from_plxpr import trace_from_pennylane
-from catalyst.jax_extras.patches import get_aval2
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.qfunc import QFunc
@@ -118,7 +117,8 @@ def qjit(
 
             - ``False`` or ``0`` or ``"none"`` or ``None`` (default): No intermediate file is kept.
             - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
-            - ``2`` or ``"pass"``: Intermediate files are saved after each pass.
+            - ``2`` or ``"changed"``: Intermediate files are saved after each pass only if changed.
+            - ``3`` or ``"pass"``: Intermediate files are saved after each pass, even if unchanged.
             If enabled, intermediate representations are available via the following attributes:
 
             - :attr:`~.QJIT.jaxpr`: JAX program representation
@@ -582,11 +582,14 @@ class QJIT(CatalystCallable):
         """Obtain the MLIR representation after optimization"""
         if not self.mlir_module:
             return None
-
+        using_python_compiler = self.compiler.is_using_python_compiler(self.mlir_module)
         stdin = self.mlir_module.operation.get_asm(
-            enable_debug_info=self.compile_options.use_nameloc
+            print_generic_op_form=using_python_compiler,
+            enable_debug_info=self.compile_options.use_nameloc,
         )
-        return to_mlir_opt(stdin=stdin, options=self.compile_options)
+        return to_mlir_opt(
+            stdin=stdin, options=self.compile_options, using_python_compiler=using_python_compiler
+        )
 
     @debug_logger
     def __call__(self, *args, **kwargs):
@@ -729,22 +732,15 @@ class QJIT(CatalystCallable):
         dbg = debug_info("qjit_capture", self.user_function, args, kwargs)
 
         if qml.capture.enabled():
-            with Patcher(
-                (
-                    jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
-                    "get_aval",
-                    get_aval2,
-                ),
-            ):
-                return trace_from_pennylane(
-                    self.user_function,
-                    static_argnums,
-                    dynamic_args,
-                    abstracted_axes,
-                    full_sig,
-                    kwargs,
-                    debug_info=dbg,
-                )
+            return trace_from_pennylane(
+                self.user_function,
+                static_argnums,
+                dynamic_args,
+                abstracted_axes,
+                full_sig,
+                kwargs,
+                debug_info=dbg,
+            )
 
         def closure(qnode, *args, **kwargs):
             params = {}

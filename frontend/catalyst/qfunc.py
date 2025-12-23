@@ -120,7 +120,7 @@ def _is_one_shot_compatible_device(qnode):
     return device_class_name != "OQDDevice"
 
 
-def configure_mcm_and_try_one_shot(qnode, args, kwargs):
+def configure_mcm_and_try_one_shot(qnode, args, kwargs, pass_pipeline=None):
     """Configure mid-circuit measurement settings and handle one-shot execution."""
     dynamic_one_shot_called = getattr(qnode, "_dynamic_one_shot_called", False)
     if not dynamic_one_shot_called:
@@ -170,7 +170,9 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs):
             )
 
             try:
-                return Function(dynamic_one_shot(qnode, mcm_config=mcm_config))(*args, **kwargs)
+                return Function(
+                    dynamic_one_shot(qnode, mcm_config=mcm_config, pass_pipeline=pass_pipeline)
+                )(*args, **kwargs)
             except (TypeError, ValueError, CompileError, NotImplementedError) as e:
                 # If user specified mcm_method, we can't fallback to single-branch-statistics,
                 # reraise the original error
@@ -283,18 +285,23 @@ class QFunc:
 
         assert isinstance(self, qml.QNode)
 
+        new_transform_program, new_pipeline = _extract_passes(self.transform_program)
         # Update the qnode with peephole pipeline
-        pass_pipeline = kwargs.pop("pass_pipeline", [])
-        pass_pipeline = dictionary_to_list_of_passes(pass_pipeline)
+        old_pipeline = kwargs.pop("pass_pipeline", None)
+        processed_old_pipeline = tuple(dictionary_to_list_of_passes(old_pipeline))
+        pass_pipeline = processed_old_pipeline + new_pipeline
+        new_qnode = copy(self)
+        # pylint: disable=attribute-defined-outside-init, protected-access
+        new_qnode._transform_program = new_transform_program
 
         # Mid-circuit measurement configuration/execution
-        fn_result = configure_mcm_and_try_one_shot(self, args, kwargs)
+        fn_result = configure_mcm_and_try_one_shot(new_qnode, args, kwargs, pass_pipeline)
 
         # If the qnode is failed to execute as one-shot, fn_result will be None
         if fn_result is not None:
             return fn_result
 
-        new_device = copy(self.device)
+        new_device = copy(new_qnode.device)
         qjit_device = QJITDevice(new_device)
 
         static_argnums = kwargs.pop("static_argnums", ())
@@ -305,11 +312,11 @@ class QFunc:
 
         def _eval_quantum(*args, **kwargs):
             trace_result = trace_quantum_function(
-                self.func,
+                new_qnode.func,
                 qjit_device,
                 args,
                 kwargs,
-                self,
+                new_qnode,
                 static_argnums,
                 debug_info,
             )
@@ -559,6 +566,7 @@ def dynamic_one_shot(qnode, **kwargs):
 
     cpy_tape = None
     mcm_config = kwargs.pop("mcm_config", None)
+    pass_pipeline = kwargs.pop("pass_pipeline", None)
 
     def transform_to_single_shot(qnode):
         if not qnode._shots:
@@ -602,6 +610,9 @@ def dynamic_one_shot(qnode, **kwargs):
     total_shots = _get_total_shots(qnode)
 
     def one_shot_wrapper(*args, **kwargs):
+        if pass_pipeline is not None:
+            kwargs["pass_pipeline"] = pass_pipeline
+
         def wrap_single_shot_qnode(*_):
             return single_shot_qnode(*args, **kwargs)
 
@@ -649,3 +660,22 @@ def dynamic_one_shot(qnode, **kwargs):
         return _finalize_output(out, ctx)
 
     return one_shot_wrapper
+
+
+def _extract_passes(transform_program):
+    """Extract transforms with pass names from the end of the CompilePipeline."""
+    tape_transforms = []
+    pass_pipeline = []
+    i = len(transform_program)
+    for t in reversed(transform_program):
+        if t.pass_name is None:
+            break
+        i -= 1
+    pass_pipeline = transform_program[i:]
+    tape_transforms = transform_program[:i]
+    for t in tape_transforms:
+        if t.transform is None:
+            raise ValueError(
+                f"{t} without a tape definition occurs before tape transform {tape_transforms[-1]}."
+            )
+    return qml.CompilePipeline(tape_transforms), tuple(pass_pipeline)

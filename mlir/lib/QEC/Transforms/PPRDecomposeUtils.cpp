@@ -14,7 +14,7 @@
 
 #include "Quantum/IR/QuantumOps.h" // for quantum::AllocQubitOp
 
-#include "QEC/IR/QECDialect.h" // for FabricateOp
+#include "QEC/IR/QECOps.h" // for FabricateOp
 #include "QEC/Transforms/PPRDecomposeUtils.h"
 
 namespace catalyst {

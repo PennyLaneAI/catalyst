@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --annotate-function -split-input-file -verify-diagnostics
+// RUN: quantum-opt %s --annotate-invalid-gradient-functions -split-input-file -verify-diagnostics
 
 // -----
 

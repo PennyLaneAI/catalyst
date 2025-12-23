@@ -19,8 +19,8 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
 
-#include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOpInterfaces.h"
+#include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
 #include "QEC/Utils/PauliStringWrapper.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -149,7 +149,11 @@ void moveCliffordPastPPM(const PauliStringWrapper &lhsPauli, const PauliStringWr
 
     rewriter.eraseOp(rhs);
 
-    sortTopologically(lhs->getBlock());
+    auto startItr = lhs->getIterator();
+    auto endItr = std::next(newPPM->getIterator());
+    llvm::iterator_range<Block::iterator> itr = llvm::make_range(startItr, endItr);
+
+    sortTopologically(lhs->getBlock(), itr);
 }
 
 bool shouldRemovePPR(PPRotationOp op)

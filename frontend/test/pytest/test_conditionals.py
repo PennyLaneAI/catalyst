@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2022-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ class TestCondToJaxpr:
                 c:i64[] = cond[
                   branch_jaxprs=[{ lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) },
                                  { lambda ; a:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
-                  nimplicit_outputs=0
+                  num_implicit_outputs=0
                 ] b a a
               in (c,) }
             """
@@ -204,8 +204,8 @@ class TestCond:
             cond_fn()
             return measure(wires=0)
 
-        assert circuit(3) == False
-        assert circuit(6) == True
+        assert not circuit(3)
+        assert circuit(6)
 
     @pytest.mark.capture_todo # [sc-97385]
     def test_branch_return_pytree_mismatch(self):
@@ -226,7 +226,7 @@ class TestCond:
 
         with pytest.raises(
             TypeError,
-            match="Conditional requires a consistent return structure across all branches",
+            match="Control flow requires a consistent return structure across all branches",
         ):
             qjit(circuit)
 
@@ -235,8 +235,8 @@ class TestCond:
         branch.
         """
 
-        def circuit():
-            @cond(True)
+        def circuit(pred: bool):
+            @cond(pred)
             def cond_fn():
                 return measure(wires=0)
 
@@ -250,7 +250,7 @@ class TestCond:
         else:
             with pytest.raises(
                 TypeError,
-                match="Conditional requires a consistent return structure across all branches",
+                match="Control flow requires a consistent return structure across all branches",
             ):
                 qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
@@ -276,7 +276,7 @@ class TestCond:
             ):
                 qjit(circuit)
         else:
-            m = "Conditional requires a consistent array shape per result across all branches"
+            m = "Control flow requires a consistent array shape per result across all branches"
             with pytest.raises(
                 TypeError,
                 match=m,
@@ -286,8 +286,8 @@ class TestCond:
     def test_branch_return_shape_mismatch_quantum(self, backend):
         """Test that an exception is raised when the array shapes across branches don't match."""
 
-        def circuit():
-            @cond(True)
+        def circuit(pred: bool):
+            @cond(pred)
             def cond_fn():
                 return measure(wires=0)
 
@@ -305,7 +305,7 @@ class TestCond:
             ):
                 qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
         else:
-            m = "Conditional requires a consistent array shape per result across all branches"
+            m = "Control flow requires a consistent array shape per result across all branches"
             with pytest.raises(
                 TypeError,
                 match=m,
@@ -461,7 +461,7 @@ class TestCond:
         else:
             with pytest.raises(
                 TypeError,
-                match="Conditional requires a consistent number of results across all branches",
+                match="Control flow requires a consistent number of results across all branches",
             ):
                 f(True, 3)
 
@@ -493,8 +493,8 @@ class TestCond:
         than the else branch, given a classical tracing context (no QNode).
         """
 
-        def circuit():
-            @cond(True)
+        def circuit(pred: bool):
+            @cond(pred)
             def cond_fn():
                 return (1, 1)
 
@@ -510,7 +510,7 @@ class TestCond:
         else:
             with pytest.raises(
                 TypeError,
-                match="Conditional requires a consistent return structure across all branches",
+                match="Control flow requires a consistent return structure across all branches",
             ):
                 qjit(circuit)
 
@@ -566,7 +566,7 @@ class TestCond:
             with pytest.raises(ValueError, match="false branch must be provided"):
                 qjit(f)
         else:
-            with pytest.raises(TypeError, match="Please specify an else branch"):
+            with pytest.raises(TypeError, match="requires a consistent return structure"):
                 qjit(f)
 
         def g(x: int):
@@ -763,8 +763,8 @@ class TestClassicalCompilation:
     def test_no_true_false_parameters(self):
         """Test non-empty parameter detection in conditionals"""
 
-        def arithc2():
-            @cond(True)
+        def arithc2(pred: bool):
+            @cond(pred)
             def branch(_):
                 return 1
 
@@ -777,8 +777,8 @@ class TestClassicalCompilation:
         with pytest.raises(TypeError, match="missing 1 required positional argument"):
             qjit(arithc2)
 
-        def arithc1():
-            @cond(True)
+        def arithc1(pred: bool):
+            @cond(pred)
             def branch():
                 return 1
 
@@ -1054,6 +1054,9 @@ class TestCondPredicateConversion:
     def test_string_conversion_failed(self):
         """Test failure at converting string to bool using Autograph."""
 
+        if qml.capture.enabled():
+            pytest.skip("works with program capture.")
+
         @qjit(autograph=True)
         def workflow(x):
             n = "fail"
@@ -1065,15 +1068,31 @@ class TestCondPredicateConversion:
 
             return y
 
-        if qml.capture.enabled():
-            with pytest.raises(TypeError, match="is not a valid JAX type"):
-                workflow(3)
-        else:
-            with pytest.raises(
-                TypeError,
-                match="Conditional predicates are required to be of bool, integer or float type",
-            ):
-                workflow(3)
+        with pytest.raises(
+            TypeError,
+            match="Conditional predicates are required to be of bool, integer or float type",
+        ):
+            workflow(3)
+
+    def test_string_conversion_capture_works(self):
+        """Test that truthy values in conditionals work when capture is enabled."""
+
+        if not qml.capture.enabled():
+            pytest.skip("only works with program capture.")
+
+        @qjit(autograph=True)
+        def workflow(x):
+            n = "fail"
+
+            if n:
+                y = x**2
+            else:
+                y = 0
+
+            return y
+
+        out = workflow(0.5)
+        assert qml.math.allclose(out, 0.25)
 
     def test_array_conversion_failed(self):
         """Test failure at converting array to bool using Autograph."""

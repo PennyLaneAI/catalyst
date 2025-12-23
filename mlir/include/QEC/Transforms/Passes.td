@@ -47,7 +47,7 @@ def DecomposeMethodOption : Option<
     /*C++ var name=*/"decomposeMethod",
     /*CLI arg name=*/"decompose-method",
     /*type=*/"::catalyst::qec::DecomposeMethod",
-    /*default=*/"::catalyst::qec::DecomposeMethod::AutoCorrected",
+    /*default=*/"::catalyst::qec::DecomposeMethod::PauliCorrected",
     "Decomposition method to use",
     [{::llvm::cl::values(
         clEnumValN(::catalyst::qec::DecomposeMethod::AutoCorrected,
@@ -71,7 +71,7 @@ def AvoidYMeasureOption : Option<
 //                               Passes
 //===----------------------------------------------------------------------===//
 
-def CliffordTToPPRPass : Pass<"to-ppr"> {
+def ToPPRPass : Pass<"to-ppr"> {
     let summary = "Convert quantum dialects to the QEC dialect.";
 
     let dependentDialects = [ "catalyst::qec::QECDialect" ];
@@ -109,6 +109,14 @@ def DecomposeCliffordPPRPass : Pass<"decompose-clifford-ppr"> {
     let options = [AvoidYMeasureOption];
 }
 
+def PPRToPPMPass : Pass<"ppr-to-ppm"> {
+    let summary = "Convert PPRotation operations to Pauli Product Measurement operations.";
+
+    let dependentDialects = [ "catalyst::qec::QECDialect" ];
+
+    let options = [DecomposeMethodOption, AvoidYMeasureOption];
+}
+
 def PPMCompilationPass : Pass<"ppm-compilation"> {
     let summary = "Convert CliffordT operations to Pauli Product Measurement operations.";
     
@@ -131,6 +139,10 @@ def TLayerReductionPass : Pass<"reduce-t-depth"> {
 
 def PPRToMBQCPass : Pass<"ppr-to-mbqc"> {
     let summary = "Convert PPR/PPM operations to MBQC operations.";
+}
+
+def DecomposeArbitraryPPRPass : Pass<"decompose-arbitrary-ppr"> {
+    let summary = "Decompose an arbitrary angle PPR into a collection of PPRs, PPMs and a single-qubit arbitrary PPR in the Z basis.";
 }
 
 #endif // QEC_PASSES

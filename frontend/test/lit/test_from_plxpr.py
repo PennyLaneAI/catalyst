@@ -138,10 +138,13 @@ def test_dynamic_wire():
         # CHECK-NEXT: [[QBIT:%.+]] = quantum.extract [[QREG]][[[SCALAR]]]
         # CHECK-NEXT: [[QBIT_1:%.+]] = quantum.custom "PauliY"() [[QBIT]]
         # CHECK-NEXT: [[QBIT_2:%.+]] = quantum.custom "PauliZ"() [[QBIT_1]]
+        # CHECK-NEXT: [[QBIT_3:%.+]] = quantum.custom "PauliX"() [[QBIT_2]]
+        # CHECK: {{%.+}} = quantum.pcphase({{%.+}}, {{%.+}}) [[QBIT_3]]
         qml.X(0)
         qml.Y(w1)
         qml.Z(w1)
-        qml.X(0)
+        qml.X(w1)
+        qml.PCPhase(0.5, wires=w1, dim=1)
         return qml.state()
 
     print(circuit.mlir)
@@ -357,7 +360,7 @@ def test_pass_application():
         return qml.probs()
 
     # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
-    # CHECK-NEXT: transform.apply_registered_pass "remove-chained-self-inverse" to [[first_pass]]
+    # CHECK-NEXT: transform.apply_registered_pass "cancel-inverses" to [[first_pass]]
 
     print(circuit.mlir)
     qml.capture.disable()
@@ -384,7 +387,7 @@ def test_pass_decomposition():
 
     # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "decompose-lowering"
     # CHECK-NEXT: [[second_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
-    # CHECK-NEXT: transform.apply_registered_pass "remove-chained-self-inverse" to [[second_pass]]
+    # CHECK-NEXT: transform.apply_registered_pass "cancel-inverses" to [[second_pass]]
 
     print(circuit1.mlir)
 
@@ -398,7 +401,7 @@ def test_pass_decomposition():
 
     # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
     # CHECK-NEXT: [[second_pass:%.+]] = transform.apply_registered_pass "decompose-lowering"
-    # CHECK-NEXT: transform.apply_registered_pass "remove-chained-self-inverse" to [[second_pass]]
+    # CHECK-NEXT: transform.apply_registered_pass "cancel-inverses" to [[second_pass]]
 
     print(circuit2.mlir)
 
@@ -411,7 +414,7 @@ def test_pass_decomposition():
         return qml.probs()
 
     # CHECK: [[first_pass:%.+]] = transform.apply_registered_pass "merge-rotations"
-    # CHECK-NEXT: [[second_pass:%.+]] = transform.apply_registered_pass "remove-chained-self-inverse"
+    # CHECK-NEXT: [[second_pass:%.+]] = transform.apply_registered_pass "cancel-inverses"
     # CHECK-NEXT: transform.apply_registered_pass "decompose-lowering" to [[second_pass]]
 
     print(circuit3.mlir)
@@ -447,7 +450,7 @@ def test_two_qnodes_with_different_passes_in_one_workflow():
     # CHECK: module @module_circuit1 {
     # CHECK: transform.apply_registered_pass "merge-rotations"
     # CHECK: module @module_circuit2 {
-    # CHECK: transform.apply_registered_pass "remove-chained-self-inverse"
+    # CHECK: transform.apply_registered_pass "cancel-inverses"
 
     print(workflow.mlir)
     qml.capture.disable()

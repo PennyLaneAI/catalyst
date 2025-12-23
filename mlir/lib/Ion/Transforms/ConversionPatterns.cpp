@@ -266,8 +266,8 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
         Type protocolFuncType = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
                                                             {ptrType, pulseArraySize.getType()});
         std::string protocolFuncName = "__catalyst__oqd__ParallelProtocol";
-        LLVM::LLVMFuncOp protocolFnDecl =
-            catalyst::ensureFunctionDeclaration(rewriter, op, protocolFuncName, protocolFuncType);
+        LLVM::LLVMFuncOp protocolFnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, protocolFuncName, protocolFuncType);
         rewriter.create<LLVM::CallOp>(loc, protocolFnDecl, operands);
 
         SmallVector<Value> values;
@@ -290,7 +290,7 @@ struct PulseOpPattern : public OpConversionPattern<catalyst::ion::PulseOp> {
 
         auto time = op.getTime();
         auto phase = rewriter.create<LLVM::ConstantOp>(loc, op.getPhase());
-        Type qubitTy = conv->convertType(catalyst::quantum::QubitType::get(ctx));
+        Type qubitTy = conv->convertType(catalyst::ion::QubitType::get(ctx));
         auto inQubit = adaptor.getInQubit();
         auto beamAttr = op.getBeam();
 
@@ -308,8 +308,8 @@ struct PulseOpPattern : public OpConversionPattern<catalyst::ion::PulseOp> {
             {conv->convertType(qubitTy), time.getType(), Float64Type::get(ctx),
              LLVM::LLVMPointerType::get(rewriter.getContext())});
         std::string qirName = "__catalyst__oqd__pulse";
-        LLVM::LLVMFuncOp fnDecl =
-            catalyst::ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, operands);
 
         return success();
