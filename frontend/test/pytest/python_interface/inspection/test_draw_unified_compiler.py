@@ -561,7 +561,7 @@ class TestDrawGraph:
             qml.H(0)
             return qml.expval(qml.Z(0))
 
-        with pytest.raises(TypeError, match="The `level` argument must be an integer or `None`"):
+        with pytest.raises(TypeError, match="The 'level' argument must be an integer or 'None'"):
             _ = draw_graph(qjit_qnode, level=unsupported_level)()
 
     def test_unsupported_qnode(self):
