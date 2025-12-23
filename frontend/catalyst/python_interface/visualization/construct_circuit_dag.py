@@ -236,7 +236,7 @@ class ConstructCircuitDAG:
                     # Otherwise, just connect to static nodes as they block dynamic
                     # node connections
                     static_nodes = all_active - self._dynamic_node_uids
-                    all_prev_uids = static_nodes if static_nodes else all_active
+                    all_prev_uids = static_nodes or all_active
             for p_uid in all_prev_uids:
                 self.dag_builder.add_edge(p_uid, node_uid, style="dashed", color="lightpink3")
         else:
