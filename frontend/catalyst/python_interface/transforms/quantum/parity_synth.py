@@ -362,7 +362,7 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
         # `inv_network_parity_matrix` might be None if the parity table was empty
         if inv_network_parity_matrix is not None:
             M = (M @ inv_network_parity_matrix) % 2
-        rowcol_circuit: list[tuple[int]] = _rowcol_parity_matrix(M)  # , connectivity=None)
+        rowcol_circuit: list[tuple[int]] = _rowcol_parity_matrix(M, connectivity=None)
 
         # Apply the parity network part of the new circuit
         for idx, phase_wire, subcircuit in subcircuits:
