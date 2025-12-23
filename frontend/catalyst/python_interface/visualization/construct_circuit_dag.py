@@ -159,7 +159,7 @@ class ConstructCircuitDAG:
         _SKIPPED_OPS = (_SKIPPED_QUANTUM_OPS, _SKIPPED_QEC_OPS, _SKIPPED_MBQC_OPS)
         if not isinstance(op, _SKIPPED_OPS):
             raise VisualizationError(
-                f"Visualization for operation `{op.name}` is currently not supported."
+                f"Visualization for operation '{op.name}' is currently not supported."
             )
 
     @_visualize_operation.register
