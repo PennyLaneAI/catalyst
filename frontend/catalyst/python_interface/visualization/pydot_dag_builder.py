@@ -70,9 +70,13 @@ class PyDotDAGBuilder(DAGBuilder):
         # - rankdir="TB": Set layout direction from Top to Bottom.
         # - compound="true": Allow edges to connect directly to clusters/subgraphs.
         # - strict=True: Prevent duplicate edges (e.g., A -> B added twice).
-        # - splines="ortho": Edges connecting clusters are orthogonal
+        # - splines="polyline": Edges connecting clusters are polylines
         self.graph: Dot = Dot(
-            graph_type="digraph", rankdir="TB", compound="true", strict=True, splines="ortho"
+            graph_type="digraph",
+            rankdir="TB",
+            compound="true",
+            strict=True,
+            splines="polyline",
         )
 
         # Use internal cache that maps cluster ID to actual pydot (Dot or Cluster) object
@@ -85,9 +89,7 @@ class PyDotDAGBuilder(DAGBuilder):
         self._edges: list[dict[str, Any]] = []
         self._clusters: dict[str, dict[str, Any]] = {}
 
-        _default_attrs: dict = (
-            {"fontname": "Helvetica", "penwidth": 2} if attrs is None else attrs
-        )
+        _default_attrs: dict = {"fontname": "Helvetica"} if attrs is None else attrs
         self._default_node_attrs: dict = (
             {
                 **_default_attrs,
@@ -103,6 +105,7 @@ class PyDotDAGBuilder(DAGBuilder):
         self._default_edge_attrs: dict = (
             {
                 "color": "lightblue4",
+                "arrowsize": 0.5,
                 "penwidth": 3,
             }
             if edge_attrs is None
@@ -113,6 +116,7 @@ class PyDotDAGBuilder(DAGBuilder):
                 **_default_attrs,
                 "shape": "rectangle",
                 "style": "solid",
+                "penwidth": 2,
             }
             if cluster_attrs is None
             else cluster_attrs
@@ -171,11 +175,11 @@ class PyDotDAGBuilder(DAGBuilder):
             ValueError: Destination is not found in the graph.
 
         """
-        if from_uid == to_uid:
+        if from_uid.split(":")[0] == to_uid.split(":")[0]:
             raise ValueError("Edges must connect two unique IDs.")
-        if from_uid not in self.nodes:
+        if from_uid.split(":")[0] not in self.nodes:
             raise ValueError("Source is not found in the graph.")
-        if to_uid not in self.nodes:
+        if to_uid.split(":")[0] not in self.nodes:
             raise ValueError("Destination is not found in the graph.")
 
         # Use ChainMap so you don't need to construct a new dictionary
