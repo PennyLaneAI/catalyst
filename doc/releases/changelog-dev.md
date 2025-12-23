@@ -27,6 +27,10 @@
   `catalyst.python_interface` namespace.
   [(#2199)](https://github.com/PennyLaneAI/catalyst/pull/2199)
 
+  * Fix a bug in the `catalyst.python_interface.pass_api.TranformInterpreterPass` pass that prevented
+    pass options from being used correctly.
+    [(#2289)](https://github.com/PennyLaneAI/catalyst/pull/2289)
+
   * Add the `PauliRotOp` operation to the xDSL Quantum dialect.
     [(#2307)](https://github.com/PennyLaneAI/catalyst/pull/2307)
 
