@@ -177,7 +177,7 @@ def resolve_constant_params(ssa: SSAValue) -> float | int | str:
     op = ssa.owner
 
     if isinstance(op, Block):
-        arg_name = list(compress(op.args, map(lambda arg: arg is ssa, op.args)))[0]
+        arg_name = next(compress(op.args, map(lambda arg: arg is ssa, op.args)))
         return arg_name.name_hint
 
     if isinstance(op, TensorExtractOp):
@@ -277,7 +277,7 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
     op = ssa.owner
 
     if isinstance(op, Block):
-        arg_name = list(compress(op.args, map(lambda arg: arg is ssa, op.args)))[0]
+        arg_name = next(compress(op.args, map(lambda arg: arg is ssa, op.args)))
         return arg_name.name_hint
 
     match op:
@@ -434,6 +434,7 @@ def xdsl_to_qml_op_name(op, adjoint_mode: bool) -> str:
         "quantum.set_basis_state": "BasisState",
         "quantum.set_state": "StatePrep",
         "quantum.unitary": "QubitUnitary",
+        "quantum.paulirot": "PauliRot",
     }
 
     if op.name == "quantum.custom":
@@ -529,12 +530,10 @@ def xdsl_to_qml_measurement_name(op, obs_op=None) -> str:
             gate_name = f"{len(op.qubits)} wires"
 
     elif op.name == "quantum.hamiltonian":
-        ops_list = [xdsl_to_qml_measurement_name(term.owner) for term in op.terms]
-        gate_name = f"Hamiltonian({', '.join(ops_list)})"
+        gate_name = f"Hamiltonian(num_terms={len(op.terms)})"
 
     elif op.name == "quantum.tensor":
-        ops_list = [xdsl_to_qml_measurement_name(operand.owner) for operand in op.operands]
-        gate_name = " @ ".join(ops_list)
+        gate_name = f"Prod(num_terms={len(op.operands)})"
 
     elif op.name == "quantum.namedobs":
         gate_name = op.type.data.value
