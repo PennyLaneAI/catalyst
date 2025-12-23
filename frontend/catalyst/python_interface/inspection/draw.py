@@ -304,12 +304,12 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         """Callback function for circuit drawing."""
 
         pass_instance = previous_pass if previous_pass else next_pass
-        # Process module to build DAG
         utility = ConstructCircuitDAG(PyDotDAGBuilder())
         utility.construct(module)
+        # Default DPI to 300 and let user fine tune control through the return MPL figure
+        utility.dag_builder.graph.set_dpi(300)
         # Store DAG in cache
-        # utility.dag_builder.graph.set_dpi(300)
-        # TODO: Update DAGBuilder to abstract away extracting image bytes
+        # TODO: Update DAGBuilder to abstract away PyDot requirement
         dot_string = utility.dag_builder.to_string()
         pass_name = pass_instance.name if hasattr(pass_instance, "name") else pass_instance
         cache[pass_level] = (
