@@ -18,6 +18,7 @@ from collections import defaultdict
 from copy import deepcopy
 from functools import singledispatch, singledispatchmethod
 from sys import setdlopenflags
+from typing import Sequence
 
 from pennylane.measurements import (
     ExpectationMP,
@@ -147,7 +148,7 @@ class ConstructCircuitDAG:
         )
         self._node_uid_counter += 1
 
-        self._connect(qml_op, node_uid)
+        self._connect(qml_op.wires, node_uid)
 
     @_visit_operation.register
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
@@ -167,7 +168,7 @@ class ConstructCircuitDAG:
         )
         self._node_uid_counter += 1
 
-        self._connect(meas, node_uid)
+        self._connect(meas.wires, node_uid)
 
     @_visit_operation.register
     def _ppr(self, op: qec.PPRotationOp | qec.PPRotationArbitraryOp) -> None:
@@ -209,16 +210,7 @@ class ConstructCircuitDAG:
         )
         self._node_uid_counter += 1
 
-        # Search through previous ops found on current wires and connect
-        prev_node_uids: set[str] = set.union(
-            set(), *(self._wire_to_node_uids[wire] for wire in wires)
-        )
-        for prev_node_uid in prev_node_uids:
-            self.dag_builder.add_edge(prev_node_uid, node_uid)
-
-        # Update affected wires to source from this node UID
-        for wire in wires:
-            self._wire_to_node_uids[wire] = {node_uid}
+        self._connect(wires, node_uid)
 
     @_visit_operation.register
     def _ppm(self, op: qec.PPMeasurementOp) -> None:
@@ -246,16 +238,7 @@ class ConstructCircuitDAG:
         )
         self._node_uid_counter += 1
 
-        # Search through previous ops found on current wires and connect
-        prev_node_uids: set[str] = set.union(
-            set(), *(self._wire_to_node_uids[wire] for wire in wires)
-        )
-        for prev_node_uid in prev_node_uids:
-            self.dag_builder.add_edge(prev_node_uid, node_uid)
-
-        # Update affected wires to source from this node UID
-        for wire in wires:
-            self._wire_to_node_uids[wire] = {node_uid}
+        self._connect(wires, node_uid)
 
     # =====================
     # QUANTUM MEASUREMENTS
@@ -334,7 +317,7 @@ class ConstructCircuitDAG:
             for p_uid in all_prev_uids:
                 self.dag_builder.add_edge(p_uid, node_uid, style="dashed", color="lightpink3")
         else:
-            self._connect(meas, node_uid, color="lightpink3")
+            self._connect(meas.wires, node_uid, is_terminal_measurement=True, color="lightpink3")
 
     # =============
     # ADJOINT
@@ -564,18 +547,20 @@ class ConstructCircuitDAG:
     # NODE CONNECTIVITY
     # =======================
 
-    def _connect(self, node: Operator | MeasurementProcess, node_uid: str, **edge_attrs):
+    def _connect(
+        self, wires: Sequence, node_uid: str, is_terminal_measurement: bool = False, **edge_attrs
+    ):
         """
         Connects a new node to its previous nodes in the DAG and updates the wire mapping in place.
         """
 
         # Record if it's a dynamic node for easy look-up
-        is_dynamic = any(not isinstance(wire, int) for wire in node.wires)
+        is_dynamic = any(not isinstance(wire, int) for wire in wires)
         if is_dynamic:
             self._dynamic_node_uids.add(node_uid)
 
         # Get all predecessor nodes
-        prev_uids: set[str] = self._get_previous_uids(node, is_dynamic)
+        prev_uids: set[str] = self._get_previous_uids(wires, is_dynamic)
 
         # Connect to all predecessors
         style = "dashed" if is_dynamic else "solid"
@@ -583,13 +568,13 @@ class ConstructCircuitDAG:
             self.dag_builder.add_edge(p_uid, node_uid, style=style, **edge_attrs)
 
         # Update wire mappings for future nodes
-        if isinstance(node, MeasurementProcess):
+        if is_terminal_measurement:
             # No need to update wire mappings for MPs as they are terminal
             return
 
-        self._update_wire_mapping(node, node_uid, is_dynamic)
+        self._update_wire_mapping(wires, node_uid, is_dynamic)
 
-    def _get_previous_uids(self, node: Operator | MeasurementProcess, is_dynamic: bool) -> set[str]:
+    def _get_previous_uids(self, wires: Sequence, is_dynamic: bool) -> set[str]:
         """Helper function to get the set of previous node uids."""
 
         prev_uids: set[str] = set()
@@ -625,7 +610,7 @@ class ConstructCircuitDAG:
         #######################
 
         # Get all nodes seen on these static wires
-        for wire in node.wires:
+        for wire in wires:
             prev_uids.update(self._wire_to_node_uids.get(wire, set()))
 
         # First time seeing this static wire
@@ -678,9 +663,7 @@ class ConstructCircuitDAG:
 
         return prev_uids
 
-    def _update_wire_mapping(
-        self, node: Operator | MeasurementProcess, node_uid: str, is_dynamic: bool
-    ) -> None:
+    def _update_wire_mapping(self, wires: Sequence, node_uid: str, is_dynamic: bool) -> None:
         """Updates the wire mapping accordingly."""
 
         if is_dynamic:
@@ -689,7 +672,7 @@ class ConstructCircuitDAG:
             self._wire_to_node_uids["dyn_wire"] = {node_uid}
         else:
             # Standard update for static wires
-            for wire in node.wires:
+            for wire in wires:
                 self._wire_to_node_uids[wire] = {node_uid}
 
             # If we just exited a conditional, update to have
