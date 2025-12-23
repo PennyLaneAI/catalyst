@@ -35,6 +35,11 @@ from xdsl.dialects.tensor import ExtractOp as TensorExtractOp
 from xdsl.ir import Block, SSAValue
 
 from catalyst.jit import QJIT, qjit
+from catalyst.python_interface.dialects.qec import (
+    PPMeasurementOp,
+    PPRotationArbitraryOp,
+    PPRotationOp,
+)
 
 from ..dialects.quantum import (
     CustomOp,
@@ -43,6 +48,7 @@ from ..dialects.quantum import (
     MeasureOp,
     MultiRZOp,
     NamedObsOp,
+    PauliRotOp,
     QubitUnitaryOp,
     SetBasisStateOp,
     SetStateOp,
@@ -321,6 +327,9 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
             | SetStateOp()
             | MultiRZOp()
             | SetBasisStateOp()
+            | PPRotationOp()
+            | PPRotationArbitraryOp()
+            | PauliRotOp()
         ):
             all_qubits = list(getattr(op, "in_qubits", [])) + list(
                 getattr(op, "in_ctrl_qubits", [])
@@ -333,6 +342,11 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
         case MeasureOp(in_qubit=in_qubit):
             return resolve_constant_wire(in_qubit)
 
+        case PPMeasurementOp():
+            # NOTE: This branch is needed to cover two PPMs in a row
+            # subtract one as the first ssa index is the result,
+            # %res, %q0, ... = qec.ppm [PAULI_WORD] %q0, ...
+            return resolve_constant_wire(op.operands[ssa.index - 1])
         case _:
             raise NotImplementedError(f"Cannot resolve wire for op: {op}")
 
@@ -378,6 +392,16 @@ def xdsl_to_qml_op(op) -> Operator:
     # Pause capture *only if active* so we can allow strings (dynamic wires) as allowed wires
     with conditional_pause(capture.pause):
         match op.name:
+            case "quantum.paulirot":
+                pw = []
+                for str_attr in op.pauli_product.data:
+                    pw.append(str(str_attr).replace('"', ""))
+                pw = "".join(pw)
+                gate = ops.PauliRot(
+                    theta=_extract(op, "angle", resolve_constant_params, single=True),
+                    pauli_word=pw,
+                    wires=ssa_to_qml_wires(op),
+                )
             case "quantum.gphase":
                 gate = ops.GlobalPhase(
                     ssa_to_qml_params(op, single=True), wires=ssa_to_qml_wires(op)
