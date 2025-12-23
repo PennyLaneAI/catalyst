@@ -298,7 +298,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
             "The circuit must be a qjit compiled qnode. Please apply the `qml.qjit` function to your qnode."
         )
 
-    cache: dict[int, tuple[str, str]] = _cache_store.setdefault(qnode, {})
+    cache: dict[int, tuple[str, str]] = {}
 
     def _draw_callback(previous_pass, module: ModuleOp, next_pass, pass_level: int = 0):
         """Callback function for circuit drawing."""
@@ -322,6 +322,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
 
     @wraps(qnode)
     def wrapper(*args, **kwargs):
+        cache.clear()
         mlir_module = get_mlir_module(qnode, args, kwargs)
         try:
             Compiler.run(mlir_module, callback=_draw_callback)
@@ -349,5 +350,8 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         ax.imshow(img)
         ax.set_axis_off()
         return fig, ax
+
+    # Store cache on wrapper
+    wrapper._cache = cache
 
     return wrapper

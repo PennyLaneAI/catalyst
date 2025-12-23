@@ -615,16 +615,16 @@ class TestDrawGraph:
             qml.RX(0.2, wires=0)
             return qml.expval(qml.X(0))
 
-        _ = draw_graph(circuit)()
-
-        # NOTE: hacky work around but lets me probe the graph
-        from catalyst.python_interface.inspection.draw import _cache_store
-
-        cache = _cache_store[circuit]
+        drawer = draw_graph(circuit)
+        _ = drawer()
+        cache = drawer._cache
 
         no_transforms = cache[0][0]
+        assert cache[0][1] == "Before MLIR Passes"
         cancel_inverses = cache[1][0]
+        assert cache[1][1] == "cancel-inverses"
         merge_rotations = cache[2][0]
+        assert cache[2][1] == "merge-rotations"
 
         # Check no transforms
         assert no_transforms.count("<name> Hadamard|<wire> [0]") == 2
@@ -657,14 +657,13 @@ class TestDrawGraph:
             qml.RX(0.2, wires=0)
             return qml.expval(qml.X(0))
 
-        _ = draw_graph(circuit)()
+        drawer = draw_graph(circuit)
+        _ = drawer()
+        cache = drawer._cache
 
-        # NOTE: hacky work around but lets me probe the graph
-        from catalyst.python_interface.inspection.draw import _cache_store
-
-        cache = _cache_store[circuit]
         assert len(cache) == 1
         graph = cache[0][0]
+        assert cache[0][1] == "Before MLIR Passes"
 
         assert graph.count("<name> Hadamard|<wire> [0]") == 2
         assert graph.count("<name> T|<wire> [1]") == 1
@@ -689,14 +688,15 @@ class TestDrawGraph:
         # Show circuit after cancel_inverses transform
         _ = draw_graph(circuit, level=1)()
 
-        # NOTE: hacky work around but lets me probe the graph
-        from catalyst.python_interface.inspection.draw import _cache_store
-
-        cache = _cache_store[circuit]
+        drawer = draw_graph(circuit)
+        _ = drawer()
+        cache = drawer._cache
         assert len(cache) == 2
 
         no_transforms = cache[0][0]
+        assert cache[0][1] == "Before MLIR Passes"
         cancel_inverses = cache[1][0]
+        assert cache[1][1] == "cancel-inverses"
 
         # Check no transforms
         assert no_transforms.count("<name> Hadamard|<wire> [0]") == 2
