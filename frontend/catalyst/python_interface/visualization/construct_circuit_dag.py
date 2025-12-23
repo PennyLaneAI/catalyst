@@ -321,9 +321,6 @@ class ConstructCircuitDAG:
         # Save wires state before all of the branches
         wire_map_before = deepcopy(self._wire_to_node_uids)
 
-        # If we have a dynamic wire pop the device
-        # if "dyn_wire" in wire_map_before:
-        #    wire_map_before.pop("device", set())
         region_wire_maps: list[dict[int | str, set[str]]] = []
 
         # Loop through each branch and visualize as a cluster
