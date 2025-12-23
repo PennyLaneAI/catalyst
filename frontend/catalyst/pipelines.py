@@ -36,8 +36,8 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 from catalyst.default_pipelines import (
     get_bufferization_stage,
     get_convert_to_llvm_stage,
-    get_enforce_runtime_invariants_stage,
     get_hlo_lowering_stage,
+    get_gradient_lowering_stage,
     get_quantum_compilation_stage,
 )
 from catalyst.utils.exceptions import CompileError
