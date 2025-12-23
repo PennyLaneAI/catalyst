@@ -17,7 +17,6 @@
 from collections import defaultdict
 from copy import deepcopy
 from functools import singledispatch, singledispatchmethod
-from sys import setdlopenflags
 
 from pennylane.measurements import (
     ExpectationMP,
@@ -26,7 +25,6 @@ from pennylane.measurements import (
     VarianceMP,
 )
 from pennylane.operation import Operator
-from scipy.constants import dyn
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region
 
