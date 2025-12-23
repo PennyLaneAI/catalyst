@@ -1228,6 +1228,32 @@ class TestCreateDynamicOperatorNodes:
         assert nodes["node2"]["label"] == f"<name> RY|<wire> [(arg5 - 3)]"
         assert nodes["node3"]["label"] == f"<name> RZ|<wire> [(arg5 + 3)]"
 
+    @pytest.mark.usefixtures("use_capture")
+    def test_ppm_dynamic(self):
+        """Test that PPMs can be captured as nodes."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit(x, y):
+            qml.pauli_measure("X", wires=[x])
+            qml.pauli_measure(pauli_word="XY", wires=[y, 0])
+
+        module = my_circuit(1, 2)
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3  # Device node + operator
+
+        assert nodes["node1"]["label"] == f"<name> PPM-X|<wire> [arg0]"
+        assert nodes["node1"]["attrs"]["fillcolor"] == "#70B3F5"
+        assert nodes["node2"]["label"] == f"<name> PPM-XY|<wire> [arg1, 0]"
+        assert nodes["node2"]["attrs"]["fillcolor"] == "#70B3F5"
+
 
 @pytest.mark.usefixtures("use_both_frontend")
 class TestCreateStaticMeasurementNodes:
