@@ -1051,6 +1051,65 @@ class TestCreateStaticOperatorNodes:
         assert nodes["node1"]["label"] == f"<name> LinearCombination|<wire> [0, 1, 2]"
         assert nodes["node2"]["label"] == f"<name> Prod|<wire> [0, 1]"
 
+    @pytest.mark.parametrize(
+        "param, wires",
+        (
+            (jax.numpy.array([1, 0]), [0]),
+            (jax.numpy.array([1, 0, 0, 0]), [0, 1]),
+            (jax.numpy.array([1, 0, 0, 0, 1, 0, 0, 0]), [0, 1, 2]),
+        ),
+    )
+    def test_state_prep(self, param, wires):
+        """Tests that state preparation operators can be captured as nodes."""
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            qml.StatePrep(param, wires=wires)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + operator
+
+        assert nodes["node1"]["label"] == f"<name> StatePrep|<wire> {wires}"
+
+    @pytest.mark.parametrize(
+        "param, wires",
+        (
+            (jax.numpy.array([1]), [0]),
+            (jax.numpy.array([1, 0]), [0, 1]),
+            (jax.numpy.array([1, 0, 0]), [0, 1, 2]),
+        ),
+    )
+    def test_basis_state(self, param, wires):
+        """Tests that basis state operators can be captured as nodes."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            qml.BasisState(param, wires=wires)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2  # Device node + operator
+
+        assert nodes["node1"]["label"] == f"<name> BasisState|<wire> {wires}"
+
 
 @pytest.mark.usefixtures("use_both_frontend")
 class TestCreateDynamicOperatorNodes:
