@@ -22,8 +22,6 @@ import pytest
 pytestmark = pytest.mark.xdsl
 xdsl = pytest.importorskip("xdsl")
 
-import jax
-
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
 import pennylane as qml
