@@ -17,7 +17,6 @@
 from collections import defaultdict
 from copy import deepcopy
 from functools import singledispatch, singledispatchmethod
-
 from typing import Sequence
 
 from pennylane.measurements import (
