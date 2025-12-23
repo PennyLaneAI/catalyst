@@ -1902,6 +1902,37 @@ class TestOperatorConnectivity:
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
+    def test_complex_connectivity_nested_if_with_else(self):
+        """Tests that complex connectivity can go through a conditional."""
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def my_workflow(a, b):
+            qml.X(a)
+            qml.S(0)
+            if a == 2:
+                if b == 2:
+                    qml.RX(0, 0)
+            else:
+                qml.Y(0)
+
+        module = my_workflow(1, 2)
+
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX", {"style": "dashed"}),
+            ("PauliX", "S"),
+            ("S", "RX"),
+            ("S", "PauliY"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
     def test_complex_connectivity_nested_if(self):
         """Tests that complex connectivity can go through a conditional."""
 
