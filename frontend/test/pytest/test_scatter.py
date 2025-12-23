@@ -18,9 +18,12 @@ import jax
 import numpy as np
 import pytest
 from jax import numpy as jnp
+from pennylane import grad
 
-from catalyst import grad, qjit
+from catalyst import qjit
 
+
+pytestmark = pytest.mark.usefixtures("use_both_frontend")
 
 def test_add_multiply():
     """Test to index a jax array and have operations on it."""
