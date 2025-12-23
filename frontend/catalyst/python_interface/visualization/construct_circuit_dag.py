@@ -163,7 +163,7 @@ class ConstructCircuitDAG:
         # NOTE: Currently only visualizing "quantum" operations
         if op.dialect_name() not in {"quantum", "qec", "mbqc"}:
             return
-        _SKIPPED_OPS = (_SKIPPED_QUANTUM_OPS, _SKIPPED_QEC_OPS, _SKIPPED_MBQC_OPS)
+        _SKIPPED_OPS = (*_SKIPPED_QUANTUM_OPS, *_SKIPPED_QEC_OPS, *_SKIPPED_MBQC_OPS)
         if not isinstance(op, _SKIPPED_OPS):
             raise VisualizationError(
                 f"Visualization for operation '{op.name}' is currently not supported."
