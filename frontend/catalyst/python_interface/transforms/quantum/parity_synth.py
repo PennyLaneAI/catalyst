@@ -292,6 +292,7 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
         as a non-phase-polynomial operation is encountered. Note that this makes the (size of the)
         rewritten phase polynomials dependent on the order in which we walk over the operations.
         """
+        raise ValueError("Parity synth error")
         # The attribute is used so we don't transform the same op multiple times
         if len(matchedOp.regions) == 0 or hasattr(matchedOp, "parity_synth_done"):
             return
