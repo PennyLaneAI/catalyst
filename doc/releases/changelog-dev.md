@@ -124,6 +124,10 @@
     into phase polynomials and re-synthesizes them into ``CNOT`` and ``RZ`` operators again.
     [(#2294)](https://github.com/PennyLaneAI/catalyst/pull/2294)
 
+  * The global xDSL pass registry is now explicitly refreshed before compiling workflows decorated with
+    :func:`catalyst.qjit`.
+    [(#2322)](https://github.com/PennyLaneAI/catalyst/pull/2322)
+
 * Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
   [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
 
