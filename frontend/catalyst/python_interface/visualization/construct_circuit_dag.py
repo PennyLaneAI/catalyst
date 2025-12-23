@@ -15,7 +15,9 @@
 """Contains the ConstructCircuitDAG tool for constructing a DAG from an xDSL module."""
 
 from collections import defaultdict
+from copy import deepcopy
 from functools import singledispatch, singledispatchmethod
+from sys import setdlopenflags
 
 from pennylane.measurements import (
     ExpectationMP,
@@ -24,8 +26,9 @@ from pennylane.measurements import (
     VarianceMP,
 )
 from pennylane.operation import Operator
+from scipy.constants import dyn
 from xdsl.dialects import builtin, func, scf
-from xdsl.ir import Block, Operation, Region, SSAValue
+from xdsl.ir import Block, Operation, Region
 
 from catalyst.python_interface.dialects import qec, quantum
 from catalyst.python_interface.inspection.xdsl_conversion import (
@@ -62,9 +65,16 @@ class ConstructCircuitDAG:
         # Values represent the set of all node uids that are on that wire.
         self._wire_to_node_uids: dict[str | int, set[str]] = defaultdict(set)
 
+        # Track which node UIDs are dynamic
+        self._dynamic_node_uids: set[str] = set()
+
         # Use counter internally for UID
         self._node_uid_counter: int = 0
         self._cluster_uid_counter: int = 0
+
+        # Record last seen cluster UID
+        # as context for how to connect certain nodes
+        self._last_cluster_uid: str = ""
 
     def _reset(self) -> None:
         """Resets the instance."""
@@ -72,6 +82,8 @@ class ConstructCircuitDAG:
         self._node_uid_counter: int = 0
         self._cluster_uid_counter: int = 0
         self._wire_to_node_uids: dict[str | int, set[str]] = defaultdict(set)
+        self._dynamic_node_uids: set[str] = set()
+        self._last_cluster_uid: str = ""
 
     def construct(self, module: builtin.ModuleOp) -> None:
         """Constructs the DAG from the module.
@@ -122,7 +134,7 @@ class ConstructCircuitDAG:
         """Generic handler for unitary gates."""
 
         # Create PennyLane instance
-        qml_op = xdsl_to_qml_op(op)
+        qml_op: Operator = xdsl_to_qml_op(op)
 
         # Add node to current cluster
         node_uid = f"node{self._node_uid_counter}"
@@ -135,23 +147,14 @@ class ConstructCircuitDAG:
         )
         self._node_uid_counter += 1
 
-        # Search through previous ops found on current wires and connect
-        prev_node_uids: set[str] = set.union(
-            set(), *(self._wire_to_node_uids[wire] for wire in qml_op.wires)
-        )
-        for prev_node_uid in prev_node_uids:
-            self.dag_builder.add_edge(prev_node_uid, node_uid)
-
-        # Update affected wires to source from this node UID
-        for wire in qml_op.wires:
-            self._wire_to_node_uids[wire] = {node_uid}
+        self._connect(qml_op, node_uid)
 
     @_visit_operation.register
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
         """Handler for the single-qubit projective measurement operation."""
 
         # Create PennyLane instance
-        meas = xdsl_to_qml_measurement(op)
+        meas: Operator = xdsl_to_qml_measurement(op)
 
         # Add node to current cluster
         node_uid = f"node{self._node_uid_counter}"
@@ -164,16 +167,7 @@ class ConstructCircuitDAG:
         )
         self._node_uid_counter += 1
 
-        # Search through previous ops found on current wires and connect
-        prev_node_uids: set[str] = set.union(
-            set(), *(self._wire_to_node_uids[wire] for wire in meas.wires)
-        )
-        for prev_node_uid in prev_node_uids:
-            self.dag_builder.add_edge(prev_node_uid, node_uid)
-
-        # Update affected wires to source from this node UID
-        for wire in meas.wires:
-            self._wire_to_node_uids[wire] = {node_uid}
+        self._connect(meas, node_uid)
 
     @_visit_operation.register
     def _ppr(self, op: qec.PPRotationOp | qec.PPRotationArbitraryOp) -> None:
@@ -287,12 +281,10 @@ class ConstructCircuitDAG:
             case quantum.StateOp():
                 meas = xdsl_to_qml_measurement(op)
                 # NOTE: state can only handle all wires
-                prev_wires = self._wire_to_node_uids.keys()
 
             case quantum.ExpvalOp() | quantum.VarianceOp():
                 obs_op = op.obs.owner
                 meas = xdsl_to_qml_measurement(op, xdsl_to_qml_measurement(obs_op))
-                prev_wires = meas.wires.labels
 
             case quantum.SampleOp() | quantum.ProbsOp():
                 obs_op = op.obs.owner
@@ -301,13 +293,6 @@ class ConstructCircuitDAG:
                 # is obs_op and function below just pulls out the static wires
                 wires = xdsl_to_qml_measurement(obs_op)
                 meas = xdsl_to_qml_measurement(op, wires=None if wires == [] else wires)
-
-                if wires == []:
-                    # If no wires specified, connect to all seen current wires
-                    prev_wires = self._wire_to_node_uids.keys()
-                else:
-                    # Use the specific wires from the observable
-                    prev_wires = wires
 
             case _:
                 return
@@ -324,10 +309,32 @@ class ConstructCircuitDAG:
         )
         self._node_uid_counter += 1
 
-        for wire in prev_wires:
-            if wire in self._wire_to_node_uids:
-                for seen_node in self._wire_to_node_uids[wire]:
-                    self.dag_builder.add_edge(seen_node, node_uid, color="lightpink3")
+        if not meas.wires:
+            # wires = [] means connect to all active wires
+            if "device" in self._wire_to_node_uids and len(self._wire_to_node_uids) == 1:
+                # Case 1: Only the device node in past history
+                all_prev_uids = self._wire_to_node_uids["device"]
+            else:
+                # Case 2: Wire map is "device" + other stuff
+                device_node_uid: set[str] = self._wire_to_node_uids.get("device", set())
+                all_active = set().union(*self._wire_to_node_uids.values()) - device_node_uid
+
+                # If we just exited a conditional (and are not in a nested one currently)
+                # We need to connect to everything seen so far as all branches are a possibility.
+                exited_conditional_cluster = "conditional" in self._last_cluster_uid and not any(
+                    "conditional" in s for s in self._cluster_uid_stack
+                )
+                if exited_conditional_cluster:
+                    all_prev_uids = all_active
+                else:
+                    # Otherwise, just connect to static nodes as they block dynamic
+                    # node connections
+                    static_nodes = all_active - self._dynamic_node_uids
+                    all_prev_uids = static_nodes or all_active
+            for p_uid in all_prev_uids:
+                self.dag_builder.add_edge(p_uid, node_uid, style="dashed", color="lightpink3")
+        else:
+            self._connect(meas, node_uid, color="lightpink3")
 
     # =============
     # ADJOINT
@@ -394,7 +401,9 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _if_op(self, operation: scf.IfOp):
         """Handles the scf.IfOp operation."""
-        uid = f"cluster{self._cluster_uid_counter}"
+
+        # Create cluster for IfOp
+        uid = f"conditional_cluster{self._cluster_uid_counter}"
         self.dag_builder.add_cluster(
             uid,
             label="conditional",
@@ -405,7 +414,8 @@ class ConstructCircuitDAG:
         self._cluster_uid_counter += 1
 
         # Save wires state before all of the branches
-        wire_map_before = self._wire_to_node_uids.copy()
+        wire_map_before = deepcopy(self._wire_to_node_uids)
+
         region_wire_maps: list[dict[int | str, set[str]]] = []
 
         # Loop through each branch and visualize as a cluster
@@ -430,39 +440,67 @@ class ConstructCircuitDAG:
             self._cluster_uid_counter += 1
 
             # Make fresh wire map before going into region
-            self._wire_to_node_uids = wire_map_before.copy()
+            self._wire_to_node_uids = deepcopy(wire_map_before)
 
             # Go recursively into the branch to process internals
             self._visit_region(region)
 
             # Update branch wire maps
             if self._wire_to_node_uids != wire_map_before:
+                # If the dynamic wire seen in this branch is different from the
+                # one seen before the conditional *and* we have other static wires
+                # clear the dyn_wires as the conditional becomes a blocking cluster.
+                #
+                # For example,
+                #
+                #    qml.H(x)
+                #    if x == 2:
+                #        qml.Y(x)
+                #        qml.X(0)
+                #    qml.Z(x)
+                #
+                before_dyn_node_uid: set[str] = wire_map_before.get("dyn_wire", set())
+                current_dyn_node_uid: set[str] = self._wire_to_node_uids["dyn_wire"]
+                if current_dyn_node_uid != before_dyn_node_uid and len(self._wire_to_node_uids) > 1:
+                    self._wire_to_node_uids["dyn_wire"] = set()
                 region_wire_maps.append(self._wire_to_node_uids)
 
             # Pop branch cluster after processing to ensure
             # logical branches are treated as 'parallel'
             self._cluster_uid_stack.pop()
 
-        # Pop IfOp cluster before leaving this handler
-        self._cluster_uid_stack.pop()
-
-        # Check what wires were affected
-        affected_wires: set[str | int] = set(wire_map_before.keys())
+        # Update affected wires with specific wires seen during branches
+        affected_wires: set[str | int] = set()
         for region_wire_map in region_wire_maps:
             affected_wires.update(region_wire_map.keys())
 
         # Update state to be the union of all branch wire maps
-        final_wire_map = defaultdict(set)
+        final_wire_map: dict[str | int, set[str]] = defaultdict(set)
         for wire in affected_wires:
-            all_nodes: set = set()
+            all_nodes: set[str] = set()
             for region_wire_map in region_wire_maps:
-                if not wire in region_wire_map:
-                    # IfOp region didn't apply anything on this wire
-                    # so default to node before the IfOp
-                    all_nodes.update(wire_map_before.get(wire, set()))
-                else:
-                    all_nodes.update(region_wire_map.get(wire, set()))
-                final_wire_map[wire] = all_nodes
+                all_nodes.update(region_wire_map.get(wire, set()))
+            final_wire_map[wire] = all_nodes
+
+        # If new dynamic wires are encountered during the conditional
+        # the old ones from before are useless
+        before_dyn_node_uid: set[str] = wire_map_before.get("dyn_wire", set())
+        current_dyn_node_uid: set[str] = final_wire_map["dyn_wire"]
+        if before_dyn_node_uid and before_dyn_node_uid < current_dyn_node_uid:
+            final_wire_map["dyn_wire"] -= before_dyn_node_uid
+
+        # If we went through a single conditional and no dynamic wires were
+        # encountered, clear the dynamic wires from before as the cluster should be
+        # blocking
+        if (
+            before_dyn_node_uid == current_dyn_node_uid
+            and sum(1 for s in self._cluster_uid_stack if "conditional" in s) == 1
+        ):
+            final_wire_map["dyn_wire"] = set()
+
+        # Pop IfOp cluster before leaving this handler
+        self._last_cluster_uid = self._cluster_uid_stack.pop()
+
         self._wire_to_node_uids = final_wire_map
 
     # ============
@@ -472,17 +510,17 @@ class ConstructCircuitDAG:
     @_visit_operation.register
     def _device_init(self, operation: quantum.DeviceInitOp) -> None:
         """Handles the initialization of a quantum device."""
-        node_id = f"node{self._node_uid_counter}"
+        node_uid = f"node{self._node_uid_counter}"
         self.dag_builder.add_node(
-            node_id,
+            node_uid,
             label=operation.device_name.data,
             cluster_uid=self._cluster_uid_stack[-1],
             fillcolor="grey",
             color="black",
             penwidth=2,
-            shape="rectangle",
         )
         self._node_uid_counter += 1
+        self._wire_to_node_uids["device"].add(node_uid)
 
     # =======================
     # FuncOp NESTING UTILITY
@@ -521,6 +559,144 @@ class ConstructCircuitDAG:
 
         # Clear seen wires as we are exiting a FuncOp (qnode)
         self._wire_to_node_uids = defaultdict(set)
+
+    # =======================
+    # NODE CONNECTIVITY
+    # =======================
+
+    def _connect(self, node: Operator | MeasurementProcess, node_uid: str, **edge_attrs):
+        """
+        Connects a new node to its previous nodes in the DAG and updates the wire mapping in place.
+        """
+
+        # Record if it's a dynamic node for easy look-up
+        is_dynamic = any(not isinstance(wire, int) for wire in node.wires)
+        if is_dynamic:
+            self._dynamic_node_uids.add(node_uid)
+
+        # Get all predecessor nodes
+        prev_uids: set[str] = self._get_previous_uids(node, is_dynamic)
+
+        # Connect to all predecessors
+        style = "dashed" if is_dynamic else "solid"
+        for p_uid in prev_uids:
+            self.dag_builder.add_edge(p_uid, node_uid, style=style, **edge_attrs)
+
+        # Update wire mappings for future nodes
+        if isinstance(node, MeasurementProcess):
+            # No need to update wire mappings for MPs as they are terminal
+            return
+
+        self._update_wire_mapping(node, node_uid, is_dynamic)
+
+    def _get_previous_uids(self, node: Operator | MeasurementProcess, is_dynamic: bool) -> set[str]:
+        """Helper function to get the set of previous node uids."""
+
+        prev_uids: set[str] = set()
+
+        #######################
+        ## PROCESS DYNAMIC NODES
+        #######################
+
+        if is_dynamic:
+            if "device" in self._wire_to_node_uids:
+                # Pop device node as this dynamic node will always superceed it
+                device_node_uid: set[str] = self._wire_to_node_uids.pop("device")
+                if not self._wire_to_node_uids:
+                    return device_node_uid
+
+            all_active = set().union(*self._wire_to_node_uids.values())
+
+            # If we just exited a conditional (and are not in a nested one currently)
+            # We need to connect to everything seen so far as all branches are a possibility.
+            exited_conditional_cluster = "conditional" in self._last_cluster_uid and not any(
+                "conditional" in s for s in self._cluster_uid_stack
+            )
+            if exited_conditional_cluster:
+                return all_active
+
+            # Otherwise, just connect to static nodes as they block dynamic
+            # node connections
+            static_nodes = all_active - self._dynamic_node_uids
+            return static_nodes if static_nodes else all_active
+
+        #######################
+        ## PROCESS STATIC NODES
+        #######################
+
+        # Get all nodes seen on these static wires
+        for wire in node.wires:
+            prev_uids.update(self._wire_to_node_uids.get(wire, set()))
+
+        # First time seeing this static wire
+        if not prev_uids:
+            # First time seeing this wire and no device node,
+            # connect to the last seen dynamic node
+            if "dyn_wire" in self._wire_to_node_uids:
+                prev_uids.update(self._wire_to_node_uids["dyn_wire"])
+
+            # If no dynamic wire has been seen yet, connect to the device
+            elif "device" in self._wire_to_node_uids:
+                prev_uids.update(self._wire_to_node_uids["device"])
+
+        # Wire map contains both a dynamic wire and nodes on the static wires.
+        # Only connect to dynamic wire if we just came from a condition.
+        #
+        # For example,
+        #
+        # if x:
+        #   qml.X(0)
+        # else:
+        #   qml.Y(dyn)
+        # qml.Z(0)
+        #
+        # We should have both X and Y connecting to the Z.
+
+        # To do this carefully, we need to check if we're in a cluster's final
+        # else condition by looking two steps behind in the stack,
+        # _cluster_uid_stack = [..., "conditional_cluster*", "cluster*"]
+        # This is required if we have situations like,
+        #
+        #    qml.H(x)
+        #    qml.S(0)
+        #    if x == 3:
+        #        if x == 2:
+        #            qml.H(0)
+        #    else:
+        #        qml.RX(0,0)
+        #
+        # We don't want the RX in the final else condition to connect to the H(x)
+
+        after_conditional_cluster = "conditional" in self._last_cluster_uid
+        inside_final_else_condition = "conditional" in self._cluster_uid_stack[-2]
+        if (
+            "dyn_wire" in self._wire_to_node_uids
+            and after_conditional_cluster
+            and not inside_final_else_condition
+        ):
+            prev_uids.update(self._wire_to_node_uids["dyn_wire"])
+
+        return prev_uids
+
+    def _update_wire_mapping(
+        self, node: Operator | MeasurementProcess, node_uid: str, is_dynamic: bool
+    ) -> None:
+        """Updates the wire mapping accordingly."""
+
+        if is_dynamic:
+            # Update last seen dynamic wire
+            self._wire_to_node_uids.clear()
+            self._wire_to_node_uids["dyn_wire"] = {node_uid}
+        else:
+            # Standard update for static wires
+            for wire in node.wires:
+                self._wire_to_node_uids[wire] = {node_uid}
+
+            # If we just exited a conditional, update to have
+            # no dynamic wires as the conditional cluster itself acts as
+            # a dynamic barrier
+            if "conditional" in self._last_cluster_uid:
+                self._wire_to_node_uids["dyn_wire"] = set()
 
 
 def _flatten_if_op(op: scf.IfOp) -> list[Region]:
