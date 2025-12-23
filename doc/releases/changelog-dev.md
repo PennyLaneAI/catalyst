@@ -79,6 +79,7 @@
   installation instructions. Additionally, it is recommended to use :func:`~.draw_graph` with 
   PennyLane's program capture enabled (see :func:`qml.capture.enable <pennylane.capture.enable>`).
 
+  [(#2298)](https://github.com/PennyLaneAI/catalyst/pull/2298)
   [(#2290)](https://github.com/PennyLaneAI/catalyst/pull/2290)
   
 * A new `gridsynth` pass is added to support Clifford+T decomopsition. This pass discretizes `RZ` and `PhaseShift` gates to either the Clifford+T basis or to the PPR basis. The pass also supports decomposing single-qubit arbitrary angle PPR in the Z basis.
