@@ -70,6 +70,9 @@ class ConstructCircuitDAG:
         # Use counter internally for UID
         self._node_uid_counter: int = 0
         self._cluster_uid_counter: int = 0
+
+        # Record last seen cluster UID
+        # as context for how to connect certain nodes
         self._last_cluster_uid: str = ""
 
     def _reset(self) -> None:
@@ -353,11 +356,21 @@ class ConstructCircuitDAG:
 
             # Update branch wire maps
             if self._wire_to_node_uids != wire_map_before:
-                # If branch has dynamic and static wires, remove the dynamic nodes
-                # as the static ones become dynamic since conditionals are blocking
-                before_dyn = wire_map_before.get("dyn_wire", set())
-                current_dyn = self._wire_to_node_uids["dyn_wire"]
-                if current_dyn != before_dyn and len(self._wire_to_node_uids) > 1:
+                # If the dynamic wire seen in this branch is different from the
+                # one seen before the conditional *and* we have other static wires
+                # clear the dyn_wires as the conditional becomes a blocking cluster.
+                #
+                # For example,
+                #
+                #    qml.H(x)
+                #    if x == 2:
+                #        qml.Y(x)
+                #        qml.X(0)
+                #    qml.Z(x)
+                #
+                before_dyn_node_uid: set[str] = wire_map_before.get("dyn_wire", set())
+                current_dyn_node_uid: set[str] = self._wire_to_node_uids["dyn_wire"]
+                if current_dyn_node_uid != before_dyn_node_uid and len(self._wire_to_node_uids) > 1:
                     self._wire_to_node_uids["dyn_wire"] = set()
                 region_wire_maps.append(self._wire_to_node_uids)
 
@@ -380,16 +393,16 @@ class ConstructCircuitDAG:
 
         # If new dynamic wires are encountered during the conditional
         # the old ones from before are useless
-        before_dyn = wire_map_before.get("dyn_wire", set())
-        current_dyn = final_wire_map["dyn_wire"]
-        if before_dyn and before_dyn < current_dyn:
-            final_wire_map["dyn_wire"] -= before_dyn
+        before_dyn_node_uid: set[str] = wire_map_before.get("dyn_wire", set())
+        current_dyn_node_uid: set[str] = final_wire_map["dyn_wire"]
+        if before_dyn_node_uid and before_dyn_node_uid < current_dyn_node_uid:
+            final_wire_map["dyn_wire"] -= before_dyn_node_uid
 
         # If we went through a single conditional and no dynamic wires were
         # encountered, clear the dynamic wires from before as the cluster should be
         # blocking
         if (
-            before_dyn == current_dyn
+            before_dyn_node_uid == current_dyn_node_uid
             and sum(1 for s in self._cluster_uid_stack if "conditional" in s) == 1
         ):
             final_wire_map["dyn_wire"] = set()
