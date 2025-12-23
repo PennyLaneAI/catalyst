@@ -479,7 +479,7 @@ class TestParitySynthIntegration:
             return qml.state()
 
         raw_circuit = qml.qjit(circuit)
-        compiled_circuit = qml.qjit(parity_synth_pass(circuit), target="mlir")
+        compiled_circuit = qml.qjit(parity_synth_pass(circuit))
 
         run_filecheck_qjit(compiled_circuit)
         args = (0.6, 0.2, -1.8)
@@ -566,7 +566,7 @@ class TestParitySynthIntegration:
             return qml.state()
 
         raw_circuit = qml.qjit(circuit)
-        compiled_circuit = qml.qjit(parity_synth_pass(circuit), target="mlir")
+        compiled_circuit = qml.qjit(parity_synth_pass(circuit))
 
         run_filecheck_qjit(compiled_circuit)
         args = (0.6, 0.2, -1.8)

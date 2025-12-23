@@ -522,6 +522,7 @@ jobs:
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         make coverage-frontend ENABLE_OQD=ON
         mv coverage.xml coverage-${{ github.job }}.xml
+        python -m pytest frontend/test/pytest/python_interface/transforms/quantum/test_xdsl_parity_synth.py
 
     - name: Upload to Codecov
       uses: codecov/codecov-action@v4
