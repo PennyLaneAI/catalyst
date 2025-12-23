@@ -269,15 +269,15 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     """
     if not HAS_MATPLOTLIB:
         raise ImportError(
-            "The draw_graph functionality requires matplotlib to be installed. You can install matplotlib via pip install matplotlib."
+            "The draw_graph functionality requires matplotlib to be installed. You can install matplotlib via 'pip install matplotlib'."
         )
     if not HAS_GRAPHVIZ:
         raise ImportError(
-            "The `Graphviz` package is not found. Please install it  for your system by following the instructions found here: https://graphviz.org/download/"
+            "The Graphviz package is not found. Please install it  for your system by following the instructions found here: https://graphviz.org/download/"
         )
     if not HAS_PYDOT:
         raise ImportError(
-            "The `pydot` package is not found. Please install with `pip install pydot`."
+            "The `pydot` package is not found. Please install with 'pip install pydot'."
         )
 
     if not isinstance(level, (int, type(None))):
