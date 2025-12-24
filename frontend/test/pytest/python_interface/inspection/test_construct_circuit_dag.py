@@ -2467,7 +2467,7 @@ class TestTerminalMeasurementConnectivity:
         assert ("node0", "node1") in edges
 
     def test_terminal_measurement_after_static_dyn_op_mix(self):
-        """Tests that a terminal measurement on a mix of dynamic and static wires connects properly."""
+        """Tests that a terminal measurement on a mix of dynamic and static wires connects."""
 
         dev = qml.device("null.qubit", wires=1)
 
@@ -2507,7 +2507,7 @@ class TestTerminalMeasurementConnectivity:
         assert ("node3", "node4") in edges
 
     def test_terminal_measurement_static_dyn_mix(self):
-        """Tests that a terminal measurement on a mix of dynamic and static wires connects properly."""
+        """Tests that a terminal measurement on a mix of dynamic and static wires connects."""
 
         dev = qml.device("null.qubit", wires=1)
 
@@ -2548,7 +2548,7 @@ class TestTerminalMeasurementConnectivity:
         assert edges[("node3", "node4")]["attrs"]["style"] == "dashed"
 
     def test_terminal_measurement_dyn_after_static(self):
-        """Tests that a terminal measurement on a mix of dynamic and static wires connects properly."""
+        """Tests that a terminal measurement on a mix of dynamic and static wires connects."""
 
         dev = qml.device("null.qubit", wires=1)
 
