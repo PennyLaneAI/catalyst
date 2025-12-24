@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Contains the ConstructCircuitDAG tool for constructing a DAG from an xDSL module."""
 
 from collections import defaultdict
@@ -575,7 +574,7 @@ class ConstructCircuitDAG:
             label = "qjit"
 
         uid = f"cluster{self._cluster_uid_counter}"
-        parent_cluster_uid = None if self._cluster_uid_stack == [] else self._cluster_uid_stack[-1]
+        parent_cluster_uid = None if not self._cluster_uid_stack else self._cluster_uid_stack[-1]
         self.dag_builder.add_cluster(
             uid,
             label=label,

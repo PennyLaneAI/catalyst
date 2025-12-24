@@ -82,6 +82,7 @@ def test_concrete_implementation_works():
     render = dag_builder.to_file("test.png")
     string = dag_builder.to_string()
 
+    # pylint: disable=use-implicit-booleaness-not-comparison
     assert node is None
     assert nodes == {}
     assert edge is None
