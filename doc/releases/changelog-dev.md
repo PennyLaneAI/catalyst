@@ -124,6 +124,9 @@
     into phase polynomials and re-synthesizes them into ``CNOT`` and ``RZ`` operators again.
     [(#2294)](https://github.com/PennyLaneAI/catalyst/pull/2294)
 
+  * The `catalyst.python_interface.pass_api.PassDispatcher` now has a more lightweight implementation.
+    [(#2324)](https://github.com/PennyLaneAI/catalyst/pull/2324)
+
   * The global xDSL pass registry is now explicitly refreshed before compiling workflows decorated with
     :func:`catalyst.qjit`.
     [(#2322)](https://github.com/PennyLaneAI/catalyst/pull/2322)
