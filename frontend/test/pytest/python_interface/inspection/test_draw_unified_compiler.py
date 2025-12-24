@@ -19,7 +19,8 @@ import pytest
 
 pytestmark = pytest.mark.xdsl
 xdsl = pytest.importorskip("xdsl")
-import matplotlib
+matplotlib = pytest.importorskip("matplotlib")
+
 import pennylane as qml
 
 from catalyst.python_interface.inspection import draw, draw_graph
