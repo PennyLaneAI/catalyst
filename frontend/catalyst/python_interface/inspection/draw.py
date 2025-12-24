@@ -125,8 +125,9 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         This function only visualizes quantum operations contained in workflows involving a single qjit-compiled QNode.
         Workflows involving multiple QNodes or operations outside QNodes cannot yet be visualized.
 
-        Only transformations found within the Cataylst compiler (MLIR passes) can be visualized. Any PennyLane tape transform
-        will have already been applied before lowering to MLIR and will appear as the base state (``level=0``) in this visualization.
+        Only transformations found within the Catalyst compiler can be visualized. Any PennyLane tape transform
+        will have already been applied before lowering to MLIR and will appear as the base state (``level=0``) in
+        this visualization.
 
     .. note::
 
