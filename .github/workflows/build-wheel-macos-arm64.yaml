@@ -467,9 +467,9 @@ jobs:
     - name: Install Python dependencies
       run: |
         python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock
-        # Install graphviz for testing the mlir-op-graph integration
+        # Install graphviz for testing graph visualization
         brew install graphviz
-        python${{ matrix.python_version }} -m pip install graphviz
+        python${{ matrix.python_version }} -m pip install graphviz pydot matplotlib
 
     - name: Install PennyLane Plugins
       run: |
