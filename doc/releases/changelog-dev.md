@@ -205,6 +205,10 @@
     into phase polynomials and re-synthesizes them into ``CNOT`` and ``RZ`` operators again.
     [(#2294)](https://github.com/PennyLaneAI/catalyst/pull/2294)
 
+  * The `catalyst.python_interface.pass_api.PassDispatcher` now has a more lightweight implementation.
+    [(#2324)](https://github.com/PennyLaneAI/catalyst/pull/2324)
+
+
 * Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
   [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
 
