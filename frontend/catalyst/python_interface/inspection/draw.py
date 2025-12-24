@@ -50,8 +50,8 @@ HAS_GRAPHVIZ = True
 if which("dot") is None:
     HAS_GRAPHVIZ = False
 
-from .construct_circuit_dag import ConstructCircuitDAG
-from .pydot_dag_builder import PyDotDAGBuilder
+from catalyst.python_interface.inspection.construct_circuit_dag import ConstructCircuitDAG
+from catalyst.python_interface.inspection.pydot_dag_builder import PyDotDAGBuilder
 
 # TODO: This caching mechanism should be improved,
 # because now it relies on a mutable global state
