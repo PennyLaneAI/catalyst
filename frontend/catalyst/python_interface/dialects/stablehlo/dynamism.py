@@ -85,7 +85,7 @@ class DynamicBroadcastInDimOp(IRDLOperation):
         # TODO: InferShapedTypeOpInterface(),
     )
 
-    irdl_options = [ParsePropInAttrDict()]
+    irdl_options = (ParsePropInAttrDict(),)
 
     # pylint: disable=too-many-branches
     def verify_(self):

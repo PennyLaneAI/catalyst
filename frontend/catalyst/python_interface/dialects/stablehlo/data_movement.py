@@ -363,7 +363,7 @@ class ScatterOp(IRDLOperation):
         # TODO: InferTypeOpInterface(),
     )
 
-    irdl_options = [SameVariadicOperandSize()]
+    irdl_options = (SameVariadicOperandSize(),)
 
     # TODO: MLIR has a custom verifier for the scatter operation.
 

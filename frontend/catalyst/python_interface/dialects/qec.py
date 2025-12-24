@@ -132,7 +132,7 @@ class PPMeasurementOp(IRDLOperation):
         `:` type(results)
     """
 
-    irdl_options = [AttrSizedOperandSegments(as_property=True)]
+    irdl_options = (AttrSizedOperandSegments(as_property=True),)
 
     pauli_product = prop_def(PauliWord)
 
@@ -161,7 +161,7 @@ class PPRotationArbitraryOp(IRDLOperation):
         `:` type($out_qubits)
     """
 
-    irdl_options = [AttrSizedOperandSegments(as_property=True)]
+    irdl_options = (AttrSizedOperandSegments(as_property=True),)
 
     pauli_product = prop_def(PauliWord)
 
@@ -188,7 +188,7 @@ class PPRotationOp(IRDLOperation):
         `:` type($out_qubits)
     """
 
-    irdl_options = [AttrSizedOperandSegments(as_property=True)]
+    irdl_options = (AttrSizedOperandSegments(as_property=True),)
 
     pauli_product = prop_def(PauliWord)
 
