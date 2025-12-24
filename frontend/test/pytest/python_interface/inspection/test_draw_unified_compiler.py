@@ -572,7 +572,7 @@ class TestDrawGraph:
             qml.H(0)
             return qml.expval(qml.Z(0))
 
-        with pytest.raises(TypeError, match="The circuit must be a qjit compiled qnode"):
+        with pytest.raises(TypeError, match="The circuit must be a qjit-compiled qnode"):
             _ = draw_graph(qnode)()
 
     def test_return_types(self):
