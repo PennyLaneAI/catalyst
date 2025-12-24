@@ -282,7 +282,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         )
     if not HAS_GRAPHVIZ:
         raise ImportError(
-            "The Graphviz package is not found. Please install itfor your system by "
+            "The Graphviz package is not found. Please install it for your system by "
             "following the instructions found here: https://graphviz.org/download/"
         )
     if not HAS_PYDOT:
