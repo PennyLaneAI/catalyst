@@ -74,6 +74,8 @@ _SKIPPED_MBQC_OPS = ()
 
 
 class VisualizationError(Exception):
+    """Custom visualization error."""
+
     pass
 
 
@@ -586,6 +588,7 @@ class ConstructCircuitDAG:
 
         self._visit_block(operation.regions[0].blocks[0])
 
+    # pylint: disable=unused-argument
     @_visit_operation.register
     def _func_return(self, operation: func.ReturnOp) -> None:
         """Handle func.return to exit FuncOp's cluster scope."""

@@ -105,6 +105,7 @@ def test_incomplete_subclass():
 
     # pylint: disable=too-few-public-methods
     class IncompleteDAGBuilder(DAGBuilder):
+        """Incomplete dag builder dummy class."""
         def add_node(self, *args, **kwargs):
             pass
 

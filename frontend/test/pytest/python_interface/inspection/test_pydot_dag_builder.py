@@ -41,7 +41,7 @@ def test_initialization_defaults():
     # Ensure duplicated edges cannot be added
     assert dag_builder.graph.obj_dict["strict"] is True
     # Ensure edges are correct
-    assert dag_builder.graph.obj_dict["attributes"]["splines"]== "polyline" 
+    assert dag_builder.graph.obj_dict["attributes"]["splines"]== "polyline"
 
 
 class TestExceptions:
