@@ -475,7 +475,6 @@ jobs:
         python3 -m pip install oqc-qcaas-client
         # Install graphviz for testing the mlir-op-graph integration
         sudo apt-get install -y graphviz
-        python3 -m pip install graphviz
         make frontend
 
     - name: Verify Graphviz installation
