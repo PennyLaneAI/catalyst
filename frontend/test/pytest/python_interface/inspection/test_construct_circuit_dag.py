@@ -757,7 +757,7 @@ class TestGetLabel:
 
     def test_global_phase_operator(self):
         """Tests against a GlobalPhase operator instance."""
-        assert get_label(qml.GlobalPhase(0.5)) == f"<name> GlobalPhase|<wire> all"
+        assert get_label(qml.GlobalPhase(0.5)) == "<name> GlobalPhase|<wire> all"
 
     @pytest.mark.parametrize(
         "meas, label",
@@ -909,7 +909,7 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + operator
 
-        assert nodes["node1"]["label"] == f"<name> MidMeasureMP|<wire> [0]"
+        assert nodes["node1"]["label"] == "<name> MidMeasureMP|<wire> [0]"
 
     @pytest.mark.usefixtures("use_capture")
     def test_ppm(self):
@@ -932,9 +932,9 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 3  # Device node + operator
 
-        assert nodes["node1"]["label"] == f"<name> PPM-X|<wire> [0]"
+        assert nodes["node1"]["label"] == "<name> PPM-X|<wire> [0]"
         assert nodes["node1"]["attrs"]["fillcolor"] == "#70B3F5"
-        assert nodes["node2"]["label"] == f"<name> PPM-XY|<wire> [0, 1]"
+        assert nodes["node2"]["label"] == "<name> PPM-XY|<wire> [0, 1]"
         assert nodes["node2"]["attrs"]["fillcolor"] == "#70B3F5"
 
     @pytest.mark.usefixtures("use_capture")
@@ -959,11 +959,11 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 4  # Device node + operator
 
-        assert nodes["node1"]["label"] == f"<name> PPR-YZ (π/2)|<wire> [0, 1]"
+        assert nodes["node1"]["label"] == "<name> PPR-YZ (π/2)|<wire> [0, 1]"
         assert nodes["node1"]["attrs"]["fillcolor"] == "#D9D9D9"
-        assert nodes["node2"]["label"] == f"<name> PPR-X (π/8)|<wire> [0]"
+        assert nodes["node2"]["label"] == "<name> PPR-X (π/8)|<wire> [0]"
         assert nodes["node2"]["attrs"]["fillcolor"] == "#E3FFA1"
-        assert nodes["node3"]["label"] == f"<name> PPR-XYZ (π/4)|<wire> [0, 1, 2]"
+        assert nodes["node3"]["label"] == "<name> PPR-XYZ (π/4)|<wire> [0, 1, 2]"
         assert nodes["node3"]["attrs"]["fillcolor"] == "#F5BD70"
 
     @pytest.mark.usefixtures("use_capture")
@@ -990,9 +990,9 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 3  # Device node + operator
 
-        assert nodes["node1"]["label"] == f"<name> PPR-X (φ)|<wire> [0]"
+        assert nodes["node1"]["label"] == "<name> PPR-X (φ)|<wire> [0]"
         assert nodes["node1"]["attrs"]["fillcolor"] == "#E3FFA1"
-        assert nodes["node2"]["label"] == f"<name> PPR-XYZ (φ)|<wire> [0, 1, 2]"
+        assert nodes["node2"]["label"] == "<name> PPR-XYZ (φ)|<wire> [0, 1, 2]"
         assert nodes["node2"]["attrs"]["fillcolor"] == "#E3FFA1"
 
     @pytest.mark.usefixtures("use_capture")
@@ -1017,8 +1017,8 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 3  # Device node + operator
 
-        assert nodes["node1"]["label"] == f"<name> PauliRot|<wire> [0]"
-        assert nodes["node2"]["label"] == f"<name> PauliRot|<wire> [0, 1, 2]"
+        assert nodes["node1"]["label"] == "<name> PauliRot|<wire> [0]"
+        assert nodes["node2"]["label"] == "<name> PauliRot|<wire> [0, 1, 2]"
 
     @pytest.mark.skipif(not qml.capture.enabled(), reason="Only works with capture enabled.")
     def test_complex_measurements(self):
@@ -1048,8 +1048,8 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 3  # Device node + measurements
 
-        assert nodes["node1"]["label"] == f"<name> LinearCombination|<wire> [0, 1, 2]"
-        assert nodes["node2"]["label"] == f"<name> Prod|<wire> [0, 1]"
+        assert nodes["node1"]["label"] == "<name> LinearCombination|<wire> [0, 1, 2]"
+        assert nodes["node2"]["label"] == "<name> Prod|<wire> [0, 1]"
 
     @pytest.mark.parametrize(
         "param, wires",
@@ -1136,7 +1136,7 @@ class TestCreateDynamicOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + SWAP
 
-        assert nodes["node1"]["label"] == f"<name> SWAP|<wire> [0, arg0]"
+        assert nodes["node1"]["label"] == "<name> SWAP|<wire> [0, arg0]"
 
     def test_qnode_argument(self):
         """Tests that qnode arguments can be used as wires."""
@@ -1160,8 +1160,8 @@ class TestCreateDynamicOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 3  # Device node + H + X
 
-        assert nodes["node1"]["label"] == f"<name> Hadamard|<wire> [arg0]"
-        assert nodes["node2"]["label"] == f"<name> PauliX|<wire> [arg1]"
+        assert nodes["node1"]["label"] == "<name> Hadamard|<wire> [arg0]"
+        assert nodes["node2"]["label"] == "<name> PauliX|<wire> [arg1]"
 
     def test_for_loop_variable(self):
         """Tests that for loop iteration variables can be used as wires."""
@@ -1184,7 +1184,7 @@ class TestCreateDynamicOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + H
 
-        assert nodes["node1"]["label"] == f"<name> Hadamard|<wire> [arg0]"
+        assert nodes["node1"]["label"] == "<name> Hadamard|<wire> [arg0]"
 
     def test_while_loop_variable(self):
         """Tests that while loop variables can be used as wires."""
@@ -1209,7 +1209,7 @@ class TestCreateDynamicOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + H
 
-        assert nodes["node1"]["label"] == f"<name> Hadamard|<wire> [arg0]"
+        assert nodes["node1"]["label"] == "<name> Hadamard|<wire> [arg0]"
 
     def test_conditional_variable(self):
         """Tests that conditional variables can be used."""
@@ -1233,7 +1233,7 @@ class TestCreateDynamicOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + H
 
-        assert nodes["node1"]["label"] == f"<name> Hadamard|<wire> [arg0]"
+        assert nodes["node1"]["label"] == "<name> Hadamard|<wire> [arg0]"
 
     def test_through_clusters(self):
         """Tests that dynamic wire labels can be accessed through clusters."""
@@ -1258,8 +1258,8 @@ class TestCreateDynamicOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 3  # Device node + H + X
 
-        assert nodes["node1"]["label"] == f"<name> Hadamard|<wire> [arg0]"
-        assert nodes["node2"]["label"] == f"<name> PauliX|<wire> [arg1]"
+        assert nodes["node1"]["label"] == "<name> Hadamard|<wire> [arg0]"
+        assert nodes["node2"]["label"] == "<name> PauliX|<wire> [arg1]"
 
     def test_visualize_pythonic_operators(self):
         """Tests that we can use operators like +,-,%"""
@@ -1283,9 +1283,9 @@ class TestCreateDynamicOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 4  # Device node + ops
 
-        assert nodes["node1"]["label"] == f"<name> RX|<wire> [(arg5 % 3)]"
-        assert nodes["node2"]["label"] == f"<name> RY|<wire> [(arg5 - 3)]"
-        assert nodes["node3"]["label"] == f"<name> RZ|<wire> [(arg5 + 3)]"
+        assert nodes["node1"]["label"] == "<name> RX|<wire> [(arg5 % 3)]"
+        assert nodes["node2"]["label"] == "<name> RY|<wire> [(arg5 - 3)]"
+        assert nodes["node3"]["label"] == "<name> RZ|<wire> [(arg5 + 3)]"
 
     @pytest.mark.usefixtures("use_capture")
     def test_ppm_dynamic(self):
@@ -1308,9 +1308,9 @@ class TestCreateDynamicOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 3  # Device node + operator
 
-        assert nodes["node1"]["label"] == f"<name> PPM-X|<wire> [arg0]"
+        assert nodes["node1"]["label"] == "<name> PPM-X|<wire> [arg0]"
         assert nodes["node1"]["attrs"]["fillcolor"] == "#70B3F5"
-        assert nodes["node2"]["label"] == f"<name> PPM-XY|<wire> [arg1, 0]"
+        assert nodes["node2"]["label"] == "<name> PPM-XY|<wire> [arg1, 0]"
         assert nodes["node2"]["attrs"]["fillcolor"] == "#70B3F5"
 
 
@@ -1448,7 +1448,7 @@ class TestCreateDynamicMeasurementNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 2  # Device node + probs
 
-        assert nodes["node1"]["label"] == f"<name> probs|<wire> [0, arg0]"
+        assert nodes["node1"]["label"] == "<name> probs|<wire> [0, arg0]"
 
     def test_qnode_argument(self):
         """Tests that qnode arguments can be used as wires."""
@@ -1477,10 +1477,10 @@ class TestCreateDynamicMeasurementNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 5  # Device node + probs + expval + var + sample
 
-        assert nodes["node1"]["label"] == f"<name> probs|<wire> [arg0]"
-        assert nodes["node2"]["label"] == f"<name> expval(PauliZ)|<wire> [arg0]"
-        assert nodes["node3"]["label"] == f"<name> var(PauliX)|<wire> [arg1]"
-        assert nodes["node4"]["label"] == f"<name> sample|<wire> [arg0]"
+        assert nodes["node1"]["label"] == "<name> probs|<wire> [arg0]"
+        assert nodes["node2"]["label"] == "<name> expval(PauliZ)|<wire> [arg0]"
+        assert nodes["node3"]["label"] == "<name> var(PauliX)|<wire> [arg1]"
+        assert nodes["node4"]["label"] == "<name> sample|<wire> [arg0]"
 
     def test_visualize_pythonic_operators_on_meas(self):
         """Tests that we can use operators like +,-,%"""
@@ -1503,11 +1503,9 @@ class TestCreateDynamicMeasurementNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 3  # Device node + meas
 
+        assert nodes["node1"]["label"] == "<name> probs|<wire> [(arg5 % 3), (arg5 - 3), (arg5 + 3)]"
         assert (
-            nodes["node1"]["label"] == f"<name> probs|<wire> [(arg5 % 3), (arg5 - 3), (arg5 + 3)]"
-        )
-        assert (
-            nodes["node2"]["label"] == f"<name> sample|<wire> [(arg5 % 3), (arg5 - 3), (arg5 + 3)]"
+            nodes["node2"]["label"] == "<name> sample|<wire> [(arg5 % 3), (arg5 - 3), (arg5 + 3)]"
         )
 
 
