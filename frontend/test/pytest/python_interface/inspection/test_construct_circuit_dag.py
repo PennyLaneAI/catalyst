@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit tests for the ConstructCircuitDAG utility."""
+# pylint: disable=unused-argument, unused-variable
 
 import re
 from unittest.mock import Mock
