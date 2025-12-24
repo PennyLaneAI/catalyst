@@ -806,6 +806,7 @@ def _meas(meas: MeasurementProcess) -> str:
     else:
         wires_str = f"[{', '.join(map(str, wires_str))}]"
 
+    # pylint: disable=protected-access
     base_name = meas._shortname
 
     match meas:
