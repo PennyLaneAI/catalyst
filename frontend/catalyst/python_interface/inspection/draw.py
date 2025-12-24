@@ -287,7 +287,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         )
     if not HAS_PYDOT:
         raise ImportError(
-            "The `pydot` package is not found. Please install with 'pip install pydot'."
+            "The 'pydot' package is not found. Please install with 'pip install pydot'."
         )
 
     if not isinstance(level, (int, type(None))):
