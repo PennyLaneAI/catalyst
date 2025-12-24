@@ -389,4 +389,5 @@ def _API_name_to_pass_name():
         "ppr_to_ppm": "ppr-to-ppm",
         "reduce_t_depth": "reduce-t-depth",
         "ppr_to_mbqc": "ppr-to-mbqc",
+        "decompose_arbitrary_ppr": "decompose-arbitrary-ppr",
     }
