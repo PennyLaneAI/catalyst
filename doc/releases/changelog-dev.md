@@ -2,7 +2,8 @@
 
 <h3>New features since last release</h3>
 
-* Compiled programs can be visualized.
+* Programs compiled with ``qjit`` can now be visualized with :func:`~.draw_graph`, allowing for 
+  sequentially analyzing impacts of compilation passes on structured and dynamic programs.
   [(#2213)](https://github.com/PennyLaneAI/catalyst/pull/2213)
   [(#2229)](https://github.com/PennyLaneAI/catalyst/pull/2229)
   [(#2214)](https://github.com/PennyLaneAI/catalyst/pull/2214)
@@ -13,6 +14,71 @@
   [(#2218)](https://github.com/PennyLaneAI/catalyst/pull/2218)
   [(#2260)](https://github.com/PennyLaneAI/catalyst/pull/2260)
   [(#2287)](https://github.com/PennyLaneAI/catalyst/pull/2287)
+  [(#2243)](https://github.com/PennyLaneAI/catalyst/pull/2243)
+
+  Consider the following circuit:
+
+  ```python
+  import pennylane as qml
+  import catalyst
+
+  qml.capture.enable()
+
+  @qml.qjit(autograph=True)
+  @qml.transforms.cancel_inverses
+  @qml.transforms.merge_rotations
+  @qml.qnode(qml.device("null.qubit", wires=3))
+  def circuit(x, y):
+      qml.X(0)
+      qml.Y(1)
+      qml.H(x) 
+      
+      for i in range(3):
+          qml.S(0)
+          qml.RX(0.1, wires=1)
+          qml.RX(0.2, wires=1)
+
+          if i == 3:
+              qml.T(0)
+          else:
+              qml.H(0)
+              qml.H(0)
+
+      qml.H(x)
+
+      return qml.expval(qml.Z(y))
+  ```
+
+  The circuit structure (``for`` loop and conditional branches) along with the dynamicism can be 
+  succinctly represented with :func:`~.draw_graph`.
+
+  ```pycon
+  >>> print(catalyst.draw_graph(circuit)())
+  (<Figure size 640x480 with 1 Axes>, <Axes: >)
+  ```
+  ![Graphical representation of circuit with dynamicism and structure](../../doc/_static/catalyst-draw-graph-changelog-0.14-example.png)
+
+  By default, all compilation passes specified will be applied and visualized. However, 
+  :func:`~.draw_graph` can be used with the ``level`` argument to inspect compilation pass impacts, 
+  where the ``level`` value denotes the cumulative set of applied compilation transforms (in the 
+  order they appear) to be applied and visualized. With ``level=1``, drawing the above circuit will 
+  apply the ``merge_rotation`` transform only:
+
+  ```pycon
+  >>> print(catalyst.draw_graph(circuit, level=1)())
+  (<Figure size 640x480 with 1 Axes>, <Axes: >)
+  ```
+  ![Graphical representation of circuit with dynamicism and structure](../../doc/_static/catalyst-draw-graph-changelog-0.14-level-example.png)
+
+  The :func:`~.draw_graph` function visualizes QNodes in a similar manner as
+  `view-op-graph in traditional MLIR <https://mlir.llvm.org/docs/Passes/#-view-op-graph>`_,
+  which leverages `Graphviz <https://graphviz.org/download/>`_ to show data-flow in compiled
+  programs. As such, use of :func:`~.draw_graph` requires installation of 
+  `Graphviz <https://graphviz.org/download/>`_ and the
+  `pydot <https://pypi.org/project/pydot/>`_ software package. Please consult the links provided for 
+  installation instructions. Additionally, it is recommended to use :func:`~.draw_graph` with 
+  PennyLane's program capture enabled (see :func:`qml.capture.enable <pennylane.capture.enable>`).
+
   [(#2298)](https://github.com/PennyLaneAI/catalyst/pull/2298)
   [(#2290)](https://github.com/PennyLaneAI/catalyst/pull/2290)
   [(#2309)](https://github.com/PennyLaneAI/catalyst/pull/2309)

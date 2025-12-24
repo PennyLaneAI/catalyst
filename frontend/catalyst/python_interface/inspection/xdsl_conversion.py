@@ -311,6 +311,9 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
         case _ if op.name == "arith.index_cast":
             return resolve_constant_params(op.operands[0])
 
+        case _ if op.name == "arith.constant":
+            return op.value.value.data  # Catalyst
+
         case TensorExtractOp(tensor=tensor):
             return resolve_constant_wire(tensor)
 

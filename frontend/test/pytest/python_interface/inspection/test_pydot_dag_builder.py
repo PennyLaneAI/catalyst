@@ -22,7 +22,7 @@ pydot = pytest.importorskip("pydot")
 pytestmark = pytest.mark.xdsl
 xdsl = pytest.importorskip("xdsl")
 # pylint: disable=wrong-import-position
-from catalyst.python_interface.visualization.pydot_dag_builder import PyDotDAGBuilder
+from catalyst.python_interface.inspection.pydot_dag_builder import PyDotDAGBuilder
 
 
 @pytest.mark.unit
@@ -40,7 +40,7 @@ def test_initialization_defaults():
     assert dag_builder.graph.get_compound() == "true"
     # Ensure duplicated edges cannot be added
     assert dag_builder.graph.obj_dict["strict"] is True
-    # Ensure edges style
+    # Ensure edges are correct
     assert dag_builder.graph.obj_dict["attributes"]["splines"]== "polyline" 
 
 

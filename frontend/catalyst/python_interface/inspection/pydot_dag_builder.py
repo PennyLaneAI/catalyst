@@ -19,12 +19,18 @@ from typing import Any
 
 from .dag_builder import DAGBuilder
 
-has_pydot = True
+HAS_PYDOT = True
 try:
     import pydot
     from pydot import Cluster, Dot, Edge, Graph, Node, Subgraph
 except ImportError:
-    has_pydot = False
+    HAS_PYDOT = False
+
+from shutil import which
+
+HAS_GRAPHVIZ = True
+if which("dot") is None:
+    HAS_GRAPHVIZ = False
 
 
 class PyDotDAGBuilder(DAGBuilder):
@@ -65,18 +71,27 @@ class PyDotDAGBuilder(DAGBuilder):
         edge_attrs: dict | None = None,
         cluster_attrs: dict | None = None,
     ) -> None:
+        if not HAS_GRAPHVIZ:
+            raise ImportError(
+                "The 'Graphviz' package is not found. Please install it for your system by "
+                "following the instructions found here: https://graphviz.org/download/"
+            )
+        if not HAS_PYDOT:
+            raise ImportError(
+                "The 'pydot' package is not found. Please install with 'pip install pydot'."
+            )
+
+
         # Initialize the pydot graph:
         # - graph_type="digraph": Create a directed graph (edges have arrows).
         # - rankdir="TB": Set layout direction from Top to Bottom.
         # - compound="true": Allow edges to connect directly to clusters/subgraphs.
         # - strict=True: Prevent duplicate edges (e.g., A -> B added twice).
-        # - splines="polyline": Edges connecting clusters are polylines
+        # - splines="polyline": Edges connecting clusters are polyline
+
+        # NOTE: splines="ortho" have an open issue on graphviz: https://gitlab.com/graphviz/graphviz/-/issues/1408
         self.graph: Dot = Dot(
-            graph_type="digraph",
-            rankdir="TB",
-            compound="true",
-            strict=True,
-            splines="polyline",
+            graph_type="digraph", rankdir="TB", compound="true", strict=True, splines="polyline"
         )
 
         # Use internal cache that maps cluster ID to actual pydot (Dot or Cluster) object
