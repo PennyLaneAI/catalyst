@@ -25,7 +25,6 @@ xdsl = pytest.importorskip("xdsl")
 from catalyst.python_interface.inspection.pydot_dag_builder import PyDotDAGBuilder
 
 
-@pytest.mark.unit
 def test_initialization_defaults():
     """Tests the default graph attributes are as expected."""
 
@@ -94,7 +93,7 @@ class TestExceptions:
 class TestAddMethods:
     """Test that elements can be added to the graph."""
 
-    @pytest.mark.unit
+    
     def test_add_node(self):
         """Unit test the `add_node` method."""
 
@@ -105,7 +104,7 @@ class TestAddMethods:
         assert len(node_list) == 1
         assert node_list[0].get_label() == "node0"
 
-    @pytest.mark.unit
+    
     def test_add_edge(self):
         """Unit test the `add_edge` method."""
 
@@ -119,7 +118,7 @@ class TestAddMethods:
         assert edge.get_source() == "0"
         assert edge.get_destination() == "1"
 
-    @pytest.mark.unit
+    
     def test_add_cluster(self):
         """Unit test the 'add_cluster' method."""
 
@@ -129,7 +128,7 @@ class TestAddMethods:
         assert len(dag_builder.graph.get_subgraphs()) == 1
         assert dag_builder.graph.get_subgraphs()[0].get_name() == "cluster_0"
 
-    @pytest.mark.unit
+    
     def test_add_node_to_parent_graph(self):
         """Tests that you can add a node to a parent graph."""
         dag_builder = PyDotDAGBuilder()
@@ -161,7 +160,7 @@ class TestAddMethods:
 
         assert not root_graph.get_node("1"), "Node 1 was incorrectly added to root"
 
-    @pytest.mark.unit
+    
     def test_add_cluster_to_parent_graph(self):
         """Test that you can add a cluster to a parent graph."""
         dag_builder = PyDotDAGBuilder()
@@ -209,7 +208,7 @@ class TestAddMethods:
 class TestAttributes:
     """Tests that the attributes for elements in the graph are overridden correctly."""
 
-    @pytest.mark.unit
+    
     def test_default_graph_attrs(self):
         """Test that default graph attributes can be set."""
 
@@ -223,7 +222,7 @@ class TestAttributes:
         cluster = dag_builder.graph.get_subgraphs()[0]
         assert cluster.get("fontname") == "Times"
 
-    @pytest.mark.unit
+    
     def test_add_node_with_attrs(self):
         """Tests that default attributes are applied and can be overridden."""
         dag_builder = PyDotDAGBuilder(attrs={"fillcolor": "lightblue", "penwidth": 3})
@@ -240,7 +239,7 @@ class TestAttributes:
         assert node1.get("fillcolor") == "red"
         assert node1.get("penwidth") == 4
 
-    @pytest.mark.unit
+    
     def test_add_edge_with_attrs(self):
         """Tests that default attributes are applied and can be overridden."""
         dag_builder = PyDotDAGBuilder(attrs={"color": "lightblue4", "penwidth": 3})
@@ -259,7 +258,7 @@ class TestAttributes:
         assert edge.get("color") == "red"
         assert edge.get("penwidth") == 4
 
-    @pytest.mark.unit
+    
     def test_add_cluster_with_attrs(self):
         """Tests that default cluster attributes are applied and can be overridden."""
         dag_builder = PyDotDAGBuilder(
@@ -362,7 +361,7 @@ class TestProperties:
 class TestOutput:
     """Test that the graph can be outputted correctly."""
 
-    @pytest.mark.unit
+    
     @pytest.mark.parametrize(
         "filename, file_format",
         [("my_graph", None), ("my_graph", "png"), ("prototype.trial1", "png")],
@@ -381,7 +380,7 @@ class TestOutput:
             filename + "." + (file_format or "png"), format=file_format or "png"
         )
 
-    @pytest.mark.unit
+    
     @pytest.mark.parametrize("file_format", ["pdf", "svg", "jpeg"])
     def test_other_supported_formats(self, monkeypatch, file_format):
         """Tests that the `to_file` method works with other formats."""
@@ -395,7 +394,7 @@ class TestOutput:
         # make sure the function handles extensions correctly
         mock_write.assert_called_once_with(f"my_graph.{file_format}", format=file_format)
 
-    @pytest.mark.unit
+    
     def test_to_string(self):
         """Tests that the `to_string` method works correclty."""
 
