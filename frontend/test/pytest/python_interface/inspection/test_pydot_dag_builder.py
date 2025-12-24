@@ -364,36 +364,36 @@ class TestOutput:
 
     @pytest.mark.unit
     @pytest.mark.parametrize(
-        "filename, format",
+        "filename, file_format",
         [("my_graph", None), ("my_graph", "png"), ("prototype.trial1", "png")],
     )
-    def test_to_file(self, monkeypatch, filename, format):
+    def test_to_file(self, monkeypatch, filename, file_format):
         """Tests that the `to_file` method works correctly."""
         dag_builder = PyDotDAGBuilder()
 
         # mock out the graph writing functionality
         mock_write = MagicMock()
         monkeypatch.setattr(dag_builder.graph, "write", mock_write)
-        dag_builder.to_file(filename + "." + (format or "png"))
+        dag_builder.to_file(filename + "." + (file_format or "png"))
 
         # make sure the function handles extensions correctly
         mock_write.assert_called_once_with(
-            filename + "." + (format or "png"), format=format or "png"
+            filename + "." + (file_format or "png"), format=file_format or "png"
         )
 
     @pytest.mark.unit
-    @pytest.mark.parametrize("format", ["pdf", "svg", "jpeg"])
-    def test_other_supported_formats(self, monkeypatch, format):
+    @pytest.mark.parametrize("file_format", ["pdf", "svg", "jpeg"])
+    def test_other_supported_formats(self, monkeypatch, file_format):
         """Tests that the `to_file` method works with other formats."""
         dag_builder = PyDotDAGBuilder()
 
         # mock out the graph writing functionality
         mock_write = MagicMock()
         monkeypatch.setattr(dag_builder.graph, "write", mock_write)
-        dag_builder.to_file(f"my_graph.{format}")
+        dag_builder.to_file(f"my_graph.{file_format}")
 
         # make sure the function handles extensions correctly
-        mock_write.assert_called_once_with(f"my_graph.{format}", format=format)
+        mock_write.assert_called_once_with(f"my_graph.{file_format}", format=file_format)
 
     @pytest.mark.unit
     def test_to_string(self):

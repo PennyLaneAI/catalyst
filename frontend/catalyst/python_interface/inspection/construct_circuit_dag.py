@@ -77,7 +77,7 @@ class VisualizationError(Exception):
 
 
 class ConstructCircuitDAG:
-    """Utility tool following the director pattern to build a DAG representation of a compiled quantum program.
+    """Build a DAG representation of a compiled quantum program using the director pattern.
 
     This tool traverses an xDSL module and constructs a Directed Acyclic Graph (DAG)
     of it's quantum program using an injected DAGBuilder instance. This tool does not
@@ -785,7 +785,7 @@ def get_label(op: Operator | MeasurementProcess) -> str:
 def _operator(op: Operator) -> str:
     """Returns the appropriate label for PennyLane Operator"""
     wires = list(op.wires.labels)
-    if wires == []:
+    if not wires:
         wires_str = "all"
     else:
         wires_str = f"[{', '.join(map(str, wires))}]"

@@ -31,7 +31,7 @@ HAS_GRAPHVIZ = True
 if which("dot") is None:
     HAS_GRAPHVIZ = False
 
-
+# pylint: disable=too-many-instance-attributes
 class PyDotDAGBuilder(DAGBuilder):
     """A Directed Acyclic Graph builder for the PyDot backend.
 
@@ -51,15 +51,11 @@ class PyDotDAGBuilder(DAGBuilder):
         strict digraph G {
         rankdir=TB;
         compound=true;
-        n0 [label="node 0", fontname=Helvetica, penwidth=3, shape=ellipse, style=filled, fillcolor=lightblue, color=lightblue4];
+        n0 [...];
         subgraph cluster_c0 {
-        fontname=Helvetica;
-        penwidth=2;
-        shape=rectangle;
-        style=solid;
+            ...
         }
-
-        n1 [label="node 1", fontname=Helvetica, penwidth=3, shape=ellipse, style=filled, fillcolor=lightblue, color=lightblue4, cluster_uid=c0];
+        n1 [...];
         }
 
     """
