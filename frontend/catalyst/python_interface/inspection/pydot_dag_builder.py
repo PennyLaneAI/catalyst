@@ -1,3 +1,5 @@
+TE: These are unsupported operations to visualize
+6
 # Copyright 2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,18 +17,17 @@
 
 import pathlib
 from collections import ChainMap
+from shutil import which
 from typing import Any
 
 from .dag_builder import DAGBuilder
 
 HAS_PYDOT = True
 try:
-    import pydot
-    from pydot import Cluster, Dot, Edge, Graph, Node, Subgraph
+    from pydot import Cluster, Dot, Edge, Graph, Node
 except ImportError:
     HAS_PYDOT = False
 
-from shutil import which
 
 HAS_GRAPHVIZ = True
 if which("dot") is None:

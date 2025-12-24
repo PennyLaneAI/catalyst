@@ -309,7 +309,6 @@ class ConstructCircuitDAG:
     ) -> None:
         """Handler for all quantum measurement operations."""
 
-        prev_wires = []
         meas = None
 
         match op:
@@ -736,10 +735,10 @@ class ConstructCircuitDAG:
                 self._wire_to_node_uids["dyn_wire"] = set()
 
 
-def _flatten_if_op(op: scf.IfOp) -> list[Region]:
+def _flatten_if_op(operation: scf.IfOp) -> list[Region]:
     """Recursively flattens a nested IfOp (if/elif/else chains)."""
 
-    then_region, else_region = op.regions
+    then_region, else_region = operation.regions
 
     flattened_op: list[Region] = [then_region]
 
