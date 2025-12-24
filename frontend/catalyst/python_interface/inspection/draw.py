@@ -50,8 +50,8 @@ HAS_GRAPHVIZ = True
 if which("dot") is None:
     HAS_GRAPHVIZ = False
 
-from catalyst.python_interface.inspection.construct_circuit_dag import ConstructCircuitDAG
-from catalyst.python_interface.inspection.pydot_dag_builder import PyDotDAGBuilder
+from .construct_circuit_dag import ConstructCircuitDAG
+from .pydot_dag_builder import PyDotDAGBuilder
 
 # TODO: This caching mechanism should be improved,
 # because now it relies on a mutable global state
@@ -120,12 +120,21 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     Visualize a single QJIT compiled QNode, showing wire flow through quantum operations,
     program structure, and pass-by-pass impacts on compiled programs.
 
+    .. warning::
+
+        This function only visualizes quantum operations contained in workflows involving a single qjit-compiled QNode.
+        Workflows involving multiple QNodes or operations outside QNodes cannot yet be visualized.
+
+        Only transformations found within the Catalyst compiler can be visualized. Any PennyLane tape transform
+        will have already been applied before lowering to MLIR and will appear as the base state (``level=0``) in
+        this visualization.
+
     .. note::
 
-        The ``draw_graph`` function visualizes QNodes in a similar manner as
-        `view-op-graph in traditional MLIR <https://mlir.llvm.org/docs/Passes/#-view-op-graph>`_,
-        which leverages `Graphviz <https://graphviz.org/download/>`_ to show data-flow in compiled
-        programs.
+        The ``draw_graph`` function visualizes a QJIT-compiled QNode in a similar manner as
+        `view-op-graph does in traditional MLIR <https://mlir.llvm.org/docs/Passes/#-view-op-graph>`_,
+        which leverages `Graphviz <https://graphviz.org/download/>`_ to show data-flow in the
+        compiled IR.
 
         As such, use of ``draw_graph`` requires installation of
         `Graphviz <https://graphviz.org/download/>`_ and the
@@ -137,7 +146,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
 
     Args:
         qnode (QJIT):
-            The input QNode that is to be visualized. The QNode is assumed to be compiled with
+            The input qjit-compiled QNode that is to be visualized. The QNode is assumed to be compiled with
             qjit.
         level (int | None):
             The level of transformation to visualize. If ``None``, the final level is visualized.
@@ -273,12 +282,12 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         )
     if not HAS_GRAPHVIZ:
         raise ImportError(
-            "The Graphviz package is not found. Please install itfor your system by "
+            "The Graphviz package is not found. Please install it for your system by "
             "following the instructions found here: https://graphviz.org/download/"
         )
     if not HAS_PYDOT:
         raise ImportError(
-            "The `pydot` package is not found. Please install with 'pip install pydot'."
+            "The 'pydot' package is not found. Please install with 'pip install pydot'."
         )
 
     if not isinstance(level, (int, type(None))):
@@ -297,7 +306,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     ):
         raise TypeError(
             "The circuit must be a qjit-compiled qnode. "
-            "Please apply the `qml.qjit` function to your qnode."
+            "Please apply the 'qml.qjit' function to your qnode."
         )
 
     cache: dict[int, tuple[str, str]] = {}

@@ -38,3 +38,4 @@ xdsl
 xdsl-jax
 pydot # Graph visualization backend requirement
 matplotlib # Graph visualization frontend requirement
+graphviz # Graph visualization backend requirement
