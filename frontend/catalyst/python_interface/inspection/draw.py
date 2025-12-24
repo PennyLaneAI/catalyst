@@ -122,12 +122,13 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
 
     .. warning::
 
-        This function only visualizes quantum operations contained in workflows involving a single qjit-compiled QNode.
-        Workflows involving multiple QNodes or operations outside QNodes cannot yet be visualized.
+        This function only visualizes quantum operations contained in workflows involving a single
+        qjit-compiled QNode. Workflows involving multiple QNodes or operations outside QNodes
+        cannot yet be visualized.
 
-        Only transformations found within the Catalyst compiler can be visualized. Any PennyLane tape transform
-        will have already been applied before lowering to MLIR and will appear as the base state (``level=0``) in
-        this visualization.
+        Only transformations found within the Catalyst compiler can be visualized. Any PennyLane
+        tape transform will have already been applied before lowering to MLIR and will appear as
+        the base state (``level=0``) in this visualization.
 
     .. note::
 
@@ -146,16 +147,16 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
 
     Args:
         qnode (QJIT):
-            The input qjit-compiled QNode that is to be visualized. The QNode is assumed to be compiled with
-            qjit.
+            The input qjit-compiled QNode that is to be visualized. The QNode is assumed to be
+            compiled with qjit.
         level (int | None):
             The level of transformation to visualize. If ``None``, the final level is visualized.
 
     Returns:
         Callable:
             A function that has the same argument signature as the compiled QNode.
-            When called, the function will return the graph as a tuple of (``matplotlib.figure.Figure``,
-            ``matplotlib.axes._axes.Axes``) pairs.
+            When called, the function will return the graph
+            as a tuple of (``matplotlib.figure.Figure``, ``matplotlib.axes._axes.Axes``) pairs.
 
     Raises:
         VisualizationError:
@@ -261,10 +262,10 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
                 qml.H(x)
                 return qml.expval(qml.Z(y))
 
-        The two ``qml.H`` gates act on wires that are dynamic. In order to preserve qubit data flow,
-        each dynamic operator acts as a "choke point" to all currently active wires. To visualize
-        this clearly, we use dashed lines to represent a dynamic dependency and solid lines for
-        static/known values:
+        The two ``qml.H`` gates act on wires that are dynamic. In order to preserve qubit data
+        flow, each dynamic operator acts as a "choke point" to all currently active wires.
+        To visualize this clearly, we use dashed lines to represent a dynamic dependency
+        and solid lines for static/known values:
 
         >>> x, y = 1, 0
         >>> print(catalyst.draw_graph(circuit)(x, y))

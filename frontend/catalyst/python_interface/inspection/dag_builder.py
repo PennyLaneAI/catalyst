@@ -23,8 +23,9 @@ NodeUID: TypeAlias = str
 class DAGBuilder(ABC):
     """An abstract base class for building Directed Acyclic Graphs (DAGs).
 
-    This class provides a simple interface with three core methods (`add_node`, `add_edge` and `add_cluster`).
-    You can override these methods to implement any backend, like `pydot` or `graphviz` or even `matplotlib`.
+    This class provides a simple interface with three core methods 
+    (`add_node`, `add_edge` and `add_cluster`). You can override these methods to implement any 
+    backend, like `pydot` or `graphviz` or even `matplotlib`.
 
     Outputting your graph can be done by overriding `to_file` and `to_string`.
     """
@@ -43,8 +44,8 @@ class DAGBuilder(ABC):
         Args:
             uid (str): Unique node ID to identify this node.
             label (str): The text to display on the node when rendered.
-            cluster_uid (str | None): Optional unique ID of the cluster this node belongs to. If `None`, this node gets
-                added on the base graph.
+            cluster_uid (str | None): Optional unique ID of the cluster this node belongs to. 
+                If `None`, this node gets added on the base graph.
             **attrs (Any): Any additional styling keyword arguments.
 
         """
@@ -79,8 +80,8 @@ class DAGBuilder(ABC):
         Args:
             uid (str): Unique cluster ID to identify this cluster.
             label (str | None): Optional text to display as a label on the cluster when rendered.
-            cluster_uid (str | None): Optional unique ID of the cluster this cluster belongs to. If `None`, the cluster will be
-                placed on the base graph.
+            cluster_uid (str | None): Optional unique ID of the cluster this cluster belongs to.
+                If `None`, the cluster will be placed on the base graph.
             **attrs (Any): Any additional styling keyword arguments.
 
         """
@@ -92,7 +93,8 @@ class DAGBuilder(ABC):
         """Retrieve the current set of nodes in the graph.
 
         Returns:
-            nodes (dict[str, dict[str, Any]]): A dictionary that maps the node's ID to its node information.
+            nodes (dict[str, dict[str, Any]]): A dictionary that maps the 
+                node's ID to its node information.
         """
         raise NotImplementedError
 
@@ -102,7 +104,8 @@ class DAGBuilder(ABC):
         """Retrieve the current set of edges in the graph.
 
         Returns:
-            edges (list[dict[str, Any]]): A list of edges where each element in the list contains a dictionary of edge information.
+            edges (list[dict[str, Any]]): A list of edges where each element in the list contains 
+                a dictionary of edge information.
         """
         raise NotImplementedError
 
@@ -112,7 +115,8 @@ class DAGBuilder(ABC):
         """Retrieve the current set of clusters in the graph.
 
         Returns:
-            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID to its cluster information.
+            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID to 
+                its cluster information.
         """
         raise NotImplementedError
 
@@ -133,7 +137,7 @@ class DAGBuilder(ABC):
     def to_string(self) -> str:
         """Return the graph as a string.
 
-        This is typically used to get the graph's representation in a standard string format like DOT.
+        This is used to get the graph's representation in a standard string format like DOT.
 
         Returns:
             str: A string representation of the graph.

@@ -81,7 +81,8 @@ class ConstructCircuitDAG:
     """Utility tool following the director pattern to build a DAG representation of a compiled quantum program.
 
     This tool traverses an xDSL module and constructs a Directed Acyclic Graph (DAG)
-    of it's quantum program using an injected DAGBuilder instance. This tool does not mutate the xDSL module.
+    of it's quantum program using an injected DAGBuilder instance. This tool does not
+    mutate the xDSL module.
 
     **Example**
 
@@ -195,7 +196,8 @@ class ConstructCircuitDAG:
             uid=node_uid,
             label=get_label(qml_op),
             cluster_uid=self._cluster_uid_stack[-1],
-            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
+            # NOTE: "record" allows us to use ports
+            # (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
         )
         self._node_uid_counter += 1
@@ -215,7 +217,8 @@ class ConstructCircuitDAG:
             uid=node_uid,
             label=get_label(meas),
             cluster_uid=self._cluster_uid_stack[-1],
-            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
+            # NOTE: "record" allows us to use ports
+            # (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
         )
         self._node_uid_counter += 1
@@ -256,7 +259,8 @@ class ConstructCircuitDAG:
             uid=node_uid,
             label=label,
             cluster_uid=self._cluster_uid_stack[-1],
-            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
+            # NOTE: "record" allows us to use ports
+            # (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
             **attrs,
         )
@@ -284,7 +288,8 @@ class ConstructCircuitDAG:
             uid=node_uid,
             label=f"<name> PPM-{pw}|<wire> {wires_str}",
             cluster_uid=self._cluster_uid_stack[-1],
-            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
+            # NOTE: "record" allows us to use ports
+            # (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
             fillcolor="#70B3F5",
         )
@@ -338,7 +343,8 @@ class ConstructCircuitDAG:
             cluster_uid=self._cluster_uid_stack[-1],
             fillcolor="lightpink",
             color="lightpink3",
-            # NOTE: "record" allows us to use ports (https://graphviz.org/doc/info/shapes.html#record)
+            # NOTE: "record" allows us to use ports
+            # (https://graphviz.org/doc/info/shapes.html#record)
             shape="record",
         )
         self._node_uid_counter += 1

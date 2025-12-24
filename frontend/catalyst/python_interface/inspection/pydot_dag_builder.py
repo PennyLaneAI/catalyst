@@ -36,7 +36,8 @@ class PyDotDAGBuilder(DAGBuilder):
     """A Directed Acyclic Graph builder for the PyDot backend.
 
     Args:
-        attrs (dict | None): User default attributes to be used for all elements (nodes, edges, clusters) in the graph.
+        attrs (dict | None): User default attributes to be used for all elements 
+            (nodes, edges, clusters) in the graph.
         node_attrs (dict | None): User default attributes for a node.
         edge_attrs (dict | None): User default attributes for an edge.
         cluster_attrs (dict | None): User default attributes for a cluster.
@@ -88,7 +89,8 @@ class PyDotDAGBuilder(DAGBuilder):
         # - strict=True: Prevent duplicate edges (e.g., A -> B added twice).
         # - splines="polyline": Edges connecting clusters are polyline
 
-        # NOTE: splines="ortho" have an open issue on graphviz: https://gitlab.com/graphviz/graphviz/-/issues/1408
+        # NOTE: splines="ortho" have an open issue 
+        # on graphviz: https://gitlab.com/graphviz/graphviz/-/issues/1408
         self.graph: Dot = Dot(
             graph_type="digraph", rankdir="TB", compound="true", strict=True, splines="polyline"
         )
@@ -221,7 +223,8 @@ class PyDotDAGBuilder(DAGBuilder):
         Args:
             uid (str): Unique cluster ID to identify this cluster.
             label (str | None): Optional text to display as a label on the cluster when rendered.
-            cluster_uid (str | None): Optional unique ID of the cluster this cluster belongs to. If `None`, the cluster will be positioned on the base graph.
+            cluster_uid (str | None): Optional unique ID of the cluster this cluster belongs to. 
+                If `None`, the cluster will be positioned on the base graph.
             **attrs (Any): Any additional styling keyword arguments.
 
         Raises:
@@ -255,7 +258,8 @@ class PyDotDAGBuilder(DAGBuilder):
         """Retrieve the current set of nodes in the graph.
 
         Returns:
-            nodes (dict[str, dict[str, Any]]): A dictionary that maps the node's ID to its node information.
+            nodes (dict[str, dict[str, Any]]): A dictionary that maps the
+                node's ID to its node information.
         """
         return self._nodes
 
@@ -264,7 +268,8 @@ class PyDotDAGBuilder(DAGBuilder):
         """Retrieve the current set of edges in the graph.
 
         Returns:
-            edges (list[dict[str, Any]]): A list of edges where each element in the list contains a dictionary of edge information.
+            edges (list[dict[str, Any]]): A list of edges where each element in the list 
+                contains a dictionary of edge information.
         """
         return self._edges
 
@@ -273,15 +278,16 @@ class PyDotDAGBuilder(DAGBuilder):
         """Retrieve the current set of clusters in the graph.
 
         Returns:
-            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID to its cluster information.
+            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID 
+                to its cluster information.
         """
         return self._clusters
 
     def to_file(self, output_filename: str) -> None:
         """Save the graph to a file.
 
-        This method will infer the file's format (e.g., 'png', 'svg') from this filename's extension.
-        If no extension is provided, the 'png' format will be the default.
+        This method will infer the file's format (e.g., 'png', 'svg') from this filename's 
+        extension. If no extension is provided, the 'png' format will be the default.
 
         Args:
             output_filename (str): Desired filename for the graph. File extension can be included
@@ -299,7 +305,7 @@ class PyDotDAGBuilder(DAGBuilder):
     def to_string(self) -> str:
         """Return the graph as a string.
 
-        This is typically used to get the graph's representation in a standard string format like DOT.
+        This is used to get the graph's representation in a standard string format like DOT.
 
         Returns:
             str: A string representation of the graph.
