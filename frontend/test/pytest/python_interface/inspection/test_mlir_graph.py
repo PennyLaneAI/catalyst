@@ -16,15 +16,8 @@
 from pathlib import Path
 from shutil import which
 
-import pytest
-
-# pylint: disable=wrong-import-position
-graphviz = pytest.importorskip("graphviz")
-
-if which("dot") is None:
-    pytest.skip(reason="Graphviz isn't installed.")
-
 import pennylane as qml
+import pytest
 
 from catalyst.python_interface.inspection import generate_mlir_graph
 from catalyst.python_interface.transforms import (
