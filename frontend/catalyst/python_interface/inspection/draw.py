@@ -120,12 +120,20 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     Visualize a single QJIT compiled QNode, showing wire flow through quantum operations,
     program structure, and pass-by-pass impacts on compiled programs.
 
+    .. warning::
+
+        This function only visualizes quantum operations contained in workflows involving a single qjit-compiled QNode.
+        Workflows involving multiple QNodes or classical operations can not yet be visualized.
+
+        Only transformations found within the Cataylst compiler (MLIR passes) can be visualized. Any PennyLane tape transform
+        will have already been applied before lowering to MLIR and will appear as the base state (``level=0``) in this visualization.
+
     .. note::
 
-        The ``draw_graph`` function visualizes QNodes in a similar manner as
-        `view-op-graph in traditional MLIR <https://mlir.llvm.org/docs/Passes/#-view-op-graph>`_,
-        which leverages `Graphviz <https://graphviz.org/download/>`_ to show data-flow in compiled
-        programs.
+        The ``draw_graph`` function visualizes a QJIT compiled QNode in a similar manner as
+        `view-op-graph does in traditional MLIR <https://mlir.llvm.org/docs/Passes/#-view-op-graph>`_,
+        which leverages `Graphviz <https://graphviz.org/download/>`_ to show data-flow in the
+        compiled IR.
 
         As such, use of ``draw_graph`` requires installation of
         `Graphviz <https://graphviz.org/download/>`_ and the
@@ -137,7 +145,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
 
     Args:
         qnode (QJIT):
-            The input QNode that is to be visualized. The QNode is assumed to be compiled with
+            The input qjit-compiled QNode that is to be visualized. The QNode is assumed to be compiled with
             qjit.
         level (int | None):
             The level of transformation to visualize. If ``None``, the final level is visualized.
