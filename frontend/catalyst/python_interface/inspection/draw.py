@@ -296,7 +296,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         )
     ):
         raise TypeError(
-            "The circuit must be a qjit compiled qnode. "
+            "The circuit must be a qjit-compiled qnode. "
             "Please apply the `qml.qjit` function to your qnode."
         )
 
