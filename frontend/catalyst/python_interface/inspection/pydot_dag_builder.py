@@ -72,7 +72,10 @@ class PyDotDAGBuilder(DAGBuilder):
         cluster_attrs: dict | None = None,
     ) -> None:
         if not HAS_GRAPHVIZ:
-            raise ImportError("The `Graphviz` package is not found. Please install it  for your system by following the instructions found here: https://graphviz.org/download/")
+            raise ImportError(
+                "The 'Graphviz' package is not found. Please install it for your system by "
+                "following the instructions found here: https://graphviz.org/download/"
+            )
         if not HAS_PYDOT:
             raise ImportError("The `pydot` package is not found. Please install with `pip install pydot`.")
 
