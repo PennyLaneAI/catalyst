@@ -134,7 +134,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     .. note::
 
         The ``draw_graph`` function visualizes a QJIT-compiled QNode in a similar manner as
-        `view-op-graph does in traditional MLIR <https://mlir.llvm.org/docs/Passes/#-view-op-graph>`_,
+        `view-op-graph does in MLIR <https://mlir.llvm.org/docs/Passes/#-view-op-graph>`_,
         which leverages `Graphviz <https://graphviz.org/download/>`_ to show data-flow in the
         compiled IR.
 
@@ -365,6 +365,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         return fig, ax
 
     # Store cache on wrapper
+    # pylint: disable = protected-access
     wrapper._cache = cache
 
     return wrapper
