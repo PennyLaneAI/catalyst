@@ -20,7 +20,6 @@ import pytest
 pytestmark = pytest.mark.xdsl
 xdsl = pytest.importorskip("xdsl")
 import matplotlib
-import numpy as np
 import pennylane as qml
 
 from catalyst.python_interface.inspection import draw, draw_graph
