@@ -35,7 +35,7 @@ from catalyst.python_interface.inspection.xdsl_conversion import (
     xdsl_to_qml_measurement,
     xdsl_to_qml_op,
 )
-from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from catalyst.python_interface.inspection.dag_builder import DAGBuilder
 
 # Defines a set of operations from the quantum dialect
 # that are not to be visualized (at the moment)

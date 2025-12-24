@@ -31,11 +31,11 @@ from xdsl.ir.core import Block, Region
 
 from catalyst import measure
 from catalyst.python_interface.conversion import parse_generic_to_xdsl_module, xdsl_from_qjit
-from catalyst.python_interface.visualization.construct_circuit_dag import (
+from catalyst.python_interface.inspection.construct_circuit_dag import (
     ConstructCircuitDAG,
     get_label,
 )
-from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from catalyst.python_interface.inspection.dag_builder import DAGBuilder
 
 
 class FakeDAGBuilder(DAGBuilder):

@@ -20,7 +20,6 @@ import warnings
 from collections.abc import Callable
 from functools import wraps
 from shutil import which
-from typing import TYPE_CHECKING
 
 from pennylane.tape import QuantumScript
 from pennylane.workflow.qnode import QNode
@@ -51,8 +50,8 @@ HAS_GRAPHVIZ = True
 if which("dot") is None:
     HAS_GRAPHVIZ = False
 
-from ..visualization.construct_circuit_dag import ConstructCircuitDAG
-from ..visualization.pydot_dag_builder import PyDotDAGBuilder
+from .construct_circuit_dag import ConstructCircuitDAG
+from .pydot_dag_builder import PyDotDAGBuilder
 
 # TODO: This caching mechanism should be improved,
 # because now it relies on a mutable global state

@@ -22,7 +22,7 @@ xdsl = pytest.importorskip("xdsl")
 
 # pylint: disable=wrong-import-position
 # This import needs to be after pytest in order to prevent ImportErrors
-from catalyst.python_interface.visualization.dag_builder import DAGBuilder
+from catalyst.python_interface.inspection.dag_builder import DAGBuilder
 
 
 def test_concrete_implementation_works():

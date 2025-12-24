@@ -22,7 +22,7 @@ pydot = pytest.importorskip("pydot")
 pytestmark = pytest.mark.xdsl
 xdsl = pytest.importorskip("xdsl")
 # pylint: disable=wrong-import-position
-from catalyst.python_interface.visualization.pydot_dag_builder import PyDotDAGBuilder
+from catalyst.python_interface.inspection.pydot_dag_builder import PyDotDAGBuilder
 
 
 @pytest.mark.unit
