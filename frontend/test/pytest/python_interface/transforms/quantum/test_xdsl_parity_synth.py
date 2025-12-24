@@ -28,7 +28,6 @@ from catalyst.python_interface.transforms import (
 from catalyst.python_interface.transforms.quantum.parity_synth import _parity_network_synth
 
 pytestmark = pytest.mark.xdsl
-pytest.importorskip("networkx")
 
 
 def validate_binary_matrix(matrix: np.ndarray):
@@ -479,7 +478,7 @@ class TestParitySynthIntegration:
             return qml.state()
 
         raw_circuit = qml.qjit(circuit)
-        compiled_circuit = qml.qjit(parity_synth_pass(circuit), target="mlir")
+        compiled_circuit = qml.qjit(parity_synth_pass(circuit))
 
         run_filecheck_qjit(compiled_circuit)
         args = (0.6, 0.2, -1.8)
@@ -566,7 +565,7 @@ class TestParitySynthIntegration:
             return qml.state()
 
         raw_circuit = qml.qjit(circuit)
-        compiled_circuit = qml.qjit(parity_synth_pass(circuit), target="mlir")
+        compiled_circuit = qml.qjit(parity_synth_pass(circuit))
 
         run_filecheck_qjit(compiled_circuit)
         args = (0.6, 0.2, -1.8)

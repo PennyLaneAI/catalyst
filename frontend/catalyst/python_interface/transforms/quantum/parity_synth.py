@@ -233,8 +233,8 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
     """
 
     phase_polynomial_ops: list[CustomOp]
-    init_wire_map: [QubitType, int]
-    global_wire_map: [QubitType, int]
+    init_wire_map: dict[QubitType, int]
+    global_wire_map: dict[QubitType, int]
     phase_polynomial_ops: set[QubitType]
     num_phase_polynomial_qubits: int
 
@@ -362,7 +362,7 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
         # `inv_network_parity_matrix` might be None if the parity table was empty
         if inv_network_parity_matrix is not None:
             M = (M @ inv_network_parity_matrix) % 2
-        rowcol_circuit: list[tuple[int]] = _rowcol_parity_matrix(M)
+        rowcol_circuit: list[tuple[int]] = _rowcol_parity_matrix(M, connectivity=None)
 
         # Apply the parity network part of the new circuit
         for idx, phase_wire, subcircuit in subcircuits:
