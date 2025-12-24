@@ -349,7 +349,7 @@ class TestTransformInterpreterPass:
         mod = circuit()
         qnode_mod = [op for op in mod.body.ops if isinstance(op, builtin.ModuleOp)][0]
         _pass = TransformInterpreterPass(
-            passes={merge_rotations_pass.name: lambda: merge_rotations_pass.module_pass},
+            passes={merge_rotations_pass.pass_name: lambda: merge_rotations_pass.module_pass},
             callback=None,
         )
         ctx = Context(allow_unregistered=True)
