@@ -50,6 +50,7 @@ HAS_GRAPHVIZ = True
 if which("dot") is None:
     HAS_GRAPHVIZ = False
 
+# pylint: disable=wrong-import-position
 from .construct_circuit_dag import ConstructCircuitDAG
 from .pydot_dag_builder import PyDotDAGBuilder
 
