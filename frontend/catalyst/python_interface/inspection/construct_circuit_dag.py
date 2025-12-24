@@ -76,8 +76,6 @@ _SKIPPED_MBQC_OPS = ()
 class VisualizationError(Exception):
     """Custom visualization error."""
 
-    pass
-
 
 class ConstructCircuitDAG:
     """Utility tool following the director pattern to build a DAG representation of a compiled quantum program.
