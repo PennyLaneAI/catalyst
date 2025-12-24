@@ -294,9 +294,9 @@ class PyDotDAGBuilder(DAGBuilder):
         if not output_filename_path.suffix:
             output_filename_path = output_filename_path.with_suffix(".png")
 
-        format = output_filename_path.suffix[1:].lower()
+        file_format = output_filename_path.suffix[1:].lower()
 
-        self.graph.write(str(output_filename_path), format=format)
+        self.graph.write(str(output_filename_path), format=file_format)
 
     def to_string(self) -> str:
         """Return the graph as a string.
