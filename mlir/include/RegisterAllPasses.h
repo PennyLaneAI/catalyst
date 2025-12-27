@@ -22,6 +22,7 @@
 #include "PauliFrame/Transforms/Passes.h"
 #include "QEC/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
+#include "RefQuantum/Transforms/Passes.h"
 #include "RTIO/Transforms/Passes.h"
 #include "Test/Transforms/Passes.h"
 #include "hlo-extensions/Transforms/Passes.h"
@@ -39,6 +40,7 @@ inline void registerAllPasses()
     pauli_frame::registerPauliFramePasses();
     qec::registerQECPasses();
     quantum::registerQuantumPasses();
+    ref_quantum::registerRefQuantumPasses();
     rtio::registerRTIOPasses();
     test::registerTestPasses();
 }

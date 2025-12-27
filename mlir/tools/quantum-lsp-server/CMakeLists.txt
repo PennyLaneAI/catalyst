@@ -8,6 +8,7 @@ set(LIBS
     MLIRRegisterAllDialects
     MLIRCatalyst
     MLIRQuantum
+    MLIRRefQuantum
     MLIRQEC
     MLIRGradient
     MLIRMBQC
