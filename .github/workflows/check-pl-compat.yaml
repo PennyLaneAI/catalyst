@@ -62,7 +62,7 @@ jobs:
       run: |
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
-        pip install amazon-braket-pennylane-plugin
+        pip install amazon-braket-pennylane-plugin graphviz
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
     - name: Get Catalyst Build Dependencies (latest)
