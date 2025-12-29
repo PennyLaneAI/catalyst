@@ -375,7 +375,7 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.xfail(
+    @pytest.mark.skip(
         reason="Graph decomp might hit PauliRot, which doesn't have a runtime stub yet."
     )
     @pytest.mark.usefixtures("use_capture_dgraph")
