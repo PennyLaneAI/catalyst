@@ -204,6 +204,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                     None,
                 )
             ) is not None:
+                #breakpoint()
                 num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
                 _create_decomposition_rule(
                     rule,
@@ -228,12 +229,17 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                 elif num_wires == -1 and op_num_wires is not None:
                     num_wires = op_num_wires
 
+                requires_copy = num_wires == -1
+                if op.op.name == "MultiRZ":
+                    requires_copy = True
+                #breakpoint()
                 _create_decomposition_rule(
                     rule,
                     op_name=op.op.name,
                     num_wires=num_wires,
                     num_params=num_params,
-                    requires_copy=num_wires == -1,
+                    #requires_copy=num_wires == -1,
+                    requires_copy=requires_copy,
                     ag_enabled=self._ag_enabled,
                     pauli_word=pauli_word,
                 )
@@ -341,6 +347,7 @@ def _create_decomposition_rule(
         # Include number of wires in the function name to avoid name clashes
         # when the same rule is compiled multiple times with different number of wires
         # (e.g., MultiRZ, GlobalPhase)
+        #breakpoint()
         func_cp.__name__ += f"_wires_{num_wires}"
 
     if ag_enabled:

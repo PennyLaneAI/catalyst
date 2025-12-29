@@ -251,9 +251,9 @@ class TestGraphDecomposition:
         ):
             qml.qjit(circuit)()
 
-    @pytest.mark.xfail(
-        reason="paulirot issue to be resolved at https://github.com/PennyLaneAI/catalyst/pull/2233"
-    )
+    # @pytest.mark.xfail(
+    #     reason="paulirot issue to be resolved at https://github.com/PennyLaneAI/catalyst/pull/2233"
+    # )
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_ftqc_rotxzx(self):
         """Test that FTQC RotXZX decomposition works with from_plxpr."""
@@ -329,9 +329,9 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.xfail(
-        reason="paulirot issue to be resolved at https://github.com/PennyLaneAI/catalyst/pull/2233"
-    )
+    # @pytest.mark.xfail(
+    #     reason="paulirot issue to be resolved at https://github.com/PennyLaneAI/catalyst/pull/2233"
+    # )
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_multi_qubits(self):
         """Test that the decompose lowering pass works with multi-qubit gates."""
@@ -356,9 +356,9 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.xfail(
-        reason="paulirot issue to be resolved at https://github.com/PennyLaneAI/catalyst/pull/2233"
-    )
+    # @pytest.mark.xfail(
+    #     reason="paulirot issue to be resolved at https://github.com/PennyLaneAI/catalyst/pull/2233"
+    # )
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_adjoint(self):
         """Test the decompose lowering pass with adjoint operations."""
