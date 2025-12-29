@@ -24,10 +24,10 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pennylane as qml
 import pytest
-from conftest import CONFIG_CUSTOM_DEVICE
 from pennylane.devices import Device
 from pennylane.devices.capabilities import OperatorProperties
 from pennylane.transforms import split_non_commuting, split_to_single_terms
+from utils import CONFIG_CUSTOM_DEVICE
 
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
@@ -628,7 +628,7 @@ class TestMeasurementTransforms:
         ],
     )
     def test_diagonalize_measurements_added_to_transforms(self, unsupported_obs, mocker):
-        """Test that the diagonalize_measurements transform is included in the TransformProgram
+        """Test that the diagonalize_measurements transform is included in the CompilePipeline
         as expected when we are not diagonalizing everything to counts or samples, but some of
         {X, Y, Z, H} are not supported."""
 

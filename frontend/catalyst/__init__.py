@@ -18,12 +18,11 @@ This package contains the Catalyst Python interface.
 # pylint: disable=wrong-import-position
 
 import sys
-import types
 from os.path import dirname
 
 import jaxlib as _jaxlib
 
-_jaxlib_version = "0.6.2"
+_jaxlib_version = "0.7.1"
 if _jaxlib.__version__ != _jaxlib_version:
     import warnings
 
@@ -77,6 +76,7 @@ from catalyst.compiler import CompileOptions
 from catalyst.debug.assertion import debug_assert
 from catalyst.jit import QJIT, qjit
 from catalyst.passes.pass_api import pipeline
+from catalyst.python_interface.inspection.draw import draw_graph
 from catalyst.utils.exceptions import (
     AutoGraphError,
     CompileError,
@@ -176,6 +176,7 @@ __all__ = (
     "debug_assert",
     "CompileOptions",
     "debug",
+    "draw_graph",
     "passes",
     "pipeline",
     *_api_extension_list,

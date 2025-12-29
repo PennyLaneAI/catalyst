@@ -56,7 +56,7 @@ jobs:
       if: ${{ inputs.catalyst == 'latest' }}
       run: |
         sudo apt-get update
-        sudo apt-get install -y ccache libasan6 lld
+        sudo apt-get install -y ccache libasan6 lld graphviz
 
     - name: Install deps (Python)
       run: |
@@ -195,7 +195,7 @@ jobs:
 
     - name: Run Frontend Tests (Kokkos)
       run: |
-        make pytest TEST_BACKEND="lightning.kokkos"
+        make pytest TEST_BACKEND="lightning.kokkos" XDSL_TESTS=OFF
 
     - name: Run Frontend Tests (Braket)
       run: |

@@ -2,8 +2,8 @@ set(LIBRARY_NAME qec-transforms)
 
 
 file(GLOB SRC
-    CliffordTToPPR.cpp
-    clifford_t_to_ppr.cpp
+    ToPPR.cpp
+    to_ppr.cpp
     CommutePPR.cpp
     commute_ppr.cpp
     MergePPRIntoPPM.cpp
@@ -20,6 +20,8 @@ file(GLOB SRC
     TLayerReduction.cpp
     ppr_to_mbqc.cpp
     PPRToMBQC.cpp
+    decompose_arbitrary_ppr.cpp
+    DecomposeArbitraryPPR.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

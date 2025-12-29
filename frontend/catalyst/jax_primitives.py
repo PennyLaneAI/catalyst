@@ -32,9 +32,8 @@ from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
-from jax._src.pjit import _pjit_lowering
+from jax._src.pjit import _pjit_lowering, jit_p
 from jax.core import AbstractValue
-from jax.experimental.pjit import pjit_p
 from jax.extend.core import Primitive
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
@@ -90,6 +89,7 @@ with Patcher(
     )
     from mlir_quantum.dialects.mbqc import MeasureInBasisOp
     from mlir_quantum.dialects.mitigation import ZneOp
+    from mlir_quantum.dialects.qec import PPMeasurementOp
     from mlir_quantum.dialects.quantum import (
         AdjointOp,
         AllocOp,
@@ -110,6 +110,7 @@ with Patcher(
         MultiRZOp,
         NamedObsOp,
         NumQubitsOp,
+        PauliRotOp,
         PCPhaseOp,
         ProbsOp,
         QubitUnitaryOp,
@@ -122,6 +123,7 @@ with Patcher(
     )
     from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
     from catalyst.jax_primitives_utils import (
+        ApplyRegisteredPassOp,
         cache,
         create_call_op,
         get_cached,
@@ -293,6 +295,10 @@ qinst_p = Primitive("qinst")
 qinst_p.multiple_results = True
 unitary_p = Primitive("unitary")
 unitary_p.multiple_results = True
+pauli_rot_p = Primitive("pauli_rot")
+pauli_rot_p.multiple_results = True
+pauli_measure_p = Primitive("pauli_measure")
+pauli_measure_p.multiple_results = True
 measure_p = Primitive("measure")
 measure_p.multiple_results = True
 compbasis_p = Primitive("compbasis")
@@ -344,7 +350,7 @@ measure_in_basis_p.multiple_results = True
 decomprule_p = core.Primitive("decomposition_rule")
 decomprule_p.multiple_results = True
 
-quantum_subroutine_p = copy.deepcopy(pjit_p)
+quantum_subroutine_p = copy.deepcopy(jit_p)
 quantum_subroutine_p.name = "quantum_subroutine_p"
 subroutine_cache: dict[callable, callable] = {}
 
@@ -388,15 +394,15 @@ def subroutine(func):
     # pylint: disable-next=import-outside-toplevel
     from catalyst.api_extensions.callbacks import WRAPPER_ASSIGNMENTS
 
-    old_pjit = jax._src.pjit.pjit_p
+    old_jit_p = jax._src.pjit.jit_p
 
     @functools.wraps(func, assigned=WRAPPER_ASSIGNMENTS)
     def inside(*args, **kwargs):
         with Patcher(
             (
                 jax._src.pjit,
-                "pjit_p",
-                old_pjit,
+                "jit_p",
+                old_jit_p,
             ),
         ):
             return func(*args, **kwargs)
@@ -411,7 +417,7 @@ def subroutine(func):
         with Patcher(
             (
                 jax._src.pjit,
-                "pjit_p",
+                "jit_p",
                 quantum_subroutine_p,
             ),
         ):
@@ -420,7 +426,7 @@ def subroutine(func):
     return wrapper
 
 
-def decomposition_rule(func=None, *, is_qreg=True, num_params=0):
+def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None):
     """
     Denotes the creation of a quantum definition in the intermediate representation.
     """
@@ -432,9 +438,15 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0):
     if func is None:
         return functools.partial(decomposition_rule, is_qreg=is_qreg, num_params=num_params)
 
+    if pauli_word is not None:
+        func = functools.partial(func, pauli_word=pauli_word)
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
+        if pauli_word is not None:
+            jaxpr = jax.make_jaxpr(func)(theta=args[0], wires=args[1], **kwargs)
+        else:
+            jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
         decomprule_p.bind(pyfun=func, func_jaxpr=jaxpr, is_qreg=is_qreg, num_params=num_params)
 
     return wrapper
@@ -607,18 +619,18 @@ def _func_lowering(ctx, *args, call_jaxpr, fn):
 # Decomp rule
 #
 @decomprule_p.def_abstract_eval
-def _decomposition_rule_abstract(*, pyfun, func_jaxpr, is_qreg=False, num_params=None):
+def _decomposition_rule_abstract(*, pyfun, func_jaxpr, is_qreg=False, num_params=None, **params):
     return ()
 
 
-def _decomposition_rule_lowering(ctx, *, pyfun, func_jaxpr, **_):
+def _decomposition_rule_lowering(ctx, *, pyfun, func_jaxpr, **params):
     """Lower a quantum decomposition rule into MLIR in a single step process.
     The step is the compilation of the definition of the function fn.
     """
 
     # Set the visibility of the decomposition rule to public
     # to avoid the elimination by the compiler
-    lower_callable(ctx, pyfun, func_jaxpr, public=True)
+    lower_callable(ctx, pyfun, func_jaxpr, public=True, **params)
     return ()
 
 
@@ -708,7 +720,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         flat_output_types,
         ir.StringAttr.get(method),
         symbol_ref,
-        mlir.flatten_lowering_ir_args(args_and_consts),
+        mlir.flatten_ir_values(args_and_consts),
         diffArgIndices=diffArgIndices,
         finiteDiffParam=finiteDiffParam,
     ).results
@@ -732,7 +744,7 @@ def _capture_grad_lowering(ctx, *args, argnums, jaxpr, n_consts, method, h, fn, 
         flat_output_types,
         ir.StringAttr.get(method),
         symbol_ref,
-        mlir.flatten_lowering_ir_args(args),
+        mlir.flatten_ir_values(args),
         diffArgIndices=diffArgIndices,
         finiteDiffParam=finiteDiffParam,
     ).results
@@ -809,7 +821,7 @@ def _value_and_grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         gradient_result_types,
         ir.StringAttr.get(method),
         symbol_ref,
-        mlir.flatten_lowering_ir_args(func_args),
+        mlir.flatten_ir_values(func_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
@@ -862,8 +874,8 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
         flat_output_types[len(flat_output_types) // 2 :],
         ir.StringAttr.get(method),
         symbol_ref,
-        mlir.flatten_lowering_ir_args(func_args),
-        mlir.flatten_lowering_ir_args(tang_args),
+        mlir.flatten_ir_values(func_args),
+        mlir.flatten_ir_values(tang_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
@@ -912,8 +924,8 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         vjp_result_types,
         ir.StringAttr.get(method),
         symbol_ref,
-        mlir.flatten_lowering_ir_args(func_args),
-        mlir.flatten_lowering_ir_args(cotang_args),
+        mlir.flatten_ir_values(func_args),
+        mlir.flatten_ir_values(cotang_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
@@ -976,7 +988,7 @@ def _zne_lowering(ctx, *args, folding, jaxpr, fn):
     return ZneOp(
         flat_output_types,
         symbol_ref,
-        mlir.flatten_lowering_ir_args(args_and_consts),
+        mlir.flatten_ir_values(args_and_consts),
         _folding_attribute(ctx, folding),
         num_folds,
     ).results
@@ -1426,6 +1438,140 @@ def _unitary_lowering(
 
 
 #
+# pauli rot operation
+#
+# pylint: disable=unused-variable
+@pauli_rot_p.def_abstract_eval
+def _pauli_rot_abstract_eval(
+    *qubits_and_ctrl_qubits,
+    angle=None,
+    pauli_word=None,
+    qubits_len=0,
+    params_len=0,
+    ctrl_len=0,
+    adjoint=False,
+):
+    # The signature here is: (using * to denote zero or more)
+    # qubits*, params*, ctrl_qubits*, ctrl_values*
+    qubits = qubits_and_ctrl_qubits[:qubits_len]
+    params = qubits_and_ctrl_qubits[qubits_len : qubits_len + params_len]
+    ctrl_qubits = qubits_and_ctrl_qubits[-2 * ctrl_len : -ctrl_len]
+    ctrl_values = qubits_and_ctrl_qubits[-ctrl_len:]
+    all_qubits = qubits + ctrl_qubits
+    assert all(isinstance(qubit, AbstractQbit) for qubit in all_qubits)
+    return (AbstractQbit(),) * (qubits_len + ctrl_len)
+
+
+@pauli_rot_p.def_impl
+def _pauli_rot_def_impl(*args, **kwargs):  # pragma: no cover
+    raise NotImplementedError()
+
+
+# pylint: disable=unused-argument
+def _pauli_rot_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    *qubits_and_params: tuple,
+    pauli_word=None,
+    qubits_len=0,
+    params_len=0,
+    ctrl_len=0,
+    adjoint=False,
+):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    qubits = qubits_and_params[:qubits_len]
+    params = qubits_and_params[qubits_len : qubits_len + params_len]
+    ctrl_qubits = qubits_and_params[qubits_len + params_len : qubits_len + params_len + ctrl_len]
+    ctrl_values = qubits_and_params[qubits_len + params_len + ctrl_len :]
+
+    for q in qubits:
+        assert ir.OpaqueType.isinstance(q.type)
+        assert ir.OpaqueType(q.type).dialect_namespace == "quantum"
+        assert ir.OpaqueType(q.type).data == "bit"
+
+    assert params_len == 1 and params[0] is not None
+    angle = params[0]
+    angle = safe_cast_to_f64(angle, "PauliRot")
+    angle = extract_scalar(angle, "PauliRot")
+    assert ir.F64Type.isinstance(angle.type)
+    assert pauli_word is not None
+
+    pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
+
+    ctrl_values_i1 = []
+    for v in ctrl_values:
+        p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
+        ctrl_values_i1.append(p)
+
+    return PauliRotOp(
+        out_qubits=[qubit.type for qubit in qubits],
+        out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+        angle=angle,
+        pauli_product=pauli_word,
+        adjoint=adjoint,
+        in_qubits=qubits,
+        in_ctrl_qubits=ctrl_qubits,
+        in_ctrl_values=ctrl_values_i1,
+    ).results
+
+
+#
+# pauli measure operation
+#
+@pauli_measure_p.def_abstract_eval
+def _pauli_measure_abstract_eval(*qubits, pauli_word=None, qubits_len=0, adjoint=False):
+    qubits = qubits[:qubits_len]
+    assert all(isinstance(qubit, AbstractQbit) for qubit in qubits)
+    # This corresponds to the measurement value and the qubits after the measurements
+    return (core.ShapedArray((), bool),) + (AbstractQbit(),) * (qubits_len)
+
+
+@pauli_measure_p.def_impl
+def _pauli_measure_def_impl(*args, **kwargs):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _pauli_measure_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    *qubits: tuple,
+    pauli_word=None,
+    qubits_len=0,
+):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    qubits = qubits[:qubits_len]
+    for q in qubits:
+        assert ir.OpaqueType.isinstance(q.type)
+        assert ir.OpaqueType(q.type).dialect_namespace == "quantum"
+        assert ir.OpaqueType(q.type).data == "bit"
+
+    assert pauli_word is not None
+
+    if not all(p in ["I", "X", "Y", "Z"] for p in pauli_word):
+        raise ValueError("Only Pauli words consisting of 'I', 'X', 'Y', and 'Z' are allowed.")
+
+    pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
+
+    result_type = ir.IntegerType.get_signless(1)
+
+    ppm_results = PPMeasurementOp(
+        out_qubits=[q.type for q in qubits],
+        mres=result_type,
+        pauli_product=pauli_word,
+        in_qubits=qubits,
+    ).results
+
+    result, *out_qubits = ppm_results  # First element is the measurement result
+
+    result_type = ir.RankedTensorType.get((), result.type)
+    from_elements_op = FromElementsOp(result_type, result)
+
+    return (from_elements_op.results[0],) + tuple(out_qubits)
+
+
+#
 # measure
 #
 @measure_p.def_abstract_eval
@@ -1732,21 +1878,11 @@ def custom_measurement_staging_rule(
     else:
         out_shapes = tuple(core.DShapedArray(shape, dtype) for dtype in dtypes)
 
-    invars = [jaxpr_trace.getvar(obs)]
-    for dyn_dim in dynamic_shape:
-        invars.append(jaxpr_trace.getvar(dyn_dim))
+    in_tracers = [obs] + list(dynamic_shape)
 
     params = {"static_shape": static_shape}
 
-    out_tracers = tuple(pe.DynamicJaxprTracer(jaxpr_trace, out_shape) for out_shape in out_shapes)
-
-    eqn = pe.new_jaxpr_eqn(
-        invars,
-        [jaxpr_trace.makevar(out_tracer) for out_tracer in out_tracers],
-        primitive,
-        params,
-        jax.core.no_effects,
-    )
+    eqn, out_tracers = jaxpr_trace.make_eqn(in_tracers, out_shapes, primitive, params, [])
 
     jaxpr_trace.frame.add_eqn(eqn)
     return out_tracers if len(out_tracers) > 1 else out_tracers[0]
@@ -2026,11 +2162,11 @@ def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, *dynamic_s
 # cond
 #
 @cond_p.def_abstract_eval
-def _cond_abstract_eval(*args, branch_jaxprs, nimplicit_outputs: int, **kwargs):
+def _cond_abstract_eval(*args, branch_jaxprs, num_implicit_outputs: int, **kwargs):
     out_type = infer_output_type_jaxpr(
         [()] + branch_jaxprs[0].jaxpr.invars,
         [],
-        branch_jaxprs[0].jaxpr.outvars[nimplicit_outputs:],
+        branch_jaxprs[0].jaxpr.outvars[num_implicit_outputs:],
         expansion_strategy=cond_expansion_strategy(),
         num_implicit_inputs=None,
     )
@@ -2046,13 +2182,13 @@ def _cond_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *preds_and_branch_args_plus_consts: tuple,
     branch_jaxprs: List[core.ClosedJaxpr],
-    nimplicit_outputs: int,
+    num_implicit_outputs: int,
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
     num_preds = len(branch_jaxprs) - 1
     preds = preds_and_branch_args_plus_consts[:num_preds]
     branch_args_plus_consts = preds_and_branch_args_plus_consts[num_preds:]
-    flat_args_plus_consts = mlir.flatten_lowering_ir_args(branch_args_plus_consts)
+    flat_args_plus_consts = mlir.flatten_ir_values(branch_args_plus_consts)
 
     # recursively lower if-else chains to nested IfOps
     def emit_branches(preds, branch_jaxprs, ip):
@@ -2077,6 +2213,7 @@ def _cond_lowering(
                     [mlir.ir_constant(c) for c in true_jaxpr.consts],  # is never hit in our tests
                     *flat_args_plus_consts,
                     dim_var_values=jax_ctx.dim_var_values,
+                    const_lowering=jax_ctx.const_lowering,
                 )
 
                 YieldOp(out)
@@ -2097,6 +2234,7 @@ def _cond_lowering(
                         [mlir.ir_constants(c) for c in otherwise_jaxpr.consts],
                         *flat_args_plus_consts,
                         dim_var_values=jax_ctx.dim_var_values,
+                        const_lowering=jax_ctx.const_lowering,
                     )
 
                     YieldOp(out)
@@ -2114,11 +2252,11 @@ def _cond_lowering(
 # Index Switch
 #
 @switch_p.def_abstract_eval
-def _switch_p_abstract_eval(*args, branch_jaxprs, nimplicit_outputs: int, **kwargs):
+def _switch_p_abstract_eval(*args, branch_jaxprs, num_implicit_outputs: int, **kwargs):
     out_type = infer_output_type_jaxpr(
         [()] + branch_jaxprs[0].jaxpr.invars,
         [],
-        branch_jaxprs[0].jaxpr.outvars[nimplicit_outputs:],
+        branch_jaxprs[0].jaxpr.outvars[num_implicit_outputs:],
         expansion_strategy=switch_expansion_strategy(),
         num_implicit_inputs=None,
     )
@@ -2135,7 +2273,7 @@ def _switch_lowering(
     jax_ctx,
     *index_and_cases_and_branch_args_plus_consts: tuple,
     branch_jaxprs: List[core.ClosedJaxpr],
-    nimplicit_outputs: int,
+    num_implicit_outputs: int,
 ):
     result_types = [mlir.aval_to_ir_types(outvar)[0] for outvar in branch_jaxprs[0].out_avals]
 
@@ -2143,7 +2281,7 @@ def _switch_lowering(
     # the last branch is default and does not have a case
     cases = index_and_cases_and_branch_args_plus_consts[1 : len(branch_jaxprs)]
     branch_args_plus_consts = index_and_cases_and_branch_args_plus_consts[len(branch_jaxprs) :]
-    flat_args_plus_consts = mlir.flatten_lowering_ir_args(branch_args_plus_consts)
+    flat_args_plus_consts = mlir.flatten_ir_values(branch_args_plus_consts)
 
     index = _cast_to_index(index)
 
@@ -2167,6 +2305,7 @@ def _switch_lowering(
                 [mlir.ir_constant(const) for const in branch_jaxpr.consts],
                 *flat_args_plus_consts,
                 dim_var_values=jax_ctx.dim_var_values,
+                const_lowering=jax_ctx.const_lowering,
             )
 
             YieldOp(out)
@@ -2182,6 +2321,7 @@ def _switch_lowering(
             [mlir.ir_constant(const) for const in branch_jaxpr.consts],
             *flat_args_plus_consts,
             dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
         )
 
         YieldOp(out)
@@ -2194,14 +2334,20 @@ def _switch_lowering(
 #
 @while_p.def_abstract_eval
 def _while_loop_abstract_eval(
-    *in_type, body_jaxpr, nimplicit, preserve_dimensions, cond_nconsts, body_nconsts, **kwargs
+    *in_type,
+    body_jaxpr,
+    num_implicit_inputs,
+    preserve_dimensions,
+    cond_nconsts,
+    body_nconsts,
+    **kwargs,
 ):
     _assert_jaxpr_without_constants(body_jaxpr)
     all_nconsts = cond_nconsts + body_nconsts
     return infer_output_type_jaxpr(
         body_jaxpr.jaxpr.invars[:all_nconsts],
         body_jaxpr.jaxpr.invars[all_nconsts:],
-        body_jaxpr.jaxpr.outvars[nimplicit:],
+        body_jaxpr.jaxpr.outvars[num_implicit_inputs:],
         expansion_strategy=while_loop_expansion_strategy(preserve_dimensions),
     )
 
@@ -2214,7 +2360,7 @@ def _while_loop_def_impl(
     body_jaxpr,
     cond_nconsts,
     body_nconsts,
-    nimplicit,
+    num_implicit_inputs,
     preserve_dimensions,
 ):  # pragma: no cover
     raise NotImplementedError()
@@ -2227,11 +2373,11 @@ def _while_loop_lowering(
     body_jaxpr: core.ClosedJaxpr,
     cond_nconsts: int,
     body_nconsts: int,
-    nimplicit: int,
+    num_implicit_inputs: int,
     preserve_dimensions: bool,
 ):
     loop_carry_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
-    flat_args_plus_consts = mlir.flatten_lowering_ir_args(iter_args_plus_consts)
+    flat_args_plus_consts = mlir.flatten_ir_values(iter_args_plus_consts)
     assert [val.type for val in flat_args_plus_consts] == loop_carry_types_plus_consts
 
     # split the argument list into 3 separate groups
@@ -2268,6 +2414,7 @@ def _while_loop_lowering(
             [mlir.ir_constants(c) for c in cond_jaxpr.consts],
             *params,
             dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
         )
 
         pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), pred, []).result
@@ -2289,6 +2436,7 @@ def _while_loop_lowering(
             [mlir.ir_constants(c) for c in cond_jaxpr.consts],
             *params,
             dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
         )
 
         YieldOp(out)
@@ -2301,16 +2449,16 @@ def _while_loop_lowering(
 #
 @for_p.def_abstract_eval
 def _for_loop_abstract_eval(
-    *args, body_jaxpr, nimplicit, preserve_dimensions, body_nconsts, **kwargs
+    *args, body_jaxpr, num_implicit_inputs, preserve_dimensions, body_nconsts, **kwargs
 ):
     _assert_jaxpr_without_constants(body_jaxpr)
 
     return infer_output_type_jaxpr(
         body_jaxpr.jaxpr.invars[:body_nconsts],
         body_jaxpr.jaxpr.invars[body_nconsts:],
-        body_jaxpr.jaxpr.outvars[nimplicit:],
+        body_jaxpr.jaxpr.outvars[num_implicit_inputs:],
         expansion_strategy=for_loop_expansion_strategy(preserve_dimensions),
-        num_implicit_inputs=nimplicit,
+        num_implicit_inputs=num_implicit_inputs,
     )
 
 
@@ -2323,7 +2471,7 @@ def _for_loop_def_impl(
     step,
     *iter_args_plus_consts,
     body_jaxpr,
-    nimplicit=0,
+    num_implicit_inputs=0,
     body_nconsts,
     preserve_dimensions,
 ):  # pragma: no cover
@@ -2337,22 +2485,22 @@ def _for_loop_lowering(
     body_jaxpr: core.ClosedJaxpr,
     body_nconsts: int,
     apply_reverse_transform: bool,
-    nimplicit: int,
+    num_implicit_inputs: int,
     preserve_dimensions,
 ):
     body_consts = iter_args_plus_consts[:body_nconsts]
-    body_implicits = iter_args_plus_consts[body_nconsts : body_nconsts + nimplicit]
-    lower_bound = iter_args_plus_consts[body_nconsts + nimplicit + 0]
-    upper_bound = iter_args_plus_consts[body_nconsts + nimplicit + 1]
-    step = iter_args_plus_consts[body_nconsts + nimplicit + 2]
-    loop_index = iter_args_plus_consts[body_nconsts + nimplicit + 3]
-    loop_args = [*body_implicits, *iter_args_plus_consts[body_nconsts + nimplicit + 4 :]]
+    body_implicits = iter_args_plus_consts[body_nconsts : body_nconsts + num_implicit_inputs]
+    lower_bound = iter_args_plus_consts[body_nconsts + num_implicit_inputs + 0]
+    upper_bound = iter_args_plus_consts[body_nconsts + num_implicit_inputs + 1]
+    step = iter_args_plus_consts[body_nconsts + num_implicit_inputs + 2]
+    loop_index = iter_args_plus_consts[body_nconsts + num_implicit_inputs + 3]
+    loop_args = [*body_implicits, *iter_args_plus_consts[body_nconsts + num_implicit_inputs + 4 :]]
 
     loop_index_type = ir.RankedTensorType(loop_index.type).element_type
 
     all_param_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
     assert [lower_bound.type, upper_bound.type, step.type] == all_param_types_plus_consts[
-        body_nconsts + nimplicit : body_nconsts + nimplicit + 3
+        body_nconsts + num_implicit_inputs : body_nconsts + num_implicit_inputs + 3
     ]
     assert [val.type for val in body_consts] == all_param_types_plus_consts[:body_nconsts]
 
@@ -2406,8 +2554,8 @@ def _for_loop_lowering(
         # Re-order arguments in accordance with jax dynamic API convensions
         consts = body_consts
         loop_iter = body_args[0]
-        implicit_args = body_args[1 : nimplicit + 1]
-        explicit_args = body_args[nimplicit + 1 :]
+        implicit_args = body_args[1 : num_implicit_inputs + 1]
+        explicit_args = body_args[num_implicit_inputs + 1 :]
         loop_params = (*consts, *implicit_args, loop_iter, *explicit_args)
 
         # Recursively generate the mlir for the loop body
@@ -2419,6 +2567,7 @@ def _for_loop_lowering(
             [mlir.ir_constants(c) for c in body_jaxpr.consts],
             *loop_params,
             dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
         )
         YieldOp(out)
 
@@ -2548,9 +2697,32 @@ def _adjoint_lowering(
             [mlir.ir_constants(c) for c in jaxpr.consts],
             *list(chain(consts, cargs, adjoint_block.arguments)),
             dim_var_values=jax_ctx.dim_var_values,
+            const_lowering=jax_ctx.const_lowering,
         )
 
         QYieldOp([out[-1]])
+
+    # Need to manually add adjoint lowering pass for PPR, since that pipeline is not
+    # end-to-end yet.
+    # TODO: remove this manual addition when PPR is end-to-end, or when PPR has its own
+    # pipeline registered.
+
+    if any(_op.name == "qec.ppr" for _op in adjoint_block.operations):
+
+        def adjoint_pass_injector(_op: ir.Operation) -> ir.WalkResult:
+            if _op.name == "transform.named_sequence":
+                with ir.InsertionPoint.at_block_begin(_op.regions[0].blocks[0]):
+                    ApplyRegisteredPassOp(
+                        result=ir.OpaqueType.get("transform", 'op<"builtin.module">'),
+                        target=_op.regions[0].blocks[0].arguments[0],  # just insert at beginning
+                        pass_name="adjoint-lowering",
+                        options={},
+                        dynamic_options={},
+                    )
+                return ir.WalkResult.INTERRUPT
+            return ir.WalkResult.ADVANCE
+
+        op.parent.parent.walk(adjoint_pass_injector, walk_order=ir.WalkOrder.PRE_ORDER)
 
     return op.results
 
@@ -2651,6 +2823,8 @@ CUSTOM_LOWERING_RULES = (
     (num_qubits_p, _num_qubits_lowering),
     (gphase_p, _gphase_lowering),
     (unitary_p, _unitary_lowering),
+    (pauli_rot_p, _pauli_rot_lowering),
+    (pauli_measure_p, _pauli_measure_lowering),
     (measure_p, _measure_lowering),
     (compbasis_p, _compbasis_lowering),
     (namedobs_p, _named_obs_lowering),

@@ -36,6 +36,10 @@ struct ResourceTracker final {
     std::unordered_map<std::size_t, std::size_t> gate_sizes_;
     std::unordered_map<QubitIdType, std::size_t> wire_depths_;
     std::size_t max_num_wires_;
+    std::size_t curr_num_wires_;
+    std::size_t total_allocd_wires_;
+    std::size_t
+        max_deallocd_depth_; // The maximum depth of any qubit which has already been released
     bool static_filename_;
     bool compute_depth_;
     std::string resources_filename_;
@@ -53,30 +57,37 @@ struct ResourceTracker final {
     void RecordOperation(const std::string &name, const std::vector<QubitIdType> &wires,
                          const std::vector<QubitIdType> &controlled_wires)
     {
-        // Sanity check that wire numbers make sense
-        std::size_t total_wires = wires.size() + controlled_wires.size();
-        std::vector<QubitIdType> combined_wires = {};
-        combined_wires.insert(combined_wires.end(), wires.begin(), wires.end());
-        combined_wires.insert(combined_wires.end(), controlled_wires.begin(),
-                              controlled_wires.end());
-        for (const auto &i : combined_wires) {
-            RT_FAIL_IF(static_cast<std::size_t>(i) >= max_num_wires_,
-                       ("Wire index " + std::to_string(i) + " exceeds allocated wires").c_str());
-        }
-
-        gate_types_[name]++;
-        gate_sizes_[total_wires]++;
         if (compute_depth_) {
             std::size_t max_depth = 0;
-            for (const auto &i : combined_wires) {
-                max_depth = std::max(max_depth, wire_depths_[i]);
+            for (const auto &i : wires) {
+                auto curr_depth = wire_depths_.find(i);
+                RT_FAIL_IF(
+                    curr_depth == wire_depths_.end(),
+                    ("Wire index " + std::to_string(i) + " is not an allocated wire").c_str());
+                max_depth = std::max(max_depth, curr_depth->second);
             }
-            // All wires used in this operation must now have their depth set based on this max
+            for (const auto &i : controlled_wires) {
+                auto curr_depth = wire_depths_.find(i);
+                RT_FAIL_IF(curr_depth == wire_depths_.end(),
+                           ("Control wire index " + std::to_string(i) + " is not an allocated wire")
+                               .c_str());
+                max_depth = std::max(max_depth, curr_depth->second);
+            }
+
+            // ALL wires used in this operation must have their depth set, including control wires
             max_depth++;
-            for (const auto &i : combined_wires) {
+            for (const auto &i : wires) {
+                wire_depths_[i] = max_depth;
+            }
+            for (const auto &i : controlled_wires) {
                 wire_depths_[i] = max_depth;
             }
         }
+
+        std::size_t total_wires = wires.size() + controlled_wires.size();
+
+        gate_types_[name]++;
+        gate_sizes_[total_wires]++;
     }
 
   public:
@@ -101,6 +112,9 @@ struct ResourceTracker final {
         gate_sizes_.clear();
         wire_depths_.clear();
         max_num_wires_ = 0;
+        curr_num_wires_ = 0;
+        max_deallocd_depth_ = 0;
+        total_allocd_wires_ = 0;
     }
 
     /**
@@ -140,7 +154,14 @@ struct ResourceTracker final {
      *
      * @return The highest number of qubits that have been allocated at any point
      */
-    auto GetNumWires() -> QubitIdType { return max_num_wires_; }
+    auto GetMaxWires() -> QubitIdType { return max_num_wires_; }
+
+    /**
+     * @brief Returns the total number of qubits allocated since the last time this object was reset
+     *
+     * @return The total number of qubits that have been allocated since the last reset
+     */
+    auto GetTotalAllocations() -> QubitIdType { return total_allocd_wires_; }
 
     /**
      * @brief Returns the filename where resource tracking information is dumped
@@ -157,19 +178,24 @@ struct ResourceTracker final {
     auto GetComputeDepth() const -> bool { return compute_depth_; }
 
     /**
-     * @brief Returns the current circuit depth if depth computation is enabled
+     * @brief Returns the maximum achieved circuit depth
+     * Only runs if depth computation is enabled, otherwise always returns 0
      *
      * @return The maximum depth across all wires if depth tracking is enabled, 0 otherwise
      */
     auto GetDepth() const -> std::size_t
     {
-        if (compute_depth_ && !wire_depths_.empty()) {
-            auto max_pair = std::max_element(wire_depths_.begin(), wire_depths_.end(),
-                                             [](const std::pair<QubitIdType, std::size_t> &p1,
-                                                const std::pair<QubitIdType, std::size_t> &p2) {
-                                                 return p1.second < p2.second;
-                                             });
-            return max_pair->second;
+        if (compute_depth_) {
+            if (!wire_depths_.empty()) {
+                auto max_pair = std::max_element(wire_depths_.begin(), wire_depths_.end(),
+                                                 [](const std::pair<QubitIdType, std::size_t> &p1,
+                                                    const std::pair<QubitIdType, std::size_t> &p2) {
+                                                     return p1.second < p2.second;
+                                                 });
+                return std::max(max_deallocd_depth_, max_pair->second);
+            }
+
+            return max_deallocd_depth_;
         }
         return 0;
     }
@@ -187,16 +213,34 @@ struct ResourceTracker final {
     }
 
     /**
-     * @brief Updates the maximum number of wires tracked
+     * @brief Registers a newly allocated qubit for tracking
      *
-     * Stores the highest number of qubits allocated at any time since device creation.
-     * The maximum can only increase, never decrease.
-     *
-     * @param max_wires The current number of allocated wires
+     * @param qid The qubit ID of the newly allocated qubit
      */
-    void SetMaxWires(std::size_t num_wires)
+    void AllocateQubit(QubitIdType qid)
     {
-        max_num_wires_ = std::max(num_wires, max_num_wires_);
+        curr_num_wires_++;
+        total_allocd_wires_++;
+        max_num_wires_ = std::max(max_num_wires_, curr_num_wires_);
+
+        if (compute_depth_) {
+            wire_depths_[qid] = 0;
+        }
+    }
+
+    /**
+     * @brief Stops tracking a qubit which has been deallocated
+     *
+     * @param qid The qubit ID of the qubit to deallocate
+     */
+    void ReleaseQubit(QubitIdType qid)
+    {
+        curr_num_wires_--;
+
+        if (compute_depth_) {
+            max_deallocd_depth_ = std::max(max_deallocd_depth_, wire_depths_[qid]);
+            wire_depths_.erase(qid);
+        }
     }
 
     /**
@@ -209,7 +253,7 @@ struct ResourceTracker final {
      */
     void SetComputeDepth(const bool compute_depth)
     {
-        if (max_num_wires_ != 0) {
+        if (total_allocd_wires_ != 0) {
             RT_FAIL("Cannot set depth tracking after qubits have been allocated.");
         }
         this->compute_depth_ = compute_depth;
@@ -275,6 +319,26 @@ struct ResourceTracker final {
     }
 
     /**
+     * @brief Records a state preparation operation for resource tracking
+     *
+     * @param wires The target wires the operation acts upon
+     */
+    void SetState(const std::vector<QubitIdType> &wires)
+    {
+        RecordOperation("StatePrep", wires, {});
+    }
+
+    /**
+     * @brief Records a basis state preparation operation for resource tracking
+     *
+     * @param wires The target wires the operation acts upon
+     */
+    void SetBasisState(const std::vector<QubitIdType> &wires)
+    {
+        RecordOperation("BasisState", wires, {});
+    }
+
+    /**
      * @brief Prints resource usage statistics in JSON format to the specified file
      *
      * Outputs comprehensive resource tracking data including number of wires,
@@ -291,6 +355,7 @@ struct ResourceTracker final {
         resources << "{\n";
         resources << "  \"num_wires\": " << max_num_wires_ << ",\n";
         resources << "  \"num_gates\": " << GetNumGates() << ",\n";
+        resources << "  \"total_allocations\": " << total_allocd_wires_ << ",\n";
         resources << "  \"gate_types\": ";
         pretty_print_dict(gate_types_, 2, resources);
         resources << ",\n";

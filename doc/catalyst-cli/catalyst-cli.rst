@@ -107,17 +107,17 @@ Name location, or named source location, is a type of source location informatio
 ``--{passname}``
 """"""""""""""""
 
-Enable a specific pass. For example, to enable the ``remove-chained-self-inverse`` pass, use
-``--remove-chained-self-inverse``.
+Enable a specific pass. For example, to enable the ``cancel-inverses`` pass, use
+``--cancel-inverses``.
 
 Catalyst's main ``mlir`` stage is split up into a sequence of pass pipelines that can also be run
 individually via this option. In that case, the name of the pipeline is substituted for the pass
 name. Currently, the following pipelines are available:
-``enforce-runtime-invariants-pipeline``,
-``hlo-lowering-pipeline``,
-``quantum-compilation-pipeline``,
-``bufferization-pipeline``,
-``llvm-dialect-lowering-pipeline``, and finally
+``quantum-compilation-stage``,
+``hlo-lowering-stage``,
+``gradient-lowering-stage``,
+``bufferization-stage``,
+``llvm-dialect-lowering-stage``, and finally
 ``default-catalyst-pipeline`` which encompasses all the above as the default pipeline used by the
 Catalyst CLI tool if no pass option is specified.
 
@@ -166,7 +166,7 @@ given stage. The stages that are currently available are:
 * MLIR: ``mlir`` (start with first MLIR stage), ``{pipeline}`` such as any of the built-in pipeline
   names described under the ``--{passname}`` option, OR any custom pipeline names if the
   ``--catalyst-pipeline={pipeline(...),...}`` option is used.
-* LLVM: ``llvm_ir`` (start with first LLVM stage), ``CoroOpt``, ``O2Opt``, ``Enzyme``.
+* LLVM: ``LLVMIRTranslation`` (start with first LLVM stage), ``CoroOpt``, ``O2Opt``, ``Enzyme``.
   Note that ``CoroOpt`` (Coroutine lowering), ``O2Opt`` (O2 optimization), and ``Enzyme``
   (automatic differentiation) passes are only run conditionally as needed.
 
@@ -199,17 +199,17 @@ We'll use the Catalyst CLI tool to run the ``quantum-opt`` compiler to perform t
 optimizations and translate the input to the LLVM dialect. We'll define a pass pipeline that applies
 two quantum-optimization passes:
 
-#. ``remove-chained-self-inverse``, which removes any operations that are applied next to their
+#. ``cancel-inverses``, which removes any operations that are applied next to their
    (self-)inverses or adjoint, in this case the two adjacent Hadamard gates.
 #. ``merge-rotations``, which combines rotation gates of the same type that act sequentially, in
    this case the two RX gates the become adjacent after the two Hadamard gates have been removed by
-   the ``remove-chained-self-inverse`` pass.
+   the ``cancel-inverses`` pass.
 
 To apply these two passes to our ``my_circuit`` function, we can do so as follows:
 
 .. code-block::
 
-    pipe(remove-chained-self-inverse;merge-rotations)
+    pipe(cancel-inverses;merge-rotations)
 
 Finally, we'll use the option ``--mlir-print-ir-after-all`` to print the resulting MLIR after each
 pass that is applied, and the ``-o`` option to set the name of the output IR file:
@@ -218,7 +218,7 @@ pass that is applied, and the ``-o`` option to set the name of the output IR fil
 
     catalyst my_circuit.mlir \
         --tool=opt \
-        --catalyst-pipeline="pipe(remove-chained-self-inverse;merge-rotations)" \
+        --catalyst-pipeline="pipe(cancel-inverses;merge-rotations)" \
         --mlir-print-ir-after-all \
         -o my_circuit-llvm.mlir
 
@@ -226,7 +226,7 @@ Running this command will output the following intermediate IR to the console:
 
 .. code-block:: mlir
 
-    // -----// IR Dump After RemoveChainedSelfInversePass (remove-chained-self-inverse) //----- //
+    // -----// IR Dump After CancelInversesPass (cancel-inverses) //----- //
     module {
       func.func @my_circuit(%arg0: !quantum.bit, %arg1: f64) -> !quantum.bit {
         %out_qubits = quantum.custom "RX"(%arg1) %arg0 : !quantum.bit
@@ -257,7 +257,7 @@ and produce a new file ``my_circuit-llvm.mlir`` containing the resulting module 
       }
     }
 
-We can see in the intermediate IR after the ``remove-chained-self-inverse`` pass that the two
+We can see in the intermediate IR after the ``cancel-inverses`` pass that the two
 adjacent Hadamard gates were removed and that the two RX gates were merged into one after the
 ``merge-rotations`` pass, with the input angle to the single RX gate being the sum of the two input
 angles to the original two gates. The result in ``my_circuit-llvm.mlir`` contains the final,

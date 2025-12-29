@@ -21,7 +21,7 @@ from catalyst.pipelines import default_pipeline
 def test_mbqc_pipeline():
     """Loosely check that the MBQC pipeline is the same as the default Catalyst pipeline, but with
     the MBQC-to-LLVM dialect-conversion pass inserted before the Quantum-to-LLVM dialect-conversion
-    pass in the ``MLIRToLLVMDialect`` pipeline stage.
+    pass in the ``MLIRToLLVMDialectConversion`` pipeline stage.
     """
     default_stages = default_pipeline()
     mbqc_stages = mbqc_pipeline()
@@ -31,7 +31,7 @@ def test_mbqc_pipeline():
     mbqc_stage_names = [item[0] for item in mbqc_stages]
 
     assert default_stage_names == mbqc_stage_names
-    assert mbqc_stage_names[-1] == "MLIRToLLVMDialect"
+    assert mbqc_stage_names[-1] == "MLIRToLLVMDialectConversion"
 
     # Check that the conversion pass(es) are in the mbqc pipeline
     _, mbqc_llvm_conversion_pipeline = mbqc_stages[-1]

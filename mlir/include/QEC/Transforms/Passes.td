@@ -71,7 +71,7 @@ def AvoidYMeasureOption : Option<
 //                               Passes
 //===----------------------------------------------------------------------===//
 
-def CliffordTToPPRPass : Pass<"to-ppr"> {
+def ToPPRPass : Pass<"to-ppr"> {
     let summary = "Convert quantum dialects to the QEC dialect.";
 
     let dependentDialects = [ "catalyst::qec::QECDialect" ];
@@ -110,7 +110,7 @@ def DecomposeCliffordPPRPass : Pass<"decompose-clifford-ppr"> {
 }
 
 def PPRToPPMPass : Pass<"ppr-to-ppm"> {
-    let summary = "Convert CliffordT operations to Pauli Product Measurement operations.";
+    let summary = "Convert PPRotation operations to Pauli Product Measurement operations.";
 
     let dependentDialects = [ "catalyst::qec::QECDialect" ];
 
@@ -139,6 +139,10 @@ def TLayerReductionPass : Pass<"reduce-t-depth"> {
 
 def PPRToMBQCPass : Pass<"ppr-to-mbqc"> {
     let summary = "Convert PPR/PPM operations to MBQC operations.";
+}
+
+def DecomposeArbitraryPPRPass : Pass<"decompose-arbitrary-ppr"> {
+    let summary = "Decompose an arbitrary angle PPR into a collection of PPRs, PPMs and a single-qubit arbitrary PPR in the Z basis.";
 }
 
 #endif // QEC_PASSES

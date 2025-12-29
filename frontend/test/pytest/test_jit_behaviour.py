@@ -905,7 +905,7 @@ class TestDefaultAvailableIR:
     def test_mlir_opt_using_xdsl_passes(self, backend):
         """Test mlir opt using xDSL passes."""
         # pylint: disable-next=import-outside-toplevel
-        from pennylane.compiler.python_compiler.transforms import iterative_cancel_inverses_pass
+        from catalyst.python_interface.transforms import iterative_cancel_inverses_pass
 
         @qjit
         @iterative_cancel_inverses_pass

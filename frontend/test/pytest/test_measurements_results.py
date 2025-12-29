@@ -18,8 +18,8 @@ from copy import deepcopy
 import numpy as np
 import pennylane as qml
 import pytest
-from conftest import CONFIG_CUSTOM_DEVICE
 from jax import numpy as jnp
+from utils import CONFIG_CUSTOM_DEVICE
 
 from catalyst import CompileError, qjit
 from catalyst.device import get_device_capabilities

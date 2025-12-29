@@ -20,7 +20,7 @@
 #include "mlir/Pass/PassManager.h"  // for PassManager
 #include "mlir/Transforms/Passes.h" // for createCSEPass
 
-#include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumDialect.h"
 

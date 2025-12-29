@@ -6,9 +6,9 @@
 
 _Lower adjoint regions containing a single quantum operations._
 
-### `-annotate-function`
+### `-annotate-invalid-gradient-functions`
 
-_Annotate functions that contain a measurement operation._
+_Annotate functions that contain operations invalid for automatic gradient computation._
 
 ### `-convert-quantum-to-llvm`
 
@@ -54,9 +54,9 @@ _Perform loop boundary optimization to eliminate the redundancy of operations on
 
 _Perform merging of chained rotation gates about the same axis._
 
-### `-remove-chained-self-inverse`
+### `-cancel-inverses`
 
-_Perform removal of chained operations that are self inverses._
+_Perform removal of chained operations that are inverses._
 
 ### `-split-multiple-tapes`
 

@@ -16,15 +16,11 @@ Pytest configuration file for Catalyst test suite.
 """
 
 import os
-import pathlib
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 
 import pennylane as qml
 import pytest
-
-TEST_PATH = os.path.dirname(__file__)
-CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device.toml")
 
 
 @pytest.fixture(scope="function")
@@ -59,6 +55,18 @@ def use_capture():
         qml.capture.disable()
 
 
+@pytest.fixture(scope="function")
+def use_capture_dgraph():
+    """Enable capture and graph-decomposition before and disable them both after the test."""
+    qml.capture.enable()
+    qml.decomposition.enable_graph()
+    try:
+        yield
+    finally:
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
+
+
 @pytest.fixture(params=["capture", "no_capture"], scope="function")
 def use_both_frontend(request):
     """Runs the test once with capture enabled and once with it disabled."""
@@ -76,3 +84,13 @@ def use_both_frontend(request):
 def requires_xdsl():
     """Fixture that ensures xdsl is available. It skips the test if xdsl is not installed."""
     pytest.importorskip("xdsl", reason="xdsl is not installed, skipping test")
+    pytest.importorskip("xdsl_jax", reason="xdsl-jax is not installed, skipping test")
+
+
+def pytest_collection_modifyitems(items, config):  # pylint: disable=unused-argument
+    """Modify collected items as needed."""
+    # Tests that do not have a specific suite marker are marked `core`
+    for item in items:
+        markers = {mark.name for mark in item.iter_markers()}
+        if "xdsl" in markers and "requires_xdsl" not in item.fixturenames:
+            item.fixturenames.append("requires_xdsl")
