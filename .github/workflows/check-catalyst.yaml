@@ -475,8 +475,12 @@ jobs:
         python3 -m pip install oqc-qcaas-client
         # Install graphviz for testing the mlir-op-graph integration
         sudo apt-get install -y graphviz
-        python3 -m pip install graphviz
         make frontend
+
+    - name: Verify Graphviz installation
+      run: |
+        dot -V 
+        dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
