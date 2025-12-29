@@ -36,7 +36,7 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 from catalyst.default_pipelines import (
     get_bufferization_stage,
     get_convert_to_llvm_stage,
-    get_enforce_runtime_invariants_stage,
+    get_gradient_lowering_stage,
     get_hlo_lowering_stage,
     get_quantum_compilation_stage,
 )
@@ -205,11 +205,11 @@ class CompileOptions:
         """Returns all stages in order for compilation"""
         # Dictionaries in python are ordered
         stages = {}
-        stages["QuantumCompilationStage"] = get_quantum_compilation_stage()
+        stages["QuantumCompilationStage"] = get_quantum_compilation_stage(self.disable_assertions)
         stages["HLOLoweringStage"] = get_hlo_lowering_stage()
         stages["GradientLoweringStage"] = get_gradient_lowering_stage()
-        stages["BufferizationStage"] = get_bufferization_stage()
-        stages["MLIRToLLVMDialectConversion"] = get_convert_to_llvm_stage()
+        stages["BufferizationStage"] = get_bufferization_stage(self.async_qnodes)
+        stages["MLIRToLLVMDialectConversion"] = get_convert_to_llvm_stage(self.async_qnodes)
         return list(stages.items())
 
 def default_pipeline() -> PipelineStages:

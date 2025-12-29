@@ -78,7 +78,7 @@ void createGradientLoweringStage(OpPassManager &pm)
 
 void createBufferizationStage(OpPassManager &pm) { parsePassPipeline(getBufferizationStage(), pm); }
 
-void createLLVMDialectLoweringPipeline(OpPassManager &pm)
+void createLLVMDialectLoweringStage(OpPassManager &pm)
 {
     parsePassPipeline(getLLVMDialectLoweringStage(), pm);
 }
@@ -86,7 +86,7 @@ void createLLVMDialectLoweringPipeline(OpPassManager &pm)
 void createDefaultCatalystPipeline(OpPassManager &pm)
 {
     createQuantumCompilationStage(pm);
-    createHloLoweringStage(pm);
+    createHLOLoweringStage(pm);
     createGradientLoweringStage(pm);
     createBufferizationStage(pm);
     createLLVMDialectLoweringStage(pm);
@@ -99,10 +99,10 @@ void registerQuantumCompilationStage()
                                createQuantumCompilationStage);
 }
 
-void registerHloLoweringStage()
+void registerHLOLoweringStage()
 {
     PassPipelineRegistration<>("hlo-lowering-stage", "Register HLO lowering stage as a pass.",
-                               createHloLoweringStage);
+                               createHLOLoweringStage);
 }
 
 void registerGradientLoweringStage()
@@ -135,7 +135,7 @@ void registerDefaultCatalystPipeline()
 void registerAllCatalystPipelines()
 {
     registerQuantumCompilationStage();
-    registerHloLoweringStage();
+    registerHLOLoweringStage();
     registerGradientLoweringStage();
     registerBufferizationStage();
     registerLLVMDialectLoweringStage();
@@ -146,7 +146,7 @@ std::vector<Pipeline> getDefaultPipeline()
 {
     using PipelineFunc = void (*)(mlir::OpPassManager &);
     std::vector<PipelineFunc> pipelineFuncs = {
-        &createQuantumCompilationStage, &createHloLoweringStage, &createGradientLoweringStage,
+        &createQuantumCompilationStage, &createHLOLoweringStage, &createGradientLoweringStage,
         &createBufferizationStage, &createLLVMDialectLoweringStage};
 
     llvm::SmallVector<std::string> defaultPipelineNames = {

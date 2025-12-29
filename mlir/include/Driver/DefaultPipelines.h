@@ -32,7 +32,7 @@ using PipelineNames = std::vector<std::string>;
 using PipelineList = std::vector<PipelineInfo>;
 
 const PipelineList pipelineList{
-    {"enforce-runtime-invariants-pipeline",
+    {"quantum-compilation-pipeline",
      {// We want the invariant that transforms that generate multiple
       // tapes will generate multiple qnodes. One for each tape.
       // Split multiple tapes enforces that invariant.
@@ -47,7 +47,8 @@ const PipelineList pipelineList{
       // keep inlining modules targeting the Catalyst runtime.
       // But qnodes targeting other backends may choose to lower
       // this into something else.
-      "inline-nested-module"}},
+      "inline-nested-module", "lower-mitigation", "adjoint-lowering",
+      "disable-assertion"}},
     {"hlo-lowering-pipeline",
      {
          "canonicalize",
@@ -66,11 +67,9 @@ const PipelineList pipelineList{
          "detensorize-scf",
          "detensorize-function-boundary",
          "canonicalize",
-         "symbol-dce",
-     }},
-    {"quantum-compilation-pipeline",
-     {"annotate-function", "lower-mitigation", "lower-gradients", "adjoint-lowering",
-      "disable-assertion"}},
+         "symbol-dce"}},
+    {"gradient-lowering-pipeline",
+     {"annotate-invalid-gradient-functions", "lower-gradients"}},
     {"bufferization-pipeline",
      {"inline",
       "convert-tensor-to-linalg",      // tensor.pad
@@ -137,20 +136,20 @@ PipelineNames getPipelineNames()
     return names;
 }
 
-PassNames getEnforceRuntimeInvariantsPipeline() { return pipelineList[0].passNames; }
-
-PassNames getHLOLoweringPipeline() { return pipelineList[1].passNames; }
-
-PassNames getQuantumCompilationPipeline(bool disableAssertion = true)
+PassNames getQuantumCompilationStage(bool disableAssertion = true)
 {
     auto &&ret =
-        pipelineList[2].passNames | std::views::filter([&disableAssertion](const auto &passName) {
+        pipelineList[0].passNames | std::views::filter([&disableAssertion](const auto &passName) {
             return (!disableAssertion && (passName == "disable-assertion")) ? false : true;
         });
     return PassNames{ret.begin(), ret.end()};
 }
 
-PassNames getBufferizationPipeline(bool asyncQNodes = false)
+PassNames getHLOLoweringStage() { return pipelineList[1].passNames; }
+
+PassNames getGradientLoweringStage() { return pipelineList[2].passNames; }
+
+PassNames getBufferizationStage(bool asyncQNodes = false)
 {
     const std::string bufferizationOptions = std::format(
         "{{{} {} {} {}{}}}", "bufferize-function-boundaries", "allow-return-allocs-from-loops",
@@ -166,7 +165,7 @@ PassNames getBufferizationPipeline(bool asyncQNodes = false)
     return PassNames{ret.begin(), ret.end()};
 }
 
-PassNames getLLVMDialectLoweringPipeline(bool asyncQNodes = false)
+PassNames getLLVMDialectLoweringStage(bool asyncQNodes = false)
 {
     auto &&ret =
         pipelineList[4].passNames | std::views::filter([&asyncQNodes](const auto &passName) {
