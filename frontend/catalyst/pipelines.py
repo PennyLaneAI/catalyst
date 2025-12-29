@@ -212,6 +212,7 @@ class CompileOptions:
         stages["MLIRToLLVMDialectConversion"] = get_convert_to_llvm_stage(self.async_qnodes)
         return list(stages.items())
 
+
 def default_pipeline() -> PipelineStages:
     """Return the pipeline stages for default Catalyst workloads.
 
