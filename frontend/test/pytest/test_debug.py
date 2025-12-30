@@ -343,7 +343,6 @@ class TestCProgramGeneration:
         with pytest.raises(TypeError, match="First argument needs to be a 'QJIT' object"):
             get_cmain(f, 0.5)
 
-    # @pytest.mark.skip
     @pytest.mark.parametrize(
         ("pass_name", "target", "replacement"),
         [
