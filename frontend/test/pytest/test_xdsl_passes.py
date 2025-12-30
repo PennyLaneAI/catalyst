@@ -170,20 +170,23 @@ class TestXDSLPassesIntegration:
         from catalyst.python_interface.transforms import merge_rotations_pass
 
         @qjit(keep_intermediate="changed", verbose=True)
-        def workflow():
+        def workflow(x):
             @merge_rotations_pass
             @qml.transforms.cancel_inverses
             @qml.qnode(qml.device("lightning.qubit", wires=2))
-            def f(x):
-                qml.RX(x, 0)
+            def f(_x):
+                qml.RX(_x, 0)
                 qml.RX(1.6, 0)
                 qml.Hadamard(1)
                 qml.Hadamard(1)
                 return qml.expval(qml.Z(0))
 
-            return f(1.5)
+            return f(x)
 
-        workflow()
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        workflow.use_cwd_for_workspace = False
+
+        workflow(1.2)
         workspace_path = str(workflow.workspace)
         assert os.path.exists(
             os.path.join(workspace_path, "0_QuantumCompilationStage", "1_cancel-inverses.mlir")
