@@ -67,11 +67,14 @@ class TestCompilerOptions:
 
         @qjit(verbose=verbose, logfile=logfile, keep_intermediate=keep_intermediate)
         @qml.qnode(qml.device(backend, wires=1))
-        def workflow():
-            qml.PauliX(wires=0)
+        def workflow(x):
+            qml.RX(x, wires=0)
             return qml.state()
 
-        workflow()
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        workflow.use_cwd_for_workspace = False
+        workflow.jit_compile((1.2,))
+
         capture_result = capsys.readouterr()
         capture = capture_result.out + capture_result.err
         assert ("[SYSTEM]" in capture) if verbose else ("[SYSTEM]" not in capture)
