@@ -51,42 +51,34 @@ def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
             "Return operands which are considered non-controlled input wire values.",
             "mlir::ValueRange", "getNonCtrlWireOperands"
         >,
-        // InterfaceMethod<
-        //     "Set all operands which are considered non-controlled input qubit values.",
-        //     "void", "setNonCtrlQubitOperands", (ins "mlir::ValueRange":$replacements)
-        // >,
-        // InterfaceMethod<
-        //     "Return results which are considered non-controlled output qubit values.",
-        //     "mlir::ResultRange", "getNonCtrlQubitResults"
-        // >,
+        InterfaceMethod<
+            "Set all operands which are considered non-controlled input wire values.",
+            "void", "setNonCtrlWireOperands", (ins "mlir::ValueRange":$replacements)
+        >,
         InterfaceMethod<
             "Return all operands which are considered controlling input wire values.",
             "mlir::ValueRange", "getCtrlWireOperands"
         >,
-        // InterfaceMethod<
-        //     "Set all operands which are considered controlling input qubit values.",
-        //     "void", "setCtrlQubitOperands", (ins "mlir::ValueRange":$replacements)
-        // >,
+        InterfaceMethod<
+            "Set all operands which are considered controlling input wire values.",
+            "void", "setCtrlWireOperands", (ins "mlir::ValueRange":$replacements)
+        >,
         InterfaceMethod<
             "Return all operands which are considered controlling input boolean values.",
             "mlir::ValueRange", "getCtrlValueOperands"
         >,
-        // InterfaceMethod<
-        //     "Set all operands which are considered controlling input boolean values.",
-        //     "void", "setCtrlValueOperands", (ins "mlir::ValueRange":$replacements)
-        // >,
-        // InterfaceMethod<
-        //     "Return all operands which are considered controlling output qubit values.",
-        //     "mlir::ResultRange", "getCtrlQubitResults"
-        // >,
-        // InterfaceMethod<
-        //     "Return adjoint flag.",
-        //     "bool", "getAdjointFlag"
-        // >,
-        // InterfaceMethod<
-        //     "Set adjoint flag.",
-        //     "void", "setAdjointFlag", (ins "bool":$adjoint)
-        // >
+        InterfaceMethod<
+            "Set all operands which are considered controlling input boolean values.",
+            "void", "setCtrlValueOperands", (ins "mlir::ValueRange":$replacements)
+        >,
+        InterfaceMethod<
+            "Return adjoint flag.",
+            "bool", "getAdjointFlag"
+        >,
+        InterfaceMethod<
+            "Set adjoint flag.",
+            "void", "setAdjointFlag", (ins "bool":$adjoint)
+        >
     ];
 
     let verify = [{

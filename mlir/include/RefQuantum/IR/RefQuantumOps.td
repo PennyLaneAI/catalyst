@@ -116,14 +116,46 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
             return getWires();
         }
 
+        void setNonCtrlWireOperands(mlir::ValueRange replacements) {
+            mlir::MutableOperandRange wires = getWiresMutable();
+            assert(wires.size() == replacements.size() &&
+                   "must provide values for all non-ctrl wire values");
+            wires.assign(replacements);
+        }
+
         mlir::ValueRange getCtrlWireOperands() {
             return getCtrlWires();
+        }
+
+        void setCtrlWireOperands(mlir::ValueRange replacements) {
+            mlir::MutableOperandRange ctrlWires = getCtrlWiresMutable();
+            assert(ctrlWires.size() == replacements.size() &&
+                   "must provide values for all ctrl wire values");
+            ctrlWires.assign(replacements);
         }
 
         mlir::ValueRange getCtrlValueOperands() {
             return getCtrlValues();
         }
 
+        void setCtrlValueOperands(mlir::ValueRange replacements) {
+            mlir::MutableOperandRange ctrlValues = getCtrlValuesMutable();
+            assert(ctrlValues.size() == replacements.size() &&
+                   "must provide values for all control values");
+            ctrlValues.assign(replacements);
+        }
+
+        bool getAdjointFlag() {
+            return getAdjoint();
+        }
+
+        void setAdjointFlag(bool adjoint) {
+            if (adjoint) {
+               (*this)->setAttr("adjoint", mlir::UnitAttr::get(this->getContext()));
+            } else {
+               (*this)->removeAttr("adjoint");
+            }
+        };
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration;
