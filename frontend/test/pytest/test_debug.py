@@ -366,12 +366,12 @@ class TestCProgramGeneration:
             ),
             (
                 "BufferizationStage",
-                "%2 = arith.mulf %1, %1 : f64",
+                "%2 = arith.mulf %1, %1 : f64\n",
                 "%t = arith.mulf %1, %1 : f64\n" + "    %2 = arith.mulf %t, %1 : f64\n",
             ),
             (
                 "MLIRToLLVMDialectConversion",
-                "%7 = llvm.fmul %6, %6 : f64",
+                "%7 = llvm.fmul %6, %6 : f64\n",
                 "%t = llvm.fmul %6, %6  : f64\n" + "    %7 = llvm.fmul %t, %6  : f64\n",
             ),
             (

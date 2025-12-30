@@ -186,7 +186,7 @@ class TestXDSLPassesIntegration:
         # Create tmp workspaces for intermediates to avoid CI race conditions
         workflow.use_cwd_for_workspace = False
 
-        workflow(1.2)
+        workflow.jit_compile((1.2,))
         workspace_path = str(workflow.workspace)
         assert os.path.exists(
             os.path.join(workspace_path, "0_QuantumCompilationStage", "1_cancel-inverses.mlir")
