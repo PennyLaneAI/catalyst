@@ -27,7 +27,7 @@ class TestKeywordArguments:
     """Test QJIT with keyword arguments."""
 
     def test_function_with_kwargs(self):
-        """Test that a function works with keyword argeument."""
+        """Test that a function works with keyword argument."""
 
         @qjit
         def f(x, y):
@@ -37,7 +37,7 @@ class TestKeywordArguments:
         assert result == f(2, 3)
 
     def test_function_with_kwargs_partial(self):
-        """Test that a function works with keyword argeument."""
+        """Test that a function works with keyword argument."""
 
         @qjit
         def f(x, y):
@@ -47,7 +47,7 @@ class TestKeywordArguments:
         assert result == f(2, 3)
 
     def test_qnode_with_kwargs(self, backend):
-        """Test that a qnode works with keyword argeument."""
+        """Test that a qnode works with keyword argument."""
         dev = qml.device(backend, wires=1)
 
         @qjit
@@ -60,7 +60,7 @@ class TestKeywordArguments:
         assert jnp.allclose(circuit(0.5, c=0.5), circuit(0.5, 0.5))
 
     def test_qnode_with_kwargs_swich_order(self, backend):
-        """Test that a qnode works with keyword argeument."""
+        """Test that a qnode works with keyword argument."""
         dev = qml.device(backend, wires=1)
 
         @qjit
@@ -75,6 +75,18 @@ class TestKeywordArguments:
         expected = circuit(0.2, 0.8)
         assert jnp.allclose(same_order, expected)
         assert jnp.allclose(switched_order, expected)
+
+    def test_keyword_recompilation(self):
+        """
+        Test that functions are correctly recompiled when keywords change.
+        """
+
+        @qml.qjit
+        def foo(x, y):
+            return x + y
+
+        assert foo(1, y=2) == 3
+        assert jnp.allclose(foo(1, y=jnp.array([2, 2])), jnp.array([3, 3]))
 
 
 if __name__ == "__main__":

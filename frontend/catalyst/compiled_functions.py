@@ -425,7 +425,7 @@ class CompilationCache:
             return TypeCompatibility.NEEDS_COMPILATION, None
 
         flat_runtime_sig, treedef, static_args = get_decomposed_signature(
-            args + tuple(kwargs.values()), self.static_argnums
+            (*args, *kwargs.values()), self.static_argnums
         )
         key = CacheKey(treedef, static_args)
         if key not in self.cache:
