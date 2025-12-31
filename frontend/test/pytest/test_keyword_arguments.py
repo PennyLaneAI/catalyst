@@ -82,11 +82,11 @@ class TestKeywordArguments:
         """
 
         @qml.qjit
-        def foo(x, y):
+        def circuit(x, y):
             return x + y
 
-        assert foo(1, y=2) == 3
-        assert jnp.allclose(foo(1, y=jnp.array([2, 2])), jnp.array([3, 3]))
+        assert circuit(1, y=2) == 3
+        assert jnp.allclose(circuit(1, y=jnp.array([2, 2])), jnp.array([3, 3]))
 
 
 if __name__ == "__main__":
