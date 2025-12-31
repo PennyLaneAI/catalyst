@@ -30,6 +30,7 @@ pytest-xdist
 pytest-cov
 pytest-mock
 nbmake
+filecheck
 
 # optional rt/test dependencies
 pennylane-lightning-kokkos
