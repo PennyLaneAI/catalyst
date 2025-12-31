@@ -178,7 +178,10 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
     // TODO: add convenience builders
 
     let assemblyFormat = [{
-        $gate_name `(` $params `)` $wires (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $ctrl_wires^ `)` )?  ( `ctrlvals` `(` $ctrl_values^ `)` )? `:` type($wires) (`ctrls` type($ctrl_wires)^ )?
+        $gate_name `(` $params `)` $wires (`adj` $adjoint^)? attr-dict
+        ( `ctrls` `(` $ctrl_wires^ `)` )?
+        ( `ctrlvals` `(` $ctrl_values^ `)` )?
+        `:` type($wires) (`ctrls` type($ctrl_wires)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{

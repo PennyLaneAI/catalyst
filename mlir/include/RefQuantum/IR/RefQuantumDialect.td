@@ -27,7 +27,11 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 def RefQuantumDialect : Dialect {
     let summary = "Reference semantics quantum dialect.";
     let description = [{
-        Here are words
+        A supplemental dialect to the core quantum dialect.
+
+        Quantum operations in this dialect follow reference semantics (as opposed to qubit value
+        semantics in the core quantum dialect): the targets of quantum operations in this dialect
+        are all integer wire indices.
     }];
 
     /// This is the namespace of the dialect in MLIR, which is used as a prefix for types and ops.
