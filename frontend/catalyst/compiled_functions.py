@@ -463,7 +463,7 @@ class CompilationCache:
 
         Args:
             fn (CompiledFunction): compilation result
-            args_and_kwargs (Iterable): arguments for determining cache key and additional metadata 
+            args_and_kwargs (Iterable): arguments for determining cache key and additional metadata
             out_treedef (PyTreeDef): the output shape of the function
             workspace (Directory): directory where compilation artifacts are stored
         """
