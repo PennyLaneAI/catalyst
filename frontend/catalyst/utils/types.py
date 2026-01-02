@@ -69,6 +69,15 @@ def convert_numpy_dtype_to_mlir(dtp):
         return ir.IntegerType.get_signless(32)
     elif dtp == np.dtype(np.int64):
         return ir.IntegerType.get_signless(64)
+    elif dtp == np.dtype(np.uint8):
+        return ir.IntegerType.get_unsigned(8)
+    elif dtp == np.dtype(np.uint16):
+        return ir.IntegerType.get_unsigned(16)
+    elif dtp == np.dtype(np.uint32):
+        return ir.IntegerType.get_unsigned(32)
+    elif dtp == np.dtype(np.uint64):
+        return ir.IntegerType.get_unsigned(64)
+
     raise ValueError("Requested type conversion not available.")
 
 
