@@ -40,10 +40,9 @@ def RefQuantumDialect : Dialect {
     /// This is the C++ namespace in which the dialect and all of its sub-components are placed.
     let cppNamespace = "::catalyst::ref_quantum";
 
-    // TODO: does it depend?
-    // let dependentDialects = [
-    //     "quantum::QuantumDialect"
-    // ];
+    let dependentDialects = [
+        "quantum::QuantumDialect"
+    ];
 }
 
 
