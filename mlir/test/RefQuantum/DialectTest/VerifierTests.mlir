@@ -59,3 +59,12 @@ func.func @test_duplicate_wires2(%w0: i64) {
     ref_quantum.custom "PauliX"() %w0 ctrls (%w0) ctrlvals (%true) : i64 ctrls i64
     return
 }
+
+// -----
+
+func.func @test_namedobs_op_bad_attribute(%w0: i64) {
+    // expected-error@+2 {{expected catalyst::quantum::NamedObservable to be one of: Identity, PauliX, PauliY, PauliZ, Hadamard}}
+    // expected-error@+1 {{failed to parse NamedObservableAttr parameter 'value' which is to be a `catalyst::quantum::NamedObservable`}}
+    %0 = ref_quantum.namedobs %w0 [ bad] : !quantum.obs
+    return
+}
