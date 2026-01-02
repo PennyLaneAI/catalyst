@@ -26,6 +26,7 @@ include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 // TODO: does it depend?
 // Ideally, I want the two dialects to be cleanly separated.
 include "Quantum/IR/QuantumDialect.td"
+include "Quantum/IR/QuantumEnums.td"
 include "RefQuantum/IR/RefQuantumDialect.td"
 include "RefQuantum/IR/RefQuantumInterfaces.td"
 
@@ -171,31 +172,34 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
 // // Observable ops are not meaningful on their own: their purpose is to be sent into a measurement
 // // Hence they are Pure, i.e. removable if no users
 
-// class Observable_Op<string mnemonic, list<Trait> traits = []> :
-//         RefQuantum_Op<mnemonic, traits # [Pure]>;
+class Observable_Op<string mnemonic, list<Trait> traits = []> :
+        RefQuantum_Op<mnemonic, traits # [Pure]>;
 
-// def NamedObsOp : Observable_Op<"namedobs"> {
-//     let summary = "Define a Named observable for use in measurements";
-//     let description = [{
-//         The `ref_quantum.namedobs` operation defines a quantum observable to be used by measurement
-//         processes. The specific observable defined here represents one of 5 named observables
-//         {Identity, PauliX, PauliY, PauliZ, Hadamard} on a qubit. The arguments are a wire to
-//         measure as well as an encoding operator for the qubit as an integer between 0-4.
-//     }];
+def NamedObsOp : Observable_Op<"namedobs"> {
+    let summary = "Define a Named observable for use in measurements";
+    let description = [{
+        The `ref_quantum.namedobs` operation defines a quantum observable to be used by measurement
+        processes. The specific observable defined here represents one of 5 named observables
+        {Identity, PauliX, PauliY, PauliZ, Hadamard} on a qubit. The arguments are a wire to
+        measure as well as an encoding operator for the qubit as an integer between 0-4.
+    }];
 
-//     let arguments = (ins
-//         I64:$wire,
-//         NamedObservableAttr:$type
-//     );
+    let arguments = (ins
+        I64:$wire
+        //NamedObservableAttr:$type
+    );
 
-//     let results = (outs
-//         ObservableType:$obs
-//     );
+    let results = (outs
+        ObservableType:$obs
+    );
 
-//     let assemblyFormat = [{
-//         $wire `[` $type `]` attr-dict  `:` type(results)
-//     }];
-// }
+    // let assemblyFormat = [{
+    //     $wire `[` $type `]` attr-dict  `:` type(results)
+    // }];
+    let assemblyFormat = [{
+        $wire attr-dict `:` type(results)
+    }];
+}
 
 // -----
 

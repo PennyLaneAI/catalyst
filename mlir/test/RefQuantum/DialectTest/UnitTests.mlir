@@ -45,13 +45,15 @@ func.func @test_custom_op(%w0: i64, %w1: i64, %w2: i64, %w3: i64, %param0: f64, 
 
 // -----
 
-// func.func @test_namedobs_op(%w0: i64) {
+func.func @test_namedobs_op(%w0: i64) {
 
-//     %ox = ref_quantum.namedobs %w0 [ PauliX] : !ref_quantum.obs
-//     %oy = ref_quantum.namedobs %w0 [ PauliY] : !ref_quantum.obs
-//     %oz = ref_quantum.namedobs %w0 [ PauliZ] : !ref_quantum.obs
-//     %oi = ref_quantum.namedobs %w0 [ Identity] : !ref_quantum.obs
-//     %oh = ref_quantum.namedobs %w0 [ Hadamard] : !ref_quantum.obs
+    //%ox = ref_quantum.namedobs %w0 [ PauliX] : !ref_quantum.obs
+    //%oy = ref_quantum.namedobs %w0 [ PauliY] : !ref_quantum.obs
+    //%oz = ref_quantum.namedobs %w0 [ PauliZ] : !ref_quantum.obs
+    //%oi = ref_quantum.namedobs %w0 [ Identity] : !ref_quantum.obs
+    //%oh = ref_quantum.namedobs %w0 [ Hadamard] : !ref_quantum.obs
 
-//     return
-// }
+    %oh = ref_quantum.namedobs %w0 : !quantum.obs
+
+    return
+}

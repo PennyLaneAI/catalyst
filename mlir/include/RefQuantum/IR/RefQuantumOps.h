@@ -18,17 +18,13 @@
 
 #include "llvm/ADT/StringRef.h"
 
-// #include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
-// #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
 
-// TODO: is it dependent on the regular quantum dialect?
-// #include "Quantum/IR/QuantumDialect.h"
-
+#include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumTraits.h"
 #include "RefQuantum/IR/RefQuantumDialect.h"
 #include "RefQuantum/IR/RefQuantumInterfaces.h"
