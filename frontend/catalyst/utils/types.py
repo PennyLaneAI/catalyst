@@ -49,7 +49,7 @@ def convert_pytype_to_shaped_array(ty):
 # pylint: disable=too-many-return-statements
 def convert_numpy_dtype_to_mlir(dtp):
     """Convert dtype to MLIR. Raise ValueError if no conversion is possible"""
-    num_bytes = np.dtype(np.dtp).itemsize
+    num_bytes = np.dtype(dtp).itemsize
     if dtp == np.dtype(np.complex128):
         base = ir.F64Type.get()
         return ir.ComplexType.get(base)
