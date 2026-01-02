@@ -46,13 +46,8 @@ def RefQuantumDialect : Dialect {
     // ];
 
     /// Use the default type printing/parsing hooks, otherwise we would have to explicitly define them.
-    // Do I even need attributes?
-    // The only attr in regular quantum dialect is the named observable.
-    // I probably also need it....
     let useDefaultAttributePrinterParser = 1;
-
-    /// Uncomment the line below if defining types for the RefQuantum dialect
-    // let useDefaultTypePrinterParser = 1;
+    let useDefaultTypePrinterParser = 1;
 }
 
 
@@ -60,11 +55,14 @@ def RefQuantumDialect : Dialect {
 // RefQuantum dialect types.
 //===----------------------------------------------------------------------===//
 
-/// Uncomment the lines below if defining types for the RefQuantum dialect
-// class RefQuantum_Type<string name, string typeMnemonic, list<Trait> traits = []>
-//         : TypeDef<RefQuantumDialect, name, traits> {
-//     let mnemonic = typeMnemonic;
-// }
+class RefQuantum_Type<string name, string typeMnemonic, list<Trait> traits = []>
+        : TypeDef<RefQuantumDialect, name, traits> {
+    let mnemonic = typeMnemonic;
+}
+
+def ObservableType : RefQuantum_Type<"Observable", "obs"> {
+    let summary = "A quantum observable for use in measurements.";
+}
 
 
 //===----------------------------------------------------------------------===//

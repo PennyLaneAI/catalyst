@@ -24,13 +24,20 @@ include "mlir/IR/OpBase.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 
 // TODO: does it depend?
+// Ideally, I want the two dialects to be cleanly separated.
 // include "Quantum/IR/QuantumDialect.td"
+// include "Quantum/IR/QuantumOps.td"
 include "RefQuantum/IR/RefQuantumDialect.td"
 include "RefQuantum/IR/RefQuantumInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // RefQuantum dialect enums.
 //===----------------------------------------------------------------------===//
+
+// I do not like this duplication.
+// Ideally, I want to reuse the observable types from regular quantum dialect.
+// But also, I want the definition of the two dialects to compeltely decouple.
+// I couldn't find a way to just include parts of the quantum dialect.
 
 def NamedObservable : I32EnumAttr<"NamedObservable",
     "Known named observables",
@@ -39,7 +46,7 @@ def NamedObservable : I32EnumAttr<"NamedObservable",
         I32EnumAttrCase<"PauliX",   1>,
         I32EnumAttrCase<"PauliY",   2>,
         I32EnumAttrCase<"PauliZ",   3>,
-        I32EnumAttrCase<"Hadamard", 4>,  // Is this ever used from frontend?
+        I32EnumAttrCase<"Hadamard", 4>,
     ]> {
     let cppNamespace = "catalyst::ref_quantum";
     let genSpecializedAttr = 0;
@@ -194,5 +201,41 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
     // let hasCanonicalizeMethod = 1;
     // let hasVerifier = 1;
 }
+
+// -----
+
+// Observable ops are not meaningful on their own: their purpose is to be sent into a measurement
+// Hence they are Pure, i.e. removable if no users
+
+class Observable_Op<string mnemonic, list<Trait> traits = []> :
+        RefQuantum_Op<mnemonic, traits # [Pure]>;
+
+def NamedObsOp : Observable_Op<"namedobs"> {
+    let summary = "Define a Named observable for use in measurements";
+    let description = [{
+        The `ref_quantum.namedobs` operation defines a quantum observable to be used by measurement
+        processes. The specific observable defined here represents one of 5 named observables
+        {Identity, PauliX, PauliY, PauliZ, Hadamard} on a qubit. The arguments are a wire to
+        measure as well as an encoding operator for the qubit as an integer between 0-4.
+    }];
+
+    let arguments = (ins
+        I64:$wire,
+        NamedObservableAttr:$type
+    );
+
+    let results = (outs
+        ObservableType:$obs
+    );
+
+    let assemblyFormat = [{
+        $wire `[` $type `]` attr-dict  `:` type(results)
+    }];
+}
+
+// -----
+
+// class Measurement_Op<string mnemonic, list<Trait> traits = []> :
+//         Quantum_Op<mnemonic, traits # [MeasurementProcess]>;
 
 #endif // REF_QUANTUM_OPS

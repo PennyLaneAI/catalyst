@@ -30,11 +30,10 @@ using namespace catalyst::ref_quantum;
 
 void RefQuantumDialect::initialize()
 {
-    /// Uncomment the lines below if defining types for the RefQuantum dialect
-    //     addTypes<
-    // #define GET_TYPEDEF_LIST
-    // #include "RefQuantum/IR/RefQuantumOpsTypes.cpp.inc"
-    //         >();
+    addTypes<
+#define GET_TYPEDEF_LIST
+#include "RefQuantum/IR/RefQuantumOpsTypes.cpp.inc"
+        >();
 
     addAttributes<
 #define GET_ATTRDEF_LIST
@@ -51,9 +50,8 @@ void RefQuantumDialect::initialize()
 // RefQuantum type definitions.
 //===----------------------------------------------------------------------===//
 
-/// Uncomment the lines below if defining types
-// #define GET_TYPEDEF_CLASSES
-// #include "RefQuantum/IR/RefQuantumOpsTypes.cpp.inc"
+#define GET_TYPEDEF_CLASSES
+#include "RefQuantum/IR/RefQuantumOpsTypes.cpp.inc"
 
 #define GET_ATTRDEF_CLASSES
 #include "RefQuantum/IR/RefQuantumAttributes.cpp.inc"

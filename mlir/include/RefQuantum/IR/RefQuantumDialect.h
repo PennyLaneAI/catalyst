@@ -26,8 +26,5 @@
 // RefQuantum type declarations.
 //===----------------------------------------------------------------------===//
 
-// Uncomment the lines below if defining custom types for the RefQuantum dialect
-// For now, I don't see a need, since plxpr does not have "qubit type" or "qreg type".
-
-// #define GET_TYPEDEF_CLASSES
-// #include "RefQuantum/IR/RefQuantumOpsTypes.h.inc"
+#define GET_TYPEDEF_CLASSES
+#include "RefQuantum/IR/RefQuantumOpsTypes.h.inc"
