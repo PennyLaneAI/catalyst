@@ -24,29 +24,6 @@ include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumEnums.td"
 include "Quantum/IR/QuantumInterfaces.td"
 
-// //===----------------------------------------------------------------------===//
-// // Quantum dialect enums.
-// //===----------------------------------------------------------------------===//
-
-// def NamedObservable : I32EnumAttr<"NamedObservable",
-//     "Known named observables",
-//     [
-//         I32EnumAttrCase<"Identity", 0>,
-//         I32EnumAttrCase<"PauliX",   1>,
-//         I32EnumAttrCase<"PauliY",   2>,
-//         I32EnumAttrCase<"PauliZ",   3>,
-//         I32EnumAttrCase<"Hadamard", 4>,
-//     ]> {
-//     let cppNamespace = "catalyst::quantum";
-//     let genSpecializedAttr = 0;
-// }
-
-// //===----------------------------------------------------------------------===//
-// // Quantum dialect attributes.
-// //===----------------------------------------------------------------------===//
-
-// def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_observable">;
-
 //===----------------------------------------------------------------------===//
 // Quantum dialect operations.
 //===----------------------------------------------------------------------===//
