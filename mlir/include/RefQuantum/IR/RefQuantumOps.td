@@ -23,8 +23,6 @@ include "mlir/IR/OpBase.td"
 //   ref dialect ---> value dialect ---> bufferization ---> ....
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 
-// TODO: does it depend?
-// Ideally, I want the two dialects to be cleanly separated.
 include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumEnums.td"
 include "RefQuantum/IR/RefQuantumDialect.td"

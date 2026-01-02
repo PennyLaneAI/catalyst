@@ -13,10 +13,7 @@
 // limitations under the License.
 
 #include "mlir/IR/Builders.h"
-#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
-#include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
 
-#include "Quantum/IR/QuantumDialect.h"
 #include "RefQuantum/IR/RefQuantumDialect.h"
 #include "RefQuantum/IR/RefQuantumOps.h"
 
