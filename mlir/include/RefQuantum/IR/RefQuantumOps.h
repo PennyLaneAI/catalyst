@@ -29,24 +29,10 @@
 // TODO: is it dependent on the regular quantum dialect?
 // #include "Quantum/IR/QuantumDialect.h"
 
+#include "Quantum/IR/QuantumTraits.h"
 #include "RefQuantum/IR/RefQuantumDialect.h"
 #include "RefQuantum/IR/RefQuantumInterfaces.h"
 
-//===----------------------------------------------------------------------===//
-// RefQuantum trait declarations.
-//===----------------------------------------------------------------------===//
-
-namespace mlir {
-namespace OpTrait {
-
-template <typename ConcreteType>
-class UnitaryTrait : public TraitBase<ConcreteType, UnitaryTrait> {};
-
-template <typename ConcreteType>
-class HermitianTrait : public TraitBase<ConcreteType, HermitianTrait> {};
-
-} // namespace OpTrait
-} // namespace mlir
 
 //===----------------------------------------------------------------------===//
 // RefQuantum ops declarations.

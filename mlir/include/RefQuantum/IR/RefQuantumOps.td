@@ -25,19 +25,9 @@ include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 
 // TODO: does it depend?
 // Ideally, I want the two dialects to be cleanly separated.
-// include "Quantum/IR/QuantumDialect.td"
-// include "Quantum/IR/QuantumOps.td"
+include "Quantum/IR/QuantumDialect.td"
 include "RefQuantum/IR/RefQuantumDialect.td"
 include "RefQuantum/IR/RefQuantumInterfaces.td"
-
-
-//===----------------------------------------------------------------------===//
-// RefQuantum dialect traits.
-//===----------------------------------------------------------------------===//
-
-def Unitary : NativeOpTrait<"UnitaryTrait">;
-def Hermitian : NativeOpTrait<"HermitianTrait">;
-
 
 //===----------------------------------------------------------------------===//
 // RefQuantum dialect operations.
