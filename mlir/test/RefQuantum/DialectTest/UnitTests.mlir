@@ -55,3 +55,13 @@ func.func @test_namedobs_op(%w0: i64) {
 
     return
 }
+
+// -----
+
+func.func @test_expval_circuit() -> f64 {
+    %0 = arith.constant 0 : i64
+    ref_quantum.custom "Hadamard"() %0 : i64
+    %obs = ref_quantum.namedobs %0 [ PauliX] : !quantum.obs
+    %expval = quantum.expval %obs : f64
+    return %expval : f64
+}
