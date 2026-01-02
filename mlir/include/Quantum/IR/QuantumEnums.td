@@ -20,7 +20,7 @@ include "mlir/IR/EnumAttr.td"
 include "Quantum/IR/QuantumDialect.td"
 
 //===----------------------------------------------------------------------===//
-// Quantum dialect enums.
+// Quantum dialect enums and enum attributes.
 //===----------------------------------------------------------------------===//
 
 def NamedObservable : I32EnumAttr<"NamedObservable",
@@ -36,11 +36,7 @@ def NamedObservable : I32EnumAttr<"NamedObservable",
     let genSpecializedAttr = 0;
 }
 
-//===----------------------------------------------------------------------===//
-// Quantum dialect attributes.
-//===----------------------------------------------------------------------===//
-
 def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_observable">;
 
 
-#endif // QUANTUM_OPS
+#endif // QUANTUM_ENUMS

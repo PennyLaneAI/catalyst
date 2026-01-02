@@ -15,7 +15,6 @@
 #ifndef QUANTUM_OPS
 #define QUANTUM_OPS
 
-// include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
