@@ -5,8 +5,5 @@ add_mlir_doc(RefQuantumOps RefQuantumOps RefQuantum/ -gen-op-doc)
 add_mlir_doc(RefQuantumInterfaces RefQuantumInterfaces RefQuantum/ -gen-op-interface-docs)
 
 set(LLVM_TARGET_DEFINITIONS RefQuantumOps.td)
-mlir_tablegen(RefQuantumEnums.h.inc -gen-enum-decls)
-mlir_tablegen(RefQuantumEnums.cpp.inc -gen-enum-defs)
 mlir_tablegen(RefQuantumAttributes.h.inc -gen-attrdef-decls -attrdefs-dialect=ref_quantum)
 mlir_tablegen(RefQuantumAttributes.cpp.inc -gen-attrdef-defs -attrdefs-dialect=ref_quantum)
-add_public_tablegen_target(MLIRRefQuantumEnumsIncGen)

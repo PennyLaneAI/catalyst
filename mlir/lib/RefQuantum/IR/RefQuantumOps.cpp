@@ -27,8 +27,6 @@ using namespace catalyst::ref_quantum;
 // RefQuantum op definitions.
 //===----------------------------------------------------------------------===//
 
-#include "RefQuantum/IR/RefQuantumEnums.cpp.inc"
-
 #define GET_OP_CLASSES
 #include "RefQuantum/IR/RefQuantumOps.cpp.inc"
 

@@ -44,24 +44,6 @@ def RefQuantumDialect : Dialect {
     // let dependentDialects = [
     //     "quantum::QuantumDialect"
     // ];
-
-    /// Use the default type printing/parsing hooks, otherwise we would have to explicitly define them.
-    let useDefaultAttributePrinterParser = 1;
-    let useDefaultTypePrinterParser = 1;
-}
-
-
-//===----------------------------------------------------------------------===//
-// RefQuantum dialect types.
-//===----------------------------------------------------------------------===//
-
-class RefQuantum_Type<string name, string typeMnemonic, list<Trait> traits = []>
-        : TypeDef<RefQuantumDialect, name, traits> {
-    let mnemonic = typeMnemonic;
-}
-
-def ObservableType : RefQuantum_Type<"Observable", "obs"> {
-    let summary = "A quantum observable for use in measurements.";
 }
 
 

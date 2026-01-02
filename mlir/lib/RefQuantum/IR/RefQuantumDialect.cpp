@@ -30,28 +30,8 @@ using namespace catalyst::ref_quantum;
 
 void RefQuantumDialect::initialize()
 {
-    addTypes<
-#define GET_TYPEDEF_LIST
-#include "RefQuantum/IR/RefQuantumOpsTypes.cpp.inc"
-        >();
-
-    addAttributes<
-#define GET_ATTRDEF_LIST
-#include "RefQuantum/IR/RefQuantumAttributes.cpp.inc"
-        >();
-
     addOperations<
 #define GET_OP_LIST
 #include "RefQuantum/IR/RefQuantumOps.cpp.inc"
         >();
 }
-
-//===----------------------------------------------------------------------===//
-// RefQuantum type definitions.
-//===----------------------------------------------------------------------===//
-
-#define GET_TYPEDEF_CLASSES
-#include "RefQuantum/IR/RefQuantumOpsTypes.cpp.inc"
-
-#define GET_ATTRDEF_CLASSES
-#include "RefQuantum/IR/RefQuantumAttributes.cpp.inc"

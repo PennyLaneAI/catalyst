@@ -52,10 +52,5 @@ class HermitianTrait : public TraitBase<ConcreteType, HermitianTrait> {};
 // RefQuantum ops declarations.
 //===----------------------------------------------------------------------===//
 
-#include "RefQuantum/IR/RefQuantumEnums.h.inc"
-
-#define GET_ATTRDEF_CLASSES
-#include "RefQuantum/IR/RefQuantumAttributes.h.inc"
-
 #define GET_OP_CLASSES
 #include "RefQuantum/IR/RefQuantumOps.h.inc"

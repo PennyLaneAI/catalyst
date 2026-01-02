@@ -21,10 +21,3 @@
 //===----------------------------------------------------------------------===//
 
 #include "RefQuantum/IR/RefQuantumOpsDialect.h.inc"
-
-//===----------------------------------------------------------------------===//
-// RefQuantum type declarations.
-//===----------------------------------------------------------------------===//
-
-#define GET_TYPEDEF_CLASSES
-#include "RefQuantum/IR/RefQuantumOpsTypes.h.inc"
