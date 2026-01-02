@@ -15,44 +15,37 @@
 #ifndef QUANTUM_OPS
 #define QUANTUM_OPS
 
-include "mlir/IR/EnumAttr.td"
+// include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
 include "Quantum/IR/QuantumDialect.td"
+include "Quantum/IR/QuantumEnums.td"
 include "Quantum/IR/QuantumInterfaces.td"
 
-//===----------------------------------------------------------------------===//
-// Quantum dialect enums.
-//===----------------------------------------------------------------------===//
+// //===----------------------------------------------------------------------===//
+// // Quantum dialect enums.
+// //===----------------------------------------------------------------------===//
 
-def NamedObservable : I32EnumAttr<"NamedObservable",
-    "Known named observables",
-    [
-        I32EnumAttrCase<"Identity", 0>,
-        I32EnumAttrCase<"PauliX",   1>,
-        I32EnumAttrCase<"PauliY",   2>,
-        I32EnumAttrCase<"PauliZ",   3>,
-        I32EnumAttrCase<"Hadamard", 4>,
-    ]> {
-    let cppNamespace = "catalyst::quantum";
-    let genSpecializedAttr = 0;
-}
+// def NamedObservable : I32EnumAttr<"NamedObservable",
+//     "Known named observables",
+//     [
+//         I32EnumAttrCase<"Identity", 0>,
+//         I32EnumAttrCase<"PauliX",   1>,
+//         I32EnumAttrCase<"PauliY",   2>,
+//         I32EnumAttrCase<"PauliZ",   3>,
+//         I32EnumAttrCase<"Hadamard", 4>,
+//     ]> {
+//     let cppNamespace = "catalyst::quantum";
+//     let genSpecializedAttr = 0;
+// }
 
+// //===----------------------------------------------------------------------===//
+// // Quantum dialect attributes.
+// //===----------------------------------------------------------------------===//
 
-//===----------------------------------------------------------------------===//
-// Quantum dialect traits.
-//===----------------------------------------------------------------------===//
-
-def Unitary : NativeOpTrait<"UnitaryTrait">;
-def Hermitian : NativeOpTrait<"HermitianTrait">;
-
-//===----------------------------------------------------------------------===//
-// Quantum dialect attributes.
-//===----------------------------------------------------------------------===//
-
-def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_observable">;
+// def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_observable">;
 
 //===----------------------------------------------------------------------===//
 // Quantum dialect operations.
