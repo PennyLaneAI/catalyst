@@ -185,19 +185,16 @@ def NamedObsOp : Observable_Op<"namedobs"> {
     }];
 
     let arguments = (ins
-        I64:$wire
-        //NamedObservableAttr:$type
+        I64:$wire,
+        NamedObservableAttr:$type
     );
 
     let results = (outs
         ObservableType:$obs
     );
 
-    // let assemblyFormat = [{
-    //     $wire `[` $type `]` attr-dict  `:` type(results)
-    // }];
     let assemblyFormat = [{
-        $wire attr-dict `:` type(results)
+        $wire `[` $type `]` attr-dict  `:` type(results)
     }];
 }
 

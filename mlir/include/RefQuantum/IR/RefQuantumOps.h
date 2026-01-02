@@ -34,5 +34,9 @@
 // RefQuantum ops declarations.
 //===----------------------------------------------------------------------===//
 
+#include "Quantum/IR/QuantumEnums.h.inc"
+#define GET_ATTRDEF_CLASSES
+#include "Quantum/IR/QuantumAttributes.h.inc"
+
 #define GET_OP_CLASSES
 #include "RefQuantum/IR/RefQuantumOps.h.inc"
