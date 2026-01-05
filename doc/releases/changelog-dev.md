@@ -291,8 +291,6 @@
   ```python
   import pennylane as qml
 
-  qml.capture.enable()
-
   @qml.qjit(pipelines=[("pipe", ["quantum-compilation-stage"])], target="mlir")
   @qml.transforms.decompose_arbitrary_ppr
   @qml.transforms.to_ppr
