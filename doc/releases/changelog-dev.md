@@ -285,8 +285,8 @@
   `arXiv:2211.15465 <https://arxiv.org/abs/2211.15465>`_.
   [(#2304)](https://github.com/PennyLaneAI/catalyst/pull/2304)
 
-  The ``decompose_arbitrary_ppr`` will decompose an arbitrary angle PPR into a collection of PPRs, 
-  PPMs and a single-qubit arbitrary PPR in the ``Z`` basis:
+  The ``decompose_arbitrary_ppr`` will decompose an arbitrary-angle PPR into a collection of PPRs, 
+  PPMs, and a single-qubit arbitrary PPR in the ``Z`` basis:
 
   ```python
   import pennylane as qml
