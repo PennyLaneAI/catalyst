@@ -102,3 +102,41 @@ func.func @test_clifford_t_to_ppr_3(%q1 : !quantum.bit, %q2 : !quantum.bit) {
     // CHECK: qec.ppr ["Z"](-8)
     func.return
 }
+
+// -----
+
+func.func @test_standard_pauli_rot_to_ppr(%q1 : !quantum.bit){
+    %cst = stablehlo.constant dense<3.1415926535897931> : tensor<f64>
+    %extracted = tensor.extract %cst[] : tensor<f64>
+    %out_qubits = quantum.paulirot ["Z"](%extracted) %q1 : !quantum.bit
+    func.return
+
+    // CHECK: qec.ppr ["Z"](2)
+}
+
+// -----
+
+func.func @test_arbitrary_pauli_rot_to_ppr(%q1 : !quantum.bit){
+    %cst = stablehlo.constant dense<0.42> : tensor<f64>
+    %extracted = tensor.extract %cst[] : tensor<f64>
+    %out_qubits = quantum.paulirot ["Z"](%extracted) %q1 : !quantum.bit
+    func.return
+
+    // CHECK: [[cst_0:%.+]] = arith.constant 4.200000e-01 : f64
+    // CHECK: [[cst_1:%.+]] = arith.constant 2.000000e+00 : f64
+    // CHECK: [[div:%.+]] = arith.divf [[cst_0]], [[cst_1]] : f64
+    // CHECK: [[q0:%.+]] = qec.ppr.arbitrary ["Z"]([[div]])
+}
+
+// -----
+
+func.func @test_dynamic_pauli_rot_to_ppr(%q1 : !quantum.bit, %arg0 : tensor<f64>){
+    %extracted = tensor.extract %arg0[] : tensor<f64>
+    %out_qubits_4 = quantum.paulirot ["Z"](%extracted) %q1 : !quantum.bit
+    func.return
+
+    // CHECK: [[extracted:%.+]] = tensor.extract
+    // CHECK: [[cst:%.+]] = arith.constant 2.000000e+00 : f64
+    // CHECK: [[div:%.+]] = arith.divf [[extracted]], [[cst]] : f64
+    // CHECK: [[q0:%.+]] = qec.ppr.arbitrary ["Z"]([[div]])
+}

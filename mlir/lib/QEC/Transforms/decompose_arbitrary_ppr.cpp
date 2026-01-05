@@ -12,44 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "to-ppr"
+#define DEBUG_TYPE "decompose-arbitrary-ppr"
 
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
-#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
-using namespace catalyst::quantum;
 using namespace catalyst::qec;
 
 namespace catalyst {
 namespace qec {
 
-#define GEN_PASS_DEF_CLIFFORDTTOPPRPASS
+#define GEN_PASS_DEF_DECOMPOSEARBITRARYPPRPASS
 #include "QEC/Transforms/Passes.h.inc"
 
-struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {
-    using CliffordTToPPRPassBase::CliffordTToPPRPassBase;
+struct DecomposeArbitraryPPRPass : impl::DecomposeArbitraryPPRPassBase<DecomposeArbitraryPPRPass> {
+    using DecomposeArbitraryPPRPassBase::DecomposeArbitraryPPRPassBase;
 
     void runOnOperation() final
     {
         auto ctx = &getContext();
-        ConversionTarget target(*ctx);
-
-        // Convert MeasureOp and CustomOp
-        target.addIllegalOp<quantum::MeasureOp>();
-        target.addIllegalOp<quantum::CustomOp>();
-
-        // Conversion target is QECDialect
-        target.addLegalDialect<qec::QECDialect>();
+        auto module = getOperation();
 
         RewritePatternSet patterns(ctx);
-        populateCliffordTToPPRPatterns(patterns);
+        populateDecomposeArbitraryPPRPatterns(patterns);
 
-        if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
             return signalPassFailure();
         }
     }

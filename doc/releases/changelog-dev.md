@@ -2,6 +2,92 @@
 
 <h3>New features since last release</h3>
 
+* Programs compiled with ``qjit`` can now be visualized with :func:`~.draw_graph`, allowing for 
+  sequentially analyzing impacts of compilation passes on structured and dynamic programs.
+  [(#2213)](https://github.com/PennyLaneAI/catalyst/pull/2213)
+  [(#2229)](https://github.com/PennyLaneAI/catalyst/pull/2229)
+  [(#2214)](https://github.com/PennyLaneAI/catalyst/pull/2214)
+  [(#2246)](https://github.com/PennyLaneAI/catalyst/pull/2246)
+  [(#2231)](https://github.com/PennyLaneAI/catalyst/pull/2231)
+  [(#2285)](https://github.com/PennyLaneAI/catalyst/pull/2285)
+  [(#2234)](https://github.com/PennyLaneAI/catalyst/pull/2234)
+  [(#2218)](https://github.com/PennyLaneAI/catalyst/pull/2218)
+  [(#2260)](https://github.com/PennyLaneAI/catalyst/pull/2260)
+  [(#2287)](https://github.com/PennyLaneAI/catalyst/pull/2287)
+  [(#2243)](https://github.com/PennyLaneAI/catalyst/pull/2243)
+
+  Consider the following circuit:
+
+  ```python
+  import pennylane as qml
+  import catalyst
+
+  qml.capture.enable()
+
+  @qml.qjit(autograph=True)
+  @qml.transforms.cancel_inverses
+  @qml.transforms.merge_rotations
+  @qml.qnode(qml.device("null.qubit", wires=3))
+  def circuit(x, y):
+      qml.X(0)
+      qml.Y(1)
+      qml.H(x) 
+      
+      for i in range(3):
+          qml.S(0)
+          qml.RX(0.1, wires=1)
+          qml.RX(0.2, wires=1)
+
+          if i == 3:
+              qml.T(0)
+          else:
+              qml.H(0)
+              qml.H(0)
+
+      qml.H(x)
+
+      return qml.expval(qml.Z(y))
+  ```
+
+  The circuit structure (``for`` loop and conditional branches) along with the dynamicism can be 
+  succinctly represented with :func:`~.draw_graph`.
+
+  ```pycon
+  >>> print(catalyst.draw_graph(circuit)())
+  (<Figure size 640x480 with 1 Axes>, <Axes: >)
+  ```
+  ![Graphical representation of circuit with dynamicism and structure](../../doc/_static/catalyst-draw-graph-changelog-0.14-example.png)
+
+  By default, all compilation passes specified will be applied and visualized. However, 
+  :func:`~.draw_graph` can be used with the ``level`` argument to inspect compilation pass impacts, 
+  where the ``level`` value denotes the cumulative set of applied compilation transforms (in the 
+  order they appear) to be applied and visualized. With ``level=1``, drawing the above circuit will 
+  apply the ``merge_rotation`` transform only:
+
+  ```pycon
+  >>> print(catalyst.draw_graph(circuit, level=1)())
+  (<Figure size 640x480 with 1 Axes>, <Axes: >)
+  ```
+  ![Graphical representation of circuit with dynamicism and structure](../../doc/_static/catalyst-draw-graph-changelog-0.14-level-example.png)
+
+  The :func:`~.draw_graph` function visualizes QNodes in a similar manner as
+  `view-op-graph in traditional MLIR <https://mlir.llvm.org/docs/Passes/#-view-op-graph>`_,
+  which leverages `Graphviz <https://graphviz.org/download/>`_ to show data-flow in compiled
+  programs. As such, use of :func:`~.draw_graph` requires installation of 
+  `Graphviz <https://graphviz.org/download/>`_ and the
+  `pydot <https://pypi.org/project/pydot/>`_ software package. Please consult the links provided for 
+  installation instructions. Additionally, it is recommended to use :func:`~.draw_graph` with 
+  PennyLane's program capture enabled (see :func:`qml.capture.enable <pennylane.capture.enable>`).
+
+  [(#2298)](https://github.com/PennyLaneAI/catalyst/pull/2298)
+  [(#2290)](https://github.com/PennyLaneAI/catalyst/pull/2290)
+  [(#2309)](https://github.com/PennyLaneAI/catalyst/pull/2309)
+  
+* A new `gridsynth` pass is added to support Clifford+T decomopsition. This pass discretizes `RZ` and `PhaseShift` gates to either the Clifford+T basis or to the PPR basis. The pass also supports decomposing single-qubit arbitrary angle PPR in the Z basis.
+  [(#2140)](https://github.com/PennyLaneAI/catalyst/pull/2140)
+  [(#2166)](https://github.com/PennyLaneAI/catalyst/pull/2166)
+  [(#2292)](https://github.com/PennyLaneAI/catalyst/pull/2292)
+
 * Catalyst now features a unified compilation framework, which enables users and developers to design
   and implement compilation passes in Python in addition to C++, on the same Catalyst IR. The Python
   interface relies on the xDSL library to represent and manipulate programs (analogous to the MLIR library
@@ -9,6 +95,16 @@
   into Catalyst without changes to the compiled Catalyst package. The new module is available under the
   `catalyst.python_interface` namespace.
   [(#2199)](https://github.com/PennyLaneAI/catalyst/pull/2199)
+
+  * Fix a bug in the `catalyst.python_interface.pass_api.TranformInterpreterPass` pass that prevented
+    pass options from being used correctly.
+    [(#2289)](https://github.com/PennyLaneAI/catalyst/pull/2289)
+
+  * Add the `PauliRotOp` operation to the xDSL Quantum dialect.
+    [(#2307)](https://github.com/PennyLaneAI/catalyst/pull/2307)
+
+  * Add the `PPRotationArbitraryOp` to the xDSL QEC dialect.
+    [(#2307)](https://github.com/PennyLaneAI/catalyst/pull/2307)
 
   * An xDSL `Universe` containing all custom xDSL dialects and passes has been registered as an entry point,
     allowing usage of PennyLane's dialects and passes with xDSL's command-line tools.
@@ -18,6 +114,7 @@
     PennyLane's new pass-by-pass specs feature. This function returns information gathered by parsing
     the xDSL generated by a given QJIT object, such as gate counts, measurements, or qubit allocations.
     [(#2238)](https://github.com/PennyLaneAI/catalyst/pull/2238)
+    [(#2315)](https://github.com/PennyLaneAI/catalyst/pull/2315)
 
   This functionality was originally developed as part of the PennyLane package, and has been migrated here.
   For earlier development notes to the feature, please refer to the
@@ -103,15 +200,29 @@
     detecting when the Python compiler is being used and routing through it appropriately.
     [(#2190)](https://github.com/PennyLaneAI/catalyst/pull/2190)
 
+  * A new experimental `parity_synth_pass` compiler pass has been added to
+    `catalyst.python_interface.transforms`. This pass groups ``CNOT`` and ``RZ`` operators
+    into phase polynomials and re-synthesizes them into ``CNOT`` and ``RZ`` operators again.
+    [(#2294)](https://github.com/PennyLaneAI/catalyst/pull/2294)
+
+  * The `catalyst.python_interface.pass_api.PassDispatcher` now has a more lightweight implementation.
+    [(#2324)](https://github.com/PennyLaneAI/catalyst/pull/2324)
+
+  * The global xDSL pass registry is now explicitly refreshed before compiling workflows decorated with
+    :func:`catalyst.qjit`.
+    [(#2322)](https://github.com/PennyLaneAI/catalyst/pull/2322)
+
 * Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
   [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
 
 * Catalyst can now compile circuits that are directly expressed in terms of Pauli product rotation
   (PPR) and Pauli product measurement (PPM) operations: :class:`~.PauliRot` and
   :func:`~.pauli_measure`, respectively. This support enables research and development
-  spurred from `A Game of Surface Codes (arXiv1808.02892) <https://arxiv.org/pdf/1808.02892>`_.
+  spurred from [A Game of Surface Codes (arXiv1808.02892)](https://arxiv.org/pdf/1808.02892).
   [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
   [(#2233)](https://github.com/PennyLaneAI/catalyst/pull/2233)
+  [(#2284)](https://github.com/PennyLaneAI/catalyst/pull/2284)
+
 
   :class:`~.PauliRot` and :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes
   for PPR-PPM compilation, which includes :func:`catalyst.passes.to_ppr`,
@@ -167,6 +278,38 @@
       shots=Shots(total_shots=None, shot_vector=())
     )
   }
+  ```
+
+* A new transform called :func:`~catalyst.passes.decompose_arbitrary_ppr` pass has been added, 
+  which decomposes abitrary-angle Pauli product rotations (PPRs) as outlined in Figure 13(d) from 
+  `arXiv:2211.15465 <https://arxiv.org/abs/2211.15465>`_.
+  [(#2304)](https://github.com/PennyLaneAI/catalyst/pull/2304)
+
+  The ``decompose_arbitrary_ppr`` will decompose an arbitrary-angle PPR into a collection of PPRs, 
+  PPMs, and a single-qubit arbitrary PPR in the ``Z`` basis:
+
+  ```python
+  import pennylane as qml
+
+  @qml.qjit(pipelines=[("pipe", ["quantum-compilation-stage"])], target="mlir")
+  @qml.transforms.decompose_arbitrary_ppr
+  @qml.transforms.to_ppr
+  @qml.qnode(qml.device("null.qubit", wires=3))
+  def circuit():
+      qml.PauliRot(0.123, pauli_word="XXY", wires=[0, 1, 2])
+      return
+  ```
+
+  ```pycon
+  >>> print(circuit.mlir_opt)
+  ...
+  %5 = qec.prepare  plus %4 : !quantum.bit
+  %mres, %out_qubits:4 = qec.ppm ["X", "X", "Y", "Z"] %1, %2, %3, %5 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+  %6 = qec.ppr ["X"](2) %out_qubits#3 cond(%mres) : !quantum.bit
+  %7 = qec.ppr.arbitrary ["Z"](%cst) %6 : !quantum.bit
+  %mres_0, %out_qubits_1 = qec.ppm ["X"] %7 : !quantum.bit
+  %8:3 = qec.ppr ["X", "X", "Y"](2) %out_qubits#0, %out_qubits#1, %out_qubits#2 cond(%mres_0) : !quantum.bit, !quantum.bit, !quantum.bit
+  ...
   ```
 
 <h3>Improvements 🛠</h3>
@@ -287,6 +430,14 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Updated tests and PennyLane dependency pin to follow changes introduced by
+  [PennyLaneAI/pennylane#8290](https://github.com/PennyLaneAI/pennylane/pull/8290).
+  [(#2286)](https://github.com/PennyLaneAI/catalyst/pull/2286)
+
+* Update `catalyst.python_interface.inspection.xdsl_conversion.get_mlir_module` to
+  no longer explicitly use the xDSL pass plugin.
+  [(#2303)](https://github.com/PennyLaneAI/catalyst/pull/2303)
+
 * Added missing `detensorize-function-boundary` and `symbol-dce` passes to `Pipelines.cpp`.
   [(#2266)](https://github.com/PennyLaneAI/catalyst/pull/2266)
 
@@ -371,10 +522,23 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* RTIO dialect is added to bypass the compilation flow from OpenAPL to ARTIQ’s LLVM IR. It is 
-  introduced to bridge the gap between ION dialect and ARTIQ’s LLVM IR. The design philosophy 
-  of RTIO dialect is primarily event-based. Every operation is asynchronous; sync behaviour occurs 
-  only via `rtio.sync` or `wait operand` in event operation. And we now support the compiling from 
+* `DecompRuleInterpreter` now solves the graph and adds decompositions rules in the `cleanup` method
+  instead of during the first call to `interpret_measurement`.
+  [(#2312)](https://github.com/PennyLaneAI/catalyst/pull/2312)
+
+* Update references to `TransformProgram` with `CompilePipeline`
+  [(#2314)](https://github.com/PennyLaneAI/catalyst/pull/2314)
+
+* xDSL and xDSL-JAX are now dependencies of Catalyst.
+  [(#2282)](https://github.com/PennyLaneAI/catalyst/pull/2282)
+
+* Python 3.14 is now officially supported. Added the forward capability with Python 3.14.
+  [(#2271)](https://github.com/PennyLaneAI/catalyst/pull/2271)
+
+* RTIO dialect is added to bypass the compilation flow from OpenAPL to ARTIQ’s LLVM IR. It is
+  introduced to bridge the gap between ION dialect and ARTIQ’s LLVM IR. The design philosophy
+  of RTIO dialect is primarily event-based. Every operation is asynchronous; sync behaviour occurs
+  only via `rtio.sync` or `wait operand` in event operation. And we now support the compiling from
   ION dialect to RTIO dilalect.
   [(#2185)](https://github.com/PennyLaneAI/catalyst/pull/2185)
   [(#2204)](https://github.com/PennyLaneAI/catalyst/pull/2204)
@@ -443,13 +607,15 @@
   gradient dialect and the `lower-gradients` compilation stage.
   [(#2241)](https://github.com/PennyLaneAI/catalyst/pull/2241)
 
-  * Added support for PPRs to the :func:`~.passes.merge_rotations` pass to merge PPRs with
-  equivalent angles, and cancelling of PPRs with opposite angles, or angles
-  that sum to identity. Also supports conditions on PPRs, merging when conditions are
-  identical and not merging otherwise.
-  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)
+  * Added support for PPRs and arbitrary angle PPRs to the :func:`~.passes.merge_rotations` pass.
+  This pass now merges PPRs with equivalent angles, and cancels PPRs with opposite angles, or
+  angles that sum to identity when the angles are known. The pass also supports conditions on PPRs,
+  merging when conditions are identical and not merging otherwise.
+  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)	
   [(#2245)](https://github.com/PennyLaneAI/catalyst/pull/2245)
   [(#2254)](https://github.com/PennyLaneAI/catalyst/pull/2254)
+  [(#2258)](https://github.com/PennyLaneAI/catalyst/pull/2258)
+  [(#2311)](https://github.com/PennyLaneAI/catalyst/pull/2311)
 
   * Refactor QEC tablegen files to separate QEC operations into a new `QECOp.td` file
   [(#2253](https://github.com/PennyLaneAI/catalyst/pull/2253)
@@ -462,7 +628,33 @@
   operations for interacting with an external Pauli frame tracking library.
   [(#2188)](https://github.com/PennyLaneAI/catalyst/pull/2188)
 
+* A new `to-pauli-frame` compilation pass has been added, which applies the Pauli frame tracking
+  protocols to a Clifford+T program.
+  [(#2269)](https://github.com/PennyLaneAI/catalyst/pull/2269)
+
 <h3>Documentation 📝</h3>
+
+* A new statevector simulator ``lightning.amdgpu`` has been added for optimized performance on AMD GPUs.
+  [(#2283)](https://github.com/PennyLaneAI/catalyst/pull/2283)
+
+  The ``lightning.amdgpu`` device is a specific instantiation of the ``lightning.kokkos`` backend, supporting the same features and operations as ``lightning.kokkos``, with pre-compiled wheels for ``lightning.amdgpu`` available on PyPI for easy installation to use on MI300 series AMD GPUs.
+
+  This device can be used within qjit'd workflows exactly as other devices compatible with Catalyst:
+
+  ```python
+  @qml.qjit
+  @qml.qnode(qml.device('lightning.amdgpu', wires=2))
+  def circuit():
+    qml.Hadamard(0)
+    return qml.state()
+  ```
+
+  ```pycon
+  >>> circuit()
+  [0.70710678+0.j 0.        +0.j 0.70710678+0.j 0.        +0.j]
+  ```
+
+  See the [Lightning-AMDGPU documentation](https://docs.pennylane.ai/projects/lightning/en/latest/lightning_amdgpu/device.html) for more details and installation instructions.
 
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
   [(#2136)](https://github.com/PennyLaneAI/catalyst/pull/2136)
@@ -473,6 +665,9 @@
 * Update `MLIR Plugins` documentation stating that plugins require adding passes via
   `--pass-pipeline`.
   [(#2168)](https://github.com/PennyLaneAI/catalyst/pull/2168)
+
+* Typos in docstring for `PPRotationArbitraryOp` and `PPRRotationOp` have been corrected.
+  [(#2297)](https://github.com/PennyLaneAI/catalyst/pull/2297)
 
 <h3>Contributors ✍️</h3>
 
@@ -488,7 +683,10 @@ Joseph Lee,
 Mehrdad Malekmohammadi,
 River McCubbin,
 Lee J. O'Riordan,
+Mudit Pandey,
+Andrija Paurevic,
 Roberto Turrado,
 Paul Haochen Wang,
+David Wierichs,
 Jake Zaia,
 Hongsheng Zheng.

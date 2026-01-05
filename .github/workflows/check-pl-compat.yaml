@@ -56,7 +56,7 @@ jobs:
       if: ${{ inputs.catalyst == 'latest' }}
       run: |
         sudo apt-get update
-        sudo apt-get install -y ccache libasan6 lld
+        sudo apt-get install -y ccache libasan6 lld graphviz
 
     - name: Install deps (Python)
       run: |
@@ -195,7 +195,7 @@ jobs:
 
     - name: Run Frontend Tests (Kokkos)
       run: |
-        make pytest TEST_BACKEND="lightning.kokkos"
+        make pytest TEST_BACKEND="lightning.kokkos" XDSL_TESTS=OFF
 
     - name: Run Frontend Tests (Braket)
       run: |
@@ -207,36 +207,3 @@ jobs:
         # We skip them for now. These demos should be properly moved to the qml repo.
         MDD_BENCHMARK_PRECISION=1 \
         python3 -m pytest demos -k "tutorial_qft_arithmetics.ipynb" --nbmake
-
-    - name: Check If Unified Compiler Tests Should Execute
-      id: check_unified_compiler
-      run: |
-        # Check if installed pennylane has python_compiler module
-        EXIT_CODE=0
-        python3 -c "from pennylane.compiler import python_compiler" || EXIT_CODE=$?
-
-        # For Unified Compiler tests to execute, PennyLane must NOT have the 'compiler.python_compiler'
-        # submodule, and Catalyst MUST have the 'python_interface' submodule
-        if [[ -d "$GITHUB_WORKSPACE/frontend/catalyst/python_interface" && EXIT_CODE -ne 0 ]]; then
-          echo "unified_compiler_available='true'" >> $GITHUB_OUTPUT
-        else
-          echo "unified_compiler_available='false'" >> $GITHUB_OUTPUT
-        fi
-
-    - name: Install Unified Compiler Dependencies
-      if: steps.check_unified_compiler.outputs.unified_compiler_available == 'true'
-      run: |
-        python3 -m pip install xdsl~=0.55.0 xdsl-jax==0.1.1
-        # Install graphviz for testing the mlir-op-graph integration
-        sudo apt-get install -y graphviz
-        python3 -m pip install graphviz
-
-    - name: Run Unified Compiler Tests
-      if: steps.check_unified_compiler.outputs.unified_compiler_available == 'true'
-      run: |
-        python3 -m pytest frontend/test/pytest -n auto -m "xdsl"
-
-    - name: Run Unified Compiler Tests (Kokkos)
-      if: steps.check_unified_compiler.outputs.unified_compiler_available == 'true'
-      run: |
-        python3 -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto -m "xdsl"

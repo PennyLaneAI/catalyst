@@ -77,6 +77,29 @@ def CancelInversesPass : Pass<"cancel-inverses"> {
     let summary = "Perform removal of chained operations that are inverses.";
 }
 
+def GridsynthPass : Pass<"gridsynth"> {
+    let summary = "Perform Ross-Selinger/Gridsynth decomposition.";
+
+    let options = [Option<
+        /*C++ var name=*/"epsilon",
+        /*CLI name=*/"epsilon",
+        /*Type=*/"double",
+       /*Default=*/"1e-4",
+       /*Description=*/"Maximum error tolerance for per-gate discretization.">, 
+        Option<
+        /*C++ var name=*/"pprBasis",
+        /*CLI name=*/"ppr-basis",
+        /*Type=*/"bool",
+        /*Default=*/"false",
+        /*Description=*/desc="Whether to decompose into the PPR basis set instead of the standard Clifford+T basis set.">,];
+
+        let dependentDialects = [
+        "memref::MemRefDialect",
+        "scf::SCFDialect",
+        "catalyst::qec::QECDialect",
+    ];
+}
+
 def MergeRotationsPass : Pass<"merge-rotations"> {
     let summary = "Perform merging of chained rotation gates about the same axis.";
 

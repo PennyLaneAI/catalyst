@@ -42,6 +42,8 @@ set(LIBS
     mbqc-transforms
     MLIRMitigation
     mitigation-transforms
+    MLIRPauliFrame
+    pauli-frame-transforms
     MLIRIon
     ion-transforms
     MLIRRTIO

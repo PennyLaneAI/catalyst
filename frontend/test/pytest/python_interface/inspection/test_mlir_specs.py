@@ -13,19 +13,16 @@
 # limitations under the License.
 """Unit test module for the mlir_specs function in the Python Compiler inspection module."""
 
-import pytest
-
-# pylint: disable=wrong-import-position
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
 from functools import partial
 
 import jax.numpy as jnp
 import pennylane as qml
+import pytest
 
 import catalyst
 from catalyst.python_interface.inspection import ResourcesResult, mlir_specs
+
+pytestmark = pytest.mark.xdsl
 
 
 def resources_equal(
@@ -39,7 +36,6 @@ def resources_equal(
 
         # actual.device_name == expected.device_name TODO: Don't worry about this one for now
         assert actual.num_allocs == expected.num_allocs
-
         assert actual.operations == expected.operations
         assert actual.measurements == expected.measurements
 
@@ -261,6 +257,39 @@ class TestMLIRSpecs:
             ValueError, match="Requested specs levels 3 not found in MLIR pass list."
         ):
             mlir_specs(simple_circuit, level=[0, 3])
+
+    def test_not_qnode(self):
+        """Test that a malformed QNode raises an error."""
+
+        def not_a_qnode():
+            pass
+
+        with pytest.raises(
+            ValueError,
+            match="The provided `qnode` argument does not appear to be a valid QJIT "
+            "compiled QNode.",
+        ):
+            mlir_specs(not_a_qnode, level=0)
+
+    def test_malformed_qnode(self):
+        """Test that a QNode without measurements can still be collected."""
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qjit
+        @qml.qnode(dev)
+        def circ(wire):
+            qml.X(0)
+            qml.X(wire)
+
+        res = mlir_specs(circ, 0, 1)
+        expected = make_static_resources(
+            operations={"PauliX": {1: 2}},
+            measurements={},
+            num_allocs=1,
+        )
+
+        assert resources_equal(res, expected)
 
     @pytest.mark.parametrize(
         "pl_ctrl_flow, iters, autograph",
@@ -539,8 +568,8 @@ class TestMLIRSpecs:
         expected = make_static_resources(
             operations={},
             measurements={
-                "expval(Hamiltonian(PauliZ @ PauliZ))": 1,
-                "expval(Hamiltonian(PauliX @ PauliZ, PauliZ @ Hadamard))": 1,
+                "expval(Hamiltonian(num_terms=1))": 1,
+                "expval(Hamiltonian(num_terms=2))": 1,
             },
             num_allocs=2,
         )
@@ -551,25 +580,26 @@ class TestMLIRSpecs:
     def test_ppr(self):
         """Test that PPRs are handled correctly."""
 
-        if qml.capture.enabled():
-            pytest.xfail("plxpr currently incompatible to_ppr pass")
+        if not qml.capture.enabled():
+            pytest.xfail("to_ppr requires plxpr to be enabled to lower PauliRot")
 
         pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
 
         @qml.qjit(pipelines=pipeline, target="mlir")
-        @catalyst.passes.to_ppr
+        @qml.transform(pass_name="to-ppr")
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circ():
             qml.H(0)
             qml.T(0)
+            qml.PauliRot(0.1234, pauli_word="Z", wires=0)
 
         expected = make_static_resources(
-            operations={"PPR-pi/4": {1: 3}, "PPR-pi/8": {1: 1}},
+            operations={"PPR-pi/4": {1: 3}, "PPR-pi/8": {1: 1}, "PPR-Phi": {1: 1}},
             measurements={},
             num_allocs=2,
         )
 
-        res = mlir_specs(circ, level=1, args=(0,))
+        res = mlir_specs(circ, level=1)
         assert resources_equal(res, expected)
 
     def test_subroutine(self):

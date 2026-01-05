@@ -258,9 +258,9 @@ def test_explicit_rz_in_mbqc(rz_angle, mbqc_pipeline):
         m1 = qml.ftqc.measure_x(1)
         m2 = qml.ftqc.cond_measure(
             m1,
-            partial(qml.ftqc.measure_arbitrary_basis, angle=angle),
-            partial(qml.ftqc.measure_arbitrary_basis, angle=-angle),
-        )(plane="XY", wires=2)
+            partial(qml.ftqc.measure_arbitrary_basis, angle=angle, plane="XY"),
+            partial(qml.ftqc.measure_arbitrary_basis, angle=-angle, plane="XY"),
+        )(wires=2)
         m3 = qml.ftqc.measure_x(3)
 
         # by-product corrections based on measurement outcomes

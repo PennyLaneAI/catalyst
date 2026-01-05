@@ -79,3 +79,52 @@ def test_pass_after_tape_transform(backend):
     c_mlir = c.mlir
     assert 'quantum.custom "PauliX"()' not in c_mlir
     assert 'transform.apply_registered_pass "my-pass"' in c_mlir
+
+
+def op_has_attr(op, attr):
+    """Check if an MLIR operation has the specified attribute."""
+    attrs = getattr(op, "attributes", [])
+    return attr in attrs or attr in getattr(attrs, "keys", lambda: [])()
+
+
+@pytest.mark.xdsl
+@pytest.mark.usefixtures("use_both_frontend")
+def test_xdsl_pass_with_qml_transform():
+    """Test that applying xDSL passes using the ``qml.transform`` decorator is able to execute
+    correctly."""
+
+    @qml.qjit
+    @qml.transform(pass_name="xdsl-cancel-inverses")
+    @qml.qnode(qml.device("null.qubit", wires=1))
+    def c():
+        qml.X(0)
+        qml.X(0)
+        return qml.state()
+
+    mod = c.mlir_module.operation
+    named_sequence_mod = None
+    for op in mod.regions[0].blocks[0].operations:
+        if getattr(op, "name", "") == "builtin.module":
+            for _op in op.regions[0].blocks[0].operations:
+                if getattr(_op, "name", "") == "builtin.module":
+                    named_sequence_mod = _op
+                    break
+            break
+
+    assert named_sequence_mod is not None
+    assert op_has_attr(named_sequence_mod, "catalyst.uses_xdsl_passes")
+    assert op_has_attr(named_sequence_mod, "transform.with_named_sequence")
+
+    named_sequence_op = next(iter(named_sequence_mod.regions[0].blocks[0].operations), None)
+    assert named_sequence_op is not None
+    first_transform_op = next(iter(named_sequence_op.regions[0].blocks[0].operations), None)
+    assert first_transform_op is not None
+
+    assert op_has_attr(first_transform_op, "catalyst.xdsl_pass")
+    assert first_transform_op.attributes["pass_name"].value == "xdsl-cancel-inverses"
+
+    assert qml.math.allclose(c(), [1, 0])
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

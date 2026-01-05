@@ -170,6 +170,7 @@ class LinkerDriver:
             f"-l{lapack_lib_name}",  # required for custom_calls lib
             "-lcustom_calls",
             "-lmlir_async_runtime",
+            "-lrt_rsdecomp",
         ]
 
         # If OQD runtime capi is built, link to it as well

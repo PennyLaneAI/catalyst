@@ -14,16 +14,13 @@
 """Unit tests for the xDSL universe."""
 
 import pytest
-
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
-# pylint: disable=wrong-import-position
 from xdsl.passes import ModulePass
 from xdsl.universe import Universe as xUniverse
 
 from catalyst.python_interface import dialects, transforms
 from catalyst.python_interface.xdsl_universe import XDSL_UNIVERSE, shared_dialects
+
+pytestmark = pytest.mark.xdsl
 
 all_dialects = tuple(getattr(dialects, name) for name in dialects.__all__)
 all_transforms = tuple(
