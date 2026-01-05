@@ -213,7 +213,7 @@ def test_identity_types(arg):
 def test_identity_types_cast_shaped_array(arg, dtype):
     """Test callback with arguments and return values of given types."""
 
-    arg_cast = jnp.array(dtype(arg))
+    arg_cast = jnp.array(arg, dtype=dtype)
 
     @base_callback
     def identity(arg: dtype) -> jax.core.ShapedArray([], dtype):
