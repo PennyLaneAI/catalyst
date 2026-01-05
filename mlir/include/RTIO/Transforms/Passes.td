@@ -39,7 +39,7 @@ def RTIOEventToARTIQPass : Pass<"convert-rtio-event-to-artiq", "mlir::ModuleOp">
     ];
 }
 
-def EmitARTIQRuntimePass : Pass<"emit-artiq-runtime", "mlir::ModuleOp"> {
+def RTIOEmitARTIQRuntimePass : Pass<"emit-artiq-runtime", "mlir::ModuleOp"> {
     let summary = "Emit ARTIQ runtime wrapper (__modinit__) that calls the kernel function";
     let description = [{
         This pass creates the ARTIQ entry point structure:

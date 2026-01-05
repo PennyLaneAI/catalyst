@@ -325,6 +325,21 @@ def canonicalize(*args, stdin=None, options: Optional[CompileOptions] = None):
     return _quantum_opt(*opts, *args, stdin=stdin)
 
 
+def _artiq_config_to_cli_flags(artiq_config):
+    """Convert ARTIQ config dict to CLI flags."""
+    flags = ["--artiq"]
+    flag_mapping = {
+        "kernel_ld": "--artiq-kernel-ld",
+        "llc_path": "--artiq-llc-path",
+        "lld_path": "--artiq-lld-path",
+    }
+    for key, flag in flag_mapping.items():
+        value = artiq_config.get(key, "")
+        if value:
+            flags.append((flag, value))
+    return flags
+
+
 def _options_to_cli_flags(options):
     """CompileOptions -> list[str|Tuple[str, str]]"""
 
@@ -368,18 +383,8 @@ def _options_to_cli_flags(options):
     if options.async_qnodes:  # pragma: nocover
         extra_args += ["--async-qnodes"]
 
-    # ARTIQ cross-compilation flags
     if options.artiq_config:
-        extra_args += ["--artiq"]
-        kernel_ld = options.artiq_config.get("kernel_ld", "")
-        if kernel_ld:
-            extra_args += [("--artiq-kernel-ld", kernel_ld)]
-        llc_path = options.artiq_config.get("llc_path", "")
-        if llc_path:
-            extra_args += [("--artiq-llc-path", llc_path)]
-        lld_path = options.artiq_config.get("lld_path", "")
-        if lld_path:
-            extra_args += [("--artiq-lld-path", lld_path)]
+        extra_args += _artiq_config_to_cli_flags(options.artiq_config)
 
     return extra_args
 
