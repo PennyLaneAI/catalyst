@@ -420,6 +420,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Updated the type support for callbacks allowing use of unsigned integers.
+  [(#2330)](https://github.com/PennyLaneAI/catalyst/pull/2330)
+
 * Updated tests and PennyLane dependency pin to follow changes introduced by
   [PennyLaneAI/pennylane#8290](https://github.com/PennyLaneAI/pennylane/pull/8290).
   [(#2286)](https://github.com/PennyLaneAI/catalyst/pull/2286)
