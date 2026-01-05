@@ -477,6 +477,16 @@ jobs:
         sudo apt-get install -y graphviz
         make frontend
 
+    - name: Install PennyLane release candidate
+      if: github.event.pull_request.base.ref == 'v0.14.0-rc'
+      run: |
+        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane'<=0.44.0'
+
+    - name: Install PennyLane-Lightning release candidate
+      if: github.event.pull_request.base.ref == 'v0.14.0-rc'
+      run: |
+        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane-lightning'<=0.44.0'
+
     - name: Verify Graphviz installation
       run: |
         dot -V 
@@ -565,6 +575,16 @@ jobs:
         python3 -m pip install -r requirements.txt
         make frontend
 
+    - name: Install PennyLane release candidate
+      if: github.event.pull_request.base.ref == 'v0.14.0-rc'
+      run: |
+        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane'<=0.44.0'
+
+    - name: Install PennyLane-Lightning-Kokkos release candidate
+      if: github.event.pull_request.base.ref == 'v0.14.0-rc'
+      run: |
+        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane-lightning-kokkos'<=0.44.0'
+
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v4
@@ -627,6 +647,11 @@ jobs:
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
+
+    - name: Install PennyLane release candidate
+      if: github.event.pull_request.base.ref == 'v0.14.0-rc'
+      run: |
+        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane'<=0.44.0'
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
