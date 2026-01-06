@@ -203,7 +203,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     Though you can ``print`` the output of ``catalyst.draw_graph``, it is recommended to use the
     ``savefig`` method of ``matplotlib.figure.Figure`` for better control over image resolution
     (DPI). Please consult the
-    `matplotlib documentation <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.savefig.html>`
+    `matplotlib documentation <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.savefig.html>`_
     for usage details of ``savefig``.
 
     With ``level=2``, both :func:`~.passes.merge_rotations` and :func:`~.passes.cancel_inverses`
