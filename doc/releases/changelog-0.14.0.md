@@ -431,6 +431,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Updated the type support for callbacks allowing use of unsigned integers.
+  [(#2330)](https://github.com/PennyLaneAI/catalyst/pull/2330)
+
 * Fixed a bug where the `qec.ppr` op attribute `rotation_kind` was not correctly constrained to
   be one of ±1, ±2, ±4, or ±8.
   Also, for Identity Pauli product, the `rotation_kind` was correctly set to 1, instead of 0.
