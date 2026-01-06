@@ -29,6 +29,20 @@ include "QEC/IR/QECOpInterfaces.td"
 
 class QEC_Op<string mnemonic, list<Trait> traits = []> : Op<QECDialect, mnemonic, traits>;
 
+//===----------------------------------------------------------------------===//
+// Attribute constraints
+//===----------------------------------------------------------------------===//
+
+// Constraint for rotation_kind: must be one of ±1, ±2, ±4, ±8
+// The power-of-2 check works because powers of 2 have exactly one bit set.
+def RotationKindConstraint : AttrConstraint<
+    CPred<"[&]() {"
+          "  auto val = ::llvm::cast<::mlir::IntegerAttr>($_self).getInt();"
+          "  auto absVal = val < 0 ? -val : val;"
+          "  return absVal >= 1 && absVal <= 8 && (absVal & (absVal - 1)) == 0;"
+          "}()">,
+    "whose value is ±1, ±2, ±4, or ±8">;
+
 def PrepareStateOp : QEC_Op<"prepare"> {
     let summary = "Initialize existing qubits into a given state.";
     let description = [{
@@ -173,7 +187,7 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {
 
     let arguments = (ins
         PauliWord:$pauli_product,  // The Pauli product to apply (e.g., ["X", "I", "Z"])
-        I16Attr:$rotation_kind,    // Rotation angle in fractions of π (e.g., 4 for π/2)
+        ConfinedAttr<I16Attr, [RotationKindConstraint]>:$rotation_kind,    // Rotation angle in fractions of π (e.g., 4 for π/2)
         Variadic<QubitType>:$in_qubits,  // The qubits to apply the rotation to
         Optional<I1>:$condition
     );
