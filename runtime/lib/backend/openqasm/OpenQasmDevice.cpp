@@ -69,7 +69,8 @@ auto OpenQasmDevice::GetDeviceShots() const -> size_t { return device_shots; }
 void OpenQasmDevice::NamedOperation(const std::string &name, const std::vector<double> &params,
                                     const std::vector<QubitIdType> &wires, bool inverse,
                                     const std::vector<QubitIdType> &controlled_wires,
-                                    const std::vector<bool> &controlled_values)
+                                    const std::vector<bool> &controlled_values,
+                                    [[maybe_unused]] const std::vector<std::string> &optional)
 {
     RT_FAIL_IF(!controlled_wires.empty() || !controlled_values.empty(),
                "OpenQasm device does not support native quantum control.");

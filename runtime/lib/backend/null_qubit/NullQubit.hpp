@@ -263,7 +263,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     void NamedOperation(const std::string &name, [[maybe_unused]] const std::vector<double> &params,
                         const std::vector<QubitIdType> &wires, bool inverse,
                         const std::vector<QubitIdType> &controlled_wires = {},
-                        const std::vector<bool> &controlled_values = {})
+                        [[maybe_unused]] const std::vector<bool> &controlled_values = {},
+                        [[maybe_unused]] const std::vector<std::string> &optional = {})
     {
         if (this->track_resources_) {
             this->resource_tracker_.NamedOperation(name, inverse, wires, controlled_wires);

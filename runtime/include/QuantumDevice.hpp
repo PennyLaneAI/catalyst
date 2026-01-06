@@ -212,11 +212,14 @@ struct QuantumDevice {
      * @param inverse Apply the inverse (Hermitian adjoint) of the operation.
      * @param controlled_wires Control qubits applied to the operation.
      * @param controlled_values Control values associated to the control qubits (equal length).
+     * @param optional Optional string parameters for device-specific features.
      */
     virtual void NamedOperation(const std::string &name, const std::vector<double> &params,
                                 const std::vector<QubitIdType> &wires, bool inverse = false,
                                 const std::vector<QubitIdType> &controlled_wires = {},
-                                const std::vector<bool> &controlled_values = {}) = 0;
+                                const std::vector<bool> &controlled_values = {},
+                                const std::vector<std::string> &optional = {}) = 0;
+
     /**
      * @brief Perform a computational-basis measurement on one qubit.
      *
@@ -526,6 +529,21 @@ struct QuantumDevice {
     virtual void State(DataView<std::complex<double>, 1> &state)
     {
         RT_FAIL("State is unsupported by device");
+    }
+
+    /**
+     * @brief (Optional) Perform a Pauli-basis measurement on a set of qubits.
+     *
+     * The output of this operation is the measurement result of a Pauli observable
+     * specified by a Pauli word (e.g. "XZYI") on the provided qubits.
+     *
+     * @param pauli_word The Pauli word specifying the observable to measure.
+     * @param wires The qubits to measure.
+     */
+    virtual auto PauliMeasure(const std::string &pauli_word, const std::vector<QubitIdType> &wires)
+        -> Result
+    {
+        RT_FAIL("PauliMeasure is unsupported by device");
     }
 
     // ----------------------------------------

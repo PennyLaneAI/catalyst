@@ -46,11 +46,12 @@
     [[nodiscard]] auto GetDeviceShots() const -> size_t override;
 
 #define QUANTUM_DEVICE_QIS_DECLARATIONS                                                            \
-    void NamedOperation(                                                                           \
-        const std::string &name, const std::vector<double> &params,                                \
-        const std::vector<QubitIdType> &wires, [[maybe_unused]] bool inverse = false,              \
-        [[maybe_unused]] const std::vector<QubitIdType> &controlled_wires = {},                    \
-        [[maybe_unused]] const std::vector<bool> &controlled_values = {}) override;                \
+    void NamedOperation(const std::string &name, const std::vector<double> &params,                \
+                        const std::vector<QubitIdType> &wires,                                     \
+                        [[maybe_unused]] bool inverse = false,                                     \
+                        [[maybe_unused]] const std::vector<QubitIdType> &controlled_wires = {},    \
+                        [[maybe_unused]] const std::vector<bool> &controlled_values = {},          \
+                        [[maybe_unused]] const std::vector<std::string> &optional = {}) override;  \
     using Catalyst::Runtime::QuantumDevice::MatrixOperation;                                       \
     void MatrixOperation(                                                                          \
         const std::vector<std::complex<double>> &matrix, const std::vector<QubitIdType> &wires,    \
