@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s | FileCheck %s
+// RUN: quantum-opt %s --split-input-file --verify-diagnostics | FileCheck %s
 
 func.func @foo(%q1 : !quantum.bit, %q2 : !quantum.bit) {
     qec.ppr ["X", "Z"] (4) %q1, %q2 : !quantum.bit, !quantum.bit
@@ -99,5 +99,13 @@ func.func @arbitrary(%q1 : !quantum.bit, %q2 : !quantum.bit) {
     %0 = qec.ppr.arbitrary ["X"](%const) %q1 : !quantum.bit
     %1:2 = qec.ppr.arbitrary ["X", "Z"](%const_1) %0, %q2 : !quantum.bit, !quantum.bit
     %2:2 = qec.ppr.arbitrary ["X", "Z"](%const_1) %1#0, %1#1 cond(%c0) : !quantum.bit, !quantum.bit
+    func.return
+}
+
+// -----
+
+func.func @baz_error(%q1 : !quantum.bit, %q2 : !quantum.bit) {
+    // expected-error@below {{'qec.ppr' op attribute 'rotation_kind' failed to satisfy constraint: 16-bit signless integer attribute whose value is ±1, ±2, ±4, or ±8}}
+    %0, %1 = qec.ppr ["X", "Z"] (16) %q1, %q2 : !quantum.bit, !quantum.bit
     func.return
 }

@@ -222,6 +222,7 @@
   [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
   [(#2233)](https://github.com/PennyLaneAI/catalyst/pull/2233)
   [(#2284)](https://github.com/PennyLaneAI/catalyst/pull/2284)
+  [(#2336)](https://github.com/PennyLaneAI/catalyst/pull/2336)
 
 
   :class:`~.PauliRot` and :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes
@@ -429,6 +430,14 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Updated the type support for callbacks allowing use of unsigned integers.
+  [(#2330)](https://github.com/PennyLaneAI/catalyst/pull/2330)
+
+* Fixed a bug where the `qec.ppr` op attribute `rotation_kind` was not correctly constrained to
+  be one of ±1, ±2, ±4, or ±8.
+  Also, for Identity Pauli product, the `rotation_kind` was correctly set to 1, instead of 0.
+  [(#2344)](https://github.com/PennyLaneAI/catalyst/pull/2344)
 
 * Updated tests and PennyLane dependency pin to follow changes introduced by
   [PennyLaneAI/pennylane#8290](https://github.com/PennyLaneAI/pennylane/pull/8290).
