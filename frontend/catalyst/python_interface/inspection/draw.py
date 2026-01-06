@@ -200,6 +200,11 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         :alt: Graphical representation of circuit with level=0
         :align: left
 
+    Though you can ``print`` the output of ``catalyst.draw_graph``, it is recommended to use the
+    ``savefig`` method of ``matplotlib.figure.Figure`` for better control over image resolution
+    (DPI). Please consult the
+    `matplotlib documentation <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.savefig.html>`
+    for usage details of ``savefig``.
 
     With ``level=2``, both :func:`~.passes.merge_rotations` and :func:`~.passes.cancel_inverses`
     will be applied, resulting in the two Hadamards cancelling and the two rotations merging:
