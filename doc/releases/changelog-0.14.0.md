@@ -1,4 +1,4 @@
-# Release 0.14.0 (development release)
+# Release 0.14.0 (current release)
 
 <h3>New features since last release</h3>
 
@@ -208,6 +208,9 @@
   * The `catalyst.python_interface.pass_api.PassDispatcher` now has a more lightweight implementation.
     [(#2324)](https://github.com/PennyLaneAI/catalyst/pull/2324)
 
+  * The global xDSL pass registry is now explicitly refreshed before compiling workflows decorated with
+    :func:`catalyst.qjit`.
+    [(#2322)](https://github.com/PennyLaneAI/catalyst/pull/2322)
 
 * Added ``catalyst.switch``, a qjit compatible, index-switch style control flow decorator.
   [(#2171)](https://github.com/PennyLaneAI/catalyst/pull/2171)
@@ -219,6 +222,7 @@
   [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
   [(#2233)](https://github.com/PennyLaneAI/catalyst/pull/2233)
   [(#2284)](https://github.com/PennyLaneAI/catalyst/pull/2284)
+  [(#2336)](https://github.com/PennyLaneAI/catalyst/pull/2336)
 
 
   :class:`~.PauliRot` and :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes
@@ -277,27 +281,37 @@
   }
   ```
 
-  * A new :func:`~catalyst.passes.decompose_arbitrary_ppr` pass has been added to the `catalyst.passes` module.
-    This will decompose an arbitrary angle PPR into a collection of PPRs, PPMs and
-    a single-qubit arbitrary PPR in the Z basis.
-    [(#2304)](https://github.com/PennyLaneAI/catalyst/pull/2304)
+* A new transform called :func:`~catalyst.passes.decompose_arbitrary_ppr` pass has been added, 
+  which decomposes abitrary-angle Pauli product rotations (PPRs) as outlined in Figure 13(d) from 
+  `arXiv:2211.15465 <https://arxiv.org/abs/2211.15465>`_.
+  [(#2304)](https://github.com/PennyLaneAI/catalyst/pull/2304)
 
-    ```python
-      import pennylane as qml
-      from catalyst import qjit, measure
-      from catalyst.passes import decompose_arbitrary_ppr, to_ppr
+  The ``decompose_arbitrary_ppr`` will decompose an arbitrary-angle PPR into a collection of PPRs, 
+  PPMs, and a single-qubit arbitrary PPR in the ``Z`` basis:
 
-      @qjit(pipelines=[("pipe", ["quantum-compilation-stage"])], target="mlir")
-      @decompose_arbitrary_ppr
-      @to_ppr
-      @qml.qnode(qml.device("null.qubit", wires=3))
-      def circuit():
-          qml.PauliRot(0.123, pauli_word="XXY", wires=[0, 1, 2])
-          return
+  ```python
+  import pennylane as qml
 
-      print(circuit.mlir_opt)
-    ```
+  @qml.qjit(pipelines=[("pipe", ["quantum-compilation-stage"])], target="mlir")
+  @qml.transforms.decompose_arbitrary_ppr
+  @qml.transforms.to_ppr
+  @qml.qnode(qml.device("null.qubit", wires=3))
+  def circuit():
+      qml.PauliRot(0.123, pauli_word="XXY", wires=[0, 1, 2])
+      return
+  ```
 
+  ```pycon
+  >>> print(circuit.mlir_opt)
+  ...
+  %5 = qec.prepare  plus %4 : !quantum.bit
+  %mres, %out_qubits:4 = qec.ppm ["X", "X", "Y", "Z"] %1, %2, %3, %5 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+  %6 = qec.ppr ["X"](2) %out_qubits#3 cond(%mres) : !quantum.bit
+  %7 = qec.ppr.arbitrary ["Z"](%cst) %6 : !quantum.bit
+  %mres_0, %out_qubits_1 = qec.ppm ["X"] %7 : !quantum.bit
+  %8:3 = qec.ppr ["X", "X", "Y"](2) %out_qubits#0, %out_qubits#1, %out_qubits#2 cond(%mres_0) : !quantum.bit, !quantum.bit, !quantum.bit
+  ...
+  ```
 
 <h3>Improvements 🛠</h3>
 
