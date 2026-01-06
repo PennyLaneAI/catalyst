@@ -204,7 +204,7 @@ LogicalResult convertZGate(CustomOp op, ConversionPatternRewriter &rewriter)
 // I = I
 LogicalResult convertIGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
-    auto gate = GateConversion({"I"}, 0);
+    auto gate = GateConversion({"I"}, 1);
     applySingleQubitConversion(op, {gate}, rewriter);
     return success();
 }
