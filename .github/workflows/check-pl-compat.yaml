@@ -140,7 +140,6 @@ jobs:
         sudo apt-get install -y graphviz
         jax_version=$(grep jax .dep-versions | awk -F '=' '{ print $2 }')
         pip install jax==$jax_version
-        pip install xdsl==0.55.4 xdsl-jax==0.1.1
         pip install --pre -U --index-url https://test.pypi.org/simple/ pennylane-catalyst'>=0.14.0rc0,<=0.14.0'
 
     - name: Install PennyLane-Lightning (stable)
