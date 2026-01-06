@@ -137,6 +137,7 @@ jobs:
       run: |
         # This is the first for the three rc installs
         # Thus this one shouldn't have no-deps: it needs to pull in all PL dependencies
+        sudo apt-get install -y graphviz
         jax_version=$(grep jax .dep-versions | awk -F '=' '{ print $2 }')
         pip install jax==$jax_version
         pip install xdsl==0.55.4 xdsl-jax==0.1.1
