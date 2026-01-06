@@ -1096,7 +1096,30 @@ void __catalyst__qis__Sample(MemRefT_double_2d *result, int64_t numQubits, ...)
         getQuantumDevicePtr()->Sample(view);
     }
     else {
-        getQuantumDevicePtr()->PartialSample(view, wires);
+        size_t shots = getQuantumDevicePtr()->GetDeviceShots();
+        size_t numWires = wires.size();
+        size_t numBasisStates = 1UL << numWires;
+
+        // Get marginal probabilities for wires
+        std::vector<double> probs(numBasisStates);
+        size_t probs_sizes[1] = {numBasisStates};
+        size_t probs_strides[1] = {1};
+        DataView<double, 1> probs_view(probs.data(), 0, probs_sizes, probs_strides);
+        getQuantumDevicePtr()->PartialProbs(probs_view, wires);
+
+        // Sample from marginal probability distribution
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::discrete_distribution<size_t> dist(probs.begin(), probs.end());
+
+        // Generate samples
+        auto samplesIter = view.begin();
+        for (size_t shot = 0; shot < shots; shot++) {
+            size_t basis_state = dist(gen);
+            for (size_t wire_idx = 0; wire_idx < numWires; wire_idx++) {
+                *(samplesIter++) = static_cast<double>((basis_state >> wire_idx) & 1UL);
+            }
+        }
     }
 }
 
