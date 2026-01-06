@@ -192,19 +192,20 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     With ``level=0``, the graphical visualization will display the program as if no transforms are
     applied:
 
-    >>> print(catalyst.draw_graph(circuit, level=0)())
-    (<Figure size 640x480 with 1 Axes>, <Axes: >)
+    >>> fig, ax = catalyst.draw_graph(circuit, level=0)()
+    >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
     .. figure:: ../../../doc/_static/catalyst-draw-graph-level0-example.png
         :width: 35%
         :alt: Graphical representation of circuit with level=0
         :align: left
 
+
     With ``level=2``, both :func:`~.passes.merge_rotations` and :func:`~.passes.cancel_inverses`
     will be applied, resulting in the two Hadamards cancelling and the two rotations merging:
 
-    >>> print(catalyst.draw_graph(circuit, level=2)())
-    (<Figure size 640x480 with 1 Axes>, <Axes: >)
+    >>> fig, ax = catalyst.draw_graph(circuit, level=2)()
+    >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
     .. figure:: ../../../doc/_static/catalyst-draw-graph-level2-example.png
         :width: 35%
@@ -235,7 +236,6 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
                 return qml.probs()
 
         >>> print(catalyst.draw_graph(circuit)())
-        (<Figure size 640x480 with 1 Axes>, <Axes: >)
 
         .. figure:: ../../../doc/_static/catalyst-draw-graph-control-flow-example.png
             :width: 35%
@@ -270,7 +270,6 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
 
         >>> x, y = 1, 0
         >>> print(catalyst.draw_graph(circuit)(x, y))
-        (<Figure size 640x480 with 1 Axes>, <Axes: >)
 
         .. figure:: ../../../doc/_static/catalyst-draw-graph-dynamic-wire-example.png
             :width: 35%
