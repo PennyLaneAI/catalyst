@@ -192,6 +192,7 @@ jobs:
 
     - name: Run Frontend Tests
       run: |
+        pip list | grep -i penny
         make pytest
 
     - name: Run Frontend Tests (Kokkos)
