@@ -147,7 +147,7 @@ class CompiledFunction:
         """Execute the compiled function with arguments ``*args``.
 
         Args:
-            lib: Shared object
+            shared_object: Shared object
             has_return: whether the function returns a value or not
             out_type: Jaxpr output type holding information about implicit outputs
             numpy_dict: dictionary of numpy arrays of buffers from the runtime
@@ -406,7 +406,7 @@ class CompilationCache:
         self.abstracted_axes = abstracted_axes
         self.cache = {}
 
-    def get_function_status_and_key(self, args, kwargs):
+    def get_function_status_and_key(self, args) -> tuple[TypeCompatibility, CacheKey]:
         """Check if the provided arguments match an existing function in the cache. The cache
         status of the function is returned as a compilation action:
          - no match: requires compilation
@@ -415,40 +415,46 @@ class CompilationCache:
 
         Args:
             args (Iterable): arguments to match to existing functions
-            kwargs (Iterable): keyword arguments to match existing functions
 
         Returns:
             TypeCompatibility
             CacheKey | None
         """
+        #print(f"getting status and key with args {args}")
         if not self.cache:
+            #print("cache was empty")
             return TypeCompatibility.NEEDS_COMPILATION, None
 
         flat_runtime_sig, treedef, static_args = get_decomposed_signature(
-            (*args, *kwargs.values()), self.static_argnums
+            args, self.static_argnums
         )
+        
+        #print(f"got decomposed signature: {flat_runtime_sig}, {treedef}, {static_args}")
+
         key = CacheKey(treedef, static_args)
         if key not in self.cache:
             return TypeCompatibility.NEEDS_COMPILATION, None
 
+        #print("key was in cache")
         entry = self.cache[key]
         runtime_signature = tree_unflatten(treedef, flat_runtime_sig)
         action = typecheck_signatures(entry.signature, runtime_signature, self.abstracted_axes)
         return action, key
 
-    def lookup(self, args, kwargs):
+    def lookup(self, args) -> tuple[CacheEntry, bool]:
         """Get a function (if present) that matches the provided argument signature. Also computes
         whether promotion is necessary.
 
         Args:
             args (Iterable): the arguments to match to existing functions
-            kwargs (Iterable): the keyword arguments to match existing functions
 
         Returns:
             CacheEntry | None: the matched cache entry
             bool: whether the matched entry requires argument promotion
         """
-        action, key = self.get_function_status_and_key(args, kwargs)
+        #print("checking cache")
+        action, key = self.get_function_status_and_key(args)
+        #print(f"status: {action, key}")
 
         if action == TypeCompatibility.NEEDS_COMPILATION:
             return None, None

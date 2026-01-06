@@ -532,7 +532,8 @@ class QJIT(CatalystCallable):
         self.compile_options = compile_options
         self.compiler = Compiler(compile_options)
         self.fn_cache = CompilationCache(
-            compile_options.static_argnums, compile_options.abstracted_axes
+            compile_options.static_argnums, 
+            compile_options.abstracted_axes,
         )
         # Active state of the compiler.
         # TODO: rework ownership of workspace, possibly CompiledFunction
@@ -551,8 +552,9 @@ class QJIT(CatalystCallable):
         self.user_sig = get_type_annotations(fn)
         self._validate_configuration()
 
+        # TODO this can't be done successfully with *args, *kwargs, so these would force jit
         # If static_argnames are present, convert them to static_argnums
-        if compile_options.static_argnames is not None:
+        if compile_options.static_argnames is not None and not has_varargs(self.original_function): # TODO this could be okay if this assigns static_argnums based on signature position rather than call position
             compile_options.static_argnums = merge_static_argname_into_argnum(
                 fn, compile_options.static_argnames, compile_options.static_argnums
             )
@@ -560,7 +562,7 @@ class QJIT(CatalystCallable):
         self.user_function = self.pre_compilation()
 
         # Static arguments require values, so we cannot AOT compile.
-        if self.user_sig is not None and not self.compile_options.static_argnums:
+        if self.user_sig is not None and not self._has_static_args():
             self.aot_compile()
 
         super().__init__("user_function")
@@ -593,31 +595,40 @@ class QJIT(CatalystCallable):
 
     @debug_logger
     def __call__(self, *args, **kwargs):
+        #print("called")
         # Transparently call Python function in case of nested QJIT calls.
         if EvaluationContext.is_tracing():
             isQNode = isinstance(self.user_function, qml.QNode)
             if isQNode and self.compile_options.static_argnums:
-                kwargs = {"static_argnums": self.compile_options.static_argnums, **kwargs}
+                kwargs = {"static_argnums": self.compile_options.static_argnums,
+                          "static_argnames": self.compile_options.static_argnames,
+                          **kwargs}
 
+            #print("running user function")
             return self.user_function(*args, **kwargs)
 
-        requires_promotion = self.jit_compile(args, **kwargs)
+        #print("determining need for promotion")
+        requires_promotion = self.jit_compile(args, kwargs)
+        #print(f"requires promotion (jit)?: {requires_promotion}")
 
         # If we receive tracers as input, dispatch to the JAX integration.
         if any(isinstance(arg, jax.core.Tracer) for arg in tree_flatten(args)[0]):
             if self.jaxed_function is None:
                 self.jaxed_function = JAX_QJIT(self)  # lazy gradient compilation
+            #print("running jaxed function")
             return self.jaxed_function(*args, **kwargs)
 
         elif requires_promotion:
             dynamic_args = filter_static_args(args, self.compile_options.static_argnums)
             args = promote_arguments(self.c_sig, dynamic_args)
 
+        #print("running with self.run")
         return self.run(args, kwargs)
 
     @debug_logger
     def aot_compile(self):
         """Compile Python function on initialization using the type hint signature."""
+        #print("aot compiling")
         self.workspace = self._get_workspace()
 
         # TODO: awkward, refactor or redesign the target feature
@@ -630,6 +641,7 @@ class QJIT(CatalystCallable):
             self.mlir_module = self.generate_ir()
 
         if self.compile_options.target in ("binary",):
+            #print("setting compiled function (binary)")
             self.compiled_function, _ = self.compile()
             self.fn_cache.insert(
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
@@ -646,20 +658,29 @@ class QJIT(CatalystCallable):
         return to_llvmir(stdin=_mlir, options=self.compile_options)
 
     @debug_logger
-    def jit_compile(self, args, **kwargs):
+    def jit_compile(self, fn_args, fn_kwargs: dict={}, **capture_kwargs) -> bool:
         """Compile Python function on invocation using the provided arguments.
 
         Args:
-            args (Iterable): arguments to use for program capture
-            kwargs (Iterable): keyword arguments to use for program capture
+            fn_args (Iterable): arguments to use for compiled function
+            fn_kwargs (dict[str, Any]): keyword arguments for compiled function
+            capture_kwargs (Iterable): keyword arguments for program capture
 
         Returns:
             bool: whether the provided arguments will require promotion to be used with the compiled
                   function
         """
-        cached_fn, requires_promotion = self.fn_cache.lookup(args, kwargs)
+        #print("jit compiling")
+        # use original function signature to positionalize args for compiled function
+        merged_args = positionalize_args(self.original_function, fn_args, fn_kwargs)
+        #print(f"merged args into {merged_args}")
+
+        # TODO lookup finds [1, (2, 3), 1] and [1, (2,), 3] to be equivalent, which it shouldn't
+        cached_fn, requires_promotion = self.fn_cache.lookup(merged_args)
+        #print(f"requires promotion (cache)?: {requires_promotion}")
 
         if cached_fn is None:
+            #print("cache missed")
             if self.user_sig and not self.compile_options.static_argnums:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
@@ -673,17 +694,22 @@ class QJIT(CatalystCallable):
             if self.compiled_function and self.compiled_function.shared_object:
                 self.compiled_function.shared_object.close()
 
-            # TODO problem appears to be here
-            self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
+            self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(fn_args, fn_kwargs,
+                                                                                   **capture_kwargs)
 
             self.mlir_module = self.generate_ir()
+            #print(self.mlir_module)
+            #print("setting compiled_function (empty cache)")
             self.compiled_function, _ = self.compile()
-
-            self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
+            #print(f"caching {self.compiled_function} with signature {inspect.signature(self.compiled_function)} and args {merged_args}")
+            self.fn_cache.insert(self.compiled_function, merged_args, self.out_treedef, self.workspace)
+            #print("cached")
 
         elif self.compiled_function is not cached_fn.compiled_fn:
+            #print("compiled function was not cached, caching")
             # Restore active state from cache.
             self.workspace = cached_fn.workspace
+            #print("setting compiled function (overwrite cache)")
             self.compiled_function = cached_fn.compiled_fn
             self.out_treedef = cached_fn.out_treedef
             self.c_sig = cached_fn.signature
@@ -707,31 +733,52 @@ class QJIT(CatalystCallable):
                     )
                 return qml.capture.run_autograph(self.original_function)
             return run_autograph(self.original_function, *self.compile_options.autograph_include)
+        
+        # convert kwargs, varargs to positional args
+        if has_varargs(self.original_function):
+            #print("making positional wrapper")
+            return make_positional_wrapper(self.original_function)
 
         return self.original_function
 
     @instrument(size_from=0)
     @debug_logger
-    def capture(self, args, **kwargs):
+    def capture(self, fn_args, fn_kwargs:dict={}, **kwargs):
         """Capture the JAX program representation (JAXPR) of the wrapped function.
 
         Args:
-            args (Iterable): arguments to use for program capture
+            fn_args (Iterable): arguments to use for program capture
+            fn_kwargs (dict): keyword arguments to use for program capture
+            kwargs: keyword arguments for program capture
 
         Returns:
             ClosedJaxpr: captured JAXPR
             PyTreeDef: PyTree metadata of the function output
             Tuple[Any]: the dynamic argument signature
         """
-        verify_static_argnums(args, self.compile_options.static_argnums)
+        #print(f"capturing with args {fn_args}")
         static_argnums = self.compile_options.static_argnums
+        static_argnames = self.compile_options.static_argnames
+        verify_static_argnums(
+                inspect.signature(self.original_function), 
+                fn_args, 
+                fn_kwargs, 
+                static_argnums,
+                static_argnames,
+        )
+        resolved_args = positionalize_args(self.original_function, fn_args, fn_kwargs)
         abstracted_axes = self.compile_options.abstracted_axes
+        print(f"resolved args {resolved_args}")
 
-        dynamic_args = filter_static_args(args, static_argnums)
+        dynamic_args = filter_static_args(inspect.signature(self.original_function),
+                                                            resolved_args, static_argnums)
+        print(f"dynamic args: {dynamic_args}")
         dynamic_sig = get_abstract_signature(dynamic_args)
-        full_sig = merge_static_args(dynamic_sig, args, static_argnums)
+        print(f"dynamic signature: {dynamic_sig}")
+        full_sig = merge_static_args(dynamic_sig, resolved_args, static_argnums)
+        print(f"got signature {full_sig}")
 
-        dbg = debug_info("qjit_capture", self.user_function, args, kwargs)
+        dbg = debug_info("qjit_capture", self.user_function, resolved_args, kwargs)
 
         if qml.capture.enabled():
             return trace_from_pennylane(
@@ -765,12 +812,20 @@ class QJIT(CatalystCallable):
             (qml.QNode, "__call__", closure),
         ):
             # TODO: improve PyTree handling
+            #print("sending to jaxpr with the following parameters:")
+            #print('\tfunction:', self.user_function)
+            #print('\tstatic argnums:', static_argnums)
+            #print('\tsignature:', full_sig)
+            #print('\tkwargs:', kwargs)
             jaxpr, out_type, treedef, plugins = trace_to_jaxpr(
-                self.user_function, static_argnums, abstracted_axes, full_sig, kwargs, dbg
+                    self.user_function, static_argnums, abstracted_axes, full_sig, kwargs, dbg
             )
             self.compile_options.pass_plugins.update(plugins)
             self.compile_options.dialect_plugins.update(plugins)
-
+            #print("tracing yielded the following:")
+            #print("\tjaxpr:", jaxpr)
+            #print("\tout_type:", out_type)
+        #print(f"capture complete, got jaxpr and out_type above, as well as {treedef} and {dynamic_sig}")
         return jaxpr, out_type, treedef, dynamic_sig
 
     @instrument(size_from=0, has_finegrained=True)
@@ -781,8 +836,10 @@ class QJIT(CatalystCallable):
         Returns:
             Tuple[ir.Module, str]: the in-memory MLIR module and its string representation
         """
+        #print(f"input abstract values: {self.jaxpr.in_avals}")
+        #print(f"generating ir with argnames {get_arg_names(self.jaxpr.in_avals, self.user_function)}")
         mlir_module, ctx = lower_jaxpr_to_mlir(
-            self.jaxpr, self.__name__, get_arg_names(self.jaxpr.in_avals, self.original_function)
+            self.jaxpr, self.__name__, get_arg_names(self.jaxpr.in_avals, self.user_function)
         )
 
         # Inject Runtime Library-specific functions (e.g. setup/teardown).
@@ -840,7 +897,11 @@ class QJIT(CatalystCallable):
         Returns:
             Any: results of the execution arranged into the original function's output PyTrees
         """
-        results = self.compiled_function(*args, **kwargs)
+        # TODO right now args and kwargs are doubling up for kwargs
+        resolved_args = positionalize_args(self.original_function, args, kwargs)
+        #print(f"running {self.compiled_function} with resolved_args {resolved_args} and kwargs {kwargs}")
+        results = self.compiled_function(*resolved_args)
+        #print("got results")
 
         # TODO: Move this to the compiled function object.
         return tree_unflatten(self.out_treedef, results)
@@ -863,6 +924,9 @@ class QJIT(CatalystCallable):
         preferred_workspace_dir = os.getcwd() if self.use_cwd_for_workspace else None
 
         return WorkspaceManager.get_or_create_workspace(workspace_name, preferred_workspace_dir)
+
+    def _has_static_args(self):
+        return self.compile_options.static_argnums or self.compile_options.static_argnames
 
 
 class JAX_QJIT:
@@ -974,3 +1038,114 @@ class JAX_QJIT:
     @debug_logger
     def __call__(self, *args, **kwargs):
         return self.jaxed_function(*args, **kwargs)
+
+
+def positionalize_args(fn, fn_args, fn_kwargs):
+    """
+    Return a tuple of arguments matching values given by fn_args and fn_kwargs,
+    ordered by their parameter positions in `fn`'s signature.
+
+    Args:
+        fn (Callable): function whose signature to match.
+        fn_args (Iterable): iterable of positional arguments to `fn`.
+        fn_kwargs (dict): dictionary of keyword arguments to `fn`.
+
+    Returns:
+        tuple: `fn_args` and `fn_kwargs` arguments in positions according to `fn`'s signature
+    """
+
+    sig = inspect.signature(fn)
+    #print(f"binding args {fn_args} and kwargs {fn_kwargs} to sig {sig} from fn {fn}")
+    bound_args = sig.bind(*fn_args, **fn_kwargs)
+    bound_args.apply_defaults()
+    
+    return tuple(bound_args.arguments[param] for param in sig.parameters)
+
+def has_varargs(fn):
+    """
+    Return true iff `fn` has variable length arguments (*args of **kwargs).
+
+    Args:
+        fn (Callable): function to examine.
+
+    Returns:
+        bool: whether `fn` accepts variable length arguments.
+    """
+
+    params = inspect.signature(fn).parameters
+    vararg_kinds = (inspect.Parameter.VAR_POSITIONAL,
+                    inspect.Parameter.VAR_KEYWORD)
+    
+    return any(params[param].kind in vararg_kinds for param in params)
+
+def make_positional_wrapper(fn):
+    """
+    Return a wrapper of `fn` whose arguments are strictly positional, matching the order of the
+    arguments of the signature of func.
+
+    Args:
+        fn (Callable): the function to wrap.
+
+    Returns:
+        (Callable): wrapper of `fn` with purely positional arguments
+    """
+
+    # TODO docstring example?
+    # TODO test this extensively
+    sig = inspect.signature(fn)
+    params = sig.parameters.values()
+    #print(f"signature: {sig}, params: {params}")
+
+    def wrapper(*input_args):
+        # accept an arbitrary number of positional arguments, mapping them (in signature order)
+        # to the arguments (positional and keyword) of fn
+        #print(f"input_args: {input_args}")
+        input_args = iter(input_args)
+        fn_args = []
+        fn_kwargs = {}
+        
+        for param in params:
+            # if we run out of args unexpectedly, call fn to trigger "normal" errors
+            try:
+                val = next(input_args)
+                #print(f"assigning value {val}")
+            except StopIteration:
+                # let this fail in the call to the underlying function to get normal user errors
+                #raise TypeError(f"insufficient args for function {fn}")
+                break
+
+            if param.kind in (inspect.Parameter.POSITIONAL_ONLY,
+                              inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                              ):
+                fn_args.append(val)
+            
+            elif param.kind in (inspect.Parameter.VAR_POSITIONAL,
+                                ):
+                fn_args.extend(val)
+
+            elif param.kind in (inspect.Parameter.KEYWORD_ONLY,):
+                fn_kwargs[param.name] = val
+
+            elif param.kind in (inspect.Parameter.VAR_KEYWORD,):
+                fn_kwargs.update(val)
+
+        try:
+            val = next(input_args) # if this succeeds then we were given too many args!
+            # it *should* error when all is well
+            
+            #print(f"got value {val}")
+            #print(f"still {len(list(input_args))} args remaining!")
+            #print(f"fn_args: {fn_args}, fn_kwargs: {fn_kwargs}, input_args: {input_args}")
+            raise TypeError("too many positional arguments") from None
+        except StopIteration:
+            # This is in fact the case we want, just pass
+            pass
+
+        #print(f"captured args {args} and kwargs {kwargs}")
+        # TODO this may be unnecessary
+        if len(fn_args) == 0:
+            return fn(**fn_kwargs)
+
+        return fn(*fn_args, **fn_kwargs)
+
+    return wrapper

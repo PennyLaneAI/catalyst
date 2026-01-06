@@ -81,12 +81,24 @@ class TestKeywordArguments:
         Test that functions are correctly recompiled when keywords change.
         """
 
-        @qml.qjit
+        @qjit
         def circuit(x, y):
             return x + y
 
         assert circuit(1, y=2) == 3
         assert jnp.allclose(circuit(1, y=jnp.array([2, 2])), jnp.array([3, 3]))
+
+    def test_keyword_ordering(self):
+        """
+        Test that kwargs in potentially positional positions are recognized as kwargs.
+        """
+
+        @qjit
+        def foo(x, *args, y=1):
+            return x - sum(args) / y
+
+        assert foo(1, 2, 3) == -4
+        assert jnp.allclose(foo(1, 2, y=3), 1 / 3)
 
 
 if __name__ == "__main__":

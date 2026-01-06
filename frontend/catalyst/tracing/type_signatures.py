@@ -32,10 +32,14 @@ from catalyst.jax_extras import get_aval2
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 
+VARARGS = (
+    inspect.Parameter.VAR_POSITIONAL,
+    inspect.Parameter.VAR_KEYWORD,
+)
 
-def get_stripped_signature(fn: Callable):
+
+def get_stripped_signature(fn: Callable) -> inspect.Signature:
     """Return the function's signature without annotations."""
-
     old_params = inspect.signature(fn).parameters.values()
     new_params = [param.replace(annotation=inspect.Parameter.empty) for param in old_params]
 
@@ -43,26 +47,32 @@ def get_stripped_signature(fn: Callable):
 
 
 def get_param_annotations(fn: Callable):
-    """Return true all parameters typed-annotations."""
+    """Return all parameters type-annotations."""
     assert isinstance(fn, Callable)
+
     signature = inspect.signature(fn)
     parameters = signature.parameters
+
     return [p.annotation for p in parameters.values()]
 
 
-def params_are_annotated(fn: Callable):
-    """Return true if all parameters are typed-annotated, or no parameters are present."""
+def params_are_annotated(fn: Callable) -> bool:
+    """Return true if all parameters are type-annotated, or no parameters are present."""
     assert isinstance(fn, Callable)
+
     annotations = get_param_annotations(fn)
     are_annotated = all(annotation is not inspect.Parameter.empty for annotation in annotations)
+
     if not are_annotated:
         return False
+
     return all(isinstance(annotation, (type, AbstractValue)) for annotation in annotations)
 
 
-def get_type_annotations(fn: Callable):
+def get_type_annotations(fn: Callable) -> tuple:
     """Get type annotations if all parameters are annotated."""
     assert isinstance(fn, Callable)
+
     if fn is not None and params_are_annotated(fn):
         annotations = get_param_annotations(fn)
         return tuple(annotations)
@@ -80,6 +90,7 @@ def get_abstract_signature(args):
         Iterable: ShapedArrays for the provided values
     """
     flat_args, treedef = tree_flatten(args)
+    # print(f"flat args: {flat_args}")
 
     abstract_args = [shaped_abstractify(arg) for arg in flat_args]
 
@@ -105,8 +116,32 @@ def verify_static_argnums_type(static_argnums):
     return None
 
 
-def verify_static_argnums(args, static_argnums):
+def get_signature_length(sig, args, kwargs):
+    """Return the total number of arguments `args` bound to signature `sig`, counting arguments in
+    varargs individually.
+
+    Args:
+        sig (inspect.Signature): the signature to analyze.
+        args (Iterable): arguments to bind to signature.
+
+    Returns:
+        int: the number of arguments in the signature.
+    """
+    bound_args = sig.bind(*args, **kwargs)
+
+    length = 0
+    for param in sig.parameters:
+        if sig.parameters[param].kind in VARARGS:
+            length += len(bound_args.arguments[param])
+        else:
+            length += 1
+
+    return length
+
+
+def verify_static_argnums(sig, args, kwargs, static_argnums, static_argnames):
     """Verify that static_argnums have correct type and range.
+    Raises a `CompileError` if not.
 
     Args:
         args (Iterable): arguments to a compiled function
@@ -115,16 +150,19 @@ def verify_static_argnums(args, static_argnums):
     Returns:
         None
     """
+    # check that all argnums are ints
     verify_static_argnums_type(static_argnums)
+    print(f"args: {args}")
+    sig_len = get_signature_length(sig, args, kwargs)
 
     for argnum in static_argnums:
-        if argnum < 0 or argnum >= len(args):
-            msg = f"argnum {argnum} is beyond the valid range of [0, {len(args)})."
+        if argnum < 0 or argnum >= sig_len:
+            msg = f"argnum {argnum} is beyond the valid range of [0, {sig_len})."
             raise CompileError(msg)
     return None
 
 
-def filter_static_args(args, static_argnums):
+def filter_static_args(sig, args, static_argnums):
     """Remove static values from arguments using the provided index list.
 
     Args:
@@ -134,14 +172,27 @@ def filter_static_args(args, static_argnums):
     Returns:
         Tuple: dynamic arguments
     """
-    return tuple(args[idx] for idx in range(len(args)) if idx not in static_argnums)
+    dynamic_args = []
+    i = 0
+    for arg, param in zip(args, sig.parameters.values()):
+        if param.kind in VARARGS:
+            for subarg in arg:
+                if i not in static_argnums:
+                    dynamic_args.append(subarg)
+                i += 1
+        else:
+            if i not in static_argnums:
+                dynamic_args.append(arg)
+            i += 1
+
+    return dynamic_args
 
 
-def split_static_args(args_and_kwargs, static_argnums):
+def split_static_args(sig, args, static_argnums):
     """Split arguments into static and dynamic values using the provided index list.
 
     Args:
-        args_and_kwargs (Iterable): arguments to a compiled function
+        args (Iterable): arguments to a compiled function
         static_argnums (Iterable[int]): indices to split on
 
     Returns:
@@ -149,11 +200,22 @@ def split_static_args(args_and_kwargs, static_argnums):
         Tuple: static arguments
     """
     dynamic_args, static_args = [], []
-    for i, arg in enumerate(args_and_kwargs):
-        if i in static_argnums:
-            static_args.append(arg)
+    i = 0
+    for arg, param in zip(args, sig.parameters.values):
+        if param.kind in VARARGS:
+            for subarg in arg:
+                if i in static_argnums:
+                    static_args.append(subarg)
+                else:
+                    dynamic_args.append(subarg)
+                i += 1
         else:
-            dynamic_args.append(arg)
+            if i in static_argnums:
+                static_args.append(arg)
+            else:
+                dynamic_args.append(arg)
+            i += 1
+
     return tuple(dynamic_args), tuple(static_args)
 
 
@@ -189,11 +251,12 @@ def merge_static_argname_into_argnum(fn: Callable, static_argnames, static_argnu
     return new_static_argnums
 
 
-def merge_static_args(signature, args, static_argnums):
+def merge_static_args(sig, abstract_args, args, static_argnums):
     """Merge static arguments back into an abstract signature, retaining the original ordering.
 
     Args:
-        signature (Iterable[ShapedArray]): abstract values of the dynamic arguments
+        sig (inspect.Signature): signature of the function
+        abstract_args (Iterable[ShapedArray]): abstract values of the dynamic arguments
         args (Iterable): original argument list to draw static values from
         static_argnums (Iterable[int]): indices to merge on
 
@@ -205,20 +268,35 @@ def merge_static_args(signature, args, static_argnums):
 
     merged_sig = list(args)  # mutable copy
 
-    dynamic_indices = [idx for idx in range(len(args)) if idx not in static_argnums]
-    for i, idx in enumerate(dynamic_indices):
-        merged_sig[idx] = signature[i]
+    # TODO dynamic_indices is incorrect since it doesn't consider varargs
+    dynamic_indices = split_static_args(sig, args, static_argnums)
+
+    arg_index = 0
+    abstract_index = 0
+    bound_args = sig.bind(args)
+    for arg, param in zip(args, sig.parameters.values()):
+        if param.kind in VARARGS:
+            for i, arg in bound_args.arguments[param]:
+                if arg_index not in static_argnums:
+                    merged_sig[arg_index][i] = abstract_args[abstract_index]
+                    abstract_index += 1
+                arg_index += 1
+        else:
+            if arg_index not in static_argnums:
+                merged_sig[arg_index] = abstract_args
+    # for i, idx in enumerate(dynamic_indices):
+    #     merged_sig[idx] = signature[i]
 
     return tuple(merged_sig)
 
 
-def get_decomposed_signature(args_and_kwargs, static_argnums):
+def get_decomposed_signature(args, static_argnums):
     """Decompose function arguments into dynamic and static arguments, where the dynamic arguments
     are further processed into abstract values and PyTree metadata. All values returned by this
     function are hashable.
 
     Args:
-        args_and_kwargs (Iterable): arguments to a compiled function
+        args (Iterable): arguments to a compiled function
         static_argnums (Iterable[int]): indices to split on
 
     Returns:
@@ -226,8 +304,11 @@ def get_decomposed_signature(args_and_kwargs, static_argnums):
         PyTreeDef: dynamic argument PyTree metadata
         Tuple[Any]: static argument values
     """
-    dynamic_args, static_args = split_static_args(args_and_kwargs, static_argnums)
+    # print(f"getting decomposed signature with args {args}")
+    dynamic_args, static_args = split_static_args(args, static_argnums)
+    # print(f"dynamic args: {dynamic_args}")
     flat_dynamic_args, treedef = tree_flatten(dynamic_args)
+    # print(f"flattened dynamic args to {flat_dynamic_args}")
     flat_signature = get_abstract_signature(flat_dynamic_args)
 
     return flat_signature, treedef, static_args
