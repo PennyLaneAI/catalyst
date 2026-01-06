@@ -98,6 +98,7 @@ def test_arbitrary_angle_pauli_rotations():
 
 test_arbitrary_angle_pauli_rotations()
 
+
 def test_arbitrary_negative_angle_pauli_rotations():
     """Test arbitrary angle PauliRot"""
     qml.capture.enable()
