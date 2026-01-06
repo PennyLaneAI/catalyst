@@ -139,7 +139,7 @@ jobs:
         # Thus this one shouldn't have no-deps: it needs to pull in all PL dependencies
         jax_version=$(grep jax .dep-versions | awk -F '=' '{ print $2 }')
         pip install jax==$jax_version
-        pip install --pre -U --index-url https://test.pypi.org/simple/ pennylane-catalyst'<=0.14.0'
+        pip install --pre -U --index-url https://test.pypi.org/simple/ pennylane-catalyst'>=0.14.0rc0,<=0.14.0'
 
     - name: Install PennyLane-Lightning (stable)
       if: ${{ inputs.lightning == 'stable' }}
@@ -159,8 +159,8 @@ jobs:
     - name: Install PennyLane-Lightning (release-candidate)
       if: ${{ inputs.lightning == 'release-candidate' }}
       run: |
-        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane-lightning'<=0.44.0'
-        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane-lightning-kokkos'<=0.44.0'
+        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane-lightning'>=0.44.0rc0,<=0.44.0'
+        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane-lightning-kokkos'>=0.44.0rc0,<=0.44.0'
 
     # PennyLane doesn't update its dev version number on every commit like Lightning, so we need to
     # force the package to be re-installed. First, handle potential dependency changes, then force
@@ -178,7 +178,7 @@ jobs:
     - name: Install PennyLane (release-candidate)
       if: ${{ inputs.pennylane == 'release-candidate' }}
       run: |
-        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane'<=0.44.0'
+        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane'>=0.44.0rc0,<=0.44.0'
 
     - name: Add Frontend Dependencies to PATH
       if: ${{ inputs.catalyst == 'latest' }}
