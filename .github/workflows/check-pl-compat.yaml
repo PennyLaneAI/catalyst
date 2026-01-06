@@ -139,7 +139,7 @@ jobs:
         # Thus this one shouldn't have no-deps: it needs to pull in all PL dependencies
         # And also this one needs to be --extra-index-url because it needs to see regular PyPI
         sudo apt-get install -y graphviz
-        pip install --pre -U --extra-index-url https://test.pypi.org/simple/ pennylane-catalyst'>=0.14.0rc0,<=0.14.0'
+        pip install --extra-index-url https://test.pypi.org/simple/ pennylane-catalyst'>=0.14.0rc0,<=0.14.0'
 
     - name: Install PennyLane-Lightning (stable)
       if: ${{ inputs.lightning == 'stable' }}
@@ -193,6 +193,9 @@ jobs:
 
     - name: Run Frontend Tests
       run: |
+        pip list | grep -i penny
+        pip list | grep -i xdsl
+        pip list | grep -i jax
         make pytest
 
     - name: Run Frontend Tests (Kokkos)
