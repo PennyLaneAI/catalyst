@@ -235,7 +235,8 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
                         qml.Z(0)
                 return qml.probs()
 
-        >>> print(catalyst.draw_graph(circuit)())
+        >>> fig, ax = catalyst.draw_graph(circuit)()
+        >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
         .. figure:: ../../../doc/_static/catalyst-draw-graph-control-flow-example.png
             :width: 35%
@@ -269,7 +270,8 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         and solid lines for static/known values:
 
         >>> x, y = 1, 0
-        >>> print(catalyst.draw_graph(circuit)(x, y))
+        >>> fig, ax = catalyst.draw_graph(circuit)(x, y)
+        >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
         .. figure:: ../../../doc/_static/catalyst-draw-graph-dynamic-wire-example.png
             :width: 35%
