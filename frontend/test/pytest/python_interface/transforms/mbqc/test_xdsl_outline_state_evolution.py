@@ -12,13 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test module for the outline state evolution transform"""
-import pytest
-
-# pylint: disable=wrong-import-position
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
 
 import pennylane as qml
+import pytest
 from pennylane.ftqc import RotXZX
 
 from catalyst.ftqc import mbqc_pipeline
@@ -30,6 +26,8 @@ from catalyst.python_interface.transforms import (
     measurements_from_samples_pass,
     outline_state_evolution_pass,
 )
+
+pytestmark = pytest.mark.xdsl
 
 
 @qml.while_loop(lambda i: i < 1000)

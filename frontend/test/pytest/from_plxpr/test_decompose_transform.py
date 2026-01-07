@@ -173,9 +173,6 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.xfail(
-        reason="paulirot issue to be resolved at https://github.com/PennyLaneAI/catalyst/pull/2233"
-    )
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_tensorlike(self):
         """Test that TensorLike parameters are handled correctly in rules."""
@@ -308,9 +305,6 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.xfail(
-        reason="paulirot issue to be resolved at https://github.com/PennyLaneAI/catalyst/pull/2233"
-    )
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_gphase(self):
         """Test that the decompose lowering pass works with GlobalPhase."""
@@ -442,9 +436,6 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.xfail(
-        reason="paulirot issue to be resolved at https://github.com/PennyLaneAI/catalyst/pull/2233"
-    )
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_multi_passes(self):
         """Test the decompose lowering pass with multiple passes."""

@@ -12,18 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test module for the combine global phases transform"""
-import pytest
-
-# pylint: disable=wrong-import-position
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
 
 import pennylane as qml
+import pytest
 
 from catalyst.python_interface.transforms import (
     CombineGlobalPhasesPass,
     combine_global_phases_pass,
 )
+
+pytestmark = pytest.mark.xdsl
 
 
 class TestCombineGlobalPhasesPass:

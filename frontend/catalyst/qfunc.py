@@ -663,7 +663,7 @@ def dynamic_one_shot(qnode, **kwargs):
 
 
 def _extract_passes(transform_program):
-    """Extract transforms with pass names from the end of the TransformProgram."""
+    """Extract transforms with pass names from the end of the CompilePipeline."""
     tape_transforms = []
     pass_pipeline = []
     i = len(transform_program)
@@ -678,4 +678,4 @@ def _extract_passes(transform_program):
             raise ValueError(
                 f"{t} without a tape definition occurs before tape transform {tape_transforms[-1]}."
             )
-    return qml.transforms.core.TransformProgram(tape_transforms), tuple(pass_pipeline)
+    return qml.CompilePipeline(tape_transforms), tuple(pass_pipeline)

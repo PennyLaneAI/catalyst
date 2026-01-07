@@ -31,7 +31,8 @@ The directory is structured as follows:
     The core modules of the runtime are structured into ``lib/capi`` and ``lib/backend``.
     `lib/capi <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/capi>`_  implements the semantics for
     QIR instructions lowered to our custom runtime. `lib/backend <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/backend>`_
-    contains implementations of the ``QuantumDevice`` API for backend simulators.
+    contains implementations of the ``QuantumDevice`` API for backend simulators. An additional module
+    `lib/RSDecompRuntime` implements the runtime component of the Ross-Selinger Gridsynth algorithm for decomposing single-qubit RZ and PhaseShift gates, which is used by the `gridsynth` compilation pass.
 
 - `tests <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/tests>`_:
     A collection of C++ tests for modules and methods in the runtime.
@@ -48,15 +49,15 @@ The following table shows the available devices along with supported features:
 
    * - **Features**
      - **PennyLane-Lightning-Qubit**
-     - **PennyLane-Lightning-Kokkos** and **PennyLane-Lightning-GPU**
+     - **PennyLane-Lightning-Kokkos**, **PennyLane-Lightning-AMDGPU** and **PennyLane-Lightning-GPU**
      - **Amazon-Braket-OpenQasm**
    * - Qubit Management
      - Dynamic allocation/deallocation
      - Static allocation/deallocation
      - Static allocation/deallocation
    * - Gate Operations
-     - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/core/src/gates/GateOperation.hpp>`_
-     - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/core/src/gates/GateOperation.hpp>`_ without controlled gates support
+     - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/core/gates/GateOperation.hpp>`_
+     - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/core/gates/GateOperation.hpp>`_
      - `Braket operations <https://github.com/PennyLaneAI/catalyst/blob/e812afbadbd777209862d5c76f394e3f0c43ffb6/runtime/lib/backend/openqasm/OpenQasmBuilder.hpp#L49>`_
    * - Quantum Observables
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, and Tensor Product of Observables

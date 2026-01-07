@@ -49,14 +49,14 @@ class TestOQDDevice:
         """Test the device preprocessing"""
         dev = OQDDevice(backend="default", wires=8)
         tranform_program, _ = dev.preprocess()
-        assert tranform_program == qml.transforms.core.TransformProgram()
+        assert tranform_program == qml.CompilePipeline()
 
     def test_preprocess_with_config(self):
         """Test the device preprocessing by explicitly passing an execution config"""
         dev = OQDDevice(backend="default", wires=8)
         execution_config = qml.devices.ExecutionConfig()
         tranform_program, config = dev.preprocess(execution_config)
-        assert tranform_program == qml.transforms.core.TransformProgram()
+        assert tranform_program == qml.CompilePipeline()
         assert config == execution_config
 
     def test_get_c_interface(self):

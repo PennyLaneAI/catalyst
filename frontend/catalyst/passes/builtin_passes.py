@@ -535,6 +535,102 @@ def ions_decomposition(qnode):  # pragma: nocover
     return PassPipelineWrapper(qnode, "ions-decomposition")
 
 
+def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
+    R"""
+    A quantnum compilation pass to discretize
+    single-qubit RZ and PhaseShift gates into the Clifford+T basis or the PPR basis using the Ross-Selinger Gridsynth algorithm.
+    Reference: https://arxiv.org/abs/1403.2975
+
+
+    .. note::
+
+        The actual discretization is only performed during execution time.
+
+    Args:
+        qnode (QNode): the QNode to apply the gridsynth compiler pass to
+        epsilon (float): The maximum permissible operator norm error per rotation gate. Defaults to ``1e-4``.
+        ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in QEC dialect. Defaults to ``False``
+
+    Returns:
+        :class:`QNode <pennylane.QNode>`
+
+    .. note::
+
+        The circuit generated from this pass with ``ppr_basis=True`` are currently not executable on any backend.
+        This is only for analysis with the ``null.qubit`` device and potential future execution
+        when a suitable backend is available.
+
+    **Example**
+
+    In this example the RZ gate will be converted into a new function, which
+    calls the discretization at execution time.
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from catalyst import qjit
+        from catalyst.passes import gridsynth
+
+        pipe = [("pipe", ["quantum-compilation-stage"])]
+
+
+        @qjit(pipelines=pipe, target="mlir")
+        @gridsynth
+        @qml.qnode(qml.device("null.qubit", wires=1))
+        def circuit():
+            qml.RZ(x, wires=0)
+            return qml.probs()
+
+        >>> print(circuit.mlir_opt)
+
+    Example MLIR Representation:
+
+    .. code-block:: mlir
+
+        . . .
+        func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
+        func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
+        func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
+        func.func private @__catalyst_decompose_RZ_0(%arg0: !quantum.bit, %arg1: f64) -> (!quantum.bit, f64) {
+            . . .
+            %2 = scf.for %arg2 = %c0 to %0 step %c1 iter_args(%arg3 = %arg0) -> (!quantum.bit) {
+                %3 = memref.load %alloc[%arg2] : memref<?xindex>
+                %4 = scf.index_switch %3 -> !quantum.bit
+                case 0 {
+                    %out_qubits = quantum.custom "T"() %arg3 : !quantum.bit
+                    scf.yield %out_qubits : !quantum.bit
+                }
+                case 1 {
+                    %out_qubits = quantum.custom "Hadamard"() %arg3 : !quantum.bit
+                    %out_qubits_0 = quantum.custom "T"() %out_qubits : !quantum.bit
+                    scf.yield %out_qubits_0 : !quantum.bit
+                }
+                case 2 {
+                    %out_qubits = quantum.custom "S"() %arg3 : !quantum.bit
+                    %out_qubits_0 = quantum.custom "Hadamard"() %out_qubits : !quantum.bit
+                    %out_qubits_1 = quantum.custom "T"() %out_qubits_0 : !quantum.bit
+                    scf.yield %out_qubits_1 : !quantum.bit
+                }
+                . . .
+            }
+        }
+
+        func.func public @circuit_0(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode} {
+            . . .
+            %2:2 = call @__catalyst_decompose_RZ_0(%1, %extracted) : (!quantum.bit, f64) -> (!quantum.bit, f64)
+            . . .
+        }
+
+
+
+    """
+    if qnode is None:
+        return functools.partial(gridsynth, epsilon=epsilon, ppr_basis=ppr_basis)
+
+    gridsynth_pass = {"gridsynth": {"epsilon": epsilon, "ppr_basis": ppr_basis}}
+    return PassPipelineWrapper(qnode, gridsynth_pass)
+
+
 def to_ppr(qnode):
     R"""
     A quantum compilation pass that converts Clifford+T gates into Pauli Product Rotation (PPR)
@@ -1285,3 +1381,54 @@ def ppr_to_mbqc(qnode):
 
     """
     return PassPipelineWrapper(qnode, "ppr-to-mbqc")
+
+
+# This pass is already covered via applying by pass
+# `qml.transform(pass_name="decompose-arbitrary-ppr")` in Pennylane.
+def decompose_arbitrary_ppr(qnode):  # pragma: nocover
+    R"""
+    Specify that the MLIR compiler pass for decomposing arbitrary Pauli product rotations (PPR)
+    operations will be applied. This will decompose into a collection of PPRs, PPMs and
+    a single-qubit arbitrary PPR in the Z basis. For more details, see Figure 13(d)
+    in `arXiv:2211.15465 <https://arxiv.org/abs/2211.15465>`_.
+
+    .. note::
+
+        For improved integration with the PennyLane frontend, including inspectability with
+        :func:`pennylane.specs`, please use :func:`pennylane.transforms.decompose_arbitrary_ppr`.
+
+        The ``decompose_arbitrary_ppr`` compilation pass requires that :func:`~.passes.to_ppr` be
+        applied first.
+
+    Args:
+        qnode (QNode): QNode to apply the pass to.
+
+    Returns:
+        ~.QNode
+
+    **Example**
+
+    .. code-block:: python
+
+        import pennylane as qml
+
+
+        @qml.qjit(pipelines=[("pipe", ["quantum-compilation-stage"])], target="mlir")
+        @qml.transforms.decompose_arbitrary_ppr
+        @qml.transforms.to_ppr
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def circuit():
+            qml.PauliRot(0.123, pauli_word="XXY", wires=[0, 1, 2])
+            return
+
+    >>> print(circuit.mlir_opt)
+    ...
+    %5 = qec.prepare  plus %4 : !quantum.bit
+    %mres, %out_qubits:4 = qec.ppm ["X", "X", "Y", "Z"] %1, %2, %3, %5 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %6 = qec.ppr ["X"](2) %out_qubits#3 cond(%mres) : !quantum.bit
+    %7 = qec.ppr.arbitrary ["Z"](%cst) %6 : !quantum.bit
+    %mres_0, %out_qubits_1 = qec.ppm ["X"] %7 : !quantum.bit
+    %8:3 = qec.ppr ["X", "X", "Y"](2) %out_qubits#0, %out_qubits#1, %out_qubits#2 cond(%mres_0) : !quantum.bit, !quantum.bit, !quantum.bit
+    ...
+    """
+    return PassPipelineWrapper(qnode, "decompose-arbitrary-ppr")
