@@ -17,6 +17,7 @@
   [(#2287)](https://github.com/PennyLaneAI/catalyst/pull/2287)
   [(#2298)](https://github.com/PennyLaneAI/catalyst/pull/2298)
   [(#2290)](https://github.com/PennyLaneAI/catalyst/pull/2290)
+  [(#2340)](https://github.com/PennyLaneAI/catalyst/pull/2340)
   [(#2357)](https://github.com/PennyLaneAI/catalyst/pull/2357)
   [(#2309)](https://github.com/PennyLaneAI/catalyst/pull/2309)
 
