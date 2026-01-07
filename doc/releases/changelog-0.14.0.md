@@ -647,9 +647,6 @@
   protocols to a Clifford+T program.
   [(#2269)](https://github.com/PennyLaneAI/catalyst/pull/2269)
 
-* Remove duplicate code for canonicalization and verification of Pauli Product Rotation operations.
-  [(#2313)](https://github.com/PennyLaneAI/catalyst/pull/2313)
-
 * Adding the measurement type into the MLIR assembly format for `qec.ppm` and `qec.select.ppm`
   [(#2347)](https://github.com/PennyLaneAI/catalyst/pull/2347)
 
