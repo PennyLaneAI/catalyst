@@ -677,7 +677,6 @@ def to_ppr(qnode):
     .. code-block:: python
 
         import pennylane as qml
-        from catalyst import qjit, measure
 
         p = [("my_pipe", ["quantum-compilation-stage"])]
 
