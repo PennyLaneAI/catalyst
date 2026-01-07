@@ -963,11 +963,12 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 4  # Device node + operator
 
-        assert nodes["node1"]["label"] == "<name> PPR-YZ (π/2)|<wire> [0, 1]"
+        sign_str = "-" if negative_angle else ""
+        assert nodes["node1"]["label"] == f"<name> PPR-YZ ({sign_str}π/2)|<wire> [0, 1]"
         assert nodes["node1"]["attrs"]["fillcolor"] == "#D9D9D9"
-        assert nodes["node2"]["label"] == "<name> PPR-X (π/8)|<wire> [0]"
+        assert nodes["node2"]["label"] == f"<name> PPR-X ({sign_str}π/8)|<wire> [0]"
         assert nodes["node2"]["attrs"]["fillcolor"] == "#E3FFA1"
-        assert nodes["node3"]["label"] == "<name> PPR-XYZ (π/4)|<wire> [0, 1, 2]"
+        assert nodes["node3"]["label"] == f"<name> PPR-XYZ ({sign_str}π/4)|<wire> [0, 1, 2]"
         assert nodes["node3"]["attrs"]["fillcolor"] == "#F5BD70"
 
     @pytest.mark.usefixtures("use_capture")
