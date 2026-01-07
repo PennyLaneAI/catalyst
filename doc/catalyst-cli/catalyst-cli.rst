@@ -89,10 +89,10 @@ Keep intermediate files after each pass or after each pipeline in the compilatio
 intermediate files are saved.
 
 * ``pass``: Keep intermediate files after each transformation/optimization pass.
-* ``changed``: Keep intermediate files after each transformation/optimization pass, but only if the
-  IR was modified by that pass.
 * ``pipeline``: Keep intermediate files after each pipeline, where a *pipeline* is a sequence of
   transformation/optimization passes.
+* ``changed``: Keep intermediate files after each transformation/optimization pass, but only if the
+  IR was modified by that pass.
 
 ``--keep-intermediate[=<true|false>]``
 """"""""""""""""""""""""""""""""""""""
