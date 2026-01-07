@@ -764,6 +764,10 @@ No deprecations have been made in this release.
 
 <h3>Documentation 📝</h3>
 
+* A clarification was made in the :doc:`Sharp Bits page <../dev/sharp_bits>` for the behaviour of 
+  :func:`qml.allocate <~.allocate>` when used with Catalyst.
+  [(#2317)](https://github.com/PennyLaneAI/catalyst/pull/2317)
+
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
   [(#2136)](https://github.com/PennyLaneAI/catalyst/pull/2136)
 
