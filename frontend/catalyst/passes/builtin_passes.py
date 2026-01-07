@@ -632,87 +632,87 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
 
 def to_ppr(qnode):
     R"""A quantum compilation pass that converts Clifford+T gates into Pauli Product Rotation (PPR)
-        gates.
+    gates.
 
-        .. note::
+    .. note::
 
-            For improved integration with the PennyLane frontend, including inspectability with
-            :func:`pennylane.specs`, please use :func:`pennylane.transforms.to_ppr`.
+        For improved integration with the PennyLane frontend, including inspectability with
+        :func:`pennylane.specs`, please use :func:`pennylane.transforms.to_ppr`.
 
-        Clifford gates are defined as :math:`\exp(-{iP\tfrac{\pi}{4}})`, where :math:`P` is a Pauli word.
-        Non-Clifford gates are defined as :math:`\exp(-{iP\tfrac{\pi}{8}})`.
+    Clifford gates are defined as :math:`\exp(-{iP\tfrac{\pi}{4}})`, where :math:`P` is a Pauli word.
+    Non-Clifford gates are defined as :math:`\exp(-{iP\tfrac{\pi}{8}})`.
 
-        For more information on the PPM compilation pass, check out the
-        `compilation hub <https://pennylane.ai/compilation/pauli-product-measurement>`__.
+    For more information on the PPM compilation pass, check out the
+    `compilation hub <https://pennylane.ai/compilation/pauli-product-measurement>`__.
 
-        .. note::
+    .. note::
 
-            The circuits that generated from this pass are currently not executable on any backend.
-            This pass is only for analysis with the ``null.qubit`` device and potential future execution
-            when a suitable backend is available.
+        The circuits that generated from this pass are currently not executable on any backend.
+        This pass is only for analysis with the ``null.qubit`` device and potential future execution
+        when a suitable backend is available.
 
-        The full list of supported gates and operations are
-        ``qml.H``,
-        ``qml.S``,
-        ``qml.T``,
-        ``qml.X``,
-        ``qml.Y``,
-        ``qml.Z``,
-        ``qml.adjoint(qml.S)``,
-        ``qml.adjoint(qml.T)``,
-        ``qml.CNOT``,
-        ``qml.PauliRot``, and
-        ``catalyst.measure``.
+    The full list of supported gates and operations are
+    ``qml.H``,
+    ``qml.S``,
+    ``qml.T``,
+    ``qml.X``,
+    ``qml.Y``,
+    ``qml.Z``,
+    ``qml.adjoint(qml.S)``,
+    ``qml.adjoint(qml.T)``,
+    ``qml.CNOT``,
+    ``qml.PauliRot``, and
+    ``catalyst.measure``.
 
-        Args:
-            fn (QNode): QNode to apply the pass to
+    Args:
+        fn (QNode): QNode to apply the pass to
 
-        Returns:
-            :class:`QNode <pennylane.QNode>`
+    Returns:
+        :class:`QNode <pennylane.QNode>`
 
-        **Example**
+    **Example**
 
-        In this example the Clifford+T gates will be converted into PPRs.
+    In this example the Clifford+T gates will be converted into PPRs.
 
-        .. code-block:: python
+    .. code-block:: python
 
-            import pennylane as qml
-    import catalyst
+        import pennylane as qml
+        import catalyst
 
-            p = [("my_pipe", ["quantum-compilation-stage"])]
+        p = [("my_pipe", ["quantum-compilation-stage"])]
 
-            @qml.qjit(pipelines=p, target="mlir")
-            @catalyst.passes.to_ppr
-            @qml.qnode(qml.device("null.qubit", wires=2))
-            def circuit():
-                qml.H(0)
-                qml.CNOT([0, 1])
-                qml.T(0)
-                return
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.to_ppr
+        @qml.qnode(qml.device("null.qubit", wires=2))
+        def circuit():
+            qml.H(0)
+            qml.CNOT([0, 1])
+            qml.T(0)
+            return
 
-            print(circuit.mlir_opt)
+        print(circuit.mlir_opt)
 
-        Because Catalyst does not currently support execution of Pauli-based computation operations, we
-        must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-        passes will be applied to the initial MLIR, without attempting to further compile for execution.
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
-        Example MLIR Representation:
+    Example MLIR Representation:
 
-        .. code-block:: mlir
+    .. code-block:: mlir
 
-            . . .
-            %2 = qec.ppr ["Z"](4) %1 : !quantum.bit
-            %3 = qec.ppr ["X"](4) %2 : !quantum.bit
-            %4 = qec.ppr ["Z"](4) %3 : !quantum.bit
-            %c_3 = stablehlo.constant dense<1> : tensor<i64>
-            %extracted_4 = tensor.extract %c_3[] : tensor<i64>
-            %5 = quantum.extract %0[%extracted_4] : !quantum.reg -> !quantum.bit
-            %6:2 = qec.ppr ["Z", "X"](4) %4, %5 : !quantum.bit, !quantum.bit
-            %7 = qec.ppr ["Z"](-4) %6#0 : !quantum.bit
-            %8 = qec.ppr ["X"](-4) %6#1 : !quantum.bit
-            %9 = qec.ppr ["Z"](8) %7 : !quantum.bit
-            %mres, %out_qubits = qec.ppm ["Z"] %8 : !quantum.bit
-            . . .
+        . . .
+        %2 = qec.ppr ["Z"](4) %1 : !quantum.bit
+        %3 = qec.ppr ["X"](4) %2 : !quantum.bit
+        %4 = qec.ppr ["Z"](4) %3 : !quantum.bit
+        %c_3 = stablehlo.constant dense<1> : tensor<i64>
+        %extracted_4 = tensor.extract %c_3[] : tensor<i64>
+        %5 = quantum.extract %0[%extracted_4] : !quantum.reg -> !quantum.bit
+        %6:2 = qec.ppr ["Z", "X"](4) %4, %5 : !quantum.bit, !quantum.bit
+        %7 = qec.ppr ["Z"](-4) %6#0 : !quantum.bit
+        %8 = qec.ppr ["X"](-4) %6#1 : !quantum.bit
+        %9 = qec.ppr ["Z"](8) %7 : !quantum.bit
+        %mres, %out_qubits = qec.ppm ["Z"] %8 : !quantum.bit
+        . . .
 
     """
     return PassPipelineWrapper(qnode, "to-ppr")
