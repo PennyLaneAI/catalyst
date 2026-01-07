@@ -254,6 +254,20 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                         """
                     )
                 )
+            # Only probs measurements are currently supported with dynamic allocation
+            # due to a bug in Lightning's PartialSample implementation
+            # TODO: Remove this once the bug is fixed
+            if not isinstance(measurement, qml.measurements.ProbabilityMP):
+                raise CompileError(
+                    textwrap.dedent(
+                        """
+                        Only probability measurements (qml.probs) are currently supported
+                        when dynamic allocations are present in the program. Other measurement
+                        types (qml.sample, qml.expval, qml.var, ...etc) will be supported
+                        in a future release after the underlying bug is fixed.
+                        """
+                    )
+                )
 
         if type(measurement) not in measurement_map:
             raise NotImplementedError(
