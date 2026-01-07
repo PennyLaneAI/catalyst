@@ -284,11 +284,6 @@
 
 <h3>Improvements 🛠</h3>
 
-* Catalyst can now use the new ``pass_name`` property of pennylane transform objects. Passes can now
-  be created using ``qml.transform(pass_name=pass_name)`` instead of ``PassPipelineWrapper``. This 
-  allows for better integration of Catalyst transforms with the PennyLane frontend.
-  [(#2149](https://github.com/PennyLaneAI/catalyst/pull/2149)
-
 * An informative error is now raised if a transform is applied inside of a ``qjit``'d QNode when 
   PennyLane's program capture is enabled.
   [(#2256)](https://github.com/PennyLaneAI/catalyst/pull/2256)
@@ -308,27 +303,9 @@
   NotImplementedError: transforms cannot currently be applied inside a QNode.
   ```
 
-* A new ``"changed"`` option has been added to the ``keep_intermediate`` parameter of
-  :func:`~.qjit`. This option saves intermediate IR files after each pass, but only when the IR is 
-  actually modified by the pass. Additionally, intermediate IR files are now organized into 
-  subdirectories for each compilation stage when using ``keep_intermediate="changed"`` or 
-  ``keep_intermediate="pass"``. These changes culminate in better IR file management.
-  [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
-
-* Resource tracking with :func:`pennylane.specs` now includes ``qml.StatePrep`` operations.
-  [(#2230)](https://github.com/PennyLaneAI/catalyst/pull/2230)
-
-* Resource tracking with :func:`pennylane.specs` now tracks dynamic wire allocation 
-  (:func:`pennylane.allocate`).
-  [(#2203)](https://github.com/PennyLaneAI/catalyst/pull/2203)
-
 * ``qml.PCPhase`` can now be ``qjit``-compiled and executed with PennyLane's program capture 
   enabled.
   [(#2226)](https://github.com/PennyLaneAI/catalyst/pull/2226)
-
-* When saving the IR that each compilation pass generates, the ``apply-transform-sequence`` pass is 
-  now counted as a single pass instead of potentially many passes.
-  [(#1978)](https://github.com/PennyLaneAI/catalyst/pull/1978)
 
 * The new graph-based decomposition framework (enabled with 
   :func:`pennylane.decomposition.enable_graph`) has Autograph feature parity with PennyLane when 
@@ -342,9 +319,10 @@
   at the MLIR level with graph-based decompositions enabled and PennyLane's program capture enabled. 
   [(#2160)](https://github.com/PennyLaneAI/catalyst/pull/2160)
 
-* A new option called ``use_nameloc`` has been added to :func:`~.qjit` that embeds variable names
-  from Python into the compiler IR, which can make it easier to read when debugging programs.
-  [(#2054)](https://github.com/PennyLaneAI/catalyst/pull/2054)
+* Catalyst can now use the new ``pass_name`` property of pennylane transform objects. Passes can now
+  be created using ``qml.transform(pass_name=pass_name)`` instead of ``PassPipelineWrapper``. This 
+  allows for better integration of Catalyst transforms with the PennyLane frontend.
+  [(#2149](https://github.com/PennyLaneAI/catalyst/pull/2149)
 
 * Compilation passes registered in PennyLane via ``@qml.transform`` can now take in optional keyword
   arguments when used with :func:`~.qjit` and when PennyLane's program capture is enabled.
@@ -357,16 +335,36 @@
   is enabled.
   [(#2078)](https://github.com/PennyLaneAI/catalyst/pull/2078)
 
+* A new ``"changed"`` option has been added to the ``keep_intermediate`` parameter of
+  :func:`~.qjit`. This option saves intermediate IR files after each pass, but only when the IR is 
+  actually modified by the pass. Additionally, intermediate IR files are now organized into 
+  subdirectories for each compilation stage when using ``keep_intermediate="changed"`` or 
+  ``keep_intermediate="pass"``. These changes culminate in better IR file management.
+  [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
+
+* Resource tracking with :func:`pennylane.specs` now includes ``qml.StatePrep`` operations and 
+  accounts for dynamic wire allocation (:func:`pennylane.allocate`).
+  [(#2230)](https://github.com/PennyLaneAI/catalyst/pull/2230)
+  [(#2203)](https://github.com/PennyLaneAI/catalyst/pull/2203)
+
+* When saving the IR that each compilation pass generates, the ``apply-transform-sequence`` pass is 
+  now counted as a single pass instead of potentially many passes.
+  [(#1978)](https://github.com/PennyLaneAI/catalyst/pull/1978)
+
+* A new option called ``use_nameloc`` has been added to :func:`~.qjit` that embeds variable names
+  from Python into the compiler IR, which can make it easier to read when debugging programs.
+  [(#2054)](https://github.com/PennyLaneAI/catalyst/pull/2054)
+
 * Dynamically allocated wires (:func:`pennylane.allocate`) can now be passed into control flow 
   blocks and subroutines.
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
   [(#2268)](https://github.com/PennyLaneAI/catalyst/pull/2268)
 
-* The `--adjoint-lowering` pass can now handle Pauli-product rotation (PPR) operations.
+* The ``--adjoint-lowering`` pass can now handle Pauli-product rotation (PPR) operations.
   [(#2227)](https://github.com/PennyLaneAI/catalyst/pull/2227)
 
 * Catalyst now supports Pauli product rotations (PPR) with arbitrary or dynamic angles in the
-  QEC dialect. This will allow :class:`qml.PauliRot` with arbitrary or dynamic angles (angles not 
+  QEC dialect. This will allow :class:`pennylane.PauliRot` with arbitrary or dynamic angles (angles not 
   known at compile time) to be lowered to the QEC dialect. This is implemented as a new 
   ``qec.ppr.arbitrary`` operation, which takes a Pauli-product and an arbitrary or
   dynamic angle as input.
@@ -383,10 +381,11 @@
 
 <h3>Breaking changes 💔</h3>
 
-* The MLIR pipeline ``enforce-runtime-invariants-pipeline`` has been renamed to
-  ``quantum-compilation-pipeline`` and the old ``quantum-compilation-pipeline`` has been renamed to
-  ``gradient-lowering-pipeline``. Users who referenced these pipeline names directly would need to
-  update their code to use the new names.
+* The MLIR pipeline ``enforce-runtime-invariants-pipeline`` has been restructured and a new pipeline
+  called ``quantum-compilation-pipeline`` has been added. Existing quantum compilation passes in the 
+  ``quantum-compilation-pipeline`` are now run together with user-provided quantum compilation 
+  passes (previously run in ``enforce-runtime-invariants``). This new combined pipeline now runs 
+  first.
   [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
 
 * The ``pipeline``  and ``"passes"`` postfixes in the compilation stage names have been changed to 
