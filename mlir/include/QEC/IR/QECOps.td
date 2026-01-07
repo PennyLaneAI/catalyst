@@ -426,7 +426,7 @@ def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, AttrSizedOperandSegments]> 
         
         Example:
         ```mlir
-        %result, %q0:3 = qec.ppm ["X", "I", "Z"] %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+        %result, %q0:3 = qec.ppm ["X", "I", "Z"] %q0, %q1, %q2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
         ```
         This measures the three qubits in the X⊗I⊗Z basis.
     }];
@@ -536,7 +536,7 @@ def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, AttrSizedOperandSegments]> 
     ];
 
     let assemblyFormat = [{
-      $pauli_product (`(` $rotation_sign^ `)`)? $in_qubits (`cond` `(` $condition^ `)`)? attr-dict `:` type($out_qubits)
+      $pauli_product (`(` $rotation_sign^ `)`)? $in_qubits (`cond` `(` $condition^ `)`)? attr-dict `:` type(results)
     }];
 
     let hasVerifier = 1;
@@ -566,7 +566,7 @@ def SelectPPMeasurementOp : QEC_Op<"select.ppm"> {
 
     Example:
     ```mlir
-    %m3, %3 = qec.select.ppm (%m1, ["X"], ["Z"]) %1#1 : !quantum.bit
+    %m3, %3 = qec.select.ppm (%m1, ["X"], ["Z"]) %1#1 : i1, !quantum.bit
     ```
     If %m1 == 1, applies "X" to %1#1; else applies "Z". Then measures.
     }];
@@ -618,7 +618,7 @@ def SelectPPMeasurementOp : QEC_Op<"select.ppm"> {
     ];
 
     let assemblyFormat = [{
-      `(` $select_switch `,` $pauli_product_0 `,` $pauli_product_1 `)` $in_qubits attr-dict `:` type($out_qubits)
+      `(` $select_switch `,` $pauli_product_0 `,` $pauli_product_1 `)` $in_qubits attr-dict `:` type(results)
     }];
     
     let hasVerifier = 1;
