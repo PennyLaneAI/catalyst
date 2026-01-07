@@ -392,15 +392,11 @@
   ``stage`` for clarity.
   [(#2230)](https://github.com/PennyLaneAI/catalyst/pull/2230)
 
-* The jaxpr transform ``pl_map_wires`` has been removed along with its test.
-  [(#2220)](https://github.com/PennyLaneAI/catalyst/pull/2220)
-
 * The JAX version used by Catalyst has been updated to 0.7.0.
   [(#2131)](https://github.com/PennyLaneAI/catalyst/pull/2131)
 
 * (Compiler integrators only) The versions of LLVM/Enzyme/stablehlo used by Catalyst have been
-  updated. Enzyme now targets `v0.0.203` with the build target `EnzymeStatic-22`, and the nanobind
-  requirement for the latest LLVM has been updated to version 2.9.
+  updated. 
   [(#2122)](https://github.com/PennyLaneAI/catalyst/pull/2122)
   [(#2174)](https://github.com/PennyLaneAI/catalyst/pull/2174)
   [(#2175)](https://github.com/PennyLaneAI/catalyst/pull/2175)
@@ -653,6 +649,9 @@ No deprecations have been made in this release.
   * The global xDSL pass registry is now explicitly refreshed before compiling workflows decorated with
     :func:`catalyst.qjit`.
     [(#2322)](https://github.com/PennyLaneAI/catalyst/pull/2322)
+
+* The jaxpr transform ``pl_map_wires`` has been removed along with its test.
+  [(#2220)](https://github.com/PennyLaneAI/catalyst/pull/2220)
 
 * ``DecompRuleInterpreter`` now solves the graph and adds decompositions rules in the ``cleanup`` 
   method instead of during the first call to ``interpret_measurement``.
