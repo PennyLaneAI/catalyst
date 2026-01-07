@@ -573,7 +573,6 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
 
         pipe = [("pipe", ["quantum-compilation-stage"])]
 
-
         @qjit(pipelines=pipe, target="mlir")
         @gridsynth
         @qml.qnode(qml.device("null.qubit", wires=1))
@@ -680,17 +679,22 @@ def to_ppr(qnode):
         import pennylane as qml
         from catalyst import qjit, measure
 
-        ppm_passes = [("PPM", ["to-ppr"])]
+        p = [("my_pipe", ["quantum-compilation-stage"])]
 
-        @qjit(pipelines=ppm_passes, keep_intermediate=True, target="mlir")
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.to_ppr
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             qml.H(0)
             qml.CNOT([0, 1])
             qml.T(0)
-            return measure(1)
+            return
 
         print(circuit.mlir_opt)
+
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
     Example MLIR Representation:
 
@@ -751,16 +755,22 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
         import pennylane as qml
         from catalyst import qjit, measure
 
-        ppm_passes = [("PPM", ["to-ppr", "commute-ppr"])]
+        p = [("my_pipe", ["quantum-compilation-stage"])]
 
-        @qjit(pipelines=ppm_passes, keep_intermediate=True, target="mlir")
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.commute_ppr
+        @catalyst.passes.to_ppr
         @qml.qnode(qml.device("null.qubit", wires=1))
         def circuit():
             qml.H(0)
             qml.T(0)
-            return measure(0)
+            return
 
         print(circuit.mlir_opt)
+
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
     Example MLIR Representation:
 
@@ -847,16 +857,23 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
         import pennylane as qml
         from catalyst import qjit, measure
 
-        ppm_passes = [("PPM",["to-ppr", "commute-ppr","merge-ppr-ppm",])]
+        p = [("my_pipe", ["quantum-compilation-stage"])]
 
-        @qjit(pipelines=ppm_passes, keep_intermediate=True, target="mlir")
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.merge_ppr_ppm
+        @catalyst.passes.commute_ppr
+        @catalyst.passes.to_ppr
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit():
             qml.H(0)
             qml.T(0)
-            return measure(0)
+            return
 
         print(circuit.mlir_opt)
+
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
     Example MLIR Representation:
 
@@ -872,20 +889,18 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
 
     .. code-block:: python
 
-        from catalyst import measure, qjit
-        from catalyst.passes import to_ppr, merge_ppr_ppm
+        p = [("my_pipe", ["quantum-compilation-stage"])]
 
-        pips = [("pipe", ["enforce-runtime-invariants-pipeline"])]
-
-        @qjit(pipelines=pips, target="mlir")
-        @to_ppr
-        @merge_ppr_ppm(max_pauli_size=2)
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.merge_ppr_ppm(max_pauli_size=2)
+        @catalyst.passes.commute_ppr
+        @catalyst.passes.to_ppr
         @qml.qnode(qml.device("lightning.qubit", wires=3))
         def circuit():
             qml.CNOT([1, 2])
             qml.CNOT([0, 1])
             qml.CNOT([0, 2])
-            return measure(0), measure(1), measure(2)
+            return
 
         print(circuit.mlir_opt)
 
@@ -947,16 +962,14 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
     .. code-block:: python
 
         import pennylane as qml
-        from catalyst import qjit, measure
-        from catalyst.passes import to_ppr, commute_ppr, merge_ppr_ppm, ppr_to_ppm
 
-        pipeline = [("pipe", ["quantum-compilation-stage"])]
+        p = [("my_pipe", ["quantum-compilation-stage"])]
 
-        @qjit(pipelines=pipeline, target="mlir")
-        @to_ppr
-        @commute_ppr
-        @merge_ppr_ppm
-        @ppr_to_ppm(decompose_method="auto-corrected")
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.ppr_to_ppm(decompose_method="auto-corrected")
+        @catalyst.passes.merge_ppr_ppm
+        @catalyst.passes.commute_ppr
+        @catalyst.passes.to_ppr
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             qml.H(0)
@@ -965,6 +978,10 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
             return measure(0), measure(1)
 
         print(circuit.mlir_opt)
+
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
     Example MLIR Representation:
 
@@ -1050,14 +1067,12 @@ def ppm_compilation(
     .. code-block:: python
 
         import pennylane as qml
-        from catalyst import qjit, measure
-        from catalyst.passes import ppm_compilation
 
-        pipeline = [("pipe", ["quantum-compilation-stage"])]
+        p = [("my_pipe", ["quantum-compilation-stage"])]
         method = "clifford-corrected"
 
-        @qjit(pipelines=pipeline, target="mlir")
-        @ppm_compilation(decompose_method=method, max_pauli_size=2)
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.ppm_compilation(decompose_method=method, max_pauli_size=2)
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             qml.CNOT([0, 1])
@@ -1067,6 +1082,10 @@ def ppm_compilation(
             return measure(0), measure(1)
 
         print(circuit.mlir_opt)
+
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
     Example MLIR Representation:
 
@@ -1149,26 +1168,30 @@ def ppm_specs(fn):
     .. code-block:: python
 
         import pennylane as qml
-        from catalyst import qjit, measure, for_loop
-        from catalyst.passes import ppm_specs, ppm_compilation
 
-        pipe = [("pipe", ["quantum-compilation-stage"])]
+        p = [("my_pipe", ["quantum-compilation-stage"])]
         device = qml.device("lightning.qubit", wires=2)
 
-        @qjit(pipelines=pipe, target="mlir")
-        @ppm_compilation
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.ppm_compilation
         @qml.qnode(device)
         def circuit():
             qml.H(0)
             qml.CNOT([0,1])
+
             @for_loop(0,10,1)
             def loop(i):
                 qml.T(1)
-            loop()
-            return measure(0), measure(1)
 
-        ppm_specs = ppm_specs(circuit)
+            loop()
+            return
+
+        ppm_specs = catalyst.passes.ppm_specs(circuit)
         print(ppm_specs)
+
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
     Example PPM Specs:
 
@@ -1249,17 +1272,14 @@ def reduce_t_depth(qnode):
     .. code-block:: python
 
         import pennylane as qml
-        from catalyst import qjit, measure
-        from catalyst.passes import to_ppr, commute_ppr, reduce_t_depth, merge_ppr_ppm
 
-        pips = [("pipe", ["quantum-compilation-stage"])]
+        p = [("my_pipe", ["quantum-compilation-stage"])]
 
-
-        @qjit(pipelines=pips, target="mlir")
-        @reduce_t_depth
-        @merge_ppr_ppm
-        @commute_ppr
-        @to_ppr
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.reduce_t_depth
+        @catalyst.passes.merge_ppr_ppm
+        @catalyst.passes.commute_ppr
+        @catalyst.passes.to_ppr
         @qml.qnode(qml.device("null.qubit", wires=3))
         def circuit():
             n = 3
@@ -1273,24 +1293,28 @@ def reduce_t_depth(qnode):
 
             return
 
-        >>> print(circuit.mlir_opt)
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
-        . . .
-        %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-        %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-        // layer 1
-        %3 = qec.ppr ["X"](8) %1 : !quantum.bit
-        %4 = qec.ppr ["X"](8) %2 : !quantum.bit
+    >>> print(circuit.mlir_opt)
 
-        // layer 2
-        %5 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
-        %6:2 = qec.ppr ["Y", "X"](8) %3, %4 : !quantum.bit, !quantum.bit
-        %7 = qec.ppr ["X"](8) %5 : !quantum.bit
-        %8:3 = qec.ppr ["X", "Y", "X"](8) %6#0, %6#1, %7:!quantum.bit, !quantum.bit, !quantum.bit
+    . . .
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    // layer 1
+    %3 = qec.ppr ["X"](8) %1 : !quantum.bit
+    %4 = qec.ppr ["X"](8) %2 : !quantum.bit
 
-        // layer 3
-        %9:3 = qec.ppr ["X", "X", "Y"](8) %8#0, %8#1, %8#2:!quantum.bit, !quantum.bit, !quantum.bit
-        . . .
+    // layer 2
+    %5 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+    %6:2 = qec.ppr ["Y", "X"](8) %3, %4 : !quantum.bit, !quantum.bit
+    %7 = qec.ppr ["X"](8) %5 : !quantum.bit
+    %8:3 = qec.ppr ["X", "Y", "X"](8) %6#0, %6#1, %7:!quantum.bit, !quantum.bit, !quantum.bit
+
+    // layer 3
+    %9:3 = qec.ppr ["X", "X", "Y"](8) %8#0, %8#1, %8#2:!quantum.bit, !quantum.bit, !quantum.bit
+    . . .
     """
 
     return PassPipelineWrapper(qnode, "reduce-t-depth")
@@ -1339,21 +1363,23 @@ def ppr_to_mbqc(qnode):
     .. code-block:: python
 
         import pennylane as qml
-        from catalyst import qjit, measure
-        from catalyst.passes import to_ppr, ppr_to_mbqc
 
-        pipeline = [("pipe", ["quantum-compilation-stage"])]
+        p = [("my_pipe", ["quantum-compilation-stage"])]
 
-        @qjit(pipelines=pipeline, keep_intermediate=True, target="mlir")
-        @ppr_to_mbqc
-        @to_ppr
+        @qml.qjit(pipelines=p, target="mlir", keep_intermediate=True)
+        @catalyst.passes.ppr_to_mbqc
+        @catalyst.passes.to_ppr
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             qml.H(0)
             qml.CNOT([0, 1])
-            return measure(1)
+            return
 
         print(circuit.mlir_opt)
+
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
     Example MLIR excerpt (structure only):
 
@@ -1414,14 +1440,19 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
 
         import pennylane as qml
 
+        p = [("my_pipe", ["quantum-compilation-stage"])]
 
-        @qml.qjit(pipelines=[("pipe", ["quantum-compilation-stage"])], target="mlir")
-        @qml.transforms.decompose_arbitrary_ppr
-        @qml.transforms.to_ppr
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.decompose_arbitrary_ppr
+        @catalyst.passes.to_ppr
         @qml.qnode(qml.device("null.qubit", wires=3))
         def circuit():
             qml.PauliRot(0.123, pauli_word="XXY", wires=[0, 1, 2])
             return
+
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
     >>> print(circuit.mlir_opt)
     ...
