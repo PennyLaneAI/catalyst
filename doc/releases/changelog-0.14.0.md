@@ -594,8 +594,7 @@ No deprecations have been made in this release.
   the sort function by explicitly passing the operations that need to be sorted.
   [(#2200)](https://github.com/PennyLaneAI/catalyst/pull/2200)
 
-* The pass pipeline is correctly registered to the transform named sequence of the one-shot qnode 
-  when `one-shot` mcm method is used.
+* Fixed a bug that was causing compilation passes to not apply when using ``mcm_method="one-shot"``.
   [(#2198)](https://github.com/PennyLaneAI/catalyst/pull/2198)
 
 * Fixed a bug where `qml.StatePrep` and `qml.BasisState` might be pushed after other
