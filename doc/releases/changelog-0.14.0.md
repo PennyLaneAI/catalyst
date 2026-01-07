@@ -15,6 +15,7 @@
   [(#2260)](https://github.com/PennyLaneAI/catalyst/pull/2260)
   [(#2287)](https://github.com/PennyLaneAI/catalyst/pull/2287)
   [(#2243)](https://github.com/PennyLaneAI/catalyst/pull/2243)
+  [(#2340)](https://github.com/PennyLaneAI/catalyst/pull/2340)
   [(#2357)](https://github.com/PennyLaneAI/catalyst/pull/2357)
 
   Consider the following circuit:
@@ -54,8 +55,9 @@
   succinctly represented with :func:`~.draw_graph`.
 
   ```pycon
-  >>> print(catalyst.draw_graph(circuit)())
-  (<Figure size 640x480 with 1 Axes>, <Axes: >)
+  >>> x, y = 1, 0
+  >>> fig, ax = catalyst.draw_graph(circuit)(x, y)
+  >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
   ```
   ![Graphical representation of circuit with dynamicism and structure](../../doc/_static/catalyst-draw-graph-changelog-0.14-example.png)
 
@@ -66,8 +68,8 @@
   apply the ``merge_rotation`` transform only:
 
   ```pycon
-  >>> print(catalyst.draw_graph(circuit, level=1)())
-  (<Figure size 640x480 with 1 Axes>, <Axes: >)
+  >>> fig, ax = catalyst.draw_graph(circuit, level=1)(x, y)
+  >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
   ```
   ![Graphical representation of circuit with dynamicism and structure](../../doc/_static/catalyst-draw-graph-changelog-0.14-level-example.png)
 
