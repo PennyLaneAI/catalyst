@@ -681,6 +681,10 @@
 * Typos in docstring for `PPRotationArbitraryOp` and `PPRRotationOp` have been corrected.
   [(#2297)](https://github.com/PennyLaneAI/catalyst/pull/2297)
 
+* Update the `decompose-arbitrary-ppr` pass documentation to use the new `pass_name` property of
+  PennyLane transform objects.
+  [(#?)](https://github.com/PennyLaneAI/catalyst/pull/?)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):

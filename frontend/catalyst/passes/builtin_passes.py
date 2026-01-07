@@ -1414,8 +1414,8 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
 
 
         @qml.qjit(pipelines=[("pipe", ["quantum-compilation-stage"])], target="mlir")
-        @qml.transforms.decompose_arbitrary_ppr
-        @qml.transforms.to_ppr
+        @qml.transform(pass_name="decompose-arbitrary-ppr")
+        @qml.transform(pass_name="to-ppr")
         @qml.qnode(qml.device("null.qubit", wires=3))
         def circuit():
             qml.PauliRot(0.123, pauli_word="XXY", wires=[0, 1, 2])
