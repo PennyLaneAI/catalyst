@@ -18,6 +18,7 @@ from copy import deepcopy
 from functools import singledispatch, singledispatchmethod
 from typing import Sequence
 
+import numpy as np
 from pennylane.measurements import (
     ExpectationMP,
     MeasurementProcess,
@@ -238,9 +239,10 @@ class ConstructCircuitDAG:
 
         attrs = {}
         if hasattr(op, "rotation_kind"):
-            denominator = abs(op.rotation_kind.value.data)
-            angle = f"π/{denominator}"
-            match denominator:
+            denominator = op.rotation_kind.value.data
+            sign_str = "-" if denominator < 0 else ""
+            angle = f"{sign_str}π/{abs(denominator)}"
+            match abs(denominator):
                 case 2:
                     attrs["fillcolor"] = "#D9D9D9"
                 case 4:
