@@ -681,6 +681,10 @@
 * Typos in docstring for `PPRotationArbitraryOp` and `PPRRotationOp` have been corrected.
   [(#2297)](https://github.com/PennyLaneAI/catalyst/pull/2297)
 
+* The `--save-ir-after-each` command line option documentation has been updated to explain the
+  `changed` value.
+  [(#2355)](https://github.com/PennyLaneAI/catalyst/pull/2355)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
