@@ -30,9 +30,13 @@ pytest-xdist
 pytest-cov
 pytest-mock
 nbmake
+filecheck
 
 # optional rt/test dependencies
 pennylane-lightning-kokkos
 amazon-braket-pennylane-plugin>1.27.1; python_version < "3.14"
 xdsl
 xdsl-jax
+pydot # Graph visualization backend requirement
+matplotlib # Graph visualization frontend requirement
+graphviz # Graph visualization backend requirement

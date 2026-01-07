@@ -49,7 +49,6 @@ from pennylane.measurements import (
 from pennylane.operation import Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
-from pennylane.transforms.core import TransformProgram
 
 import catalyst
 from catalyst.api_extensions.callbacks import MemrefCallable
@@ -1526,9 +1525,9 @@ def _trace_classical_phase(
             config = _make_execution_config(qnode)
             device_program, config = device.preprocess(ctx, execution_config=config, shots=shots)
         else:
-            device_program = TransformProgram()
+            device_program = qml.CompilePipeline()
 
-        qnode_program = qnode.transform_program if qnode else TransformProgram()
+        qnode_program = qnode.transform_program if qnode else qml.CompilePipeline()
 
         tapes, post_processing, tracing_mode = apply_transforms(
             qnode_program,

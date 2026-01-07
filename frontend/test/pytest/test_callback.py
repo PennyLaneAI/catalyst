@@ -193,20 +193,37 @@ def test_identity_types(arg):
 @pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize(
     "arg",
-    [jnp.array(0), jnp.array(1)],
+    [0, 1, 2.0],
 )
-def test_identity_types_shaped_array(arg):
-    """Test callback with return values. Use ShapedArray to denote the type"""
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        jnp.float32,
+        jnp.float64,
+        jnp.int8,
+        jnp.int16,
+        jnp.int32,
+        jnp.int64,
+        jnp.uint8,
+        jnp.uint16,
+        jnp.uint32,
+        jnp.uint64,
+    ],
+)
+def test_identity_types_cast_shaped_array(arg, dtype):
+    """Test callback with arguments and return values of given types."""
+
+    arg_cast = jnp.array(arg, dtype=dtype)
 
     @base_callback
-    def identity(arg) -> jax.core.ShapedArray([], int):
+    def identity(arg: dtype) -> jax.core.ShapedArray([], dtype):
         return arg
 
     @qjit
     def cir(x):
         return identity(x)
 
-    assert np.allclose(cir(arg), arg)
+    assert np.allclose(cir(arg_cast), arg_cast)
 
 
 @pytest.mark.usefixtures("use_both_frontend")

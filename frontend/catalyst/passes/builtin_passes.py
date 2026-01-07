@@ -1389,57 +1389,46 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
     R"""
     Specify that the MLIR compiler pass for decomposing arbitrary Pauli product rotations (PPR)
     operations will be applied. This will decompose into a collection of PPRs, PPMs and
-    a single-qubit arbitrary PPR in the Z basis.
+    a single-qubit arbitrary PPR in the Z basis. For more details, see Figure 13(d)
+    in `arXiv:2211.15465 <https://arxiv.org/abs/2211.15465>`_.
 
     .. note::
-        This pass should be used in conjunction with :func:`~.passes.to_ppr`. The ``to_ppr`` pass
-        should be applied before ``decompose_arbitrary_ppr``.
 
-    For details, see the Figure 13(d) of [Active volume](https://arxiv.org/abs/2211.15465).
+        For improved integration with the PennyLane frontend, including inspectability with
+        :func:`pennylane.specs`, please use :func:`pennylane.transforms.decompose_arbitrary_ppr`.
 
-    **Example**
-    .. code-block:: python
-
-        import pennylane as qml
-        from catalyst import qjit, measure
-        from catalyst.passes import decompose_arbitrary_ppr, to_ppr
-
-        @qjit(pipelines=[("pipe", ["quantum-compilation-stage"])], target="mlir")
-        @decompose_arbitrary_ppr
-        @to_ppr
-        @qml.qnode(qml.device("null.qubit", wires=3))
-        def circuit():
-            qml.PauliRot(0.123, pauli_word="XXY", wires=[0, 1, 2])
-            return
-
-        print(circuit.mlir_opt)
-
-    Example MLIR output:
-
-    .. code-block:: mlir
-        ...
-        %0 = quantum.alloc( 3) : !quantum.reg
-        %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-        %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-        %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
-        %4 = quantum.alloc_qb : !quantum.bit
-        %5 = qec.prepare  plus %4 : !quantum.bit
-        %mres, %out_qubits:4 = qec.ppm ["X", "X", "Y", "Z"] %1, %2, %3, %5 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
-        %6 = qec.ppr ["X"](2) %out_qubits#3 cond(%mres) : !quantum.bit
-        %7 = qec.ppr.arbitrary ["Z"](%cst) %6 : !quantum.bit
-        %mres_0, %out_qubits_1 = qec.ppm ["X"] %7 : !quantum.bit
-        %8:3 = qec.ppr ["X", "X", "Y"](2) %out_qubits#0, %out_qubits#1, %out_qubits#2 cond(%mres_0) : !quantum.bit, !quantum.bit, !quantum.bit
-        quantum.dealloc_qb %out_qubits_1 : !quantum.bit
-        %9 = quantum.insert %0[ 0], %8#0 : !quantum.reg, !quantum.bit
-        %10 = quantum.insert %9[ 1], %8#1 : !quantum.reg, !quantum.bit
-        %11 = quantum.insert %10[ 2], %8#2 : !quantum.reg, !quantum.bit
-        quantum.dealloc %11 : !quantum.reg
-
+        The ``decompose_arbitrary_ppr`` compilation pass requires that :func:`~.passes.to_ppr` be
+        applied first.
 
     Args:
         qnode (QNode): QNode to apply the pass to.
 
     Returns:
         ~.QNode
+
+    **Example**
+
+    .. code-block:: python
+
+        import pennylane as qml
+
+
+        @qml.qjit(pipelines=[("pipe", ["quantum-compilation-stage"])], target="mlir")
+        @qml.transforms.decompose_arbitrary_ppr
+        @qml.transforms.to_ppr
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def circuit():
+            qml.PauliRot(0.123, pauli_word="XXY", wires=[0, 1, 2])
+            return
+
+    >>> print(circuit.mlir_opt)
+    ...
+    %5 = qec.prepare  plus %4 : !quantum.bit
+    %mres, %out_qubits:4 = qec.ppm ["X", "X", "Y", "Z"] %1, %2, %3, %5 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %6 = qec.ppr ["X"](2) %out_qubits#3 cond(%mres) : !quantum.bit
+    %7 = qec.ppr.arbitrary ["Z"](%cst) %6 : !quantum.bit
+    %mres_0, %out_qubits_1 = qec.ppm ["X"] %7 : !quantum.bit
+    %8:3 = qec.ppr ["X", "X", "Y"](2) %out_qubits#0, %out_qubits#1, %out_qubits#2 cond(%mres_0) : !quantum.bit, !quantum.bit, !quantum.bit
+    ...
     """
     return PassPipelineWrapper(qnode, "decompose-arbitrary-ppr")
