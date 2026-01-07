@@ -288,6 +288,7 @@
   which decomposes abitrary-angle Pauli product rotations (PPRs) as outlined in Figure 13(d) from 
   `arXiv:2211.15465 <https://arxiv.org/abs/2211.15465>`_.
   [(#2304)](https://github.com/PennyLaneAI/catalyst/pull/2304)
+  [(#2354)](https://github.com/PennyLaneAI/catalyst/pull/2354)
 
   The ``decompose_arbitrary_ppr`` will decompose an arbitrary-angle PPR into a collection of PPRs, 
   PPMs, and a single-qubit arbitrary PPR in the ``Z`` basis:
