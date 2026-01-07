@@ -441,15 +441,6 @@ No deprecations have been made in this release.
   ``rotation_kind`` was correctly set to ``1``, instead of ``0``.
   [(#2344)](https://github.com/PennyLaneAI/catalyst/pull/2344)
 
-* Updated tests and the PennyLane dependency pin to follow changes introduced by
-  [PennyLaneAI/pennylane#8290](https://github.com/PennyLaneAI/pennylane/pull/8290).
-  [(#2286)](https://github.com/PennyLaneAI/catalyst/pull/2286)
-
-* Updated ``catalyst.python_interface.inspection.xdsl_conversion.get_mlir_module`` to
-  no longer explicitly use the xDSL pass plugin, which was causing an issue with the new ``specs``
-  functionality introduced in this release. 
-  [(#2303)](https://github.com/PennyLaneAI/catalyst/pull/2303)
-
 * Added missing ``detensorize-function-boundary`` and ``symbol-dce`` passes to ``Pipelines.cpp``.
   [(#2266)](https://github.com/PennyLaneAI/catalyst/pull/2266)
 
@@ -501,8 +492,8 @@ No deprecations have been made in this release.
   ```
 
 * Fixed an issue with :func:`~.passes.commute_ppr` and :func:`~.passes.merge_ppr_ppm` where they
-  were incorrectly moving nullary operations. This also improves the compilation time by reducing
-  the sort function by explicitly passing the operations that need to be sorted.
+  were incorrectly moving operations. This also improves the compilation time by reducing the sort 
+  function by explicitly passing the operations that need to be sorted.
   [(#2200)](https://github.com/PennyLaneAI/catalyst/pull/2200)
 
 * Fixed a bug that was causing compilation passes to not apply when using ``mcm_method="one-shot"``.
@@ -567,6 +558,7 @@ No deprecations have been made in this release.
     returns information gathered by parsing the xDSL-generated MLIR from a given QJIT object, such 
     as gate counts, measurements, or qubit allocations.
     [(#2238)](https://github.com/PennyLaneAI/catalyst/pull/2238)
+    [(#2303)](https://github.com/PennyLaneAI/catalyst/pull/2303)
     [(#2315)](https://github.com/PennyLaneAI/catalyst/pull/2315)
 
   * Added an experimental ``outline_state_evolution_pass`` xDSL pass to 
