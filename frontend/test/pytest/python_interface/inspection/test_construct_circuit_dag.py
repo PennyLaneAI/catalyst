@@ -18,6 +18,7 @@ import re
 from unittest.mock import Mock
 
 import jax
+from numpy import negative
 import pytest
 
 pytestmark = pytest.mark.xdsl
@@ -939,17 +940,19 @@ class TestCreateStaticOperatorNodes:
         assert nodes["node2"]["attrs"]["fillcolor"] == "#70B3F5"
 
     @pytest.mark.usefixtures("use_capture")
-    def test_ppr(self):
+    @pytest.mark.parametrize("negative_angle", [True, False])
+    def test_ppr(self, negative_angle):
         """Tests that a PPR node can be created."""
         pipe = [("pipe", ["quantum-compilation-stage"])]
 
+        multiplier = -1 if negative_angle else 1
         @qml.qjit(pipelines=pipe, target="mlir")
         @qml.transform(pass_name="to-ppr")
         @qml.qnode(qml.device("null.qubit", wires=3))
         def cir():
-            qml.PauliRot(jax.numpy.pi, pauli_word="YZ", wires=[0, 1])
-            qml.PauliRot(jax.numpy.pi / 4, pauli_word="X", wires=[0])
-            qml.PauliRot(jax.numpy.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
+            qml.PauliRot(multiplier * jax.numpy.pi, pauli_word="YZ", wires=[0, 1])
+            qml.PauliRot(multiplier * jax.numpy.pi / 4, pauli_word="X", wires=[0])
+            qml.PauliRot(multiplier * jax.numpy.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
 
         module = parse_generic_to_xdsl_module(cir.mlir_opt)
 
