@@ -18,8 +18,8 @@ import re
 from unittest.mock import Mock
 
 import jax
-from numpy import negative
 import pytest
+from numpy import negative
 
 pytestmark = pytest.mark.xdsl
 xdsl = pytest.importorskip("xdsl")
@@ -946,6 +946,7 @@ class TestCreateStaticOperatorNodes:
         pipe = [("pipe", ["quantum-compilation-stage"])]
 
         multiplier = -1 if negative_angle else 1
+
         @qml.qjit(pipelines=pipe, target="mlir")
         @qml.transform(pass_name="to-ppr")
         @qml.qnode(qml.device("null.qubit", wires=3))
