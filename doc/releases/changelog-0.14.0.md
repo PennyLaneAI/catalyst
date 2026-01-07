@@ -529,6 +529,9 @@
   on devices that support analytical execution.
   [(#2281)](https://github.com/PennyLaneAI/catalyst/pull/2281)
 
+* Fixes a bug where `qml.vjp` and `qml.jvp` were not working with autograph.
+  [(#2345)](https://github.com/PennyLaneAI/catalyst/pull/2345)
+
 <h3>Internal changes ⚙️</h3>
 
 * `DecompRuleInterpreter` now solves the graph and adds decompositions rules in the `cleanup` method
