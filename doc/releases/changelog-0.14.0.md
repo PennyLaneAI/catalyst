@@ -683,7 +683,7 @@
 
 * Update the `decompose-arbitrary-ppr` pass documentation to use
   `@qml.transform` with `pass_name` argument instead of `@qml.transforms`.
-  [(#?)](https://github.com/PennyLaneAI/catalyst/pull/?)
+  [(#2354)](https://github.com/PennyLaneAI/catalyst/pull/2354)
 
 <h3>Contributors ✍️</h3>
 
