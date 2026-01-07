@@ -1271,7 +1271,7 @@ def reduce_t_depth(qnode):
         qnode (QNode): QNode to apply the pass to.
 
     Returns:
-        ~.QNode: Returns decorated QNode.
+        :class:`QNode <pennylane.QNode>`: Returns decorated QNode.
 
     **Example**
 
@@ -1371,7 +1371,7 @@ def ppr_to_mbqc(qnode):
         fn (QNode): QNode to apply the pass to.
 
     Returns:
-        ~.QNode
+        :class:`QNode <pennylane.QNode>`
 
     **Example**
 
@@ -1452,7 +1452,7 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
         qnode (QNode): QNode to apply the pass to.
 
     Returns:
-        ~.QNode
+        :class:`QNode <pennylane.QNode>`
 
     **Example**
 

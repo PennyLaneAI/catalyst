@@ -287,6 +287,7 @@
   which decomposes abitrary-angle Pauli product rotations (PPRs) as outlined in Figure 13(d) from 
   `arXiv:2211.15465 <https://arxiv.org/abs/2211.15465>`_.
   [(#2304)](https://github.com/PennyLaneAI/catalyst/pull/2304)
+  [(#2354)](https://github.com/PennyLaneAI/catalyst/pull/2354)
 
   The ``decompose_arbitrary_ppr`` will decompose an arbitrary-angle PPR into a collection of PPRs, 
   PPMs, and a single-qubit arbitrary PPR in the ``Z`` basis:
@@ -648,6 +649,9 @@
 
 * Adding the measurement type into the MLIR assembly format for `qec.ppm` and `qec.select.ppm`
   [(#2347)](https://github.com/PennyLaneAI/catalyst/pull/2347)
+
+* Remove duplicate code for canonicalization and verification of Pauli Product Rotation operations.
+  [(#2313)](https://github.com/PennyLaneAI/catalyst/pull/2313)
 
 <h3>Documentation 📝</h3>
 
