@@ -535,7 +535,8 @@ No deprecations have been made in this release.
   [(#2286)](https://github.com/PennyLaneAI/catalyst/pull/2286)
 
 * Updated ``catalyst.python_interface.inspection.xdsl_conversion.get_mlir_module`` to
-  no longer explicitly use the xDSL pass plugin. 
+  no longer explicitly use the xDSL pass plugin, which was causing an issue with the new ``specs``
+  functionality introduced in this release. 
   [(#2303)](https://github.com/PennyLaneAI/catalyst/pull/2303)
 
 * Added missing ``detensorize-function-boundary`` and ``symbol-dce`` passes to ``Pipelines.cpp``.
