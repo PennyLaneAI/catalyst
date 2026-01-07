@@ -681,8 +681,8 @@
 * Typos in docstring for `PPRotationArbitraryOp` and `PPRRotationOp` have been corrected.
   [(#2297)](https://github.com/PennyLaneAI/catalyst/pull/2297)
 
-* Update the `decompose-arbitrary-ppr` pass documentation to use the new `pass_name` property of
-  PennyLane transform objects.
+* Update the `decompose-arbitrary-ppr` pass documentation to use
+  `@qml.transform` with `pass_name` argument instead of `@qml.transforms`.
   [(#?)](https://github.com/PennyLaneAI/catalyst/pull/?)
 
 <h3>Contributors ✍️</h3>
