@@ -224,7 +224,6 @@
   spurred from [A Game of Surface Codes (arXiv1808.02892)](https://arxiv.org/pdf/1808.02892).
   [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
   [(#2233)](https://github.com/PennyLaneAI/catalyst/pull/2233)
-  [(#2296)](https://github.com/PennyLaneAI/catalyst/pull/2296)
   [(#2284)](https://github.com/PennyLaneAI/catalyst/pull/2284)
   [(#2336)](https://github.com/PennyLaneAI/catalyst/pull/2336)
 
