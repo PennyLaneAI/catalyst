@@ -82,13 +82,15 @@ Select the tool to run individually. The default is ``all``.
 * ``llc``: Run ``llc`` on the LLVM IR input.
 * ``all``: Run all of ``opt``, ``translate`` and ``llc`` on the MLIR input.
 
-``--save-ir-after-each=<pass|pipeline>``
-""""""""""""""""""""""""""""""""""""""""
+``--save-ir-after-each=<pass|pipeline|changed>``
+"""""""""""""""""""""""""""""""""""""""""""""""
 
 Keep intermediate files after each pass or after each pipeline in the compilation. By default, no
 intermediate files are saved.
 
 * ``pass``: Keep intermediate files after each transformation/optimization pass.
+* ``changed``: Keep intermediate files after each transformation/optimization pass, but only if the
+  IR was modified by that pass.
 * ``pipeline``: Keep intermediate files after each pipeline, where a *pipeline* is a sequence of
   transformation/optimization passes.
 
