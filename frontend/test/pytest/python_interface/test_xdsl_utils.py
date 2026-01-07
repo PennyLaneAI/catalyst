@@ -11,19 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Unit tests for xDSL utilities."""
+# pylint: disable=line-too-long
 
 import pytest
-
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
-# pylint: disable=wrong-import-position,line-too-long
 from xdsl.dialects import arith, builtin, tensor, test
 
 from catalyst.python_interface.dialects.stablehlo import ConstantOp as hloConstantOp
-from catalyst.python_interface.utils import get_constant_from_ssa
+from catalyst.python_interface.utils import get_constant_from_ssa, get_pyval_from_xdsl_attr
+
+pytestmark = pytest.mark.xdsl
 
 
 class TestGetConstantFromSSA:
@@ -114,6 +111,120 @@ class TestGetConstantFromSSA:
         assert isinstance(val.type, builtin.Float64Type)
 
         assert get_constant_from_ssa(val) is None
+
+
+class TestGetPyvalFromXdslAttr:
+    """Unit tests for ``get_pyval_from_xdsl_attr``."""
+
+    @pytest.mark.parametrize("bitwidth", [16, 32, 64])
+    def test_int(self, bitwidth):
+        """Test that integer attributes are converted correctly."""
+        in_val = 1234
+        attr = builtin.IntegerAttr(in_val, bitwidth)
+        val = get_pyval_from_xdsl_attr(attr)
+
+        assert isinstance(val, int)
+        assert val == in_val
+
+    @pytest.mark.parametrize("in_val", [True, False])
+    def test_bool(self, in_val):
+        """Test that boolean attributes are converted correctly."""
+        attr = builtin.IntegerAttr.from_bool(in_val)
+        val = get_pyval_from_xdsl_attr(attr)
+
+        assert isinstance(val, bool)
+        assert val == in_val
+
+    @pytest.mark.parametrize("bitwidth", [16, 32, 64])
+    def test_float(self, bitwidth):
+        """Test that float attributes are converted correctly."""
+        in_val = 1.56
+        attr = builtin.FloatAttr(in_val, bitwidth)
+        val = get_pyval_from_xdsl_attr(attr)
+
+        assert isinstance(val, float)
+        assert round(val, 2) == in_val
+
+    def test_string(self):
+        """Test that string attributes are converted correctly."""
+        in_val = "test_string"
+        attr = builtin.StringAttr(in_val)
+        val = get_pyval_from_xdsl_attr(attr)
+
+        assert isinstance(val, str)
+        assert val == in_val
+
+    def test_array(self):
+        """Test that array attributes are converted correctly."""
+        in_val = (1, 2, 3, 4)
+        attr = builtin.ArrayAttr([builtin.IntegerAttr(v, 64) for v in in_val])
+        val = get_pyval_from_xdsl_attr(attr)
+
+        assert isinstance(val, tuple)
+        assert all(isinstance(v, int) for v in val)
+        assert val == in_val
+
+    def test_dict(self):
+        """Test that dict attributes are converted correctly."""
+        in_val = {"a": 1, "b": 2, "c": 3}
+        attr = builtin.DictionaryAttr({k: builtin.IntegerAttr(v, 64) for k, v in in_val.items()})
+        val = get_pyval_from_xdsl_attr(attr)
+
+        assert isinstance(val, dict)
+        assert all(isinstance(k, str) for k in val.keys())
+        assert all(isinstance(v, int) for v in val.values())
+        assert val == in_val
+
+    def test_nested_containers(self):
+        """Test that nested container attributes are converted correctly."""
+        expected_val = {"a": (1, 2, 3), "b": {"c": 1.5, "d": (False, True)}, "e": "test_string"}
+        attr = builtin.DictionaryAttr(
+            {
+                "a": builtin.ArrayAttr(
+                    [
+                        builtin.IntegerAttr(1, 64),
+                        builtin.IntegerAttr(2, 64),
+                        builtin.IntegerAttr(3, 64),
+                    ]
+                ),
+                "b": builtin.DictionaryAttr(
+                    {
+                        "c": builtin.FloatAttr(1.5, 64),
+                        "d": builtin.ArrayAttr(
+                            [
+                                builtin.IntegerAttr.from_bool(False),
+                                builtin.IntegerAttr.from_bool(True),
+                            ]
+                        ),
+                    }
+                ),
+                "e": builtin.StringAttr("test_string"),
+            }
+        )
+        val = get_pyval_from_xdsl_attr(attr)
+
+        # Verify types
+        assert isinstance(val, dict)
+
+        assert isinstance(val["a"], tuple)
+        assert all(isinstance(v, int) for v in val["a"])
+
+        assert isinstance(val["b"], dict)
+        assert isinstance(val["b"]["c"], float)
+        assert isinstance(val["b"]["d"], tuple)
+        assert all(isinstance(v, bool) for v in val["b"]["d"])
+
+        assert isinstance(val["e"], str)
+
+        assert val == expected_val
+
+    def test_unsupported_attr(self):
+        """Test that trying to convert an unsupported attribute raises an error."""
+        attr = builtin.DenseIntElementsAttr.from_list(
+            builtin.TensorType(builtin.IndexType(), ()), [123]
+        )
+        with pytest.raises(ValueError, match="cannot be converted to a Python value"):
+            _ = get_pyval_from_xdsl_attr(attr)
 
 
 if __name__ == "__main__":

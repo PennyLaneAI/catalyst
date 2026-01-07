@@ -10,8 +10,8 @@ enzyme=v0.0.203
 
 # For a custom PL version, update the package version here and at
 # 'doc/requirements.txt'
-pennylane=0.44.0-dev56
+pennylane=0.44.0-dev72
 
 # For a custom LQ/LK version, update the package version here and at
 # 'doc/requirements.txt'
-lightning=0.44.0-dev16
+lightning=0.44.0-dev26

@@ -11,16 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Unit tests for the xDSL Quantum dialect."""
+
 import pytest
-
-# pylint: disable=wrong-import-position
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
 from xdsl.dialects.builtin import (
     I32,
+    ArrayAttr,
     ComplexType,
     Float64Type,
     StringAttr,
@@ -31,7 +27,7 @@ from xdsl.dialects.builtin import (
 from xdsl.dialects.test import TestOp
 from xdsl.ir import AttributeCovT, Block, Operation, OpResult, Region
 
-from catalyst.python_interface.dialects import Quantum
+from catalyst.python_interface.dialects import Quantum, quantum
 from catalyst.python_interface.dialects.quantum import (
     CustomOp,
     NamedObservableAttr,
@@ -39,6 +35,8 @@ from catalyst.python_interface.dialects.quantum import (
     QubitType,
     QuregType,
 )
+
+pytestmark = pytest.mark.xdsl
 
 all_ops = list(Quantum.operations)
 all_attrs = list(Quantum.attributes)
@@ -66,6 +64,7 @@ expected_ops_names = {
     "MultiRZOp": "quantum.multirz",
     "NamedObsOp": "quantum.namedobs",
     "NumQubitsOp": "quantum.num_qubits",
+    "PauliRotOp": "quantum.paulirot",
     "PCPhaseOp": "quantum.pcphase",
     "ProbsOp": "quantum.probs",
     "QubitUnitaryOp": "quantum.unitary",
@@ -112,121 +111,161 @@ coeffs = create_ssa_value(TensorType(Float64Type(), shape=(10,)))
 samples = create_ssa_value(TensorType(Float64Type(), shape=(8, 7)))
 basis_state = create_ssa_value(TensorType(i1, shape=(8,)))
 state = create_ssa_value(TensorType(ComplexType(Float64Type()), shape=(16,)))
+pauli_word = ArrayAttr([StringAttr("X"), StringAttr("Y"), StringAttr("Z")])
 
 expected_ops_init_kwargs = {
-    "AdjointOp": {
-        "qreg": qreg,
-        "region": Region(Block((CustomOp(gate_name="CNOT", in_qubits=(q0, q1)),))),
-    },
-    "AllocOp": {"nqubits": 3},
-    "AllocQubitOp": {},
-    "ComputationalBasisOp": {"operands": (q0, None), "result_types": (obs,)},
-    "CountsOp": {
-        "operands": (obs, i, None, None),
-        "result_types": (TensorType(Float64Type(), shape=(1,)), TensorType(I32, shape=(1,))),
-    },
-    "CustomOp": {
-        "gate_name": "RX",
-        "in_qubits": (q0, q1),
-        "in_ctrl_qubits": (q2,),
-        "params": (theta,),
-        "adjoint": True,
-    },
-    "DeallocOp": {"qreg": qreg},
-    "DeallocQubitOp": {"qubit": q0},
-    "DeviceInitOp": {
-        "operands": (i,),
-        "properties": {"lib": StringAttr("lib"), "device_name": StringAttr("my_device")},
-    },
-    "DeviceReleaseOp": {},
-    "ExpvalOp": {"obs": obs},
-    "ExtractOp": {"qreg": qreg, "idx": i},
-    "FinalizeOp": {},
-    "GlobalPhaseOp": {"params": theta, "in_ctrl_qubits": q0},
-    "HamiltonianOp": {"operands": (coeffs, (obs,)), "result_types": (obs,)},
-    "HermitianOp": {"operands": (matrix, (q0, q1)), "result_types": (obs,)},
-    "InitializeOp": {},
-    "InsertOp": {"in_qreg": qreg, "idx": i, "qubit": q1},
-    "MeasureOp": {"in_qubit": q0, "postselect": i},
-    "MultiRZOp": {
-        "theta": theta,
-        "in_qubits": (q1, q0),
-        "in_ctrl_qubits": (q2,),
-        "in_ctrl_values": (i,),
-        "adjoint": UnitAttr(),
-    },
-    "NamedObsOp": {"qubit": q0, "obs_type": pauli_x},
-    "NumQubitsOp": {"result_types": (i,)},
-    "PCPhaseOp": {
-        "theta": theta,
-        "dim": dim,
-        "in_qubits": (q1, q0),
-        "in_ctrl_qubits": (q2,),
-        "in_ctrl_values": (i,),
-        "adjoint": False,
-    },
-    "ProbsOp": {
-        "operands": (obs, i, None),
-        "result_types": (TensorType(Float64Type(), shape=(8,)),),
-    },
-    "QubitUnitaryOp": {"matrix": matrix, "in_qubits": (q2,), "adjoint": True},
-    "SampleOp": {"operands": (obs, i, samples), "result_types": (samples,)},
-    "SetBasisStateOp": {"operands": (basis_state, (q0, q2)), "result_types": ((q1, q2),)},
-    "SetStateOp": {"operands": (state, (q0, q1)), "result_types": ((q0, q1),)},
-    "StateOp": {"operands": (obs, i, state), "result_types": (state,)},
-    "TensorOp": {"operands": ((obs, obs),), "result_types": (obs,)},
-    "VarianceOp": {"obs": (obs,)},
-    "YieldOp": {"operands": (qreg,)},
+    "AdjointOp": [
+        {
+            "qreg": qreg,
+            "region": Region(Block((CustomOp(gate_name="CNOT", in_qubits=(q0, q1)),))),
+        }
+    ],
+    "AllocOp": [{"nqubits": 3}],
+    "AllocQubitOp": [{}],
+    "ComputationalBasisOp": [{"operands": (q0, None), "result_types": (obs,)}],
+    "CountsOp": [
+        {
+            "operands": (obs, i, None, None),
+            "result_types": (TensorType(Float64Type(), shape=(1,)), TensorType(I32, shape=(1,))),
+        }
+    ],
+    "CustomOp": [
+        {
+            "gate_name": "RX",
+            "in_qubits": (q0, q1),
+            "in_ctrl_qubits": (q2,),
+            "params": (theta,),
+            "adjoint": True,
+        }
+    ],
+    "DeallocOp": [{"qreg": qreg}],
+    "DeallocQubitOp": [{"qubit": q0}],
+    "DeviceInitOp": [
+        {
+            "operands": (i,),
+            "properties": {"lib": StringAttr("lib"), "device_name": StringAttr("my_device")},
+        }
+    ],
+    "DeviceReleaseOp": [{}],
+    "ExpvalOp": [{"obs": obs}],
+    "ExtractOp": [{"qreg": qreg, "idx": i}],
+    "FinalizeOp": [{}],
+    "GlobalPhaseOp": [{"params": theta, "in_ctrl_qubits": q0}],
+    "HamiltonianOp": [{"operands": (coeffs, (obs,)), "result_types": (obs,)}],
+    "HermitianOp": [{"operands": (matrix, (q0, q1)), "result_types": (obs,)}],
+    "InitializeOp": [{}],
+    "InsertOp": [{"in_qreg": qreg, "idx": i, "qubit": q1}],
+    "MeasureOp": [{"in_qubit": q0, "postselect": i}],
+    "MultiRZOp": [
+        {
+            "theta": theta,
+            "in_qubits": (q1, q0),
+            "in_ctrl_qubits": (q2,),
+            "in_ctrl_values": (i,),
+            "adjoint": UnitAttr(),
+        }
+    ],
+    "NamedObsOp": [{"qubit": q0, "obs_type": pauli_x}],
+    "NumQubitsOp": [{"result_types": (i,)}],
+    "PauliRotOp": [
+        {"angle": theta, "pauli_product": "XYZ", "in_qubits": (q0,)},
+        {"angle": theta, "pauli_product": ["X", "Y", "Z"], "in_qubits": (q0,)},
+        {"angle": theta, "pauli_product": pauli_word, "in_qubits": (q0,)},
+    ],
+    "PCPhaseOp": [
+        {
+            "theta": theta,
+            "dim": dim,
+            "in_qubits": (q1, q0),
+            "in_ctrl_qubits": (q2,),
+            "in_ctrl_values": (i,),
+            "adjoint": False,
+        }
+    ],
+    "ProbsOp": [
+        {
+            "operands": (obs, i, None),
+            "result_types": (TensorType(Float64Type(), shape=(8,)),),
+        }
+    ],
+    "QubitUnitaryOp": [{"matrix": matrix, "in_qubits": (q2,), "adjoint": True}],
+    "SampleOp": [{"operands": (obs, i, samples), "result_types": (samples,)}],
+    "SetBasisStateOp": [{"operands": (basis_state, (q0, q2)), "result_types": ((q1, q2),)}],
+    "SetStateOp": [{"operands": (state, (q0, q1)), "result_types": ((q0, q1),)}],
+    "StateOp": [{"operands": (obs, i, state), "result_types": (state,)}],
+    "TensorOp": [{"operands": ((obs, obs),), "result_types": (obs,)}],
+    "VarianceOp": [{"obs": (obs,)}],
+    "YieldOp": [{"operands": (qreg,)}],
 }
 
 
-def test_quantum_dialect_name():
-    """Test that the QuantumDialect name is correct."""
-    assert Quantum.name == "quantum"
+class TestDialectBasics:
+    """Unit tests for basic checks for the Quantum dialect."""
+
+    def test_quantum_dialect_name(self):
+        """Test that the QuantumDialect name is correct."""
+        assert Quantum.name == "quantum"
+
+    @pytest.mark.parametrize("op", all_ops)
+    def test_all_operations_names(self, op):
+        """Test that all operations have the expected name."""
+        op_class_name = op.__name__
+        expected_name = expected_ops_names.get(op_class_name)
+        assert (
+            expected_name is not None
+        ), f"Unexpected operation {op_class_name} found in QuantumDialect"
+        assert op.name == expected_name
+
+    def test_only_existing_operations_are_expected(self):
+        """Test that the expected operations above only contain existing operations."""
+        existing_ops_names = {op.__name__ for op in all_ops}
+        assert existing_ops_names == set(expected_ops_names)
+
+    @pytest.mark.parametrize("op", all_ops)
+    def test_operation_construction(self, op):
+        """Test the constructors of operations in the Quantum dialect."""
+        kwargs_list = expected_ops_init_kwargs[op.__name__]
+        for kwargs in kwargs_list:
+            cloned_kwargs = {
+                k: v.clone() if isinstance(v, (Operation, Region)) else v for k, v in kwargs.items()
+            }
+            _ = op(**cloned_kwargs)
+
+    @pytest.mark.parametrize("attr", all_attrs)
+    def test_all_attributes_names(self, attr):
+        """Test that all attributes have the expected name."""
+        attr_class_name = attr.__name__
+        expected_name = expected_attrs_names.get(attr_class_name)
+        assert (
+            expected_name is not None
+        ), f"Unexpected attribute {attr_class_name} found in QuantumDialect"
+        assert attr.name == expected_name
+
+    def test_only_existing_attributes_are_expected(self):
+        """Test that the expected attributes above only contain existing attributes."""
+        existing_attrs_names = {attr.__name__ for attr in all_attrs}
+        assert existing_attrs_names == set(expected_attrs_names)
 
 
-@pytest.mark.parametrize("op", all_ops)
-def test_all_operations_names(op):
-    """Test that all operations have the expected name."""
-    op_class_name = op.__name__
-    expected_name = expected_ops_names.get(op_class_name)
-    assert (
-        expected_name is not None
-    ), f"Unexpected operation {op_class_name} found in QuantumDialect"
-    assert op.name == expected_name
+class TestCustomVerifiers:
+    """Unit tests for operations and attributes that have custom verification."""
 
+    def test_valid_paulirot(self):
+        """Test that a valid PauliRotOp passes verification."""
+        op = quantum.PauliRotOp(angle=theta, pauli_product="XYZ", in_qubits=(q0, q1, q2))
+        op.verify()
 
-def test_only_existing_operations_are_expected():
-    """Test that the expected operations above only contain existing operations."""
-    existing_ops_names = {op.__name__ for op in all_ops}
-    assert existing_ops_names == set(expected_ops_names)
+    def test_invalid_paulirot(self):
+        """Test that invalid PauliRotOps raise an error during verification."""
+        # Invalid pauli string
+        op = quantum.PauliRotOp(angle=theta, pauli_product="WYZ", in_qubits=(q0, q1, q2))
+        with pytest.raises(ValueError, match="is not a valid Pauli operator"):
+            op.verify()
 
-
-@pytest.mark.parametrize("op", all_ops)
-def test_operation_construction(op):
-    """Test the constructors of operations in the Quantum dialect."""
-    kwargs = {
-        k: v.clone() if isinstance(v, (Operation, Region)) else v
-        for k, v in expected_ops_init_kwargs[op.__name__].items()
-    }
-    _ = op(**kwargs)
-
-
-@pytest.mark.parametrize("attr", all_attrs)
-def test_all_attributes_names(attr):
-    """Test that all attributes have the expected name."""
-    attr_class_name = attr.__name__
-    expected_name = expected_attrs_names.get(attr_class_name)
-    assert (
-        expected_name is not None
-    ), f"Unexpected attribute {attr_class_name} found in QuantumDialect"
-    assert attr.name == expected_name
-
-
-def test_only_existing_attributes_are_expected():
-    """Test that the expected attributes above only contain existing attributes."""
-    existing_attrs_names = {attr.__name__ for attr in all_attrs}
-    assert existing_attrs_names == set(expected_attrs_names)
+        # Invalid pauli string length
+        op = quantum.PauliRotOp(angle=theta, pauli_product="XY", in_qubits=(q0, q1, q2))
+        with pytest.raises(ValueError, match="The length of the Pauli word"):
+            op.verify()
 
 
 class TestAssemblyFormat:
@@ -373,6 +412,19 @@ class TestAssemblyFormat:
         // Adjoint
         // CHECK: {{%.+}}, {{%.+}} = quantum.multirz([[PARAM1]]) [[Q0]], [[Q1]] adj : !quantum.bit, !quantum.bit
         %qm6, %qm7 = quantum.multirz(%param1) %q0, %q1 adj : !quantum.bit, !quantum.bit
+
+        ////////////////// **PauliRotOp tests** //////////////////
+        // No control wires
+        // CHECK: {{%.+}}, {{%.+}}, {{%.+}} = quantum.paulirot ["X", "Y", "Z"]([[PARAM1]]) [[Q0]], [[Q1]], [[Q2]] : !quantum.bit, !quantum.bit, !quantum.bit
+        %qpr1, %qpr2, %qpr3 = quantum.paulirot ["X", "Y", "Z"](%param1) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+
+        // Control wires and values
+        // CHECK: {{%.+}}, {{%.+}}, {{%.+}} = quantum.paulirot ["X", "Y"]([[PARAM1]]) [[Q0]], [[Q1]] ctrls([[Q2]]) ctrlvals([[TRUE_CST]]) : !quantum.bit, !quantum.bit ctrls !quantum.bit
+        %qpr4, %qpr5, %qpr6 = quantum.paulirot ["X", "Y"](%param1) %q0, %q1 ctrls(%q2) ctrlvals(%true_cst) : !quantum.bit, !quantum.bit ctrls !quantum.bit
+
+        // Adjoint
+        // CHECK: {{%.+}}, {{%.+}} = quantum.paulirot ["X", "Y"]([[PARAM1]]) [[Q0]], [[Q1]] adj : !quantum.bit, !quantum.bit
+        %qpr7, %qpr8 = quantum.paulirot ["X", "Y"](%param1) %q0, %q1 adj : !quantum.bit, !quantum.bit
 
         ////////////////// **PCPhaseOp tests** //////////////////
         // No control wires

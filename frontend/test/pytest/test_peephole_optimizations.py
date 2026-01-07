@@ -526,6 +526,34 @@ def test_merge_rotation_ppr():
     assert 'qec.ppr ["X", "Y", "Z"](2)' in ir_opt
 
 
+@pytest.mark.usefixtures("use_capture")
+def test_merge_rotation_arbitrary_angle_ppr():
+    """Test that the merge_rotation pass correctly merges arbtirary angle PPRs."""
+
+    my_pipeline = [("pipe", ["quantum-compilation-stage"])]
+
+    @qml.qjit(pipelines=my_pipeline, target="mlir")
+    def test_merge_rotation_ppr_workflow():
+        @qml.transforms.merge_rotations
+        @to_ppr_alias
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x, y):
+            qml.PauliRot(x, pauli_word="ZY", wires=[0, 1])
+            qml.PauliRot(y, pauli_word="ZY", wires=[0, 1])
+
+        return circuit(2.6, 0.3)
+
+    ir = test_merge_rotation_ppr_workflow.mlir
+    ir_opt = test_merge_rotation_ppr_workflow.mlir_opt
+
+    assert 'transform.apply_registered_pass "merge-rotations"' in ir
+    assert "qec.ppr.arbitrary" not in ir
+    assert "arith.addf" not in ir
+
+    assert "arith.addf" in ir_opt
+    assert ir_opt.count('qec.ppr.arbitrary ["Z", "Y"]') == 1
+
+
 def test_clifford_to_ppm():
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
@@ -581,6 +609,36 @@ def test_clifford_to_ppm():
     assert ppm_specs_output["f_0"]["max_weight_pi2"] == 2
 
     assert ppm_specs_output["g_0"]["logical_qubits"] == 2
+
+
+@pytest.mark.usefixtures("use_capture")
+def test_decompose_arbitrary_ppr():
+    """
+    Test the `decompose_arbitrary_ppr` pass.
+    """
+
+    my_pipeline = [("pipe", ["quantum-compilation-stage"])]
+
+    @qml.qjit(pipelines=my_pipeline, target="mlir")
+    def test_decompose_arbitrary_ppr_workflow():
+        @qml.transform(pass_name="decompose-arbitrary-ppr")
+        @qml.transform(pass_name="to-ppr")
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            qml.PauliRot(0.123, pauli_word="XYZ", wires=[0, 1, 2])
+
+        return circuit()
+
+    ir = test_decompose_arbitrary_ppr_workflow.mlir
+    ir_opt = test_decompose_arbitrary_ppr_workflow.mlir_opt
+
+    print(ir_opt)
+
+    assert 'transform.apply_registered_pass "decompose-arbitrary-ppr"' in ir
+    assert 'qec.ppr.arbitrary ["X", "Y", "Z"]' not in ir_opt
+    assert 'qec.ppm ["X", "Y", "Z", "Z"]' in ir_opt
+    assert 'qec.ppr.arbitrary ["Z"]' in ir_opt
+    assert 'qec.ppr ["X", "Y", "Z"](2)' in ir_opt
 
 
 class TestPPMSpecsErrors:

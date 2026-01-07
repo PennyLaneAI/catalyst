@@ -121,6 +121,12 @@ else:
     lightning_dep = f"pennylane-lightning>={lq_min_release}"
     kokkos_dep = ""
 
+# If targeting RC branch, we must install latest RC packages from TestPyPI
+# Revert when merging RC branch back to main
+pennylane_dep = f"pennylane>=0.44.0rc0,<=0.44.0"
+lightning_dep = f"pennylane-lightning>=0.44.0rc0,<=0.44.0"
+kokkos_dep = f"pennylane-lightning-kokkos>=0.44.0rc0,<=0.44.0"
+
 requirements = [
     pennylane_dep,
     lightning_dep,
@@ -130,6 +136,8 @@ requirements = [
     "numpy!=2.0.0",
     "scipy-openblas32>=0.3.26",  # symbol and library name
     "diastatic-malt>=2.15.2",
+    "xdsl==0.55.4",
+    "xdsl-jax==0.1.1",
 ]
 
 entry_points = {
