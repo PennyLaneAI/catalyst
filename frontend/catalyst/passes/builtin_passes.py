@@ -1232,7 +1232,7 @@ def reduce_t_depth(qnode):
         qnode (QNode): QNode to apply the pass to.
 
     Returns:
-        ~.QNode: Returns decorated QNode.
+        :class:`QNode <pennylane.QNode>`: Returns decorated QNode.
 
     **Example**
 
@@ -1326,7 +1326,7 @@ def ppr_to_mbqc(qnode):
         fn (QNode): QNode to apply the pass to.
 
     Returns:
-        ~.QNode
+        :class:`QNode <pennylane.QNode>`
 
     **Example**
 
@@ -1412,7 +1412,7 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
 
         import pennylane as qml
 
-qml.capture.enable()
+        qml.capture.enable()
 
         @qml.qjit(pipelines=[("pipe", ["quantum-compilation-stage"])], target="mlir")
         @qml.transform(pass_name="decompose-arbitrary-ppr")
@@ -1424,6 +1424,7 @@ qml.capture.enable()
 
     >>> print(circuit.mlir_opt)
     ...
+    %cst = arith.constant 0.061499999999999999 : f64
     %5 = qec.prepare  plus %4 : !quantum.bit
     %mres, %out_qubits:4 = qec.ppm ["X", "X", "Y", "Z"] %1, %2, %3, %5 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
     %6 = qec.ppr ["X"](2) %out_qubits#3 cond(%mres) : !quantum.bit
