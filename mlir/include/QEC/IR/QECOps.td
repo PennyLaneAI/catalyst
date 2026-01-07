@@ -618,7 +618,7 @@ def SelectPPMeasurementOp : QEC_Op<"select.ppm"> {
     ];
 
     let assemblyFormat = [{
-      `(` $select_switch `,` $pauli_product_0 `,` $pauli_product_1 `)` $in_qubits attr-dict `:` type($mres) `,` type($out_qubits)
+      `(` $select_switch `,` $pauli_product_0 `,` $pauli_product_1 `)` $in_qubits attr-dict `:` type(results)
     }];
     
     let hasVerifier = 1;
