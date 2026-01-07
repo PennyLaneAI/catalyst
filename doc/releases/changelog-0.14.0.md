@@ -542,31 +542,34 @@ No deprecations have been made in this release.
 * Added missing ``detensorize-function-boundary`` and ``symbol-dce`` passes to ``Pipelines.cpp``.
   [(#2266)](https://github.com/PennyLaneAI/catalyst/pull/2266)
 
-* Fixes an issue where a heap-to-stack allocation conversion pass was causing SIGSEGV issues
-  during program execution at runtime.
+* Fixed an issue where a heap-to-stack allocation conversion pass was causing SIGSEGV issues during 
+  program execution at runtime.
   [(#2172)](https://github.com/PennyLaneAI/catalyst/pull/2172)
 
-* Fixes the issue with capturing unutilized abstracted adjoint and controlled rules
-  by the graph in the new decomposition framework.
+* Fixed an issue with capturing unutilized abstracted adjoint and controlled rules by the graph in 
+  the new decomposition framework.
   [(#2160)](https://github.com/PennyLaneAI/catalyst/pull/2160)
 
-* Fixes the translation of plxpr control flow for edge cases where the `consts` were being
-  reordered.
+* Fixed the translation of PennyLane control flow (``qml.for_loop``) to Catalyst control flow
+  for edge cases where the ``consts`` were being reordered.
   [(#2128)](https://github.com/PennyLaneAI/catalyst/pull/2128)
   [(#2133)](https://github.com/PennyLaneAI/catalyst/pull/2133)
 
-* Fixes the translation of `QubitUnitary` and `GlobalPhase` ops
-  when they are modified by adjoint or control.
+* Fixed the translation of ``QubitUnitary`` and ``GlobalPhase`` operations to Catalyst when they are 
+  modified by ``adjoint`` or ``ctrl``.
   [(##2158)](https://github.com/PennyLaneAI/catalyst/pull/2158)
 
-* Fixes the translation of a workflow with different transforms applied to different qnodes.
+* Fixed an issue with the translation of a workflow with different transforms applied to different 
+  QNodes, which was causing transforms to act beyond the code they are intended to be applied to.
   [(#2167)](https://github.com/PennyLaneAI/catalyst/pull/2167)
 
-* Fix canonicalization of eliminating redundant `quantum.insert` and `quantum.extract` pairs.
+* Fixed canonicalization of eliminating redundant ``quantum.insert`` and ``quantum.extract`` pairs.
   When extracting a qubit immediately after inserting it at the same index, the operations can
   be cancelled out while properly updating remaining uses of the register.
   [(#2162)](https://github.com/PennyLaneAI/catalyst/pull/2162)
+
   For an example:
+  
   ```mlir
   // Before canonicalization
   %1 = quantum.insert %0[%idx], %qubit1 : !quantum.reg, !quantum.bit
@@ -586,13 +589,13 @@ No deprecations have been made in this release.
   // ... use %4
   ```
 
-* Fixes :func:`~.passes.commute_ppr` and :func:`~.passes.merge_ppr_ppm` incorrectly
-  moving nullary operations. This also improves the compilation time by reducing
-  the sort function, by explicitly passing the operations that need to be sorted.
+* Fixed an issue with :func:`~.passes.commute_ppr` and :func:`~.passes.merge_ppr_ppm` where they
+  were incorrectly moving nullary operations. This also improves the compilation time by reducing
+  the sort function by explicitly passing the operations that need to be sorted.
   [(#2200)](https://github.com/PennyLaneAI/catalyst/pull/2200)
 
-* The pass pipeline is correctly registered to the transform named sequence of the
-  one-shot qnode when `one-shot` mcm method is used.
+* The pass pipeline is correctly registered to the transform named sequence of the one-shot qnode 
+  when `one-shot` mcm method is used.
   [(#2198)](https://github.com/PennyLaneAI/catalyst/pull/2198)
 
 * Fixed a bug where `qml.StatePrep` and `qml.BasisState` might be pushed after other
@@ -604,7 +607,6 @@ No deprecations have been made in this release.
   [(#2262)](https://github.com/PennyLaneAI/catalyst/pull/2262)
 
   This fix enables automatic qubit management to be used with gradients.
-
 
 * Fixed the :func:`~.passes.commute_ppr` pass incorrectly modifying operands of PPRs that live in
   different blocks.
