@@ -242,7 +242,7 @@ class ConstructCircuitDAG:
             denominator = op.rotation_kind.value.data
             sign_str = "-" if denominator < 0 else ""
             angle = f"{sign_str}π/{abs(denominator)}"
-            match denominator:
+            match abs(denominator):
                 case 2:
                     attrs["fillcolor"] = "#D9D9D9"
                 case 4:
