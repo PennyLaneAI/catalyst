@@ -19,7 +19,6 @@ from unittest.mock import Mock
 
 import jax
 import pytest
-from numpy import negative
 
 pytestmark = pytest.mark.xdsl
 xdsl = pytest.importorskip("xdsl")
