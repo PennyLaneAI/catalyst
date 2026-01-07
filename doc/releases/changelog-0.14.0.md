@@ -460,18 +460,19 @@
   [(#2130)](https://github.com/PennyLaneAI/catalyst/pull/2130)
   [(#2268)](https://github.com/PennyLaneAI/catalyst/pull/2268)
 
-* The `--adjoint-lowering` pass can now handle PPR operations.
+* The `--adjoint-lowering` pass can now handle Pauli-product rotation (PPR) operations.
   [(#2227)](https://github.com/PennyLaneAI/catalyst/pull/2227)
 
-* Catalyst now supports Pauli product rotations with arbitrary or dynamic angles in the
-  QEC dialect. This will allow :class:`qml.PauliRot` with arbitrary or dynamic angles,
-  angles not known at compile time, to be lowered to the QEC dialect. This is implemented
-  as a new `qec.ppr.arbitrary` operation, which takes a Pauli product and an arbitrary or
-  dynamic angle as input. The arbitrary angles are specified as a double in terms of radian.
+* Catalyst now supports Pauli product rotations (PPR) with arbitrary or dynamic angles in the
+  QEC dialect. This will allow :class:`qml.PauliRot` with arbitrary or dynamic angles (angles not 
+  known at compile time) to be lowered to the QEC dialect. This is implemented as a new 
+  ``qec.ppr.arbitrary`` operation, which takes a Pauli-product and an arbitrary or
+  dynamic angle as input.
   [(#2232)](https://github.com/PennyLaneAI/catalyst/pull/2232)
   [(#2233)](https://github.com/PennyLaneAI/catalyst/pull/2233)
 
   For example:
+
   ```mlir
   %const = arith.constant 0.124 : f64
   %1:2 = qec.ppr.arbitrary ["X", "Z"](%const) %q1, %q2 : !quantum.bit, !quantum.bit
@@ -486,10 +487,11 @@
   update their code to use the new names.
   [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
 
-  * The ``pipeline``  and "passes" postfixes in the compilation stage names have been changed to ``stage``.
+* The ``pipeline``  and ``"passes"`` postfixes in the compilation stage names have been changed to 
+  ``stage``.
   [(#2230)](https://github.com/PennyLaneAI/catalyst/pull/2230)
 
-* The plxpr transform `pl_map_wires` has been removed along with its test.
+* The jaxpr transform ``pl_map_wires`` has been removed along with its test.
   [(#2220)](https://github.com/PennyLaneAI/catalyst/pull/2220)
 
 * The JAX version used by Catalyst has been updated to 0.7.0.
@@ -510,31 +512,33 @@
   - The Enzyme version has been updated to
   [v0.0.203](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.203).
 
-* The pass `remove-chained-self-inverse` has been renamed to `cancel-inverses`, to better
+* The ``remove-chained-self-inverse`` pass has been renamed to ``cancel-inverses`` to better
   conform with the name of the corresponding transform in PennyLane.
   [(#2201)](https://github.com/PennyLaneAI/catalyst/pull/2201)
 
 <h3>Deprecations 👋</h3>
 
+No deprecations have been made in this release.
+
 <h3>Bug fixes 🐛</h3>
 
-* Updated the type support for callbacks allowing use of unsigned integers.
+* Updated the type support for callbacks allowing for the use of unsigned integers.
   [(#2330)](https://github.com/PennyLaneAI/catalyst/pull/2330)
 
-* Fixed a bug where the `qec.ppr` op attribute `rotation_kind` was not correctly constrained to
-  be one of ±1, ±2, ±4, or ±8.
-  Also, for Identity Pauli product, the `rotation_kind` was correctly set to 1, instead of 0.
+* Fixed a bug where the ``qec.ppr`` op attribute ``rotation_kind`` was not correctly constrained to
+  be one of ``±1``, ``±2``, ``±4``, or ``±8``. Also, for the identity Pauli product, the 
+  ``rotation_kind`` was correctly set to ``1``, instead of ``0``.
   [(#2344)](https://github.com/PennyLaneAI/catalyst/pull/2344)
 
-* Updated tests and PennyLane dependency pin to follow changes introduced by
+* Updated tests and the PennyLane dependency pin to follow changes introduced by
   [PennyLaneAI/pennylane#8290](https://github.com/PennyLaneAI/pennylane/pull/8290).
   [(#2286)](https://github.com/PennyLaneAI/catalyst/pull/2286)
 
-* Update `catalyst.python_interface.inspection.xdsl_conversion.get_mlir_module` to
-  no longer explicitly use the xDSL pass plugin.
+* Updated ``catalyst.python_interface.inspection.xdsl_conversion.get_mlir_module`` to
+  no longer explicitly use the xDSL pass plugin. 
   [(#2303)](https://github.com/PennyLaneAI/catalyst/pull/2303)
 
-* Added missing `detensorize-function-boundary` and `symbol-dce` passes to `Pipelines.cpp`.
+* Added missing ``detensorize-function-boundary`` and ``symbol-dce`` passes to ``Pipelines.cpp``.
   [(#2266)](https://github.com/PennyLaneAI/catalyst/pull/2266)
 
 * Fixes an issue where a heap-to-stack allocation conversion pass was causing SIGSEGV issues
