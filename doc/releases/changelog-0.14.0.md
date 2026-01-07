@@ -15,6 +15,8 @@
   [(#2260)](https://github.com/PennyLaneAI/catalyst/pull/2260)
   [(#2287)](https://github.com/PennyLaneAI/catalyst/pull/2287)
   [(#2243)](https://github.com/PennyLaneAI/catalyst/pull/2243)
+  [(#2340)](https://github.com/PennyLaneAI/catalyst/pull/2340)
+  [(#2357)](https://github.com/PennyLaneAI/catalyst/pull/2357)
 
   Consider the following circuit:
 
@@ -53,8 +55,9 @@
   succinctly represented with :func:`~.draw_graph`.
 
   ```pycon
-  >>> print(catalyst.draw_graph(circuit)())
-  (<Figure size 640x480 with 1 Axes>, <Axes: >)
+  >>> x, y = 1, 0
+  >>> fig, ax = catalyst.draw_graph(circuit)(x, y)
+  >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
   ```
   ![Graphical representation of circuit with dynamicism and structure](../../doc/_static/catalyst-draw-graph-changelog-0.14-example.png)
 
@@ -65,8 +68,8 @@
   apply the ``merge_rotation`` transform only:
 
   ```pycon
-  >>> print(catalyst.draw_graph(circuit, level=1)())
-  (<Figure size 640x480 with 1 Axes>, <Axes: >)
+  >>> fig, ax = catalyst.draw_graph(circuit, level=1)(x, y)
+  >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
   ```
   ![Graphical representation of circuit with dynamicism and structure](../../doc/_static/catalyst-draw-graph-changelog-0.14-level-example.png)
 
@@ -285,6 +288,7 @@
   which decomposes abitrary-angle Pauli product rotations (PPRs) as outlined in Figure 13(d) from
   `arXiv:2211.15465 <https://arxiv.org/abs/2211.15465>`_.
   [(#2304)](https://github.com/PennyLaneAI/catalyst/pull/2304)
+  [(#2354)](https://github.com/PennyLaneAI/catalyst/pull/2354)
 
   The ``decompose_arbitrary_ppr`` will decompose an arbitrary-angle PPR into a collection of PPRs,
   PPMs, and a single-qubit arbitrary PPR in the ``Z`` basis:
@@ -431,6 +435,14 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug in the `gradient.value_and_grad` verifier that incorrectly validated gradient result
+  types by matching from the tail of callee arguments, ignoring `diffArgIndices`. This caused false
+  verification errors when differentiating a subset of arguments with different types.
+  [(#?)](https://github.com/PennyLaneAI/catalyst/pull/?)
+
+* Updated the type support for callbacks allowing use of unsigned integers.
+  [(#2330)](https://github.com/PennyLaneAI/catalyst/pull/2330)
+
 * Fixed a bug where the `qec.ppr` op attribute `rotation_kind` was not correctly constrained to
   be one of ±1, ±2, ±4, or ±8.
   Also, for Identity Pauli product, the `rotation_kind` was correctly set to 1, instead of 0.
@@ -529,6 +541,9 @@
 * Fix incorrect detection of tracer wires in the frontend. Previously, NumPy integers would be
   detected as dynamic wires leading to unnecessary instructions in the program IR.
   [(#2361)](https://github.com/PennyLaneAI/catalyst/pull/2361)
+
+* Fixes a bug where `qml.vjp` and `qml.jvp` were not working with autograph.
+  [(#2345)](https://github.com/PennyLaneAI/catalyst/pull/2345)
 
 <h3>Internal changes ⚙️</h3>
 
@@ -641,6 +656,12 @@
 * A new `to-pauli-frame` compilation pass has been added, which applies the Pauli frame tracking
   protocols to a Clifford+T program.
   [(#2269)](https://github.com/PennyLaneAI/catalyst/pull/2269)
+
+* Adding the measurement type into the MLIR assembly format for `qec.ppm` and `qec.select.ppm`
+  [(#2347)](https://github.com/PennyLaneAI/catalyst/pull/2347)
+
+* Remove duplicate code for canonicalization and verification of Pauli Product Rotation operations.
+  [(#2313)](https://github.com/PennyLaneAI/catalyst/pull/2313)
 
 <h3>Documentation 📝</h3>
 
