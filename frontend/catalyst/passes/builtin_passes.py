@@ -1404,7 +1404,7 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
         qnode (QNode): QNode to apply the pass to.
 
     Returns:
-        ~.QNode
+        :class:`QNode <pennylane.QNode>`
 
     **Example**
 
