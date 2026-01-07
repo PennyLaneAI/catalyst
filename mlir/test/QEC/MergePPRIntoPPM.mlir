@@ -22,22 +22,22 @@
 func.func public @merge_ppr_ppm_pi_4_rotation_test_1(%q1: !quantum.bit) -> tensor<i1> {
 
     // CHECK-NOT: qec.ppr ["X"]
-    // CHECK:     qec.ppm ["X"] %
+    // CHECK:     qec.ppm ["X"]
     // CHECK-NOT: qec.ppr ["X"]
     %0 = qec.ppr ["X"](4) %q1: !quantum.bit
-    %m, %out_qubits = qec.ppm ["X"] %0 : !quantum.bit
+    %m, %out_qubits = qec.ppm ["X"] %0 : i1, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     return %from_elements : tensor<i1>
 }
 
 func.func public @merge_ppr_ppm_pi_4_rotation_test_2() -> tensor<i1> {
 
-    // CHECK: qec.ppm ["Y"] %
+    // CHECK: qec.ppm ["Y"]
     // CHECK-NOT: qec.ppr ["X"]
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = qec.ppr ["X"](-4) %1 : !quantum.bit
-    %m, %out_qubits = qec.ppm ["Z"](-1) %2 : !quantum.bit
+    %m, %out_qubits = qec.ppm ["Z"](-1) %2 : i1, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     %3 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
     quantum.dealloc %3 : !quantum.reg
@@ -46,10 +46,10 @@ func.func public @merge_ppr_ppm_pi_4_rotation_test_2() -> tensor<i1> {
 
 func.func public @merge_ppr_ppm_pi_4_rotation_test_3(%q1: !quantum.bit) -> tensor<i1> {
 
-    // CHECK: qec.ppm ["Y"] %
+    // CHECK: qec.ppm ["Y"]
     // CHECK-NOT: qec.ppr ["X"]
     %0 = qec.ppr ["X"](-4) %q1 : !quantum.bit
-    %m, %out_qubits = qec.ppm ["Z"](-1) %0 : !quantum.bit
+    %m, %out_qubits = qec.ppm ["Z"](-1) %0 : i1, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     return %from_elements : tensor<i1>
 }
@@ -60,20 +60,20 @@ func.func public @merge_ppr_ppm_pi_4_rotation_test_3(%q1: !quantum.bit) -> tenso
 
 func.func public @commute_ppr_ppm_pi_4_rotation_test_1(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
-    // CHECK: qec.ppm ["Z"](-1) %
+    // CHECK: qec.ppm ["Z"](-1)
     // CHECK: qec.ppr ["X"](4)
     %0 = qec.ppr ["X"](4) %q1: !quantum.bit
-    %m, %out_qubits = qec.ppm ["Y"] %0 : !quantum.bit
+    %m, %out_qubits = qec.ppm ["Y"] %0 : i1, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     return %from_elements, %out_qubits : tensor<i1>, !quantum.bit
 }
 
 func.func public @commute_ppr_ppm_pi_4_rotation_test_2(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
-    // CHECK: qec.ppm ["Y"] %
+    // CHECK: qec.ppm ["Y"]
     // CHECK: qec.ppr ["X"](-4)
     %0 = qec.ppr ["X"](-4) %q1: !quantum.bit
-    %m, %out_qubits = qec.ppm ["Z"](-1) %0 : !quantum.bit
+    %m, %out_qubits = qec.ppm ["Z"](-1) %0 : i1, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     return %from_elements, %out_qubits : tensor<i1>, !quantum.bit
 }
@@ -88,7 +88,7 @@ func.func public @commute_ppr_ppm_pi_4_rotation_test_3(%q1: !quantum.bit, %q2: !
     // CHECK:     return %from_elements, [[o1]]#1 : tensor<i1>, !quantum.bit
     %0 = qec.ppr ["X"](8) %q1: !quantum.bit
     %1 = qec.ppr ["X"](4) %q2: !quantum.bit
-    %m, %out_qubits:2 = qec.ppm ["X", "X"] %0, %1 : !quantum.bit, !quantum.bit
+    %m, %out_qubits:2 = qec.ppm ["X", "X"] %0, %1 : i1, !quantum.bit, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     return %from_elements, %out_qubits#0 : tensor<i1>, !quantum.bit
 }
@@ -103,7 +103,7 @@ func.func public @commute_ppr_ppm_pi_4_rotation_test_4(%q1: !quantum.bit, %q2: !
     // CHECK:     return %from_elements, [[o1]]#1 : tensor<i1>, !quantum.bit
     %0 = qec.ppr ["X"](8) %q1: !quantum.bit
     %1 = qec.ppr ["Y"](4) %q2: !quantum.bit
-    %m, %out_qubits:2 = qec.ppm ["X", "X"] %0, %1 : !quantum.bit, !quantum.bit
+    %m, %out_qubits:2 = qec.ppm ["X", "X"] %0, %1 : i1, !quantum.bit, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     return %from_elements, %out_qubits#0 : tensor<i1>, !quantum.bit
 }
@@ -117,7 +117,7 @@ func.func public @commute_ppr_ppm_pi_4_rotation_test_5(%q1: !quantum.bit, %q2: !
     // CHECK: return [[f1]], [[q2]]#0 : tensor<i1>, !quantum.bit
     %0:2 = qec.ppr ["X", "X"](8) %q1, %q2 : !quantum.bit, !quantum.bit
     %1:2 = qec.ppr ["Y", "X"](4) %0#0, %0#1 : !quantum.bit, !quantum.bit
-    %m, %out_qubits:2 = qec.ppm ["X", "Z"] %1#0, %1#1 : !quantum.bit, !quantum.bit
+    %m, %out_qubits:2 = qec.ppm ["X", "Z"] %1#0, %1#1 : i1, !quantum.bit, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     return %from_elements, %out_qubits#0 : tensor<i1>, !quantum.bit
 }
@@ -129,22 +129,22 @@ func.func public @commute_ppr_ppm_pi_4_rotation_test_5(%q1: !quantum.bit, %q2: !
 func.func public @merge_ppr_ppm_pi_2_rotation_test_1(%q1: !quantum.bit) -> tensor<i1> {
 
     // CHECK-NOT: qec.ppr ["X"]
-    // CHECK:     qec.ppm ["X"] %
+    // CHECK:     qec.ppm ["X"]
     // CHECK-NOT: qec.ppr ["X"]
     %0 = qec.ppr ["X"](2) %q1: !quantum.bit
-    %m, %out_qubits = qec.ppm ["X"] %0 : !quantum.bit
+    %m, %out_qubits = qec.ppm ["X"] %0 : i1, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     return %from_elements : tensor<i1>
 }
 
 func.func public @merge_ppr_ppm_pi_2_rotation_test_2() -> tensor<i1> {
 
-    // CHECK: qec.ppm ["Z"] %
+    // CHECK: qec.ppm ["Z"]
     // CHECK-NOT: qec.ppr ["X"]
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = qec.ppr ["X"](-2) %1 : !quantum.bit
-    %m, %out_qubits = qec.ppm ["Z"](-1) %2 : !quantum.bit
+    %m, %out_qubits = qec.ppm ["Z"](-1) %2 : i1, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     %3 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
     quantum.dealloc %3 : !quantum.reg
@@ -153,10 +153,10 @@ func.func public @merge_ppr_ppm_pi_2_rotation_test_2() -> tensor<i1> {
 
 func.func public @merge_ppr_ppm_pi_2_rotation_test_3(%q1: !quantum.bit) -> tensor<i1> {
 
-    // CHECK: qec.ppm ["Z"] %
+    // CHECK: qec.ppm ["Z"]
     // CHECK-NOT: qec.ppr ["X"]
     %0 = qec.ppr ["X"](-2) %q1 : !quantum.bit
-    %m, %out_qubits = qec.ppm ["Z"](-1) %0 : !quantum.bit
+    %m, %out_qubits = qec.ppm ["Z"](-1) %0 : i1, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     return %from_elements : tensor<i1>
 }
@@ -167,10 +167,10 @@ func.func public @merge_ppr_ppm_pi_2_rotation_test_3(%q1: !quantum.bit) -> tenso
 
 func.func public @commute_ppr_ppm_pi_2_rotation_test_1(%q1: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
 
-    // CHECK: qec.ppm ["Y"](-1) %
+    // CHECK: qec.ppm ["Y"](-1)
     // CHECK: qec.ppr ["X"](2)
     %0 = qec.ppr ["X"](2) %q1: !quantum.bit
-    %m, %out_qubits = qec.ppm ["Y"] %0 : !quantum.bit
+    %m, %out_qubits = qec.ppm ["Y"] %0 : i1, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     return %from_elements, %out_qubits : tensor<i1>, !quantum.bit
 }
@@ -180,7 +180,7 @@ func.func public @commute_ppr_ppm_pi_2_rotation_test_2(%q1: !quantum.bit) -> (te
     // CHECK: qec.ppm ["Z"] %
     // CHECK: qec.ppr ["X"](-2)
     %0 = qec.ppr ["X"](-2) %q1: !quantum.bit
-    %m, %out_qubits = qec.ppm ["Z"](-1) %0 : !quantum.bit
+    %m, %out_qubits = qec.ppm ["Z"](-1) %0 : i1, !quantum.bit
     %from_elements = tensor.from_elements %m : tensor<i1>
     return %from_elements, %out_qubits : tensor<i1>, !quantum.bit
 }
@@ -235,10 +235,10 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     %19 = qec.ppr ["X"](4) %18 : !quantum.bit
     %20 = qec.ppr ["X"](4) %19 : !quantum.bit
 
-    %mres_4, %out_qubit_4 = qec.ppm ["Z"] %15 : !quantum.bit
-    %mres_3, %out_qubit_3 = qec.ppm ["Z"] %20 : !quantum.bit
-    %mres_2, %out_qubit_2 = qec.ppm ["Z"] %10 : !quantum.bit
-    %mres_1, %out_qubit_1 = qec.ppm ["Z"] %17 : !quantum.bit
+    %mres_4, %out_qubit_4 = qec.ppm ["Z"] %15 : i1, !quantum.bit
+    %mres_3, %out_qubit_3 = qec.ppm ["Z"] %20 : i1, !quantum.bit
+    %mres_2, %out_qubit_2 = qec.ppm ["Z"] %10 : i1, !quantum.bit
+    %mres_1, %out_qubit_1 = qec.ppm ["Z"] %17 : i1, !quantum.bit
     return
 }
 
@@ -250,7 +250,7 @@ func.func public @circuit_transformed_0() -> (tensor<i1>, tensor<i1>) {
     // CHECK: [[q1:%.+]] = quantum.extract [[qreg]][ 1]
     // CHECK: [[q2:%.+]]:2 = qec.ppr ["X", "Z"](8) [[q0]], [[q1]]
     // CHECK: [[m1:%.+]], [[o1:%.+]]:2 = qec.ppm ["X", "Z"] [[q2]]#0, [[q2]]#1
-    // CHECK: [[m2:%.+]], [[o2:%.+]] = qec.ppm ["X"] [[o1]]#0 : !quantum.bit
+    // CHECK: [[m2:%.+]], [[o2:%.+]] = qec.ppm ["X"] [[o1]]#0 : i1, !quantum.bit
     // CHECK: [[f1:%.+]] = tensor.from_elements [[m2]] : tensor<i1>
     // CHECK: [[q3:%.+]] = quantum.insert [[qreg]][ 0], [[o2]]
     // CHECK: [[f2:%.+]] = tensor.from_elements [[m1]] : tensor<i1>
@@ -271,11 +271,11 @@ func.func public @circuit_transformed_0() -> (tensor<i1>, tensor<i1>) {
     %6 = qec.ppr ["Z"](4) %5 : !quantum.bit
     %7:2 = qec.ppr ["Z", "X"](4) %6, %3#1 : !quantum.bit, !quantum.bit
     %8 = qec.ppr ["Z"](-4) %7#0 : !quantum.bit
-    %mres, %out_qubits = qec.ppm ["Z"] %8 : !quantum.bit
+    %mres, %out_qubits = qec.ppm ["Z"] %8 : i1, !quantum.bit
     %from_elements = tensor.from_elements %mres : tensor<i1>
     %9 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
     %10 = qec.ppr ["X"](-4) %7#1 : !quantum.bit
-    %mres_0, %out_qubits_1 = qec.ppm ["Z"] %10 : !quantum.bit
+    %mres_0, %out_qubits_1 = qec.ppm ["Z"] %10 : i1, !quantum.bit
     %from_elements_2 = tensor.from_elements %mres_0 : tensor<i1>
     %11 = quantum.insert %9[ 1], %out_qubits_1 : !quantum.reg, !quantum.bit
     quantum.dealloc %11 : !quantum.reg

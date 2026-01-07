@@ -15,6 +15,8 @@
   [(#2260)](https://github.com/PennyLaneAI/catalyst/pull/2260)
   [(#2287)](https://github.com/PennyLaneAI/catalyst/pull/2287)
   [(#2243)](https://github.com/PennyLaneAI/catalyst/pull/2243)
+  [(#2340)](https://github.com/PennyLaneAI/catalyst/pull/2340)
+  [(#2357)](https://github.com/PennyLaneAI/catalyst/pull/2357)
 
   Consider the following circuit:
 
@@ -53,8 +55,9 @@
   succinctly represented with :func:`~.draw_graph`.
 
   ```pycon
-  >>> print(catalyst.draw_graph(circuit)())
-  (<Figure size 640x480 with 1 Axes>, <Axes: >)
+  >>> x, y = 1, 0
+  >>> fig, ax = catalyst.draw_graph(circuit)(x, y)
+  >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
   ```
   ![Graphical representation of circuit with dynamicism and structure](../../doc/_static/catalyst-draw-graph-changelog-0.14-example.png)
 
@@ -65,8 +68,8 @@
   apply the ``merge_rotation`` transform only:
 
   ```pycon
-  >>> print(catalyst.draw_graph(circuit, level=1)())
-  (<Figure size 640x480 with 1 Axes>, <Axes: >)
+  >>> fig, ax = catalyst.draw_graph(circuit, level=1)(x, y)
+  >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
   ```
   ![Graphical representation of circuit with dynamicism and structure](../../doc/_static/catalyst-draw-graph-changelog-0.14-level-example.png)
 
@@ -222,6 +225,7 @@
   [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
   [(#2233)](https://github.com/PennyLaneAI/catalyst/pull/2233)
   [(#2284)](https://github.com/PennyLaneAI/catalyst/pull/2284)
+  [(#2336)](https://github.com/PennyLaneAI/catalyst/pull/2336)
 
 
   :class:`~.PauliRot` and :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes
@@ -430,10 +434,13 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Updated the type support for callbacks allowing use of unsigned integers.
+  [(#2330)](https://github.com/PennyLaneAI/catalyst/pull/2330)
+
 * Fixed a bug where the `qec.ppr` op attribute `rotation_kind` was not correctly constrained to
   be one of ±1, ±2, ±4, or ±8.
   Also, for Identity Pauli product, the `rotation_kind` was correctly set to 1, instead of 0.
-  [(#?)](https://github.com/PennyLaneAI/catalyst/pull/?)
+  [(#2344)](https://github.com/PennyLaneAI/catalyst/pull/2344)
 
 * Updated tests and PennyLane dependency pin to follow changes introduced by
   [PennyLaneAI/pennylane#8290](https://github.com/PennyLaneAI/pennylane/pull/8290).
@@ -524,6 +531,9 @@
 * Fixes a bug where Catalyst was incorrectly raising an error about a missing shots parameter
   on devices that support analytical execution.
   [(#2281)](https://github.com/PennyLaneAI/catalyst/pull/2281)
+
+* Fixes a bug where `qml.vjp` and `qml.jvp` were not working with autograph.
+  [(#2345)](https://github.com/PennyLaneAI/catalyst/pull/2345)
 
 <h3>Internal changes ⚙️</h3>
 
@@ -639,6 +649,9 @@
 
 * Remove duplicate code for canonicalization and verification of Pauli Product Rotation operations.
   [(#2313)](https://github.com/PennyLaneAI/catalyst/pull/2313)
+
+* Adding the measurement type into the MLIR assembly format for `qec.ppm` and `qec.select.ppm`
+  [(#2347)](https://github.com/PennyLaneAI/catalyst/pull/2347)
 
 <h3>Documentation 📝</h3>
 

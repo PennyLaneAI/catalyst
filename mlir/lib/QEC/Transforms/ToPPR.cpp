@@ -258,7 +258,7 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
 
         auto angle = std::fmod(ppr_angle, PI);
 
-        if (angle < TOLERANCE) {
+        if (std::abs(angle) < TOLERANCE) {
             // If the angle is 0, we can just erase the PauliRotOp.
             rewriter.replaceOp(op, inQubits);
             return success();
