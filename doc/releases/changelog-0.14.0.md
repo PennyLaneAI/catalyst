@@ -17,6 +17,7 @@
   [(#2287)](https://github.com/PennyLaneAI/catalyst/pull/2287)
   [(#2298)](https://github.com/PennyLaneAI/catalyst/pull/2298)
   [(#2290)](https://github.com/PennyLaneAI/catalyst/pull/2290)
+  [(#2357)](https://github.com/PennyLaneAI/catalyst/pull/2357)
   [(#2309)](https://github.com/PennyLaneAI/catalyst/pull/2309)
 
   Consider the following circuit:
@@ -761,6 +762,9 @@ No deprecations have been made in this release.
 * A new ``to-pauli-frame`` compilation pass has been added, which applies the Pauli frame tracking
   protocols to a Clifford+T program.
   [(#2269)](https://github.com/PennyLaneAI/catalyst/pull/2269)
+
+* Adding the measurement type into the MLIR assembly format for `qec.ppm` and `qec.select.ppm`
+  [(#2347)](https://github.com/PennyLaneAI/catalyst/pull/2347)
 
 <h3>Documentation 📝</h3>
 
