@@ -597,32 +597,30 @@ No deprecations have been made in this release.
 * Fixed a bug that was causing compilation passes to not apply when using ``mcm_method="one-shot"``.
   [(#2198)](https://github.com/PennyLaneAI/catalyst/pull/2198)
 
-* Fixed a bug where `qml.StatePrep` and `qml.BasisState` might be pushed after other
-  gates, overwriting their effects.
+* Fixed a bug where ``qml.StatePrep`` and ``qml.BasisState`` might be pushed after other gates, 
+  overwriting their effects.
   [(#2239)](https://github.com/PennyLaneAI/catalyst/pull/2239)
 
-* Fixed a bug where `quantum.num_qubits` operations are not properly removed during classical
-  processing of gradient transforms.
+* Fixed a bug where ``quantum.num_qubits`` operations were not properly removed during classical
+  processing of gradient transforms. This fix enables automatic qubit management (i.e., creating a 
+  device and not providing the ``wires`` argument) to be used with gradients.
   [(#2262)](https://github.com/PennyLaneAI/catalyst/pull/2262)
 
-  This fix enables automatic qubit management to be used with gradients.
-
-* Fixed the :func:`~.passes.commute_ppr` pass incorrectly modifying operands of PPRs that live in
-  different blocks.
+* Fixed a but with :func:`~.passes.commute_ppr` that was incorrectly modifying operands of PPRs that 
+  live in different blocks of MLIR.
   [(#2267)](https://github.com/PennyLaneAI/catalyst/pull/2267)
 
-* The `--inline-nested-module` pass no longer renames external function declarations.
+* The ``--inline-nested-module`` pass no longer renames external function declarations. This pass 
+  inlines the QNode MLIR modules into the global QJIT MLIR module. If a QNode module contains 
+  function declarations to external APIs, the names of these declarations must stay unchanged. This 
+  change enables quantum compilation passes to generate calls to external APIs.
   [(#2244)](https://github.com/PennyLaneAI/catalyst/pull/2244)
 
-  This pass inlines the qnode MLIR modules into the global QJIT MLIR module. If a qnode module
-  contains function declarations to external APIs, the names of these declarations must
-  stay unchanged. This change enables quantum passes to generate calls to external APIs.
-
-* Fixes a bug where Catalyst was incorrectly raising an error about a missing shots parameter
+* Fixed a bug where Catalyst was incorrectly raising an error about a missing shots parameter
   on devices that support analytical execution.
   [(#2281)](https://github.com/PennyLaneAI/catalyst/pull/2281)
 
-* Fixes a bug where `qml.vjp` and `qml.jvp` were not working with autograph.
+* Fixed a bug where ``qml.vjp`` and ``qml.jvp`` were not working with Autograph.
   [(#2345)](https://github.com/PennyLaneAI/catalyst/pull/2345)
 
 <h3>Internal changes ⚙️</h3>
