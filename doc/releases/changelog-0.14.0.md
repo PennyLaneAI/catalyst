@@ -625,11 +625,11 @@ No deprecations have been made in this release.
 
 <h3>Internal changes ⚙️</h3>
 
-* `DecompRuleInterpreter` now solves the graph and adds decompositions rules in the `cleanup` method
-  instead of during the first call to `interpret_measurement`.
+* ``DecompRuleInterpreter`` now solves the graph and adds decompositions rules in the ``cleanup`` 
+  method instead of during the first call to ``interpret_measurement``.
   [(#2312)](https://github.com/PennyLaneAI/catalyst/pull/2312)
 
-* Update references to `TransformProgram` with `CompilePipeline`
+* Updated references to ``TransformProgram`` with the new :class:`pennylane.CompilePipeline` class.
   [(#2314)](https://github.com/PennyLaneAI/catalyst/pull/2314)
 
 * xDSL and xDSL-JAX are now dependencies of Catalyst.
@@ -638,48 +638,49 @@ No deprecations have been made in this release.
 * Python 3.14 is now officially supported. Added the forward capability with Python 3.14.
   [(#2271)](https://github.com/PennyLaneAI/catalyst/pull/2271)
 
-* RTIO dialect is added to bypass the compilation flow from OpenAPL to ARTIQ’s LLVM IR. It is
-  introduced to bridge the gap between ION dialect and ARTIQ’s LLVM IR. The design philosophy
-  of RTIO dialect is primarily event-based. Every operation is asynchronous; sync behaviour occurs
-  only via `rtio.sync` or `wait operand` in event operation. And we now support the compiling from
-  ION dialect to RTIO dilalect.
+* The RTIO dialect is added to bypass the compilation flow from OpenAPL to ARTIQ’s LLVM IR. It is
+  introduced to bridge the gap between the ion dialect and ARTIQ’s LLVM IR. The design philosophy
+  of the RTIO dialect is primarily event-based. Every operation is asynchronous; sync behaviour 
+  occurs only via ``rtio.sync`` or ``wait operand`` in event operation. And we now support the 
+  compiling from the ion dialect to the RTIO dilalect.
   [(#2185)](https://github.com/PennyLaneAI/catalyst/pull/2185)
   [(#2204)](https://github.com/PennyLaneAI/catalyst/pull/2204)
 
-* Integration tests for `qml.specs` have been updated to match the new output format introduced
-  in PennyLane.
+* Integration tests for ``qml.specs`` have been updated to match the new output format introduced
+  in PennyLane v0.44.
   [(#2255)](https://github.com/PennyLaneAI/catalyst/pull/2255)
 
 * Resource tracking now writes out at device destruction time instead of qubit deallocation
   time. The written resources will be the total amount of resources collected throughout the
-  lifetime of the execution. For executions that split work between multiple functions,
-  e.g. with the `split-non-commuting` pass, this ensures that resource tracking outputs
-  the total resources used for all splits.
+  lifetime of the execution. For executions that split work between multiple functions (e.g., with 
+  the ``split-non-commuting`` pass), this ensures that resource tracking outputs the total resources 
+  used for all splits.
   [(#2219)](https://github.com/PennyLaneAI/catalyst/pull/2219)
 
-* Replaces the deprecated `shape_dtype_to_ir_type` function with the `RankedTensorType.get` method.
+* Replaced the deprecated ``shape_dtype_to_ir_type`` function with the ``RankedTensorType.get`` 
+  method.
   [(#2159)](https://github.com/PennyLaneAI/catalyst/pull/2159)
 
-* Updates to PennyLane's use of a single transform primitive with a `transform` kwarg.
+* Updates to PennyLane's use of a single transform primitive with a ``transform`` kwarg.
   [(#2177)](https://github.com/PennyLaneAI/catalyst/pull/2177)
 
-* The pytest tests are now run with `strict=True` by default.
+* The pytest tests are now run with ``strict=True`` by default.
   [(#2180)](https://github.com/PennyLaneAI/catalyst/pull/2180)
 
-* Refactor Catalyst pass registering so that it's no longer necessary to manually add new
-  passes at `registerAllCatalystPasses`.
+* Refactored Catalyst's pass registering so that it's no longer necessary to manually add new
+  passes at ``registerAllCatalystPasses``.
   [(#1984)](https://github.com/PennyLaneAI/catalyst/pull/1984)
 
-* Split `from_plxpr.py` into two files.
+* Split ``from_plxpr.py`` into two files.
   [(#2142)](https://github.com/PennyLaneAI/catalyst/pull/2142)
 
-* Re-work `DataView` to avoid an axis of size 0 possibly triggering a segfault via an underflow
-  error, as discovered in
+* Re-worked ``DataView`` to avoid an axis of size ``0`` possibly triggering a segfault via an 
+  underflow error, as discovered in
   [this comment](https://github.com/PennyLaneAI/catalyst/pull/1598#issuecomment-2779178046).
   [(#1621)](https://github.com/PennyLaneAI/catalyst/pull/2164)
 
-* Decouple the ion dialect from the quantum dialect to support the new RTIO compilation flow.
-  The ion dialect now uses its own `!ion.qubit` type instead of depending on `!quantum.bit`.
+* Decoupled the ION dialect from the quantum dialect to support the new RTIO compilation flow. The 
+  ion dialect now uses its own ``!ion.qubit`` type instead of depending on ``!quantum.bit``.
   Conversion between qubits of quantum and ion dialects is handled via unrealized conversion casts.
   [(#2163)](https://github.com/PennyLaneAI/catalyst/pull/2163)
 
@@ -698,19 +699,18 @@ No deprecations have been made in this release.
   }
   ```
 
-  * Added support for `ppr-to-ppm` as an individual MLIR pass and python binding
-  for the qec dialect.
+* Added support for ``ppr-to-ppm`` as an individual MLIR pass and Python binding for the qec 
+  dialect.
   [(#2189)](https://github.com/PennyLaneAI/catalyst/pull/2189)
 
-  * Added a canonicalization pattern for `qec.ppr` to remove any PPRs consisting only
-  of identities.
+* Added a canonicalization pattern for ``qec.ppr`` to remove any PPRs consisting only of identities.
   [(#2192)](https://github.com/PennyLaneAI/catalyst/pull/2192)
 
-  * Renamed `annotate-function` pass to `annotate-invalid-gradient-functions` and move it to the
-  gradient dialect and the `lower-gradients` compilation stage.
+* Renamed the ``annotate-function`` pass to ``annotate-invalid-gradient-functions`` and moved it to 
+  the gradient dialect and the ``lower-gradients`` compilation stage.
   [(#2241)](https://github.com/PennyLaneAI/catalyst/pull/2241)
 
-  * Added support for PPRs and arbitrary angle PPRs to the :func:`~.passes.merge_rotations` pass.
+* Added support for PPRs and arbitrary-angle PPRs to the :func:`~.passes.merge_rotations` pass.
   This pass now merges PPRs with equivalent angles, and cancels PPRs with opposite angles, or
   angles that sum to identity when the angles are known. The pass also supports conditions on PPRs,
   merging when conditions are identical and not merging otherwise.
@@ -720,29 +720,32 @@ No deprecations have been made in this release.
   [(#2258)](https://github.com/PennyLaneAI/catalyst/pull/2258)
   [(#2311)](https://github.com/PennyLaneAI/catalyst/pull/2311)
 
-  * Refactor QEC tablegen files to separate QEC operations into a new `QECOp.td` file
+* Refactored QEC tablegen files to separate QEC operations into a new ``QECOp.td`` file
   [(#2253](https://github.com/PennyLaneAI/catalyst/pull/2253)
 
-  * Removed the `getRotationKind` and `setRotationKind` methods from
-  the QEC interface `QECOpInterface` to simplify the interface.
+* Removed the ``getRotationKind`` and ``setRotationKind`` methods from the QEC interface 
+  ``QECOpInterface`` to simplify the interface.
   [(#2250)](https://github.com/PennyLaneAI/catalyst/pull/2250)
 
-* A new `PauliFrame` dialect has been added. This dialect includes a set of abstractions and
+* A new ``PauliFrame`` dialect has been added. This dialect includes a set of abstractions and
   operations for interacting with an external Pauli frame tracking library.
   [(#2188)](https://github.com/PennyLaneAI/catalyst/pull/2188)
 
-* A new `to-pauli-frame` compilation pass has been added, which applies the Pauli frame tracking
+* A new ``to-pauli-frame`` compilation pass has been added, which applies the Pauli frame tracking
   protocols to a Clifford+T program.
   [(#2269)](https://github.com/PennyLaneAI/catalyst/pull/2269)
 
 <h3>Documentation 📝</h3>
 
-* A new statevector simulator ``lightning.amdgpu`` has been added for optimized performance on AMD GPUs.
+* A new statevector simulator ``lightning.amdgpu`` has been added for optimized performance on AMD 
+  GPUs.
   [(#2283)](https://github.com/PennyLaneAI/catalyst/pull/2283)
 
-  The ``lightning.amdgpu`` device is a specific instantiation of the ``lightning.kokkos`` backend, supporting the same features and operations as ``lightning.kokkos``, with pre-compiled wheels for ``lightning.amdgpu`` available on PyPI for easy installation to use on MI300 series AMD GPUs.
+  The ``lightning.amdgpu`` device is a specific instantiation of the ``lightning.kokkos`` backend, 
+  supporting the same features and operations as ``lightning.kokkos``, with pre-compiled wheels for 
+  ``lightning.amdgpu`` available on PyPI for easy installation to use on MI300 series AMD GPUs.
 
-  This device can be used within qjit'd workflows exactly as other devices compatible with Catalyst:
+  This device can be used within ``qjit``'d workflows exactly as other devices compatible with Catalyst:
 
   ```python
   @qml.qjit
@@ -757,19 +760,20 @@ No deprecations have been made in this release.
   [0.70710678+0.j 0.        +0.j 0.70710678+0.j 0.        +0.j]
   ```
 
-  See the [Lightning-AMDGPU documentation](https://docs.pennylane.ai/projects/lightning/en/latest/lightning_amdgpu/device.html) for more details and installation instructions.
+  See the [Lightning-AMDGPU documentation](https://docs.pennylane.ai/projects/lightning/en/latest/lightning_amdgpu/device.html) 
+  for more details and installation instructions.
 
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
   [(#2136)](https://github.com/PennyLaneAI/catalyst/pull/2136)
 
-* Fix `catalyst.qjit` and `catalyst.CompileOptions` docs rendering.
+* Fixed a rendering issue in ``catalyst.qjit`` and `catalyst.CompileOptions` docstrings.
   [(#2156)](https://github.com/PennyLaneAI/catalyst/pull/2156)
 
-* Update `MLIR Plugins` documentation stating that plugins require adding passes via
-  `--pass-pipeline`.
+* Updated the MLIR Plugins documentation stating that plugins require adding passes via 
+  ``--pass-pipeline``.
   [(#2168)](https://github.com/PennyLaneAI/catalyst/pull/2168)
 
-* Typos in docstring for `PPRotationArbitraryOp` and `PPRRotationOp` have been corrected.
+* Typos in the docstrings for ``PPRotationArbitraryOp`` and ``PPRRotationOp`` have been corrected.
   [(#2297)](https://github.com/PennyLaneAI/catalyst/pull/2297)
 
 <h3>Contributors ✍️</h3>
@@ -779,6 +783,7 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
 Yushao Chen,
+Isaac De Vlugt,
 Sengthai Heng,
 Jeffrey Kam,
 Christina Lee,
