@@ -121,16 +121,6 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     Visualize a single QJIT compiled QNode, showing wire flow through quantum operations,
     program structure, and pass-by-pass impacts on compiled programs.
 
-    .. warning::
-
-        This function only visualizes quantum operations contained in workflows involving a single
-        qjit-compiled QNode. Workflows involving multiple QNodes or operations outside QNodes
-        cannot yet be visualized.
-
-        Only transformations found within the Catalyst compiler can be visualized. Any PennyLane
-        tape transform will have already been applied before lowering to MLIR and will appear as
-        the base state (``level=0``) in this visualization.
-
     .. note::
 
         The ``draw_graph`` function visualizes a QJIT-compiled QNode in a similar manner as
@@ -164,9 +154,19 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
             If the circuit contains operations that cannot be converted to a graphical
             representation.
 
+    .. warning::
+
+        This function only visualizes quantum operations contained in workflows involving a single
+        ``qjit``-compiled QNode. Workflows involving multiple QNodes or operations outside QNodes
+        cannot yet be visualized.
+
+        Only transformations found within the Catalyst compiler can be visualized. Any PennyLane
+        tape transform will have already been applied before lowering to MLIR and will appear as
+        the base state (``level=0``) in this visualization.
+
     **Example**
 
-    Using ``draw_graph`` requires a qjit'd QNode and a ``level`` argument, which denotes the
+    Using ``draw_graph`` requires a ``qjit``'d QNode and a ``level`` argument, which denotes the
     cumulative set of applied compilation transforms (in the order they appear) to be applied and
     visualized.
 
