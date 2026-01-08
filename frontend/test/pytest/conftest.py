@@ -84,10 +84,11 @@ def use_both_frontend(request):
 
 def pytest_collection_modifyitems(items, config):  # pylint: disable=unused-argument
     """Modify collected items as needed."""
-    # Tests that do not have a specific suite marker are marked `core`
+    xdsl_tests_skipped = "not xdsl" in config.getoption("markexpr")
+
     for item in items:
         markers = {mark.name for mark in item.iter_markers()}
-        if "xdsl" in markers:
+        if "xdsl" in markers and not xdsl_tests_skipped:
             # If filecheck is not installed, the xDSL lit tests get skipped silently. This
             # warning will provide verbosity to testers.
             if not find_spec("filecheck"):
@@ -97,4 +98,5 @@ def pytest_collection_modifyitems(items, config):  # pylint: disable=unused-argu
                     "or 'run_filecheck_qjit' fixtures will be skipped.",
                     UserWarning,
                 )
-                break
+
+            break
