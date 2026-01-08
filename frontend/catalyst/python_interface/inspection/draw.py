@@ -116,20 +116,11 @@ def draw(qnode: QNode, *, level: int | None = None) -> Callable:
     return wrapper
 
 
+# pylint: disable=line-too-long
 def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     """
     Visualize a single QJIT compiled QNode, showing wire flow through quantum operations,
     program structure, and pass-by-pass impacts on compiled programs.
-
-    .. warning::
-
-        This function only visualizes quantum operations contained in workflows involving a single
-        qjit-compiled QNode. Workflows involving multiple QNodes or operations outside QNodes
-        cannot yet be visualized.
-
-        Only transformations found within the Catalyst compiler can be visualized. Any PennyLane
-        tape transform will have already been applied before lowering to MLIR and will appear as
-        the base state (``level=0``) in this visualization.
 
     .. note::
 
@@ -164,9 +155,19 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
             If the circuit contains operations that cannot be converted to a graphical
             representation.
 
+    .. warning::
+
+        This function only visualizes quantum operations contained in workflows involving a single
+        ``qjit``-compiled QNode. Workflows involving multiple QNodes or operations outside QNodes
+        cannot yet be visualized.
+
+        Only transformations found within the Catalyst compiler can be visualized. Any PennyLane
+        tape transform will have already been applied before lowering to MLIR and will appear as
+        the base state (``level=0``) in this visualization.
+
     **Example**
 
-    Using ``draw_graph`` requires a qjit'd QNode and a ``level`` argument, which denotes the
+    Using ``draw_graph`` requires a ``qjit``'d QNode and a ``level`` argument, which denotes the
     cumulative set of applied compilation transforms (in the order they appear) to be applied and
     visualized.
 
@@ -192,19 +193,25 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     With ``level=0``, the graphical visualization will display the program as if no transforms are
     applied:
 
-    >>> print(catalyst.draw_graph(circuit, level=0)())
-    (<Figure size 640x480 with 1 Axes>, <Axes: >)
+    >>> fig, ax = catalyst.draw_graph(circuit, level=0)()
+    >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
     .. figure:: ../../../doc/_static/catalyst-draw-graph-level0-example.png
         :width: 35%
         :alt: Graphical representation of circuit with level=0
         :align: left
 
+    Though you can ``print`` the output of ``catalyst.draw_graph``, it is recommended to use the
+    ``savefig`` method of ``matplotlib.figure.Figure`` for better control over image resolution
+    (DPI). Please consult the
+    `matplotlib documentation <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.savefig.html>`_
+    for usage details of ``savefig``.
+
     With ``level=2``, both :func:`~.passes.merge_rotations` and :func:`~.passes.cancel_inverses`
     will be applied, resulting in the two Hadamards cancelling and the two rotations merging:
 
-    >>> print(catalyst.draw_graph(circuit, level=2)())
-    (<Figure size 640x480 with 1 Axes>, <Axes: >)
+    >>> fig, ax = catalyst.draw_graph(circuit, level=2)()
+    >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
     .. figure:: ../../../doc/_static/catalyst-draw-graph-level2-example.png
         :width: 35%
@@ -234,8 +241,8 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
                         qml.Z(0)
                 return qml.probs()
 
-        >>> print(catalyst.draw_graph(circuit)())
-        (<Figure size 640x480 with 1 Axes>, <Axes: >)
+        >>> fig, ax = catalyst.draw_graph(circuit)()
+        >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
         .. figure:: ../../../doc/_static/catalyst-draw-graph-control-flow-example.png
             :width: 35%
@@ -269,8 +276,8 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         and solid lines for static/known values:
 
         >>> x, y = 1, 0
-        >>> print(catalyst.draw_graph(circuit)(x, y))
-        (<Figure size 640x480 with 1 Axes>, <Axes: >)
+        >>> fig, ax = catalyst.draw_graph(circuit)(x, y)
+        >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
         .. figure:: ../../../doc/_static/catalyst-draw-graph-dynamic-wire-example.png
             :width: 35%
