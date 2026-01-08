@@ -67,15 +67,16 @@ class OutputContext:
 
 def _resolve_mcm_config(mcm_config, shots):
     """Helper function for resolving and validating that the mcm_config is valid for executing."""
-    updated_values = {}
+    analytic_shots = isinstance(shots, int) and shots == 0
 
-    updated_values["postselect_mode"] = (
-        None if isinstance(shots, int) and shots == 0 else mcm_config.postselect_mode
-    )
+    updated_values = {}
+    updated_values["postselect_mode"] = None if analytic_shots else mcm_config.postselect_mode
     if mcm_config.mcm_method is None:
         updated_values["mcm_method"] = "one-shot"
+
     if mcm_config.mcm_method == "deferred":
         raise ValueError("mcm_method='deferred' is not supported with Catalyst.")
+
     if (
         mcm_config.mcm_method == "single-branch-statistics"
         and mcm_config.postselect_mode == "hw-like"
@@ -83,7 +84,8 @@ def _resolve_mcm_config(mcm_config, shots):
         raise ValueError(
             "Cannot use postselect_mode='hw-like' with Catalyst when mcm_method != 'one-shot'."
         )
-    if mcm_config.mcm_method == "one-shot" and shots == 0:
+
+    if mcm_config.mcm_method == "one-shot" and analytic_shots:
         raise ValueError(
             "Cannot use the 'one-shot' method for mid-circuit measurements with analytic mode."
         )
