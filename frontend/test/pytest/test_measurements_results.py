@@ -35,17 +35,12 @@ class TestSample:
     def test_sample_on_0qbits(self):
         """Test sample on 0 qubits."""
 
-        # TODO: try set_shots after capture work is completed
-        with pytest.warns(
-            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
-        ):
-            device = qml.device("lightning.qubit", wires=0, shots=10)
+        device = qml.device("lightning.qubit", wires=0)
 
-            @qjit
-            @qml.set_shots(10)
-            @qml.qnode(device)
-            def sample_0qbit():
-                return qml.sample()
+        @qjit
+        @qml.qnode(device, shots=10)
+        def sample_0qbit():
+            return qml.sample()
 
         expected = np.empty(shape=(10, 0), dtype=int)
         observed = sample_0qbit()
@@ -54,17 +49,13 @@ class TestSample:
     def test_sample_on_1qbit(self, backend):
         """Test sample on 1 qubit."""
 
-        # TODO: try set_shots after capture work is completed
-        with pytest.warns(
-            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
-        ):
-            device = qml.device(backend, wires=1, shots=1000)
+        device = qml.device(backend, wires=1)
 
-            @qjit
-            @qml.qnode(device)
-            def sample_1qbit(x: float):
-                qml.RX(x, wires=0)
-                return qml.sample()
+        @qjit
+        @qml.qnode(device, shots=1000)
+        def sample_1qbit(x: float):
+            qml.RX(x, wires=0)
+            return qml.sample()
 
         expected = np.array([[0]] * 1000)
         observed = sample_1qbit(0.0)
@@ -77,18 +68,14 @@ class TestSample:
     def test_sample_on_2qbits(self, backend):
         """Test sample on 2 qubits."""
 
-        # TODO: try set_shots after capture work is completed
-        with pytest.warns(
-            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
-        ):
-            device = qml.device(backend, wires=2, shots=1000)
+        device = qml.device(backend, wires=2)
 
-            @qjit
-            @qml.qnode(device)
-            def sample_2qbits(x: float):
-                qml.RX(x, wires=0)
-                qml.RY(x, wires=1)
-                return qml.sample()
+        @qjit
+        @qml.qnode(device, shots=1000)
+        def sample_2qbits(x: float):
+            qml.RX(x, wires=0)
+            qml.RY(x, wires=1)
+            return qml.sample()
 
         expected = np.array([[0, 0]] * 1000)
         observed = sample_2qbits(0.0)

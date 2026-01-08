@@ -905,7 +905,7 @@ class TestCutCircuitMCTransform:
         def qnode_builder(device_name):
             """Builder"""
 
-            @qml.qnode(qml.device(device_name, wires=2, shots=None))
+            @qml.qnode(qml.device(device_name, wires=2))
             def qfunc(x):
                 """Example taken from PL tests."""
                 qml.RX(x, wires=0)
@@ -983,7 +983,7 @@ class TestSplitNonCommuting:
             """Builder"""
 
             @qml.transforms.split_non_commuting
-            @qml.qnode(qml.device(device_name, wires=2, shots=None))
+            @qml.qnode(qml.device(device_name, wires=2))
             def qfunc():
                 """Example taken from PL tests"""
                 obs1 = qml.prod(qml.PauliX(0), qml.PauliX(1))

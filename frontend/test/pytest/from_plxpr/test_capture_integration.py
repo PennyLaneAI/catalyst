@@ -1516,24 +1516,20 @@ class TestCapture:
 
         qml.capture.enable()
 
-        # TODO: try set_shots after capture work is completed
-        with pytest.warns(
-            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
-        ):
+        @qjit(target="mlir")
+        @qml.set_shots(10)
+        @qml.qnode(qml.device(backend, wires=2))
+        def captured_circuit():
+            @qml.for_loop(0, 2, 1)
+            def loop_0(i):
+                qml.RX(0, wires=i)
 
-            @qjit(target="mlir")
-            @qml.qnode(qml.device(backend, wires=2, shots=10))
-            def captured_circuit():
-                @qml.for_loop(0, 2, 1)
-                def loop_0(i):
-                    qml.RX(0, wires=i)
+            loop_0()  # pylint: disable=no-value-for-parameter
 
-                loop_0()  # pylint: disable=no-value-for-parameter
+            qml.RX(0, wires=0)
+            return qml.sample()
 
-                qml.RX(0, wires=0)
-                return qml.sample()
-
-            capture_result = captured_circuit()
+        capture_result = captured_circuit()
         assert "shots(%" in captured_circuit.mlir
 
         qml.capture.disable()

@@ -542,12 +542,12 @@ def dynamic_one_shot(qnode, **kwargs):
 
     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", shots=100)
+        dev = qml.device("lightning.qubit")
         params = np.pi / 4 * np.ones(2)
 
         @qjit
         @dynamic_one_shot
-        @qml.qnode(dev, diff_method=None)
+        @qml.qnode(dev, diff_method=None, shots=100)
         def circuit(x, y):
             qml.RX(x, wires=0)
             m0 = measure(0, reset=reset, postselect=postselect)

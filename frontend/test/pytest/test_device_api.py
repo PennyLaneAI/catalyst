@@ -26,13 +26,10 @@ from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 
 def test_qjit_device():
     """Test the qjit device from a device using the new api."""
-    with pytest.warns(
-        qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
-    ):
-        device = NullQubit(wires=10, shots=2032)
 
-        # Create qjit device
-        device_qjit = QJITDevice(device)
+    # Create qjit device
+    device = NullQubit(wires=10)
+    device_qjit = QJITDevice(device)
 
     # Check attributes of the new device
     # Since shots are not used in the new API, we expect None
