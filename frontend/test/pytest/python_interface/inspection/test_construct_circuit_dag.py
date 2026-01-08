@@ -1520,6 +1520,35 @@ class TestCreateDynamicMeasurementNodes:
 class TestOperatorConnectivity:
     """Tests that operators are properly connected."""
 
+    def test_global_phase_connectivity(self):
+        """Tests the connectivity of the global phase operator."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            qml.X(0)
+            qml.GlobalPhase(0.5)
+            qml.Y(1)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX"),
+            ("PauliX", "GlobalPhase", {"style": "dashed"}),
+            ("GlobalPhase", "PauliY"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
+
     def test_static_connection_within_cluster(self):
         """Tests that connections can be made within the same cluster."""
 

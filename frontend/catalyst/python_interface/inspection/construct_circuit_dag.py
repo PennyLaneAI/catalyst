@@ -614,7 +614,7 @@ class ConstructCircuitDAG:
         """
 
         # Record if it's a dynamic node for easy look-up
-        is_dynamic = any(not isinstance(wire, int) for wire in wires)
+        is_dynamic = any(not isinstance(wire, int) for wire in wires) or len(wires) == 0
         if is_dynamic:
             self._dynamic_node_uids.add(node_uid)
 
