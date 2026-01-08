@@ -137,6 +137,16 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         Additionally, it is recommended to use ``draw_graph`` with PennyLane's program capture
         enabled (see :func:`qml.capture.enable <pennylane.capture.enable>`).
 
+    .. warning::
+
+        This function only visualizes quantum operations contained in workflows involving a single
+        ``qjit``-compiled QNode. Workflows involving multiple QNodes or operations outside QNodes
+        cannot yet be visualized.
+
+        Only transformations found within the Catalyst compiler can be visualized. Any PennyLane
+        tape transform will have already been applied before lowering to MLIR and will appear as
+        the base state (``level=0``) in this visualization.
+
     Args:
         qnode (QJIT):
             The input qjit-compiled QNode that is to be visualized. The QNode is assumed to be
@@ -155,7 +165,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
             If the circuit contains operations that cannot be converted to a graphical
             representation.
         TypeError:
-            If the ``level`` argument is not of type integer or ``None``. If the input `QNode` is not
+            If the ``level`` argument is not of type integer or ``None``. If the input ``QNode`` is not
             qjit-compiled.
         ValueError:
             If the ``level`` argument is a negative integer.
@@ -164,16 +174,6 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         UserWarning:
             If the ``level`` argument provided is larger than the number of passes present in the
             compilation pipeline.
-
-    .. warning::
-
-        This function only visualizes quantum operations contained in workflows involving a single
-        ``qjit``-compiled QNode. Workflows involving multiple QNodes or operations outside QNodes
-        cannot yet be visualized.
-
-        Only transformations found within the Catalyst compiler can be visualized. Any PennyLane
-        tape transform will have already been applied before lowering to MLIR and will appear as
-        the base state (``level=0``) in this visualization.
 
     **Example**
 
