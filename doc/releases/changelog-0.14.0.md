@@ -438,7 +438,7 @@
 * Fixed a bug in the `gradient.value_and_grad` verifier that incorrectly validated gradient result
   types by matching from the tail of callee arguments, ignoring `diffArgIndices`. This caused false
   verification errors when differentiating a subset of arguments with different types.
-  [(#?)](https://github.com/PennyLaneAI/catalyst/pull/?)
+  [(#2349)](https://github.com/PennyLaneAI/catalyst/pull/2349)
 
 * Updated the type support for callbacks allowing use of unsigned integers.
   [(#2330)](https://github.com/PennyLaneAI/catalyst/pull/2330)
