@@ -144,7 +144,7 @@ def resolve_measurement(name: str) -> MeasurementProcess:
 
 def _tensor_shape_from_ssa(ssa: SSAValue) -> list[int]:
     """Extract the concrete shape from an SSA tensor value."""
-    ssa_type = ssa.type 
+    ssa_type = ssa.type
 
     if hasattr(ssa_type, "shape") and hasattr(ssa_type.shape, "data"):
         return [dim.data for dim in ssa_type.shape.data]

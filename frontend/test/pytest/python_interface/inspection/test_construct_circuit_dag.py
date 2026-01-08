@@ -850,8 +850,8 @@ class TestCreateStaticOperatorNodes:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_circuit():
-            qml.QubitUnitary(jax.numpy.array([[0, 1], [1, 0]]), wires=0) # real
-            qml.QubitUnitary(jax.numpy.array([[1, 0], [0, 1j]]), wires=0) # complex
+            qml.QubitUnitary(jax.numpy.array([[0, 1], [1, 0]]), wires=0)  # real
+            qml.QubitUnitary(jax.numpy.array([[1, 0], [0, 1j]]), wires=0)  # complex
 
         module = my_circuit()
 
