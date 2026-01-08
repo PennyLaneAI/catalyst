@@ -381,11 +381,11 @@
 
 <h3>Breaking changes 💔</h3>
 
-* The MLIR pipeline ``enforce-runtime-invariants-pipeline`` has been restructured and a new pipeline
-  called ``quantum-compilation-pipeline`` has been added. Existing quantum compilation passes in the 
-  ``quantum-compilation-pipeline`` are now run together with user-provided quantum compilation 
-  passes (previously run in ``enforce-runtime-invariants``). This new combined pipeline now runs 
-  first.
+* The standard Catalyst pipelines have been restructured, such that default and user QNode passes
+  are run together in the first pipeline. For this purpose, the old ``quantum-compilation-pipeline``
+  and ``enforce-runtime-invariants-pipeline`` have been merged into a single
+  ``quantum-compilation-pipeline``, while a new ``gradient-lowering-pipeline`` has been split out
+  from the old ``quantum-compilation-pipeline``. 
   [(#2186)](https://github.com/PennyLaneAI/catalyst/pull/2186)
 
 * The ``pipeline``  and ``"passes"`` postfixes in the compilation stage names have been changed to 
@@ -418,7 +418,8 @@
 No deprecations have been made in this release.
 
 <h3>Bug fixes 🐛</h3>
-
+* Fixed a bug in the :func:`catalyst.passes.merge_ppr_ppm` that was causing an iteration out-of-bound error.
+  [(#2359)](https://github.com/PennyLaneAI/catalyst/pull/2359)
 * Updated the type support for callbacks allowing for the use of unsigned integers.
   [(#2330)](https://github.com/PennyLaneAI/catalyst/pull/2330)
 
@@ -441,7 +442,7 @@ No deprecations have been made in this release.
   ``rotation_kind`` was correctly set to ``1``, instead of ``0``.
   [(#2344)](https://github.com/PennyLaneAI/catalyst/pull/2344)
 
-* Added missing ``detensorize-function-boundary`` and ``symbol-dce`` passes to ``Pipelines.cpp``.
+* Running the Catalyst compiler from the command line no longer misses the ``detensorize-function-boundary`` and ``symbol-dce`` passes.
   [(#2266)](https://github.com/PennyLaneAI/catalyst/pull/2266)
 
 * Fixed an issue where a heap-to-stack allocation conversion pass was causing SIGSEGV issues during 
