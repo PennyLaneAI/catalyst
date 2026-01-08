@@ -433,6 +433,11 @@
   conform with the name of the corresponding transform in PennyLane.
   [(#2201)](https://github.com/PennyLaneAI/catalyst/pull/2201)
 
+* The `to-ppr` pass now automatically runs canonicalization patterns after converting quantum
+  operations to Pauli Product Rotation (PPR) form. This removes identity Pauli rotations
+  (e.g., `["I", "I", "I"]`) automatically, simplifying the resulting IR.
+  [(#2367)](https://github.com/PennyLaneAI/catalyst/pull/2367)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
