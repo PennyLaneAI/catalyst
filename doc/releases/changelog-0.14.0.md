@@ -229,7 +229,6 @@
   [(#2336)](https://github.com/PennyLaneAI/catalyst/pull/2336)
   [(#2360)](https://github.com/PennyLaneAI/catalyst/pull/2360)
 
-
   :class:`~.PauliRot` and :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes
   for PPR-PPM compilation, which includes :func:`catalyst.passes.to_ppr`,
   :func:`catalyst.passes.commute_ppr`, :func:`catalyst.passes.merge_ppr_ppm`,
