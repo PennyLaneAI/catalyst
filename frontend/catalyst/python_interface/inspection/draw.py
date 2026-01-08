@@ -21,6 +21,7 @@ from collections.abc import Callable
 from functools import wraps
 from shutil import which
 
+from jaxlib.mlir.ir import Value
 from pennylane.tape import QuantumScript
 from pennylane.workflow.qnode import QNode
 from xdsl.dialects.builtin import ModuleOp
@@ -300,6 +301,8 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
 
     if not isinstance(level, (int, type(None))):
         raise TypeError("The 'level' argument must be an integer or 'None'.")
+    if isinstance(level, int) and level < 0:
+        raise ValueError("The 'level' argument must be a positive integer.")
 
     max_level = None
     if isinstance(level, int):

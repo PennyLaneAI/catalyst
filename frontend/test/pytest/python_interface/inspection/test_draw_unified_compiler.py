@@ -564,6 +564,18 @@ class TestDrawGraph:
         with pytest.raises(TypeError, match="The 'level' argument must be an integer or 'None'"):
             _ = draw_graph(qjit_qnode, level=unsupported_level)()
 
+    def test_negative_level_integer(self):
+        """Tests that a negative integer for a level is unsupported."""
+
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(qml.device("null.qubit", wires=2))
+        def qjit_qnode():
+            qml.H(0)
+            return qml.expval(qml.Z(0))
+
+        with pytest.raises(ValueError, match="The 'level' argument must be a positive integer"):
+            _ = draw_graph(qjit_qnode, level=-1)()
+
     def test_unsupported_qnode(self):
         """Tests that only qjit'd qnodes are allowed to be visualized."""
 
