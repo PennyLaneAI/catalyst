@@ -88,10 +88,13 @@ def pytest_collection_modifyitems(items, config):  # pylint: disable=unused-argu
 
     for item in items:
         markers = {mark.name for mark in item.iter_markers()}
-        if "xdsl" in markers and not xdsl_tests_skipped:
+        # The nested conditional can be merged with this one, but we don't do that so that we can
+        # break right after the first xDSL test is found. Otherwise, we will have unnecessary
+        # iterations if filecheck is installed or xDSL tests are skipped.
+        if "xdsl" in markers:
             # If filecheck is not installed, the xDSL lit tests get skipped silently. This
             # warning will provide verbosity to testers.
-            if not find_spec("filecheck"):
+            if not (xdsl_tests_skipped or find_spec("filecheck")):
                 warn(
                     "The 'filecheck' Python package must be installed to use fixtures for "
                     "lit testing xDSL features. Otherwise, tests using the 'run_filecheck' "
