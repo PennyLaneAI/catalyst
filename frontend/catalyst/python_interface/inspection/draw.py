@@ -153,6 +153,16 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         VisualizationError:
             If the circuit contains operations that cannot be converted to a graphical
             representation.
+        TypeError:
+            If the ``level`` argument is not of type integer or ``None``. If the input `QNode` is not
+            qjit-compiled.
+        ValueError:
+            If the ``level`` argument is a negative integer.
+
+    Warns:
+        UserWarning:
+            If the ``level`` argument provided is larger than the number of passes present in the
+            compilation pipeline.
 
     .. warning::
 
