@@ -32,8 +32,14 @@ from catalyst.jax_extras import get_aval2
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 
-VARARGS = (
+POSITIONAL_KINDS = (
+    inspect.Parameter.POSITIONAL_ONLY,
+    inspect.Parameter.POSITIONAL_OR_KEYWORD,
     inspect.Parameter.VAR_POSITIONAL,
+)
+
+KEYWORD_KINDS = (
+    inspect.Parameter.KEYWORD_ONLY,
     inspect.Parameter.VAR_KEYWORD,
 )
 
@@ -46,55 +52,95 @@ def get_stripped_signature(fn: Callable) -> inspect.Signature:
     return inspect.Signature(new_params)
 
 
-def get_param_annotations(fn: Callable):
-    """Return all parameters type-annotations."""
-    assert isinstance(fn, Callable)
-
-    signature = inspect.signature(fn)
-    parameters = signature.parameters
-
-    return [p.annotation for p in parameters.values()]
+def get_annotations_from_signature(sig):
+    return {param.name: param.annotation for param in sig.parameters.values()}
 
 
-def params_are_annotated(fn: Callable) -> bool:
+def get_dynamic_sig(full_sig, static_argnums):
+    return inspect.Signature(
+        (param for i, param in enumerate(full_sig.parameters.values()) if i not in static_argnums)
+    )
+
+
+def get_arg_annotations_from_signature(sig):
+    """
+    Return arguments shape from a functions signature.
+    """
+
+    return tuple(
+        param.annotation for param in sig.parameters.values() if param.kind in POSITIONAL_KINDS
+    )
+
+
+def get_kwarg_annotations_from_signature(sig):
+    """
+    Return arguments shape from a functions signature.
+    """
+
+    return {
+        param.name: param.annotation
+        for param in sig.parameters.values()
+        if param.kind in KEYWORD_KINDS
+    }
+
+
+def all_params_are_annotated(sig):
     """Return true if all parameters are type-annotated, or no parameters are present."""
-    assert isinstance(fn, Callable)
+    assert isinstance(sig, inspect.Signature)
 
-    annotations = get_param_annotations(fn)
-    are_annotated = all(annotation is not inspect.Parameter.empty for annotation in annotations)
+    params = sig.parameters.values()
+    # print(f"parameters: {params}")
+    are_annotated = all(param.annotation is not inspect.Parameter.empty for param in params)
+    # print(f"are_annotated? {are_annotated}")
 
     if not are_annotated:
         return False
 
-    return all(isinstance(annotation, (type, AbstractValue)) for annotation in annotations)
+    # for param in params:
+    #     if not isinstance(param.annotation, (type, AbstractValue)):
+    #         print(f"param {param} with annotation {param.annotation} of type {type(param.annotation)} failed the check")
+
+    are_valid_annotations = all(
+        isinstance(param.annotation, (type, AbstractValue)) for param in params
+    )
+    # print(f"are typed? {are_typed}")
+    return are_valid_annotations
 
 
-def get_type_annotations(fn: Callable) -> tuple:
-    """Get type annotations if all parameters are annotated."""
+def get_type_annotations_if_all_annotated(fn):
+    """Get type annotations if all parameters are annotated.
+
+    Args:
+        fn (Callable): function whose annotations to retrieve.
+
+    Returns:
+        dict | None: type annotations for all parameters if available, otherwise None.
+    """
     assert isinstance(fn, Callable)
 
-    if fn is not None and params_are_annotated(fn):
-        annotations = get_param_annotations(fn)
-        return tuple(annotations)
+    if fn is not None and all_params_are_annotated(fn):
+        # print("params are annotated, getting annotations")
+        return inspect.get_annotations(fn)
+    # else:
+    # print(f"type annotations failed, function is None? {fn is None}")
 
     return None
 
 
-def get_abstract_signature(args):
+def get_abstract_args(args, kwargs):
     """Get abstract values from real arguments, preserving PyTrees.
 
     Args:
         args (Iterable): arguments to convert
 
     Returns:
-        Iterable: ShapedArrays for the provided values
+        Iterable: ShapedArrays for the provided arguments
+        dict: ShapedArrays for the provided keyword arguments
     """
-    flat_args, treedef = tree_flatten(args)
-    # print(f"flat args: {flat_args}")
 
-    abstract_args = [shaped_abstractify(arg) for arg in flat_args]
-
-    return tree_unflatten(treedef, abstract_args)
+    flat_args, in_tree = tree_flatten((args, kwargs))
+    flat_abstract_args = [shaped_abstractify(arg) for arg in flat_args]
+    return tree_unflatten(in_tree, flat_abstract_args)
 
 
 def verify_static_argnums_type(static_argnums):
@@ -116,30 +162,7 @@ def verify_static_argnums_type(static_argnums):
     return None
 
 
-def get_signature_length(sig, args, kwargs):
-    """Return the total number of arguments `args` bound to signature `sig`, counting arguments in
-    varargs individually.
-
-    Args:
-        sig (inspect.Signature): the signature to analyze.
-        args (Iterable): arguments to bind to signature.
-
-    Returns:
-        int: the number of arguments in the signature.
-    """
-    bound_args = sig.bind(*args, **kwargs)
-
-    length = 0
-    for param in sig.parameters:
-        if sig.parameters[param].kind in VARARGS:
-            length += len(bound_args.arguments[param])
-        else:
-            length += 1
-
-    return length
-
-
-def verify_static_argnums(sig, args, kwargs, static_argnums, static_argnames):
+def verify_static_argnums(args, kwargs, static_argnums):
     """Verify that static_argnums have correct type and range.
     Raises a `CompileError` if not.
 
@@ -152,17 +175,14 @@ def verify_static_argnums(sig, args, kwargs, static_argnums, static_argnames):
     """
     # check that all argnums are ints
     verify_static_argnums_type(static_argnums)
-    print(f"args: {args}")
-    sig_len = get_signature_length(sig, args, kwargs)
-
     for argnum in static_argnums:
-        if argnum < 0 or argnum >= sig_len:
-            msg = f"argnum {argnum} is beyond the valid range of [0, {sig_len})."
+        if argnum < 0 or argnum >= len(args) + len(kwargs):
+            msg = f"argnum {argnum} is beyond the valid range of [0, {len(args) + len(kwargs)})."
             raise CompileError(msg)
     return None
 
 
-def filter_static_args(sig, args, static_argnums):
+def filter_static_args(args, kwargs, static_argnums):
     """Remove static values from arguments using the provided index list.
 
     Args:
@@ -171,24 +191,17 @@ def filter_static_args(sig, args, static_argnums):
 
     Returns:
         Tuple: dynamic arguments
+        dict: dynamic keyword arguments
     """
-    dynamic_args = []
-    i = 0
-    for arg, param in zip(args, sig.parameters.values()):
-        if param.kind in VARARGS:
-            for subarg in arg:
-                if i not in static_argnums:
-                    dynamic_args.append(subarg)
-                i += 1
-        else:
-            if i not in static_argnums:
-                dynamic_args.append(arg)
-            i += 1
-
-    return dynamic_args
+    # print(f"filtering with {args}, {kwargs} and {static_argnums}")
+    return tuple(arg for i, arg in enumerate(args) if i not in static_argnums), {
+        key: value
+        for i, (key, value) in enumerate(kwargs.items())
+        if len(args) + i not in static_argnums
+    }
 
 
-def split_static_args(sig, args, static_argnums):
+def split_static_args(args, kwargs, static_argnums):
     """Split arguments into static and dynamic values using the provided index list.
 
     Args:
@@ -199,24 +212,16 @@ def split_static_args(sig, args, static_argnums):
         Tuple: dynamic arguments
         Tuple: static arguments
     """
-    dynamic_args, static_args = [], []
-    i = 0
-    for arg, param in zip(args, sig.parameters.values):
-        if param.kind in VARARGS:
-            for subarg in arg:
-                if i in static_argnums:
-                    static_args.append(subarg)
-                else:
-                    dynamic_args.append(subarg)
-                i += 1
-        else:
-            if i in static_argnums:
-                static_args.append(arg)
-            else:
-                dynamic_args.append(arg)
-            i += 1
+    split_args = ([], [])
+    split_kwargs = ({}, {})
 
-    return tuple(dynamic_args), tuple(static_args)
+    for i in range(len(args)):
+        split_args[int(i in static_argnums)].append(args[i])
+
+    for i, argname in enumerate(kwargs):
+        split_kwargs[int(len(args) + i in static_argnums)][argname] = kwargs[argname]
+
+    return tuple(split_args[0]), split_kwargs[0], tuple(split_args[1]), split_kwargs[1]
 
 
 def merge_static_argname_into_argnum(fn: Callable, static_argnames, static_argnums):
@@ -251,46 +256,46 @@ def merge_static_argname_into_argnum(fn: Callable, static_argnames, static_argnu
     return new_static_argnums
 
 
-def merge_static_args(sig, abstract_args, args, static_argnums):
-    """Merge static arguments back into an abstract signature, retaining the original ordering.
+def merge_static_args(abstract_sig, static_sig, static_argnums):
+    """Merge abstracted dynamic arguments back into call arguments, retaining the original ordering.
 
     Args:
         sig (inspect.Signature): signature of the function
-        abstract_args (Iterable[ShapedArray]): abstract values of the dynamic arguments
-        args (Iterable): original argument list to draw static values from
-        static_argnums (Iterable[int]): indices to merge on
+        abstract_args (Iterable[ShapedArray]): abstracted values of dynamic arguments
+        args (Iterable): original arguments with static values
+        static_argnums (Iterable[int]): indices of static arguments
 
     Returns:
         Tuple[ShapedArray | Any]: a mixture of ShapedArrays and static argument values
     """
+    # printf"merging static sig {static_sig} and abstract sig {abstract_sig}")
     if not static_argnums:
-        return signature
+        return abstract_sig
 
-    merged_sig = list(args)  # mutable copy
+    abstract_args = abstract_sig[0]
+    abstracts_kwargs = abstract_sig[1]
 
-    # TODO dynamic_indices is incorrect since it doesn't consider varargs
-    dynamic_indices = split_static_args(sig, args, static_argnums)
+    static_args = static_sig[0]
+    static_kwargs = static_sig[1]
 
-    arg_index = 0
+    merged_args = list(static_args)
+    merged_kwargs = static_kwargs  # TODO make sure this doesn't mutate the original
+
     abstract_index = 0
-    bound_args = sig.bind(args)
-    for arg, param in zip(args, sig.parameters.values()):
-        if param.kind in VARARGS:
-            for i, arg in bound_args.arguments[param]:
-                if arg_index not in static_argnums:
-                    merged_sig[arg_index][i] = abstract_args[abstract_index]
-                    abstract_index += 1
-                arg_index += 1
-        else:
-            if arg_index not in static_argnums:
-                merged_sig[arg_index] = abstract_args
-    # for i, idx in enumerate(dynamic_indices):
-    #     merged_sig[idx] = signature[i]
+    for i, arg in enumerate(static_args):
+        if i not in static_argnums:
+            merged_args[i] = abstract_args[abstract_index]
+            abstract_index += 1
 
-    return tuple(merged_sig)
+    for i, key in enumerate(static_kwargs):
+        if len(static_args) + i not in static_args:
+            merged_kwargs[key] = abstract_kwargs[key]
+            abstract_index += 1
+
+    return (tuple(merged_args), merged_kwargs)
 
 
-def get_decomposed_signature(args, static_argnums):
+def get_decomposed_signature(args, kwargs, static_argnums):
     """Decompose function arguments into dynamic and static arguments, where the dynamic arguments
     are further processed into abstract values and PyTree metadata. All values returned by this
     function are hashable.
@@ -304,14 +309,13 @@ def get_decomposed_signature(args, static_argnums):
         PyTreeDef: dynamic argument PyTree metadata
         Tuple[Any]: static argument values
     """
-    # print(f"getting decomposed signature with args {args}")
-    dynamic_args, static_args = split_static_args(args, static_argnums)
-    # print(f"dynamic args: {dynamic_args}")
-    flat_dynamic_args, treedef = tree_flatten(dynamic_args)
-    # print(f"flattened dynamic args to {flat_dynamic_args}")
-    flat_signature = get_abstract_signature(flat_dynamic_args)
+    dynamic_args, dynamic_kwargs, static_args, static_kwargs = split_static_args(
+        args, kwargs, static_argnums
+    )
+    flat_dynamic_args, dynamic_in_tree = tree_flatten((dynamic_args, dynamic_kwargs))
 
-    return flat_signature, treedef, static_args
+    flat_abstract_args = tuple(shaped_abstractify(arg) for arg in flat_dynamic_args)
+    return flat_abstract_args, dynamic_in_tree, static_args
 
 
 class TypeCompatibility(enum.Enum):
@@ -358,9 +362,13 @@ def typecheck_signatures(compiled_signature, runtime_signature, abstracted_axes=
         (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
     ):
         # TODO: do away with private jax functions
-        axes_specs_compile = _flat_axes_specs(abstracted_axes, *compiled_signature)
-        axes_specs_runtime = _flat_axes_specs(abstracted_axes, *runtime_signature)
+        # print(f"compile specs from {abstracted_axes} and {flat_compiled_sig}")
+        axes_specs_compile = _flat_axes_specs(abstracted_axes, *flat_compiled_sig)
+        # print(f"runtime specs from {abstracted_axes} and {runtime_signature}")
+        axes_specs_runtime = _flat_axes_specs(abstracted_axes, *flat_runtime_sig)
+        # print(f"compile in_types from {axes_specs_compile}, {flat_compiled_sig}")
         in_type_compiled = infer_lambda_input_type(axes_specs_compile, flat_compiled_sig)
+        # print(f"runtime in_types from {axes_specs_runtime}, {flat_runtime_sig}")
         in_type_runtime = infer_lambda_input_type(axes_specs_runtime, flat_runtime_sig)
 
         if in_type_compiled == in_type_runtime:
@@ -381,7 +389,7 @@ def typecheck_signatures(compiled_signature, runtime_signature, abstracted_axes=
     return action
 
 
-def promote_arguments(target_signature, args):
+def promote_arguments(target_call_signature, args, kwargs):
     """Promote arguments to the provided target signature, preserving PyTrees.
 
     Args:
@@ -391,12 +399,12 @@ def promote_arguments(target_signature, args):
     Returns:
         Iterable: arguments promoted to target signature
     """
-    flat_target_sig, target_treedef = tree_flatten(target_signature)
-    flat_args, treedef = tree_flatten(args)
-    assert target_treedef == treedef, "Argument PyTrees did not match target signature."
+    flat_target_args, target_treedef = tree_flatten(target_call_signature)
+    flat_args, treedef = tree_flatten((args, kwargs))
+    assert target_treedef == treedef, "Argument PyTrees did not match target structure."
 
     promoted_args = []
-    for c_param, r_param in zip(flat_target_sig, flat_args):
+    for c_param, r_param in zip(flat_target_args, flat_args):
         assert isinstance(c_param, jax.core.ShapedArray)
         r_param = jax.numpy.asarray(r_param)
         arg_dtype = r_param.dtype

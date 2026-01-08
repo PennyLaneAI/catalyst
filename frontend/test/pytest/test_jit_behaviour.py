@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 import random
 import warnings
 from functools import partial
@@ -28,8 +29,8 @@ from catalyst import for_loop, grad, measure, qjit
 from catalyst.jax_primitives import _scalar_abstractify
 from catalyst.tracing.type_signatures import (
     TypeCompatibility,
-    get_abstract_signature,
-    params_are_annotated,
+    all_params_are_annotated,
+    get_abstract_args,
     typecheck_signatures,
 )
 from catalyst.utils.exceptions import CompileError
@@ -565,7 +566,7 @@ class TestSignatureErrors:
 
         string = "hello world"
         with pytest.raises(TypeError, match="<class 'str'> is not a valid JAX type"):
-            get_abstract_signature([string])
+            get_abstract_args([string], {})
 
     def test_incompatible_type_reachable_from_user_code(self):
         """Raise error message for incompatible types"""
@@ -1026,7 +1027,7 @@ class TestParamsAnnotations:
     def test_params_invalid_annotation(self):
         def foo(hello: "BAD ANNOTATION"): ...
 
-        assert not params_are_annotated(foo)
+        assert not all_params_are_annotated(inspect.signature(foo))
 
 
 class TestErrorNestedQNode:

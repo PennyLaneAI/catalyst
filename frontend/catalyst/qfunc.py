@@ -17,6 +17,7 @@ This module contains a patch for the upstream qml.QNode behaviour, in particular
 what happens when a QNode object is called during tracing. Mostly this involves bypassing
 the default behaviour and replacing it with a function-like "QNode" primitive.
 """
+import inspect
 import logging
 from copy import copy
 from dataclasses import dataclass, replace
@@ -279,6 +280,7 @@ class QFunc:
     # pylint: disable=self-cls-assignment
     @debug_logger
     def __call__(self, *args, **kwargs):
+        ##printf"calling qfunc with args {args} and kwargs {kwargs}")
 
         if EvaluationContext.is_quantum_tracing():
             raise CompileError("Can't nest qnodes under qjit")
@@ -305,6 +307,9 @@ class QFunc:
         qjit_device = QJITDevice(new_device)
 
         static_argnums = kwargs.pop("static_argnums", ())
+        static_argnames = kwargs.pop(
+            "static_argnames", ()
+        )  # TODO probably need to do something with this...
         out_tree_expected = kwargs.pop("_out_tree_expected", [])
         classical_return_indices = kwargs.pop("_classical_return_indices", [])
         num_mcm_expected = kwargs.pop("_num_mcm_expected", [])
@@ -330,21 +335,32 @@ class QFunc:
             out_tree_expected.append(out_tree_exp)
             classical_return_indices.append(cls_ret_idx)
             num_mcm_expected.append(num_mcm)
-            dynamic_args = filter_static_args(args, static_argnums)
-            args_expanded = get_implicit_and_explicit_flat_args(None, *dynamic_args, **kwargs)
+            dynamic_args, dynamic_kwargs = filter_static_args(args, kwargs, static_argnums)
+            # printf"dynamic args, dynamic_kwargs: {dynamic_args}, {dynamic_kwargs}")
+            args_expanded = get_implicit_and_explicit_flat_args(
+                None, *dynamic_args, **dynamic_kwargs
+            )
+            # printf"expanded args to {args_expanded}")
+            # print"about to evaluate jaxpr with the following parameters:")
+            # printf"\tclosed jaxpr: {closed_jaxpr.jaxpr}")
+            # printf"\tconsts: {closed_jaxpr.consts}")
             res_expanded = eval_jaxpr(closed_jaxpr.jaxpr, closed_jaxpr.consts, *args_expanded)
+            # print"evaluated jaxpr")
             _, out_keep = unzip2(out_type)
             res_flat = [r for r, k in zip(res_expanded, out_keep) if k]
             return tree_unflatten(out_tree, res_flat)
 
+        # printf"deducing abstract vals from args {args} and kwargs {kwargs}")
         flattened_fun, _, _, out_tree_promise = deduce_avals(
             _eval_quantum, args, kwargs, static_argnums, debug_info
         )
-        dynamic_args = filter_static_args(args, static_argnums)
-        args_flat = tree_flatten((dynamic_args, kwargs))[0]
+        dynamic_args, dynamic_kwargs = filter_static_args(args, kwargs, static_argnums)
+        # printf"got dynamic args {dynamic_args}, dynamic_kwargs {dynamic_kwargs}")
+        flat_dynamic_sig, dynamic_in_tree = tree_flatten((dynamic_args, dynamic_kwargs))
         res_flat = quantum_kernel_p.bind(
-            flattened_fun, *args_flat, qnode=self, pipeline=tuple(pass_pipeline)
+            flattened_fun, *flat_dynamic_sig, qnode=self, pipeline=tuple(pass_pipeline)
         )
+        # print"bound kernel")
         return tree_unflatten(out_tree_promise(), res_flat)[0]
 
 

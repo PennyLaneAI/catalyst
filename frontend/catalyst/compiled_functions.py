@@ -156,15 +156,21 @@ class CompiledFunction:
         Returns:
             the return values computed by the function or None if the function has no results
         """
-
+        # print("opening shared object")
         with shared_object as lib:
+            # print("object open")
             result_desc = type(args[0].contents) if has_return else None
+            # print(f"got result description {result_desc}")
+            # print(f"wrapping {lib.function} with {args}, memtransfter is {lib.mem_transfer} and dict {numpy_dict}")
             retval = wrapper.wrap(lib.function, args, result_desc, lib.mem_transfer, numpy_dict)
+            # print("wrapped")
 
+        # print("checking out_type")
         if out_type is not None:
             keep_outputs = [k for _, k in out_type]
             retval = [r for (k, r) in zip(keep_outputs, retval) if k]
 
+        # print("cleaning retval")
         retval = [jnp.asarray(arr) for arr in retval]
         return retval
 
@@ -281,6 +287,7 @@ class CompiledFunction:
                 numpy arrays.
 
         """
+        # print(f"args_to_memref_descs args, kwargs: {args}, {kwargs}")
         numpy_arg_buffer = []
         return_value_pointer = ctypes.POINTER(ctypes.c_int)()  # This is the null pointer
 
@@ -290,6 +297,7 @@ class CompiledFunction:
         c_abi_args = []
 
         args_data, args_shape = tree_flatten((args, kwargs))
+        # print(f"args_data: {args_data}")
 
         for arg in args_data:
             numpy_arg = np.asarray(arg)
@@ -325,19 +333,24 @@ class CompiledFunction:
         return get_template(self.func_name, self.restype, *buffer)
 
     def __call__(self, *args, **kwargs):
+        # print(f"calling compiled function with args {args} and kwargs {kwargs}")
         static_argnums = self.compile_options.static_argnums
-        dynamic_args = filter_static_args(args, static_argnums)
+        dynamic_args, dynamic_kwargs = filter_static_args(args, kwargs, static_argnums)
+        # print(f"got dynamic args {dynamic_args} and kwargs {dynamic_kwargs}")
 
         if self.compile_options.abstracted_axes is not None:
+            # print("found abstracted axes")
             abstracted_axes = self.compile_options.abstracted_axes
-            dynamic_args = get_implicit_and_explicit_flat_args(
-                abstracted_axes, *dynamic_args, **kwargs
-            )
+            dynamic_args = get_implicit_and_explicit_flat_args(abstracted_axes, *args, **kwargs)
+            # print(f"got flat_dynamic_args {flat_dynamic_args}")
 
-        abi_args, _buffer = self.args_to_memref_descs(self.restype, dynamic_args, **kwargs)
+        abi_args, _buffer = self.args_to_memref_descs(self.restype, dynamic_args, **dynamic_kwargs)
+        # print(f"got abi_args {abi_args} and buffer {_buffer}")
 
         numpy_dict = {nparr.ctypes.data: nparr for nparr in _buffer}
+        # print(f"got numpy_dict {numpy_dict}")
 
+        # print("getting result")
         result = CompiledFunction._exec(
             self.shared_object,
             self.restype,
@@ -345,6 +358,8 @@ class CompiledFunction:
             numpy_dict,
             *abi_args,
         )
+
+        # print("got result")
 
         return result
 
@@ -406,7 +421,7 @@ class CompilationCache:
         self.abstracted_axes = abstracted_axes
         self.cache = {}
 
-    def get_function_status_and_key(self, args) -> tuple[TypeCompatibility, CacheKey]:
+    def get_function_status_and_key(self, args, kwargs) -> tuple[TypeCompatibility, CacheKey]:
         """Check if the provided arguments match an existing function in the cache. The cache
         status of the function is returned as a compilation action:
          - no match: requires compilation
@@ -420,28 +435,27 @@ class CompilationCache:
             TypeCompatibility
             CacheKey | None
         """
-        #print(f"getting status and key with args {args}")
         if not self.cache:
-            #print("cache was empty")
+            # print("cache was empty")
             return TypeCompatibility.NEEDS_COMPILATION, None
 
-        flat_runtime_sig, treedef, static_args = get_decomposed_signature(
-            args, self.static_argnums
+        flat_abstract_args, dynamic_in_tree, static_args = get_decomposed_signature(
+            args, kwargs, self.static_argnums
         )
-        
-        #print(f"got decomposed signature: {flat_runtime_sig}, {treedef}, {static_args}")
 
-        key = CacheKey(treedef, static_args)
+        # print(f"checking cache with shape {dynamic_in_tree} and {static_args}")
+        key = CacheKey(dynamic_in_tree, static_args)
         if key not in self.cache:
             return TypeCompatibility.NEEDS_COMPILATION, None
 
-        #print("key was in cache")
+        # print("key was in cache")
         entry = self.cache[key]
-        runtime_signature = tree_unflatten(treedef, flat_runtime_sig)
+        runtime_signature = tree_unflatten(dynamic_in_tree, flat_abstract_args)
+        # print(f"typechecking signatures with {entry.signature}, {runtime_signature}, {self.abstracted_axes}")
         action = typecheck_signatures(entry.signature, runtime_signature, self.abstracted_axes)
         return action, key
 
-    def lookup(self, args) -> tuple[CacheEntry, bool]:
+    def lookup(self, fn_args, fn_kwargs) -> tuple[CacheEntry, bool]:
         """Get a function (if present) that matches the provided argument signature. Also computes
         whether promotion is necessary.
 
@@ -452,9 +466,9 @@ class CompilationCache:
             CacheEntry | None: the matched cache entry
             bool: whether the matched entry requires argument promotion
         """
-        #print("checking cache")
-        action, key = self.get_function_status_and_key(args)
-        #print(f"status: {action, key}")
+        # print("checking cache")
+        action, key = self.get_function_status_and_key(fn_args, fn_kwargs)
+        # print(f"status: {action, key}")
 
         if action == TypeCompatibility.NEEDS_COMPILATION:
             return None, None
@@ -464,7 +478,7 @@ class CompilationCache:
             assert action == TypeCompatibility.CAN_SKIP_PROMOTION
             return self.cache[key], False
 
-    def insert(self, fn, args_and_kwargs, out_treedef, workspace):
+    def insert(self, fn, args, kwargs, out_treedef, workspace):
         """Inserts the provided function into the cache.
 
         Args:
@@ -475,12 +489,16 @@ class CompilationCache:
         """
         assert isinstance(fn, CompiledFunction)
 
-        flat_signature, treedef, static_args = get_decomposed_signature(
-            args_and_kwargs, self.static_argnums
-        )
-        signature = tree_unflatten(treedef, flat_signature)
+        # print(f"caching with args {args} and kwargs {kwargs}")
 
-        key = CacheKey(treedef, static_args)
+        flat_abstract_args, dynamic_in_tree, static_args = get_decomposed_signature(
+            args, kwargs, self.static_argnums
+        )
+
+        # print(f"caching with shape {dynamic_in_tree} and static_args {static_args}")
+        key = CacheKey(dynamic_in_tree, static_args)
+
+        signature = tree_unflatten(dynamic_in_tree, flat_abstract_args)
         entry = CacheEntry(fn, signature, out_treedef, workspace)
         self.cache[key] = entry
 

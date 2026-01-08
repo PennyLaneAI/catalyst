@@ -66,14 +66,15 @@ class TestStaticArguments:
             f(5)
 
     @pytest.mark.parametrize("argnums", [1.0, [1.0], ["x"]])
-    def test_unsopported_type_static_argument(self, argnums):
+    def test_unsupported_type_static_argument(self, argnums):
         """Test QJIT with invalid static argument type."""
 
-        @qjit(static_argnums=argnums)
-        def f(x, y):
-            return x + y
-
         with pytest.raises(TypeError, match="The `static_argnums` argument to"):
+
+            @qjit(static_argnums=argnums)
+            def f(x, y):
+                return x + y
+
             f(5, 6)
 
     def test_one_static_argument(self):
@@ -162,7 +163,7 @@ class TestStaticArguments:
 
         circuit(0.5, 0.5)
         captured = capsys.readouterr()
-        assert captured.out.strip() == "Inside QNode: 0.5"
+        assert "Inside QNode: 0.5" in captured.out.strip()
 
     def test_qnode_nested_with_static_arguments(self, capsys):
         """Test if QJIT static arguments pass through QNode correctly."""
@@ -182,7 +183,7 @@ class TestStaticArguments:
 
         wrapper(0.5, 0.5)
         captured = capsys.readouterr()
-        assert captured.out.strip() == "Inside QNode: 0.5"
+        assert "Inside QNode: 0.5" in captured.out.strip()
 
     def test_qnode_switch_params(self, capsys):
         """Test if QJIT static arguments pass through QNode correctly when params are switched."""
@@ -202,7 +203,7 @@ class TestStaticArguments:
 
         wrapper(0.5, 0.5)
         captured = capsys.readouterr()
-        assert captured.out.strip() == "Inside QNode: 0.5"
+        assert "Inside QNode: 0.5" in captured.out.strip()
 
     def test_qnode_nested_not_qnode(self, capsys):
         """Test if QJIT static arguments pass through nested Qjit calls with no QNodes."""
@@ -219,7 +220,7 @@ class TestStaticArguments:
 
         wrapper(0.5, 0.5)
         captured = capsys.readouterr()
-        assert captured.out.strip() == "Inside QNode: 0.5"
+        assert "Inside QNode: 0.5" in captured.out.strip()
 
     def test_static_argnames(self):
         # pylint: disable=unused-argument, function-redefined

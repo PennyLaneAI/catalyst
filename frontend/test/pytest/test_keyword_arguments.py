@@ -26,15 +26,80 @@ from catalyst import qjit
 class TestKeywordArguments:
     """Test QJIT with keyword arguments."""
 
-    def test_function_with_kwargs(self):
-        """Test that a function works with keyword argument."""
+    def test_function_with_no_args(self):
+        """Test qjit on a function without arguments."""
+
+        @qjit
+        def f():
+            return 19
+
+        assert f() == 19
+
+    def test_function_with_positional_args(self):
+        """Test qjit on a function with positional only arguments."""
+
+        @qjit
+        def f(x, y, z, t, /):
+            return sum([x, y, z]) * t
+
+        assert f(4, 5, 2, 3) == 33
+        # with pytest.raises(TypeError):
+        #     f(1, 2, 3, t=4)
+
+    def test_function_with_positional_or_kwargs(self):
+        """Test qjit on a function with positional or keyword arguments."""
 
         @qjit
         def f(x, y):
             return x * y
 
-        result = f(3, y=2)
-        assert result == f(2, 3)
+        assert f(4, 7) == 28
+        assert f(x=3, y=-2) == -6
+        assert f(2, y=3) == f(2, 3)
+
+    def test_function_with_var_positional(self):
+        """Test qjit on a function with variable number of positional arguments."""
+
+        @qjit
+        def f(*args):
+            return sum(args)
+
+        assert f(1) == 1
+        assert f(3, 6) == 9
+        assert f(4, 6, 8, 10) == 28
+
+    def test_function_with_keyword_only(self):
+        """Test qjit on a function with keyword only arguments."""
+
+        @qjit
+        def f(*, x=1, y=3):
+            return x - y
+
+        assert f() == -2
+        assert f(x=4) == 1
+        assert f(y=2) == -1
+
+    def test_function_with_required_keyword_only(self):
+        """Test qjit on a function with required keyword only arguments."""
+
+        @qjit
+        def f(*, x, y):
+            return x / y
+
+        assert f(x=1, y=2) == 1 / 2
+
+        # with pytest.raises(TypeError):
+        #     f(1, y=2)
+
+    def test_function_with_variable_kwargs(self):
+        """Test qjit on a function with a variable number of keyword arguments."""
+
+        @qjit
+        def f(**kwargs):
+            return sum(kwargs.values())
+
+        print(f"test output: {f(x=1)}")
+        assert f(x=1, y=4, eighteen=18, nineteen=19) == 42
 
     def test_function_with_kwargs_partial(self):
         """Test that a function works with keyword argument."""
@@ -59,7 +124,7 @@ class TestKeywordArguments:
 
         assert jnp.allclose(circuit(0.5, c=0.5), circuit(0.5, 0.5))
 
-    def test_qnode_with_kwargs_swich_order(self, backend):
+    def test_qnode_with_kwargs_switch_order(self, backend):
         """Test that a qnode works with keyword argument."""
         dev = qml.device(backend, wires=1)
 
