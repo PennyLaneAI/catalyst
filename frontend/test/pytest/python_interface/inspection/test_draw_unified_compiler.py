@@ -576,6 +576,27 @@ class TestDrawGraph:
         with pytest.raises(ValueError, match="The 'level' argument must be a positive integer"):
             _ = draw_graph(qjit_qnode, level=-1)()
 
+    def test_level_greater_than_num_of_passes(self):
+        """Tests that a user warning is raised if the level is greater than number of passes."""
+
+        @qml.qjit
+        @qml.transforms.merge_rotations
+        @qml.transforms.cancel_inverses
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def circuit():
+            qml.H(0)
+            qml.T(1)
+            qml.H(0)
+            qml.RX(0.1, wires=0)
+            qml.RX(0.2, wires=0)
+            return qml.expval(qml.X(0))
+
+        with pytest.warns(
+            UserWarning,
+            match="Level requested \(100\) is higher than the number of compilation passes present: 2",
+        ):
+            _ = draw_graph(circuit, level=100)()
+
     def test_unsupported_qnode(self):
         """Tests that only qjit'd qnodes are allowed to be visualized."""
 
