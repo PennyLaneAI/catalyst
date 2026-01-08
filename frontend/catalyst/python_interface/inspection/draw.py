@@ -129,9 +129,9 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         compiled IR.
 
         As such, use of ``draw_graph`` requires installation of
-        `Graphviz <https://graphviz.org/download/>`_ and the
-        `pydot <https://pypi.org/project/pydot/>`_ software package. Please consult the links
-        provided for installation instructions.
+        `Graphviz <https://graphviz.org/download/>`_,
+        `pydot <https://pypi.org/project/pydot/>`_, and `matplotlib <https://matplotlib.org/stable/install/index.html>`_ software packages. 
+        Please consult the links provided for installation instructions.
 
         Additionally, it is recommended to use ``draw_graph`` with PennyLane's program capture
         enabled (see :func:`qml.capture.enable <pennylane.capture.enable>`).
