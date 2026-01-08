@@ -226,6 +226,7 @@
   [(#2233)](https://github.com/PennyLaneAI/catalyst/pull/2233)
   [(#2284)](https://github.com/PennyLaneAI/catalyst/pull/2284)
   [(#2336)](https://github.com/PennyLaneAI/catalyst/pull/2336)
+  [(#2360)](https://github.com/PennyLaneAI/catalyst/pull/2360)
 
 
   :class:`~.PauliRot` and :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes
@@ -430,6 +431,11 @@
 * The pass `remove-chained-self-inverse` has been renamed to `cancel-inverses`, to better
   conform with the name of the corresponding transform in PennyLane.
   [(#2201)](https://github.com/PennyLaneAI/catalyst/pull/2201)
+
+* The `to-ppr` pass now automatically runs canonicalization patterns after converting quantum
+  operations to Pauli Product Rotation (PPR) form. This removes identity Pauli rotations
+  (e.g., `["I", "I", "I"]`) automatically, simplifying the resulting IR.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
 
 <h3>Deprecations 👋</h3>
 

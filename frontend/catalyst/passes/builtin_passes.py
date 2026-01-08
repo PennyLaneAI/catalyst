@@ -749,6 +749,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
 
         @qml.qjit(target="mlir")
         @partial(qml.transforms.commute_ppr, max_pauli_size=2)
+        @qml.transforms.to_ppr
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
 
@@ -839,6 +840,7 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
 
         @qml.qjit(target="mlir")
         @partial(qml.transforms.merge_ppr_ppm, max_pauli_size=2)
+        @qml.transforms.to_ppr
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
@@ -934,7 +936,8 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
         qml.capture.enable()
 
         @qml.qjit(target="mlir")
-        @partial(ppr_to_ppm, decompose_method="auto-corrected")
+        @partial(qml.transforms.ppr_to_ppm, decompose_method="auto-corrected")
+        @qml.transforms.to_ppr
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             # equivalent to a Hadamard gate
