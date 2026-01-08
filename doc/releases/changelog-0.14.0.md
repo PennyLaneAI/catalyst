@@ -17,6 +17,7 @@
   [(#2243)](https://github.com/PennyLaneAI/catalyst/pull/2243)
   [(#2340)](https://github.com/PennyLaneAI/catalyst/pull/2340)
   [(#2357)](https://github.com/PennyLaneAI/catalyst/pull/2357)
+  [(#2363)](https://github.com/PennyLaneAI/catalyst/pull/2363)
 
   Consider the following circuit:
 

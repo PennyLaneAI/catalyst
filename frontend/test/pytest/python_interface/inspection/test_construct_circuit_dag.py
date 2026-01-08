@@ -850,7 +850,8 @@ class TestCreateStaticOperatorNodes:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_circuit():
-            qml.QubitUnitary(jax.numpy.array([[0, 1], [1, 0]]), wires=0)
+            qml.QubitUnitary(jax.numpy.array([[0, 1], [1, 0]]), wires=0)  # real
+            qml.QubitUnitary(jax.numpy.array([[1, 0], [0, 1j]]), wires=0)  # complex
 
         module = my_circuit()
 
@@ -860,9 +861,10 @@ class TestCreateStaticOperatorNodes:
 
         # Ensure DAG only has one node
         nodes = utility.dag_builder.nodes
-        assert len(nodes) == 2  # Device node + operator
+        assert len(nodes) == 3  # Device node + operators
 
         assert nodes["node1"]["label"] == get_label(qml.QubitUnitary([[0, 1], [1, 0]], wires=0))
+        assert nodes["node2"]["label"] == get_label(qml.QubitUnitary([[1, 0], [0, 1j]], wires=0))
 
     def test_multi_rz_op(self):
         """Test that MultiRZ operations can be handled."""
@@ -1517,6 +1519,35 @@ class TestCreateDynamicMeasurementNodes:
 @pytest.mark.usefixtures("use_both_frontend")
 class TestOperatorConnectivity:
     """Tests that operators are properly connected."""
+
+    def test_global_phase_connectivity(self):
+        """Tests the connectivity of the global phase operator."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            qml.X(0)
+            qml.GlobalPhase(0.5)
+            qml.Y(1)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        expected_edges = (
+            ("NullQubit", "PauliX"),
+            ("PauliX", "GlobalPhase", {"style": "dashed"}),
+            ("GlobalPhase", "PauliY"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
 
     def test_static_connection_within_cluster(self):
         """Tests that connections can be made within the same cluster."""
