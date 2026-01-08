@@ -19,10 +19,11 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "QEC/IR/QECDialect.h"
-#include "QEC/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
+
+#include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOps.h"
+#include "QEC/Transforms/Patterns.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
