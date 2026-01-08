@@ -850,7 +850,8 @@ class TestCreateStaticOperatorNodes:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_circuit():
-            qml.QubitUnitary(jax.numpy.array([[0, 1], [1, 0]]), wires=0)
+            qml.QubitUnitary(jax.numpy.array([[0, 1], [1, 0]]), wires=0) # real
+            qml.QubitUnitary(jax.numpy.array([[1, 0], [0, 1j]]), wires=0) # complex
 
         module = my_circuit()
 
@@ -860,9 +861,10 @@ class TestCreateStaticOperatorNodes:
 
         # Ensure DAG only has one node
         nodes = utility.dag_builder.nodes
-        assert len(nodes) == 2  # Device node + operator
+        assert len(nodes) == 3  # Device node + operators
 
         assert nodes["node1"]["label"] == get_label(qml.QubitUnitary([[0, 1], [1, 0]], wires=0))
+        assert nodes["node2"]["label"] == get_label(qml.QubitUnitary([[1, 0], [0, 1j]], wires=0))
 
     def test_multi_rz_op(self):
         """Test that MultiRZ operations can be handled."""
