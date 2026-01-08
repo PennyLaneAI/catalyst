@@ -226,6 +226,7 @@
   [(#2233)](https://github.com/PennyLaneAI/catalyst/pull/2233)
   [(#2284)](https://github.com/PennyLaneAI/catalyst/pull/2284)
   [(#2336)](https://github.com/PennyLaneAI/catalyst/pull/2336)
+  [(#2360)](https://github.com/PennyLaneAI/catalyst/pull/2360)
 
 
   :class:`~.PauliRot` and :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes
