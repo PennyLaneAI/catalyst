@@ -365,7 +365,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
 
         max_level = max(cache.keys())
 
-        if max_level and level > max_level:
+        if max_level and isinstance(level, int) and level > max_level:
             warnings.warn(
                 f"Level requested ({level}) is higher than the number of compilation passes present: {max_level}."
             )
