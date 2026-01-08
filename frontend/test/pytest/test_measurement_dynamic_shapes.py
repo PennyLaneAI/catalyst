@@ -69,7 +69,7 @@ def test_dynamic_counts(capfd):
         @qml.qnode(device)
         def circuit():
             qml.RX(1.5, 0)
-            return qml.counts()
+            return qml.counts(all_outcomes=True)
 
         return circuit()
 

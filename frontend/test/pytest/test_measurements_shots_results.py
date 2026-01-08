@@ -616,7 +616,7 @@ class TestOtherMeasurements:
 
         @qml.qnode(dev)
         def circuit():
-            return meas_fun(wires=0)
+            return meas_fun(wires=0, **({"all_outcomes": True} if meas_fun is qml.counts else {}))
 
         if qml.capture.enabled():
             with pytest.raises(ValueError, match="finite shots are required"):
@@ -636,7 +636,7 @@ class TestOtherMeasurements:
             qml.RY(x, wires=0)
             return (
                 qml.sample(),
-                qml.counts(),
+                qml.counts(all_outcomes=True),
                 qml.expval(qml.PauliZ(0)),
                 qml.var(qml.PauliZ(0)),
                 qml.probs(wires=[0, 1]),

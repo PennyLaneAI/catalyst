@@ -120,7 +120,7 @@ class TestCounts:
         @qml.set_shots(10)
         @qml.qnode(qml.device("lightning.qubit", wires=0))
         def counts_0qbit():
-            return qml.counts()
+            return qml.counts(all_outcomes=True)
 
         expected = [np.array([0]), np.array([10])]
         observed = counts_0qbit()
@@ -135,7 +135,7 @@ class TestCounts:
         @qml.qnode(qml.device(backend, wires=1), mcm_method=mcm_method)
         def counts_1qbit(x: float):
             qml.RX(x, wires=0)
-            return qml.counts()
+            return qml.counts(all_outcomes=True)
 
         expected = [np.array([0, 1]), np.array([1000, 0])]
         observed = counts_1qbit(0.0)
@@ -155,7 +155,7 @@ class TestCounts:
         def counts_2qbit(x: float):
             qml.RX(x, wires=0)
             qml.RY(x, wires=1)
-            return qml.counts()
+            return qml.counts(all_outcomes=True)
 
         expected = [np.array([0, 1, 2, 3]), np.array([1000, 0, 0, 0])]
         observed = counts_2qbit(0.0)
@@ -174,7 +174,7 @@ class TestCounts:
         def counts_2qbit(x: float, y: float):
             qml.RX(x, wires=0)
             qml.RX(y, wires=1)
-            return qml.counts()
+            return qml.counts(all_outcomes=True)
 
         expected = [np.array([0, 1, 2, 3]), np.array([0, 0, 1000, 0])]
         observed = counts_2qbit(np.pi, 0)
@@ -212,7 +212,7 @@ class TestCounts:
         @qml.qnode(qml.device("lightning.qubit"), mcm_method=mcm_method)
         def counts_dynamic_wires():
             qml.Hadamard(wires=1)
-            return qml.counts()
+            return qml.counts(all_outcomes=True)
 
         if qml.capture.enabled():
             with pytest.raises(
@@ -1294,7 +1294,7 @@ class TestNullQubitMeasurements:
         def circuit_counts():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)
-            return qml.counts()
+            return qml.counts(all_outcomes=True)
 
         # Explicitly define expected result for counts since qjit outputs results in different
         # format than native PennyLane
@@ -1315,7 +1315,7 @@ class TestNullQubitMeasurements:
         def circuit_counts():
             qml.Hadamard(wires=0)
             qml.Hadamard(wires=1)
-            return qml.counts(wires=0), qml.counts(wires=1)
+            return qml.counts(wires=0, all_outcomes=True), qml.counts(wires=1, all_outcomes=True)
 
         # Explicitly define expected result for counts since qjit outputs results in different
         # format than native PennyLane
