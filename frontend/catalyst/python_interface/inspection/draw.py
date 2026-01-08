@@ -116,6 +116,7 @@ def draw(qnode: QNode, *, level: int | None = None) -> Callable:
     return wrapper
 
 
+# pylint: disable=line-too-long
 def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     """
     Visualize a single QJIT compiled QNode, showing wire flow through quantum operations,
@@ -129,12 +130,22 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         compiled IR.
 
         As such, use of ``draw_graph`` requires installation of
-        `Graphviz <https://graphviz.org/download/>`_ and the
-        `pydot <https://pypi.org/project/pydot/>`_ software package. Please consult the links
-        provided for installation instructions.
+        `Graphviz <https://graphviz.org/download/>`_,
+        `pydot <https://pypi.org/project/pydot/>`_, and `matplotlib <https://matplotlib.org/stable/install/index.html>`_ software packages.
+        Please consult the links provided for installation instructions.
 
         Additionally, it is recommended to use ``draw_graph`` with PennyLane's program capture
         enabled (see :func:`qml.capture.enable <pennylane.capture.enable>`).
+
+    .. warning::
+
+        This function only visualizes quantum operations contained in workflows involving a single
+        ``qjit``-compiled QNode. Workflows involving multiple QNodes or operations outside QNodes
+        cannot yet be visualized.
+
+        Only transformations found within the Catalyst compiler can be visualized. Any PennyLane
+        tape transform will have already been applied before lowering to MLIR and will appear as
+        the base state (``level=0``) in this visualization.
 
     Args:
         qnode (QJIT):
@@ -153,16 +164,16 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         VisualizationError:
             If the circuit contains operations that cannot be converted to a graphical
             representation.
+        TypeError:
+            If the ``level`` argument is not of type integer or ``None``. If the input ``QNode`` is not
+            qjit-compiled.
+        ValueError:
+            If the ``level`` argument is a negative integer.
 
-    .. warning::
-
-        This function only visualizes quantum operations contained in workflows involving a single
-        ``qjit``-compiled QNode. Workflows involving multiple QNodes or operations outside QNodes
-        cannot yet be visualized.
-
-        Only transformations found within the Catalyst compiler can be visualized. Any PennyLane
-        tape transform will have already been applied before lowering to MLIR and will appear as
-        the base state (``level=0``) in this visualization.
+    Warns:
+        UserWarning:
+            If the ``level`` argument provided is larger than the number of passes present in the
+            compilation pipeline.
 
     **Example**
 
@@ -300,6 +311,8 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
 
     if not isinstance(level, (int, type(None))):
         raise TypeError("The 'level' argument must be an integer or 'None'.")
+    if isinstance(level, int) and level < 0:
+        raise ValueError("The 'level' argument must be a positive integer.")
 
     max_level = None
     if isinstance(level, int):
@@ -351,6 +364,12 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
             pass
 
         max_level = max(cache.keys())
+
+        if max_level and isinstance(level, int) and level > max_level:
+            warnings.warn(
+                f"Level requested ({level}) is higher than the number of compilation passes present: {max_level}."
+            )
+
         dot_string, _ = cache.get(level, cache[max_level])
         # TODO:  Remove dependency on PyDot
         (graph,) = pydot.graph_from_dot_data(dot_string)
