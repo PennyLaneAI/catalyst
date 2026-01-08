@@ -18,7 +18,6 @@ from copy import deepcopy
 from functools import singledispatch, singledispatchmethod
 from typing import Sequence
 
-import numpy as np
 from pennylane.measurements import (
     ExpectationMP,
     MeasurementProcess,
