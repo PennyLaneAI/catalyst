@@ -21,7 +21,6 @@ from collections.abc import Callable
 from functools import wraps
 from shutil import which
 
-from jaxlib.mlir.ir import Value
 from pennylane.tape import QuantumScript
 from pennylane.workflow.qnode import QNode
 from xdsl.dialects.builtin import ModuleOp
