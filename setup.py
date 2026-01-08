@@ -200,14 +200,14 @@ class UnifiedBuildExt(build_ext):
         1. `get_ext_filename`, in order to remove the architecture/python
            version suffix of the library name.
         2. `build_extension`, in order to handle the compilation of extensions
-           with CMake configurations, namely the catalyst.utils.wrapper module,
-           and of generic C/C++ extensions without a CMake configuration, namely
-           the catalyst.utils.libcustom_calls module, which is currently built
-           as a plain setuptools Extension.
+           with CMake configurations, namely the catalyst.utils.wrapper and the
+           catalyst.default_pipelines modules, and of generic C/C++ extensions
+           without a CMake configuration, namely the catalyst.utils.libcustom_calls
+           module, which is currently built as a plain setuptools Extension.
 
     TODO: Eventually it would be better to build the utils.libcustom_calls
-    module using a CMake configuration as well, rather than as a setuptools
-    Extension.
+      module using a CMake configuration as well, rather than as a setuptools
+      Extension.
     """
 
     def initialize_options(self):
@@ -366,6 +366,7 @@ frontend_dir = os.path.join(project_root_dir, "frontend")
 ext_modules = [
     custom_calls_extension,
     CMakeExtension("catalyst.utils.wrapper", sourcedir=frontend_dir),
+    CMakeExtension("catalyst.default_pipelines", sourcedir=frontend_dir),
 ]
 
 options = {"bdist_wheel": {"py_limited_api": "cp312"}} if sys.hexversion >= 0x030C0000 else {}
