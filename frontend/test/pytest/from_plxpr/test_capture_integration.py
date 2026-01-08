@@ -1376,7 +1376,6 @@ class TestCapture:
         qml.capture.disable()
 
         # Capture disabled
-        @qjit
         @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: float, y: float, z: float):
@@ -1389,7 +1388,12 @@ class TestCapture:
             cond_fn()
             return qml.expval(qml.PauliZ(0))
 
-        assert jnp.allclose(circuit(1.5, 2.5, 3.5), capture_result)
+        # non-capture pathway is not actively developed and raises unnecessary warnings (wontfix)
+        with pytest.warns(UserWarning, match="MidCircuitMeasure does not define a decomposition"):
+            with pytest.warns(UserWarning, match="Cond does not define a decomposition"):
+                non_capture_result = qjit(circuit)(1.5, 2.5, 3.5)
+
+        assert jnp.allclose(non_capture_result, capture_result)
 
     def test_transform_single_qubit_fusion_workflow(self, backend):
         """Test the integration for a circuit with a 'single_qubit_fusion' transform."""
