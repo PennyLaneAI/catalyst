@@ -4,6 +4,10 @@ add_mlir_doc(QuantumDialect QuantumDialect Quantum/ -gen-dialect-doc)
 add_mlir_doc(QuantumOps QuantumOps Quantum/ -gen-op-doc)
 add_mlir_doc(QuantumInterfaces QuantumInterfaces Quantum/ -gen-op-interface-docs)
 
+set(LLVM_TARGET_DEFINITIONS QuantumTypeInterfaces.td)
+mlir_tablegen(QuantumTypeInterfaces.h.inc -gen-type-interface-decls)
+mlir_tablegen(QuantumTypeInterfaces.cpp.inc -gen-type-interface-defs)
+
 set(LLVM_TARGET_DEFINITIONS QuantumAttrDefs.td)
 mlir_tablegen(QuantumEnums.h.inc -gen-enum-decls)
 mlir_tablegen(QuantumEnums.cpp.inc -gen-enum-defs)

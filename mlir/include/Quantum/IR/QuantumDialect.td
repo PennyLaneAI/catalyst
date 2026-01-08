@@ -18,6 +18,8 @@
 include "mlir/IR/DialectBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
+include "Quantum/IR/QuantumTypeInterfaces.td"
+
 //===----------------------------------------------------------------------===//
 // Quantum dialect.
 //===----------------------------------------------------------------------===//
@@ -56,6 +58,32 @@ def QuantumDialect : Dialect {
 
 def Unitary : NativeOpTrait<"UnitaryTrait">;
 def Hermitian : NativeOpTrait<"HermitianTrait">;
+
+// Hierarchical qubit types for FTQC workloads
+def LogicalQubitType : Quantum_Type<"LogicalQubit", "bit.logical", [QubitTypeInterface]> {
+    let summary = "Logical qubit";
+    let description = [{
+        Values with logical qubit type represent qubits at the logical layer of program
+        representation. In other words, they represent qubit values allocated and acted on by the
+        user program, and are agnostic to any specific QEC or hardware architecture.
+    }];
+}
+
+def QECQubitType : Quantum_Type<"QECQubit", "bit.qec", [QubitTypeInterface]> {
+    let summary = "QEC qubit";
+    let description = [{
+        Values with QEC qubit type represent qubits at the quantum-error-corrected (QEC) layer of
+        program representation.
+    }];
+}
+
+def PhysicalQubitType : Quantum_Type<"PhysicalQubit", "bit.physical", [QubitTypeInterface]> {
+    let summary = "Physical qubit";
+    let description = [{
+        Values with physical qubit type represent qubits at the physical layer of program
+        representation.
+    }];
+}
 
 //===----------------------------------------------------------------------===//
 // Quantum resource abstractions.

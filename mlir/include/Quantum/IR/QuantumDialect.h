@@ -31,6 +31,11 @@
 // Quantum resource abstractions declarations.
 //===----------------------------------------------------------------------===//
 
+#include "Quantum/IR/QuantumTypeInterfaces.h.inc"
+
+#define GET_TYPEDEF_CLASSES
+#include "Quantum/IR/QuantumOpsTypes.h.inc"
+
 class QuantumMemory : public mlir::SideEffects::Resource::Base<QuantumMemory> {
     llvm::StringRef getName() final { return "QuantumMemory"; }
 };
