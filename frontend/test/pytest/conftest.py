@@ -16,8 +16,10 @@ Pytest configuration file for Catalyst test suite.
 """
 
 import os
+from importlib.util import find_spec
 from tempfile import TemporaryDirectory
 from textwrap import dedent
+from warnings import warn
 
 import pennylane as qml
 import pytest
@@ -80,17 +82,19 @@ def use_both_frontend(request):
         yield
 
 
-@pytest.fixture(scope="function")
-def requires_xdsl():
-    """Fixture that ensures xdsl is available. It skips the test if xdsl is not installed."""
-    pytest.importorskip("xdsl", reason="xdsl is not installed, skipping test")
-    pytest.importorskip("xdsl_jax", reason="xdsl-jax is not installed, skipping test")
-
-
 def pytest_collection_modifyitems(items, config):  # pylint: disable=unused-argument
     """Modify collected items as needed."""
     # Tests that do not have a specific suite marker are marked `core`
     for item in items:
         markers = {mark.name for mark in item.iter_markers()}
-        if "xdsl" in markers and "requires_xdsl" not in item.fixturenames:
-            item.fixturenames.append("requires_xdsl")
+        if "xdsl" in markers:
+            # If filecheck is not installed, the xDSL lit tests get skipped silently. This
+            # warning will provide verbosity to testers.
+            if not find_spec("filecheck"):
+                warn(
+                    "The 'filecheck' Python package must be installed to use fixtures for "
+                    "lit testing xDSL features. Otherwise, tests using the 'run_filecheck' "
+                    "or 'run_filecheck_qjit' fixtures will be skipped.",
+                    UserWarning,
+                )
+                break
