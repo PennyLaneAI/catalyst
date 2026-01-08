@@ -435,7 +435,7 @@
 * The `to-ppr` pass now automatically runs canonicalization patterns after converting quantum
   operations to Pauli Product Rotation (PPR) form. This removes identity Pauli rotations
   (e.g., `["I", "I", "I"]`) automatically, simplifying the resulting IR.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#2367)](https://github.com/PennyLaneAI/catalyst/pull/2367)
 
 <h3>Deprecations 👋</h3>
 
