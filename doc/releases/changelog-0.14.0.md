@@ -2,7 +2,7 @@
 
 <h3>New features since last release</h3>
 
-* Programs compiled with ``qjit`` can now be visualized with :func:`~.draw_graph`, allowing for 
+* Programs compiled with ``qjit`` can now be visualized with :func:`~.draw_graph`, allowing for
   sequentially analyzing impacts of compilation passes on structured and dynamic programs.
   [(#2213)](https://github.com/PennyLaneAI/catalyst/pull/2213)
   [(#2229)](https://github.com/PennyLaneAI/catalyst/pull/2229)
@@ -33,8 +33,8 @@
   def circuit(x, y):
       qml.X(0)
       qml.Y(1)
-      qml.H(x) 
-      
+      qml.H(x)
+
       for i in range(3):
           qml.S(0)
           qml.RX(0.1, wires=1)
@@ -51,7 +51,7 @@
       return qml.expval(qml.Z(y))
   ```
 
-  The circuit structure (``for`` loop and conditional branches) along with the dynamicism can be 
+  The circuit structure (``for`` loop and conditional branches) along with the dynamicism can be
   succinctly represented with :func:`~.draw_graph`.
 
   ```pycon
@@ -61,10 +61,10 @@
   ```
   ![Graphical representation of circuit with dynamicism and structure](../../doc/_static/catalyst-draw-graph-changelog-0.14-example.png)
 
-  By default, all compilation passes specified will be applied and visualized. However, 
-  :func:`~.draw_graph` can be used with the ``level`` argument to inspect compilation pass impacts, 
-  where the ``level`` value denotes the cumulative set of applied compilation transforms (in the 
-  order they appear) to be applied and visualized. With ``level=1``, drawing the above circuit will 
+  By default, all compilation passes specified will be applied and visualized. However,
+  :func:`~.draw_graph` can be used with the ``level`` argument to inspect compilation pass impacts,
+  where the ``level`` value denotes the cumulative set of applied compilation transforms (in the
+  order they appear) to be applied and visualized. With ``level=1``, drawing the above circuit will
   apply the ``merge_rotation`` transform only:
 
   ```pycon
@@ -76,16 +76,16 @@
   The :func:`~.draw_graph` function visualizes QNodes in a similar manner as
   `view-op-graph in traditional MLIR <https://mlir.llvm.org/docs/Passes/#-view-op-graph>`_,
   which leverages `Graphviz <https://graphviz.org/download/>`_ to show data-flow in compiled
-  programs. As such, use of :func:`~.draw_graph` requires installation of 
+  programs. As such, use of :func:`~.draw_graph` requires installation of
   `Graphviz <https://graphviz.org/download/>`_ and the
-  `pydot <https://pypi.org/project/pydot/>`_ software package. Please consult the links provided for 
-  installation instructions. Additionally, it is recommended to use :func:`~.draw_graph` with 
+  `pydot <https://pypi.org/project/pydot/>`_ software package. Please consult the links provided for
+  installation instructions. Additionally, it is recommended to use :func:`~.draw_graph` with
   PennyLane's program capture enabled (see :func:`qml.capture.enable <pennylane.capture.enable>`).
 
   [(#2298)](https://github.com/PennyLaneAI/catalyst/pull/2298)
   [(#2290)](https://github.com/PennyLaneAI/catalyst/pull/2290)
   [(#2309)](https://github.com/PennyLaneAI/catalyst/pull/2309)
-  
+
 * A new `gridsynth` pass is added to support Clifford+T decomopsition. This pass discretizes `RZ` and `PhaseShift` gates to either the Clifford+T basis or to the PPR basis. The pass also supports decomposing single-qubit arbitrary angle PPR in the Z basis.
   [(#2140)](https://github.com/PennyLaneAI/catalyst/pull/2140)
   [(#2166)](https://github.com/PennyLaneAI/catalyst/pull/2166)
@@ -284,13 +284,13 @@
   }
   ```
 
-* A new transform called :func:`~catalyst.passes.decompose_arbitrary_ppr` pass has been added, 
-  which decomposes abitrary-angle Pauli product rotations (PPRs) as outlined in Figure 13(d) from 
+* A new transform called :func:`~catalyst.passes.decompose_arbitrary_ppr` pass has been added,
+  which decomposes abitrary-angle Pauli product rotations (PPRs) as outlined in Figure 13(d) from
   `arXiv:2211.15465 <https://arxiv.org/abs/2211.15465>`_.
   [(#2304)](https://github.com/PennyLaneAI/catalyst/pull/2304)
   [(#2354)](https://github.com/PennyLaneAI/catalyst/pull/2354)
 
-  The ``decompose_arbitrary_ppr`` will decompose an arbitrary-angle PPR into a collection of PPRs, 
+  The ``decompose_arbitrary_ppr`` will decompose an arbitrary-angle PPR into a collection of PPRs,
   PPMs, and a single-qubit arbitrary PPR in the ``Z`` basis:
 
   ```python
@@ -538,6 +538,10 @@
   on devices that support analytical execution.
   [(#2281)](https://github.com/PennyLaneAI/catalyst/pull/2281)
 
+* Fix incorrect detection of tracer wires in the frontend. Previously, NumPy integers would be
+  detected as dynamic wires leading to unnecessary instructions in the program IR.
+  [(#2361)](https://github.com/PennyLaneAI/catalyst/pull/2361)
+
 * Fixes a bug where `qml.vjp` and `qml.jvp` were not working with autograph.
   [(#2345)](https://github.com/PennyLaneAI/catalyst/pull/2345)
 
@@ -632,7 +636,7 @@
   This pass now merges PPRs with equivalent angles, and cancels PPRs with opposite angles, or
   angles that sum to identity when the angles are known. The pass also supports conditions on PPRs,
   merging when conditions are identical and not merging otherwise.
-  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)	
+  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)
   [(#2245)](https://github.com/PennyLaneAI/catalyst/pull/2245)
   [(#2254)](https://github.com/PennyLaneAI/catalyst/pull/2254)
   [(#2258)](https://github.com/PennyLaneAI/catalyst/pull/2258)
