@@ -1097,7 +1097,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit(target="mlir")
+        @qjit
         @qml.transforms.cancel_inverses
         @qml.qnode(qml.device(backend, wires=1))
         def captured_circuit(x: float):
@@ -1131,7 +1131,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit(target="mlir")
+        @qjit
         @qml.transforms.merge_rotations
         @qml.qnode(qml.device(backend, wires=1))
         def captured_circuit(x: float):
@@ -1175,15 +1175,13 @@ class TestCapture:
             return qml.expval(qml.PauliZ(0))
 
         captured_inverses_rotations = qjit(
-            qml.transforms.cancel_inverses(qml.transforms.merge_rotations(captured_circuit)),
-            target="mlir",
+            qml.transforms.cancel_inverses(qml.transforms.merge_rotations(captured_circuit))
         )
         captured_inverses_rotations_result = captured_inverses_rotations(0.1)
         assert has_catalyst_transforms(captured_inverses_rotations.mlir)
 
         captured_rotations_inverses = qjit(
             qml.transforms.merge_rotations(qml.transforms.cancel_inverses(captured_circuit)),
-            target="mlir",
         )
         captured_rotations_inverses_result = captured_rotations_inverses(0.1)
         assert has_catalyst_transforms(captured_rotations_inverses.mlir)
@@ -1223,10 +1221,10 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit(target="mlir")
+        @qjit
         @qml.transforms.unitary_to_rot
         @qml.qnode(qml.device(backend, wires=1))
-        def captured_circuit(U: ShapedArray([2, 2], float)):
+        def captured_circuit(U: ShapedArray([2, 2], complex)):
             qml.QubitUnitary(U, 0)
             return qml.expval(qml.Z(0))
 
@@ -1240,7 +1238,7 @@ class TestCapture:
         @qjit
         @qml.transforms.unitary_to_rot
         @qml.qnode(qml.device(backend, wires=1))
-        def circuit(U: ShapedArray([2, 2], float)):
+        def circuit(U: ShapedArray([2, 2], complex)):
             qml.QubitUnitary(U, 0)
             return qml.expval(qml.Z(0))
 
@@ -1257,7 +1255,7 @@ class TestCapture:
         qml.capture.enable()
 
         @qml.qnode(qml.device(backend, wires=1))
-        def captured_circuit(U: ShapedArray([2, 2], float)):
+        def captured_circuit(U: ShapedArray([2, 2], complex)):
             qml.QubitUnitary(U, 0)
             qml.Hadamard(wires=0)
             qml.Hadamard(wires=0)
@@ -1268,7 +1266,6 @@ class TestCapture:
 
         captured_inverses_unitary = qjit(
             qml.transforms.cancel_inverses(qml.transforms.unitary_to_rot(captured_circuit)),
-            target="mlir",
         )
         captured_inverses_unitary_result = captured_inverses_unitary(U.matrix())
 
@@ -1283,7 +1280,6 @@ class TestCapture:
 
         captured_unitary_inverses = qjit(
             qml.transforms.unitary_to_rot(qml.transforms.cancel_inverses(captured_circuit)),
-            target="mlir",
         )
         captured_unitary_inverses_result = captured_unitary_inverses(U.matrix())
 
@@ -1299,17 +1295,17 @@ class TestCapture:
         # Capture disabled
 
         @qml.qnode(qml.device(backend, wires=1))
-        def circuit(U: ShapedArray([2, 2], float)):
+        def circuit(U: ShapedArray([2, 2], complex)):
             qml.QubitUnitary(U, 0)
             qml.Hadamard(wires=0)
             qml.Hadamard(wires=0)
             return qml.expval(qml.PauliZ(0))
 
         inverses_unitary_result = qjit(
-            qml.transforms.cancel_inverses(qml.transforms.unitary_to_rot(captured_circuit))
+            qml.transforms.cancel_inverses(qml.transforms.unitary_to_rot(circuit))
         )(U.matrix())
         unitary_inverses_result = qjit(
-            qml.transforms.unitary_to_rot(qml.transforms.cancel_inverses(captured_circuit))
+            qml.transforms.unitary_to_rot(qml.transforms.cancel_inverses(circuit))
         )(U.matrix())
 
         assert (
@@ -1326,7 +1322,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit(target="mlir")
+        @qjit
         @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
         @qml.qnode(qml.device(backend, wires=2))
         def captured_circuit(x: float, y: float, z: float):
@@ -1357,7 +1353,7 @@ class TestCapture:
         qml.capture.enable()
         qml.decomposition.enable_graph()
 
-        @qjit(target="mlir")
+        @qjit
         @partial(qml.transforms.decompose, gate_set=[qml.RX, qml.RY, qml.RZ])
         @qml.qnode(qml.device(backend, wires=2))
         def captured_circuit(x: float, y: float, z: float):
@@ -1402,7 +1398,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit(target="mlir")
+        @qjit
         @qml.transforms.single_qubit_fusion
         @qml.qnode(qml.device(backend, wires=1))
         def captured_circuit():
@@ -1441,7 +1437,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit(target="mlir")
+        @qjit
         @partial(qml.transforms.commute_controlled, direction="left")
         @qml.qnode(qml.device(backend, wires=3))
         def captured_circuit():
@@ -1488,7 +1484,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit(target="mlir")
+        @qjit
         @qml.transforms.merge_amplitude_embedding
         @qml.qnode(qml.device(backend, wires=2))
         def captured_circuit():
@@ -1520,7 +1516,7 @@ class TestCapture:
 
         qml.capture.enable()
 
-        @qjit(target="mlir")
+        @qjit
         @qml.set_shots(10)
         @qml.qnode(qml.device(backend, wires=2))
         def captured_circuit():
