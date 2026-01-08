@@ -116,6 +116,7 @@ def draw(qnode: QNode, *, level: int | None = None) -> Callable:
     return wrapper
 
 
+# pylint: disable=line-too-long
 def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     """
     Visualize a single QJIT compiled QNode, showing wire flow through quantum operations,
