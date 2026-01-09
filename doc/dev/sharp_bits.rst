@@ -1286,23 +1286,24 @@ Currently, however, this is not the case for the following functionalities.
   behaves differently when Catalyst is present or not. In particular:
 
   - The ``state`` and ``restored`` keyword arguments of ``qml.allocate()`` are
-    ignored in Catalyst. This is because Catalyst's ``quantum.alloc`` operation
-    always asks the device to allocate a wire in the zero state. Therefore, there
-    is no need to request wires in the zero state, nor is there a need to keep
-    track of whether wires were restored in the zero state or not.
+    ignored in Catalyst. The reason is that the only supported mode is to always allocate in the
+    zero state.
 
   - Related to the above point, in PennyLane, dynamic wire allocations do not
     increase the total number of wires used in the circuit. This is because
-    PennyLane treats the number of wires during device
-    initialization (the ``qml.device("...", wires=N)``) as the device capacity.
-    Briefly, when ``qml.allocate()`` is encountered, PennyLane looks into the pool
-    of existing wires and chooses a suitable set of wires that is currently unused
-    as the result of the allocation, instead of requesting additional wires from
-    the device. However, Catalyst treats this number as the initial number of
-    wires requested, and future allocations will request additional wires on top
-    of the initial ones. This will cause a performance difference, specifically in
-    memory usage, when using dynamic wire allocations with and without Catalyst.
-
+    PennyLane treats the number of wires during device initialization (the 
+    ``qml.device("...", wires=N)``) as the device capacity. Briefly, when 
+    ``qml.allocate()`` is encountered, PennyLane looks into the pool of existing
+    wires and chooses a suitable set of wires that is currently unused as the 
+    result of the allocation, instead of requesting additional wires from the 
+    device. However, Catalyst treats device wires as completely separate from 
+    wires that are requested via ``qml.allocate``; they are two separate pools
+    of memory, where wires requested with ``qml.allocate`` are in addition to
+    initial ones from ``qml.device``. If the pool of wires from ``device`` is
+    called "device" and the pool of wires from ``qml.allocate`` is called 
+    "dynamic", future calls to ``qml.allocate`` can reuse wires from the 
+    dynamic pool, but not from the device pool. 
+     
   - Dynamically allocated wires cannot be used in quantum adjoints yet.
 
   .. code-block:: python
