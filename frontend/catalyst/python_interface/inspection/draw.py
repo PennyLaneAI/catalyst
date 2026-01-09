@@ -195,6 +195,10 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
             If the ``level`` argument provided is larger than the number of passes present in the
             compilation pipeline.
 
+        Lastly, ``catalyst.draw_graph`` is currently not compatible with dynamic wire allocation.
+        This includes :func:`pennylane.allocation.allocate` and dynamic wire allocation that may
+        occur in MLIR directly (via ``quantum.alloc_qb`` instructions).
+
     **Example**
 
     Using ``draw_graph`` requires a ``qjit``'d QNode and a ``level`` argument, which denotes the
