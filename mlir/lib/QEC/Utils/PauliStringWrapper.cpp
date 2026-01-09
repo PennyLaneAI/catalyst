@@ -176,11 +176,13 @@ SmallVector<StringRef> removeIdentityPauli(QECOpInterface op, SmallVector<Value>
 
     auto pauliProduct = op.getPauliProduct();
     SmallVector<StringRef> pauliProductArrayRef;
+    int erased = 0;
 
     for (auto [i, pauli] : llvm::enumerate(pauliProduct)) {
         auto pauliStr = mlir::cast<mlir::StringAttr>(pauli).getValue();
         if (pauliStr == "I" || pauliStr == "_") {
-            qubits.erase(qubits.begin() + i);
+            qubits.erase(qubits.begin() + i - erased);
+            erased++;
             continue;
         }
         pauliProductArrayRef.push_back(pauliStr);

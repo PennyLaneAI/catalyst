@@ -2,7 +2,7 @@
 
 <h3>New features since last release</h3>
 
-* Programs compiled with ``qjit`` can now be visualized with :func:`~.draw_graph`, allowing for 
+* Programs compiled with ``qjit`` can now be visualized with :func:`~.draw_graph`, allowing for
   sequentially analyzing impacts of compilation passes on structured and dynamic programs.
   [(#2213)](https://github.com/PennyLaneAI/catalyst/pull/2213)
   [(#2214)](https://github.com/PennyLaneAI/catalyst/pull/2214)
@@ -20,6 +20,7 @@
   [(#2340)](https://github.com/PennyLaneAI/catalyst/pull/2340)
   [(#2357)](https://github.com/PennyLaneAI/catalyst/pull/2357)
   [(#2309)](https://github.com/PennyLaneAI/catalyst/pull/2309)
+  [(#2363)](https://github.com/PennyLaneAI/catalyst/pull/2363)
 
   Consider the following circuit:
 
@@ -34,8 +35,8 @@
   def circuit(x, y):
       qml.X(0)
       qml.Y(1)
-      qml.H(x) 
-      
+      qml.H(x)
+
       for i in range(3):
           qml.S(0)
           qml.RX(0.1, wires=1)
@@ -162,6 +163,7 @@
   [(#2284)](https://github.com/PennyLaneAI/catalyst/pull/2284)
   [(#2296)](https://github.com/PennyLaneAI/catalyst/pull/2296)
   [(#2336)](https://github.com/PennyLaneAI/catalyst/pull/2336)
+  [(#2360)](https://github.com/PennyLaneAI/catalyst/pull/2360)
 
   :class:`~.PauliRot` and :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes
   for PPR-PPM compilation only when PennyLane program capture is enabled. This includes 
@@ -219,6 +221,7 @@
   decomposes abitrary-angle Pauli-product rotations (PPRs) as outlined in Figure 13(d) from 
   `arXiv:2211.15465 <https://arxiv.org/abs/2211.15465>`_.
   [(#2304)](https://github.com/PennyLaneAI/catalyst/pull/2304)
+  [(#2354)](https://github.com/PennyLaneAI/catalyst/pull/2354)
 
   An arbitrary-angle PPR is defined as a PPR whose angle of rotation is not :math:`\tfrac{\pi}{2}`, 
   :math:`\tfrac{\pi}{4}`, or :math:`\tfrac{\pi}{8}`. The :func:`~.passes.decompose_arbitrary_ppr` 
@@ -313,6 +316,13 @@
 
 * Pytree inputs can now be used when PennyLane's program capture is enabled.
   [(#2165)](https://github.com/PennyLaneAI/catalyst/pull/2165)
+
+* The `ppr-to-mbqc` pass now supports lowering `qec.ppr.arbitrary` operations (Pauli Product
+  Rotations with arbitrary angles) to MBQC-style gate sequences. The lowering follows the same
+  pattern as fixed-angle PPR operations: conjugation gates to map Paulis to the Z-basis, a CNOT
+  ladder to accumulate parity, an RZ gate with angle `2θ` (where `θ` is the PPR angle), and reverse
+  operations to restore the original basis.
+  [(#2373)](https://github.com/PennyLaneAI/catalyst/pull/2373)
 
 * ``qml.grad`` and ``qml.jacobian`` can now be used with ``qjit`` when PennyLane's program capture 
   is enabled.
@@ -511,6 +521,11 @@
   conform with the name of the corresponding transform in PennyLane.
   [(#2201)](https://github.com/PennyLaneAI/catalyst/pull/2201)
 
+* The `to-ppr` pass now automatically runs canonicalization patterns after converting quantum
+  operations to Pauli Product Rotation (PPR) form. This removes identity Pauli rotations
+  (e.g., `["I", "I", "I"]`) automatically, simplifying the resulting IR.
+  [(#2367)](https://github.com/PennyLaneAI/catalyst/pull/2367)
+
 <h3>Deprecations 👋</h3>
 
 No deprecations have been made in this release.
@@ -631,6 +646,10 @@ No deprecations have been made in this release.
 * Fixed a bug where ``qml.vjp`` and ``qml.jvp`` were not working with Autograph.
   [(#2345)](https://github.com/PennyLaneAI/catalyst/pull/2345)
 
+* Fixed incorrect detection of tracer wires in the frontend. Previously, NumPy integers would be
+  detected as dynamic wires leading to unnecessary instructions in the program IR.
+  [(#2361)](https://github.com/PennyLaneAI/catalyst/pull/2361)
+
 <h3>Internal changes ⚙️</h3>
 
 * The jaxpr transform ``pl_map_wires`` has been removed along with its test.
@@ -725,7 +744,7 @@ No deprecations have been made in this release.
   This pass now merges PPRs with equivalent angles, and cancels PPRs with opposite angles, or
   angles that sum to identity when the angles are known. The pass also supports conditions on PPRs,
   merging when conditions are identical and not merging otherwise.
-  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)	
+  [(#2224)](https://github.com/PennyLaneAI/catalyst/pull/2224)
   [(#2245)](https://github.com/PennyLaneAI/catalyst/pull/2245)
   [(#2254)](https://github.com/PennyLaneAI/catalyst/pull/2254)
   [(#2258)](https://github.com/PennyLaneAI/catalyst/pull/2258)
@@ -748,6 +767,9 @@ No deprecations have been made in this release.
 
 * Adding the measurement type into the MLIR assembly format for `qec.ppm` and `qec.select.ppm`
   [(#2347)](https://github.com/PennyLaneAI/catalyst/pull/2347)
+
+* Remove duplicate code for canonicalization and verification of Pauli Product Rotation operations.
+  [(#2313)](https://github.com/PennyLaneAI/catalyst/pull/2313)
 
 <h3>Documentation 📝</h3>
 
@@ -776,6 +798,10 @@ No deprecations have been made in this release.
 
 * Typos in the docstrings for ``PPRotationArbitraryOp`` and ``PPRRotationOp`` have been corrected.
   [(#2297)](https://github.com/PennyLaneAI/catalyst/pull/2297)
+
+* The `--save-ir-after-each` command line option documentation has been updated to explain the
+  `changed` value.
+  [(#2355)](https://github.com/PennyLaneAI/catalyst/pull/2355)
 
 <h3>Contributors ✍️</h3>
 
