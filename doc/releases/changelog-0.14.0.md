@@ -396,6 +396,13 @@
   %2:2 = qec.ppr.arbitrary ["X", "Z"](%const) %1#0, %1#1 cond(%c0) : !quantum.bit, !quantum.bit
   ```
 
+* The `ppr-to-mbqc` pass now supports lowering `qec.ppr.arbitrary` operations (Pauli Product
+  Rotations with arbitrary angles) to MBQC-style gate sequences. The lowering follows the same
+  pattern as fixed-angle PPR operations: conjugation gates to map Paulis to Z-basis, a CNOT ladder
+  to accumulate parity, an RZ gate with angle `2θ` (where `θ` is the PPR angle), and reverse
+  operations to restore the original basis.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
 <h3>Breaking changes 💔</h3>
 
 * The MLIR pipeline ``enforce-runtime-invariants-pipeline`` has been renamed to
