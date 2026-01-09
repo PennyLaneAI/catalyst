@@ -12,22 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef QUANTUM_ATTR_DEFS
+#define QUANTUM_ATTR_DEFS
 
-#include "mlir/IR/OpDefinition.h"
+include "mlir/IR/EnumAttr.td"
+
+include "Quantum/IR/QuantumDialect.td"
 
 //===----------------------------------------------------------------------===//
-// Quantum trait declarations.
+// Quantum dialect enums and attributes.
 //===----------------------------------------------------------------------===//
 
-namespace mlir {
-namespace OpTrait {
+def NamedObservable : I32EnumAttr<"NamedObservable",
+    "Known named observables",
+    [
+        I32EnumAttrCase<"Identity", 0>,
+        I32EnumAttrCase<"PauliX",   1>,
+        I32EnumAttrCase<"PauliY",   2>,
+        I32EnumAttrCase<"PauliZ",   3>,
+        I32EnumAttrCase<"Hadamard", 4>,
+    ]> {
+    let cppNamespace = "catalyst::quantum";
+    let genSpecializedAttr = 0;
+}
 
-template <typename ConcreteType>
-class UnitaryTrait : public TraitBase<ConcreteType, UnitaryTrait> {};
+def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_observable">;
 
-template <typename ConcreteType>
-class HermitianTrait : public TraitBase<ConcreteType, HermitianTrait> {};
 
-} // namespace OpTrait
-} // namespace mlir
+#endif // QUANTUM_ATTR_DEFS
