@@ -134,6 +134,7 @@ with Patcher(
     )
 
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
+from pennylane.capture.primitives import subroutine_prim as pl_subroutine_prim
 
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
@@ -584,6 +585,7 @@ def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode, pipeline=None):
     Returns:
       List[mlir.Value] corresponding
     """
+    print("in quantum kernel lowering")
     assert isinstance(qnode, qml.QNode), "This function expects qnodes"
     if pipeline is None:
         pipeline = tuple()
@@ -613,7 +615,6 @@ def _func_lowering(ctx, *args, call_jaxpr, fn):
     func_op = lower_callable(ctx, fn, call_jaxpr)
     call_op = create_call_op(ctx, func_op, *args)
     return call_op.results
-
 
 #
 # Decomp rule
@@ -2844,6 +2845,7 @@ CUSTOM_LOWERING_RULES = (
     (grad_p, _grad_lowering),
     (pl_jac_prim, _capture_grad_lowering),
     (func_p, _func_lowering),
+    (pl_subroutine_prim, _func_lowering),
     (jvp_p, _jvp_lowering),
     (vjp_p, _vjp_lowering),
     (adjoint_p, _adjoint_lowering),
