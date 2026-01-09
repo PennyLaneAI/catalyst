@@ -18,18 +18,14 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
+#include "Quantum/IR/QuantumAttrDefs.h"
+#include "Quantum/IR/QuantumTypes.h"
+
 //===----------------------------------------------------------------------===//
 // Quantum dialect declarations.
 //===----------------------------------------------------------------------===//
 
 #include "Quantum/IR/QuantumOpsDialect.h.inc"
-
-//===----------------------------------------------------------------------===//
-// Quantum type declarations.
-//===----------------------------------------------------------------------===//
-
-#define GET_TYPEDEF_CLASSES
-#include "Quantum/IR/QuantumOpsTypes.h.inc"
 
 //===----------------------------------------------------------------------===//
 // Quantum resource abstractions declarations
