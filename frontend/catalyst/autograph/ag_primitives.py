@@ -536,7 +536,9 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             catalyst.value_and_grad,
             catalyst.jacobian,
             catalyst.vjp,
+            qml.vjp,
             catalyst.jvp,
+            qml.jvp,
             catalyst.vmap,
             catalyst.mitigate_with_zne,
         )

@@ -204,7 +204,7 @@ LogicalResult convertZGate(CustomOp op, ConversionPatternRewriter &rewriter)
 // I = I
 LogicalResult convertIGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
-    auto gate = GateConversion({"I"}, 0);
+    auto gate = GateConversion({"I"}, 1);
     applySingleQubitConversion(op, {gate}, rewriter);
     return success();
 }
@@ -258,7 +258,7 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
 
         auto angle = std::fmod(ppr_angle, PI);
 
-        if (angle < TOLERANCE) {
+        if (std::abs(angle) < TOLERANCE) {
             // If the angle is 0, we can just erase the PauliRotOp.
             rewriter.replaceOp(op, inQubits);
             return success();
