@@ -22,6 +22,7 @@ include "mlir/Interfaces/ControlFlowInterfaces.td"
 
 include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumInterfaces.td"
+include "Quantum/IR/QuantumTypes.td"
 
 //===----------------------------------------------------------------------===//
 // Quantum dialect enums.
