@@ -475,6 +475,11 @@ jobs:
         python3 -m pip install oqc-qcaas-client
         # Install graphviz for testing the mlir-op-graph integration
         sudo apt-get install -y graphviz
+        # TODO: --- remove workaround before merging to main ----------------- #
+        pip install git+https://github.com/PennyLaneAI/pennylane@v0.44.0-rc0
+        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning==0.44.0
+        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning-Kokkos==0.44.0
+        # -------------------------------------------------------------------- #
         make frontend
 
     - name: Verify Graphviz installation
@@ -563,6 +568,11 @@ jobs:
         sudo apt-get install -y libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
+        # TODO: --- remove workaround before merging to main ----------------- #
+        pip install git+https://github.com/PennyLaneAI/pennylane@v0.44.0-rc0
+        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning==0.44.0
+        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning-Kokkos==0.44.0
+        # -------------------------------------------------------------------- #
         make frontend
 
     - name: Get Cached LLVM Build
@@ -626,6 +636,11 @@ jobs:
         sudo apt-get install -y libasan6 make
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
+        # TODO: --- remove workaround before merging to main ----------------- #
+        pip install git+https://github.com/PennyLaneAI/pennylane@v0.44.0-rc0
+        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning==0.44.0
+        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning-Kokkos==0.44.0
+        # -------------------------------------------------------------------- #
         make frontend
 
     - name: Get Cached LLVM Build
