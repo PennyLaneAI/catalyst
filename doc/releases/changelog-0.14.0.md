@@ -401,7 +401,7 @@
   pattern as fixed-angle PPR operations: conjugation gates to map Paulis to Z-basis, a CNOT ladder
   to accumulate parity, an RZ gate with angle `2θ` (where `θ` is the PPR angle), and reverse
   operations to restore the original basis.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#2373)](https://github.com/PennyLaneAI/catalyst/pull/2373)
 
 <h3>Breaking changes 💔</h3>
 
