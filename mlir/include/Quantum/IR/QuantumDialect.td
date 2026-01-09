@@ -16,7 +16,6 @@
 #define QUANTUM_DIALECT
 
 include "mlir/IR/DialectBase.td"
-include "mlir/IR/AttrTypeBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
@@ -49,28 +48,6 @@ def QuantumDialect : Dialect {
     /// Use the default type printing/parsing hooks, otherwise we would explicitly define them.
     let useDefaultTypePrinterParser = 1;
     let useDefaultAttributePrinterParser = 1;
-}
-
-//===----------------------------------------------------------------------===//
-// Quantum dialect types.
-//===----------------------------------------------------------------------===//
-
-class Quantum_Type<string name, string typeMnemonic, list<Trait> traits = []>
-        : TypeDef<QuantumDialect, name, traits> {
-    let mnemonic = typeMnemonic;
-}
-
-def QubitType : Quantum_Type<"Qubit", "bit"> {
-    let summary = "A value-semantic qubit (state).";
-}
-def QuregType : Quantum_Type<"Qureg", "reg"> {
-    let summary = "An array of value-semantic qubits (i.e. quantum register).";
-}
-def ObservableType : Quantum_Type<"Observable", "obs"> {
-    let summary = "A quantum observable for use in measurements.";
-}
-def ResultType : Quantum_Type<"Result", "res"> {
-    let summary = "A quantum measurement result.";
 }
 
 //===----------------------------------------------------------------------===//
