@@ -1291,7 +1291,7 @@ Currently, however, this is not the case for the following functionalities.
     is no need to request wires in the zero state, nor is there a need to keep
     track of whether wires were restored in the zero state or not.
 
-  - Related to the above point, in PennyLane, dynamic wire allocations do not 
+  - Related to the above point, in PennyLane, dynamic wire allocations do not
     increase the total number of wires used in the circuit. This is because
     PennyLane treats the number of wires during device
     initialization (the ``qml.device("...", wires=N)``) as the device capacity.
@@ -1320,4 +1320,37 @@ Currently, however, this is not the case for the following functionalities.
   NotImplementedError: Dynamically allocated wires cannot be used in quantum adjoints yet.
 
   - Usage of ``qml.allocate()`` with Catalyst prohibits returning any terminal measurement
-    *except for* ``qml.probs``.
+    *except for* ``qml.probs``. This is due to a bug in Lightning.
+    Other measurement types (``qml.sample``, ``qml.expval``, ``qml.var``, etc.)
+    will be supported in the future after the underlying bug is fixed.
+
+  .. code-block:: python
+
+    qml.capture.enable()
+
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=3, shots=10))
+    def circuit():
+        with qml.allocate(2) as qs:
+            qml.X(qs[1])
+        return qml.sample(wires=[0, 1])
+
+  >>> circuit()
+  CompileError: Only probability measurements (qml.probs) are currently supported
+  when dynamic allocations are present in the program. Other measurement
+  types (qml.sample, qml.expval, qml.var, ...etc) will be supported
+  in a future release after the underlying bug is fixed.
+
+  .. code-block:: python
+
+    qml.capture.enable()
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit():
+        with qml.allocate(1) as q:
+            qml.X(q[0])
+        return qml.probs(wires=[0])
+
+  >>> circuit()
+  Array([1., 0.], dtype=float64)
