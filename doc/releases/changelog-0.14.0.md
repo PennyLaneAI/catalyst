@@ -523,10 +523,17 @@
 No deprecations have been made in this release.
 
 <h3>Bug fixes 🐛</h3>
+
 * Fixed a bug in the :func:`catalyst.passes.merge_ppr_ppm` that was causing an iteration out-of-bound error.
   [(#2359)](https://github.com/PennyLaneAI/catalyst/pull/2359)
+
 * Updated the type support for callbacks allowing for the use of unsigned integers.
   [(#2330)](https://github.com/PennyLaneAI/catalyst/pull/2330)
+
+* Fixed a bug in the ``gradient.value_and_grad`` verifier that incorrectly validated gradient result
+  types by matching from the tail of callee arguments, ignoring ``diffArgIndices``. This caused 
+  false verification errors when differentiating a subset of arguments with different types.
+  [(#2349)](https://github.com/PennyLaneAI/catalyst/pull/2349)
 
 * Fixed a bug in the ``catalyst.python_interface.pass_api.TranformInterpreterPass`` pass that 
   prevented pass options from being used correctly.
