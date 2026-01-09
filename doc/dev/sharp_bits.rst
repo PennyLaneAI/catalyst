@@ -1270,6 +1270,19 @@ the ``@qjit`` decorator is applied.
 
 Currently, however, this is not the case for the following functionalities.
 
+- **Graph-based decompositions**: Graph-based decompositions can be enabled via
+  :func:`pennylane.decomposition.enable_graph`. Scenarios can happen in which 
+  the graph may use different solutions non-deterministically if there exist 
+  intermediate decompositions that have the same overall cost. This phenomenon
+  is not an issue, except for in cases where intermediate gates are not
+  executable with ``qjit`` present. An example of such a gate is 
+  ``qml.PauliRot``; if an intermediate decomposition is chosen that includes
+  a ``qml.PauliRot`` instance, Catalyst cannot execute the program. If this 
+  behaviour is encountered, this can be counteracted by adding a prohibitively
+  large penalty to the graph solution should it encounter a ``qml.PauliRot`` 
+  instance (e.g., 
+  ``qml.transforms.decomopose(..., gate_set={..., qml.PauliRot: 100_000})``).
+
 - **Measurement behaviour**: :func:`catalyst.measure` currently behaves
   differently from its PennyLane counterpart :func:`pennylane.measure`.
   In particular:
