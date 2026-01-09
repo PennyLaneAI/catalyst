@@ -612,35 +612,17 @@ def test_unsupported_adjoint(backend):
 
 
 @pytest.mark.usefixtures("use_capture")
-def test_expval_with_dynamic_wires(backend):
+@pytest.mark.parametrize(
+    "measurement_fn, shots",
+    [
+        (lambda: qml.expval(qml.Z(0)), None),
+        (lambda: qml.var(qml.Z(0)), None),
+        (lambda: qml.sample(wires=[0]), 10),
+    ],
+)
+def test_non_probs_measurement_with_dynamic_wires(backend, measurement_fn, shots):
     """
-    Test that an error is raised when using qml.expval with dynamic wire allocations.
-    """
-
-    with pytest.raises(
-        CompileError,
-        match=textwrap.dedent(
-            """
-            Only probability measurements \\(qml.probs\\) are currently supported
-            when dynamic allocations are present in the program. Other measurement
-            types \\(qml.sample, qml.expval, qml.var, ...etc\\) will be supported
-            in a future release after the underlying bug is fixed.
-            """
-        ),
-    ):
-
-        @qjit
-        @qml.qnode(qml.device(backend, wires=1))
-        def circuit():
-            with qml.allocate(1) as q:
-                qml.X(q[0])
-            return qml.expval(qml.Z(0))
-
-
-@pytest.mark.usefixtures("use_capture")
-def test_var_with_dynamic_wires(backend):
-    """
-    Test that an error is raised when using qml.var with dynamic wire allocations.
+    Test that an error is raised when using non-probs measurements with dynamic wire allocations.
     """
 
     with pytest.raises(
@@ -656,38 +638,11 @@ def test_var_with_dynamic_wires(backend):
     ):
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1))
+        @qml.qnode(qml.device(backend, wires=1, shots=shots))
         def circuit():
             with qml.allocate(1) as q:
                 qml.X(q[0])
-            return qml.var(qml.Z(0))
-
-
-@pytest.mark.usefixtures("use_capture")
-def test_sample_with_dynamic_wires(backend):
-    """
-    Test that an error is raised when using qml.sample with dynamic wire allocations.
-    """
-
-    with pytest.raises(
-        CompileError,
-        match=textwrap.dedent(
-            """
-            Only probability measurements \\(qml.probs\\) are currently supported
-            when dynamic allocations are present in the program. Other measurement
-            types \\(qml.sample, qml.expval, qml.var, ...etc\\) will be supported
-            in a future release after the underlying bug is fixed.
-            """
-        ),
-    ):
-
-        @qjit
-        @qml.set_shots(10)
-        @qml.qnode(qml.device(backend, wires=1))
-        def circuit():
-            with qml.allocate(1) as q:
-                qml.X(q[0])
-            return qml.sample(wires=[0])
+            return measurement_fn()
 
 
 if __name__ == "__main__":
