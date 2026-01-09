@@ -758,9 +758,12 @@ No deprecations have been made in this release.
 
 <h3>Documentation 📝</h3>
 
-* A clarification was made in the :doc:`Sharp Bits page <../dev/sharp_bits>` for the behaviour of 
-  :func:`qml.allocate <~.allocate>` when used with Catalyst.
+* Clarifications were made in the :doc:`Sharp Bits page <../dev/sharp_bits>` for the behaviour of 
+  :func:`qml.allocate <~.allocate>` when used with Catalyst. In particular, returning any terminal
+  measurement besides ``qml.probs`` when ``qml.allocate`` is used within a ``qjit``'d workflow is
+  not supported.
   [(#2317)](https://github.com/PennyLaneAI/catalyst/pull/2317)
+  [(#2358)](https://github.com/PennyLaneAI/catalyst/pull/2358)
 
 * A typo in the code example for :func:`~.passes.ppr_to_ppm` has been corrected.
   [(#2136)](https://github.com/PennyLaneAI/catalyst/pull/2136)
