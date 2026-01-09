@@ -756,10 +756,6 @@ class TestGetLabel:
         """Tests against an operator instance."""
         assert get_label(op) == label
 
-    def test_global_phase_operator(self):
-        """Tests against a GlobalPhase operator instance."""
-        assert get_label(qml.GlobalPhase(0.5)) == "<name> GlobalPhase|<wire> all"
-
     @pytest.mark.parametrize(
         "meas, label",
         [
@@ -840,7 +836,7 @@ class TestCreateStaticOperatorNodes:
         assert len(nodes) == 2  # Device node + operator
 
         # Compiler throws out the wires and they get converted to wires=[] no matter what
-        assert nodes["node1"]["label"] == get_label(qml.GlobalPhase(0.5))
+        assert nodes["node1"]["label"] == "GlobalPhase"
 
     def test_qubit_unitary_op(self):
         """Test that QubitUnitary operations can be handled."""
@@ -1531,7 +1527,7 @@ class TestOperatorConnectivity:
         def my_circuit():
             qml.X(0)
             qml.GlobalPhase(0.5)
-            qml.Y(1)
+            qml.Y(0)
 
         module = my_circuit()
 
@@ -1542,10 +1538,13 @@ class TestOperatorConnectivity:
         edges = utility.dag_builder.edges
         nodes = utility.dag_builder.nodes
 
+        # Ensure globalphase shows up
+        assert "GlobalPhase" in nodes["node2"]["label"]
+
+        # Ensure proper connectivity
         expected_edges = (
             ("NullQubit", "PauliX"),
-            ("PauliX", "GlobalPhase", {"style": "dashed"}),
-            ("GlobalPhase", "PauliY"),
+            ("PauliX", "PauliY"),
         )
         assert_dag_structure(nodes, edges, expected_edges)
 

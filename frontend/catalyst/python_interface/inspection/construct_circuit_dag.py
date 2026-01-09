@@ -176,7 +176,6 @@ class ConstructCircuitDAG:
         self,
         op: (
             quantum.CustomOp
-            | quantum.GlobalPhaseOp
             | quantum.QubitUnitaryOp
             | quantum.MultiRZOp
             | quantum.SetBasisStateOp
@@ -202,6 +201,29 @@ class ConstructCircuitDAG:
         self._node_uid_counter += 1
 
         self._connect(qml_op.wires, node_uid)
+
+    @_visualize_operation.register
+    def _gate_op(self, op: quantum.GlobalPhaseOp) -> None:
+        """Handler for GlobalPhase.
+
+        Unlike standard gates, GlobalPhase does not have data dependencies
+        (it does not act on specific wires). Consequently, it is rendered as
+        a disjoint or 'floating' node within the current cluster to reflect
+        that it has no strict ordering requirements relative to other
+        quantum operations.
+        """
+
+        # Create PennyLane instance
+        qml_op: Operator = xdsl_to_qml_op(op)
+
+        # Add node to current cluster
+        node_uid = f"node{self._node_uid_counter}"
+        self.dag_builder.add_node(
+            uid=node_uid,
+            label="GlobalPhase",
+            cluster_uid=self._cluster_uid_stack[-1],
+        )
+        self._node_uid_counter += 1
 
     @_visualize_operation.register
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
@@ -613,7 +635,7 @@ class ConstructCircuitDAG:
         """
 
         # Record if it's a dynamic node for easy look-up
-        is_dynamic = any(not isinstance(wire, int) for wire in wires) or len(wires) == 0
+        is_dynamic = any(not isinstance(wire, int) for wire in wires)
         if is_dynamic:
             self._dynamic_node_uids.add(node_uid)
 
