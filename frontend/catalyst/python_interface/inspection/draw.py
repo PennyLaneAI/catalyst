@@ -116,6 +116,26 @@ def draw(qnode: QNode, *, level: int | None = None) -> Callable:
     return wrapper
 
 
+def check_draw_imports():
+    """
+    Raise errors and early exit if dependencies of the draw feature are missing.
+    """
+    if not HAS_MATPLOTLIB:
+        raise ImportError(
+            "The draw_graph functionality requires matplotlib to be installed. "
+            "You can install matplotlib via 'pip install matplotlib'."
+        )
+    if not HAS_GRAPHVIZ:
+        raise ImportError(
+            "The Graphviz package is not found. Please install it for your system by "
+            "following the instructions found here: https://graphviz.org/download/"
+        )
+    if not HAS_PYDOT:
+        raise ImportError(
+            "The 'pydot' package is not found. Please install with 'pip install pydot'."
+        )
+
+
 # pylint: disable=line-too-long
 def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     """
@@ -294,20 +314,8 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
             :alt: Graphical representation of circuit with control flow
             :align: left
     """
-    if not HAS_MATPLOTLIB:
-        raise ImportError(
-            "The draw_graph functionality requires matplotlib to be installed. "
-            "You can install matplotlib via 'pip install matplotlib'."
-        )
-    if not HAS_GRAPHVIZ:
-        raise ImportError(
-            "The Graphviz package is not found. Please install it for your system by "
-            "following the instructions found here: https://graphviz.org/download/"
-        )
-    if not HAS_PYDOT:
-        raise ImportError(
-            "The 'pydot' package is not found. Please install with 'pip install pydot'."
-        )
+
+    check_draw_imports()
 
     if not isinstance(level, (int, type(None))):
         raise TypeError("The 'level' argument must be an integer or 'None'.")
