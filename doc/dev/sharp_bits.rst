@@ -1317,4 +1317,7 @@ Currently, however, this is not the case for the following functionalities.
         return qml.probs(wires=[0])
 
   >>> print(circuit())
-    NotImplementedError: Dynamically allocated wires cannot be used in quantum adjoints yet.
+  NotImplementedError: Dynamically allocated wires cannot be used in quantum adjoints yet.
+
+  - Usage of ``qml.allocate()`` with Catalyst prohibits returning any terminal measurement
+    *except for* ``qml.probs``.
