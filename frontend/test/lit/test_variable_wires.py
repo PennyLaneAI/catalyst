@@ -51,6 +51,9 @@ print(f.mlir)
 @qml.qnode(qml.device("null.qubit", wires=2))
 # CHECK-LABEL: public @g()
 def g():
+    """
+    Test no extraneous insert ops.
+    """
     wires = np.arange(2, dtype=int)
 
     # CHECK: quantum.custom "PauliX"
