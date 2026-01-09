@@ -758,6 +758,12 @@ No deprecations have been made in this release.
 
 <h3>Documentation 📝</h3>
 
+* A note was made in the :doc:`Sharp Bits page <../dev/sharp_bits>` for the behaviour of 
+  ``qml.transforms.decompose`` when graph-based decompositions are enabled with 
+  :func:`pennylane.decomposition.enable_graph`. It clarifies that non-deterministic graph solutions 
+  may lead to non-executable programs if intermediate gates are not executable by Catalyst.
+  [(#2377)](https://github.com/PennyLaneAI/catalyst/pull/2377)
+
 * Clarifications were made in the :doc:`Sharp Bits page <../dev/sharp_bits>` for the behaviour of 
   :func:`qml.allocate <~.allocate>` when used with Catalyst. In particular, returning any terminal
   measurement besides ``qml.probs`` when ``qml.allocate`` is used within a ``qjit``'d workflow is
