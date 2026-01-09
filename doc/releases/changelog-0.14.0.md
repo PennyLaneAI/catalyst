@@ -189,8 +189,6 @@
       qml.PauliRot(jnp.pi / 2, pauli_word="X", wires=0)
       qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
 
-      ppm1 = qml.pauli_measure(pauli_word="XX", wires=[1, 2])
-
       # equivalent to a CNOT gate
       qml.PauliRot(jnp.pi / 2, pauli_word="ZX", wires=[0, 1])
       qml.PauliRot(-jnp.pi / 2, pauli_word="Z", wires=[0])
@@ -199,7 +197,7 @@
       # equivalent to a T gate
       qml.PauliRot(jnp.pi / 4, pauli_word="Z", wires=0)
 
-      ppm2 = qml.pauli_measure(pauli_word="ZX", wires=[1, 2])
+      ppm = qml.pauli_measure(pauli_word="ZXY", wires=[1, 2, 0])
 
       return 
   ```
@@ -207,13 +205,13 @@
   ```pycon
   >>> print(circuit.mlir_opt)
   ... 
-  %mres, %out_qubits:2 = qec.ppm ["X", "X"] %2, %3 : i1, !quantum.bit, !quantum.bit
-  %4 = qec.fabricate  magic : !quantum.bit
-  %mres_0, %out_qubits_1:2 = qec.ppm ["X", "Z"] %1, %4 : i1, !quantum.bit, !quantum.bit
-  %mres_2, %out_qubits_3 = qec.select.ppm(%mres_0, ["Y"], ["X"]) %out_qubits_1#1 : i1, !quantum.bit
-  %5 = qec.ppr ["X"](2) %out_qubits_1#0 cond(%mres_2) : !quantum.bit
-  quantum.dealloc_qb %out_qubits_3 : !quantum.bit
-  %mres_4, %out_qubits_5:3 = qec.ppm ["X", "Z", "X"] %5, %out_qubits#0, %out_qubits#1 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+  %3 = qec.fabricate  magic : !quantum.bit
+  %mres, %out_qubits:2 = qec.ppm ["X", "Z"] %1, %3 : i1, !quantum.bit, !quantum.bit
+  %mres_0, %out_qubits_1 = qec.select.ppm(%mres, ["Y"], ["X"]) %out_qubits#1 : i1, !quantum.bit
+  %4 = qec.ppr ["X"](2) %out_qubits#0 cond(%mres_0) : !quantum.bit
+  quantum.dealloc_qb %out_qubits_1 : !quantum.bit
+  %5 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+  %mres_2, %out_qubits_3:3 = qec.ppm ["Z", "Y", "X"] %4, %2, %5 : i1, !quantum.bit, !quantum.bit, !quantum.bit
   ...
   ```
 
