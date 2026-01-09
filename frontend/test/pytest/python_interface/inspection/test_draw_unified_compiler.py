@@ -576,6 +576,7 @@ class TestDrawGraph:
         with pytest.raises(ValueError, match="The 'level' argument must be a positive integer"):
             _ = draw_graph(qjit_qnode, level=-1)()
 
+    # pylint: disable=line-too-long
     def test_level_greater_than_num_of_passes(self):
         """Tests that a user warning is raised if the level is greater than number of passes."""
 
@@ -593,7 +594,7 @@ class TestDrawGraph:
 
         with pytest.warns(
             UserWarning,
-            match="Level requested \(100\) is higher than the number of compilation passes present: 2",
+            match="Level requested \\(100\\) is higher than the number of compilation passes present: 2",
         ):
             _ = draw_graph(circuit, level=100)()
 
