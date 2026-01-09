@@ -28,7 +28,7 @@
 #include "Quantum/IR/QuantumOpsDialect.h.inc"
 
 //===----------------------------------------------------------------------===//
-// Quantum resource abstractions declarations
+// Quantum resource abstractions declarations.
 //===----------------------------------------------------------------------===//
 
 class QuantumMemory : public mlir::SideEffects::Resource::Base<QuantumMemory> {
