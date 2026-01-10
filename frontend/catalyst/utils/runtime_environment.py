@@ -19,6 +19,7 @@ import os
 import os.path
 import sys
 import sysconfig
+import shutil
 
 from catalyst._configuration import INSTALLED
 
@@ -86,6 +87,11 @@ def get_cli_path() -> str:  # pragma: nocover
     # Fallback to python location
     path = os.path.join(os.path.dirname(sys.executable), catalyst_cli)
     if os.path.isfile(path):
+        return path
+
+    # Environment path
+    path = shutil.which(catalyst_cli)
+    if path is not None:
         return path
 
     raise RuntimeError(
