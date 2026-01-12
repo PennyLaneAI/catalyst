@@ -80,24 +80,35 @@ class UnrollLoopPattern(RewritePattern):
                     return True, None
 
                 if isinstance(bound, Block):
-
-                    error_msg = "To resolve this issue, ensure that loop bounds are literals or compile-time constants (e.g., use `for i in range(5)` instead of `for i in range(n)` where n is a runtime variable)."
-
+                    error_msg = (
+                        "To resolve this issue, ensure that loop bounds are "
+                        "literals or compile-time constants (e.g., use "
+                        "`for i in range(5)` instead of `for i in range(n)` "
+                        "where n is a runtime variable)."
+                    )
                     return False, error_msg
                     # TODO: ^^^^^^^^^^^^^^
-                    # JAX sometimes hosts constants out of the regions they are defined in.
-                    # Therefore, we might reach a BlockArgument when tracing back the origin of a bound,
-                    # producing false negatives error here.
-                    # We should trace back to the parent region and search for constants there.
+                    # JAX sometimes hosts constants out of the regions they
+                    # are defined in. Therefore, we might reach a BlockArgument
+                    # when tracing back the origin of a bound, producing false
+                    # negatives error here. We should trace back to the parent
+                    # region and search for constants there.
 
                 if len(bound.regions) > 0:
-
-                    error_msg = "Additionally, the bound seems to come from an operation with regions, which is not supported. Try to ensure that loop bounds are literals or compile-time constants and do not depend on operations with regions."
+                    error_msg = (
+                        "Additionally, the bound seems to come from an "
+                        "operation with regions, which is not supported. "
+                        "Try to ensure that loop bounds are literals or "
+                        "compile-time constants and do not depend on "
+                        "operations with regions."
+                    )
                     return False, error_msg
 
                 if len(bound.operands) == 0:
-
-                    error_msg = "The bound seems to be derived from an operation different than arith.ConstantOp or stablehlo.ConstantOp."
+                    error_msg = (
+                        "The bound seems to be derived from an operation "
+                        "different than arith.ConstantOp or stablehlo.ConstantOp."
+                    )
                     return False, error_msg
 
                 bound = bound.operands[0]

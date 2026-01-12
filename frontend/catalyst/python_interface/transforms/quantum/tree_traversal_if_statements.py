@@ -144,16 +144,19 @@ class IfOperatorPartitioningPattern(RewritePattern):
                     # Check if the mcm share an immediate IfOp with other mcm
                     if (op, mcm_on_if_region) in self.immediate_if_4_mcm:
                         raise CompileError(
-                            "Not supported: Multiple mid-circuit measurements within the same immediate If statement. "
-                            "Each If statement can only contain one mid-circuit measurement. "
+                            "Not supported: Multiple mid-circuit measurements "
+                            "within the same immediate If statement. "
+                            "Each If statement can only contain one "
+                            "mid-circuit measurement. "
                             "Example of unsupported pattern:\n\n"
                             "  if condition:\n"
                             "      m1 = measure(q[0])  # First measurement\n"
-                            "      m2 = measure(q[1])  # Second measurement - NOT ALLOWED\n"
+                            "      m2 = measure(q[1])  # NOT ALLOWED\n"
                             "  else:\n"
                             "      m1 = measure(q[0])  # First measurement\n"
-                            "      m2 = measure(q[1])  # Second measurement - NOT ALLOWED\n\n"
-                            "Please restructure your code to use separate If statements for each measurement."
+                            "      m2 = measure(q[1])  # NOT ALLOWED\n\n"
+                            "Please restructure your code to use separate "
+                            "If statements for each measurement."
                         )
 
                     self.immediate_if_4_mcm.append((op, mcm_on_if_region))
@@ -183,14 +186,19 @@ class IfOperatorPartitioningPattern(RewritePattern):
                     ):
                         if isinstance(outer_op, quantum.CustomOp):
                             raise CompileError(
-                                "Not supported: Quantum operations after nested If statements containing mid-circuit measurements. "
-                                "Quantum operations cannot be placed after If statements that contain nested If statements with measurements. "
+                                "Not supported: Quantum operations after nested "
+                                "If statements containing mid-circuit measurements. "
+                                "Quantum operations cannot be placed after If "
+                                "statements that contain nested If statements "
+                                "with measurements. "
                                 "Example of unsupported pattern:\n\n"
                                 "  if condition1:\n"
                                 "      if condition2:\n"
-                                "          m = measure(q[0])  # Mid-circuit measurement\n"
-                                "      qml.RX(0.5, wires=0)  # Quantum operation after nested If - NOT ALLOWED\n\n"
-                                "Please restructure your code to avoid quantum operations after nested If statements with measurements."
+                                "          m = measure(q[0])  # MCM\n"
+                                "      qml.RX(0.5, wires=0)  # NOT ALLOWED\n\n"
+                                "Please restructure your code to avoid quantum "
+                                "operations after nested If statements "
+                                "with measurements."
                             )
 
     def looking_for_nested_if_ops(self, op: Operation) -> bool:
@@ -345,7 +353,8 @@ class IfOperatorPartitioningPattern(RewritePattern):
             # Mark as flattened
             self.if_op_with_mcm_4_flatten[target_outer_if_op]["flattened"] = True
 
-    def move_inner_if_op_2_outer(  # pylint: disable=too-many-branches,too-many-arguments,too-many-statements,no-member
+    # pylint: disable-next=too-many-branches,too-many-arguments,too-many-statements
+    def move_inner_if_op_2_outer(
         self,
         inner_op: scf.IfOp,
         outer_if_op: scf.IfOp,
@@ -372,8 +381,9 @@ class IfOperatorPartitioningPattern(RewritePattern):
 
         inner_results = inner_op.results
 
-        # Replace the qreg from the inner IfOp with the immediate outer IfOp qreg
-        # This dont affect the inner IfOp since its qreg is only used in quantum ops inside its regions
+        # Replace the qreg from the inner IfOp with the immediate outer IfOp qreg.
+        # This doesn't affect the inner IfOp since its qreg is only used
+        # in quantum ops inside its regions.
         qreg_from_if_op_inner = [
             mv for mv in missing_values_inner if isinstance(mv.type, quantum.QuregType)
         ]
@@ -434,7 +444,7 @@ class IfOperatorPartitioningPattern(RewritePattern):
             # Create a new empty block for false region
             new_false_block = Block()
 
-            # Create a yield operation for false region using the same return types as the original IfOp
+            # Create a yield op for false region using the same return types
             yield_false = scf.YieldOp(where_to_insert.results[0])
 
             # Create a new empty block for false region
@@ -455,7 +465,8 @@ class IfOperatorPartitioningPattern(RewritePattern):
         # ------------------------------------------------------------------------------------------
         # Create new IfOp with cloned regions
 
-        # Check if we need to update the conditional, if the conditional not depends on previous IfOp results
+        # Check if we need to update the conditional. If the conditional
+        # doesn't depend on previous IfOp results
         # that have been removed, then we need to update it
         needs_to_update_conditional = True
 
@@ -572,7 +583,7 @@ class IfOperatorPartitioningPattern(RewritePattern):
         return where_to_insert, outer_if_op
 
     def split_if_ops(self, rewriter: PatternRewriter) -> None:
-        """Split all scf.IfOps containing mid-circuit measurement operations into separate branches."""
+        """Split all scf.IfOps containing MCMs into separate branches."""
 
         for _if_op in self.if_op_with_mcm:
             self.split_if_op(_if_op, rewriter)

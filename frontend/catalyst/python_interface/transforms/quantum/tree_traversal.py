@@ -194,8 +194,9 @@ class TreeTraversalPattern(RewritePattern):
         if not self.check_if_qnode_has_mcms(func_op):
             return
 
-        # Start with creating a new QNode function that will perform the tree traversal simulation.
-        # We prep the original QNode by ensuring measure boundaries are also quantum register boundaries.
+        # Start with creating a new QNode function for tree traversal simulation.
+        # We prep the original QNode by ensuring measure boundaries are also
+        # quantum register boundaries.
         self.funcs.simple_io_func = self.simplify_quantum_io(func_op, rewriter)
 
         self.setup_traversal_function(self.funcs.simple_io_func, rewriter)
@@ -384,10 +385,11 @@ class TreeTraversalPattern(RewritePattern):
         rewriter.erase_op(self.funcs.simple_io_func)
 
     def split_traversal_segments(self, func_op: func.FuncOp, rewriter: PatternRewriter):
-        """Split the quantum function into segments separated by measure operations.
+        """Split the quantum function into segments separated by measure ops.
 
-        Due to the pre-processing of the QNode (result in simple_io_func), we can assume the register is the only
-        quantum value going between segments.
+        Due to the pre-processing of the QNode (result in simple_io_func),
+        we can assume the register is the only quantum value going between
+        segments.
         """
         rewriter.insertion_point = InsertPoint.at_start(self.funcs.tt_op.body.block)
 
@@ -576,7 +578,7 @@ class TreeTraversalPattern(RewritePattern):
         all_io_types = [val.type for val in all_segment_io]
         fun_type = builtin.FunctionType.from_lists(
             [
-                builtin.IndexType(),  # function id is the depth of the tree, index for segment function
+                builtin.IndexType(),  # function id: depth of tree, segment index
                 builtin.IndexType(),  # branch number, 0, 1, or 2
                 self.stacks.visited_stack_type,  # visited stack
                 self.stacks.statevec_stack_type,  # state vector
@@ -836,7 +838,7 @@ class TreeTraversalPattern(RewritePattern):
         true_block = if_op.true_region.block
         false_block = if_op.false_region.block
 
-        # True branch (branch_type == 0): compute probabilities and determine postselect/visited_status
+        # True branch (branch_type == 0): compute probs and determine postselect
         # Create computational basis observable
         def create_prob_ops(qubit: SSAValue):
             comp_basis_op = quantum.ComputationalBasisOp(
@@ -1237,7 +1239,7 @@ class TreeTraversalPattern(RewritePattern):
         condOp = scf.ConditionOp(depth_gt_zero, current_depth, *segment_iter_args)
         # condOp = scf.ConditionOp(or_op, current_depth, *segment_iter_args)
 
-        # for op in (c0_, depth_gt_zero, load_visited, visited_status, c2, visited_not_finished, or_op, condOp):
+        # for op in (c0_, depth_gt_zero, load_visited, visited_status, ...):
         #     rewriter.insert_op(op, InsertPoint.at_end(conditionBlock))
         for op in (c0_, depth_gt_zero, condOp):
             rewriter.insert_op(op, InsertPoint.at_end(conditionBlock))
