@@ -34,6 +34,10 @@ class TestKeywordArguments:
             return 19
 
         assert f() == 19
+        cf_id = id(f.compiled_function)
+
+        assert f() == 19
+        assert cf_id == id(f.compiled_function)  # no recompile
 
     def test_function_with_positional_args(self):
         """Test qjit on a function with positional only arguments."""
@@ -43,8 +47,8 @@ class TestKeywordArguments:
             return sum([x, y, z]) * t
 
         assert f(4, 5, 2, 3) == 33
-        # with pytest.raises(TypeError):
-        #     f(1, 2, 3, t=4)
+        with pytest.raises(TypeError):
+            f(1, 2, 3, t=4)  # pylint: disable=positional-only-arguments-expected
 
     def test_function_with_positional_or_kwargs(self):
         """Test qjit on a function with positional or keyword arguments."""
@@ -55,7 +59,11 @@ class TestKeywordArguments:
 
         assert f(4, 7) == 28
         assert f(x=3, y=-2) == -6
-        assert f(2, y=3) == f(2, 3)
+        cf_id = id(f.compiled_function)
+
+        assert f(x=3, y=-2) == -6
+        assert cf_id == id(f.compiled_function)
+        assert f(2, y=3) == 6
 
     def test_function_with_var_positional(self):
         """Test qjit on a function with variable number of positional arguments."""
@@ -64,8 +72,18 @@ class TestKeywordArguments:
         def f(*args):
             return sum(args)
 
+        assert f() == 0
         assert f(1) == 1
+        cf_id = id(f.compiled_function)
+
+        # don't recompile on same type+shape
+        assert f(4) == 4
+        assert cf_id == id(f.compiled_function)
+
+        # recompile on different shape
         assert f(3, 6) == 9
+        assert cf_id != id(f.compiled_function)
+
         assert f(4, 6, 8, 10) == 28
 
     def test_function_with_keyword_only(self):
@@ -75,7 +93,14 @@ class TestKeywordArguments:
         def f(*, x=1, y=3):
             return x - y
 
+        # TODO apply default values for aot compilation
         assert f() == -2
+        # cf_id = id(f.compiled_function)
+
+        assert f(x=1, y=3) == -2
+        # TODO prevent recompilation on keywords equivalent to defaults
+        # assert cf_id == id(f.compiled_function)
+
         assert f(x=4) == 1
         assert f(y=2) == -1
 
@@ -88,8 +113,8 @@ class TestKeywordArguments:
 
         assert f(x=1, y=2) == 1 / 2
 
-        # with pytest.raises(TypeError):
-        #     f(1, y=2)
+        with pytest.raises(TypeError):
+            f(1, y=2)  # pylint: disable=too-many-function-args, missing-kwoa
 
     def test_function_with_variable_kwargs(self):
         """Test qjit on a function with a variable number of keyword arguments."""
@@ -98,8 +123,14 @@ class TestKeywordArguments:
         def f(**kwargs):
             return sum(kwargs.values())
 
-        print(f"test output: {f(x=1)}")
+        assert f(a=1, b=2, c=3, d=4) == 10
+        cf_id = id(f.compiled_function)
+
+        assert f(a=2, b=3, c=4, d=5) == 14
+        assert cf_id == id(f.compiled_function)
+
         assert f(x=1, y=4, eighteen=18, nineteen=19) == 42
+        assert cf_id != id(f.compiled_function)
 
     def test_function_with_kwargs_partial(self):
         """Test that a function works with keyword argument."""
@@ -159,11 +190,11 @@ class TestKeywordArguments:
         """
 
         @qjit
-        def foo(x, *args, y=1):
+        def f(x, *args, y=1):
             return x - sum(args) / y
 
-        assert foo(1, 2, 3) == -4
-        assert jnp.allclose(foo(1, 2, y=3), 1 / 3)
+        assert f(1, 2, 3) == -4
+        assert jnp.allclose(f(1, 2, y=3), 1 / 3)
 
 
 if __name__ == "__main__":
