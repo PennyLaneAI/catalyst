@@ -36,6 +36,7 @@
       qml.X(0)
       qml.Y(1)
       qml.H(x)
+      qml.GlobalPhase(1.0)
 
       for i in range(3):
           qml.S(0)
