@@ -226,6 +226,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             self.init_qreg.insert_all_dangling_qubits()
             return compbasis_p.bind(self.init_qreg.get(), qreg_available=True)
 
+    # pylint: disable=too-many-branches
     def interpret_measurement(self, measurement):
         """Rebind a measurement as a catalyst instruction.
 
