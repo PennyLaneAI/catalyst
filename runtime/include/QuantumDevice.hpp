@@ -212,13 +212,13 @@ struct QuantumDevice {
      * @param inverse Apply the inverse (Hermitian adjoint) of the operation.
      * @param controlled_wires Control qubits applied to the operation.
      * @param controlled_values Control values associated to the control qubits (equal length).
-     * @param optional Optional string parameters for device-specific features.
+     * @param optional_params Optional string parameters for device-specific features.
      */
     virtual void NamedOperation(const std::string &name, const std::vector<double> &params,
                                 const std::vector<QubitIdType> &wires, bool inverse = false,
                                 const std::vector<QubitIdType> &controlled_wires = {},
                                 const std::vector<bool> &controlled_values = {},
-                                const std::vector<std::string> &optional = {}) = 0;
+                                const std::vector<std::string> &optional_params = {}) = 0;
 
     /**
      * @brief Perform a computational-basis measurement on one qubit.
