@@ -156,8 +156,8 @@
   ```
 
 * Catalyst can now compile circuits that are directly expressed in terms of Pauli product rotation
-  (PPR) and Pauli product measurement (PPM) operations: :class:`pennylane.PauliRot` and
-  :func:`pennylane.pauli_measure`, respectively. This is only supported with PennyLane program capture
+  (PPR) and Pauli product measurement (PPM) operations: :class:`~.PauliRot` and
+  :func:`~.pauli_measure`, respectively. This is only supported with PennyLane program capture
   enabled (:func:`pennylane.capture.enable`). This support enables research and development spurred
   from [A Game of Surface Codes (arXiv1808.02892)](https://arxiv.org/pdf/1808.02892).
   [(#2145)](https://github.com/PennyLaneAI/catalyst/pull/2145)
@@ -167,7 +167,7 @@
   [(#2336)](https://github.com/PennyLaneAI/catalyst/pull/2336)
   [(#2360)](https://github.com/PennyLaneAI/catalyst/pull/2360)
 
-  :class:`pennylane.PauliRot` and :func:`pennylane.pauli_measure` can be manipulated with Catalyst's existing passes
+  :class:`~.PauliRot` and :func:`~.pauli_measure` can be manipulated with Catalyst's existing passes
   for PPR-PPM compilation only when PennyLane program capture is enabled. This includes
   :func:`pennylane.transforms.to_ppr`, :func:`pennylane.transforms.commute_ppr`,
   :func:`pennylane.transforms.merge_ppr_ppm`, :func:`pennylane.transforms.ppr_to_ppm`,

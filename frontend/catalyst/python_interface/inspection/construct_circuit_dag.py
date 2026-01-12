@@ -25,6 +25,7 @@ from pennylane.measurements import (
     VarianceMP,
 )
 from pennylane.operation import Operator
+from pennylane.ops import GlobalPhase
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region
 
@@ -185,7 +186,6 @@ class ConstructCircuitDAG:
         ),
     ) -> None:
         """Generic handler for unitary gates."""
-
         # Create PennyLane instance
         qml_op: Operator = xdsl_to_qml_op(op)
 
@@ -201,7 +201,13 @@ class ConstructCircuitDAG:
         )
         self._node_uid_counter += 1
 
-        self._connect(qml_op.wires, node_uid)
+        # Unlike standard gates, GlobalPhase does not have data dependencies
+        # (it does not act on specific wires). Consequently, it is rendered as
+        # a disjoint or 'floating' node within the current cluster to reflect
+        # that it has no strict ordering requirements relative to other
+        # quantum operations.
+        if len(qml_op.wires) != 0:
+            self._connect(qml_op.wires, node_uid)
 
     @_visualize_operation.register
     def _projective_measure_op(self, op: quantum.MeasureOp) -> None:
@@ -380,7 +386,7 @@ class ConstructCircuitDAG:
     # ADJOINT
     # =============
 
-    @_visualize_operation.register
+    @_visit_operation.register
     def _adjoint(self, operation: quantum.AdjointOp) -> None:
         """Handle a PennyLane adjoint operation."""
 
@@ -785,11 +791,21 @@ def get_label(op: Operator | MeasurementProcess) -> str:
 @get_label.register
 def _operator(op: Operator) -> str:
     """Returns the appropriate label for PennyLane Operator"""
+    base_op = getattr(op, "base", op)
+
+    # If Adjoint(GlobalPhase) or GlobalPhase, wires will be []
+    # and so we don't need a port node. Controlled(GlobalPhase)
+    # will contain control wires that need to be visualized on the
+    # "wires" port.
+    if isinstance(base_op, GlobalPhase) and len(op.wires) == 0:
+        return str(op.name)
+
     wires = list(op.wires.labels)
     if not wires:
         wires_str = "all"
     else:
         wires_str = f"[{', '.join(map(str, wires))}]"
+
     # Using <...> lets us use ports (https://graphviz.org/doc/info/shapes.html#record)
     return f"<name> {op.name}|<wire> {wires_str}"
 
