@@ -17,7 +17,7 @@ Circuit inspection & visualization functions for Catalyst and xDSL transformatio
 
 
 from .collector import QMLCollector
-from .draw import draw
+from .draw import draw, draw_graph
 from .mlir_graph import generate_mlir_graph
 from .specs import mlir_specs
 from .specs_collector import ResourcesResult, specs_collect
@@ -25,6 +25,7 @@ from .specs_collector import ResourcesResult, specs_collect
 __all__ = [
     "QMLCollector",
     "draw",
+    "draw_graph",
     "generate_mlir_graph",
     "specs_collect",
     "ResourcesResult",

@@ -396,7 +396,8 @@ class TestIntegration:
         assert check_cache(inner)
         assert fn(3) == tuple([jax.numpy.array(2.0), jax.numpy.array(6.0)])
 
-    def test_vjp_wrapper(self):
+    @pytest.mark.parametrize("vjp_func", [vjp, qml.vjp])
+    def test_vjp_wrapper(self, vjp_func):
         """Test conversion is happening succesfully on functions wrapped with 'vjp'."""
 
         def inner(x):
@@ -404,14 +405,15 @@ class TestIntegration:
 
         @qjit(autograph=True)
         def fn(x: float):
-            return vjp(inner, (x,), (1.0, 1.0))
+            return vjp_func(inner, (x,), (1.0, 1.0))
 
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(inner)
         assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
         assert np.allclose(fn(3)[1], jnp.array(8.0))
 
-    def test_jvp_wrapper(self):
+    @pytest.mark.parametrize("jvp_func", [jvp, qml.jvp])
+    def test_jvp_wrapper(self, jvp_func):
         """Test conversion is happening succesfully on functions wrapped with 'jvp'."""
 
         def inner(x):
@@ -419,7 +421,7 @@ class TestIntegration:
 
         @qjit(autograph=True)
         def fn(x: float):
-            return jvp(inner, (x,), (1.0,))
+            return jvp_func(inner, (x,), (1.0,))
 
         assert hasattr(fn.user_function, "ag_unconverted")
         assert check_cache(inner)
