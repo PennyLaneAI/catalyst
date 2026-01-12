@@ -398,6 +398,7 @@ class IfOperatorPartitioningPattern(RewritePattern):
 
         return qreg_from_if_op_inner[0], qreg_from_if_op_outer[0], attr_dict
 
+    # pylint: disable-next=too-many-arguments
     def _create_new_inner_if_regions(
         self,
         inner_op: scf.IfOp,
@@ -435,6 +436,7 @@ class IfOperatorPartitioningPattern(RewritePattern):
 
         return new_true_block, new_false_block, new_if_op_attrs
 
+    # pylint: disable-next=too-many-arguments
     def _create_and_insert_new_inner_if_op(
         self,
         inner_op: scf.IfOp,
@@ -495,6 +497,7 @@ class IfOperatorPartitioningPattern(RewritePattern):
 
         return new_inner_op, where_to_insert, needs_to_update_conditional
 
+    # pylint: disable-next=too-many-arguments
     def _create_and_update_outer_if_op(
         self,
         outer_if_op: scf.IfOp,
