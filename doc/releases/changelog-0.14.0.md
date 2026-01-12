@@ -21,6 +21,7 @@
   [(#2357)](https://github.com/PennyLaneAI/catalyst/pull/2357)
   [(#2309)](https://github.com/PennyLaneAI/catalyst/pull/2309)
   [(#2363)](https://github.com/PennyLaneAI/catalyst/pull/2363)
+  [(#2380)](https://github.com/PennyLaneAI/catalyst/pull/2380)
 
   Consider the following circuit:
 
@@ -36,6 +37,7 @@
       qml.X(0)
       qml.Y(1)
       qml.H(x)
+      qml.GlobalPhase(1.0)
 
       for i in range(3):
           qml.S(0)
