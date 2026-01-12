@@ -25,6 +25,7 @@ from pennylane.measurements import (
     VarianceMP,
 )
 from pennylane.operation import Operator
+from pennylane.ops import GlobalPhase
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region
 
@@ -220,7 +221,7 @@ class ConstructCircuitDAG:
         node_uid = f"node{self._node_uid_counter}"
         self.dag_builder.add_node(
             uid=node_uid,
-            label="GlobalPhase",
+            label=get_label(qml_op),
             cluster_uid=self._cluster_uid_stack[-1],
         )
         self._node_uid_counter += 1
@@ -807,11 +808,19 @@ def get_label(op: Operator | MeasurementProcess) -> str:
 @get_label.register
 def _operator(op: Operator) -> str:
     """Returns the appropriate label for PennyLane Operator"""
+    # Check if this is a GlobalPhase or a symbolic wrapper around one
+    # (e.g., Adjoint(GlobalPhase) or Controlled(GlobalPhase))
+    base_op = getattr(op, "base", op)
+
+    if isinstance(base_op, GlobalPhase):
+        return str(op.name)
+
     wires = list(op.wires.labels)
     if not wires:
         wires_str = "all"
     else:
         wires_str = f"[{', '.join(map(str, wires))}]"
+
     # Using <...> lets us use ports (https://graphviz.org/doc/info/shapes.html#record)
     return f"<name> {op.name}|<wire> {wires_str}"
 

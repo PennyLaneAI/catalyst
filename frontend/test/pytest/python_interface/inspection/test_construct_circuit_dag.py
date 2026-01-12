@@ -756,6 +756,12 @@ class TestGetLabel:
         """Tests against an operator instance."""
         assert get_label(op) == label
 
+    def test_global_phase_operator(self):
+        """Tests against a GlobalPhase operator instance."""
+        assert get_label(qml.GlobalPhase(0.5)) == "GlobalPhase"
+        assert get_label(qml.ctrl(qml.GlobalPhase(0.0), control=0)) == "C(GlobalPhase)"
+        assert get_label(qml.adjoint(qml.GlobalPhase(0.0))) == "Adjoint(GlobalPhase)"
+
     @pytest.mark.parametrize(
         "meas, label",
         [
