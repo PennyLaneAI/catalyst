@@ -1,4 +1,4 @@
-# Copyright 2025 Xanadu Quantum Technologies Inc.
+# Copyright 2025-2026 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 """General purpose utilities to use with xDSL."""
 
 from numbers import Number
-from typing import Any
+from typing import Any, Type, TypeVar
 
 from xdsl.dialects.arith import ConstantOp as arithConstantOp
 from xdsl.dialects.builtin import (
@@ -29,9 +29,18 @@ from xdsl.dialects.builtin import (
     StringAttr,
 )
 from xdsl.dialects.tensor import ExtractOp as tensorExtractOp
-from xdsl.ir import Attribute, SSAValue
+from xdsl.ir import Attribute, Operation, SSAValue
 
 from catalyst.python_interface.dialects.stablehlo import ConstantOp as hloConstantOp
+
+T = TypeVar("T")
+
+
+def get_parent_of_type(op: Operation, kind: Type[T]) -> T | None:
+    """Walk up the parent tree until an op of the specified type is found."""
+    while (op := op.parent_op()) and not isinstance(op, kind):
+        pass
+    return op
 
 
 def get_constant_from_ssa(value: SSAValue) -> Number | None:
