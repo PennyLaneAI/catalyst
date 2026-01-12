@@ -18,7 +18,6 @@ from collections.abc import Iterable, Sequence
 from functools import reduce
 
 import numpy as np
-
 import pennylane as qml
 
 
