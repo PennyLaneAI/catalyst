@@ -29,9 +29,10 @@ class TreeTraversalPass(passes.ModulePass):
 
     name = "xdsl-tree-traversal"
 
-    def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
+    def apply(
+        self, _ctx: context.Context, op: builtin.ModuleOp
+    ) -> None:  # pylint: disable=unused-argument
         """Apply the tree traversal pass (no-op)."""
-        pass
 
 
 tree_traversal_pass = compiler_transform(TreeTraversalPass)
