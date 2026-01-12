@@ -11,12 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# pylint: disable=no-member  # False positives with xDSL region.block access
 
 """
 Implementation of the Tree-Traversal MCM simulation method as an xDSL transform in Catalyst.
-This module contains a rewrite pattern that partitions if statements containing mid-circuit measurements.
+This module contains a rewrite pattern that partitions if statements containing mid-circuit
+measurements.
 """
+
+# pylint: disable=no-member
+# pylint: disable=too-many-positional-arguments
+# pylint: disable=too-many-branches
 
 from itertools import chain
 from typing import List, Set, Tuple, Type
@@ -27,7 +31,6 @@ from xdsl.pattern_rewriter import PatternRewriter, RewritePattern, op_type_rewri
 from xdsl.rewriter import InsertPoint
 
 from catalyst.python_interface.dialects import quantum
-
 from catalyst.utils.exceptions import CompileError
 
 
@@ -103,8 +106,10 @@ class IfOperatorPartitioningPattern(RewritePattern):
             rewriter.insert_op(q_insert, InsertPoint.before(current_op))
 
             # Replace the old q_reg with the output of q_insert
+            # Capture q_extract and q_insert by value to avoid cell-var-from-loop
             qreg_from_if_op[0].replace_by_if(
-                q_insert.results[0], lambda use: use.operation not in [q_extract, q_insert]
+                q_insert.results[0],
+                lambda use, ext=q_extract, ins=q_insert: use.operation not in [ext, ins],
             )
 
     def detect_mcm_in_if_ops(self, op: Operation) -> bool:

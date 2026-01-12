@@ -13,33 +13,31 @@
 # limitations under the License.
 """Unit test module for the tree-traversal transform"""
 
+# pylint: disable=too-many-lines
+
 import numpy as np
+import pennylane as qml
 import pytest
+
+from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
+from catalyst.python_interface import mcm_utils
+from catalyst.python_interface.transforms import TreeTraversalPass, tree_traversal_pass
+from catalyst.utils.exceptions import CompileError
 
 pytestmark = pytest.mark.xdsl
 
 xdsl = pytest.importorskip("xdsl")
 catalyst = pytest.importorskip("catalyst")
 
-# pylint: disable=wrong-import-position
-from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
-from catalyst.python_interface import mcm_utils
-
-import pennylane as qml
-from catalyst.python_interface.transforms import TreeTraversalPass, tree_traversal_pass
-from catalyst.utils.exceptions import CompileError
-
-"""
-Not supported features:
-    - mcm postselection
-    - mcm reset
-    - return qml.state()
-    - return qml.probs()
-    - return qml.sample()
-    - return multiple measurements, e.g.
-        return qml.expval(Z(0)), qml.expval(X(1))
-    - qml.expval(mcm_result)
-"""
+# Not supported features:
+#     - mcm postselection
+#     - mcm reset
+#     - return qml.state()
+#     - return qml.probs()
+#     - return qml.sample()
+#     - return multiple measurements, e.g.
+#         return qml.expval(Z(0)), qml.expval(X(1))
+#     - qml.expval(mcm_result)
 
 
 class TestTreeTraversalPassBase:
@@ -47,13 +45,10 @@ class TestTreeTraversalPassBase:
 
     def test_func_no_mcm(self, run_filecheck):
         """Test tree traversal pass would not be applied to a func without MCMs."""
-
-        """
-        Circuit Test
-        def c():
-            qml.X(0)
-            return qml.expval(qml.Z(0))
-        """
+        # Circuit Test:
+        # def c():
+        #     qml.X(0)
+        #     return qml.expval(qml.Z(0))
 
         program = """
             builtin.module @module_circuit {
@@ -87,15 +82,12 @@ class TestTreeTraversalPassBase:
 
     def test_single_mcm(self, run_filecheck):
         """Test tree traversal pass would be applied to a func with a single MCM."""
-
-        """
-        Circuit Test
-        def c():
-            qml.X(0)
-            qml.measure(1)
-            qml.Y(1)
-            return qml.expval(qml.Z(0))
-        """
+        # Circuit Test:
+        # def c():
+        #     qml.X(0)
+        #     qml.measure(1)
+        #     qml.Y(1)
+        #     return qml.expval(qml.Z(0))
 
         program = """
         builtin.module @module_circuit {
@@ -148,17 +140,15 @@ class TestTreeTraversalPassBase:
 
     def test_two_mcm(self, run_filecheck):
         """Test tree traversal pass would be applied to a func with two MCMs."""
+        # Circuit Test:
+        # def c():
+        #     qml.X(0)
+        #     qml.measure(0)
+        #     qml.Y(1)
+        #     qml.measure(1)
+        #     qml.Z(0)
+        #     return qml.expval(qml.Z(0))
 
-        """
-        Circuit Test
-        def c():
-            qml.X(0)
-            qml.measure(0)
-            qml.Y(1)
-            qml.measure(1)
-            qml.Z(0)
-            return qml.expval(qml.Z(0))
-        """
         program = """
 
         builtin.module @module_circuit {
@@ -217,19 +207,17 @@ class TestTreeTraversalPassBase:
 
     def test_many_mcm(self, run_filecheck):
         """Test tree traversal pass with a function containing many MCM (mid-circuit measurement) operations."""
+        # Circuit Test:
+        # def c():
+        #     qml.X(0)
+        #     qml.measure(0)
+        #     qml.measure(1)
+        #     qml.measure(0)
+        #     qml.measure(1)
+        #     qml.measure(0)
+        #     qml.Z(0)
+        #     return qml.expval(qml.Z(0))
 
-        """
-        Circuit Test
-        def c():
-            qml.X(0)
-            qml.measure(0)
-            qml.measure(1)
-            qml.measure(0)
-            qml.measure(1)
-            qml.measure(0)
-            qml.Z(0)
-            return qml.expval(qml.Z(0))
-        """
         program = """
 
         builtin.module @module_circuit {
@@ -300,18 +288,14 @@ class TestTreeTraversalPassBase:
 
     def test_gates_on_mcm_segments(self, run_filecheck):
         """Test tree traversal pass to check if the gates are applied on the correct segments."""
-
-        """
-        Circuit Test
-        def c():
-            qml.X(0)
-            qml.measure(0)
-            qml.S(0)
-            qml.measure(0)
-            qml.T(0)
-
-            return qml.expval(qml.Z(0))
-        """
+        # Circuit Test:
+        # def c():
+        #     qml.X(0)
+        #     qml.measure(0)
+        #     qml.S(0)
+        #     qml.measure(0)
+        #     qml.T(0)
+        #     return qml.expval(qml.Z(0))
 
         program = """
         builtin.module @module_circuit {
@@ -360,15 +344,12 @@ class TestTreeTraversalPassBase:
 
     def test_simple_io_function(self, run_filecheck):
         """Test tree traversal pass with simple io structure."""
-
-        """
-        Circuit Test
-        def c():
-            qml.X(0)
-            qml.measure(0)
-            qml.Y(1)
-            return qml.expval(qml.Z(0))
-        """
+        # Circuit Test:
+        # def c():
+        #     qml.X(0)
+        #     qml.measure(0)
+        #     qml.Y(1)
+        #     return qml.expval(qml.Z(0))
 
         program = """
         builtin.module @module_circuit {
@@ -428,15 +409,12 @@ class TestTreeTraversalPassBase:
 
     def test_state_transition_function(self, run_filecheck):
         """Test tree traversal pass with simple io structure."""
-
-        """
-        Circuit Test
-        def c():
-            qml.X(0)
-            qml.measure(0)
-            qml.Y(1)
-            return qml.expval(qml.Z(0))
-        """
+        # Circuit Test:
+        # def c():
+        #     qml.X(0)
+        #     qml.measure(0)
+        #     qml.Y(1)
+        #     return qml.expval(qml.Z(0))
 
         program = """
         builtin.module @module_circuit {
@@ -491,15 +469,12 @@ class TestTreeTraversalPassBase:
 
     def test_segment_table_function(self, run_filecheck):
         """Test tree traversal pass with simple io structure."""
-
-        """
-        Circuit Test
-        def c():
-            qml.X(0)
-            qml.measure(0)
-            qml.Y(1)
-            return qml.expval(qml.Z(0))
-        """
+        # Circuit Test:
+        # def c():
+        #     qml.X(0)
+        #     qml.measure(0)
+        #     qml.Y(1)
+        #     return qml.expval(qml.Z(0))
 
         program = """
         builtin.module @module_circuit {
@@ -582,7 +557,7 @@ class TestTreeTraversalPassBase:
     @pytest.mark.parametrize("shots", [None, 10000])
     @pytest.mark.usefixtures("use_capture")
     def test_result_validation(self, shots):
-
+        """Test that tree traversal pass produces same results as deferred measurement method."""
         dev = qml.device("lightning.qubit", wires=4, seed=42)
 
         def test_circuit():
@@ -640,8 +615,7 @@ class TestTreeTraversalPassBase:
         dev = qml.device("lightning.qubit", wires=3)
         params = [np.pi / 2.5, np.pi / 3, -np.pi / 3.5]
 
-        def obs_tape(x, y, z, reset=False, postselect=None):
-
+        def obs_tape(x, y, _z, reset=False, postselect=None):
             for i in range(3):
                 qml.measure(i, reset=reset)
 
@@ -700,18 +674,15 @@ class TestTreeTraversalPassIfStatement:
 
     def test_if_statement_with_mcm_true(self, run_filecheck):
         """Test tree traversal pass would be applied to a func with an if statement."""
-
-        """
-        Circuit Test
-        def circuit():
-            def ansatz_true():
-                m = qml.measure(1)
-                qml.Z(1)
-            def ansatz_false():
-                qml.Y(1)
-            qml.cond(True, ansatz_true, ansatz_false)()
-            return qml.expval(qml.Z(0))
-        """
+        # Circuit Test:
+        # def circuit():
+        #     def ansatz_true():
+        #         m = qml.measure(1)
+        #         qml.Z(1)
+        #     def ansatz_false():
+        #         qml.Y(1)
+        #     qml.cond(True, ansatz_true, ansatz_false)()
+        #     return qml.expval(qml.Z(0))
 
         program = """
         builtin.module @module_circuit {
@@ -801,18 +772,15 @@ class TestTreeTraversalPassIfStatement:
 
     def test_if_statement_with_mcm_false(self, run_filecheck):
         """Test tree traversal pass would be applied to a func with an if statement."""
-
-        """
-        Circuit Test
-        def circuit():
-            def ansatz_true():
-                qml.Z(1)
-            def ansatz_false():
-                m = qml.measure(1)
-                qml.Y(1)
-            qml.cond(True, ansatz_true, ansatz_false)()
-            return qml.expval(qml.Z(0))
-        """
+        # Circuit Test:
+        # def circuit():
+        #     def ansatz_true():
+        #         qml.Z(1)
+        #     def ansatz_false():
+        #         m = qml.measure(1)
+        #         qml.Y(1)
+        #     qml.cond(True, ansatz_true, ansatz_false)()
+        #     return qml.expval(qml.Z(0))
 
         program = """
         builtin.module @module_circuit {
@@ -899,19 +867,16 @@ class TestTreeTraversalPassIfStatement:
 
     def test_if_statement_with_mcm_both(self, run_filecheck):
         """Test tree traversal pass would be applied to a func with an if statement."""
-
-        """
-        Circuit Test
-        def circuit():
-            def ansatz_true():
-                m = qml.measure(1)
-                qml.Z(1)
-            def ansatz_false():
-                m = qml.measure(1)
-                qml.Y(1)
-            qml.cond(True, ansatz_true, ansatz_false)()
-            return qml.expval(qml.Z(0))
-        """
+        # Circuit Test:
+        # def circuit():
+        #     def ansatz_true():
+        #         m = qml.measure(1)
+        #         qml.Z(1)
+        #     def ansatz_false():
+        #         m = qml.measure(1)
+        #         qml.Y(1)
+        #     qml.cond(True, ansatz_true, ansatz_false)()
+        #     return qml.expval(qml.Z(0))
 
         program = """
         builtin.module @module_circuit {
@@ -1015,29 +980,21 @@ class TestTreeTraversalPassIfStatement:
 
     def test_if_statement_with_nested_mcm(self, run_filecheck):
         """Test tree traversal pass would be applied to a func with an if statement."""
-
-        """
-        Circuit Test
-        def circuit():
-            def ansatz_true():
-                qml.Z(0)
-
-                def nested_ansatz_true():
-                    m1 = qml.measure(1)
-                    qml.X( 0)
-                def nested_ansatz_false():
-                    qml.Y( 0)
-                qml.cond(True, nested_ansatz_true, nested_ansatz_false)()
-
-            def ansatz_false():
-                qml.T(0)
-
-            qml.cond(True, ansatz_true, ansatz_false)()
-            qml.S(0)
-
-            return qml.expval(qml.Z(0))
-
-        """
+        # Circuit Test:
+        # def circuit():
+        #     def ansatz_true():
+        #         qml.Z(0)
+        #         def nested_ansatz_true():
+        #             m1 = qml.measure(1)
+        #             qml.X(0)
+        #         def nested_ansatz_false():
+        #             qml.Y(0)
+        #         qml.cond(True, nested_ansatz_true, nested_ansatz_false)()
+        #     def ansatz_false():
+        #         qml.T(0)
+        #     qml.cond(True, ansatz_true, ansatz_false)()
+        #     qml.S(0)
+        #     return qml.expval(qml.Z(0))
 
         program = """
         builtin.module @module_circuit {
@@ -1190,7 +1147,7 @@ class TestTreeTraversalPassIfStatement:
         ],
     )
     def test_execution_validation(self, shots, branch, measure_f):
-
+        """Test execution validation for if statement with mid-circuit measurements."""
         dev = qml.device("lightning.qubit", wires=4, seed=33)
 
         def test_circuit(branch_select):
@@ -1241,15 +1198,12 @@ class TestTreeTraversalPassStaticForLoop:
 
     def test_static_for_loop_without_mcm(self, run_filecheck):
         """Test tree traversal pass would be applied to a func with a static for loop."""
-
-        """
-        Circuit Test
-        def circuit():
-            for i in range(3):
-                qml.X(i)
-            qml.measure(0)
-            return qml.expval(qml.Z(0))
-        """
+        # Circuit Test:
+        # def circuit():
+        #     for i in range(3):
+        #         qml.X(i)
+        #     qml.measure(0)
+        #     return qml.expval(qml.Z(0))
 
         program = """
         builtin.module @module_circuit {
@@ -1310,15 +1264,12 @@ class TestTreeTraversalPassStaticForLoop:
 
     def test_static_for_loop_remove_loop(self, run_filecheck):
         """Test tree traversal pass would be applied to a func with a static for loop."""
-
-        """
-        Circuit Test
-        def circuit():
-            for i in range(3):
-                qml.X(i)
-                qml.measure(i)
-            return qml.expval(qml.Z(0))
-        """
+        # Circuit Test:
+        # def circuit():
+        #     for i in range(3):
+        #         qml.X(i)
+        #         qml.measure(i)
+        #     return qml.expval(qml.Z(0))
 
         program = """
         builtin.module @module_circuit {
@@ -1378,15 +1329,12 @@ class TestTreeTraversalPassStaticForLoop:
 
     def test_static_for_loop_count_ops(self, run_filecheck):
         """Test tree traversal pass would be applied to a func with a static for loop."""
-
-        """
-        Circuit Test
-        def circuit():
-            for i in range(3):
-                qml.X(i)
-                qml.measure(i)
-            return qml.expval(qml.Z(0))
-        """
+        # Circuit Test:
+        # def circuit():
+        #     for i in range(3):
+        #         qml.X(i)
+        #         qml.measure(i)
+        #     return qml.expval(qml.Z(0))
 
         program = """
         builtin.module @module_circuit {
@@ -1454,16 +1402,13 @@ class TestTreeTraversalPassStaticForLoop:
 
     def test_2_static_for_loop_with_without_mcm(self, run_filecheck):
         """Test tree traversal pass would be applied to a func with a static for loop."""
-
-        """
-        Circuit Test
-        def circuit():
-            for i in range(3):
-                qml.X(i)
-            for i in range(3):
-                qml.measure(i)
-            return qml.expval(qml.Z(0))
-        """
+        # Circuit Test:
+        # def circuit():
+        #     for i in range(3):
+        #         qml.X(i)
+        #     for i in range(3):
+        #         qml.measure(i)
+        #     return qml.expval(qml.Z(0))
 
         program = """
         builtin.module @module_circuit {
@@ -1542,17 +1487,14 @@ class TestTreeTraversalPassStaticForLoop:
 
     def test_nested_static_for_loop_with_mcm(self, run_filecheck):
         """Test tree traversal pass would be applied to a func with a static for loop."""
-
-        """
-        Circuit Test
-        def circuit():
-            for i in range(3):
-                qml.X(i)
-                for j in range(3):
-                    qml.Y(j)
-                    qml.measure(j)
-            return qml.expval(qml.Z(0))
-        """
+        # Circuit Test:
+        # def circuit():
+        #     for i in range(3):
+        #         qml.X(i)
+        #         for j in range(3):
+        #             qml.Y(j)
+        #             qml.measure(j)
+        #     return qml.expval(qml.Z(0))
 
         program = """
         builtin.module @module_circuit {
@@ -1656,17 +1598,14 @@ class TestTreeTraversalPassStaticForLoop:
 
     def test_nested_static_for_loop_with_mcm_early(self, run_filecheck):
         """Test tree traversal pass would be applied to a func with a static for loop."""
-
-        """
-        Circuit Test
-        def circuit():
-            for i in range(3):
-                qml.X(i)
-                qml.measure(i)
-                for j in range(3):
-                    qml.Y(j)
-            return qml.expval(qml.Z(0))
-        """
+        # Circuit Test:
+        # def circuit():
+        #     for i in range(3):
+        #         qml.X(i)
+        #         qml.measure(i)
+        #         for j in range(3):
+        #             qml.Y(j)
+        #     return qml.expval(qml.Z(0))
 
         program = """
         builtin.module @module_circuit {
@@ -1799,7 +1738,7 @@ class TestTreeTraversalPassStaticForLoop:
     @pytest.mark.usefixtures("use_capture")
     @pytest.mark.parametrize("shots", [None, 10000])
     def test_execution_validation(self, shots):
-
+        """Test execution validation for static for loop with mid-circuit measurements."""
         dev = qml.device("lightning.qubit", wires=4)
 
         def test_circuit():
@@ -1857,7 +1796,7 @@ class TestTreeTraversalPassStaticForLoop:
         dev = qml.device("lightning.qubit", wires=3, seed=42)
         params = [np.pi / 2.5, np.pi / 3, -np.pi / 3.5]
 
-        def obs_tape(x, y, z, reset=False, postselect=None):
+        def obs_tape(_x, _y, _z, reset=False, postselect=None):  # pylint: disable=unused-argument
             for i in range(3):
                 qml.RX(np.pi / (i + 1), i)
                 # qml.measure(i)

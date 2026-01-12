@@ -11,11 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# pylint: disable=no-member  # False positives with xDSL region.block access
+
+# pylint: disable=no-member
+# pylint: disable=line-too-long
 
 """
 Implementation of the Tree-Traversal MCM simulation method as an xDSL transform in Catalyst.
-This module contains a rewrite pattern that unrolls static loops containing mid-circuit measurements.
+This module contains a rewrite pattern that unrolls static loops containing mid-circuit
+measurements.
 """
 
 from xdsl.dialects import arith, builtin, scf
@@ -23,10 +26,9 @@ from xdsl.ir import Block, Operation, SSAValue
 from xdsl.pattern_rewriter import PatternRewriter, RewritePattern
 from xdsl.rewriter import InsertPoint
 
-from catalyst.utils.exceptions import CompileError
-
 from catalyst.python_interface.dialects import quantum, stablehlo
 from catalyst.python_interface.utils import get_constant_from_ssa
+from catalyst.utils.exceptions import CompileError
 
 
 class UnrollLoopPattern(RewritePattern):

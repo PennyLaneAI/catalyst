@@ -15,12 +15,12 @@
 """This file contains the implementation of the tree_traversal transform,
 written using xDSL."""
 
-from dataclasses import dataclass
-
+# pylint: disable=too-many-lines
+# pylint: disable=too-many-positional-arguments
+# pylint: disable=no-member
 
 from dataclasses import dataclass, field
 from itertools import chain
-
 
 from xdsl import context
 from xdsl.dialects import arith, builtin, func, memref, scf, tensor
@@ -29,9 +29,9 @@ from xdsl.passes import ModulePass
 from xdsl.pattern_rewriter import PatternRewriter, RewritePattern, op_type_rewrite_pattern
 from xdsl.rewriter import BlockInsertPoint, InsertPoint
 
-from catalyst.python_interface.utils import get_parent_of_type
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.pass_api import compiler_transform
+from catalyst.python_interface.utils import get_parent_of_type
 
 from .tree_traversal_if_statements import IfOperatorPartitioningPattern
 from .tree_traversal_unroll_static_loops import UnrollLoopPattern
@@ -290,8 +290,10 @@ class TreeTraversalPattern(RewritePattern):
                     for qb, idx in list(qubit_to_reg_idx.items()):
                         extract_op = quantum.ExtractOp(current_reg, idx)
                         rewriter.insert(extract_op)
+                        # Capture insert_ops by value to avoid cell-var-from-loop
                         qb.replace_by_if(
-                            extract_op.qubit, lambda use: use.operation not in insert_ops
+                            extract_op.qubit,
+                            lambda use, ops=insert_ops: use.operation not in ops,
                         )
                         qubit_to_reg_idx[extract_op.qubit] = idx
                         del qubit_to_reg_idx[qb]
