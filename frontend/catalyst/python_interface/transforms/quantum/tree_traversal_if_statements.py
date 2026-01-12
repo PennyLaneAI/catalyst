@@ -337,19 +337,14 @@ class IfOperatorPartitioningPattern(RewritePattern):
                 rewriter.erase_op(hold_op)
             self.if_op_with_mcm_4_flatten[target_outer_if_op]["flattened"] = True
 
-    # pylint: disable-next=too-many-branches,too-many-arguments,too-many-statements
-    def move_inner_if_op_2_outer(
+    def _analyze_ssa_dependencies(
         self,
         inner_op: scf.IfOp,
         outer_if_op: scf.IfOp,
         new_outer_if_op_output: list[SSAValue],
         new_outer_if_op_output_types: list[Type],
-        where_to_insert: scf.IfOp,
-        holder_returns: dict[scf.IfOp, scf.IfOp],
-        rewriter: PatternRewriter,
-    ) -> None:
-        """Move inner IfOp after the outer IfOp."""
-
+    ) -> list[SSAValue]:
+        """Analyze SSA value dependencies between inner and outer IfOps."""
         definition_outer = self.analyze_definitions_for_ops([outer_if_op])
         missing_values_inner = self.analyze_missing_values_for_ops([inner_op])
 
@@ -363,11 +358,15 @@ class IfOperatorPartitioningPattern(RewritePattern):
                 new_outer_if_op_output.append(mv)
                 new_outer_if_op_output_types.append(mv.type)
 
+        return missing_values_inner
+
+    def _prepare_quantum_registers_and_attributes(
+        self, inner_op: scf.IfOp, where_to_insert: scf.IfOp, missing_values_inner: list[SSAValue]
+    ):
+        """Prepare quantum registers and attributes for inner IfOp transformation."""
         inner_results = inner_op.results
 
-        # Replace the qreg from the inner IfOp with the immediate outer IfOp qreg.
-        # This doesn't affect the inner IfOp since its qreg is only used
-        # in quantum ops inside its regions.
+        # Replace the qreg from the inner IfOp with the immediate outer IfOp qreg
         qreg_from_if_op_inner = [
             mv for mv in missing_values_inner if isinstance(mv.type, quantum.QuregType)
         ]
@@ -393,66 +392,63 @@ class IfOperatorPartitioningPattern(RewritePattern):
             # Add a new attribute to mark it as flattened
             inner_op.attributes["old_return"] = builtin.StringAttr("true")
 
-        # expand the current attr_dict
+        # Expand the current attr_dict
         attr_dict = inner_op.attributes.copy()
         attr_dict.update({"flattened": builtin.StringAttr("true")})
 
-        ############################################################################################
-        # Create new inner IfOp with updated regions
+        return qreg_from_if_op_inner[0], qreg_from_if_op_outer[0], attr_dict
 
-        # ------------------------------------------------------------------------------------------
+    def _create_new_inner_if_regions(
+        self,
+        inner_op: scf.IfOp,
+        where_to_insert: scf.IfOp,
+        qreg_inner: SSAValue,
+        qreg_outer: SSAValue,
+        attr_dict: dict,
+    ):
+        """Create new regions for the inner IfOp with updated quantum register mappings."""
         # Inner true region
-
-        # Create comprehensive value mapping for all values used in both regions
-        value_mapper = {}
-        value_mapper[qreg_from_if_op_inner[0]] = qreg_from_if_op_outer[0]
-
+        value_mapper = {qreg_inner: qreg_outer}
         inner_true_region = inner_op.true_region
-
         true_ops = list(inner_true_region.blocks[0].ops)
-
         new_true_block = Block()
-
         self.clone_operations_to_block(true_ops, new_true_block, value_mapper)
 
-        # ------------------------------------------------------------------------------------------
         # Inner false region
-
         false_inner_ops = list(inner_op.false_region.blocks[0].ops)
 
-        new_false_block = None
-
         if len(false_inner_ops) == 1 and isinstance(false_inner_ops[0], scf.YieldOp):
-            # If the false region only contains a yield operation, we can create an empty block
-
-            # Create a new empty block for false region
+            # If the false region only contains a yield operation, create an empty block
             new_false_block = Block()
-
-            # Create a yield op for false region using the same return types
             yield_false = scf.YieldOp(where_to_insert.results[0])
-
-            # Create a new empty block for false region
             new_false_block.add_op(yield_false)
-
         else:
             # If the false region contains other operations, clone them as usual
             false_block_inner = inner_op.false_region.detach_block(0)
             false_ops = list(false_block_inner.ops)
-
             new_false_block = Block()
-
-            value_mapper = {qreg_from_if_op_inner[0]: qreg_from_if_op_outer[0]}
+            value_mapper = {qreg_inner: qreg_outer}
             self.clone_operations_to_block(false_ops, new_false_block, value_mapper)
 
         new_if_op_attrs = where_to_insert.attributes.copy()
         new_if_op_attrs.update(attr_dict or {})
-        # ------------------------------------------------------------------------------------------
-        # Create new IfOp with cloned regions
 
-        # Check if we need to update the conditional. If the conditional
-        # doesn't depend on previous IfOp results
-        # that have been removed, then we need to update it
+        return new_true_block, new_false_block, new_if_op_attrs
+
+    def _create_and_insert_new_inner_if_op(
+        self,
+        inner_op: scf.IfOp,
+        where_to_insert: scf.IfOp,
+        new_true_block: Block,
+        new_false_block: Block,
+        new_if_op_attrs: dict,
+        holder_returns: dict,
+        missing_values_inner: list[SSAValue],
+        rewriter: PatternRewriter,
+    ):
+        """Create and insert the new inner IfOp, handling conditional updates."""
         needs_to_update_conditional = True
+        inner_results = inner_op.results
 
         if inner_op.cond.owner.attributes.get("old_return", None) is not None and isinstance(
             inner_op.cond.owner, scf.IfOp
@@ -466,7 +462,6 @@ class IfOperatorPartitioningPattern(RewritePattern):
                 if res in missing_values_inner:
                     remove_index = missing_values_inner.index(res)
                     missing_values_inner.pop(remove_index)
-
         else:
             conditional = inner_op.cond
 
@@ -497,14 +492,20 @@ class IfOperatorPartitioningPattern(RewritePattern):
                         unused_op = op
             if update_unused_cond:
                 inner_op.cond.replace_by(unused_op.cond)
-        ############################################################################################
-        # Create a new outer IfOp that includes the new outputs needed from the inner IfOp
 
-        # ------------------------------------------------------------------------------------------
+        return new_inner_op, where_to_insert, needs_to_update_conditional
+
+    def _create_and_update_outer_if_op(
+        self,
+        outer_if_op: scf.IfOp,
+        missing_values_inner: list[SSAValue],
+        needs_to_update_conditional: bool,
+        new_inner_op: scf.IfOp,
+        rewriter: PatternRewriter,
+    ) -> scf.IfOp:
+        """Create a new outer IfOp with updated yields to include values from inner IfOp."""
         # Outer true block
-
         true_block = outer_if_op.true_region.detach_block(0)
-
         true_yield_op = [op for op in true_block.ops if isinstance(op, scf.YieldOp)][-1]
 
         # Merge the existing true yield operands with the missing values from inner IfOp
@@ -514,15 +515,10 @@ class IfOperatorPartitioningPattern(RewritePattern):
         return_types = [new_r.type for new_r in new_res]
 
         new_true_yield_op = scf.YieldOp(*new_res)
-
         rewriter.replace_op(true_yield_op, new_true_yield_op)
 
-        # ------------------------------------------------------------------------------------------
         # Outer false block
-
-        # Detach the false block to preserve SSA dependencies
         false_block = outer_if_op.false_region.detach_block(0)
-
         false_op_res = []
 
         if needs_to_update_conditional:
@@ -531,14 +527,10 @@ class IfOperatorPartitioningPattern(RewritePattern):
             rewriter.insert_op(false_op, InsertPoint.at_start(false_block))
 
         false_yield_op = [op for op in false_block.ops if isinstance(op, scf.YieldOp)][-1]
-
         new_res = list(false_yield_op.operands) + false_op_res
-
         new_false_yield_op = scf.YieldOp(*new_res)
-
         rewriter.replace_op(false_yield_op, new_false_yield_op)
 
-        # ------------------------------------------------------------------------------------------
         # Create new IfOp with cloned regions
         new_outer_if_op = scf.IfOp(
             outer_if_op.cond,
@@ -548,7 +540,7 @@ class IfOperatorPartitioningPattern(RewritePattern):
             outer_if_op.attributes.copy(),
         )
 
-        # Add it at the top of the block
+        # Add it before the old outer IfOp
         rewriter.insert_op(new_outer_if_op, InsertPoint.before(outer_if_op))
 
         for old_result, new_result in zip(outer_if_op.results, new_outer_if_op.results):
@@ -556,15 +548,61 @@ class IfOperatorPartitioningPattern(RewritePattern):
 
         rewriter.erase_op(outer_if_op)
 
-        outer_if_op = new_outer_if_op
-
         if needs_to_update_conditional:
             new_cond = new_inner_op.cond
             new_cond.replace_by_if(
-                outer_if_op.results[-1], lambda use: use.operation in [new_inner_op]
+                new_outer_if_op.results[-1], lambda use: use.operation in [new_inner_op]
             )
 
-        return where_to_insert, outer_if_op
+        return new_outer_if_op
+
+    # pylint: disable-next=too-many-arguments
+    def move_inner_if_op_2_outer(
+        self,
+        inner_op: scf.IfOp,
+        outer_if_op: scf.IfOp,
+        new_outer_if_op_output: list[SSAValue],
+        new_outer_if_op_output_types: list[Type],
+        where_to_insert: scf.IfOp,
+        holder_returns: dict[scf.IfOp, scf.IfOp],
+        rewriter: PatternRewriter,
+    ) -> None:
+        """Move inner IfOp after the outer IfOp."""
+
+        missing_values_inner = self._analyze_ssa_dependencies(
+            inner_op, outer_if_op, new_outer_if_op_output, new_outer_if_op_output_types
+        )
+
+        qreg_inner, qreg_outer, attr_dict = self._prepare_quantum_registers_and_attributes(
+            inner_op, where_to_insert, missing_values_inner
+        )
+
+        new_true_block, new_false_block, new_if_op_attrs = self._create_new_inner_if_regions(
+            inner_op, where_to_insert, qreg_inner, qreg_outer, attr_dict
+        )
+
+        new_inner_op, where_to_insert, needs_to_update_conditional = (
+            self._create_and_insert_new_inner_if_op(
+                inner_op,
+                where_to_insert,
+                new_true_block,
+                new_false_block,
+                new_if_op_attrs,
+                holder_returns,
+                missing_values_inner,
+                rewriter,
+            )
+        )
+
+        new_outer_if_op = self._create_and_update_outer_if_op(
+            outer_if_op,
+            missing_values_inner,
+            needs_to_update_conditional,
+            new_inner_op,
+            rewriter,
+        )
+
+        return where_to_insert, new_outer_if_op
 
     def split_if_ops(self, rewriter: PatternRewriter) -> None:
         """Split all scf.IfOps containing MCMs into separate branches."""
