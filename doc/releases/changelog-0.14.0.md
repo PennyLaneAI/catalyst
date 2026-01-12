@@ -29,8 +29,8 @@
   import catalyst
 
   @qml.qjit(autograph=True)
-  @qml.transforms.cancel_inverses
-  @qml.transforms.merge_rotations
+  @catalyst.passes.cancel_inverses
+  @catalyst.passes.merge_rotations
   @qml.qnode(qml.device("null.qubit", wires=3))
   def circuit(x, y):
       qml.X(0)
