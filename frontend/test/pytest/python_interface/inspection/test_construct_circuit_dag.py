@@ -759,7 +759,10 @@ class TestGetLabel:
     def test_global_phase_operator(self):
         """Tests against a GlobalPhase operator instance."""
         assert get_label(qml.GlobalPhase(0.5)) == "GlobalPhase"
-        assert get_label(qml.ctrl(qml.GlobalPhase(0.0), control=0)) == "C(GlobalPhase)"
+        assert (
+            get_label(qml.ctrl(qml.GlobalPhase(0.0), control=0))
+            == "<name> C(GlobalPhase)|<wire> [0]"
+        )
         assert get_label(qml.adjoint(qml.GlobalPhase(0.0))) == "Adjoint(GlobalPhase)"
 
     @pytest.mark.parametrize(
@@ -1533,6 +1536,8 @@ class TestOperatorConnectivity:
         def my_circuit():
             qml.X(0)
             qml.GlobalPhase(0.5)
+            qml.adjoint(qml.GlobalPhase(0.5))
+            qml.ctrl(qml.GlobalPhase, control=0)(0.5)
             qml.Y(0)
 
         module = my_circuit()
@@ -1544,13 +1549,15 @@ class TestOperatorConnectivity:
         edges = utility.dag_builder.edges
         nodes = utility.dag_builder.nodes
 
-        # Ensure globalphase shows up
+        # Ensure disjoint globalphase nodes show up
         assert "GlobalPhase" in nodes["node2"]["label"]
+        assert "Adjoint(GlobalPhase)" in nodes["node3"]["label"]
 
         # Ensure proper connectivity
         expected_edges = (
             ("NullQubit", "PauliX"),
-            ("PauliX", "PauliY"),
+            ("PauliX", "C(GlobalPhase)"),
+            ("C(GlobalPhase)", "PauliY"),
         )
         assert_dag_structure(nodes, edges, expected_edges)
 
@@ -2678,6 +2685,7 @@ class TestCtrl:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
@@ -2702,6 +2710,7 @@ class TestCtrl:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
@@ -2726,6 +2735,7 @@ class TestCtrl:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
@@ -2752,6 +2762,7 @@ class TestCtrl:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
@@ -2789,6 +2800,8 @@ class TestAdjoint:
         clusters = utility.dag_builder.clusters
         nodes = utility.dag_builder.nodes
 
+        assert len(nodes) == 2
+
         # cluster0 -> qjit
         # cluster1 -> my_workflow
         assert clusters["cluster2"]["label"] == "adjoint"
@@ -2814,6 +2827,7 @@ class TestAdjoint:
 
         clusters = utility.dag_builder.clusters
         nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
@@ -2840,6 +2854,7 @@ class TestAdjoint:
 
         clusters = utility.dag_builder.clusters
         nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
