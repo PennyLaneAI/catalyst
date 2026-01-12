@@ -49,6 +49,7 @@ def convert_pytype_to_shaped_array(ty):
 # pylint: disable=too-many-return-statements
 def convert_numpy_dtype_to_mlir(dtp):
     """Convert dtype to MLIR. Raise ValueError if no conversion is possible"""
+    num_bytes = np.dtype(dtp).itemsize
     if dtp == np.dtype(np.complex128):
         base = ir.F64Type.get()
         return ir.ComplexType.get(base)
@@ -61,14 +62,11 @@ def convert_numpy_dtype_to_mlir(dtp):
         return ir.F32Type.get()
     elif dtp == np.dtype(np.bool_):
         return ir.IntegerType.get_signless(1)
-    elif dtp == np.dtype(np.int8):
-        return ir.IntegerType.get_signless(8)
-    elif dtp == np.dtype(np.int16):
-        return ir.IntegerType.get_signless(16)
-    elif dtp == np.dtype(np.int32):
-        return ir.IntegerType.get_signless(32)
-    elif dtp == np.dtype(np.int64):
-        return ir.IntegerType.get_signless(64)
+    elif np.issubdtype(dtp, np.signedinteger):
+        return ir.IntegerType.get_signless(8 * num_bytes)
+    elif np.issubdtype(dtp, np.unsignedinteger):
+        return ir.IntegerType.get_unsigned(8 * num_bytes)
+
     raise ValueError("Requested type conversion not available.")
 
 
