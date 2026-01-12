@@ -195,15 +195,9 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
             If the ``level`` argument provided is larger than the number of passes present in the
             compilation pipeline.
 
-    .. warning::
-
-        This function only visualizes quantum operations contained in workflows involving a single
-        ``qjit``-compiled QNode. Workflows involving multiple QNodes or operations outside QNodes
-        cannot yet be visualized.
-
-        Only transformations found within the Catalyst compiler can be visualized. Any PennyLane
-        tape transform will have already been applied before lowering to MLIR and will appear as
-        the base state (``level=0``) in this visualization.
+        Lastly, ``catalyst.draw_graph`` is currently not compatible with dynamic wire allocation.
+        This includes :func:`pennylane.allocation.allocate` and dynamic wire allocation that may
+        occur in MLIR directly (via ``quantum.alloc_qb`` instructions).
 
     **Example**
 

@@ -1270,6 +1270,19 @@ the ``@qjit`` decorator is applied.
 
 Currently, however, this is not the case for the following functionalities.
 
+- **Graph-based decompositions**: Graph-based decompositions can be enabled via
+  :func:`pennylane.decomposition.enable_graph`. Scenarios can happen in which 
+  the graph may use different solutions non-deterministically if there exist 
+  intermediate decompositions that have the same overall cost. This phenomenon
+  is not an issue, except for in cases where intermediate gates are not
+  executable with ``qjit`` present. An example of such a gate is 
+  ``qml.PauliRot``; if an intermediate decomposition is chosen that includes
+  a ``qml.PauliRot`` instance, Catalyst cannot execute the program. If this 
+  behaviour is encountered, this can be counteracted by adding a prohibitively
+  large penalty to the graph solution should it encounter a ``qml.PauliRot`` 
+  instance (e.g., 
+  ``qml.transforms.decomopose(..., gate_set={..., qml.PauliRot: 100_000})``).
+
 - **Measurement behaviour**: :func:`catalyst.measure` currently behaves
   differently from its PennyLane counterpart :func:`pennylane.measure`.
   In particular:
@@ -1289,7 +1302,7 @@ Currently, however, this is not the case for the following functionalities.
     ignored in Catalyst. The reason is that the only supported mode is to always allocate in the
     zero state.
 
-  - Related to the above point, in PennyLane, dynamic wire allocations do not 
+  - Related to the above point, in PennyLane, dynamic wire allocations do not
     increase the total number of wires used in the circuit. This is because
     PennyLane treats the number of wires during device initialization (the 
     ``qml.device("...", wires=N)``) as the device capacity. Briefly, when 
@@ -1318,4 +1331,40 @@ Currently, however, this is not the case for the following functionalities.
         return qml.probs(wires=[0])
 
   >>> print(circuit())
-    NotImplementedError: Dynamically allocated wires cannot be used in quantum adjoints yet.
+  NotImplementedError: Dynamically allocated wires cannot be used in quantum adjoints yet.
+
+  - Usage of ``qml.allocate()`` with Catalyst prohibits returning any terminal measurement
+    *except for* ``qml.probs``. This is due to a bug in Lightning.
+    Other measurement types (``qml.sample``, ``qml.expval``, ``qml.var``, etc.)
+    will be supported in the future after the underlying bug is fixed.
+
+  .. code-block:: python
+
+    qml.capture.enable()
+
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=3, shots=10))
+    def circuit():
+        with qml.allocate(2) as qs:
+            qml.X(qs[1])
+        return qml.sample(wires=[0, 1])
+
+  >>> circuit()
+  CompileError: Only probability measurements (qml.probs) are currently supported
+  when dynamic allocations are present in the program. Other measurement
+  types (qml.sample, qml.expval, qml.var, ...etc) will be supported
+  in a future release after the underlying bug is fixed.
+
+  .. code-block:: python
+
+    qml.capture.enable()
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit():
+        with qml.allocate(1) as q:
+            qml.X(q[0])
+        return qml.probs(wires=[0])
+
+  >>> circuit()
+  Array([1., 0.], dtype=float64)
