@@ -14,6 +14,7 @@
 """Unit test module for the tree-traversal transform"""
 
 # pylint: disable=too-many-lines
+# pylint: disable=line-too-long
 
 import numpy as np
 import pennylane as qml
@@ -206,7 +207,7 @@ class TestTreeTraversalPassBase:
         run_filecheck(program, pipeline)
 
     def test_many_mcm(self, run_filecheck):
-        """Test tree traversal pass with a function containing many MCM (mid-circuit measurement) operations."""
+        """Test tree traversal pass with a function containing many MCM operations."""
         # Circuit Test:
         # def c():
         #     qml.X(0)
@@ -608,8 +609,8 @@ class TestTreeTraversalPassBase:
         ],
     )
     def test_result_validation_multiple_measurements(self, shots, postselect, reset, measure_f):
-        """Tests that DefaultQubit handles a circuit with a single mid-circuit measurement with reset
-        and a conditional gate. Multiple measurements of the mid-circuit measurement value are
+        """Tests that DefaultQubit handles a circuit with a single mid-circuit measurement with
+        reset and a conditional gate. Multiple measurements of the mid-circuit measurement value are
         performed. This function also tests `reset` parametrizing over the parameter."""
 
         dev = qml.device("lightning.qubit", wires=3)
@@ -1789,8 +1790,8 @@ class TestTreeTraversalPassStaticForLoop:
         ],
     )
     def test_multiple_measurements(self, shots, postselect, reset, measure_f):
-        """Tests that DefaultQubit handles a circuit with a single mid-circuit measurement with reset
-        and a conditional gate. Multiple measurements of the mid-circuit measurement value are
+        """Tests that DefaultQubit handles a circuit with a single mid-circuit measurement with
+        reset and a conditional gate. Multiple measurements of the mid-circuit measurement value are
         performed. This function also tests `reset` parametrizing over the parameter."""
 
         dev = qml.device("lightning.qubit", wires=3, seed=42)

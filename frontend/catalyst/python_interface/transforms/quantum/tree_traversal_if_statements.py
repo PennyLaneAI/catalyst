@@ -250,49 +250,67 @@ class IfOperatorPartitioningPattern(RewritePattern):
                     collector.remove(op)
                 collector.append(op)
 
-    def flatten_nested_IfOps(
-        self, rewriter: PatternRewriter
-    ) -> None:  # pylint: disable=too-many-branches
+    def _find_deepest_if_ops_to_flatten(self):
+        """Find the deepest outer IfOps that need to be flattened."""
+        deepest = 0
+        deepest_op = None
+
+        for outer_if_op, inner_data in self.if_op_with_mcm_4_flatten.items():
+            depth = inner_data["depth"]
+            if depth > deepest and not inner_data["flattened"]:
+                deepest = depth
+                deepest_op = outer_if_op
+
+        return deepest_op
+
+    def _update_if_op_references(
+        self, old_op: scf.IfOp, new_op: scf.IfOp, to_insert: scf.IfOp = None
+    ):
+        """Update references to an IfOp in tracking dictionaries."""
+        if old_op == new_op:
+            return
+
+        # Update the key in the flatten dict
+        if old_op in self.if_op_with_mcm_4_flatten:
+            self.if_op_with_mcm_4_flatten[new_op] = self.if_op_with_mcm_4_flatten.pop(old_op)
+
+        # Update references in inner lists
+        if to_insert is not None:
+            for value in self.if_op_with_mcm_4_flatten.values():
+                if old_op in value["inners"]:
+                    idx = value["inners"].index(old_op)
+                    value["inners"][idx] = new_op
+                    value["inners"].insert(idx + 1, to_insert)
+        else:
+            for value in self.if_op_with_mcm_4_flatten.values():
+                if old_op in value["inners"]:
+                    idx = value["inners"].index(old_op)
+                    value["inners"][idx] = new_op
+
+        # Update final_if_ops_with_mcm set
+        if old_op in self.final_if_ops_with_mcm:
+            self.final_if_ops_with_mcm.remove(old_op)
+            self.final_if_ops_with_mcm.add(new_op)
+
+    def flatten_nested_IfOps(self, rewriter: PatternRewriter) -> None:
         """Flatten nested scf.IfOps into a single level scf.IfOp."""
-
-        def find_deepest_if_ops_2_flat():
-            """Find all outer IfOps that need to be flattened with their inner IfOps."""
-
-            deepest = 0
-            deepest_op = None
-
-            for outer_if_op, inner_data in self.if_op_with_mcm_4_flatten.items():
-                depth = inner_data["depth"]
-
-                if depth > deepest and not inner_data["flattened"]:
-                    deepest = depth
-                    deepest_op = outer_if_op
-
-            return deepest_op
-
         # Flatten until no more nested IfOps
         while True:
-            target_outer_if_op = find_deepest_if_ops_2_flat()
-
+            target_outer_if_op = self._find_deepest_if_ops_to_flatten()
             if target_outer_if_op is None:
                 break
 
             # Set outer IfOp
             new_outer_if_op_output = list(target_outer_if_op.results)
             new_outer_if_op_output_types = [out.type for out in target_outer_if_op.results]
-
             where_to_insert = target_outer_if_op
 
             # Set inner IfOps
             inner_if_list = self.if_op_with_mcm_4_flatten[target_outer_if_op]["inners"]
-
-            # Holder for IfOps that are kept for updating SSA values later
             holder_returns: dict[scf.IfOp, scf.IfOp] = {}
-
             inner_count = 1
 
             for inner_op in inner_if_list:
-
                 # Move inner IfOp to outer IfOp
                 new_inner_if_op, new_outer_if_op = self.move_inner_if_op_2_outer(
                     inner_op,
@@ -304,53 +322,19 @@ class IfOperatorPartitioningPattern(RewritePattern):
                     rewriter,
                 )
 
-                # Update references in the if_op_with_mcm_4_flatten dictionary for inner_if_op
-                if new_inner_if_op != inner_op:
-                    # Update the key
-                    if new_inner_if_op in self.if_op_with_mcm_4_flatten:
-                        self.if_op_with_mcm_4_flatten[new_inner_if_op] = (
-                            self.if_op_with_mcm_4_flatten.pop(inner_op)
-                        )
-                    # Update any references to inner_op in other inner lists
-                    for value in self.if_op_with_mcm_4_flatten.values():
-                        if inner_op in value["inners"]:
-                            idx = value["inners"].index(inner_op)
-                            value["inners"][idx] = new_inner_if_op
+                # Update references
+                self._update_if_op_references(inner_op, new_inner_if_op)
+                self._update_if_op_references(
+                    target_outer_if_op, new_outer_if_op, to_insert=new_inner_if_op
+                )
 
-                    if inner_op in self.final_if_ops_with_mcm:
-                        self.final_if_ops_with_mcm.remove(inner_op)
-                        self.final_if_ops_with_mcm.add(new_inner_if_op)
-
-                # Update where_to_insert for next inner IfOp
                 where_to_insert = new_inner_if_op
-
-                # Update target_outer_if_op reference if it has changed
-                if target_outer_if_op != new_outer_if_op:
-                    self.if_op_with_mcm_4_flatten[new_outer_if_op] = (
-                        self.if_op_with_mcm_4_flatten.pop(target_outer_if_op)
-                    )
-
-                    # Update target_outer_if_op in any inner_if_list that may refer to it
-                    for value in self.if_op_with_mcm_4_flatten.values():
-                        if target_outer_if_op in value["inners"]:
-                            idx = value["inners"].index(target_outer_if_op)
-                            value["inners"][idx] = new_outer_if_op
-                            value["inners"].insert(idx + inner_count, new_inner_if_op)
-
-                    if target_outer_if_op in self.final_if_ops_with_mcm:
-                        self.final_if_ops_with_mcm.remove(target_outer_if_op)
-                        self.final_if_ops_with_mcm.add(new_outer_if_op)
-
-                # Update target_outer_if_op for next iteration
                 target_outer_if_op = new_outer_if_op
-
                 inner_count += 1
 
-            # Detach and erase old outer if op
+            # Cleanup
             for hold_op in holder_returns:
                 rewriter.erase_op(hold_op)
-
-            # Mark as flattened
             self.if_op_with_mcm_4_flatten[target_outer_if_op]["flattened"] = True
 
     # pylint: disable-next=too-many-branches,too-many-arguments,too-many-statements
