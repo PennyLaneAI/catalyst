@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef QUANTUM_TYPES
+#define QUANTUM_TYPES
+
 include "mlir/IR/AttrTypeBase.td"
 
 include "Quantum/IR/QuantumDialect.td"
@@ -37,3 +40,5 @@ def ObservableType : Quantum_Type<"Observable", "obs"> {
 def ResultType : Quantum_Type<"Result", "res"> {
     let summary = "A quantum measurement result.";
 }
+
+#endif // QUANTUM_TYPES
