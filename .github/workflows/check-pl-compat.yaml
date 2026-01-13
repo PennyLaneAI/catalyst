@@ -115,6 +115,7 @@ jobs:
     - name: Install Catalyst (stable)
       if: ${{ inputs.catalyst == 'stable' }}
       run: |
+        sudo apt-get install -y graphviz
         pip install pennylane-catalyst
 
     - name: Install Catalyst (latest)
