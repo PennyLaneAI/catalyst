@@ -2,13 +2,50 @@ name: Validate xDSL Dialects
 on:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  constants:
+    name: Get Constants
+    uses: ./.github/workflows/constants.yaml
+    with:
+      runs_on: ubuntu-24.04
+
   compare-dialects:
     name: Compare xDSL and MLIR Dialects
+    needs: constants
     runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
-      - name: Checkout Catalyst
-        uses: actions/checkout@v4
-        with:
-          ref: main
+    - name: Checkout Catalyst
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ needs.constants.outputs.primary_python_version }}
+
+    - name: Get Cached LLVM Build
+      id: cache-llvm-build
+      uses: actions/cache/restore@v4
+      with:
+        path: llvm-build
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
+        fail-on-cache-miss: true
+
+    - name: Install Catalyst
+      run: |
+        # We don't need to build Catalyst from scratch as we only need the installation
+        # to use the xDSl dialects
+        make frontend
+
+    - name: Verify dialects
+      run: |
+        OPTIONS="--llvm-build $(pwd)/llvm-build --catalyst-root $GITHUB_WORKSPACE"
+        python3 $GITHUB_WORKSPACE/.github/compare_xdsl_tblgen.py $OPTIONS
+
