@@ -35,6 +35,7 @@ from operator import is_not
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
+from catalyst.tracing.type_signatures import verify_static_argnums_type
 from catalyst.utils.exceptions import CompileError
 
 PipelineStage = Tuple[str, List[str]]
@@ -168,6 +169,8 @@ class CompileOptions:
             self.static_argnums = (static_argnums,)
         elif isinstance(static_argnums, Iterable):
             self.static_argnums = tuple(static_argnums)
+
+        verify_static_argnums_type(self.static_argnums)
 
         if self.pass_plugins is None:
             self.pass_plugins = set()

@@ -45,10 +45,10 @@ def catalyst_execute_jaxpr(jaxpr):
         """A variant of catalyst.QJIT with a pre-constructed jaxpr."""
 
         # pylint: disable=missing-function-docstring
-        def capture(self, args):
+        def capture(self, args, kwargs={}):
 
             result_treedef = jax.tree_util.tree_structure((0,) * len(jaxpr.out_avals))
-            arg_signature = catalyst.tracing.type_signatures.get_abstract_signature(args)
+            arg_signature = catalyst.tracing.type_signatures.get_abstract_args(args, kwargs)
 
             return jaxpr, None, result_treedef, arg_signature
 

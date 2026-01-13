@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 import random
 import warnings
 from functools import partial
@@ -28,8 +29,8 @@ from catalyst import for_loop, grad, measure, qjit
 from catalyst.jax_primitives import _scalar_abstractify
 from catalyst.tracing.type_signatures import (
     TypeCompatibility,
-    get_abstract_signature,
-    params_are_annotated,
+    all_params_are_annotated,
+    get_abstract_args,
     typecheck_signatures,
 )
 from catalyst.utils.exceptions import CompileError
@@ -482,23 +483,6 @@ class TestShots:
             observed_shape = jnp.shape(observed_val)
             assert expected_shape == observed_shape
 
-    def test_shots_in_callsite_in_sample(self, backend):
-        """Test shots in callsite in sample."""
-
-        max_shots = 500
-        max_wires = 9
-        for x in range(1, 5):
-            shots = random.randint(1, max_shots)
-            wires = random.randint(1, max_wires)
-            expected_shape = (shots, wires)
-            f_aot = fsample_aot_builder(backend, wires=wires)
-            observed_val = f_aot(0.0, shots=shots)  # pylint: disable=unexpected-keyword-arg
-            observed_shape = jnp.shape(observed_val)
-            # We are failing this test because of the type system.
-            # If shots is specified AOT, we would need to recompile
-            # since the types are set at compile time. I.e., before the call.
-            # assert expected_shape == observed_shape
-
 
 class TestPromotionRules:
     """Class to test different promotion rules."""
@@ -582,7 +566,7 @@ class TestSignatureErrors:
 
         string = "hello world"
         with pytest.raises(TypeError, match="<class 'str'> is not a valid JAX type"):
-            get_abstract_signature([string])
+            get_abstract_args([string], {})
 
     def test_incompatible_type_reachable_from_user_code(self):
         """Raise error message for incompatible types"""
@@ -1044,7 +1028,7 @@ class TestParamsAnnotations:
     def test_params_invalid_annotation(self):
         def foo(hello: "BAD ANNOTATION"): ...
 
-        assert not params_are_annotated(foo)
+        assert not all_params_are_annotated(inspect.signature(foo))
 
 
 class TestErrorNestedQNode:
