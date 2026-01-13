@@ -29,6 +29,20 @@ include "QEC/IR/QECOpInterfaces.td"
 
 class QEC_Op<string mnemonic, list<Trait> traits = []> : Op<QECDialect, mnemonic, traits>;
 
+//===----------------------------------------------------------------------===//
+// Attribute constraints
+//===----------------------------------------------------------------------===//
+
+// Constraint for rotation_kind: must be one of ±1, ±2, ±4, ±8
+// The power-of-2 check works because powers of 2 have exactly one bit set.
+def RotationKindConstraint : AttrConstraint<
+    CPred<"[&]() {"
+          "  auto val = ::llvm::cast<::mlir::IntegerAttr>($_self).getInt();"
+          "  auto absVal = val < 0 ? -val : val;"
+          "  return absVal >= 1 && absVal <= 8 && (absVal & (absVal - 1)) == 0;"
+          "}()">,
+    "whose value is ±1, ±2, ±4, or ±8">;
+
 def PrepareStateOp : QEC_Op<"prepare"> {
     let summary = "Initialize existing qubits into a given state.";
     let description = [{
@@ -150,7 +164,7 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {
 
     let description = [{
         The PPRotationOp represents a Pauli product rotation operation on a set of qubits.
-        It applies a rotation of the form exp(iθP) where:
+        It applies a rotation of the form exp(-iθP) where:
         - P is a Pauli product (specified by pauli_product)
         - θ is the rotation angle (specified by rotation_kind in fractions of π)
         
@@ -168,12 +182,12 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {
         %Q_0:3 = qec.ppr ["X", "I", "Z"](4) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
         %Q_1:3 = qec.ppr ["X", "I", "Z"](4) %Q_0[0], %Q_0[1], %Q_0[2] cond(%c0) : !quantum.bit, !quantum.bit, !quantum.bit
         ```
-        This applies exp(iπ/4 * X⊗I⊗Z) to the three qubits.
+        This applies exp(-iπ/4 * X⊗I⊗Z) to the three qubits.
     }];
 
     let arguments = (ins
         PauliWord:$pauli_product,  // The Pauli product to apply (e.g., ["X", "I", "Z"])
-        I16Attr:$rotation_kind,    // Rotation angle in fractions of π (e.g., 4 for π/2)
+        ConfinedAttr<I16Attr, [RotationKindConstraint]>:$rotation_kind,    // Rotation angle in fractions of π (e.g., 4 for π/2)
         Variadic<QubitType>:$in_qubits,  // The qubits to apply the rotation to
         Optional<I1>:$condition
     );
@@ -293,11 +307,11 @@ def PPRotationOp : QEC_Op<"ppr", [QECOpInterface, AttrSizedOperandSegments]> {
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def PPRotationArbitraryOp : QEC_Op<"ppr.arbitrary", [AttrSizedOperandSegments]> {
+def PPRotationArbitraryOp : QEC_Op<"ppr.arbitrary", [QECOpInterface, AttrSizedOperandSegments]> {
     let summary = "Pauli Product Rotation with arbitrary angle.";
     let description = [{
         The PPRotationArbitraryOp represents a Pauli product rotation operation with an arbitrary angle.
-        It applies a rotation of the form exp(iθP) to a set of qubits, where:
+        It applies a rotation of the form exp(-iθP) to a set of qubits, where:
         - P is a Pauli product (specified by pauli_product)
         - θ is the rotation angle (specified by arbitrary_angle in radians)
         
@@ -312,7 +326,7 @@ def PPRotationArbitraryOp : QEC_Op<"ppr.arbitrary", [AttrSizedOperandSegments]> 
         %const = arith.constant 0.14 : f64
         %result = qec.ppr.arbitrary ["X", "Z"](%const) %q0, %q1 : !quantum.bit, !quantum.bit
         ```
-        This applies exp(i0.14 * X⊗Z) to the two qubits.
+        This applies exp(-i0.14 * X⊗Z) to the two qubits.
     }];
 
     let arguments = (ins
@@ -325,6 +339,67 @@ def PPRotationArbitraryOp : QEC_Op<"ppr.arbitrary", [AttrSizedOperandSegments]> 
     let results = (outs
         Variadic<QubitType>:$out_qubits
     );
+
+    let builders = [
+        OpBuilder<
+        (ins
+            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product,
+            "::mlir::Value":$arbitrary_angle,
+            "::mlir::ValueRange":$in_qubits
+        ),[{
+            PPRotationArbitraryOp::build($_builder, $_state,
+            /*out_qubits=*/ mlir::TypeRange(in_qubits),
+            /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product),
+            /*arbitrary_angle=*/ arbitrary_angle,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ nullptr);
+        }]>,
+        // Convenience builder with no condition
+        OpBuilder<
+        (ins
+            "::mlir::TypeRange":$out_qubits,
+            "::mlir::ArrayAttr":$pauli_product,
+            "::mlir::Value":$arbitrary_angle,
+            "::mlir::ValueRange":$in_qubits
+        ),[{
+            PPRotationArbitraryOp::build($_builder, $_state,
+            /*out_qubits=*/ out_qubits,
+            /*pauli_product=*/ pauli_product,
+            /*arbitrary_angle=*/ arbitrary_angle,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ nullptr);
+        }]>,
+        // Convenience builder with ArrayRef<StringRef> with condition
+        OpBuilder<
+        (ins
+            "::mlir::TypeRange":$out_qubits,
+            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product,
+            "::mlir::Value":$arbitrary_angle,
+            "::mlir::ValueRange":$in_qubits
+        ),[{
+            PPRotationArbitraryOp::build($_builder, $_state,
+            /*out_qubits=*/ out_qubits,
+            /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product),
+            /*arbitrary_angle=*/ arbitrary_angle,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ nullptr);
+        }]>,
+        // Convenience builder with no type range
+        OpBuilder<
+        (ins
+            "::mlir::ArrayAttr":$pauli_product,
+            "::mlir::Value":$arbitrary_angle,
+            "::mlir::ValueRange":$in_qubits,
+            "::mlir::Value":$condition
+        ),[{
+            PPRotationArbitraryOp::build($_builder, $_state,
+            /*out_qubits=*/ mlir::TypeRange(in_qubits),
+            /*pauli_product=*/ pauli_product,
+            /*arbitrary_angle=*/ arbitrary_angle,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ condition);
+        }]>,
+    ];
 
     let assemblyFormat = [{
         $pauli_product `(` $arbitrary_angle `)` $in_qubits attr-dict (`cond` `(` $condition^ `)`)? `:` type($out_qubits)
@@ -351,7 +426,7 @@ def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, AttrSizedOperandSegments]> 
         
         Example:
         ```mlir
-        %result, %q0:3 = qec.ppm ["X", "I", "Z"] %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
+        %result, %q0:3 = qec.ppm ["X", "I", "Z"] %q0, %q1, %q2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
         ```
         This measures the three qubits in the X⊗I⊗Z basis.
     }];
@@ -461,7 +536,7 @@ def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, AttrSizedOperandSegments]> 
     ];
 
     let assemblyFormat = [{
-      $pauli_product (`(` $rotation_sign^ `)`)? $in_qubits (`cond` `(` $condition^ `)`)? attr-dict `:` type($out_qubits)
+      $pauli_product (`(` $rotation_sign^ `)`)? $in_qubits (`cond` `(` $condition^ `)`)? attr-dict `:` type(results)
     }];
 
     let hasVerifier = 1;
@@ -491,7 +566,7 @@ def SelectPPMeasurementOp : QEC_Op<"select.ppm"> {
 
     Example:
     ```mlir
-    %m3, %3 = qec.select.ppm (%m1, ["X"], ["Z"]) %1#1 : !quantum.bit
+    %m3, %3 = qec.select.ppm (%m1, ["X"], ["Z"]) %1#1 : i1, !quantum.bit
     ```
     If %m1 == 1, applies "X" to %1#1; else applies "Z". Then measures.
     }];
@@ -543,7 +618,7 @@ def SelectPPMeasurementOp : QEC_Op<"select.ppm"> {
     ];
 
     let assemblyFormat = [{
-      `(` $select_switch `,` $pauli_product_0 `,` $pauli_product_1 `)` $in_qubits attr-dict `:` type($out_qubits)
+      `(` $select_switch `,` $pauli_product_0 `,` $pauli_product_1 `)` $in_qubits attr-dict `:` type(results)
     }];
     
     let hasVerifier = 1;

@@ -14,12 +14,16 @@
 
 #define DEBUG_TYPE "to-ppr"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#include "Quantum/IR/QuantumOps.h"
 
 #include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
-#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -28,28 +32,37 @@ using namespace catalyst::qec;
 namespace catalyst {
 namespace qec {
 
-#define GEN_PASS_DEF_CLIFFORDTTOPPRPASS
+#define GEN_PASS_DEF_TOPPRPASS
 #include "QEC/Transforms/Passes.h.inc"
 
-struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {
-    using CliffordTToPPRPassBase::CliffordTToPPRPassBase;
+struct ToPPRPass : impl::ToPPRPassBase<ToPPRPass> {
+    using ToPPRPassBase::ToPPRPassBase;
 
     void runOnOperation() final
     {
         auto ctx = &getContext();
         ConversionTarget target(*ctx);
 
-        // Convert MeasureOp and CustomOp
+        // Convert MeasureOp, CustomOp, and PauliRotOp
         target.addIllegalOp<quantum::MeasureOp>();
         target.addIllegalOp<quantum::CustomOp>();
 
         // Conversion target is QECDialect
         target.addLegalDialect<qec::QECDialect>();
+        target.addLegalDialect<mlir::arith::ArithDialect>();
 
         RewritePatternSet patterns(ctx);
-        populateCliffordTToPPRPatterns(patterns);
+        populateToPPRPatterns(patterns);
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
+            return signalPassFailure();
+        }
+
+        // Add canonicalization pass
+        RewritePatternSet canonPatterns(ctx);
+        catalyst::qec::PPRotationOp::getCanonicalizationPatterns(canonPatterns, ctx);
+        catalyst::qec::PPRotationArbitraryOp::getCanonicalizationPatterns(canonPatterns, ctx);
+        if (failed(applyPatternsGreedily(getOperation(), std::move(canonPatterns)))) {
             return signalPassFailure();
         }
     }

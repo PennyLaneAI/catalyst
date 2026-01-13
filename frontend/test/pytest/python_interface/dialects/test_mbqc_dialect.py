@@ -11,22 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Unit tests for the xDSL MBQC dialect."""
-
+# pylint: disable=line-too-long
 
 import pytest
-
-# pylint: disable=wrong-import-position,line-too-long
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, test
 from xdsl.parser import Parser
 from xdsl.utils.exceptions import VerifyException
 
 from catalyst.python_interface.dialects import Quantum, mbqc
+
+pytestmark = pytest.mark.xdsl
 
 all_ops = list(mbqc.MBQC.operations)
 all_attrs = list(mbqc.MBQC.attributes)

@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test module for the merge rotations transform"""
-import pytest
-
-# pylint: disable=wrong-import-position,line-too-long
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
+# pylint: disable=line-too-long
 
 import pennylane as qml
+import pytest
 
 from catalyst.python_interface.transforms import MergeRotationsPass, merge_rotations_pass
+
+pytestmark = pytest.mark.xdsl
 
 
 class TestMergeRotationsPass:

@@ -17,15 +17,8 @@
 from typing import TypeAlias
 
 import pytest
-
-# pylint: disable=wrong-import-position
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
 from xdsl.dialects.builtin import AnyAttr, TensorType, f32, i32, i64
 from xdsl.ir import Attribute
-
-# xdsl imports
 from xdsl.irdl import (
     IRDLOperation,
     attr_def,
@@ -47,6 +40,7 @@ from catalyst.python_interface.xdsl_extras.traits import (
     SameOperandsElementType,
 )
 
+pytestmark = pytest.mark.xdsl
 AnyTensorType: TypeAlias = TensorType[Attribute]
 
 

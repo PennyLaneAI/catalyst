@@ -220,18 +220,15 @@ LogicalResult ValueAndGradOp::verifySymbolUses(SymbolTableCollection &symbolTabl
         }
     }
 
-    for (size_t i = 0; i < callee.getFunctionType().getNumResults(); i++) {
-        // callee (function to be differentiated) always returns a single float
-        // grad type and shape should match the callee's argument's type and shape
-        // match from the tail because constant inputs will have types in the front
-        auto calleeInputType =
-            callee.getFunctionType().getInput(callee.getFunctionType().getNumInputs() - 1 - i);
-        auto gradRtype = grad_types[grad_types.size() - 1 - i];
+    // Each gradient result type must match the type of its corresponding
+    // differentiated operand (indexed by diffArgIndices).
+    for (size_t i = 0; i < diffArgIndices.size(); i++) {
+        auto calleeInputType = callee.getFunctionType().getInput(diffArgIndices[i]);
+        auto gradRtype = grad_types[i];
         if (calleeInputType != gradRtype) {
             return this->emitOpError("result types do not match")
-                   << " result " << i << " should match "
-                   << " was expected to match the type " << gradRtype << " but got "
-                   << calleeInputType;
+                   << " gradient " << i << " (for arg " << diffArgIndices[i] << ")"
+                   << " expected type " << calleeInputType << " but got " << gradRtype;
         }
     }
 

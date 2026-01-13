@@ -11,14 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Unit tests for xDSL utilities."""
+# pylint: disable=line-too-long
 
 import pytest
 
-# pylint: disable=wrong-import-position
 pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
 
 import pennylane as qml
 from jax import jit
@@ -41,6 +39,13 @@ from catalyst.python_interface.conversion import (
 )
 from catalyst.python_interface.dialects import stablehlo
 from catalyst.python_interface.utils import get_constant_from_ssa
+
+from xdsl.dialects import arith, builtin, tensor, test
+
+from catalyst.python_interface.dialects.stablehlo import ConstantOp as hloConstantOp
+from catalyst.python_interface.utils import get_constant_from_ssa, get_pyval_from_xdsl_attr
+
+pytestmark = pytest.mark.xdsl
 
 
 class TestGetConstantFromSSA:

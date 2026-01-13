@@ -18,14 +18,23 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "Ion/IR/IonInfo.h"
 #include "Ion/Transforms/oqd_database_managers.hpp"
 
 namespace catalyst {
 namespace ion {
-
+// Gates to pulses conversion patterns
 void populateGatesToPulsesPatterns(mlir::RewritePatternSet &, const OQDDatabaseManager &);
 void populateConversionPatterns(mlir::LLVMTypeConverter &typeConverter,
                                 mlir::RewritePatternSet &patterns);
+
+// Ion to RTIO conversion patterns
+void populateIonPulseToRTIOPatterns(mlir::TypeConverter &typeConverter,
+                                    mlir::RewritePatternSet &patterns, const IonInfo &ionInfo,
+                                    mlir::DenseMap<mlir::Value, mlir::Value> &qextractToMemrefMap);
+void populateParallelProtocolToRTIOPatterns(mlir::TypeConverter &typeConverter,
+                                            mlir::RewritePatternSet &patterns);
+void populateIonToRTIOFinalizePatterns(mlir::RewritePatternSet &patterns);
 
 } // namespace ion
 } // namespace catalyst
