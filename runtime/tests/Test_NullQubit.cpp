@@ -942,9 +942,9 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
     sim->NamedOperation("T", {}, {Qs[0]}, true);
     sim->NamedOperation("S", {}, {Qs[0]}, false, {Qs[2]});
+    sim->NamedOperation("S", {0.1}, {Qs[0]}, false, {Qs[1], Qs[2]}, {true, true}, {"some_label"});
     sim->NamedOperation("T", {}, {Qs[0]}, true, {Qs[2]});
     sim->NamedOperation("CNOT", {}, {Qs[0], Qs[1]}, false);
-    sim->NamedOperation("PauliRot", {0.1}, {Qs[0]}, false, {}, {}, {"XYZ"});
 
     // Applying an empty matrix is fine for NullQubit
     sim->MatrixOperation({}, {Qs[0]}, false);
