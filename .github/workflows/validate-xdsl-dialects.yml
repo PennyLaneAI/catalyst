@@ -1,0 +1,14 @@
+name: Validate xDSL Dialects
+on:
+  workflow_dispatch:
+
+jobs:
+  compare-dialects:
+    name: Compare xDSL and MLIR Dialects
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout Catalyst
+        uses: actions/checkout@v4
+        with:
+          ref: main
