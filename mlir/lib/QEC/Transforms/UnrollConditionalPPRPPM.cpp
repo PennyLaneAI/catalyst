@@ -52,13 +52,13 @@ struct LowerSelectPPM : public OpRewritePattern<SelectPPMeasurementOp> {
         ArrayAttr pauliProduct1 = op.getPauliProduct_1();
         ValueRange inQubits = op.getInQubits();
 
-        SmallVector<mlir::Type> resultTypes; // (i1, qubits...)
+        SmallVector<mlir::Type> resultTypes; // (i1, qubits)
         resultTypes.push_back(rewriter.getI1Type());
         for (auto qubit : inQubits) {
             resultTypes.push_back(qubit.getType());
         }
 
-        auto ifOp = rewriter.create<scf::IfOp>(loc, resultTypes, selectSwitch, /*hasElse=*/true);
+        auto ifOp = rewriter.create<scf::IfOp>(loc, resultTypes, selectSwitch, true);
         {
             OpBuilder::InsertionGuard guard(rewriter);
             rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
@@ -76,67 +76,6 @@ struct LowerSelectPPM : public OpRewritePattern<SelectPPMeasurementOp> {
             SmallVector<mlir::Value> yieldValues;
             yieldValues.push_back(ppm1.getMres());
             yieldValues.append(ppm1.getOutQubits().begin(), ppm1.getOutQubits().end());
-            rewriter.create<scf::YieldOp>(loc, yieldValues);
-        }
-
-        rewriter.replaceOp(op, ifOp.getResults());
-        return success();
-    }
-};
-
-// Lower qec.ppm cond(...) to scf.if with ppm operation
-//
-// For example:
-// %mres, %out = qec.ppm ["X"] %qubits cond(%cond) : i1, !quantum.bit
-//
-// becomes:
-// %mres, %out = scf.if %cond -> (i1, !quantum.bit) {
-//   %m0, %out0 = qec.ppm ["X"] %qubits : i1, !quantum.bit
-//   scf.yield %m0, %out0 : i1, !quantum.bit
-///
-//   %false = arith.constant false : i1
-//   scf.yield %false, %qubits : i1, !quantum.bit
-// }
-struct LowerCondPPM : public OpRewritePattern<PPMeasurementOp> {
-    using OpRewritePattern::OpRewritePattern;
-
-    LogicalResult matchAndRewrite(PPMeasurementOp op, PatternRewriter &rewriter) const override
-    {
-        // Only match if there's a condition
-        if (!op.getCondition()) {
-            return failure();
-        }
-
-        Location loc = op.getLoc();
-        mlir::Value condition = op.getCondition();
-        ArrayAttr pauliProduct = op.getPauliProduct();
-        ValueRange inQubits = op.getInQubits();
-
-        SmallVector<mlir::Type> resultTypes; // (i1, qubits...)
-        resultTypes.push_back(rewriter.getI1Type());
-        for (auto qubit : inQubits) {
-            resultTypes.push_back(qubit.getType());
-        }
-
-        auto ifOp = rewriter.create<scf::IfOp>(loc, resultTypes, condition, /*hasElse=*/true);
-        {
-            OpBuilder::InsertionGuard guard(rewriter);
-            rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
-            auto ppm = rewriter.create<PPMeasurementOp>(loc, pauliProduct, inQubits);
-            SmallVector<mlir::Value> yieldValues;
-            yieldValues.push_back(ppm.getMres());
-            yieldValues.append(ppm.getOutQubits().begin(), ppm.getOutQubits().end());
-            rewriter.create<scf::YieldOp>(loc, yieldValues);
-        }
-
-        {
-            // Unchanged else block. Returns false for mres and passes through qubits.
-            OpBuilder::InsertionGuard guard(rewriter);
-            rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
-            auto falseConst = rewriter.create<arith::ConstantOp>(loc, rewriter.getBoolAttr(false));
-            SmallVector<mlir::Value> yieldValues;
-            yieldValues.push_back(falseConst);
-            yieldValues.append(inQubits.begin(), inQubits.end());
             rewriter.create<scf::YieldOp>(loc, yieldValues);
         }
 
@@ -178,7 +117,7 @@ struct LowerCondPPR : public OpRewritePattern<PPRotationOp> {
             resultTypes.push_back(qubit.getType());
         }
 
-        auto ifOp = rewriter.create<scf::IfOp>(loc, resultTypes, condition, /*hasElse=*/true);
+        auto ifOp = rewriter.create<scf::IfOp>(loc, resultTypes, condition, true);
         {
             OpBuilder::InsertionGuard guard(rewriter);
             rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
@@ -208,7 +147,6 @@ void populateUnrollConditionalPPRPPMPatterns(RewritePatternSet &patterns)
 {
     patterns.add<LowerSelectPPM>(patterns.getContext());
     patterns.add<LowerCondPPR>(patterns.getContext());
-    patterns.add<LowerCondPPM>(patterns.getContext());
 }
 
 } // namespace qec

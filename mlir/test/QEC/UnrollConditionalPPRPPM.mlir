@@ -42,20 +42,6 @@ func.func @test_ppr_cond(%q : !quantum.bit, %cond : i1) -> !quantum.bit {
 
 // -----
 
-func.func @test_ppm_cond(%q : !quantum.bit, %cond : i1) -> (i1, !quantum.bit) {
-    // CHECK-DAG-NOT: qec.ppm ["Z"] {{.*}} cond({{.*}})
-    // CHECK: scf.if {{.*}} -> (i1, !quantum.bit)
-    // CHECK: [[m1:%.+]], [[q1:%.+]] = qec.ppm ["Z"]
-    // CHECK: scf.yield [[m1]], [[q1]] : i1, !quantum.bit
-    // CHECK: else
-    // CHECK-NOT: qec.ppm
-    // CHECK: scf.yield {{.*}}, {{.*}} : i1, !quantum.bit
-    %m, %q1 = qec.ppm ["Z"] %q cond(%cond) : i1, !quantum.bit
-    func.return %m, %q1 : i1, !quantum.bit
-}
-
-// -----
-
 func.func @test_no_cond(%q : !quantum.bit) -> (i1, !quantum.bit) {
     // CHECK: [[q1:%.+]] = qec.ppr ["X"](4)
     // CHECK: [[q2:%.+]] = qec.ppm ["Y"] [[q1]]
