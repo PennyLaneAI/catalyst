@@ -12,8 +12,13 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Added PauliMeasure and PauliRot to the runtime CAPI and QuantumDevice C++ API.
+  [(2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
+Ali Asadi
+Jeffrey Kam
