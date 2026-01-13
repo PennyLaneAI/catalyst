@@ -15,13 +15,13 @@
 // RUN: quantum-opt --unroll-conditional-ppr-ppm --split-input-file -verify-diagnostics %s | FileCheck %s
 
 func.func @test_select_ppm(%q : !quantum.bit, %cond : i1) -> (i1, !quantum.bit) {
-    // CHECK-DAG-NOT: qec.select.ppm({{.*}}, ["X"], ["Z"])
     // CHECK: scf.if {{.*}} -> (i1, !quantum.bit)
     // CHECK: [[m1:%.+]], [[q1:%.+]] = qec.ppm ["X"]
     // CHECK: scf.yield [[m1]], [[q1]]
     // CHECK: else
     // CHECK: [[m2:%.+]], [[q2:%.+]] = qec.ppm ["Z"]
     // CHECK: scf.yield [[m2]], [[q2]]
+    // CHECK-NOT: qec.select.ppm({{.*}}, ["X"], ["Z"])
     %m, %out = qec.select.ppm (%cond, ["X"], ["Z"]) %q : i1, !quantum.bit
     func.return %m, %out : i1, !quantum.bit
 }
@@ -29,13 +29,13 @@ func.func @test_select_ppm(%q : !quantum.bit, %cond : i1) -> (i1, !quantum.bit) 
 // -----
 
 func.func @test_ppr_cond(%q : !quantum.bit, %cond : i1) -> !quantum.bit {
-    // CHECK-DAG-NOT: qec.ppr["X"](4) {{.*}} cond({{.*}})
     // CHECK: scf.if {{.*}} -> (!quantum.bit)
     // CHECK: [[q1:%.+]] = qec.ppr ["X"](4)
     // CHECK: scf.yield [[q1]] : !quantum.bit
     // CHECK: else
     // CHECK-NOT: qec.ppr
     // CHECK: scf.yield {{.*}} : !quantum.bit
+    // CHECK-NOT: qec.ppr["X"](4) {{.*}} cond({{.*}})
     %q1 = qec.ppr ["X"](4) %q cond(%cond) : !quantum.bit
     func.return %q1 : !quantum.bit
 }
