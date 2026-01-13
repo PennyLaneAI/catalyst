@@ -17,7 +17,7 @@
   This includes `qec.ppr` and `qec.ppr.arbitrary` (lowered to `__catalyst__qis__PauliRot`),
   `qec.ppm` (lowered to `__catalyst__qis__PauliMeasure`). This enables device execution of QEC
   operations through the Catalyst runtime.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#2389)](https://github.com/PennyLaneAI/catalyst/pull/2389)
 
 <h3>Documentation 📝</h3>
 
