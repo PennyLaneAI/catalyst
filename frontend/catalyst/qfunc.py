@@ -114,11 +114,9 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs, pass_pipeline=None):
     if dynamic_one_shot_called:
         return
 
-    mcm_config = copy(
-        qml.devices.MCMConfig(
-            postselect_mode=qnode.execute_kwargs["postselect_mode"],
-            mcm_method=qnode.execute_kwargs["mcm_method"],
-        )
+    mcm_config = qml.devices.MCMConfig(
+        postselect_mode=qnode.execute_kwargs["postselect_mode"],
+        mcm_method=qnode.execute_kwargs["mcm_method"],
     )
     total_shots = qnode._shots.total_shots
     user_specified_mcm_method = mcm_config.mcm_method
