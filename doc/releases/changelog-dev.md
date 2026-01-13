@@ -12,6 +12,11 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* A new compiler pass `unroll-conditional-ppr-ppm` for lowering conditional PPR and PPMs
+  into normal PPR and PPMs with SCF dialect to support runtime execution.
+  [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
+
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
