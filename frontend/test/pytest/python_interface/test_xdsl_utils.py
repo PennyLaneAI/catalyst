@@ -380,7 +380,7 @@ class TestInliningUtils:
 
         mod1_main = func.FuncOp(name="main", function_type=((), ()))
         mod1_func = func.FuncOp(name="not_main", function_type=((), ()))
-        mod1_ops = [mod1_main, mod1_func, test.TestPureOp()]
+        mod1_ops = [test.TestPureOp(), mod1_main, mod1_func]
         mod1 = builtin.ModuleOp(mod1_ops)
 
         mod2_ops = [test.TestOp()]
@@ -389,20 +389,24 @@ class TestInliningUtils:
         inline_module(mod1, mod2, change_main_to=change_main_to)
 
         assert len(mod2.ops) == 4
-        expected_mod2 = builtin.ModuleOp(ops=[op.clone() for op in mod2_ops + mod1_ops])
+        expected_ops = [
+            test.TestOp(),
+            test.TestPureOp(),
+            func.FuncOp(name=change_main_to or "main", function_type=((), ())),
+            func.FuncOp(name="not_main", function_type=((), ())),
+        ]
+        expected_mod2 = builtin.ModuleOp(expected_ops)
         assert mod2.is_structurally_equivalent(expected_mod2)
+        expected_names = {"not_main", change_main_to or "main"}
+        actual_names = set(op.sym_name.data for op in mod2.ops if isinstance(op, func.FuncOp))
+        assert actual_names == expected_names
 
         # Check that mod1 is unchanged
         expected_mod1 = builtin.ModuleOp(ops=[op.clone() for op in mod1_ops])
         assert mod1.is_structurally_equivalent(expected_mod1)
-
-        expected_names = {"not_main", change_main_to or "main"}
-        actual_names = set()
-        for op in mod2.ops:
-            if isinstance(op, func.FuncOp):
-                actual_names.add(op.sym_name.data)
-
-        assert actual_names == expected_names
+        original_names = {"not_main", "main"}
+        actual_mod1_names = set(op.sym_name.data for op in mod1.ops if isinstance(op, func.FuncOp))
+        assert actual_mod1_names == original_names
 
     def test_inline_jit_to_module(self):
         """Test that the inline_jit_to_module function works correctly."""

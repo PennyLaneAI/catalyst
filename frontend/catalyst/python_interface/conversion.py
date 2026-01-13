@@ -122,12 +122,6 @@ def inline_module(
 
     If ``from_mod`` has a ``main`` function, its name is changed to ``change_main_to`` if specified.
     """
-    if change_main_to:
-        main = xSymbolTable.lookup_symbol(from_mod, "main")
-        if main is not None:
-            assert isinstance(main, xfunc.FuncOp)
-            main.properties["sym_name"] = xbuiltin.StringAttr(change_main_to)
-
     for op in from_mod.body.ops:
         clone = op.clone()
         if op.has_trait(SymbolOpInterface):
@@ -136,6 +130,12 @@ def inline_module(
 
         else:
             to_mod.regions[0].blocks[0].add_op(clone)
+
+    if change_main_to:
+        main = xSymbolTable.lookup_symbol(to_mod, "main")
+        if main is not None:
+            assert isinstance(main, xfunc.FuncOp)
+            main.properties["sym_name"] = xbuiltin.StringAttr(change_main_to)
 
 
 def inline_jit_to_module(func: JaxJittedFunction, mod: xbuiltin.ModuleOp) -> Callable[..., None]:
