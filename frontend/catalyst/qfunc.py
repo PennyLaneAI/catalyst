@@ -20,6 +20,7 @@ the default behaviour and replacing it with a function-like "QNode" primitive.
 import logging
 from copy import copy
 from dataclasses import dataclass, replace
+from numbers import Integral
 from typing import Callable, Sequence
 
 import jax.numpy as jnp
@@ -67,7 +68,7 @@ class OutputContext:
 
 def _resolve_mcm_config(mcm_config, shots):
     """Helper function for resolving and validating that the mcm_config is valid for executing."""
-    analytic_shots = isinstance(shots, int) and shots == 0
+    analytic_shots = shots is None
 
     updated_values = {}
     updated_values["postselect_mode"] = None if analytic_shots else mcm_config.postselect_mode
@@ -91,22 +92,6 @@ def _resolve_mcm_config(mcm_config, shots):
         )
 
     return replace(mcm_config, **updated_values)
-
-
-def _get_total_shots(qnode):
-    """
-    Extract total shots from qnode.
-    If shots is None on the qnode, this method returns 0 (static).
-    This method allows the qnode shots to be either static (python int
-    literals) or dynamic (tracers).
-    """
-    # due to possibility of tracer, we cannot use a simple `or` here to simplify
-    shots_value = qnode._shots.total_shots  # pylint: disable=protected-access
-    if shots_value is None:
-        shots = 0
-    else:
-        shots = shots_value
-    return shots
 
 
 def _is_one_shot_compatible_device(qnode):
@@ -135,22 +120,23 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs, pass_pipeline=None):
             mcm_method=qnode.execute_kwargs["mcm_method"],
         )
     )
-    total_shots = _get_total_shots(qnode)
+    total_shots = qnode._shots.total_shots
     user_specified_mcm_method = mcm_config.mcm_method
     mcm_config = _resolve_mcm_config(mcm_config, total_shots)
 
     # Check if measurements_from_{samples/counts} is being used.
     uses_measurements_from_samples = uses_transform(qnode, "measurements_from_samples")
     uses_measurements_from_counts = uses_transform(qnode, "measurements_from_counts")
-    has_finite_shots = isinstance(total_shots, int) and total_shots > 0
+    has_finite_shots = total_shots is not None
+    has_static_shots = has_finite_shots and isinstance(total_shots, Integral)
 
     # For cases that user are not tend to executed with one-shot, and facing
     # 1. non-one-shot compatible device,
-    # 2. non-finite shots,
+    # 2. analytic or dynamic shots,
     # 3. measurement transform,
     # fallback to single-branch-statistics
     one_shot_compatible = _is_one_shot_compatible_device(qnode)
-    one_shot_compatible &= has_finite_shots
+    one_shot_compatible &= has_static_shots
     one_shot_compatible &= not uses_measurements_from_samples
     one_shot_compatible &= not uses_measurements_from_counts
 
@@ -610,7 +596,8 @@ def dynamic_one_shot(qnode, **kwargs):
         single_shot_qnode.execute_kwargs["postselect_mode"] = mcm_config.postselect_mode
         single_shot_qnode.execute_kwargs["mcm_method"] = mcm_config.mcm_method
     single_shot_qnode._dynamic_one_shot_called = True
-    total_shots = _get_total_shots(qnode)
+    total_shots = qnode._shots.total_shots
+    assert total_shots is not None, "must have a shot value for one-shot"
 
     def one_shot_wrapper(*args, **kwargs):
         if pass_pipeline is not None:
