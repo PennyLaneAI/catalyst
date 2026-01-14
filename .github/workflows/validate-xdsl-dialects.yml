@@ -24,6 +24,8 @@ jobs:
     steps:
     - name: Checkout Catalyst
       uses: actions/checkout@v4
+      with:
+        submodules: true
 
     - name: Set up Python
       uses: actions/setup-python@v5
