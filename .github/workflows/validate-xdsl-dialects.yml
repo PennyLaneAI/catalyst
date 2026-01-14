@@ -46,6 +46,7 @@ jobs:
 
     - name: Create Python Dialects
       run: |
+        ls
         OPTIONS="--llvm-build $(pwd)/llvm-build --catalyst-root $GITHUB_WORKSPACE --save-path $(pwd)/gen_dialects"
         python3 $GITHUB_WORKSPACE/.github/workflows/xdsl_scripts/create_py_dialects.py $OPTIONS
 

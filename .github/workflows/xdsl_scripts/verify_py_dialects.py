@@ -14,11 +14,10 @@
 """This file contains a script for comparing Catalyst's MLIR dialects
 with their xDSL versions."""
 
-
-import importlib.util
-import sys
 from argparse import ArgumentParser
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from sys import modules as sys_modules
 
 from xdsl.ir import Dialect
 
@@ -37,9 +36,9 @@ def import_from_path(module_name, file_path):
     """Dynamically import a source file/folder as a module.
     Reference: https://docs.python.org/3/library/importlib.html#importing-a-source-file-directly
     """
-    spec = importlib.util.spec_from_file_location(module_name, file_path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
+    spec = spec_from_file_location(module_name, file_path)
+    module = module_from_spec(spec)
+    sys_modules[module_name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -88,23 +87,23 @@ def parse_args(verbose=True):
 
 
 if __name__ == "__main__":
-    parsed_args = parse_args(verbose=True)
-    save_path = Path(parsed_args.save_path)
+    _parsed_args = parse_args(verbose=True)
+    _save_path = Path(_parsed_args.save_path)
 
     errors = []
 
     for macro, dialect in all_dialects.items():
-        gen_dialect_path = save_path / f"{macro}.py"
+        gen_dialect_path = _save_path / f"{macro}.py"
         gen_dialect_mod = import_from_path(macro, gen_dialect_path)
 
         # Auto-generated dialects end with the "Dialect" suffix
         dialect_name = f"{dialect}Dialect"
-        gen_dialect = getattr(gen_dialect_mod, dialect_name)
+        _gen_dialect = getattr(gen_dialect_mod, dialect_name)
 
-        catalyst_dialect = getattr(getattr(xdialects, macro), dialect)
+        _catalyst_dialect = getattr(getattr(xdialects, macro), dialect)
 
         print(f"Verifying the '{dialect}' dialect.")
 
-        verify_dialect(catalyst_dialect, gen_dialect)
+        verify_dialect(_catalyst_dialect, _gen_dialect)
 
         print(f"Successfully verified the '{dialect}' dialect.")
