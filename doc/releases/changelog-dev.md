@@ -15,6 +15,10 @@
 * Added PauliMeasure and PauliRot to the runtime CAPI and QuantumDevice C++ API.
   [(2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
 
+* The quantum dialect MLIR and TableGen source has been refactored to place type and attribute
+  definitions in separate file scopes.
+  [(#2329)](https://github.com/PennyLaneAI/catalyst/pull/2329)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
