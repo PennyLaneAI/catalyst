@@ -46,6 +46,9 @@ jobs:
         # We don't need to build Catalyst from scratch as we only need the installation
         # to use the xDSl dialects
         make frontend
+        # ruff is a dependency for the xdsl-tblgen CLI tool. Generally, it gets installed if
+        # installing xdsl[dev], but we install it separately to simplify dependency installation
+        python3 -m pip install ruff
 
     - name: Create Python Dialects
       run: |
