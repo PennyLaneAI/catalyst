@@ -485,11 +485,6 @@ jobs:
 
     - name: Install Catalyst
       run: |
-        # TODO: --- remove workaround before merging to main ----------------- #
-        pip install git+https://github.com/PennyLaneAI/pennylane@v0.44.0-rc0
-        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning==0.44.0
-        pip install --extra-index-url=https://test.pypi.org/simple/ PennyLane-Lightning-Kokkos==0.44.0
-        # -------------------------------------------------------------------- #
         python${{ matrix.python_version }} -m pip install dist/*.whl --extra-index-url https://test.pypi.org/simple
 
     - name: Install Standalone Plugin
