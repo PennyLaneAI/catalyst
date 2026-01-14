@@ -44,8 +44,20 @@ jobs:
         # to use the xDSl dialects
         make frontend
 
-    - name: Verify dialects
+    - name: Create Python Dialects
       run: |
-        OPTIONS="--llvm-build $(pwd)/llvm-build --catalyst-root $GITHUB_WORKSPACE"
-        python3 $GITHUB_WORKSPACE/.github/compare_xdsl_tblgen.py $OPTIONS
+        OPTIONS="--llvm-build $(pwd)/llvm-build --catalyst-root $GITHUB_WORKSPACE --save-path $(pwd)/gen_dialects"
+        python3 $GITHUB_WORKSPACE/.github/xdsl_scripts/create_py_dialects.py $OPTIONS
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: gen_dialects
+        path: gen_dialects
+
+    - name: Verify Python Dialects
+      run: |
+        OPTIONS="--save-path $(pwd)/gen_dialects"
+        python3 $GITHUB_WORKSPACE/.github/xdsl_scripts/verify_py_dialects.py $OPTIONS
+
 
