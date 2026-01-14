@@ -16,9 +16,14 @@
   into normal PPR and PPMs with SCF dialect to support runtime execution.
   [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
 
+* The quantum dialect MLIR and TableGen source has been refactored to place type and attribute
+  definitions in separate file scopes.
+  [(#2329)](https://github.com/PennyLaneAI/catalyst/pull/2329)
 
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
+
+Jeffrey Kam
