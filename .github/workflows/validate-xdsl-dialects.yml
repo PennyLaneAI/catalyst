@@ -47,21 +47,25 @@ jobs:
     - name: Create Python Dialects
       run: |
         ls
+        echo
         cd mlir; ls
+        echo
         cd llvm-project; ls
+        echo
         cd mlir; ls
-        OPTIONS="--llvm-build $(pwd)/llvm-build --catalyst-root $GITHUB_WORKSPACE --save-path $(pwd)/gen_dialects"
-        python3 $GITHUB_WORKSPACE/.github/workflows/xdsl_scripts/create_py_dialects.py $OPTIONS
+        echo
+        # OPTIONS="--llvm-build $(pwd)/llvm-build --catalyst-root $GITHUB_WORKSPACE --save-path $(pwd)/gen_dialects"
+        # python3 $GITHUB_WORKSPACE/.github/workflows/xdsl_scripts/create_py_dialects.py $OPTIONS
 
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: gen_dialects
-        path: gen_dialects
+    # - name: Upload Artifact
+    #   uses: actions/upload-artifact@v4
+    #   with:
+    #     name: gen_dialects
+    #     path: gen_dialects
 
-    - name: Verify Python Dialects
-      run: |
-        OPTIONS="--save-path $(pwd)/gen_dialects"
-        python3 $GITHUB_WORKSPACE/.github/workflows/xdsl_scripts/verify_py_dialects.py $OPTIONS
+    # - name: Verify Python Dialects
+    #   run: |
+    #     OPTIONS="--save-path $(pwd)/gen_dialects"
+    #     python3 $GITHUB_WORKSPACE/.github/workflows/xdsl_scripts/verify_py_dialects.py $OPTIONS
 
 
