@@ -1198,15 +1198,10 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
     {
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
-        const TypeConverter *conv = this->getTypeConverter();
         ModuleOp mod = op->template getParentOfType<ModuleOp>();
 
         // Create a global string for the Pauli word
         Value pauliWordPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct());
-
-        // Get modifiers pointer (no modifiers for PPR, pass nullptr)
-        auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, /*adjoint=*/false,
-                                            /*controlledQubits=*/{}, /*controlledValues=*/{});
 
         // void __catalyst__qis__PauliRot(const char* pauliStr, double theta,
         //                                 const Modifiers*, int64_t numQubits, ...qubits)
@@ -1239,7 +1234,7 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
         SmallVector<Value> args;
         args.push_back(pauliWordPtr);
         args.push_back(thetaValue);
-        args.push_back(modifiersPtr);
+        args.push_back(rewriter.create<LLVM::ZeroOp>(loc, ptrType));
         args.push_back(
             rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
         args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
@@ -1269,7 +1264,8 @@ struct PPMeasurementOpPattern : public OpConversionPattern<PPMeasurementOp> {
         // Create a global string for the Pauli word
         Value pauliWordPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct());
 
-        // RESULT* __catalyst__qis__PauliMeasure(int8_t* pauliWord, int64_t numQubits, ...qubits)
+        // RESULT* __catalyst__qis__PauliMeasure(const char* pauliWord, int64_t numQubits,
+        // ...qubits)
         StringRef qirName = "__catalyst__qis__PauliMeasure";
         Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
         Type qirSignature = LLVM::LLVMFunctionType::get(conv->convertType(ResultType::get(ctx)),
