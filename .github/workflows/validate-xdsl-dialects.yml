@@ -8,7 +8,7 @@ concurrency:
 
 jobs:
   constants:
-    name: Get Constants
+    name: Set Constants
     uses: ./.github/workflows/constants.yaml
     with:
       runs_on: ubuntu-24.04
@@ -47,6 +47,9 @@ jobs:
     - name: Create Python Dialects
       run: |
         ls
+        cd mlir; ls
+        cd llvm-project; ls
+        cd mlir; ls
         OPTIONS="--llvm-build $(pwd)/llvm-build --catalyst-root $GITHUB_WORKSPACE --save-path $(pwd)/gen_dialects"
         python3 $GITHUB_WORKSPACE/.github/workflows/xdsl_scripts/create_py_dialects.py $OPTIONS
 
