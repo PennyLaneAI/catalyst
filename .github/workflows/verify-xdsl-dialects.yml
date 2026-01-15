@@ -23,7 +23,7 @@ jobs:
 
   quantum:
     name: Quantum Dialects Build
-    needs: constants
+    needs: [constants]
     runs-on: ${{ needs.determine_runner.outputs.runner_group }}
     strategy:
       matrix:
@@ -135,7 +135,7 @@ jobs:
 
   compare-dialects:
     name: Compare xDSL and MLIR Dialects
-    needs: constants
+    needs: [constants, quantum]
     runs-on: ubuntu-24.04
     strategy:
       matrix:
