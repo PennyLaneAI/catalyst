@@ -66,7 +66,7 @@ class OutputContext:
     num_mcm: int
 
 
-class FallbackToSingleBranch(Exception):
+class FallbackToSingleBranchError(Exception):
     """Exception to signal execution can proceed in single-branch-statistics mode."""
 
 
@@ -162,7 +162,7 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs, pass_pipeline=None):
         return Function(
             dynamic_one_shot(qnode, mcm_config=mcm_config, pass_pipeline=pass_pipeline)
         )(*args, **kwargs)
-    except FallbackToSingleBranch:
+    except FallbackToSingleBranchError:
         return None
 
 
@@ -439,7 +439,7 @@ def _validate_one_shot_measurements(
         qnode: The quantum node being transformed
 
     Raises:
-        FallbackToSingleBranch: If there is no MCMs and the user hasn't explicitly selected one-shot
+        FallbackToSingleBranchError: no MCMs and the user hasn't explicitly selected one-shot
         NotImplementedError: If measurement configuration is not supported
     """
     mcm_method = mcm_config.mcm_method
@@ -455,7 +455,7 @@ def _validate_one_shot_measurements(
         not any(isinstance(op, MidCircuitMeasure) for op in tape.operations)
         and user_specified_mcm_method is None
     ):
-        raise FallbackToSingleBranch("No mid-circuit measurements present.")
+        raise FallbackToSingleBranchError("No mid-circuit measurements present.")
 
     for m in tape.measurements:
         # Check one-shot restrictions based on the measurement process type.
