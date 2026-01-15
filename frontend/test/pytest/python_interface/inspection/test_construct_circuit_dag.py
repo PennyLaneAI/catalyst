@@ -35,6 +35,7 @@ from catalyst.python_interface.inspection.dag_builder import DAGBuilder
 pytestmark = pytest.mark.xdsl
 
 
+# pylint: disable=missing-function-docstring
 class FakeDAGBuilder(DAGBuilder):
     """
     A concrete implementation of DAGBuilder used ONLY for testing.
