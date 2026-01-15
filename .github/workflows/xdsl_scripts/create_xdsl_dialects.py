@@ -17,6 +17,7 @@ with their xDSL versions."""
 from argparse import ArgumentParser
 from json import dumps, loads
 from pathlib import Path
+from re import escape, sub
 from subprocess import list2cmdline, run
 
 all_dialects = {
@@ -26,27 +27,6 @@ all_dialects = {
     "quantum": "Quantum",
 }
 """Dictionary mapping the macro corresponding to a dialect its name."""
-
-
-def remove_invalid_field_from_json(json_str: str, dialect_name: str) -> str:
-    """The JSON file for certain dialects may contain more than one dialect in
-    their "Dialect" field. This function removes all invalid dialects from the
-    "Dialect" field and returns an updated JSON string.
-
-    Args:
-        json_str (str): JSON string for the dialect being converted
-        cur_dialect (str): name of the dialect being converted
-
-    Returns:
-        str: JSON string with the invalid dialect name removed
-    """
-    loaded = loads(json_str)
-
-    dialects = loaded["!instanceof"]["Dialect"]
-    new_dialects = [d for d in dialects if dialect_name in d]
-    loaded["!instanceof"]["Dialect"] = new_dialects
-
-    return dumps(loaded)
 
 
 def create_py_dialect(
@@ -104,6 +84,54 @@ def create_py_dialect(
         )
 
     print(f"'{dialect_name}' dialect converted successfully and saved to '{str(final_path)}'.")
+    print("Stripping unnecessary operation definition details from the '{dialect}' dialect.")
+
+    strip_op_defs(final_path)
+
+    print(f"Stripped operation definition details successfully.\n")
+
+
+def remove_invalid_field_from_json(json_str: str, dialect_name: str) -> str:
+    """The JSON file for certain dialects may contain more than one dialect in
+    their "Dialect" field. This function removes all invalid dialects from the
+    "Dialect" field and returns an updated JSON string.
+
+    Args:
+        json_str (str): JSON string for the dialect being converted
+        cur_dialect (str): name of the dialect being converted
+
+    Returns:
+        str: JSON string with the invalid dialect name removed
+    """
+    loaded = loads(json_str)
+
+    dialects = loaded["!instanceof"]["Dialect"]
+    new_dialects = [d for d in dialects if dialect_name in d]
+    loaded["!instanceof"]["Dialect"] = new_dialects
+
+    return dumps(loaded)
+
+
+def strip_op_defs(file_path: Path):
+    """Strip unnecessary details from the operation definitions of
+    all classes within the provided file. ``xdsl-tblgen`` does not
+    always produce executable code since it generates constraints
+    that are sometimes invalid. This function replaces all constraints
+    with ``AnyAttr()``, since the constraints will not be used during
+    verification.
+
+    Args:
+        file_path (pathlib.Path): path to the Python file being stripped
+    """
+    with open(file_path, "r") as f:
+        content = f.read()
+
+    search_pattern = r"((operand|prop|result|attr)_def\().*(\)\n)"
+    replace_pattern = r"\1AnyAttr()\3"
+    content = sub(search_pattern, replace_pattern, content)
+
+    with open(file_path, "w") as f:
+        f.write(content)
 
 
 def parse_args():
