@@ -115,7 +115,7 @@ class TestSample:
         if mcm_method == "one-shot":
             with pytest.raises(
                 NotImplementedError,
-                match="Measurement SampleMP with empty wires is not supported with dynamic wires",
+                match="cannot be used without wires and a dynamic number of device wires",
             ):
                 qjit(sample_dynamic_wires)()
         else:
@@ -237,8 +237,7 @@ class TestCounts:
             if mcm_method == "one-shot":
                 with pytest.raises(
                     NotImplementedError,
-                    match="Measurement CountsMP with empty wires is not supported with dynamic "
-                    "wires",
+                    match="cannot be used without wires and a dynamic number of device wires",
                 ):
                     qjit(counts_dynamic_wires)()
             else:

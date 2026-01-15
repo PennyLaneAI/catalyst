@@ -961,7 +961,7 @@ class TestTransform:
         if mcm_method == "one-shot":
             with pytest.raises(
                 CompileError,
-                match=f"{transform_measurement.__name__} is not supported with one-shot",
+                match=f"'{transform_measurement.__name__}' transform is not supported",
             ):
                 qjit(circuit)()
         else:
