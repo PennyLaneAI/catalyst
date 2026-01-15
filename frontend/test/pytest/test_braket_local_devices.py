@@ -147,19 +147,14 @@ class TestBraketSample:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.local.qubit",
-                backend="braket_sv",
-                wires=1,
-                shots=1000,
-            ),
+            qml.device("braket.local.qubit", backend="braket_sv", wires=1),
         ],
     )
     def test_sample_on_1qbit_braket(self, device):
         """Test sample on 1 qubit on braket devices."""
 
         @qjit
-        @qml.qnode(device)
+        @qml.qnode(device, shots=1000)
         def sample_1qbit(x: float):
             qml.RX(x, wires=0)
             return qml.sample()
@@ -175,19 +170,14 @@ class TestBraketSample:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.local.qubit",
-                backend="braket_sv",
-                wires=2,
-                shots=1000,
-            ),
+            qml.device("braket.local.qubit", backend="braket_sv", wires=2),
         ],
     )
     def test_sample_on_2qbits_braket(self, device):
         """Test sample on 2 qubits on braket devices."""
 
         @qjit
-        @qml.qnode(device)
+        @qml.qnode(device, shots=1000)
         def sample_2qbits(x: float):
             qml.RX(x, wires=0)
             qml.RY(x, wires=1)
@@ -208,19 +198,14 @@ class TestBraketProbs:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.local.qubit",
-                backend="braket_sv",
-                wires=1,
-                shots=1000,
-            ),
+            qml.device("braket.local.qubit", backend="braket_sv", wires=1),
         ],
     )
     def test_probs_on_1qbit_braket(self, device):
         """Test probs on 1 qubit on braket devices."""
 
         @qjit
-        @qml.qnode(device)
+        @qml.qnode(device, shots=1000)
         def probs_1qbit(x: float):
             qml.RX(x, wires=0)
             return qml.probs()
@@ -231,19 +216,14 @@ class TestBraketProbs:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.local.qubit",
-                backend="braket_sv",
-                wires=2,
-                shots=1000,
-            ),
+            qml.device("braket.local.qubit", backend="braket_sv", wires=2),
         ],
     )
     def test_probs_on_2qbits_braket(self, device):
         """Test probs on 2 qubits on braket devices."""
 
         @qjit
-        @qml.qnode(device)
+        @qml.qnode(device, shots=1000)
         def probs_2qbits(x: float):
             qml.RX(x, wires=0)
             qml.RY(x, wires=1)
@@ -260,19 +240,14 @@ class TestBraketCounts:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.local.qubit",
-                backend="braket_sv",
-                wires=1,
-                shots=1000,
-            ),
+            qml.device("braket.local.qubit", backend="braket_sv", wires=1),
         ],
     )
     def test_count_on_1qbit_braket(self, device):
         """Test counts on 1 qubits on braket devices."""
 
         @qjit
-        @qml.qnode(device)
+        @qml.qnode(device, shots=1000)
         def counts_1qbit(x: float):
             qml.RX(x, wires=0)
             return qml.counts()
@@ -288,19 +263,14 @@ class TestBraketCounts:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.local.qubit",
-                backend="braket_sv",
-                wires=2,
-                shots=1000,
-            ),
+            qml.device("braket.local.qubit", backend="braket_sv", wires=2),
         ],
     )
     def test_count_on_2qbits_braket(self, device):
         """Test counts on 2 qubits on braket devices."""
 
         @qjit
-        @qml.qnode(device)
+        @qml.qnode(device, shots=1000)
         def counts_2qbit(x: float):
             qml.RX(x, wires=0)
             qml.RY(x, wires=1)
@@ -634,18 +604,14 @@ class TestBraketMeasurementsProcess:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.local.qubit",
-                wires=1,
-                shots=100,
-            ),
+            qml.device("braket.local.qubit", wires=1),
         ],
     )
     def test_multiple_return_values_braket2(self, device):
         """Test multiple return values with shots > 0."""
 
         @qjit
-        @qml.qnode(device)
+        @qml.qnode(device, shots=100)
         def all_measurements(x):
             qml.RY(x, wires=0)
             return (
