@@ -23,8 +23,9 @@ include "mlir/IR/OpBase.td"
 //   ref dialect ---> value dialect ---> bufferization ---> ....
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 
+include "Quantum/IR/QuantumAttrDefs.td"
 include "Quantum/IR/QuantumDialect.td"
-include "Quantum/IR/QuantumEnums.td"
+include "Quantum/IR/QuantumTypes.td"
 include "RefQuantum/IR/RefQuantumDialect.td"
 include "RefQuantum/IR/RefQuantumInterfaces.td"
 

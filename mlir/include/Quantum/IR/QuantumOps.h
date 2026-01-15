@@ -29,7 +29,6 @@
 
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
-#include "Quantum/IR/QuantumTraits.h"
 
 //===----------------------------------------------------------------------===//
 // Quantum ops declarations.

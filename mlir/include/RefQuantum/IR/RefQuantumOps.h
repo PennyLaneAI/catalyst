@@ -25,18 +25,12 @@
 #include "mlir/Support/LogicalResult.h"
 
 #include "Quantum/IR/QuantumDialect.h"
-#include "Quantum/IR/QuantumTraits.h"
 #include "RefQuantum/IR/RefQuantumDialect.h"
 #include "RefQuantum/IR/RefQuantumInterfaces.h"
-
 
 //===----------------------------------------------------------------------===//
 // RefQuantum ops declarations.
 //===----------------------------------------------------------------------===//
-
-#include "Quantum/IR/QuantumEnums.h.inc"
-#define GET_ATTRDEF_CLASSES
-#include "Quantum/IR/QuantumAttributes.h.inc"
 
 #define GET_OP_CLASSES
 #include "RefQuantum/IR/RefQuantumOps.h.inc"

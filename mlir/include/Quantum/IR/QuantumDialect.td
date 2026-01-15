@@ -58,13 +58,6 @@ def Unitary : NativeOpTrait<"UnitaryTrait">;
 def Hermitian : NativeOpTrait<"HermitianTrait">;
 
 //===----------------------------------------------------------------------===//
-// Quantum dialect traits.
-//===----------------------------------------------------------------------===//
-
-def Unitary : NativeOpTrait<"UnitaryTrait">;
-def Hermitian : NativeOpTrait<"HermitianTrait">;
-
-//===----------------------------------------------------------------------===//
 // Quantum resource abstractions.
 //===----------------------------------------------------------------------===//
 

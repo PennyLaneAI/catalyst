@@ -21,7 +21,6 @@ include "mlir/Interfaces/ControlFlowInterfaces.td"
 
 include "Quantum/IR/QuantumAttrDefs.td"
 include "Quantum/IR/QuantumDialect.td"
-include "Quantum/IR/QuantumEnums.td"
 include "Quantum/IR/QuantumInterfaces.td"
 include "Quantum/IR/QuantumTypes.td"
 
