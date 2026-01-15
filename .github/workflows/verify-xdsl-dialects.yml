@@ -56,14 +56,15 @@ jobs:
         # installing xdsl[dev], but we install it separately to simplify dependency installation
         python -m pip install ruff
 
-        # We only want the frontend to be usable, so we use a minimal source build
-        cd catalyst
-
-        # Create Python environment
+        # Install Catalyst. We only want the frontend to be usable, so we use a minimal
+        # source build using TestPyPI wheels
+        # 1. Create Python environment
         python -m venv .catalyst_venv
 
-        # Install Catalyst and activate Python environment
+        # 2. Install Catalyst
         bash ./setup_dev_from_wheel.sh ./.catalyst_venv $BRANCH
+
+        # 3. Activate Python environment
         source ./.catalyst_venv/bin/activate
 
     - name: Create Python Dialects
