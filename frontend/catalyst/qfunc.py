@@ -19,7 +19,7 @@ the default behaviour and replacing it with a function-like "QNode" primitive.
 """
 import logging
 from copy import copy
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from numbers import Integral
 from typing import Callable, Sequence
 
@@ -70,35 +70,45 @@ class FallbackToSingleBranch(Exception):
     """Exception to signal execution can proceed in single-branch-statistics mode."""
 
 
-def _resolve_mcm_config(mcm_config, shots):
+def _resolve_mcm_config(qnode):
     """Helper function for resolving and validating that the mcm_config is valid for executing."""
-    analytic_shots = shots is None
+    total_shots = qnode._shots.total_shots
+    analytic_shots = total_shots is None
+    finite_shots = not analytic_shots
+    static_shots = finite_shots and isinstance(total_shots, Integral)
+    device_compatible = _is_one_shot_compatible_device(qnode)
 
-    updated_values = {}
-    updated_values["postselect_mode"] = None if analytic_shots else mcm_config.postselect_mode
-    if mcm_config.mcm_method is None:
-        updated_values["mcm_method"] = "one-shot"
+    mcm_method = qnode.execute_kwargs["mcm_method"]
+    # discard the parameter when in analytic mode since it's not relevant
+    postselect_mode = None if analytic_shots else qnode.execute_kwargs["postselect_mode"]
 
-    if mcm_config.mcm_method == "deferred":
+    # Check for some invalid user-configurations
+    if mcm_method == "deferred":
         raise ValueError("mcm_method='deferred' is not supported with Catalyst.")
 
-    if (
-        mcm_config.mcm_method == "single-branch-statistics"
-        and mcm_config.postselect_mode == "hw-like"
-    ):
-        raise ValueError(
-            "Cannot use postselect_mode='hw-like' with Catalyst when mcm_method != 'one-shot'."
-        )
+    if mcm_method == "single-branch-statistics" and postselect_mode == "hw-like":
+        raise ValueError("'hw-like' post-selection requires mcm_method='one-shot'.")
 
-    if mcm_config.mcm_method == "one-shot" and analytic_shots:
-        raise ValueError(
-            "Cannot use the 'one-shot' method for mid-circuit measurements with analytic mode."
-        )
+    if mcm_method == "one-shot" and analytic_shots:
+        raise ValueError("mcm_method='one-shot' is not supported in analytic shot mode.")
 
-    return replace(mcm_config, **updated_values)
+    if mcm_method == "one-shot" and not device_compatible:
+        raise ValueError("mcm_method='one-shot' is not supported in the chosen device.")
+
+    # Set the default method if none was chosen. Currently, only a static shot value
+    # is supported with one-shot. Some devices also won't support it.
+    if mcm_method is None:
+        if static_shots and device_compatible:
+            mcm_method = "one-shot"
+            postselect_mode = postselect_mode or "hw-like"
+        else:
+            mcm_method = "single-branch-statistics"
+
+    return qml.devices.MCMConfig(postselect_mode=postselect_mode, mcm_method=mcm_method)
 
 
 def _is_one_shot_compatible_device(qnode):
+    # TODO: remove the need for a hardcoded list of devices
     device_name = qnode.device.name
     exclude_devices = {"softwareq.qpp", "nvidia.custatevec", "nvidia.cutensornet"}
 
@@ -118,58 +128,35 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs, pass_pipeline=None):
     if dynamic_one_shot_called:
         return
 
-    mcm_config = qml.devices.MCMConfig(
-        postselect_mode=qnode.execute_kwargs["postselect_mode"],
-        mcm_method=qnode.execute_kwargs["mcm_method"],
-    )
-    total_shots = qnode._shots.total_shots
-    user_specified_mcm_method = mcm_config.mcm_method
-    mcm_config = _resolve_mcm_config(mcm_config, total_shots)
-
-    # Check if measurements_from_{samples/counts} is being used.
-    uses_measurements_from_samples = uses_transform(qnode, "measurements_from_samples")
-    uses_measurements_from_counts = uses_transform(qnode, "measurements_from_counts")
-    has_finite_shots = total_shots is not None
-    has_static_shots = has_finite_shots and isinstance(total_shots, Integral)
-
-    # For cases that user are not tend to executed with one-shot, and facing
-    # 1. non-one-shot compatible device,
-    # 2. analytic or dynamic shots,
-    # 3. measurement transform,
-    # fallback to single-branch-statistics
-    one_shot_compatible = _is_one_shot_compatible_device(qnode)
-    one_shot_compatible &= has_static_shots
-    one_shot_compatible &= not uses_measurements_from_samples
-    one_shot_compatible &= not uses_measurements_from_counts
-
-    should_fallback = (
-        not one_shot_compatible
-        and user_specified_mcm_method is None
-        and mcm_config.mcm_method == "one-shot"
-    )
-
-    if should_fallback:
-        mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
+    mcm_config = _resolve_mcm_config(qnode)
 
     if mcm_config.mcm_method != "one-shot":
         return
 
+    # Special case for measurements_from_{samples/counts} transforms. If the default is determined
+    # to be one-shot, but no mcms are being used, we don't want to raise an error outright. Since
+    # the mcm determination happens later, we currently always fallback to single-branch if the
+    # user hasn't specified one-shot explicitly. TODO: remove need for special case
+    no_user_mcm_method = qnode.execute_kwargs["mcm_method"] is None
+    uses_measurements_from_samples = uses_transform(qnode, "measurements_from_samples")
+    uses_measurements_from_counts = uses_transform(qnode, "measurements_from_counts")
+    if no_user_mcm_method and (uses_measurements_from_samples or uses_measurements_from_counts):
+        return
+
     # These transforms are currently not compatible with one-shot when used manually,
     # although they can be used from within a device transform program.
-    if uses_transform(qnode, "measurements_from_samples"):
+    if uses_measurements_from_samples:
         raise CompileError(
             "The 'measurements_from_samples' transform is not supported with the chosen or default "
             "mcm_method 'one-shot'. Please consider using 'single-branch-statistics' if you need "
             "to use this transform explicitly."
         )
-    if uses_transform(qnode, "measurements_from_counts"):
+    if uses_measurements_from_counts:
         raise CompileError(
             "The 'measurements_from_counts' transform is not supported with the chosen or default "
             "mcm_method 'one-shot'. Please consider using 'single-branch-statistics' if you need "
             "to use this transform explicitly."
         )
-
-    mcm_config = replace(mcm_config, postselect_mode=mcm_config.postselect_mode or "hw-like")
 
     try:
         return Function(
@@ -452,7 +439,7 @@ def _validate_one_shot_measurements(
         qnode: The quantum node being transformed
 
     Raises:
-        TypeError: If unsupported measurement types are used
+        FallbackToSingleBranch: If there is no MCMs and the user hasn't explicitly selected one-shot
         NotImplementedError: If measurement configuration is not supported
     """
     mcm_method = mcm_config.mcm_method

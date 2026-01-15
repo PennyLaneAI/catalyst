@@ -248,7 +248,7 @@ class TestMidCircuitMeasurement:
             return qml.expval(qml.Z(0))
 
         with pytest.raises(
-            ValueError, match="Cannot use the 'one-shot' method for mid-circuit measurements"
+            ValueError, match="mcm_method='one-shot' is not supported in analytic shot mode"
         ):
             _ = circuit(1.8)
 
@@ -267,7 +267,7 @@ class TestMidCircuitMeasurement:
 
         with pytest.raises(
             ValueError,
-            match=("Cannot use postselect_mode='hw-like' with Catalyst when"),
+            match=("'hw-like' post-selection requires mcm_method='one-shot'"),
         ):
             _ = circuit(1.8)
 
