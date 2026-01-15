@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/IR/TypeRange.h"
 
 #include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
