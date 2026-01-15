@@ -1,4 +1,4 @@
-# Copyright 2025 Xanadu Quantum Technologies Inc.
+# Copyright 2025-2026 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ from .quantum import (
     MergeRotationsPass,
     ParitySynthPass,
     SplitNonCommutingPass,
+    TreeTraversalPass,
     combine_global_phases_pass,
     diagonalize_final_measurements_pass,
     iterative_cancel_inverses_pass,
@@ -38,6 +39,7 @@ from .quantum import (
     merge_rotations_pass,
     parity_synth_pass,
     split_non_commuting_pass,
+    tree_traversal_pass,
 )
 
 __all__ = [
@@ -56,6 +58,8 @@ __all__ = [
     "parity_synth_pass",
     "split_non_commuting_pass",
     "SplitNonCommutingPass",
+    "tree_traversal_pass",
+    "TreeTraversalPass",
     # MBQC
     "convert_to_mbqc_formalism_pass",
     "ConvertToMBQCFormalismPass",
