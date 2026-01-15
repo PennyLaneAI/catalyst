@@ -16,6 +16,13 @@
   into normal PPR and PPMs with SCF dialect to support runtime execution.
   [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
 
+* Added LLVM conversion patterns to lower QEC dialect operations to their corresponding runtime
+  CAPI calls. 
+  This includes `qec.ppr` and `qec.ppr.arbitrary` (lowered to `__catalyst__qis__PauliRot`),
+  `qec.ppm` (lowered to `__catalyst__qis__PauliMeasure`). This enables device execution of QEC
+  operations through the Catalyst runtime.
+  [(#2389)](https://github.com/PennyLaneAI/catalyst/pull/2389)
+
 * The quantum dialect MLIR and TableGen source has been refactored to place type and attribute
   definitions in separate file scopes.
   [(#2329)](https://github.com/PennyLaneAI/catalyst/pull/2329)
@@ -26,4 +33,5 @@
 
 This release contains contributions from (in alphabetical order):
 
+Sengthai Heng,
 Jeffrey Kam
