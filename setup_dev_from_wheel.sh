@@ -22,7 +22,7 @@ install_catalyst_wheel(){
         echo "Error: Please provide a path for the Python virtual environment"
         exit
     else
-        # Create (if not created yet) and activate the virtual environment 
+        # Create (if not created yet) and activate the virtual environment
         python3 -m venv $PYTHON_ENV_PATH
         source $PYTHON_ENV_PATH/bin/activate
         echo "Success: The Python virtual environment located at '$PYTHON_ENV_PATH' was activated"
@@ -47,13 +47,14 @@ checkout_nightly_build(){
 
     # Update to the latest commit at the main branch
     cd $CATALYST_DIR
+    ls
     git switch main
     git fetch
     git pull
 
     # Search for the commit corresponding to latest available Wheel at TestPyPI
     git log --grep="bump nightly version" | grep "commit" | cut -d " " -f 2 | while read -r NIGHTLY_BUMP; do
-        git checkout $NIGHTLY_BUMP; 
+        git checkout $NIGHTLY_BUMP;
         export DIFF=$(diff $CATALYST_WHEEL/_version.py $CATALYST_FRONTEND_SRC/_version.py)
         if [ -z "${DIFF}" ]; then
             export CATALYST_WHEEL_COMMIT=$(git log -1 --format="%h")
@@ -71,7 +72,7 @@ checkout_nightly_build(){
 
 link_repo_to_wheel(){
     echo "Linking Catalyst repository to Catalyst Wheel..."
-    
+
     # switch to branch if given
     if [ ! -z "${BRANCH}" ]; then
         git switch $BRANCH
