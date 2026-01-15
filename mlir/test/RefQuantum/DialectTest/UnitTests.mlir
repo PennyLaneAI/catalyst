@@ -60,6 +60,25 @@ func.func @test_custom_op(%w0: i64, %w1: i64, %w2: i64, %w3: i64, %param0: f64, 
 
 // -----
 
+func.func @test_global_phase(%w0: i64, %cv: i1, %param: f64) {
+
+    // Basic
+    ref_quantum.gphase(%param) : f64
+
+    // With adjoint
+    ref_quantum.gphase(%param) adj : f64
+
+    // With control
+    ref_quantum.gphase(%param) ctrls (%w0) ctrlvals (%cv) : f64 ctrls i64
+
+    // With control and adjoint
+    ref_quantum.gphase(%param) adj ctrls (%w0) ctrlvals (%cv) : f64 ctrls i64
+
+    return
+}
+
+// -----
+
 func.func @test_namedobs_op(%w0: i64) {
 
     %ox = ref_quantum.namedobs %w0 [ PauliX] : !quantum.obs

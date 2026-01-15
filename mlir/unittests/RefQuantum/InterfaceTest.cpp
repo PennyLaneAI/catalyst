@@ -222,4 +222,41 @@ func.func @f(%w0: i64) {
     ASSERT_TRUE(!customOp.getAdjointFlag());
 }
 
+TEST(InterfaceTests, globalPhase)
+{
+    std::string moduleStr = R"mlir(
+func.func @f(%w0: i64, %cv: i1, %param: f64) {
+    ref_quantum.gphase(%param) adj ctrls (%w0) ctrlvals (%cv) : f64 ctrls i64
+    return
+}
+  )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<func::FuncDialect, catalyst::ref_quantum::RefQuantumDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> mod = parseSourceString<ModuleOp>(moduleStr, config);
+
+    // Parse ops
+    func::FuncOp f = *(*mod).getOps<func::FuncOp>().begin();
+    catalyst::ref_quantum::GlobalPhaseOp gphaseOp =
+        *f.getOps<catalyst::ref_quantum::GlobalPhaseOp>().begin();
+
+    Block &bb = f.getCallableRegion()->front();
+    auto args = bb.getArguments();
+
+    // Run checks
+    ValueRange allParams = gphaseOp.getAllParams();
+    ASSERT_TRUE(allParams.size() == 1 && allParams[0] == args[2]);
+
+    ASSERT_TRUE(gphaseOp.getAdjointFlag());
+
+    ValueRange ctrlWireOperands = gphaseOp.getCtrlWireOperands();
+    ASSERT_TRUE(ctrlWireOperands.size() == 1 && ctrlWireOperands[0] == args[0]);
+
+    ValueRange ctrlValueOperands = gphaseOp.getCtrlValueOperands();
+    ASSERT_TRUE(ctrlValueOperands.size() == 1 && ctrlValueOperands[0] == args[1]);
+}
+
 } // namespace

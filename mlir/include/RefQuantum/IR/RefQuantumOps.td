@@ -207,6 +207,42 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
     // let hasVerifier = 1;
 }
 
+def GlobalPhaseOp : UnitaryGate_Op<"gphase", [ParametrizedGate, AttrSizedOperandSegments]> {
+    let summary = "Global Phase.";
+
+    let description = [{
+        Applies global phase to the current system.
+    }];
+
+    let arguments = (ins
+        F64:$params,
+        UnitAttr:$adjoint,
+        Variadic<I64>:$ctrl_wires,
+        Variadic<I1>:$ctrl_values
+    );
+
+    let assemblyFormat = [{
+        `(` $params `)` (`adj` $adjoint^)? attr-dict
+        ( `ctrls` `(` $ctrl_wires^ `)` )?
+        ( `ctrlvals` `(` $ctrl_values^ `)` )?
+        `:` type($params) (`ctrls` type($ctrl_wires)^ )?
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getAllParams() {
+            return getODSOperands(0);  // `params` is the 0-th operand
+        }
+
+        // Simulate missing operands and results for the default impl of the quantum gate interface.
+        mlir::OperandRange getWires() {
+            return {getOperands().begin(), getOperands().begin()};
+        }
+        mlir::MutableOperandRange getWiresMutable() {
+            return mlir::MutableOperandRange(getOperation(), 0, 0);
+        }
+    }];
+}
+
 // // -----
 
 // // Observable ops are not meaningful on their own: their purpose is to be sent into a measurement

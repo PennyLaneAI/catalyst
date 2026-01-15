@@ -62,6 +62,15 @@ func.func @test_duplicate_wires2(%w0: i64) {
 
 // -----
 
+func.func @test_gphase_control(%w0: i64, %param: f64) {
+    %true = llvm.mlir.constant (1 : i1) :i1
+    // expected-error@+1 {{number of controlling wires in input (1) and controlling values (2) must be the same}}
+    ref_quantum.gphase(%param) ctrls (%w0) ctrlvals (%true, %true) : f64 ctrls i64
+    return
+}
+
+// -----
+
 func.func @test_namedobs_op_bad_attribute(%w0: i64) {
     // expected-error@+2 {{expected catalyst::quantum::NamedObservable to be one of: Identity, PauliX, PauliY, PauliZ, Hadamard}}
     // expected-error@+1 {{failed to parse NamedObservableAttr parameter 'value' which is to be a `catalyst::quantum::NamedObservable`}}
