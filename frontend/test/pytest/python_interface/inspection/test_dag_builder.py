@@ -25,7 +25,7 @@ pytestmark = pytest.mark.xdsl
 def test_concrete_implementation_works():
     """Unit test for concrete implementation of abc."""
 
-    # pylint: disable=unused-argument
+    # pylint: disable=unused-argument,missing-function-docstring
     class ConcreteDAGBuilder(DAGBuilder):
         """Concrete subclass of an ABC for testing purposes."""
 

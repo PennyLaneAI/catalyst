@@ -622,6 +622,8 @@ class TestDrawGraph:
 
     def test_return_types(self):
         """Tests the return types of the function without crashing CI."""
+        # pylint: disable=import-outside-toplevel
+        import matplotlib
 
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(qml.device("null.qubit", wires=2))
