@@ -447,7 +447,6 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_autograph(self):
         """Test the decompose lowering pass with autograph."""
 
@@ -470,15 +469,21 @@ class TestGraphDecomposition:
             qml.MultiRZ(0.5, wires=[0, 1, 4])
             return qml.expval(qml.Z(0))
 
-        without_qjit = qml.transforms.decompose(circuit, gate_set={"RZ", "CNOT"})
+        qml.capture.enable()
+        qml.decomposition.enable_graph()
         with_qjit = qml.qjit(
             qml.transforms.decompose(circuit, gate_set={"RZ", "CNOT"}), autograph=True
         )
-
-        assert qml.math.allclose(without_qjit(), with_qjit())
-
-        expected_resources = qml.specs(without_qjit, level="device")()["resources"].gate_types
+        with_qjit_result = with_qjit()
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
+
+        qml.decomposition.disable_graph()
+        qml.capture.disable()
+
+        without_qjit = qml.transforms.decompose(circuit, gate_set={"RZ", "CNOT"})
+        expected_resources = qml.specs(without_qjit, level="device")()["resources"].gate_types
+
+        assert qml.math.allclose(without_qjit(), with_qjit_result)
         assert resources == expected_resources
 
 
