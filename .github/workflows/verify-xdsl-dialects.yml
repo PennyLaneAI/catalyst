@@ -40,14 +40,6 @@ jobs:
       with:
         python-version: ${{ needs.constants.outputs.primary_python_version }}
 
-    - name: Get Cached LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache/restore@v4
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
-        fail-on-cache-miss: true
-
     - name: Install Catalyst and Dependencies
       env:
         BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
@@ -66,6 +58,16 @@ jobs:
 
         # 3. Activate Python environment
         source ./.catalyst_venv/bin/activate
+
+    # We get the cached LLVM build after installing Catalyst so that the diff does not impact
+    # the Catalyst installation process
+    - name: Get Cached LLVM Build
+      id: cache-llvm-build
+      uses: actions/cache/restore@v4
+      with:
+        path: llvm-build
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
+        fail-on-cache-miss: true
 
     - name: Create Python Dialects
       run: |
