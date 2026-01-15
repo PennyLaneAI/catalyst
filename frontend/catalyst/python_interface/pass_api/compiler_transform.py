@@ -13,13 +13,13 @@
 # limitations under the License.
 """Core API for registering xDSL transforms for use with PennyLane and Catalyst."""
 
-from pennylane.transforms.core.transform_dispatcher import TransformDispatcher
+from pennylane.transforms.core import Transform 
 from xdsl.passes import ModulePass
 
 from .apply_transform_sequence import register_pass
 
 
-class PassDispatcher(TransformDispatcher):
+class PassDispatcher(Transform):
     """Wrapper class for applying passes to QJIT-ed workflows."""
 
     module_pass: ModulePass
