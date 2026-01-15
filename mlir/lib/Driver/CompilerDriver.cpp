@@ -33,6 +33,7 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/Program.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -840,10 +841,27 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             CO_MSG(options, Verbosity::All,
                    "[ARTIQ] Compiling with external LLC: " << llcCmd << "\n");
 
-            int llcResult = std::system(llcCmd.c_str());
+            std::string objectFile = options.getObjectFile();
+            llvm::SmallVector<llvm::StringRef, 8> llcArgs;
+            llcArgs.push_back(llcPath);
+            llcArgs.push_back("-mtriple=armv7-unknown-linux-gnueabihf");
+            llcArgs.push_back("-mcpu=cortex-a9");
+            llcArgs.push_back("-filetype=obj");
+            llcArgs.push_back("-relocation-model=pic");
+            llcArgs.push_back("-o");
+            llcArgs.push_back(objectFile);
+            llcArgs.push_back(llFile);
+
+            std::string llcErrMsg;
+            int llcResult =
+                llvm::sys::ExecuteAndWait(llcPath, llcArgs, std::nullopt, {}, 0, 0, &llcErrMsg);
             if (llcResult != 0) {
                 CO_MSG(options, Verbosity::Urgent,
-                       "External LLC failed with exit code: " << llcResult << "\n");
+                       "External LLC failed with exit code: " << llcResult);
+                if (!llcErrMsg.empty()) {
+                    CO_MSG(options, Verbosity::Urgent, ": " << llcErrMsg);
+                }
+                CO_MSG(options, Verbosity::Urgent, "\n");
                 return failure();
             }
 
@@ -862,10 +880,32 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
             CO_MSG(options, Verbosity::All, "[ARTIQ] Linking ELF: " << lldCmd << "\n");
 
-            int lldResult = std::system(lldCmd.c_str());
+            std::string kernelLd = options.artiqKernelLd;
+            std::string objectFileLd = options.getObjectFile();
+            std::string elfFile = options.getElfFile();
+            llvm::SmallVector<llvm::StringRef, 12> lldArgs;
+            lldArgs.push_back(lldPath);
+            lldArgs.push_back("-shared");
+            lldArgs.push_back("--eh-frame-hdr");
+            lldArgs.push_back("-m");
+            lldArgs.push_back("armelf_linux_eabi");
+            lldArgs.push_back("--target2=rel");
+            lldArgs.push_back("-T");
+            lldArgs.push_back(kernelLd);
+            lldArgs.push_back(objectFileLd);
+            lldArgs.push_back("-o");
+            lldArgs.push_back(elfFile);
+
+            std::string lldErrMsg;
+            int lldResult =
+                llvm::sys::ExecuteAndWait(lldPath, lldArgs, std::nullopt, {}, 0, 0, &lldErrMsg);
             if (lldResult != 0) {
                 CO_MSG(options, Verbosity::Urgent,
-                       "LLD linking failed with exit code: " << lldResult << "\n");
+                       "LLD linking failed with exit code: " << lldResult);
+                if (!lldErrMsg.empty()) {
+                    CO_MSG(options, Verbosity::Urgent, ": " << lldErrMsg);
+                }
+                CO_MSG(options, Verbosity::Urgent, "\n");
                 return failure();
             }
 
