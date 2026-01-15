@@ -16,7 +16,6 @@
 
 #include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
-#include "QEC/Utils/QECOpUtils.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
