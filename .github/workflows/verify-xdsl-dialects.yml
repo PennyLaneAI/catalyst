@@ -30,34 +30,36 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
-    - name: Checkout Catalyst
-      uses: actions/checkout@v4
-      with:
-        submodules: true
-
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: ${{ needs.constants.outputs.primary_python_version }}
 
+    - name: Checkout Catalyst
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+
     - name: Install Catalyst and Dependencies
       env:
         BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
       run: |
-        # ruff is a dependency for the xdsl-tblgen CLI tool. Generally, it gets installed if
-        # installing xdsl[dev], but we install it separately to simplify dependency installation
-        python -m pip install ruff
-
         # Install Catalyst. We only want the frontend to be usable, so we use a minimal
         # source build using TestPyPI wheels
         # 1. Create Python environment
         python -m venv .venv
+
+        git status
 
         # 2. Install Catalyst
         bash ./setup_dev_from_wheel.sh ./.venv $BRANCH
 
         # 3. Activate Python environment
         source ./.venv/bin/activate
+
+        # ruff is a dependency for the xdsl-tblgen CLI tool. Generally, it gets installed if
+        # installing xdsl[dev], but we install it separately to simplify dependency installation
+        python -m pip install ruff
 
     # We get the cached LLVM build after installing Catalyst so that the diff does not impact
     # the Catalyst installation process
