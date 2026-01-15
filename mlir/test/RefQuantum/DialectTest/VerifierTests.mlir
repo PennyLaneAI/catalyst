@@ -80,6 +80,15 @@ func.func @test_multirz_control(%w0: i64, %w1: i64, %theta: f64) {
 
 // -----
 
+func.func @test_multirz_duplicate_wires(%w0: i64, %theta: f64) {
+    %true = llvm.mlir.constant (1 : i1) :i1
+    // expected-error@+1 {{all wires on a quantum gate must be distinct (including controls)}}
+    ref_quantum.multirz(%theta) %w0, %w0 : i64, i64
+    return
+}
+
+// -----
+
 func.func @test_namedobs_op_bad_attribute(%w0: i64) {
     // expected-error@+2 {{expected catalyst::quantum::NamedObservable to be one of: Identity, PauliX, PauliY, PauliZ, Hadamard}}
     // expected-error@+1 {{failed to parse NamedObservableAttr parameter 'value' which is to be a `catalyst::quantum::NamedObservable`}}
