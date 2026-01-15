@@ -38,11 +38,13 @@ jobs:
     - name: Checkout Catalyst
       uses: actions/checkout@v4
       with:
+        ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
         submodules: true
+        fetch-depth: 0
 
     - name: Install Catalyst and Dependencies
       env:
-        BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+        BRANCH: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
       run: |
         # Install Catalyst. We only want the frontend to be usable, so we use a minimal
         # source build using TestPyPI wheels

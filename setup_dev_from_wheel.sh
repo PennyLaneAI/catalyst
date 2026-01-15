@@ -47,7 +47,6 @@ checkout_nightly_build(){
 
     # Update to the latest commit at the main branch
     cd $CATALYST_DIR
-    ls
     git switch main
     git fetch
     git pull
