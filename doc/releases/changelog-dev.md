@@ -12,6 +12,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* A new compiler pass `unroll-conditional-ppr-ppm` for lowering conditional PPR and PPMs
+  into normal PPR and PPMs with SCF dialect to support runtime execution.
+  [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
+
 * Added LLVM conversion patterns to lower QEC dialect operations to their corresponding runtime
   CAPI calls. 
   This includes `qec.ppr` and `qec.ppr.arbitrary` (lowered to `__catalyst__qis__PauliRot`),
@@ -30,3 +34,4 @@
 This release contains contributions from (in alphabetical order):
 
 Sengthai Heng,
+Jeffrey Kam
