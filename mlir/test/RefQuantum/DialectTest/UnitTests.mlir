@@ -16,6 +16,21 @@
 //
 // RUN: quantum-opt --split-input-file --verify-diagnostics %s
 
+
+func.func @test_set_state(%arg0 : tensor<2xcomplex<f64>>, %w0: i64) {
+    ref_quantum.set_state(%arg0) %w0 : tensor<2xcomplex<f64>>, i64
+    return
+}
+
+// -----
+
+func.func @test_basis_state(%arg0 : tensor<1xi1>, %w0: i64) {
+    ref_quantum.set_basis_state(%arg0) %w0 : tensor<1xi1>, i64
+    return
+}
+
+// -----
+
 func.func @test_custom_op(%w0: i64, %w1: i64, %w2: i64, %w3: i64, %param0: f64, %param1: f64) {
 
     // Basic

@@ -132,6 +132,47 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
+def SetStateOp : Gate_Op<"set_state"> {
+    let summary = "Set state to a complex vector.";
+    let description = [{
+        This operation is useful for simulators implementing state preparation.
+        Instead of decomposing state preparation into multiple operations, this
+        operation shortcuts all of that into a single operation.
+    }];
+
+    let arguments = (ins
+        1DTensorOf<[Complex<F64>]>:$in_state,
+        Variadic<I64>:$wires
+    );
+
+    let assemblyFormat = [{
+        `(` $in_state `)` $wires attr-dict `:` type(operands)
+    }];
+
+}
+
+
+def SetBasisStateOp : Gate_Op<"set_basis_state"> {
+    let summary = "Set basis state.";
+    let description = [{
+        This operation is useful for simulators implementing set basis state.
+        Instead of decomposing basis state into multiple operations, this
+        operation shortcuts all of that into a single operation.
+        This signature matches the one in pennylane-lightning which expects
+        only a single integer as opposed to a binary digit.
+    }];
+
+    let arguments = (ins
+        1DTensorOf<[I1]>:$basis_state,
+        Variadic<I64>:$wires
+    );
+
+    let assemblyFormat = [{
+        `(` $basis_state`)` $wires attr-dict `:` type(operands)
+    }];
+}
+
+
 def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegments]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
