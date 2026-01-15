@@ -51,13 +51,13 @@ jobs:
         # Install Catalyst. We only want the frontend to be usable, so we use a minimal
         # source build using TestPyPI wheels
         # 1. Create Python environment
-        python -m venv .catalyst_venv
+        python -m venv .venv
 
         # 2. Install Catalyst
-        bash ./setup_dev_from_wheel.sh ./.catalyst_venv $BRANCH
+        bash ./setup_dev_from_wheel.sh ./.venv $BRANCH
 
         # 3. Activate Python environment
-        source ./.catalyst_venv/bin/activate
+        source ./.venv/bin/activate
 
     # We get the cached LLVM build after installing Catalyst so that the diff does not impact
     # the Catalyst installation process
