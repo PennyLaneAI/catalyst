@@ -33,7 +33,7 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
-    - name: Set up Python # Ensure the "primary" python version is used
+    - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: ${{ needs.constants.outputs.primary_python_version }}

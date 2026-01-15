@@ -69,7 +69,7 @@ def create_py_dialect(
             f"\n{llvm_res.stderr.decode()}"
         )
 
-    corrected_json = remove_invalid_field_from_json(llvm_res.stdout.decode(), dialect_name)
+    corrected_json = remove_invalid_fields_from_json(llvm_res.stdout.decode(), dialect_name)
     final_path = save_path / f"{dialect_macro}.py"
     xdsl_cmd = ["xdsl-tblgen", "-o", str(final_path)]
 
@@ -91,10 +91,12 @@ def create_py_dialect(
     print("Stripped operation definition details successfully.\n")
 
 
-def remove_invalid_field_from_json(json_str: str, dialect_name: str) -> str:
+def remove_invalid_fields_from_json(json_str: str, dialect_name: str) -> str:
     """The JSON file for certain dialects may contain more than one dialect in
     their "Dialect" field. This function removes all invalid dialects from the
-    "Dialect" field and returns an updated JSON string.
+    "Dialect" field and returns an updated JSON string. Additionally, we don't
+    want the auto-generated dialects to include assembly formats, which will
+    also be removed.
 
     Args:
         json_str (str): JSON string for the dialect being converted
@@ -103,11 +105,19 @@ def remove_invalid_field_from_json(json_str: str, dialect_name: str) -> str:
     Returns:
         str: JSON string with the invalid dialect name removed
     """
+    # Normalize the dialect name
+    json_str = sub(f"{dialect_name}_Dialect", f"{dialect_name}Dialect", json_str)
+
     loaded = loads(json_str)
 
     dialects = loaded["!instanceof"]["Dialect"]
     new_dialects = [d for d in dialects if dialect_name in d]
     loaded["!instanceof"]["Dialect"] = new_dialects
+
+    for val in loaded.values():
+        if isinstance(val, dict):
+            _ = val.pop("assemblyFormat", None)
+            _ = val.pop("hasCustomAssemblyFormat", None)
 
     return dumps(loaded)
 
@@ -126,6 +136,7 @@ def strip_op_defs(file_path: Path):
     with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
 
+    # Remove operand/property/attribute/result constraints
     search_pattern = r"((operand|prop|result|attr)_def\().*(\)\n)"
     replace_pattern = r"\1AnyAttr()\3"
     content = sub(search_pattern, replace_pattern, content)
