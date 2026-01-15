@@ -84,7 +84,7 @@ def create_py_dialect(
         )
 
     print(f"'{dialect_name}' dialect converted successfully and saved to '{str(final_path)}'.")
-    print(f"Stripping unnecessary operation definition details from the '{dialect}' dialect.")
+    print(f"Stripping unnecessary operation definition details from the '{dialect_name}' dialect.")
 
     strip_op_defs(final_path)
 
