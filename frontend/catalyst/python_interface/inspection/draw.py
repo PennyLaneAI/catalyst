@@ -116,20 +116,31 @@ def draw(qnode: QNode, *, level: int | None = None) -> Callable:
     return wrapper
 
 
+def check_draw_imports():
+    """
+    Raise errors and early exit if dependencies of the draw feature are missing.
+    """
+    if not HAS_MATPLOTLIB:
+        raise ImportError(
+            "The draw_graph functionality requires matplotlib to be installed. "
+            "You can install matplotlib via 'pip install matplotlib'."
+        )
+    if not HAS_GRAPHVIZ:
+        raise ImportError(
+            "The Graphviz package is not found. Please install it for your system by "
+            "following the instructions found here: https://graphviz.org/download/"
+        )
+    if not HAS_PYDOT:
+        raise ImportError(
+            "The 'pydot' package is not found. Please install with 'pip install pydot'."
+        )
+
+
+# pylint: disable=line-too-long
 def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     """
     Visualize a single QJIT compiled QNode, showing wire flow through quantum operations,
     program structure, and pass-by-pass impacts on compiled programs.
-
-    .. warning::
-
-        This function only visualizes quantum operations contained in workflows involving a single
-        qjit-compiled QNode. Workflows involving multiple QNodes or operations outside QNodes
-        cannot yet be visualized.
-
-        Only transformations found within the Catalyst compiler can be visualized. Any PennyLane
-        tape transform will have already been applied before lowering to MLIR and will appear as
-        the base state (``level=0``) in this visualization.
 
     .. note::
 
@@ -139,12 +150,22 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         compiled IR.
 
         As such, use of ``draw_graph`` requires installation of
-        `Graphviz <https://graphviz.org/download/>`_ and the
-        `pydot <https://pypi.org/project/pydot/>`_ software package. Please consult the links
-        provided for installation instructions.
+        `Graphviz <https://graphviz.org/download/>`_,
+        `pydot <https://pypi.org/project/pydot/>`_, and `matplotlib <https://matplotlib.org/stable/install/index.html>`_ software packages.
+        Please consult the links provided for installation instructions.
 
         Additionally, it is recommended to use ``draw_graph`` with PennyLane's program capture
         enabled (see :func:`qml.capture.enable <pennylane.capture.enable>`).
+
+    .. warning::
+
+        This function only visualizes quantum operations contained in workflows involving a single
+        ``qjit``-compiled QNode. Workflows involving multiple QNodes or operations outside QNodes
+        cannot yet be visualized.
+
+        Only transformations found within the Catalyst compiler can be visualized. Any PennyLane
+        tape transform will have already been applied before lowering to MLIR and will appear as
+        the base state (``level=0``) in this visualization.
 
     Args:
         qnode (QJIT):
@@ -163,10 +184,24 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         VisualizationError:
             If the circuit contains operations that cannot be converted to a graphical
             representation.
+        TypeError:
+            If the ``level`` argument is not of type integer or ``None``. If the input ``QNode`` is not
+            qjit-compiled.
+        ValueError:
+            If the ``level`` argument is a negative integer.
+
+    Warns:
+        UserWarning:
+            If the ``level`` argument provided is larger than the number of passes present in the
+            compilation pipeline.
+
+        Lastly, ``catalyst.draw_graph`` is currently not compatible with dynamic wire allocation.
+        This includes :func:`pennylane.allocation.allocate` and dynamic wire allocation that may
+        occur in MLIR directly (via ``quantum.alloc_qb`` instructions).
 
     **Example**
 
-    Using ``draw_graph`` requires a qjit'd QNode and a ``level`` argument, which denotes the
+    Using ``draw_graph`` requires a ``qjit``'d QNode and a ``level`` argument, which denotes the
     cumulative set of applied compilation transforms (in the order they appear) to be applied and
     visualized.
 
@@ -192,19 +227,25 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     With ``level=0``, the graphical visualization will display the program as if no transforms are
     applied:
 
-    >>> print(catalyst.draw_graph(circuit, level=0)())
-    (<Figure size 640x480 with 1 Axes>, <Axes: >)
+    >>> fig, ax = catalyst.draw_graph(circuit, level=0)()
+    >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
     .. figure:: ../../../doc/_static/catalyst-draw-graph-level0-example.png
         :width: 35%
         :alt: Graphical representation of circuit with level=0
         :align: left
 
+    Though you can ``print`` the output of ``catalyst.draw_graph``, it is recommended to use the
+    ``savefig`` method of ``matplotlib.figure.Figure`` for better control over image resolution
+    (DPI). Please consult the
+    `matplotlib documentation <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.savefig.html>`_
+    for usage details of ``savefig``.
+
     With ``level=2``, both :func:`~.passes.merge_rotations` and :func:`~.passes.cancel_inverses`
     will be applied, resulting in the two Hadamards cancelling and the two rotations merging:
 
-    >>> print(catalyst.draw_graph(circuit, level=2)())
-    (<Figure size 640x480 with 1 Axes>, <Axes: >)
+    >>> fig, ax = catalyst.draw_graph(circuit, level=2)()
+    >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
     .. figure:: ../../../doc/_static/catalyst-draw-graph-level2-example.png
         :width: 35%
@@ -234,8 +275,8 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
                         qml.Z(0)
                 return qml.probs()
 
-        >>> print(catalyst.draw_graph(circuit)())
-        (<Figure size 640x480 with 1 Axes>, <Axes: >)
+        >>> fig, ax = catalyst.draw_graph(circuit)()
+        >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
         .. figure:: ../../../doc/_static/catalyst-draw-graph-control-flow-example.png
             :width: 35%
@@ -269,31 +310,21 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         and solid lines for static/known values:
 
         >>> x, y = 1, 0
-        >>> print(catalyst.draw_graph(circuit)(x, y))
-        (<Figure size 640x480 with 1 Axes>, <Axes: >)
+        >>> fig, ax = catalyst.draw_graph(circuit)(x, y)
+        >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
         .. figure:: ../../../doc/_static/catalyst-draw-graph-dynamic-wire-example.png
             :width: 35%
             :alt: Graphical representation of circuit with control flow
             :align: left
     """
-    if not HAS_MATPLOTLIB:
-        raise ImportError(
-            "The draw_graph functionality requires matplotlib to be installed. "
-            "You can install matplotlib via 'pip install matplotlib'."
-        )
-    if not HAS_GRAPHVIZ:
-        raise ImportError(
-            "The Graphviz package is not found. Please install it for your system by "
-            "following the instructions found here: https://graphviz.org/download/"
-        )
-    if not HAS_PYDOT:
-        raise ImportError(
-            "The 'pydot' package is not found. Please install with 'pip install pydot'."
-        )
+
+    check_draw_imports()
 
     if not isinstance(level, (int, type(None))):
         raise TypeError("The 'level' argument must be an integer or 'None'.")
+    if isinstance(level, int) and level < 0:
+        raise ValueError("The 'level' argument must be a positive integer.")
 
     max_level = None
     if isinstance(level, int):
@@ -345,6 +376,12 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
             pass
 
         max_level = max(cache.keys())
+
+        if max_level and isinstance(level, int) and level > max_level:
+            warnings.warn(
+                f"Level requested ({level}) is higher than the number of compilation passes present: {max_level}."
+            )
+
         dot_string, _ = cache.get(level, cache[max_level])
         # TODO:  Remove dependency on PyDot
         (graph,) = pydot.graph_from_dot_data(dot_string)

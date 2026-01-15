@@ -222,6 +222,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                 # dictionary to get the number of wires.
                 num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
                 pauli_word = op.op.params.get("pauli_word", None)
+                requires_copy = num_wires == -1
 
                 if op.op.name in ("PauliRot", "PauliMeasure"):
                     num_wires = len(pauli_word)
@@ -233,7 +234,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                     op_name=op.op.name,
                     num_wires=num_wires,
                     num_params=num_params,
-                    requires_copy=num_wires == -1,
+                    requires_copy=requires_copy,
                     ag_enabled=self._ag_enabled,
                     pauli_word=pauli_word,
                 )

@@ -15,7 +15,6 @@
 
 from inspect import getsource
 from io import StringIO
-from warnings import warn
 
 import pytest
 from xdsl.context import Context
@@ -105,12 +104,7 @@ def run_filecheck():
             generic program string back to an xDSL module. ``False`` by default.
     """
     if not deps_available:
-        warn(
-            "The filecheck Python package must be installed to use the 'run_filecheck' "
-            "fixture. Install it using 'python -m pip install filecheck'.",
-            UserWarning,
-        )
-        pytest.skip("Cannot run lit tests without xDSL and filecheck.")
+        pytest.skip("Cannot run xDSL lit tests without the Python 'filecheck' package.")
 
     yield _run_filecheck_impl
 
@@ -214,11 +208,6 @@ def run_filecheck_qjit():
 
     """
     if not deps_available:
-        warn(
-            "The filecheck Python package must be installed to use the 'run_filecheck_qjit' "
-            "fixture. Install it using 'python -m pip install filecheck'.",
-            UserWarning,
-        )
-        pytest.skip("Cannot run lit tests without xDSL and filecheck.")
+        pytest.skip("Cannot run xDSL lit tests without the Python 'filecheck' package.")
 
     yield _run_filecheck_qjit_impl
