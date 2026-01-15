@@ -16,11 +16,9 @@
 
 #include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
-#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 using namespace catalyst;
-using namespace catalyst::quantum;
 using namespace catalyst::qec;
 
 namespace {
