@@ -49,10 +49,8 @@ jobs:
         # 1. Create Python environment
         python -m venv .venv
 
-        git status
-
         # 2. Install Catalyst
-        bash ./setup_dev_from_wheel.sh ./.venv $BRANCH
+        echo "y" | bash ./setup_dev_from_wheel.sh ./.venv $BRANCH
 
         # 3. Activate Python environment
         source ./.venv/bin/activate
