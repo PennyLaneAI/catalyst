@@ -269,6 +269,20 @@ TEST_CASE("Test a NullQubit circuit with num_qubits=1 that performs a measuremen
     CHECK(*m == false); // Measurement of NullQubit should always return 0 (false)
 }
 
+TEST_CASE_METHOD(NullQubitRuntimeFixture,
+                 "Test null qubit circuit with pauli measurement throws an exception",
+                 "[NullQubit]")
+{
+    // Allocate register with three qubits, [0, 1, 2]
+    QirArray *reg = __catalyst__rt__qubit_allocate_array(3);
+
+    auto reg_vec = *reinterpret_cast<std::vector<QubitIdType> *>(reg);
+
+    // PauliMeasure is unsupported by device
+    CHECK_THROWS_WITH(__catalyst__qis__PauliMeasure("X", 3, reg_vec[0], reg_vec[1], reg_vec[2]),
+                      ContainsSubstring("PauliMeasure is unsupported by device"));
+}
+
 TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample calling Hadamard, "
           "ControlledPhaseShift, IsingYY, and CRX quantum operations",
           "[CoreQIS]")
