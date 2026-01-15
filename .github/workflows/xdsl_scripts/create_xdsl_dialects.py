@@ -17,7 +17,7 @@ with their xDSL versions."""
 from argparse import ArgumentParser
 from json import dumps, loads
 from pathlib import Path
-from re import escape, sub
+from re import sub
 from subprocess import list2cmdline, run
 
 all_dialects = {
@@ -84,11 +84,11 @@ def create_py_dialect(
         )
 
     print(f"'{dialect_name}' dialect converted successfully and saved to '{str(final_path)}'.")
-    print("Stripping unnecessary operation definition details from the '{dialect}' dialect.")
+    print(f"Stripping unnecessary operation definition details from the '{dialect}' dialect.")
 
     strip_op_defs(final_path)
 
-    print(f"Stripped operation definition details successfully.\n")
+    print("Stripped operation definition details successfully.\n")
 
 
 def remove_invalid_field_from_json(json_str: str, dialect_name: str) -> str:
@@ -123,14 +123,14 @@ def strip_op_defs(file_path: Path):
     Args:
         file_path (pathlib.Path): path to the Python file being stripped
     """
-    with open(file_path, "r") as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
 
     search_pattern = r"((operand|prop|result|attr)_def\().*(\)\n)"
     replace_pattern = r"\1AnyAttr()\3"
     content = sub(search_pattern, replace_pattern, content)
 
-    with open(file_path, "w") as f:
+    with open(file_path, "w", encoding="utf-8") as f:
         f.write(content)
 
 
