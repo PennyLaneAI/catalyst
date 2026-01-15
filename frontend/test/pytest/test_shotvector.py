@@ -14,8 +14,6 @@
 
 """Integration tests for the runtime assertion feature."""
 
-import re
-
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
@@ -120,7 +118,7 @@ class TestShotVector:
                 qjit(circuit)()
         else:
             with pytest.raises(
-                NotImplementedError, match=f"measurement process does not support shot-vectors"
+                NotImplementedError, match="measurement process does not support shot-vectors"
             ):
                 qjit(circuit)()
 

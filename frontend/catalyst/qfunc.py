@@ -72,7 +72,7 @@ class FallbackToSingleBranch(Exception):
 
 def _resolve_mcm_config(qnode):
     """Helper function for resolving and validating that the mcm_config is valid for executing."""
-    total_shots = qnode._shots.total_shots
+    total_shots = qnode._shots.total_shots  # pylint: disable=protected-access
     analytic_shots = total_shots is None
     finite_shots = not analytic_shots
     static_shots = finite_shots and isinstance(total_shots, Integral)
@@ -126,12 +126,12 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs, pass_pipeline=None):
     # If we are already running a one-shot transformed QNode, do not apply MCM processing again.
     dynamic_one_shot_called = getattr(qnode, "_dynamic_one_shot_called", False)
     if dynamic_one_shot_called:
-        return
+        return None
 
     mcm_config = _resolve_mcm_config(qnode)
 
     if mcm_config.mcm_method != "one-shot":
-        return
+        return None
 
     # Special case for measurements_from_{samples/counts} transforms. If the default is determined
     # to be one-shot, but no mcms are being used, we don't want to raise an error outright. Since
@@ -141,7 +141,7 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs, pass_pipeline=None):
     uses_measurements_from_samples = uses_transform(qnode, "measurements_from_samples")
     uses_measurements_from_counts = uses_transform(qnode, "measurements_from_counts")
     if no_user_mcm_method and (uses_measurements_from_samples or uses_measurements_from_counts):
-        return
+        return None
 
     # These transforms are currently not compatible with one-shot when used manually,
     # although they can be used from within a device transform program.
@@ -468,7 +468,7 @@ def _validate_one_shot_measurements(
 
         if isinstance(m, VarianceMP) and m.obs:
             raise NotImplementedError(
-                f"qml.var() cannot be used on observables (MCMs are allowed) with the chosen or "
+                "qml.var() cannot be used on observables (MCMs are allowed) with the chosen or "
                 "default mcm_method 'one-shot'. Please consider using 'single-branch-statistics' "
                 "or using it on MCMs instead."
             )
@@ -486,7 +486,7 @@ def _validate_one_shot_measurements(
             and not device_has_static_wires
         ):
             raise NotImplementedError(
-                f"qml.sample() and qml.counts() cannot be used without wires and a dynamic number "
+                "qml.sample() and qml.counts() cannot be used without wires and a dynamic number "
                 "of device wires in the chosen or default mcm_method 'one-shot'. Please consider "
                 "using 'single-branch-statistics', providing explicit wires in the measurement "
                 "process, or setting a constant number of wires in the device."
