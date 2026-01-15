@@ -243,6 +243,44 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [ParametrizedGate, AttrSizedOperand
     }];
 }
 
+def MultiRZOp : UnitaryGate_Op<"multirz", [ParametrizedGate, AttrSizedOperandSegments]> {
+    let summary = "Apply an arbitrary multi Z rotation";
+    let description = [{
+        The `ref_quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
+        The arguments are the rotation angle `theta` and a set of wires the operation acts on.
+
+        .. note::
+            This operation is one of the few quantum operations that is not applied via
+            ``ref_quantum.custom``. The reason for this is that its quantum dialect counterpart
+            needs to be handled in a special way during the lowering due to its C function being
+            variadic on the number of qubits.
+    }];
+
+    let arguments = (ins
+        F64:$theta,
+        Variadic<I64>:$wires,
+        UnitAttr:$adjoint,
+        Variadic<I64>:$ctrl_wires,
+        Variadic<I1>:$ctrl_values
+    );
+
+    let assemblyFormat = [{
+        `(` $theta `)` $wires (`adj` $adjoint^)? attr-dict
+        ( `ctrls` `(` $ctrl_wires^ `)` )?
+        ( `ctrlvals` `(` $ctrl_values^ `)` )?
+        `:` type($wires) (`ctrls` type($ctrl_wires)^ )?
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getAllParams() {
+            return getODSOperands(0);  // `theta` is the 0-th operand
+        }
+    }];
+
+    // TODO
+    // let hasCanonicalizeMethod = 1;
+}
+
 // // -----
 
 // // Observable ops are not meaningful on their own: their purpose is to be sent into a measurement
