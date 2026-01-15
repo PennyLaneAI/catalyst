@@ -1241,7 +1241,7 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
 
-        // Replace the op with the input qubits (reference semantics)
+        // Replace the op with the input qubits
         SmallVector<Value> values;
         values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
         rewriter.replaceOp(op, values);
