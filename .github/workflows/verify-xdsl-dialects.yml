@@ -17,7 +17,7 @@ jobs:
         && contains(github.event.pull_request.labels.*.name, 'unified compiler') )
         || github.event_name == 'workflow_dispatch'
       }}
-    uses: ./.github/workflows/constants.yaml
+    uses: ./.github/workflows/constants.yml
     with:
       runs_on: ubuntu-24.04
 

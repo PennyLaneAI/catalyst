@@ -20,7 +20,7 @@ concurrency:
 jobs:
   constants:
     name: "Set build matrix"
-    uses: ./.github/workflows/constants.yaml
+    uses: ./.github/workflows/constants.yml
     with:
       use_release_tag: ${{ inputs.catalyst == 'stable' }}
 
