@@ -448,6 +448,7 @@ class Compiler:
         )
         return cmd
 
+    # pylint: disable=too-many-branches
     @debug_logger
     def run_from_ir(self, ir: str, module_name: str, workspace: Directory):
         """Compile a shared object from a textual IR (MLIR or LLVM).

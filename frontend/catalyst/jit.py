@@ -16,6 +16,8 @@
 compilation of hybrid quantum-classical functions using Catalyst.
 """
 
+# pylint: disable=too-many-lines
+
 import copy
 import functools
 import inspect
