@@ -15,14 +15,15 @@
 #ifndef QUANTUM_OPS
 #define QUANTUM_OPS
 
-// include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
+include "Quantum/IR/QuantumAttrDefs.td"
 include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumEnums.td"
 include "Quantum/IR/QuantumInterfaces.td"
+include "Quantum/IR/QuantumTypes.td"
 
 //===----------------------------------------------------------------------===//
 // Quantum dialect operations.

@@ -758,7 +758,12 @@ class TestGetLabel:
 
     def test_global_phase_operator(self):
         """Tests against a GlobalPhase operator instance."""
-        assert get_label(qml.GlobalPhase(0.5)) == "<name> GlobalPhase|<wire> all"
+        assert get_label(qml.GlobalPhase(0.5)) == "GlobalPhase"
+        assert (
+            get_label(qml.ctrl(qml.GlobalPhase(0.0), control=0))
+            == "<name> C(GlobalPhase)|<wire> [0]"
+        )
+        assert get_label(qml.adjoint(qml.GlobalPhase(0.0))) == "Adjoint(GlobalPhase)"
 
     @pytest.mark.parametrize(
         "meas, label",
@@ -840,7 +845,7 @@ class TestCreateStaticOperatorNodes:
         assert len(nodes) == 2  # Device node + operator
 
         # Compiler throws out the wires and they get converted to wires=[] no matter what
-        assert nodes["node1"]["label"] == get_label(qml.GlobalPhase(0.5))
+        assert nodes["node1"]["label"] == "GlobalPhase"
 
     def test_qubit_unitary_op(self):
         """Test that QubitUnitary operations can be handled."""
@@ -850,7 +855,8 @@ class TestCreateStaticOperatorNodes:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_circuit():
-            qml.QubitUnitary(jax.numpy.array([[0, 1], [1, 0]]), wires=0)
+            qml.QubitUnitary(jax.numpy.array([[0, 1], [1, 0]]), wires=0)  # real
+            qml.QubitUnitary(jax.numpy.array([[1, 0], [0, 1j]]), wires=0)  # complex
 
         module = my_circuit()
 
@@ -860,9 +866,10 @@ class TestCreateStaticOperatorNodes:
 
         # Ensure DAG only has one node
         nodes = utility.dag_builder.nodes
-        assert len(nodes) == 2  # Device node + operator
+        assert len(nodes) == 3  # Device node + operators
 
         assert nodes["node1"]["label"] == get_label(qml.QubitUnitary([[0, 1], [1, 0]], wires=0))
+        assert nodes["node2"]["label"] == get_label(qml.QubitUnitary([[1, 0], [0, 1j]], wires=0))
 
     def test_multi_rz_op(self):
         """Test that MultiRZ operations can be handled."""
@@ -939,17 +946,20 @@ class TestCreateStaticOperatorNodes:
         assert nodes["node2"]["attrs"]["fillcolor"] == "#70B3F5"
 
     @pytest.mark.usefixtures("use_capture")
-    def test_ppr(self):
+    @pytest.mark.parametrize("negative_angle", [True, False])
+    def test_ppr(self, negative_angle):
         """Tests that a PPR node can be created."""
         pipe = [("pipe", ["quantum-compilation-stage"])]
+
+        multiplier = -1 if negative_angle else 1
 
         @qml.qjit(pipelines=pipe, target="mlir")
         @qml.transform(pass_name="to-ppr")
         @qml.qnode(qml.device("null.qubit", wires=3))
         def cir():
-            qml.PauliRot(jax.numpy.pi, pauli_word="YZ", wires=[0, 1])
-            qml.PauliRot(jax.numpy.pi / 4, pauli_word="X", wires=[0])
-            qml.PauliRot(jax.numpy.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
+            qml.PauliRot(multiplier * jax.numpy.pi, pauli_word="YZ", wires=[0, 1])
+            qml.PauliRot(multiplier * jax.numpy.pi / 4, pauli_word="X", wires=[0])
+            qml.PauliRot(multiplier * jax.numpy.pi / 2, pauli_word="XYZ", wires=[0, 1, 2])
 
         module = parse_generic_to_xdsl_module(cir.mlir_opt)
 
@@ -960,11 +970,12 @@ class TestCreateStaticOperatorNodes:
         nodes = utility.dag_builder.nodes
         assert len(nodes) == 4  # Device node + operator
 
-        assert nodes["node1"]["label"] == "<name> PPR-YZ (π/2)|<wire> [0, 1]"
+        sign_str = "-" if negative_angle else ""
+        assert nodes["node1"]["label"] == f"<name> PPR-YZ ({sign_str}π/2)|<wire> [0, 1]"
         assert nodes["node1"]["attrs"]["fillcolor"] == "#D9D9D9"
-        assert nodes["node2"]["label"] == "<name> PPR-X (π/8)|<wire> [0]"
+        assert nodes["node2"]["label"] == f"<name> PPR-X ({sign_str}π/8)|<wire> [0]"
         assert nodes["node2"]["attrs"]["fillcolor"] == "#E3FFA1"
-        assert nodes["node3"]["label"] == "<name> PPR-XYZ (π/4)|<wire> [0, 1, 2]"
+        assert nodes["node3"]["label"] == f"<name> PPR-XYZ ({sign_str}π/4)|<wire> [0, 1, 2]"
         assert nodes["node3"]["attrs"]["fillcolor"] == "#F5BD70"
 
     @pytest.mark.usefixtures("use_capture")
@@ -1513,6 +1524,42 @@ class TestCreateDynamicMeasurementNodes:
 @pytest.mark.usefixtures("use_both_frontend")
 class TestOperatorConnectivity:
     """Tests that operators are properly connected."""
+
+    def test_global_phase_connectivity(self):
+        """Tests the connectivity of the global phase operator."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            qml.X(0)
+            qml.GlobalPhase(0.5)
+            qml.adjoint(qml.GlobalPhase(0.5))
+            qml.ctrl(qml.GlobalPhase, control=0)(0.5)
+            qml.Y(0)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # Ensure disjoint globalphase nodes show up
+        assert "GlobalPhase" in nodes["node2"]["label"]
+        assert "Adjoint(GlobalPhase)" in nodes["node3"]["label"]
+
+        # Ensure proper connectivity
+        expected_edges = (
+            ("NullQubit", "PauliX"),
+            ("PauliX", "C(GlobalPhase)"),
+            ("C(GlobalPhase)", "PauliY"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
 
     def test_static_connection_within_cluster(self):
         """Tests that connections can be made within the same cluster."""
@@ -2638,6 +2685,7 @@ class TestCtrl:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
@@ -2662,6 +2710,7 @@ class TestCtrl:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
@@ -2686,6 +2735,7 @@ class TestCtrl:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
@@ -2712,6 +2762,7 @@ class TestCtrl:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
@@ -2749,6 +2800,8 @@ class TestAdjoint:
         clusters = utility.dag_builder.clusters
         nodes = utility.dag_builder.nodes
 
+        assert len(nodes) == 2
+
         # cluster0 -> qjit
         # cluster1 -> my_workflow
         assert clusters["cluster2"]["label"] == "adjoint"
@@ -2774,6 +2827,7 @@ class TestAdjoint:
 
         clusters = utility.dag_builder.clusters
         nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
@@ -2800,6 +2854,7 @@ class TestAdjoint:
 
         clusters = utility.dag_builder.clusters
         nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow

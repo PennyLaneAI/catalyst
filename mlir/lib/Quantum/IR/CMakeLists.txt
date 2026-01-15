@@ -7,7 +7,7 @@ add_mlir_library(MLIRQuantum
     ${PROJECT_SOURCE_DIR}/include/Quantum
 
     DEPENDS
+    MLIRQuantumAttrDefsIncGen
     MLIRQuantumInterfacesIncGen
     MLIRQuantumOpsIncGen
-    MLIRQuantumEnumsIncGen
 )

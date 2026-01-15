@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,28 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef QUANTUM_ATTR_DEFS
+#define QUANTUM_ATTR_DEFS
 
-#include <optional>
+include "mlir/IR/EnumAttr.td"
 
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/ErrorHandling.h"
-
-#include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/Dialect.h"
-#include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Interfaces/ControlFlowInterfaces.h"
-#include "mlir/Support/LogicalResult.h"
-
-#include "Quantum/IR/QuantumDialect.h"
-#include "Quantum/IR/QuantumInterfaces.h"
-#include "Quantum/IR/QuantumTraits.h"
+include "Quantum/IR/QuantumDialect.td"
 
 //===----------------------------------------------------------------------===//
-// Quantum ops declarations.
+// Quantum dialect enums and attributes.
 //===----------------------------------------------------------------------===//
 
-#define GET_OP_CLASSES
-#include "Quantum/IR/QuantumOps.h.inc"
+def NamedObservable : I32EnumAttr<"NamedObservable",
+    "Known named observables",
+    [
+        I32EnumAttrCase<"Identity", 0>,
+        I32EnumAttrCase<"PauliX",   1>,
+        I32EnumAttrCase<"PauliY",   2>,
+        I32EnumAttrCase<"PauliZ",   3>,
+        I32EnumAttrCase<"Hadamard", 4>,
+    ]> {
+    let cppNamespace = "catalyst::quantum";
+    let genSpecializedAttr = 0;
+}
+
+def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_observable">;
+
+
+#endif // QUANTUM_ATTR_DEFS
