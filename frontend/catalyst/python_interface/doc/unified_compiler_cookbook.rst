@@ -260,10 +260,10 @@ operations looks like:
         # RX, etc.). These options basically say, "when the operation instance
         # is initialized, create 2 properties that store the length of each of
         # the different groups of operands and results.
-        irdl_options = [
+        irdl_options = (
             AttrSizedOperandSegments(as_property=True),
             AttrSizedResultSegments(as_property=True),
-        ]
+        )
 
         # var_operand_def means that the length of this operand
         # can vary.
