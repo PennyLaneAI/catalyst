@@ -66,6 +66,10 @@ class OutputContext:
     num_mcm: int
 
 
+class FallbackToSingleBranch(Exception):
+    """Exception to signal execution can proceed in single-branch-statistics mode."""
+
+
 def _resolve_mcm_config(mcm_config, shots):
     """Helper function for resolving and validating that the mcm_config is valid for executing."""
     analytic_shots = shots is None
@@ -162,30 +166,8 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs, pass_pipeline=None):
         return Function(
             dynamic_one_shot(qnode, mcm_config=mcm_config, pass_pipeline=pass_pipeline)
         )(*args, **kwargs)
-    except (TypeError, ValueError, CompileError, NotImplementedError) as e:
-        # If user specified mcm_method, we can't fallback to single-branch-statistics,
-        # reraise the original error
-        if user_specified_mcm_method is not None:
-            raise
-
-        # Fallback only if mcm was auto-determined
-        error_msg = str(e)
-        unsupported_measurement_error = any(
-            pattern in error_msg
-            for pattern in [
-                "Native mid-circuit measurement mode does not support",
-                "qml.var(obs) cannot be returned when `mcm_method='one-shot'`",
-                "empty wires is not supported with dynamic wires in one-shot mode",
-                "No need to run one-shot mode",
-            ]
-        )
-
-        # Fallback if error is related to unsupported measurements
-        if unsupported_measurement_error:
-            logger.warning("Fallback to single-branch-statistics: %s", e)
-            mcm_config = replace(mcm_config, mcm_method="single-branch-statistics")
-        else:
-            raise
+    except FallbackToSingleBranch:
+        return None
 
 
 def _reconstruct_output_with_classical_values(
@@ -477,7 +459,7 @@ def _validate_one_shot_measurements(
         not any(isinstance(op, MidCircuitMeasure) for op in tape.operations)
         and user_specified_mcm_method is None
     ):
-        raise ValueError("No need to run one-shot mode when there are no mid-circuit measurements.")
+        raise FallbackToSingleBranch("No mid-circuit measurements present.")
 
     for m in tape.measurements:
         # Check if measurement type is supported
