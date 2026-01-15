@@ -18,7 +18,14 @@
 // Quantum type declarations.
 //===----------------------------------------------------------------------===//
 
+#include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/Types.h"
+
+#include "Quantum/IR/QuantumAttrDefs.h"
 
 #define GET_TYPEDEF_CLASSES
 #include "Quantum/IR/QuantumOpsTypes.h.inc"
+
+void printQubitLevel(mlir::AsmPrinter &printer, catalyst::quantum::QubitLevel level);
+
+mlir::ParseResult parseQubitLevel(mlir::AsmParser &parser, catalyst::quantum::QubitLevel &level);
