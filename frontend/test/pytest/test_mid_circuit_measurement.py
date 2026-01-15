@@ -540,8 +540,8 @@ class TestDynamicOneShotIntegration:
             return qml.classical_shadow(wires=0)
 
         with pytest.raises(
-            TypeError,
-            match="Native mid-circuit measurement mode does not support",
+            NotImplementedError,
+            match="measurement process is not compatible with the chosen or default mcm_method",
         ):
             func(param)
 
@@ -673,7 +673,9 @@ class TestDynamicOneShotIntegration:
             params = jnp.pi / 2.1 * jnp.ones(2)
 
         if measure_f == qml.var and not isinstance(meas_obj, str):
-            with pytest.raises(TypeError, match="qml.var\\(obs\\) cannot be returned when"):
+            with pytest.raises(
+                NotImplementedError, match=r"qml.var\(\) cannot be used on observables"
+            ):
                 func(*params)
             return
 

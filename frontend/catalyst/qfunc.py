@@ -154,11 +154,20 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs, pass_pipeline=None):
     if mcm_config.mcm_method != "one-shot":
         return
 
-    # If measurements_from_samples/counts while one-shot is used, raise an error
-    if uses_measurements_from_samples:
-        raise CompileError("measurements_from_samples is not supported with one-shot")
-    if uses_measurements_from_counts:
-        raise CompileError("measurements_from_counts is not supported with one-shot")
+    # These transforms are currently not compatible with one-shot when used manually,
+    # although they can be used from within a device transform program.
+    if uses_transform(qnode, "measurements_from_samples"):
+        raise CompileError(
+            "The 'measurements_from_samples' transform is not supported with the chosen or default "
+            "mcm_method 'one-shot'. Please consider using 'single-branch-statistics' if you need "
+            "to use this transform explicitly."
+        )
+    if uses_transform(qnode, "measurements_from_counts"):
+        raise CompileError(
+            "The 'measurements_from_counts' transform is not supported with the chosen or default "
+            "mcm_method 'one-shot'. Please consider using 'single-branch-statistics' if you need "
+            "to use this transform explicitly."
+        )
 
     mcm_config = replace(mcm_config, postselect_mode=mcm_config.postselect_mode or "hw-like")
 
@@ -451,7 +460,7 @@ def _validate_one_shot_measurements(
 
     # Check if using shot vector with non-SampleMP measurements
     has_shot_vector = len(shot_vector) > 1 or any(copies > 1 for _, copies in shot_vector)
-    has_wires = wires is not None and not is_dynamic_wires(wires)
+    device_has_static_wires = wires is not None and not is_dynamic_wires(wires)
 
     # Raise an error if there are no mid-circuit measurements, it will fallback to
     # single-branch-statistics
@@ -462,33 +471,38 @@ def _validate_one_shot_measurements(
         raise FallbackToSingleBranch("No mid-circuit measurements present.")
 
     for m in tape.measurements:
-        # Check if measurement type is supported
+        # Check one-shot restrictions based on the measurement process type.
         if not isinstance(m, (CountsMP, ExpectationMP, ProbabilityMP, SampleMP, VarianceMP)):
-            raise TypeError(
-                f"Native mid-circuit measurement mode does not support {type(m).__name__} "
-                "measurements."
+            raise NotImplementedError(
+                f"The {type(m).__name__} measurement process is not compatible with the chosen or "
+                "default mcm_method 'one-shot'. Please consider using 'single-branch-statistics' "
+                "or a different measurement process."
             )
 
-        # Check variance with observable
         if isinstance(m, VarianceMP) and m.obs:
-            raise TypeError(
-                "qml.var(obs) cannot be returned when `mcm_method='one-shot'` because "
-                "the Catalyst compiler does not support qml.sample(obs)."
+            raise NotImplementedError(
+                f"qml.var() cannot be used on observables (MCMs are allowed) with the chosen or "
+                "default mcm_method 'one-shot'. Please consider using 'single-branch-statistics' "
+                "or using it on MCMs instead."
             )
 
-        # Check if the measurement is supported with shot-vector
         if has_shot_vector and not isinstance(m, SampleMP):
             raise NotImplementedError(
-                f"Measurement {type(m).__name__} does not support shot-vectors. "
-                "Use qml.sample() instead."
+                f"The {type(m).__name__} measurement process does not support shot-vectors "
+                "with the chosen or default mcm_method 'one-shot'. Please consider using "
+                "'single-branch-statistics' or qml.sample() instead."
             )
 
-        # Check dynamic wires with empty wires
-        if not has_wires and isinstance(m, (SampleMP, CountsMP)) and (m.wires.tolist() == []):
+        if (
+            isinstance(m, (SampleMP, CountsMP))
+            and not m.wires.tolist()
+            and not device_has_static_wires
+        ):
             raise NotImplementedError(
-                f"Measurement {type(m).__name__} with empty wires is not supported with "
-                "dynamic wires in one-shot mode. Please specify a constant number of wires on "
-                "the device."
+                f"qml.sample() and qml.counts() cannot be used without wires and a dynamic number "
+                "of device wires in the chosen or default mcm_method 'one-shot'. Please consider "
+                "using 'single-branch-statistics', providing explicit wires in the measurement "
+                "process, or setting a constant number of wires in the device."
             )
 
 
