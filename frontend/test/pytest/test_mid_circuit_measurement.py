@@ -30,6 +30,7 @@ from catalyst import CompileError, cond, grad
 from catalyst import jvp as C_jvp
 from catalyst import qjit, value_and_grad
 from catalyst import vjp as C_vjp
+from catalyst.third_party.oqd import OQDDevice
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
 
@@ -1002,6 +1003,16 @@ class TestDynamicOneShotIntegration:
         res_cat, tree_cat = tree_flatten(r2)
         assert tree_jax == tree_cat
         assert np.allclose(res_jax, res_cat)
+
+    def test_unsupported_one_shot_device(self):
+        """Test unsupported device edge case."""
+
+        @qml.qnode(OQDDevice(backend="default", wires=1), shots=10, mcm_method="one-shot")
+        def circuit():
+            return qml.sample()
+
+        with pytest.raises(ValueError, match="'one-shot' is not supported in the chosen device"):
+            qjit(circuit)
 
 
 def sample_to_counts(results, meas_obj):
