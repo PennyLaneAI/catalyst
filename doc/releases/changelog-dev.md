@@ -4,6 +4,15 @@
 
 <h3>Improvements 🛠</h3>
 
+* The default mcm_method for the finite-shots setting (dynamic one-shot) no longer silently falls
+  back to single-branch statistics in most cases. Instead, an error message is raised pointing out
+  alternatives, like explicitly selecting single-branch statistics.
+  [(#2398)](https://github.com/PennyLaneAI/catalyst/pull/2398)
+
+  Importantly, single-branch statistics only explores one branch of the MCM decision tree, meaning
+  program outputs are typically probabilistic and statistics produced by measurement processes are
+  conditional on the selected decision tree path.
+
 <h3>Breaking changes 💔</h3>
 
 <h3>Deprecations 👋</h3>
