@@ -86,7 +86,7 @@ def create_py_dialect(
     print(f"'{dialect_name}' dialect converted successfully and saved to '{str(final_path)}'.")
     print(f"Stripping unnecessary operation definition details from the '{dialect_name}' dialect.")
 
-    strip_op_defs(final_path)
+    resolve_op_defs(final_path)
 
     print("Stripped operation definition details successfully.\n")
 
@@ -122,7 +122,7 @@ def remove_invalid_fields_from_json(json_str: str, dialect_name: str) -> str:
     return dumps(loaded)
 
 
-def strip_op_defs(file_path: Path):
+def resolve_op_defs(file_path: Path):
     """Strip unnecessary details from the operation definitions of
     all classes within the provided file. ``xdsl-tblgen`` does not
     always produce executable code since it generates constraints
@@ -139,6 +139,12 @@ def strip_op_defs(file_path: Path):
     # Remove operand/property/attribute/result constraints
     search_pattern = r"((operand|prop|result|attr)_def\().*(\)\n)"
     replace_pattern = r"\1AnyAttr()\3"
+    content = sub(search_pattern, replace_pattern, content)
+
+    # Add irdl_options. These are added for blanket coverage of the case
+    # where an operation may have multiple variadic operands or results
+    search_pattern = r"(\(IRDLOperation\):)"
+    replace_pattern = r"\1\n\n    irdl_options = (AttrSizedOperandSegments(as_property=True), AttrSizedResultSegments(as_property=True))\n"
     content = sub(search_pattern, replace_pattern, content)
 
     with open(file_path, "w", encoding="utf-8") as f:
