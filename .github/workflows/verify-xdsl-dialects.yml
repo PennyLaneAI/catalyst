@@ -30,48 +30,51 @@ jobs:
         compiler: ${{ fromJson(needs.constants.outputs.compilers) }}
 
     steps:
+    - name: Checkout Catalyst
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: ${{ needs.constants.outputs.primary_python_version }}
 
-    - name: Checkout Catalyst
-      uses: actions/checkout@v4
-      with:
-        ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
-        submodules: true
-        fetch-depth: 0
-
     - name: Install Catalyst and Dependencies
       env:
         BRANCH: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
       run: |
-        # Install Catalyst. We only want the frontend to be usable, so we use a minimal
-        # source build using TestPyPI wheels
-        # 1. Create Python environment
-        python -m venv .venv
-
-        # 2. Install Catalyst
-        echo "y" | bash ./setup_dev_from_wheel.sh ./.venv $BRANCH
-
-        # 3. Activate Python environment
-        source ./.venv/bin/activate
+        make frontend
 
         # ruff is a dependency for the xdsl-tblgen CLI tool. Generally, it gets installed if
         # installing xdsl[dev], but we install it separately to simplify dependency installation
         python -m pip install ruff
 
-    # We get the cached LLVM build after installing Catalyst so that the diff does not impact
-    # the Catalyst installation process
     - name: Get Cached LLVM Build
       id: cache-llvm-build
-      uses: actions/cache/restore@v4
+      uses: actions/cache@v4
       with:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
         fail-on-cache-miss: true
 
-    - name: Create Python Dialects
+    - name: Download Quantum Build Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: quantum-build-${{ matrix.compiler }}
+        path: quantum-build
+
+    - name: Add Frontend Dependencies to PATH
+      run: |
+        echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
+        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
+        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+        echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
+        echo "DIALECTS_BUILD_DIR=$(pwd)/quantum-build" >> $GITHUB_ENV
+        echo "LLVM_BUILD_DIR=$(pwd)/llvm-build" >> $GITHUB_ENV
+        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
+
+    - name: Create Reference xDSL Dialects
       run: |
         OPTIONS="--llvm-build $(pwd)/llvm-build --catalyst-root $GITHUB_WORKSPACE --save-path $(pwd)/gen_dialects"
         python $GITHUB_WORKSPACE/.github/workflows/xdsl_scripts/create_xdsl_dialects.py $OPTIONS
@@ -82,7 +85,7 @@ jobs:
         name: gen_dialects
         path: gen_dialects
 
-    - name: Verify Python Dialects
+    - name: Verify xDSL Dialects
       run: |
         OPTIONS="--save-path $(pwd)/gen_dialects"
         python $GITHUB_WORKSPACE/.github/workflows/xdsl_scripts/verify_xdsl_dialects.py $OPTIONS
