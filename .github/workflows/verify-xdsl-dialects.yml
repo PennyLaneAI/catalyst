@@ -48,19 +48,28 @@ jobs:
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-${{ matrix.compiler }}
         fail-on-cache-miss: true
 
-    - name: Install Catalyst
+    - name: Install Catalyst and Dependencies
+      env:
+        BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
       run: |
-        # We don't need to build Catalyst from scratch as we only need the installation
-        # to use the xDSl dialects
-        make frontend
         # ruff is a dependency for the xdsl-tblgen CLI tool. Generally, it gets installed if
         # installing xdsl[dev], but we install it separately to simplify dependency installation
-        python3 -m pip install ruff
+        python -m pip install ruff
+
+        # We only want the frontend to be usable, so we use a minimal source build
+        cd catalyst
+
+        # Create Python environment
+        python -m venv .catalyst_venv
+
+        # Install Catalyst and activate Python environment
+        bash ./setup_dev_from_wheel.sh ./.catalyst_venv $BRANCH
+        source ./.catalyst_venv/bin/activate
 
     - name: Create Python Dialects
       run: |
         OPTIONS="--llvm-build $(pwd)/llvm-build --catalyst-root $GITHUB_WORKSPACE --save-path $(pwd)/gen_dialects"
-        python3 $GITHUB_WORKSPACE/.github/workflows/xdsl_scripts/create_xdsl_dialects.py $OPTIONS
+        python $GITHUB_WORKSPACE/.github/workflows/xdsl_scripts/create_xdsl_dialects.py $OPTIONS
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
@@ -71,6 +80,6 @@ jobs:
     - name: Verify Python Dialects
       run: |
         OPTIONS="--save-path $(pwd)/gen_dialects"
-        python3 $GITHUB_WORKSPACE/.github/workflows/xdsl_scripts/verify_xdsl_dialects.py $OPTIONS
+        python $GITHUB_WORKSPACE/.github/workflows/xdsl_scripts/verify_xdsl_dialects.py $OPTIONS
 
 
