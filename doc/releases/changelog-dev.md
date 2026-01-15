@@ -12,12 +12,23 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Added PauliMeasure and PauliRot to the runtime CAPI and QuantumDevice C++ API.
-  [(2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
-
 * The quantum dialect MLIR and TableGen source has been refactored to place type and attribute
   definitions in separate file scopes.
   [(#2329)](https://github.com/PennyLaneAI/catalyst/pull/2329)
+
+* Added PauliMeasure and PauliRot to the runtime CAPI and QuantumDevice C++ API.
+  [(2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
+
+* Added LLVM conversion patterns to lower QEC dialect operations to their corresponding runtime
+  CAPI calls. 
+  This includes `qec.ppr` and `qec.ppr.arbitrary` (lowered to `__catalyst__qis__PauliRot`),
+  `qec.ppm` (lowered to `__catalyst__qis__PauliMeasure`). This enables device execution of QEC
+  operations through the Catalyst runtime.
+  [(#2389)](https://github.com/PennyLaneAI/catalyst/pull/2389)
+
+* A new compiler pass `unroll-conditional-ppr-ppm` for lowering conditional PPR and PPMs
+  into normal PPR and PPMs with SCF dialect to support runtime execution.
+  [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
 
 <h3>Documentation 📝</h3>
 
@@ -25,4 +36,5 @@
 
 This release contains contributions from (in alphabetical order):
 Ali Asadi
-Jeffrey Kam
+Sengthai Heng,
+Jeffrey Kam.
