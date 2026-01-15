@@ -10,6 +10,13 @@ concurrency:
 jobs:
   constants:
     name: Set Constants
+    if: >-
+      ${{
+        ( github.event_name == 'pull_request'
+        && github.event.pull_request.draft == false
+        && contains(github.event.pull_request.labels.*.name, 'unified compiler') )
+        || github.event_name == 'workflow_dispatch'
+      }}
     uses: ./.github/workflows/constants.yaml
     with:
       runs_on: ubuntu-24.04
