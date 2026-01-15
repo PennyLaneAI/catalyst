@@ -101,7 +101,7 @@ def test_abc_cannot_be_instantiated():
 def test_incomplete_subclass():
     """Tests that an incomplete subclass will fail"""
 
-    # pylint: disable=too-few-public-methods
+    # pylint: disable=too-few-public-methods,missing-function-docstring
     class IncompleteDAGBuilder(DAGBuilder):
         """Incomplete dag builder dummy class."""
 
