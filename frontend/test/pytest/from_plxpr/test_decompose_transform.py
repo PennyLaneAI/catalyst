@@ -299,15 +299,17 @@ class TestGraphDecomposition:
             qml.MultiRZ(0.5, wires=[0, 1, 3])
             return qml.expval(qml.X(0))
 
-        without_qjit = circuit()
         with_qjit = qml.qjit(circuit)
-
-        assert qml.math.allclose(without_qjit, with_qjit())
-
-        expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
+        result_with_qjit = with_qjit()
         with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
             resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
+
+        with qml.capture.pause():
+            result_without_qjit = circuit()
+            expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
+
         assert resources == expected_resources
+        assert qml.math.allclose(result_without_qjit, result_with_qjit)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_gphase(self):
@@ -423,15 +425,17 @@ class TestGraphDecomposition:
             qml.QFT(wires=[0, 1, 2, 3])
             return qml.expval(qml.Z(0))
 
-        without_qjit = circuit()
         with_qjit = qml.qjit(circuit)
-
-        assert qml.math.allclose(without_qjit, with_qjit())
-
-        expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
+        result_with_qjit = with_qjit()
         with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
             resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
+
+        with qml.capture.pause():
+            result_without_qjit = circuit()
+            expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
+
         assert resources == expected_resources
+        assert qml.math.allclose(result_without_qjit, result_with_qjit)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_multi_passes(self):
@@ -483,16 +487,19 @@ class TestGraphDecomposition:
             qml.MultiRZ(0.5, wires=[0, 1, 4])
             return qml.expval(qml.Z(0))
 
-        without_qjit = qml.transforms.decompose(circuit, gate_set={"RZ", "CNOT"})
         with_qjit = qml.qjit(
             qml.transforms.decompose(circuit, gate_set={"RZ", "CNOT"}), autograph=True
         )
-
-        assert qml.math.allclose(without_qjit(), with_qjit())
-
-        expected_resources = qml.specs(without_qjit, level="device")()["resources"].gate_types
+        with_qjit_result = with_qjit()
         with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
             resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
+
+        with qml.capture.pause():
+            without_qjit = qml.transforms.decompose(circuit, gate_set={"RZ", "CNOT"})
+            without_qjit_result = without_qjit()
+            expected_resources = qml.specs(without_qjit, level="device")()["resources"].gate_types
+
+        assert qml.math.allclose(without_qjit_result, with_qjit_result)
         assert resources == expected_resources
 
 
