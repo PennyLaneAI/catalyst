@@ -875,7 +875,7 @@ def test_jvp_argument_type_checks_incompatible_n_inputs(diff_method):
 
         @qjit
         def C_workflow():
-            # If `f` takes one differentiable param (argnum=[0]), then `tangents` must have length 1
+            # If `f` takes 1 differentiable param (argnums=[0]), then `tangents` must have length 1
             x = (1.0,)
             tangents = (1.0, 1.0)
             return C_jvp(f_R1_to_R2, x, tangents, method=diff_method, argnums=[0])
