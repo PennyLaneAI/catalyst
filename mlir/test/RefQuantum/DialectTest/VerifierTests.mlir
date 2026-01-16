@@ -62,6 +62,40 @@ func.func @test_duplicate_wires2(%w0: i64) {
 
 // -----
 
+func.func @test_paulirot_length_mismatch(%w0: i64, %angle: f64) {
+    // expected-error@+1 {{length of Pauli word (2) and number of wires (1) must be the same}}
+    ref_quantum.paulirot ["Z", "X"](%angle) %w0 : i64
+    return
+}
+
+// -----
+
+func.func @test_paulirot_bad_pauli_word(%w0: i64, %angle: f64) {
+    // expected-error@+1 {{Only "X", "Y", "Z", and "I" are valid Pauli words.}}
+    ref_quantum.paulirot ["bad"](%angle) %w0 : i64
+    return
+}
+
+// -----
+
+func.func @test_paulirot_control(%w0: i64, %w1: i64, %angle: f64) {
+    %true = llvm.mlir.constant (1 : i1) :i1
+    // expected-error@+1 {{number of controlling wires in input (1) and controlling values (2) must be the same}}
+    ref_quantum.paulirot ["Z"](%angle) %w0 ctrls (%w1) ctrlvals (%true, %true) : i64 ctrls i64
+    return
+}
+
+// -----
+
+func.func @test_paulirot_duplicate_wires(%w0: i64, %angle: f64) {
+    %true = llvm.mlir.constant (1 : i1) :i1
+    // expected-error@+1 {{all wires on a quantum gate must be distinct (including controls)}}
+    ref_quantum.paulirot ["Z", "I"](%angle) %w0, %w0 : i64, i64
+    return
+}
+
+// -----
+
 func.func @test_gphase_control(%w0: i64, %param: f64) {
     %true = llvm.mlir.constant (1 : i1) :i1
     // expected-error@+1 {{number of controlling wires in input (1) and controlling values (2) must be the same}}

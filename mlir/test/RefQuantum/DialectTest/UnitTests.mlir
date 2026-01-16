@@ -58,6 +58,29 @@ func.func @test_custom_op(%w0: i64, %w1: i64, %w2: i64, %w3: i64, %param0: f64, 
     return
 }
 
+
+// -----
+
+func.func @test_paulirot_op(%w0: i64, %w1: i64, %w2: i64, %w3: i64, %angle: f64) {
+
+    // Basic
+    ref_quantum.paulirot ["Z"](%angle) %w0 : i64
+    ref_quantum.paulirot ["Z", "X"](%angle) %w0, %w1 : i64, i64
+
+    // With adjoint
+    ref_quantum.paulirot ["Z", "X", "I"](%angle) %w0, %w1, %w2 adj : i64, i64, i64
+
+    // With control
+    %true = llvm.mlir.constant (1 : i1) :i1
+    %false = llvm.mlir.constant (0 : i1) :i1
+    ref_quantum.paulirot ["Y", "I"](%angle) %w0, %w1 ctrls (%w2, %w3) ctrlvals (%true, %false) : i64, i64 ctrls i64, i64
+
+    // With params, control and adjoint altogether
+    ref_quantum.paulirot ["I", "X"](%angle) %w0, %w1 adj ctrls (%w2, %w3) ctrlvals (%true, %false) : i64, i64 ctrls i64, i64
+
+    return
+}
+
 // -----
 
 func.func @test_global_phase(%w0: i64, %cv: i1, %param: f64) {

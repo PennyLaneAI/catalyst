@@ -534,8 +534,6 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
     let hasVerifier = 1;
 }
 
-def PauliWord : TypedArrayAttrBase<StrAttr, "A product of Pauli operators, aka a Pauli word.">;
-
 def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
                                          AttrSizedOperandSegments, AttrSizedResultSegments]> {
     let summary = "Apply a Pauli Product Rotation";

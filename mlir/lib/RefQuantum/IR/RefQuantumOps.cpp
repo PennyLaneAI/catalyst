@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "mlir/IR/OpImplementation.h"
+#include "llvm/ADT/StringSet.h"
 
 #include "RefQuantum/IR/RefQuantumDialect.h"
 #include "RefQuantum/IR/RefQuantumOps.h"
@@ -44,6 +45,27 @@ static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length
 //===----------------------------------------------------------------------===//
 // RefQuantum op verifiers.
 //===----------------------------------------------------------------------===//
+
+static const mlir::StringSet<> validPauliWords = {"X", "Y", "Z", "I"};
+
+LogicalResult PauliRotOp::verify()
+{
+    size_t pauliWordLength = getPauliProduct().size();
+    size_t numWires = getWires().size();
+    if (pauliWordLength != numWires) {
+        return emitOpError() << "length of Pauli word (" << pauliWordLength
+                             << ") and number of wires (" << numWires << ") must be the same";
+    }
+
+    if (!llvm::all_of(getPauliProduct(), [](mlir::Attribute attr) {
+            auto pauliStr = llvm::cast<mlir::StringAttr>(attr);
+            return validPauliWords.contains(pauliStr.getValue());
+        })) {
+        return emitOpError() << "Only \"X\", \"Y\", \"Z\", and \"I\" are valid Pauli words.";
+    }
+
+    return success();
+}
 
 LogicalResult QubitUnitaryOp::verify()
 {
