@@ -1,4 +1,4 @@
-# Copyright 2024 Xanadu Quantum Technologies Inc.
+# Copyright 2024-2026 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 This submodule contains classes for the OQD device and its properties.
 """
 
+from .oqd_compile import compile_to_artiq
 from .oqd_device import OQDDevice, OQDDevicePipeline
 
-__all__ = ["OQDDevice", "OQDDevicePipeline"]
+__all__ = ["OQDDevice", "OQDDevicePipeline", "compile_to_artiq"]

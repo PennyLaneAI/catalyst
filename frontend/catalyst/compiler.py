@@ -1,4 +1,4 @@
-# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+# Copyright 2022-2026 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -430,6 +430,7 @@ class Compiler:
         )
         return cmd
 
+    # pylint: disable=too-many-branches
     @debug_logger
     def run_from_ir(self, ir: str, module_name: str, workspace: Directory):
         """Compile a shared object from a textual IR (MLIR or LLVM).
@@ -484,8 +485,15 @@ class Compiler:
         else:
             out_IR = None
 
+        # If target is llvm-ir, only return LLVM IR without linking
+        if self.options.target == "llvmir":
+            output = output_ir_name if os.path.exists(output_ir_name) else None
+            if os.path.exists(tmp_infile_name):
+                os.remove(tmp_infile_name)
+            return output, out_IR
+
         output = LinkerDriver.run(output_object_name, options=self.options)
-        output_object_name = str(pathlib.Path(output).absolute())
+        output = str(pathlib.Path(output).absolute())
 
         # Clean up temporary files
         if os.path.exists(tmp_infile_name):
@@ -493,7 +501,7 @@ class Compiler:
         if os.path.exists(output_ir_name):
             os.remove(output_ir_name)
 
-        return output_object_name, out_IR
+        return output, out_IR
 
     def has_xdsl_passes_in_transform_modules(self, mlir_module):
         """Check if the MLIR module contains xDSL passes in transform dialect.

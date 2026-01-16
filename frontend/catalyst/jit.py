@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Xanadu Quantum Technologies Inc.
+# Copyright 2022-2026 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -603,6 +603,10 @@ class QJIT(CatalystCallable):
 
         requires_promotion = self.jit_compile(args, **kwargs)
 
+        # For llvm-ir target, compilation is complete, no execution needed
+        if self.compile_options.target == "llvmir":
+            return None
+
         # If we receive tracers as input, dispatch to the JAX integration.
         if any(isinstance(arg, jax.core.Tracer) for arg in tree_flatten(args)[0]):
             if self.jaxed_function is None:
@@ -621,16 +625,18 @@ class QJIT(CatalystCallable):
         self.workspace = self._get_workspace()
 
         # TODO: awkward, refactor or redesign the target feature
-        if self.compile_options.target in ("jaxpr", "mlir", "binary"):
+        if self.compile_options.target in ("jaxpr", "mlir", "llvmir", "binary"):
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
                 self.user_sig or ()
             )
 
-        if self.compile_options.target in ("mlir", "binary"):
+        if self.compile_options.target in ("mlir", "llvmir", "binary"):
             self.mlir_module = self.generate_ir()
 
-        if self.compile_options.target in ("binary",):
+        if self.compile_options.target in ("llvmir", "binary"):
             self.compiled_function, _ = self.compile()
+
+        if self.compile_options.target in ("binary",):
             self.fn_cache.insert(
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
@@ -656,6 +662,15 @@ class QJIT(CatalystCallable):
             bool: whether the provided arguments will require promotion to be used with the compiled
                   function
         """
+        if self.compile_options.target == "llvmir":
+            if self.mlir_module is not None:
+                return False
+            self.workspace = self._get_workspace()
+            self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
+            self.mlir_module = self.generate_ir()
+            self.compiled_function, _ = self.compile()
+            return False
+
         cached_fn, requires_promotion = self.fn_cache.lookup(args)
 
         if cached_fn is None:
@@ -795,6 +810,7 @@ class QJIT(CatalystCallable):
 
         Returns:
             Tuple[CompiledFunction, str]: the compilation result and LLVMIR
+            For targets that skip execution, returns (None, llvm_ir) instead.
         """
         # WARNING: assumption is that the first function is the entry point to the compiled program.
         entry_point_func = self.mlir_module.body.operations[0]
@@ -819,6 +835,9 @@ class QJIT(CatalystCallable):
             )
         else:
             shared_object, llvm_ir = self.compiler.run(self.mlir_module, self.workspace)
+
+        if self.compile_options.target == "llvmir":
+            return None, llvm_ir
 
         compiled_fn = CompiledFunction(
             shared_object, func_name, restype, self.out_type, self.compile_options

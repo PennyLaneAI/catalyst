@@ -1,4 +1,4 @@
-// Copyright 2025 Xanadu Quantum Technologies Inc.
+// Copyright 2025-2026 Xanadu Quantum Technologies Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -39,6 +39,19 @@ def RTIOEventToARTIQPass : Pass<"convert-rtio-event-to-artiq", "mlir::ModuleOp">
     ];
 }
 
+def RTIOEmitARTIQRuntimePass : Pass<"emit-artiq-runtime", "mlir::ModuleOp"> {
+    let summary = "Emit ARTIQ runtime wrapper (__modinit__) that calls the kernel function";
+    let description = [{
+        This pass creates the ARTIQ entry point structure:
+        - __modinit__ (entry point) -> calls kernel function
+
+        This pass injects the necessary ARTIQ runtime boilerplate directly into the MLIR module
+        to allow Catalyst-generated kernels can be loaded and executed by ARTIQ
+    }];
+
+    let dependentDialects = [
+        "mlir::LLVM::LLVMDialect",
+        "mlir::func::FuncDialect"
+    ];
+}
 #endif // RTIO_PASSES
-
-
