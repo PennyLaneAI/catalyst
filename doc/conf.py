@@ -159,7 +159,9 @@ ogp_social_cards = {
 }
 
 # The base URL with a proper language and version.
-html_baseurl = os.environ.get("READTHEDOCS_CANONICAL_URL", "https://docs.pennylane.ai/projects/catalyst/")
+html_baseurl = os.environ.get(
+    "READTHEDOCS_CANONICAL_URL", "https://docs.pennylane.ai/projects/catalyst/"
+)
 
 autosummary_generate = True
 autosummary_imported_members = False
