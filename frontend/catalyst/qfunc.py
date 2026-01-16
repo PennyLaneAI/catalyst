@@ -251,14 +251,14 @@ class QFunc:
 
         assert isinstance(self, qml.QNode)
 
-        new_transform_program, new_pipeline = _extract_passes(self.transform_program)
+        new_compile_pipeline, new_pipeline = _extract_passes(self.compile_pipeline)
         # Update the qnode with peephole pipeline
         old_pipeline = kwargs.pop("pass_pipeline", None)
         processed_old_pipeline = tuple(dictionary_to_list_of_passes(old_pipeline))
         pass_pipeline = processed_old_pipeline + new_pipeline
         new_qnode = copy(self)
         # pylint: disable=attribute-defined-outside-init, protected-access
-        new_qnode._transform_program = new_transform_program
+        new_qnode._compile_pipeline = new_compile_pipeline
 
         # Mid-circuit measurement configuration:
         one_shot_results = configure_mcm_and_try_one_shot(new_qnode, args, kwargs, pass_pipeline)
