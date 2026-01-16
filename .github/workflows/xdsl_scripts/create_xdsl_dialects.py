@@ -149,8 +149,8 @@ def resolve_op_defs(file_path: Path):
 
     # Update UnitAttr fields to be optional properties. xdsl-tblgen makes them
     # mandatory properties, which is not valid
-    search_pattern = r"\bprop_def\(EqAttrConstraint\(UnitAttr\(\)\)\)"
-    replace_pattern = r"opt_prop_def(UnitAttr) # pragma: re ignore"
+    search_pattern = r"\b(prop|attr)_def\(EqAttrConstraint\(UnitAttr\(\)\)\)"
+    replace_pattern = r"opt_\1_def(UnitAttr) # pragma: re ignore"
     content = sub(search_pattern, replace_pattern, content)
 
     # Remove operand/property/attribute/result constraints
