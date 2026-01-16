@@ -18,6 +18,8 @@ import pytest
 
 from catalyst import qjit
 
+pytestmark = pytest.mark.usefixtures("use_both_frontend")
+
 ops = [
     qml.Identity(wires=0),
     qml.PauliX(wires=1),

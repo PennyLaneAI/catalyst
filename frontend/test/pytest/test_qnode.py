@@ -16,13 +16,21 @@
 
 import jax.numpy as jnp
 import pennylane as qml
+from pennylane import grad
 import pytest
 
 import catalyst
-from catalyst import CompileError, grad, measure, qjit
+from catalyst import CompileError, measure, qjit
+from catalyst import measure as c_measure
 from catalyst.device.qjit_device import QJITDevice
 
 
+def measure(*args, **kwargs):
+    if qml.capture.enabled():
+        return qml.measure(*args, **kwargs)
+    return c_measure(*args, **kwargs)
+
+@pytest.mark.old_frontend
 @pytest.mark.parametrize("_in,_out", [(0, False), (1, True)])
 def test_variable_capture(_in, _out):
     """Test closures (outer-scope variable capture) for quantum functions."""
@@ -44,6 +52,7 @@ def test_variable_capture(_in, _out):
     assert workflow(_in) == _out
 
 
+@pytest.mark.old_frontend
 @pytest.mark.parametrize(
     "_in,_out",
     [
@@ -71,6 +80,7 @@ def test_variable_capture_multiple_devices(_in, _out, backend):
     assert workflow(_in) == _out
 
 
+@pytest.mark.old_frontend
 def test_unsupported_device():
     """Test unsupported device."""
 
@@ -83,6 +93,7 @@ def test_unsupported_device():
         qjit(func)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_qfunc_output_shape_scalar():
     """Check that scalar outputs of QNodes are not wrapped in a list/tuple.
     Note that qjit separately unwraps length-1 return values from the jitted function."""
@@ -119,6 +130,7 @@ def test_qfunc_output_shape_list():
         return res[0] * 1j
 
 
+@pytest.mark.old_frontend
 @pytest.mark.parametrize("grad_method", ["adjoint", "parameter-shift"])
 def test_qnode_grad_method_stored_on_execution_config(grad_method, mocker):
     """Test that the grad_method specified on the qnode is updated on the ExecutionConfig
@@ -148,6 +160,7 @@ def test_qnode_grad_method_stored_on_execution_config(grad_method, mocker):
 
 
 # pylint: disable=protected_access
+@pytest.mark.old_frontend
 def test_execution_config_grad_method_with_no_qnode():
     """Test that if qnode is None (default value on ``trace_quantum_function``) when
     ``_make_execution_config`` is called, an appropriate ExecutionConfig is returned"""

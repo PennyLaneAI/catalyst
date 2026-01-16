@@ -16,9 +16,18 @@
 import numpy as np
 import pennylane as qml
 import pytest
+from pennylane import cond
 
-from catalyst import CompileError, cond, measure, qjit
+from catalyst import CompileError, measure, qjit
+from catalyst import measure as c_measure
 
+pytestmark = pytest.mark.usefixtures("use_both_frontend")
+
+
+def measure(*args, **kwargs):
+    if qml.capture.enabled():
+        return qml.measure(*args, **kwargs)
+    return c_measure(*args, **kwargs)
 
 def test_seeded_async():
     """Test that seeding and async cannot be simultaneously used"""
