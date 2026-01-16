@@ -21,11 +21,15 @@ from re import fullmatch
 from sys import modules as sys_modules
 from types import ModuleType
 
+from xdsl.dialects.builtin import UnitAttr
 from xdsl.ir import Attribute, Dialect, Operation
 from xdsl.irdl import (
     AttributeDef,
+    AttrOrPropDef,
+    BaseAttr,
     OpDef,
     OperandDef,
+    OptionalDef,
     PropertyDef,
     RegionDef,
     ResultDef,
@@ -141,8 +145,9 @@ def verify_operands(c_def: OpDef, g_def: OpDef) -> None:
     )
 
     for operand_name in c_operand_names:
+        # Verifying that optional, variadic, and default operands match
         assert type(c_operands[operand_name]) == type(g_operands[operand_name]), (
-            f"Mismatch between types for '{operand_name}' operand. "
+            f"Mismatch between types for '{operand_name}' operand of {c_def.name}. "
             f"xDSL operand type: {type(c_operands[operand_name])}, "
             f"MLIR operand type: {type(g_operands[operand_name])}"
         )
@@ -167,11 +172,13 @@ def verify_properties(c_def: OpDef, g_def: OpDef) -> None:
     )
 
     for prop_name in c_prop_names:
+        # Verifying that optional, variadic, and default properties match
         assert type(c_props[prop_name]) == type(g_props[prop_name]), (
-            f"Mismatch between types for '{prop_name}' property. "
+            f"Mismatch between types for '{prop_name}' property of {c_def.name}. "
             f"xDSL property type: {type(c_props[prop_name])}, "
             f"MLIR property type: {type(g_props[prop_name])}"
         )
+        assert_unit_attr(c_props[prop_name], g_props[prop_name], c_def.name, prop_name)
 
 
 def verify_attributes(c_def: OpDef, g_def: OpDef) -> None:
@@ -193,11 +200,13 @@ def verify_attributes(c_def: OpDef, g_def: OpDef) -> None:
     )
 
     for attr_name in c_attr_names:
+        # Verifying that optional, variadic, and default attributes match
         assert type(c_attrs[attr_name]) == type(g_attrs[attr_name]), (
-            f"Mismatch between types for '{attr_name}' attribute. "
+            f"Mismatch between types for '{attr_name}' attribute of {c_def.name}. "
             f"xDSL attribute type: {type(c_attrs[attr_name])}, "
             f"MLIR attribute type: {type(g_attrs[attr_name])}"
         )
+        assert_unit_attr(c_attrs[attr_name], g_attrs[attr_name], c_def.name, attr_name)
 
 
 def verify_regions(c_def: OpDef, g_def: OpDef) -> None:
@@ -216,8 +225,9 @@ def verify_regions(c_def: OpDef, g_def: OpDef) -> None:
     )
 
     for region_name in c_region_names:
+        # Verifying that optional, variadic, and default regions match
         assert type(c_regions[region_name]) == type(g_regions[region_name]), (
-            f"Mismatch between types for '{region_name}' region. "
+            f"Mismatch between types for '{region_name}' region of {c_def.name}. "
             f"xDSL region type: {type(c_regions[region_name])}, "
             f"MLIR region type: {type(g_regions[region_name])}"
         )
@@ -245,10 +255,28 @@ def verify_results(c_def: OpDef, g_def: OpDef) -> None:
     )
 
     for result_name in c_result_names:
+        # Verifying that optional, variadic, and default results match
         assert type(c_results[result_name]) == type(g_results[result_name]), (
-            f"Mismatch between types for '{result_name}' result. "
+            f"Mismatch between types for '{result_name}' result of {c_def.name}. "
             f"xDSL result type: {type(c_results[result_name])}, "
             f"MLIR result type: {type(g_results[result_name])}"
+        )
+
+
+def assert_unit_attr(c_attr: AttrOrPropDef, g_attr: AttrOrPropDef, op_name: str, attr_name):
+    """Assert that UnitAttr fields are correctly defined."""
+    if isinstance(c_attr.constr, BaseAttr) and c_attr.constr.attr == UnitAttr:
+        # UnitAttrs shiould've already been parsed and converted to a standardized
+        # format by the script that created the auto-generated dialects, so this
+        # assertion is fine.
+        assert (
+            g_attr.constr.attr == UnitAttr
+        ), f"The '{attr_name}' field of {op_name} is a UnitAttr, but the MLIR field is a {g_attr}."
+
+        # UnitAttrs must also always be optional attributes or properties.
+        assert isinstance(c_attr, OptionalDef), (
+            "UnitAttrs must be defined as option attributes or properties. "
+            f"The xDSL {op_name} operation's {attr_name} field is a UnitAttr but not optional."
         )
 
 
