@@ -38,5 +38,6 @@ def NamedObservable : I32EnumAttr<"NamedObservable",
 
 def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_observable">;
 
+def PauliWord : TypedArrayAttrBase<StrAttr, "A product of Pauli operators, aka a Pauli word.">;
 
 #endif // QUANTUM_ATTR_DEFS
