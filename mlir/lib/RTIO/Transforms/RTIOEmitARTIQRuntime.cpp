@@ -67,7 +67,7 @@ struct RTIOEmitARTIQRuntimePass
             return;
         }
 
-        // Find the kernel function e(could be LLVM func or func.func)
+        // Find the kernel function (could be LLVM func or func.func)
         LLVM::LLVMFuncOp llvmKernelFunc =
             module.lookupSymbol<LLVM::LLVMFuncOp>(ARTIQFuncNames::kernel);
 
