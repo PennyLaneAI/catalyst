@@ -46,10 +46,14 @@
 
 <h3>Documentation 📝</h3>
 
+* Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
+  [(#2406)](https://github.com/PennyLaneAI/catalyst/pull/2406)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
 Sengthai Heng,
-Jeffrey Kam.
+Jeffrey Kam,
+Mudit Pandey.
