@@ -281,6 +281,10 @@ TEST_CASE_METHOD(NullQubitRuntimeFixture,
     // PauliMeasure is unsupported by device
     CHECK_THROWS_WITH(__catalyst__qis__PauliMeasure("XYZ", 3, reg_vec[0], reg_vec[1], reg_vec[2]),
                       ContainsSubstring("PauliMeasure is unsupported by device"));
+
+    NullQubit device;
+    CHECK_THROWS_WITH(device.PauliMeasure("X", {0}),
+                      ContainsSubstring(" PauliMeasure is unsupported by devic"));
 }
 
 TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample calling Hadamard, "
