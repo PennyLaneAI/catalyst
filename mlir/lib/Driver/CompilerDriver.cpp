@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <cassert>
-#include <cstdlib>
 
 #include <algorithm>
 #include <filesystem>
@@ -33,7 +32,6 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/Program.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -809,6 +807,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
     if (runLLC && (inType == InputType::LLVMIR)) {
         TimingScope llcTiming = timing.nest("llc");
+        // Set data layout before LLVM passes or the default one is used.
+        llvm::Triple targetTriple(llvm::sys::getDefaultTargetTriple());
 
         llvm::InitializeAllTargetInfos();
         llvm::InitializeAllTargets();
@@ -816,18 +816,13 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         llvm::InitializeAllAsmParsers();
         llvm::InitializeAllAsmPrinters();
 
-        llvm::Triple targetTriple(llvm::sys::getDefaultTargetTriple());
+        std::string err;
+        auto target = llvm::TargetRegistry::lookupTarget(targetTriple, err);
+        llvm::TargetOptions opt;
+
         const char *cpu = "generic";
         const char *features = "";
 
-        std::string err;
-        auto target = llvm::TargetRegistry::lookupTarget(targetTriple.str(), err);
-        if (!target) {
-            CO_MSG(options, Verbosity::Urgent, "Failed to lookup target: " << err << "\n");
-            return failure();
-        }
-
-        llvm::TargetOptions opt;
         auto targetMachine =
             target->createTargetMachine(targetTriple, cpu, features, opt, llvm::Reloc::Model::PIC_);
         targetMachine->setOptLevel(llvm::CodeGenOptLevel::None);
