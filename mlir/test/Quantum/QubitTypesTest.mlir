@@ -98,6 +98,62 @@ func.func @test_ctrl_physical(%0 : !quantum.bit<physical>, %1 : !quantum.bit<phy
 
 // -----
 
+func.func @test_alloc_qb_default() {
+    %0 = quantum.alloc_qb : !quantum.bit
+    return
+}
+
+// -----
+
+func.func @test_alloc_qb_abs() {
+    %0 = quantum.alloc_qb : !quantum.bit<abstract>
+    return
+}
+
+// -----
+
+func.func @test_alloc_qb_log() {
+    %0 = quantum.alloc_qb : !quantum.bit<logical>
+    return
+}
+
+// -----
+
+func.func @test_alloc_qb_phy() {
+    %0 = quantum.alloc_qb : !quantum.bit<physical>
+    return
+}
+
+// -----
+
+func.func @test_dealloc_qb_default(%0 : !quantum.bit) {
+    quantum.dealloc_qb %0 : !quantum.bit
+    return
+}
+
+// -----
+
+func.func @test_dealloc_qb_abs(%0 : !quantum.bit<abstract>) {
+    quantum.dealloc_qb %0 : !quantum.bit<abstract>
+    return
+}
+
+// -----
+
+func.func @test_dealloc_qb_log(%0 : !quantum.bit<logical>) {
+    quantum.dealloc_qb %0 : !quantum.bit<logical>
+    return
+}
+
+// -----
+
+func.func @test_dealloc_qb_phy(%0 : !quantum.bit<physical>) {
+    quantum.dealloc_qb %0 : !quantum.bit<physical>
+    return
+}
+
+// -----
+
 
 //===----------------------------------------------------------------------===//
 // Verifier tests: Does incorrect usage result in expected errors?
