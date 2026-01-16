@@ -17,6 +17,7 @@ with their xDSL versions."""
 from argparse import ArgumentParser
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from re import fullmatch
 from sys import modules as sys_modules
 from types import ModuleType
 
@@ -232,6 +233,12 @@ def verify_results(c_def: OpDef, g_def: OpDef) -> None:
     c_result_names: set[str] = set(c_results.keys())
     g_results: dict[str, ResultDef] = dict(g_def.results)
     g_result_names: set[str] = set(g_results.keys())
+
+    if any(fullmatch(r"v[0-9]+", result_name) for result_name in g_result_names):
+        # If there are any unnamed results, xdsl-tblgen will rename them to
+        # vX, where X is an integer
+        return
+
     assert c_result_names == g_result_names, (
         f"Mismatch between result names for {c_def.name}.\n"
         f"xDSL results: {c_result_names}, MLIR results: {g_result_names}"
