@@ -17,18 +17,15 @@ from typing import Any
 
 import pytest
 
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
-# pylint: disable=wrong-import-position
-# This import needs to be after pytest in order to prevent ImportErrors
 from catalyst.python_interface.inspection.dag_builder import DAGBuilder
+
+pytestmark = pytest.mark.xdsl
 
 
 def test_concrete_implementation_works():
     """Unit test for concrete implementation of abc."""
 
-    # pylint: disable=unused-argument
+    # pylint: disable=unused-argument,missing-function-docstring
     class ConcreteDAGBuilder(DAGBuilder):
         """Concrete subclass of an ABC for testing purposes."""
 
@@ -104,9 +101,10 @@ def test_abc_cannot_be_instantiated():
 def test_incomplete_subclass():
     """Tests that an incomplete subclass will fail"""
 
-    # pylint: disable=too-few-public-methods
+    # pylint: disable=too-few-public-methods,missing-function-docstring
     class IncompleteDAGBuilder(DAGBuilder):
         """Incomplete dag builder dummy class."""
+
         def add_node(self, *args, **kwargs):
             pass
 
