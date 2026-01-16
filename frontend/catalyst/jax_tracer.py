@@ -1080,8 +1080,8 @@ def trace_quantum_measurements(
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
             if shots_obj.has_partitioned_shots and not isinstance(output, SampleMP):
                 raise NotImplementedError(
-                    f"Measurement {type(output).__name__} does not support shot-vectors. "
-                    "Use qml.sample() instead."
+                    f"The {type(output).__name__} measurement process does not support "
+                    "shot-vectors. Please consider using qml.sample() instead."
                 )
 
             if device.wires is None:

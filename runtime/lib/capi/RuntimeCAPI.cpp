@@ -859,6 +859,28 @@ void __catalyst__qis__PSWAP(double phi, QUBIT *wire0, QUBIT *wire1, const Modifi
         MODIFIERS_ARGS(modifiers));
 }
 
+void __catalyst__qis__PauliRot(const char *pauliStr, double theta, const Modifiers *modifiers,
+                               int64_t numQubits, ...)
+{
+    RT_ASSERT(numQubits >= 0);
+
+    // convert chat* to string
+    std::string pauliStr_(pauliStr);
+    RT_FAIL_IF(static_cast<size_t>(numQubits) != pauliStr_.size(),
+               "The length of the pauli string must be equal to the number of wires.");
+
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (int64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+
+    getQuantumDevicePtr()->NamedOperation("PauliRot", {theta}, wires,
+                                          /* modifiers */ MODIFIERS_ARGS(modifiers), {pauliStr_});
+}
+
 static void _qubitUnitary_impl(MemRefT_CplxT_double_2d *matrix, int64_t numQubits,
                                std::vector<std::complex<double>> &coeffs,
                                std::vector<QubitIdType> &wires, va_list *args)
@@ -1010,6 +1032,26 @@ RESULT *__catalyst__qis__Measure(QUBIT *wire, int32_t postselect)
     }
 
     return getQuantumDevicePtr()->Measure(reinterpret_cast<QubitIdType>(wire), postselectOpt);
+}
+
+RESULT *__catalyst__qis__PauliMeasure(const char *pauliStr, int64_t numQubits, ...)
+{
+    RT_ASSERT(numQubits >= 0);
+
+    // convert chat* to string
+    std::string pauliStr_(pauliStr);
+    RT_FAIL_IF(static_cast<size_t>(numQubits) != pauliStr_.size(),
+               "The length of the pauli string must be equal to the number of wires.");
+
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (int64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+
+    return getQuantumDevicePtr()->PauliMeasure(pauliStr_, wires);
 }
 
 double __catalyst__qis__Expval(ObsIdType obsKey) { return getQuantumDevicePtr()->Expval(obsKey); }
