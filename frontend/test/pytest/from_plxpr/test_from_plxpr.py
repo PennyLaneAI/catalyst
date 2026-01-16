@@ -462,7 +462,7 @@ class TestCatalystCompareJaxpr:
         @qml.qnode(dev)
         def circuit():
             qml.X(0)
-            return qml.counts()
+            return qml.counts(all_outcomes=True)
 
         qml.capture.enable()
         plxpr = jax.make_jaxpr(circuit)()

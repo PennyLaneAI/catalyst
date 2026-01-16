@@ -121,9 +121,9 @@ def mitigate_with_zne(
 
         from pennylane.noise import exponential_extrapolate
 
-        dev = qml.device("lightning.qubit", wires=2, shots=100000)
+        dev = qml.device("lightning.qubit", wires=2)
 
-        @qml.qnode(dev)
+        @qml.qnode(dev, shots=100000)
         def circuit(weights):
             qml.StronglyEntanglingLayers(weights, wires=[0, 1])
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
