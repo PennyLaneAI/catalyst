@@ -132,6 +132,7 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx_copybutton",
     "sphinxext.opengraph",
+    "sphinx_sitemap",
     "sphinx_automodapi.automodapi",
     "sphinx_automodapi.smart_resolver",
     "sphinx_tabs.tabs",
@@ -158,7 +159,7 @@ ogp_social_cards = {
 }
 
 # The base URL with a proper language and version.
-html_baseurl = os.environ.get("READTHEDOCS_CANONICAL_URL", "/")
+html_baseurl = os.environ.get("READTHEDOCS_CANONICAL_URL", "https://docs.pennylane.ai/projects/catalyst/")
 
 autosummary_generate = True
 autosummary_imported_members = False
@@ -298,6 +299,10 @@ html_theme_options = {
 
 edit_on_github_project = "PennyLaneAI/catalyst"
 edit_on_github_branch = "main/doc"
+
+# -- Sitemap settings -----------------------------------------------------
+sitemap_url_scheme = "{link}"
+sitemap_excludes = []  # Explicitly set to empty to avoid accidental excludes
 
 # ============================================================
 
