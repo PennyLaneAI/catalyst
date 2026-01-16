@@ -136,7 +136,7 @@ def resolve_op_defs(file_path: Path):
     """
     # Make allowed line length very long to make regex simpler
     err = run(
-        ["ruff", "format", "--line-length=500", str(file_path)], capture_output=True, check=False
+        ["ruff", "format", "--line-length", "300", str(file_path)], capture_output=True, check=False
     )
     if err.returncode != 0:
         warn(
@@ -147,14 +147,20 @@ def resolve_op_defs(file_path: Path):
     with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
 
+    # Update UnitAttr fields to be optional properties. xdsl-tblgen makes them
+    # mandatory properties, which is not valid
+    search_pattern = r"\bprop_def\(EqAttrConstraint\(UnitAttr\(\)\)\)"
+    replace_pattern = r"opt_prop_def(UnitAttr) # pragma: re ignore"
+    content = sub(search_pattern, replace_pattern, content)
+
     # Remove operand/property/attribute/result constraints
-    search_pattern = r"((operand|prop|result|attr)_def\().*(\)\n)"
-    replace_pattern = r"\1AnyAttr()\3"
+    search_pattern = r"((operand|prop|result|attr)_def\().*(\))\s*(?<!# pragma: re ignore)\n"
+    replace_pattern = r"\1AnyAttr()\3\n\n"
     content = sub(search_pattern, replace_pattern, content)
 
     # Add irdl_options. These are added for blanket coverage of the case
     # where an operation may have multiple variadic operands or results
-    search_pattern = r"(\(IRDLOperation\):)"
+    search_pattern = r'(\(IRDLOperation\):((\s|\n|\t)+(""".+"""))?)'
     replace_pattern = r"\1\n\n    irdl_options = (AttrSizedOperandSegments(as_property=True), AttrSizedResultSegments(as_property=True))\n"
     content = sub(search_pattern, replace_pattern, content)
 
