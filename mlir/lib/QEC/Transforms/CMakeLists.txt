@@ -2,6 +2,8 @@ set(LIBRARY_NAME qec-transforms)
 
 
 file(GLOB SRC
+    UnrollConditionalPPRPPM.cpp
+    unroll_conditional_ppr_ppm.cpp
     ToPPR.cpp
     to_ppr.cpp
     CommutePPR.cpp
