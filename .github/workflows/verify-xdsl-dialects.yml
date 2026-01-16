@@ -151,8 +151,6 @@ jobs:
         python-version: ${{ needs.constants.outputs.primary_python_version }}
 
     - name: Install Catalyst and Dependencies
-      env:
-        BRANCH: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
       run: |
         make frontend
 
