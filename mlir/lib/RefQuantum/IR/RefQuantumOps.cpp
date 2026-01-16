@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/IR/Builders.h"
+#include <cmath> // std::pow
+
 #include "mlir/IR/OpImplementation.h"
-#include "llvm/ADT/StringSet.h"
-#include "llvm/ADT/TypeSwitch.h"
 
 #include "RefQuantum/IR/RefQuantumDialect.h"
 #include "RefQuantum/IR/RefQuantumOps.h"
@@ -30,10 +29,32 @@ using namespace catalyst::ref_quantum;
 #define GET_OP_CLASSES
 #include "RefQuantum/IR/RefQuantumOps.cpp.inc"
 
+namespace catalyst::ref_quantum {
+
+// Utils
+static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length1)
+{
+    ShapedType tensor = cast<ShapedType>(ty);
+    if (!tensor.hasStaticShape() || tensor.getShape().size() != 2 ||
+        tensor.getShape()[0] != length0 || tensor.getShape()[1] != length1) {
+        return failure();
+    }
+
+    return success();
+}
+
 //===----------------------------------------------------------------------===//
 // RefQuantum op verifiers.
 //===----------------------------------------------------------------------===//
 
-namespace catalyst::ref_quantum {
+LogicalResult QubitUnitaryOp::verify()
+{
+    size_t dim = std::pow(2, getWires().size());
+    if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim))) {
+        return emitOpError("The Unitary matrix must be of size 2^(num_wires) * 2^(num_wires)");
+    }
+
+    return success();
+}
 
 } // namespace catalyst::ref_quantum

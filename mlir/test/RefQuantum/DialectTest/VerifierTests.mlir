@@ -107,6 +107,32 @@ func.func @test_pcphase_duplicate_wires(%w0: i64, %theta: f64, %dim: f64) {
 
 // -----
 
+func.func @test_unitary_bad_matrix_shape(%w0: i64, %matrix: tensor<37x42xcomplex<f64>>) {
+    // expected-error@+1 {{The Unitary matrix must be of size 2^(num_wires) * 2^(num_wires)}}
+    ref_quantum.unitary (%matrix : tensor<37x42xcomplex<f64>>) %w0 : i64
+    return
+}
+
+// -----
+
+func.func @test_unitary_control(%w0: i64, %w1: i64, %matrix: tensor<2x2xcomplex<f64>>) {
+    %true = llvm.mlir.constant (1 : i1) :i1
+    // expected-error@+1 {{number of controlling wires in input (1) and controlling values (2) must be the same}}
+    ref_quantum.unitary(%matrix: tensor<2x2xcomplex<f64>>) %w0 ctrls (%w1) ctrlvals (%true, %true) : i64 ctrls i64
+    return
+}
+
+// -----
+
+func.func @test_unitary_duplicate_wires(%w0: i64, %matrix: tensor<4x4xcomplex<f64>>) {
+    %true = llvm.mlir.constant (1 : i1) :i1
+    // expected-error@+1 {{all wires on a quantum gate must be distinct (including controls)}}
+    ref_quantum.unitary(%matrix: tensor<4x4xcomplex<f64>>) %w0, %w0 : i64, i64
+    return
+}
+
+// -----
+
 func.func @test_namedobs_op_bad_attribute(%w0: i64) {
     // expected-error@+2 {{expected catalyst::quantum::NamedObservable to be one of: Identity, PauliX, PauliY, PauliZ, Hadamard}}
     // expected-error@+1 {{failed to parse NamedObservableAttr parameter 'value' which is to be a `catalyst::quantum::NamedObservable`}}

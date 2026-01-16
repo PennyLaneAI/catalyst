@@ -125,6 +125,32 @@ func.func @test_pcphase(%w0: i64, %w1: i64, %w2: i64, %w3: i64, %theta: f64, %di
 
 // -----
 
+func.func @test_qubit_unitary(%w0: i64, %w1: i64, %w2: i64, %w3: i64) {
+
+    // Basic
+    %matrix22 = tensor.empty() : tensor<2x2xcomplex<f64>>
+    %matrix44 = tensor.empty() : tensor<4x4xcomplex<f64>>
+
+    ref_quantum.unitary (%matrix22 : tensor<2x2xcomplex<f64>>) %w0 : i64
+    ref_quantum.unitary (%matrix44 : tensor<4x4xcomplex<f64>>) %w0, %w1 : i64, i64
+
+    // With adjoint
+    ref_quantum.unitary (%matrix22 : tensor<2x2xcomplex<f64>>) %w0 adj : i64
+
+    // With control
+    %true = llvm.mlir.constant (1 : i1) :i1
+    %false = llvm.mlir.constant (0 : i1) :i1
+    ref_quantum.unitary (%matrix22 : tensor<2x2xcomplex<f64>>) %w0 ctrls (%w1) ctrlvals (%true) : i64 ctrls i64
+    ref_quantum.unitary (%matrix44 : tensor<4x4xcomplex<f64>>) %w0, %w1 ctrls (%w2, %w3) ctrlvals (%true, %false) : i64, i64 ctrls i64, i64
+
+    // With control and adjoint
+    ref_quantum.unitary (%matrix44 : tensor<4x4xcomplex<f64>>) %w0, %w1 adj ctrls (%w2, %w3) ctrlvals (%true, %false) : i64, i64 ctrls i64, i64
+
+    return
+}
+
+// -----
+
 func.func @test_namedobs_op(%w0: i64) {
 
     %ox = ref_quantum.namedobs %w0 [ PauliX] : !quantum.obs

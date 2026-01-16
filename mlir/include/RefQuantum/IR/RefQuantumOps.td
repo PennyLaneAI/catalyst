@@ -138,6 +138,12 @@ def SetStateOp : Gate_Op<"set_state"> {
         This operation is useful for simulators implementing state preparation.
         Instead of decomposing state preparation into multiple operations, this
         operation shortcuts all of that into a single operation.
+
+        .. note::
+            This op is not bufferizable at the moment, and must take in the state as a tensor
+            instead of a memref. To execute reference semantics quantum dialect, please convert
+            to the value semantics quantum dialect, where ops are bufferizable and lowerable to
+            LLVM IR.
     }];
 
     let arguments = (ins
@@ -160,6 +166,12 @@ def SetBasisStateOp : Gate_Op<"set_basis_state"> {
         operation shortcuts all of that into a single operation.
         This signature matches the one in pennylane-lightning which expects
         only a single integer as opposed to a binary digit.
+
+        .. note::
+            This op is not bufferizable at the moment, and must take in the basis state as a tensor
+            instead of a memref. To execute reference semantics quantum dialect, please convert
+            to the value semantics quantum dialect, where ops are bufferizable and lowerable to
+            LLVM IR.
     }];
 
     let arguments = (ins
@@ -329,10 +341,47 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSeg
     // let hasCanonicalizeMethod = 1;
 }
 
-// // -----
+def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOperandSegments]> {
+    let summary = "Apply an arbitrary fixed unitary matrix";
+    let description = [{
+        The `ref_quantum.unitary` operation applies an arbitrary fixed unitary matrix to the
+        state-vector. The arguments are a set of qubits and a 2-dim matrix of complex numbers
+        that represents a Unitary matrix of size 2^(number of qubits) * 2^(number of qubits).
 
-// // Observable ops are not meaningful on their own: their purpose is to be sent into a measurement
-// // Hence they are Pure, i.e. removable if no users
+        .. note::
+            This op is not bufferizable at the moment, and must take in the matrix as a tensor
+            instead of a memref. To execute reference semantics quantum dialect, please convert
+            to the value semantics quantum dialect, where ops are bufferizable and lowerable to
+            LLVM IR.
+    }];
+
+    let arguments = (ins
+        2DTensorOf<[Complex<F64>]>:$matrix,
+        Variadic<I64>:$wires,
+        UnitAttr:$adjoint,
+        Variadic<I64>:$ctrl_wires,
+        Variadic<I1>:$ctrl_values
+    );
+
+    let assemblyFormat = [{
+        `(` $matrix `:` type($matrix) `)` $wires (`adj` $adjoint^)? attr-dict
+        ( `ctrls` `(` $ctrl_wires^ `)` )?
+        ( `ctrlvals` `(` $ctrl_values^ `)` )?
+        `:` type($wires) (`ctrls` type($ctrl_wires)^ )?
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getAllParams() {
+            return getODSOperands(0);  // `matrix` is the first operand
+        }
+    }];
+
+    let hasVerifier = 1;
+}
+// -----
+
+// Observable ops are not meaningful on their own: their purpose is to be sent into a measurement
+// Hence they are Pure, i.e. removable if no users
 
 class Observable_Op<string mnemonic, list<Trait> traits = []> :
         RefQuantum_Op<mnemonic, traits # [Pure]>;
