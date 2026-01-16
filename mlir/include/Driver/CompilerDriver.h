@@ -86,13 +86,6 @@ struct CompilerOptions {
         using path = std::filesystem::path;
         return path(workspace.str()) / path(moduleName.str() + ".o");
     }
-
-    /// Get the destination of the LLVM IR file.
-    std::string getLLFile() const
-    {
-        using path = std::filesystem::path;
-        return path(workspace.str()) / path(moduleName.str() + ".ll");
-    }
 };
 
 struct CompilerOutput {
