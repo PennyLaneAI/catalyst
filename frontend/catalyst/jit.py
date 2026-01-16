@@ -16,8 +16,6 @@
 compilation of hybrid quantum-classical functions using Catalyst.
 """
 
-# pylint: disable=too-many-lines
-
 import copy
 import functools
 import inspect
@@ -532,7 +530,6 @@ class QJIT(CatalystCallable):
         functools.update_wrapper(self, fn)
         self.original_function = fn
         self.compile_options = compile_options
-
         self.compiler = Compiler(compile_options)
         self.fn_cache = CompilationCache(
             compile_options.static_argnums, compile_options.abstracted_axes
