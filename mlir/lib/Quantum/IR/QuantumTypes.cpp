@@ -28,7 +28,7 @@ LogicalResult QubitType::verify(function_ref<InFlightDiagnostic()> emitError, Qu
     // In other words, abstract and logical qubits cannot specify a role
     if ((level != QubitLevel::QEC && level != QubitLevel::Physical) && role != QubitRole::Null) {
         return emitError() << "qubit role '" << stringifyQubitRole(role)
-                           << "' is only allowed for qec or physical qubits; "
+                           << "' is only permitted for qec and physical qubits; "
                            << "found level '" << stringifyQubitLevel(level) << "'";
     }
     return success();

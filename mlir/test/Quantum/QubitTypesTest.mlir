@@ -154,6 +154,20 @@ func.func @test_dealloc_qb_phy(%0 : !quantum.bit<physical>) {
 
 // -----
 
+func.func @test_abs_null_type(%0 : !quantum.bit<abstract, null>) {
+    %1 = quantum.custom ""() %0 : !quantum.bit<abstract, null>
+    return
+}
+
+// -----
+
+func.func @test_log_null_type(%0 : !quantum.bit<logical, null>) {
+    %1 = quantum.custom ""() %0 : !quantum.bit<logical, null>
+    return
+}
+
+// -----
+
 func.func @test_qec_data_type(%0 : !quantum.bit<qec, data>) {
     %1 = quantum.custom ""() %0 : !quantum.bit<qec, data>
     return
@@ -300,41 +314,41 @@ func.func @test_2q_mix_input_ctrl_types_abs_phy(%0 : !quantum.bit<abstract>, %1 
 // -----
 
 func.func @test_abs_data_type(%0 : !quantum.bit<abstract, data>) {
-    // expected-error @above {{qubit role 'data' is only allowed for qec or physical qubits}}
+    // expected-error @above {{qubit role 'data' is only permitted for qec and physical qubits}}
     return
 }
 
 // -----
 
 func.func @test_abs_xcheck_type(%0 : !quantum.bit<abstract, xcheck>) {
-    // expected-error @above {{qubit role 'xcheck' is only allowed for qec or physical qubits}}
+    // expected-error @above {{qubit role 'xcheck' is only permitted for qec and physical qubits}}
     return
 }
 
 // -----
 
 func.func @test_abs_zcheck_type(%0 : !quantum.bit<abstract, zcheck>) {
-    // expected-error @above {{qubit role 'zcheck' is only allowed for qec or physical qubits}}
+    // expected-error @above {{qubit role 'zcheck' is only permitted for qec and physical qubits}}
     return
 }
 
 // -----
 
 func.func @test_abs_data_type(%0 : !quantum.bit<logical, data>) {
-    // expected-error @above {{qubit role 'data' is only allowed for qec or physical qubits}}
+    // expected-error @above {{qubit role 'data' is only permitted for qec and physical qubits}}
     return
 }
 
 // -----
 
 func.func @test_abs_xcheck_type(%0 : !quantum.bit<logical, xcheck>) {
-    // expected-error @above {{qubit role 'xcheck' is only allowed for qec or physical qubits}}
+    // expected-error @above {{qubit role 'xcheck' is only permitted for qec and physical qubits}}
     return
 }
 
 // -----
 
 func.func @test_abs_zcheck_type(%0 : !quantum.bit<logical, zcheck>) {
-    // expected-error @above {{qubit role 'zcheck' is only allowed for qec or physical qubits}}
+    // expected-error @above {{qubit role 'zcheck' is only permitted for qec and physical qubits}}
     return
 }
