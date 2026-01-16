@@ -188,6 +188,7 @@ def _link_object_to_elf(
         raise RuntimeError(f"ELF file was not created: {output_elf_path}")
 
 
+# pylint: disable=too-many-arguments,too-many-positional-arguments
 def link_to_artiq_elf(
     llvm_ir_path: str,
     output_elf_path: str,
