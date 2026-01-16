@@ -16,10 +16,6 @@
 OQD Compiler utilities for compiling and linking LLVM IR to ARTIQ's binary.
 """
 
-
-# This module provides utilities to compile and link Catalyst-generated LLVM IR to ARTIQ's binary.
-# This keeps OQD-specific logic out of Catalyst core.
-
 import os
 import subprocess
 from pathlib import Path
