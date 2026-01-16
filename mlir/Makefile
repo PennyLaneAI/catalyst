@@ -92,7 +92,8 @@ llvm:
 	# Note: the upstream lit test llvm-project/mlir/test/python/execution_engine.py requries
 	# the python package `ml_dtypes`. We don't actually use the execution engine, so we skip the
 	# test to reduce unnecessary dependencies.
-	LIT_FILTER_OUT="Bytecode|tosa-to-tensor|execution_engine" cmake --build $(LLVM_BUILD_DIR) --target $(LLVM_TARGETS)
+	# Note: python_test.py fails with Python 3.14 due to type hint representation changes
+	LIT_FILTER_OUT="Bytecode|tosa-to-tensor|execution_engine|python_test.py" cmake --build $(LLVM_BUILD_DIR) --target $(LLVM_TARGETS)
 
 .PHONY: stablehlo
 stablehlo:
