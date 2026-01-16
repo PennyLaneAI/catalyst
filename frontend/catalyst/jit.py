@@ -626,7 +626,7 @@ class QJIT(CatalystCallable):
         self.workspace = self._get_workspace()
 
         # TODO: awkward, refactor or redesign the target feature
-        if self.compile_options.target in ("jaxpr", "mlir", "binary", "llvmir"):
+        if self.compile_options.target in ("jaxpr", "mlir", "llvmir", "binary"):
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
                 self.user_sig or ()
             )
