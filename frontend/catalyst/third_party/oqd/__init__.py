@@ -15,6 +15,7 @@
 This submodule contains classes for the OQD device and its properties.
 """
 
+from .oqd_compile import compile_to_artiq
 from .oqd_device import OQDDevice, OQDDevicePipeline
 
-__all__ = ["OQDDevice", "OQDDevicePipeline"]
+__all__ = ["OQDDevice", "OQDDevicePipeline", "compile_to_artiq"]

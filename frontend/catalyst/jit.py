@@ -533,12 +533,6 @@ class QJIT(CatalystCallable):
         self.original_function = fn
         self.compile_options = compile_options
 
-        # Extract artiq_config from device
-        if compile_options.artiq_config is None and isinstance(fn, qml.QNode):
-            device_artiq_config = getattr(fn.device, "artiq_config", None)
-            if device_artiq_config is not None:
-                compile_options.artiq_config = device_artiq_config
-
         self.compiler = Compiler(compile_options)
         self.fn_cache = CompilationCache(
             compile_options.static_argnums, compile_options.abstracted_axes
@@ -555,11 +549,8 @@ class QJIT(CatalystCallable):
         self.mlir_module = None
         self.out_type = None
         self.overwrite_ir = None
-        # Use cwd for workspace if keep_intermediate is set or for ARTIQ targets
-        self.use_cwd_for_workspace = (
-            self.compile_options.keep_intermediate or self.compile_options.artiq_config
-        )
-        self._artiq_compiled = False  # Track if ARTIQ compilation has been done
+        # Use cwd for workspace if keep_intermediate is set
+        self.use_cwd_for_workspace = self.compile_options.keep_intermediate
 
         self.user_sig = get_type_annotations(fn)
         self._validate_configuration()
@@ -616,8 +607,8 @@ class QJIT(CatalystCallable):
 
         requires_promotion = self.jit_compile(args, **kwargs)
 
-        # For ARTIQ targets, compilation is complete, no execution needed
-        if self.compile_options.artiq_config:
+        # For llvm-ir target, compilation is complete, no execution needed
+        if self.compile_options.target == "llvmir":
             return None
 
         # If we receive tracers as input, dispatch to the JAX integration.
@@ -638,21 +629,18 @@ class QJIT(CatalystCallable):
         self.workspace = self._get_workspace()
 
         # TODO: awkward, refactor or redesign the target feature
-        if self.compile_options.target in ("jaxpr", "mlir", "binary"):
+        if self.compile_options.target in ("jaxpr", "mlir", "binary", "llvmir"):
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
                 self.user_sig or ()
             )
 
-        if self.compile_options.target in ("mlir", "binary"):
+        if self.compile_options.target in ("mlir", "llvmir", "binary"):
             self.mlir_module = self.generate_ir()
 
-        if self.compile_options.target in ("binary",):
+        if self.compile_options.target in ("llvmir", "binary"):
             self.compiled_function, _ = self.compile()
 
-            if self.compile_options.artiq_config:
-                self._artiq_compiled = True
-                return
-
+        if self.compile_options.target in ("binary",):
             self.fn_cache.insert(
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
@@ -678,15 +666,13 @@ class QJIT(CatalystCallable):
             bool: whether the provided arguments will require promotion to be used with the compiled
                   function
         """
-        # For ARTIQ targets, compile only once (skip if already compiled via AOT)
-        if self.compile_options.artiq_config:
-            if self._artiq_compiled:
+        if self.compile_options.target == "llvmir":
+            if self.mlir_module is not None:
                 return False
             self.workspace = self._get_workspace()
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
             self.mlir_module = self.generate_ir()
             self.compiled_function, _ = self.compile()
-            self._artiq_compiled = True
             return False
 
         cached_fn, requires_promotion = self.fn_cache.lookup(args)
@@ -828,7 +814,7 @@ class QJIT(CatalystCallable):
 
         Returns:
             Tuple[CompiledFunction, str]: the compilation result and LLVMIR
-            For ARTIQ targets, returns (None, llvm_ir) instead.
+            For targets that skip execution, returns (None, llvm_ir) instead.
         """
         # WARNING: assumption is that the first function is the entry point to the compiled program.
         entry_point_func = self.mlir_module.body.operations[0]
@@ -854,10 +840,7 @@ class QJIT(CatalystCallable):
         else:
             shared_object, llvm_ir = self.compiler.run(self.mlir_module, self.workspace)
 
-        # We don't create a CompiledFunction for ARTIQ targets, just return it with None
-        if self.compile_options.artiq_config:
-            print(f"[ARTIQ] Generated ELF: {shared_object}")
-            print(f"[ARTIQ] Object files saved in workspace: {self.workspace}")
+        if self.compile_options.target == "llvmir":
             return None, llvm_ir
 
         compiled_fn = CompiledFunction(

@@ -816,105 +816,6 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         llvm::InitializeAllAsmParsers();
         llvm::InitializeAllAsmPrinters();
 
-        // Use external LLC with ARM support (catalyst's LLVM doesn't have corresponding ARM backend
-        // for now)
-        if (options.artiqEnabled) {
-            // Save LLVM IR to file for external LLC
-            std::string llFile = options.getLLFile();
-            std::error_code errCode;
-            llvm::raw_fd_ostream llOut(llFile, errCode, llvm::sys::fs::OF_None);
-            if (errCode) {
-                CO_MSG(options, Verbosity::Urgent,
-                       "Failed to open " << llFile << ": " << errCode.message() << "\n");
-                return failure();
-            }
-            llvmModule->print(llOut, nullptr);
-            llOut.close();
-
-            // Get LLC path
-            std::string llcPath = options.artiqLlcPath.empty() ? "llc" : options.artiqLlcPath;
-            std::string llcCmd = llcPath +
-                                 " -mtriple=armv7-unknown-linux-gnueabihf -mcpu=cortex-a9"
-                                 " -filetype=obj -relocation-model=pic -o " +
-                                 options.getObjectFile() + " " + llFile + " 2>&1";
-
-            CO_MSG(options, Verbosity::All,
-                   "[ARTIQ] Compiling with external LLC: " << llcCmd << "\n");
-
-            std::string objectFile = options.getObjectFile();
-            llvm::SmallVector<llvm::StringRef, 8> llcArgs;
-            llcArgs.push_back(llcPath);
-            llcArgs.push_back("-mtriple=armv7-unknown-linux-gnueabihf");
-            llcArgs.push_back("-mcpu=cortex-a9");
-            llcArgs.push_back("-filetype=obj");
-            llcArgs.push_back("-relocation-model=pic");
-            llcArgs.push_back("-o");
-            llcArgs.push_back(objectFile);
-            llcArgs.push_back(llFile);
-
-            std::string llcErrMsg;
-            int llcResult =
-                llvm::sys::ExecuteAndWait(llcPath, llcArgs, std::nullopt, {}, 0, 0, &llcErrMsg);
-            if (llcResult != 0) {
-                CO_MSG(options, Verbosity::Urgent,
-                       "External LLC failed with exit code: " << llcResult);
-                if (!llcErrMsg.empty()) {
-                    CO_MSG(options, Verbosity::Urgent, ": " << llcErrMsg);
-                }
-                CO_MSG(options, Verbosity::Urgent, "\n");
-                return failure();
-            }
-
-            // Link to ELF
-            std::string lldPath = options.artiqLldPath.empty() ? "ld.lld" : options.artiqLldPath;
-            if (options.artiqKernelLd.empty()) {
-                CO_MSG(options, Verbosity::Urgent, "ARTIQ kernel.ld path not specified\n");
-                return failure();
-            }
-
-            std::string lldCmd = lldPath +
-                                 " -shared --eh-frame-hdr -m armelf_linux_eabi "
-                                 "--target2=rel -T " +
-                                 options.artiqKernelLd + " " + options.getObjectFile() + " -o " +
-                                 options.getElfFile() + " 2>&1";
-
-            CO_MSG(options, Verbosity::All, "[ARTIQ] Linking ELF: " << lldCmd << "\n");
-
-            std::string kernelLd = options.artiqKernelLd;
-            std::string objectFileLd = options.getObjectFile();
-            std::string elfFile = options.getElfFile();
-            llvm::SmallVector<llvm::StringRef, 12> lldArgs;
-            lldArgs.push_back(lldPath);
-            lldArgs.push_back("-shared");
-            lldArgs.push_back("--eh-frame-hdr");
-            lldArgs.push_back("-m");
-            lldArgs.push_back("armelf_linux_eabi");
-            lldArgs.push_back("--target2=rel");
-            lldArgs.push_back("-T");
-            lldArgs.push_back(kernelLd);
-            lldArgs.push_back(objectFileLd);
-            lldArgs.push_back("-o");
-            lldArgs.push_back(elfFile);
-
-            std::string lldErrMsg;
-            int lldResult =
-                llvm::sys::ExecuteAndWait(lldPath, lldArgs, std::nullopt, {}, 0, 0, &lldErrMsg);
-            if (lldResult != 0) {
-                CO_MSG(options, Verbosity::Urgent,
-                       "LLD linking failed with exit code: " << lldResult);
-                if (!lldErrMsg.empty()) {
-                    CO_MSG(options, Verbosity::Urgent, ": " << lldErrMsg);
-                }
-                CO_MSG(options, Verbosity::Urgent, "\n");
-                return failure();
-            }
-
-            CO_MSG(options, Verbosity::All,
-                   "[ARTIQ] Generated ELF: " << options.getElfFile() << "\n");
-            llcTiming.stop();
-            return success();
-        }
-
         llvm::Triple targetTriple(llvm::sys::getDefaultTargetTriple());
         const char *cpu = "generic";
         const char *features = "";
@@ -1115,17 +1016,6 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                                   cl::desc("Print the whole module in intermediate files"),
                                   cl::init(true), cl::cat(CatalystCat));
 
-    // ARTIQ cross-compilation options
-    cl::opt<bool> ArtiqEnabled("artiq", cl::desc("Enable ARTIQ cross-compilation to ARM ELF"),
-                               cl::init(false), cl::cat(CatalystCat));
-    cl::opt<std::string> ArtiqKernelLd("artiq-kernel-ld",
-                                       cl::desc("Path to ARTIQ kernel.ld linker script"),
-                                       cl::init(""), cl::cat(CatalystCat));
-    cl::opt<std::string> ArtiqLlcPath("artiq-llc-path", cl::desc("Path to llc for ARTIQ"),
-                                      cl::init(""), cl::cat(CatalystCat));
-    cl::opt<std::string> ArtiqLldPath("artiq-lld-path", cl::desc("Path to ld.lld for ARTIQ"),
-                                      cl::init(""), cl::cat(CatalystCat));
-
     // Create dialect registry
     DialectRegistry registry;
     mlir::registerAllPasses();
@@ -1177,11 +1067,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                             .pipelinesCfg = parsePipelines(CatalystPipeline),
                             .checkpointStage = CheckpointStage,
                             .loweringAction = LoweringAction,
-                            .dumpPassPipeline = DumpPassPipeline,
-                            .artiqEnabled = ArtiqEnabled,
-                            .artiqKernelLd = ArtiqKernelLd,
-                            .artiqLlcPath = ArtiqLlcPath,
-                            .artiqLldPath = ArtiqLldPath};
+                            .dumpPassPipeline = DumpPassPipeline};
 
     mlir::LogicalResult result = QuantumDriverMain(options, *output, registry);
 

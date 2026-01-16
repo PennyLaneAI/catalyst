@@ -325,21 +325,6 @@ def canonicalize(*args, stdin=None, options: Optional[CompileOptions] = None):
     return _quantum_opt(*opts, *args, stdin=stdin)
 
 
-def _artiq_config_to_cli_flags(artiq_config):
-    """Convert ARTIQ config dict to CLI flags."""
-    flags = ["--artiq"]
-    flag_mapping = {
-        "kernel_ld": "--artiq-kernel-ld",
-        "llc_path": "--artiq-llc-path",
-        "lld_path": "--artiq-lld-path",
-    }
-    for key, flag in flag_mapping.items():
-        value = artiq_config.get(key, "")
-        if value:
-            flags.append((flag, value))
-    return flags
-
-
 def _options_to_cli_flags(options):
     """CompileOptions -> list[str|Tuple[str, str]]"""
 
@@ -382,9 +367,6 @@ def _options_to_cli_flags(options):
 
     if options.async_qnodes:  # pragma: nocover
         extra_args += ["--async-qnodes"]
-
-    if options.artiq_config:
-        extra_args += _artiq_config_to_cli_flags(options.artiq_config)
 
     return extra_args
 
@@ -503,25 +485,21 @@ class Compiler:
         else:
             out_IR = None
 
-        if self.options.artiq_config:
-            output_elf_name = os.path.join(str(workspace), f"{module_name}.elf")
-            output = str(pathlib.Path(output_elf_name).absolute())
-
-            if self.options.verbose:
-                print(f"[ARTIQ] Generated ELF: {output}", file=self.options.logfile)
-
-            # Clean up temporary input file
+        # If target is llvm-ir, only return LLVM IR without linking
+        if self.options.target == "llvmir":
+            output = output_ir_name if os.path.exists(output_ir_name) else None
             if os.path.exists(tmp_infile_name):
                 os.remove(tmp_infile_name)
-        else:
-            output = LinkerDriver.run(output_object_name, options=self.options)
-            output = str(pathlib.Path(output).absolute())
+            return output, out_IR
 
-            # Clean up temporary files
-            if os.path.exists(tmp_infile_name):
-                os.remove(tmp_infile_name)
-            if os.path.exists(output_ir_name):
-                os.remove(output_ir_name)
+        output = LinkerDriver.run(output_object_name, options=self.options)
+        output = str(pathlib.Path(output).absolute())
+
+        # Clean up temporary files
+        if os.path.exists(tmp_infile_name):
+            os.remove(tmp_infile_name)
+        if os.path.exists(output_ir_name):
+            os.remove(output_ir_name)
 
         return output, out_IR
 

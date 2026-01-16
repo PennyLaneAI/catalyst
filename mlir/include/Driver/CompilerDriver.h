@@ -80,24 +80,11 @@ struct CompilerOptions {
     /// If true, the compiler will dump the pass pipeline that will be run.
     bool dumpPassPipeline;
 
-    /// ARTIQ cross-compilation settings
-    bool artiqEnabled = false;
-    std::string artiqKernelLd; // Path to ARTIQ kernel.ld linker script
-    std::string artiqLlcPath;  // Path to llc
-    std::string artiqLldPath;  // Path to ld.lld
-
     /// Get the destination of the object file at the end of compilation.
     std::string getObjectFile() const
     {
         using path = std::filesystem::path;
         return path(workspace.str()) / path(moduleName.str() + ".o");
-    }
-
-    /// Get the destination of the ELF file for ARTIQ.
-    std::string getElfFile() const
-    {
-        using path = std::filesystem::path;
-        return path(workspace.str()) / path(moduleName.str() + ".elf");
     }
 
     /// Get the destination of the LLVM IR file.
