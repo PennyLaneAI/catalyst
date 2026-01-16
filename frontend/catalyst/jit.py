@@ -546,7 +546,6 @@ class QJIT(CatalystCallable):
         self.mlir_module = None
         self.out_type = None
         self.overwrite_ir = None
-        # Use cwd for workspace if keep_intermediate is set
         self.use_cwd_for_workspace = self.compile_options.keep_intermediate
 
         self.user_sig = get_type_annotations(fn)
