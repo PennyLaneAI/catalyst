@@ -18,14 +18,8 @@ import re
 from unittest.mock import Mock
 
 import jax
-import pytest
-
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
-# pylint: disable=wrong-import-position
-# This import needs to be after pytest in order to prevent ImportErrors
 import pennylane as qml
+import pytest
 from xdsl.dialects import test
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir.core import Block, Region
@@ -38,7 +32,10 @@ from catalyst.python_interface.inspection.construct_circuit_dag import (
 )
 from catalyst.python_interface.inspection.dag_builder import DAGBuilder
 
+pytestmark = pytest.mark.xdsl
 
+
+# pylint: disable=missing-function-docstring
 class FakeDAGBuilder(DAGBuilder):
     """
     A concrete implementation of DAGBuilder used ONLY for testing.

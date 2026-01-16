@@ -59,7 +59,8 @@ auto OQDDevice::GetDeviceShots() const -> size_t { return device_shots; }
 
 void OQDDevice::NamedOperation(const std::string &, const std::vector<double> &,
                                const std::vector<QubitIdType> &, bool,
-                               const std::vector<QubitIdType> &, const std::vector<bool> &)
+                               const std::vector<QubitIdType> &, const std::vector<bool> &,
+                               const std::vector<std::string> &)
 {
     RT_FAIL("NamedOperation unsupported by device");
 }

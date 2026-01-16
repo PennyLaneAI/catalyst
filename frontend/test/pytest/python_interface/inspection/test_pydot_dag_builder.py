@@ -13,16 +13,18 @@
 # limitations under the License.
 """Unit tests for the PyDotDAGBuilder subclass."""
 
+from shutil import which
 from unittest.mock import MagicMock
 
 import pytest
 
-pydot = pytest.importorskip("pydot")
+from catalyst.python_interface.inspection.pydot_dag_builder import PyDotDAGBuilder
 
 pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-# pylint: disable=wrong-import-position
-from catalyst.python_interface.inspection.pydot_dag_builder import PyDotDAGBuilder
+pydot = pytest.importorskip("pydot")
+
+if which("dot") is None:
+    pytest.skip(reason="Graphviz isn't installed.", allow_module_level=True)
 
 
 def test_initialization_defaults():
@@ -150,9 +152,7 @@ class TestAddMethods:
         cluster_graph = cluster_list[0]  # Get the actual subgraph object
 
         assert cluster_graph.get_node("1"), "Node 1 not found in cluster 'c0'"
-        assert not cluster_graph.get_node("0"), (
-            "Node 0 was incorrectly added to cluster"
-        )
+        assert not cluster_graph.get_node("0"), "Node 0 was incorrectly added to cluster"
 
         assert not root_graph.get_node("1"), "Node 1 was incorrectly added to root"
 
@@ -383,9 +383,7 @@ class TestOutput:
         dag_builder.to_file(f"my_graph.{file_format}")
 
         # make sure the function handles extensions correctly
-        mock_write.assert_called_once_with(
-            f"my_graph.{file_format}", format=file_format
-        )
+        mock_write.assert_called_once_with(f"my_graph.{file_format}", format=file_format)
 
     def test_to_string(self):
         """Tests that the `to_string` method works correclty."""
