@@ -160,8 +160,11 @@ def resolve_op_defs(file_path: Path):
 
     # Add irdl_options. These are added for blanket coverage of the case
     # where an operation may have multiple variadic operands or results
-    search_pattern = r'(\(IRDLOperation\):((\s|\n|\t)+(""".+"""))?)'
-    replace_pattern = r"\1\n\n    irdl_options = (AttrSizedOperandSegments(as_property=True), AttrSizedResultSegments(as_property=True))\n"
+    search_pattern = r'(\(IRDLOperation\):(\n\s+(""".+"""))?)'
+    replace_pattern = (
+        r"\1\n\n    irdl_options = (AttrSizedOperandSegments(as_property=True), "
+        r"AttrSizedResultSegments(as_property=True))\n"
+    )
     content = sub(search_pattern, replace_pattern, content)
 
     with open(file_path, "w", encoding="utf-8") as f:
