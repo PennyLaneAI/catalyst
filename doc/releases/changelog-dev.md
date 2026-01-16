@@ -39,11 +39,17 @@
   into normal PPR and PPMs with SCF dialect to support runtime execution.
   [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
 
+* New qubit-type specializations have been added Catalyst's MLIR type system. These new qubit types
+  include `!quantum.bit<logical>`, `!quantum.bit<qec>` and `!quantum.bit<physical>`. The original
+  `!quantum.bit` type continues to be supported and used as the default qubit type.
+  [(#2369)](https://github.com/PennyLaneAI/catalyst/pull/2369)
+
 <h3>Documentation 📝</h3>
 
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
-Ali Asadi
+Ali Asadi,
+Joey Carter,
 Sengthai Heng,
 Jeffrey Kam.
