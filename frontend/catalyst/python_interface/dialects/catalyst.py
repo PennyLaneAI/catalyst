@@ -244,7 +244,7 @@ class PrintOp(IRDLOperation):
 
     const_val = opt_prop_def(StringAttr)
 
-    print_descriptor = prop_def(UnitAttr)
+    print_descriptor = opt_prop_def(UnitAttr)
 
 
 Catalyst = Dialect(
