@@ -1,4 +1,4 @@
-// Copyright 2023-2026 Xanadu Quantum Technologies Inc.
+// Copyright 2023 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -819,10 +819,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         std::string err;
         auto target = llvm::TargetRegistry::lookupTarget(targetTriple, err);
         llvm::TargetOptions opt;
-
         const char *cpu = "generic";
         const char *features = "";
-
         auto targetMachine =
             target->createTargetMachine(targetTriple, cpu, features, opt, llvm::Reloc::Model::PIC_);
         targetMachine->setOptLevel(llvm::CodeGenOptLevel::None);
