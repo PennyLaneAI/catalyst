@@ -281,6 +281,54 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [ParametrizedGate, AttrSizedOperandSeg
     // let hasCanonicalizeMethod = 1;
 }
 
+def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSegments]> {
+    let summary = "Apply a projector-controlled phase gate";
+    let description = [{
+        This gate is built from simpler gates like `PhaseShift` and `PauliX` and acts on a group
+        of wires and takes a rotation angle.
+        It also takes another number, an integer called `dim`, which defines a specific part
+        of the quantum state. The gate then applies a positive phase shift to a portion of the
+        state defined by `dim`. At the same time, it applies a negative phase shift to the rest
+        of the state.
+
+        .. note::
+            This operation is one of the few quantum operations that is not applied via
+            ``quantum.custom``. The reason for this is that its quantum dialect counterpart needs
+            to be handled in a special way during the lowering due to its C function being variadic
+            on the number of qubits.
+
+        .. note::
+            `dim` is currently captured as a float number for compatibility with
+            runtime and device integration.
+
+    }];
+
+    let arguments = (ins
+        F64:$theta,
+        F64:$dim,
+        Variadic<I64>:$wires,
+        UnitAttr:$adjoint,
+        Variadic<I64>:$ctrl_wires,
+        Variadic<I1>:$ctrl_values
+    );
+
+    let assemblyFormat = [{
+        `(` $theta `,` $dim `)` $wires (`adj` $adjoint^)? attr-dict
+        ( `ctrls` `(` $ctrl_wires^ `)` )?
+        ( `ctrlvals` `(` $ctrl_values^ `)` )?
+        `:` type($wires) (`ctrls` type($ctrl_wires)^ )?
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getAllParams() {
+            return getODSOperands(0);  // `theta` is the 0-th operand
+        }
+    }];
+
+    // TODO
+    // let hasCanonicalizeMethod = 1;
+}
+
 // // -----
 
 // // Observable ops are not meaningful on their own: their purpose is to be sent into a measurement

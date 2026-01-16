@@ -102,6 +102,29 @@ func.func @test_multirz(%w0: i64, %w1: i64, %w2: i64, %w3: i64, %theta: f64) {
 
 // -----
 
+func.func @test_pcphase(%w0: i64, %w1: i64, %w2: i64, %w3: i64, %theta: f64, %dim: f64) {
+
+    // Basic
+    ref_quantum.pcphase (%theta, %dim) %w0 : i64
+    ref_quantum.pcphase (%theta, %dim) %w0, %w1, %w2 : i64, i64, i64
+
+    // With adjoint
+    ref_quantum.pcphase (%theta, %dim) %w0, %w1 adj : i64, i64
+
+    // With control
+    %true = llvm.mlir.constant (1 : i1) :i1
+    %false = llvm.mlir.constant (0 : i1) :i1
+    ref_quantum.pcphase (%theta, %dim) %w0 ctrls (%w1) ctrlvals (%true) : i64 ctrls i64
+    ref_quantum.pcphase (%theta, %dim) %w0, %w1 ctrls (%w2, %w3) ctrlvals (%true, %false) : i64, i64 ctrls i64, i64
+
+    // With control and adjoint
+    ref_quantum.pcphase (%theta, %dim) %w0, %w1 adj ctrls (%w2, %w3) ctrlvals (%true, %false) : i64, i64 ctrls i64, i64
+
+    return
+}
+
+// -----
+
 func.func @test_namedobs_op(%w0: i64) {
 
     %ox = ref_quantum.namedobs %w0 [ PauliX] : !quantum.obs
