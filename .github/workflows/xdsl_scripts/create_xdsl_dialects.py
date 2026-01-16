@@ -19,6 +19,7 @@ from json import dumps, loads
 from pathlib import Path
 from re import sub
 from subprocess import list2cmdline, run
+from warnings import warn
 
 all_dialects = {
     "catalyst": "Catalyst",
@@ -133,6 +134,16 @@ def resolve_op_defs(file_path: Path):
     Args:
         file_path (pathlib.Path): path to the Python file being stripped
     """
+    # Make allowed line length very long to make regex simpler
+    err = run(
+        ["ruff", "format", "--line-length=500", str(file_path)], capture_output=True, check=False
+    )
+    if err.returncode != 0:
+        warn(
+            "Formatting the generated dialect failed. The operation definition "
+            "simplification may not work well."
+        )
+
     with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
 
