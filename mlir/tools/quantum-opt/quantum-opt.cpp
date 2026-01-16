@@ -44,8 +44,8 @@
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
-#include "RefQuantum/IR/RefQuantumDialect.h"
 #include "RTIO/IR/RTIODialect.h"
+#include "RefQuantum/IR/RefQuantumDialect.h"
 #include "RegisterAllPasses.h"
 
 namespace test {

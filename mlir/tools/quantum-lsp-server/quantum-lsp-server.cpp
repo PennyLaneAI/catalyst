@@ -24,8 +24,8 @@
 #include "PauliFrame/IR/PauliFrameDialect.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
-#include "RefQuantum/IR/RefQuantumDialect.h"
 #include "RTIO/IR/RTIODialect.h"
+#include "RefQuantum/IR/RefQuantumDialect.h"
 
 #include "stablehlo/dialect/Register.h"
 

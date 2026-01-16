@@ -18,9 +18,9 @@
 #include "mlir/IR/PatternMatch.h"
 
 // #include "RefQuantum/IR/RefQuantumOps.h"
-#include "RefQuantum/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "RefQuantum/Transforms/Patterns.h"
 
 using namespace mlir;
 
@@ -29,13 +29,13 @@ namespace {
 struct RQHelloWorldPattern : public OpRewritePattern<catalyst::quantum::CustomOp> {
     using OpRewritePattern::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(catalyst::quantum::CustomOp op, PatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(catalyst::quantum::CustomOp op,
+                                  PatternRewriter &rewriter) const override
     {
         llvm::errs() << "hello world! Visiting " << op << "\n";
         return success();
     }
 };
-
 
 } // namespace
 
