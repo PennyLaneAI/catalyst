@@ -72,49 +72,39 @@ def compile_to_artiq(circuit, artiq_config, output_elf_name=None, verbose=True):
     return output_elf_path
 
 
-def link_to_artiq_elf(
-    llvm_ir_path: str,
-    output_elf_path: str,
-    kernel_ld: str,
-    llc_path: Optional[str] = None,
-    lld_path: Optional[str] = None,
-    verbose: bool = False,
-) -> str:
-    """Link LLVM IR to ARTIQ ELF format.
-
-    Args:
-        llvm_ir_path: Path to the LLVM IR file (.ll)
-        output_elf_path: Path to output ELF file
-        kernel_ld: Path to ARTIQ's kernel.ld linker script
-        llc_path: Path to llc (LLVM compiler). If None, uses "llc" from PATH
-        lld_path: Path to ld.lld (LLVM linker). If None, uses "ld.lld" from PATH
-        verbose: If True, print compilation commands
-
-    Returns:
-        Path to the generated ELF file
-    """
-    llvm_ir_path = Path(llvm_ir_path)
-    output_elf_path = Path(output_elf_path)
-    kernel_ld = Path(kernel_ld)
-
+def _validate_paths(llvm_ir_path: Path, kernel_ld: Path) -> None:
+    """Validate that required input files exist."""
     if not llvm_ir_path.exists():
         raise FileNotFoundError(f"LLVM IR file not found: {llvm_ir_path}")
-
     if not kernel_ld.exists():
         raise FileNotFoundError(f"ARTIQ kernel.ld not found: {kernel_ld}")
 
-    # Use default paths if not provided
-    llc_cmd = llc_path if llc_path else "llc"
-    lld_cmd = lld_path if lld_path else "ld.lld"
 
-    # Check if tools exist
-    if llc_path and not Path(llc_path).exists():
-        raise FileNotFoundError(f"llc not found: {llc_path}")
-    if lld_path and not Path(lld_path).exists():
-        raise FileNotFoundError(f"ld.lld not found: {lld_path}")
+def _get_tool_command(tool_path: Optional[str], default_name: str) -> str:
+    """Get tool command path, validating if custom path is provided."""
+    if tool_path is None:
+        return default_name
+    tool_path_obj = Path(tool_path)
+    if not tool_path_obj.exists():
+        raise FileNotFoundError(f"{default_name} not found: {tool_path}")
+    return tool_path
 
-    # Compile LLVM IR to object file with llc
-    object_file = output_elf_path.with_suffix(".o")
+
+def _compile_llvm_to_object(
+    llvm_ir_path: Path, object_file: Path, llc_cmd: str, verbose: bool
+) -> None:
+    """Compile LLVM IR to object file with llc.
+
+    Args:
+        llvm_ir_path: Path to LLVM IR file
+        object_file: Path to object file
+        llc_cmd: Command to use for llc compiler
+        verbose: Whether to print verbose output
+
+    Raises:
+        RuntimeError: If compilation fails
+        FileNotFoundError: If llc is not found
+    """
     llc_args = [
         llc_cmd,
         "-mtriple=armv7-unknown-linux-gnueabihf",
@@ -146,7 +136,23 @@ def link_to_artiq_elf(
     if not object_file.exists():
         raise RuntimeError(f"Object file was not created: {object_file}")
 
-    # Link object file to ELF with ld.lld
+
+def _link_object_to_elf(
+    object_file: Path, output_elf_path: Path, kernel_ld: Path, lld_cmd: str, verbose: bool
+) -> None:
+    """Link object file to ELF format with ld.lld.
+
+    Args:
+        object_file: Path to object file
+        output_elf_path: Path to output ELF file
+        kernel_ld: Path to kernel linker script
+        lld_cmd: Command to use for ld.lld linker
+        verbose: Whether to print verbose output
+
+    Raises:
+        RuntimeError: If linking fails
+        FileNotFoundError: If ld.lld is not found
+    """
     lld_args = [
         lld_cmd,
         "-shared",
@@ -181,7 +187,42 @@ def link_to_artiq_elf(
     if not output_elf_path.exists():
         raise RuntimeError(f"ELF file was not created: {output_elf_path}")
 
-    if verbose:
-        print(f"[ARTIQ] Generated ELF: {output_elf_path}")
 
-    return str(output_elf_path)
+def link_to_artiq_elf(
+    llvm_ir_path: str,
+    output_elf_path: str,
+    kernel_ld: str,
+    llc_path: Optional[str] = None,
+    lld_path: Optional[str] = None,
+    verbose: bool = False,
+) -> str:
+    """Link LLVM IR to ARTIQ ELF format.
+
+    Args:
+        llvm_ir_path: Path to the LLVM IR file (.ll)
+        output_elf_path: Path to output ELF file
+        kernel_ld: Path to ARTIQ's kernel.ld linker script
+        llc_path: Path to llc (LLVM compiler). If None, uses "llc" from PATH
+        lld_path: Path to ld.lld (LLVM linker). If None, uses "ld.lld" from PATH
+        verbose: If True, print compilation commands
+
+    Returns:
+        Path to the generated ELF file
+    """
+    llvm_ir_path_obj = Path(llvm_ir_path)
+    output_elf_path_obj = Path(output_elf_path)
+    kernel_ld_obj = Path(kernel_ld)
+
+    _validate_paths(llvm_ir_path_obj, kernel_ld_obj)
+
+    llc_cmd = _get_tool_command(llc_path, "llc")
+    lld_cmd = _get_tool_command(lld_path, "ld.lld")
+
+    object_file = output_elf_path_obj.with_suffix(".o")
+    _compile_llvm_to_object(llvm_ir_path_obj, object_file, llc_cmd, verbose)
+    _link_object_to_elf(object_file, output_elf_path_obj, kernel_ld_obj, lld_cmd, verbose)
+
+    if verbose:
+        print(f"[ARTIQ] Generated ELF: {output_elf_path_obj}")
+
+    return str(output_elf_path_obj)
