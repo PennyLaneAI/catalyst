@@ -456,10 +456,3 @@ func.func @state_good(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64, %in_stat
     quantum.state %obs shape %c : tensor<?xcomplex<f64>>
     return
 }
-
-// -----
-
-func.func @qubit_type_abstract(%q0 : !quantum.bit<logical>) {
-    %q3 = quantum.custom "PauliZ"() %q0 : !quantum.bit<logical>
-    return
-}
