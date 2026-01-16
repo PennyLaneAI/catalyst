@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cmath> // std::pow
-
 #include "mlir/IR/OpImplementation.h"
 
 #include "RefQuantum/IR/RefQuantumDialect.h"
@@ -49,7 +47,7 @@ static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length
 
 LogicalResult QubitUnitaryOp::verify()
 {
-    size_t dim = std::pow(2, getWires().size());
+    size_t dim = 1 << getWires().size();
     if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim))) {
         return emitOpError("The Unitary matrix must be of size 2^(num_wires) * 2^(num_wires)");
     }
