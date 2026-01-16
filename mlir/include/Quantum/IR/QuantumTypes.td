@@ -32,21 +32,27 @@ def QubitType : Quantum_Type<"Qubit", "bit"> {
     let summary = "A value-semantic qubit (state).";
 
     let parameters = (ins
-        DefaultValuedParameter<"QubitLevel", "QubitLevel::Abstract">:$level
+        DefaultValuedParameter<"QubitLevel", "QubitLevel::Abstract">:$level,
+        DefaultValuedParameter<"QubitRole", "QubitRole::Null">:$role
     );
 
-    let assemblyFormat = "(`<` $level^ `>`)?";
+    let assemblyFormat = "(`<` $level^ (`,` $role^ )? `>`)?";
 
-    // This allows the ODS generator to "build" the type automatically
-    // using the Abstract qubit level when it needs a default.
-    let builderCall = "$_builder.getType<quantum::QubitType>(quantum::QubitLevel::Abstract)";
+    // This allows the ODS generator to "build" the type automatically using the
+    // 'Abstract' qubit level and 'Null' qubit role and when it needs a default.
+    let builderCall = [{
+        $_builder.getType<quantum::QubitType>(
+            quantum::QubitLevel::Abstract, quantum::QubitRole::Null)
+    }];
 
     let extraClassDeclaration = [{
-        // Get an instance of the QubitType with the default 'Abstract' level.
+        // Get an instance of the QubitType with the default 'Abstract' level and 'Null' role.
         static QubitType get(::mlir::MLIRContext *context) {
-            return get(context, quantum::QubitLevel::Abstract);
+            return get(context, quantum::QubitLevel::Abstract, quantum::QubitRole::Null);
         }
     }];
+
+    let genVerifyDecl = 1;
 }
 def QuregType : Quantum_Type<"Qureg", "reg"> {
     let summary = "An array of value-semantic qubits (i.e. quantum register).";

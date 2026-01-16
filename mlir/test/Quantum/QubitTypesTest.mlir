@@ -154,6 +154,47 @@ func.func @test_dealloc_qb_phy(%0 : !quantum.bit<physical>) {
 
 // -----
 
+func.func @test_qec_data_type(%0 : !quantum.bit<qec, data>) {
+    %1 = quantum.custom ""() %0 : !quantum.bit<qec, data>
+    return
+}
+
+// -----
+
+func.func @test_qec_xcheck_type(%0 : !quantum.bit<qec, xcheck>) {
+    %1 = quantum.custom ""() %0 : !quantum.bit<qec, xcheck>
+    return
+}
+
+// -----
+
+func.func @test_qec_zcheck_type(%0 : !quantum.bit<qec, zcheck>) {
+    %1 = quantum.custom ""() %0 : !quantum.bit<qec, zcheck>
+    return
+}
+
+// -----
+
+func.func @test_phy_data_type(%0 : !quantum.bit<physical, data>) {
+    %1 = quantum.custom ""() %0 : !quantum.bit<physical, data>
+    return
+}
+
+// -----
+
+func.func @test_phy_xcheck_type(%0 : !quantum.bit<physical, xcheck>) {
+    %1 = quantum.custom ""() %0 : !quantum.bit<physical, xcheck>
+    return
+}
+
+// -----
+
+func.func @test_phy_zcheck_type(%0 : !quantum.bit<physical, zcheck>) {
+    %1 = quantum.custom ""() %0 : !quantum.bit<physical, zcheck>
+    return
+}
+
+// -----
 
 //===----------------------------------------------------------------------===//
 // Verifier tests: Does incorrect usage result in expected errors?
@@ -253,5 +294,47 @@ func.func @test_2q_mix_input_ctrl_types_abs_phy(%0 : !quantum.bit<abstract>, %1 
     %true = llvm.mlir.constant (1 : i1) : i1
     // expected-error @below {{requires all qubit operands and results to have the same type}}
     %2, %3 = quantum.custom ""() %0 ctrls (%1) ctrlvals (%true) : !quantum.bit<abstract> ctrls !quantum.bit<physical>
+    return
+}
+
+// -----
+
+func.func @test_abs_data_type(%0 : !quantum.bit<abstract, data>) {
+    // expected-error @above {{qubit role 'data' is only allowed for qec or physical qubits}}
+    return
+}
+
+// -----
+
+func.func @test_abs_xcheck_type(%0 : !quantum.bit<abstract, xcheck>) {
+    // expected-error @above {{qubit role 'xcheck' is only allowed for qec or physical qubits}}
+    return
+}
+
+// -----
+
+func.func @test_abs_zcheck_type(%0 : !quantum.bit<abstract, zcheck>) {
+    // expected-error @above {{qubit role 'zcheck' is only allowed for qec or physical qubits}}
+    return
+}
+
+// -----
+
+func.func @test_abs_data_type(%0 : !quantum.bit<logical, data>) {
+    // expected-error @above {{qubit role 'data' is only allowed for qec or physical qubits}}
+    return
+}
+
+// -----
+
+func.func @test_abs_xcheck_type(%0 : !quantum.bit<logical, xcheck>) {
+    // expected-error @above {{qubit role 'xcheck' is only allowed for qec or physical qubits}}
+    return
+}
+
+// -----
+
+func.func @test_abs_zcheck_type(%0 : !quantum.bit<logical, zcheck>) {
+    // expected-error @above {{qubit role 'zcheck' is only allowed for qec or physical qubits}}
     return
 }

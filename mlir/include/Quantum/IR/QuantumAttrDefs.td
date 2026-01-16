@@ -50,5 +50,16 @@ def QubitLevel : I32EnumAttr<"QubitLevel",
     let genSpecializedAttr = 0;
 }
 
+def QubitRole : I32EnumAttr<"QubitRole",
+    "Qubit roles for further specialization in the hierarchical qubit representation",
+    [
+        I32EnumAttrCase<"Null",   0, "null">,
+        I32EnumAttrCase<"Data",   1, "data">,
+        I32EnumAttrCase<"XCheck", 2, "xcheck">,
+        I32EnumAttrCase<"ZCheck", 3, "zcheck">,
+    ]> {
+    let cppNamespace = "catalyst::quantum";
+    let genSpecializedAttr = 0;
+}
 
 #endif // QUANTUM_ATTR_DEFS
