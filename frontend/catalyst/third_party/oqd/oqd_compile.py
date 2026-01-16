@@ -26,7 +26,7 @@ def compile_to_artiq(circuit, artiq_config, output_elf_name=None, verbose=True):
     """Compile a qjit-compiled circuit to ARTIQ's binary.
 
     This function takes a circuit compiled with target="llvmir", writes the LLVM IR
-    to a file, and links it to an ARTIQ'se binary.
+    to a file, and links it to an ARTIQ's binary.
 
     Args:
         circuit: A QJIT-compiled function (must be compiled with target="llvmir")
