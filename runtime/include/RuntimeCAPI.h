@@ -87,6 +87,7 @@ void __catalyst__qis__GlobalPhase(double, const Modifiers *);
 void __catalyst__qis__PCPhase(double, double, const Modifiers *, int64_t, /*qubits*/...);
 void __catalyst__qis__ISWAP(QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__PSWAP(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__PauliRot(const char *, double, const Modifiers *, int64_t, /*qubits*/...);
 
 // Struct pointer arguments for these instructions represent real arguments,
 // as passing structs by value is too unreliable / compiler dependant.
@@ -100,6 +101,7 @@ ObsIdType __catalyst__qis__HamiltonianObs(MemRefT_double_1d *, int64_t, /*obsKey
 
 // Struct pointers arguments here represent return values.
 RESULT *__catalyst__qis__Measure(QUBIT *, int32_t);
+RESULT *__catalyst__qis__PauliMeasure(const char *, int64_t, /*qubits*/...);
 double __catalyst__qis__Expval(ObsIdType);
 double __catalyst__qis__Variance(ObsIdType);
 void __catalyst__qis__Probs(MemRefT_double_1d *, int64_t, /*qubits*/...);
