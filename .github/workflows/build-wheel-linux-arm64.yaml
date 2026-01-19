@@ -467,6 +467,9 @@ jobs:
     - name: Install Python dependencies
       run: |
         python${{ matrix.python_version }} -m pip install pytest pytest-xdist pytest-mock
+        # Install graphviz for testing graph visualization
+        sudo apt-get install -y graphviz
+        python${{ matrix.python_version }} -m pip install graphviz pydot matplotlib
 
     - name: Install PennyLane Plugins
       run: |
@@ -474,9 +477,11 @@ jobs:
         python${{ matrix.python_version }} -m pip install 'amazon-braket-pennylane-plugin>=1.31.0'
 
     - name: Install OQC client
-      if: matrix.python_version != '3.13'
       run: |
-        python${{ matrix.python_version }} -m pip install oqc-qcaas-client
+        python_minor=$(echo "${{ matrix.python_version }}" | cut -d. -f2)
+        if [ "$python_minor" -lt 13 ]; then
+          python${{ matrix.python_version }} -m pip install oqc-qcaas-client
+        fi
 
     - name: Install Catalyst
       run: |
@@ -491,9 +496,9 @@ jobs:
     - name: Run Python Pytest Tests
       run: |
         python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --backend="lightning.kokkos" -n auto -m "not xdsl"
         python${{ matrix.python_version }} -m pytest frontend/test/async_tests
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto || true
+        python${{ matrix.python_version }} -m pytest frontend/test/pytest --runbraket=LOCAL -n auto -m "not xdsl" || true
         python${{ matrix.python_version }} -m pytest frontend/test/test_oqc/oqc -n auto
 
     - name: Run Standalone Plugin Tests
@@ -501,16 +506,3 @@ jobs:
       if: env.BUILD_STANDALONE_PLUGIN == 'true'
       run: |
         python${{ matrix.python_version }} -m pytest standalone_plugin_wheel/standalone_plugin/test -n auto
-
-    - name: Install Unified Compiler Dependencies
-      run: |
-        python${{ matrix.python_version }} -m pip install xdsl~=0.55.0 xdsl-jax==0.1.1
-        # Install graphviz for testing the mlir-op-graph integration
-        sudo apt-get install -y graphviz
-        python${{ matrix.python_version }} -m pip install graphviz
-
-    - name: Run Unified Compiler Tests
-      run: |
-        python${{ matrix.python_version }} -m pytest frontend/test/pytest -n auto -m "xdsl"
-
-

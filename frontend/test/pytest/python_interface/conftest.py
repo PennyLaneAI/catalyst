@@ -17,6 +17,13 @@ from inspect import getsource
 from io import StringIO
 
 import pytest
+from xdsl.context import Context
+from xdsl.dialects import test
+from xdsl.passes import PassPipeline
+from xdsl.printer import Printer
+
+from catalyst.python_interface import Compiler, QuantumParser
+from catalyst.python_interface.conversion import parse_generic_to_xdsl_module
 
 deps_available = True
 
@@ -25,13 +32,6 @@ try:
     from filecheck.matcher import Matcher
     from filecheck.options import parse_argv_options
     from filecheck.parser import Parser, pattern_for_opts
-    from xdsl.context import Context
-    from xdsl.dialects import test
-    from xdsl.passes import PassPipeline
-    from xdsl.printer import Printer
-
-    from catalyst.python_interface import Compiler, QuantumParser
-    from catalyst.python_interface.conversion import parse_generic_to_xdsl_module
 
 except (ImportError, ModuleNotFoundError):
     deps_available = False
@@ -104,7 +104,7 @@ def run_filecheck():
             generic program string back to an xDSL module. ``False`` by default.
     """
     if not deps_available:
-        pytest.skip("Cannot run lit tests without xDSL and filecheck.")
+        pytest.skip("Cannot run xDSL lit tests without the Python 'filecheck' package.")
 
     yield _run_filecheck_impl
 
@@ -119,7 +119,7 @@ def _get_filecheck_directives(qjit_fn):
     filecheck_directives = []
     for line in src.splitlines():
         line = line.strip()
-        if line[0] != "#":
+        if not line or line[0] != "#":
             continue
 
         line = line[1:].strip()
@@ -157,7 +157,16 @@ def _run_filecheck_qjit_impl(qjit_fn, verify=False):
     )
 
     exit_code = matcher.run()
-    assert exit_code == 0, f"filecheck failed with exit code {exit_code}"
+
+    if exit_code != 0:
+        for l in str(xdsl_module).split("\n"):
+            if "quantum.custom" in l:
+                print("\033[31m" + l + "\033[0m")
+            else:
+                print(l)
+        raise AssertionError(
+            f"filecheck failed with exit code {exit_code}. See the checked xdsl_module above."
+        )
 
 
 @pytest.fixture(scope="function")
@@ -199,6 +208,6 @@ def run_filecheck_qjit():
 
     """
     if not deps_available:
-        pytest.skip("Cannot run lit tests without xDSL and filecheck.")
+        pytest.skip("Cannot run xDSL lit tests without the Python 'filecheck' package.")
 
     yield _run_filecheck_qjit_impl

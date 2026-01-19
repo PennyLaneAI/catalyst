@@ -262,6 +262,27 @@ static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length
 
 // ----- gates
 
+static const mlir::StringSet<> validPauliWords = {"X", "Y", "Z", "I"};
+
+LogicalResult PauliRotOp::verify()
+{
+    size_t pauliWordLength = getPauliProduct().size();
+    size_t numQubits = getInQubits().size();
+    if (pauliWordLength != numQubits) {
+        return emitOpError() << "length of Pauli word (" << pauliWordLength
+                             << ") and number of qubits (" << numQubits << ") must be the same";
+    }
+
+    if (!llvm::all_of(getPauliProduct(), [](mlir::Attribute attr) {
+            auto pauliStr = llvm::cast<mlir::StringAttr>(attr);
+            return validPauliWords.contains(pauliStr.getValue());
+        })) {
+        return emitOpError() << "Only \"X\", \"Y\", \"Z\", and \"I\" are valid Pauli words.";
+    }
+
+    return success();
+}
+
 LogicalResult QubitUnitaryOp::verify()
 {
     size_t dim = std::pow(2, getInQubits().size());

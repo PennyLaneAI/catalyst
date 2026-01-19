@@ -22,6 +22,7 @@ TEST_BRAKET ?= NONE
 ENABLE_ASAN ?= OFF
 TOML_SPECS ?= $(shell find ./runtime ./frontend -name '*.toml' -not -name 'pyproject.toml')
 ENABLE_FLAKY ?= OFF
+XDSL_TESTS ?= ON
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM),Linux)
@@ -59,7 +60,11 @@ FLAKY :=
 ifeq ($(ENABLE_FLAKY),ON)
 FLAKY := --force-flaky --max-runs=5 --min-passes=5
 endif
-PYTEST_FLAGS := $(PARALLELIZE) $(TEST_EXCLUDES) $(FLAKY)
+XDSL_MARKER :=
+ifeq ($(XDSL_TESTS),OFF)
+XDSL_MARKER := -m "not xdsl"
+endif
+PYTEST_FLAGS := $(PARALLELIZE) $(TEST_EXCLUDES) $(FLAKY) $(XDSL_MARKER)
 
 # TODO: Find out why we have container overflow on macOS.
 ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0,detect_container_overflow=0"

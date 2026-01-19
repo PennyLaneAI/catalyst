@@ -27,31 +27,12 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
 
+#include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumInterfaces.h"
-
-//===----------------------------------------------------------------------===//
-// Quantum trait declarations.
-//===----------------------------------------------------------------------===//
-
-namespace mlir {
-namespace OpTrait {
-
-template <typename ConcreteType>
-class UnitaryTrait : public TraitBase<ConcreteType, UnitaryTrait> {};
-
-template <typename ConcreteType>
-class HermitianTrait : public TraitBase<ConcreteType, HermitianTrait> {};
-
-} // namespace OpTrait
-} // namespace mlir
 
 //===----------------------------------------------------------------------===//
 // Quantum ops declarations.
 //===----------------------------------------------------------------------===//
 
-#include "Quantum/IR/QuantumDialect.h"
-#include "Quantum/IR/QuantumEnums.h.inc"
-#define GET_ATTRDEF_CLASSES
-#include "Quantum/IR/QuantumAttributes.h.inc"
 #define GET_OP_CLASSES
 #include "Quantum/IR/QuantumOps.h.inc"

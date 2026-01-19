@@ -16,6 +16,7 @@
 
 import platform
 from dataclasses import replace
+from functools import partial
 
 import jax
 import numpy as np
@@ -102,7 +103,7 @@ def test_grad_outside_qjit():
     x = 4.0
 
     expected = jax.grad(f)(x)
-    result = grad(f)(x)
+    result = catalyst.grad(f)(x)
 
     assert np.allclose(expected, result)
 
@@ -132,7 +133,7 @@ def test_grad_outside_qjit_argnum(argnums):
     x, y = 4.0, 4.0
 
     expected = jax.grad(f, argnums=argnums if argnums is not None else 0)(x, y)
-    result = grad(f, argnums=argnums)(x, y)
+    result = catalyst.grad(f, argnums=argnums)(x, y)
 
     assert np.allclose(expected, result)
 
@@ -1825,7 +1826,7 @@ def test_paramshift_with_gates(gate, state):
 
     dev = qml.device("lightning.qubit", wires=1)
 
-    @grad
+    @partial(grad, argnums=0)
     @qml.qnode(dev, diff_method="parameter-shift")
     def cost(x):
         gate(state, wires=0)
