@@ -106,8 +106,8 @@ struct GatesToPulsesPass : impl::GatesToPulsesPassBase<GatesToPulsesPass> {
             }
 
             builder.setInsertionPointToStart(&(op->getRegion(0).front()));
-            builder.create<ion::IonOp>(
-                op->getLoc(), IonType::get(ctx), builder.getStringAttr(ion.name),
+            ion::IonOp::create(
+                builder, op->getLoc(), IonType::get(ctx), builder.getStringAttr(ion.name),
                 builder.getF64FloatAttr(ion.mass), builder.getF64FloatAttr(ion.charge),
                 ion.position, builder.getArrayAttr(levels), builder.getArrayAttr(transitions));
 
@@ -117,7 +117,7 @@ struct GatesToPulsesPass : impl::GatesToPulsesPassBase<GatesToPulsesPass> {
             }
             // TODO: For now, we only print one phonon to be consistent with TriCal examples,
             // but we should print all of them eventually
-            builder.create<ion::ModesOp>(op->getLoc(), builder.getArrayAttr(phonons[0]));
+            ion::ModesOp::create(builder, op->getLoc(), builder.getArrayAttr(phonons[0]));
         }
 
         RewritePatternSet ionPatterns(&getContext());
