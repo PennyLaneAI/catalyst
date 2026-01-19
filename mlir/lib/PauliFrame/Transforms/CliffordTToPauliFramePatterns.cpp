@@ -84,26 +84,26 @@ GateEnum hashGate(CustomOp op)
 // Applies the gates in the order X -> Z and returns the output qubit of the Z gate.
 OpResult insertPauliOpsAfterFlush(PatternRewriter &rewriter, Location loc, FlushOp flushOp)
 {
-    auto pauliXIfOp = rewriter.create<scf::IfOp>(
-        loc, flushOp.getXParity(),
+    auto pauliXIfOp = scf::IfOp::create(
+        rewriter, loc, flushOp.getXParity(),
         [&](OpBuilder &builder, Location loc) { // then
-            auto pauliX = rewriter.create<CustomOp>(loc, "X", flushOp.getOutQubit());
-            builder.create<scf::YieldOp>(loc, pauliX.getOutQubits());
+            auto pauliX = CustomOp::create(rewriter, loc, "X", flushOp.getOutQubit());
+            scf::YieldOp::create(builder, loc, pauliX.getOutQubits());
         },
         [&](OpBuilder &builder, Location loc) { // else
-            builder.create<scf::YieldOp>(loc, flushOp.getOutQubit());
+            scf::YieldOp::create(builder, loc, flushOp.getOutQubit());
         });
 
     auto pauliXOutQubit = pauliXIfOp->getResult(0);
 
-    auto pauliZIfOp = rewriter.create<scf::IfOp>(
-        loc, flushOp.getZParity(),
+    auto pauliZIfOp = scf::IfOp::create(
+        rewriter, loc, flushOp.getZParity(),
         [&](OpBuilder &builder, Location loc) { // then
-            auto pauliZ = rewriter.create<CustomOp>(loc, "Z", pauliXOutQubit);
-            builder.create<scf::YieldOp>(loc, pauliZ.getOutQubits());
+            auto pauliZ = CustomOp::create(rewriter, loc, "Z", pauliXOutQubit);
+            scf::YieldOp::create(builder, loc, pauliZ.getOutQubits());
         },
         [&](OpBuilder &builder, Location loc) { // else
-            builder.create<scf::YieldOp>(loc, pauliXOutQubit);
+            scf::YieldOp::create(builder, loc, pauliXOutQubit);
         });
 
     return pauliZIfOp->getResult(0);
@@ -137,7 +137,7 @@ LogicalResult convertPauliGate(CustomOp op, PatternRewriter &rewriter, bool x_pa
     auto inQubits = op.getInQubits();
 
     UpdateOp updateOp =
-        rewriter.create<UpdateOp>(loc, outQubitTypes, rewriter.getBoolAttr(x_parity),
+        UpdateOp::create(rewriter, loc, outQubitTypes, rewriter.getBoolAttr(x_parity),
                                   rewriter.getBoolAttr(z_parity), inQubits);
 
     rewriter.replaceOp(op, updateOp.getOutQubits());
@@ -172,7 +172,7 @@ LogicalResult convertCliffordGate(CustomOp op, PatternRewriter &rewriter, Cliffo
     auto inQubits = op.getInQubits();
 
     UpdateWithCliffordOp updateOp =
-        rewriter.create<UpdateWithCliffordOp>(loc, outQubitTypes, gate, inQubits);
+        UpdateWithCliffordOp::create(rewriter, loc, outQubitTypes, gate, inQubits);
 
     rewriter.modifyOpInPlace(op, [&] { op->setOperands(updateOp->getResults()); });
     return success();
@@ -219,7 +219,7 @@ LogicalResult convertNonCliffordGate(CustomOp op, PatternRewriter &rewriter)
     auto outQubitType = outQubitTypes[0];
     auto inQubits = op.getInQubits();
 
-    FlushOp flushOp = rewriter.create<FlushOp>(loc, rewriter.getI1Type(), rewriter.getI1Type(),
+    FlushOp flushOp = FlushOp::create(rewriter, loc, rewriter.getI1Type(), rewriter.getI1Type(),
                                                outQubitType, inQubits[0]);
 
     auto pauliZOutQubit = insertPauliOpsAfterFlush(rewriter, loc, flushOp);
@@ -297,7 +297,7 @@ struct InitPauliRecordQbitPattern : public OpRewritePattern<AllocQubitOp> {
         LLVM_DEBUG(llvm::dbgs() << "Initializing Pauli record of qubit: " << qubit << "\n");
 
         rewriter.setInsertionPointAfter(op);
-        InitOp initOp = rewriter.create<InitOp>(loc, qubit.getType(), qubit);
+        InitOp initOp = InitOp::create(rewriter, loc, qubit.getType(), qubit);
 
         qubit.replaceAllUsesExcept(initOp.getOutQubits()[0], initOp);
         return success();
@@ -330,7 +330,7 @@ struct InitPauliRecordQregPattern : public OpRewritePattern<AllocOp> {
                                 << "\n");
 
         rewriter.setInsertionPointAfter(op);
-        InitQregOp initQregOp = rewriter.create<InitQregOp>(loc, qreg.getType(), qreg);
+        InitQregOp initQregOp = InitQregOp::create(rewriter, loc, qreg.getType(), qreg);
 
         qreg.replaceAllUsesExcept(initQregOp.getOutQreg(), initQregOp);
         return success();
@@ -365,7 +365,7 @@ struct CorrectMeasurementPattern : public OpRewritePattern<MeasureOp> {
                          << outQubit << "\n");
 
         rewriter.setInsertionPointAfter(op);
-        CorrectMeasurementOp correctMeasOp = rewriter.create<CorrectMeasurementOp>(
+        CorrectMeasurementOp correctMeasOp = CorrectMeasurementOp::create(rewriter,
             loc, mres.getType(), outQubit.getType(), mres, outQubit);
 
         mres.replaceAllUsesExcept(correctMeasOp.getOutMres(), correctMeasOp);
@@ -452,7 +452,7 @@ struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<Measuremen
         auto insertFlushOpPerQubitOrSkip = [&](unsigned int idx, const Value qubit) {
             std::optional<FlushOp> flushOp = getFlushOpAppliedToQubit(qubit);
             if (!flushOp) {
-                auto flushOp = rewriter.create<FlushOp>(
+                auto flushOp = FlushOp::create(rewriter,
                     loc, rewriter.getI1Type(), rewriter.getI1Type(), qubit.getType(), qubit);
                 auto pauliZOutQubit = insertPauliOpsAfterFlush(rewriter, loc, flushOp);
                 rewriter.modifyOpInPlace(obsOp, [&] { obsOp->setOperand(idx, pauliZOutQubit); });
