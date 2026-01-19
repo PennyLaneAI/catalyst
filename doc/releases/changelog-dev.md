@@ -15,6 +15,9 @@
 
 <h3>Breaking changes 💔</h3>
 
+* Dropped support for NumPy 1.x following its end-of-life. NumPy 2.0 or higher is now required.
+  [(#2407)](https://github.com/PennyLaneAI/catalyst/pull/2407)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
@@ -50,4 +53,5 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi
 Sengthai Heng,
 Jeffrey Kam,
-Mudit Pandey.
+Mudit Pandey,
+Andrija Paurevic.
