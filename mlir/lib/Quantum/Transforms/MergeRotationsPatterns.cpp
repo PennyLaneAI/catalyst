@@ -431,12 +431,11 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
                 mergeOpOutQubits = parentOpInQubits;
             }
             else {
-                mergeOpOutQubits = rewriter
-                                       .create<PPRotationOp>(loc,
-                                                             /*pauli_product=*/newPauliProduct,
-                                                             /*rotationKind=*/newAngle,
-                                                             /*in_qubits=*/newInQubits,
-                                                             /*condition=*/opCondition)
+                mergeOpOutQubits = PPRotationOp::create(rewriter, loc,
+                                                        /*pauli_product=*/newPauliProduct,
+                                                        /*rotationKind=*/newAngle,
+                                                        /*in_qubits=*/newInQubits,
+                                                        /*condition=*/opCondition)
                                        .getOutQubits();
             }
         }

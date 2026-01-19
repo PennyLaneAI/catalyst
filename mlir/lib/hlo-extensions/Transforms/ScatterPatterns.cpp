@@ -334,106 +334,104 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
 
         // Create a SCF for op, the initial value for args is the results
         Value resultValue =
-            rewriter
-                .create<scf::ForOp>(
-                    loc, c0, sizeAllUpdatesIndices, c1, /*iterArgsInit=*/variables.resultsValue,
-                    [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
-                        // Get the results
-                        auto results = iterArgs.front();
+            scf::ForOp::create(
+                rewriter, loc, c0, sizeAllUpdatesIndices, c1,
+                /*iterArgsInit=*/variables.resultsValue,
+                [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
+                    // Get the results
+                    auto results = iterArgs.front();
 
-                        // Extract from the all indices tensor the right configuration
-                        // with the value i as index: allUpdatesIndices[i]
-                        Value updatesIndices;
-                        if (variables.allUpdatesIndicesTensor) {
-                            updatesIndices = extractUpdateIndices(variables.allUpdatesIndicesTensor,
-                                                                  i, loc, builder);
+                    // Extract from the all indices tensor the right configuration
+                    // with the value i as index: allUpdatesIndices[i]
+                    Value updatesIndices;
+                    if (variables.allUpdatesIndicesTensor) {
+                        updatesIndices = extractUpdateIndices(variables.allUpdatesIndicesTensor, i,
+                                                              loc, builder);
+                    }
+
+                    // Scatter update
+                    SmallVector<Value> updateScatterIndices;
+                    if (variables.allUpdatesIndicesTensor) {
+                        for (int64_t index : variables.updatedScatterDims) {
+                            Value indexValue = index::ConstantOp::create(builder, loc, index);
+                            Value updateScatterIndex =
+                                tensor::ExtractOp::create(builder, loc, updatesIndices, indexValue);
+                            updateScatterIndices.push_back(updateScatterIndex);
                         }
+                    }
 
-                        // Scatter update
-                        SmallVector<Value> updateScatterIndices;
-                        if (variables.allUpdatesIndicesTensor) {
-                            for (int64_t index : variables.updatedScatterDims) {
+                    // Windows update
+                    SmallVector<Value> updateWindowsIndices;
+                    if (variables.allUpdatesIndicesTensor) {
+                        for (int64_t index : variables.updatedWindowsDims) {
+                            Value indexValue = index::ConstantOp::create(builder, loc, index);
+                            Value updateWindowsIndex =
+                                tensor::ExtractOp::create(builder, loc, updatesIndices, indexValue);
+                            updateWindowsIndices.push_back(updateWindowsIndex);
+                        }
+                    }
+
+                    // Get results indices from update indices.
+                    // The results indices are used to store the computed update of one element.
+                    SmallVector<Value> resultsIndicesValue = getResultsIndices(
+                        updateScatterIndices, updateWindowsIndices, variables.inputsShape,
+                        variables.insertedWindowsDims, variables.scatterIndices,
+                        variables.indexVectorDim, variables.scatterDimsToOperandDims, builder, loc);
+
+                    // Right now the indices are stored in an IR tensor.
+                    // We need to extract them all to pass them to the tensor.extract op.
+                    SmallVector<Value> updatesIndicesValue;
+                    if (updatesIndices) {
+                        if (isa<RankedTensorType>(updatesIndices.getType())) {
+                            RankedTensorType updateType =
+                                cast<RankedTensorType>(updatesIndices.getType());
+
+                            for (int64_t index = 0; index < updateType.getShape()[0]; ++index) {
                                 Value indexValue = index::ConstantOp::create(builder, loc, index);
-                                Value updateScatterIndex = tensor::ExtractOp::create(
-                                    builder, loc, updatesIndices, indexValue);
-                                updateScatterIndices.push_back(updateScatterIndex);
+                                Value value = tensor::ExtractOp::create(builder, loc,
+                                                                        updatesIndices, indexValue);
+                                updatesIndicesValue.push_back(value);
                             }
                         }
+                    }
+                    // Set the arguments of the update function
+                    Value updateValue = tensor::ExtractOp::create(
+                        builder, loc, variables.updatesValue, updatesIndicesValue);
+                    Value resultValue =
+                        tensor::ExtractOp::create(builder, loc, results, resultsIndicesValue);
+                    // The update function from JAX always expects tensors.
+                    // Convert f64 -> tensor<f64> if necessary
+                    if (!isa<RankedTensorType>(updateValue.getType())) {
+                        Type resultTy = RankedTensorType::get({}, updateValue.getType());
+                        updateValue =
+                            tensor::FromElementsOp::create(builder, loc, resultTy, updateValue);
+                    }
+                    if (!isa<RankedTensorType>(resultValue.getType())) {
+                        Type resultTy = RankedTensorType::get({}, resultValue.getType());
+                        resultValue =
+                            tensor::FromElementsOp::create(builder, loc, resultTy, resultValue);
+                    }
 
-                        // Windows update
-                        SmallVector<Value> updateWindowsIndices;
-                        if (variables.allUpdatesIndicesTensor) {
-                            for (int64_t index : variables.updatedWindowsDims) {
-                                Value indexValue = index::ConstantOp::create(builder, loc, index);
-                                Value updateWindowsIndex = tensor::ExtractOp::create(
-                                    builder, loc, updatesIndices, indexValue);
-                                updateWindowsIndices.push_back(updateWindowsIndex);
-                            }
-                        }
+                    // Set the arguments for the call op
+                    std::vector<Value> args{resultValue, updateValue};
 
-                        // Get results indices from update indices.
-                        // The results indices are used to store the computed update of one element.
-                        SmallVector<Value> resultsIndicesValue =
-                            getResultsIndices(updateScatterIndices, updateWindowsIndices,
-                                              variables.inputsShape, variables.insertedWindowsDims,
-                                              variables.scatterIndices, variables.indexVectorDim,
-                                              variables.scatterDimsToOperandDims, builder, loc);
-
-                        // Right now the indices are stored in an IR tensor.
-                        // We need to extract them all to pass them to the tensor.extract op.
-                        SmallVector<Value> updatesIndicesValue;
-                        if (updatesIndices) {
-                            if (isa<RankedTensorType>(updatesIndices.getType())) {
-                                RankedTensorType updateType =
-                                    cast<RankedTensorType>(updatesIndices.getType());
-
-                                for (int64_t index = 0; index < updateType.getShape()[0]; ++index) {
-                                    Value indexValue =
-                                        index::ConstantOp::create(builder, loc, index);
-                                    Value value = tensor::ExtractOp::create(
-                                        builder, loc, updatesIndices, indexValue);
-                                    updatesIndicesValue.push_back(value);
-                                }
-                            }
-                        }
-                        // Set the arguments of the update function
-                        Value updateValue = tensor::ExtractOp::create(
-                            builder, loc, variables.updatesValue, updatesIndicesValue);
-                        Value resultValue =
-                            tensor::ExtractOp::create(builder, loc, results, resultsIndicesValue);
-                        // The update function from JAX always expects tensors.
-                        // Convert f64 -> tensor<f64> if necessary
-                        if (!isa<RankedTensorType>(updateValue.getType())) {
-                            Type resultTy = RankedTensorType::get({}, updateValue.getType());
-                            updateValue =
-                                tensor::FromElementsOp::create(builder, loc, resultTy, updateValue);
-                        }
-                        if (!isa<RankedTensorType>(resultValue.getType())) {
-                            Type resultTy = RankedTensorType::get({}, resultValue.getType());
-                            resultValue =
-                                tensor::FromElementsOp::create(builder, loc, resultTy, resultValue);
-                        }
-
-                        // Set the arguments for the call op
-                        std::vector<Value> args{resultValue, updateValue};
-
-                        // Call the function that computes the update
-                        Value updated =
-                            func::CallOp::create(builder, loc, updateFnOp, args).getResult(0);
-                        // The update function from JAX always produces tensors.
-                        // Convert tensor<f64> -> f64 if necessary
-                        Value updatedExtracted;
-                        if (isa<RankedTensorType>(updated.getType())) {
-                            updatedExtracted = tensor::ExtractOp::create(builder, loc, updated);
-                        }
-                        else {
-                            updatedExtracted = updated;
-                        }
-                        // Insert the computed update in the results and replace the previous value
-                        Value res = tensor::InsertOp::create(builder, loc, updatedExtracted,
-                                                             results, resultsIndicesValue);
-                        scf::YieldOp::create(builder, loc, res);
-                    })
+                    // Call the function that computes the update
+                    Value updated =
+                        func::CallOp::create(builder, loc, updateFnOp, args).getResult(0);
+                    // The update function from JAX always produces tensors.
+                    // Convert tensor<f64> -> f64 if necessary
+                    Value updatedExtracted;
+                    if (isa<RankedTensorType>(updated.getType())) {
+                        updatedExtracted = tensor::ExtractOp::create(builder, loc, updated);
+                    }
+                    else {
+                        updatedExtracted = updated;
+                    }
+                    // Insert the computed update in the results and replace the previous value
+                    Value res = tensor::InsertOp::create(builder, loc, updatedExtracted, results,
+                                                         resultsIndicesValue);
+                    scf::YieldOp::create(builder, loc, res);
+                })
                 .getResult(0);
         // Replace the results with the updated one
         rewriter.replaceOp(op, resultValue);

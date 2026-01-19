@@ -487,7 +487,7 @@ struct SortOpPattern : public OpRewritePattern<SortOp> {
         auto firstOperandType = mlir::cast<ShapedType>(firstOperand.getType());
         int64_t inputRank = firstOperandType.getRank();
 
-        Value sortDimSize = b.createOrFold<tensor::DimOp>(
+        Value sortDimSize = tensor::DimOp::create(b, b.getLoc(),
             firstOperand, arith::ConstantIndexOp::create(b, b.getLoc(), op.getDimension()));
         int64_t staticSortDimSize = firstOperandType.getDimSize(op.getDimension());
 

@@ -62,8 +62,8 @@ void constructLayer(QECLayer &layer, IRRewriter &writer)
     OpBuilder::InsertionGuard guard(writer);
     writer.setInsertionPointAfter(layer.getOps().back());
 
-    auto layerOp = writer.create<qec::LayerOp>(
-        loc, inOperands, outResults,
+    auto layerOp = qec::LayerOp::create(
+        writer, loc, inOperands, outResults,
         [&](OpBuilder &builder, Location loc, ValueRange operands, ValueRange results) {
             // Map input operands to the layer's block arguments (block arguments are entries)
             IRMapping mapper;
