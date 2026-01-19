@@ -842,7 +842,7 @@ module @test_ppr {
     func.func @ppr(%q0 : !quantum.bit, %q1 : !quantum.bit, %q2 : !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
         // CHECK: llvm.mlir.addressof @pauli_word_XIZ : !llvm.ptr
         // CHECK: [[pauliPtr:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<4 x i8>
-        // CHECK: [[theta:%.+]] = llvm.mlir.constant(0.7
+        // CHECK: [[theta:%.+]] = llvm.mlir.constant(1.5
         // CHECK: [[numQubits:%.+]] = llvm.mlir.constant(3 : i64) : i64
         // CHECK: llvm.call @__catalyst__qis__PauliRot([[pauliPtr]], [[theta]], {{%.+}}, [[numQubits]], %arg0, %arg1, %arg2)
         %out:3 = qec.ppr ["X", "I", "Z"](4) %q0, %q1, %q2 : !quantum.bit, !quantum.bit, !quantum.bit
@@ -859,8 +859,10 @@ module @test_ppr_arbitrary {
     // CHECK: llvm.mlir.global internal constant @pauli_word_XZ("XZ\00")
     func.func @ppr_arbitrary(%q0 : !quantum.bit, %q1 : !quantum.bit, %theta : f64) -> (!quantum.bit, !quantum.bit) {
         // CHECK: [[pauliPtr:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<3 x i8>
+        // CHECK: [[CONST2:%.+]] = llvm.mlir.constant(2.000000e+00 : f64) : f64
+        // CHECK: [[MUL:%.+]] = llvm.fmul %arg2, [[CONST2]] : f64
         // CHECK: [[numQubits:%.+]] = llvm.mlir.constant(2 : i64) : i64
-        // CHECK: llvm.call @__catalyst__qis__PauliRot([[pauliPtr]], %arg2, {{%.+}}, [[numQubits]], %arg0, %arg1)
+        // CHECK: llvm.call @__catalyst__qis__PauliRot([[pauliPtr]], [[MUL]], {{%.+}}, [[numQubits]], %arg0, %arg1)
         %out:2 = qec.ppr.arbitrary ["X", "Z"](%theta) %q0, %q1 : !quantum.bit, !quantum.bit
         return %out#0, %out#1 : !quantum.bit, !quantum.bit
     }
