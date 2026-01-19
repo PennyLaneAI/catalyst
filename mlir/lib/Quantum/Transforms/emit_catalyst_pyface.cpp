@@ -137,7 +137,7 @@ void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewrit
         convertFunctionTypeCatalystWrapper(rewriter, functionType, hasReturns, hasInputs);
 
     Location loc = op.getLoc();
-    auto wrapperFuncOp = rewriter.create<LLVM::LLVMFuncOp>(
+    auto wrapperFuncOp = LLVM::LLVMFuncOp::create(rewriter,
         loc, llvm::formatv("_catalyst_pyface_{0}", nameWithoutPrefix).str(), wrapperFuncType,
         LLVM::Linkage::External, /*dsoLocal*/ false,
         /*cconv*/ LLVM::CConv::C);
@@ -158,17 +158,17 @@ void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewrit
     if (hasInputs) {
         Value arg = wrapperFuncOp.getArgument(1);
         auto argType = inputType;
-        Value structOfMemrefs = rewriter.create<LLVM::LoadOp>(loc, argType, arg);
+        Value structOfMemrefs = LLVM::LoadOp::create(rewriter, loc, argType, arg);
 
         for (size_t idx = 0; idx < params.size(); idx++) {
-            Value pointer = rewriter.create<LLVM::ExtractValueOp>(loc, structOfMemrefs, idx);
+            Value pointer = LLVM::ExtractValueOp::create(rewriter, loc, structOfMemrefs, idx);
             args.push_back(pointer);
         }
     }
 
-    auto call = rewriter.create<LLVM::CallOp>(loc, op, args);
+    auto call = LLVM::CallOp::create(rewriter, loc, op, args);
 
-    rewriter.create<LLVM::ReturnOp>(loc, call.getResults());
+    LLVM::ReturnOp::create(rewriter, loc, call.getResults());
 }
 
 struct EmitCatalystPyInterfaceTransform : public OpRewritePattern<LLVM::LLVMFuncOp> {

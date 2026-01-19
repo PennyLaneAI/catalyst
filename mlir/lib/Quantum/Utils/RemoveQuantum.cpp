@@ -73,18 +73,18 @@ void replaceQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewrite
             if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
                 auto shape = tensorType.getShape();
                 auto elemType = tensorType.getElementType();
-                auto res = rewriter.create<tensor::EmptyOp>(loc, shape, elemType);
+                auto res = tensor::EmptyOp::create(rewriter, loc, shape, elemType);
                 results.push_back(res);
             }
             else {
                 if (type.isInteger()) {
-                    auto res = rewriter.create<arith::ConstantOp>(loc, type,
-                                                                  rewriter.getIntegerAttr(type, 0));
+                    auto res = arith::ConstantOp::create(rewriter, loc, type,
+                                                          rewriter.getIntegerAttr(type, 0));
                     results.push_back(res);
                 }
                 else if (type.isIntOrFloat()) {
-                    auto res = rewriter.create<arith::ConstantOp>(loc, type,
-                                                                  rewriter.getFloatAttr(type, 0.0));
+                    auto res = arith::ConstantOp::create(rewriter, loc, type,
+                                                         rewriter.getFloatAttr(type, 0.0));
                     results.push_back(res);
                 }
                 else {

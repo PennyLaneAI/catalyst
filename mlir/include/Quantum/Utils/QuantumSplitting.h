@@ -66,7 +66,7 @@ class AugmentedCircuitGenerator {
     template <typename IndexingOp> void cacheDynamicWire(IndexingOp op, mlir::OpBuilder &builder)
     {
         if (!op.getIdxAttr().has_value()) {
-            builder.create<ListPushOp>(op.getLoc(), oldToCloned.lookupOrDefault(op.getIdx()),
+            ListPushOp::create(builder, op.getLoc(), oldToCloned.lookupOrDefault(op.getIdx()),
                                        cache.wireVector);
         }
     }

@@ -52,7 +52,7 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(insert_after_gate);
         quantum::CustomOp newGate =
-            builder.create<quantum::CustomOp>(loc,
+            quantum::CustomOp::create(builder, loc,
                                               /*out_qubits=*/mlir::TypeRange({outQubit.getType()}),
                                               /*out_ctrl_qubits=*/mlir::TypeRange(),
                                               /*params=*/mlir::ValueRange(),
@@ -74,7 +74,7 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(insert_after_gate);
         quantum::CustomOp newGate =
-            builder.create<quantum::CustomOp>(loc,
+            quantum::CustomOp::create(builder, loc,
                                               /*out_qubits=*/mlir::TypeRange({inQubit.getType()}),
                                               /*out_ctrl_qubits=*/mlir::TypeRange(),
                                               /*params=*/mlir::ValueRange(),
@@ -97,7 +97,7 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
     {
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(insert_after_gate);
-        quantum::CustomOp newGate = builder.create<quantum::CustomOp>(
+        quantum::CustomOp newGate = quantum::CustomOp::create(builder,
             loc,
             /*out_qubits=*/mlir::TypeRange({controlOut.getType(), targetOut.getType()}),
             /*out_ctrl_qubits=*/mlir::TypeRange({}),
@@ -120,7 +120,7 @@ struct DisentangleSWAPPass : public impl::DisentangleSWAPPassBase<DisentangleSWA
     {
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(insert_after_gate);
-        quantum::CustomOp newGate = builder.create<quantum::CustomOp>(
+        quantum::CustomOp newGate = quantum::CustomOp::create(builder,
             loc,
             /*out_qubits=*/mlir::TypeRange({controlIn.getType(), targetIn.getType()}),
             /*out_ctrl_qubits=*/mlir::TypeRange({}),

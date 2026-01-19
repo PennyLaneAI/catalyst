@@ -82,7 +82,7 @@ void disentangleCNOTs(FunctionOpInterface &func, bool verbose)
             else {
                 builder.setInsertionPoint(op);
                 quantum::CustomOp xgate =
-                    builder.create<quantum::CustomOp>(loc, /*gate_name=*/"PauliX",
+                    quantum::CustomOp::create(builder, loc, /*gate_name=*/"PauliX",
                                                       /*in_qubits=*/mlir::ValueRange({targetIn}));
                 builder.replaceAllUsesWith(targetOut, xgate->getResult(0));
                 builder.eraseOp(op);
@@ -111,7 +111,7 @@ void disentangleCNOTs(FunctionOpInterface &func, bool verbose)
             else {
                 builder.setInsertionPoint(op);
                 quantum::CustomOp zgate =
-                    builder.create<quantum::CustomOp>(loc, /*gate_name=*/"PauliZ",
+                    quantum::CustomOp::create(builder, loc, /*gate_name=*/"PauliZ",
                                                       /*in_qubits=*/mlir::ValueRange({controlIn}));
                 builder.replaceAllUsesWith(controlOut, zgate->getResult(0));
                 builder.eraseOp(op);
