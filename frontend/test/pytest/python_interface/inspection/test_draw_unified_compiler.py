@@ -14,20 +14,31 @@
 """Unit test module for the draw function in the unified compiler inspection module."""
 # pylint: disable=unnecessary-lambda, protected-access, wrong-import-position
 
+from importlib.util import find_spec
+from shutil import which
+
 import jax
-import pytest
-
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-matplotlib = pytest.importorskip("matplotlib")
-
 import pennylane as qml
+import pytest
 
 from catalyst.python_interface.inspection import draw, draw_graph
 from catalyst.python_interface.transforms import (
     iterative_cancel_inverses_pass,
     merge_rotations_pass,
 )
+
+pytestmark = pytest.mark.xdsl
+
+
+@pytest.fixture(scope="function")
+def skip_no_graph_deps():
+    """Fixture to skip tests for catalyst.draw_graph if dependencies aren't installed."""
+    if which("dot") is None:
+        pytest.skip(reason="Graphviz isn't installed.")
+    if find_spec("matplotlib") is None:
+        pytest.skip(reason="matplotlib isn't installed.")
+    if find_spec("pydot") is None:
+        pytest.skip(reason="pydot isn't installed.")
 
 
 @pytest.mark.usefixtures("use_capture")
@@ -537,7 +548,7 @@ class TestDraw:
             print(draw(circuit)())
 
 
-@pytest.mark.usefixtures("use_both_frontend")
+@pytest.mark.usefixtures("use_both_frontend", "skip_no_graph_deps")
 class TestDrawGraph:
     """Tests the `draw_graph` frontend."""
 
@@ -611,6 +622,8 @@ class TestDrawGraph:
 
     def test_return_types(self):
         """Tests the return types of the function without crashing CI."""
+        # pylint: disable=import-outside-toplevel
+        import matplotlib
 
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(qml.device("null.qubit", wires=2))

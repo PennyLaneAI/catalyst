@@ -35,17 +35,12 @@ class TestSample:
     def test_sample_on_0qbits(self):
         """Test sample on 0 qubits."""
 
-        # TODO: try set_shots after capture work is completed
-        with pytest.warns(
-            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
-        ):
-            device = qml.device("lightning.qubit", wires=0, shots=10)
+        device = qml.device("lightning.qubit", wires=0)
 
-            @qjit
-            @qml.set_shots(10)
-            @qml.qnode(device)
-            def sample_0qbit():
-                return qml.sample()
+        @qjit
+        @qml.qnode(device, shots=10)
+        def sample_0qbit():
+            return qml.sample()
 
         expected = np.empty(shape=(10, 0), dtype=int)
         observed = sample_0qbit()
@@ -54,17 +49,13 @@ class TestSample:
     def test_sample_on_1qbit(self, backend):
         """Test sample on 1 qubit."""
 
-        # TODO: try set_shots after capture work is completed
-        with pytest.warns(
-            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
-        ):
-            device = qml.device(backend, wires=1, shots=1000)
+        device = qml.device(backend, wires=1)
 
-            @qjit
-            @qml.qnode(device)
-            def sample_1qbit(x: float):
-                qml.RX(x, wires=0)
-                return qml.sample()
+        @qjit
+        @qml.qnode(device, shots=1000)
+        def sample_1qbit(x: float):
+            qml.RX(x, wires=0)
+            return qml.sample()
 
         expected = np.array([[0]] * 1000)
         observed = sample_1qbit(0.0)
@@ -77,18 +68,14 @@ class TestSample:
     def test_sample_on_2qbits(self, backend):
         """Test sample on 2 qubits."""
 
-        # TODO: try set_shots after capture work is completed
-        with pytest.warns(
-            qml.exceptions.PennyLaneDeprecationWarning, match="shots on device is deprecated"
-        ):
-            device = qml.device(backend, wires=2, shots=1000)
+        device = qml.device(backend, wires=2)
 
-            @qjit
-            @qml.qnode(device)
-            def sample_2qbits(x: float):
-                qml.RX(x, wires=0)
-                qml.RY(x, wires=1)
-                return qml.sample()
+        @qjit
+        @qml.qnode(device, shots=1000)
+        def sample_2qbits(x: float):
+            qml.RX(x, wires=0)
+            qml.RY(x, wires=1)
+            return qml.sample()
 
         expected = np.array([[0, 0]] * 1000)
         observed = sample_2qbits(0.0)
@@ -133,7 +120,7 @@ class TestCounts:
         @qml.set_shots(10)
         @qml.qnode(qml.device("lightning.qubit", wires=0))
         def counts_0qbit():
-            return qml.counts()
+            return qml.counts(all_outcomes=True)
 
         expected = [np.array([0]), np.array([10])]
         observed = counts_0qbit()
@@ -148,7 +135,7 @@ class TestCounts:
         @qml.qnode(qml.device(backend, wires=1), mcm_method=mcm_method)
         def counts_1qbit(x: float):
             qml.RX(x, wires=0)
-            return qml.counts()
+            return qml.counts(all_outcomes=True)
 
         expected = [np.array([0, 1]), np.array([1000, 0])]
         observed = counts_1qbit(0.0)
@@ -168,7 +155,7 @@ class TestCounts:
         def counts_2qbit(x: float):
             qml.RX(x, wires=0)
             qml.RY(x, wires=1)
-            return qml.counts()
+            return qml.counts(all_outcomes=True)
 
         expected = [np.array([0, 1, 2, 3]), np.array([1000, 0, 0, 0])]
         observed = counts_2qbit(0.0)
@@ -187,7 +174,7 @@ class TestCounts:
         def counts_2qbit(x: float, y: float):
             qml.RX(x, wires=0)
             qml.RX(y, wires=1)
-            return qml.counts()
+            return qml.counts(all_outcomes=True)
 
         expected = [np.array([0, 1, 2, 3]), np.array([0, 0, 1000, 0])]
         observed = counts_2qbit(np.pi, 0)
@@ -225,7 +212,7 @@ class TestCounts:
         @qml.qnode(qml.device("lightning.qubit"), mcm_method=mcm_method)
         def counts_dynamic_wires():
             qml.Hadamard(wires=1)
-            return qml.counts()
+            return qml.counts(all_outcomes=True)
 
         if qml.capture.enabled():
             with pytest.raises(
@@ -1306,7 +1293,7 @@ class TestNullQubitMeasurements:
         def circuit_counts():
             for i in range(n_qubits):
                 qml.Hadamard(wires=i)
-            return qml.counts()
+            return qml.counts(all_outcomes=True)
 
         # Explicitly define expected result for counts since qjit outputs results in different
         # format than native PennyLane
@@ -1327,7 +1314,7 @@ class TestNullQubitMeasurements:
         def circuit_counts():
             qml.Hadamard(wires=0)
             qml.Hadamard(wires=1)
-            return qml.counts(wires=0), qml.counts(wires=1)
+            return qml.counts(wires=0, all_outcomes=True), qml.counts(wires=1, all_outcomes=True)
 
         # Explicitly define expected result for counts since qjit outputs results in different
         # format than native PennyLane

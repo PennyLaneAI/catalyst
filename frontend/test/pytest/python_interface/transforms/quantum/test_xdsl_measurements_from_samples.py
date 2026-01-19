@@ -843,9 +843,8 @@ class TestMeasurementsFromSamplesIntegration:
         @measurements_from_samples_pass
         @partial(
             qml.transforms.decompose,
-            gate_set={"X", "Y", "Z", "S", "H", "CNOT", "RZ", "GlobalPhase"},
+            gate_set={"X", "Y", "Z", "S", "H", "CNOT", "RZ", "RY", "GlobalPhase"},
         )
-        @qml.set_shots(1000)
         @qml.qnode(dev, shots=1000)
         def circuit():
             qml.CRX(0.1, wires=[0, 1])

@@ -638,7 +638,7 @@ def test_non_probs_measurement_with_dynamic_wires(backend, measurement_fn, shots
     ):
 
         @qjit
-        @qml.qnode(qml.device(backend, wires=1, shots=shots))
+        @qml.qnode(qml.device(backend, wires=1), shots=shots)
         def circuit():
             with qml.allocate(1) as q:
                 qml.X(q[0])
