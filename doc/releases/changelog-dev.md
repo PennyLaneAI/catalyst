@@ -13,6 +13,10 @@
   program outputs are typically probabilistic and statistics produced by measurement processes are
   conditional on the selected decision tree path.
 
+* Two new verifiers were added to the `quantum.paulirot` operation. They verify that the Pauli word
+  length and the number of qubit operands are the same, and that all of the Pauli words are legal.
+  [(#2405)](https://github.com/PennyLaneAI/catalyst/pull/2405)
+
 <h3>Breaking changes 💔</h3>
 
 * Dropped support for NumPy 1.x following its end-of-life. NumPy 2.0 or higher is now required.
@@ -50,8 +54,9 @@
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
-Ali Asadi
+Ali Asadi,
 Sengthai Heng,
 Jeffrey Kam,
 Mudit Pandey,
-Andrija Paurevic.
+Andrija Paurevic,
+Paul Haochen Wang.
