@@ -29,8 +29,9 @@
   definitions in separate file scopes.
   [(#2329)](https://github.com/PennyLaneAI/catalyst/pull/2329)
 
-* Added `PauliMeasure` and `PauliRot` to the runtime CAPI and QuantumDevice C++ API.
+* Added lowering of `qec.ppm`, `qec.ppr`, and `quantum.paulirot` to the runtime CAPI and QuantumDevice C++ API.
   [(#2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
+  [(#2413)](https://github.com/PennyLaneAI/catalyst/pull/2413)
 
 * Added LLVM conversion patterns to lower QEC dialect operations to their corresponding runtime
   CAPI calls.
