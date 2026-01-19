@@ -126,8 +126,8 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
                 hForResult = tensor::SplatOp::create(rewriter, loc, hForResult, gradientTy);
             }
             else if (isGradientTensor) {
-                Value outTensor = tensor::EmptyOp::create(rewriter, loc, gradientShape, baseResultTy,
-                                                                   dynamicDimSizes);
+                Value outTensor = tensor::EmptyOp::create(rewriter, loc, gradientShape,
+                                                          baseResultTy, dynamicDimSizes);
                 hForResult =
                     linalg::FillOp::create(rewriter, loc, hForResult, outTensor).getResult(0);
             }
@@ -169,18 +169,20 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
 
                     auto cloneOp = bufferization::CloneOp::create(rewriter, loc, toBufferOp);
 
-                    auto toTensorOp = bufferization::ToTensorOp::create(rewriter,
-                        loc, memref::getTensorTypeFromMemRefType(cloneOp.getOutput().getType()),
-                        cloneOp, true);
+                    auto toTensorOp = bufferization::ToTensorOp::create(
+                        rewriter, loc,
+                        memref::getTensorTypeFromMemRefType(cloneOp.getOutput().getType()), cloneOp,
+                        true);
 
                     auto diffArgCopy = toTensorOp.getResult();
 
-                    Value diffArgElem = tensor::ExtractOp::create(rewriter,
-                        loc, diffArgCopy, tensorIndices.take_back(operandRank));
+                    Value diffArgElem = tensor::ExtractOp::create(
+                        rewriter, loc, diffArgCopy, tensorIndices.take_back(operandRank));
                     Value diffArgElemShifted =
                         arith::AddFOp::create(rewriter, loc, diffArgElem, hForOperand);
-                    Value diffArgShifted = tensor::InsertOp::create(rewriter,
-                        loc, diffArgElemShifted, diffArgCopy, tensorIndices.take_back(operandRank));
+                    Value diffArgShifted =
+                        tensor::InsertOp::create(rewriter, loc, diffArgElemShifted, diffArgCopy,
+                                                 tensorIndices.take_back(operandRank));
 
                     std::vector<Value> callArgsForward(callArgs.begin(), callArgs.end());
                     callArgsForward[diffArgIdx] = diffArgShifted;
@@ -191,15 +193,15 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
 
                     Value result = arith::SubFOp::create(rewriter, loc, callResForward, callRes);
                     if (isResultTensor) {
-                        result = tensor::ExtractOp::create(rewriter,
-                            loc, result, tensorIndices.take_front(resultRank));
+                        result = tensor::ExtractOp::create(rewriter, loc, result,
+                                                           tensorIndices.take_front(resultRank));
                     }
 
                     tensor::YieldOp::create(rewriter, loc, result);
                 };
 
                 gradient = tensor::GenerateOp::create(rewriter, loc, gradientTy, dynamicDimSizes,
-                                                               bodyBuilder);
+                                                      bodyBuilder);
             }
 
             gradient = arith::DivFOp::create(rewriter, loc, gradient, hForResult);

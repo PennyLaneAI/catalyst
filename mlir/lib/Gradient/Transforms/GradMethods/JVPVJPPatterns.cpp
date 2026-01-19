@@ -95,9 +95,9 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
     auto fCallOp = func::CallOp::create(rewriter, loc, calleeOp, calleeOperands);
 
     auto gradOp = GradOp::create(rewriter, loc, grad_result_types, op.getMethod(), op.getCallee(),
-                                          calleeOperands, op.getDiffArgIndicesAttr(),
-                                          op.getFiniteDiffParamAttr(), /*arg_attrs=*/nullptr,
-                                          /*res_attrs=*/nullptr);
+                                 calleeOperands, op.getDiffArgIndicesAttr(),
+                                 op.getFiniteDiffParamAttr(), /*arg_attrs=*/nullptr,
+                                 /*res_attrs=*/nullptr);
 
     std::vector<Value> einsumResults;
     for (size_t nout = 0; nout < funcResultTypes.size(); nout++) {
@@ -158,8 +158,9 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
             }
             else {
                 assert(acc.value().getType() == res.getType());
-                auto addOp = linalg::AddOp::create(rewriter,
-                    loc, res.getType(), ValueRange{acc.value(), res}, ValueRange{acc.value()});
+                auto addOp =
+                    linalg::AddOp::create(rewriter, loc, res.getType(),
+                                          ValueRange{acc.value(), res}, ValueRange{acc.value()});
                 acc = addOp.getResultTensors()[0];
             }
         }
@@ -213,9 +214,9 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
     auto fCallOp = func::CallOp::create(rewriter, loc, calleeOp, calleeOperands);
 
     auto gradOp = GradOp::create(rewriter, loc, grad_result_types, op.getMethod(), op.getCallee(),
-                                          calleeOperands, op.getDiffArgIndicesAttr(),
-                                          op.getFiniteDiffParamAttr(), /*arg_attrs=*/nullptr,
-                                          /*res_attrs=*/nullptr);
+                                 calleeOperands, op.getDiffArgIndicesAttr(),
+                                 op.getFiniteDiffParamAttr(), /*arg_attrs=*/nullptr,
+                                 /*res_attrs=*/nullptr);
 
     std::vector<Value> einsumResults;
     for (size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {
@@ -272,8 +273,9 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
             else {
                 assert(acc.value().getType() == res.getType());
 
-                auto addOp = linalg::AddOp::create(rewriter,
-                    loc, res.getType(), ValueRange{acc.value(), res}, ValueRange{acc.value()});
+                auto addOp =
+                    linalg::AddOp::create(rewriter, loc, res.getType(),
+                                          ValueRange{acc.value(), res}, ValueRange{acc.value()});
                 acc = addOp.getResultTensors()[0];
             }
         }

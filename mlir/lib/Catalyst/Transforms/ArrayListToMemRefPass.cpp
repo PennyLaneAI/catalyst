@@ -81,8 +81,9 @@ struct ArrayListBuilder {
             Value two = arith::ConstantIndexOp::create(thenBuilder, loc, 2);
             Value newCapacity = arith::MulIOp::create(thenBuilder, loc, capacityVal, two);
             Value oldElements = memref::LoadOp::create(thenBuilder, loc, elementsField);
-            Value newElements = memref::ReallocOp::create(
-                thenBuilder, loc, cast<MemRefType>(oldElements.getType()), oldElements, newCapacity);
+            Value newElements =
+                memref::ReallocOp::create(thenBuilder, loc, cast<MemRefType>(oldElements.getType()),
+                                          oldElements, newCapacity);
             memref::StoreOp::create(thenBuilder, loc, newElements, elementsField);
             memref::StoreOp::create(thenBuilder, loc, newCapacity, capacityField);
             scf::YieldOp::create(thenBuilder, loc);
@@ -147,9 +148,9 @@ struct ArrayListBuilder {
 
     Value emitPop(Location loc, OpBuilder &builder, FlatSymbolRefAttr popFn) const
     {
-        auto callOp = func::CallOp::create(
-            builder, loc, popFn, /*results=*/elementType,
-            /*operands=*/ValueRange{dataField, sizeField, capacityField});
+        auto callOp =
+            func::CallOp::create(builder, loc, popFn, /*results=*/elementType,
+                                 /*operands=*/ValueRange{dataField, sizeField, capacityField});
         return callOp.getResult(0);
     }
 };

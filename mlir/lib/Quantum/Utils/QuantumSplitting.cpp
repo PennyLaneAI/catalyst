@@ -264,8 +264,8 @@ void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp, OpBuilder &buil
         ListPushOp::create(builder, forOp.getLoc(), oldToCloned.lookupOrDefault(param), tape);
     }
 
-    auto newForOp = scf::ForOp::create(builder,
-        forOp.getLoc(), oldToCloned.lookupOrDefault(forOp.getLowerBound()),
+    auto newForOp = scf::ForOp::create(
+        builder, forOp.getLoc(), oldToCloned.lookupOrDefault(forOp.getLowerBound()),
         oldToCloned.lookupOrDefault(forOp.getUpperBound()),
         oldToCloned.lookupOrDefault(forOp.getStep()), classicalInits,
         [&](OpBuilder &builder, Location loc, Value inductionVar, ValueRange iterArgs) {
@@ -322,13 +322,13 @@ void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder &
         };
     };
 
-    auto newWhileOp = scf::WhileOp::create(
-        builder, whileOp.getLoc(), classicalResultTypes, classicalInits,
-        getRegionBuilder(whileOp.getBefore(), /*incrementCounter=*/false),
-        // We only care about the number of times the "After" region executes. The frontend
-        // does not support putting quantum operations in the "Before" region, which only
-        // computes the iteration condition.
-        getRegionBuilder(whileOp.getAfter(), /*incrementCounter=*/true));
+    auto newWhileOp =
+        scf::WhileOp::create(builder, whileOp.getLoc(), classicalResultTypes, classicalInits,
+                             getRegionBuilder(whileOp.getBefore(), /*incrementCounter=*/false),
+                             // We only care about the number of times the "After" region executes.
+                             // The frontend does not support putting quantum operations in the
+                             // "Before" region, which only computes the iteration condition.
+                             getRegionBuilder(whileOp.getAfter(), /*incrementCounter=*/true));
 
     mapResults(whileOp, newWhileOp, argIdxMapping);
 
@@ -357,7 +357,7 @@ void AugmentedCircuitGenerator::visitOperation(scf::IfOp ifOp, OpBuilder &builde
 
     auto newIfOp =
         scf::IfOp::create(builder, ifOp.getLoc(), condition, getRegionBuilder(ifOp.getThenRegion()),
-                                  getRegionBuilder(ifOp.getElseRegion()));
+                          getRegionBuilder(ifOp.getElseRegion()));
 
     mapResults(ifOp, newIfOp, argIdxMapping);
 }

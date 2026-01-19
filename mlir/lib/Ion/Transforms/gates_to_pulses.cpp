@@ -106,10 +106,10 @@ struct GatesToPulsesPass : impl::GatesToPulsesPassBase<GatesToPulsesPass> {
             }
 
             builder.setInsertionPointToStart(&(op->getRegion(0).front()));
-            ion::IonOp::create(
-                builder, op->getLoc(), IonType::get(ctx), builder.getStringAttr(ion.name),
-                builder.getF64FloatAttr(ion.mass), builder.getF64FloatAttr(ion.charge),
-                ion.position, builder.getArrayAttr(levels), builder.getArrayAttr(transitions));
+            ion::IonOp::create(builder, op->getLoc(), IonType::get(ctx),
+                               builder.getStringAttr(ion.name), builder.getF64FloatAttr(ion.mass),
+                               builder.getF64FloatAttr(ion.charge), ion.position,
+                               builder.getArrayAttr(levels), builder.getArrayAttr(transitions));
 
             SmallVector<Attribute> phonons;
             for (const Phonon &phonon : dataManager.getPhononParams()) {

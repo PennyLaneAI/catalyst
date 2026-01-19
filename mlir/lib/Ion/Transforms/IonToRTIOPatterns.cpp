@@ -167,8 +167,8 @@ struct ParallelProtocolToRTIOPattern : public OpConversionPattern<ion::ParallelP
         SmallVector<Value> results;
         for (Value result : op.getResults()) {
             // unrealized conversion cast sync event to result type
-            auto event =
-                UnrealizedConversionCastOp::create(rewriter, loc, result.getType(), outputSyncEvent);
+            auto event = UnrealizedConversionCastOp::create(rewriter, loc, result.getType(),
+                                                            outputSyncEvent);
             results.push_back(event.getResult(0));
         }
 
@@ -236,7 +236,8 @@ struct PulseToRTIOPattern : public OpConversionPattern<ion::PulseOp> {
         double frequency = calculateFrequency(transitionIndex, detuning, ionInfo);
         Value freqValue =
             arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(frequency));
-        Value phaseValue = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(phase));
+        Value phaseValue =
+            arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(phase));
 
         // Convert the qubit to a channel
         ArrayAttr qualifiers = rewriter.getArrayAttr({rewriter.getI64IntegerAttr(transitionIndex)});
@@ -262,7 +263,7 @@ struct PulseToRTIOPattern : public OpConversionPattern<ion::PulseOp> {
         // Create rtio.pulse
         auto eventType = rtio::EventType::get(ctx);
         Value event = rtio::RTIOPulseOp::create(rewriter, loc, eventType, channel, duration,
-                                                         freqValue, phaseValue, nullptr);
+                                                freqValue, phaseValue, nullptr);
         rewriter.replaceOp(op, event);
 
         return success();

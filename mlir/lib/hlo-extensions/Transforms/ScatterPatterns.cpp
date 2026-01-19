@@ -354,8 +354,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
                         if (variables.allUpdatesIndicesTensor) {
                             for (int64_t index : variables.updatedScatterDims) {
                                 Value indexValue = index::ConstantOp::create(builder, loc, index);
-                                Value updateScatterIndex = tensor::ExtractOp::create(builder,
-                                    loc, updatesIndices, indexValue);
+                                Value updateScatterIndex = tensor::ExtractOp::create(
+                                    builder, loc, updatesIndices, indexValue);
                                 updateScatterIndices.push_back(updateScatterIndex);
                             }
                         }
@@ -365,8 +365,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
                         if (variables.allUpdatesIndicesTensor) {
                             for (int64_t index : variables.updatedWindowsDims) {
                                 Value indexValue = index::ConstantOp::create(builder, loc, index);
-                                Value updateWindowsIndex = tensor::ExtractOp::create(builder,
-                                    loc, updatesIndices, indexValue);
+                                Value updateWindowsIndex = tensor::ExtractOp::create(
+                                    builder, loc, updatesIndices, indexValue);
                                 updateWindowsIndices.push_back(updateWindowsIndex);
                             }
                         }
@@ -390,15 +390,15 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
                                 for (int64_t index = 0; index < updateType.getShape()[0]; ++index) {
                                     Value indexValue =
                                         index::ConstantOp::create(builder, loc, index);
-                                    Value value = tensor::ExtractOp::create(builder,
-                                        loc, updatesIndices, indexValue);
+                                    Value value = tensor::ExtractOp::create(
+                                        builder, loc, updatesIndices, indexValue);
                                     updatesIndicesValue.push_back(value);
                                 }
                             }
                         }
                         // Set the arguments of the update function
-                        Value updateValue = tensor::ExtractOp::create(builder,
-                            loc, variables.updatesValue, updatesIndicesValue);
+                        Value updateValue = tensor::ExtractOp::create(
+                            builder, loc, variables.updatesValue, updatesIndicesValue);
                         Value resultValue =
                             tensor::ExtractOp::create(builder, loc, results, resultsIndicesValue);
                         // The update function from JAX always expects tensors.
@@ -430,8 +430,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
                             updatedExtracted = updated;
                         }
                         // Insert the computed update in the results and replace the previous value
-                        Value res = tensor::InsertOp::create(builder, loc, updatedExtracted, results,
-                                                                     resultsIndicesValue);
+                        Value res = tensor::InsertOp::create(builder, loc, updatedExtracted,
+                                                             results, resultsIndicesValue);
                         scf::YieldOp::create(builder, loc, res);
                     })
                 .getResult(0);
@@ -564,7 +564,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
 
         builder.setInsertionPointToEnd(funcBody);
         func::ReturnOp::create(builder, loc, originalTerminator->getResultTypes(),
-                                       originalTerminator->getOperands());
+                               originalTerminator->getOperands());
         rewriter.eraseOp(originalTerminator);
         return SymbolRefAttr::get(ctx, funcName);
     }
@@ -720,8 +720,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
             1, scatterIndicesTensorType, offsets, sizes, strides);
 
         return tensor::ExtractSliceOp::create(builder, loc, resultType, scatterIndices, dynOffsets,
-                                                      dynSizes, dynStrides, offsets, sizes,
-                                                      strides);
+                                              dynSizes, dynStrides, offsets, sizes, strides);
     }
     // From a index value i it extracts the update indices from the tensor of values.
     Value extractUpdateIndices(Value allUpdatesIndicesTensor, Value i, Location loc,
@@ -750,8 +749,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
             rank - 1, updateType, offsets, sizes, strides);
 
         return tensor::ExtractSliceOp::create(builder, loc, resultType, allUpdatesIndicesTensor,
-                                                      dynOffsets, dynSizes, dynStrides, offsets,
-                                                      sizes, strides);
+                                              dynOffsets, dynSizes, dynStrides, offsets, sizes,
+                                              strides);
     }
 };
 

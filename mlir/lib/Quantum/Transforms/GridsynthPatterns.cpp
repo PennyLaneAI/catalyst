@@ -142,7 +142,7 @@ void populatePPRBasisSwitchCases(PatternRewriter &rewriter, Location loc,
         uint16_t finalRotationArg = static_cast<uint16_t>(signedRotation);
 
         auto pprOp = catalyst::qec::PPRotationOp::create(builder, loc, pauliWord, finalRotationArg,
-                                                                 ValueRange{currentQbit}, nullptr);
+                                                         ValueRange{currentQbit}, nullptr);
 
         return pprOp->getResult(0);
     };
@@ -266,8 +266,9 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
 
         // Create the switch operation inside the loop
         DenseI64ArrayAttr caseValuesAttr = rewriter.getDenseI64ArrayAttr(caseValues);
-        auto switchOp = scf::IndexSwitchOp::create(
-            rewriter, loc, TypeRange{qbitType}, currentGateIndex, caseValuesAttr, caseValues.size());
+        auto switchOp =
+            scf::IndexSwitchOp::create(rewriter, loc, TypeRange{qbitType}, currentGateIndex,
+                                       caseValuesAttr, caseValues.size());
 
         // Populate Switch Cases
         if (pprBasis) {
@@ -335,7 +336,7 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
 
     // Call GetSize
     auto callGetSizeOp = func::CallOp::create(rewriter, loc, extFuncs.getSize,
-                                                       ValueRange{angle, epsilonVal, pprBasisVal});
+                                              ValueRange{angle, epsilonVal, pprBasisVal});
     Value num_gates = callGetSizeOp->getResult(0);
 
     // Call GetGates
@@ -344,11 +345,11 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
     Value gatesMemref = memref::AllocOp::create(rewriter, loc, gatesMemRefType, num_gates);
 
     func::CallOp::create(rewriter, loc, extFuncs.getGates,
-                                  ValueRange{gatesMemref, angle, epsilonVal, pprBasisVal});
+                         ValueRange{gatesMemref, angle, epsilonVal, pprBasisVal});
 
     // Call GetPhase
     auto callGetPhaseOp = func::CallOp::create(rewriter, loc, extFuncs.getPhase,
-                                                        ValueRange{angle, epsilonVal, pprBasisVal});
+                                               ValueRange{angle, epsilonVal, pprBasisVal});
     Value runtimePhase = callGetPhaseOp->getResult(0);
 
     // Build the Loop logic
@@ -421,7 +422,7 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
         gphaseAttrs.append(
             rewriter.getNamedAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 0})));
         GlobalPhaseOp::create(rewriter, loc, TypeRange{}, ValueRange{finalPhase},
-                                       gphaseAttrs.getAttrs());
+                              gphaseAttrs.getAttrs());
 
         // Replace the RZ/PhaseShift op with the resulting qubit
         rewriter.replaceOp(op, finalQbitResult);
@@ -479,7 +480,7 @@ struct DecomposePPRArbitraryOpPattern
         gphaseAttrs.append(
             rewriter.getNamedAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 0})));
         GlobalPhaseOp::create(rewriter, loc, TypeRange{}, ValueRange{runtimePhase},
-                                       gphaseAttrs.getAttrs());
+                              gphaseAttrs.getAttrs());
 
         rewriter.replaceOp(op, finalQbitResult);
         return success();

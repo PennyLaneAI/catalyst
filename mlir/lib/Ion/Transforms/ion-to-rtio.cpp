@@ -305,7 +305,7 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
             // Get the global memref in the function
             builder.setInsertionPointAfter(allocOp);
             Value qubitMap = memref::GetGlobalOp::create(builder, allocOp.getLoc(), memrefType,
-                                                                 globalOp.getSymName());
+                                                         globalOp.getSymName());
 
             qregToMemrefMap[allocOp.getResult()] = qubitMap;
         });

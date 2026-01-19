@@ -118,7 +118,7 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
             auto pprPI2 =
                 PPRotationOp::create(rewriter, loc, pauliP, 2, outPZQubits, ppmX.getMres());
             DeallocQubitOp::create(rewriter, loc,
-                                            ppmX.getOutQubits().back()); // Deallocate |m⟩ qubit
+                                   ppmX.getOutQubits().back()); // Deallocate |m⟩ qubit
             scf::YieldOp::create(rewriter, loc, pprPI2.getOutQubits());
         };
 
@@ -134,9 +134,10 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
     else {
         SmallVector<StringRef> pauliX = {"X"};
         SmallVector<StringRef> pauliY = {"Y"};
-        auto ppmXY = SelectPPMeasurementOp::create(rewriter, loc, ppmPZRes, rotationKind > 0 ? pauliY : pauliX, rotationKind > 0 ? pauliX : pauliY,
-            loc, ppmPZRes, rotationKind > 0 ? pauliY : pauliX, rotationKind > 0 ? pauliX : pauliY,
-            ppmPZ.getOutQubits().back());
+        auto ppmXY = SelectPPMeasurementOp::create(
+            rewriter, loc, ppmPZRes, rotationKind > 0 ? pauliY : pauliX,
+            rotationKind > 0 ? pauliX : pauliY, loc, ppmPZRes, rotationKind > 0 ? pauliY : pauliX,
+            rotationKind > 0 ? pauliX : pauliY, ppmPZ.getOutQubits().back());
         // PPR P(π/2) on input qubits if PPM (X or Y) yields -1
         SmallVector<Value> outPZQubits = ppmPZ.getOutQubits(); // [input qubits, |m⟩]
         outPZQubits.pop_back();                                // [input qubits]
@@ -203,7 +204,7 @@ void decomposeAutoCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op,
     SmallVector<Value> axillaryQubits = {ppmPZ.getOutQubits().back(), axillaryQubit};
     SmallVector<StringRef> pauliZY = {"Z", pauliForAxillaryQubit}; // [Z, Y/Z]
     auto ppmZY = PPMeasurementOp::create(rewriter, loc, pauliZY, rotationSign, axillaryQubits,
-                                                  nullptr); // [|m⟩, |Y⟩/|0⟩]
+                                         nullptr); // [|m⟩, |Y⟩/|0⟩]
 
     // PPM (X) on qubit |m⟩
     SmallVector<StringRef> pauliX = {"X"};
@@ -212,7 +213,7 @@ void decomposeAutoCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op,
     // PPM (X/Z) based on the result of PPM (P⊗Z) on qubit |0⟩
     SmallVector<StringRef> pauliZ = {"Z"};
     auto ppmXZ = SelectPPMeasurementOp::create(rewriter, loc, ppmPZ.getMres(), pauliX, pauliZ,
-                                                        ppmZY.getOutQubits().back()); // |0⟩
+                                               ppmZY.getOutQubits().back()); // |0⟩
 
     // XOR of the results of PPM (P⊗Z) and PPM (X)
     auto condOp = arith::XOrIOp::create(rewriter, loc, ppmZY.getMres(), ppmX.getMres());

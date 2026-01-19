@@ -85,15 +85,15 @@ void initializeCotangents(TypeRange primalResultTypes, unsigned activeResult, Va
                             ? cast<RankedTensorType>(activeResultType).getElementType()
                             : activeResultType);
 
-    Value zero = arith::ConstantFloatOp::create(builder,
-        loc, elementType, APFloat(elementType.getFloatSemantics(), 0));
+    Value zero = arith::ConstantFloatOp::create(builder, loc, elementType,
+                                                APFloat(elementType.getFloatSemantics(), 0));
     Value one = arith::ConstantFloatOp::create(builder, loc, elementType,
-                                                       APFloat(elementType.getFloatSemantics(), 1));
+                                               APFloat(elementType.getFloatSemantics(), 1));
 
     Value zeroTensor;
     if (auto activeResultTensor = dyn_cast<RankedTensorType>(activeResultType)) {
         zeroTensor = tensor::EmptyOp::create(builder, loc, activeResultTensor,
-                                                     /*dynamicSizes=*/ValueRange{});
+                                             /*dynamicSizes=*/ValueRange{});
     }
     else {
         zeroTensor = tensor::EmptyOp::create(builder, loc, ArrayRef<int64_t>(), activeResultType);
@@ -199,9 +199,9 @@ static FailureOr<func::FuncOp> cloneCallee(PatternRewriter &rewriter, Operation 
                     if (callOp.getCallee() == qnode.getName()) {
                         PatternRewriter::InsertionGuard insertionGuard(rewriter);
                         rewriter.setInsertionPointToStart(&funcOp.getFunctionBody().front());
-                        Value paramCount =
-                            func::CallOp::create(rewriter, loc, paramCountFn, callOp.getArgOperands())
-                                .getResult(0);
+                        Value paramCount = func::CallOp::create(rewriter, loc, paramCountFn,
+                                                                callOp.getArgOperands())
+                                               .getResult(0);
                         callOp.setCallee(qnodeSplit.getName());
                         callOp.getOperandsMutable().append(paramCount);
                     }
@@ -391,12 +391,12 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
             for (unsigned argIdx = 0; argIdx < diffArgIndices.size(); argIdx++) {
                 Type jacobianType = resultTypes[argIdx + cotangentIdx * diffArgIndices.size()];
                 if (auto tensorType = dyn_cast<RankedTensorType>(jacobianType)) {
-                    jacobians.push_back(tensor::EmptyOp::create(rewriter,
-                        loc, tensorType.getShape(), tensorType.getElementType()));
+                    jacobians.push_back(tensor::EmptyOp::create(
+                        rewriter, loc, tensorType.getShape(), tensorType.getElementType()));
                 }
                 else {
-                    jacobians.push_back(arith::ConstantFloatOp::create(rewriter,
-                        loc, cast<FloatType>(jacobianType), APFloat(0.0)));
+                    jacobians.push_back(arith::ConstantFloatOp::create(
+                        rewriter, loc, cast<FloatType>(jacobianType), APFloat(0.0)));
                 }
             }
 
@@ -411,8 +411,8 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
                         initializeCotangents(callee.getResultTypes(), cotangentIdx, indices,
                                              rewriter, loc, cotangents);
 
-                        auto backpropOp = gradient::BackpropOp::create(rewriter,
-                            loc, valTypes, computeBackpropTypes(callee, diffArgIndices),
+                        auto backpropOp = gradient::BackpropOp::create(
+                            rewriter, loc, valTypes, computeBackpropTypes(callee, diffArgIndices),
                             SymbolRefAttr::get(callee), entryBlock->getArguments(),
                             /*arg_shadows=*/ValueRange{},
                             /*primal results=*/ValueRange{}, cotangents, diffArgIndicesAttr,
@@ -457,9 +457,9 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
                                     SmallVector<OpFoldResult> strides{jacobianRank,
                                                                       rewriter.getIndexAttr(1)};
 
-                                    jacobians[backpropIdx] = tensor::InsertSliceOp::create(rewriter,
-                                        loc, jacobianSlice, jacobians[backpropIdx], offsets, sizes,
-                                        strides);
+                                    jacobians[backpropIdx] = tensor::InsertSliceOp::create(
+                                        rewriter, loc, jacobianSlice, jacobians[backpropIdx],
+                                        offsets, sizes, strides);
                                 }
                                 else {
                                     jacobians[backpropIdx] = jacobianSlice;
@@ -467,8 +467,8 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
                             }
                             else {
                                 assert(isa<FloatType>(jacobianSlice.getType()));
-                                jacobians[backpropIdx] = tensor::InsertOp::create(rewriter,
-                                    loc, jacobianSlice, jacobians[backpropIdx], indices);
+                                jacobians[backpropIdx] = tensor::InsertOp::create(
+                                    rewriter, loc, jacobianSlice, jacobians[backpropIdx], indices);
                             }
                             backpropGradResults[backpropIdx +
                                                 cotangentIdx * diffArgIndices.size()] =
@@ -482,8 +482,8 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
                 initializeCotangents(callee.getResultTypes(), cotangentIdx, ValueRange(), rewriter,
                                      loc, cotangents);
 
-                auto backpropOp = gradient::BackpropOp::create(rewriter,
-                    loc, valTypes, computeBackpropTypes(callee, diffArgIndices),
+                auto backpropOp = gradient::BackpropOp::create(
+                    rewriter, loc, valTypes, computeBackpropTypes(callee, diffArgIndices),
                     SymbolRefAttr::get(callee), entryBlock->getArguments(),
                     /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangents,
                     diffArgIndicesAttr, keepValueResults);
@@ -503,8 +503,8 @@ static func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc,
                         // user requests a scalar, give it to them.
                         if (isa<RankedTensorType>(jacobianSlice.getType()) &&
                             isa<FloatType>(resultTypes[resultIdx])) {
-                            backpropGradResults[resultIdx] = tensor::ExtractOp::create(rewriter,
-                                loc, jacobianSlice, ValueRange{});
+                            backpropGradResults[resultIdx] = tensor::ExtractOp::create(
+                                rewriter, loc, jacobianSlice, ValueRange{});
                         }
                     }
                 }

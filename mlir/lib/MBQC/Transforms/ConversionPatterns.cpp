@@ -64,9 +64,10 @@ struct MeasureInBasisOpPattern : public OpConversionPattern<MeasureInBasisOp> {
             LLVM::ConstantOp::create(rewriter, loc, rewriter.getI32IntegerAttr(planeValueInt));
 
         // Create the postselect value. If not given, it defaults to NO_POSTSELECT
-        LLVM::ConstantOp postselect = LLVM::ConstantOp::create(rewriter,
-            loc, op.getPostselect() ? op.getPostselectAttr()
-                                    : rewriter.getI32IntegerAttr(NO_POSTSELECT));
+        LLVM::ConstantOp postselect = LLVM::ConstantOp::create(
+            rewriter, loc,
+            op.getPostselect() ? op.getPostselectAttr()
+                               : rewriter.getI32IntegerAttr(NO_POSTSELECT));
 
         // Add values as arguments of the CallOp
         SmallVector<Value> args = {adaptor.getInQubit(), planeValue, op.getAngle(), postselect};

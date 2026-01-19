@@ -42,12 +42,11 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
         OpBuilder::InsertionGuard guard(rewriter); // to reset the insertion point
         rewriter.setInsertionPointToStart(mod.getBody());
         glb = LLVM::GlobalOp::create(rewriter, loc, type, true, LLVM::Linkage::Internal, key,
-                                              rewriter.getStringAttr(value));
+                                     rewriter.getStringAttr(value));
     }
     return LLVM::GEPOp::create(rewriter, loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
-                                        type, LLVM::AddressOfOp::create(rewriter, loc, glb),
-                                        ArrayRef<LLVM::GEPArg>{0, 0},
-                                        LLVM::GEPNoWrapFlags::inbounds);
+                               type, LLVM::AddressOfOp::create(rewriter, loc, glb),
+                               ArrayRef<LLVM::GEPArg>{0, 0}, LLVM::GEPNoWrapFlags::inbounds);
 }
 
 /**
@@ -82,18 +81,18 @@ Value getModifiersPtr(Location loc, RewriterBase &rewriter, const TypeConverter 
     auto adjointVal = LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(adjoint));
     auto structType = LLVM::LLVMStructType::getLiteral(ctx, {boolType, sizeType, ptrType, ptrType});
     auto modifiersPtr = catalyst::getStaticAlloca(loc, rewriter, structType, 1).getResult();
-    auto adjointPtr = LLVM::GEPOp::create(rewriter, loc, ptrType, structType, modifiersPtr,
-                                                   llvm::ArrayRef<LLVM::GEPArg>{0, 0},
-                                                   LLVM::GEPNoWrapFlags::inbounds);
-    auto numControlledPtr = LLVM::GEPOp::create(rewriter, loc, ptrType, structType, modifiersPtr,
-                                                         llvm::ArrayRef<LLVM::GEPArg>{0, 1},
-                                                         LLVM::GEPNoWrapFlags::inbounds);
-    auto controlledWiresPtr = LLVM::GEPOp::create(rewriter, loc, ptrType, structType, modifiersPtr,
-                                                           llvm::ArrayRef<LLVM::GEPArg>{0, 2},
-                                                           LLVM::GEPNoWrapFlags::inbounds);
-    auto controlledValuesPtr = LLVM::GEPOp::create(rewriter, loc, ptrType, structType, modifiersPtr,
-                                                            llvm::ArrayRef<LLVM::GEPArg>{0, 3},
-                                                            LLVM::GEPNoWrapFlags::inbounds);
+    auto adjointPtr =
+        LLVM::GEPOp::create(rewriter, loc, ptrType, structType, modifiersPtr,
+                            llvm::ArrayRef<LLVM::GEPArg>{0, 0}, LLVM::GEPNoWrapFlags::inbounds);
+    auto numControlledPtr =
+        LLVM::GEPOp::create(rewriter, loc, ptrType, structType, modifiersPtr,
+                            llvm::ArrayRef<LLVM::GEPArg>{0, 1}, LLVM::GEPNoWrapFlags::inbounds);
+    auto controlledWiresPtr =
+        LLVM::GEPOp::create(rewriter, loc, ptrType, structType, modifiersPtr,
+                            llvm::ArrayRef<LLVM::GEPArg>{0, 2}, LLVM::GEPNoWrapFlags::inbounds);
+    auto controlledValuesPtr =
+        LLVM::GEPOp::create(rewriter, loc, ptrType, structType, modifiersPtr,
+                            llvm::ArrayRef<LLVM::GEPArg>{0, 3}, LLVM::GEPNoWrapFlags::inbounds);
 
     Value ctrlPtr = nullPtr;
     Value valuePtr = nullPtr;
@@ -105,15 +104,15 @@ Value getModifiersPtr(Location loc, RewriterBase &rewriter, const TypeConverter 
         for (int i = 0; static_cast<size_t>(i) < controlledQubits.size(); i++) {
             {
                 auto itemPtr = LLVM::GEPOp::create(rewriter, loc, ptrType, ptrType, ctrlPtr,
-                                                            llvm::ArrayRef<LLVM::GEPArg>{i},
-                                                            LLVM::GEPNoWrapFlags::inbounds);
+                                                   llvm::ArrayRef<LLVM::GEPArg>{i},
+                                                   LLVM::GEPNoWrapFlags::inbounds);
                 auto qubit = controlledQubits[i];
                 LLVM::StoreOp::create(rewriter, loc, qubit, itemPtr);
             }
             {
                 auto itemPtr = LLVM::GEPOp::create(rewriter, loc, ptrType, boolType, valuePtr,
-                                                            llvm::ArrayRef<LLVM::GEPArg>{i},
-                                                            LLVM::GEPNoWrapFlags::inbounds);
+                                                   llvm::ArrayRef<LLVM::GEPArg>{i},
+                                                   LLVM::GEPNoWrapFlags::inbounds);
                 auto value = controlledValues[i];
                 LLVM::StoreOp::create(rewriter, loc, value, itemPtr);
             }
@@ -121,8 +120,8 @@ Value getModifiersPtr(Location loc, RewriterBase &rewriter, const TypeConverter 
     }
 
     LLVM::StoreOp::create(rewriter, loc, adjointVal, adjointPtr);
-    auto ctrlQubits =
-        LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(controlledQubits.size()));
+    auto ctrlQubits = LLVM::ConstantOp::create(rewriter, loc,
+                                               rewriter.getI64IntegerAttr(controlledQubits.size()));
     LLVM::StoreOp::create(rewriter, loc, ctrlQubits, numControlledPtr);
     LLVM::StoreOp::create(rewriter, loc, ctrlPtr, controlledWiresPtr);
     LLVM::StoreOp::create(rewriter, loc, valuePtr, controlledValuesPtr);
@@ -155,8 +154,8 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
                 IRRewriter::InsertPoint ip = rewriter.saveInsertionPoint();
                 OpBuilder::InsertionGuard guard(rewriter); // to reset the insertion point
                 rewriter.setInsertionPointToStart(mod.getBody());
-                LLVM::GlobalOp seed_glb = LLVM::GlobalOp::create(rewriter,
-                    loc, IntegerType::get(ctx, 32), true, LLVM::Linkage::Internal, "seed",
+                LLVM::GlobalOp seed_glb = LLVM::GlobalOp::create(
+                    rewriter, loc, IntegerType::get(ctx, 32), true, LLVM::Linkage::Internal, "seed",
                     cast<IntegerAttr>(op->getAttr("seed")));
                 rewriter.restoreInsertionPoint(ip);
                 seed_val = LLVM::AddressOfOp::create(rewriter, loc, seed_glb);
@@ -229,7 +228,7 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
         }
 
         Value autoQubitManagement = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI1Type(),
-                                                                      op.getAutoQubitManagement());
+                                                             op.getAutoQubitManagement());
         operands.push_back(autoQubitManagement);
 
         LLVM::CallOp::create(rewriter, loc, fnDecl, operands);
@@ -505,8 +504,8 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
             // get the number of qbuits and place the input qubits at the end of the arguments.
             int64_t numQubits = op.getOutQubits().size();
             args.insert(args.end(), modifiersPtr);
-            args.insert(args.end(), LLVM::ConstantOp::create(rewriter,
-                                        loc, rewriter.getI64IntegerAttr(numQubits)));
+            args.insert(args.end(), LLVM::ConstantOp::create(
+                                        rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
             args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
         }
         else {
@@ -878,9 +877,10 @@ struct MeasureOpPattern : public OpConversionPattern<MeasureOp> {
             rewriter, op, qirName, qirSignature);
 
         // Create the postselect value. If not given, it defaults to NO_POSTSELECT
-        LLVM::ConstantOp postselect = LLVM::ConstantOp::create(rewriter,
-            loc, op.getPostselect() ? op.getPostselectAttr()
-                                    : rewriter.getI32IntegerAttr(NO_POSTSELECT));
+        LLVM::ConstantOp postselect = LLVM::ConstantOp::create(
+            rewriter, loc,
+            op.getPostselect() ? op.getPostselectAttr()
+                               : rewriter.getI32IntegerAttr(NO_POSTSELECT));
 
         // Add qubit and postselect values as arguments of the CallOp
         SmallVector<Value> args = {adaptor.getInQubit(), postselect};
@@ -1074,7 +1074,8 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
         else {
             // __catalyst__qis__State does not support individual qubit measurements yet, so it must
             // be invoked without specific specific qubits (i.e. measure the whole register).
-            Value numQubits = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(0));
+            Value numQubits =
+                LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(0));
             args.push_back(numQubits);
         }
 

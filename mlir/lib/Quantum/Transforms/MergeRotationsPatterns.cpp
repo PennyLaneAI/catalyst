@@ -98,9 +98,9 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
             Value sumParam = arith::AddFOp::create(rewriter, loc, parentParam, param).getResult();
             sumParams.push_back(sumParam);
         }
-        auto mergeOp = CustomOp::create(rewriter, loc, outQubitsTypes, outQubitsCtrlTypes, sumParams,
-                                                 parentInQubits, op.getGateName(), false,
-                                                 parentInCtrlQubits, parentInCtrlValues);
+        auto mergeOp = CustomOp::create(rewriter, loc, outQubitsTypes, outQubitsCtrlTypes,
+                                        sumParams, parentInQubits, op.getGateName(), false,
+                                        parentInCtrlQubits, parentInCtrlValues);
 
         rewriter.replaceOp(op, mergeOp);
         rewriter.eraseOp(parentOp);
@@ -162,38 +162,39 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
             omegaF = omega2;
         }
         else if (theta1IsZero && theta2IsZero) {
-            phiF =
-                arith::AddFOp::create(rewriter, loc, arith::AddFOp::create(rewriter, loc, phi1, phi2),
-                arith::AddFOp::create(rewriter, loc, omega1, omega2));
+            phiF = arith::AddFOp::create(rewriter, loc,
+                                         arith::AddFOp::create(rewriter, loc, phi1, phi2),
+                                         arith::AddFOp::create(rewriter, loc, omega1, omega2));
             thetaF = zeroConst;
             omegaF = zeroConst;
         }
         else if (theta1IsZero) {
             phiF = arith::AddFOp::create(rewriter, loc,
-                arith::AddFOp::create(rewriter, loc, phi1, phi2), omega1);
+                                         arith::AddFOp::create(rewriter, loc, phi1, phi2), omega1);
             thetaF = theta2;
             omegaF = omega2;
         }
         else if (theta2IsZero) {
             phiF = phi1;
             thetaF = theta1;
-            omegaF = arith::AddFOp::create(rewriter, loc,
-                arith::AddFOp::create(rewriter, loc, omega1, omega2), phi2);
+            omegaF = arith::AddFOp::create(
+                rewriter, loc, arith::AddFOp::create(rewriter, loc, omega1, omega2), phi2);
         }
         else {
-            auto halfConst = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(0.5));
+            auto halfConst =
+                arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(0.5));
             auto twoConst = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0));
 
             // α1 = (ϕ1 + ω1)/2, α2 = (ϕ2 + ω2)/2
             // β1 = (ϕ1 - ω1)/2, β2 = (ϕ2 - ω2)/2
-            auto alpha1 = arith::MulFOp::create(rewriter, loc,
-                loc, arith::AddFOp::create(rewriter, loc, phi1, omega1), halfConst);
-            auto alpha2 = arith::MulFOp::create(rewriter, loc,
-                loc, arith::AddFOp::create(rewriter, loc, phi2, omega2), halfConst);
-            auto beta1 = arith::MulFOp::create(rewriter, loc,
-                loc, arith::SubFOp::create(rewriter, loc, phi1, omega1), halfConst);
-            auto beta2 = arith::MulFOp::create(rewriter, loc,
-                loc, arith::SubFOp::create(rewriter, loc, phi2, omega2), halfConst);
+            auto alpha1 = arith::MulFOp::create(
+                rewriter, loc, loc, arith::AddFOp::create(rewriter, loc, phi1, omega1), halfConst);
+            auto alpha2 = arith::MulFOp::create(
+                rewriter, loc, loc, arith::AddFOp::create(rewriter, loc, phi2, omega2), halfConst);
+            auto beta1 = arith::MulFOp::create(
+                rewriter, loc, loc, arith::SubFOp::create(rewriter, loc, phi1, omega1), halfConst);
+            auto beta2 = arith::MulFOp::create(
+                rewriter, loc, loc, arith::SubFOp::create(rewriter, loc, phi2, omega2), halfConst);
 
             // c1 = cos(θ1/2), c2 = cos(θ2/2)
             // s1 = sin(θ1/2), s2 = sin(θ2/2)
@@ -211,10 +212,10 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
             auto s1TimesS2 = arith::MulFOp::create(rewriter, loc, s1, s2);
             auto firstAddend =
                 arith::MulFOp::create(rewriter, loc, arith::MulFOp::create(rewriter, loc, c1, c1),
-                arith::MulFOp::create(rewriter, loc, c2, c2));
+                                      arith::MulFOp::create(rewriter, loc, c2, c2));
             auto secondAddend =
                 arith::MulFOp::create(rewriter, loc, arith::MulFOp::create(rewriter, loc, s1, s1),
-                arith::MulFOp::create(rewriter, loc, s2, s2));
+                                      arith::MulFOp::create(rewriter, loc, s2, s2));
             auto thirdAddend = arith::NegFOp::create(rewriter, loc,
                 loc, arith::MulFOp::create(rewriter, loc, twoConst,
                          loc, twoConst,
@@ -278,9 +279,9 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
         }
 
         auto sumParams = SmallVector<Value>{phiF, thetaF, omegaF};
-            auto mergeOp = CustomOp::create(rewriter, loc, outQubitsTypes, outQubitsCtrlTypes, sumParams,
-                                                 parentInQubits, op.getGateName(), false,
-                                                 parentInCtrlQubits, parentInCtrlValues);
+        auto mergeOp = CustomOp::create(rewriter, loc, outQubitsTypes, outQubitsCtrlTypes,
+                                        sumParams, parentInQubits, op.getGateName(), false,
+                                        parentInCtrlQubits, parentInCtrlValues);
 
         rewriter.replaceOp(op, mergeOp);
         rewriter.eraseOp(parentOp);
@@ -446,10 +447,10 @@ struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
                 arith::AddFOp::create(rewriter, loc, opRotation, parentOpRotation).getResult();
 
             mergeOpOutQubits = PPRotationArbitraryOp::create(rewriter, loc,
-                                                                  /*pauli_product=*/newPauliProduct,
-                                                                  /*arbitrary_angle=*/newAngle,
-                                                                  /*in_qubits=*/newInQubits,
-                                                                  /*condition=*/opCondition)
+                                                             /*pauli_product=*/newPauliProduct,
+                                                             /*arbitrary_angle=*/newAngle,
+                                                             /*in_qubits=*/newInQubits,
+                                                             /*condition=*/opCondition)
                                    .getOutQubits();
         }
 
@@ -490,9 +491,9 @@ struct MergeMultiRZRewritePattern : public OpRewritePattern<MultiRZOp> {
 
         Value sumParam = arith::AddFOp::create(rewriter, loc, parentTheta, theta).getResult();
 
-        auto mergeOp = MultiRZOp::create(rewriter, loc, outQubitsTypes, outQubitsCtrlTypes, sumParam,
-                                                  parentInQubits, nullptr, parentInCtrlQubits,
-                                                  parentInCtrlValues);
+        auto mergeOp =
+            MultiRZOp::create(rewriter, loc, outQubitsTypes, outQubitsCtrlTypes, sumParam,
+                              parentInQubits, nullptr, parentInCtrlQubits, parentInCtrlValues);
         rewriter.replaceOp(op, mergeOp);
         rewriter.eraseOp(parentOp);
 

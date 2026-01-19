@@ -192,8 +192,8 @@ struct CallOpToAsyncOPRewritePattern : public mlir::OpRewritePattern<func::CallO
 
         rewriter.modifyOpInPlace(op, [&] { op->setAttr("transformed", rewriter.getUnitAttr()); });
         IRMapping map;
-        auto executeOp =
-            async::ExecuteOp::create(rewriter, op.getLoc(), retTy, dependencies, operands, noopExec);
+        auto executeOp = async::ExecuteOp::create(rewriter, op.getLoc(), retTy, dependencies,
+                                                  operands, noopExec);
         {
             PatternRewriter::InsertionGuard insertGuard(rewriter);
             rewriter.setInsertionPoint(executeOp.getBody(), executeOp.getBody()->end());

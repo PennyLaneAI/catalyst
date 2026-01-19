@@ -67,7 +67,7 @@ class AugmentedCircuitGenerator {
     {
         if (!op.getIdxAttr().has_value()) {
             ListPushOp::create(builder, op.getLoc(), oldToCloned.lookupOrDefault(op.getIdx()),
-                                       cache.wireVector);
+                               cache.wireVector);
         }
     }
 

@@ -410,11 +410,11 @@ void decomposeFrequencyPulses(ScheduleGroupsMap &pulseGroups)
         builder.setInsertionPoint(firstRoot);
 
         // Create sync
-        Value chainStart =
-            originalWaits.size() > 1
-                ? rtio::RTIOSyncOp::create(builder,
-                      firstRoot.getLoc(), rtio::EventType::get(builder.getContext()), originalWaits)
-                : originalWaits[0];
+        Value chainStart = originalWaits.size() > 1
+                               ? rtio::RTIOSyncOp::create(
+                                     builder, firstRoot.getLoc(),
+                                     rtio::EventType::get(builder.getContext()), originalWaits)
+                               : originalWaits[0];
 
         // Create frequency setting chain
         Value lastFreqEvent = chainStart;

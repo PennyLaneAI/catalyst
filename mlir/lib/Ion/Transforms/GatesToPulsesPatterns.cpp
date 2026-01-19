@@ -210,21 +210,21 @@ mlir::Value CreateNormalizedAngle(mlir::PatternRewriter &rewriter, mlir::Locatio
     auto zero_attr = rewriter.getZeroAttr(angle.getType());
     auto zero_const = arith::ConstantOp::create(rewriter, loc, angle.getType(), zero_attr);
     auto less_than_zero = arith::CmpFOp::create(rewriter, loc, arith::CmpFPredicate::OLT, remainder,
-                                                         zero_const); // Signed less than
+                                                zero_const); // Signed less than
 
     // Create a conditional add (if remainder < 0, add 4*PI)
-    auto normalized_angle =
-        scf::IfOp::create(
-            rewriter, loc, less_than_zero,
-            [&](OpBuilder &builder, Location loc) { // then
-                mlir::Value add_op = arith::AddFOp::create(
-                    rewriter, loc, angle.getType(), remainder, four_pi_const); // or AddIOp for integers
-                scf::YieldOp::create(builder, loc, add_op);
-            },
-            [&](OpBuilder &builder, Location loc) { // else
-                scf::YieldOp::create(builder, loc, remainder);
-            })
-        .getResult(0);
+    auto normalized_angle = scf::IfOp::create(
+                                rewriter, loc, less_than_zero,
+                                [&](OpBuilder &builder, Location loc) { // then
+                                    mlir::Value add_op = arith::AddFOp::create(
+                                        rewriter, loc, angle.getType(), remainder,
+                                        four_pi_const); // or AddIOp for integers
+                                    scf::YieldOp::create(builder, loc, add_op);
+                                },
+                                [&](OpBuilder &builder, Location loc) { // else
+                                    scf::YieldOp::create(builder, loc, remainder);
+                                })
+                                .getResult(0);
 
     return normalized_angle;
 }
@@ -302,14 +302,15 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
         }
 
         auto ppOp = ion::ParallelProtocolOp::create(
-            rewriter, loc, ionQubits.value(), [&](OpBuilder &builder, Location loc, ValueRange qubits) {
+            rewriter, loc, ionQubits.value(),
+            [&](OpBuilder &builder, Location loc, ValueRange qubits) {
                 mlir::FloatAttr phase1Attr = builder.getF64FloatAttr(phase1);
                 mlir::FloatAttr phase2Attr = builder.getF64FloatAttr(phase2);
                 auto qubit = qubits.front();
                 ion::PulseOp::create(builder, loc, PulseType::get(ctx), time, qubit, beam0toEAttr,
-                                             phase1Attr);
+                                     phase1Attr);
                 ion::PulseOp::create(builder, loc, PulseType::get(ctx), time, qubit, beam1toEAttr,
-                                             phase2Attr);
+                                     phase2Attr);
             });
 
         // Convert ion.qubit back to quantum.bit
@@ -406,7 +407,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
             }
 
             auto ppOp = ion::ParallelProtocolOp::create(
-                rewriter, loc, ionQubits.value(), [&](OpBuilder &builder, Location loc, ValueRange qubits) {
+                rewriter, loc, ionQubits.value(),
+                [&](OpBuilder &builder, Location loc, ValueRange qubits) {
                     mlir::FloatAttr phase0Attr = builder.getF64FloatAttr(0.0);
                     auto qubit0 = qubits.front();
                     auto qubit1 = qubits.back();
@@ -435,7 +437,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                                       rewriter.getDenseI64ArrayAttr(beam.polarization),
                                       rewriter.getDenseI64ArrayAttr(beam.wavevector));
                     ion::PulseOp::create(builder, loc, PulseType::get(ctx), time, qubit0, beam1Attr,
-                                                 phase0Attr);
+                                         phase0Attr);
 
                     // Pulse2(
                     //     transition=Transition(level1=1,level2=e),
@@ -458,7 +460,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                                       rewriter.getDenseI64ArrayAttr(beam.polarization),
                                       rewriter.getDenseI64ArrayAttr(flipSign(beam.wavevector)));
                     ion::PulseOp::create(builder, loc, PulseType::get(ctx), time, qubit0, beam2Attr,
-                                                 phase0Attr);
+                                         phase0Attr);
 
                     // Pulse3(
                     //     transition=Transition(level1=1,level2=e),
@@ -480,7 +482,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                                       rewriter.getDenseI64ArrayAttr(beam.polarization),
                                       rewriter.getDenseI64ArrayAttr(flipSign(beam.wavevector)));
                     ion::PulseOp::create(builder, loc, PulseType::get(ctx), time, qubit0, beam3Attr,
-                                                 phase0Attr);
+                                         phase0Attr);
 
                     // Pulse4(
                     //     transition=Transition(level1=0,level2=e),
@@ -500,7 +502,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                                       rewriter.getDenseI64ArrayAttr(beam.polarization),
                                       rewriter.getDenseI64ArrayAttr(beam.wavevector));
                     ion::PulseOp::create(builder, loc, PulseType::get(ctx), time, qubit1, beam4Attr,
-                                                 phase0Attr);
+                                         phase0Attr);
 
                     // Pulse5(
                     //     transition=Transition(level1=1,level2=e),
@@ -523,7 +525,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                                       rewriter.getDenseI64ArrayAttr(beam.polarization),
                                       rewriter.getDenseI64ArrayAttr(flipSign(beam.wavevector)));
                     ion::PulseOp::create(builder, loc, PulseType::get(ctx), time, qubit1, beam5Attr,
-                                                 phase0Attr);
+                                         phase0Attr);
 
                     // Pulse6(
                     //     transition=Transition(level1=1,level2=e),
@@ -546,7 +548,7 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                                       rewriter.getDenseI64ArrayAttr(beam.polarization),
                                       rewriter.getDenseI64ArrayAttr(flipSign(beam.wavevector)));
                     ion::PulseOp::create(builder, loc, PulseType::get(ctx), time, qubit1, beam6Attr,
-                                                 phase0Attr);
+                                         phase0Attr);
                 });
 
             // Convert ion.qubit back to quantum.bit

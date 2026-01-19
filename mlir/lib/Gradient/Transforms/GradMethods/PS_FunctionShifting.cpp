@@ -98,8 +98,8 @@ func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter &rewriter,
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
                 rewriter.setInsertionPointToStart(forOp.getBody());
 
-                Value idx = arith::ConstantOp::create(rewriter,
-                    loc, rewriter.getIndexAttr(selectors.size()));
+                Value idx = arith::ConstantOp::create(rewriter, loc,
+                                                      rewriter.getIndexAttr(selectors.size()));
                 Value selector = tensor::ExtractOp::create(rewriter, loc, selectorVector, idx);
                 Value iteration = forOp.getInductionVar();
                 selectors.push_back({iteration, selector});

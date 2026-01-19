@@ -66,8 +66,8 @@ struct PulseOpLowering : public OpConversionPattern<RTIOPulseOp> {
 
         Value amplitude = artiq.constF64(1.0);
         LLVM::CallOp::create(rewriter, op.getLoc(), setFreqFunc,
-                                      ValueRange{adaptor.getChannel(), adaptor.getFrequency(),
-                                                 adaptor.getPhase(), amplitude});
+                             ValueRange{adaptor.getChannel(), adaptor.getFrequency(),
+                                        adaptor.getPhase(), amplitude});
 
         Value newTime = artiq.nowMu();
         rewriter.replaceOp(op, newTime);
@@ -150,8 +150,8 @@ struct ChannelOpLowering : public OpConversionPattern<RTIOChannelOp> {
     {
         int32_t channelId = extractChannelId(op.getChannel());
         Type resultType = getTypeConverter()->convertType(op.getChannel().getType());
-        Value result = arith::ConstantOp::create(rewriter,
-            op.getLoc(), rewriter.getIntegerAttr(resultType, channelId));
+        Value result = arith::ConstantOp::create(rewriter, op.getLoc(),
+                                                 rewriter.getIntegerAttr(resultType, channelId));
         rewriter.replaceOp(op, result);
         return success();
     }
@@ -184,8 +184,8 @@ struct DecomposePulsePattern : public OpRewritePattern<RTIOPulseOp> {
 
         // Sync both pulses
         auto eventType = EventType::get(rewriter.getContext());
-        Value syncEvent = RTIOSyncOp::create(rewriter,
-            loc, eventType, ValueRange{controlPulse.getEvent(), slackPulse.getEvent()});
+        Value syncEvent = RTIOSyncOp::create(
+            rewriter, loc, eventType, ValueRange{controlPulse.getEvent(), slackPulse.getEvent()});
 
         rewriter.replaceOp(op, syncEvent);
         return success();

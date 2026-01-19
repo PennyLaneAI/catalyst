@@ -138,7 +138,7 @@ LogicalResult convertPauliGate(CustomOp op, PatternRewriter &rewriter, bool x_pa
 
     UpdateOp updateOp =
         UpdateOp::create(rewriter, loc, outQubitTypes, rewriter.getBoolAttr(x_parity),
-                                  rewriter.getBoolAttr(z_parity), inQubits);
+                         rewriter.getBoolAttr(z_parity), inQubits);
 
     rewriter.replaceOp(op, updateOp.getOutQubits());
     return success();
@@ -220,7 +220,7 @@ LogicalResult convertNonCliffordGate(CustomOp op, PatternRewriter &rewriter)
     auto inQubits = op.getInQubits();
 
     FlushOp flushOp = FlushOp::create(rewriter, loc, rewriter.getI1Type(), rewriter.getI1Type(),
-                                               outQubitType, inQubits[0]);
+                                      outQubitType, inQubits[0]);
 
     auto pauliZOutQubit = insertPauliOpsAfterFlush(rewriter, loc, flushOp);
 
@@ -365,8 +365,8 @@ struct CorrectMeasurementPattern : public OpRewritePattern<MeasureOp> {
                          << outQubit << "\n");
 
         rewriter.setInsertionPointAfter(op);
-        CorrectMeasurementOp correctMeasOp = CorrectMeasurementOp::create(rewriter,
-            loc, mres.getType(), outQubit.getType(), mres, outQubit);
+        CorrectMeasurementOp correctMeasOp = CorrectMeasurementOp::create(
+            rewriter, loc, mres.getType(), outQubit.getType(), mres, outQubit);
 
         mres.replaceAllUsesExcept(correctMeasOp.getOutMres(), correctMeasOp);
         outQubit.replaceAllUsesExcept(correctMeasOp.getOutQubit(), correctMeasOp);
@@ -452,8 +452,8 @@ struct FlushBeforeMeasurementProcessPattern : public OpRewritePattern<Measuremen
         auto insertFlushOpPerQubitOrSkip = [&](unsigned int idx, const Value qubit) {
             std::optional<FlushOp> flushOp = getFlushOpAppliedToQubit(qubit);
             if (!flushOp) {
-                auto flushOp = FlushOp::create(rewriter,
-                    loc, rewriter.getI1Type(), rewriter.getI1Type(), qubit.getType(), qubit);
+                auto flushOp = FlushOp::create(rewriter, loc, rewriter.getI1Type(),
+                                               rewriter.getI1Type(), qubit.getType(), qubit);
                 auto pauliZOutQubit = insertPauliOpsAfterFlush(rewriter, loc, flushOp);
                 rewriter.modifyOpInPlace(obsOp, [&] { obsOp->setOperand(idx, pauliZOutQubit); });
             }

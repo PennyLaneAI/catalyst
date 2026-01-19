@@ -59,8 +59,9 @@ static std::vector<Value> computePartialDerivative(PatternRewriter &rewriter, Lo
 {
     constexpr double shift = llvm::numbers::pi / 2;
     ShapedType shiftVectorType = RankedTensorType::get({numShifts}, rewriter.getF64Type());
-    Value selectorVector = bufferization::ToTensorOp::create(rewriter,
-        loc, memref::getTensorTypeFromMemRefType(selectorBuffer.getType()), selectorBuffer, true);
+    Value selectorVector = bufferization::ToTensorOp::create(
+        rewriter, loc, memref::getTensorTypeFromMemRefType(selectorBuffer.getType()),
+        selectorBuffer, true);
 
     // Define the shift vectors (pos/neg) as sparse tensor constants.
     DenseElementsAttr nonZeroIndices = rewriter.getI64TensorAttr(currentShift);
@@ -157,10 +158,10 @@ static void storePartialDerivative(PatternRewriter &rewriter, Location loc,
                 strides);
             Value gradientSubview =
                 memref::SubViewOp::create(rewriter, loc, resultType, gradientBuffer, dynOffsets,
-                                                   dynSizes, dynStrides, offsets, sizes, strides);
+                                          dynSizes, dynStrides, offsets, sizes, strides);
 
-            auto materializeOp = bufferization::MaterializeInDestinationOp::create(rewriter,
-                loc, derivative, gradientSubview);
+            auto materializeOp = bufferization::MaterializeInDestinationOp::create(
+                rewriter, loc, derivative, gradientSubview);
             materializeOp.setWritable(true);
         }
         else if (isDerivativeScalarTensor) {
@@ -286,8 +287,9 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
                 std::vector<Value> gradientTensors;
                 gradientTensors.reserve(gradResTypes.size());
                 for (Value gradientBuffer : gradientBuffers) {
-                    gradientTensors.push_back(bufferization::ToTensorOp::create(rewriter,
-                        loc, memref::getTensorTypeFromMemRefType(gradientBuffer.getType()),
+                    gradientTensors.push_back(bufferization::ToTensorOp::create(
+                        rewriter, loc,
+                        memref::getTensorTypeFromMemRefType(gradientBuffer.getType()),
                         gradientBuffer, true));
                 }
                 op->setOperands(gradientTensors);

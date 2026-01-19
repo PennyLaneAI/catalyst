@@ -221,7 +221,7 @@ struct AdjointOpInterface
 
         auto newAdjointOp =
             AdjointOp::create(rewriter, loc, nonTensorResultTypes, adjointOp.getCalleeAttr(),
-                                       adjointOp.getGradSize(), bufferArgs, memrefValues);
+                              adjointOp.getGradSize(), bufferArgs, memrefValues);
         SmallVector<Value> bufferdNewValues;
         size_t nonTensorResultCounter = 0;
         size_t tensorResultCounter = 0;
@@ -348,8 +348,8 @@ struct BackpropOpInterface
         // 4. Create bufferized backprop op
         DenseIntElementsAttr diffArgIndicesAttr = backpropOp.getDiffArgIndices().value_or(nullptr);
         auto bufferizedBackpropOp = BackpropOp::create(
-            rewriter, loc, TypeRange{}, scalarReturnTypes, backpropOp.getCalleeAttr(), bufferArgs, argShadows,
-            calleeResults, bufferCotangents, diffArgIndicesAttr,
+            rewriter, loc, TypeRange{}, scalarReturnTypes, backpropOp.getCalleeAttr(), bufferArgs,
+            argShadows, calleeResults, bufferCotangents, diffArgIndicesAttr,
             backpropOp.getKeepValueResultsAttr());
         // Fill in the null placeholders.
         for (const auto &[idx, scalarResult] :

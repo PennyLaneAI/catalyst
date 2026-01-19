@@ -134,8 +134,8 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
 
             if (isScalarTensor(oldArg.getType())) {
                 // Insert a FromElementsOp if the old argument is a scalar tensor
-                auto fromElementsOp = tensor::FromElementsOp::create(
-                    rewriter, newArg.getLoc(), oldArg.getType(), newArg);
+                auto fromElementsOp = tensor::FromElementsOp::create(rewriter, newArg.getLoc(),
+                                                                     oldArg.getType(), newArg);
                 mapper.map(oldArg, fromElementsOp.getResult());
             }
             else {

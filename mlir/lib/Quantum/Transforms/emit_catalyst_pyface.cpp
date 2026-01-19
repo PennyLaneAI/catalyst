@@ -137,9 +137,9 @@ void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewrit
         convertFunctionTypeCatalystWrapper(rewriter, functionType, hasReturns, hasInputs);
 
     Location loc = op.getLoc();
-    auto wrapperFuncOp = LLVM::LLVMFuncOp::create(rewriter,
-        loc, llvm::formatv("_catalyst_pyface_{0}", nameWithoutPrefix).str(), wrapperFuncType,
-        LLVM::Linkage::External, /*dsoLocal*/ false,
+    auto wrapperFuncOp = LLVM::LLVMFuncOp::create(
+        rewriter, loc, llvm::formatv("_catalyst_pyface_{0}", nameWithoutPrefix).str(),
+        wrapperFuncType, LLVM::Linkage::External, /*dsoLocal*/ false,
         /*cconv*/ LLVM::CConv::C);
 
     OpBuilder::InsertionGuard guard(rewriter);

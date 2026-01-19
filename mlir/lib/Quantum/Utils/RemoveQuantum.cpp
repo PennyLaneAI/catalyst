@@ -79,7 +79,7 @@ void replaceQuantumMeasurements(func::FuncOp &function, PatternRewriter &rewrite
             else {
                 if (type.isInteger()) {
                     auto res = arith::ConstantOp::create(rewriter, loc, type,
-                                                          rewriter.getIntegerAttr(type, 0));
+                                                         rewriter.getIntegerAttr(type, 0));
                     results.push_back(res);
                 }
                 else if (type.isIntOrFloat()) {

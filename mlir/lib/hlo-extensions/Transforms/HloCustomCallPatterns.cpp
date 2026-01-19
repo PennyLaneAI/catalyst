@@ -72,18 +72,18 @@ struct HloCustomCallOpRewritePattern : public mlir::OpRewritePattern<stablehlo::
 
                 if (auto intAttr = dyn_cast<IntegerAttr>(attrValue)) {
                     auto type = RankedTensorType::get({}, intAttr.getType());
-                    constVal = arith::ConstantOp::create(rewriter,
-                        loc, DenseElementsAttr::get(type, intAttr.getValue()));
+                    constVal = arith::ConstantOp::create(
+                        rewriter, loc, DenseElementsAttr::get(type, intAttr.getValue()));
                 }
                 else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(attrValue)) {
                     auto type = RankedTensorType::get({}, floatAttr.getType());
-                    constVal = arith::ConstantOp::create(rewriter,
-                        loc, DenseElementsAttr::get(type, floatAttr.getValue()));
+                    constVal = arith::ConstantOp::create(
+                        rewriter, loc, DenseElementsAttr::get(type, floatAttr.getValue()));
                 }
                 else if (auto boolAttr = llvm::dyn_cast<BoolAttr>(attrValue)) {
                     auto type = RankedTensorType::get({}, rewriter.getI1Type());
-                    constVal = arith::ConstantOp::create(rewriter,
-                        loc, DenseElementsAttr::get(type, boolAttr.getValue()));
+                    constVal = arith::ConstantOp::create(
+                        rewriter, loc, DenseElementsAttr::get(type, boolAttr.getValue()));
                 }
                 else {
                     LLVM_DEBUG(llvm::dbgs() << "Unsupported attribute type for: "

@@ -165,60 +165,59 @@ LogicalResult ZneLowering::matchAndRewrite(mitigation::ZneOp op, PatternRewriter
         tensor::EmptyOp::create(rewriter, loc, resultType.getShape(), resultType.getElementType());
     Value resultValues =
         scf::ForOp::create(
-                rewriter, loc, c0, size, c1, /*iterArgsInit=*/results,
-                [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
-                    std::vector<Value> newArgs(op.getArgs().begin(), op.getArgs().end());
-                    SmallVector<Value> index = {i};
-                    Value numFold = tensor::ExtractOp::create(builder, loc, numFolds, index);
-                    Value numFoldCasted =
-                        index::CastSOp::create(builder, loc, builder.getIndexType(), numFold);
-                    newArgs.push_back(numFoldCasted);
-                    func::CallOp callOp = func::CallOp::create(builder, loc, fnFoldedOp, newArgs);
+            rewriter, loc, c0, size, c1, /*iterArgsInit=*/results,
+            [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
+                std::vector<Value> newArgs(op.getArgs().begin(), op.getArgs().end());
+                SmallVector<Value> index = {i};
+                Value numFold = tensor::ExtractOp::create(builder, loc, numFolds, index);
+                Value numFoldCasted =
+                    index::CastSOp::create(builder, loc, builder.getIndexType(), numFold);
+                newArgs.push_back(numFoldCasted);
+                func::CallOp callOp = func::CallOp::create(builder, loc, fnFoldedOp, newArgs);
 
-                    int64_t numResults = callOp.getNumResults();
+                int64_t numResults = callOp.getNumResults();
 
-                    // Measurements
-                    ValueRange resultValuesMulti = callOp.getResults();
-                    SmallVector<Value> vectorResultsMulti;
-                    // Create a tensor
-                    for (Value resultValue : resultValuesMulti) {
-                        Value resultExtracted;
-                        if (isa<RankedTensorType>(resultValue.getType())) {
-                            resultExtracted = tensor::ExtractOp::create(builder, loc, resultValue);
-                        }
-                        else {
-                            resultExtracted = resultValue;
-                        }
-                        vectorResultsMulti.push_back(resultExtracted);
+                // Measurements
+                ValueRange resultValuesMulti = callOp.getResults();
+                SmallVector<Value> vectorResultsMulti;
+                // Create a tensor
+                for (Value resultValue : resultValuesMulti) {
+                    Value resultExtracted;
+                    if (isa<RankedTensorType>(resultValue.getType())) {
+                        resultExtracted = tensor::ExtractOp::create(builder, loc, resultValue);
                     }
-                    SmallVector<int64_t> resShape = {numResults};
-                    Type type = RankedTensorType::get(resShape, vectorResultsMulti[0].getType());
-                    auto tensorResults =
-                        tensor::FromElementsOp::create(builder, loc, type, vectorResultsMulti);
-                    Value sizeResultsValue = index::ConstantOp::create(rewriter, loc, numResults);
-                    Value resultValuesFor =
-                        scf::ForOp::create(
-                                rewriter, loc, c0, sizeResultsValue, c1,
-                                /*iterArgsInit=*/iterArgs.front(),
-                                [&](OpBuilder &builder, Location loc, Value j,
-                                    ValueRange iterArgsIn) {
-                                    Value resultExtracted =
-                                        tensor::ExtractOp::create(builder, loc, tensorResults, j);
-                                    SmallVector<Value> indices;
-                                    if (numResults == 1) {
-                                        indices = {i};
-                                    }
-                                    else {
-                                        indices = {i, j};
-                                    }
-                                    Value resultInserted = tensor::InsertOp::create(
-                                        builder, loc, resultExtracted, iterArgsIn.front(), indices);
+                    else {
+                        resultExtracted = resultValue;
+                    }
+                    vectorResultsMulti.push_back(resultExtracted);
+                }
+                SmallVector<int64_t> resShape = {numResults};
+                Type type = RankedTensorType::get(resShape, vectorResultsMulti[0].getType());
+                auto tensorResults =
+                    tensor::FromElementsOp::create(builder, loc, type, vectorResultsMulti);
+                Value sizeResultsValue = index::ConstantOp::create(rewriter, loc, numResults);
+                Value resultValuesFor =
+                    scf::ForOp::create(
+                        rewriter, loc, c0, sizeResultsValue, c1,
+                        /*iterArgsInit=*/iterArgs.front(),
+                        [&](OpBuilder &builder, Location loc, Value j, ValueRange iterArgsIn) {
+                            Value resultExtracted =
+                                tensor::ExtractOp::create(builder, loc, tensorResults, j);
+                            SmallVector<Value> indices;
+                            if (numResults == 1) {
+                                indices = {i};
+                            }
+                            else {
+                                indices = {i, j};
+                            }
+                            Value resultInserted = tensor::InsertOp::create(
+                                builder, loc, resultExtracted, iterArgsIn.front(), indices);
 
-                                    scf::YieldOp::create(builder, loc, resultInserted);
-                                })
-                            .getResult(0);
-                    scf::YieldOp::create(builder, loc, resultValuesFor);
-                })
+                            scf::YieldOp::create(builder, loc, resultInserted);
+                        })
+                        .getResult(0);
+                scf::YieldOp::create(builder, loc, resultValuesFor);
+            })
             .getResult(0);
     // Replace the original results
     rewriter.replaceOp(op, resultValues);
@@ -255,43 +254,44 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
     rewriter.insert(shotsLocal);
     quantum::DeviceInitOp::create(rewriter, loc, shotsLocal->getResult(0), lib, name, kwargs);
 
-    Value allocQreg = func::CallOp::create(rewriter, loc, fnAllocOp, numberQubitsValue).getResult(0);
+    Value allocQreg =
+        func::CallOp::create(rewriter, loc, fnAllocOp, numberQubitsValue).getResult(0);
 
     int64_t sizeArgs = fnFoldedOp.getArguments().size();
     Value size = fnFoldedOp.getArgument(sizeArgs - 1);
     // Add scf for loop to create the folding
     Value loopedQreg =
         scf::ForOp::create(
-                rewriter, loc, c0, size, c1, /*iterArgsInit=*/allocQreg,
-                [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
-                    Value qreg = iterArgs.front();
-                    std::vector<Value> argsAndQreg(fnFoldedOp.getArguments().begin(),
-                                                   fnFoldedOp.getArguments().end());
-                    argsAndQreg.pop_back();
-                    argsAndQreg.push_back(qreg);
+            rewriter, loc, c0, size, c1, /*iterArgsInit=*/allocQreg,
+            [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
+                Value qreg = iterArgs.front();
+                std::vector<Value> argsAndQreg(fnFoldedOp.getArguments().begin(),
+                                               fnFoldedOp.getArguments().end());
+                argsAndQreg.pop_back();
+                argsAndQreg.push_back(qreg);
 
-                    // Call the function without measurements
-                    Value fnWithoutMeasurementsQreg =
-                        func::CallOp::create(builder, loc, fnWithoutMeasurementsOp, argsAndQreg)
-                            .getResult(0);
+                // Call the function without measurements
+                Value fnWithoutMeasurementsQreg =
+                    func::CallOp::create(builder, loc, fnWithoutMeasurementsOp, argsAndQreg)
+                        .getResult(0);
 
-                    // Call the function without measurements in an adjoint region
-                    auto adjointOp = quantum::AdjointOp::create(builder, loc, qregType,
-                                                                        fnWithoutMeasurementsQreg);
-                    Region *adjointRegion = &adjointOp.getRegion();
-                    Block *adjointBlock = builder.createBlock(adjointRegion, {}, qregType, loc);
+                // Call the function without measurements in an adjoint region
+                auto adjointOp =
+                    quantum::AdjointOp::create(builder, loc, qregType, fnWithoutMeasurementsQreg);
+                Region *adjointRegion = &adjointOp.getRegion();
+                Block *adjointBlock = builder.createBlock(adjointRegion, {}, qregType, loc);
 
-                    std::vector<Value> argsAndQregAdjoint(fnFoldedOp.getArguments().begin(),
-                                                          fnFoldedOp.getArguments().end());
-                    argsAndQregAdjoint.pop_back();
-                    argsAndQregAdjoint.push_back(adjointBlock->getArgument(0));
-                    Value fnWithoutMeasurementsAdjointQreg =
-                        func::CallOp::create(builder, loc, fnWithoutMeasurementsOp, argsAndQregAdjoint)
-                            .getResult(0);
-                    quantum::YieldOp::create(builder, loc, fnWithoutMeasurementsAdjointQreg);
-                    builder.setInsertionPointAfter(adjointOp);
-                    scf::YieldOp::create(builder, loc, adjointOp.getResult());
-                })
+                std::vector<Value> argsAndQregAdjoint(fnFoldedOp.getArguments().begin(),
+                                                      fnFoldedOp.getArguments().end());
+                argsAndQregAdjoint.pop_back();
+                argsAndQregAdjoint.push_back(adjointBlock->getArgument(0));
+                Value fnWithoutMeasurementsAdjointQreg =
+                    func::CallOp::create(builder, loc, fnWithoutMeasurementsOp, argsAndQregAdjoint)
+                        .getResult(0);
+                quantum::YieldOp::create(builder, loc, fnWithoutMeasurementsAdjointQreg);
+                builder.setInsertionPointAfter(adjointOp);
+                scf::YieldOp::create(builder, loc, adjointOp.getResult());
+            })
             .getResult(0);
     std::vector<Value> argsAndRegMeasurement(fnFoldedOp.getArguments().begin(),
                                              fnFoldedOp.getArguments().end());
@@ -331,24 +331,23 @@ FlatSymbolRefAttr allLocalFolding(PatternRewriter &rewriter, std::string fnFolde
 
         // Insert a for loop immediately before each quantum::QuantumGate
         const auto forVal =
-            scf::ForOp::create(
-                    rewriter, loc, c0, size, c1, /*iterArgsInit=*/opQubitArgs,
-                    [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
-                        // Create adjoint and original operations
-                        quantum::QuantumGate origOp =
-                            dyn_cast<quantum::QuantumGate>(builder.clone(*op));
-                        origOp.setQubitOperands(iterArgs);
-                        auto origOpVal = origOp->getResults();
+            scf::ForOp::create(rewriter, loc, c0, size, c1, /*iterArgsInit=*/opQubitArgs,
+                               [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
+                                   // Create adjoint and original operations
+                                   quantum::QuantumGate origOp =
+                                       dyn_cast<quantum::QuantumGate>(builder.clone(*op));
+                                   origOp.setQubitOperands(iterArgs);
+                                   auto origOpVal = origOp->getResults();
 
-                        quantum::QuantumGate adjointOp =
-                            dyn_cast<quantum::QuantumGate>(builder.clone(*origOp));
-                        adjointOp.setQubitOperands(origOpVal);
-                        adjointOp.setAdjointFlag(!adjointOp.getAdjointFlag());
-                        auto adjointOpVal = adjointOp->getResults();
+                                   quantum::QuantumGate adjointOp =
+                                       dyn_cast<quantum::QuantumGate>(builder.clone(*origOp));
+                                   adjointOp.setQubitOperands(origOpVal);
+                                   adjointOp.setAdjointFlag(!adjointOp.getAdjointFlag());
+                                   auto adjointOpVal = adjointOp->getResults();
 
-                        // Yield the qubits.
-                        scf::YieldOp::create(builder, loc, adjointOpVal);
-                    })
+                                   // Yield the qubits.
+                                   scf::YieldOp::create(builder, loc, adjointOpVal);
+                               })
                 .getResults();
 
         op.setQubitOperands(forVal);

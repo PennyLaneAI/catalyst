@@ -46,12 +46,11 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
         OpBuilder::InsertionGuard guard(rewriter); // to reset the insertion point
         rewriter.setInsertionPointToStart(mod.getBody());
         glb = LLVM::GlobalOp::create(rewriter, loc, type, true, LLVM::Linkage::Internal, key,
-                                              rewriter.getStringAttr(value));
+                                     rewriter.getStringAttr(value));
     }
     return LLVM::GEPOp::create(rewriter, loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
-                                        type, LLVM::AddressOfOp::create(rewriter, loc, glb),
-                                        ArrayRef<LLVM::GEPArg>{0, 0},
-                                        LLVM::GEPNoWrapFlags::inbounds);
+                               type, LLVM::AddressOfOp::create(rewriter, loc, glb),
+                               ArrayRef<LLVM::GEPArg>{0, 0}, LLVM::GEPNoWrapFlags::inbounds);
 }
 
 enum NumericType : int8_t {
@@ -229,7 +228,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
             LLVM::StoreOp::create(rewriter, loc, structValue, structPtr);
 
             Value printDescriptor = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI1Type(),
-                                                                      op.getPrintDescriptor());
+                                                             op.getPrintDescriptor());
             SmallVector<Value> callArgs{structPtr, printDescriptor};
             rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, callArgs);
         }
@@ -308,9 +307,9 @@ Value EncodeDataMemRef(Location loc, PatternRewriter &rewriter, MemRefType memre
     // Memref data
     MemRefDescriptor desc = MemRefDescriptor(memrefLlvm);
     Value c0 = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(0));
-    Value data = LLVM::GEPOp::create(rewriter, loc, ptr, memrefType.getElementType(),
-                                              desc.alignedPtr(rewriter, loc), c0,
-                                              LLVM::GEPNoWrapFlags::inbounds);
+    Value data =
+        LLVM::GEPOp::create(rewriter, loc, ptr, memrefType.getElementType(),
+                            desc.alignedPtr(rewriter, loc), c0, LLVM::GEPNoWrapFlags::inbounds);
     memref = LLVM::InsertValueOp::create(rewriter, loc, memref, data, 1);
 
     // Dtype
@@ -506,8 +505,8 @@ struct ReplaceCallbackOpWithFuncOp : public OpConversionPattern<CallbackOp> {
         ModuleOp mod = op->getParentOfType<ModuleOp>();
         rewriter.setInsertionPointToStart(mod.getBody());
 
-        auto func =
-            mlir::func::FuncOp::create(rewriter, op.getLoc(), op.getSymName(), op.getFunctionType());
+        auto func = mlir::func::FuncOp::create(rewriter, op.getLoc(), op.getSymName(),
+                                               op.getFunctionType());
         func.setPrivate();
         auto noinline = rewriter.getStringAttr("noinline");
         rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());

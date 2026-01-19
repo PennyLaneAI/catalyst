@@ -71,8 +71,9 @@ LogicalResult wrapMemRefArgsFunc(func::FuncOp func, const TypeConverter *typeCon
             // used. Otherwise, LLVM may optimize it away with a poison value.
             //   Note: both the volatile load and store are necessary. MLIR respects the store
             //   but not the load, while LLVM respects the volatile load but not the store.
-            Value replacedMemref = LLVM::LoadOp::create(rewriter,
-                loc, structType, wrappedMemref, /*alignment*/ 0, /*isVolatile=*/volatileArgs);
+            Value replacedMemref =
+                LLVM::LoadOp::create(rewriter, loc, structType, wrappedMemref, /*alignment*/ 0,
+                                     /*isVolatile=*/volatileArgs);
             if (volatileArgs) {
                 LLVM::StoreOp::create(rewriter, loc, replacedMemref, wrappedMemref);
             }
@@ -151,19 +152,20 @@ LLVM::GlobalOp insertEnzymeCustomGradient(OpBuilder &builder, ModuleOp moduleOp,
     auto ptrType = LLVM::LLVMPointerType::get(context);
     auto resultType = LLVM::LLVMArrayType::get(ptrType, 3);
     customGradient = LLVM::GlobalOp::create(builder, loc, resultType,
-                                                    /*isConstant=*/false, LLVM::Linkage::External,
-                                                    key, /*address space=*/nullptr);
+                                            /*isConstant=*/false, LLVM::Linkage::External, key,
+                                            /*address space=*/nullptr);
     builder.createBlock(&customGradient.getInitializerRegion());
     Value origFnPtr = func::ConstantOp::create(builder, loc, originalFunc.getFunctionType(),
-                                                       originalFunc.getName());
+                                               originalFunc.getName());
     Value augFnPtr = func::ConstantOp::create(builder, loc, augmentedPrimal.getFunctionType(),
-                                                      augmentedPrimal.getName());
+                                              augmentedPrimal.getName());
     Value gradFnPtr =
         func::ConstantOp::create(builder, loc, gradient.getFunctionType(), gradient.getName());
     SmallVector<Value> fnPtrs{origFnPtr, augFnPtr, gradFnPtr};
     Value result = LLVM::UndefOp::create(builder, loc, resultType);
     for (const auto &[idx, fnPtr] : llvm::enumerate(fnPtrs)) {
-        Value casted = UnrealizedConversionCastOp::create(builder, loc, ptrType, fnPtr).getResult(0);
+        Value casted =
+            UnrealizedConversionCastOp::create(builder, loc, ptrType, fnPtr).getResult(0);
         result = LLVM::InsertValueOp::create(builder, loc, result, casted, idx);
     }
 
@@ -237,10 +239,10 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
             rewriter, op, gradFnName, gradFnSignature);
 
         // Run the forward pass and cache the circuit.
-        Value c_true = LLVM::ConstantOp::create(rewriter,
-            loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 1));
-        Value c_false = LLVM::ConstantOp::create(rewriter,
-            loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 0));
+        Value c_true = LLVM::ConstantOp::create(
+            rewriter, loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 1));
+        Value c_false = LLVM::ConstantOp::create(
+            rewriter, loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 0));
         LLVM::CallOp::create(rewriter, loc, cacheFnDecl, c_true);
         Value qreg = func::CallOp::create(rewriter, loc, callee, op.getArgs()).getResult(0);
         if (!isa<catalyst::quantum::QuregType>(qreg.getType()))
@@ -251,12 +253,12 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
         // arguments to the C function, although in this case as a variadic argument list to allow
         // for a varying number of results in a single signature.
         Value c1 = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(1));
-        Value numResults = LLVM::ConstantOp::create(rewriter,
-            loc, rewriter.getI64IntegerAttr(op.getDataIn().size()));
+        Value numResults = LLVM::ConstantOp::create(
+            rewriter, loc, rewriter.getI64IntegerAttr(op.getDataIn().size()));
         SmallVector<Value> args = {numResults};
         for (Value memref : adaptor.getDataIn()) {
-            Value newArg = LLVM::AllocaOp::create(rewriter,
-                loc, LLVM::LLVMPointerType::get(rewriter.getContext()), vectorType, c1);
+            Value newArg = LLVM::AllocaOp::create(
+                rewriter, loc, LLVM::LLVMPointerType::get(rewriter.getContext()), vectorType, c1);
             LLVM::StoreOp::create(rewriter, loc, memref, newArg);
             args.push_back(newArg);
         }
@@ -372,8 +374,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         insertGlobalSymbol(rewriter, moduleOp, enzyme_dupnoneed_key, std::nullopt);
 
         ValueRange argShadows = adaptor.getDiffArgShadows();
-        Value enzymeConst = LLVM::AddressOfOp::create(rewriter, loc, LLVM::LLVMPointerType::get(ctx),
-                                                               enzyme_const_key);
+        Value enzymeConst = LLVM::AddressOfOp::create(
+            rewriter, loc, LLVM::LLVMPointerType::get(ctx), enzyme_const_key);
         ValueRange convArgs = adaptor.getArgs();
         // Add the arguments and the argument shadows of memrefs
         for (auto [index, arg] : llvm::enumerate(op.getArgs())) {
@@ -427,8 +429,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
   private:
     Value castToConvertedType(Value value, OpBuilder &builder, Location loc) const
     {
-        auto casted = UnrealizedConversionCastOp::create(builder,
-            loc, getTypeConverter()->convertType(value.getType()), value);
+        auto casted = UnrealizedConversionCastOp::create(
+            builder, loc, getTypeConverter()->convertType(value.getType()), value);
         return casted.getResult(0);
     }
 
@@ -464,7 +466,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                     computeMemRefSizeInBytes(memRefType, shadowDesc, builder, loc);
                 Value zero = LLVM::ConstantOp::create(builder, loc, builder.getI8Type(), 0);
                 LLVM::MemsetOp::create(builder, loc, shadowPtr, zero, bufferSizeBytes,
-                                               /*isVolatile=*/false);
+                                       /*isVolatile=*/false);
             }
             callArgs.push_back(shadowPtr);
         }
@@ -532,12 +534,12 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         }
         else {
             bufferSize = LLVM::MulOp::create(builder, loc, descriptor.size(builder, loc, 0),
-                                                     descriptor.stride(builder, loc, 0));
+                                             descriptor.stride(builder, loc, 0));
             bufferSize =
                 LLVM::AddOp::create(builder, loc, descriptor.offset(builder, loc), bufferSize);
         }
-        Value elementByteSize = LLVM::ConstantOp::create(builder,
-            loc, indexType, builder.getIndexAttr(type.getElementTypeBitWidth() / 8));
+        Value elementByteSize = LLVM::ConstantOp::create(
+            builder, loc, indexType, builder.getIndexAttr(type.getElementTypeBitWidth() / 8));
         Value bufferSizeBytes = LLVM::MulOp::create(builder, loc, elementByteSize, bufferSize);
         return bufferSizeBytes;
     }
@@ -575,8 +577,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         auto tapeType = LLVM::LLVMPointerType::get(ctx);
         SmallVector<Type> argTypes;
         convertCustomGradArgumentTypes(qnode.getArgumentTypes(), argTypes);
-        augmentedForward = func::FuncOp::create(builder,
-            qnode.getLoc(), augmentedName, FunctionType::get(ctx, argTypes, {tapeType}));
+        augmentedForward = func::FuncOp::create(builder, qnode.getLoc(), augmentedName,
+                                                FunctionType::get(ctx, argTypes, {tapeType}));
         augmentedForward.setPrivate();
         Location loc = qnode.getLoc();
 
@@ -734,12 +736,11 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         auto resultType = LLVM::LLVMArrayType::get(ptrType, 4);
 
         LLVM::GlobalOp::create(builder, loc, LLVM::LLVMArrayType::get(builder.getI8Type(), 3), true,
-                                       LLVM::Linkage::Linkonce, "dealloc_indices",
-                                       builder.getStringAttr(StringRef("-1", 3)));
-        allocationLike =
-            LLVM::GlobalOp::create(builder, loc, resultType,
-                                           /*isConstant=*/false, LLVM::Linkage::External,
-                                           enzyme_allocation_key, /*address space=*/nullptr);
+                               LLVM::Linkage::Linkonce, "dealloc_indices",
+                               builder.getStringAttr(StringRef("-1", 3)));
+        allocationLike = LLVM::GlobalOp::create(builder, loc, resultType,
+                                                /*isConstant=*/false, LLVM::Linkage::External,
+                                                enzyme_allocation_key, /*address space=*/nullptr);
         builder.createBlock(&allocationLike.getInitializerRegion());
         Value allocFn = LLVM::AddressOfOp::create(builder, loc, ptrType, allocFuncName);
         Value sizeArgIndex =
@@ -750,9 +751,12 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         Value freeFn = LLVM::AddressOfOp::create(builder, loc, ptrType, freeFuncName);
 
         Value result = LLVM::UndefOp::create(builder, loc, resultType);
-        result = LLVM::InsertValueOp::create(builder, loc, result, allocFn, SmallVector<int64_t>{0});
-        result = LLVM::InsertValueOp::create(builder, loc, result, sizeArgIndexPtr, SmallVector<int64_t>{1});
-        result = LLVM::InsertValueOp::create(builder, loc, result, deallocIndicesPtr, SmallVector<int64_t>{2});
+        result =
+            LLVM::InsertValueOp::create(builder, loc, result, allocFn, SmallVector<int64_t>{0});
+        result = LLVM::InsertValueOp::create(builder, loc, result, sizeArgIndexPtr,
+                                             SmallVector<int64_t>{1});
+        result = LLVM::InsertValueOp::create(builder, loc, result, deallocIndicesPtr,
+                                             SmallVector<int64_t>{2});
         result = LLVM::InsertValueOp::create(builder, loc, result, freeFn, SmallVector<int64_t>{3});
         LLVM::ReturnOp::create(builder, loc, result);
 
@@ -775,12 +779,12 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         if (!glb) {
             if (!value) {
                 LLVM::GlobalOp::create(rewriter, op.getLoc(), shortTy,
-                                                /*isConstant=*/true, LLVM::Linkage::Linkonce, key,
-                                                IntegerAttr::get(shortTy, 0));
+                                       /*isConstant=*/true, LLVM::Linkage::Linkonce, key,
+                                       IntegerAttr::get(shortTy, 0));
             }
             else {
-                LLVM::GlobalOp::create(rewriter,
-                    op.getLoc(), LLVM::LLVMArrayType::get(shortTy, value->size()), true,
+                LLVM::GlobalOp::create(
+                    rewriter, op.getLoc(), LLVM::LLVMArrayType::get(shortTy, value->size()), true,
                     LLVM::Linkage::Linkonce, key, rewriter.getStringAttr(*value));
             }
         }
@@ -803,8 +807,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             return glb;
         }
         glb = LLVM::GlobalOp::create(rewriter, op.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2),
-                                              /*isConstant=*/false, LLVM::Linkage::External, key,
-                                              nullptr);
+                                     /*isConstant=*/false, LLVM::Linkage::External, key, nullptr);
 
         // Create the block and push it back in the global
         auto *contextGlb = glb.getContext();
@@ -825,10 +828,10 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
         auto undefArray =
             LLVM::UndefOp::create(rewriter, glb.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2));
-        Value llvmInsert0 =
-            LLVM::InsertValueOp::create(rewriter, glb.getLoc(), undefArray, originalGlobal, SmallVector<int64_t>{0});
-        Value llvmInsert1 =
-            LLVM::InsertValueOp::create(rewriter, glb.getLoc(), llvmInsert0, enzymeGlobal, SmallVector<int64_t>{1});
+        Value llvmInsert0 = LLVM::InsertValueOp::create(rewriter, glb.getLoc(), undefArray,
+                                                        originalGlobal, SmallVector<int64_t>{0});
+        Value llvmInsert1 = LLVM::InsertValueOp::create(rewriter, glb.getLoc(), llvmInsert0,
+                                                        enzymeGlobal, SmallVector<int64_t>{1});
         LLVM::ReturnOp::create(rewriter, glb.getLoc(), llvmInsert1);
         return glb;
     }

@@ -134,7 +134,7 @@ void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter &rewrite
         Value allocatedPtrToInt =
             LLVM::PtrToIntOp::create(rewriter, op->getLoc(), llvmIndex, allocatedPtr);
         Value comparison = LLVM::ICmpOp::create(rewriter, op->getLoc(), LLVM::ICmpPredicate::eq,
-                                                         deadbeef, allocatedPtrToInt);
+                                                deadbeef, allocatedPtrToInt);
 
         scf::IfOp ifOp = scf::IfOp::create(
             rewriter, op->getLoc(), comparison,

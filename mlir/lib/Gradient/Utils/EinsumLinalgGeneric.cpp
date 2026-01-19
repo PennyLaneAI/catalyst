@@ -43,8 +43,8 @@ Value buildTensorLinalgGeneric(OpBuilder &builder, Location loc, ValueRange oper
 {
     // Initialize the result tensor
     FloatType elementType = cast<FloatType>(resultType.getElementType());
-    Value zero = arith::ConstantFloatOp::create(
-        builder, loc, elementType, APFloat::getZero(elementType.getFloatSemantics()));
+    Value zero = arith::ConstantFloatOp::create(builder, loc, elementType,
+                                                APFloat::getZero(elementType.getFloatSemantics()));
     Value result =
         tensor::EmptyOp::create(builder, loc, resultType.getShape(), resultType.getElementType());
     result = linalg::FillOp::create(builder, loc, zero, result).getResult(0);
@@ -115,8 +115,9 @@ Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<int64_t> axisCod
     inferIteratorTypes(axisDims, axisCodesResult, iteratorTypes);
     auto bodyBuilder = [](OpBuilder &builder, Location loc, ValueRange args) {
         linalg::YieldOp::create(
-            builder, loc, Value(arith::AddFOp::create(
-                     builder, loc, args[2], arith::MulFOp::create(builder, loc, args[0], args[1]))));
+            builder, loc,
+            Value(arith::AddFOp::create(builder, loc, args[2],
+                                        arith::MulFOp::create(builder, loc, args[0], args[1]))));
     };
 
     if (useBufferSemantics) {

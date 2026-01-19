@@ -149,8 +149,8 @@ class ARTIQRuntimeBuilder {
     {
         ensureConfigSpiFunc();
         auto func = getModule().lookupSymbol<LLVM::LLVMFuncOp>(ARTIQFuncNames::configSpi);
-        auto call =
-            LLVM::CallOp::create(builder, getLoc(), func, ValueRange{baseAddr, cs, len, div, flags});
+        auto call = LLVM::CallOp::create(builder, getLoc(), func,
+                                         ValueRange{baseAddr, cs, len, div, flags});
         call.setCConv(LLVM::CConv::Fast);
         call.setTailCallKind(LLVM::TailCallKind::Tail);
     }
@@ -170,7 +170,7 @@ class ARTIQRuntimeBuilder {
         ensureSetFrequencyFunc();
         auto func = getModule().lookupSymbol<LLVM::LLVMFuncOp>(ARTIQFuncNames::setFrequency);
         LLVM::CallOp::create(builder, getLoc(), func,
-                                     ValueRange{channelId, freqHz, phaseTurns, amplitude});
+                             ValueRange{channelId, freqHz, phaseTurns, amplitude});
         return nowMu();
     }
 
@@ -235,7 +235,7 @@ class ARTIQRuntimeBuilder {
 
         auto funcTy = LLVM::LLVMFunctionType::get(i64Ty, {f64Ty});
         auto func = LLVM::LLVMFuncOp::create(builder, getLoc(), ARTIQFuncNames::secToMu, funcTy,
-                                                     LLVM::Linkage::Internal);
+                                             LLVM::Linkage::Internal);
         func.setCConv(LLVM::CConv::Fast);
 
         Block *entry = func.addEntryBlock(builder);
@@ -262,7 +262,7 @@ class ARTIQRuntimeBuilder {
 
         auto funcTy = LLVM::LLVMFunctionType::get(voidTy, {i32Ty, i32Ty, i32Ty, i32Ty, i32Ty});
         auto func = LLVM::LLVMFuncOp::create(builder, getLoc(), ARTIQFuncNames::configSpi, funcTy,
-                                                     LLVM::Linkage::Internal);
+                                             LLVM::Linkage::Internal);
 
         Block *entry = func.addEntryBlock(builder);
         builder.setInsertionPointToStart(entry);
@@ -304,8 +304,8 @@ class ARTIQRuntimeBuilder {
         builder.setInsertionPointToStart(module.getBody());
 
         auto funcTy = LLVM::LLVMFunctionType::get(voidTy, {i32Ty, f64Ty, f64Ty, f64Ty});
-        auto func = LLVM::LLVMFuncOp::create(builder, getLoc(), ARTIQFuncNames::setFrequency, funcTy,
-                                                     LLVM::Linkage::Internal);
+        auto func = LLVM::LLVMFuncOp::create(builder, getLoc(), ARTIQFuncNames::setFrequency,
+                                             funcTy, LLVM::Linkage::Internal);
 
         Block *entry = func.addEntryBlock(builder);
         builder.setInsertionPointToStart(entry);
