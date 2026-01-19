@@ -62,7 +62,7 @@
   * :func:`catalyst.passes.ppr_to_ppm <~.passes.ppr_to_ppm>`: Absorb Clifford PPRs into terminal Pauli 
     product measurements (PPMs).
 
-  For more information on PPMs, please refer to our [PPM documentation page](https://pennylane.ai/compilation/pauli-based-computation).
+  For more information on PPMs, please refer to our [Pauli-based computation documentation page](https://pennylane.ai/compilation/pauli-based-computation).
 
 * Catalyst now supports qubit number-invariant compilation. That is, programs can be compiled without
   specifying the number of qubits to allocate ahead of time. Instead, the device can be supplied with
