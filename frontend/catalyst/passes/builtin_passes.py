@@ -643,7 +643,7 @@ def to_ppr(qnode):
     Non-Clifford gates are defined as :math:`\exp(-{iP\tfrac{\pi}{8}})`.
 
     For more information on the PPM compilation pass, check out the
-    `compilation hub <https://pennylane.ai/compilation/pauli-product-measurement>`__.
+    `compilation hub <https://pennylane.ai/compilation/pauli-based-computation>`__.
 
     .. note::
 
@@ -727,7 +727,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
         :func:`pennylane.specs`, please use :func:`pennylane.transforms.commute_ppr`.
 
     For more information on PPRs, check out the
-    `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
+    `Compilation Hub <https://pennylane.ai/compilation/pauli-based-computation>`_.
 
     .. note::
 
@@ -842,7 +842,7 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
         :func:`pennylane.specs`, please use :func:`pennylane.transforms.merge_ppr_ppm`.
 
     For more information on PPRs and PPMs, check out
-    the `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
+    the `Compilation Hub <https://pennylane.ai/compilation/pauli-based-computation>`_.
 
     Args:
         fn (QNode): QNode to apply the pass to
@@ -1045,7 +1045,7 @@ def ppm_compilation(
     :func:`~.passes.commute_ppr` and :func:`~.passes.merge_ppr_ppm` passes.
 
     For more information on PPRs and PPMs, check out
-    the `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
+    the `Compilation Hub <https://pennylane.ai/compilation/pauli-based-computation>`_.
 
     Args:
         qnode (QNode, optional): QNode to apply the pass to. If None, returns a decorator.
