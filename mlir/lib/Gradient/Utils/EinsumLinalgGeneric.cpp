@@ -31,8 +31,8 @@ Value buildBufferLinalgGeneric(OpBuilder &builder, Location loc, ValueRange oper
                                ArrayRef<utils::IteratorType> iteratorTypes,
                                function_ref<void(OpBuilder &, Location, ValueRange)> buildBody)
 {
-    builder.create<linalg::GenericOp>(loc, operands, output, indexingMaps, iteratorTypes,
-                                      buildBody);
+    linalg::GenericOp::create(builder, loc, operands, output, indexingMaps, iteratorTypes,
+                              buildBody);
     return output;
 }
 
@@ -43,14 +43,14 @@ Value buildTensorLinalgGeneric(OpBuilder &builder, Location loc, ValueRange oper
 {
     // Initialize the result tensor
     FloatType elementType = cast<FloatType>(resultType.getElementType());
-    Value zero = builder.create<arith::ConstantFloatOp>(
-        loc, elementType, APFloat::getZero(elementType.getFloatSemantics()));
+    Value zero = arith::ConstantFloatOp::create(
+        builder, loc, elementType, APFloat::getZero(elementType.getFloatSemantics()));
     Value result =
-        builder.create<tensor::EmptyOp>(loc, resultType.getShape(), resultType.getElementType());
-    result = builder.create<linalg::FillOp>(loc, zero, result).getResult(0);
+        tensor::EmptyOp::create(builder, loc, resultType.getShape(), resultType.getElementType());
+    result = linalg::FillOp::create(builder, loc, zero, result).getResult(0);
 
-    auto genericOp = builder.create<linalg::GenericOp>(loc, resultType, operands, result,
-                                                       indexingMaps, iteratorTypes, buildBody);
+    auto genericOp = linalg::GenericOp::create(builder, loc, resultType, operands, result,
+                                               indexingMaps, iteratorTypes, buildBody);
     return genericOp.getResult(0);
 }
 
@@ -114,9 +114,9 @@ Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<int64_t> axisCod
                       maps);
     inferIteratorTypes(axisDims, axisCodesResult, iteratorTypes);
     auto bodyBuilder = [](OpBuilder &builder, Location loc, ValueRange args) {
-        builder.create<linalg::YieldOp>(
-            loc, Value(builder.create<arith::AddFOp>(
-                     loc, args[2], builder.create<arith::MulFOp>(loc, args[0], args[1]))));
+        linalg::YieldOp::create(
+            builder, loc, Value(arith::AddFOp::create(
+                     builder, loc, args[2], arith::MulFOp::create(builder, loc, args[0], args[1]))));
     };
 
     if (useBufferSemantics) {

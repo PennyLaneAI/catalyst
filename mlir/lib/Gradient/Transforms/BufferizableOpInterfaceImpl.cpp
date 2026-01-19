@@ -84,13 +84,13 @@ Value generateAllocation(OpBuilder &builder, Location loc, Value reference)
     if (!memrefType.hasStaticShape()) {
         for (int64_t dim = 0; dim < memrefType.getRank(); dim++) {
             if (memrefType.isDynamicDim(dim)) {
-                Value dimIndex = builder.create<index::ConstantOp>(loc, dim);
-                dynamicDims.push_back(builder.create<memref::DimOp>(loc, reference, dimIndex));
+                Value dimIndex = index::ConstantOp::create(builder, loc, dim);
+                dynamicDims.push_back(memref::DimOp::create(builder, loc, reference, dimIndex));
             }
         }
     }
 
-    return builder.create<memref::AllocOp>(loc, memrefType, dynamicDims);
+    return memref::AllocOp::create(builder, loc, memrefType, dynamicDims);
 }
 
 // Helper function to generate a list of memref allocations.
@@ -195,7 +195,7 @@ struct AdjointOpInterface
         for (const auto &[i, resType] : llvm::enumerate(resTypes)) {
             if (isa<MemRefType>(resType)) {
                 MemRefType memrefType = cast<MemRefType>(resType);
-                Value memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType, gradSize);
+                Value memrefValue = memref::AllocOp::create(rewriter, loc, memrefType, gradSize);
                 memrefValues.push_back(memrefValue);
             }
             else {
@@ -220,7 +220,7 @@ struct AdjointOpInterface
         }
 
         auto newAdjointOp =
-            rewriter.create<AdjointOp>(loc, nonTensorResultTypes, adjointOp.getCalleeAttr(),
+            AdjointOp::create(rewriter, loc, nonTensorResultTypes, adjointOp.getCalleeAttr(),
                                        adjointOp.getGradSize(), bufferArgs, memrefValues);
         SmallVector<Value> bufferdNewValues;
         size_t nonTensorResultCounter = 0;
@@ -347,8 +347,8 @@ struct BackpropOpInterface
 
         // 4. Create bufferized backprop op
         DenseIntElementsAttr diffArgIndicesAttr = backpropOp.getDiffArgIndices().value_or(nullptr);
-        auto bufferizedBackpropOp = rewriter.create<BackpropOp>(
-            loc, TypeRange{}, scalarReturnTypes, backpropOp.getCalleeAttr(), bufferArgs, argShadows,
+        auto bufferizedBackpropOp = BackpropOp::create(
+            rewriter, loc, TypeRange{}, scalarReturnTypes, backpropOp.getCalleeAttr(), bufferArgs, argShadows,
             calleeResults, bufferCotangents, diffArgIndicesAttr,
             backpropOp.getKeepValueResultsAttr());
         // Fill in the null placeholders.
@@ -479,7 +479,7 @@ struct ForwardOpInterface
                 options.unknownTypeConverterFn(cast<TensorType>(returnVal.getType()),
                                                *options.defaultMemorySpaceFn(tensorType), options);
             Value toBufferOp =
-                rewriter.create<bufferization::ToBufferOp>(loc, resultType, returnVal);
+                bufferization::ToBufferOp::create(rewriter, loc, resultType, returnVal);
             returnValues.push_back(toBufferOp);
         }
 
@@ -588,7 +588,7 @@ struct ReverseOpInterface
                 options.unknownTypeConverterFn(cast<TensorType>(returnVal.getType()),
                                                *options.defaultMemorySpaceFn(tensorType), options);
             Value toBufferOp =
-                rewriter.create<bufferization::ToBufferOp>(loc, resultType, returnVal);
+                bufferization::ToBufferOp::create(rewriter, loc, resultType, returnVal);
             returnValues.push_back(toBufferOp);
         }
 

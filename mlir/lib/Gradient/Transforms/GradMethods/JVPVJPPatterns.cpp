@@ -92,9 +92,9 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
     assert(grad_result_types.size() == func_diff_operand_indices.size() * funcResultTypes.size() &&
            "GradOp does't seem to return a tuple of Jacobians");
 
-    auto fCallOp = rewriter.create<func::CallOp>(loc, calleeOp, calleeOperands);
+    auto fCallOp = func::CallOp::create(rewriter, loc, calleeOp, calleeOperands);
 
-    auto gradOp = rewriter.create<GradOp>(loc, grad_result_types, op.getMethod(), op.getCallee(),
+    auto gradOp = GradOp::create(rewriter, loc, grad_result_types, op.getMethod(), op.getCallee(),
                                           calleeOperands, op.getDiffArgIndicesAttr(),
                                           op.getFiniteDiffParamAttr(), /*arg_attrs=*/nullptr,
                                           /*res_attrs=*/nullptr);
@@ -158,7 +158,7 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
             }
             else {
                 assert(acc.value().getType() == res.getType());
-                auto addOp = rewriter.create<linalg::AddOp>(
+                auto addOp = linalg::AddOp::create(rewriter,
                     loc, res.getType(), ValueRange{acc.value(), res}, ValueRange{acc.value()});
                 acc = addOp.getResultTensors()[0];
             }
@@ -210,9 +210,9 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
     assert(grad_result_types.size() == func_diff_operand_indices.size() * funcResultTypes.size() &&
            "GradOp does't seem to return a tuple of Jacobians");
 
-    auto fCallOp = rewriter.create<func::CallOp>(loc, calleeOp, calleeOperands);
+    auto fCallOp = func::CallOp::create(rewriter, loc, calleeOp, calleeOperands);
 
-    auto gradOp = rewriter.create<GradOp>(loc, grad_result_types, op.getMethod(), op.getCallee(),
+    auto gradOp = GradOp::create(rewriter, loc, grad_result_types, op.getMethod(), op.getCallee(),
                                           calleeOperands, op.getDiffArgIndicesAttr(),
                                           op.getFiniteDiffParamAttr(), /*arg_attrs=*/nullptr,
                                           /*res_attrs=*/nullptr);
@@ -272,7 +272,7 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
             else {
                 assert(acc.value().getType() == res.getType());
 
-                auto addOp = rewriter.create<linalg::AddOp>(
+                auto addOp = linalg::AddOp::create(rewriter,
                     loc, res.getType(), ValueRange{acc.value(), res}, ValueRange{acc.value()});
                 acc = addOp.getResultTensors()[0];
             }
