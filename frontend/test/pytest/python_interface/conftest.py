@@ -109,12 +109,13 @@ def run_filecheck():
         verify (bool): Whether or not to verify the IR after parsing and transforming.
             ``False`` by default.
         roundtrip (bool): Whether or not to use round-trip testing. This is useful for dialect
-            tests to verify that xDSL both parses and prints the IR correctly. If ``True``, we parse
-            the program string into an xDSL module, print it, parse the printed module into an MLIR module,
-            print it again, and then parse this back to an xDSL module. ``False`` by default.
-        pretty_print (bool): Whether to pretty print the program when round-trip testing is performed.
-            If ``False``, the program will be printed in generic format. If ``roundtrip == False``,
-            this argument does nothing. ``False`` by default.
+            tests to verify that xDSL both parses and prints the IR correctly. If ``True``, we
+            parse the program string into an xDSL module, print it, parse the printed module
+            into an MLIR module, print it again, and then parse this back to an xDSL module.
+            ``False`` by default.
+        pretty_print (bool): Whether to pretty print the program when round-trip testing is
+            performed. If ``False``, the program will be printed in generic format. If
+            ``roundtrip == False``, this argument does nothing. ``False`` by default.
     """
     if not deps_available:
         pytest.skip("Cannot run xDSL lit tests without the Python 'filecheck' package.")
