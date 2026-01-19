@@ -63,7 +63,7 @@ func::FuncOp createZneFunc(func::FuncOp funcOp, PatternRewriter &rewriter)
                                                   /*outputs=*/funcOp.getResultTypes());
     std::string fnFoldedName = funcOp.getName().str() + ".zne";
     rewriter.setInsertionPointToStart(funcOp->getParentOfType<ModuleOp>().getBody());
-    auto fnFoldedOp = rewriter.create<func::FuncOp>(loc, fnFoldedName, fnFoldedType);
+    auto fnFoldedOp = func::FuncOp::create(rewriter, loc, fnFoldedName, fnFoldedType);
 
     rewriter.cloneRegionBefore(funcOp.getBody(), fnFoldedOp.getBody(), fnFoldedOp.end());
 
@@ -156,25 +156,24 @@ LogicalResult ZneLowering::matchAndRewrite(mitigation::ZneOp op, PatternRewriter
     RankedTensorType resultType = cast<RankedTensorType>(op.getResultTypes().front());
 
     // Loop over the num fold to create a folded circuit per factor
-    Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
-    Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
-    Value size = rewriter.create<index::ConstantOp>(loc, sizeInt);
+    Value c0 = index::ConstantOp::create(rewriter, loc, 0);
+    Value c1 = index::ConstantOp::create(rewriter, loc, 1);
+    Value size = index::ConstantOp::create(rewriter, loc, sizeInt);
     // Initialize the results as empty tensor
 
     Value results =
-        rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), resultType.getElementType());
+        tensor::EmptyOp::create(rewriter, loc, resultType.getShape(), resultType.getElementType());
     Value resultValues =
-        rewriter
-            .create<scf::ForOp>(
-                loc, c0, size, c1, /*iterArgsInit=*/results,
+        scf::ForOp::create(
+                rewriter, loc, c0, size, c1, /*iterArgsInit=*/results,
                 [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
                     std::vector<Value> newArgs(op.getArgs().begin(), op.getArgs().end());
                     SmallVector<Value> index = {i};
-                    Value numFold = builder.create<tensor::ExtractOp>(loc, numFolds, index);
+                    Value numFold = tensor::ExtractOp::create(builder, loc, numFolds, index);
                     Value numFoldCasted =
-                        builder.create<index::CastSOp>(loc, builder.getIndexType(), numFold);
+                        index::CastSOp::create(builder, loc, builder.getIndexType(), numFold);
                     newArgs.push_back(numFoldCasted);
-                    func::CallOp callOp = builder.create<func::CallOp>(loc, fnFoldedOp, newArgs);
+                    func::CallOp callOp = func::CallOp::create(builder, loc, fnFoldedOp, newArgs);
 
                     int64_t numResults = callOp.getNumResults();
 
@@ -185,7 +184,7 @@ LogicalResult ZneLowering::matchAndRewrite(mitigation::ZneOp op, PatternRewriter
                     for (Value resultValue : resultValuesMulti) {
                         Value resultExtracted;
                         if (isa<RankedTensorType>(resultValue.getType())) {
-                            resultExtracted = builder.create<tensor::ExtractOp>(loc, resultValue);
+                            resultExtracted = tensor::ExtractOp::create(builder, loc, resultValue);
                         }
                         else {
                             resultExtracted = resultValue;
@@ -195,17 +194,16 @@ LogicalResult ZneLowering::matchAndRewrite(mitigation::ZneOp op, PatternRewriter
                     SmallVector<int64_t> resShape = {numResults};
                     Type type = RankedTensorType::get(resShape, vectorResultsMulti[0].getType());
                     auto tensorResults =
-                        builder.create<tensor::FromElementsOp>(loc, type, vectorResultsMulti);
-                    Value sizeResultsValue = rewriter.create<index::ConstantOp>(loc, numResults);
+                        tensor::FromElementsOp::create(builder, loc, type, vectorResultsMulti);
+                    Value sizeResultsValue = index::ConstantOp::create(rewriter, loc, numResults);
                     Value resultValuesFor =
-                        rewriter
-                            .create<scf::ForOp>(
-                                loc, c0, sizeResultsValue, c1,
+                        scf::ForOp::create(
+                                rewriter, loc, c0, sizeResultsValue, c1,
                                 /*iterArgsInit=*/iterArgs.front(),
                                 [&](OpBuilder &builder, Location loc, Value j,
                                     ValueRange iterArgsIn) {
                                     Value resultExtracted =
-                                        builder.create<tensor::ExtractOp>(loc, tensorResults, j);
+                                        tensor::ExtractOp::create(builder, loc, tensorResults, j);
                                     SmallVector<Value> indices;
                                     if (numResults == 1) {
                                         indices = {i};
@@ -213,13 +211,13 @@ LogicalResult ZneLowering::matchAndRewrite(mitigation::ZneOp op, PatternRewriter
                                     else {
                                         indices = {i, j};
                                     }
-                                    Value resultInserted = builder.create<tensor::InsertOp>(
-                                        loc, resultExtracted, iterArgsIn.front(), indices);
+                                    Value resultInserted = tensor::InsertOp::create(
+                                        builder, loc, resultExtracted, iterArgsIn.front(), indices);
 
-                                    builder.create<scf::YieldOp>(loc, resultInserted);
+                                    scf::YieldOp::create(builder, loc, resultInserted);
                                 })
                             .getResult(0);
-                    builder.create<scf::YieldOp>(loc, resultValuesFor);
+                    scf::YieldOp::create(builder, loc, resultValuesFor);
                 })
             .getResult(0);
     // Replace the original results
@@ -242,10 +240,10 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
 
     rewriter.setInsertionPointToStart(fnFoldedOp.addEntryBlock());
     // Loop control variables
-    Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
-    Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
+    Value c0 = index::ConstantOp::create(rewriter, loc, 0);
+    Value c1 = index::ConstantOp::create(rewriter, loc, 1);
     TypedAttr numberQubitsAttr = rewriter.getI64IntegerAttr(numberQubits);
-    Value numberQubitsValue = rewriter.create<arith::ConstantOp>(loc, numberQubitsAttr);
+    Value numberQubitsValue = arith::ConstantOp::create(rewriter, loc, numberQubitsAttr);
 
     // TODO: in the frontend, calculation of shots will happen outside of the qnode,
     // before qml.device(..., shots = <some value computed earlier>) is called,
@@ -255,17 +253,16 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
     Operation *shotsLocal = shots->clone();
 
     rewriter.insert(shotsLocal);
-    rewriter.create<quantum::DeviceInitOp>(loc, shotsLocal->getResult(0), lib, name, kwargs);
+    quantum::DeviceInitOp::create(rewriter, loc, shotsLocal->getResult(0), lib, name, kwargs);
 
-    Value allocQreg = rewriter.create<func::CallOp>(loc, fnAllocOp, numberQubitsValue).getResult(0);
+    Value allocQreg = func::CallOp::create(rewriter, loc, fnAllocOp, numberQubitsValue).getResult(0);
 
     int64_t sizeArgs = fnFoldedOp.getArguments().size();
     Value size = fnFoldedOp.getArgument(sizeArgs - 1);
     // Add scf for loop to create the folding
     Value loopedQreg =
-        rewriter
-            .create<scf::ForOp>(
-                loc, c0, size, c1, /*iterArgsInit=*/allocQreg,
+        scf::ForOp::create(
+                rewriter, loc, c0, size, c1, /*iterArgsInit=*/allocQreg,
                 [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
                     Value qreg = iterArgs.front();
                     std::vector<Value> argsAndQreg(fnFoldedOp.getArguments().begin(),
@@ -275,11 +272,11 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
 
                     // Call the function without measurements
                     Value fnWithoutMeasurementsQreg =
-                        builder.create<func::CallOp>(loc, fnWithoutMeasurementsOp, argsAndQreg)
+                        func::CallOp::create(builder, loc, fnWithoutMeasurementsOp, argsAndQreg)
                             .getResult(0);
 
                     // Call the function without measurements in an adjoint region
-                    auto adjointOp = builder.create<quantum::AdjointOp>(loc, qregType,
+                    auto adjointOp = quantum::AdjointOp::create(builder, loc, qregType,
                                                                         fnWithoutMeasurementsQreg);
                     Region *adjointRegion = &adjointOp.getRegion();
                     Block *adjointBlock = builder.createBlock(adjointRegion, {}, qregType, loc);
@@ -289,12 +286,11 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
                     argsAndQregAdjoint.pop_back();
                     argsAndQregAdjoint.push_back(adjointBlock->getArgument(0));
                     Value fnWithoutMeasurementsAdjointQreg =
-                        builder
-                            .create<func::CallOp>(loc, fnWithoutMeasurementsOp, argsAndQregAdjoint)
+                        func::CallOp::create(builder, loc, fnWithoutMeasurementsOp, argsAndQregAdjoint)
                             .getResult(0);
-                    builder.create<quantum::YieldOp>(loc, fnWithoutMeasurementsAdjointQreg);
+                    quantum::YieldOp::create(builder, loc, fnWithoutMeasurementsAdjointQreg);
                     builder.setInsertionPointAfter(adjointOp);
-                    builder.create<scf::YieldOp>(loc, adjointOp.getResult());
+                    scf::YieldOp::create(builder, loc, adjointOp.getResult());
                 })
             .getResult(0);
     std::vector<Value> argsAndRegMeasurement(fnFoldedOp.getArguments().begin(),
@@ -302,11 +298,11 @@ FlatSymbolRefAttr globalFolding(Location loc, PatternRewriter &rewriter, std::st
     argsAndRegMeasurement.pop_back();
     argsAndRegMeasurement.push_back(loopedQreg);
     ValueRange funcFolded =
-        rewriter.create<func::CallOp>(loc, fnWithMeasurementsOp, argsAndRegMeasurement)
+        func::CallOp::create(rewriter, loc, fnWithMeasurementsOp, argsAndRegMeasurement)
             .getResults();
     // Remove device
-    rewriter.create<quantum::DeviceReleaseOp>(loc);
-    rewriter.create<func::ReturnOp>(loc, funcFolded);
+    quantum::DeviceReleaseOp::create(rewriter, loc);
+    func::ReturnOp::create(rewriter, loc, funcFolded);
     return SymbolRefAttr::get(rewriter.getContext(), fnFoldedName);
 }
 // In *.cpp module only, to keep extraneous headers out of *.hpp
@@ -335,9 +331,8 @@ FlatSymbolRefAttr allLocalFolding(PatternRewriter &rewriter, std::string fnFolde
 
         // Insert a for loop immediately before each quantum::QuantumGate
         const auto forVal =
-            rewriter
-                .create<scf::ForOp>(
-                    loc, c0, size, c1, /*iterArgsInit=*/opQubitArgs,
+            scf::ForOp::create(
+                    rewriter, loc, c0, size, c1, /*iterArgsInit=*/opQubitArgs,
                     [&](OpBuilder &builder, Location loc, Value i, ValueRange iterArgs) {
                         // Create adjoint and original operations
                         quantum::QuantumGate origOp =
@@ -352,7 +347,7 @@ FlatSymbolRefAttr allLocalFolding(PatternRewriter &rewriter, std::string fnFolde
                         auto adjointOpVal = adjointOp->getResults();
 
                         // Yield the qubits.
-                        builder.create<scf::YieldOp>(loc, adjointOpVal);
+                        scf::YieldOp::create(builder, loc, adjointOpVal);
                     })
                 .getResults();
 
@@ -405,7 +400,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
                                                   typesFolded,
                                                   /*outputs=*/fnOp.getResultTypes());
 
-    func::FuncOp fnFoldedOp = rewriter.create<func::FuncOp>(loc, fnFoldedName, fnFoldedType);
+    func::FuncOp fnFoldedOp = func::FuncOp::create(rewriter, loc, fnFoldedName, fnFoldedType);
     fnFoldedOp.setPrivate();
     if (foldingAlgorithm == Folding(1)) {
         // Quantum Alloc function
@@ -436,8 +431,8 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFoldedCircuit(Location loc, PatternRew
     Block *fnFoldedOpBlock = &fnFoldedOp.getBody().front();
     rewriter.setInsertionPointToStart(fnFoldedOpBlock);
     // Loop control variables
-    Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
-    Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
+    Value c0 = index::ConstantOp::create(rewriter, loc, 0);
+    Value c1 = index::ConstantOp::create(rewriter, loc, 1);
 
     fnFoldedOpBlock->addArgument(fnFoldedOp.getArgumentTypes().back(), loc);
 
@@ -465,14 +460,14 @@ FlatSymbolRefAttr ZneLowering::getOrInsertQuantumAlloc(Location loc, PatternRewr
     FunctionType fnAllocType = FunctionType::get(ctx, /*inputs=*/
                                                  i64Type,
                                                  /*outputs=*/qregType);
-    func::FuncOp fnAlloc = rewriter.create<func::FuncOp>(loc, fnAllocName, fnAllocType);
+    func::FuncOp fnAlloc = func::FuncOp::create(rewriter, loc, fnAllocName, fnAllocType);
     fnAlloc.setPrivate();
     Block *allocBloc = fnAlloc.addEntryBlock();
     rewriter.setInsertionPointToStart(allocBloc);
     Value nQubits = allocBloc->getArgument(0);
     IntegerAttr intAttr{};
-    auto qreg = rewriter.create<quantum::AllocOp>(loc, qregType, nQubits, intAttr);
-    rewriter.create<func::ReturnOp>(loc, qreg.getResult());
+    auto qreg = quantum::AllocOp::create(rewriter, loc, qregType, nQubits, intAttr);
+    func::ReturnOp::create(rewriter, loc, qreg.getResult());
     return SymbolRefAttr::get(ctx, fnAllocName);
 }
 FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
@@ -497,7 +492,7 @@ FlatSymbolRefAttr ZneLowering::getOrInsertFnWithoutMeasurements(Location loc,
                                                                typesWithoutMeasurements,
                                                                /*outputs=*/qregType);
     func::FuncOp fnWithoutMeasurementsOp =
-        rewriter.create<func::FuncOp>(loc, fnWithoutMeasurementsName, fnWithoutMeasurementsType);
+        func::FuncOp::create(rewriter, loc, fnWithoutMeasurementsName, fnWithoutMeasurementsType);
     fnWithoutMeasurementsOp.setPrivate();
     rewriter.cloneRegionBefore(fnOp.getBody(), fnWithoutMeasurementsOp.getBody(),
                                fnWithoutMeasurementsOp.end());
@@ -551,7 +546,7 @@ ZneLowering::getOrInsertFnWithMeasurements(Location loc, PatternRewriter &rewrit
                                                             typesWithQreg,
                                                             /*outputs=*/fnOp.getResultTypes());
     func::FuncOp fnWithMeasurementsOp =
-        rewriter.create<func::FuncOp>(loc, fnWithMeasurementsName, fnWithMeasurementsType);
+        func::FuncOp::create(rewriter, loc, fnWithMeasurementsName, fnWithMeasurementsType);
     fnWithMeasurementsOp.setPrivate();
     rewriter.cloneRegionBefore(fnOp.getBody(), fnWithMeasurementsOp.getBody(),
                                fnWithMeasurementsOp.end());
