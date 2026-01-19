@@ -147,9 +147,9 @@ struct CustomCallOpInterface
                     MemRefType::get(bufferedOperandMemrefType.getShape(),
                                     bufferedOperandMemrefType.getElementType());
                 auto allocOp =
-                    rewriter.create<memref::AllocOp>(op->getLoc(), copiedOperandMemrefType);
+                    memref::AllocOp::create(rewriter, op->getLoc(), copiedOperandMemrefType);
                 auto copyOp =
-                    rewriter.create<memref::CopyOp>(op->getLoc(), *opBuffer, allocOp.getResult());
+                    memref::CopyOp::create(rewriter, op->getLoc(), *opBuffer, allocOp.getResult());
                 bufferArgs.push_back(copyOp.getTarget());
             }
             else {
@@ -171,7 +171,7 @@ struct CustomCallOpInterface
             MemRefType memrefType =
                 MemRefType::get(tensorType.getShape(), tensorType.getElementType());
             auto newBuffer =
-                rewriter.create<bufferization::ToBufferOp>(op->getLoc(), memrefType, *tensorAlloc);
+                bufferization::ToBufferOp::create(rewriter, op->getLoc(), memrefType, *tensorAlloc);
             bufferArgs.push_back(newBuffer);
         }
 
@@ -180,8 +180,8 @@ struct CustomCallOpInterface
         IntegerAttr numArgumentsAttr = rewriter.getI32IntegerAttr(numArguments);
 
         // Create an updated custom call operation
-        rewriter.create<CustomCallOp>(op->getLoc(), TypeRange{}, bufferArgs,
-                                      customCallOp.getCallTargetName(), numArgumentsAttr);
+        CustomCallOp::create(rewriter, op->getLoc(), TypeRange{}, bufferArgs,
+                            customCallOp.getCallTargetName(), numArgumentsAttr);
         size_t startIndex = bufferArgs.size() - customCallOp.getNumResults();
         SmallVector<Value> bufferResults(bufferArgs.begin() + startIndex, bufferArgs.end());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, bufferResults);
@@ -318,15 +318,15 @@ struct CallbackCallOpInterface
             auto shape = tensorTy.getShape();
             auto elementTy = tensorTy.getElementType();
             auto memrefType = MemRefType::get(shape, elementTy);
-            auto toBufferOp = rewriter.create<bufferization::ToBufferOp>(loc, memrefType, tensor);
+            auto toBufferOp = bufferization::ToBufferOp::create(rewriter, loc, memrefType, tensor);
             auto memref = toBufferOp.getResult();
             outmemrefs.push_back(memref);
             newInputs.push_back(memref);
         }
 
         SmallVector<Type> emptyRets;
-        rewriter.create<CallbackCallOp>(loc, emptyRets, callOp.getCallee(), newInputs,
-                                        /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr);
+        CallbackCallOp::create(rewriter, loc, emptyRets, callOp.getCallee(), newInputs,
+                               /*arg_attrs=*/nullptr, /*res_attrs=*/nullptr);
         bufferization::replaceOpWithBufferizedValues(rewriter, op, outmemrefs);
         return success();
     }
