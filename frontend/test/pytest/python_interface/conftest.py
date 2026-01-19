@@ -22,6 +22,7 @@ from xdsl.dialects import test
 from xdsl.passes import PassPipeline
 from xdsl.printer import Printer
 
+from catalyst.compiler import _quantum_opt
 from catalyst.python_interface import Compiler, QuantumParser
 from catalyst.python_interface.conversion import parse_generic_to_xdsl_module
 
@@ -37,7 +38,9 @@ except (ImportError, ModuleNotFoundError):
     deps_available = False
 
 
-def _run_filecheck_impl(program_str, pipeline=(), verify=False, roundtrip=False):
+def _run_filecheck_impl(
+    program_str, pipeline=(), verify=False, roundtrip=False, pretty_print=False
+):
     """Run filecheck on an xDSL module, comparing it to a program string containing
     filecheck directives."""
     if not deps_available:
@@ -47,10 +50,17 @@ def _run_filecheck_impl(program_str, pipeline=(), verify=False, roundtrip=False)
     xdsl_module = QuantumParser(ctx, program_str, extra_dialects=(test.Test,)).parse_module()
 
     if roundtrip:
-        # Print generic format
+        # Print -> parse to MLIR -> print -> parse to xDSL
+        # If `pretty_print == True`, the assembly format (or other custom printing logic)
+        # will be used
         stream = StringIO()
-        Printer(stream=stream, print_generic_format=True).print_op(xdsl_module)
-        xdsl_module = QuantumParser(ctx, stream.getvalue()).parse_module()
+        Printer(stream=stream, print_generic_format=not pretty_print).print_op(xdsl_module)
+
+        opt_args = ("-allow-unregistered-dialect",)
+        opt_args += () if pretty_print else ("-mlir-print-op-generic",)
+        from_mlir = _quantum_opt(*opt_args, stdin=stream.getvalue())
+
+        xdsl_module = QuantumParser(ctx, from_mlir, extra_dialects=(test.Test,)).parse_module()
 
     if verify:
         xdsl_module.verify()
@@ -100,8 +110,11 @@ def run_filecheck():
             ``False`` by default.
         roundtrip (bool): Whether or not to use round-trip testing. This is useful for dialect
             tests to verify that xDSL both parses and prints the IR correctly. If ``True``, we parse
-            the program string into an xDSL module, print it in generic format, and then parse the
-            generic program string back to an xDSL module. ``False`` by default.
+            the program string into an xDSL module, print it, parse the printed module into an MLIR module,
+            print it again, and then parse this back to an xDSL module. ``False`` by default.
+        pretty_print (bool): Whether to pretty print the program when round-trip testing is performed.
+            If ``False``, the program will be printed in generic format. If ``roundtrip == False``,
+            this argument does nothing. ``False`` by default.
     """
     if not deps_available:
         pytest.skip("Cannot run xDSL lit tests without the Python 'filecheck' package.")
