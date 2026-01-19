@@ -54,13 +54,13 @@ builtin.module @jit_outer attributes {mhlo.num_partitions = 1 : i32, mhlo.num_re
 }
 
 
-Nice! Key points to note: \* The module has the same name as the
-decorated function (``outer``) with the ``jit_`` prefix. \* The entry
-point function is aptly named ``main``. \* Any jitted functions called
-within the entry point have their own function inside the module, and a
-corresponding ``func.call`` operation where it gets called. \* If
-``inner`` was not decorated with ``jax.jit``, its body would have been
-inlined into ``outer``:
+Nice! Key points to note:
+
+* The module has the same name as the decorated function (``outer``) with the ``jit_`` prefix.
+* The entry point function is aptly named ``main``.
+* Any jitted functions called within the entry point have their own function inside the module, and a
+  corresponding ``func.call`` operation where it gets called.
+* If ``inner`` was not decorated with ``jax.jit``, its body would have been inlined into ``outer``:
 
 .. code-block:: python
 
