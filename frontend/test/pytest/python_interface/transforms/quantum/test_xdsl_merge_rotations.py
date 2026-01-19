@@ -12,16 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test module for the merge rotations transform"""
-import pytest
-
-# pylint: disable=wrong-import-position,line-too-long
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
+# pylint: disable=line-too-long
 
 import pennylane as qml
+import pytest
 
-from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface.transforms import MergeRotationsPass, merge_rotations_pass
+
+pytestmark = pytest.mark.xdsl
 
 
 class TestMergeRotationsPass:
@@ -227,7 +225,7 @@ class TestMergeRotationsIntegration:
         """Test that the MergeRotationsPass works correctly with qjit."""
         dev = qml.device("lightning.qubit", wires=1)
 
-        @qml.qjit(target="mlir", pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qml.qjit(target="mlir")
         @merge_rotations_pass
         @qml.qnode(dev)
         def circuit(x: float, y: float):

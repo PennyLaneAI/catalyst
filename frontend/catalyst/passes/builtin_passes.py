@@ -535,10 +535,109 @@ def ions_decomposition(qnode):  # pragma: nocover
     return PassPipelineWrapper(qnode, "ions-decomposition")
 
 
-def to_ppr(qnode):
+def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
     R"""
-    A quantum compilation pass that converts Clifford+T gates into Pauli Product Rotation (PPR)
+    A quantnum compilation pass to discretize
+    single-qubit RZ and PhaseShift gates into the Clifford+T basis or the PPR basis using the Ross-Selinger Gridsynth algorithm.
+    Reference: https://arxiv.org/abs/1403.2975
+
+
+    .. note::
+
+        The actual discretization is only performed during execution time.
+
+    Args:
+        qnode (QNode): the QNode to apply the gridsynth compiler pass to
+        epsilon (float): The maximum permissible operator norm error per rotation gate. Defaults to ``1e-4``.
+        ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in QEC dialect. Defaults to ``False``
+
+    Returns:
+        :class:`QNode <pennylane.QNode>`
+
+    .. note::
+
+        The circuit generated from this pass with ``ppr_basis=True`` are currently not executable on any backend.
+        This is only for analysis with the ``null.qubit`` device and potential future execution
+        when a suitable backend is available.
+
+    **Example**
+
+    In this example the RZ gate will be converted into a new function, which
+    calls the discretization at execution time.
+
+    .. code-block:: python
+
+        import pennylane as qml
+        from catalyst import qjit
+        from catalyst.passes import gridsynth
+
+        pipe = [("pipe", ["quantum-compilation-stage"])]
+
+        @qjit(pipelines=pipe, target="mlir")
+        @gridsynth
+        @qml.qnode(qml.device("null.qubit", wires=1))
+        def circuit():
+            qml.RZ(x, wires=0)
+            return qml.probs()
+
+        >>> print(circuit.mlir_opt)
+
+    Example MLIR Representation:
+
+    .. code-block:: mlir
+
+        . . .
+        func.func private @rs_decomposition_get_phase(f64, f64, i1) -> f64
+        func.func private @rs_decomposition_get_gates(memref<?xindex>, f64, f64, i1)
+        func.func private @rs_decomposition_get_size(f64, f64, i1) -> index
+        func.func private @__catalyst_decompose_RZ_0(%arg0: !quantum.bit, %arg1: f64) -> (!quantum.bit, f64) {
+            . . .
+            %2 = scf.for %arg2 = %c0 to %0 step %c1 iter_args(%arg3 = %arg0) -> (!quantum.bit) {
+                %3 = memref.load %alloc[%arg2] : memref<?xindex>
+                %4 = scf.index_switch %3 -> !quantum.bit
+                case 0 {
+                    %out_qubits = quantum.custom "T"() %arg3 : !quantum.bit
+                    scf.yield %out_qubits : !quantum.bit
+                }
+                case 1 {
+                    %out_qubits = quantum.custom "Hadamard"() %arg3 : !quantum.bit
+                    %out_qubits_0 = quantum.custom "T"() %out_qubits : !quantum.bit
+                    scf.yield %out_qubits_0 : !quantum.bit
+                }
+                case 2 {
+                    %out_qubits = quantum.custom "S"() %arg3 : !quantum.bit
+                    %out_qubits_0 = quantum.custom "Hadamard"() %out_qubits : !quantum.bit
+                    %out_qubits_1 = quantum.custom "T"() %out_qubits_0 : !quantum.bit
+                    scf.yield %out_qubits_1 : !quantum.bit
+                }
+                . . .
+            }
+        }
+
+        func.func public @circuit_0(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode} {
+            . . .
+            %2:2 = call @__catalyst_decompose_RZ_0(%1, %extracted) : (!quantum.bit, f64) -> (!quantum.bit, f64)
+            . . .
+        }
+
+
+
+    """
+    if qnode is None:
+        return functools.partial(gridsynth, epsilon=epsilon, ppr_basis=ppr_basis)
+
+    gridsynth_pass = {"gridsynth": {"epsilon": epsilon, "ppr_basis": ppr_basis}}
+    return PassPipelineWrapper(qnode, gridsynth_pass)
+
+
+def to_ppr(qnode):
+    R"""A quantum compilation pass that converts Clifford+T gates into Pauli Product Rotation (PPR)
     gates.
+
+    .. note::
+
+        For improved integration with the PennyLane frontend, including inspectability with
+        :func:`pennylane.specs`, please use :func:`pennylane.transforms.to_ppr`.
 
     Clifford gates are defined as :math:`\exp(-{iP\tfrac{\pi}{4}})`, where :math:`P` is a Pauli word.
     Non-Clifford gates are defined as :math:`\exp(-{iP\tfrac{\pi}{8}})`.
@@ -561,7 +660,8 @@ def to_ppr(qnode):
     ``qml.Z``,
     ``qml.adjoint(qml.S)``,
     ``qml.adjoint(qml.T)``,
-    ``qml.CNOT``, and
+    ``qml.CNOT``,
+    ``qml.PauliRot``, and
     ``catalyst.measure``.
 
     Args:
@@ -572,44 +672,45 @@ def to_ppr(qnode):
 
     **Example**
 
-    The ``to_ppr`` compilation pass can be applied as a dectorator on a QNode:
+    In this example the Clifford+T gates will be converted into PPRs.
 
     .. code-block:: python
 
         import pennylane as qml
+        import catalyst
 
-        qml.capture.enable()
+        p = [("my_pipe", ["quantum-compilation-stage"])]
 
-        @qml.qjit(target="mlir")
-        @qml.transforms.to_ppr
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.to_ppr
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             qml.H(0)
             qml.CNOT([0, 1])
             qml.T(0)
-            return qml.expval(qml.Z(0))
+            return
 
-    For clear and inspectable results, use ``target="mlir"`` in the ``qjit`` decorator, ensure that
-    PennyLane's program capture is enabled, :func:`pennylane.capture.enable`, and call ``to_ppr``
-    from the PennyLane frontend (``qml.transforms.to_ppr``) instead of with
-    ``catalyst.passes.to_ppr``.
+        print(circuit.mlir_opt)
 
-    >>> print(qml.specs(circuit, level="all")()['resources'])
-    {
-        'No transforms': ...,
-        'Before MLIR Passes (MLIR-0)': ...,
-        'to-ppr (MLIR-1)': Resources(
-            num_wires=2,
-            num_gates=7,
-            gate_types=defaultdict(<class 'int'>, {'PPR-pi/4-w1': 5, 'PPR-pi/4-w2': 1, 'PPR-pi/8-w1': 1}),
-            gate_sizes=defaultdict(<class 'int'>, {1: 6, 2: 1}),
-            depth=None,
-            shots=Shots(total_shots=None, shot_vector=())
-        )
-    }
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
-    In the above output, ``PPR-theta-weight`` denotes the type of PPR present in the circuit, where
-    ``theta`` is the PPR angle (:math:`\theta`) and ``weight`` is the PPR weight.
+    Example MLIR Representation:
+
+    .. code-block:: mlir
+
+        . . .
+        %2 = qec.ppr ["Z"](4) %1 : !quantum.bit
+        %3 = qec.ppr ["X"](4) %2 : !quantum.bit
+        %4 = qec.ppr ["Z"](4) %3 : !quantum.bit
+        %5 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+        %6:2 = qec.ppr ["Z", "X"](4) %4, %5 : !quantum.bit, !quantum.bit
+        %7 = qec.ppr ["Z"](-4) %6#0 : !quantum.bit
+        %8 = qec.ppr ["X"](-4) %6#1 : !quantum.bit
+        %9 = qec.ppr ["Z"](8) %7 : !quantum.bit
+        . . .
+
     """
     return PassPipelineWrapper(qnode, "to-ppr")
 
@@ -620,82 +721,107 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
     :math:`\exp(-{iP\tfrac{\pi}{4}})`, past non-Clifford PPRs gates,
     :math:`\exp(-{iP\tfrac{\pi}{8}})`, where :math:`P` is a Pauli word.
 
+    .. note::
+
+        For improved integration with the PennyLane frontend, including inspectability with
+        :func:`pennylane.specs`, please use :func:`pennylane.transforms.commute_ppr`.
+
     For more information on PPRs, check out the
     `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
 
     .. note::
 
-        The circuits that generated from this pass are currently not executable on any backend.
-        This pass is only for analysis with the ``null.qubit`` device and potential future execution
-        when a suitable backend is available.
+        The ``commute_ppr`` compilation pass requires that :func:`~.passes.to_ppr` be applied first.
 
     Args:
         fn (QNode): QNode to apply the pass to.
-        max_pauli_size (int):
-            The maximum size of Pauli strings resulting from commutation. If a commutation results
-            in a PPR that acts on more than ``max_pauli_size`` qubits, that commutation will not be
-            performed.
+        max_pauli_size (int): The maximum size of the Pauli strings after commuting.
 
     Returns:
         :class:`QNode <pennylane.QNode>`
 
     **Example**
 
-    The ``commute_ppr`` compilation pass can be applied as a dectorator on a QNode:
+    The ``commute_ppr`` pass must be used in conjunction with :func:`~.passes.to_ppr`
+    to first convert gates into PPRs. In this example, the Clifford+T gates in the
+    circuit will be converted into PPRs first, then the Clifford PPRs will be
+    commuted past the non-Clifford PPR.
 
     .. code-block:: python
 
         import pennylane as qml
-        from functools import partial
-        import jax.numpy as jnp
+        import catalyst
 
-        qml.capture.enable()
+        p = [("my_pipe", ["quantum-compilation-stage"])]
 
-        @qml.qjit(target="mlir")
-        @partial(qml.transforms.commute_ppr, max_pauli_size=2)
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.commute_ppr
+        @catalyst.passes.to_ppr
+        @qml.qnode(qml.device("null.qubit", wires=1))
         def circuit():
+            qml.H(0)
+            qml.T(0)
+            return
 
-            # equivalent to a Hadamard gate
-            qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
-            qml.PauliRot(jnp.pi / 2, pauli_word="X", wires=0)
-            qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
+        print(circuit.mlir_opt)
 
-            # equivalent to a CNOT gate
-            qml.PauliRot(jnp.pi / 2, pauli_word="ZX", wires=[0, 1])
-            qml.PauliRot(-jnp.pi / 2, pauli_word="Z", wires=0)
-            qml.PauliRot(-jnp.pi / 2, pauli_word="X", wires=1)
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
-            # equivalent to a T gate
-            qml.PauliRot(jnp.pi / 4, pauli_word="Z", wires=0)
+    Example MLIR Representation:
 
-            return qml.expval(qml.Z(0))
+    .. code-block:: mlir
 
-    For clear and inspectable results, use ``target="mlir"`` in the ``qjit`` decorator, ensure that
-    PennyLane's program capture is enabled, :func:`pennylane.capture.enable`, and call
-    ``commute_ppr`` from the PennyLane frontend (``qml.transforms.commute_ppr``) instead of with
-    ``catalyst.passes.commute_ppr``.
+        . . .
+        %2 = qec.ppr ["X"](8) %1 : !quantum.bit
+        %3 = qec.ppr ["Z"](4) %2 : !quantum.bit
+        %4 = qec.ppr ["X"](4) %3 : !quantum.bit
+        %5 = qec.ppr ["Z"](4) %4 : !quantum.bit
+        %6 = quantum.insert %0[ 0], %5 : !quantum.reg, !quantum.bit
+        . . .
 
-    >>> print(qml.specs(circuit, level="all")()['resources'])
-    {
-        'No transforms': ...,
-        'Before MLIR Passes (MLIR-0)': ...,
-        'commute-ppr (MLIR-1)': Resources(
-            num_wires=2,
-            num_gates=7,
-            gate_types=defaultdict(<class 'int'>, {'PPR-pi/8-w1': 1, 'PPR-pi/4-w1': 5, 'PPR-pi/4-w2': 1}),
-            gate_sizes=defaultdict(<class 'int'>, {1: 6, 2: 1}),
-            depth=None,
-            shots=Shots(total_shots=None, shot_vector=()))
-    }
+    If a commutation resulted in a PPR acting on more than
+    ``max_pauli_size`` qubits (here, ``max_pauli_size = 2``), that commutation would be skipped.
 
-    In the example above, the Clifford PPRs (``H`` and ``CNOT``) will be commuted past the
-    non-Clifford PPR (``T``). In the output above, ``PPR-theta-weight`` denotes the type of PPR
-    present in the circuit, where ``theta`` is the PPR angle (:math:`\theta`) and ``weight`` is the
-    PPR weight.
+    .. code-block:: python
 
-    Note that if a commutation resulted in a PPR acting on more than ``max_pauli_size`` qubits
-    (here, ``max_pauli_size = 2``), that commutation would be skipped.
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.commute_ppr(max_pauli_size=2)
+        @catalyst.passes.to_ppr
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            qml.H(0)
+            qml.CNOT([1, 2])
+            qml.CNOT([0, 1])
+            qml.CNOT([0, 2])
+            for i in range(3):
+                qml.T(i)
+            return
+
+        print(circuit.mlir_opt)
+
+    Example MLIR Representation:
+
+    .. code-block:: mlir
+
+        . . .
+        %4:2 = qec.ppr ["Z", "X"](4) %2, %3 : !quantum.bit, !quantum.bit
+        %5 = qec.ppr ["X"](8) %1 : !quantum.bit
+        %6:2 = qec.ppr ["X", "Y"](-8) %5, %4#1 : !quantum.bit, !quantum.bit
+        %7 = qec.ppr ["X"](-4) %6#1 : !quantum.bit
+        %8:2 = qec.ppr ["X", "Z"](8) %6#0, %4#0 : !quantum.bit, !quantum.bit
+        %9 = qec.ppr ["Z"](4) %8#0 : !quantum.bit
+        %10 = qec.ppr ["X"](4) %9 : !quantum.bit
+        %11 = qec.ppr ["Z"](4) %10 : !quantum.bit
+        %12 = qec.ppr ["Z"](-4) %8#1 : !quantum.bit
+        %13:2 = qec.ppr ["Z", "X"](4) %11, %12 : !quantum.bit, !quantum.bit
+        %14 = qec.ppr ["X"](-4) %13#1 : !quantum.bit
+        %15 = qec.ppr ["Z"](-4) %13#0 : !quantum.bit
+        %16:2 = qec.ppr ["Z", "X"](4) %15, %7 : !quantum.bit, !quantum.bit
+        %17 = qec.ppr ["Z"](-4) %16#0 : !quantum.bit
+        %18 = qec.ppr ["X"](-4) %16#1 : !quantum.bit
+        . . .
     """
 
     if qnode is None:
@@ -710,74 +836,91 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     A quantum compilation pass that absorbs Clifford Pauli product rotation (PPR) operations,
     :math:`\exp{-iP\tfrac{\pi}{4}}`, into the final Pauli product measurements (PPMs).
 
+    .. note::
+
+        For improved integration with the PennyLane frontend, including inspectability with
+        :func:`pennylane.specs`, please use :func:`pennylane.transforms.merge_ppr_ppm`.
+
     For more information on PPRs and PPMs, check out
     the `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
 
-    .. note::
-
-        The circuits that generated from this pass are currently not executable on any backend.
-        This pass is only for analysis with the ``null.qubit`` device and potential future execution
-        when a suitable backend is available.
-
     Args:
         fn (QNode): QNode to apply the pass to
-        max_pauli_size (int):
-            The maximum size of Pauli strings resulting from merging. If a merge results in a PPM
-            that acts on more than ``max_pauli_size`` qubits, that merge will not be performed. The
-            default value is ``0`` (no limit).
+        max_pauli_size (int): The maximum size of the Pauli strings after merging.
 
     Returns:
         :class:`QNode <pennylane.QNode>`
 
     **Example**
 
-    The ``merge_ppr_ppm`` compilation pass can be applied as a dectorator on a QNode:
+    In this example, the Clifford+T gates will be converted into PPRs first,
+    then the Clifford PPRs will be commuted past the non-Clifford PPR,
+    and finally the Clifford PPRs will be absorbed into the Pauli Product Measurements.
 
     .. code-block:: python
 
         import pennylane as qml
-        from functools import partial
-        import jax.numpy as jnp
+        import catalyst
 
-        qml.capture.enable()
+        p = [("my_pipe", ["quantum-compilation-stage"])]
 
-        @qml.qjit(target="mlir")
-        @partial(qml.transforms.merge_ppr_ppm, max_pauli_size=2)
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.merge_ppr_ppm
+        @catalyst.passes.commute_ppr
+        @catalyst.passes.to_ppr
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit():
-            qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
-            qml.PauliRot(jnp.pi / 2, pauli_word="X", wires=0)
-            qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
+            qml.H(0)
+            qml.T(0)
+            return catalyst.measure(0), catalyst.measure(1)
 
-            ppm = qml.pauli_measure(pauli_word="ZX", wires=[0, 1])
+        print(circuit.mlir_opt)
 
-            return
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
-    In the above example, every PPR (``PauliRot``) and the PPM (``pauli_measure``) can be merged
-    into one PPM that acts on two qubits. For clear and inspectable results, use ``target="mlir"``
-    in the ``qjit`` decorator, ensure that PennyLane's program capture is enabled,
-    :func:`pennylane.capture.enable`, and call ``ppr_to_ppm`` from the PennyLane frontend
-    (``qml.transforms.merge_ppr_ppm``) instead of with ``catalyst.passes.merge_ppr_ppm``.
+    Example MLIR Representation:
 
-    >>> print(qml.specs(circuit, level="all")()['resources'])
-    {
-        'No transforms': ...,
-        'Before MLIR Passes (MLIR-0)': ...,
-        'merge-ppr-ppm (MLIR-1)': Resources(
-            num_wires=2,
-            num_gates=1,
-            gate_types=defaultdict(<class 'int'>, {'PPM-w2': 1}),
-            gate_sizes=defaultdict(<class 'int'>, {2: 1}),
-            depth=None,
-            shots=Shots(total_shots=None, shot_vector=())
-        )
-    }
+    .. code-block:: mlir
 
-    In the above output, ``PPM-weight`` denotes the type of PPM present in the circuit, where
-    ``weight`` is the PPM weight.
+        . . .
+        %2 = qec.ppr ["X"](8) %1 : !quantum.bit
+        %mres, %out_qubits = qec.ppm ["X"] %2 : i1, !quantum.bit
+        %from_elements = tensor.from_elements %mres : tensor<i1>
+        %3 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+        %mres_0, %out_qubits_1 = qec.ppm ["Z"] %3 : i1, !quantum.bit
+        . . .
 
-    If a merging resulted in a PPM acting on more than ``max_pauli_size`` qubits, that merging
-    operation would be skipped.
+    If a merging resulted in a PPM acting on more than
+    `max_pauli_size` qubits (here, `max_pauli_size = 2`), that merging would be skipped.
+
+    .. code-block:: python
+
+        p = [("my_pipe", ["quantum-compilation-stage"])]
+
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.merge_ppr_ppm(max_pauli_size=2)
+        @catalyst.passes.commute_ppr
+        @catalyst.passes.to_ppr
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def circuit():
+            qml.CNOT([1, 2])
+            qml.CNOT([0, 1])
+            qml.CNOT([0, 2])
+            return catalyst.measure(0), catalyst.measure(1)
+
+        print(circuit.mlir_opt)
+
+    Example MLIR Representation:
+
+    .. code-block:: mlir
+
+        . . .
+        %mres, %out_qubits:2 = qec.ppm ["Z", "Z"] %1, %3 : i1, !quantum.bit, !quantum.bit
+        %mres_0, %out_qubits_1 = qec.ppm ["Z"] %out_qubits#1 : i1, !quantum.bit
+        . . .
+
     """
     if qnode is None:
         return functools.partial(merge_ppr_ppm, max_pauli_size=max_pauli_size)
@@ -791,96 +934,77 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
     A quantum compilation pass that decomposes Pauli product rotations (PPRs),
     :math:`P(\theta) = \exp(-iP\theta)`, into Pauli product measurements (PPMs).
 
+    .. note::
+
+        For improved integration with the PennyLane frontend, including inspectability with
+        :func:`pennylane.specs`, please use :func:`pennylane.transforms.ppr_to_ppm`.
+
     This pass is used to decompose both non-Clifford and Clifford PPRs into PPMs. The non-Clifford
     PPRs (:math:`\theta = \tfrac{\pi}{8}`) are decomposed first, then Clifford PPRs
     (:math:`\theta = \tfrac{\pi}{4}`) are decomposed.
-
-    For more information on PPRs and PPMs, check out
-    the `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
-
-    .. note::
-
-        The circuits that generated from this pass are currently not executable on any backend.
-        This pass is only for analysis with the ``null.qubit`` device and potential future execution
-        when a suitable backend is available.
 
     Args:
         qnode (QNode): QNode to apply the pass to.
         decompose_method (str, optional): The method to use for decomposing non-Clifford PPRs.
             Options are ``"pauli-corrected"``, ``"auto-corrected"``, and ``"clifford-corrected"``.
             Defaults to ``"pauli-corrected"``.
-            ``"pauli-corrected"`` uses a reactive measurement for correction that is based on Figure
-            13 in `arXiv:2211.15465 <https://arxiv.org/pdf/2211.15465>`_.
-            ``"auto-corrected"`` uses an additional measurement for correction that is based on
-            Figure 7 in `A Game of Surface Codes <https://arxiv.org/abs/1808.02892>`__, and
-            ``"clifford-corrected"`` uses a Clifford rotation for correction that is based on
-            Figure 17(b) in `A Game of Surface Codes <https://arxiv.org/abs/1808.02892>`__.
+            ``"pauli-corrected"`` uses a reactive measurement for correction.
+            ``"auto-corrected"`` uses an additional measurement for correction.
+            ``"clifford-corrected"`` uses a Clifford rotation for correction.
 
         avoid_y_measure (bool): Rather than performing a Pauli-Y measurement for Clifford rotations
             (sometimes more costly), a :math:`Y` state (:math:`Y\vert 0 \rangle`) is used instead
-            (requires :math:`Y`-state preparation). This is currently only supported when using the
-            ``"clifford-corrected"`` and ``"pauli-corrected"`` decomposition method. Defaults to
-            ``False``.
+            (requires :math:`Y` state preparation).
+            This is currently only supported when using the ``"clifford-corrected"`` and ``"pauli-corrected"`` decomposition method.
+            Defaults to ``False``.
 
     Returns:
         :class:`QNode <pennylane.QNode>`
 
     **Example**
 
-    The ``ppr_to_ppm`` compilation pass can be applied as a dectorator on a QNode:
+    This example shows the sequence of passes that will be applied. The last pass
+    will convert the non-Clifford PPR into Pauli Product Measurements.
 
     .. code-block:: python
 
         import pennylane as qml
-        from functools import partial
-        import jax.numpy as jnp
+        import catalyst
 
-        qml.capture.enable()
+        p = [("my_pipe", ["quantum-compilation-stage"])]
 
-        @qml.qjit(target="mlir")
-        @partial(ppr_to_ppm, decompose_method="auto-corrected")
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.ppr_to_ppm(decompose_method="auto-corrected")
+        @catalyst.passes.merge_ppr_ppm
+        @catalyst.passes.commute_ppr
+        @catalyst.passes.to_ppr
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
-            # equivalent to a Hadamard gate
-            qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
-            qml.PauliRot(jnp.pi / 2, pauli_word="X", wires=0)
-            qml.PauliRot(jnp.pi / 2, pauli_word="Z", wires=0)
+            qml.H(0)
+            qml.T(0)
+            qml.CNOT([0, 1])
+            return catalyst.measure(0), catalyst.measure(1)
 
-            # equivalent to a CNOT gate
-            qml.PauliRot(jnp.pi / 2, pauli_word="ZX", wires=[0, 1])
-            qml.PauliRot(-jnp.pi / 2, pauli_word="Z", wires=[0])
-            qml.PauliRot(-jnp.pi / 2, pauli_word="X", wires=[1])
+        print(circuit.mlir_opt)
 
-            # equivalent to a T gate
-            qml.PauliRot(jnp.pi / 4, pauli_word="Z", wires=0)
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
-            return
+    Example MLIR Representation:
 
-    For clear and inspectable results, use ``target="mlir"`` in the ``qjit`` decorator, ensure that
-    PennyLane's program capture is enabled, :func:`pennylane.capture.enable`, and call
-    ``ppr_to_ppm`` from the PennyLane frontend (``qml.transforms.ppr_to_ppm``) instead of with
-    ``catalyst.passes.ppr_to_ppm``.
+    .. code-block:: mlir
 
-    >>> print(qml.specs(circuit, level="all")()['resources'])
-    {
-        'No transforms': ...,
-        'Before MLIR Passes (MLIR-0)': ...,
-        'ppr-to-ppm (MLIR-1)': Resources(
-            num_wires=8,
-            num_gates=21,
-            gate_types=defaultdict(<class 'int'>, {'PPM-w2': 6, 'PPM-w1': 7, 'PPR-pi/2-w1': 6, 'PPM-w3': 1, 'PPR-pi/2-w2': 1}),
-            gate_sizes=defaultdict(<class 'int'>, {2: 7, 1: 13, 3: 1}),
-            depth=None,
-            shots=Shots(total_shots=None, shot_vector=())
-        )
-    }
+        . . .
+        %3 = qec.fabricate  magic : !quantum.bit
+        %mres, %out_qubits:2 = qec.ppm ["X", "Z"] %1, %3 : i1, !quantum.bit, !quantum.bit
+        %mres_0, %out_qubits_1:2 = qec.ppm ["Z", "Y"](-1) %out_qubits#1, %2 : i1, !quantum.bit, !quantum.bit
+        %mres_2, %out_qubits_3 = qec.ppm ["X"] %out_qubits_1#0 : i1, !quantum.bit
+        %mres_4, %out_qubits_5 = qec.select.ppm(%mres, ["X"], ["Z"]) %out_qubits_1#1 : i1, !quantum.bit
+        %4 = arith.xori %mres_0, %mres_2 : i1
+        %5 = qec.ppr ["X"](2) %out_qubits#0 cond(%4) : !quantum.bit
+        . . .
 
-    In the above output, ``PPM-weight`` denotes the type of PPM present in the circuit, where
-    ``weight`` is the PPM weight. ``PPR-theta-weight`` denotes the type of PPR present in the
-    circuit, where ``theta`` is the PPR angle (:math:`\theta`) and ``weight`` is the PPR weight.
-    Note that :math:`\theta = \tfrac{\pi}{2}` PPRs correspond to Pauli operators:
-    :math:`P(\tfrac{\pi}{2}) = \exp(-iP\tfrac{\pi}{2}) = P`. Pauli operators can be commuted to the
-    end of the circuit and absorbed into terminal measurements.
     """
     passes = {
         "ppr_to_ppm": {
@@ -904,6 +1028,11 @@ def ppm_compilation(
     A quantum compilation pass that transforms Clifford+T gates into Pauli product measurements
     (PPMs).
 
+    .. note::
+
+        For improved integration with the PennyLane frontend, including inspectability with
+        :func:`pennylane.specs`, please use :func:`pennylane.transforms.ppm_compilation`.
+
     This pass combines multiple sub-passes:
 
     - :func:`~.passes.to_ppr` : Converts gates into Pauli Product Rotations (PPRs)
@@ -918,30 +1047,17 @@ def ppm_compilation(
     For more information on PPRs and PPMs, check out
     the `Compilation Hub <https://pennylane.ai/compilation/pauli-product-measurement>`_.
 
-    .. note::
-
-        The circuits that generated from this pass are currently not executable on any backend.
-        This pass is only for analysis with the ``null.qubit`` device and potential future execution
-        when a suitable backend is available.
-
     Args:
-        qnode (QNode, optional): QNode to apply the pass to. If ``None``, returns a decorator.
+        qnode (QNode, optional): QNode to apply the pass to. If None, returns a decorator.
         decompose_method (str, optional): The method to use for decomposing non-Clifford PPRs.
-            Options are ``"pauli-corrected"``, ``"auto-corrected"``, and ``"clifford-corrected"``.
-            Defaults to ``"pauli-corrected"``.
-            ``"pauli-corrected"`` uses a reactive measurement for correction that is based on Figure
-            13 in `arXiv:2211.15465 <https://arxiv.org/pdf/2211.15465>`_.
-            ``"auto-corrected"`` uses an additional measurement for correction that is based on
-            Figure 7 in `A Game of Surface Codes <https://arxiv.org/abs/1808.02892>`__, and
-            ``"clifford-corrected"`` uses a Clifford rotation for correction that is based on
-            Figure 17(b) in `A Game of Surface Codes <https://arxiv.org/abs/1808.02892>`__.
-
+            Options are ``"pauli-corrected"``, ``"auto-corrected"`` and ``"clifford-corrected"``. Defaults to
+            ``"pauli-corrected"``.
+            ``"pauli-corrected"`` uses a reactive measurement for correction.
+            ``"auto-corrected"`` uses an additional measurement for correction.
+            ``"clifford-corrected"`` uses a Clifford rotation for correction.
         avoid_y_measure (bool): Rather than performing a Pauli-Y measurement for Clifford rotations
             (sometimes more costly), a :math:`Y` state (:math:`Y\vert 0 \rangle`) is used instead
-            (requires :math:`Y`-state preparation). This is currently only supported when using the
-            ``"clifford-corrected"`` and ``"pauli-corrected"`` decomposition method. Defaults to
-            ``False``.
-
+            (requires :math:`Y` state preparation). Defaults to ``False``.
         max_pauli_size (int): The maximum size of the Pauli strings after commuting or merging.
             Defaults to 0 (no limit).
 
@@ -950,53 +1066,66 @@ def ppm_compilation(
 
     **Example**
 
-    The ``commute_ppr`` compilation pass can be applied as a dectorator on a QNode:
+    If a merging resulted in a PPM acting on more than
+    ``max_pauli_size`` qubits (here, ``max_pauli_size = 2``), that merging would be skipped.
+    However, when decomposed into PPMs, at least one qubit will be applied, so the final
+    PPMs will act on at least one additional qubit.
 
     .. code-block:: python
 
         import pennylane as qml
-        from functools import partial
+        import catalyst
 
-        qml.capture.enable()
+        p = [("my_pipe", ["quantum-compilation-stage"])]
+        method = "clifford-corrected"
 
-        @qml.qjit(target="mlir")
-        @partial(qml.transforms.ppm_compilation, decompose_method="clifford-corrected", max_pauli_size=2)
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.ppm_compilation(decompose_method=method, max_pauli_size=2)
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
-            qml.H(0)
             qml.CNOT([0, 1])
-            qml.T(0)
-            return
+            qml.CNOT([1, 0])
+            qml.adjoint(qml.T)(0)
+            qml.T(1)
+            return catalyst.measure(0), catalyst.measure(1)
 
-    For clear and inspectable results, use ``target="mlir"`` in the ``qjit`` decorator, ensure that
-    PennyLane's program capture is enabled, :func:`pennylane.capture.enable`, and call
-    ``ppm_compilation`` from the PennyLane frontend (``qml.transforms.ppm_compilation``) instead of
-    with ``catalyst.passes.ppm_compilation``.
+        print(circuit.mlir_opt)
 
-    >>> print(qml.specs(circuit, level="all")()['resources'])
-    {
-        'No transforms': ...,
-        'Before MLIR Passes (MLIR-0)': ...,
-        'ppm-compilation (MLIR-1)': Resources(
-            num_wires=7,
-            num_gates=18,
-            gate_types=defaultdict(<class 'int'>, {'PPM-w2': 5, 'PPM-w1': 6, 'PPR-pi/2-w1': 5, 'PPM-w3': 1, 'PPR-pi/2-w2': 1}),
-            gate_sizes=defaultdict(<class 'int'>, {2: 6, 1: 11, 3: 1}),
-            depth=None,
-            shots=Shots(total_shots=None, shot_vector=())
-        )
-    }
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
-    In the above output, ``PPM-weight`` denotes the type of PPM present in the circuit, where
-    ``weight`` is the PPM weight. ``PPR-theta-weight`` denotes the type of PPR present in the
-    circuit, where ``theta`` is the PPR angle (:math:`\theta`) and ``weight`` is the PPR weight.
-    Note that :math:`\theta = \tfrac{\pi}{2}` PPRs correspond to Pauli operators:
-    :math:`P(\tfrac{\pi}{2}) = \exp(-iP\tfrac{\pi}{2}) = P`. Pauli operators can be commuted to the
-    end of the circuit and absorbed into terminal measurements.
+    Example MLIR Representation:
 
-    Note that if a commutation or merge resulted in a PPR or PPN acting on more than
-    ``max_pauli_size`` qubits (here, ``max_pauli_size = 2``), that commutation or merge would be
-    skipped.
+    .. code-block:: mlir
+
+        . . .
+        %3 = qec.fabricate  magic : !quantum.bit
+        %mres, %out_qubits:3 = qec.ppm ["Z", "Z", "Z"] %1, %2, %3 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+        %4 = quantum.alloc_qb : !quantum.bit
+        %mres_0, %out_qubits_1:3 = qec.ppm ["Z", "Z", "Y"](-1) %out_qubits#0, %out_qubits#1, %4 cond(%mres) : i1, !quantum.bit, !quantum.bit, !quantum.bit
+        %mres_2, %out_qubits_3 = qec.ppm ["X"] %out_qubits_1#2 cond(%mres) : i1, !quantum.bit
+        %5 = arith.xori %mres_0, %mres_2 : i1
+        %6:2 = qec.ppr ["Z", "Z"](2) %out_qubits_1#0, %out_qubits_1#1 cond(%5) : !quantum.bit, !quantum.bit
+        quantum.dealloc_qb %out_qubits_3 : !quantum.bit
+        %mres_4, %out_qubits_5 = qec.ppm ["X"] %out_qubits#2 : i1, !quantum.bit
+        %7:2 = qec.ppr ["Z", "Z"](2) %6#0, %6#1 cond(%mres_4) : !quantum.bit, !quantum.bit
+        quantum.dealloc_qb %out_qubits_5 : !quantum.bit
+        %8 = qec.fabricate  magic_conj : !quantum.bit
+        %mres_6, %out_qubits_7:2 = qec.ppm ["Z", "Z"] %7#1, %8 : i1, !quantum.bit, !quantum.bit
+        %9 = quantum.alloc_qb : !quantum.bit
+        %mres_8, %out_qubits_9:2 = qec.ppm ["Z", "Y"](-1) %out_qubits_7#0, %9 cond(%mres_6) : i1, !quantum.bit, !quantum.bit
+        %mres_10, %out_qubits_11 = qec.ppm ["X"] %out_qubits_9#1 cond(%mres_6) : i1, !quantum.bit
+        %10 = arith.xori %mres_8, %mres_10 : i1
+        %11 = qec.ppr ["Z"](2) %out_qubits_9#0 cond(%10) : !quantum.bit
+        quantum.dealloc_qb %out_qubits_11 : !quantum.bit
+        %mres_12, %out_qubits_13 = qec.ppm ["X"] %out_qubits_7#1 : i1, !quantum.bit
+        %12 = qec.ppr ["Z"](2) %11 cond(%mres_12) : !quantum.bit
+        quantum.dealloc_qb %out_qubits_13 : !quantum.bit
+        %mres_14, %out_qubits_15:2 = qec.ppm ["Z", "Z"] %7#0, %12 : i1, !quantum.bit, !quantum.bit
+        %mres_16, %out_qubits_17 = qec.ppm ["Z"] %out_qubits_15#1 : i1, !quantum.bit
+        . . .
+
     """
     passes = {
         "ppm-compilation": {
@@ -1018,8 +1147,7 @@ def ppm_compilation(
 
 
 def ppm_specs(fn):
-    R"""
-    This function returns following Pauli product rotation (PPR) and Pauli product measurement (PPM)
+    R"""This function returns following Pauli product rotation (PPR) and Pauli product measurement (PPM)
     specs in a dictionary:
 
     - Pi/4 PPR (count the number of clifford PPRs)
@@ -1051,39 +1179,46 @@ def ppm_specs(fn):
     .. code-block:: python
 
         import pennylane as qml
-        from catalyst import qjit, measure, for_loop
-        from catalyst.passes import ppm_specs, ppm_compilation
+        import catalyst
 
-        pipe = [("pipe", ["quantum-compilation-stage"])]
+        p = [("my_pipe", ["quantum-compilation-stage"])]
         device = qml.device("lightning.qubit", wires=2)
 
-        @qjit(pipelines=pipe, target="mlir")
-        @ppm_compilation
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.ppm_compilation
         @qml.qnode(device)
         def circuit():
             qml.H(0)
             qml.CNOT([0,1])
-            @for_loop(0,10,1)
+
+            @catalyst.for_loop(0,10,1)
             def loop(i):
                 qml.T(1)
-            loop()
-            return measure(0), measure(1)
 
-        ppm_specs = ppm_specs(circuit)
+            loop()
+            return catalyst.measure(0), catalyst.measure(1)
+
+        ppm_specs = catalyst.passes.ppm_specs(circuit)
         print(ppm_specs)
+
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
     Example PPM Specs:
 
     .. code-block:: pycon
 
         . . .
-        {
-            'circuit_0': {
-                        'max_weight_pi2': 2,
-                        'logical_qubits': 2,
-                        'num_of_ppm': 44,
-                        'pi2_ppr': 16
-                    },
+        {'circuit_0':
+            {
+                'depth_pi2_ppr': 7,
+                'depth_ppm': 15,
+                'logical_qubits': 2,
+                'max_weight_pi2': 2,
+                'num_of_ppm': 24,
+                'pi2_ppr': 16
+            }
         }
         . . .
 
@@ -1136,7 +1271,7 @@ def reduce_t_depth(qnode):
         qnode (QNode): QNode to apply the pass to.
 
     Returns:
-        ~.QNode: Returns decorated QNode.
+        :class:`QNode <pennylane.QNode>`: Returns decorated QNode.
 
     **Example**
 
@@ -1151,17 +1286,15 @@ def reduce_t_depth(qnode):
     .. code-block:: python
 
         import pennylane as qml
-        from catalyst import qjit, measure
-        from catalyst.passes import to_ppr, commute_ppr, reduce_t_depth, merge_ppr_ppm
+        import catalyst
 
-        pips = [("pipe", ["quantum-compilation-stage"])]
+        p = [("my_pipe", ["quantum-compilation-stage"])]
 
-
-        @qjit(pipelines=pips, target="mlir")
-        @reduce_t_depth
-        @merge_ppr_ppm
-        @commute_ppr
-        @to_ppr
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.reduce_t_depth
+        @catalyst.passes.merge_ppr_ppm
+        @catalyst.passes.commute_ppr
+        @catalyst.passes.to_ppr
         @qml.qnode(qml.device("null.qubit", wires=3))
         def circuit():
             n = 3
@@ -1173,26 +1306,34 @@ def reduce_t_depth(qnode):
                 qml.H(wires=i)
                 qml.T(wires=i)
 
-            return
+            return catalyst.measure(0), catalyst.measure(1), catalyst.measure(2)
 
-        >>> print(circuit.mlir_opt)
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
-        . . .
-        %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-        %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-        // layer 1
-        %3 = qec.ppr ["X"](8) %1 : !quantum.bit
-        %4 = qec.ppr ["X"](8) %2 : !quantum.bit
+    >>> print(circuit.mlir_opt)
 
-        // layer 2
-        %5 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
-        %6:2 = qec.ppr ["Y", "X"](8) %3, %4 : !quantum.bit, !quantum.bit
-        %7 = qec.ppr ["X"](8) %5 : !quantum.bit
-        %8:3 = qec.ppr ["X", "Y", "X"](8) %6#0, %6#1, %7:!quantum.bit, !quantum.bit, !quantum.bit
+    . . .
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    // layer 1
+    %3 = qec.ppr ["X"](8) %1 : !quantum.bit
+    %4 = qec.ppr ["X"](8) %2 : !quantum.bit
 
-        // layer 3
-        %9:3 = qec.ppr ["X", "X", "Y"](8) %8#0, %8#1, %8#2:!quantum.bit, !quantum.bit, !quantum.bit
-        . . .
+    // layer 2
+    %5:2 = qec.ppr ["Y", "X"](8) %3, %4 : !quantum.bit, !quantum.bit
+    %6 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+    %7:3 = qec.ppr ["X", "Y", "X"](8) %5#0, %5#1, %6 : !quantum.bit, !quantum.bit, !quantum.bit
+    %8 = qec.ppr ["X"](8) %7#2 : !quantum.bit
+
+    // layer 3
+    %9:3 = qec.ppr ["X", "X", "Y"](8) %7#0, %7#1, %8 : !quantum.bit, !quantum.bit, !quantum.bit
+
+    %mres, %out_qubits:3 = qec.ppm ["X", "X", "Y"] %9#0, %9#1, %9#2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+    %mres_0, %out_qubits_1:3 = qec.ppm ["Y", "X", "X"] %out_qubits#0, %out_qubits#1, %out_qubits#2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+    %mres_2, %out_qubits_3:3 = qec.ppm ["X", "Y", "X"] %out_qubits_1#0, %out_qubits_1#1, %out_qubits_1#2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+    . . .
     """
 
     return PassPipelineWrapper(qnode, "reduce-t-depth")
@@ -1230,7 +1371,7 @@ def ppr_to_mbqc(qnode):
         fn (QNode): QNode to apply the pass to.
 
     Returns:
-        ~.QNode
+        :class:`QNode <pennylane.QNode>`
 
     **Example**
 
@@ -1241,21 +1382,24 @@ def ppr_to_mbqc(qnode):
     .. code-block:: python
 
         import pennylane as qml
-        from catalyst import qjit, measure
-        from catalyst.passes import to_ppr, ppr_to_mbqc
+        import catalyst
 
-        pipeline = [("pipe", ["quantum-compilation-stage"])]
+        p = [("my_pipe", ["quantum-compilation-stage"])]
 
-        @qjit(pipelines=pipeline, keep_intermediate=True, target="mlir")
-        @ppr_to_mbqc
-        @to_ppr
+        @qml.qjit(pipelines=p, target="mlir", keep_intermediate=True)
+        @catalyst.passes.ppr_to_mbqc
+        @catalyst.passes.to_ppr
         @qml.qnode(qml.device("null.qubit", wires=2))
         def circuit():
             qml.H(0)
             qml.CNOT([0, 1])
-            return measure(1)
+            return
 
         print(circuit.mlir_opt)
+
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
     Example MLIR excerpt (structure only):
 
@@ -1285,3 +1429,63 @@ def ppr_to_mbqc(qnode):
 
     """
     return PassPipelineWrapper(qnode, "ppr-to-mbqc")
+
+
+# This pass is already covered via applying by pass
+# `qml.transform(pass_name="decompose-arbitrary-ppr")` in Pennylane.
+def decompose_arbitrary_ppr(qnode):  # pragma: nocover
+    R"""
+    Specify that the MLIR compiler pass for decomposing arbitrary Pauli product rotations (PPR)
+    operations will be applied. This will decompose into a collection of PPRs, PPMs and
+    a single-qubit arbitrary PPR in the Z basis. For more details, see Figure 13(d)
+    in `arXiv:2211.15465 <https://arxiv.org/abs/2211.15465>`_.
+
+    .. note::
+
+        For improved integration with the PennyLane frontend, including inspectability with
+        :func:`pennylane.specs`, please use :func:`pennylane.transforms.decompose_arbitrary_ppr`.
+
+        The ``decompose_arbitrary_ppr`` compilation pass requires that :func:`~.passes.to_ppr` be
+        applied first.
+
+    Args:
+        qnode (QNode): QNode to apply the pass to.
+
+    Returns:
+        :class:`QNode <pennylane.QNode>`
+
+    **Example**
+
+    .. code-block:: python
+
+        import pennylane as qml
+        import catalyst
+
+        p = [("my_pipe", ["quantum-compilation-stage"])]
+
+        @qml.qjit(pipelines=p, target="mlir")
+        @catalyst.passes.decompose_arbitrary_ppr
+        @catalyst.passes.to_ppr
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def circuit():
+            qml.PauliRot(0.123, pauli_word="XXY", wires=[0, 1, 2])
+            return catalyst.measure(0), catalyst.measure(1), catalyst.measure(2)
+
+    Because Catalyst does not currently support execution of Pauli-based computation operations, we
+    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
+    passes will be applied to the initial MLIR, without attempting to further compile for execution.
+
+    >>> print(circuit.mlir_opt)
+    ...
+    %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %out_qubits_2 = quantum.custom "Hadamard"() %2 : !quantum.bit
+    %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
+    %out_qubits_3 = quantum.custom "RX"(%cst_1) %3 : !quantum.bit
+    %out_qubits_4:3 = quantum.multirz(%cst_0) %out_qubits, %out_qubits_2, %out_qubits_3 : !quantum.bit, !quantum.bit, !quantum.bit
+    %out_qubits_5 = quantum.custom "Hadamard"() %out_qubits_4#0 : !quantum.bit
+    %mres, %out_qubit = quantum.measure %out_qubits_5 : i1, !quantum.bit
+    %from_elements = tensor.from_elements %mres : tensor<i1>
+    %out_qubits_6 = quantum.custom "Hadamard"() %out_qubits_4#1 : !quantum.bit
+    """
+    return PassPipelineWrapper(qnode, "decompose-arbitrary-ppr")

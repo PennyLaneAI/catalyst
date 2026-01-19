@@ -25,7 +25,6 @@ from typing import Optional
 import pennylane as qml
 from pennylane.devices import Device
 from pennylane.devices.execution_config import ExecutionConfig
-from pennylane.transforms.core import TransformProgram
 
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
@@ -63,7 +62,7 @@ class CustomDevice(Device):
         if execution_config is None:
             execution_config = ExecutionConfig()
 
-        transform_program = TransformProgram()
+        transform_program = qml.CompilePipeline()
         transform_program.add_transform(qml.transforms.split_non_commuting)
         return transform_program, execution_config
 

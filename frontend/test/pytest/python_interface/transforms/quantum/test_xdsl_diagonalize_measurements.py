@@ -13,22 +13,16 @@
 # limitations under the License.
 """Unit test module for the xDSL implementation of the diagonalize_final_measurements pass"""
 
-
-# pylint: disable=wrong-import-position
-
 import numpy as np
+import pennylane as qml
 import pytest
 
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
-import pennylane as qml
-
-from catalyst.passes import apply_pass, xdsl_plugin
 from catalyst.python_interface.transforms import (
     DiagonalizeFinalMeasurementsPass,
     diagonalize_final_measurements_pass,
 )
+
+pytestmark = pytest.mark.xdsl
 
 
 class TestDiagonalizeFinalMeasurementsPass:
@@ -343,7 +337,6 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
         ), "Sanity check failed, is expected_res correct?"
         circuit_compiled = qml.qjit(
             diagonalize_final_measurements_pass(circuit_ref),
-            pass_plugins=[xdsl_plugin.getXDSLPluginAbsolutePath()],
         )
 
         assert np.allclose(expected_res(angle), circuit_compiled(angle))
@@ -376,7 +369,6 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
         ), "Sanity check failed, is expected_res correct?"
         circuit_compiled = qml.qjit(
             diagonalize_final_measurements_pass(circuit_ref),
-            pass_plugins=[xdsl_plugin.getXDSLPluginAbsolutePath()],
         )
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
@@ -406,7 +398,6 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
 
         circuit_compiled = qml.qjit(
             diagonalize_final_measurements_pass(circuit_ref),
-            pass_plugins=[xdsl_plugin.getXDSLPluginAbsolutePath()],
         )
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
@@ -418,7 +409,7 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
 
         dev = qml.device("lightning.qubit", wires=2)
 
-        @qml.qjit(pass_plugins=[xdsl_plugin.getXDSLPluginAbsolutePath()])
+        @qml.qjit
         @diagonalize_final_measurements_pass
         @qml.qnode(dev)
         def circuit(x):
@@ -437,7 +428,7 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
         non-commuting observables."""
         dev = qml.device("lightning.qubit", wires=1)
 
-        @qml.qjit(pass_plugins=[xdsl_plugin.getXDSLPluginAbsolutePath()])
+        @qml.qjit
         @diagonalize_final_measurements_pass
         @qml.qnode(dev)
         def circuit(x):
@@ -450,6 +441,7 @@ class TestDiagonalizeFinalMeasurementsProgramCaptureExecution:
             _ = circuit(0.7)
 
 
+@pytest.mark.usefixtures("use_capture")
 class TestDiagonalizeFinalMeasurementsCatalystFrontend:
     """Integration tests going through the catalyst frontend (program capture disabled)"""
 
@@ -487,7 +479,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         ), "Sanity check failed, is expected_res correct?"
 
         circuit_compiled = qml.qjit(
-            apply_pass("catalyst_xdsl_plugin.diagonalize-final-measurements")(circuit_ref),
+            diagonalize_final_measurements_pass(circuit_ref),
         )
 
         np.allclose(expected_res(angle), circuit_compiled(angle))
@@ -519,7 +511,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         ), "Sanity check failed, is expected_res correct?"
 
         circuit_compiled = qml.qjit(
-            apply_pass("catalyst_xdsl_plugin.diagonalize-final-measurements")(circuit_ref),
+            diagonalize_final_measurements_pass(circuit_ref),
         )
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
@@ -547,7 +539,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         ), "Sanity check failed, is expected_res correct?"
 
         circuit_compiled = qml.qjit(
-            apply_pass("catalyst_xdsl_plugin.diagonalize-final-measurements")(circuit_ref),
+            diagonalize_final_measurements_pass(circuit_ref),
         )
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
@@ -559,7 +551,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         dev = qml.device("lightning.qubit", wires=2)
 
         @qml.qjit()
-        @apply_pass("catalyst_xdsl_plugin.diagonalize-final-measurements")
+        @diagonalize_final_measurements_pass
         @qml.qnode(dev)
         def circuit(x):
             qml.RX(x, 0)
@@ -577,7 +569,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         dev = qml.device("lightning.qubit", wires=1)
 
         @qml.qjit()
-        @apply_pass("catalyst_xdsl_plugin.diagonalize-final-measurements")
+        @diagonalize_final_measurements_pass
         @qml.qnode(dev)
         def circuit(x):
             qml.RX(x, 0)

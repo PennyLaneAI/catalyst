@@ -16,6 +16,8 @@
 
 """Test Pauli rotations and Pauli measurements with FTQC device."""
 
+from functools import partial
+
 import numpy as np
 import pennylane as qml
 from pennylane.ftqc.catalyst_pass_aliases import (
@@ -29,6 +31,27 @@ from pennylane.ftqc.catalyst_pass_aliases import (
 from catalyst import qjit
 
 
+def test_pauli_rot_lowering():
+    """Test that qml.PauliRot is lowered to quantum.paulirot."""
+    qml.capture.enable()
+    dev = qml.device("null.qubit", wires=1)
+
+    pipeline = [("pipe", ["quantum-compilation-stage"])]
+
+    @qjit(pipelines=pipeline, target="mlir")
+    @qml.qnode(device=dev)
+    def circuit():
+        qml.PauliRot(np.pi / 4, "X", wires=0)
+
+    # CHECK: [[cst:%.+]]  = arith.constant 0.78539816339744828
+    # CHECK: quantum.paulirot ["X"]([[cst]])
+    print(circuit.mlir_opt)
+    qml.capture.disable()
+
+
+test_pauli_rot_lowering()
+
+
 def test_single_qubit_pauli_rotations():
     """Test single qubit PauliRot"""
     qml.capture.enable()
@@ -37,6 +60,7 @@ def test_single_qubit_pauli_rotations():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.PauliRot(np.pi / 4, "X", wires=0)
@@ -61,17 +85,40 @@ def test_arbitrary_angle_pauli_rotations():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.PauliRot(0.42, "X", wires=0)
 
-    # CHECK: [[cst:%.+]] = arith.constant 4.200000e-01 : f64
+    # CHECK: [[cst:%.+]] = arith.constant 2.100000e-01 : f64
     # CHECK: [[q0:%.+]] = qec.ppr.arbitrary ["X"]([[cst]])
     print(circuit.mlir_opt)
     qml.capture.disable()
 
 
 test_arbitrary_angle_pauli_rotations()
+
+
+def test_arbitrary_negative_angle_pauli_rotations():
+    """Test arbitrary angle PauliRot"""
+    qml.capture.enable()
+    dev = qml.device("null.qubit", wires=1)
+
+    pipeline = [("pipe", ["quantum-compilation-stage"])]
+
+    @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
+    @qml.qnode(device=dev)
+    def circuit():
+        qml.PauliRot(-0.42, "X", wires=0)
+
+    # CHECK: [[cst:%.+]] = arith.constant -2.100000e-01 : f64
+    # CHECK: [[q0:%.+]] = qec.ppr.arbitrary ["X"]([[cst]])
+    print(circuit.mlir_opt)
+    qml.capture.disable()
+
+
+test_arbitrary_negative_angle_pauli_rotations()
 
 
 def test_dynamic_angle_pauli_rotations():
@@ -82,12 +129,15 @@ def test_dynamic_angle_pauli_rotations():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit(x: float):
         qml.PauliRot(x, "X", wires=0)
 
+    # CHECK: [[cst:%.+]] = arith.constant 2.000000e+00 : f64
     # CHECK: [[extracted:%.+]] = tensor.extract
-    # CHECK: [[q0:%.+]] = qec.ppr.arbitrary ["X"]([[extracted]])
+    # CHECK: [[div:%.+]] = arith.divf [[extracted]], [[cst]] : f64
+    # CHECK: [[q0:%.+]] = qec.ppr.arbitrary ["X"]([[div]])
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -103,6 +153,7 @@ def test_multi_qubit_pauli_rotations():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.PauliRot(np.pi / 4, "XYZ", wires=[0, 1, 2])
@@ -129,13 +180,14 @@ def test_arbitrary_angle_multi_qubit_pauli_rotations():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.PauliRot(0.42, "XZ", wires=[0, 1])
         qml.PauliRot(0.84, "YX", wires=[0, 1])
 
-    # CHECK: [[cst:%.+]] = arith.constant 8.400000e-01 : f64
-    # CHECK: [[cst_1:%.+]] = arith.constant 4.200000e-01 : f64
+    # CHECK: [[cst:%.+]] = arith.constant 4.200000e-01 : f64
+    # CHECK: [[cst_1:%.+]] = arith.constant 2.100000e-01 : f64
     # CHECK: [[q0:%.+]]:2 = qec.ppr.arbitrary ["X", "Z"]([[cst_1]])
     # CHECK: [[q1:%.+]]:2 = qec.ppr.arbitrary ["Y", "X"]([[cst]]) [[q0]]#0, [[q0]]#1
     print(circuit.mlir_opt)
@@ -153,15 +205,19 @@ def test_dynamic_angle_multi_qubit_pauli_rotations():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit(x: float):
         qml.PauliRot(x, "XZ", wires=[0, 1])
         qml.PauliRot(x, "YX", wires=[0, 1])
 
+    # CHECK: [[cst:%.+]] = arith.constant 2.000000e+00 : f64
     # CHECK: [[extracted:%.+]] = tensor.extract
-    # CHECK: [[q0:%.+]]:2 = qec.ppr.arbitrary ["X", "Z"]([[extracted]])
+    # CHECK: [[div:%.+]] = arith.divf [[extracted]], [[cst]] : f64
+    # CHECK: [[q0:%.+]]:2 = qec.ppr.arbitrary ["X", "Z"]([[div]])
     # CHECK: [[extracted_1:%.+]] = tensor.extract
-    # CHECK: [[q1:%.+]]:2 = qec.ppr.arbitrary ["Y", "X"]([[extracted_1]]) [[q0]]#0, [[q0]]#1
+    # CHECK: [[div_1:%.+]] = arith.divf [[extracted_1]], [[cst]] : f64
+    # CHECK: [[q1:%.+]]:2 = qec.ppr.arbitrary ["Y", "X"]([[div_1]]) [[q0]]#0, [[q0]]#1
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -177,6 +233,7 @@ def test_single_qubit_pauli_measurements():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.pauli_measure("X", wires=0)
@@ -201,6 +258,7 @@ def test_multi_qubit_pauli_measurements():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.pauli_measure("XYZ", wires=[0, 1, 2])
@@ -225,6 +283,7 @@ def test_pauli_rot_and_measure_combined():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.PauliRot(np.pi / 4, "X", wires=0)
@@ -314,6 +373,7 @@ def test_merge_ppr_ppm():
 
     @qjit(pipelines=pipeline, target="mlir")
     @merge_ppr_ppm
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.PauliRot(np.pi / 2, "Z", wires=0)
@@ -337,6 +397,7 @@ def test_ppr_to_ppm():
     @qjit(pipelines=pipeline, target="mlir")
     @ppr_to_ppm
     @merge_ppr_ppm
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.PauliRot(np.pi / 2, "X", wires=0)
@@ -390,13 +451,14 @@ def test_pauli_rot_and_measure_with_cond():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
-        qml.PauliRot(np.pi / 2, "Z", wires=0)
+        qml.PauliRot(np.pi / 2, wires=0, pauli_word="Z")
         m = qml.pauli_measure("Z", wires=0)
-        qml.cond(m, qml.PauliRot)(theta=np.pi / 2, pauli_word="Z", wires=0)
+        qml.cond(m, partial(qml.PauliRot, pauli_word="Z"))(theta=np.pi / 2, wires=0)
 
-    # CHECK: qec.ppr ["Z"](4)
+    # CHECK: [[q0:%.+]] = qec.ppr ["Z"](4)
     # CHECK: qec.ppm ["Z"]
     # CHECK: scf.if
     # CHECK: qec.ppr ["Z"](4)
@@ -421,16 +483,15 @@ def test_pauli_rot_with_adjoint_region():
         qml.PauliRot(np.pi / 4, "XZ", wires=[0, 1])
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.PauliRot(np.pi / 2, "YX", wires=[0, 1])
         qml.adjoint(f)()
 
-    # CHECK: transform.apply_registered_pass "adjoint-lowering"
     # CHECK: qec.ppr ["Y", "X"](4)
-    # CHECK: quantum.adjoint
-    # CHECK: qec.ppr ["X", "Z"](8)
-    print(circuit.mlir)
+    # CHECK: qec.ppr ["X", "Z"](-8)
+    print(circuit.mlir_opt)
     qml.capture.disable()
 
 
@@ -445,14 +506,13 @@ def test_pauli_rot_with_adjoint_single_gate():
     pipeline = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
     @qml.qnode(device=dev)
     def circuit():
         qml.adjoint(qml.PauliRot(np.pi / 2, "XZ", wires=[0, 1]))
 
-    # CHECK-NOT: transform.apply_registered_pass "adjoint-lowering"
-    # CHECK-NOT: quantum.adjoint
     # CHECK: qec.ppr ["X", "Z"](-4)
-    print(circuit.mlir)
+    print(circuit.mlir_opt)
     qml.capture.disable()
 
 

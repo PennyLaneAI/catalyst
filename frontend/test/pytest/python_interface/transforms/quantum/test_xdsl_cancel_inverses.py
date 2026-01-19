@@ -13,19 +13,15 @@
 # limitations under the License.
 """Unit test module for the iterative cancel inverses transform"""
 
+import pennylane as qml
 import pytest
 
-# pylint: disable=wrong-import-position
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
-import pennylane as qml
-
-from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface.transforms import (
     IterativeCancelInversesPass,
     iterative_cancel_inverses_pass,
 )
+
+pytestmark = pytest.mark.xdsl
 
 
 class TestIterativeCancelInversesPass:
@@ -194,7 +190,7 @@ class TestIterativeCancelInversesIntegration:
         """Test that the IterativeCancelInversesPass works correctly with qjit."""
         dev = qml.device("lightning.qubit", wires=2)
 
-        @qml.qjit(target="mlir", pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qml.qjit(target="mlir")
         @iterative_cancel_inverses_pass
         @qml.qnode(dev)
         def circuit():
@@ -212,7 +208,7 @@ class TestIterativeCancelInversesIntegration:
         there are no operations that can be cancelled."""
         dev = qml.device("lightning.qubit", wires=2)
 
-        @qml.qjit(target="mlir", pass_plugins=[getXDSLPluginAbsolutePath()])
+        @qml.qjit(target="mlir")
         @iterative_cancel_inverses_pass
         @qml.qnode(dev)
         def circuit():

@@ -12,19 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test module for the split non-commuting transform"""
-import pytest
-
-# pylint: disable=wrong-import-position
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
 
 import pennylane as qml
+import pytest
 
-from catalyst.passes.xdsl_plugin import getXDSLPluginAbsolutePath
 from catalyst.python_interface.transforms import (
     SplitNonCommutingPass,
     split_non_commuting_pass,
 )
+
+pytestmark = pytest.mark.xdsl
 
 
 class TestSplitNonCommutingPass:
@@ -229,10 +226,7 @@ class TestSplitNonCommutingPass:
             i = i + 1
             return i
 
-        @qml.qjit(
-            target="mlir",
-            pass_plugins=[getXDSLPluginAbsolutePath()],
-        )
+        @qml.qjit(target="mlir")
         @split_non_commuting_pass
         @qml.set_shots(10)
         @qml.qnode(dev)
@@ -276,10 +270,7 @@ class TestSplitNonCommutingPass:
             i = i + 1
             return i
 
-        @qml.qjit(
-            target="mlir",
-            pass_plugins=[getXDSLPluginAbsolutePath()],
-        )
+        @qml.qjit(target="mlir")
         @split_non_commuting_pass
         @qml.qnode(dev)
         def circuit():

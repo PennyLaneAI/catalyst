@@ -107,8 +107,8 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
 
     void NamedOperation(const std::string &, const std::vector<double> &,
                         const std::vector<QubitIdType> &, bool = false,
-                        const std::vector<QubitIdType> & = {},
-                        const std::vector<bool> & = {}) override;
+                        const std::vector<QubitIdType> & = {}, const std::vector<bool> & = {},
+                        const std::vector<std::string> & = {}) override;
     void MatrixOperation(const std::vector<std::complex<double>> &,
                          const std::vector<QubitIdType> &, bool = false,
                          const std::vector<QubitIdType> & = {},
