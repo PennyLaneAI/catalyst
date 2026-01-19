@@ -1004,7 +1004,7 @@ def uses_transform(qnode, transform_name):
         bool: True if `transform_name` is detected (and is only one if only_one=True),
               False otherwise
     """
-    transform_program = getattr(qnode, "compile_pipeline", [])
-    transform_funcs = [transform_container.transform for transform_container in transform_program]
+    compile_pipeline = getattr(qnode, "compile_pipeline", [])
+    transform_funcs = [bound_transform.transform for bound_transform in compile_pipeline]
 
     return any(transform_name in func.__name__ for func in transform_funcs)
