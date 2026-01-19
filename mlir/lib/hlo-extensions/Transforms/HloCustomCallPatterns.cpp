@@ -50,7 +50,7 @@ struct HloCustomCallOpRewritePattern : public mlir::OpRewritePattern<stablehlo::
         auto makeConst = [&](int64_t val) -> Value {
             auto type = RankedTensorType::get({}, rewriter.getI32Type());
             auto attr = DenseElementsAttr::get(type, APInt(32, static_cast<uint64_t>(val)));
-            return rewriter.create<arith::ConstantOp>(loc, attr);
+            return arith::ConstantOp::create(rewriter, loc, attr);
         };
 
         if (operands.empty()) {
@@ -72,17 +72,17 @@ struct HloCustomCallOpRewritePattern : public mlir::OpRewritePattern<stablehlo::
 
                 if (auto intAttr = dyn_cast<IntegerAttr>(attrValue)) {
                     auto type = RankedTensorType::get({}, intAttr.getType());
-                    constVal = rewriter.create<arith::ConstantOp>(
+                    constVal = arith::ConstantOp::create(rewriter,
                         loc, DenseElementsAttr::get(type, intAttr.getValue()));
                 }
                 else if (auto floatAttr = llvm::dyn_cast<FloatAttr>(attrValue)) {
                     auto type = RankedTensorType::get({}, floatAttr.getType());
-                    constVal = rewriter.create<arith::ConstantOp>(
+                    constVal = arith::ConstantOp::create(rewriter,
                         loc, DenseElementsAttr::get(type, floatAttr.getValue()));
                 }
                 else if (auto boolAttr = llvm::dyn_cast<BoolAttr>(attrValue)) {
                     auto type = RankedTensorType::get({}, rewriter.getI1Type());
-                    constVal = rewriter.create<arith::ConstantOp>(
+                    constVal = arith::ConstantOp::create(rewriter,
                         loc, DenseElementsAttr::get(type, boolAttr.getValue()));
                 }
                 else {
