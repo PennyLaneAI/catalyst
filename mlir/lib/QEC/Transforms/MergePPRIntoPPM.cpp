@@ -135,7 +135,7 @@ void moveCliffordPastPPM(const PauliStringWrapper &lhsPauli, const PauliStringWr
     Type mresType = rhs.getMres().getType();
 
     auto newPPM =
-        rewriter.create<PPMeasurementOp>(rhs->getLoc(), mresType, newOutQubitTypes, pauliProduct,
+        PPMeasurementOp::create(rewriter, rhs->getLoc(), mresType, newOutQubitTypes, pauliProduct,
                                          rhs.getRotationSign(), newRHSOperands);
     rewriter.moveOpBefore(newPPM, rhs);
 

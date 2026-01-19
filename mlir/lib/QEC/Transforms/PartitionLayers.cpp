@@ -86,7 +86,7 @@ void constructLayer(QECLayer &layer, IRRewriter &writer)
                     }
                 }
             }
-            builder.create<qec::YieldOp>(loc, newResults);
+            qec::YieldOp::create(builder, loc, newResults);
         });
 
     // Replace all uses of the original SSA results with the new layer results

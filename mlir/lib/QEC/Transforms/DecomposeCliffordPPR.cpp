@@ -69,13 +69,13 @@ PPRotationOp decompose_pi_over_four_flattening(bool avoidPauliYMeasure, PPRotati
     pauliP.emplace_back(pauliForAxillaryQubit);
 
     auto ppmPZ =
-        rewriter.create<PPMeasurementOp>(loc, pauliP, rotationSign, m1InQubits, measResult);
+        PPMeasurementOp::create(rewriter, loc, pauliP, rotationSign, m1InQubits, measResult);
 
     SmallVector<StringRef> pauliX = {"X"};
     auto ppmX =
-        rewriter.create<PPMeasurementOp>(loc, pauliX, ppmPZ.getOutQubits().back(), measResult);
+        PPMeasurementOp::create(rewriter, loc, pauliX, ppmPZ.getOutQubits().back(), measResult);
 
-    auto cond = rewriter.create<arith::XOrIOp>(loc, ppmPZ.getMres(), ppmX.getMres());
+    auto cond = arith::XOrIOp::create(rewriter, loc, ppmPZ.getMres(), ppmX.getMres());
 
     SmallVector<Value> outPZQubits = ppmPZ.getOutQubits();
     outPZQubits.pop_back();
@@ -83,10 +83,10 @@ PPRotationOp decompose_pi_over_four_flattening(bool avoidPauliYMeasure, PPRotati
 
     const uint16_t PI_DENOMINATOR = 2; // For rotation of P(PI/2)
     auto pprPI2 =
-        rewriter.create<PPRotationOp>(loc, pauliP, PI_DENOMINATOR, outPZQubits, cond.getResult());
+        PPRotationOp::create(rewriter, loc, pauliP, PI_DENOMINATOR, outPZQubits, cond.getResult());
 
     // Deallocate the axillary qubit
-    rewriter.create<DeallocQubitOp>(loc, ppmX.getOutQubits().back());
+    DeallocQubitOp::create(rewriter, loc, ppmX.getOutQubits().back());
 
     rewriter.replaceOp(op, pprPI2.getOutQubits());
     return pprPI2;
