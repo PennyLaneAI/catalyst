@@ -65,7 +65,7 @@ struct PulseOpLowering : public OpConversionPattern<RTIOPulseOp> {
         }
 
         Value amplitude = artiq.constF64(1.0);
-        rewriter.create<LLVM::CallOp>(op.getLoc(), setFreqFunc,
+        LLVM::CallOp::create(rewriter, op.getLoc(), setFreqFunc,
                                       ValueRange{adaptor.getChannel(), adaptor.getFrequency(),
                                                  adaptor.getPhase(), amplitude});
 
@@ -92,7 +92,7 @@ struct PulseOpLowering : public OpConversionPattern<RTIOPulseOp> {
 
         // Enforce minimum pulse duration to avoid 0 duratoin events
         Value minDuration = artiq.constI64(ARTIQHardwareConfig::minTTLPulseMu);
-        durationMu = rewriter.create<arith::MaxSIOp>(op.getLoc(), durationMu, minDuration);
+        durationMu = arith::MaxSIOp::create(rewriter, op.getLoc(), durationMu, minDuration);
 
         artiq.ttlOn(channelAddr);
         artiq.delayMu(durationMu);
@@ -120,7 +120,7 @@ struct SyncOpLowering : public OpConversionPattern<RTIOSyncOp> {
         // Compute maximum timestamp
         Value maxTime = events[0];
         for (size_t i = 1; i < events.size(); ++i) {
-            maxTime = rewriter.create<arith::MaxSIOp>(op.getLoc(), maxTime, events[i]);
+            maxTime = arith::MaxSIOp::create(rewriter, op.getLoc(), maxTime, events[i]);
         }
 
         ARTIQRuntimeBuilder artiq(rewriter, op);
@@ -150,7 +150,7 @@ struct ChannelOpLowering : public OpConversionPattern<RTIOChannelOp> {
     {
         int32_t channelId = extractChannelId(op.getChannel());
         Type resultType = getTypeConverter()->convertType(op.getChannel().getType());
-        Value result = rewriter.create<arith::ConstantOp>(
+        Value result = arith::ConstantOp::create(rewriter,
             op.getLoc(), rewriter.getIntegerAttr(resultType, channelId));
         rewriter.replaceOp(op, result);
         return success();
@@ -184,7 +184,7 @@ struct DecomposePulsePattern : public OpRewritePattern<RTIOPulseOp> {
 
         // Sync both pulses
         auto eventType = EventType::get(rewriter.getContext());
-        Value syncEvent = rewriter.create<RTIOSyncOp>(
+        Value syncEvent = RTIOSyncOp::create(rewriter,
             loc, eventType, ValueRange{controlPulse.getEvent(), slackPulse.getEvent()});
 
         rewriter.replaceOp(op, syncEvent);

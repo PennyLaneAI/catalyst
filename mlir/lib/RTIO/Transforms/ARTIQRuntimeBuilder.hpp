@@ -85,7 +85,7 @@ class ARTIQRuntimeBuilder {
     Value nowMu()
     {
         auto func = ensureFunc(ARTIQFuncNames::nowMu, LLVM::LLVMFunctionType::get(i64Ty, {}));
-        auto call = builder.create<LLVM::CallOp>(getLoc(), func, ValueRange{});
+        auto call = LLVM::CallOp::create(builder, getLoc(), func, ValueRange{});
         call.setTailCallKind(LLVM::TailCallKind::Tail);
         return call.getResult();
     }
@@ -93,7 +93,7 @@ class ARTIQRuntimeBuilder {
     void atMu(Value time)
     {
         auto func = ensureFunc(ARTIQFuncNames::atMu, LLVM::LLVMFunctionType::get(voidTy, {i64Ty}));
-        auto call = builder.create<LLVM::CallOp>(getLoc(), func, ValueRange{time});
+        auto call = LLVM::CallOp::create(builder, getLoc(), func, ValueRange{time});
         call.setTailCallKind(LLVM::TailCallKind::Tail);
     }
 
@@ -101,7 +101,7 @@ class ARTIQRuntimeBuilder {
     {
         auto func =
             ensureFunc(ARTIQFuncNames::delayMu, LLVM::LLVMFunctionType::get(voidTy, {i64Ty}));
-        auto call = builder.create<LLVM::CallOp>(getLoc(), func, ValueRange{duration});
+        auto call = LLVM::CallOp::create(builder, getLoc(), func, ValueRange{duration});
         call.setCConv(LLVM::CConv::Fast);
         call.setTailCallKind(LLVM::TailCallKind::Tail);
     }
@@ -111,14 +111,14 @@ class ARTIQRuntimeBuilder {
     {
         auto func = ensureFunc(ARTIQFuncNames::rtioOutput,
                                LLVM::LLVMFunctionType::get(voidTy, {i32Ty, i32Ty}));
-        auto call = builder.create<LLVM::CallOp>(getLoc(), func, ValueRange{addr, val});
+        auto call = LLVM::CallOp::create(builder, getLoc(), func, ValueRange{addr, val});
         call.setTailCallKind(LLVM::TailCallKind::Tail);
     }
 
     void rtioInit()
     {
         auto func = ensureFunc(ARTIQFuncNames::rtioInit, LLVM::LLVMFunctionType::get(voidTy, {}));
-        auto call = builder.create<LLVM::CallOp>(getLoc(), func, ValueRange{});
+        auto call = LLVM::CallOp::create(builder, getLoc(), func, ValueRange{});
         call.setCConv(LLVM::CConv::Fast);
         call.setTailCallKind(LLVM::TailCallKind::Tail);
     }
@@ -127,7 +127,7 @@ class ARTIQRuntimeBuilder {
     {
         auto func =
             ensureFunc(ARTIQFuncNames::rtioGetCounter, LLVM::LLVMFunctionType::get(i64Ty, {}));
-        auto call = builder.create<LLVM::CallOp>(getLoc(), func, ValueRange{});
+        auto call = LLVM::CallOp::create(builder, getLoc(), func, ValueRange{});
         call.setCConv(LLVM::CConv::Fast);
         call.setTailCallKind(LLVM::TailCallKind::Tail);
         return call.getResult();
@@ -138,7 +138,7 @@ class ARTIQRuntimeBuilder {
     {
         ensureSecToMuFunc();
         auto func = getModule().lookupSymbol<LLVM::LLVMFuncOp>(ARTIQFuncNames::secToMu);
-        auto call = builder.create<LLVM::CallOp>(getLoc(), func, ValueRange{durationSec});
+        auto call = LLVM::CallOp::create(builder, getLoc(), func, ValueRange{durationSec});
         call.setCConv(LLVM::CConv::Fast);
         call.setTailCallKind(LLVM::TailCallKind::Tail);
         return call.getResult();
@@ -150,7 +150,7 @@ class ARTIQRuntimeBuilder {
         ensureConfigSpiFunc();
         auto func = getModule().lookupSymbol<LLVM::LLVMFuncOp>(ARTIQFuncNames::configSpi);
         auto call =
-            builder.create<LLVM::CallOp>(getLoc(), func, ValueRange{baseAddr, cs, len, div, flags});
+            LLVM::CallOp::create(builder, getLoc(), func, ValueRange{baseAddr, cs, len, div, flags});
         call.setCConv(LLVM::CConv::Fast);
         call.setTailCallKind(LLVM::TailCallKind::Tail);
     }
@@ -169,7 +169,7 @@ class ARTIQRuntimeBuilder {
     {
         ensureSetFrequencyFunc();
         auto func = getModule().lookupSymbol<LLVM::LLVMFuncOp>(ARTIQFuncNames::setFrequency);
-        builder.create<LLVM::CallOp>(getLoc(), func,
+        LLVM::CallOp::create(builder, getLoc(), func,
                                      ValueRange{channelId, freqHz, phaseTurns, amplitude});
         return nowMu();
     }
@@ -182,17 +182,17 @@ class ARTIQRuntimeBuilder {
     // Constant creation helpers
     Value constI32(int32_t val)
     {
-        return builder.create<arith::ConstantOp>(getLoc(), builder.getI32IntegerAttr(val));
+        return arith::ConstantOp::create(builder, getLoc(), builder.getI32IntegerAttr(val));
     }
 
     Value constI64(int64_t val)
     {
-        return builder.create<arith::ConstantOp>(getLoc(), builder.getI64IntegerAttr(val));
+        return arith::ConstantOp::create(builder, getLoc(), builder.getI64IntegerAttr(val));
     }
 
     Value constF64(double val)
     {
-        return builder.create<arith::ConstantOp>(getLoc(), builder.getF64FloatAttr(val));
+        return arith::ConstantOp::create(builder, getLoc(), builder.getF64FloatAttr(val));
     }
 
     // Accessors
@@ -234,7 +234,7 @@ class ARTIQRuntimeBuilder {
         builder.setInsertionPointToStart(module.getBody());
 
         auto funcTy = LLVM::LLVMFunctionType::get(i64Ty, {f64Ty});
-        auto func = builder.create<LLVM::LLVMFuncOp>(getLoc(), ARTIQFuncNames::secToMu, funcTy,
+        auto func = LLVM::LLVMFuncOp::create(builder, getLoc(), ARTIQFuncNames::secToMu, funcTy,
                                                      LLVM::Linkage::Internal);
         func.setCConv(LLVM::CConv::Fast);
 
@@ -244,10 +244,10 @@ class ARTIQRuntimeBuilder {
 
         // duration_mu = round(duration_sec / 1e-9)
         Value nsPerMu = constF64(ARTIQHardwareConfig::nanosecondPeriod);
-        Value durationNs = builder.create<arith::DivFOp>(getLoc(), durationSec, nsPerMu);
-        Value rounded = builder.create<math::RoundOp>(getLoc(), durationNs);
-        Value result = builder.create<arith::FPToSIOp>(getLoc(), i64Ty, rounded);
-        builder.create<LLVM::ReturnOp>(getLoc(), result);
+        Value durationNs = arith::DivFOp::create(builder, getLoc(), durationSec, nsPerMu);
+        Value rounded = math::RoundOp::create(builder, getLoc(), durationNs);
+        Value result = arith::FPToSIOp::create(builder, getLoc(), i64Ty, rounded);
+        LLVM::ReturnOp::create(builder, getLoc(), result);
     }
 
     void ensureConfigSpiFunc()
@@ -261,7 +261,7 @@ class ARTIQRuntimeBuilder {
         builder.setInsertionPointToStart(module.getBody());
 
         auto funcTy = LLVM::LLVMFunctionType::get(voidTy, {i32Ty, i32Ty, i32Ty, i32Ty, i32Ty});
-        auto func = builder.create<LLVM::LLVMFuncOp>(getLoc(), ARTIQFuncNames::configSpi, funcTy,
+        auto func = LLVM::LLVMFuncOp::create(builder, getLoc(), ARTIQFuncNames::configSpi, funcTy,
                                                      LLVM::Linkage::Internal);
 
         Block *entry = func.addEntryBlock(builder);
@@ -274,21 +274,21 @@ class ARTIQRuntimeBuilder {
         Value flags = entry->getArgument(4);
 
         // Config register address = Base | 1
-        Value configAddr = builder.create<arith::OrIOp>(getLoc(), baseAddr, constI32(1));
+        Value configAddr = arith::OrIOp::create(builder, getLoc(), baseAddr, constI32(1));
 
         // Pack: (CS << 24) | ((div - 2) << 16) | ((len - 1) << 8) | flags
-        Value csShifted = builder.create<arith::ShLIOp>(getLoc(), cs, constI32(24));
-        Value divOffset = builder.create<arith::SubIOp>(getLoc(), div, constI32(2));
-        Value divShifted = builder.create<arith::ShLIOp>(getLoc(), divOffset, constI32(16));
-        Value lenOffset = builder.create<arith::SubIOp>(getLoc(), len, constI32(1));
-        Value lenShifted = builder.create<arith::ShLIOp>(getLoc(), lenOffset, constI32(8));
+        Value csShifted = arith::ShLIOp::create(builder, getLoc(), cs, constI32(24));
+        Value divOffset = arith::SubIOp::create(builder, getLoc(), div, constI32(2));
+        Value divShifted = arith::ShLIOp::create(builder, getLoc(), divOffset, constI32(16));
+        Value lenOffset = arith::SubIOp::create(builder, getLoc(), len, constI32(1));
+        Value lenShifted = arith::ShLIOp::create(builder, getLoc(), lenOffset, constI32(8));
 
-        Value packed = builder.create<arith::OrIOp>(getLoc(), csShifted, divShifted);
-        packed = builder.create<arith::OrIOp>(getLoc(), packed, lenShifted);
-        packed = builder.create<arith::OrIOp>(getLoc(), packed, flags);
+        Value packed = arith::OrIOp::create(builder, getLoc(), csShifted, divShifted);
+        packed = arith::OrIOp::create(builder, getLoc(), packed, lenShifted);
+        packed = arith::OrIOp::create(builder, getLoc(), packed, flags);
 
         rtioOutput(configAddr, packed);
-        builder.create<LLVM::ReturnOp>(getLoc(), ValueRange{});
+        LLVM::ReturnOp::create(builder, getLoc(), ValueRange{});
     }
 
     void ensureSetFrequencyFunc()
@@ -304,7 +304,7 @@ class ARTIQRuntimeBuilder {
         builder.setInsertionPointToStart(module.getBody());
 
         auto funcTy = LLVM::LLVMFunctionType::get(voidTy, {i32Ty, f64Ty, f64Ty, f64Ty});
-        auto func = builder.create<LLVM::LLVMFuncOp>(getLoc(), ARTIQFuncNames::setFrequency, funcTy,
+        auto func = LLVM::LLVMFuncOp::create(builder, getLoc(), ARTIQFuncNames::setFrequency, funcTy,
                                                      LLVM::Linkage::Internal);
 
         Block *entry = func.addEntryBlock(builder);
@@ -322,21 +322,21 @@ class ARTIQRuntimeBuilder {
         // CS calculation: csBase is the chip_select for ch0 (typically 4)
         // For Urukul: ch0->CS=4, ch1->CS=5, ch2->CS=6, ch3->CS=7
         // So CS = csBase + channelId
-        Value cs = builder.create<arith::AddIOp>(getLoc(), constI32(csBase), channelId);
+        Value cs = arith::AddIOp::create(builder, getLoc(), constI32(csBase), channelId);
         Value spiBase = constI32(spiBaseAddr);
         Value ioUpdate = constI32(ioUpdateAddr);
 
         // Calculate FTW: round(frequency * (2^32 / sys_clk))
         Value ftwScale = constF64(ARTIQHardwareConfig::ftwScaleFactor);
-        Value ftwDouble = builder.create<arith::MulFOp>(getLoc(), freqHz, ftwScale);
-        Value ftwRounded = builder.create<math::RoundOp>(getLoc(), ftwDouble);
-        Value ftw = builder.create<arith::FPToUIOp>(getLoc(), i32Ty, ftwRounded);
+        Value ftwDouble = arith::MulFOp::create(builder, getLoc(), freqHz, ftwScale);
+        Value ftwRounded = math::RoundOp::create(builder, getLoc(), ftwDouble);
+        Value ftw = arith::FPToUIOp::create(builder, getLoc(), i32Ty, ftwRounded);
 
         // Calculate POW: round(phaseTurns * 65536)
         Value powScale = constF64(ARTIQHardwareConfig::powScaleFactor);
-        Value powDouble = builder.create<arith::MulFOp>(getLoc(), phaseTurns, powScale);
-        Value powRounded = builder.create<math::RoundOp>(getLoc(), powDouble);
-        Value pow = builder.create<arith::FPToUIOp>(getLoc(), i32Ty, powRounded);
+        Value powDouble = arith::MulFOp::create(builder, getLoc(), phaseTurns, powScale);
+        Value powRounded = math::RoundOp::create(builder, getLoc(), powDouble);
+        Value pow = arith::FPToUIOp::create(builder, getLoc(), i32Ty, powRounded);
 
         // SPI Transfer: Write instruction to profile 7 (0x15)
         configSpi(spiBase, cs, constI32(ARTIQHardwareConfig::spiLen8),
@@ -354,11 +354,11 @@ class ARTIQRuntimeBuilder {
                   constI32(ARTIQHardwareConfig::spiFlagsKeepCS));
         delayMu(constI64(ARTIQHardwareConfig::refPeriodMu));
         Value asfScale = constF64(static_cast<double>(ARTIQHardwareConfig::maxAmplitude));
-        Value asfDouble = builder.create<arith::MulFOp>(getLoc(), amplitude, asfScale);
-        Value asfRounded = builder.create<math::RoundOp>(getLoc(), asfDouble);
-        Value asf = builder.create<arith::FPToUIOp>(getLoc(), i32Ty, asfRounded);
-        Value asfShifted = builder.create<arith::ShLIOp>(getLoc(), asf, constI32(16));
-        Value ampPhase = builder.create<arith::OrIOp>(getLoc(), asfShifted, pow);
+        Value asfDouble = arith::MulFOp::create(builder, getLoc(), amplitude, asfScale);
+        Value asfRounded = math::RoundOp::create(builder, getLoc(), asfDouble);
+        Value asf = arith::FPToUIOp::create(builder, getLoc(), i32Ty, asfRounded);
+        Value asfShifted = arith::ShLIOp::create(builder, getLoc(), asf, constI32(16));
+        Value ampPhase = arith::OrIOp::create(builder, getLoc(), asfShifted, pow);
         rtioOutput(spiBase, ampPhase);
         // Wait for SPI transmission to complete
         waitForSpi(ARTIQHardwareConfig::spiLen32, ARTIQHardwareConfig::spiDiv);
@@ -377,7 +377,7 @@ class ARTIQRuntimeBuilder {
         delayMu(constI64(ARTIQHardwareConfig::ioUpdatePulseWidth));
         ttlOff(ioUpdate);
 
-        builder.create<LLVM::ReturnOp>(getLoc(), ValueRange{});
+        LLVM::ReturnOp::create(builder, getLoc(), ValueRange{});
     }
 
     /// Returns hardware addresses: (spiBaseAddr, csBase, ioUpdateAddr)

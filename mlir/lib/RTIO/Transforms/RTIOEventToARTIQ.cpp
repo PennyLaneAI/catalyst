@@ -265,7 +265,7 @@ class PulseScheduler {
 
         auto eventType = rtio::EventType::get(builder.getContext());
         Value syncEvent =
-            builder.create<rtio::RTIOSyncOp>(anyPulse.getLoc(), eventType, eventsToSync);
+            rtio::RTIOSyncOp::create(builder, anyPulse.getLoc(), eventType, eventsToSync);
 
         // Update boundaries and consumers
         for (auto &[_, pulse] : channelBoundary) {
@@ -412,7 +412,7 @@ void decomposeFrequencyPulses(ScheduleGroupsMap &pulseGroups)
         // Create sync
         Value chainStart =
             originalWaits.size() > 1
-                ? builder.create<rtio::RTIOSyncOp>(
+                ? rtio::RTIOSyncOp::create(builder,
                       firstRoot.getLoc(), rtio::EventType::get(builder.getContext()), originalWaits)
                 : originalWaits[0];
 
@@ -532,7 +532,7 @@ struct RTIOEventToARTIQPass : public impl::RTIOEventToARTIQPassBase<RTIOEventToA
         // Set initial timeline: at_mu(rtio_get_counter() + slack)
         Value counter = artiq.rtioGetCounter();
         Value slack = artiq.constI64(ARTIQHardwareConfig::initSlackDelay);
-        Value initialTime = builder.create<arith::AddIOp>(kernelFunc.getLoc(), counter, slack);
+        Value initialTime = arith::AddIOp::create(builder, kernelFunc.getLoc(), counter, slack);
         artiq.atMu(initialTime);
 
         return success();
