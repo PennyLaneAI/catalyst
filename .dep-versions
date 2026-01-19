@@ -1,6 +1,6 @@
 # Always update the version check in catalyst.__init__ when changing the JAX version.
 jax=0.7.1
-stablehlo=d496423cdb7f7d5272f14d517681202a0b9cbe41
+stablehlo=v1.13.7
 llvm=8f264586d7521b0e305ca7bb78825aa3382ffef7
 enzyme=v0.0.238
 
