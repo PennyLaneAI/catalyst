@@ -125,8 +125,8 @@ class WorkspaceManager:
             curr_preferred_name_str = preferred_name + "_" + str(count)
             curr_preferred_name = pathlib.Path(curr_preferred_name_str)
             curr_preferred_abspath = path / curr_preferred_name
-            count += 1
-
-        free_preferred_abspath = pathlib.Path(curr_preferred_abspath)
-        free_preferred_abspath.mkdir()
-        return free_preferred_abspath
+            try:
+                curr_preferred_abspath.mkdir(exist_ok=False)
+                return curr_preferred_abspath
+            except FileExistsError:
+                count += 1
