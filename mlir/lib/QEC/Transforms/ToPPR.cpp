@@ -77,6 +77,23 @@ void applyAdjointIfNeeded(GateConversion &gateConversion, CustomOp op)
     }
 }
 
+void applyGlobalPhase(Location loc, Value phaseValue, ConversionPatternRewriter &rewriter)
+{
+    //   static GlobalPhaseOp create(::mlir::OpBuilder &builder, ::mlir::Location location,
+    //   ::mlir::TypeRange out_ctrl_qubits, ::mlir::Value params, /*optional*/bool adjoint,
+    //   ::mlir::ValueRange in_ctrl_qubits, ::mlir::ValueRange in_ctrl_values);
+
+    rewriter.create<GlobalPhaseOp>(loc, /*out_ctrl_qubits=*/TypeRange{}, /*params=*/phaseValue,
+                                   /*adjoint=*/false, /*in_ctrl_qubits*/ ValueRange{},
+                                   /*in_ctrl_values*/ ValueRange{});
+}
+
+void applyGlobalPhase(Location loc, const double phase, ConversionPatternRewriter &rewriter)
+{
+    Value paramValue = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(phase));
+    applyGlobalPhase(loc, paramValue, rewriter);
+}
+
 //===----------------------------------------------------------------------===//
 //                       Gate conversion functions
 //===----------------------------------------------------------------------===//
@@ -316,22 +333,30 @@ struct QECOpLowering : public ConversionPattern {
     LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const final
     {
+        const auto PI = llvm::numbers::pi;
         // cast to OriginOp
         if (auto originOp = dyn_cast_or_null<CustomOp>(op)) {
             switch (hashGate(originOp)) {
             case GateEnum::H:
+                applyGlobalPhase(op->getLoc(), -PI / 2, rewriter);
                 return convertHGate(originOp, rewriter);
             case GateEnum::S:
+                applyGlobalPhase(op->getLoc(), -PI / 4, rewriter);
                 return convertSGate(originOp, rewriter);
             case GateEnum::T:
+                applyGlobalPhase(op->getLoc(), -PI / 8, rewriter);
                 return convertTGate(originOp, rewriter);
             case GateEnum::X:
+                applyGlobalPhase(op->getLoc(), -PI / 2, rewriter);
                 return convertXGate(originOp, rewriter);
             case GateEnum::Y:
+                applyGlobalPhase(op->getLoc(), -PI / 2, rewriter);
                 return convertYGate(originOp, rewriter);
             case GateEnum::Z:
+                applyGlobalPhase(op->getLoc(), -PI / 2, rewriter);
                 return convertZGate(originOp, rewriter);
             case GateEnum::CNOT:
+                applyGlobalPhase(op->getLoc(), PI / 4, rewriter);
                 return convertCNOTGate(originOp, rewriter);
             case GateEnum::I:
                 return convertIGate(originOp, rewriter);
@@ -343,6 +368,10 @@ struct QECOpLowering : public ConversionPattern {
             }
         }
         else if (auto originOp = dyn_cast_or_null<PauliRotOp>(op)) {
+            auto loc = originOp.getLoc();
+            Value c2 = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(2.0));
+            Value halfAngle = rewriter.create<arith::DivFOp>(loc, originOp.getAngle(), c2);
+            applyGlobalPhase(loc, halfAngle, rewriter);
             return convertPauliRotGate(originOp, rewriter);
         }
         else if (auto originOp = dyn_cast_or_null<MeasureOp>(op)) {

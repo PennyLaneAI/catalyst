@@ -135,6 +135,7 @@ func.func @test_dynamic_pauli_rot_to_ppr(%q1 : !quantum.bit, %arg0 : tensor<f64>
 
     // CHECK: [[cst:%.+]] = arith.constant 2.000000e+00 : f64
     // CHECK: [[extracted:%.+]] = tensor.extract
+    // CHECK: quantum.gphase
     // CHECK: [[div:%.+]] = arith.divf [[extracted]], [[cst]] : f64
     // CHECK: [[q0:%.+]] = qec.ppr.arbitrary ["Z"]([[div]])
 }

@@ -43,6 +43,11 @@
   into normal PPR and PPMs with SCF dialect to support runtime execution.
   [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
 
+* Added global phase tracking to the `to-ppr` compiler pass. When converting quantum gates to
+  Pauli Product Rotations (PPR), the pass now emits `quantum.gphase` operations to preserve
+  global phase correctness.
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+
 <h3>Documentation 📝</h3>
 
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
