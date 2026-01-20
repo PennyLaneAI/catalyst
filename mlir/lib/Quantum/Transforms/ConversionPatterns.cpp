@@ -931,10 +931,10 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         }
         else if constexpr (std::is_same_v<T, CountsOp>) {
             auto aStruct = LLVM::UndefOp::create(rewriter, loc, structType);
-            auto bStruct =
-                LLVM::InsertValueOp::create(rewriter, loc, aStruct, adaptor.getInEigvals(), SmallVector<int64_t>{0});
-            auto cStruct =
-                LLVM::InsertValueOp::create(rewriter, loc, bStruct, adaptor.getInCounts(), SmallVector<int64_t>{1});
+            auto bStruct = LLVM::InsertValueOp::create(
+                rewriter, loc, aStruct, adaptor.getInEigvals(), SmallVector<int64_t>{0});
+            auto cStruct = LLVM::InsertValueOp::create(
+                rewriter, loc, bStruct, adaptor.getInCounts(), SmallVector<int64_t>{1});
             LLVM::StoreOp::create(rewriter, loc, cStruct, structPtr);
         }
 
