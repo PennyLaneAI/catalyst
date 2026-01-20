@@ -37,6 +37,19 @@ func.func @test_dealloc(%arg0 : !ref_quantum.allocation) {
 
 // -----
 
+func.func @test_make_reference(%arg0 : !ref_quantum.allocation, %arg1: i64) {
+
+    // Static
+    %0 = ref_quantum.make_reference %arg0, 3 : !ref_quantum.allocation -> !ref_quantum.qubit_ref
+
+    // Dynamic
+    %1 = ref_quantum.make_reference %arg0, %arg1 : !ref_quantum.allocation, i64 -> !ref_quantum.qubit_ref
+
+    return
+}
+
+// -----
+
 func.func @test_set_state(%arg0 : tensor<2xcomplex<f64>>, %q0: !ref_quantum.qubit_ref) {
     ref_quantum.set_state(%arg0) %q0 : tensor<2xcomplex<f64>>, !ref_quantum.qubit_ref
     return
@@ -212,9 +225,14 @@ func.func @test_namedobs_op(%q0: !ref_quantum.qubit_ref) {
 
 // -----
 
-func.func @test_expval_circuit(%q0: !ref_quantum.qubit_ref) -> f64 {
+func.func @test_expval_circuit() -> f64 {
+    %a = ref_quantum.alloc(2) : !ref_quantum.allocation
+    %q0 = ref_quantum.make_reference %a, 0 : !ref_quantum.allocation -> !ref_quantum.qubit_ref
+    %q1 = ref_quantum.make_reference %a, 1 : !ref_quantum.allocation -> !ref_quantum.qubit_ref
     ref_quantum.custom "Hadamard"() %q0 : !ref_quantum.qubit_ref
-    %obs = ref_quantum.namedobs %q0 [ PauliX] : !quantum.obs
+    ref_quantum.custom "CNOT"() %q0, %q1 : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
+    ref_quantum.custom "Hadamard"() %q0 : !ref_quantum.qubit_ref
+    %obs = ref_quantum.namedobs %q1 [ PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
     return %expval : f64
 }

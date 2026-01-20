@@ -83,6 +83,31 @@ def DeallocOp : Memory_Op<"dealloc"> {
     // let hasCanonicalizeMethod = 1;
 }
 
+def MakeReferenceOp : Memory_Op<"make_reference", [NoMemoryEffect]> {
+    let summary = "Produce a qubit reference SSA value from an allocation and an index.";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        AllocationType:$allocation,
+        Optional<I64>:$idx,
+        OptionalAttr<ConfinedAttr<I64Attr, [IntNonNegative]>>:$idx_attr
+    );
+
+    let results = (outs
+        QubitReferenceType:$wire
+    );
+
+    let assemblyFormat = [{
+        $allocation `,` ($idx^):($idx_attr)? attr-dict `:` type(operands) `->` type(results)
+    }];
+
+    // TODO
+    // let hasCanonicalizeMethod = 1;
+    // let hasVerifier = 1;
+    // let hasFolder = 1;
+}
+
 // -----
 
 class Gate_Op<string mnemonic, list<Trait> traits = []> :
