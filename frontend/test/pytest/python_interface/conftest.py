@@ -38,6 +38,7 @@ except (ImportError, ModuleNotFoundError):
     deps_available = False
 
 
+# pylint: disable=too-many-positional-arguments,too-many-arguments
 def _run_filecheck_impl(
     program_str: str,
     pipeline: tuple[ModulePass, ...] = (),
