@@ -148,7 +148,7 @@ def _compile_llvm_to_object(llvm_ir_path: Path, object_file: Path, llc_cmd: str)
     _run_subprocess_with_validation(
         args=llc_args,
         error_prefix="LLC failed",
-        file_not_found_msg="llc not found. Please install LLVM or provide path via llc_path argument.",
+        file_not_found_msg="llc not found. Please provide path via llc_path argument.",
         output_file=object_file,
         stderr_prefix="[ARTIQ] LLC stderr",
     )
@@ -188,7 +188,7 @@ def _link_object_to_elf(
     _run_subprocess_with_validation(
         args=lld_args,
         error_prefix="LLD linking failed",
-        file_not_found_msg="ld.lld not found. Please install LLVM LLD or provide path via lld_path argument.",
+        file_not_found_msg="ld.lld not found. Please provide path via lld_path argument.",
         output_file=output_elf_path,
         stderr_prefix="[ARTIQ] LLD stderr",
     )
