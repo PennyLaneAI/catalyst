@@ -12,6 +12,7 @@ STABLEHLO_BUILD_DIR ?= $(MK_DIR)/stablehlo/build
 ENZYME_BUILD_DIR ?= $(MK_DIR)/Enzyme/build
 RT_BUILD_DIR ?= $(MK_DIR)/../runtime/build
 ENABLE_ASAN ?= OFF
+ENABLE_OQD ?= OFF
 STRICT_WARNINGS ?= ON
 BUILD_TYPE ?= Release
 LLVM_EXTERNAL_LIT ?= $(LLVM_BUILD_DIR)/bin/llvm-lit
@@ -36,8 +37,15 @@ USE_SANITIZER_NAMES=""
 USE_SANITIZER_FLAGS=""
 endif
 
-LLVM_PROJECTS ?= mlir;lld
-LLVM_TARGETS ?= check-mlir llvm-symbolizer lld
+ifeq ($(ENABLE_OQD), ON)
+LLD_TARGET ?= lld
+else
+LLD_TARGET ?=
+endif
+
+LLVM_PROJECTS ?= mlir;$(LLD_TARGET)
+LLVM_TARGETS ?= check-mlir llvm-symbolizer $(LLD_TARGET)
+
 TRIPLE_TARGETS ?= "ARM"
 
 .PHONY: help
