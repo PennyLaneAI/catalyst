@@ -15,6 +15,7 @@
 """Tests for OQD device ARTIQ compilation."""
 
 import os
+import shutil
 import subprocess
 
 import numpy as np
@@ -81,8 +82,12 @@ class TestOQDARTIQCompilation:
         ), f"Output file should have .elf extension: {output_elf_path}"
 
         # Verify required ARTIQ symbols are present
+        objdump_path = shutil.which("objdump")
+        if objdump_path is None:
+            pytest.skip("objdump not found in PATH")
+
         symbol_result = subprocess.run(
-            ["objdump", "-t", output_elf_path],
+            [objdump_path, "-t", output_elf_path],
             capture_output=True,
             text=True,
             check=False,
