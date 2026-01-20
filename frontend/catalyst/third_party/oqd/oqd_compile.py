@@ -88,6 +88,38 @@ def _get_tool_command(tool_path: Optional[str], default_name: str) -> str:
     return tool_path
 
 
+def _run_subprocess_with_validation(
+    args: list[str],
+    error_prefix: str,
+    file_not_found_msg: str,
+    output_file: Path,
+    stderr_prefix: Optional[str] = None,
+) -> None:
+    """Run a subprocess command and validate the output file was created.
+
+    Args:
+        args: Command arguments to pass to subprocess.run
+        error_prefix: Prefix for error message on CalledProcessError
+        file_not_found_msg: Message for FileNotFoundError
+        output_file: Path to expected output file
+        stderr_prefix: Optional prefix for stderr output
+    """
+    try:
+        result = subprocess.run(args, check=True, capture_output=True, text=True)
+        if stderr_prefix:
+            print(f"{stderr_prefix}: {result.stderr}")
+    except subprocess.CalledProcessError as e:
+        error_msg = f"{error_prefix} with exit code: {e.returncode}"
+        if e.stderr:
+            error_msg += f"\n{e.stderr}"
+        raise RuntimeError(error_msg) from e
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(file_not_found_msg) from exc
+
+    if not output_file.exists():
+        raise RuntimeError(f"{output_file.name} was not created: {output_file}")
+
+
 def _compile_llvm_to_object(llvm_ir_path: Path, object_file: Path, llc_cmd: str) -> None:
     """Compile LLVM IR to object file with llc.
 
@@ -113,21 +145,13 @@ def _compile_llvm_to_object(llvm_ir_path: Path, object_file: Path, llc_cmd: str)
 
     print(f"[ARTIQ] Compiling with external LLC: {' '.join(llc_args)}")
 
-    try:
-        result = subprocess.run(llc_args, check=True, capture_output=True, text=True)
-        print(f"[ARTIQ] LLC stderr: {result.stderr}")
-    except subprocess.CalledProcessError as e:
-        error_msg = f"External LLC failed with exit code: {e.returncode}"
-        if e.stderr:
-            error_msg += f"\n{e.stderr}"
-        raise RuntimeError(error_msg) from e
-    except FileNotFoundError as exc:
-        raise FileNotFoundError(
-            "llc not found. Please install LLVM or provide path via llc_path argument."
-        ) from exc
-
-    if not object_file.exists():
-        raise RuntimeError(f"Object file was not created: {object_file}")
+    _run_subprocess_with_validation(
+        args=llc_args,
+        error_prefix="LLC failed",
+        file_not_found_msg="llc not found. Please install LLVM or provide path via llc_path argument.",
+        output_file=object_file,
+        stderr_prefix="[ARTIQ] LLC stderr",
+    )
 
 
 def _link_object_to_elf(
@@ -161,21 +185,13 @@ def _link_object_to_elf(
 
     print(f"[ARTIQ] Linking ELF: {' '.join(lld_args)}")
 
-    try:
-        result = subprocess.run(lld_args, check=True, capture_output=True, text=True)
-        print(f"[ARTIQ] LLD stderr: {result.stderr}")
-    except subprocess.CalledProcessError as e:
-        error_msg = f"LLD linking failed with exit code: {e.returncode}"
-        if e.stderr:
-            error_msg += f"\n{e.stderr}"
-        raise RuntimeError(error_msg) from e
-    except FileNotFoundError as exc:
-        raise FileNotFoundError(
-            "ld.lld not found. Please install LLVM LLD or provide path via lld_path argument."
-        ) from exc
-
-    if not output_elf_path.exists():
-        raise RuntimeError(f"ELF file was not created: {output_elf_path}")
+    _run_subprocess_with_validation(
+        args=lld_args,
+        error_prefix="LLD linking failed",
+        file_not_found_msg="ld.lld not found. Please install LLVM LLD or provide path via lld_path argument.",
+        output_file=output_elf_path,
+        stderr_prefix="[ARTIQ] LLD stderr",
+    )
 
 
 # pylint: disable=too-many-arguments,too-many-positional-arguments
