@@ -496,13 +496,6 @@ class Compiler:
             if os.path.exists(tmp_infile_name):
                 os.remove(tmp_infile_name)
             if os.path.exists(output_ir_name):
-                # Don't remove .ll file if we want to read it back in other ranks?
-                # Actually below checks if exists to read it.
-                # But original code removed it.
-                # If we remove it here, other ranks can't read it.
-                # Original code:
-                # if os.path.exists(output_ir_name): os.remove(output_ir_name)
-                # But it reads it BEFORE removing.
                 pass
 
         # Synchronize all ranks
@@ -512,25 +505,12 @@ class Compiler:
         output_object_name = os.path.join(str(workspace), f"{module_name}.o")
         output_ir_name = os.path.join(str(workspace), f"{module_name}.ll")
 
-        # Re-construct output path (LinkerDriver usually returns .so path)
-        # Note: LinkerDriver.run returns the output filename.
-        # But we don't have it on Rank > 0 unless we assume standard naming.
-        # LinkerDriver default output is {module_name}.so in cwd or workspace?
-        # Looking at LinkerDriver usage in original code:
-        # output = LinkerDriver.run(output_object_name, options=self.options)
-        # output_object_name = str(pathlib.Path(output).absolute())
-
-        # We need to ensure output_object_name matches what LinkerDriver produced.
-        # If LinkerDriver is deterministic based on input, we can predict it.
-        # Assuming module_name.so in workspace.
         output_filename = os.path.join(str(workspace), f"{module_name}.so")
         output_object_name = str(pathlib.Path(output_filename).absolute())
 
         if os.path.exists(output_ir_name):
             with open(output_ir_name, "r", encoding="utf-8") as f:
                 out_IR = f.read()
-            # Now Rank 0 (and others?) can try to remove it if needed, but safe to keep or race to delete.
-            # Original code removed it.
             if rank == 0:
                  os.remove(output_ir_name)
         else:
@@ -730,8 +710,6 @@ class Compiler:
             # pylint: disable-next=import-outside-toplevel
             from catalyst.python_interface import Compiler as UnifiedCompiler
 
-            # Only Rank 0 should run the python compilation pipeline if it has side effects (files)
-            # or if we want to avoid redundant work.
             if rank == 0:
                 callback = self._create_xdsl_pass_save_callback(workspace)
                 compiler = UnifiedCompiler()
