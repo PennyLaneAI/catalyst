@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Optional
 
 
-def compile_to_artiq(circuit, artiq_config, output_elf_name=None, verbose=True):
+def compile_to_artiq(circuit, artiq_config, output_elf_name=None):
     """Compile a qjit-compiled circuit to ARTIQ's binary.
 
     This function takes a circuit compiled with target="llvmir", writes the LLVM IR
@@ -35,7 +35,6 @@ def compile_to_artiq(circuit, artiq_config, output_elf_name=None, verbose=True):
             - llc_path: (optional) Path to llc compiler
             - lld_path: (optional) Path to ld.lld linker
         output_elf_name: Name of the output ELF file (default: None, uses circuit function name)
-        verbose: Whether to print verbose output (default: True)
 
     Returns:
         str: Path to the generated binary file
@@ -66,7 +65,6 @@ def compile_to_artiq(circuit, artiq_config, output_elf_name=None, verbose=True):
         kernel_ld=artiq_config["kernel_ld"],
         llc_path=artiq_config.get("llc_path"),
         lld_path=artiq_config.get("lld_path"),
-        verbose=verbose,
     )
 
     return output_elf_path
@@ -90,16 +88,13 @@ def _get_tool_command(tool_path: Optional[str], default_name: str) -> str:
     return tool_path
 
 
-def _compile_llvm_to_object(
-    llvm_ir_path: Path, object_file: Path, llc_cmd: str, verbose: bool
-) -> None:
+def _compile_llvm_to_object(llvm_ir_path: Path, object_file: Path, llc_cmd: str) -> None:
     """Compile LLVM IR to object file with llc.
 
     Args:
         llvm_ir_path: Path to LLVM IR file
         object_file: Path to object file
         llc_cmd: Command to use for llc compiler
-        verbose: Whether to print verbose output
 
     Raises:
         RuntimeError: If compilation fails
@@ -116,13 +111,11 @@ def _compile_llvm_to_object(
         str(llvm_ir_path),
     ]
 
-    if verbose:
-        print(f"[ARTIQ] Compiling with external LLC: {' '.join(llc_args)}")
+    print(f"[ARTIQ] Compiling with external LLC: {' '.join(llc_args)}")
 
     try:
         result = subprocess.run(llc_args, check=True, capture_output=True, text=True)
-        if verbose and result.stderr:
-            print(f"[ARTIQ] LLC stderr: {result.stderr}")
+        print(f"[ARTIQ] LLC stderr: {result.stderr}")
     except subprocess.CalledProcessError as e:
         error_msg = f"External LLC failed with exit code: {e.returncode}"
         if e.stderr:
@@ -138,7 +131,7 @@ def _compile_llvm_to_object(
 
 
 def _link_object_to_elf(
-    object_file: Path, output_elf_path: Path, kernel_ld: Path, lld_cmd: str, verbose: bool
+    object_file: Path, output_elf_path: Path, kernel_ld: Path, lld_cmd: str
 ) -> None:
     """Link object file to ELF format with ld.lld.
 
@@ -147,7 +140,6 @@ def _link_object_to_elf(
         output_elf_path: Path to output ELF file
         kernel_ld: Path to kernel linker script
         lld_cmd: Command to use for ld.lld linker
-        verbose: Whether to print verbose output
 
     Raises:
         RuntimeError: If linking fails
@@ -167,13 +159,11 @@ def _link_object_to_elf(
         str(output_elf_path),
     ]
 
-    if verbose:
-        print(f"[ARTIQ] Linking ELF: {' '.join(lld_args)}")
+    print(f"[ARTIQ] Linking ELF: {' '.join(lld_args)}")
 
     try:
         result = subprocess.run(lld_args, check=True, capture_output=True, text=True)
-        if verbose and result.stderr:
-            print(f"[ARTIQ] LLD stderr: {result.stderr}")
+        print(f"[ARTIQ] LLD stderr: {result.stderr}")
     except subprocess.CalledProcessError as e:
         error_msg = f"LLD linking failed with exit code: {e.returncode}"
         if e.stderr:
@@ -195,7 +185,6 @@ def link_to_artiq_elf(
     kernel_ld: str,
     llc_path: Optional[str] = None,
     lld_path: Optional[str] = None,
-    verbose: bool = False,
 ) -> str:
     """Link LLVM IR to ARTIQ ELF format.
 
@@ -205,7 +194,6 @@ def link_to_artiq_elf(
         kernel_ld: Path to ARTIQ's kernel.ld linker script
         llc_path: Path to llc (LLVM compiler). If None, uses "llc" from PATH
         lld_path: Path to ld.lld (LLVM linker). If None, uses "ld.lld" from PATH
-        verbose: If True, print compilation commands
 
     Returns:
         Path to the generated ELF file
@@ -220,10 +208,9 @@ def link_to_artiq_elf(
     lld_cmd = _get_tool_command(lld_path, "ld.lld")
 
     object_file = output_elf_path_obj.with_suffix(".o")
-    _compile_llvm_to_object(llvm_ir_path_obj, object_file, llc_cmd, verbose)
-    _link_object_to_elf(object_file, output_elf_path_obj, kernel_ld_obj, lld_cmd, verbose)
+    _compile_llvm_to_object(llvm_ir_path_obj, object_file, llc_cmd)
+    _link_object_to_elf(object_file, output_elf_path_obj, kernel_ld_obj, lld_cmd)
 
-    if verbose:
-        print(f"[ARTIQ] Generated ELF: {output_elf_path_obj}")
+    print(f"[ARTIQ] Generated ELF: {output_elf_path_obj}")
 
     return str(output_elf_path_obj)
