@@ -1225,11 +1225,15 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
             double theta = 2 * (llvm::numbers::pi / static_cast<double>(rotationKind));
             thetaValue = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64FloatAttr(theta));
         }
-        else {
+        else if constexpr (std::is_same_v<T, PPRotationArbitraryOp>) {
             // multiply by 2 to get the rotation angle
             thetaValue = rewriter.create<LLVM::FMulOp>(
                 loc, adaptor.getArbitraryAngle(),
                 rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64FloatAttr(2.0)));
+        }
+        else if constexpr (std::is_same_v<T, PauliRotOp>) {
+            // Use the arbitrary angle directly
+            thetaValue = adaptor.getAngle();
         }
 
         // Build the arguments: pauliStr, theta, modifiers, numQubits, qubits...
@@ -1346,6 +1350,8 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<SetStateOpPattern>(typeConverter, patterns.getContext());
     patterns.add<SetBasisStateOpPattern>(typeConverter, patterns.getContext());
     // Pauli-based Computational Operations
+    patterns.add<PPRotationBasedPattern<PauliRotOp>>(typeConverter, patterns.getContext());
+
     patterns.add<PPRotationBasedPattern<PPRotationOp>>(typeConverter, patterns.getContext());
     patterns.add<PPRotationBasedPattern<PPRotationArbitraryOp>>(typeConverter,
                                                                 patterns.getContext());
