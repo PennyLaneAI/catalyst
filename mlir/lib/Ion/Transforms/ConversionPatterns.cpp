@@ -56,11 +56,11 @@ Value createBeamStruct(Location loc, OpBuilder &rewriter, MLIRContext *ctx, Beam
 
     Value beamStruct = LLVM::UndefOp::create(rewriter, loc, beamStructType);
     beamStruct = LLVM::InsertValueOp::create(
-        rewriter, loc, beamStruct, LLVM::ConstantOp::create(rewriter, loc, transitionIndex), 0);
+        rewriter, loc, beamStruct, LLVM::ConstantOp::create(rewriter, loc, transitionIndex), SmallVector<int64_t>{0});
     beamStruct = LLVM::InsertValueOp::create(rewriter, loc, beamStruct,
-                                             LLVM::ConstantOp::create(rewriter, loc, rabi), 1);
+                                             LLVM::ConstantOp::create(rewriter, loc, rabi), SmallVector<int64_t>{1});
     beamStruct = LLVM::InsertValueOp::create(rewriter, loc, beamStruct,
-                                             LLVM::ConstantOp::create(rewriter, loc, detuning), 2);
+                                             LLVM::ConstantOp::create(rewriter, loc, detuning), SmallVector<int64_t>{2});
     for (size_t i = 0; i < polarization.size(); i++) {
         Value polarizaitonConst = LLVM::ConstantOp::create(
             rewriter, loc, rewriter.getI64Type(),

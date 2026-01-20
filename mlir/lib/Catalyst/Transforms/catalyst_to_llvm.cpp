@@ -164,7 +164,7 @@ Value EncodeOpaqueMemRef(Location loc, PatternRewriter &rewriter, MemRefType mem
     memref = LLVM::InsertValueOp::create(rewriter, loc, memref, memrefPtr, SmallVector<int64_t>{1});
 
     // Dtype
-    memref = LLVM::InsertValueOp::create(rewriter, loc, memref, dtype, 2);
+    memref = LLVM::InsertValueOp::create(rewriter, loc, memref, dtype, SmallVector<int64_t>{2});
 
     return memref;
 }
@@ -310,10 +310,10 @@ Value EncodeDataMemRef(Location loc, PatternRewriter &rewriter, MemRefType memre
     Value data =
         LLVM::GEPOp::create(rewriter, loc, ptr, memrefType.getElementType(),
                             desc.alignedPtr(rewriter, loc), c0, LLVM::GEPNoWrapFlags::inbounds);
-    memref = LLVM::InsertValueOp::create(rewriter, loc, memref, data, 1);
+    memref = LLVM::InsertValueOp::create(rewriter, loc, memref, data, SmallVector<int64_t>{1});
 
     // Dtype
-    memref = LLVM::InsertValueOp::create(rewriter, loc, memref, dtype, 2);
+    memref = LLVM::InsertValueOp::create(rewriter, loc, memref, dtype, SmallVector<int64_t>{2});
 
     return memref;
 }
