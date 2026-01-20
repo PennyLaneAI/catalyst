@@ -55,9 +55,11 @@ def _run_filecheck_impl(
     xdsl_module = QuantumParser(ctx, program_str, extra_dialects=(test.Test,)).parse_module()
 
     if roundtrip:
-        # Print -> parse to MLIR -> print -> parse to xDSL
+        # Print -> parse to xDSL
         # If `pretty_print == True`, the assembly format (or other custom printing logic)
         # will be used
+        # If `to_mlir == True`, the printed program will be parsed to MLIR and printed back
+        # before parsing to xDSL
         stream = StringIO()
         Printer(stream=stream, print_generic_format=not pretty_print).print_op(xdsl_module)
         mod_str = stream.getvalue()
