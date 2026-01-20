@@ -54,7 +54,8 @@ struct RegisterInactiveCallbackPass
         auto undef = LLVM::UndefOp::create(builder, glb.getLoc(), arrTy);
         auto fnSym = SymbolRefAttr::get(context, inactive_callbackFnName);
         auto fnPtr = LLVM::AddressOfOp::create(builder, glb.getLoc(), ptrTy, fnSym);
-        auto filledInArray = LLVM::InsertValueOp::create(builder, glb.getLoc(), undef, fnPtr, 0);
+        auto filledInArray = LLVM::InsertValueOp::create(builder, glb.getLoc(), undef, fnPtr,
+                                                         SmallVector<int64_t>{0});
         LLVM::ReturnOp::create(builder, glb.getLoc(), filledInArray);
     }
 };

@@ -156,12 +156,12 @@ Value EncodeOpaqueMemRef(Location loc, PatternRewriter &rewriter, MemRefType mem
     // Construct encoded memref value.
     Value memref = LLVM::UndefOp::create(rewriter, loc, type);
     // Rank
-    memref = LLVM::InsertValueOp::create(rewriter, loc, memref, rank, 0);
+    memref = LLVM::InsertValueOp::create(rewriter, loc, memref, rank, SmallVector<int64_t>{0});
 
     // Memref
     Value memrefPtr = getStaticAlloca(loc, rewriter, llvmMemrefType, 1);
     LLVM::StoreOp::create(rewriter, loc, memrefLlvm, memrefPtr);
-    memref = LLVM::InsertValueOp::create(rewriter, loc, memref, memrefPtr, 1);
+    memref = LLVM::InsertValueOp::create(rewriter, loc, memref, memrefPtr, SmallVector<int64_t>{1});
 
     // Dtype
     memref = LLVM::InsertValueOp::create(rewriter, loc, memref, dtype, 2);
@@ -302,7 +302,7 @@ Value EncodeDataMemRef(Location loc, PatternRewriter &rewriter, MemRefType memre
     // Construct encoded memref value.
     Value memref = LLVM::UndefOp::create(rewriter, loc, type);
     // Rank
-    memref = LLVM::InsertValueOp::create(rewriter, loc, memref, rank, 0);
+    memref = LLVM::InsertValueOp::create(rewriter, loc, memref, rank, SmallVector<int64_t>{0});
 
     // Memref data
     MemRefDescriptor desc = MemRefDescriptor(memrefLlvm);
