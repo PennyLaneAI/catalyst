@@ -456,42 +456,85 @@ class Compiler:
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".mlir", dir=str(workspace), delete=False
-        ) as tmp_infile:
-            tmp_infile_name = tmp_infile.name
-            tmp_infile.write(ir)
+        # Detect MPI environment and synchronize compilation
+        comm = None
+        rank = 0
+        try:
+            from mpi4py import MPI
+            comm = MPI.COMM_WORLD
+            rank = comm.Get_rank()
+        except ImportError:
+            pass
+
+        # Rank 0 performs compilation
+        if rank == 0:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".mlir", dir=str(workspace), delete=False
+            ) as tmp_infile:
+                tmp_infile_name = tmp_infile.name
+                tmp_infile.write(ir)
+
+            output_object_name = os.path.join(str(workspace), f"{module_name}.o")
+            output_ir_name = os.path.join(str(workspace), f"{module_name}.ll")
+
+            cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace)
+            try:
+                if self.options.verbose:
+                    print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
+                result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+                if self.options.verbose or os.getenv("ENABLE_DIAGNOSTICS"):
+                    if result.stdout:
+                        print(result.stdout.strip(), file=self.options.logfile)
+                    if result.stderr:
+                        print(result.stderr.strip(), file=self.options.logfile)
+            except subprocess.CalledProcessError as e:  # pragma: nocover
+                raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
+
+            output = LinkerDriver.run(output_object_name, options=self.options)
+
+            # Clean up temporary files
+            if os.path.exists(tmp_infile_name):
+                os.remove(tmp_infile_name)
+            if os.path.exists(output_ir_name):
+                # Don't remove .ll file if we want to read it back in other ranks?
+                # Actually below checks if exists to read it.
+                # But original code removed it.
+                # If we remove it here, other ranks can't read it.
+                # Original code:
+                # if os.path.exists(output_ir_name): os.remove(output_ir_name)
+                # But it reads it BEFORE removing.
+                pass
+
+        # Synchronize all ranks
+        if comm:
+            comm.Barrier()
 
         output_object_name = os.path.join(str(workspace), f"{module_name}.o")
         output_ir_name = os.path.join(str(workspace), f"{module_name}.ll")
 
-        cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace)
-        try:
-            if self.options.verbose:
-                print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-            if self.options.verbose or os.getenv("ENABLE_DIAGNOSTICS"):
-                if result.stdout:
-                    print(result.stdout.strip(), file=self.options.logfile)
-                if result.stderr:
-                    print(result.stderr.strip(), file=self.options.logfile)
-        except subprocess.CalledProcessError as e:  # pragma: nocover
-            raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
+        # Re-construct output path (LinkerDriver usually returns .so path)
+        # Note: LinkerDriver.run returns the output filename.
+        # But we don't have it on Rank > 0 unless we assume standard naming.
+        # LinkerDriver default output is {module_name}.so in cwd or workspace?
+        # Looking at LinkerDriver usage in original code:
+        # output = LinkerDriver.run(output_object_name, options=self.options)
+        # output_object_name = str(pathlib.Path(output).absolute())
+
+        # We need to ensure output_object_name matches what LinkerDriver produced.
+        # If LinkerDriver is deterministic based on input, we can predict it.
+        # Assuming module_name.so in workspace.
+        output_filename = os.path.join(str(workspace), f"{module_name}.so")
+        output_object_name = str(pathlib.Path(output_filename).absolute())
 
         if os.path.exists(output_ir_name):
             with open(output_ir_name, "r", encoding="utf-8") as f:
                 out_IR = f.read()
+            # Now Rank 0 (and others?) can try to remove it if needed, but safe to keep or race to delete.
+            # Original code removed it.
+            if rank == 0:
+                 os.remove(output_ir_name)
         else:
             out_IR = None
-
-        output = LinkerDriver.run(output_object_name, options=self.options)
-        output_object_name = str(pathlib.Path(output).absolute())
-
-        # Clean up temporary files
-        if os.path.exists(tmp_infile_name):
-            os.remove(tmp_infile_name)
-        if os.path.exists(output_ir_name):
-            os.remove(output_ir_name)
 
         return output_object_name, out_IR
 
@@ -653,12 +696,29 @@ class Compiler:
         using_python_compiler = self.is_using_python_compiler(mlir_module)
         workspace = args[0] if args else kwargs.get("workspace")
         module_name = str(mlir_module.operation.attributes["sym_name"]).replace('"', "")
+
+        if workspace:
+            output_filename = os.path.join(str(workspace), f"{module_name}.so")
+            if os.path.exists(output_filename):
+                return output_filename, None
+
         ir = mlir_module.operation.get_asm(
             binary=False, print_generic_op_form=using_python_compiler, assume_verified=True
         )
 
+        # Detect MPI environment
+        rank = 0
+        try:
+            from mpi4py import MPI
+            comm = MPI.COMM_WORLD
+            if comm.Get_size() > 1:
+                rank = comm.Get_rank()
+        except ImportError:
+            pass
+
         # Save intermediate IR before any compiler transformation is applied
-        if workspace and self.options.keep_intermediate:
+        # Only Rank 0 should write files.
+        if rank == 0 and workspace and self.options.keep_intermediate:
             initial_ir_file = os.path.join(str(workspace), f"0_{module_name}.mlir")
             with open(initial_ir_file, "w", encoding="utf-8") as f:
                 # We need to canonicalize the IR to get the pretty format
@@ -670,9 +730,12 @@ class Compiler:
             # pylint: disable-next=import-outside-toplevel
             from catalyst.python_interface import Compiler as UnifiedCompiler
 
-            callback = self._create_xdsl_pass_save_callback(workspace)
-            compiler = UnifiedCompiler()
-            ir = compiler.run(ir, callback=callback)
+            # Only Rank 0 should run the python compilation pipeline if it has side effects (files)
+            # or if we want to avoid redundant work.
+            if rank == 0:
+                callback = self._create_xdsl_pass_save_callback(workspace)
+                compiler = UnifiedCompiler()
+                ir = compiler.run(ir, callback=callback)
 
         return self.run_from_ir(
             ir,

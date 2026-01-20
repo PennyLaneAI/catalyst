@@ -100,7 +100,37 @@ class WorkspaceManager:
                                 operating system.
         """
         path, name = WorkspaceManager._get_preferred_abspath(name, path)
-        return Directory(WorkspaceManager._get_or_create_directory(path, name))
+
+        # Detect MPI and synchronize workspace path so all ranks use the same directory
+        comm = None
+        rank = 0
+        try:
+            from mpi4py import MPI
+            comm = MPI.COMM_WORLD
+            if comm.Get_size() > 1:
+                rank = comm.Get_rank()
+            else:
+                comm = None
+        except ImportError:
+            pass
+
+        if comm:
+            dir_path_str = None
+            if rank == 0:
+                # Rank 0 creates the directory (potentially with random suffix)
+                directory = Directory(WorkspaceManager._get_or_create_directory(path, name))
+                dir_path_str = str(directory)
+                # Broadcast the path to other ranks
+                comm.bcast(dir_path_str, root=0)
+                return directory
+            else:
+                # Other ranks receive the path
+                dir_path_str = comm.bcast(None, root=0)
+                # Return a directory object pointing to the existing path
+                # Note: These ranks won't own the TemporaryDirectory object, so they won't trigger cleanup.
+                return Directory(pathlib.Path(dir_path_str))
+        else:
+            return Directory(WorkspaceManager._get_or_create_directory(path, name))
 
     @staticmethod
     def _get_preferred_abspath(name, path=None):
@@ -116,17 +146,12 @@ class WorkspaceManager:
             # This can likely avoid having all the code below.
             return TemporaryDirectorySilent(dir=path.resolve(), prefix=name.name)
 
-        count = 1
         curr_preferred_abspath = path / name
-        preferred_name = name.name
+        try:
+            curr_preferred_abspath.mkdir(exist_ok=True)
+            return curr_preferred_abspath
+        except OSError as e:
+            # If for some reason we cannot create it or reuse it (e.g. permission), fallback?
+            # For now, let's just raise or rely on standard behavior.
+            raise e
 
-        # TODO: Maybe just look for the last one?
-        while curr_preferred_abspath.exists():
-            curr_preferred_name_str = preferred_name + "_" + str(count)
-            curr_preferred_name = pathlib.Path(curr_preferred_name_str)
-            curr_preferred_abspath = path / curr_preferred_name
-            try:
-                curr_preferred_abspath.mkdir(exist_ok=False)
-                return curr_preferred_abspath
-            except FileExistsError:
-                count += 1
