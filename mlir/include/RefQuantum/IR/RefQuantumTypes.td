@@ -28,6 +28,10 @@ class RefQuantum_Type<string name, string typeMnemonic, list<Trait> traits = []>
     let mnemonic = typeMnemonic;
 }
 
+def AllocationType : RefQuantum_Type<"Allocation", "allocation"> {
+    let summary = "An allocation result.";
+}
+
 def QubitReferenceType : RefQuantum_Type<"QubitRef", "qubit_ref"> {
     let summary = "A reference to a qubit.";
 }

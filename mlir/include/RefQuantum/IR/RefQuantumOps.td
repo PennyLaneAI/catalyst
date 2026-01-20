@@ -38,8 +38,33 @@ include "RefQuantum/IR/RefQuantumTypes.td"
 
 class Memory_Op<string mnemonic, list<Trait> traits = []> : RefQuantum_Op<mnemonic, traits>;
 
-// TODO: (dynamic) alloc and deallocs
-// Note that extracts and inserts are not a thing in reference semantics
+def AllocOp : Memory_Op<"alloc"> {
+    let summary = "Allocate n qubits.";
+    let description = [{
+        This operation represents the allocations of some number of qubits.
+
+        To distinguish from the quantum registers in the value semantics quantum dialect, which are
+        lowered to arrays of qubit IDs in runtime, the result of this operation in reference
+        semantics is an SSA value of `Allocation` type, whose entire purpose is to serve as an
+        operand to the `MakeReference` operation to produce a qubit reference value.
+    }];
+
+    let arguments = (ins
+        Optional<I64>:$nqubits,
+        OptionalAttr<ConfinedAttr<I64Attr, [IntNonNegative]>>:$nqubits_attr
+    );
+
+    let results = (outs
+        AllocationType:$allocation
+    );
+
+    let assemblyFormat = [{
+        `(` ($nqubits^):($nqubits_attr)? `)` attr-dict `:` type(results)
+    }];
+
+    // TODO
+    // let hasCanonicalizeMethod = 1;
+}
 
 // -----
 
