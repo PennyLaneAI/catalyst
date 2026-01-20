@@ -346,7 +346,7 @@ struct QECOpLowering : public ConversionPattern {
             return convertPauliRotGate(originOp, rewriter);
         }
         else if (auto originOp = dyn_cast_or_null<MeasureOp>(op)) {
-            return convertMeasureOpToPPM(originOp, "Z", rewriter);
+            return convertMeasureZ(originOp, rewriter);
         }
         op->emitError("Unsupported operation. Supported operations: CustomOp, MeasureOp");
         return failure();
