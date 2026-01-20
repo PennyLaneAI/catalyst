@@ -268,11 +268,14 @@ class TestCustomVerifiers:
             op.verify()
 
 
+@pytest.mark.parametrize(
+    "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
+)
 class TestAssemblyFormat:
     """Lit tests for assembly format of operations/attributes in the Quantum
     dialect."""
 
-    def test_qubit_qreg_operations(self, run_filecheck):
+    def test_qubit_qreg_operations(self, run_filecheck, pretty_print):
         """Test that the assembly format for operations for allocation/deallocation of
         qubits/quantum registers works correctly."""
 
@@ -330,9 +333,9 @@ class TestAssemblyFormat:
         %qreg2 = quantum.insert %qreg1[%dyn_index], %dyn_qubit1 : !quantum.reg, !quantum.bit
         """
 
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
 
-    def test_quantum_ops(self, run_filecheck):
+    def test_quantum_ops(self, run_filecheck, pretty_print):
         """Test that the assembly format for quantum non-terminal operations works correctly."""
 
         # Tests for CustomOp, GlobalPhaseOp, MeasureOp, MultiRZOp, QubitUnitaryOp
@@ -393,12 +396,12 @@ class TestAssemblyFormat:
         quantum.gphase(%param1) :
 
         // Control wires and values
-        // CHECK: {{%.+}}, {{%.+}} = quantum.gphase([[PARAM1]]) ctrls([[Q0]], [[Q1]]) ctrlvals([[FALSE_CST]], [[TRUE_CST]]) : !quantum.bit, !quantum.bit
-        %qg1, %qg2 = quantum.gphase(%param1) ctrls(%q0, %q1) ctrlvals(%false_cst, %true_cst) : !quantum.bit, !quantum.bit
+        // CHECK: {{%.+}}, {{%.+}} = quantum.gphase([[PARAM1]]) ctrls([[Q0]], [[Q1]]) ctrlvals([[FALSE_CST]], [[TRUE_CST]]) : ctrls !quantum.bit, !quantum.bit
+        %qg1, %qg2 = quantum.gphase(%param1) ctrls(%q0, %q1) ctrlvals(%false_cst, %true_cst) : ctrls !quantum.bit, !quantum.bit
 
         // Adjoint
-        // CHECK: {{%.+}} = quantum.gphase([[PARAM1]]) {adjoint} ctrls([[Q0]]) ctrlvals([[TRUE_CST]]) : !quantum.bit
-        %qg3 = quantum.gphase(%param1) {adjoint} ctrls(%q0) ctrlvals(%true_cst) : !quantum.bit
+        // CHECK: {{%.+}} = quantum.gphase([[PARAM1]]) {adjoint} ctrls([[Q0]]) ctrlvals([[TRUE_CST]]) : ctrls !quantum.bit
+        %qg3 = quantum.gphase(%param1) {adjoint} ctrls(%q0) ctrlvals(%true_cst) : ctrls !quantum.bit
 
         ////////////////// **MultiRZOp tests** //////////////////
         // No control wires
@@ -468,9 +471,9 @@ class TestAssemblyFormat:
         %mres3, %mqubit3 = quantum.measure %q2 postselect 1 : i1, !quantum.bit
         """
 
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
 
-    def test_state_prep(self, run_filecheck):
+    def test_state_prep(self, run_filecheck, pretty_print):
         """Test that the assembly format for state prep operations works correctly."""
 
         # Tests for SetBasisStateOp, SetStateOp
@@ -510,9 +513,9 @@ class TestAssemblyFormat:
         %q8, %q9 = quantum.set_state(%state_memref) %q6, %q7 : (memref<4xcomplex<f64>>, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
         """
 
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
 
-    def test_observables(self, run_filecheck):
+    def test_observables(self, run_filecheck, pretty_print):
         """Test that the assembly format for observable operations works correctly."""
 
         # Tests for observables: ComputationalBasisOp, HamiltonianOp, HermitianOp,
@@ -588,9 +591,9 @@ class TestAssemblyFormat:
         %cb_all = quantum.compbasis qreg %qreg : !quantum.obs
         """
 
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
 
-    def test_measurements(self, run_filecheck):
+    def test_measurements(self, run_filecheck, pretty_print):
         """Test that the assembly format for measurement operations works correctly."""
 
         # Tests for measurements: CountsOp, ExpvalOp, MeasureOp, ProbsOp, SampleOp,
@@ -699,9 +702,9 @@ class TestAssemblyFormat:
         quantum.sample %c_obs in(%samples_in : memref<7x3xf64>)
         """
 
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
 
-    def test_miscellaneous_operations(self, run_filecheck):
+    def test_miscellaneous_operations(self, run_filecheck, pretty_print):
         """Test that the assembly format for miscelleneous operations
         works correctly."""
 
@@ -754,7 +757,7 @@ class TestAssemblyFormat:
         %nqubits = quantum.num_qubits : i64
         """
 
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
 
 
 if __name__ == "__main__":

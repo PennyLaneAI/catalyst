@@ -61,7 +61,10 @@ def test_all_attributes_names(attr):
     assert attr.name == expected_name
 
 
-def test_assembly_format(run_filecheck):
+@pytest.mark.parametrize(
+    "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
+)
+def test_assembly_format(run_filecheck, pretty_print):
     """Test the assembly format of the qec ops."""
     program = """
     // CHECK: [[Q0:%.+]], [[Q1:%.+]], [[Q2:%.+]] = "test.op"() : () -> (!quantum.bit
@@ -96,4 +99,4 @@ def test_assembly_format(run_filecheck):
 
     """
 
-    run_filecheck(program, roundtrip=True, verify=True)
+    run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)

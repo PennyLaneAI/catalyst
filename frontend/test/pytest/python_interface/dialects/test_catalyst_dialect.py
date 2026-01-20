@@ -68,7 +68,18 @@ def test_all_attributes_names(attr):
     assert attr.name == expected_name
 
 
-def test_assembly_format(run_filecheck):
+@pytest.mark.parametrize(
+    "pretty_print",
+    [
+        pytest.param(
+            True,
+            id="pretty_print",
+            marks=pytest.mark.xfail(reason="No assembly format for arraylist"),
+        ),
+        pytest.param(False, id="generic_print"),
+    ],
+)
+def test_assembly_format(run_filecheck, pretty_print):
     """Test the assembly format of the catalyst ops."""
     program = """
     // Function to set up symbols for call-like operations
@@ -108,4 +119,4 @@ def test_assembly_format(run_filecheck):
     %callback_result = catalyst.callback_call @test_func(%tensor_val) : (tensor<1xf64>) -> f64
     """
 
-    run_filecheck(program, roundtrip=True, verify=True)
+    run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
