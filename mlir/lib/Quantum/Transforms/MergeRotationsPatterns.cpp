@@ -188,13 +188,13 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
             // α1 = (ϕ1 + ω1)/2, α2 = (ϕ2 + ω2)/2
             // β1 = (ϕ1 - ω1)/2, β2 = (ϕ2 - ω2)/2
             auto alpha1 = arith::MulFOp::create(
-                rewriter, loc, loc, arith::AddFOp::create(rewriter, loc, phi1, omega1), halfConst);
+                rewriter, loc, arith::AddFOp::create(rewriter, loc, phi1, omega1), halfConst);
             auto alpha2 = arith::MulFOp::create(
-                rewriter, loc, loc, arith::AddFOp::create(rewriter, loc, phi2, omega2), halfConst);
+                rewriter, loc, arith::AddFOp::create(rewriter, loc, phi2, omega2), halfConst);
             auto beta1 = arith::MulFOp::create(
-                rewriter, loc, loc, arith::SubFOp::create(rewriter, loc, phi1, omega1), halfConst);
+                rewriter, loc, arith::SubFOp::create(rewriter, loc, phi1, omega1), halfConst);
             auto beta2 = arith::MulFOp::create(
-                rewriter, loc, loc, arith::SubFOp::create(rewriter, loc, phi2, omega2), halfConst);
+                rewriter, loc, arith::SubFOp::create(rewriter, loc, phi2, omega2), halfConst);
 
             // c1 = cos(θ1/2), c2 = cos(θ2/2)
             // s1 = sin(θ1/2), s2 = sin(θ2/2)
@@ -217,11 +217,10 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
                 arith::MulFOp::create(rewriter, loc, arith::MulFOp::create(rewriter, loc, s1, s1),
                                       arith::MulFOp::create(rewriter, loc, s2, s2));
             auto thirdAddend = arith::NegFOp::create(rewriter, loc,
-                loc, arith::MulFOp::create(rewriter, loc, twoConst,
-                         loc, twoConst,
-                         arith::MulFOp::create(rewriter, loc, c1TimesC2,
-                         arith::MulFOp::create(rewriter, loc, s1TimesS2,
-                         math::CosOp::create(rewriter, loc, arith::AddFOp::create(rewriter, loc, omega1, phi2)))));
+                arith::MulFOp::create(rewriter, loc, twoConst,
+                    arith::MulFOp::create(rewriter, loc, c1TimesC2,
+                        arith::MulFOp::create(rewriter, loc, s1TimesS2,
+                            math::CosOp::create(rewriter, loc, arith::AddFOp::create(rewriter, loc, omega1, phi2))))));
             auto cF = math::SqrtOp::create(rewriter, loc,
                 arith::AddFOp::create(rewriter, loc, firstAddend,
                 arith::AddFOp::create(rewriter, loc, secondAddend, thirdAddend)));
@@ -241,14 +240,14 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
             auto alpha1PlusAlpha2 = arith::AddFOp::create(rewriter, loc, alpha1, alpha2);
             auto beta2MinusBeta1 = arith::SubFOp::create(rewriter, loc, beta2, beta1);
             auto term1 = arith::NegFOp::create(rewriter, loc,
-                loc, arith::MulFOp::create(rewriter, loc, c1TimesC2, math::SinOp::create(rewriter, loc, alpha1PlusAlpha2)));
+                arith::MulFOp::create(rewriter, loc, c1TimesC2, math::SinOp::create(rewriter, loc, alpha1PlusAlpha2)));
             auto term2 = arith::NegFOp::create(rewriter, loc,
-                loc, arith::MulFOp::create(rewriter, loc, s1TimesS2, math::SinOp::create(rewriter, loc, beta2MinusBeta1)));
+                arith::MulFOp::create(rewriter, loc, s1TimesS2, math::SinOp::create(rewriter, loc, beta2MinusBeta1)));
             auto term3 = arith::MulFOp::create(rewriter, loc, c1TimesC2, math::CosOp::create(rewriter, loc, alpha1PlusAlpha2));
             auto term4 = arith::NegFOp::create(rewriter, loc,
-                loc, arith::MulFOp::create(rewriter, loc, s1TimesS2, math::CosOp::create(rewriter, loc, beta2MinusBeta1)));
+                arith::MulFOp::create(rewriter, loc, s1TimesS2, math::CosOp::create(rewriter, loc, beta2MinusBeta1)));
             auto alphaF = arith::NegFOp::create(rewriter, loc,
-                loc, math::AtanOp::create(rewriter, loc, arith::DivFOp::create(rewriter, loc, arith::AddFOp::create(rewriter, loc, term1, term2),
+                math::AtanOp::create(rewriter, loc, arith::DivFOp::create(rewriter, loc, arith::AddFOp::create(rewriter, loc, term1, term2),
                                   arith::AddFOp::create(rewriter, loc, term3, term4))));
 
             // βF = - atan((- c1 * s2 * sin(α1 + β2) + s1 * c2 * sin(α2 - β1)) /
@@ -258,17 +257,15 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
             auto alpha1PlusBeta2 = arith::AddFOp::create(rewriter, loc, alpha1, beta2);
             auto alpha2MinusBeta1 = arith::SubFOp::create(rewriter, loc, alpha2, beta1);
             auto term5 = arith::NegFOp::create(rewriter, loc,
-                loc, arith::MulFOp::create(rewriter, loc, c1TimesS2, math::SinOp::create(rewriter, loc, alpha1PlusBeta2)));
+                arith::MulFOp::create(rewriter, loc, c1TimesS2, math::SinOp::create(rewriter, loc, alpha1PlusBeta2)));
             auto term6 = arith::MulFOp::create(rewriter, loc,
-                loc, s1TimesC2, math::SinOp::create(rewriter, loc, alpha2MinusBeta1));
+                s1TimesC2, math::SinOp::create(rewriter, loc, alpha2MinusBeta1));
             auto term7 = arith::MulFOp::create(rewriter, loc,
-                loc, c1TimesS2, math::CosOp::create(rewriter, loc, alpha1PlusBeta2));
+                c1TimesS2, math::CosOp::create(rewriter, loc, alpha1PlusBeta2));
             auto term8 = arith::MulFOp::create(rewriter, loc,
-                loc, s1TimesC2, math::CosOp::create(rewriter, loc, alpha2MinusBeta1));
+                s1TimesC2, math::CosOp::create(rewriter, loc, alpha2MinusBeta1));
             auto betaF = arith::NegFOp::create(rewriter, loc,
-                loc, math::AtanOp::create(rewriter, loc, arith::DivFOp::create(rewriter, loc, arith::AddFOp::create(rewriter, loc, term5, term6),
-                         loc, arith::DivFOp::create(rewriter, loc,
-                                  loc, arith::AddFOp::create(rewriter, loc, term5, term6),
+                math::AtanOp::create(rewriter, loc, arith::DivFOp::create(rewriter, loc, arith::AddFOp::create(rewriter, loc, term5, term6),
                                   arith::AddFOp::create(rewriter, loc, term7, term8))));
 
             // ϕF = αF + βF
