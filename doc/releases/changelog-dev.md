@@ -26,6 +26,11 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed the angle conversion when lowering `qec.ppr` and `qec.ppr.arbitrary` operations to
+  `__catalyst__qis__PauliRot` runtime calls. The PPR rotation angle is now correctly multiplied
+  by 2 to match the PauliRot convention (`PauliRot(φ) == PPR(φ/2)`).
+  [(#2414)](https://github.com/PennyLaneAI/catalyst/pull/2414)
+
 <h3>Internal changes ⚙️</h3>
 
 * The quantum dialect MLIR and TableGen source has been refactored to place type and attribute
