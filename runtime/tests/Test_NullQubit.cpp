@@ -269,6 +269,24 @@ TEST_CASE("Test a NullQubit circuit with num_qubits=1 that performs a measuremen
     CHECK(*m == false); // Measurement of NullQubit should always return 0 (false)
 }
 
+TEST_CASE_METHOD(NullQubitRuntimeFixture,
+                 "Test null qubit circuit with pauli measurement throws an exception",
+                 "[NullQubit]")
+{
+    // Allocate register with three qubits, [0, 1, 2]
+    QirArray *reg = __catalyst__rt__qubit_allocate_array(3);
+
+    auto reg_vec = *reinterpret_cast<std::vector<QubitIdType> *>(reg);
+
+    // PauliMeasure is unsupported by device
+    CHECK_THROWS_WITH(__catalyst__qis__PauliMeasure("XYZ", 3, reg_vec[0], reg_vec[1], reg_vec[2]),
+                      ContainsSubstring("PauliMeasure is unsupported by device"));
+
+    NullQubit device;
+    CHECK_THROWS_WITH(device.PauliMeasure("X", {0}),
+                      ContainsSubstring(" PauliMeasure is unsupported by devic"));
+}
+
 TEST_CASE("Test __catalyst__qis__Sample with num_qubits=2 and PartialSample calling Hadamard, "
           "ControlledPhaseShift, IsingYY, and CRX quantum operations",
           "[CoreQIS]")
@@ -942,7 +960,7 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
     sim->NamedOperation("T", {}, {Qs[0]}, true);
     sim->NamedOperation("S", {}, {Qs[0]}, false, {Qs[2]});
-    sim->NamedOperation("S", {}, {Qs[0]}, false, {Qs[1], Qs[2]});
+    sim->NamedOperation("S", {0.1}, {Qs[0]}, false, {Qs[1], Qs[2]}, {true, true}, {"some_label"});
     sim->NamedOperation("T", {}, {Qs[0]}, true, {Qs[2]});
     sim->NamedOperation("CNOT", {}, {Qs[0], Qs[1]}, false);
 

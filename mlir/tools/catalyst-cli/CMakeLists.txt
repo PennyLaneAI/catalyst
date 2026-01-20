@@ -48,6 +48,7 @@ set(LIBS
     MLIRCatalystTest
     ${ENZYME_LIB}
     CatalystCompilerDriver
+    MLIRTestDialect
 )
 
 add_mlir_tool(catalyst-cli catalyst-cli.cpp SUPPORT_PLUGINS)

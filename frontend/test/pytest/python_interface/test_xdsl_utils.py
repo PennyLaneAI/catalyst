@@ -14,9 +14,26 @@
 """Unit tests for xDSL utilities."""
 # pylint: disable=line-too-long
 
+import pennylane as qml
 import pytest
-from xdsl.dialects import arith, builtin, tensor, test
+from jax import jit
+from jaxlib.mlir.ir import Module as jaxModule
+from xdsl.context import Context
+from xdsl.dialects import arith, builtin, func, tensor, test
 
+from catalyst.python_interface import QuantumParser
+from catalyst.python_interface.conversion import (
+    generic_str,
+    inline_jit_to_module,
+    inline_module,
+    mlir_from_docstring,
+    mlir_module,
+    parse_generic_to_mlir_module,
+    parse_generic_to_xdsl_module,
+    xdsl_from_docstring,
+    xdsl_from_qjit,
+    xdsl_module,
+)
 from catalyst.python_interface.dialects.stablehlo import ConstantOp as hloConstantOp
 from catalyst.python_interface.utils import get_constant_from_ssa, get_pyval_from_xdsl_attr
 
@@ -225,6 +242,210 @@ class TestGetPyvalFromXdslAttr:
         )
         with pytest.raises(ValueError, match="cannot be converted to a Python value"):
             _ = get_pyval_from_xdsl_attr(attr)
+
+
+class TestConversionUtils:
+    """Unit tests for utilities for converting Python code to xDSL modules."""
+
+    def test_generic_str(self):
+        """Test that the generic_str function works correctly."""
+
+        @jit
+        def f(x):
+            return x + 1
+
+        gen_str = generic_str(f)(1)
+        context = Context()
+        module = QuantumParser(context, gen_str).parse_module()
+
+        assert len(module.regions[0].blocks[0].ops) == 1
+        func_op = module.regions[0].blocks[0].first_op
+        assert isinstance(func_op, func.FuncOp)
+
+        expected_op_names = ["stablehlo.constant", "stablehlo.add", "func.return"]
+        for op, expected_op_name in zip(func_op.body.ops, expected_op_names):
+            assert op.name == expected_op_name
+
+    def test_mlir_module(self):
+        """Test that the mlir_module function works correctly."""
+
+        @jit
+        def f(x):
+            return x + 1
+
+        mod = mlir_module(f)(1)
+        assert isinstance(mod, jaxModule)
+
+    def test_xdsl_module(self):
+        """Test that the xdsl_module function works correctly."""
+
+        @jit
+        def f(x):
+            return x + 1
+
+        mod = xdsl_module(f)(1)
+        assert isinstance(mod, builtin.ModuleOp)
+
+        assert len(mod.regions[0].blocks[0].ops) == 1
+        func_op = mod.regions[0].blocks[0].first_op
+        assert isinstance(func_op, func.FuncOp)
+
+        expected_op_names = ["stablehlo.constant", "stablehlo.add", "func.return"]
+        for op, expected_op_name in zip(func_op.body.ops, expected_op_names):
+            assert op.name == expected_op_name
+
+    def test_parse_generic_to_mlir_module(self):
+        """Test that the parse_generic_to_mlir_module function works correctly."""
+        program_str = """
+            "builtin.module"() ({
+                %0 = "arith.constant"() <{value = 0 : i64}> : () -> i64
+            }) : () -> ()
+        """
+
+        mod = parse_generic_to_mlir_module(program_str)
+        assert isinstance(mod, jaxModule)
+
+    def test_parse_generic_to_xdsl_module(self):
+        """Test that the parse_generic_to_xdsl_module function works correctly."""
+        program_str = """
+            "builtin.module"() ({
+                %0 = "arith.constant"() <{value = 0 : i64}> : () -> i64
+            }) : () -> ()
+        """
+
+        mod = parse_generic_to_xdsl_module(program_str)
+        assert isinstance(mod, builtin.ModuleOp)
+
+        assert len(mod.regions[0].blocks[0].ops) == 1
+        assert isinstance(mod.regions[0].blocks[0].first_op, arith.ConstantOp)
+
+    def test_mlir_from_docstring(self):
+        """Test that the mlir_from_docstring function works correctly."""
+
+        def f():
+            """
+            %0 = "arith.constant"() <{value = 0 : i64}> : () -> i64
+            """
+
+        mod = mlir_from_docstring(f)
+        assert isinstance(mod, jaxModule)
+
+    def test_xdsl_from_docstring(self):
+        """Test that the xdsl_from_docstring function works correctly."""
+
+        def f():
+            """
+            %0 = "arith.constant"() <{value = 0 : i64}> : () -> i64
+            """
+
+        mod = xdsl_from_docstring(f)
+        assert isinstance(mod, builtin.ModuleOp)
+
+        assert len(mod.regions[0].blocks[0].ops) == 1
+        assert isinstance(mod.regions[0].blocks[0].first_op, arith.ConstantOp)
+
+    def test_xdsl_from_qjit(self):
+        """Test that the xdsl_from_qjit function works correctly."""
+
+        @qml.qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit():
+            return qml.state()
+
+        mod = xdsl_from_qjit(circuit)()
+        assert isinstance(mod, builtin.ModuleOp)
+
+        nested_modules = []
+        for op in mod.body.ops:
+            if isinstance(op, builtin.ModuleOp):
+                nested_modules.append(op)
+
+        funcs = []
+        assert len(nested_modules) == 1
+        for op in nested_modules[0].body.ops:
+            if isinstance(op, func.FuncOp):
+                funcs.append(op)
+
+        assert len(funcs) == 1
+        # All qnodes have a UnitAttr attribute called qnode
+        assert funcs[0].attributes.get("qnode", None) is not None
+
+
+class TestInliningUtils:
+    """Unit tests for utilities for inlining operations into xDSL modules."""
+
+    @pytest.mark.parametrize("change_main_to", ["foo", None])
+    def test_inline_module(self, change_main_to):
+        """Test that the inline_module function works correctly."""
+
+        mod1_main = func.FuncOp(name="main", function_type=((), ()))
+        mod1_func = func.FuncOp(name="not_main", function_type=((), ()))
+        mod1_ops = [test.TestPureOp(), mod1_main, mod1_func]
+        mod1 = builtin.ModuleOp(mod1_ops)
+
+        mod2_ops = [test.TestOp()]
+        mod2 = builtin.ModuleOp(mod2_ops)
+
+        inline_module(mod1, mod2, change_main_to=change_main_to)
+
+        assert len(mod2.ops) == 4
+        expected_ops = [
+            test.TestOp(),
+            test.TestPureOp(),
+            func.FuncOp(name=change_main_to or "main", function_type=((), ())),
+            func.FuncOp(name="not_main", function_type=((), ())),
+        ]
+        expected_mod2 = builtin.ModuleOp(expected_ops)
+        assert mod2.is_structurally_equivalent(expected_mod2)
+        expected_names = {"not_main", change_main_to or "main"}
+        actual_names = set(op.sym_name.data for op in mod2.ops if isinstance(op, func.FuncOp))
+        assert actual_names == expected_names
+
+        # Check that mod1 is unchanged
+        expected_mod1 = builtin.ModuleOp(ops=[op.clone() for op in mod1_ops])
+        assert mod1.is_structurally_equivalent(expected_mod1)
+        original_names = {"not_main", "main"}
+        actual_mod1_names = set(op.sym_name.data for op in mod1.ops if isinstance(op, func.FuncOp))
+        assert actual_mod1_names == original_names
+
+    def test_inline_jit_to_module(self):
+        """Test that the inline_jit_to_module function works correctly."""
+
+        @jit
+        def f1(x):
+            return x
+
+        @jit
+        def f2(x):
+            return f1(x)
+
+        mod = builtin.ModuleOp(ops=[])
+        # Mutate the module in-place
+        inline_jit_to_module(f2, mod)(1.5)
+
+        expected_func_names = {"f1", "f2"}
+        funcs = []
+        actual_func_names = set()
+        f2_func = None
+        assert len(mod.ops) == 2
+        for op in mod.body.ops:
+            assert isinstance(op, func.FuncOp)
+            funcs.append(op)
+            sym_name = op.sym_name.data
+            actual_func_names.add(sym_name)
+            if sym_name == "f2":
+                f2_func = op
+
+        assert actual_func_names == expected_func_names
+
+        # Check that f2 calls f1
+        call_op = None
+        for op in f2_func.body.ops:
+            if isinstance(op, func.CallOp):
+                call_op = op
+
+        assert call_op is not None
+        assert call_op.callee.root_reference.data == "f1"
 
 
 if __name__ == "__main__":

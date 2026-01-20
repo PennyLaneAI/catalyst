@@ -28,6 +28,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax._src.tree_util import tree_flatten, tree_leaves, tree_structure, tree_unflatten
 from jax.api_util import debug_info
+from jax.core import Tracer
 
 from catalyst.api_extensions.control_flow import for_loop
 from catalyst.jax_extras import make_jaxpr2
@@ -351,6 +352,8 @@ class VmapCallable(CatalystCallable):
             )
 
         batch_size = batch_sizes[0] if batch_sizes else 0
+        if isinstance(batch_size, Tracer):
+            raise ValueError("Invalid batch size; cannot vmap over a dynamic (tracer) array size")
 
         if axis_size is not None:
             if axis_size <= batch_size:

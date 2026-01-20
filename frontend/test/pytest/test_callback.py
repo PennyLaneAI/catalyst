@@ -877,8 +877,7 @@ def test_active_grad_inside_qjit(backend, scale):
         qml.RX(param, wires=0)
         return qml.expval(qml.PauliZ(0))
 
-    @jax.jit
-    @qml.grad
+    @partial(qml.grad, argnums=0)
     @qml.qnode(qml.device(backend, wires=1))
     def wrapper_jit(x):
         param = scale * identity(x)
