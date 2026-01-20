@@ -36,9 +36,8 @@ USE_SANITIZER_NAMES=""
 USE_SANITIZER_FLAGS=""
 endif
 
-LLVM_PROJECTS ?= mlir;lld
-LLVM_TARGETS ?= check-mlir llvm-symbolizer lld
-TRIPLE_TARGETS ?= "ARM"
+LLVM_PROJECTS ?= mlir
+LLVM_TARGETS ?= check-mlir llvm-symbolizer
 
 .PHONY: help
 help:
@@ -71,7 +70,7 @@ llvm:
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLLVM_BUILD_EXAMPLES=OFF \
-		-DLLVM_TARGETS_TO_BUILD="host;$(TRIPLE_TARGETS)" \
+		-DLLVM_TARGETS_TO_BUILD="host" \
 		-DLLVM_ENABLE_PROJECTS="$(LLVM_PROJECTS)" \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DMLIR_ENABLE_BINDINGS_PYTHON=ON \
