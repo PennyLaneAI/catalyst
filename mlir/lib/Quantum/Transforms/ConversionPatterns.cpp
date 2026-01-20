@@ -1216,17 +1216,24 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
             rewriter, op, qirName, qirSignature);
 
         // Get the rotation angle based on the op type
+        // Since the qml.PauliRot(phi) == PPR(phi/2), this rotation_kind is multiplied by 2.
         Value thetaValue;
         if constexpr (std::is_same_v<T, PPRotationOp>) {
             // Compute the rotation angle: theta = π / rotation_kind
             // rotation_kind can be ±1, ±2, ±4, ±8
             int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
-            double theta = llvm::numbers::pi / static_cast<double>(rotationKind);
+            double theta = 2 * (llvm::numbers::pi / static_cast<double>(rotationKind));
             thetaValue = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64FloatAttr(theta));
         }
-        else {
+        else if constexpr (std::is_same_v<T, PPRotationArbitraryOp>) {
+            // multiply by 2 to get the rotation angle
+            thetaValue = rewriter.create<LLVM::FMulOp>(
+                loc, adaptor.getArbitraryAngle(),
+                rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64FloatAttr(2.0)));
+        }
+        else if constexpr (std::is_same_v<T, PauliRotOp>) {
             // Use the arbitrary angle directly
-            thetaValue = adaptor.getArbitraryAngle();
+            thetaValue = adaptor.getAngle();
         }
 
         // Build the arguments: pauliStr, theta, modifiers, numQubits, qubits...
@@ -1343,6 +1350,8 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<SetStateOpPattern>(typeConverter, patterns.getContext());
     patterns.add<SetBasisStateOpPattern>(typeConverter, patterns.getContext());
     // Pauli-based Computational Operations
+    patterns.add<PPRotationBasedPattern<PauliRotOp>>(typeConverter, patterns.getContext());
+
     patterns.add<PPRotationBasedPattern<PPRotationOp>>(typeConverter, patterns.getContext());
     patterns.add<PPRotationBasedPattern<PPRotationArbitraryOp>>(typeConverter,
                                                                 patterns.getContext());
