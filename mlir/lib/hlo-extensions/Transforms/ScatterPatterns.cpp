@@ -715,7 +715,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
 
         // Deduce result types
         auto resultType = tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
-            1, scatterIndicesTensorType, offsets, sizes, strides);
+            1, scatterIndicesTensorType, sizes);
 
         return tensor::ExtractSliceOp::create(builder, loc, resultType, scatterIndices, dynOffsets,
                                               dynSizes, dynStrides, offsets, sizes, strides);
@@ -744,7 +744,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<stablehlo::Scatte
 
         // Deduce result types
         auto resultType = tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
-            rank - 1, updateType, offsets, sizes, strides);
+            rank - 1, updateType, sizes);
 
         return tensor::ExtractSliceOp::create(builder, loc, resultType, allUpdatesIndicesTensor,
                                               dynOffsets, dynSizes, dynStrides, offsets, sizes,

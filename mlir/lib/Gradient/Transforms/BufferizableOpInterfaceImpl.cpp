@@ -131,10 +131,11 @@ getBufferizedFunctionArgType(FunctionOpInterface funcOp, int64_t index,
     auto tensorType = dyn_cast<TensorType>(funcOp.getArgumentTypes()[index]);
     assert(tensorType && "expected TensorType");
 
-    BaseMemRefType memrefType = options.functionArgTypeConverterFn(
-        tensorType, *options.defaultMemorySpaceFn(tensorType), nullptr, options);
+    auto tensorLikeType = dyn_cast<bufferization::TensorLikeType>(tensorType);
+    bufferization::BufferLikeType memrefType = options.functionArgTypeConverterFn(
+        tensorLikeType, *options.defaultMemorySpaceFn(tensorType), nullptr, options);
 
-    return cast<bufferization::BufferLikeType>(memrefType);
+    return memrefType;
 }
 
 static ReturnOp getAssumedUniqueReturnOp(FunctionOpInterface funcOp)

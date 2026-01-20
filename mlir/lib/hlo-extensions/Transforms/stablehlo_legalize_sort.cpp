@@ -426,7 +426,7 @@ struct Slicer {
     RankedTensorType toSlicedType(RankedTensorType sourceType)
     {
         return tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
-            /*resultRank=*/1, sourceType, offsets, sizes, strides);
+            /*resultRank=*/1, sourceType, sizes);
     }
 
     MemRefType toSlicedType(MemRefType sourceType)
