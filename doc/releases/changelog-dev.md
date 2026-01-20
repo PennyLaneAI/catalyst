@@ -19,6 +19,9 @@
 
 <h3>Breaking changes 💔</h3>
 
+* Dropped support for NumPy 1.x following its end-of-life. NumPy 2.0 or higher is now required.
+  [(#2407)](https://github.com/PennyLaneAI/catalyst/pull/2407)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
@@ -43,6 +46,9 @@
   into normal PPR and PPMs with SCF dialect to support runtime execution.
   [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
 
+* The upstream MLIR `Test` dialect is now available via the `catalyst` command line tool.
+  [(#2417)](https://github.com/PennyLaneAI/catalyst/pull/2417)
+
 <h3>Documentation 📝</h3>
 
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
@@ -55,4 +61,5 @@ Ali Asadi,
 Sengthai Heng,
 Jeffrey Kam,
 Mudit Pandey,
+Andrija Paurevic,
 Paul Haochen Wang.
