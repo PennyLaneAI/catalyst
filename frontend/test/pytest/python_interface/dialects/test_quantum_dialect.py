@@ -15,14 +15,15 @@
 
 import pytest
 from xdsl.dialects.builtin import (
-    I32,
     ArrayAttr,
     ComplexType,
     Float64Type,
+    IntegerAttr,
     StringAttr,
     TensorType,
     UnitAttr,
     i1,
+    i64,
 )
 from xdsl.dialects.test import TestOp
 from xdsl.ir import AttributeCovT, Block, Operation, OpResult, Region
@@ -105,13 +106,15 @@ theta = create_ssa_value(Float64Type())
 dim = create_ssa_value(Float64Type())
 pauli_x = NamedObservableAttr("PauliX")
 obs = create_ssa_value(ObservableType())
-i = create_ssa_value(I32)
-matrix = create_ssa_value(TensorType(element_type=Float64Type, shape=(2, 2)))
+bool_ssa = create_ssa_value(i1)
+matrix = create_ssa_value(TensorType(element_type=Float64Type(), shape=(2, 2)))
 coeffs = create_ssa_value(TensorType(Float64Type(), shape=(10,)))
 samples = create_ssa_value(TensorType(Float64Type(), shape=(8, 7)))
 basis_state = create_ssa_value(TensorType(i1, shape=(8,)))
 state = create_ssa_value(TensorType(ComplexType(Float64Type()), shape=(16,)))
 pauli_word = ArrayAttr([StringAttr("X"), StringAttr("Y"), StringAttr("Z")])
+int_ssa = create_ssa_value(i64)
+int_attr = IntegerAttr(0, 32)
 
 expected_ops_init_kwargs = {
     "AdjointOp": [
@@ -120,57 +123,94 @@ expected_ops_init_kwargs = {
             "region": Region(Block((CustomOp(gate_name="CNOT", in_qubits=(q0, q1)),))),
         }
     ],
-    "AllocOp": [{"nqubits": 3}],
+    "AllocOp": [{"nqubits": 3}, {"nqubits": int_ssa}, {"nqubits": IntegerAttr(3, 64)}],
     "AllocQubitOp": [{}],
     "ComputationalBasisOp": [{"operands": (q0, None), "result_types": (obs,)}],
     "CountsOp": [
         {
-            "operands": (obs, i, None, None),
-            "result_types": (TensorType(Float64Type(), shape=(1,)), TensorType(I32, shape=(1,))),
+            "operands": (obs, int_ssa, None, None),
+            "result_types": (TensorType(Float64Type(), shape=(1,)), TensorType(i64, shape=(1,))),
         }
     ],
     "CustomOp": [
         {
             "gate_name": "RX",
+            "params": (theta,),
             "in_qubits": (q0, q1),
             "in_ctrl_qubits": (q2,),
-            "params": (theta,),
+            "in_ctrl_values": (bool_ssa,),
             "adjoint": True,
-        }
+        },
+        {
+            "gate_name": StringAttr("RX"),
+            "params": theta,
+            "in_qubits": q0,
+            "in_ctrl_qubits": q2,
+            "in_ctrl_values": bool_ssa,
+        },
     ],
     "DeallocOp": [{"qreg": qreg}],
     "DeallocQubitOp": [{"qubit": q0}],
     "DeviceInitOp": [
         {
-            "operands": (i,),
+            "operands": (int_ssa,),
             "properties": {"lib": StringAttr("lib"), "device_name": StringAttr("my_device")},
         }
     ],
     "DeviceReleaseOp": [{}],
     "ExpvalOp": [{"obs": obs}],
-    "ExtractOp": [{"qreg": qreg, "idx": i}],
+    "ExtractOp": [
+        {"qreg": qreg, "idx": int_ssa},
+        {"qreg": qreg, "idx": int_attr},
+        {"qreg": qreg, "idx": 0},
+    ],
     "FinalizeOp": [{}],
-    "GlobalPhaseOp": [{"params": theta, "in_ctrl_qubits": q0}],
+    "GlobalPhaseOp": [
+        {"params": theta, "in_ctrl_qubits": (q0,), "in_ctrl_values": (bool_ssa,)},
+        {"params": theta, "in_ctrl_qubits": q0, "in_ctrl_values": bool_ssa},
+    ],
     "HamiltonianOp": [{"operands": (coeffs, (obs,)), "result_types": (obs,)}],
     "HermitianOp": [{"operands": (matrix, (q0, q1)), "result_types": (obs,)}],
     "InitializeOp": [{}],
-    "InsertOp": [{"in_qreg": qreg, "idx": i, "qubit": q1}],
-    "MeasureOp": [{"in_qubit": q0, "postselect": i}],
+    "InsertOp": [
+        {"in_qreg": qreg, "idx": int_ssa, "qubit": q1},
+        {"in_qreg": qreg, "idx": int_attr, "qubit": q1},
+        {"in_qreg": qreg, "idx": 0, "qubit": q1},
+    ],
+    "MeasureOp": [
+        {"in_qubit": q0, "postselect": int_ssa},
+        {"in_qubit": q0},
+        {"in_qubit": q0, "postselect": 1},
+    ],
     "MultiRZOp": [
         {
             "theta": theta,
             "in_qubits": (q1, q0),
             "in_ctrl_qubits": (q2,),
-            "in_ctrl_values": (i,),
+            "in_ctrl_values": (bool_ssa,),
             "adjoint": UnitAttr(),
-        }
+        },
+        {
+            "theta": theta,
+            "in_qubits": q1,
+            "in_ctrl_qubits": q2,
+            "in_ctrl_values": bool_ssa,
+            "adjoint": UnitAttr(),
+        },
     ],
     "NamedObsOp": [{"qubit": q0, "obs_type": pauli_x}],
-    "NumQubitsOp": [{"result_types": (i,)}],
+    "NumQubitsOp": [{"result_types": (int_ssa,)}],
     "PauliRotOp": [
         {"angle": theta, "pauli_product": "XYZ", "in_qubits": (q0,)},
         {"angle": theta, "pauli_product": ["X", "Y", "Z"], "in_qubits": (q0,)},
         {"angle": theta, "pauli_product": pauli_word, "in_qubits": (q0,)},
+        {
+            "angle": theta,
+            "pauli_product": pauli_word,
+            "in_qubits": q0,
+            "in_ctrl_qubits": q2,
+            "in_ctrl_values": bool_ssa,
+        },
     ],
     "PCPhaseOp": [
         {
@@ -178,21 +218,31 @@ expected_ops_init_kwargs = {
             "dim": dim,
             "in_qubits": (q1, q0),
             "in_ctrl_qubits": (q2,),
-            "in_ctrl_values": (i,),
+            "in_ctrl_values": (bool_ssa,),
             "adjoint": False,
-        }
+        },
+        {
+            "theta": theta,
+            "dim": dim,
+            "in_qubits": q1,
+            "in_ctrl_qubits": q2,
+            "in_ctrl_values": bool_ssa,
+        },
     ],
     "ProbsOp": [
         {
-            "operands": (obs, i, None),
+            "operands": (obs, int_ssa, None),
             "result_types": (TensorType(Float64Type(), shape=(8,)),),
         }
     ],
-    "QubitUnitaryOp": [{"matrix": matrix, "in_qubits": (q2,), "adjoint": True}],
-    "SampleOp": [{"operands": (obs, i, samples), "result_types": (samples,)}],
+    "QubitUnitaryOp": [
+        {"matrix": matrix, "in_qubits": (q2,), "adjoint": True},
+        {"matrix": matrix, "in_qubits": q2, "in_ctrl_qubits": q1, "in_ctrl_values": bool_ssa},
+    ],
+    "SampleOp": [{"operands": (obs, int_ssa, samples), "result_types": (samples,)}],
     "SetBasisStateOp": [{"operands": (basis_state, (q0, q2)), "result_types": ((q1, q2),)}],
     "SetStateOp": [{"operands": (state, (q0, q1)), "result_types": ((q0, q1),)}],
-    "StateOp": [{"operands": (obs, i, state), "result_types": (state,)}],
+    "StateOp": [{"operands": (obs, int_ssa, state), "result_types": (state,)}],
     "TensorOp": [{"operands": ((obs, obs),), "result_types": (obs,)}],
     "VarianceOp": [{"obs": (obs,)}],
     "YieldOp": [{"operands": (qreg,)}],
