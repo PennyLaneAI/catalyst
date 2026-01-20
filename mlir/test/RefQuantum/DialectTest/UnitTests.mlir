@@ -234,5 +234,29 @@ func.func @test_expval_circuit() -> f64 {
     ref_quantum.custom "Hadamard"() %q0 : !ref_quantum.qubit_ref
     %obs = ref_quantum.namedobs %q1 [ PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
+    ref_quantum.dealloc %a : !ref_quantum.allocation
+    return %expval : f64
+}
+
+// -----
+
+func.func @test_circuit_with_loop(%nqubits: i64) -> f64 {
+    %a = ref_quantum.alloc(%nqubits) : !ref_quantum.allocation
+
+    %start = arith.constant 0 : index
+    %step = arith.constant 1 : index
+    %stop = index.casts %nqubits : i64 to index
+
+    scf.for %i = %start to %stop step %step {
+        %int = index.casts %i : index to i64
+        %this_q = ref_quantum.make_reference %a, %int : !ref_quantum.allocation, i64 -> !ref_quantum.qubit_ref
+        ref_quantum.custom "Hadamard"() %this_q : !ref_quantum.qubit_ref
+        scf.yield
+    }
+
+    %q0 = ref_quantum.make_reference %a, 0 : !ref_quantum.allocation -> !ref_quantum.qubit_ref
+    %obs = ref_quantum.namedobs %q0 [ PauliX] : !quantum.obs
+    %expval = quantum.expval %obs : f64
+    ref_quantum.dealloc %a : !ref_quantum.allocation
     return %expval : f64
 }
