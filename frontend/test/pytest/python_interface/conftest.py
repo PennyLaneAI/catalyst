@@ -19,7 +19,7 @@ from io import StringIO
 import pytest
 from xdsl.context import Context
 from xdsl.dialects import test
-from xdsl.passes import PassPipeline
+from xdsl.passes import ModulePass, PassPipeline
 from xdsl.printer import Printer
 
 from catalyst.compiler import _quantum_opt
@@ -39,14 +39,19 @@ except (ImportError, ModuleNotFoundError):
 
 
 def _run_filecheck_impl(
-    program_str, pipeline=(), verify=False, roundtrip=False, pretty_print=False
+    program_str: str,
+    pipeline: tuple[ModulePass, ...] = (),
+    verify: bool = False,
+    roundtrip: bool = False,
+    to_mlir: bool = True,
+    pretty_print: bool = False,
 ):
     """Run filecheck on an xDSL module, comparing it to a program string containing
     filecheck directives."""
     if not deps_available:
         return
 
-    ctx = Context()
+    ctx = Context(allow_unregistered=False)
     xdsl_module = QuantumParser(ctx, program_str, extra_dialects=(test.Test,)).parse_module()
 
     if roundtrip:
@@ -55,12 +60,16 @@ def _run_filecheck_impl(
         # will be used
         stream = StringIO()
         Printer(stream=stream, print_generic_format=not pretty_print).print_op(xdsl_module)
+        mod_str = stream.getvalue()
 
-        opt_args = ("-allow-unregistered-dialect",)
-        opt_args += () if pretty_print else ("-mlir-print-op-generic",)
-        from_mlir = _quantum_opt(*opt_args, stdin=stream.getvalue())
+        if to_mlir:
+            # We need to provide an empty pass pipeline explicitly. Without doing so,
+            # Catalyst CLI lowers the module to LLVM IR
+            opt_args = ("--catalyst-pipeline=empty_pipe()",)
+            opt_args += () if pretty_print else ("-mlir-print-op-generic",)
+            mod_str = _quantum_opt(*opt_args, stdin=mod_str)
 
-        xdsl_module = QuantumParser(ctx, from_mlir, extra_dialects=(test.Test,)).parse_module()
+        xdsl_module = QuantumParser(ctx, mod_str, extra_dialects=(test.Test,)).parse_module()
 
     if verify:
         xdsl_module.verify()
@@ -113,9 +122,11 @@ def run_filecheck():
             parse the program string into an xDSL module, print it, parse the printed module
             into an MLIR module, print it again, and then parse this back to an xDSL module.
             ``False`` by default.
+        to_mlir (bool): Whether to parse the program to MLIR when round-trip testing is performed.
+            If ``roundtrip == False``, this argument is ignored. ``True`` by default.
         pretty_print (bool): Whether to pretty print the program when round-trip testing is
             performed. If ``False``, the program will be printed in generic format. If
-            ``roundtrip == False``, this argument does nothing. ``False`` by default.
+            ``roundtrip == False``, this argument is ignored. ``False`` by default.
     """
     if not deps_available:
         pytest.skip("Cannot run xDSL lit tests without the Python 'filecheck' package.")
