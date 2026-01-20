@@ -38,5 +38,30 @@ def NamedObservable : I32EnumAttr<"NamedObservable",
 
 def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_observable">;
 
+def QubitLevel : I32EnumAttr<"QubitLevel",
+    "Qubit levels in the hierarchical qubit representation",
+    [
+        I32EnumAttrCase<"Abstract", 0, "abstract">,
+        I32EnumAttrCase<"Logical",  1, "logical">,
+        I32EnumAttrCase<"QEC",      2, "qec">,
+        I32EnumAttrCase<"Physical", 3, "physical">,
+    ]> {
+    let cppNamespace = "catalyst::quantum";
+    let genSpecializedAttr = 0;
+}
+
+def QubitRole : I32EnumAttr<"QubitRole",
+    "Qubit roles for further specialization in the hierarchical qubit representation",
+    [
+        I32EnumAttrCase<"Null",   0, "null">,
+        I32EnumAttrCase<"Data",   1, "data">,
+        I32EnumAttrCase<"XCheck", 2, "xcheck">,
+        I32EnumAttrCase<"ZCheck", 3, "zcheck">,
+    ]> {
+    let cppNamespace = "catalyst::quantum";
+    let genSpecializedAttr = 0;
+}
+
+def PauliWord : TypedArrayAttrBase<StrAttr, "A product of Pauli operators, aka a Pauli word.">;
 
 #endif // QUANTUM_ATTR_DEFS
