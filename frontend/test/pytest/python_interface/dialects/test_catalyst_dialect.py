@@ -108,4 +108,4 @@ def test_assembly_format(run_filecheck):
     %callback_result = catalyst.callback_call @test_func(%tensor_val) : (tensor<1xf64>) -> f64
     """
 
-    run_filecheck(program, roundtrip=True)
+    run_filecheck(program, roundtrip=True, verify=True)
