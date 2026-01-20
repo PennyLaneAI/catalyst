@@ -66,6 +66,23 @@ def AllocOp : Memory_Op<"alloc"> {
     // let hasCanonicalizeMethod = 1;
 }
 
+def DeallocOp : Memory_Op<"dealloc"> {
+    let summary = "Deallocate an allocation.";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        AllocationType:$allocation
+    );
+
+    let assemblyFormat = [{
+        $allocation attr-dict `:` type(operands)
+    }];
+
+    // TODO
+    // let hasCanonicalizeMethod = 1;
+}
+
 // -----
 
 class Gate_Op<string mnemonic, list<Trait> traits = []> :

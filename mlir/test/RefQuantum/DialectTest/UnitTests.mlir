@@ -30,6 +30,13 @@ func.func @test_alloc(%arg0 : i64) {
 
 // -----
 
+func.func @test_dealloc(%arg0 : !ref_quantum.allocation) {
+    ref_quantum.dealloc %arg0 : !ref_quantum.allocation
+    return
+}
+
+// -----
+
 func.func @test_set_state(%arg0 : tensor<2xcomplex<f64>>, %q0: !ref_quantum.qubit_ref) {
     ref_quantum.set_state(%arg0) %q0 : tensor<2xcomplex<f64>>, !ref_quantum.qubit_ref
     return
