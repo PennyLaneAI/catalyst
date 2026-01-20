@@ -136,7 +136,6 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
         SmallVector<StringRef> pauliY = {"Y"};
         auto ppmXY = SelectPPMeasurementOp::create(
             rewriter, loc, ppmPZRes, rotationKind > 0 ? pauliY : pauliX,
-            rotationKind > 0 ? pauliX : pauliY, loc, ppmPZRes, rotationKind > 0 ? pauliY : pauliX,
             rotationKind > 0 ? pauliX : pauliY, ppmPZ.getOutQubits().back());
         // PPR P(π/2) on input qubits if PPM (X or Y) yields -1
         SmallVector<Value> outPZQubits = ppmPZ.getOutQubits(); // [input qubits, |m⟩]
