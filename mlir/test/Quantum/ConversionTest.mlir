@@ -839,12 +839,12 @@ module @test_set_basis_state {
 module @test_pauli_rot {
     // CHECK: llvm.func @__catalyst__qis__PauliRot(!llvm.ptr, f64, !llvm.ptr, i64, ...)
     // CHECK: llvm.mlir.global internal constant @pauli_word_X("X\00")
-    func.func @pauli_rot(%q0 : !quantum.bit) -> (!quantum.bit) {
+    func.func @pauli_rot(%q0 : !quantum.bit, %angle : f64) -> (!quantum.bit) {
         // CHECK: llvm.mlir.addressof @pauli_word_X : !llvm.ptr
         // CHECK: [[pauliPtr:%.+]] = llvm.getelementptr inbounds {{.*}}[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.array<2 x i8>
         // CHECK: [[numQubits:%.+]] = llvm.mlir.constant(1 : i64) : i64
         // CHECK: llvm.call @__catalyst__qis__PauliRot([[pauliPtr]], {{%.+}}, {{%.+}}, [[numQubits]], %arg0)
-        %out = qec.ppr ["X"](4) %q0 : !quantum.bit
+        %out = quantum.paulirot ["X"](%angle) %q0 : !quantum.bit
         return %out : !quantum.bit
     }
 }
