@@ -15,6 +15,16 @@
 
 <h3>Breaking changes 💔</h3>
 
+* (Compiler integrators only) The versions of StableHLO/LLVM/Enzyme used by Catalyst have been updated.
+  [(#2415)](https://github.com/PennyLaneAI/catalyst/pull/2415)
+
+  - The StableHLO version has been updated to
+  [v1.13.7](https://github.com/openxla/stablehlo/tree/v1.13.7).
+  - The LLVM version has been updated to
+  [commit 8f26458](https://github.com/llvm/llvm-project/tree/8f264586d7521b0e305ca7bb78825aa3382ffef7).
+  - The Enzyme version has been updated to
+  [v0.0.238](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.238).
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
@@ -50,4 +60,5 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi
 Sengthai Heng,
 Jeffrey Kam,
+Mehrdad Malekmohammadi,
 Mudit Pandey.
