@@ -71,6 +71,12 @@ def test_all_attributes_names(attr):
 def test_assembly_format(run_filecheck):
     """Test the assembly format of the catalyst ops."""
     program = """
+    // Function to set up symbols for call-like operations
+    // CHECK: func.func public @[[TEST_FUNC:[a-z_]+]]() {
+    func.func public @test_func() {
+        func.return
+    }
+
     // CHECK: [[LIST:%.+]] = catalyst.list_init : !catalyst.arraylist<f64>
     %list = catalyst.list_init : !catalyst.arraylist<f64>
 
@@ -79,6 +85,9 @@ def test_assembly_format(run_filecheck):
 
     // CHECK: [[VAL:%.+]] = "test.op"() : () -> f64
     %val = "test.op"() : () -> f64
+
+    // CHECK: [[TENSOR_VAL:%.+]] = "test.op"() : () -> tensor<1xf64>
+    %tensor_val = "test.op"() : () -> tensor<1xf64>
 
     // CHECK: [[POP_RESULT:%.+]] = catalyst.list_pop [[LIST]] : !catalyst.arraylist<f64>
     %pop_result = catalyst.list_pop %list : !catalyst.arraylist<f64>
@@ -89,14 +98,14 @@ def test_assembly_format(run_filecheck):
     // CHECK: catalyst.list_dealloc [[LIST]] : !catalyst.arraylist<f64>
     catalyst.list_dealloc %list : !catalyst.arraylist<f64>
 
-    // CHECK: [[CUSTOM_RESULT:%.+]] = catalyst.custom_call fn("custom_function") ([[VAL]]) : (f64) -> f64
-    %custom_result = catalyst.custom_call fn("custom_function")(%val) : (f64) -> f64
+    // CHECK: [[CUSTOM_RESULT:%.+]] = catalyst.custom_call fn("[[TEST_FUNC]]") ([[VAL]]) : (f64) -> f64
+    %custom_result = catalyst.custom_call fn("test_func")(%val) : (f64) -> f64
 
-    // CHECK: [[KERNEL_RESULT:%.+]] = catalyst.launch_kernel @kernel_name([[VAL]]) : (f64) -> f64
-    %kernel_result = catalyst.launch_kernel @kernel_name(%val) : (f64) -> f64
+    // CHECK: [[KERNEL_RESULT:%.+]] = catalyst.launch_kernel @[[TEST_FUNC]]([[TENSOR_VAL]]) : (tensor<1xf64>) -> f64
+    %kernel_result = catalyst.launch_kernel @test_func(%tensor_val) : (tensor<1xf64>) -> f64
 
-    // CHECK: [[CALLBACK_RESULT:%.+]] = catalyst.callback_call @callback_func([[VAL]]) : (f64) -> f64
-    %callback_result = catalyst.callback_call @callback_func(%val) : (f64) -> f64
+    // CHECK: [[CALLBACK_RESULT:%.+]] = catalyst.callback_call @[[TEST_FUNC]]([[TENSOR_VAL]]) : (tensor<1xf64>) -> f64
+    %callback_result = catalyst.callback_call @test_func(%tensor_val) : (tensor<1xf64>) -> f64
     """
 
     run_filecheck(program, roundtrip=True)
