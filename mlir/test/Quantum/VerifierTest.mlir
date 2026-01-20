@@ -127,6 +127,23 @@ func.func @controlled2(%1 : !quantum.bit, %2 : !quantum.bit, %3 : !quantum.bit) 
     return
 }
 
+// -----
+
+func.func @test_paulirot_length_mismatch(%1 : !quantum.bit, %angle: f64) {
+    // expected-error@+1 {{length of Pauli word (2) and number of qubits (1) must be the same}}
+    %q = quantum.paulirot ["Z", "X"](%angle) %1 : !quantum.bit
+    return
+}
+
+// -----
+
+func.func @test_paulirot_bad_pauli_word(%1 : !quantum.bit, %angle: f64) {
+    // expected-error@+1 {{Only "X", "Y", "Z", and "I" are valid Pauli words.}}
+    %q = quantum.paulirot ["bad"](%angle) %1 : !quantum.bit
+    return
+}
+
+// -----
 
 //////////////////
 // Measurements //

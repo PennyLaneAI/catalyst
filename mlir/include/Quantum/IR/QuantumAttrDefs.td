@@ -62,4 +62,6 @@ def QubitRole : I32EnumAttr<"QubitRole",
     let genSpecializedAttr = 0;
 }
 
+def PauliWord : TypedArrayAttrBase<StrAttr, "A product of Pauli operators, aka a Pauli word.">;
+
 #endif // QUANTUM_ATTR_DEFS
