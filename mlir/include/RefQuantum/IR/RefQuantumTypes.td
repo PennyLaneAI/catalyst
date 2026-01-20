@@ -1,4 +1,4 @@
-// Copyright 2025 Xanadu Quantum Technologies Inc.
+// Copyright 2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef REFQUANTUM_TYPES
+#define REFQUANTUM_TYPES
 
-#include "mlir/IR/Dialect.h"
+include "mlir/IR/AttrTypeBase.td"
 
-#include "RefQuantum/IR/RefQuantumTypes.h"
+include "RefQuantum/IR/RefQuantumDialect.td"
 
 //===----------------------------------------------------------------------===//
-// RefQuantum dialect declarations.
+// RefQuantum dialect types.
 //===----------------------------------------------------------------------===//
 
-#include "RefQuantum/IR/RefQuantumOpsDialect.h.inc"
+class RefQuantum_Type<string name, string typeMnemonic, list<Trait> traits = []>
+        : TypeDef<RefQuantumDialect, name, traits> {
+    let mnemonic = typeMnemonic;
+}
+
+def QubitReferenceType : RefQuantum_Type<"QubitRef", "qubit_ref"> {
+    let summary = "A reference to a qubit.";
+}
+
+#endif // REFQUANTUM_TYPES

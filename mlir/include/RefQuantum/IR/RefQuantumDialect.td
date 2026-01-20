@@ -43,6 +43,8 @@ def RefQuantumDialect : Dialect {
     let dependentDialects = [
         "quantum::QuantumDialect"
     ];
+
+    let useDefaultTypePrinterParser = 1;
 }
 
 

@@ -1,4 +1,4 @@
-// Copyright 2025 Xanadu Quantum Technologies Inc.
+// Copyright 2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,12 +14,11 @@
 
 #pragma once
 
-#include "mlir/IR/Dialect.h"
-
-#include "RefQuantum/IR/RefQuantumTypes.h"
-
 //===----------------------------------------------------------------------===//
-// RefQuantum dialect declarations.
+// RefQuantum type declarations.
 //===----------------------------------------------------------------------===//
 
-#include "RefQuantum/IR/RefQuantumOpsDialect.h.inc"
+#include "mlir/IR/Types.h"
+
+#define GET_TYPEDEF_CLASSES
+#include "RefQuantum/IR/RefQuantumOpsTypes.h.inc"

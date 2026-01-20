@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
+#include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
 
 #include "RefQuantum/IR/RefQuantumDialect.h"
 #include "RefQuantum/IR/RefQuantumOps.h"
@@ -28,8 +30,20 @@ using namespace catalyst::ref_quantum;
 
 void RefQuantumDialect::initialize()
 {
+    addTypes<
+#define GET_TYPEDEF_LIST
+#include "RefQuantum/IR/RefQuantumOpsTypes.cpp.inc"
+        >();
+
     addOperations<
 #define GET_OP_LIST
 #include "RefQuantum/IR/RefQuantumOps.cpp.inc"
         >();
 }
+
+//===----------------------------------------------------------------------===//
+// RefQuantum type definitions.
+//===----------------------------------------------------------------------===//
+
+#define GET_TYPEDEF_CLASSES
+#include "RefQuantum/IR/RefQuantumOpsTypes.cpp.inc"

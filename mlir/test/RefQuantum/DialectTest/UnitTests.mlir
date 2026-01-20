@@ -17,43 +17,44 @@
 // RUN: quantum-opt --split-input-file --verify-diagnostics %s
 
 
-func.func @test_set_state(%arg0 : tensor<2xcomplex<f64>>, %w0: i64) {
-    ref_quantum.set_state(%arg0) %w0 : tensor<2xcomplex<f64>>, i64
+func.func @test_set_state(%arg0 : tensor<2xcomplex<f64>>, %q0: !ref_quantum.qubit_ref) {
+    ref_quantum.set_state(%arg0) %q0 : tensor<2xcomplex<f64>>, !ref_quantum.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_basis_state(%arg0 : tensor<1xi1>, %w0: i64) {
-    ref_quantum.set_basis_state(%arg0) %w0 : tensor<1xi1>, i64
+func.func @test_basis_state(%arg0 : tensor<1xi1>, %q0: !ref_quantum.qubit_ref) {
+    ref_quantum.set_basis_state(%arg0) %q0 : tensor<1xi1>, !ref_quantum.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_custom_op(%w0: i64, %w1: i64, %w2: i64, %w3: i64, %param0: f64, %param1: f64) {
+func.func @test_custom_op(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref,
+    %q2: !ref_quantum.qubit_ref, %q3: !ref_quantum.qubit_ref, %param0: f64, %param1: f64) {
 
     // Basic
-    ref_quantum.custom "Hadamard"() %w0 : i64
-    ref_quantum.custom "CNOT"() %w0, %w1 : i64, i64
+    ref_quantum.custom "Hadamard"() %q0 : !ref_quantum.qubit_ref
+    ref_quantum.custom "CNOT"() %q0, %q1 : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     // With params
-    ref_quantum.custom "RX"(%param0) %w0 : i64
-    ref_quantum.custom "Rot"(%param0, %param1, %param1) %w0 : i64
+    ref_quantum.custom "RX"(%param0) %q0 : !ref_quantum.qubit_ref
+    ref_quantum.custom "Rot"(%param0, %param1, %param1) %q0 : !ref_quantum.qubit_ref
 
     // With adjoint
-    ref_quantum.custom "PauliX"() %w0 adj : i64
-    ref_quantum.custom "CNOT"() %w0, %w1 adj : i64, i64
+    ref_quantum.custom "PauliX"() %q0 adj : !ref_quantum.qubit_ref
+    ref_quantum.custom "CNOT"() %q0, %q1 adj : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     // With control
     %true = llvm.mlir.constant (1 : i1) :i1
     %false = llvm.mlir.constant (0 : i1) :i1
-    ref_quantum.custom "PauliZ"() %w0 ctrls (%w1) ctrlvals (%true) : i64 ctrls i64
-    ref_quantum.custom "RY"(%param0) %w0 ctrls (%w1) ctrlvals (%true) : i64 ctrls i64
-    ref_quantum.custom "SWAP"() %w0, %w1 ctrls (%w2, %w3) ctrlvals (%true, %false) : i64, i64 ctrls i64, i64
+    ref_quantum.custom "PauliZ"() %q0 ctrls (%q1) ctrlvals (%true) : !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref
+    ref_quantum.custom "RY"(%param0) %q0 ctrls (%q1) ctrlvals (%true) : !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref
+    ref_quantum.custom "SWAP"() %q0, %q1 ctrls (%q2, %q3) ctrlvals (%true, %false) : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     // With params, control and adjoint altogether
-    ref_quantum.custom "Rot"(%param0, %param1, %param1) %w0, %w1 adj ctrls (%w2, %w3) ctrlvals (%true, %false) : i64, i64 ctrls i64, i64
+    ref_quantum.custom "Rot"(%param0, %param1, %param1) %q0, %q1 adj ctrls (%q2, %q3) ctrlvals (%true, %false) : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     return
 }
@@ -61,29 +62,30 @@ func.func @test_custom_op(%w0: i64, %w1: i64, %w2: i64, %w3: i64, %param0: f64, 
 
 // -----
 
-func.func @test_paulirot_op(%w0: i64, %w1: i64, %w2: i64, %w3: i64, %angle: f64) {
+func.func @test_paulirot_op(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref,
+    %q2: !ref_quantum.qubit_ref, %q3: !ref_quantum.qubit_ref, %angle: f64) {
 
     // Basic
-    ref_quantum.paulirot ["Z"](%angle) %w0 : i64
-    ref_quantum.paulirot ["Z", "X"](%angle) %w0, %w1 : i64, i64
+    ref_quantum.paulirot ["Z"](%angle) %q0 : !ref_quantum.qubit_ref
+    ref_quantum.paulirot ["Z", "X"](%angle) %q0, %q1 : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     // With adjoint
-    ref_quantum.paulirot ["Z", "X", "I"](%angle) %w0, %w1, %w2 adj : i64, i64, i64
+    ref_quantum.paulirot ["Z", "X", "I"](%angle) %q0, %q1, %q2 adj : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     // With control
     %true = llvm.mlir.constant (1 : i1) :i1
     %false = llvm.mlir.constant (0 : i1) :i1
-    ref_quantum.paulirot ["Y", "I"](%angle) %w0, %w1 ctrls (%w2, %w3) ctrlvals (%true, %false) : i64, i64 ctrls i64, i64
+    ref_quantum.paulirot ["Y", "I"](%angle) %q0, %q1 ctrls (%q2, %q3) ctrlvals (%true, %false) : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     // With params, control and adjoint altogether
-    ref_quantum.paulirot ["I", "X"](%angle) %w0, %w1 adj ctrls (%w2, %w3) ctrlvals (%true, %false) : i64, i64 ctrls i64, i64
+    ref_quantum.paulirot ["I", "X"](%angle) %q0, %q1 adj ctrls (%q2, %q3) ctrlvals (%true, %false) : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     return
 }
 
 // -----
 
-func.func @test_global_phase(%w0: i64, %cv: i1, %param: f64) {
+func.func @test_global_phase(%q0: !ref_quantum.qubit_ref, %cv: i1, %param: f64) {
 
     // Basic
     ref_quantum.gphase(%param) : f64
@@ -92,105 +94,107 @@ func.func @test_global_phase(%w0: i64, %cv: i1, %param: f64) {
     ref_quantum.gphase(%param) adj : f64
 
     // With control
-    ref_quantum.gphase(%param) ctrls (%w0) ctrlvals (%cv) : f64 ctrls i64
+    ref_quantum.gphase(%param) ctrls (%q0) ctrlvals (%cv) : f64 ctrls !ref_quantum.qubit_ref
 
     // With control and adjoint
-    ref_quantum.gphase(%param) adj ctrls (%w0) ctrlvals (%cv) : f64 ctrls i64
+    ref_quantum.gphase(%param) adj ctrls (%q0) ctrlvals (%cv) : f64 ctrls !ref_quantum.qubit_ref
 
     return
 }
 
 // -----
 
-func.func @test_multirz(%w0: i64, %w1: i64, %w2: i64, %w3: i64, %theta: f64) {
+func.func @test_multirz(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref,
+    %q2: !ref_quantum.qubit_ref, %q3: !ref_quantum.qubit_ref, %theta: f64) {
 
     // Basic
-    ref_quantum.multirz (%theta) %w0 : i64
-    ref_quantum.multirz (%theta) %w0, %w1 : i64, i64
+    ref_quantum.multirz (%theta) %q0 : !ref_quantum.qubit_ref
+    ref_quantum.multirz (%theta) %q0, %q1 : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     // With adjoint
-    ref_quantum.multirz (%theta) %w0, %w1, %w2 adj : i64, i64, i64
+    ref_quantum.multirz (%theta) %q0, %q1, %q2 adj : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     // With control
     %true = llvm.mlir.constant (1 : i1) :i1
     %false = llvm.mlir.constant (0 : i1) :i1
-    ref_quantum.multirz (%theta) %w0 ctrls (%w1) ctrlvals (%true) : i64 ctrls i64
-    ref_quantum.multirz (%theta) %w0, %w1 ctrls (%w2, %w3) ctrlvals (%true, %false) : i64, i64 ctrls i64, i64
+    ref_quantum.multirz (%theta) %q0 ctrls (%q1) ctrlvals (%true) : !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref
+    ref_quantum.multirz (%theta) %q0, %q1 ctrls (%q2, %q3) ctrlvals (%true, %false) : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     // With control and adjoint
-    ref_quantum.multirz (%theta) %w0, %w1 adj ctrls (%w2, %w3) ctrlvals (%true, %false) : i64, i64 ctrls i64, i64
+    ref_quantum.multirz (%theta) %q0, %q1 adj ctrls (%q2, %q3) ctrlvals (%true, %false) : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     return
 }
 
 // -----
 
-func.func @test_pcphase(%w0: i64, %w1: i64, %w2: i64, %w3: i64, %theta: f64, %dim: f64) {
+func.func @test_pcphase(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref,
+    %q2: !ref_quantum.qubit_ref, %q3: !ref_quantum.qubit_ref, %theta: f64, %dim: f64) {
 
     // Basic
-    ref_quantum.pcphase (%theta, %dim) %w0 : i64
-    ref_quantum.pcphase (%theta, %dim) %w0, %w1, %w2 : i64, i64, i64
+    ref_quantum.pcphase (%theta, %dim) %q0 : !ref_quantum.qubit_ref
+    ref_quantum.pcphase (%theta, %dim) %q0, %q1, %q2 : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     // With adjoint
-    ref_quantum.pcphase (%theta, %dim) %w0, %w1 adj : i64, i64
+    ref_quantum.pcphase (%theta, %dim) %q0, %q1 adj : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     // With control
     %true = llvm.mlir.constant (1 : i1) :i1
     %false = llvm.mlir.constant (0 : i1) :i1
-    ref_quantum.pcphase (%theta, %dim) %w0 ctrls (%w1) ctrlvals (%true) : i64 ctrls i64
-    ref_quantum.pcphase (%theta, %dim) %w0, %w1 ctrls (%w2, %w3) ctrlvals (%true, %false) : i64, i64 ctrls i64, i64
+    ref_quantum.pcphase (%theta, %dim) %q0 ctrls (%q1) ctrlvals (%true) : !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref
+    ref_quantum.pcphase (%theta, %dim) %q0, %q1 ctrls (%q2, %q3) ctrlvals (%true, %false) : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     // With control and adjoint
-    ref_quantum.pcphase (%theta, %dim) %w0, %w1 adj ctrls (%w2, %w3) ctrlvals (%true, %false) : i64, i64 ctrls i64, i64
+    ref_quantum.pcphase (%theta, %dim) %q0, %q1 adj ctrls (%q2, %q3) ctrlvals (%true, %false) : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     return
 }
 
 // -----
 
-func.func @test_qubit_unitary(%w0: i64, %w1: i64, %w2: i64, %w3: i64) {
+func.func @test_qubit_unitary(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref,
+    %q2: !ref_quantum.qubit_ref, %q3: !ref_quantum.qubit_ref) {
 
     // Basic
     %matrix22 = tensor.empty() : tensor<2x2xcomplex<f64>>
     %matrix44 = tensor.empty() : tensor<4x4xcomplex<f64>>
 
-    ref_quantum.unitary (%matrix22 : tensor<2x2xcomplex<f64>>) %w0 : i64
-    ref_quantum.unitary (%matrix44 : tensor<4x4xcomplex<f64>>) %w0, %w1 : i64, i64
+    ref_quantum.unitary (%matrix22 : tensor<2x2xcomplex<f64>>) %q0 : !ref_quantum.qubit_ref
+    ref_quantum.unitary (%matrix44 : tensor<4x4xcomplex<f64>>) %q0, %q1 : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     // With adjoint
-    ref_quantum.unitary (%matrix22 : tensor<2x2xcomplex<f64>>) %w0 adj : i64
+    ref_quantum.unitary (%matrix22 : tensor<2x2xcomplex<f64>>) %q0 adj : !ref_quantum.qubit_ref
 
     // With control
     %true = llvm.mlir.constant (1 : i1) :i1
     %false = llvm.mlir.constant (0 : i1) :i1
-    ref_quantum.unitary (%matrix22 : tensor<2x2xcomplex<f64>>) %w0 ctrls (%w1) ctrlvals (%true) : i64 ctrls i64
-    ref_quantum.unitary (%matrix44 : tensor<4x4xcomplex<f64>>) %w0, %w1 ctrls (%w2, %w3) ctrlvals (%true, %false) : i64, i64 ctrls i64, i64
+    ref_quantum.unitary (%matrix22 : tensor<2x2xcomplex<f64>>) %q0 ctrls (%q1) ctrlvals (%true) : !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref
+    ref_quantum.unitary (%matrix44 : tensor<4x4xcomplex<f64>>) %q0, %q1 ctrls (%q2, %q3) ctrlvals (%true, %false) : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     // With control and adjoint
-    ref_quantum.unitary (%matrix44 : tensor<4x4xcomplex<f64>>) %w0, %w1 adj ctrls (%w2, %w3) ctrlvals (%true, %false) : i64, i64 ctrls i64, i64
+    ref_quantum.unitary (%matrix44 : tensor<4x4xcomplex<f64>>) %q0, %q1 adj ctrls (%q2, %q3) ctrlvals (%true, %false) : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
 
     return
 }
 
 // -----
 
-func.func @test_namedobs_op(%w0: i64) {
+func.func @test_namedobs_op(%q0: !ref_quantum.qubit_ref) {
 
-    %ox = ref_quantum.namedobs %w0 [ PauliX] : !quantum.obs
-    %oy = ref_quantum.namedobs %w0 [ PauliY] : !quantum.obs
-    %oz = ref_quantum.namedobs %w0 [ PauliZ] : !quantum.obs
-    %oi = ref_quantum.namedobs %w0 [ Identity] : !quantum.obs
-    %oh = ref_quantum.namedobs %w0 [ Hadamard] : !quantum.obs
+    %ox = ref_quantum.namedobs %q0 [ PauliX] : !quantum.obs
+    %oy = ref_quantum.namedobs %q0 [ PauliY] : !quantum.obs
+    %oz = ref_quantum.namedobs %q0 [ PauliZ] : !quantum.obs
+    %oi = ref_quantum.namedobs %q0 [ Identity] : !quantum.obs
+    %oh = ref_quantum.namedobs %q0 [ Hadamard] : !quantum.obs
 
     return
 }
 
 // -----
 
-func.func @test_expval_circuit() -> f64 {
-    %0 = arith.constant 0 : i64
-    ref_quantum.custom "Hadamard"() %0 : i64
-    %obs = ref_quantum.namedobs %0 [ PauliX] : !quantum.obs
+func.func @test_expval_circuit(%q0: !ref_quantum.qubit_ref) -> f64 {
+    ref_quantum.custom "Hadamard"() %q0 : !ref_quantum.qubit_ref
+    %obs = ref_quantum.namedobs %q0 [ PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
     return %expval : f64
 }
