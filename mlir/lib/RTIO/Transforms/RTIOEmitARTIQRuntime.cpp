@@ -58,37 +58,37 @@ struct RTIOEmitARTIQRuntimePass
 
     void runOnOperation() override
     {
-        ModuleOp module = getOperation();
+        ModuleOp moduleOp = getOperation();
         MLIRContext *ctx = &getContext();
         OpBuilder builder(ctx);
 
         // Check if __modinit__ already exists (the entry point of ARTIQ device)
-        if (module.lookupSymbol<LLVM::LLVMFuncOp>(ARTIQRuntime::modinit)) {
+        if (moduleOp.lookupSymbol<LLVM::LLVMFuncOp>(ARTIQRuntime::modinit)) {
             return;
         }
 
         // Find the kernel function (could be LLVM func or func.func)
         LLVM::LLVMFuncOp llvmKernelFunc =
-            module.lookupSymbol<LLVM::LLVMFuncOp>(ARTIQFuncNames::kernel);
+            moduleOp.lookupSymbol<LLVM::LLVMFuncOp>(ARTIQFuncNames::kernel);
 
         if (!llvmKernelFunc) {
-            module.emitError("Cannot find kernel function");
+            moduleOp.emitError("Cannot find kernel function");
             return signalPassFailure();
         }
 
         // Create ARTIQ runtime wrapper
-        if (failed(emitARTIQRuntimeForLLVMFunc(module, builder, llvmKernelFunc))) {
+        if (failed(emitARTIQRuntimeForLLVMFunc(moduleOp, builder, llvmKernelFunc))) {
             return signalPassFailure();
         }
     }
 
   private:
     /// Emit ARTIQ runtime wrapper for LLVM dialect kernel function
-    LogicalResult emitARTIQRuntimeForLLVMFunc(ModuleOp module, OpBuilder &builder,
+    LogicalResult emitARTIQRuntimeForLLVMFunc(ModuleOp moduleOp, OpBuilder &builder,
                                               LLVM::LLVMFuncOp kernelFunc)
     {
         MLIRContext *ctx = builder.getContext();
-        Location loc = module.getLoc();
+        Location loc = moduleOp.getLoc();
 
         // Types
         Type voidTy = LLVM::LLVMVoidType::get(ctx);
@@ -97,10 +97,10 @@ struct RTIOEmitARTIQRuntimePass
         Type i64Ty = IntegerType::get(ctx, 64);
 
         OpBuilder::InsertionGuard guard(builder);
-        builder.setInsertionPointToStart(module.getBody());
+        builder.setInsertionPointToStart(moduleOp.getBody());
 
         // Declare __artiq_personality (exception handling)
-        declareARTIQPersonality(module, builder, loc);
+        declareARTIQPersonality(moduleOp, builder, loc);
 
         // Create entry function: void @__modinit__(ptr %self)
         auto modinitTy = LLVM::LLVMFunctionType::get(voidTy, {ptrTy});
@@ -146,9 +146,9 @@ struct RTIOEmitARTIQRuntimePass
     }
 
     /// Declare __artiq_personality function
-    void declareARTIQPersonality(ModuleOp module, OpBuilder &builder, Location loc)
+    void declareARTIQPersonality(ModuleOp moduleOp, OpBuilder &builder, Location loc)
     {
-        if (module.lookupSymbol<LLVM::LLVMFuncOp>(ARTIQRuntime::artiqPersonality)) {
+        if (moduleOp.lookupSymbol<LLVM::LLVMFuncOp>(ARTIQRuntime::artiqPersonality)) {
             return;
         }
 
