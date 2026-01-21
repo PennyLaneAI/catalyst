@@ -350,7 +350,6 @@ struct QECOpLowering : public ConversionPattern {
     LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const final
     {
-        const auto PI = llvm::numbers::pi;
         // cast to OriginOp
         if (auto originOp = dyn_cast_or_null<CustomOp>(op)) {
             switch (hashGate(originOp)) {
