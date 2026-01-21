@@ -681,13 +681,16 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs, debug_in
         ),
         (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
     ):
+        # print("making kwargs")
         make_jaxpr_kwargs = {
             "static_argnums": static_argnums,
             "abstracted_axes": abstracted_axes,
             "debug_info": debug_info,
         }
         with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
+            # print(f"making jaxpr with args {args} and kwargs {kwargs} and make_jaxpr_kwargs {make_jaxpr_kwargs}")
             jaxpr, out_type, out_treedef = make_jaxpr2(func, **make_jaxpr_kwargs)(*args, **kwargs)
+            # print("jaxpr made")
             plugins = EvaluationContext.get_plugins()
 
     return jaxpr, out_type, out_treedef, plugins

@@ -92,7 +92,7 @@ def get_mlir_module(qnode: QNode | QJIT, args, kwargs) -> Module:
     else:
         jitted_qnode = qjit(qnode)
 
-    jitted_qnode.jit_compile(args, **kwargs)
+    jitted_qnode.jit_compile(args, kwargs)
     return jitted_qnode.mlir_module
 
 

@@ -203,7 +203,9 @@ class TestJAXAD:
             return jnp.cos(result) ** 2
 
         x = jnp.array([0.1, 0.2, 0.3])
+        print("getting cost function")
         result = cost_fn(x, circuit)
+        print("getting reference")
         reference = cost_fn(x, circuit.user_function)
 
         assert jnp.allclose(result, reference)
