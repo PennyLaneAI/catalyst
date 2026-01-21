@@ -275,10 +275,6 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
 
     auto angleOpt = resolveConstantValue(angleValue);
 
-    Value c2 = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(2.0));
-    Value halfAngle = rewriter.create<arith::DivFOp>(loc, op.getAngle(), c2);
-    applyGlobalPhase(loc, halfAngle, rewriter);
-
     if (angleOpt.has_value()) {
         constexpr double PI = llvm::numbers::pi;
         constexpr double SPECIFIC_ANGLES[6] = {PI / 2, PI / 4, PI / 8, -PI / 8, -PI / 4, -PI / 2};
