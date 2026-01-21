@@ -139,7 +139,6 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                 "graph-based decomposition is enabled."
             )
 
-        self._ag_enabled = ag_enabled
         self._gate_set = gate_set
         self._fixed_decomps = fixed_decomps
         self._alt_decomps = alt_decomps
@@ -209,7 +208,6 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                     num_wires=len(o.wires),
                     num_params=num_params,
                     requires_copy=num_wires == -1,
-                    ag_enabled=self._ag_enabled,
                 )
             elif op.op.name in COMPILER_OPS_FOR_DECOMPOSITION:
                 # In this part, we need to handle the case where an operation in
@@ -233,7 +231,6 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                     num_wires=num_wires,
                     num_params=num_params,
                     requires_copy=requires_copy,
-                    ag_enabled=self._ag_enabled,
                     pauli_word=pauli_word,
                 )
             elif not any(
