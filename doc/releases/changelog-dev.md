@@ -31,6 +31,9 @@
   by 2 to match the PauliRot convention (`PauliRot(φ) == PPR(φ/2)`).
   [(#2414)](https://github.com/PennyLaneAI/catalyst/pull/2414)
 
+* Fixing incorrect lowering of PPM into CAPI calls when the PPM is in the negative basis.
+  [(#2422)](https://github.com/PennyLaneAI/catalyst/pull/2422)
+
 <h3>Internal changes ⚙️</h3>
 
 * The quantum dialect MLIR and TableGen source has been refactored to place type and attribute
