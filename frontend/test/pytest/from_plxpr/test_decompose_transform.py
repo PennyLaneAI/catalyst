@@ -465,6 +465,5 @@ class TestGraphDecomposition:
         assert resources == expected_resources
 
 
-
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
