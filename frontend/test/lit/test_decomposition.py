@@ -1262,5 +1262,3 @@ def test_decomposition_rule_with_allocation():
 
 
 test_decomposition_rule_with_allocation()
-
-
