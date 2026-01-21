@@ -115,7 +115,6 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
     See also: :class:`~.DecompositionGraph`.
 
     Args:
-        ag_enabled (bool): Whether to enable autograph in the decomposition rules.
         gate_set (set[Operator] or None): The target gate set to decompose to
         fixed_decomps (dict or None): A dictionary of fixed decomposition rules
             to use in the decomposition graph.
@@ -129,7 +128,6 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
     def __init__(
         self,
         *,
-        ag_enabled=False,
         gate_set=None,
         fixed_decomps=None,
         alt_decomps=None,
@@ -263,7 +261,6 @@ def _create_decomposition_rule(
     num_wires: int,
     num_params: int,
     requires_copy: bool = False,
-    ag_enabled: bool = False,
     pauli_word: str | None = None,
 ):
     """Create a decomposition rule from a callable.
@@ -276,7 +273,6 @@ def _create_decomposition_rule(
         requires_copy (bool): Whether to create a copy of the function
             to avoid mutating the original. This is required for operations
             with a variable number of wires (e.g., MultiRZ, GlobalPhase).
-        ag_enabled (bool): Whether to enable autograph in the decomposition rule.
     """
 
     sig_func = inspect.signature(func)
@@ -343,14 +339,6 @@ def _create_decomposition_rule(
         # when the same rule is compiled multiple times with different number of wires
         # (e.g., MultiRZ, GlobalPhase)
         func_cp.__name__ += f"_wires_{num_wires}"
-
-    if ag_enabled:
-        from pennylane.capture.autograph import (  # pylint: disable=import-outside-toplevel
-            run_autograph,
-        )
-
-        # Capture the function with autograph
-        func_cp = run_autograph(func_cp)
 
     # Set custom attributes for the decomposition rule
     # These attributes are used in the MLIR decomposition pass

@@ -33,6 +33,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Autograph is no longer applied to decomposition rules based on whether it's applied to the workflow itself.
+  Operator developers now need to manually apply autograph to decomposition rules when needed.
+
 * The quantum dialect MLIR and TableGen source has been refactored to place type and attribute
   definitions in separate file scopes.
   [(#2329)](https://github.com/PennyLaneAI/catalyst/pull/2329)
