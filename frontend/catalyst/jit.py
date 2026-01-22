@@ -634,7 +634,7 @@ class QJIT(CatalystCallable):
             self.mlir_module = self.generate_ir()
 
         if self.compile_options.target in ("llvmir", "binary"):
-            self.compiled_function, _ = self.compile()
+            self.compiled_function, self.llvm_ir = self.compile()
 
         if self.compile_options.target in ("binary",):
             self.fn_cache.insert(
@@ -644,6 +644,9 @@ class QJIT(CatalystCallable):
     @property
     def llvmir(self):
         """LLVMIR textual representation."""
+        if self.llvm_ir is not None:
+            return self.llvm_ir
+
         if not self.mlir_module:
             return None
 
