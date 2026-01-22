@@ -491,11 +491,11 @@ class GlobalPhaseOp(IRDLOperation):
     name = "quantum.gphase"
 
     assembly_format = """
-        `(` $params `)` 
-        attr-dict 
-        ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  
-        ( `ctrlvals` `(` $in_ctrl_values^ `)` )? 
-        `:` type(results)
+        `(` $params `)`
+        attr-dict
+        ( `ctrls` `(` $in_ctrl_qubits^ `)` )?
+        ( `ctrlvals` `(` $in_ctrl_values^ `)` )?
+        `:` (`ctrls` type($out_ctrl_qubits)^ )?
     """
 
     irdl_options = (AttrSizedOperandSegments(as_property=True), ParsePropInAttrDict())
