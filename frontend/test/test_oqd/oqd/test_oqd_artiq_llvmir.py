@@ -46,9 +46,7 @@ class TestOQDARTIQLLVMIR:
 
     def test_rx_gate_llvmir_contains_artiq_symbols(self):
         """Test that LLVM IR contains required ARTIQ symbols (__modinit__ and __kernel__)."""
-        artiq_config = {
-            "kernel_ld": os.path.join(MODULE_TEST_PATH, "kernel.ld"),
-        }
+        artiq_config = {"kernel_ld": None}
 
         oqd_dev = OQDDevice(
             backend="default",
