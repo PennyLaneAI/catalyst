@@ -395,11 +395,11 @@ class TestIntegration:
 
         if qml.capture.enabled() and vjp_func == vjp:
             pytest.skip("program capture needs qml.vjp")
-        
+
         def inner(x):
             if x > 0:
                 return 2 * x, x**2
-            return 4*x, x**8
+            return 4 * x, x**8
 
         @qjit(autograph=True)
         def fn(x: float):
