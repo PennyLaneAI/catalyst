@@ -14,10 +14,6 @@
 
 #define DEBUG_TYPE "lower-qec-init-ops"
 
-#include <type_traits>
-
-#include "llvm/Support/MathExtras.h"
-
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Builders.h"
 
