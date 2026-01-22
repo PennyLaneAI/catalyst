@@ -800,7 +800,7 @@ class QJIT(CatalystCallable):
 
         Returns:
             Tuple[CompiledFunction, str]: the compilation result and LLVMIR
-            For targets that skip execution, returns (None, llvm_ir) instead.
+            For link=False, returns (None, llvm_ir) instead.
         """
         # WARNING: assumption is that the first function is the entry point to the compiled program.
         entry_point_func = self.mlir_module.body.operations[0]
