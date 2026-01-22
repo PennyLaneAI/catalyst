@@ -727,7 +727,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
         :func:`pennylane.specs`, please use :func:`pennylane.transforms.commute_ppr`.
 
     For more information on PPRs, check out the
-    `Compilation Hub <https://pennylane.ai/compilation/pauli-based-computation>`_.
+    `Compilation Hub <https://pennylane.ai/compilation/pauli-product-rotations>`_.
 
     .. note::
 
