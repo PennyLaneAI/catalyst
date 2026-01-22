@@ -25,7 +25,7 @@ jobs:
 
   constants:
     name: "Set build matrix"
-    uses: ./.github/workflows/constants.yaml
+    uses: ./.github/workflows/constants.yml
     needs: [determine_runner]
     with:
       multiple_compilers: ${{ github.trigger == 'push' && github.ref_name == 'main' }}
@@ -479,7 +479,7 @@ jobs:
 
     - name: Verify Graphviz installation
       run: |
-        dot -V 
+        dot -V
         dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
 
     - name: Get Cached LLVM Build
