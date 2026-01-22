@@ -485,8 +485,7 @@ class Compiler:
         else:
             out_IR = None
 
-        # If target is llvm-ir, only return LLVM IR without linking
-        if self.options.target == "llvmir":
+        if not self.options.link:
             output = output_ir_name if os.path.exists(output_ir_name) else None
             if os.path.exists(tmp_infile_name):
                 os.remove(tmp_infile_name)
