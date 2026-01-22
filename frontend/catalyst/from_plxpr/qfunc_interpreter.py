@@ -237,7 +237,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             AbstractQbit: The resulting measurement value.
         """
         if self.has_dynamic_allocation:
-            if len(measurement.wires) == 0:
+            if len(measurement.wires) == 0 and not isinstance(measurement, qml.measurements.StateMP):
                 raise CompileError(
                     textwrap.dedent(
                         """
@@ -246,26 +246,13 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                         """
                     )
                 )
+
             if any(is_dynamically_allocated_wire(w) for w in measurement.wires):
                 raise CompileError(
                     textwrap.dedent(
                         """
                         Terminal measurements cannot take in dynamically allocated wires
                         since they must be temporary.
-                        """
-                    )
-                )
-            # Only probs measurements are currently supported with dynamic allocation
-            # due to a bug in Lightning's PartialSample implementation
-            # TODO: Remove this once the bug is fixed
-            if not isinstance(measurement, qml.measurements.ProbabilityMP):
-                raise CompileError(
-                    textwrap.dedent(
-                        """
-                        Only probability measurements (qml.probs) are currently supported
-                        when dynamic allocations are present in the program. Other measurement
-                        types (qml.sample, qml.expval, qml.var, ...etc) will be supported
-                        in a future release after the underlying bug is fixed.
                         """
                     )
                 )
