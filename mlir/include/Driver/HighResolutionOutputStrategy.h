@@ -17,15 +17,17 @@
 #include "mlir/Support/Timing.h"
 #include "llvm/Support/raw_ostream.h"
 
-class HighResolutionOutputStrategy : public mlir::OutputStrategy {
+using namespace mlir;
+
+class HighResolutionOutputStrategy : public OutputStrategy {
   public:
     HighResolutionOutputStrategy(llvm::raw_ostream &os) : OutputStrategy(os) {}
-    void printTime(const mlir::TimeRecord &time, const mlir::TimeRecord &total) override;
-    void printListEntry(llvm::StringRef name, const mlir::TimeRecord &time,
-                        const mlir::TimeRecord &total, bool lastEntry) override;
-    void printTreeEntry(unsigned indent, llvm::StringRef name, const mlir::TimeRecord &time,
-                        const mlir::TimeRecord &total) override;
+    void printTime(const TimeRecord &time, const TimeRecord &total) override;
+    void printListEntry(llvm::StringRef name, const TimeRecord &time, const TimeRecord &total,
+                        bool lastEntry) override;
+    void printTreeEntry(unsigned indent, llvm::StringRef name, const TimeRecord &time,
+                        const TimeRecord &total) override;
     void printTreeEntryEnd(unsigned indent, bool lastEntry) override;
-    void printHeader(const mlir::TimeRecord &total) override;
+    void printHeader(const TimeRecord &total) override;
     void printFooter() override;
 };
