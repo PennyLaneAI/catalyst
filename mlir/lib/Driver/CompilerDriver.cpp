@@ -332,6 +332,13 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
 
 } // namespace
 
+/// The upstream MLIR Test dialect does not have a header we can include
+/// We must declare the registration function, and link to the corresponding upstream target
+/// in CMake.
+namespace test {
+void registerTestDialect(mlir::DialectRegistry &);
+} // namespace test
+
 namespace {
 /// Parse an MLIR module given in textual ASM representation. Any errors during parsing will be
 /// output to diagnosticStream.
@@ -369,6 +376,7 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     // MLIR Core dialects
     registerAllDialects(registry);
     registerAllExtensions(registry);
+    ::test::registerTestDialect(registry);
 
     // HLO
     stablehlo::registerAllDialects(registry);
