@@ -486,10 +486,9 @@ class Compiler:
             out_IR = None
 
         if not self.options.link:
-            output = output_ir_name if os.path.exists(output_ir_name) else None
             if os.path.exists(tmp_infile_name):
                 os.remove(tmp_infile_name)
-            return output, out_IR
+            return None, out_IR
 
         output = LinkerDriver.run(output_object_name, options=self.options)
         output = str(pathlib.Path(output).absolute())
