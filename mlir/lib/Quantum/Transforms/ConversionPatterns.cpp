@@ -1219,6 +1219,9 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
         // Since the qml.PauliRot(phi) == PPR(phi/2), this rotation_kind is multiplied by 2.
         Value thetaValue;
         if constexpr (std::is_same_v<T, PPRotationOp>) {
+            if (op.getCondition()) {
+                return op.emitOpError("PPRotationOp with condition is not supported.");
+            }
             // Compute the rotation angle: theta = π / rotation_kind
             // rotation_kind can be ±1, ±2, ±4, ±8
             int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
@@ -1226,6 +1229,9 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
             thetaValue = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64FloatAttr(theta));
         }
         else if constexpr (std::is_same_v<T, PPRotationArbitraryOp>) {
+            if (op.getCondition()) {
+                return op.emitOpError("PPRotationArbitraryOp with condition is not supported.");
+            }
             // multiply by 2 to get the rotation angle
             thetaValue = rewriter.create<LLVM::FMulOp>(
                 loc, adaptor.getArbitraryAngle(),
@@ -1295,6 +1301,13 @@ struct PPMeasurementOpPattern : public OpConversionPattern<PPMeasurementOp> {
 
         // Load the measurement result (i1) from the result pointer
         Value mres = rewriter.create<LLVM::LoadOp>(loc, IntegerType::get(ctx, 1), resultPtr);
+
+        // if the uint16_t rotation_sign is -1, we need to negate the measurement result
+        if (static_cast<int16_t>(op.getRotationSign()) == -1) {
+            Value one = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(),
+                                                          rewriter.getBoolAttr(true));
+            mres = rewriter.create<LLVM::XOrOp>(loc, mres, one);
+        }
 
         // Replace the op with the measurement result and the input qubits
         SmallVector<Value> values;
