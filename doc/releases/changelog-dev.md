@@ -72,7 +72,7 @@
   to Quantum dialect operations. This pass converts `qec.prepare` to `quantum.set_state` and
   `qec.fabricate` to `quantum.alloc_qb` + `quantum.set_state`, enabling runtime execution of
   QEC state preparation operations.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
 
 <h3>Documentation 📝</h3>
 
