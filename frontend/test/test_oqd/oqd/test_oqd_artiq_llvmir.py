@@ -64,10 +64,10 @@ class TestOQDARTIQLLVMIR:
         def circuit():
             x = np.pi / 2
             qml.RX(x, wires=0)
-            return qml.counts(all_outcomes=True)
+            return qml.counts(wires=0)
 
         # Get the LLVM IR
-        llvm_ir = circuit.qir
+        llvm_ir = circuit.llvmir
 
         # Verify required ARTIQ symbols and structure
         assert "define void @__modinit__" in llvm_ir, "Missing __modinit__ function definition"

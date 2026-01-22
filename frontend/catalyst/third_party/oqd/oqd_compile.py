@@ -40,7 +40,7 @@ def compile_to_artiq(circuit, artiq_config, output_elf_name=None):
         str: Path to the generated binary file
     """
     # Get LLVM IR text and write to file
-    llvm_ir_text = circuit.qir
+    llvm_ir_text = circuit.llvmir
     circuit_name = getattr(circuit, "__name__", "circuit")
     llvm_ir_path = os.path.join(str(circuit.workspace), f"{circuit_name}.ll")
     with open(llvm_ir_path, "w", encoding="utf-8") as f:

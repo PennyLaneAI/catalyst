@@ -124,7 +124,7 @@ def qjit(
             - :attr:`~.QJIT.jaxpr`: JAX program representation
             - :attr:`~.QJIT.mlir`: MLIR representation after canonicalization
             - :attr:`~.QJIT.mlir_opt`: MLIR representation after optimization
-            - :attr:`~.QJIT.qir`: QIR in LLVM IR form
+            - :attr:`~.QJIT.llvmir`: LLVM IR representation
         use_nameloc (bool): If ``True``, function parameter names are added to the IR as name
             locations.
         verbose (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
@@ -522,7 +522,8 @@ class QJIT(CatalystCallable):
                              object to compile, as is, without any modifications
     :ivar jaxpr: This attribute stores the Jaxpr compiled from the function as a string.
     :ivar mlir: This attribute stores the MLIR compiled from the function as a string.
-    :ivar qir: This attribute stores the QIR in LLVM IR form compiled from the function as a string.
+    :ivar llvmir: This attribute stores the LLVM IR representation compiled from the function as
+                  a string.
     """
 
     @debug_logger_init
@@ -544,6 +545,7 @@ class QJIT(CatalystCallable):
         # IRs are only available for the most recently traced function.
         self.jaxpr = None
         self.mlir_module = None
+        self.llvm_ir = None
         self.out_type = None
         self.overwrite_ir = None
         self.use_cwd_for_workspace = self.compile_options.keep_intermediate
@@ -603,10 +605,6 @@ class QJIT(CatalystCallable):
 
         requires_promotion = self.jit_compile(args, **kwargs)
 
-        # For llvm-ir target, compilation is complete, no execution needed
-        if self.compile_options.target == "llvmir":
-            return None
-
         # If we receive tracers as input, dispatch to the JAX integration.
         if any(isinstance(arg, jax.core.Tracer) for arg in tree_flatten(args)[0]):
             if self.jaxed_function is None:
@@ -634,7 +632,9 @@ class QJIT(CatalystCallable):
             self.mlir_module = self.generate_ir()
 
         if self.compile_options.target in ("llvmir", "binary"):
-            self.compiled_function, _ = self.compile()
+            self.compiled_function, llvm_ir = self.compile()
+            if self.compile_options.target == "llvmir":
+                self.llvm_ir = llvm_ir
 
         if self.compile_options.target in ("binary",):
             self.fn_cache.insert(
@@ -642,8 +642,11 @@ class QJIT(CatalystCallable):
             )
 
     @property
-    def qir(self):
+    def llvmir(self):
         """LLVMIR textual representation."""
+        if self.llvm_ir is not None:
+            return self.llvm_ir
+
         if not self.mlir_module:
             # TODO: Should we go through the translation?
             return None
@@ -662,15 +665,6 @@ class QJIT(CatalystCallable):
             bool: whether the provided arguments will require promotion to be used with the compiled
                   function
         """
-        if self.compile_options.target == "llvmir":
-            if self.mlir_module is not None:
-                return False
-            self.workspace = self._get_workspace()
-            self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
-            self.mlir_module = self.generate_ir()
-            self.compiled_function, _ = self.compile()
-            return False
-
         cached_fn, requires_promotion = self.fn_cache.lookup(args)
 
         if cached_fn is None:
