@@ -1527,7 +1527,7 @@ def _trace_classical_phase(
         else:
             device_program = qml.CompilePipeline()
 
-        qnode_program = qnode.transform_program if qnode else qml.CompilePipeline()
+        qnode_program = qnode.compile_pipeline if qnode else qml.CompilePipeline()
 
         tapes, post_processing, tracing_mode = apply_transforms(
             qnode_program,
