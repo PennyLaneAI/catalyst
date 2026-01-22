@@ -728,14 +728,15 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
 
 
 # pylint: disable=too-many-arguments
-def _capture_grad_lowering(ctx, *args, argnums, jaxpr, method, h, fn, scalar_out):
+def _capture_grad_lowering(ctx, *args, argnums, jaxpr, n_consts, method, h, fn, scalar_out):
     mlir_ctx = ctx.module_context.context
     f64 = ir.F64Type.get(mlir_ctx)
     finiteDiffParam = ir.FloatAttr.get(f64, h)
 
-    argnum_numpy = np.array(argnums)
+    new_argnums = [num + n_consts for num in argnums]
+    argnum_numpy = np.array(new_argnums)
     diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
-    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums), fn=fn)
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *new_argnums), fn=fn)
     symbol_ref = get_symbolref(ctx, func_op)
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
