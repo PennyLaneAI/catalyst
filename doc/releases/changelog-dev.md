@@ -39,6 +39,9 @@
   into normal PPR and PPMs with SCF dialect to support runtime execution.
   [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
 
+* Increased format size for the `--mlir-timing` flag, displaying more decimals for better timing precision.
+  [(#2423)](https://github.com/PennyLaneAI/catalyst/pull/2423)
+
 <h3>Documentation 📝</h3>
 
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
@@ -50,4 +53,5 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi
 Sengthai Heng,
 Jeffrey Kam,
+River McCubbin,
 Mudit Pandey.
