@@ -58,7 +58,7 @@ class TestOQDARTIQLLVMIR:
         # Compile to LLVM IR only
         oqd_pipelines = _get_oqd_pipelines()
 
-        @qjit(pipelines=oqd_pipelines, target="llvmir")
+        @qjit(pipelines=oqd_pipelines, target="llvmir", link=False)
         @qml.set_shots(4)
         @qml.qnode(oqd_dev)
         def circuit():
