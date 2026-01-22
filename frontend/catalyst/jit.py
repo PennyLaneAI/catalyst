@@ -78,6 +78,7 @@ def qjit(
     autograph_include=(),
     async_qnodes=False,
     target="binary",
+    link=True,
     keep_intermediate=False,
     use_nameloc=False,
     verbose=False,
@@ -113,6 +114,7 @@ def qjit(
         async_qnodes (bool): Experimental support for automatically executing
             QNodes asynchronously, if supported by the device runtime.
         target (str): The compilation target.
+        link (bool): If ``True``, the compiled function is linked to a shared object.
         keep_intermediate (Union[str, int, bool]): Level controlling intermediate file generation.
 
             - ``False`` or ``0`` or ``"none"`` or ``None`` (default): No intermediate file is kept.
@@ -632,9 +634,7 @@ class QJIT(CatalystCallable):
             self.mlir_module = self.generate_ir()
 
         if self.compile_options.target in ("llvmir", "binary"):
-            self.compiled_function, llvm_ir = self.compile()
-            if self.compile_options.target == "llvmir":
-                self.llvm_ir = llvm_ir
+            self.compiled_function, _ = self.compile()
 
         if self.compile_options.target in ("binary",):
             self.fn_cache.insert(
@@ -644,11 +644,7 @@ class QJIT(CatalystCallable):
     @property
     def llvmir(self):
         """LLVMIR textual representation."""
-        if self.llvm_ir is not None:
-            return self.llvm_ir
-
         if not self.mlir_module:
-            # TODO: Should we go through the translation?
             return None
 
         _mlir = str(self.mlir_module)
@@ -830,13 +826,12 @@ class QJIT(CatalystCallable):
         else:
             shared_object, llvm_ir = self.compiler.run(self.mlir_module, self.workspace)
 
-        if self.compile_options.target == "llvmir":
+        if not self.compile_options.link:
             return None, llvm_ir
 
         compiled_fn = CompiledFunction(
             shared_object, func_name, restype, self.out_type, self.compile_options
         )
-
         return compiled_fn, llvm_ir
 
     @instrument(has_finegrained=True)
