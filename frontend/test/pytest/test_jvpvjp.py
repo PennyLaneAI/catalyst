@@ -736,8 +736,7 @@ def test_vjp_against_jax_argnum0_case_TT_TT(diff_method):
     # argnums = 0
     assert tree_cat_a == jax.tree_util.tree_structure(((0, 0), 0))
     # argnums = [0]
-    assert tree_cat_b == jax.tree_util.tree_structure(((0,0), (0, )))
-
+    assert tree_cat_b == jax.tree_util.tree_structure(((0, 0), (0,)))
 
     for r_j, r_c in zip(res_cat_a, res_cat_b):
         assert_allclose(r_j, r_c)
