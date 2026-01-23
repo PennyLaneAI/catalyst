@@ -85,5 +85,5 @@ Sengthai Heng,
 Jeffrey Kam,
 Mudit Pandey,
 Andrija Paurevic,
-David D.W. Ren
+David D.W. Ren,
 Paul Haochen Wang.
