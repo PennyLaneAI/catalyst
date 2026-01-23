@@ -510,8 +510,8 @@ class TestPassByPassSpecs:
             shots=Shots(None),
             level=2,
             resources=SpecsResources(
-                gate_types={"PPR-pi/4": 3, "PPR-pi/8": 1},
-                gate_sizes={1: 4},
+                gate_types={"GlobalPhase": 2, "PPR-pi/4": 3, "PPR-pi/8": 1},
+                gate_sizes={0: 2, 1: 4},
                 measurements={},
                 num_allocs=2,
             ),

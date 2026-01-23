@@ -31,6 +31,9 @@
   by 2 to match the PauliRot convention (`PauliRot(φ) == PPR(φ/2)`).
   [(#2414)](https://github.com/PennyLaneAI/catalyst/pull/2414)
 
+* Fixing incorrect lowering of PPM into CAPI calls when the PPM is in the negative basis.
+  [(#2422)](https://github.com/PennyLaneAI/catalyst/pull/2422)
+
 <h3>Internal changes ⚙️</h3>
 
 * Autograph is no longer applied to decomposition rules based on whether it's applied to the workflow itself.
@@ -56,6 +59,11 @@
   into normal PPR and PPMs with SCF dialect to support runtime execution.
   [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
 
+* Added global phase tracking to the `to-ppr` compiler pass. When converting quantum gates to
+  Pauli Product Rotations (PPR), the pass now emits `quantum.gphase` operations to preserve
+  global phase correctness.
+  [(#2419)](https://github.com/PennyLaneAI/catalyst/pull/2419)
+  
 * New qubit-type specializations have been added to Catalyst's MLIR type system. These new qubit
   types include `!quantum.bit<logical>`, `!quantum.bit<qec>` and `!quantum.bit<physical>`. The
   original `!quantum.bit` type continues to be supported and used as the default qubit type.
