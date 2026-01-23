@@ -24,7 +24,7 @@ try:
 
     has_networkx = True
 except ModuleNotFoundError as networkx_import_error:
-    has_networkx = False
+    has_networkx = False  # pragma: no cover
 
 import numpy as np
 from pennylane.transforms.intermediate_reps.rowcol import _rowcol_parity_matrix
@@ -60,15 +60,10 @@ def _apply_dfs_po_circuit(tree, source, P, inv_synth_matrix=None):
     """
     dfs_po = list(nx.dfs_postorder_nodes(tree, source=source))
     sub_circuit = []
-    if inv_synth_matrix is None:
-        for i, j in zip(dfs_po[:-1], dfs_po[1:]):
-            sub_circuit.append((i, j))
-            P[i] += P[j]
-    else:
-        for i, j in zip(dfs_po[:-1], dfs_po[1:]):
-            sub_circuit.append((i, j))
-            P[i] += P[j]
-            inv_synth_matrix[:, i] += inv_synth_matrix[:, j]
+    for i, j in zip(dfs_po[:-1], dfs_po[1:]):
+        sub_circuit.append((i, j))
+        P[i] += P[j]
+        inv_synth_matrix[:, i] += inv_synth_matrix[:, j]
     P %= 2
     return sub_circuit
 

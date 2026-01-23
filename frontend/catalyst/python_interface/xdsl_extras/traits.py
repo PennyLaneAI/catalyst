@@ -164,15 +164,8 @@ class Elementwise(OpTrait):
         # At this point, operand_mappable_types should not be empty
         assert operand_mappable_types, "At least one operand must be a vector or tensor"
 
-        # If an operand is non-scalar, then there must be at least one non-scalar result
-        if not result_mappable_types:
-            raise VerifyException(
-                f"'{op.name}': if an operand is non-scalar, then there must be at "
-                "least one non-scalar result"
-            )
-
         # If an operand is non-scalar, then all results must be non-scalar
-        if len(result_mappable_types) != len(op.results):
+        if not result_mappable_types or len(result_mappable_types) != len(op.results):
             raise VerifyException(
                 f"'{op.name}': if an operand is non-scalar, then all results must be non-scalar"
             )
@@ -219,9 +212,8 @@ class AllMatchSameOperatorTrait(OpTrait):
         attributes = []
         for name in self.attr_names:
             value = getattr(op, name, None)
-            if value is None:
-                return
-            attributes.append(value)
+            if value is not None:
+                attributes.append(value)
 
         if len(attributes) <= 1:
             return

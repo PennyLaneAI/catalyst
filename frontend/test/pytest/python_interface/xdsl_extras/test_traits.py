@@ -24,6 +24,8 @@ from xdsl.irdl import (
     attr_def,
     irdl_op_definition,
     operand_def,
+    opt_operand_def,
+    opt_result_def,
     result_def,
     traits_def,
     var_operand_def,
@@ -54,17 +56,24 @@ def test_same_operands_and_result_shape_trait():
 
         name = "test.shape_test"
         traits = traits_def(SameOperandsAndResultShape())
-        operand = operand_def(AnyTensorType)
-        result = result_def(AnyTensorType)
+        operand = opt_operand_def(AnyTensorType)
+        result = opt_result_def(AnyTensorType)
 
     assert ShapeTestOp.has_trait(SameOperandsAndResultShape)
 
+    # Verification passes if operand and result shape matches
     operand = create_ssa_value(TensorType(i32, [2, 3]))
     op = ShapeTestOp.create(operands=[operand], result_types=[TensorType(i32, [2, 3])])
     op.verify()
 
+    # Verification passes if operand and result shape does not match
     op = ShapeTestOp.create(operands=[operand], result_types=[TensorType(i32, [3, 2])])
     with pytest.raises(VerifyException, match="requires the same shape"):
+        op.verify()
+
+    # Verification fails when there are no operands or results
+    op = ShapeTestOp.create(operands=[], result_types=[])
+    with pytest.raises(VerifyException, match="requires at least one result or operand"):
         op.verify()
 
 
@@ -80,21 +89,27 @@ def test_same_operands_element_type_trait():
         traits = traits_def(SameOperandsElementType())
 
         operand1 = operand_def(AnyTensorType)
-        operand2 = operand_def(AnyTensorType)
+        operand2 = opt_operand_def(AnyTensorType)
         result = result_def(AnyTensorType)
 
     assert ShapeTestOp.has_trait(SameOperandsElementType)
 
+    # Verification passes when operand types match
     operand1 = create_ssa_value(TensorType(i32, [2, 3]))
     operand2 = create_ssa_value(TensorType(i32, [3, 2]))
     op = ShapeTestOp.create(operands=[operand1, operand2], result_types=[TensorType(i32, [2, 2])])
     op.verify()
 
+    # Verification fails when operand types do not match
     operand3 = create_ssa_value(TensorType(f32, [2, 3]))
     op = ShapeTestOp.create(operands=[operand1, operand3], result_types=[TensorType(f32, [2, 3])])
 
     with pytest.raises(VerifyException, match="requires the same element type for all operands"):
         op.verify()
+
+    # Verification passes if one or less operand
+    op = ShapeTestOp.create(operands=[operand1], result_types=[TensorType(i32, [2, 2])])
+    op.verify()
 
 
 # Test the SameOperandsAndResultElementType trait
@@ -108,17 +123,19 @@ def test_same_operands_and_result_element_type_trait():
         name = "test.element_type_test"
         traits = traits_def(SameOperandsAndResultElementType())
 
-        operand = operand_def(AnyTensorType)
-        result = result_def(AnyTensorType)
+        operand = opt_operand_def(AnyTensorType)
+        result = opt_result_def(AnyTensorType)
 
     assert ElementTypeTestOp.has_trait(SameOperandsAndResultElementType)
 
+    # Verification passes when operand and result have same element type
     op = ElementTypeTestOp.create(
         operands=[create_ssa_value(TensorType(i32, [2, 3]))],
         result_types=[TensorType(i32, [2, 3])],
     )
     op.verify()
 
+    # Verification fails when operand and result have different element type
     op = ElementTypeTestOp.create(
         operands=[create_ssa_value(TensorType(i32, [2, 3]))],
         result_types=[TensorType(f32, [2, 3])],
@@ -126,6 +143,11 @@ def test_same_operands_and_result_element_type_trait():
     with pytest.raises(
         VerifyException, match="requires the same element type for all operands and results"
     ):
+        op.verify()
+
+    # Verification fails when there are no operands or results
+    op = ElementTypeTestOp.create(operands=[], result_types=[])
+    with pytest.raises(VerifyException, match="requires at least one result or operand"):
         op.verify()
 
 
@@ -168,7 +190,7 @@ def test_elementwise_trait_failure_no_tensor_result():
 
     with pytest.raises(
         VerifyException,
-        match="if an operand is non-scalar, then there must be at least one non-scalar result",
+        match="if an operand is non-scalar, then all results must be non-scalar",
     ):
         op.verify()
 
@@ -292,6 +314,26 @@ def test_all_element_counts_match():
     )
     with pytest.raises(VerifyException, match=r"all of \{a, b\} must have the same element count"):
         trait.verify(op)
+
+
+def test_all_match_same_operator_one_attribute():
+    """Test that verification of AllMatchSameOperatorTrait passes if the operation being
+    verified has one or less attributes that match."""
+
+    @irdl_op_definition
+    class ElemCountMockOp(IRDLOperation):
+        """Test operation for the AllMatchSameOperatorTrait trait."""
+
+        name = "test.elem_counts_match"
+        traits = traits_def()
+        a = attr_def(AnyAttr())
+        b = attr_def(AnyAttr())
+
+    op = ElemCountMockOp.create(
+        attributes={"a": TensorType(i64, [2, 3]), "b": TensorType(i64, [6])}
+    )
+    trait = AllMatchSameOperatorTrait(("a", "c"), lambda a: a.element_count(), "element count")
+    trait.verify(op)
 
 
 def test_operator_cannot_compute_raises_verifyexception():
