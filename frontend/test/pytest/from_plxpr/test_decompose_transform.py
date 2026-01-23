@@ -262,7 +262,7 @@ class TestGraphDecomposition:
 
         @partial(
             qml.transforms.decompose,
-            gate_set={qml.CNOT: 1, qml.GlobalPhase: 1, qml.RX: 1, qml.RZ: 1, "PauliRot": 100},
+            gate_set={"CNOT", "GlobalPhase", "RX", "RZ", "PauliRot"},
         )
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
@@ -393,7 +393,7 @@ class TestGraphDecomposition:
 
         @partial(
             qml.transforms.decompose,
-            gate_set={"RX": 1, "RZ": 1, "H": 1, "CZ": 1, "PauliRot": 100},
+            gate_set={"RX", "RZ", "H", "CZ", "PauliRot"},
         )
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
@@ -418,7 +418,7 @@ class TestGraphDecomposition:
 
         @partial(
             qml.transforms.decompose,
-            gate_set={"RX": 1, "RY": 1, "CNOT": 1, "GlobalPhase": 1, "PauliRot": 100},
+            gate_set={"RX", "RY", "CNOT", "GlobalPhase", "PauliRot"},
         )
         @qml.qnode(qml.device("lightning.qubit", wires=4))
         def circuit():
@@ -430,9 +430,8 @@ class TestGraphDecomposition:
         with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
             resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
 
-        with qml.capture.pause():
-            result_without_qjit = circuit()
-            expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
+        result_without_qjit = circuit()
+        expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
 
         assert resources == expected_resources
         assert qml.math.allclose(result_without_qjit, result_with_qjit)
