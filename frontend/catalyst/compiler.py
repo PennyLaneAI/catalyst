@@ -461,6 +461,7 @@ class Compiler:
         rank = 0
         try:
             from mpi4py import MPI
+
             comm = MPI.COMM_WORLD
             rank = comm.Get_rank()
         except ImportError:
@@ -488,7 +489,9 @@ class Compiler:
                     if result.stderr:
                         print(result.stderr.strip(), file=self.options.logfile)
             except subprocess.CalledProcessError as e:  # pragma: nocover
-                raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
+                raise CompileError(
+                    f"catalyst failed with error code {e.returncode}: {e.stderr}"
+                ) from e
 
             output = LinkerDriver.run(output_object_name, options=self.options)
 
@@ -512,7 +515,7 @@ class Compiler:
             with open(output_ir_name, "r", encoding="utf-8") as f:
                 out_IR = f.read()
             if rank == 0:
-                 os.remove(output_ir_name)
+                os.remove(output_ir_name)
         else:
             out_IR = None
 
@@ -690,6 +693,7 @@ class Compiler:
         rank = 0
         try:
             from mpi4py import MPI
+
             comm = MPI.COMM_WORLD
             if comm.Get_size() > 1:
                 rank = comm.Get_rank()

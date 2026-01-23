@@ -106,6 +106,7 @@ class WorkspaceManager:
         rank = 0
         try:
             from mpi4py import MPI
+
             comm = MPI.COMM_WORLD
             if comm.Get_size() > 1:
                 rank = comm.Get_rank()
@@ -154,4 +155,3 @@ class WorkspaceManager:
             # If for some reason we cannot create it or reuse it (e.g. permission), fallback?
             # For now, let's just raise or rely on standard behavior.
             raise e
-
