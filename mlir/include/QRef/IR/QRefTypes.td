@@ -32,7 +32,7 @@ def AllocationType : QRef_Type<"Allocation", "allocation"> {
     let summary = "An allocation result.";
 }
 
-def QubitReferenceType : QRef_Type<"QubitRef", "qubit_ref"> {
+def QRefQubitType : QRef_Type<"Qubit", "bit"> {
     let summary = "A reference to a qubit.";
 }
 

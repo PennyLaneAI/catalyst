@@ -95,7 +95,7 @@ def MakeReferenceOp : Memory_Op<"make_reference", [NoMemoryEffect]> {
     );
 
     let results = (outs
-        QubitReferenceType:$wire
+        QRefQubitType:$wire
     );
 
     let assemblyFormat = [{
@@ -216,7 +216,7 @@ def SetStateOp : Gate_Op<"set_state"> {
 
     let arguments = (ins
         1DTensorOf<[Complex<F64>]>:$in_state,
-        Variadic<QubitReferenceType>:$wires
+        Variadic<QRefQubitType>:$wires
     );
 
     let assemblyFormat = [{
@@ -244,7 +244,7 @@ def SetBasisStateOp : Gate_Op<"set_basis_state"> {
 
     let arguments = (ins
         1DTensorOf<[I1]>:$basis_state,
-        Variadic<QubitReferenceType>:$wires
+        Variadic<QRefQubitType>:$wires
     );
 
     let assemblyFormat = [{
@@ -260,10 +260,10 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
 
     let arguments = (ins
         Variadic<F64>:$params,
-        Variadic<QubitReferenceType>:$wires,
+        Variadic<QRefQubitType>:$wires,
         StrAttr:$gate_name,
         UnitAttr:$adjoint,
-        Variadic<QubitReferenceType>:$ctrl_wires,
+        Variadic<QRefQubitType>:$ctrl_wires,
         Variadic<I1>:$ctrl_values
     );
 
@@ -301,9 +301,9 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [ParametrizedGate, AttrSizedOperandS
     let arguments = (ins
         F64:$angle,
         PauliWord:$pauli_product,
-        Variadic<QubitReferenceType>:$wires,
+        Variadic<QRefQubitType>:$wires,
         UnitAttr:$adjoint,
-        Variadic<QubitReferenceType>:$ctrl_wires,
+        Variadic<QRefQubitType>:$ctrl_wires,
         Variadic<I1>:$ctrl_values
     );
 
@@ -333,7 +333,7 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [ParametrizedGate, AttrSizedOperand
     let arguments = (ins
         F64:$params,
         UnitAttr:$adjoint,
-        Variadic<QubitReferenceType>:$ctrl_wires,
+        Variadic<QRefQubitType>:$ctrl_wires,
         Variadic<I1>:$ctrl_values
     );
 
@@ -374,9 +374,9 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [ParametrizedGate, AttrSizedOperandSeg
 
     let arguments = (ins
         F64:$theta,
-        Variadic<QubitReferenceType>:$wires,
+        Variadic<QRefQubitType>:$wires,
         UnitAttr:$adjoint,
-        Variadic<QubitReferenceType>:$ctrl_wires,
+        Variadic<QRefQubitType>:$ctrl_wires,
         Variadic<I1>:$ctrl_values
     );
 
@@ -422,9 +422,9 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSeg
     let arguments = (ins
         F64:$theta,
         F64:$dim,
-        Variadic<QubitReferenceType>:$wires,
+        Variadic<QRefQubitType>:$wires,
         UnitAttr:$adjoint,
-        Variadic<QubitReferenceType>:$ctrl_wires,
+        Variadic<QRefQubitType>:$ctrl_wires,
         Variadic<I1>:$ctrl_values
     );
 
@@ -461,9 +461,9 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOpera
 
     let arguments = (ins
         2DTensorOf<[Complex<F64>]>:$matrix,
-        Variadic<QubitReferenceType>:$wires,
+        Variadic<QRefQubitType>:$wires,
         UnitAttr:$adjoint,
-        Variadic<QubitReferenceType>:$ctrl_wires,
+        Variadic<QRefQubitType>:$ctrl_wires,
         Variadic<I1>:$ctrl_values
     );
 
@@ -500,7 +500,7 @@ def NamedObsOp : Observable_Op<"namedobs"> {
     }];
 
     let arguments = (ins
-        QubitReferenceType:$wire,
+        QRefQubitType:$wire,
         NamedObservableAttr:$type
     );
 
