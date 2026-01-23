@@ -1516,6 +1516,32 @@ def test_pytrees_return_classical_function(backend, diff_method):
         assert len(result[1]) == 2
 
 
+@pytest.mark.xfail(reason="issue #1335 in lightning")
+@pytest.mark.usefixtures("use_both_frontend")
+@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
+def test_multiple_expval_cost_fun(backend, diff_method):
+    """Test that we produce correct results with multiple results being differentiated."""
+
+    @qml.qnode(qml.device(backend, wires=2), diff_method=diff_method)
+    def circuit(weights, data):
+
+        qml.RY(weights[0], wires=0)
+        qml.RX(data[0], wires=0)
+        qml.RY(weights[1], wires=1)
+        qml.RX(data[1], wires=1)
+
+        return qml.expval(qml.Z(0)), qml.expval(qml.Z(0))
+
+    def loss_fn(weights, data):
+        return jnp.array(circuit(weights, data))
+
+    result = qjit(grad(loss_fn, argnums=[0, 1]))(jnp.array([0.1, 0.2]), jnp.array([0.3, 0.4]))
+    expected = jax.grad(loss_fn, argnums=[0, 1])(jnp.array([0.1, 0.2]), jnp.array([0.3, 0.4]))
+
+    assert np.allclose(result[0], expected[0])
+    assert np.allclose(result[1], expected[1])
+
+
 @pytest.mark.usefixtures("use_both_frontend")
 def test_pytrees_return_classical():
     """Test the jacobian on a function with a return including list and dictionaries."""
@@ -2366,6 +2392,44 @@ def test_closure_variable_grad(diff_method):
 
     expected = workflow_no_closure(1.0, 0.25)
     observed = workflow_closure(1.0, 0.25)
+    assert np.allclose(expected, observed)
+
+
+@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
+def test_closure_variable_value_and_grad(diff_method):
+    """Test that value and grad can take closure variables"""
+
+    @qml.qjit
+    def workflow_closure(x, y):
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev, diff_method=diff_method)
+        def circuit(x):
+            qml.RX(jnp.pi * x, wires=0)
+            qml.RX(jnp.pi * y, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        g = value_and_grad(circuit)
+        return g(x)
+
+    @qml.qjit
+    def workflow_no_closure(x, y):
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev, diff_method=diff_method)
+        def circuit(x, y):
+            qml.RX(jnp.pi * x, wires=0)
+            qml.RX(jnp.pi * y, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        g = value_and_grad(circuit)
+        return g(x, y)
+
+    x, y = 1.0, 0.25
+    expected = workflow_no_closure(x, y)
+    observed = workflow_closure(x, y)
     assert np.allclose(expected, observed)
 
 
