@@ -1294,10 +1294,10 @@ def test_decompose_autograph_multi_blocks():
     def circuit_29(n: int):
 
         # CHECK: {{%.+}} = scf.for %arg1 = {{%.+}} to %1 step {{%.+}} iter_args(%arg2 = %0) -> (!quantum.reg) {
-        @qml.for_loop(n) # not using autograph, should still work on decmop
-        def f(i):
+        @qml.for_loop(n)
+        def f(i): # pylint: disable=unused-argument
             qml.MultiRZ(0.5, wires=[0, 1, 2, 3, 4])
-        f()
+        f() # pylint: disable=no-value-for-parameter
 
         return qml.expval(qml.Z(0))
 
