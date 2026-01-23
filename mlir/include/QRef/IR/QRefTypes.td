@@ -28,8 +28,12 @@ class QRef_Type<string name, string typeMnemonic, list<Trait> traits = []>
     let mnemonic = typeMnemonic;
 }
 
-def AllocationType : QRef_Type<"Allocation", "allocation"> {
-    let summary = "An allocation result.";
+def QRefQuregType : QRef_Type<"Qureg", "reg"> {
+    let summary = "A container value for qubit references.";
+
+    let parameters = (ins "unsigned":$size);
+
+    let assemblyFormat = "`<` $size `>`";
 }
 
 def QRefQubitType : QRef_Type<"Qubit", "bit"> {

@@ -55,7 +55,7 @@ def AllocOp : Memory_Op<"alloc"> {
     );
 
     let results = (outs
-        AllocationType:$allocation
+        QRefQuregType:$allocation
     );
 
     let assemblyFormat = [{
@@ -72,7 +72,7 @@ def DeallocOp : Memory_Op<"dealloc"> {
     }];
 
     let arguments = (ins
-        AllocationType:$allocation
+        QRefQuregType:$allocation
     );
 
     let assemblyFormat = [{
@@ -89,7 +89,7 @@ def GetOp : Memory_Op<"get", [NoMemoryEffect]> {
     }];
 
     let arguments = (ins
-        AllocationType:$allocation,
+        QRefQuregType:$allocation,
         Optional<I64>:$idx,
         OptionalAttr<ConfinedAttr<I64Attr, [IntNonNegative]>>:$idx_attr
     );

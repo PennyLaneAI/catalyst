@@ -20,30 +20,30 @@
 func.func @test_alloc(%arg0 : i64) {
 
     // Static
-    %0 = qref.alloc(2) : !qref.allocation
+    %0 = qref.alloc(2) : !qref.reg<2>
 
     // Dynamic
-    %1 = qref.alloc(%arg0) : !qref.allocation
+    %1 = qref.alloc(%arg0) : !qref.reg<?>
 
     return
 }
 
 // -----
 
-func.func @test_dealloc(%arg0 : !qref.allocation) {
-    qref.dealloc %arg0 : !qref.allocation
+func.func @test_dealloc(%arg0 : !qref.reg<10>) {
+    qref.dealloc %arg0 : !qref.reg<10>
     return
 }
 
 // -----
 
-func.func @test_get(%arg0 : !qref.allocation, %arg1: i64) {
+func.func @test_get(%arg0 : !qref.reg<10>, %arg1: i64) {
 
     // Static
-    %0 = qref.get %arg0[3] : !qref.allocation -> !qref.bit
+    %0 = qref.get %arg0[3] : !qref.reg<10> -> !qref.bit
 
     // Dynamic
-    %1 = qref.get %arg0[%arg1] : !qref.allocation, i64 -> !qref.bit
+    %1 = qref.get %arg0[%arg1] : !qref.reg<10>, i64 -> !qref.bit
 
     return
 }
@@ -226,22 +226,22 @@ func.func @test_namedobs_op(%q0: !qref.bit) {
 // -----
 
 func.func @test_expval_circuit() -> f64 {
-    %a = qref.alloc(2) : !qref.allocation
-    %q0 = qref.get %a[0] : !qref.allocation -> !qref.bit
-    %q1 = qref.get %a[1] : !qref.allocation -> !qref.bit
+    %a = qref.alloc(2) : !qref.reg<2>
+    %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit
+    %q1 = qref.get %a[1] : !qref.reg<2> -> !qref.bit
     qref.custom "Hadamard"() %q0 : !qref.bit
     qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
     qref.custom "Hadamard"() %q0 : !qref.bit
     %obs = qref.namedobs %q1 [ PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
-    qref.dealloc %a : !qref.allocation
+    qref.dealloc %a : !qref.reg<2>
     return %expval : f64
 }
 
 // -----
 
 func.func @test_circuit_with_loop(%nqubits: i64) -> f64 {
-    %a = qref.alloc(%nqubits) : !qref.allocation
+    %a = qref.alloc(%nqubits) : !qref.reg<?>
 
     %start = arith.constant 0 : index
     %step = arith.constant 1 : index
@@ -249,14 +249,14 @@ func.func @test_circuit_with_loop(%nqubits: i64) -> f64 {
 
     scf.for %i = %start to %stop step %step {
         %int = index.casts %i : index to i64
-        %this_q = qref.get %a[%int] : !qref.allocation, i64 -> !qref.bit
+        %this_q = qref.get %a[%int] : !qref.reg<?>, i64 -> !qref.bit
         qref.custom "Hadamard"() %this_q : !qref.bit
         scf.yield
     }
 
-    %q0 = qref.get %a[0] : !qref.allocation -> !qref.bit
+    %q0 = qref.get %a[0] : !qref.reg<?> -> !qref.bit
     %obs = qref.namedobs %q0 [ PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
-    qref.dealloc %a : !qref.allocation
+    qref.dealloc %a : !qref.reg<?>
     return %expval : f64
 }
