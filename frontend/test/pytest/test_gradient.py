@@ -1502,8 +1502,7 @@ def test_pytrees_return_classical_function(backend, diff_method):
     phi = 0.2
 
     if diff_method == "adjoint" and qml.capture.enabled():
-        if qml.capture.enabled():
-            pytest.xfail("TODO")
+        pytest.xfail("TODO")
     else:
         result = qjit(qml.jacobian(circuit, argnums=[0, 1]))(psi, phi)
 
