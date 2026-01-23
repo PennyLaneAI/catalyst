@@ -18,158 +18,158 @@
 
 // -----
 
-func.func @test_controlled1(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref) {
+func.func @test_controlled1(%q0: !qref.qubit_ref, %q1: !qref.qubit_ref) {
     %true = llvm.mlir.constant (1 : i1) :i1
     // expected-error@+1 {{number of controlling wires in input (1) and controlling values (2) must be the same}}
-    ref_quantum.custom "PauliZ"() %q0 ctrls (%q1) ctrlvals (%true, %true) : !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref
+    qref.custom "PauliZ"() %q0 ctrls (%q1) ctrlvals (%true, %true) : !qref.qubit_ref ctrls !qref.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_controlled2(%q0: !ref_quantum.qubit_ref) {
+func.func @test_controlled2(%q0: !qref.qubit_ref) {
     %true = llvm.mlir.constant (1 : i1) :i1
     // expected-error@+1 {{number of controlling wires in input (0) and controlling values (1) must be the same}}
-    ref_quantum.custom "PauliZ"() %q0 ctrls () ctrlvals (%true) : !ref_quantum.qubit_ref
+    qref.custom "PauliZ"() %q0 ctrls () ctrlvals (%true) : !qref.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_controlled3(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref) {
+func.func @test_controlled3(%q0: !qref.qubit_ref, %q1: !qref.qubit_ref) {
     %true = llvm.mlir.constant (1 : i1) :i1
     // expected-error@+1 {{number of controlling wires in input (1) and controlling values (0) must be the same}}
-    ref_quantum.custom "PauliZ"() %q0 ctrls (%q1) ctrlvals () : !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref
+    qref.custom "PauliZ"() %q0 ctrls (%q1) ctrlvals () : !qref.qubit_ref ctrls !qref.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_duplicate_wires1(%q0: !ref_quantum.qubit_ref) {
+func.func @test_duplicate_wires1(%q0: !qref.qubit_ref) {
 	// expected-error@+1 {{all wires on a quantum gate must be distinct (including controls)}}
-    ref_quantum.custom "CNOT"() %q0, %q0 : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
+    qref.custom "CNOT"() %q0, %q0 : !qref.qubit_ref, !qref.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_duplicate_wires2(%q0: !ref_quantum.qubit_ref) {
+func.func @test_duplicate_wires2(%q0: !qref.qubit_ref) {
 	%true = llvm.mlir.constant (1 : i1) :i1
 	// expected-error@+1 {{all wires on a quantum gate must be distinct (including controls)}}
-    ref_quantum.custom "PauliX"() %q0 ctrls (%q0) ctrlvals (%true) : !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref
+    qref.custom "PauliX"() %q0 ctrls (%q0) ctrlvals (%true) : !qref.qubit_ref ctrls !qref.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_paulirot_length_mismatch(%q0: !ref_quantum.qubit_ref, %angle: f64) {
+func.func @test_paulirot_length_mismatch(%q0: !qref.qubit_ref, %angle: f64) {
     // expected-error@+1 {{length of Pauli word (2) and number of wires (1) must be the same}}
-    ref_quantum.paulirot ["Z", "X"](%angle) %q0 : !ref_quantum.qubit_ref
+    qref.paulirot ["Z", "X"](%angle) %q0 : !qref.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_paulirot_bad_pauli_word(%q0: !ref_quantum.qubit_ref, %angle: f64) {
+func.func @test_paulirot_bad_pauli_word(%q0: !qref.qubit_ref, %angle: f64) {
     // expected-error@+1 {{Only "X", "Y", "Z", and "I" are valid Pauli words.}}
-    ref_quantum.paulirot ["bad"](%angle) %q0 : !ref_quantum.qubit_ref
+    qref.paulirot ["bad"](%angle) %q0 : !qref.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_paulirot_control(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref, %angle: f64) {
+func.func @test_paulirot_control(%q0: !qref.qubit_ref, %q1: !qref.qubit_ref, %angle: f64) {
     %true = llvm.mlir.constant (1 : i1) :i1
     // expected-error@+1 {{number of controlling wires in input (1) and controlling values (2) must be the same}}
-    ref_quantum.paulirot ["Z"](%angle) %q0 ctrls (%q1) ctrlvals (%true, %true) : !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref
+    qref.paulirot ["Z"](%angle) %q0 ctrls (%q1) ctrlvals (%true, %true) : !qref.qubit_ref ctrls !qref.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_paulirot_duplicate_wires(%q0: !ref_quantum.qubit_ref, %angle: f64) {
+func.func @test_paulirot_duplicate_wires(%q0: !qref.qubit_ref, %angle: f64) {
     %true = llvm.mlir.constant (1 : i1) :i1
     // expected-error@+1 {{all wires on a quantum gate must be distinct (including controls)}}
-    ref_quantum.paulirot ["Z", "I"](%angle) %q0, %q0 : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
+    qref.paulirot ["Z", "I"](%angle) %q0, %q0 : !qref.qubit_ref, !qref.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_gphase_control(%q0: !ref_quantum.qubit_ref, %param: f64) {
+func.func @test_gphase_control(%q0: !qref.qubit_ref, %param: f64) {
     %true = llvm.mlir.constant (1 : i1) :i1
     // expected-error@+1 {{number of controlling wires in input (1) and controlling values (2) must be the same}}
-    ref_quantum.gphase(%param) ctrls (%q0) ctrlvals (%true, %true) : f64 ctrls !ref_quantum.qubit_ref
+    qref.gphase(%param) ctrls (%q0) ctrlvals (%true, %true) : f64 ctrls !qref.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_multirz_control(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref, %theta: f64) {
+func.func @test_multirz_control(%q0: !qref.qubit_ref, %q1: !qref.qubit_ref, %theta: f64) {
     %true = llvm.mlir.constant (1 : i1) :i1
     // expected-error@+1 {{number of controlling wires in input (1) and controlling values (2) must be the same}}
-    ref_quantum.multirz(%theta) %q0 ctrls (%q1) ctrlvals (%true, %true) : !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref
+    qref.multirz(%theta) %q0 ctrls (%q1) ctrlvals (%true, %true) : !qref.qubit_ref ctrls !qref.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_multirz_duplicate_wires(%q0: !ref_quantum.qubit_ref, %theta: f64) {
+func.func @test_multirz_duplicate_wires(%q0: !qref.qubit_ref, %theta: f64) {
     %true = llvm.mlir.constant (1 : i1) :i1
     // expected-error@+1 {{all wires on a quantum gate must be distinct (including controls)}}
-    ref_quantum.multirz(%theta) %q0, %q0 : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
+    qref.multirz(%theta) %q0, %q0 : !qref.qubit_ref, !qref.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_pcphase_control(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref, %theta: f64, %dim: f64) {
+func.func @test_pcphase_control(%q0: !qref.qubit_ref, %q1: !qref.qubit_ref, %theta: f64, %dim: f64) {
     %true = llvm.mlir.constant (1 : i1) :i1
     // expected-error@+1 {{number of controlling wires in input (1) and controlling values (2) must be the same}}
-    ref_quantum.pcphase(%theta, %dim) %q0 ctrls (%q1) ctrlvals (%true, %true) : !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref
+    qref.pcphase(%theta, %dim) %q0 ctrls (%q1) ctrlvals (%true, %true) : !qref.qubit_ref ctrls !qref.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_pcphase_duplicate_wires(%q0: !ref_quantum.qubit_ref, %theta: f64, %dim: f64) {
+func.func @test_pcphase_duplicate_wires(%q0: !qref.qubit_ref, %theta: f64, %dim: f64) {
     %true = llvm.mlir.constant (1 : i1) :i1
     // expected-error@+1 {{all wires on a quantum gate must be distinct (including controls)}}
-    ref_quantum.pcphase(%theta, %dim) %q0, %q0 : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
+    qref.pcphase(%theta, %dim) %q0, %q0 : !qref.qubit_ref, !qref.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_unitary_bad_matrix_shape(%q0: !ref_quantum.qubit_ref, %matrix: tensor<37x42xcomplex<f64>>) {
+func.func @test_unitary_bad_matrix_shape(%q0: !qref.qubit_ref, %matrix: tensor<37x42xcomplex<f64>>) {
     // expected-error@+1 {{The Unitary matrix must be of size 2^(num_wires) * 2^(num_wires)}}
-    ref_quantum.unitary (%matrix : tensor<37x42xcomplex<f64>>) %q0 : !ref_quantum.qubit_ref
+    qref.unitary (%matrix : tensor<37x42xcomplex<f64>>) %q0 : !qref.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_unitary_control(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref, %matrix: tensor<2x2xcomplex<f64>>) {
+func.func @test_unitary_control(%q0: !qref.qubit_ref, %q1: !qref.qubit_ref, %matrix: tensor<2x2xcomplex<f64>>) {
     %true = llvm.mlir.constant (1 : i1) :i1
     // expected-error@+1 {{number of controlling wires in input (1) and controlling values (2) must be the same}}
-    ref_quantum.unitary(%matrix: tensor<2x2xcomplex<f64>>) %q0 ctrls (%q1) ctrlvals (%true, %true) : !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref
+    qref.unitary(%matrix: tensor<2x2xcomplex<f64>>) %q0 ctrls (%q1) ctrlvals (%true, %true) : !qref.qubit_ref ctrls !qref.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_unitary_duplicate_wires(%q0: !ref_quantum.qubit_ref, %matrix: tensor<4x4xcomplex<f64>>) {
+func.func @test_unitary_duplicate_wires(%q0: !qref.qubit_ref, %matrix: tensor<4x4xcomplex<f64>>) {
     %true = llvm.mlir.constant (1 : i1) :i1
     // expected-error@+1 {{all wires on a quantum gate must be distinct (including controls)}}
-    ref_quantum.unitary(%matrix: tensor<4x4xcomplex<f64>>) %q0, %q0 : !ref_quantum.qubit_ref, !ref_quantum.qubit_ref
+    qref.unitary(%matrix: tensor<4x4xcomplex<f64>>) %q0, %q0 : !qref.qubit_ref, !qref.qubit_ref
     return
 }
 
 // -----
 
-func.func @test_namedobs_op_bad_attribute(%q0: !ref_quantum.qubit_ref) {
+func.func @test_namedobs_op_bad_attribute(%q0: !qref.qubit_ref) {
     // expected-error@+2 {{expected catalyst::quantum::NamedObservable to be one of: Identity, PauliX, PauliY, PauliZ, Hadamard}}
     // expected-error@+1 {{failed to parse NamedObservableAttr parameter 'value' which is to be a `catalyst::quantum::NamedObservable`}}
-    %0 = ref_quantum.namedobs %q0 [ bad] : !quantum.obs
+    %0 = qref.namedobs %q0 [ bad] : !quantum.obs
     return
 }

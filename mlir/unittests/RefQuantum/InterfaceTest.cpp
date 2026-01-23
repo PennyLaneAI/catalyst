@@ -24,8 +24,8 @@
 #include "mlir/Parser/Parser.h"
 #include "llvm/Support/SourceMgr.h"
 
-#include "RefQuantum/IR/RefQuantumInterfaces.h"
-#include "RefQuantum/IR/RefQuantumOps.h"
+#include "QRef/IR/QRefInterfaces.h"
+#include "QRef/IR/QRefOps.h"
 
 using namespace mlir;
 
@@ -34,22 +34,22 @@ namespace {
 TEST(InterfaceTests, Getters)
 {
     std::string moduleStr = R"mlir(
-func.func @f(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref, %param: f64, %bool: i1) {
-    ref_quantum.custom "Rot"(%param, %param) %q0 adj ctrls (%q1) ctrlvals (%bool) : !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref
+func.func @f(%q0: !qref.qubit_ref, %q1: !qref.qubit_ref, %param: f64, %bool: i1) {
+    qref.custom "Rot"(%param, %param) %q0 adj ctrls (%q1) ctrlvals (%bool) : !qref.qubit_ref ctrls !qref.qubit_ref
     return
 }
   )mlir";
 
     // Parsing boilerplate
     DialectRegistry registry;
-    registry.insert<func::FuncDialect, catalyst::ref_quantum::RefQuantumDialect>();
+    registry.insert<func::FuncDialect, catalyst::qref::QRefDialect>();
     MLIRContext context(registry);
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> mod = parseSourceString<ModuleOp>(moduleStr, config);
 
     // Parse ops
     func::FuncOp f = *(*mod).getOps<func::FuncOp>().begin();
-    catalyst::ref_quantum::CustomOp customOp = *f.getOps<catalyst::ref_quantum::CustomOp>().begin();
+    catalyst::qref::CustomOp customOp = *f.getOps<catalyst::qref::CustomOp>().begin();
 
     Block &bb = f.getCallableRegion()->front();
     auto args = bb.getArguments();
@@ -80,22 +80,22 @@ func.func @f(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref, %param: f
 TEST(InterfaceTests, setWireOperands)
 {
     std::string moduleStr = R"mlir(
-func.func @f(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref, %bool: i1) {
-    ref_quantum.custom "Rot"() %q0 ctrls (%q1) ctrlvals (%bool) : !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref
+func.func @f(%q0: !qref.qubit_ref, %q1: !qref.qubit_ref, %bool: i1) {
+    qref.custom "Rot"() %q0 ctrls (%q1) ctrlvals (%bool) : !qref.qubit_ref ctrls !qref.qubit_ref
     return
 }
   )mlir";
 
     // Parsing boilerplate
     DialectRegistry registry;
-    registry.insert<func::FuncDialect, catalyst::ref_quantum::RefQuantumDialect>();
+    registry.insert<func::FuncDialect, catalyst::qref::QRefDialect>();
     MLIRContext context(registry);
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> mod = parseSourceString<ModuleOp>(moduleStr, config);
 
     // Parse ops
     func::FuncOp f = *(*mod).getOps<func::FuncOp>().begin();
-    catalyst::ref_quantum::CustomOp customOp = *f.getOps<catalyst::ref_quantum::CustomOp>().begin();
+    catalyst::qref::CustomOp customOp = *f.getOps<catalyst::qref::CustomOp>().begin();
 
     Block &bb = f.getCallableRegion()->front();
     auto args = bb.getArguments();
@@ -110,22 +110,22 @@ func.func @f(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref, %bool: i1
 TEST(InterfaceTests, setNonCtrlWireOperands)
 {
     std::string moduleStr = R"mlir(
-func.func @f(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref, %q2: !ref_quantum.qubit_ref, %bool: i1) {
-    ref_quantum.custom "Rot"() %q0 ctrls (%q1) ctrlvals (%bool) : !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref
+func.func @f(%q0: !qref.qubit_ref, %q1: !qref.qubit_ref, %q2: !qref.qubit_ref, %bool: i1) {
+    qref.custom "Rot"() %q0 ctrls (%q1) ctrlvals (%bool) : !qref.qubit_ref ctrls !qref.qubit_ref
     return
 }
   )mlir";
 
     // Parsing boilerplate
     DialectRegistry registry;
-    registry.insert<func::FuncDialect, catalyst::ref_quantum::RefQuantumDialect>();
+    registry.insert<func::FuncDialect, catalyst::qref::QRefDialect>();
     MLIRContext context(registry);
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> mod = parseSourceString<ModuleOp>(moduleStr, config);
 
     // Parse ops
     func::FuncOp f = *(*mod).getOps<func::FuncOp>().begin();
-    catalyst::ref_quantum::CustomOp customOp = *f.getOps<catalyst::ref_quantum::CustomOp>().begin();
+    catalyst::qref::CustomOp customOp = *f.getOps<catalyst::qref::CustomOp>().begin();
 
     Block &bb = f.getCallableRegion()->front();
     auto args = bb.getArguments();
@@ -139,22 +139,22 @@ func.func @f(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref, %q2: !ref
 TEST(InterfaceTests, setCtrlWireOperands)
 {
     std::string moduleStr = R"mlir(
-func.func @f(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref, %q2: !ref_quantum.qubit_ref, %bool: i1) {
-    ref_quantum.custom "Rot"() %q0 ctrls (%q1) ctrlvals (%bool) : !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref
+func.func @f(%q0: !qref.qubit_ref, %q1: !qref.qubit_ref, %q2: !qref.qubit_ref, %bool: i1) {
+    qref.custom "Rot"() %q0 ctrls (%q1) ctrlvals (%bool) : !qref.qubit_ref ctrls !qref.qubit_ref
     return
 }
   )mlir";
 
     // Parsing boilerplate
     DialectRegistry registry;
-    registry.insert<func::FuncDialect, catalyst::ref_quantum::RefQuantumDialect>();
+    registry.insert<func::FuncDialect, catalyst::qref::QRefDialect>();
     MLIRContext context(registry);
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> mod = parseSourceString<ModuleOp>(moduleStr, config);
 
     // Parse ops
     func::FuncOp f = *(*mod).getOps<func::FuncOp>().begin();
-    catalyst::ref_quantum::CustomOp customOp = *f.getOps<catalyst::ref_quantum::CustomOp>().begin();
+    catalyst::qref::CustomOp customOp = *f.getOps<catalyst::qref::CustomOp>().begin();
 
     Block &bb = f.getCallableRegion()->front();
     auto args = bb.getArguments();
@@ -168,22 +168,22 @@ func.func @f(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref, %q2: !ref
 TEST(InterfaceTests, setCtrlValueOperands)
 {
     std::string moduleStr = R"mlir(
-func.func @f(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref, %bool: i1, %other_bool: i1) {
-    ref_quantum.custom "Rot"() %q0 ctrls (%q1) ctrlvals (%bool) : !ref_quantum.qubit_ref ctrls !ref_quantum.qubit_ref
+func.func @f(%q0: !qref.qubit_ref, %q1: !qref.qubit_ref, %bool: i1, %other_bool: i1) {
+    qref.custom "Rot"() %q0 ctrls (%q1) ctrlvals (%bool) : !qref.qubit_ref ctrls !qref.qubit_ref
     return
 }
   )mlir";
 
     // Parsing boilerplate
     DialectRegistry registry;
-    registry.insert<func::FuncDialect, catalyst::ref_quantum::RefQuantumDialect>();
+    registry.insert<func::FuncDialect, catalyst::qref::QRefDialect>();
     MLIRContext context(registry);
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> mod = parseSourceString<ModuleOp>(moduleStr, config);
 
     // Parse ops
     func::FuncOp f = *(*mod).getOps<func::FuncOp>().begin();
-    catalyst::ref_quantum::CustomOp customOp = *f.getOps<catalyst::ref_quantum::CustomOp>().begin();
+    catalyst::qref::CustomOp customOp = *f.getOps<catalyst::qref::CustomOp>().begin();
 
     Block &bb = f.getCallableRegion()->front();
     auto args = bb.getArguments();
@@ -197,22 +197,22 @@ func.func @f(%q0: !ref_quantum.qubit_ref, %q1: !ref_quantum.qubit_ref, %bool: i1
 TEST(InterfaceTests, setAdjointFlag)
 {
     std::string moduleStr = R"mlir(
-func.func @f(%q0: !ref_quantum.qubit_ref) {
-    ref_quantum.custom "PauliX"() %q0 : !ref_quantum.qubit_ref
+func.func @f(%q0: !qref.qubit_ref) {
+    qref.custom "PauliX"() %q0 : !qref.qubit_ref
     return
 }
   )mlir";
 
     // Parsing boilerplate
     DialectRegistry registry;
-    registry.insert<func::FuncDialect, catalyst::ref_quantum::RefQuantumDialect>();
+    registry.insert<func::FuncDialect, catalyst::qref::QRefDialect>();
     MLIRContext context(registry);
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> mod = parseSourceString<ModuleOp>(moduleStr, config);
 
     // Parse ops
     func::FuncOp f = *(*mod).getOps<func::FuncOp>().begin();
-    catalyst::ref_quantum::CustomOp customOp = *f.getOps<catalyst::ref_quantum::CustomOp>().begin();
+    catalyst::qref::CustomOp customOp = *f.getOps<catalyst::qref::CustomOp>().begin();
 
     // Run checks
     customOp.setAdjointFlag(true);
@@ -225,23 +225,23 @@ func.func @f(%q0: !ref_quantum.qubit_ref) {
 TEST(InterfaceTests, globalPhase)
 {
     std::string moduleStr = R"mlir(
-func.func @f(%q0: !ref_quantum.qubit_ref, %cv: i1, %param: f64) {
-    ref_quantum.gphase(%param) adj ctrls (%q0) ctrlvals (%cv) : f64 ctrls !ref_quantum.qubit_ref
+func.func @f(%q0: !qref.qubit_ref, %cv: i1, %param: f64) {
+    qref.gphase(%param) adj ctrls (%q0) ctrlvals (%cv) : f64 ctrls !qref.qubit_ref
     return
 }
   )mlir";
 
     // Parsing boilerplate
     DialectRegistry registry;
-    registry.insert<func::FuncDialect, catalyst::ref_quantum::RefQuantumDialect>();
+    registry.insert<func::FuncDialect, catalyst::qref::QRefDialect>();
     MLIRContext context(registry);
     ParserConfig config(&context, /*verifyAfterParse=*/false);
     OwningOpRef<ModuleOp> mod = parseSourceString<ModuleOp>(moduleStr, config);
 
     // Parse ops
     func::FuncOp f = *(*mod).getOps<func::FuncOp>().begin();
-    catalyst::ref_quantum::GlobalPhaseOp gphaseOp =
-        *f.getOps<catalyst::ref_quantum::GlobalPhaseOp>().begin();
+    catalyst::qref::GlobalPhaseOp gphaseOp =
+        *f.getOps<catalyst::qref::GlobalPhaseOp>().begin();
 
     Block &bb = f.getCallableRegion()->front();
     auto args = bb.getArguments();

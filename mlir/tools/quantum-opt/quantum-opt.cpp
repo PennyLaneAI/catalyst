@@ -42,10 +42,10 @@
 #include "Mitigation/IR/MitigationDialect.h"
 #include "PauliFrame/IR/PauliFrameDialect.h"
 #include "QEC/IR/QECDialect.h"
+#include "QRef/IR/QRefDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "RTIO/IR/RTIODialect.h"
-#include "RefQuantum/IR/RefQuantumDialect.h"
 #include "RegisterAllPasses.h"
 
 namespace test {
@@ -67,7 +67,7 @@ int main(int argc, char **argv)
     mlir::func::registerAllExtensions(registry);
     registry.insert<catalyst::CatalystDialect>();
     registry.insert<catalyst::quantum::QuantumDialect>();
-    registry.insert<catalyst::ref_quantum::RefQuantumDialect>();
+    registry.insert<catalyst::qref::QRefDialect>();
     registry.insert<catalyst::qec::QECDialect>();
     registry.insert<catalyst::gradient::GradientDialect>();
     registry.insert<catalyst::mbqc::MBQCDialect>();

@@ -5,7 +5,7 @@ add_catalyst_unittest(CatalystRefQuantumUnitTests
 target_link_libraries(CatalystRefQuantumUnitTests PRIVATE
   MLIRArithDialect
   MLIRFuncDialect
-  MLIRRefQuantum
+  MLIRQRef
   MLIRQuantum
   MLIRIR
   MLIRParser
