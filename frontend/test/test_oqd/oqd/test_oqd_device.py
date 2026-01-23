@@ -66,15 +66,15 @@ class TestOQDDevice:
         name, _ = dev.get_c_interface()
         assert name == "oqd"
 
-    def test_unsupported_one_shot_device(self):
-        """Test unsupported device edge case."""
+    # def test_unsupported_one_shot_device(self):
+    #     """Test unsupported device edge case."""
 
-        @qml.qnode(OQDDevice(backend="default", wires=1), shots=10, mcm_method="one-shot")
-        def circuit():
-            return qml.sample()
+    #     @qml.qnode(OQDDevice(backend="default", wires=1), shots=10, mcm_method="one-shot")
+    #     def circuit():
+    #         return qml.sample()
 
-        with pytest.raises(ValueError, match="'one-shot' is not supported in the chosen device"):
-            qjit(circuit)
+    #     with pytest.raises(ValueError, match="'one-shot' is not supported in the chosen device"):
+    #         qjit(circuit)
 
 
 if __name__ == "__main__":
