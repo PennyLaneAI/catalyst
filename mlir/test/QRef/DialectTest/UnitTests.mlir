@@ -37,13 +37,13 @@ func.func @test_dealloc(%arg0 : !qref.allocation) {
 
 // -----
 
-func.func @test_make_reference(%arg0 : !qref.allocation, %arg1: i64) {
+func.func @test_get(%arg0 : !qref.allocation, %arg1: i64) {
 
     // Static
-    %0 = qref.make_reference %arg0, 3 : !qref.allocation -> !qref.bit
+    %0 = qref.get %arg0[3] : !qref.allocation -> !qref.bit
 
     // Dynamic
-    %1 = qref.make_reference %arg0, %arg1 : !qref.allocation, i64 -> !qref.bit
+    %1 = qref.get %arg0[%arg1] : !qref.allocation, i64 -> !qref.bit
 
     return
 }
@@ -227,8 +227,8 @@ func.func @test_namedobs_op(%q0: !qref.bit) {
 
 func.func @test_expval_circuit() -> f64 {
     %a = qref.alloc(2) : !qref.allocation
-    %q0 = qref.make_reference %a, 0 : !qref.allocation -> !qref.bit
-    %q1 = qref.make_reference %a, 1 : !qref.allocation -> !qref.bit
+    %q0 = qref.get %a[0] : !qref.allocation -> !qref.bit
+    %q1 = qref.get %a[1] : !qref.allocation -> !qref.bit
     qref.custom "Hadamard"() %q0 : !qref.bit
     qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
     qref.custom "Hadamard"() %q0 : !qref.bit
@@ -249,12 +249,12 @@ func.func @test_circuit_with_loop(%nqubits: i64) -> f64 {
 
     scf.for %i = %start to %stop step %step {
         %int = index.casts %i : index to i64
-        %this_q = qref.make_reference %a, %int : !qref.allocation, i64 -> !qref.bit
+        %this_q = qref.get %a[%int] : !qref.allocation, i64 -> !qref.bit
         qref.custom "Hadamard"() %this_q : !qref.bit
         scf.yield
     }
 
-    %q0 = qref.make_reference %a, 0 : !qref.allocation -> !qref.bit
+    %q0 = qref.get %a[0] : !qref.allocation -> !qref.bit
     %obs = qref.namedobs %q0 [ PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
     qref.dealloc %a : !qref.allocation

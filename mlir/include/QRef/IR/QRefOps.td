@@ -83,7 +83,7 @@ def DeallocOp : Memory_Op<"dealloc"> {
     // let hasCanonicalizeMethod = 1;
 }
 
-def MakeReferenceOp : Memory_Op<"make_reference", [NoMemoryEffect]> {
+def GetOp : Memory_Op<"get", [NoMemoryEffect]> {
     let summary = "Produce a qubit reference SSA value from an allocation and an index.";
     let description = [{
     }];
@@ -99,7 +99,7 @@ def MakeReferenceOp : Memory_Op<"make_reference", [NoMemoryEffect]> {
     );
 
     let assemblyFormat = [{
-        $allocation `,` ($idx^):($idx_attr)? attr-dict `:` type(operands) `->` type(results)
+        $allocation `[` ($idx^):($idx_attr)? `]` attr-dict `:` type(operands) `->` type(results)
     }];
 
     // TODO
