@@ -18,9 +18,9 @@
 #include "mlir/IR/PatternMatch.h"
 
 // #include "QRef/IR/QRefOps.h"
+#include "QRef/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "QRef/Transforms/Patterns.h"
 
 using namespace mlir;
 

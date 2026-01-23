@@ -240,8 +240,7 @@ func.func @f(%q0: !qref.qubit_ref, %cv: i1, %param: f64) {
 
     // Parse ops
     func::FuncOp f = *(*mod).getOps<func::FuncOp>().begin();
-    catalyst::qref::GlobalPhaseOp gphaseOp =
-        *f.getOps<catalyst::qref::GlobalPhaseOp>().begin();
+    catalyst::qref::GlobalPhaseOp gphaseOp = *f.getOps<catalyst::qref::GlobalPhaseOp>().begin();
 
     Block &bb = f.getCallableRegion()->front();
     auto args = bb.getArguments();
