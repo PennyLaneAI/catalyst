@@ -402,7 +402,7 @@ class TestIntegration:
         """Test conversion is happening succesfully on functions wrapped with 'vjp'."""
 
         if qml.capture.enabled() and vjp_func == vjp:  # pylint: disable=comparison-with-callable
-            pytest.skip("program capture needs qml.vjp")
+            pytest.xfail("program capture autograph doesn't work with catalyst.vjp")
         def inner(x):
             if x > 0:
                 return 2 * x, x**2
