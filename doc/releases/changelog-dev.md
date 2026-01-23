@@ -65,6 +65,9 @@
   original `!quantum.bit` type continues to be supported and used as the default qubit type.
   [(#2369)](https://github.com/PennyLaneAI/catalyst/pull/2369)
 
+  The corresponding register-type specializations have also been added.
+  [(#2431)](https://github.com/PennyLaneAI/catalyst/pull/2431)
+
 * The upstream MLIR `Test` dialect is now available via the `catalyst` command line tool.
   [(#2417)](https://github.com/PennyLaneAI/catalyst/pull/2417)
 
