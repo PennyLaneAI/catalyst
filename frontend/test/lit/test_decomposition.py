@@ -1295,9 +1295,10 @@ def test_decompose_autograph_multi_blocks():
 
         # CHECK: {{%.+}} = scf.for %arg1 = {{%.+}} to %1 step {{%.+}} iter_args(%arg2 = %0) -> (!quantum.reg) {
         @qml.for_loop(n)
-        def f(i): # pylint: disable=unused-argument
+        def f(i):  # pylint: disable=unused-argument
             qml.MultiRZ(0.5, wires=[0, 1, 2, 3, 4])
-        f() # pylint: disable=no-value-for-parameter
+
+        f()  # pylint: disable=no-value-for-parameter
 
         return qml.expval(qml.Z(0))
 
