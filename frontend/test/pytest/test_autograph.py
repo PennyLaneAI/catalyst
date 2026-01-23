@@ -401,7 +401,8 @@ class TestIntegration:
     def test_vjp_wrapper(self, vjp_func):
         """Test conversion is happening succesfully on functions wrapped with 'vjp'."""
 
-
+        if qml.capture.enabled() and vjp_func == vjp:  # pylint: disable=comparison-with-callable
+            pytest.skip("program capture needs qml.vjp")
         def inner(x):
             if x > 0:
                 return 2 * x, x**2
