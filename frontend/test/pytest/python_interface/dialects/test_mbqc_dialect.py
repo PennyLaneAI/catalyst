@@ -60,7 +60,10 @@ def test_all_attributes_names(attr):
     assert attr.name == expected_name
 
 
-def test_assembly_format(run_filecheck):
+@pytest.mark.parametrize(
+    "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
+)
+def test_assembly_format(run_filecheck, pretty_print):
     """Test the assembly format of the mbqc ops."""
     program = r"""
     // CHECK: [[angle:%.+]] = "test.op"() : () -> f64
@@ -94,7 +97,7 @@ def test_assembly_format(run_filecheck):
     %graph_reg = mbqc.graph_state_prep (%adj_matrix : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !quantum.reg
     """
 
-    run_filecheck(program, roundtrip=True)
+    run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
 
 
 class TestMeasureInBasisOp:
