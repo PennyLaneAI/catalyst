@@ -19,17 +19,17 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "RefQuantum/IR/RefQuantumOps.h"
-#include "RefQuantum/Transforms/Patterns.h"
+#include "QRef/IR/QRefOps.h"
+#include "QRef/Transforms/Patterns.h"
 
 using namespace mlir;
 
 namespace catalyst {
-namespace ref_quantum {
+namespace qref {
 
 #define GEN_PASS_DECL_RQHELLOWORLDPASS
 #define GEN_PASS_DEF_RQHELLOWORLDPASS
-#include "RefQuantum/Transforms/Passes.h.inc"
+#include "QRef/Transforms/Passes.h.inc"
 
 struct RQHelloWorldPass : impl::RQHelloWorldPassBase<RQHelloWorldPass> {
     using RQHelloWorldPassBase::RQHelloWorldPassBase;
@@ -47,5 +47,5 @@ struct RQHelloWorldPass : impl::RQHelloWorldPassBase<RQHelloWorldPass> {
     }
 };
 
-} // namespace ref_quantum
+} // namespace qref
 } // namespace catalyst

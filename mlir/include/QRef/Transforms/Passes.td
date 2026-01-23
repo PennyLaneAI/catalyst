@@ -1,4 +1,4 @@
-// Copyright 2026 Xanadu Quantum Technologies Inc.
+// Copyright 2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#ifndef REF_QUANTUM_PASSES
+#define REF_QUANTUM_PASSES
 
-//===----------------------------------------------------------------------===//
-// RefQuantum type declarations.
-//===----------------------------------------------------------------------===//
+include "mlir/Pass/PassBase.td"
 
-#include "mlir/IR/Types.h"
+def RQHelloWorldPass : Pass<"rq-hw"> {
+    let summary = "QRef Hello world!";
 
-#define GET_TYPEDEF_CLASSES
-#include "RefQuantum/IR/RefQuantumOpsTypes.h.inc"
+    // let dependentDialects = [
+    //    "scf::SCFDialect",
+    //    "catalyst::quantum::QuantumDialect"
+    // ];
+}
+
+#endif // REF_QUANTUM_PASSES

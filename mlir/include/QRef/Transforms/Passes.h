@@ -14,23 +14,14 @@
 
 #pragma once
 
-#include <optional>
+#include "mlir/Pass/Pass.h"
 
-#include "llvm/ADT/StringRef.h"
+namespace catalyst {
+namespace qref {
 
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/Dialect.h"
-#include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Support/LogicalResult.h"
+#define GEN_PASS_DECL
+#define GEN_PASS_REGISTRATION
+#include "QRef/Transforms/Passes.h.inc"
 
-#include "Quantum/IR/QuantumDialect.h"
-#include "RefQuantum/IR/RefQuantumDialect.h"
-#include "RefQuantum/IR/RefQuantumInterfaces.h"
-
-//===----------------------------------------------------------------------===//
-// RefQuantum ops declarations.
-//===----------------------------------------------------------------------===//
-
-#define GET_OP_CLASSES
-#include "RefQuantum/IR/RefQuantumOps.h.inc"
+} // namespace qref
+} // namespace catalyst

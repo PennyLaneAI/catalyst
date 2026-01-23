@@ -14,14 +14,12 @@
 
 #pragma once
 
-#include "mlir/Pass/Pass.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace catalyst {
-namespace ref_quantum {
+namespace qref {
 
-#define GEN_PASS_DECL
-#define GEN_PASS_REGISTRATION
-#include "RefQuantum/Transforms/Passes.h.inc"
+void populateRQHelloWorldPatterns(mlir::RewritePatternSet &patterns);
 
-} // namespace ref_quantum
+} // namespace qref
 } // namespace catalyst

@@ -15,20 +15,20 @@
 #include "mlir/IR/OpImplementation.h"
 #include "llvm/ADT/StringSet.h"
 
-#include "RefQuantum/IR/RefQuantumDialect.h"
-#include "RefQuantum/IR/RefQuantumOps.h"
+#include "QRef/IR/QRefDialect.h"
+#include "QRef/IR/QRefOps.h"
 
 using namespace mlir;
-using namespace catalyst::ref_quantum;
+using namespace catalyst::qref;
 
 //===----------------------------------------------------------------------===//
-// RefQuantum op definitions.
+// QRef op definitions.
 //===----------------------------------------------------------------------===//
 
 #define GET_OP_CLASSES
-#include "RefQuantum/IR/RefQuantumOps.cpp.inc"
+#include "QRef/IR/QRefOps.cpp.inc"
 
-namespace catalyst::ref_quantum {
+namespace catalyst::qref {
 
 // Utils
 static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length1)
@@ -43,7 +43,7 @@ static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length
 }
 
 //===----------------------------------------------------------------------===//
-// RefQuantum op verifiers.
+// QRef op verifiers.
 //===----------------------------------------------------------------------===//
 
 static const mlir::StringSet<> validPauliWords = {"X", "Y", "Z", "I"};
@@ -77,4 +77,4 @@ LogicalResult QubitUnitaryOp::verify()
     return success();
 }
 
-} // namespace catalyst::ref_quantum
+} // namespace catalyst::qref

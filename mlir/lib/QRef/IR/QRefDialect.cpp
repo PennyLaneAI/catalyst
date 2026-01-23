@@ -16,34 +16,34 @@
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
 #include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
 
-#include "RefQuantum/IR/RefQuantumDialect.h"
-#include "RefQuantum/IR/RefQuantumOps.h"
+#include "QRef/IR/QRefDialect.h"
+#include "QRef/IR/QRefOps.h"
 
 using namespace mlir;
-using namespace catalyst::ref_quantum;
+using namespace catalyst::qref;
 
 //===----------------------------------------------------------------------===//
-// RefQuantum dialect definitions.
+// QRef dialect definitions.
 //===----------------------------------------------------------------------===//
 
-#include "RefQuantum/IR/RefQuantumOpsDialect.cpp.inc"
+#include "QRef/IR/QRefOpsDialect.cpp.inc"
 
-void RefQuantumDialect::initialize()
+void QRefDialect::initialize()
 {
     addTypes<
 #define GET_TYPEDEF_LIST
-#include "RefQuantum/IR/RefQuantumOpsTypes.cpp.inc"
+#include "QRef/IR/QRefOpsTypes.cpp.inc"
         >();
 
     addOperations<
 #define GET_OP_LIST
-#include "RefQuantum/IR/RefQuantumOps.cpp.inc"
+#include "QRef/IR/QRefOps.cpp.inc"
         >();
 }
 
 //===----------------------------------------------------------------------===//
-// RefQuantum type definitions.
+// QRef type definitions.
 //===----------------------------------------------------------------------===//
 
 #define GET_TYPEDEF_CLASSES
-#include "RefQuantum/IR/RefQuantumOpsTypes.cpp.inc"
+#include "QRef/IR/QRefOpsTypes.cpp.inc"

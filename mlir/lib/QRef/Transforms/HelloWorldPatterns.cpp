@@ -17,10 +17,10 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 
-// #include "RefQuantum/IR/RefQuantumOps.h"
+// #include "QRef/IR/QRefOps.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "RefQuantum/Transforms/Patterns.h"
+#include "QRef/Transforms/Patterns.h"
 
 using namespace mlir;
 
@@ -40,12 +40,12 @@ struct RQHelloWorldPattern : public OpRewritePattern<catalyst::quantum::CustomOp
 } // namespace
 
 namespace catalyst {
-namespace ref_quantum {
+namespace qref {
 
 void populateRQHelloWorldPatterns(RewritePatternSet &patterns)
 {
     patterns.add<RQHelloWorldPattern>(patterns.getContext());
 }
 
-} // namespace ref_quantum
+} // namespace qref
 } // namespace catalyst

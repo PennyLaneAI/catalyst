@@ -26,17 +26,17 @@ include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 include "Quantum/IR/QuantumAttrDefs.td"
 include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumTypes.td"
-include "RefQuantum/IR/RefQuantumDialect.td"
-include "RefQuantum/IR/RefQuantumInterfaces.td"
-include "RefQuantum/IR/RefQuantumTypes.td"
+include "QRef/IR/QRefDialect.td"
+include "QRef/IR/QRefInterfaces.td"
+include "QRef/IR/QRefTypes.td"
 
 //===----------------------------------------------------------------------===//
-// RefQuantum dialect operations.
+// QRef dialect operations.
 //===----------------------------------------------------------------------===//
 
 // -----
 
-class Memory_Op<string mnemonic, list<Trait> traits = []> : RefQuantum_Op<mnemonic, traits>;
+class Memory_Op<string mnemonic, list<Trait> traits = []> : QRef_Op<mnemonic, traits>;
 
 def AllocOp : Memory_Op<"alloc"> {
     let summary = "Allocate n qubits.";
@@ -111,7 +111,7 @@ def MakeReferenceOp : Memory_Op<"make_reference", [NoMemoryEffect]> {
 // -----
 
 class Gate_Op<string mnemonic, list<Trait> traits = []> :
-        RefQuantum_Op<mnemonic, traits # [QuantumOperation]> {
+        QRef_Op<mnemonic, traits # [QuantumOperation]> {
 
     code extraBaseClassDeclaration = [{
         std::vector<mlir::Value> getWireOperands() {
@@ -290,7 +290,7 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
 def PauliRotOp : UnitaryGate_Op<"paulirot", [ParametrizedGate, AttrSizedOperandSegments]> {
     let summary = "Apply a Pauli Product Rotation";
     let description = [{
-        The `ref_quantum.paulirot` operation applies a rotation around a Pauli product
+        The `qref.paulirot` operation applies a rotation around a Pauli product
         operator to the state-vector.
         The arguments are the rotation angle `angle`, a string representing the
         Pauli product operator, and a set of qubits the operation acts on.
@@ -362,12 +362,12 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [ParametrizedGate, AttrSizedOperand
 def MultiRZOp : UnitaryGate_Op<"multirz", [ParametrizedGate, AttrSizedOperandSegments]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
-        The `ref_quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
+        The `qref.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
         The arguments are the rotation angle `theta` and a set of wires the operation acts on.
 
         .. note::
             This operation is one of the few quantum operations that is not applied via
-            ``ref_quantum.custom``. The reason for this is that its quantum dialect counterpart
+            ``qref.custom``. The reason for this is that its quantum dialect counterpart
             needs to be handled in a special way during the lowering due to its C function being
             variadic on the number of qubits.
     }];
@@ -448,7 +448,7 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSeg
 def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOperandSegments]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
-        The `ref_quantum.unitary` operation applies an arbitrary fixed unitary matrix to the
+        The `qref.unitary` operation applies an arbitrary fixed unitary matrix to the
         state-vector. The arguments are a set of qubits and a 2-dim matrix of complex numbers
         that represents a Unitary matrix of size 2^(number of qubits) * 2^(number of qubits).
 
@@ -488,12 +488,12 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOpera
 // Hence they are Pure, i.e. removable if no users
 
 class Observable_Op<string mnemonic, list<Trait> traits = []> :
-        RefQuantum_Op<mnemonic, traits # [Pure]>;
+        QRef_Op<mnemonic, traits # [Pure]>;
 
 def NamedObsOp : Observable_Op<"namedobs"> {
     let summary = "Define a Named observable for use in measurements";
     let description = [{
-        The `ref_quantum.namedobs` operation defines a quantum observable to be used by measurement
+        The `qref.namedobs` operation defines a quantum observable to be used by measurement
         processes. The specific observable defined here represents one of 5 named observables
         {Identity, PauliX, PauliY, PauliZ, Hadamard} on a qubit. The arguments are a wire to
         measure as well as an encoding operator for the qubit as an integer between 0-4.

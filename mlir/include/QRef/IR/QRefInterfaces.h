@@ -14,12 +14,12 @@
 
 #pragma once
 
-#include "mlir/IR/PatternMatch.h"
+#include <vector>
 
-namespace catalyst {
-namespace ref_quantum {
+#include "mlir/IR/OpDefinition.h"
 
-void populateRQHelloWorldPatterns(mlir::RewritePatternSet &patterns);
+//===----------------------------------------------------------------------===//
+// QRef interface declarations.
+//===----------------------------------------------------------------------===//
 
-} // namespace ref_quantum
-} // namespace catalyst
+#include "QRef/IR/QRefInterfaces.h.inc"

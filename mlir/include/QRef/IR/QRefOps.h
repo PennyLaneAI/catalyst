@@ -14,12 +14,23 @@
 
 #pragma once
 
-#include <vector>
+#include <optional>
 
+#include "llvm/ADT/StringRef.h"
+
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Support/LogicalResult.h"
+
+#include "Quantum/IR/QuantumDialect.h"
+#include "QRef/IR/QRefDialect.h"
+#include "QRef/IR/QRefInterfaces.h"
 
 //===----------------------------------------------------------------------===//
-// RefQuantum interface declarations.
+// QRef ops declarations.
 //===----------------------------------------------------------------------===//
 
-#include "RefQuantum/IR/RefQuantumInterfaces.h.inc"
+#define GET_OP_CLASSES
+#include "QRef/IR/QRefOps.h.inc"

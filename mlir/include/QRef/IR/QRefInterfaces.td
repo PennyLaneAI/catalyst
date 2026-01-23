@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef REFQUANTUM_INTERFACES
-#define REFQUANTUM_INTERFACES
+#ifndef QREF_INTERFACES
+#define QREF_INTERFACES
 
 include "mlir/IR/OpBase.td"
 
@@ -24,7 +24,7 @@ def QuantumOperation : OpInterface<"QuantumOperation"> {
         under this class.
     }];
 
-    let cppNamespace = "::catalyst::ref_quantum";
+    let cppNamespace = "::catalyst::qref";
 
     let methods = [
         InterfaceMethod<
@@ -44,7 +44,7 @@ def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
         These operations can be inverted and controlled.
     }];
 
-    let cppNamespace = "::catalyst::ref_quantum";
+    let cppNamespace = "::catalyst::qref";
 
     let methods = [
         InterfaceMethod<
@@ -117,7 +117,7 @@ def ParametrizedGate : OpInterface<"ParametrizedGate", [QuantumGate]> {
         classical gate parameters.
     }];
 
-    let cppNamespace = "::catalyst::ref_quantum";
+    let cppNamespace = "::catalyst::qref";
 
     let methods = [
         InterfaceMethod<
@@ -133,4 +133,4 @@ def ParametrizedGate : OpInterface<"ParametrizedGate", [QuantumGate]> {
 }
 
 
-#endif // REFQUANTUM_INTERFACES
+#endif // QREF_INTERFACES

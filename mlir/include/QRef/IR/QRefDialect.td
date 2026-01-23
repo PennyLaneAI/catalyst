@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef REF_QUANTUM_DIALECT
-#define REF_QUANTUM_DIALECT
+#ifndef QREF_DIALECT
+#define QREF_DIALECT
 
 include "mlir/IR/DialectBase.td"
 include "mlir/IR/OpBase.td"
@@ -21,10 +21,10 @@ include "mlir/IR/AttrTypeBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
-// RefQuantum dialect definition.
+// QRef dialect definition.
 //===----------------------------------------------------------------------===//
 
-def RefQuantumDialect : Dialect {
+def QRefDialect : Dialect {
     let summary = "Reference semantics quantum dialect.";
     let description = [{
         A supplemental dialect to the core quantum dialect.
@@ -35,10 +35,10 @@ def RefQuantumDialect : Dialect {
     }];
 
     /// This is the namespace of the dialect in MLIR, which is used as a prefix for types and ops.
-    let name = "ref_quantum";
+    let name = "qref";
 
     /// This is the C++ namespace in which the dialect and all of its sub-components are placed.
-    let cppNamespace = "::catalyst::ref_quantum";
+    let cppNamespace = "::catalyst::qref";
 
     let dependentDialects = [
         "quantum::QuantumDialect"
@@ -49,11 +49,11 @@ def RefQuantumDialect : Dialect {
 
 
 //===----------------------------------------------------------------------===//
-// RefQuantum dialect base operation.
+// QRef dialect base operation.
 //===----------------------------------------------------------------------===//
 
-class RefQuantum_Op<string mnemonic, list<Trait> traits = []> :
-        Op<RefQuantumDialect, mnemonic, traits>;
+class QRef_Op<string mnemonic, list<Trait> traits = []> :
+        Op<QRefDialect, mnemonic, traits>;
 
 
-#endif // REF_QUANTUM_DIALECT
+#endif // QREF_DIALECT

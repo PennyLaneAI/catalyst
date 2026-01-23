@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "RefQuantum/IR/RefQuantumInterfaces.h"
+#pragma once
 
-using namespace mlir;
-using namespace catalyst::ref_quantum;
+#include "mlir/IR/Dialect.h"
+
+#include "QRef/IR/QRefTypes.h"
 
 //===----------------------------------------------------------------------===//
-// RefQuantum interface definitions.
+// QRef dialect declarations.
 //===----------------------------------------------------------------------===//
 
-#include "RefQuantum/IR/RefQuantumInterfaces.cpp.inc"
+#include "QRef/IR/QRefOpsDialect.h.inc"
