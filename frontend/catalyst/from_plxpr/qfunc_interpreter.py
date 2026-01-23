@@ -237,7 +237,9 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             AbstractQbit: The resulting measurement value.
         """
         if self.has_dynamic_allocation:
-            if len(measurement.wires) == 0 and not isinstance(measurement, qml.measurements.StateMP):
+            if len(measurement.wires) == 0 and not isinstance(
+                measurement, qml.measurements.StateMP
+            ):
                 raise CompileError(
                     textwrap.dedent(
                         """
