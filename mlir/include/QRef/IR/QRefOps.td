@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef REF_QUANTUM_OPS
-#define REF_QUANTUM_OPS
+#ifndef QREF_OPS
+#define QREF_OPS
 
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
@@ -518,4 +518,4 @@ def NamedObsOp : Observable_Op<"namedobs"> {
 // class Measurement_Op<string mnemonic, list<Trait> traits = []> :
 //         Quantum_Op<mnemonic, traits # [MeasurementProcess]>;
 
-#endif // REF_QUANTUM_OPS
+#endif // QREF_OPS

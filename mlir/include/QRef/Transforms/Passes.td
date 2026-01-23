@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef REF_QUANTUM_PASSES
-#define REF_QUANTUM_PASSES
+#ifndef QREF_PASSES
+#define QREF_PASSES
 
 include "mlir/Pass/PassBase.td"
 
@@ -26,4 +26,4 @@ def RQHelloWorldPass : Pass<"rq-hw"> {
     // ];
 }
 
-#endif // REF_QUANTUM_PASSES
+#endif // QREF_PASSES

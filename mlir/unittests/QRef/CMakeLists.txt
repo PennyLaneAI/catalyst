@@ -1,8 +1,8 @@
-add_catalyst_unittest(CatalystRefQuantumUnitTests
+add_catalyst_unittest(CatalystQRefUnitTests
   InterfaceTest.cpp
 )
 
-target_link_libraries(CatalystRefQuantumUnitTests PRIVATE
+target_link_libraries(CatalystQRefUnitTests PRIVATE
   MLIRArithDialect
   MLIRFuncDialect
   MLIRQRef
