@@ -2512,8 +2512,8 @@ def test_best_diff_method_multi_expval():
     qjit_jacobian = qjit(jacobian(circuit, argnums=[0, 1]))
     _ = qjit_jacobian(0.1, 0.2)
 
-    assert "parameter-shift" in qjit_jacobian.mlir
-    assert "adjoint" not in qjit_jacobian.mlir
+    assert "parameter-shift" not in qjit_jacobian.mlir
+    assert "adjoint" in qjit_jacobian.mlir
 
 
 @pytest.mark.usefixtures("use_both_frontend")
