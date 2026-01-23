@@ -403,6 +403,7 @@ class TestIntegration:
 
         if qml.capture.enabled() and vjp_func == vjp:  # pylint: disable=comparison-with-callable
             pytest.xfail("program capture autograph doesn't work with catalyst.vjp")
+
         def inner(x):
             if x > 0:
                 return 2 * x, x**2
