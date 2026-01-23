@@ -1302,7 +1302,7 @@ def test_decompose_autograph_multi_blocks():
 
         return qml.expval(qml.Z(0))
 
-    # CHECK: func.func public @ag___multi_rz_decomposition(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<5xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 5 : i64, target_gate = "MultiRZ"}
+    # CHECK: func.func public @ag___multi_rz_decomposition_wires_5(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<5xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 5 : i64, target_gate = "MultiRZ"}
     # CHECK: {{%.+}} = scf.for %arg3 = %c0 to %c4 step %c1 iter_args(%arg4 = %arg0) -> (!quantum.reg)
     # CHECK: {{%.+}} = scf.for %arg3 = %c0 to %c4 step %c1 iter_args(%arg4 = %4) -> (!quantum.reg)
     print(circuit_29.mlir)
