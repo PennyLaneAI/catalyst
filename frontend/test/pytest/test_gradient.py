@@ -1501,14 +1501,9 @@ def test_pytrees_return_classical_function(backend, diff_method):
     psi = 0.1
     phi = 0.2
 
-    if diff_method == "adjoint":
-        # Adjoint method does not support multiple return values
+    if diff_method == "adjoint" and qml.capture.enabled():
         if qml.capture.enabled():
             pytest.xfail("TODO")
-        # TODO: specify error message and/or fix, currently MLIR Assertion error
-        #       "invalid qfunc symbol in adjoint op" which doesn't seem right
-        with pytest.raises(CompileError):
-            qjit(qml.jacobian(circuit, argnums=[0, 1]))(psi, phi)
     else:
         result = qjit(qml.jacobian(circuit, argnums=[0, 1]))(psi, phi)
 
