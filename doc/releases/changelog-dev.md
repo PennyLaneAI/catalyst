@@ -36,6 +36,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Autograph is no longer applied to decomposition rules based on whether it's applied to the workflow itself.
+  Operator developers now need to manually apply autograph to decomposition rules when needed.
+  [(#2421)](https://github.com/PennyLaneAI/catalyst/pull/2421)
+
 * The quantum dialect MLIR and TableGen source has been refactored to place type and attribute
   definitions in separate file scopes.
   [(#2329)](https://github.com/PennyLaneAI/catalyst/pull/2329)
@@ -73,6 +77,9 @@
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
   [(#2406)](https://github.com/PennyLaneAI/catalyst/pull/2406)
 
+* Updated the changelog and builtin_passes.py to link to https://pennylane.ai/compilation/pauli-based-computation instead.
+  [(#2409)](https://github.com/PennyLaneAI/catalyst/pull/2409)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
@@ -82,4 +89,5 @@ Sengthai Heng,
 Jeffrey Kam,
 Mudit Pandey,
 Andrija Paurevic,
+David D.W. Ren,
 Paul Haochen Wang.

@@ -463,44 +463,6 @@ class TestGraphDecomposition:
             resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.usefixtures("use_capture_dgraph")
-    def test_autograph(self):
-        """Test the decompose lowering pass with autograph."""
-
-        def _multi_rz_decomposition_resources(num_wires):
-            """Resources required for MultiRZ decomposition."""
-            return {qml.RZ: 1, qml.CNOT: 2 * (num_wires - 1)}
-
-        @qml.register_resources(_multi_rz_decomposition_resources)
-        def _multi_rz_decomposition(theta, wires, **__):
-            """Decomposition of MultiRZ using CNOTs and RZs."""
-            for i in range(len(wires) - 1):
-                qml.CNOT(wires=(wires[i], wires[i + 1]))
-            qml.RZ(theta, wires=wires[0])
-            for i in range(len(wires) - 1, 0, -1):
-                qml.CNOT(wires=(wires[i], wires[i - 1]))
-
-        @qml.qnode(qml.device("lightning.qubit", wires=5))
-        def circuit():
-            qml.MultiRZ(0.5, wires=[0, 1, 2, 3, 4])
-            qml.MultiRZ(0.5, wires=[0, 1, 4])
-            return qml.expval(qml.Z(0))
-
-        with_qjit = qml.qjit(
-            qml.transforms.decompose(circuit, gate_set={"RZ", "CNOT"}), autograph=True
-        )
-        with_qjit_result = with_qjit()
-        with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
-            resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
-
-        with qml.capture.pause():
-            without_qjit = qml.transforms.decompose(circuit, gate_set={"RZ", "CNOT"})
-            without_qjit_result = without_qjit()
-            expected_resources = qml.specs(without_qjit, level="device")()["resources"].gate_types
-
-        assert qml.math.allclose(without_qjit_result, with_qjit_result)
-        assert resources == expected_resources
-
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

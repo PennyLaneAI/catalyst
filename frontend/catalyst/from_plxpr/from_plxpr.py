@@ -268,17 +268,12 @@ def handle_qnode(
 
     graph_succeeded = False
     if self.requires_decompose_lowering:
-        # Determine if autograph is enabled in the qnode
-        # If so, we need to enable it in the decomposition rules as well
-        # TODO: enable autograph per decomposition rule instead of globally
-        ag_enabled = getattr(qnode, "ag_module", None) is not None
 
         closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
             inner_jaxpr=closed_jaxpr.jaxpr,
             consts=closed_jaxpr.consts,
             tkwargs=self.decompose_tkwargs,
             ncargs=non_const_args,
-            ag_enabled=ag_enabled,
         )
 
         # Fallback to the legacy decomposition if the graph-based decomposition failed
@@ -578,7 +573,7 @@ def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=Non
     return final_jaxpr
 
 
-def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs, ag_enabled):
+def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs):
     """Collect and compile graph solutions for a given JAXPR.
 
     This function uses the DecompRuleInterpreter to evaluate
@@ -593,13 +588,12 @@ def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs, a
         consts (list): The constants used in the JAXPR.
         tkwargs (list): The keyword arguments of the decompose transform.
         ncargs (list): Non-constant arguments for the JAXPR.
-        ag_enabled (bool): Whether to enable autograph in the decomposition rules.
 
     Returns:
         ClosedJaxpr: The decomposed JAXPR.
         bool: A flag indicating whether the graph-based decomposition was successful.
     """
-    gds_interpreter = DecompRuleInterpreter(ag_enabled=ag_enabled, **tkwargs)
+    gds_interpreter = DecompRuleInterpreter(**tkwargs)
 
     def gds_wrapper(*args):
         return gds_interpreter.eval(inner_jaxpr, consts, *args)
