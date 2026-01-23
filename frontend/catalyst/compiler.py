@@ -487,7 +487,9 @@ class Compiler:
 
         if self.options.link:
             output = LinkerDriver.run(output_object_name, options=self.options)
-        output = str(pathlib.Path(output).absolute())
+            output = str(pathlib.Path(output).absolute())
+        else:
+            output = None
 
         # Clean up temporary files
         if os.path.exists(tmp_infile_name):
