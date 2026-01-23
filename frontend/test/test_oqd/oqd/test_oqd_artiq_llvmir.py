@@ -64,7 +64,7 @@ class TestOQDARTIQLLVMIR:
         def circuit():
             x = np.pi / 2
             qml.RX(x, wires=0)
-            return qml.counts(wires=0)
+            return qml.counts(all_outcomes=True)
 
         # Get the LLVM IR
         llvm_ir = circuit.llvmir
