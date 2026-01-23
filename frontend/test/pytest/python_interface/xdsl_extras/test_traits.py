@@ -335,6 +335,9 @@ def test_all_match_same_operator_one_attribute():
     trait = AllMatchSameOperatorTrait(("a", "c"), lambda a: a.element_count(), "element count")
     trait.verify(op)
 
+    trait = AllMatchSameOperatorTrait(("a",), lambda a: a.element_count(), "element count")
+    trait.verify(op)
+
 
 def test_operator_cannot_compute_raises_verifyexception():
     """Trait should raise when it cannot compute the property for given attributes."""

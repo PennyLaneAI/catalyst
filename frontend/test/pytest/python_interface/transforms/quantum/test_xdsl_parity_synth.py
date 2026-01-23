@@ -318,6 +318,24 @@ class TestParitySynthPass:
 
         run_filecheck(translate_program_to_xdsl(program), self.pipeline)
 
+    def test_merge_with_region_ops(self, run_filecheck):
+        """Test that a phase polynomial of two CNOTs separated by a rotation on the control
+        is reduced when there are operations with regions (such as control flow)."""
+        program = """
+            func.func @test_func(%arg0: f64) {
+                %0 = INIT_QUBIT
+                %1 = INIT_QUBIT
+                %2, %3 = _CNOT %0, %1
+                // CHECK: quantum.custom "RZ"(%arg0) [[q0]] : !quantum.bit
+                %4 = quantum.custom "RZ"(%arg0) %2 : !quantum.bit
+                %5, %6 = _CNOT %4, %3
+                // CHECK-NOT: "quantum.custom"
+                return
+            }
+        """
+
+        run_filecheck(translate_program_to_xdsl(program), self.pipeline)
+
     def test_two_phase_polynomials_first_merge(self, run_filecheck):
         """Test that two phase polynomials separated by a non-phase-polynomial operation is
         compiled correctly if the former polynomial can be reduced."""

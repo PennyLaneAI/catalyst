@@ -212,8 +212,9 @@ class AllMatchSameOperatorTrait(OpTrait):
         attributes = []
         for name in self.attr_names:
             value = getattr(op, name, None)
-            if value is not None:
-                attributes.append(value)
+            if value is None:
+                return
+            attributes.append(value)
 
         if len(attributes) <= 1:
             return

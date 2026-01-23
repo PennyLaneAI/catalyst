@@ -294,7 +294,7 @@ class PyDotDAGBuilder(DAGBuilder):
 
         file_format = output_filename_path.suffix[1:].lower()
 
-        self.graph.write(str(output_filename_path), format=file_format)
+        self.graph.write(str(output_filename_path), format=file_format)  # pragma: no cover
 
     def to_string(self) -> str:
         """Return the graph as a string.

@@ -23,8 +23,8 @@ try:
     import networkx as nx
 
     has_networkx = True
-except ModuleNotFoundError as networkx_import_error:
-    has_networkx = False  # pragma: no cover
+except ModuleNotFoundError as networkx_import_error:  # pragma: no cover
+    has_networkx = False
 
 import numpy as np
 from pennylane.transforms.intermediate_reps.rowcol import _rowcol_parity_matrix
