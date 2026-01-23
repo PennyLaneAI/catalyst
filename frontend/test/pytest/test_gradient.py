@@ -2433,44 +2433,6 @@ def test_closure_variable_value_and_grad(diff_method):
     assert np.allclose(expected, observed)
 
 
-@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_closure_variable_value_and_grad(diff_method):
-    """Test that value and grad can take closure variables"""
-
-    @qml.qjit
-    def workflow_closure(x, y):
-
-        dev = qml.device("lightning.qubit", wires=1)
-
-        @qml.qnode(dev, diff_method=diff_method)
-        def circuit(x):
-            qml.RX(jnp.pi * x, wires=0)
-            qml.RX(jnp.pi * y, wires=0)
-            return qml.expval(qml.PauliY(0))
-
-        g = value_and_grad(circuit)
-        return g(x)
-
-    @qml.qjit
-    def workflow_no_closure(x, y):
-
-        dev = qml.device("lightning.qubit", wires=1)
-
-        @qml.qnode(dev, diff_method=diff_method)
-        def circuit(x, y):
-            qml.RX(jnp.pi * x, wires=0)
-            qml.RX(jnp.pi * y, wires=0)
-            return qml.expval(qml.PauliY(0))
-
-        g = value_and_grad(circuit)
-        return g(x, y)
-
-    x, y = 1.0, 0.25
-    expected = workflow_no_closure(x, y)
-    observed = workflow_closure(x, y)
-    assert np.allclose(expected, observed)
-
-
 def test_bufferization_inside_tensor_generate(backend):
     """This tests specifically for an bug already
     filed in LLVM: https://github.com/llvm/llvm-project/issues/141667
