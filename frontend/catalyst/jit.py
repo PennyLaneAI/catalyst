@@ -685,7 +685,8 @@ class QJIT(CatalystCallable):
             self.mlir_module = self.generate_ir()
             self.compiled_function, _ = self.compile()
 
-            self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
+            if self.compile_options.link:
+                self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
         elif self.compiled_function is not cached_fn.compiled_fn:
             # Restore active state from cache.
@@ -849,6 +850,12 @@ class QJIT(CatalystCallable):
         Returns:
             Any: results of the execution arranged into the original function's output PyTrees
         """
+        if self.compiled_function is None:
+            raise CompileError(
+                "Cannot execute function: no compiled function available. "
+                "The function must be compiled before execution."
+            )
+
         results = self.compiled_function(*args, **kwargs)
 
         # TODO: Move this to the compiled function object.
