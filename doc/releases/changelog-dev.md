@@ -73,6 +73,9 @@
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
   [(#2406)](https://github.com/PennyLaneAI/catalyst/pull/2406)
 
+* Updated the changelog and builtin_passes.py to link to https://pennylane.ai/compilation/pauli-based-computation instead.
+  [(#2409)](https://github.com/PennyLaneAI/catalyst/pull/2409)
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
@@ -82,4 +85,5 @@ Sengthai Heng,
 Jeffrey Kam,
 Mudit Pandey,
 Andrija Paurevic,
+David D.W. Ren,
 Paul Haochen Wang.
