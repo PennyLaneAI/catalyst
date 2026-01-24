@@ -116,12 +116,9 @@ def _is_one_shot_compatible_device(qnode):
     if device_name in exclude_devices:
         return False
 
-    # Check for OQD
-    device = qnode.device
-    if hasattr(device, "get_c_interface") and device.get_c_interface()[0] == "oqd":
-        return False
-
-    return True
+    # Additional check for OQDDevice class
+    device_class_name = qnode.device.__class__.__name__
+    return device_class_name != "OQDDevice"
 
 
 def configure_mcm_and_try_one_shot(qnode, args, kwargs, pass_pipeline=None):
