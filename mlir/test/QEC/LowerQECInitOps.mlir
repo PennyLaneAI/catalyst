@@ -14,121 +14,118 @@
 
 // RUN: quantum-opt --lower-qec-init-ops --split-input-file --verify-diagnostics %s | FileCheck %s
 
-// Test lowering qec.prepare zero to quantum.set_state
+// Test lowering qec.prepare zero (no gates needed)
 func.func @test_prepare_zero(%q : !quantum.bit) -> !quantum.bit {
     %0 = qec.prepare zero %q : !quantum.bit
     return %0 : !quantum.bit
 
     // CHECK-LABEL: func.func @test_prepare_zero
-    // CHECK: [[STATE:%.+]] = arith.constant dense<[(1.000000e+00,0.000000e+00), (0.000000e+00,0.000000e+00)]> : tensor<2xcomplex<f64>>
-    // CHECK: [[OUT:%.+]] = quantum.set_state([[STATE]]) {{.*}} : (tensor<2xcomplex<f64>>, !quantum.bit) -> !quantum.bit
-    // CHECK: return [[OUT]]
+    // CHECK-SAME: (%[[Q:.*]]: !quantum.bit)
+    // CHECK: return %[[Q]]
 }
 
 // -----
 
-// Test lowering qec.prepare one to quantum.set_state
+// Test lowering qec.prepare one to PauliX gate
 func.func @test_prepare_one(%q : !quantum.bit) -> !quantum.bit {
     %0 = qec.prepare one %q : !quantum.bit
     return %0 : !quantum.bit
 
     // CHECK-LABEL: func.func @test_prepare_one
-    // CHECK: [[STATE:%.+]] = arith.constant dense<[(0.000000e+00,0.000000e+00), (1.000000e+00,0.000000e+00)]> : tensor<2xcomplex<f64>>
-    // CHECK: [[OUT:%.+]] = quantum.set_state([[STATE]]) {{.*}} : (tensor<2xcomplex<f64>>, !quantum.bit) -> !quantum.bit
+    // CHECK: [[OUT:%.+]] = quantum.custom "PauliX"() {{.*}} : !quantum.bit
     // CHECK: return [[OUT]]
 }
 
 // -----
 
-// Test lowering qec.prepare plus to quantum.set_state
+// Test lowering qec.prepare plus to Hadamard gate
 func.func @test_prepare_plus(%q : !quantum.bit) -> !quantum.bit {
     %0 = qec.prepare plus %q : !quantum.bit
     return %0 : !quantum.bit
 
     // CHECK-LABEL: func.func @test_prepare_plus
-    // CHECK: [[STATE:%.+]] = arith.constant dense<(0.707{{.*}},0.000000e+00)> : tensor<2xcomplex<f64>>
-    // CHECK: [[OUT:%.+]] = quantum.set_state([[STATE]]) {{.*}} : (tensor<2xcomplex<f64>>, !quantum.bit) -> !quantum.bit
+    // CHECK: [[OUT:%.+]] = quantum.custom "Hadamard"() {{.*}} : !quantum.bit
     // CHECK: return [[OUT]]
 }
 
 // -----
 
-// Test lowering qec.prepare minus to quantum.set_state
+// Test lowering qec.prepare minus to Hadamard + PauliZ gates
 func.func @test_prepare_minus(%q : !quantum.bit) -> !quantum.bit {
     %0 = qec.prepare minus %q : !quantum.bit
     return %0 : !quantum.bit
 
     // CHECK-LABEL: func.func @test_prepare_minus
-    // CHECK: [[STATE:%.+]] = arith.constant dense<[(0.707{{.*}},0.000000e+00), (-0.707{{.*}},0.000000e+00)]> : tensor<2xcomplex<f64>>
-    // CHECK: [[OUT:%.+]] = quantum.set_state([[STATE]]) {{.*}} : (tensor<2xcomplex<f64>>, !quantum.bit) -> !quantum.bit
+    // CHECK: [[H:%.+]] = quantum.custom "Hadamard"() {{.*}} : !quantum.bit
+    // CHECK: [[OUT:%.+]] = quantum.custom "PauliZ"() [[H]] : !quantum.bit
     // CHECK: return [[OUT]]
 }
 
 // -----
 
-// Test lowering qec.prepare plus_i to quantum.set_state
+// Test lowering qec.prepare plus_i to Hadamard + S gates
 func.func @test_prepare_plus_i(%q : !quantum.bit) -> !quantum.bit {
     %0 = qec.prepare plus_i %q : !quantum.bit
     return %0 : !quantum.bit
 
     // CHECK-LABEL: func.func @test_prepare_plus_i
-    // CHECK: [[STATE:%.+]] = arith.constant dense<[(0.707{{.*}},0.000000e+00), (0.000000e+00,0.707{{.*}})]> : tensor<2xcomplex<f64>>
-    // CHECK: [[OUT:%.+]] = quantum.set_state([[STATE]]) {{.*}} : (tensor<2xcomplex<f64>>, !quantum.bit) -> !quantum.bit
+    // CHECK: [[H:%.+]] = quantum.custom "Hadamard"() {{.*}} : !quantum.bit
+    // CHECK: [[OUT:%.+]] = quantum.custom "S"() [[H]] : !quantum.bit
     // CHECK: return [[OUT]]
 }
 
 // -----
 
-// Test lowering qec.prepare minus_i to quantum.set_state
+// Test lowering qec.prepare minus_i to Hadamard + S† gates
 func.func @test_prepare_minus_i(%q : !quantum.bit) -> !quantum.bit {
     %0 = qec.prepare minus_i %q : !quantum.bit
     return %0 : !quantum.bit
 
     // CHECK-LABEL: func.func @test_prepare_minus_i
-    // CHECK: [[STATE:%.+]] = arith.constant dense<[(0.707{{.*}},0.000000e+00), (0.000000e+00,-0.707{{.*}})]> : tensor<2xcomplex<f64>>
-    // CHECK: [[OUT:%.+]] = quantum.set_state([[STATE]]) {{.*}} : (tensor<2xcomplex<f64>>, !quantum.bit) -> !quantum.bit
+    // CHECK: [[H:%.+]] = quantum.custom "Hadamard"() {{.*}} : !quantum.bit
+    // CHECK: [[OUT:%.+]] = quantum.custom "S"() [[H]] {adjoint} : !quantum.bit
     // CHECK: return [[OUT]]
 }
 
 // -----
 
-// Test lowering qec.fabricate magic to quantum.alloc_qb + quantum.set_state
+// Test lowering qec.fabricate magic to quantum.alloc_qb + Hadamard + T
 func.func @test_fabricate_magic() -> !quantum.bit {
     %0 = qec.fabricate magic : !quantum.bit
     return %0 : !quantum.bit
 
     // CHECK-LABEL: func.func @test_fabricate_magic
-    // CHECK: [[STATE:%.+]] = arith.constant dense<[(0.707{{.*}},0.000000e+00), (5.000000e-01,5.000000e-01)]> : tensor<2xcomplex<f64>>
     // CHECK: [[Q:%.+]] = quantum.alloc_qb : !quantum.bit
-    // CHECK: [[OUT:%.+]] = quantum.set_state([[STATE]]) [[Q]] : (tensor<2xcomplex<f64>>, !quantum.bit) -> !quantum.bit
+    // CHECK: [[H:%.+]] = quantum.custom "Hadamard"() [[Q]] : !quantum.bit
+    // CHECK: [[OUT:%.+]] = quantum.custom "T"() [[H]] : !quantum.bit
     // CHECK: return [[OUT]]
 }
 
 // -----
 
-// Test lowering qec.fabricate magic_conj to quantum.alloc_qb + quantum.set_state
+// Test lowering qec.fabricate magic_conj to quantum.alloc_qb + Hadamard + T†
 func.func @test_fabricate_magic_conj() -> !quantum.bit {
     %0 = qec.fabricate magic_conj : !quantum.bit
     return %0 : !quantum.bit
 
     // CHECK-LABEL: func.func @test_fabricate_magic_conj
-    // CHECK: [[STATE:%.+]] = arith.constant dense<[(0.707{{.*}},0.000000e+00), (5.000000e-01,-5.000000e-01)]> : tensor<2xcomplex<f64>>
     // CHECK: [[Q:%.+]] = quantum.alloc_qb : !quantum.bit
-    // CHECK: [[OUT:%.+]] = quantum.set_state([[STATE]]) [[Q]] : (tensor<2xcomplex<f64>>, !quantum.bit) -> !quantum.bit
+    // CHECK: [[H:%.+]] = quantum.custom "Hadamard"() [[Q]] : !quantum.bit
+    // CHECK: [[OUT:%.+]] = quantum.custom "T"() [[H]] {adjoint} : !quantum.bit
     // CHECK: return [[OUT]]
 }
 
 // -----
 
-// Test lowering qec.fabricate plus_i to quantum.alloc_qb + quantum.set_state
+// Test lowering qec.fabricate plus_i to quantum.alloc_qb + Hadamard + S
 func.func @test_fabricate_plus_i() -> !quantum.bit {
     %0 = qec.fabricate plus_i : !quantum.bit
     return %0 : !quantum.bit
 
     // CHECK-LABEL: func.func @test_fabricate_plus_i
-    // CHECK: [[STATE:%.+]] = arith.constant dense<[(0.707{{.*}},0.000000e+00), (0.000000e+00,0.707{{.*}})]> : tensor<2xcomplex<f64>>
     // CHECK: [[Q:%.+]] = quantum.alloc_qb : !quantum.bit
-    // CHECK: [[OUT:%.+]] = quantum.set_state([[STATE]]) [[Q]] : (tensor<2xcomplex<f64>>, !quantum.bit) -> !quantum.bit
+    // CHECK: [[H:%.+]] = quantum.custom "Hadamard"() [[Q]] : !quantum.bit
+    // CHECK: [[OUT:%.+]] = quantum.custom "S"() [[H]] : !quantum.bit
     // CHECK: return [[OUT]]
 }
 
@@ -136,13 +133,13 @@ func.func @test_fabricate_plus_i() -> !quantum.bit {
 
 // Test lowering qec.prepare with multiple qubits
 func.func @test_prepare_multiple_qubits(%q1 : !quantum.bit, %q2 : !quantum.bit) -> (!quantum.bit, !quantum.bit) {
-    %0, %1 = qec.prepare zero %q1, %q2 : !quantum.bit, !quantum.bit
+    %0, %1 = qec.prepare plus %q1, %q2 : !quantum.bit, !quantum.bit
     return %0, %1 : !quantum.bit, !quantum.bit
 
     // CHECK-LABEL: func.func @test_prepare_multiple_qubits
-    // CHECK: [[STATE:%.+]] = arith.constant dense<[(1.000000e+00,0.000000e+00), (0.000000e+00,0.000000e+00)]> : tensor<2xcomplex<f64>>
-    // CHECK: [[OUT1:%.+]] = quantum.set_state([[STATE]]) {{.*}} : (tensor<2xcomplex<f64>>, !quantum.bit) -> !quantum.bit
-    // CHECK: [[OUT2:%.+]] = quantum.set_state([[STATE]]) {{.*}} : (tensor<2xcomplex<f64>>, !quantum.bit) -> !quantum.bit
+    // CHECK-SAME: (%[[Q1:.*]]: !quantum.bit, %[[Q2:.*]]: !quantum.bit)
+    // CHECK: [[OUT1:%.+]] = quantum.custom "Hadamard"() %[[Q1]] : !quantum.bit
+    // CHECK: [[OUT2:%.+]] = quantum.custom "Hadamard"() %[[Q2]] : !quantum.bit
     // CHECK: return [[OUT1]], [[OUT2]]
 }
 
@@ -154,8 +151,11 @@ func.func @test_fabricate_multiple_qubits() -> (!quantum.bit, !quantum.bit) {
     return %0, %1 : !quantum.bit, !quantum.bit
 
     // CHECK-LABEL: func.func @test_fabricate_multiple_qubits
-    // CHECK: [[STATE:%.+]] = arith.constant dense<[(0.707{{.*}},0.000000e+00), (5.000000e-01,5.000000e-01)]> : tensor<2xcomplex<f64>>
-    // CHECK: [[OUT1:%.+]] = quantum.set_state([[STATE]]) {{.*}} : (tensor<2xcomplex<f64>>, !quantum.bit) -> !quantum.bit
-    // CHECK: [[OUT2:%.+]] = quantum.set_state([[STATE]]) {{.*}} : (tensor<2xcomplex<f64>>, !quantum.bit) -> !quantum.bit
+    // CHECK: [[Q1:%.+]] = quantum.alloc_qb : !quantum.bit
+    // CHECK: [[H1:%.+]] = quantum.custom "Hadamard"() [[Q1]] : !quantum.bit
+    // CHECK: [[OUT1:%.+]] = quantum.custom "T"() [[H1]] : !quantum.bit
+    // CHECK: [[Q2:%.+]] = quantum.alloc_qb : !quantum.bit
+    // CHECK: [[H2:%.+]] = quantum.custom "Hadamard"() [[Q2]] : !quantum.bit
+    // CHECK: [[OUT2:%.+]] = quantum.custom "T"() [[H2]] : !quantum.bit
     // CHECK: return [[OUT1]], [[OUT2]]
 }

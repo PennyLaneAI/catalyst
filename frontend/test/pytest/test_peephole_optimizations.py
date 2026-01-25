@@ -641,6 +641,58 @@ def test_decompose_arbitrary_ppr():
     assert 'qec.ppr ["X", "Y", "Z"](2)' in ir_opt
 
 
+@pytest.mark.usefixtures("use_capture")
+class TestLowerQECInitOps:
+    """Test that the lower-qec-init-ops pass correctly lowers fabricate/prepare ops to gates."""
+
+    @pytest.mark.parametrize(
+        "gates,expected_bloch",
+        [
+            (lambda: qml.Identity(0), (0.0, 0.0, 1.0)),
+            (lambda: qml.PauliX(0), (0.0, 0.0, -1.0)),
+            (lambda: (qml.H(0), qml.PauliZ(0)), (-1.0, 0.0, 0.0)),
+            (lambda: qml.H(0), (1.0, 0.0, 0.0)),
+            (lambda: (qml.H(0), qml.T(0)), (0.70710678, 0.70710678, 0.0)),
+            (lambda: (qml.H(0), qml.S(0)), (0.0, 1.0, 0.0)),
+        ],
+    )
+    def test_lower_qec_init_ops_preserves_states(self, gates, expected_bloch):
+        """Test that lower-qec-init-ops correctly lowers states through the PPR/PPM pipeline."""
+
+        @qml.qjit
+        @qml.transform(pass_name="to-ppr")
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def baseline_circuit():
+            gates()
+            return (
+                qml.expval(qml.PauliX(0)),
+                qml.expval(qml.PauliY(0)),
+                qml.expval(qml.PauliZ(0)),
+            )
+
+        @qml.qjit
+        @qml.transform(pass_name="unroll-conditional-ppr-ppm")
+        @qml.transform(pass_name="lower-qec-init-ops")
+        @qml.transform(pass_name="ppr-to-ppm")
+        @qml.transform(pass_name="to-ppr")
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def lowered_circuit():
+            gates()
+            return (
+                qml.expval(qml.PauliX(0)),
+                qml.expval(qml.PauliY(0)),
+                qml.expval(qml.PauliZ(0)),
+            )
+
+        baseline_result = baseline_circuit()
+        lowered_result = lowered_circuit()
+
+        # Verify baseline matches expected Bloch vector
+        assert np.allclose(baseline_result, expected_bloch, atol=1e-6)
+        # Verify lowered circuit matches baseline
+        assert np.allclose(lowered_result, baseline_result, atol=1e-6)
+
+
 class TestPPMSpecsErrors:
     """Test if errors are caught when calling ppm_specs"""
 
