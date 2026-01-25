@@ -101,7 +101,7 @@ if(NOT LAPACKE_FOUND)
 
     ExternalProject_Add(lapacke-accelerate
         GIT_REPOSITORY https://github.com/lepus2589/accelerate-lapacke.git
-        GIT_TAG 6cf628bd8c169fe3753555f593a8a1ddf0a124a1  # v2.0.0
+        GIT_TAG v2.0.0
         PREFIX _lapacke-accelerate
         CMAKE_ARGS "--preset accelerate-lapacke32"
                    "-DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/_lapacke-accelerate/install"
