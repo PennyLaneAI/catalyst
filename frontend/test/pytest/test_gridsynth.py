@@ -14,9 +14,9 @@
 
 """Test cases for the gridsynth discretization/decomposition pass."""
 
+import numpy as np
 import pennylane as qml
 import pytest
-import numpy as np
 
 
 @pytest.mark.usefixtures("use_capture")

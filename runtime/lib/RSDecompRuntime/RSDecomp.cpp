@@ -210,7 +210,7 @@ std::pair<bool, double> try_append_pair_expansion(std::vector<PPRGateType> &out,
 }
 
 /**
- * @brief Convert single gate for HST_to_PPR
+ * @brief Convert single gate for HST_to_PPR and return the global phase update.
  */
 double append_single_gate_expansion(std::vector<PPRGateType> &out, GateType gate)
 {

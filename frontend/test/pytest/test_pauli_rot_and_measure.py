@@ -191,4 +191,3 @@ def test_pauli_rot_and_measure_execution():
     expected = []
 
     assert np.allclose(qjit_gosc_circuit, expected)
-    
