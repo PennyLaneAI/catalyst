@@ -26,6 +26,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Restore the ability to differentiate multiple (expectation value) QNode results with the
+  adjoint-differentiation method.
+  [(#2428)](https://github.com/PennyLaneAI/catalyst/pull/2428)
+
 * Fixed the angle conversion when lowering `qec.ppr` and `qec.ppr.arbitrary` operations to
   `__catalyst__qis__PauliRot` runtime calls. The PPR rotation angle is now correctly multiplied
   by 2 to match the PauliRot convention (`PauliRot(φ) == PPR(φ/2)`).
@@ -63,7 +67,7 @@
   Pauli Product Rotations (PPR), the pass now emits `quantum.gphase` operations to preserve
   global phase correctness.
   [(#2419)](https://github.com/PennyLaneAI/catalyst/pull/2419)
-  
+
 * New qubit-type specializations have been added to Catalyst's MLIR type system. These new qubit
   types include `!quantum.bit<logical>`, `!quantum.bit<qec>` and `!quantum.bit<physical>`. The
   original `!quantum.bit` type continues to be supported and used as the default qubit type.
@@ -95,6 +99,7 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
 Sengthai Heng,
+David Ittah,
 Jeffrey Kam,
 Mudit Pandey,
 Andrija Paurevic,
