@@ -2,6 +2,55 @@
 
 <h3>New features since last release</h3>
 
+* OQD (Open Quantum Design) end-to-end pipeline is added to Catalyst.
+  The pipeline supports compilation to LLVM IR with `target="llvmir"` and `link=False`, allowing integration with ARTIQ's cross-compilation toolchain via the `compile_to_artiq()` function in `catalyst.third_party.oqd` to generate ARTIQ's binary.
+  [(#2299)](https://github.com/PennyLaneAI/catalyst/pull/2299)
+
+  see `frontend/test/test_oqd/oqd/test_oqd_artiq_llvmir.py` for more details.
+
+  For example:
+  ```python
+  import os
+  import numpy as np
+  import pennylane as qml
+
+  from catalyst import qjit
+  from catalyst.third_party.oqd import OQDDevice, OQDDevicePipeline, compile_to_artiq
+
+  OQD_PIPELINES = OQDDevicePipeline(
+      os.path.join("calibration_data", "device.toml"),
+      os.path.join("calibration_data", "qubit.toml"),
+      os.path.join("calibration_data", "gate.toml"),
+      os.path.join("device_db", "device_db.json"),
+  )
+
+  def test_rx_gate():
+      """Test RX gate with ARTIQ linking done in user code."""
+      artiq_config = {
+          "kernel_ld": "/path/to/kernel.ld",
+          "llc_path": "/path/to/llc",
+          "lld_path": "/path/to/ld.lld",
+      }
+
+      oqd_dev = OQDDevice(
+          backend="default",
+          shots=4,
+          wires=1,
+          artiq_config=artiq_config
+      )
+      qml.capture.enable()
+
+      @qjit(pipelines=OQD_PIPELINES, target="llvmir", link=False)
+      @qml.qnode(oqd_dev)
+      def circuit():
+          qml.RX(0.5, wires=0)
+          return qml.counts(wires=0)
+
+      output_elf_path = compile_to_artiq(circuit, oqd_dev.artiq_config)
+
+  test_rx_gate()
+  ```
+
 <h3>Improvements 🛠</h3>
 
 * The default mcm_method for the finite-shots setting (dynamic one-shot) no longer silently falls
@@ -63,7 +112,7 @@
   Pauli Product Rotations (PPR), the pass now emits `quantum.gphase` operations to preserve
   global phase correctness.
   [(#2419)](https://github.com/PennyLaneAI/catalyst/pull/2419)
-  
+
 * New qubit-type specializations have been added to Catalyst's MLIR type system. These new qubit
   types include `!quantum.bit<logical>`, `!quantum.bit<qec>` and `!quantum.bit<physical>`. The
   original `!quantum.bit` type continues to be supported and used as the default qubit type.
@@ -90,4 +139,5 @@ Jeffrey Kam,
 Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Hongsheng Zheng.
