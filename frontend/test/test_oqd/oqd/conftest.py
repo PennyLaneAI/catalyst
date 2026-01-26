@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Pytest configuration file for OQD test suite.
+"""
+import os
+from tempfile import TemporaryDirectory
+
 import pennylane as qml
 import pytest
 
