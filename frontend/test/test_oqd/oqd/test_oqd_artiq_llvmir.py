@@ -20,7 +20,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import qjit, CompileError
+from catalyst import CompileError, qjit
 from catalyst.third_party.oqd import OQDDevice, OQDDevicePipeline
 
 MODULE_TEST_PATH = os.path.dirname(__file__)
