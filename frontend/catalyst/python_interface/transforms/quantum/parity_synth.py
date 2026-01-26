@@ -306,9 +306,7 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
                         if len(op.regions) != 0:
                             # Do phase polynomial rewriting up to this point
                             self.rewrite_phase_polynomial(rewriter)
-                            # Rewrite regions of this operation; Creating a new PatternRewriter
-                            # so its matched operation is `op`, not `matchedOp`
-                            # self.match_and_rewrite(op, pattern_rewriter.PatternRewriter(op))
+                            # Rewrite regions of this operation
                             self.match_and_rewrite(op, rewriter)
                         continue
 
