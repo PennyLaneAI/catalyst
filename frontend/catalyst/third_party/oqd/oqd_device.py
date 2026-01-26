@@ -20,7 +20,6 @@ This module defines the classes that represent an Open Quantum Design (OQD)
 trapped-ion quantum computer device.
 """
 from typing import Optional
-import os
 import platform
 
 from pennylane import CompilePipeline
