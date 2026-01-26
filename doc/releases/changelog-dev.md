@@ -34,6 +34,10 @@
 * Fixing incorrect lowering of PPM into CAPI calls when the PPM is in the negative basis.
   [(#2422)](https://github.com/PennyLaneAI/catalyst/pull/2422)
 
+* Fixed the GlobalPhase discrepancies when executing gridsynth in the PPR basis.
+  [(#2433)](https://github.com/PennyLaneAI/catalyst/pull/2433)
+
+
 <h3>Internal changes ⚙️</h3>
 
 * Autograph is no longer applied to decomposition rules based on whether it's applied to the workflow itself.
