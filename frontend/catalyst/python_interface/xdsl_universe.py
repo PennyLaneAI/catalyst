@@ -30,7 +30,7 @@ names_to_dialects = {
 }
 
 # Create a map from pass names to their respective ModulePass. The transforms module
-# contains PassDispatcher instances as well as ModulePasses. We only want to collect
+# contains CompilerTransform instances as well as ModulePasses. We only want to collect
 # the ModulePasses. We cannot use issubclass with instances, which is why we first
 # check if isinstance(transform, type).
 names_to_passes = {

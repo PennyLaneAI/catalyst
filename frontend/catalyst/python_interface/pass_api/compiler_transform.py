@@ -13,13 +13,28 @@
 # limitations under the License.
 """Core API for registering xDSL transforms for use with PennyLane and Catalyst."""
 
+from collections.abc import Callable, Sequence
+from inspect import signature
+from types import UnionType
+from typing import ClassVar, Union, get_args, get_origin
+
 from pennylane.transforms.core import Transform
+from xdsl.context import Context
+from xdsl.dialects import builtin
+from xdsl.ir import Operation
 from xdsl.passes import ModulePass
+from xdsl.pattern_rewriter import (
+    GreedyRewritePatternApplier,
+    PatternRewriter,
+    PatternRewriteWalker,
+    RewritePattern,
+    op_type_rewrite_pattern,
+)
 
 from .apply_transform_sequence import register_pass
 
 
-class PassDispatcher(Transform):
+class CompilerTransform(Transform):
     """Wrapper class for applying passes to QJIT-ed workflows."""
 
     module_pass: ModulePass
@@ -29,13 +44,169 @@ class PassDispatcher(Transform):
         super().__init__(pass_name=module_pass.name)
 
 
-def compiler_transform(module_pass: ModulePass) -> PassDispatcher:
+def compiler_transform(module_pass: ModulePass) -> CompilerTransform:
     """Wrapper function to register xDSL passes to use with QJIT-ed workflows."""
-    dispatcher = PassDispatcher(module_pass)
+    transform = CompilerTransform(module_pass)
 
     # Registration for apply-transform-sequence interpreter
     def get_pass_cls():
         return module_pass
 
     register_pass(module_pass.name, get_pass_cls)
-    return dispatcher
+    return transform
+
+
+class CompilationPass(ModulePass):
+    """An xdsl ``ModulePass`` subclass for defining passes."""
+
+    name: ClassVar[str]
+    """String mnemonic for a compilation pass."""
+
+    recursive: ClassVar[bool] = True
+    """Whether or not the actions should be applied recursively. If ``True``,
+    the actions will be applied repeatedly until a steady-state is reached.
+    ``True`` by default.
+    """
+
+    greedy: ClassVar[bool] = True
+    """Whether or not the actions should be applied greedily. If ``True``,
+    each iteration of the actions' application (if ``recursive == True``)
+    will only apply the first action that modifies the input module.
+    ``True`` by default."""
+
+    _rewrite_patterns: ClassVar[dict[Operation, RewritePattern]] = {}
+    r"""Dictionary of registered actions. The keys are operations for which we have
+    registered actions, and the values are the corresponding ``RewritePattern``\ s."""
+
+    @classmethod
+    def action(
+        cls, action: Callable[["CompilationPass", Operation, PatternRewriter], None]
+    ) -> None:
+        """Register an "action" that performs a transformation on an input operation.
+
+        The action must type hint which operation is being rewritten. It must have
+        the following signature:
+
+        .. code-block:: python
+
+            @CompilationPass.action
+            def rewrite_myop(self, op: MyOperation, rewriter: PatternRewriter) -> None:
+                ...
+
+        In the above example, the type hint for the second argument, which is ``op``,
+        is used to determine which xDSL operation is being matched. If not provided,
+        _all_ xDSL operations will be matched.
+
+        Additionally, the type hint can also contain a union of multiple operation types:
+
+        .. code-block:: python
+
+            @CompilationPass.action
+            def rewrite_myop(
+                self, op: MyOperation1 | MyOperation2 | MyOperation3, rewriter: PatternRewriter
+            ) -> None:
+                ...
+
+        .. note::
+
+            If an action for the provided operation already exists, the old action
+            will get overwritten. For actions that were annotated with a union of
+            multiple operation types, registered actions for all of the operations
+            in the union will be overwritten. To see all registered actions, use the
+            :meth:`~.CompilationPass.actions` property.
+
+        Args:
+            action (Callable): A callable meeting the aforementioned constraints that transforms
+                a given operation
+        """
+        # xdsl.pattern_rewriter.op_type_rewrite_pattern was used as a reference to
+        # implement the type hint collection. Source:
+        # https://github.com/xdslproject/xdsl/blob/main/xdsl/pattern_rewriter.py
+        params = [param for param in signature(action, eval_str=True).parameters.values()]
+        if len(params) != 3 or params[0].name != "self":
+            raise ValueError("The action must have 3 arguments, with the first one being 'self'.")
+
+        # If a type hint for the op we're trying to match isn't provided, match all ops
+        hint = Operation if params[-2].name not in action.__annotations__ else params[-2].annotation
+        expected_types = get_args(hint) if get_origin(hint) in (Union, UnionType) else (hint,)
+        rewrite_pattern = _create_rewrite_pattern(expected_types, action)
+
+        for et in expected_types:
+            cls._rewrite_patterns[et] = rewrite_pattern
+
+    def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:  # pylint: disable=unused-argument
+        """Apply the transformation to the input module.
+
+        If ``greedy`` is ``True``, the actions will be applied greedily, i.e., for each
+        operation in the worklist, we will apply only the first action that matches the
+        operation. Otherwise, they will be applied by creating a different worklist for each
+        action.
+
+        If ``recursive`` is ``True``, the worklist algorithm will continue applying the actions
+        until a steady-state is reached.
+
+        .. note::
+
+            The input module is mutated in-place.
+
+        Args:
+            ctx: Context containing operation and attribute registrations
+            op: Module to which to apply the transform
+        """
+        if self.greedy:
+            pattern = GreedyRewritePatternApplier(
+                rewrite_patterns=[rp(self) for rp in self._rewrite_patterns.values()]
+            )
+            walker = PatternRewriteWalker(pattern=pattern, apply_recursively=self.recursive)
+            walker.rewrite_module(op)
+
+        else:
+            for rp in self._rewrite_patterns.values():
+                walker = PatternRewriteWalker(pattern=rp(self), apply_recursively=self.recursive)
+                walker.rewrite_module(op)
+
+
+def _update_type_hints(expected_types: Sequence[type[Operation]]) -> Callable:
+    """Update the signature of a ``match_and_rewrite`` method to use the provided operation
+    as the first argument's type hint."""
+
+    if not all(issubclass(e, Operation) for e in expected_types):
+        raise TypeError(
+            "Only Operation types or unions of Operation types can be used to register actions."
+        )
+    hint = expected_types[0] if len(expected_types) == 1 else Union[*expected_types]
+
+    def _update_match_and_rewrite(method: Callable) -> Callable:
+        params = tuple(signature(method).parameters)
+        # Update type hint of operation argument
+        # TODO: Is it fine to mutate in-place or should we return a new function?
+        op_arg_name = params[-2]
+        method.__annotations__[op_arg_name] = hint
+
+        return method
+
+    return _update_match_and_rewrite
+
+
+def _create_rewrite_pattern(
+    expected_types: Sequence[type[Operation]], action: Callable
+) -> RewritePattern:
+    """Given an action defined as a function, create a ``RewritePattern`` which
+    can be used with xDSL's pass API."""
+
+    # pylint: disable=too-few-public-methods, arguments-differ
+    class _RewritePattern(RewritePattern):
+        """Anonymous rewrite pattern for transforming a matched operation."""
+
+        _pass: CompilationPass
+
+        def __init__(self, _pass):
+            self._pass = _pass
+            super().__init__()
+
+        @op_type_rewrite_pattern
+        @_update_type_hints(expected_types)
+        def match_and_rewrite(self, op: Operation, rewriter: PatternRewriter) -> None:
+            action(self._pass, op, rewriter)
+
+    return _RewritePattern

@@ -18,11 +18,10 @@ from xdsl.ir import Operation
 
 from catalyst.python_interface.dialects import quantum
 
-from .compiler_transform import compiler_transform
-from .passes import PLModulePass
+from .compiler_transform import CompilationPass, compiler_transform
 
 
-class CancelInverses(PLModulePass):
+class CancelInverses(CompilationPass):
     """Reimplementation of cancel_inverses using new API."""
 
     name = "cancel-inverses-2"
@@ -57,7 +56,7 @@ class CancelInverses(PLModulePass):
         return False
 
 
-@CancelInverses.rewrite_rule
+@CancelInverses.action
 def rewrite_custom_op(self, op: quantum.CustomOp, rewriter):
     """Rewrite rule for CustomOp."""
     while isinstance(op, quantum.CustomOp) and op.gate_name.data in self.self_inverses:
@@ -82,26 +81,26 @@ def rewrite_custom_op(self, op: quantum.CustomOp, rewriter):
 
 # We can register more rewrite rules as needed. Here are some
 # dummy rewrite rules to illustrate:
-@CancelInverses.rewrite_rule
+@CancelInverses.action
 def rewrite_insert_op(self, op: quantum.InsertOp, rewriter):
     """Rewrite rule for InsertOp."""
     return
 
 
-@CancelInverses.rewrite_rule
+@CancelInverses.action
 def rewrite_extract_op(self, op: quantum.ExtractOp, rewriter):
     """Rewrite rule for ExtractOp."""
     return
 
 
-@CancelInverses.rewrite_rule
+@CancelInverses.action
 def rewrite_mid_measure_op(self, op: quantum.MeasureOp, rewriter):
     """Rewrite rule for MeasureOp."""
     return
 
 
 # Unions of operation types can also be used
-@CancelInverses.rewrite_rule
+@CancelInverses.action
 def rewrite_observable_op(
     self,
     op: (
