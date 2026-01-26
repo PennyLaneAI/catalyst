@@ -69,6 +69,8 @@ class TestOQDDevice:
     def test_unsupported_one_shot_device(self):
         """Test unsupported device edge case."""
 
+        qml.capture.disable()
+
         @qml.qnode(OQDDevice(backend="default", wires=1), shots=10, mcm_method="one-shot")
         def circuit():
             return qml.sample()
