@@ -14,9 +14,6 @@
 
 #define DEBUG_TYPE "lower-qec-init-ops"
 
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/IR/Builders.h"
-
 #include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -27,53 +24,56 @@ using namespace catalyst::quantum;
 
 namespace {
 
-/// Get the state vector values for a given LogicalInitKind
-/// Returns {re0, im0, re1, im1} for a single qubit state
-std::tuple<double, double, double, double> getStateVectorValues(LogicalInitKind initState)
+/// Create a single-qubit gate using CustomOp
+/// Returns the output qubit from the gate
+Value createGate(Location loc, PatternRewriter &rewriter, Value inQubit, StringRef gateName,
+                 bool adjoint = false)
 {
-    constexpr double sqrt2_inv = 1.0 / llvm::numbers::sqrt2; // 1/√2
+    auto outQubitType = inQubit.getType();
+    auto gateOp = rewriter.create<CustomOp>(loc,
+                                            /*out_qubits=*/TypeRange{outQubitType},
+                                            /*out_ctrl_qubits=*/TypeRange{},
+                                            /*params=*/ValueRange{},
+                                            /*in_qubits=*/ValueRange{inQubit},
+                                            /*gate_name=*/gateName,
+                                            /*adjoint=*/adjoint,
+                                            /*in_ctrl_qubits=*/ValueRange{},
+                                            /*in_ctrl_values=*/ValueRange{});
+    return gateOp.getOutQubits().front();
+}
 
+/// Apply the gates required to prepare the given state from |0⟩
+/// Returns the final qubit after all gates are applied
+Value applyStatePreparationGates(Location loc, PatternRewriter &rewriter, Value qubit,
+                                 LogicalInitKind initState)
+{
     switch (initState) {
-    case LogicalInitKind::zero:
-        return {1.0, 0.0, 0.0, 0.0};
-    case LogicalInitKind::one:
-        return {0.0, 0.0, 1.0, 0.0};
-    case LogicalInitKind::plus:
-        return {sqrt2_inv, 0.0, sqrt2_inv, 0.0};
-    case LogicalInitKind::minus:
-        return {sqrt2_inv, 0.0, -sqrt2_inv, 0.0};
-    case LogicalInitKind::plus_i:
-        return {sqrt2_inv, 0.0, 0.0, sqrt2_inv};
-    case LogicalInitKind::minus_i:
-        return {sqrt2_inv, 0.0, 0.0, -sqrt2_inv};
-    case LogicalInitKind::magic: // T gate
-        // |m⟩ = (|0⟩ + e^{iπ/4}|1⟩) / √2 = [1/√2, (1+i)/(2)]
-        return {sqrt2_inv, 0.0, 0.5, 0.5};
-    case LogicalInitKind::magic_conj: // T† gate
-        // |m̅⟩ = (|0⟩ + e^{-iπ/4}|1⟩) / √2 = [1/√2, (1-i)/(2)]
-        return {sqrt2_inv, 0.0, 0.5, -0.5};
+    case LogicalInitKind::zero: // |0⟩ - no gates needed
+        return qubit;
+    case LogicalInitKind::one: // |1⟩ = X|0⟩
+        return createGate(loc, rewriter, qubit, "PauliX");
+    case LogicalInitKind::plus: // |+⟩ = H|0⟩
+        return createGate(loc, rewriter, qubit, "Hadamard");
+    case LogicalInitKind::minus: // |−⟩ = ZH|0⟩
+        qubit = createGate(loc, rewriter, qubit, "Hadamard");
+        return createGate(loc, rewriter, qubit, "PauliZ");
+    case LogicalInitKind::plus_i: // |+i⟩ = SH|0⟩
+        qubit = createGate(loc, rewriter, qubit, "Hadamard");
+        return createGate(loc, rewriter, qubit, "S");
+    case LogicalInitKind::minus_i: // |−i⟩ = S†H|0⟩
+        qubit = createGate(loc, rewriter, qubit, "Hadamard");
+        return createGate(loc, rewriter, qubit, "S", /*adjoint=*/true);
+    case LogicalInitKind::magic: // |m⟩ = TH|0⟩
+        qubit = createGate(loc, rewriter, qubit, "Hadamard");
+        return createGate(loc, rewriter, qubit, "T");
+    case LogicalInitKind::magic_conj: // |m̅⟩ = T†H|0⟩
+        qubit = createGate(loc, rewriter, qubit, "Hadamard");
+        return createGate(loc, rewriter, qubit, "T", /*adjoint=*/true);
     }
     llvm_unreachable("Unknown LogicalInitKind");
 }
 
-/// Create a dense tensor constant for a single qubit state vector
-Value createStateVectorTensor(Location loc, PatternRewriter &rewriter, LogicalInitKind initState)
-{
-    auto ctx = rewriter.getContext();
-    auto f64Type = Float64Type::get(ctx);
-    auto complexType = ComplexType::get(f64Type);
-    auto tensorType = RankedTensorType::get({2}, complexType);
-
-    auto [re0, im0, re1, im1] = getStateVectorValues(initState);
-
-    auto denseAttr = DenseElementsAttr::get(
-        tensorType, ArrayRef<std::complex<double>>{std::complex<double>(re0, im0),
-                                                   std::complex<double>(re1, im1)});
-
-    return rewriter.create<arith::ConstantOp>(loc, denseAttr);
-}
-
-/// Template pattern to lower QEC init ops (PrepareStateOp, FabricateOp) to SetStateOp
+/// Template pattern to lower QEC init ops (PrepareStateOp, FabricateOp) to alloc + gates
 /// - PrepareStateOp: uses existing input qubits
 /// - FabricateOp: allocates new qubits via AllocQubitOp
 template <typename OpType> struct LowerQECInitOpPattern : public OpRewritePattern<OpType> {
@@ -99,9 +99,9 @@ template <typename OpType> struct LowerQECInitOpPattern : public OpRewritePatter
                 qubit = allocOp.getResult();
             }
 
-            Value stateVector = createStateVectorTensor(loc, rewriter, initState);
-            auto setStateOp = rewriter.create<SetStateOp>(loc, qubit.getType(), stateVector, qubit);
-            resultQubits.push_back(setStateOp.getOutQubits().front());
+            // Apply the appropriate gates to prepare the desired state
+            Value resultQubit = applyStatePreparationGates(loc, rewriter, qubit, initState);
+            resultQubits.push_back(resultQubit);
         }
 
         rewriter.replaceOp(op, resultQubits);
