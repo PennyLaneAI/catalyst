@@ -72,6 +72,12 @@
 * The upstream MLIR `Test` dialect is now available via the `catalyst` command line tool.
   [(#2417)](https://github.com/PennyLaneAI/catalyst/pull/2417)
 
+* A new compiler pass `lower-qec-init-ops` has been added to lower QEC initialization operations
+  to Quantum dialect operations. This pass converts `qec.prepare` to `quantum.custom` and
+  `qec.fabricate` to `quantum.alloc_qb` + `quantum.custom`, enabling runtime execution of
+  QEC state preparation operations.
+  [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
+
 <h3>Documentation 📝</h3>
 
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
