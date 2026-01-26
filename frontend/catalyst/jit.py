@@ -683,7 +683,7 @@ class QJIT(CatalystCallable):
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
 
             self.mlir_module = self.generate_ir()
-            self.compiled_function, _ = self.compile()
+            self.compiled_function, self.llvm_ir = self.compile()
 
             if self.compile_options.link:
                 self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
