@@ -322,14 +322,31 @@ class TestParitySynthPass:
         """Test that a phase polynomial of two CNOTs separated by a rotation on the control
         is reduced when there are operations with regions (such as control flow)."""
         program = """
+            // CHECK: func.func @test_func([[ARG0:%.+]] : f64
             func.func @test_func(%arg0: f64) {
                 %0 = INIT_QUBIT
                 %1 = INIT_QUBIT
                 %2, %3 = _CNOT %0, %1
-                // CHECK: quantum.custom "RZ"(%arg0) [[q0]] : !quantum.bit
+                // CHECK: [[q2:%.+]] = quantum.custom "RZ"([[ARG0]]) [[q0]] : !quantum.bit
                 %4 = quantum.custom "RZ"(%arg0) %2 : !quantum.bit
                 %5, %6 = _CNOT %4, %3
                 // CHECK-NOT: "quantum.custom"
+
+                // CHECK: [[START:%.+]], [[STOP:%.+]], [[STEP:%.+]] = "test.op"() : ()
+                %start, %stop, %step = "test.op"() : () -> (index, index, index)
+
+                // CHECK: scf.for [[I:%.+]] = [[START]] to [[STOP]] step [[STEP]]
+                // CHECK-SAME: iter_args([[ITER_Q0:%.+]] = [[q2]], [[ITER_Q1:%.+]] = [[q1]])
+                %7, %8 = scf.for %i = %start to %stop step %step iter_args(%iter_q0 = %5, %iter_q1 = %6) -> (!quantum.bit, !quantum.bit) {
+                    %9, %10 = _CNOT %iter_q0, %iter_q1
+                    // CHECK: [[Q_LOOP:%.+]] = quantum.custom "RZ"([[ARG0]]) [[ITER_Q0]] : !quantum.bit
+                    %11 = quantum.custom "RZ"(%arg0) %9 : !quantum.bit
+                    %12, %13 = _CNOT %11, %10
+                    // CHECK-NOT: "quantum.custom"
+                    // CHECK: scf.yield [[Q_LOOP]], [[ITER_Q1]]
+                    scf.yield %12, %13 : !quantum.bit, !quantum.bit
+                }
+
                 return
             }
         """
@@ -589,6 +606,87 @@ class TestParitySynthIntegration:
         args = (0.6, 0.2, -1.8)
         for wires in [(0, 1), (0, 2), (2, 3)]:
             assert np.allclose(raw_circuit(*args, *wires), compiled_circuit(*args, *wires))
+
+    def test_qjit_with_control_flow(self, run_filecheck_qjit):
+        """Test that ParitySynth works correctly with qjit when there is control flow."""
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qml.qnode(dev)
+        def circuit(x: float):
+            # Phase tensor
+            # CHECK: func.func public @circuit([[FLOAT_ARG:%.+]] : tensor<f64>)
+
+            # Qubit extraction for wire 0
+            # CHECK: [[ZERO:%.+]] = "stablehlo.constant"() <{value = dense<0> : tensor<i64>}>
+            # Ignore the first tensor.extract, that is for device allocation
+            # CHECK: tensor.extract [[ZERO]][] : tensor<i64>
+            # CHECK: [[Q0_IND:%.+]] = tensor.extract [[ZERO]][] : tensor<i64>
+            # CHECK-NEXT: [[Q0:%.+]] = quantum.extract {{%.+}}[[[Q0_IND]]]
+
+            # Phase extraction
+            # CHECK: [[PHI:%.+]] = tensor.extract [[FLOAT_ARG]][] : tensor<f64>
+
+            # Gates
+            # CHECK-NOT: quantum.custom "CNOT"
+            # CHECK: quantum.custom "RZ"([[PHI]]) [[Q0]]
+            # CHECK-NOT: quantum.custom
+            qml.CNOT((0, 1))
+            qml.RZ(x, 0)
+            qml.CNOT((0, 1))
+
+            # CHECK: scf.for
+            @qml.for_loop(4)
+            def loop_fn(_i):
+                # Qubit extraction for wire 0
+                # CHECK: [[ZERO_LOOP:%.+]] = "stablehlo.constant"() <{value = dense<0> : tensor<i64>}>
+                # CHECK: [[Q0_IND_LOOP:%.+]] = tensor.extract [[ZERO_LOOP]][] : tensor<i64>
+                # CHECK-NEXT: [[Q0_LOOP:%.+]] = quantum.extract {{%.+}}[[[Q0_IND_LOOP]]]
+
+                # Phase extraction
+                # CHECK: [[PHI_LOOP:%.+]] = tensor.extract [[FLOAT_ARG]][] : tensor<f64>
+
+                # Gates
+                # CHECK-NOT: quantum.custom "CNOT"
+                # CHECK: quantum.custom "RZ"([[PHI_LOOP]]) [[Q0_LOOP]]
+                # CHECK-NOT: quantum.custom
+                qml.CNOT((0, 1))
+                qml.RZ(x, 0)
+                qml.CNOT((0, 1))
+
+                # CHECK: scf.if
+                @qml.cond(x > 2.5)
+                def cond_fn():
+                    # Qubit extraction for wire 0
+                    # CHECK: [[ZERO_IF:%.+]] = "stablehlo.constant"() <{value = dense<0> : tensor<i64>}>
+                    # CHECK: [[Q0_IND_IF:%.+]] = tensor.extract [[ZERO_IF]][] : tensor<i64>
+                    # CHECK-NEXT: [[Q0_IF:%.+]] = quantum.extract {{%.+}}[[[Q0_IND_IF]]]
+
+                    # Phase extraction
+                    # CHECK: [[PHI_IF:%.+]] = tensor.extract [[FLOAT_ARG]][] : tensor<f64>
+
+                    # Gates
+                    # CHECK-NOT: quantum.custom "CNOT"
+                    # CHECK: quantum.custom "RZ"([[PHI_IF]]) [[Q0_IF]]
+                    # CHECK-NOT: quantum.custom
+                    qml.CNOT((0, 1))
+                    qml.RZ(x, 0)
+                    qml.CNOT((0, 1))
+                    # CHECK: scf.yield
+
+                cond_fn()
+                # CHECK: scf.yield
+
+            loop_fn()
+            # CHECK-NOT: quantum.custom
+
+            return qml.state()
+
+        raw_circuit = qml.qjit(circuit)
+        compiled_circuit = qml.qjit(parity_synth_pass(circuit))
+
+        run_filecheck_qjit(compiled_circuit)
+        for x in [0.5, 1.5, 2.5, 3.5]:
+            assert np.allclose(compiled_circuit(x), raw_circuit(x))
 
 
 if __name__ == "__main__":

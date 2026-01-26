@@ -308,7 +308,8 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
                             self.rewrite_phase_polynomial(rewriter)
                             # Rewrite regions of this operation; Creating a new PatternRewriter
                             # so its matched operation is `op`, not `matchedOp`
-                            self.match_and_rewrite(op, pattern_rewriter.PatternRewriter(op))
+                            # self.match_and_rewrite(op, pattern_rewriter.PatternRewriter(op))
+                            self.match_and_rewrite(op, rewriter)
                         continue
 
                     if isinstance(op, CustomOp) and op.gate_name.data in valid_phase_polynomial_ops:
