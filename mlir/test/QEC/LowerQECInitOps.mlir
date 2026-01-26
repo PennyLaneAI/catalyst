@@ -83,7 +83,7 @@ func.func @test_prepare_minus_i(%q : !quantum.bit) -> !quantum.bit {
 
     // CHECK-LABEL: func.func @test_prepare_minus_i
     // CHECK: [[H:%.+]] = quantum.custom "Hadamard"() {{.*}} : !quantum.bit
-    // CHECK: [[OUT:%.+]] = quantum.custom "S"() [[H]] {adjoint} : !quantum.bit
+    // CHECK: [[OUT:%.+]] = quantum.custom "S"() [[H]] adj : !quantum.bit
     // CHECK: return [[OUT]]
 }
 
@@ -111,7 +111,7 @@ func.func @test_fabricate_magic_conj() -> !quantum.bit {
     // CHECK-LABEL: func.func @test_fabricate_magic_conj
     // CHECK: [[Q:%.+]] = quantum.alloc_qb : !quantum.bit
     // CHECK: [[H:%.+]] = quantum.custom "Hadamard"() [[Q]] : !quantum.bit
-    // CHECK: [[OUT:%.+]] = quantum.custom "T"() [[H]] {adjoint} : !quantum.bit
+    // CHECK: [[OUT:%.+]] = quantum.custom "T"() [[H]] adj : !quantum.bit
     // CHECK: return [[OUT]]
 }
 
