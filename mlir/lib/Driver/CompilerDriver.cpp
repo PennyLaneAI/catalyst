@@ -68,6 +68,7 @@
 #include "Driver/Support.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientInterfaces.h"
+#include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
@@ -353,9 +354,12 @@ OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, const llvm::SourceMgr &s
 bool containsGradients(mlir::ModuleOp moduleOp)
 {
     bool contain = false;
-    moduleOp.walk([&](catalyst::gradient::GradientOpInterface op) {
-        contain = true;
-        return WalkResult::interrupt();
+    moduleOp.walk([&](Operation *op) {
+        if (isa<gradient::GradientOpInterface>(op) || isa<gradient::BackpropOp>(op)) {
+            contain = true;
+            return WalkResult::interrupt();
+        }
+        return WalkResult::advance();
     });
     return contain;
 }
