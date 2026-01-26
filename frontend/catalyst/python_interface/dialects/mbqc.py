@@ -46,7 +46,6 @@ from xdsl.irdl import (
     prop_def,
     result_def,
 )
-from xdsl.utils.exceptions import VerifyException
 from xdsl.utils.str_enum import StrEnum  # StrEnum is standard in Python>=3.11
 
 from catalyst.python_interface.xdsl_extras import MemRefConstraint, TensorConstraint

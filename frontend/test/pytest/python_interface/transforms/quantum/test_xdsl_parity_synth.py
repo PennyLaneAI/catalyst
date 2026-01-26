@@ -617,7 +617,7 @@ class TestParitySynthIntegration:
             # CHECK: func.func public @circuit([[FLOAT_ARG:%.+]] : tensor<f64>)
 
             # Qubit extraction for wire 0
-            # CHECK: [[ZERO:%.+]] = "stablehlo.constant"() <{value = dense<0> : tensor<i64>}>
+            # CHECK: [[ZERO:%.+]] = "stablehlo.constant"() <{value = dense<0>
             # Ignore the first tensor.extract, that is for device allocation
             # CHECK: tensor.extract [[ZERO]][] : tensor<i64>
             # CHECK: [[Q0_IND:%.+]] = tensor.extract [[ZERO]][] : tensor<i64>
@@ -638,7 +638,7 @@ class TestParitySynthIntegration:
             @qml.for_loop(4)
             def loop_fn(_i):
                 # Qubit extraction for wire 0
-                # CHECK: [[ZERO_LOOP:%.+]] = "stablehlo.constant"() <{value = dense<0> : tensor<i64>}>
+                # CHECK: [[ZERO_LOOP:%.+]] = "stablehlo.constant"() <{value = dense<0>
                 # CHECK: [[Q0_IND_LOOP:%.+]] = tensor.extract [[ZERO_LOOP]][] : tensor<i64>
                 # CHECK-NEXT: [[Q0_LOOP:%.+]] = quantum.extract {{%.+}}[[[Q0_IND_LOOP]]]
 
@@ -657,7 +657,7 @@ class TestParitySynthIntegration:
                 @qml.cond(x > 2.5)
                 def cond_fn():
                     # Qubit extraction for wire 0
-                    # CHECK: [[ZERO_IF:%.+]] = "stablehlo.constant"() <{value = dense<0> : tensor<i64>}>
+                    # CHECK: [[ZERO_IF:%.+]] = "stablehlo.constant"() <{value = dense<0>
                     # CHECK: [[Q0_IND_IF:%.+]] = tensor.extract [[ZERO_IF]][] : tensor<i64>
                     # CHECK-NEXT: [[Q0_IF:%.+]] = quantum.extract {{%.+}}[[[Q0_IND_IF]]]
 
