@@ -64,8 +64,7 @@ def QuregType : Quantum_Type<"Qureg", "reg"> {
     let assemblyFormat = "(`<` $level^ `>`)?";
 
     let builderCall = [{
-        $_builder.getType<quantum::QuregType>(
-            quantum::QubitLevel::Abstract)
+        $_builder.getType<quantum::QuregType>(quantum::QubitLevel::Abstract)
     }];
 
     let extraClassDeclaration = [{
