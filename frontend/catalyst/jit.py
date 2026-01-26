@@ -636,7 +636,7 @@ class QJIT(CatalystCallable):
         if self.compile_options.target in ("llvmir", "binary"):
             self.compiled_function, self.llvm_ir = self.compile()
 
-        if self.compile_options.target in ("binary",):
+        if self.compile_options.target in ("binary",) and self.compile_options.link:
             self.fn_cache.insert(
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
