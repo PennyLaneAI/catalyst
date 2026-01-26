@@ -37,7 +37,7 @@
 <h3>Internal changes ⚙️</h3>
 
 * `catalyst.python_interface.xdsl_universe.XDSL_UNIVERSE` has been renamed to `CATALYST_XDSL_UNIVERSE`.
-  [(#)]()
+  [(#2435)](https://github.com/PennyLaneAI/catalyst/pull/2435)
 
 * Autograph is no longer applied to decomposition rules based on whether it's applied to the workflow itself.
   Operator developers now need to manually apply autograph to decomposition rules when needed.
