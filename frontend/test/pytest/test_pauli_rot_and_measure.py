@@ -176,3 +176,19 @@ def test_pauli_measure_to_ppr_pauli_word_error():
                 qml.pauli_measure("A", wires=0)
 
             return f()
+
+
+@pytest.mark.usefixtures("use_capture")
+def test_pauli_rot_and_measure_execution():
+    """Test that PauliRot and PauliMeasure are executed correctly."""
+
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def gosc_circuit():
+        qml.PauliRot(np.pi / 4, "X", wires=0)
+        qml.pauli_measure("X", wires=0)
+
+    qjit_gosc_circuit = qjit(gosc_circuit)
+    expected = []
+
+    assert np.allclose(qjit_gosc_circuit, expected)
+    
