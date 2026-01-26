@@ -36,6 +36,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The xDSL :class:`~catalyst.python_interface.Quantum` dialect has been split into multiple files
+  to structure operations and attributes more concretely.
+  [(#2434)](https://github.com/PennyLaneAI/catalyst/pull/2434)
+
 * Autograph is no longer applied to decomposition rules based on whether it's applied to the workflow itself.
   Operator developers now need to manually apply autograph to decomposition rules when needed.
   [(#2421)](https://github.com/PennyLaneAI/catalyst/pull/2421)
@@ -63,7 +67,7 @@
   Pauli Product Rotations (PPR), the pass now emits `quantum.gphase` operations to preserve
   global phase correctness.
   [(#2419)](https://github.com/PennyLaneAI/catalyst/pull/2419)
-  
+
 * New qubit-type specializations have been added to Catalyst's MLIR type system. These new qubit
   types include `!quantum.bit<logical>`, `!quantum.bit<qec>` and `!quantum.bit<physical>`. The
   original `!quantum.bit` type continues to be supported and used as the default qubit type.
