@@ -30,16 +30,6 @@ from catalyst.compiler import get_lib_path
 BACKENDS = ["default"]
 
 
-def get_default_artiq_config():
-    """Get default ARTIQ cross-compilation configuration"""
-    # Check environment variable
-    kernel_ld = os.environ.get("ARTIQ_KERNEL_LD")
-    if kernel_ld and os.path.exists(kernel_ld):
-        return {"kernel_ld": kernel_ld}
-
-    return None
-
-
 def OQDDevicePipeline(device, qubit, gate, device_db=None):
     """
     Generate the compilation pipeline for an OQD device.
@@ -156,11 +146,7 @@ class OQDDevice(Device):
         self.device_kwargs = {
             "openapl_file_name": self._openapl_file_name,
         }
-
-        if artiq_config is not None:
-            self._artiq_config = artiq_config
-        else:
-            self._artiq_config = get_default_artiq_config()
+        self._artiq_config = artiq_config
 
     @property
     def artiq_config(self):

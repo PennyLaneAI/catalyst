@@ -92,6 +92,9 @@ class TestOQDARTIQLLVMIR:
         # Test that the llvm ir is the same after getting it again
         assert circuit.llvmir == llvm_ir, "LLVM IR should be the same after getting it again"
 
+        # Test artiq_config
+        assert oqd_dev.artiq_config == artiq_config, "Same artiq_config should be returned"
+
     @pytest.mark.usefixtures("use_capture")
     def test_no_compilation_error(self):
         """Test that no compilation error is raised."""
