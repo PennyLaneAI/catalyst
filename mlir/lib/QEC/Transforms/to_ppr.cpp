@@ -50,6 +50,7 @@ struct ToPPRPass : impl::ToPPRPassBase<ToPPRPass> {
         // Conversion target is QECDialect
         target.addLegalDialect<qec::QECDialect>();
         target.addLegalDialect<mlir::arith::ArithDialect>();
+        target.addLegalOp<GlobalPhaseOp>();
 
         RewritePatternSet patterns(ctx);
         populateToPPRPatterns(patterns);

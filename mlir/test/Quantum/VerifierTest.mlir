@@ -59,7 +59,7 @@ func.func @custom(%f : f64, %q1 : !quantum.bit, %q2 : !quantum.bit) {
     %q4 = quantum.custom "RZ"(%f) %q1 : !quantum.bit
     %q5, %q6 = quantum.custom "CNOT"() %q1, %q2 : !quantum.bit, !quantum.bit
 
-    // expected-error@+1 {{number of qubits in input (2) and output (1) must be the same}}
+    // expected-error@+1 {{number of operands and types do not match}}
     %err = quantum.custom "CNOT"() %q1, %q2 : !quantum.bit
 
     return
@@ -68,7 +68,7 @@ func.func @custom(%f : f64, %q1 : !quantum.bit, %q2 : !quantum.bit) {
 // -----
 
 func.func @multirz2(%q0 : !quantum.bit, %q1 : !quantum.bit, %theta : f64) {
-    // expected-error@+1 {{number of qubits in input (2) and output (1) must be the same}}
+    // expected-error@+1 {{number of operands and types do not match}}
     %err = quantum.multirz(%theta) %q0, %q1 : !quantum.bit
 
     return
@@ -77,7 +77,7 @@ func.func @multirz2(%q0 : !quantum.bit, %q1 : !quantum.bit, %theta : f64) {
 // -----
 
 func.func @multirz3(%q0 : !quantum.bit, %theta : f64) {
-    // expected-error@+1 {{number of qubits in input (1) and output (2) must be the same}}
+    // expected-error@+1 {{number of operands and types do not match}}
     %err:2 = quantum.multirz(%theta) %q0 : !quantum.bit, !quantum.bit
 
     return
@@ -86,7 +86,7 @@ func.func @multirz3(%q0 : !quantum.bit, %theta : f64) {
 // -----
 
 func.func @unitary2(%q0 : !quantum.bit, %q1 : !quantum.bit,  %m : tensor<4x4xcomplex<f64>>) {
-    // expected-error@+1 {{number of qubits in input (2) and output (1) must be the same}}
+    // expected-error@+1 {{number of operands and types do not match}}
     %err = quantum.unitary(%m: tensor<4x4xcomplex<f64>>) %q0, %q1 : !quantum.bit
 
     return
@@ -110,7 +110,7 @@ func.func @controlled1(%1 : !quantum.bit, %2 : !quantum.bit, %3 : !quantum.bit) 
     %cst = llvm.mlir.constant (6.000000e-01 : f64) : f64
     %cst_0 = llvm.mlir.constant (9.000000e-01 : f64) : f64
     %cst_1 = llvm.mlir.constant (3.000000e-01 : f64) : f64
-    // expected-error@+1 {{number of controlling qubits in input (1) and output (0) must be the same}}
+    // expected-error@+1 {{number of operands and types do not match}}
     %out_qubits:2  = quantum.custom "Rot"(%cst, %cst_1, %cst_0) %2 ctrls (%3) ctrlvals (%true) : !quantum.bit, !quantum.bit
     return
 }
@@ -122,11 +122,28 @@ func.func @controlled2(%1 : !quantum.bit, %2 : !quantum.bit, %3 : !quantum.bit) 
     %cst = llvm.mlir.constant (6.000000e-01 : f64) : f64
     %cst_0 = llvm.mlir.constant (9.000000e-01 : f64) : f64
     %cst_1 = llvm.mlir.constant (3.000000e-01 : f64) : f64
-    // expected-error@+1 {{number of controlling qubits in input (2) and controlling values (1) must be the same}}
+    // expected-error@+1 {{number of operands and types do not match}}
     %out_qubits:3  = quantum.custom "Rot"(%cst, %cst_1, %cst_0) %2 ctrls (%3, %3) ctrlvals (%true) : !quantum.bit, !quantum.bit, !quantum.bit
     return
 }
 
+// -----
+
+func.func @test_paulirot_length_mismatch(%1 : !quantum.bit, %angle: f64) {
+    // expected-error@+1 {{length of Pauli word (2) and number of qubits (1) must be the same}}
+    %q = quantum.paulirot ["Z", "X"](%angle) %1 : !quantum.bit
+    return
+}
+
+// -----
+
+func.func @test_paulirot_bad_pauli_word(%1 : !quantum.bit, %angle: f64) {
+    // expected-error@+1 {{Only "X", "Y", "Z", and "I" are valid Pauli words.}}
+    %q = quantum.paulirot ["bad"](%angle) %1 : !quantum.bit
+    return
+}
+
+// -----
 
 //////////////////
 // Measurements //
