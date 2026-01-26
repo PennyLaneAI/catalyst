@@ -20,7 +20,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import qjit
+from catalyst import qjit, CompileError
 from catalyst.third_party.oqd import OQDDevice, OQDDevicePipeline
 
 MODULE_TEST_PATH = os.path.dirname(__file__)
@@ -44,6 +44,7 @@ def _get_oqd_pipelines():
 class TestOQDARTIQLLVMIR:
     """Test OQD device ARTIQ LLVM IR generation."""
 
+    @pytest.mark.usefixtures("use_capture")
     def test_rx_gate_llvmir_contains_artiq_symbols(self):
         """Test that LLVM IR contains required ARTIQ symbols (__modinit__ and __kernel__)."""
         artiq_config = {"kernel_ld": None}
@@ -53,7 +54,6 @@ class TestOQDARTIQLLVMIR:
             wires=1,
             artiq_config=artiq_config,
         )
-        qml.capture.enable()
 
         # Compile to LLVM IR only
         oqd_pipelines = _get_oqd_pipelines()
@@ -88,6 +88,37 @@ class TestOQDARTIQLLVMIR:
         assert (
             "call fastcc void @rtio_init()" in llvm_ir or "call void @rtio_init()" in llvm_ir
         ), "Missing rtio_init call in __kernel__"
+
+        # Test that the llvm ir is the same after getting it again
+        assert circuit.llvmir == llvm_ir, "LLVM IR should be the same after getting it again"
+
+    @pytest.mark.usefixtures("use_capture")
+    def test_no_compilation_error(self):
+        """Test that no compilation error is raised."""
+        artiq_config = {"kernel_ld": None}
+
+        oqd_dev = OQDDevice(
+            backend="default",
+            wires=1,
+            artiq_config=artiq_config,
+        )
+
+        oqd_pipelines = _get_oqd_pipelines()
+
+        @qjit(pipelines=oqd_pipelines, target="llvmir", link=False)
+        @qml.set_shots(4)
+        @qml.qnode(oqd_dev)
+        def circuit():
+            x = np.pi / 2
+            qml.RX(x, wires=0)
+            return qml.counts(all_outcomes=True)
+
+        with pytest.raises(
+            CompileError,
+            match="Cannot execute function: no compiled function available. "
+            "The function must be compiled before execution.",
+        ):
+            circuit()
 
 
 if __name__ == "__main__":
