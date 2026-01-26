@@ -226,6 +226,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             self.init_qreg.insert_all_dangling_qubits()
             return compbasis_p.bind(self.init_qreg.get(), qreg_available=True)
 
+    # pylint: disable=too-many-branches
     def interpret_measurement(self, measurement):
         """Rebind a measurement as a catalyst instruction.
 
@@ -251,6 +252,20 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                         """
                         Terminal measurements cannot take in dynamically allocated wires
                         since they must be temporary.
+                        """
+                    )
+                )
+            # Only probs measurements are currently supported with dynamic allocation
+            # due to a bug in Lightning's PartialSample implementation
+            # TODO: Remove this once the bug is fixed
+            if not isinstance(measurement, qml.measurements.ProbabilityMP):
+                raise CompileError(
+                    textwrap.dedent(
+                        """
+                        Only probability measurements (qml.probs) are currently supported
+                        when dynamic allocations are present in the program. Other measurement
+                        types (qml.sample, qml.expval, qml.var, ...etc) will be supported
+                        in a future release after the underlying bug is fixed.
                         """
                     )
                 )

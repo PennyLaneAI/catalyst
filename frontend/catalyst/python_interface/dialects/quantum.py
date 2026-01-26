@@ -230,7 +230,7 @@ class ComputationalBasisOp(IRDLOperation):
         (`qubits` $qubits^)? (`qreg` $qreg^)? attr-dict `:` type(results)
     """
 
-    irdl_options = [AttrSizedOperandSegments(as_property=True)]
+    irdl_options = (AttrSizedOperandSegments(as_property=True),)
 
     qubits = var_operand_def(QubitType)
 
@@ -251,10 +251,10 @@ class CountsOp(IRDLOperation):
         attr-dict ( `:` type($eigvals)^ `,` type($counts) )?
     """
 
-    irdl_options = [
+    irdl_options = (
         AttrSizedOperandSegments(as_property=True),
         SameVariadicResultSize(),
-    ]
+    )
 
     obs = operand_def(ObservableType)
 
@@ -284,10 +284,10 @@ class CustomOp(IRDLOperation):
         `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     """
 
-    irdl_options = [
+    irdl_options = (
         AttrSizedOperandSegments(as_property=True),
         AttrSizedResultSegments(as_property=True),
-    ]
+    )
 
     params = var_operand_def(Float64Type())
 
@@ -395,7 +395,7 @@ class DeviceInitOp(IRDLOperation):
         (`shots` `(` $shots^ `)`)? `[` $lib `,` $device_name `,` $kwargs `]` attr-dict
     """
 
-    irdl_options = [ParsePropInAttrDict()]
+    irdl_options = (ParsePropInAttrDict(),)
 
     shots = opt_operand_def(i64)
 
@@ -491,14 +491,14 @@ class GlobalPhaseOp(IRDLOperation):
     name = "quantum.gphase"
 
     assembly_format = """
-        `(` $params `)` 
-        attr-dict 
-        ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  
-        ( `ctrlvals` `(` $in_ctrl_values^ `)` )? 
-        `:` type(results)
+        `(` $params `)`
+        attr-dict
+        ( `ctrls` `(` $in_ctrl_qubits^ `)` )?
+        ( `ctrlvals` `(` $in_ctrl_values^ `)` )?
+        `:` (`ctrls` type($out_ctrl_qubits)^ )?
     """
 
-    irdl_options = [AttrSizedOperandSegments(as_property=True), ParsePropInAttrDict()]
+    irdl_options = (AttrSizedOperandSegments(as_property=True), ParsePropInAttrDict())
 
     params = operand_def(Float64Type())
 
@@ -684,10 +684,10 @@ class MultiRZOp(IRDLOperation):
         `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     """
 
-    irdl_options = [
+    irdl_options = (
         AttrSizedOperandSegments(as_property=True),
         AttrSizedResultSegments(as_property=True),
-    ]
+    )
 
     theta = operand_def(Float64Type())
 
@@ -796,10 +796,10 @@ class PauliRotOp(IRDLOperation):
 
     VALID_PAULIS: ClassVar[tuple[str]] = ("X", "Y", "Z", "I")
 
-    irdl_options = [
+    irdl_options = (
         AttrSizedOperandSegments(as_property=True),
         AttrSizedResultSegments(as_property=True),
-    ]
+    )
 
     angle = operand_def(Float64Type())
 
@@ -888,10 +888,10 @@ class PCPhaseOp(IRDLOperation):
         `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     """
 
-    irdl_options = [
+    irdl_options = (
         AttrSizedOperandSegments(as_property=True),
         AttrSizedResultSegments(as_property=True),
-    ]
+    )
 
     theta = operand_def(Float64Type())
 
@@ -963,7 +963,7 @@ class ProbsOp(IRDLOperation):
         attr-dict ( `:` type($probabilities)^ )?
     """
 
-    irdl_options = [AttrSizedOperandSegments(as_property=True)]
+    irdl_options = (AttrSizedOperandSegments(as_property=True),)
 
     obs = operand_def(ObservableType)
 
@@ -989,10 +989,10 @@ class QubitUnitaryOp(IRDLOperation):
         `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     """
 
-    irdl_options = [
+    irdl_options = (
         AttrSizedOperandSegments(as_property=True),
         AttrSizedResultSegments(as_property=True),
-    ]
+    )
 
     matrix = operand_def(
         (TensorConstraint(element_type=ComplexType(Float64Type()), rank=2))
@@ -1066,7 +1066,7 @@ class SampleOp(IRDLOperation):
         attr-dict ( `:` type($samples)^ )?
     """
 
-    irdl_options = [AttrSizedOperandSegments(as_property=True)]
+    irdl_options = (AttrSizedOperandSegments(as_property=True),)
 
     obs = operand_def(ObservableType)
 
@@ -1128,7 +1128,7 @@ class StateOp(IRDLOperation):
         attr-dict ( `:` type($state)^ )?
     """
 
-    irdl_options = [AttrSizedOperandSegments(as_property=True)]
+    irdl_options = (AttrSizedOperandSegments(as_property=True),)
 
     obs = operand_def(ObservableType)
 

@@ -15,11 +15,21 @@
 """General purpose utilities to use with xDSL."""
 
 from numbers import Number
+from typing import Any
 
 from xdsl.dialects.arith import ConstantOp as arithConstantOp
-from xdsl.dialects.builtin import ComplexType, ShapedType
+from xdsl.dialects.builtin import (
+    ArrayAttr,
+    ComplexType,
+    DictionaryAttr,
+    FloatAttr,
+    IntegerAttr,
+    IntegerType,
+    ShapedType,
+    StringAttr,
+)
 from xdsl.dialects.tensor import ExtractOp as tensorExtractOp
-from xdsl.ir import SSAValue
+from xdsl.ir import Attribute, SSAValue
 
 from catalyst.python_interface.dialects.stablehlo import ConstantOp as hloConstantOp
 
@@ -75,3 +85,33 @@ def get_constant_from_ssa(value: SSAValue) -> Number | None:
                 return val
 
     return None
+
+
+def get_pyval_from_xdsl_attr(attr: Attribute) -> Any:
+    """Get a Python value from an xDSL attribute."""
+    val = None
+
+    match attr:
+        case IntegerAttr():
+            # Booleans are represented as integer attributes with a bitwidth of 1
+            if isinstance(attr.type, IntegerType) and attr.type.width.data == 1:
+                val = bool(attr.value.data)
+            else:
+                val = attr.value.data
+
+        case FloatAttr():
+            val = attr.value.data
+
+        case StringAttr():
+            val = attr.data
+
+        case ArrayAttr():
+            val = tuple(get_pyval_from_xdsl_attr(_attr) for _attr in attr.data)
+
+        case DictionaryAttr():
+            val = {k: get_pyval_from_xdsl_attr(v) for k, v in attr.data.items()}
+
+        case _:
+            raise ValueError(f"{attr} cannot be converted to a Python value.")
+
+    return val

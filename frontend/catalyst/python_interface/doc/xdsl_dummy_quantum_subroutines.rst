@@ -10,6 +10,7 @@
     from xdsl.builder import ImplicitBuilder
     from xdsl.dialects import builtin, func
     from xdsl.ir import Block, Region
+    from xdsl.rewriter import InsertPoint
 
 Convert into xDSL module
 ========================
@@ -137,7 +138,7 @@ Now, we write a pass to do the substitution
                 [customOp.in_qubits[0]],
                 self.subroutine.function_type.outputs.data,
             )
-            rewriter.insert_op_after_matched_op(callOp)
+            rewriter.insert_op(callOp, insertion_point=InsertPoint.after(customOp))
             rewriter.replace_all_uses_with(customOp.out_qubits[0], callOp.results[0])
             rewriter.erase_op(customOp)
 

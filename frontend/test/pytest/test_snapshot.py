@@ -59,11 +59,12 @@ class TestSnapshot:
 
             circuit()
 
-    def test_snapshot_on_single_wire(self):
+    def test_snapshot_on_single_wire(self, backend):
         """Test all six single qubit basis states in qml.Snapshot without shots"""
-        dev = qml.device("lightning.qubit", wires=1)
 
-        @qml.qnode(dev)
+        pl_dev = qml.device("default.qubit", wires=1)
+        cat_dev = qml.device(backend, wires=1)
+
         def circuit():
             qml.Snapshot()  # |0>
             qml.X(wires=0)
@@ -78,14 +79,14 @@ class TestSnapshot:
             qml.Snapshot()  # |+>
             return qml.state(), qml.probs(), qml.expval(qml.X(0)), qml.var(qml.Z(0))
 
-        expected_measurement_results = circuit()
+        pl_circuit = qml.qnode(pl_dev)(circuit)
+        expected_measurement_results = pl_circuit()
 
-        expected_snapshot_results = list(
-            qml.snapshots(circuit)().values()
-        )  # get the snapshot result values
+        expected_snapshot_results = list(qml.snapshots(pl_circuit)().values())
         expected_snapshot_results = expected_snapshot_results[:-1]  # remove 'execution_results' key
 
-        jitted_results = qjit(circuit)()
+        cat_circuit = qjit(qml.qnode(cat_dev)(circuit))
+        jitted_results = cat_circuit()
         jitted_snapshot_results = jitted_results[0]
         jitted_measurement_results = jitted_results[1]
 
@@ -95,12 +96,11 @@ class TestSnapshot:
             for i in range(len(jitted_measurement_results))
         )
 
-    def test_snapshot_on_two_wire(self):
+    def test_snapshot_on_two_wire(self, backend):
         """Test qml.Snapshot on two qubits with shots"""
-        dev = qml.device("lightning.qubit", wires=2)
+        pl_dev = qml.device("default.qubit", wires=2)
+        cat_dev = qml.device(backend, wires=2)
 
-        @qml.set_shots(5)
-        @qml.qnode(dev)
         def circuit():
             qml.Snapshot()  # |00>
             qml.Hadamard(wires=0)
@@ -113,14 +113,14 @@ class TestSnapshot:
             qml.X(wires=1)  # |11> to measure in comp-basis
             return {0: qml.counts(), 1: qml.sample()}
 
-        expected_measurement_results = circuit()
+        pl_circuit = qml.qnode(pl_dev, shots=5)(circuit)
+        expected_measurement_results = pl_circuit()
 
-        expected_snapshot_results = list(
-            qml.snapshots(circuit)().values()
-        )  # get the snapshot result values
+        expected_snapshot_results = list(qml.snapshots(pl_circuit)().values())
         expected_snapshot_results = expected_snapshot_results[:-1]  # remove 'execution_results' key
 
-        jitted_results = qjit(circuit)()
+        cat_circuit = qjit(qml.qnode(cat_dev, shots=5)(circuit))
+        jitted_results = cat_circuit()
         jitted_snapshot_results = jitted_results[0]
         jitted_measurement_results = jitted_results[1]
 

@@ -99,6 +99,28 @@ def test_arbitrary_angle_pauli_rotations():
 test_arbitrary_angle_pauli_rotations()
 
 
+def test_arbitrary_negative_angle_pauli_rotations():
+    """Test arbitrary angle PauliRot"""
+    qml.capture.enable()
+    dev = qml.device("null.qubit", wires=1)
+
+    pipeline = [("pipe", ["quantum-compilation-stage"])]
+
+    @qjit(pipelines=pipeline, target="mlir")
+    @to_ppr
+    @qml.qnode(device=dev)
+    def circuit():
+        qml.PauliRot(-0.42, "X", wires=0)
+
+    # CHECK: [[cst:%.+]] = arith.constant -2.100000e-01 : f64
+    # CHECK: [[q0:%.+]] = qec.ppr.arbitrary ["X"]([[cst]])
+    print(circuit.mlir_opt)
+    qml.capture.disable()
+
+
+test_arbitrary_negative_angle_pauli_rotations()
+
+
 def test_dynamic_angle_pauli_rotations():
     """Test dynamic angle PauliRot"""
     qml.capture.enable()

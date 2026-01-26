@@ -17,10 +17,13 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#include "Quantum/IR/QuantumOps.h"
 
 #include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
-#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -47,11 +50,20 @@ struct ToPPRPass : impl::ToPPRPassBase<ToPPRPass> {
         // Conversion target is QECDialect
         target.addLegalDialect<qec::QECDialect>();
         target.addLegalDialect<mlir::arith::ArithDialect>();
+        target.addLegalOp<GlobalPhaseOp>();
 
         RewritePatternSet patterns(ctx);
         populateToPPRPatterns(patterns);
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
+            return signalPassFailure();
+        }
+
+        // Add canonicalization pass
+        RewritePatternSet canonPatterns(ctx);
+        catalyst::qec::PPRotationOp::getCanonicalizationPatterns(canonPatterns, ctx);
+        catalyst::qec::PPRotationArbitraryOp::getCanonicalizationPatterns(canonPatterns, ctx);
+        if (failed(applyPatternsGreedily(getOperation(), std::move(canonPatterns)))) {
             return signalPassFailure();
         }
     }

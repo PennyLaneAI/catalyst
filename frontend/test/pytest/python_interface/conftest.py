@@ -17,6 +17,14 @@ from inspect import getsource
 from io import StringIO
 
 import pytest
+from xdsl.context import Context
+from xdsl.dialects import test
+from xdsl.passes import ModulePass, PassPipeline
+from xdsl.printer import Printer
+
+from catalyst.compiler import _quantum_opt
+from catalyst.python_interface import Compiler, QuantumParser
+from catalyst.python_interface.conversion import parse_generic_to_xdsl_module
 
 deps_available = True
 
@@ -25,32 +33,46 @@ try:
     from filecheck.matcher import Matcher
     from filecheck.options import parse_argv_options
     from filecheck.parser import Parser, pattern_for_opts
-    from xdsl.context import Context
-    from xdsl.dialects import test
-    from xdsl.passes import PassPipeline
-    from xdsl.printer import Printer
-
-    from catalyst.python_interface import Compiler, QuantumParser
-    from catalyst.python_interface.conversion import parse_generic_to_xdsl_module
 
 except (ImportError, ModuleNotFoundError):
     deps_available = False
 
 
-def _run_filecheck_impl(program_str, pipeline=(), verify=False, roundtrip=False):
+# pylint: disable=too-many-positional-arguments,too-many-arguments
+def _run_filecheck_impl(
+    program_str: str,
+    pipeline: tuple[ModulePass, ...] = (),
+    verify: bool = False,
+    roundtrip: bool = False,
+    to_mlir: bool = True,
+    pretty_print: bool = False,
+):
     """Run filecheck on an xDSL module, comparing it to a program string containing
     filecheck directives."""
     if not deps_available:
         return
 
-    ctx = Context()
+    ctx = Context(allow_unregistered=False)
     xdsl_module = QuantumParser(ctx, program_str, extra_dialects=(test.Test,)).parse_module()
 
     if roundtrip:
-        # Print generic format
+        # Print -> parse to xDSL
+        # If `pretty_print == True`, the assembly format (or other custom printing logic)
+        # will be used
+        # If `to_mlir == True`, the printed program will be parsed to MLIR and printed back
+        # before parsing to xDSL
         stream = StringIO()
-        Printer(stream=stream, print_generic_format=True).print_op(xdsl_module)
-        xdsl_module = QuantumParser(ctx, stream.getvalue()).parse_module()
+        Printer(stream=stream, print_generic_format=not pretty_print).print_op(xdsl_module)
+        mod_str = stream.getvalue()
+
+        if to_mlir:
+            # We need to provide an empty pass pipeline explicitly. Without doing so,
+            # Catalyst CLI lowers the module to LLVM IR
+            opt_args = ("--catalyst-pipeline=empty_pipe()",)
+            opt_args += () if pretty_print else ("-mlir-print-op-generic",)
+            mod_str = _quantum_opt(*opt_args, stdin=mod_str)
+
+        xdsl_module = QuantumParser(ctx, mod_str, extra_dialects=(test.Test,)).parse_module()
 
     if verify:
         xdsl_module.verify()
@@ -99,12 +121,18 @@ def run_filecheck():
         verify (bool): Whether or not to verify the IR after parsing and transforming.
             ``False`` by default.
         roundtrip (bool): Whether or not to use round-trip testing. This is useful for dialect
-            tests to verify that xDSL both parses and prints the IR correctly. If ``True``, we parse
-            the program string into an xDSL module, print it in generic format, and then parse the
-            generic program string back to an xDSL module. ``False`` by default.
+            tests to verify that xDSL both parses and prints the IR correctly. If ``True``, we
+            parse the program string into an xDSL module, print it, parse the printed module
+            into an MLIR module, print it again, and then parse this back to an xDSL module.
+            ``False`` by default.
+        to_mlir (bool): Whether to parse the program to MLIR when round-trip testing is performed.
+            If ``roundtrip == False``, this argument is ignored. ``True`` by default.
+        pretty_print (bool): Whether to pretty print the program when round-trip testing is
+            performed. If ``False``, the program will be printed in generic format. If
+            ``roundtrip == False``, this argument is ignored. ``False`` by default.
     """
     if not deps_available:
-        pytest.skip("Cannot run lit tests without xDSL and filecheck.")
+        pytest.skip("Cannot run xDSL lit tests without the Python 'filecheck' package.")
 
     yield _run_filecheck_impl
 
@@ -208,6 +236,6 @@ def run_filecheck_qjit():
 
     """
     if not deps_available:
-        pytest.skip("Cannot run lit tests without xDSL and filecheck.")
+        pytest.skip("Cannot run xDSL lit tests without the Python 'filecheck' package.")
 
     yield _run_filecheck_qjit_impl

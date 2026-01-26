@@ -12,13 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test module for the draw function in the unified compiler inspection module."""
-# pylint: disable=unnecessary-lambda
+# pylint: disable=unnecessary-lambda, protected-access, wrong-import-position
+
+from importlib.util import find_spec
+from shutil import which
 
 import jax
 import pennylane as qml
 import pytest
 
-from catalyst.python_interface.inspection import draw
+from catalyst.python_interface.inspection import draw, draw_graph
 from catalyst.python_interface.transforms import (
     iterative_cancel_inverses_pass,
     merge_rotations_pass,
@@ -27,8 +30,19 @@ from catalyst.python_interface.transforms import (
 pytestmark = pytest.mark.xdsl
 
 
+@pytest.fixture(scope="function")
+def skip_no_graph_deps():
+    """Fixture to skip tests for catalyst.draw_graph if dependencies aren't installed."""
+    if which("dot") is None:
+        pytest.skip(reason="Graphviz isn't installed.")
+    if find_spec("matplotlib") is None:
+        pytest.skip(reason="matplotlib isn't installed.")
+    if find_spec("pydot") is None:
+        pytest.skip(reason="pydot isn't installed.")
+
+
 @pytest.mark.usefixtures("use_capture")
-class Testdraw:
+class TestDraw:
     """Unit tests for the draw function in the unified compiler inspection module."""
 
     @pytest.fixture
@@ -267,7 +281,11 @@ class Testdraw:
                 "0: ──RX─┤  Sample\n1: ──RY─┤  Sample\n2: ──RZ─┤  Sample",
             ),
             (
-                lambda: (qml.expval(qml.X(0)), qml.expval(qml.Y(1)), qml.expval(qml.Z(2))),
+                lambda: (
+                    qml.expval(qml.X(0)),
+                    qml.expval(qml.Y(1)),
+                    qml.expval(qml.Z(2)),
+                ),
                 "0: ──RX─┤  <X>\n1: ──RY─┤  <Y>\n2: ──RZ─┤  <Z>",
             ),
             (
@@ -392,7 +410,11 @@ class Testdraw:
                 [
                     (qml.StatePrep, jax.numpy.array([1, 0]), [0]),
                     (qml.StatePrep, jax.numpy.array([1, 0, 0, 0]), [0, 1]),
-                    (qml.StatePrep, jax.numpy.array([1, 0, 0, 0, 1, 0, 0, 0]), [0, 1, 2]),
+                    (
+                        qml.StatePrep,
+                        jax.numpy.array([1, 0, 0, 0, 1, 0, 0, 0]),
+                        [0, 1, 2],
+                    ),
                     (qml.StatePrep, jax.numpy.array([1, 0, 0, 0]), [0, 1]),
                     (qml.StatePrep, jax.numpy.array([1, 0]), [0]),
                 ],
@@ -524,6 +546,214 @@ class Testdraw:
 
         with pytest.raises(NotImplementedError, match="not yet supported"):
             print(draw(circuit)())
+
+
+@pytest.mark.usefixtures("use_both_frontend", "skip_no_graph_deps")
+class TestDrawGraph:
+    """Tests the `draw_graph` frontend."""
+
+    @pytest.mark.parametrize(
+        "unsupported_level",
+        (
+            [0],
+            [0, 1],
+            (0,),
+            (0, 1),
+            slice(0, 2),
+            "cancel-inverses",
+        ),
+    )
+    def test_unsupported_levels(self, unsupported_level):
+        """Tests proper handling of the level argument."""
+
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(qml.device("null.qubit", wires=2))
+        def qjit_qnode():
+            qml.H(0)
+            return qml.expval(qml.Z(0))
+
+        with pytest.raises(TypeError, match="The 'level' argument must be an integer or 'None'"):
+            _ = draw_graph(qjit_qnode, level=unsupported_level)()
+
+    def test_negative_level_integer(self):
+        """Tests that a negative integer for a level is unsupported."""
+
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(qml.device("null.qubit", wires=2))
+        def qjit_qnode():
+            qml.H(0)
+            return qml.expval(qml.Z(0))
+
+        with pytest.raises(ValueError, match="The 'level' argument must be a positive integer"):
+            _ = draw_graph(qjit_qnode, level=-1)()
+
+    # pylint: disable=line-too-long
+    def test_level_greater_than_num_of_passes(self):
+        """Tests that a user warning is raised if the level is greater than number of passes."""
+
+        @qml.qjit
+        @qml.transforms.merge_rotations
+        @qml.transforms.cancel_inverses
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def circuit():
+            qml.H(0)
+            qml.T(1)
+            qml.H(0)
+            qml.RX(0.1, wires=0)
+            qml.RX(0.2, wires=0)
+            return qml.expval(qml.X(0))
+
+        with pytest.warns(
+            UserWarning,
+            match="Level requested \\(100\\) is higher than the number of compilation passes present: 2",
+        ):
+            _ = draw_graph(circuit, level=100)()
+
+    def test_unsupported_qnode(self):
+        """Tests that only qjit'd qnodes are allowed to be visualized."""
+
+        @qml.qnode(qml.device("null.qubit", wires=2))
+        def qnode():
+            qml.H(0)
+            return qml.expval(qml.Z(0))
+
+        with pytest.raises(TypeError, match="The circuit must be a qjit-compiled qnode"):
+            _ = draw_graph(qnode)()
+
+    def test_return_types(self):
+        """Tests the return types of the function without crashing CI."""
+        # pylint: disable=import-outside-toplevel
+        import matplotlib
+
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(qml.device("null.qubit", wires=2))
+        def qjit_qnode():
+            qml.H(0)
+            return qml.expval(qml.Z(0))
+
+        # from unittest.mock import patch
+
+        ## Mock out the creation of the PNG
+        # with patch("pydot.Dot.create_png") as mock_create_png:
+        #    # Creates a simple 1x1 pixel transparent image https://en.wikipedia.org/wiki/PNG
+        #    mock_create_png.return_value = (
+        #        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00"
+        #        b"\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9c"
+        #        b"c\x00\x01\x00\x00\x05\x00\x01\r\n\x2e\xe4\x00\x00\x00\x00IEND\xaeB`\x82"
+        #    )
+
+        fig, axes = draw_graph(qjit_qnode)()
+
+        assert isinstance(fig, matplotlib.figure.Figure)
+        assert isinstance(axes, matplotlib.axes._axes.Axes)
+
+    def test_transforms_step_through(self):
+        """Tests that the level argument controls transformations step through."""
+
+        @qml.qjit
+        @qml.transforms.merge_rotations
+        @qml.transforms.cancel_inverses
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def circuit():
+            qml.H(0)
+            qml.T(1)
+            qml.H(0)
+            qml.RX(0.1, wires=0)
+            qml.RX(0.2, wires=0)
+            return qml.expval(qml.X(0))
+
+        drawer = draw_graph(circuit)
+        _ = drawer()
+        cache = drawer._cache
+
+        no_transforms = cache[0][0]
+        assert cache[0][1] == "Before MLIR Passes"
+        cancel_inverses = cache[1][0]
+        assert cache[1][1] == "cancel-inverses"
+        merge_rotations = cache[2][0]
+        assert cache[2][1] == "merge-rotations"
+
+        # Check no transforms
+        assert no_transforms.count("<name> Hadamard|<wire> [0]") == 2
+        assert no_transforms.count("<name> T|<wire> [1]") == 1
+        assert no_transforms.count("<name> RX|<wire> [0]") == 2
+        assert no_transforms.count("expval(PauliX)") == 1
+
+        # Cancel inverses
+        assert cancel_inverses.count("<name> Hadamard|<wire> [0]") == 0
+        assert cancel_inverses.count("<name> T|<wire> [1]") == 1
+        assert cancel_inverses.count("<name> RX|<wire> [0]") == 2
+        assert cancel_inverses.count("expval(PauliX)") == 1
+
+        # Merge rotations
+        assert merge_rotations.count("<name> Hadamard|<wire> [0]") == 0
+        assert merge_rotations.count("<name> T|<wire> [1]") == 1
+        assert merge_rotations.count("<name> RX|<wire> [0]") == 1
+        assert merge_rotations.count("expval(PauliX)") == 1
+
+    def test_empty_passpipeline(self):
+        """Tests that it works with an empty pass pipeline."""
+
+        @qml.qjit
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def circuit():
+            qml.H(0)
+            qml.T(1)
+            qml.H(0)
+            qml.RX(0.1, wires=0)
+            qml.RX(0.2, wires=0)
+            return qml.expval(qml.X(0))
+
+        drawer = draw_graph(circuit)
+        _ = drawer()
+        cache = drawer._cache
+
+        assert len(cache) == 1
+        graph = cache[0][0]
+        assert cache[0][1] == "Before MLIR Passes"
+
+        assert graph.count("<name> Hadamard|<wire> [0]") == 2
+        assert graph.count("<name> T|<wire> [1]") == 1
+        assert graph.count("<name> RX|<wire> [0]") == 2
+        assert graph.count("expval(PauliX)") == 1
+
+    def test_early_callback_exit(self):
+        """Tests that unnecessary callbacks aren't performend."""
+
+        @qml.qjit
+        @qml.transforms.merge_rotations
+        @qml.transforms.cancel_inverses
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def circuit():
+            qml.H(0)
+            qml.T(1)
+            qml.H(0)
+            qml.RX(0.1, wires=0)
+            qml.RX(0.2, wires=0)
+            return qml.expval(qml.X(0))
+
+        # Show circuit after cancel_inverses transform
+        drawer = draw_graph(circuit, level=1)
+        _ = drawer()
+        cache = drawer._cache
+        assert len(cache) == 2
+
+        no_transforms = cache[0][0]
+        assert cache[0][1] == "Before MLIR Passes"
+        cancel_inverses = cache[1][0]
+        assert cache[1][1] == "cancel-inverses"
+
+        # Check no transforms
+        assert no_transforms.count("<name> Hadamard|<wire> [0]") == 2
+        assert no_transforms.count("<name> T|<wire> [1]") == 1
+        assert no_transforms.count("<name> RX|<wire> [0]") == 2
+        assert no_transforms.count("expval(PauliX)") == 1
+
+        # Cancel inverses
+        assert cancel_inverses.count("<name> Hadamard|<wire> [0]") == 0
+        assert cancel_inverses.count("<name> T|<wire> [1]") == 1
+        assert cancel_inverses.count("<name> RX|<wire> [0]") == 2
+        assert cancel_inverses.count("expval(PauliX)") == 1
 
 
 if __name__ == "__main__":

@@ -14,8 +14,6 @@
 
 """Integration tests for the runtime assertion feature."""
 
-import re
-
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
@@ -117,14 +115,12 @@ class TestShotVector:
 
         if measurement[1] == "VarianceMP" and mcm_method == "one-shot":
             with pytest.raises(
-                TypeError,
-                match=re.escape("qml.var(obs) cannot be returned when `mcm_method='one-shot'`"),
+                NotImplementedError, match=r"qml.var\(\) cannot be used on observables"
             ):
                 qjit(circuit)()
         else:
             with pytest.raises(
-                NotImplementedError,
-                match=re.compile(f"Measurement {measurement[1]} does not support shot-vectors"),
+                NotImplementedError, match="measurement process does not support shot-vectors"
             ):
                 qjit(circuit)()
 

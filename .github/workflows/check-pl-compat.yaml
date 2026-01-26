@@ -44,7 +44,7 @@ jobs:
         # was built and uploaded to TestPyPI, so that the tests are the compatible ones
         # to be run with the latest rc/rc/rc packges on TestPyPI.
         # This would be the last autobump-and-upload commit made on the rc branch.
-        git checkout v0.13.0-rc
+        git checkout v0.14.0-rc
         git checkout "$(git log -1 --author="ringo-but-quantum" --pretty=format:%H)"
 
     - name: Set up Python
@@ -56,7 +56,7 @@ jobs:
       if: ${{ inputs.catalyst == 'latest' }}
       run: |
         sudo apt-get update
-        sudo apt-get install -y ccache libasan6 lld
+        sudo apt-get install -y ccache libasan6 lld graphviz
 
     - name: Install deps (Python)
       run: |
@@ -115,6 +115,7 @@ jobs:
     - name: Install Catalyst (stable)
       if: ${{ inputs.catalyst == 'stable' }}
       run: |
+        sudo apt-get install -y graphviz
         pip install pennylane-catalyst
 
     - name: Install Catalyst (latest)
@@ -137,9 +138,9 @@ jobs:
       run: |
         # This is the first for the three rc installs
         # Thus this one shouldn't have no-deps: it needs to pull in all PL dependencies
-        jax_version=$(grep jax .dep-versions | awk -F '=' '{ print $2 }')
-        pip install jax==$jax_version
-        pip install --pre -U --index-url https://test.pypi.org/simple/ pennylane-catalyst'<=0.13.0'
+        # And also this one needs to be --extra-index-url because it needs to see regular PyPI
+        sudo apt-get install -y graphviz
+        pip install --extra-index-url https://test.pypi.org/simple/ pennylane-catalyst'>=0.14.0rc0,<=0.14.0'
 
     - name: Install PennyLane-Lightning (stable)
       if: ${{ inputs.lightning == 'stable' }}
@@ -159,8 +160,9 @@ jobs:
     - name: Install PennyLane-Lightning (release-candidate)
       if: ${{ inputs.lightning == 'release-candidate' }}
       run: |
-        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane-lightning'<=0.43.0'
-        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane-lightning-kokkos'<=0.43.0'
+        # Do not overwrite any dependencies, just fetch rc package from TestPyPI
+        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane-lightning'>=0.44.0rc0,<=0.44.0'
+        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane-lightning-kokkos'>=0.44.0rc0,<=0.44.0'
 
     # PennyLane doesn't update its dev version number on every commit like Lightning, so we need to
     # force the package to be re-installed. First, handle potential dependency changes, then force
@@ -178,7 +180,8 @@ jobs:
     - name: Install PennyLane (release-candidate)
       if: ${{ inputs.pennylane == 'release-candidate' }}
       run: |
-        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane'<=0.43.0'
+        # Do not overwrite any dependencies, just fetch rc package from TestPyPI
+        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane'>=0.44.0rc0,<=0.44.0'
 
     - name: Add Frontend Dependencies to PATH
       if: ${{ inputs.catalyst == 'latest' }}

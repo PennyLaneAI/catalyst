@@ -115,7 +115,6 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
     See also: :class:`~.DecompositionGraph`.
 
     Args:
-        ag_enabled (bool): Whether to enable autograph in the decomposition rules.
         gate_set (set[Operator] or None): The target gate set to decompose to
         fixed_decomps (dict or None): A dictionary of fixed decomposition rules
             to use in the decomposition graph.
@@ -129,7 +128,6 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
     def __init__(
         self,
         *,
-        ag_enabled=False,
         gate_set=None,
         fixed_decomps=None,
         alt_decomps=None,
@@ -141,7 +139,6 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                 "graph-based decomposition is enabled."
             )
 
-        self._ag_enabled = ag_enabled
         self._gate_set = gate_set
         self._fixed_decomps = fixed_decomps
         self._alt_decomps = alt_decomps
@@ -211,7 +208,6 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                     num_wires=len(o.wires),
                     num_params=num_params,
                     requires_copy=num_wires == -1,
-                    ag_enabled=self._ag_enabled,
                 )
             elif op.op.name in COMPILER_OPS_FOR_DECOMPOSITION:
                 # In this part, we need to handle the case where an operation in
@@ -222,6 +218,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                 # dictionary to get the number of wires.
                 num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
                 pauli_word = op.op.params.get("pauli_word", None)
+                requires_copy = num_wires == -1
 
                 if op.op.name in ("PauliRot", "PauliMeasure"):
                     num_wires = len(pauli_word)
@@ -233,8 +230,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                     op_name=op.op.name,
                     num_wires=num_wires,
                     num_params=num_params,
-                    requires_copy=num_wires == -1,
-                    ag_enabled=self._ag_enabled,
+                    requires_copy=requires_copy,
                     pauli_word=pauli_word,
                 )
             elif not any(
@@ -262,7 +258,6 @@ def _create_decomposition_rule(
     num_wires: int,
     num_params: int,
     requires_copy: bool = False,
-    ag_enabled: bool = False,
     pauli_word: str | None = None,
 ):
     """Create a decomposition rule from a callable.
@@ -275,7 +270,6 @@ def _create_decomposition_rule(
         requires_copy (bool): Whether to create a copy of the function
             to avoid mutating the original. This is required for operations
             with a variable number of wires (e.g., MultiRZ, GlobalPhase).
-        ag_enabled (bool): Whether to enable autograph in the decomposition rule.
     """
 
     sig_func = inspect.signature(func)
@@ -342,14 +336,6 @@ def _create_decomposition_rule(
         # when the same rule is compiled multiple times with different number of wires
         # (e.g., MultiRZ, GlobalPhase)
         func_cp.__name__ += f"_wires_{num_wires}"
-
-    if ag_enabled:
-        from pennylane.capture.autograph import (  # pylint: disable=import-outside-toplevel
-            run_autograph,
-        )
-
-        # Capture the function with autograph
-        func_cp = run_autograph(func_cp)
 
     # Set custom attributes for the decomposition rule
     # These attributes are used in the MLIR decomposition pass
