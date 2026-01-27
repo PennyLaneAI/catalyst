@@ -394,6 +394,7 @@ class QJITDevice(qml.devices.Device):
         capabilities = filter_device_capabilities_with_shots(
             capabilities=self.capabilities,
             shots_present=bool(shots),
+            unitary_support=getattr(self.original_device, "_to_matrix_ops", None),
         )
 
         # measurement transforms may change operations on the tape to accommodate
@@ -552,13 +553,27 @@ def _load_device_capabilities(device) -> DeviceCapabilities:
     return capabilities
 
 
-def filter_device_capabilities_with_shots(capabilities, shots_present) -> DeviceCapabilities:
+def filter_device_capabilities_with_shots(
+    capabilities, shots_present, unitary_support=None
+) -> DeviceCapabilities:
     """
     Process the device capabilities depending on whether shots are present in the user program,
     and whether device supports QubitUnitary ops.
     """
 
     device_capabilities = capabilities.filter(finite_shots=shots_present)
+
+    # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
+    #       when customizable multi-pathway decomposition is implemented. (Epic 74474)
+    # If the device does not support QubitUnitary, we remove the to_matrix_ops attribute
+    # from the device capabilities, to avoid Catalyst attempting to decompose operations
+    # into unitaries.
+    # Why? Because the current to_matrix_ops decomposition pathway is not customizable per device,
+    # and may lead to unintentional decompositions.
+    if unitary_support is not None and device_capabilities.supports_operation("QubitUnitary"):
+        _to_matrix_ops = unitary_support
+        setattr(device_capabilities, "to_matrix_ops", _to_matrix_ops)
+
     return device_capabilities
 
 

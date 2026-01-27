@@ -214,10 +214,6 @@ def catalyst_acceptance(
     if not is_differentiable(op, capabilities, grad_method):
         return None
 
-    if isinstance(op, qml.PCPhase) and len(op.wires) > 10:
-        # we ideally want to avoid decomp for num_qubits > 10 (experimentally determined)
-        return None
-
     if isinstance(op, qml.ops.Adjoint):
         match = catalyst_acceptance(op.base, capabilities, grad_method)
         if match and is_invertible(op.base, capabilities):
