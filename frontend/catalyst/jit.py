@@ -852,7 +852,8 @@ class QJIT(CatalystCallable):
                 "Functions compiled with target='llvmir' cannot be executed directly. "
                 "Access the generated LLVM IR via the '.llvmir' property."
             )
-        elif self.compiled_function is None:
+
+        if self.compiled_function is None:
             raise CompileError(
                 "Cannot execute function: no compiled function available. "
                 "The function must be compiled before execution."
