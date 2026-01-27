@@ -24,31 +24,27 @@
       os.path.join("device_db", "device_db.json"),
   )
 
-  def test_rx_gate():
-      """Test RX gate with ARTIQ linking done in user code."""
-      artiq_config = {
-          "kernel_ld": "/path/to/kernel.ld",
-          "llc_path": "/path/to/llc",
-          "lld_path": "/path/to/ld.lld",
-      }
+  artiq_config = {
+      "kernel_ld": "/path/to/kernel.ld",
+      "llc_path": "/path/to/llc",
+      "lld_path": "/path/to/ld.lld",
+  }
 
-      oqd_dev = OQDDevice(
-          backend="default",
-          shots=4,
-          wires=1,
-          artiq_config=artiq_config
-      )
-      qml.capture.enable()
+  oqd_dev = OQDDevice(
+      backend="default",
+      shots=4,
+      wires=1,
+      artiq_config=artiq_config
+  )
+  qml.capture.enable()
 
-      @qjit(pipelines=OQD_PIPELINES, target=llvmir)
-      @qml.qnode(oqd_dev)
-      def circuit():
-          qml.RX(0.5, wires=0)
-          return qml.counts(wires=0)
+  @qjit(pipelines=OQD_PIPELINES, target="llvmir")
+  @qml.qnode(oqd_dev)
+  def circuit():
+      qml.RX(0.5, wires=0)
+      return qml.counts(wires=0)
 
-      output_elf_path = compile_to_artiq(circuit, oqd_dev.artiq_config)
-
-  test_rx_gate()
+  output_elf_path = compile_to_artiq(circuit, oqd_dev.artiq_config)
   ```
 
 <h3>Improvements 🛠</h3>
