@@ -17,7 +17,14 @@
   length and the number of qubit operands are the same, and that all of the Pauli words are legal.
   [(#2405)](https://github.com/PennyLaneAI/catalyst/pull/2405)
 
+* `qml.vjp` can now be used with Catalyst and program capture.
+  [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
+
 <h3>Breaking changes 💔</h3>
+
+* When an integer argnums is provided to `catalyst.vjp`, a singleton dimension is now squeezed
+  out. This brings the behaviour in line with that of `grad` and `jacobian`.
+  [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
 
 * Dropped support for NumPy 1.x following its end-of-life. NumPy 2.0 or higher is now required.
   [(#2407)](https://github.com/PennyLaneAI/catalyst/pull/2407)
@@ -26,6 +33,13 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fix `replace_ir` for certain stages when used with gradients.
+  [(#2436)](https://github.com/PennyLaneAI/catalyst/pull/2436)
+
+* Restore the ability to differentiate multiple (expectation value) QNode results with the
+  adjoint-differentiation method.
+  [(#2428)](https://github.com/PennyLaneAI/catalyst/pull/2428)
+
 * Fixed the angle conversion when lowering `qec.ppr` and `qec.ppr.arbitrary` operations to
   `__catalyst__qis__PauliRot` runtime calls. The PPR rotation angle is now correctly multiplied
   by 2 to match the PauliRot convention (`PauliRot(φ) == PPR(φ/2)`).
@@ -33,6 +47,10 @@
 
 * Fixing incorrect lowering of PPM into CAPI calls when the PPM is in the negative basis.
   [(#2422)](https://github.com/PennyLaneAI/catalyst/pull/2422)
+
+* Fixed the GlobalPhase discrepancies when executing gridsynth in the PPR basis.
+  [(#2433)](https://github.com/PennyLaneAI/catalyst/pull/2433)
+
 
 <h3>Internal changes ⚙️</h3>
 
@@ -63,6 +81,9 @@
   into normal PPR and PPMs with SCF dialect to support runtime execution.
   [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
 
+* Increased format size for the `--mlir-timing` flag, displaying more decimals for better timing precision.
+  [(#2423)](https://github.com/PennyLaneAI/catalyst/pull/2423)
+  
 * Added global phase tracking to the `to-ppr` compiler pass. When converting quantum gates to
   Pauli Product Rotations (PPR), the pass now emits `quantum.gphase` operations to preserve
   global phase correctness.
@@ -99,7 +120,9 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
 Sengthai Heng,
+David Ittah,
 Jeffrey Kam,
+River McCubbin,
 Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,

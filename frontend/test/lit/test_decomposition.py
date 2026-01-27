@@ -1177,7 +1177,7 @@ def test_decompose_lowering_fallback():
     @qml.qjit(target="mlir")
     @partial(qml.transforms.decompose, gate_set={qml.RX, qml.RZ})
     @qml.qnode(qml.device("lightning.qubit", wires=2))
-    # CHECK: func.func public @circuit_25() -> tensor<4xcomplex<f64>> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode}
+    # CHECK-LABEL: func.func public @circuit_25()
     def circuit_25():
         # CHECK: [[OUT_QUBIT:%.+]] = quantum.custom "RZ"(%cst) {{%.+}} : !quantum.bit
         # CHECK-NEXT: [[OUT_QUBIT_0:%.+]] = quantum.custom "RX"(%cst) [[OUT_QUBIT]] : !quantum.bit
