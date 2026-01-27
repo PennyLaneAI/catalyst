@@ -14,7 +14,7 @@
 """Operations for the xDSL Quantum dialect, which mirrors Catalyst's MLIR
 Quantum dialect."""
 
-from .gates import (
+from .gate_ops import (
     CustomOp,
     GateOp,
     GlobalPhaseOp,
@@ -25,7 +25,7 @@ from .gates import (
     SetBasisStateOp,
     SetStateOp,
 )
-from .measurements import (
+from .measurement_ops import (
     CountsOp,
     ExpvalOp,
     MeasureOp,
@@ -35,7 +35,7 @@ from .measurements import (
     TerminalMeasurementOp,
     VarianceOp,
 )
-from .miscellaneous import (
+from .miscellaneous_ops import (
     AdjointOp,
     DeviceInitOp,
     DeviceReleaseOp,
@@ -44,7 +44,7 @@ from .miscellaneous import (
     NumQubitsOp,
     YieldOp,
 )
-from .observables import (
+from .observable_ops import (
     ComputationalBasisOp,
     HamiltonianOp,
     HermitianOp,
