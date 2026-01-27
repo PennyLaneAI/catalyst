@@ -128,6 +128,7 @@ struct ResourceTracker final {
      *
      * @param gate_name Optional specific gate name to count. If empty, returns total count of all
      * gates
+     *
      * @return The count of gates matching the specified name, or total gate count if no name
      * provided
      */
@@ -142,6 +143,28 @@ struct ResourceTracker final {
             num_gates += count;
         }
         return num_gates;
+    }
+
+    /**
+     * @brief Returns the number of measurements used since the last time this object was reset
+     *
+     * @param meas_name Optional specific measurement name to count. If empty, returns total count
+     * of all measurements
+     *
+     * @return The count of measurements matching the specified name, or total measurement count if
+     * no name provided
+     */
+    auto GetNumMeasurements(const std::string &meas_name = "") -> std::size_t
+    {
+        if (meas_name != "") {
+            return measurements_[meas_name];
+        }
+
+        std::size_t num_measurements = 0;
+        for (const auto &[meas_type, count] : measurements_) {
+            num_measurements += count;
+        }
+        return num_measurements;
     }
 
     /**
