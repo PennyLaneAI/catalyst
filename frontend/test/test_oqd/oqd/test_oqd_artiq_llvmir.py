@@ -119,8 +119,6 @@ class TestOQDARTIQLLVMIR:
         with pytest.raises(
             CompileError,
             match="Functions compiled with target='llvmir' cannot be executed directly. "
-            "LLVM IR is an intermediate representation that requires further processing "
-            "\\(e\\.g\\.\\, linking and compilation\\) before execution\\. "
             "Access the generated LLVM IR via the '\\.llvmir' property\\.",
         ):
             circuit()
