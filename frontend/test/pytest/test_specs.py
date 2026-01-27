@@ -46,6 +46,7 @@ def check_specs_resources_same(
     expected_res: (
         SpecsResources | list[SpecsResources] | dict[any, SpecsResources | list[SpecsResources]]
     ),
+    skip_measurements: bool = False,
 ) -> None:
     """Helper function to check if 2 resources objects are the same"""
     assert type(actual_res) == type(expected_res)
@@ -54,20 +55,24 @@ def check_specs_resources_same(
         assert len(actual_res) == len(expected_res)
 
         for r1, r2 in zip(actual_res, expected_res):
-            check_specs_resources_same(r1, r2)
+            check_specs_resources_same(r1, r2, skip_measurements=skip_measurements)
 
     elif isinstance(actual_res, dict):
         assert len(actual_res) == len(expected_res)
 
         for k in actual_res.keys():
             assert k in expected_res
-            check_specs_resources_same(actual_res[k], expected_res[k])
+            check_specs_resources_same(
+                actual_res[k], expected_res[k], skip_measurements=skip_measurements
+            )
 
     elif isinstance(actual_res, SpecsResources):
         assert actual_res.gate_types == expected_res.gate_types
         assert actual_res.gate_sizes == expected_res.gate_sizes
 
-        assert actual_res.measurements == expected_res.measurements
+        # TODO: Measurements are not yet supported in Catalyst device-level specs
+        if not skip_measurements:
+            assert actual_res.measurements == expected_res.measurements
 
         assert actual_res.num_allocs == expected_res.num_allocs
         assert actual_res.depth == expected_res.depth
@@ -77,10 +82,12 @@ def check_specs_resources_same(
         raise ValueError("Invalid Type")
 
 
-def check_specs_same(actual: CircuitSpecs, expected: CircuitSpecs):
+def check_specs_same(actual: CircuitSpecs, expected: CircuitSpecs, skip_measurements: bool = False):
     """Check that two specs dictionaries are the same."""
     check_specs_header_same(actual, expected)
-    check_specs_resources_same(actual["resources"], expected["resources"])
+    check_specs_resources_same(
+        actual["resources"], expected["resources"], skip_measurements=skip_measurements
+    )
 
 
 class TestDeviceLevelSpecs:
@@ -97,10 +104,11 @@ class TestDeviceLevelSpecs:
             return qml.expval(qml.PauliZ(0))
 
         pl_specs = qml.specs(circuit, level="device")()
-        cat_specs = qml.specs(qjit(circuit), level="device")()
+        with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
+            cat_specs = qml.specs(qjit(circuit), level="device")()
 
         assert cat_specs["device_name"] == "lightning.qubit"
-        check_specs_same(cat_specs, pl_specs)
+        check_specs_same(cat_specs, pl_specs, skip_measurements=True)
 
     def test_complex(self):
         """Test a complex case of qml.specs() against PennyLane"""
@@ -125,7 +133,8 @@ class TestDeviceLevelSpecs:
             return qml.probs()
 
         pl_specs = qml.specs(circuit, level="device")()
-        cat_specs = qml.specs(qjit(circuit), level="device")()
+        with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
+            cat_specs = qml.specs(qjit(circuit), level="device")()
 
         assert cat_specs["device_name"] == "lightning.qubit"
 
@@ -136,52 +145,7 @@ class TestDeviceLevelSpecs:
         ]
         del cat_specs["resources"].gate_types["CY"]
 
-        check_specs_same(cat_specs, pl_specs)
-
-    def test_measurements(self):
-        """Test that measurements are tracked correctly at device level."""
-
-        dev = qml.device("null.qubit", wires=3)
-
-        @qml.set_shots(1)
-        @qml.qnode(dev)
-        def circuit():
-            return (
-                qml.expval(qml.PauliX(0)),
-                qml.expval(qml.PauliZ(0)),
-                qml.expval(qml.PauliZ(1)),
-                qml.probs(),
-                qml.probs(wires=[0]),
-                qml.sample(),
-                qml.counts(),
-                qml.counts(wires=[1]),
-            )
-
-        pl_specs = qml.specs(circuit, level="device")()
-        cat_specs = qml.specs(qjit(circuit), level="device")()
-
-        check_specs_same(cat_specs, pl_specs)
-
-        @qml.qnode(dev)
-        def circuit_complex():
-            coeffs = [0.2, -0.543]
-            obs = [qml.X(0) @ qml.Z(1), qml.Z(0) @ qml.Hadamard(2)]
-            ham = qml.ops.LinearCombination(coeffs, obs)
-            return (
-                qml.expval(qml.PauliZ(0) @ qml.PauliX(1)),
-                qml.expval(ham),
-                qml.state(),
-                qml.var(qml.PauliX(0) @ qml.PauliY(1) @ qml.PauliZ(2)),
-            )
-
-        complex_meas_specs = qml.specs(qjit(circuit_complex), level="device")()
-        expected_measurements = {
-            "expval(Prod(num_terms=2))": 1,
-            "expval(Hamiltonian(num_terms=2))": 1,
-            "state(all wires)": 1,
-            "var(Prod(num_terms=3))": 1,
-        }
-        assert complex_meas_specs["resources"].measurements == expected_measurements
+        check_specs_same(cat_specs, pl_specs, skip_measurements=True)
 
 
 class TestPassByPassSpecs:
