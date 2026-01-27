@@ -40,7 +40,7 @@
       )
       qml.capture.enable()
 
-      @qjit(pipelines=OQD_PIPELINES, link=False)
+      @qjit(pipelines=OQD_PIPELINES, target=llvmir)
       @qml.qnode(oqd_dev)
       def circuit():
           qml.RX(0.5, wires=0)
