@@ -78,7 +78,6 @@ def qjit(
     autograph_include=(),
     async_qnodes=False,
     target="binary",
-    link=True,
     keep_intermediate=False,
     use_nameloc=False,
     verbose=False,
@@ -114,7 +113,6 @@ def qjit(
         async_qnodes (bool): Experimental support for automatically executing
             QNodes asynchronously, if supported by the device runtime.
         target (str): The compilation target.
-        link (bool): If ``True``, the compiled function is linked to a shared object.
         keep_intermediate (Union[str, int, bool]): Level controlling intermediate file generation.
 
             - ``False`` or ``0`` or ``"none"`` or ``None`` (default): No intermediate file is kept.
@@ -636,7 +634,7 @@ class QJIT(CatalystCallable):
         if self.compile_options.target in ("llvmir", "binary"):
             self.compiled_function, self.llvm_ir = self.compile()
 
-        if self.compile_options.target in ("binary",) and self.compile_options.link:
+        if self.compile_options.target in ("binary",):
             self.fn_cache.insert(
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
@@ -685,7 +683,7 @@ class QJIT(CatalystCallable):
             self.mlir_module = self.generate_ir()
             self.compiled_function, self.llvm_ir = self.compile()
 
-            if self.compile_options.link:
+            if self.compile_options.target != "llvmir":
                 self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
         elif self.compiled_function is not cached_fn.compiled_fn:
@@ -804,7 +802,6 @@ class QJIT(CatalystCallable):
 
         Returns:
             Tuple[CompiledFunction, str]: the compilation result and LLVMIR
-            For link=False, returns (None, llvm_ir) instead.
         """
         # WARNING: assumption is that the first function is the entry point to the compiled program.
         entry_point_func = self.mlir_module.body.operations[0]
@@ -830,7 +827,7 @@ class QJIT(CatalystCallable):
         else:
             shared_object, llvm_ir = self.compiler.run(self.mlir_module, self.workspace)
 
-        if not self.compile_options.link:
+        if self.compile_options.target == "llvmir":
             return None, llvm_ir
 
         compiled_fn = CompiledFunction(
@@ -850,10 +847,10 @@ class QJIT(CatalystCallable):
         Returns:
             Any: results of the execution arranged into the original function's output PyTrees
         """
-        if self.compiled_function is None:
+        if self.compile_options.target == "llvmir":
             raise CompileError(
-                "Cannot execute function: no compiled function available. "
-                "The function must be compiled before execution."
+                "Functions compiled with target='llvmir' cannot be executed directly. "
+                "Access the generated LLVM IR via the '.llvmir' property."
             )
 
         results = self.compiled_function(*args, **kwargs)

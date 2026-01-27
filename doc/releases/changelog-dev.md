@@ -3,7 +3,7 @@
 <h3>New features since last release</h3>
 
 * OQD (Open Quantum Design) end-to-end pipeline is added to Catalyst.
-  The pipeline supports compilation to LLVM IR with `target="llvmir"` and `link=False`, allowing integration with ARTIQ's cross-compilation toolchain via the `compile_to_artiq()` function in `catalyst.third_party.oqd` to generate ARTIQ's binary.
+  The pipeline supports compilation to LLVM IR with `target="llvmir"`. Allowing integration with ARTIQ's cross-compilation toolchain via the `compile_to_artiq()` function in `catalyst.third_party.oqd` to generate ARTIQ's binary.
   [(#2299)](https://github.com/PennyLaneAI/catalyst/pull/2299)
 
   see `frontend/test/test_oqd/oqd/test_oqd_artiq_llvmir.py` for more details.
