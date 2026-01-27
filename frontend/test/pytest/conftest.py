@@ -51,9 +51,15 @@ def disable_capture():
 def use_capture():
     """Enable capture before and disable capture after the test."""
     qml.capture.enable()
+    # FIXME: enable graph decomposition by default with capture
+    # this is temporary until we can properly test all cases
+    # where capture + graph decomposition is used
+    qml.decomposition.enable_graph()
     try:
         yield
     finally:
+        # FIXME: disable graph decomposition after the test
+        qml.decomposition.disable_graph()
         qml.capture.disable()
 
 
