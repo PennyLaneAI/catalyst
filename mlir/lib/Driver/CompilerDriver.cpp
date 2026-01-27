@@ -1045,10 +1045,15 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     llvm::InitLLVM y(argc, argv);
     MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
 
-    // Read the input IR file
-    std::string source = readInputFile(inputFilename);
-    if (source.empty()) {
-        llvm::errs() << "Error: Unable to read input file: " << inputFilename << "\n";
+    if (config.shouldShowDialects()) {
+        llvm::outs() << "Available Dialects: ";
+        interleave(registry.getDialectNames(), llvm::outs(), ",");
+        llvm::outs() << "\n";
+        return 1;
+    }
+
+    if (config.shouldListPasses()) {
+        mlir::printRegisteredPasses();
         return 1;
     }
 
@@ -1056,6 +1061,13 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     assert(output);
     output->outputFilename = outputFilename;
     llvm::raw_string_ostream errStream{output->diagnosticMessages};
+
+    // Read the input IR file
+    std::string source = readInputFile(inputFilename);
+    if (source.empty()) {
+        llvm::errs() << "Error: Unable to read input file: " << inputFilename << "\n";
+        return 1;
+    }
 
     CompilerOptions options{.source = source,
                             .workspace = WorkspaceDir,
