@@ -8,6 +8,7 @@
   Note that one needs to apply `@qml.transform(pass_name="unroll-conditional-ppr-ppm")` and 
   `@qml.transform(pass_name="lower-qec-init-ops")` after passes that introduce conditional PPR/PPMs
   as well as any `qec.prepare` and `qec.fabricate` operations in the MLIR.
+  
   For example, we can now execute the following circuit.
   ```python
   import pennylane as qml
@@ -34,11 +35,7 @@
   [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
   [(#2413)](https://github.com/PennyLaneAI/catalyst/pull/2413)
   [(#2414)](https://github.com/PennyLaneAI/catalyst/pull/2414)
-  [(#2419)](https://github.com/PennyLaneAI/catalyst/pull/2419)
-  [(#2422)](https://github.com/PennyLaneAI/catalyst/pull/2422)
   [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
-  [(#2430)](https://github.com/PennyLaneAI/catalyst/pull/2430)
-  [(#2433)](https://github.com/PennyLaneAI/catalyst/pull/2433)
   [(#2443)](https://github.com/PennyLaneAI/catalyst/pull/2443)
 
 <h3>Improvements 🛠</h3>
