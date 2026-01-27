@@ -649,7 +649,8 @@ class QJIT(CatalystCallable):
             return None
 
         _mlir = str(self.mlir_module)
-        return to_llvmir(stdin=_mlir, options=self.compile_options)
+        self.llvm_ir = to_llvmir(stdin=_mlir, options=self.compile_options)
+        return self.llvm_ir
 
     @debug_logger
     def jit_compile(self, args, **kwargs):
