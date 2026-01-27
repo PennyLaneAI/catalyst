@@ -22,6 +22,9 @@ from catalyst import DifferentiableCompileError as DiffErr
 from catalyst import grad, qjit
 
 
+@pytest.mark.capture_todo
+
+
 class TestExamplesFromWebsite:
     """Test the easiest examples from the website"""
 

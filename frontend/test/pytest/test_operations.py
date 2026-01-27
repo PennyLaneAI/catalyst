@@ -22,6 +22,10 @@ from catalyst.api_extensions.control_flow import Cond, ForLoop, WhileLoop
 from catalyst.jax_tracer import HybridOp, has_nested_tapes
 
 
+pytestmark = pytest.mark.usefixtures("use_both_frontend")
+
+
+@pytest.mark.capture_todo
 def test_no_parameters(backend):
     """Test no-param operations."""
 
@@ -95,6 +99,7 @@ def test_no_parameters(backend):
     assert np.allclose(qjit_fn(), qml_fn())
 
 
+@pytest.mark.capture_todo
 def test_param(backend):
     """Test param operations."""
 
@@ -158,6 +163,7 @@ def test_param(backend):
     assert np.allclose(qjit_fn(3.14, 0.6), qml_fn(3.14, 0.6))
 
 
+@pytest.mark.old_frontend
 def test_hybrid_op_repr(backend):
     """Test hybrid operation representation"""
 
@@ -231,6 +237,7 @@ def test_qubitunitary_complex(inp, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
+@pytest.mark.capture_todo
 def test_multicontrolledx_via_paulix():
     """Test that lightning executes multicontrolled x via paulix rather than qubit unitary."""
 

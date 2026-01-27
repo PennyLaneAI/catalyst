@@ -27,8 +27,8 @@ from catalyst.utils.runtime_environment import get_lib_path
 
 # pylint: disable=too-many-lines
 
+pytestmark = pytest.mark.usefixtures("use_both_frontend")
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestSample:
     """Test sample."""
 
@@ -109,7 +109,6 @@ class TestSample:
             qjit(sample_dynamic_wires)()
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestCounts:
     """Test counts."""
 
@@ -231,7 +230,6 @@ class TestCounts:
                 qjit(counts_dynamic_wires)()
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestExpval:
 
     def test_named(self, backend):
@@ -459,7 +457,6 @@ class TestExpval:
         assert np.isclose(observed, expected)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestVar:
 
     def test_rx(self, backend):
@@ -745,7 +742,6 @@ class TestVar:
         )
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestState:
     """Test state measurement processes."""
 
@@ -778,7 +774,6 @@ class TestState:
         assert np.allclose(observed, expected)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestProbs:
     """Test probabilities measurement processes."""
 
@@ -811,7 +806,6 @@ class TestProbs:
         assert np.allclose(observed, expected)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestNewArithmeticOps:
     "Test PennyLane new arithmetic operators"
 
@@ -1122,6 +1116,7 @@ class CustomDevice(qml.devices.Device):
 class TestDensityMatrixMP:
     """Tests for density_matrix"""
 
+    @pytest.mark.capture_todo
     def test_error(self):
         """Test that tracing density matrix produces an error"""
 
@@ -1134,7 +1129,6 @@ class TestDensityMatrixMP:
                 return qml.density_matrix([0])
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestVnEntropy:
     """Test vnentropy."""
 
@@ -1154,7 +1148,6 @@ class TestVnEntropy:
         assert circuit_entropy(np.pi / 2) == expected
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestMutualInfo:
     """Test mutualinfo."""
 
@@ -1176,7 +1169,6 @@ class TestMutualInfo:
         assert mutual_info_circuit() == expected
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestShadow:
     """Test shadow."""
 
@@ -1200,7 +1192,6 @@ class TestShadow:
         assert expected_recipes == actual_recipes
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestShadowExpval:
     """Test shadowexpval."""
 
@@ -1223,7 +1214,6 @@ class TestShadowExpval:
         assert shadow_expval_circuit(0, H) == expected
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 class TestPurity:
     """Test purity."""
 
@@ -1338,8 +1328,9 @@ class TestNullQubitMeasurements:
                 qml.Hadamard(wires=i)
             return qml.probs()
 
-        expected = circuit_probs()
         observed = qjit(circuit_probs)()
+        qml.capture.disable()
+        expected = circuit_probs()
         assert np.array_equal(observed, expected)
 
     def test_nullq_probs_per_wire(self):
@@ -1352,8 +1343,9 @@ class TestNullQubitMeasurements:
             qml.Hadamard(wires=1)
             return qml.probs(wires=0), qml.probs(wires=1)
 
-        expected = circuit_probs()
         observed = qjit(circuit_probs)()
+        qml.capture.disable()
+        expected = circuit_probs()
         assert np.array_equal(observed, expected)
 
     @pytest.mark.parametrize("n_qubits", [0, 1, 2])
@@ -1367,8 +1359,9 @@ class TestNullQubitMeasurements:
                 qml.Hadamard(wires=i)
             return qml.state()
 
-        expected = circuit_state()
         observed = qjit(circuit_state)()
+        qml.capture.disable()
+        expected = circuit_state()
         assert np.array_equal(observed, expected)
 
     @pytest.mark.parametrize("n_qubits", [1, 2])
@@ -1383,8 +1376,9 @@ class TestNullQubitMeasurements:
 
             return qml.expval(qml.X(0)), qml.expval(qml.Y(0)), qml.expval(qml.Z(0))
 
-        expected = circuit_expval()
         observed = qjit(circuit_expval)()
+        qml.capture.disable()
+        expected = circuit_expval()
         assert np.array_equal(observed, expected)
 
     @pytest.mark.parametrize("n_qubits", [1, 2])
@@ -1399,8 +1393,10 @@ class TestNullQubitMeasurements:
 
             return qml.var(qml.X(0)), qml.var(qml.Y(0)), qml.var(qml.Z(0))
 
-        expected = circuit_var()
+
         observed = qjit(circuit_var)()
+        qml.capture.disable()
+        expected = circuit_var()
         assert np.array_equal(observed, expected)
 
 

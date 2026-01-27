@@ -27,10 +27,11 @@ from pennylane import adjoint, cond, for_loop, grad, qjit
 from catalyst import measure
 
 
+pytestmark = pytest.mark.usefixtures("use_both_frontend")
+
 class TestPyTreesReturnValues:
     """Test QJIT workflows with different return value data-types."""
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_return_value_float(self, backend):
         """Test constant."""
 
@@ -47,6 +48,7 @@ class TestPyTreesReturnValues:
         result = jitted_fn(params)
         assert jnp.allclose(result, expected)
 
+    @pytest.mark.old_frontend
     def test_return_value_mcm(self, backend):
         """Test that a qnode can return a scalar mcm."""
 
@@ -59,6 +61,7 @@ class TestPyTreesReturnValues:
         result = jitted_fn()
         assert not result
 
+    @pytest.mark.old_frontend
     def test_return_value_arrays(self, backend):
         """Test arrays."""
 
@@ -89,7 +92,8 @@ class TestPyTreesReturnValues:
         assert jnp.allclose(result[0], jnp.pi)
         assert jnp.allclose(result[1], ip_result)
 
-    def test_return_value_tuples(self, backend, tol_stochastic):
+    @pytest.mark.old_frontend
+    def test_return_value_tuples(self, backend):
         """Test tuples."""
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -121,6 +125,8 @@ class TestPyTreesReturnValues:
         assert result[0][0][0] + result[0][0][1] == result[0][1]
         assert result[0][0][0] * result[0][0][1] == result[1]
 
+    def test_tuple_mps(self, backend, tol_stochastic):
+        """Test returning a tuple of measurement processes."""
         @qml.set_shots(1000)
         @qml.qnode(qml.device(backend, wires=2))
         def circuit3(params):
@@ -171,7 +177,6 @@ class TestPyTreesReturnValues:
         assert result[0] == 4.0
         assert result[1] == 6.0
 
-    @pytest.mark.usefixtures("use_both_frontend")
     def test_return_value_hybrid(self, backend):
         """Test tuples."""
 
@@ -191,6 +196,7 @@ class TestPyTreesReturnValues:
         assert jnp.allclose(result[0], result[2])
         assert jnp.allclose(result[1][0] + result[1][1], 1.0)
 
+    @pytest.mark.old_frontend
     def test_return_value_cond(self, backend):
         """Test conditionals."""
 
@@ -215,6 +221,9 @@ class TestPyTreesReturnValues:
         res5 = circuit1(5)
         assert res5[0] == 25
         assert res5[1] == (125, 625)
+
+    def test_return_value_cond_no_qnode(self):
+        """Test qjitting a cond with no qnode."""
 
         # Classical Path.
         @qjit
@@ -241,12 +250,9 @@ class TestPyTreesReturnValues:
         assert res5["cond"][1] == (125, 625)
         assert res5["const"] == 5
 
-    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
+    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", pytest.param("one-shot", marks=pytest.mark.capture_todo)])
     def test_return_value_dict(self, backend, tol_stochastic, mcm_method):
         """Test dictionaries."""
-
-        if mcm_method == "one-shot" and qml.capture.enabled():
-            pytest.xfail()
 
         @qml.qnode(qml.device(backend, wires=2))
         def circuit1(params):
@@ -289,6 +295,41 @@ class TestPyTreesReturnValues:
             result["expval"]["z0"], expected_expval, atol=tol_stochastic, rtol=tol_stochastic
         )
 
+
+        @qml.set_shots(None)
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit3(params):
+            qml.RX(params[0], wires=0)
+            qml.RX(params[1], wires=1)
+            return {
+                "state": qml.state(),
+                "expval": {
+                    "z0": qml.expval(qml.PauliZ(0)),
+                },
+            }
+
+        params = [0.5, 0.6]
+        expected_expval = 0.87758256
+
+        jitted_fn = qjit(circuit3)
+        result = jitted_fn(params)
+        assert isinstance(result, dict)
+        assert len(result["state"]) == 4
+        assert jnp.allclose(result["expval"]["z0"], expected_expval)
+
+        @qjit
+        def workflow1(param):
+            return {"w": jnp.sin(param), "q": jnp.cos(param)}
+
+        result = workflow1(jnp.pi / 2)
+        assert isinstance(result, dict)
+        assert result["w"] == 1
+
+    @pytest.mark.capture_todo
+    @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", pytest.param("one-shot", marks=pytest.mark.capture_todo)])
+    def test_return_value_dict_snapshots(self, backend, tol_stochastic, mcm_method):
+        """Test snapshots and reutrning a dict."""
+
         @qml.set_shots(1000)
         @qml.qnode(qml.device(backend, wires=2), mcm_method=mcm_method)
         def circuit2_snapshot(params):
@@ -325,34 +366,6 @@ class TestPyTreesReturnValues:
             result[1]["expval"]["z0"], expected_expval, atol=tol_stochastic, rtol=tol_stochastic
         )
 
-        @qml.set_shots(None)
-        @qml.qnode(qml.device(backend, wires=2))
-        def circuit3(params):
-            qml.RX(params[0], wires=0)
-            qml.RX(params[1], wires=1)
-            return {
-                "state": qml.state(),
-                "expval": {
-                    "z0": qml.expval(qml.PauliZ(0)),
-                },
-            }
-
-        params = [0.5, 0.6]
-        expected_expval = 0.87758256
-
-        jitted_fn = qjit(circuit3)
-        result = jitted_fn(params)
-        assert isinstance(result, dict)
-        assert len(result["state"]) == 4
-        assert jnp.allclose(result["expval"]["z0"], expected_expval)
-
-        @qjit
-        def workflow1(param):
-            return {"w": jnp.sin(param), "q": jnp.cos(param)}
-
-        result = workflow1(jnp.pi / 2)
-        assert isinstance(result, dict)
-        assert result["w"] == 1
 
 
 class TestPyTreesFuncArgs:

@@ -82,11 +82,9 @@ class TestCondToJaxpr:
 class TestCond:
     """Test suite for the Cond functionality in Catalyst."""
 
+    @pytest.mark.capture_todo
     def test_simple_cond(self, backend):
         """Test basic function with conditional."""
-
-        if qml.capture.enabled():
-            pytest.xfail("Capture does not support returning classical values from qnodes")
 
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
@@ -109,11 +107,9 @@ class TestCond:
         assert circuit(5) == 25
         assert circuit(6) == 36
 
+    @pytest.mark.capture_todo
     def test_cond_one_else_if(self, backend):
         """Test a cond with one else_if branch"""
-
-        if qml.capture.enabled():
-            pytest.xfail("Capture does not support returning classical values from qnodes")
 
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
@@ -136,11 +132,9 @@ class TestCond:
         assert circuit(2) == 4
         assert circuit(1) == 1
 
+    @pytest.mark.capture_todo
     def test_cond_many_else_if(self, backend):
         """Test a cond with multiple else_if branches"""
-
-        if qml.capture.enabled():
-            pytest.xfail("Capture does not support returning classical values from qnodes")
 
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
@@ -196,11 +190,9 @@ class TestCond:
         assert circuit(2) == 8
         assert circuit(-3) == -3
 
+    @pytest.mark.capture_todo
     def test_qubit_manipulation_cond(self, backend):
         """Test conditional with quantum operation."""
-
-        if qml.capture.enabled():
-            pytest.xfail("Capture does not support returning mcms")
 
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
@@ -215,13 +207,11 @@ class TestCond:
         assert not circuit(3)
         assert circuit(6)
 
+    @pytest.mark.capture_todo # [sc-97385]
     def test_branch_return_pytree_mismatch(self):
         """Test that an exception is raised when the true branch returns a value without an else
         branch.
         """
-
-        if qml.capture.enabled():
-            pytest.xfail("We forgot about this case and will fix it in pl-core.")  # [sc-97385]
 
         def circuit():
             @cond(True)
@@ -322,12 +312,10 @@ class TestCond:
             ):
                 qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
+    @pytest.mark.capture_todo
     def test_branch_multi_return_type_unification_qnode_1(self, backend):
         """Test that an exception is not raised when the return types of all branches do not match
         but could be unified."""
-
-        if qml.capture.enabled():
-            pytest.xfail("capture does not allow returning mcm's or classical values")
 
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
@@ -348,11 +336,9 @@ class TestCond:
 
         assert 0 == circuit()
 
+    @pytest.mark.capture_todo
     def test_branch_multi_return_type_unification_qjit(self):
         """Test that unification happens before the results of the cond primitve is available."""
-
-        if qml.capture.enabled():
-            pytest.xfail("capture requires same dtype across all branches")  # [sc-97050]
 
         @qjit
         def circuit():
@@ -370,11 +356,9 @@ class TestCond:
 
         assert 0 == circuit()
 
+    @pytest.mark.capture_todo # [sc-87050]
     def test_branch_multi_return_type_unification_qjit_2(self):
         """Test that unification happens before the results of the cond primitve is available."""
-
-        if qml.capture.enabled():
-            pytest.xfail("capture requires same dtype across all branches")  # [sc-97050]
 
         @qjit
         def circuit(cond1, cond2):
@@ -398,11 +382,9 @@ class TestCond:
 
         assert 0.5 == circuit(False, True)
 
+    @pytest.mark.capture_todo # [sc-97050]
     def test_branch_multi_return_type_unification_qjit_3(self):
         """Test that unification happens before the results of the cond primitve is available."""
-
-        if qml.capture.enabled():
-            pytest.xfail("capture requires same dtype across all branches")  # [sc-97050]
 
         @qjit
         def circuit(cond1, cond2):
@@ -426,11 +408,9 @@ class TestCond:
 
         assert 0.0 == circuit(False, True)
 
+    @pytest.mark.capture_todo # [sc-97050]
     def test_branch_multi_return_type_unification_qjit_4(self):
         """Test that unification happens before the results of the cond primitve is available."""
-
-        if qml.capture.enabled():
-            pytest.xfail("capture requires same dtype across all branches")  # [sc-97050]
 
         @qjit
         def circuit(cond1, cond2):
@@ -485,12 +465,11 @@ class TestCond:
             ):
                 f(True, 3)
 
+    @pytest.mark.capture_todo
     def test_branch_multi_return_type_unification_qnode_2(self, backend):
         """Test that unification happens before the results of the cond primitive is available.
         See the FIXME in the ``CondCallable._call_with_quantum_ctx`` function.
         """
-        if qml.capture.enabled():
-            pytest.xfail(reason="unification not working with capture")
 
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
@@ -535,12 +514,11 @@ class TestCond:
             ):
                 qjit(circuit)
 
+    @pytest.mark.capture_todo
     def test_branch_return_promotion_classical(self):
         """Test that an exception is raised when the true branch returns a different type than the
         else branch, given a classical tracing context (no QNode).
         """
-        if qml.capture.enabled():
-            pytest.xfail("capture requires matching dtypes.")
 
         def circuit():
             @cond(True)

@@ -28,11 +28,15 @@ In other words, the reference runs of automatic qubit management should be qjit 
 specified during device initialization, instead of non qjit runs.
 """
 
+import pytest
+
 import numpy as np
 import pennylane as qml
 from jax import numpy as jnp
 
 from catalyst import jacobian, qjit
+
+pytestmark = [pytest.mark.capture_todo]
 
 
 def test_partial_sample(backend):
