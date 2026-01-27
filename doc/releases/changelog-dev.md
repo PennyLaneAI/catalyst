@@ -54,6 +54,11 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The private helper `_extract_passes` of `qfunc.py` uses `BoundTransform.tape_transform`
+  instead of the deprecated `BoundTransform.transform`.
+  `jax_tracer.py` and `tracing.py` also updated accordingly.
+  [(#2440)](https://github.com/PennyLaneAI/catalyst/pull/2440)
+
 * Autograph is no longer applied to decomposition rules based on whether it's applied to the workflow itself.
   Operator developers now need to manually apply autograph to decomposition rules when needed.
   [(#2421)](https://github.com/PennyLaneAI/catalyst/pull/2421)
@@ -115,6 +120,7 @@
 This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
+Yushao Chen,
 Sengthai Heng,
 David Ittah,
 Jeffrey Kam,
