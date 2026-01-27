@@ -31,6 +31,9 @@
   by 2 to match the PauliRot convention (`PauliRot(φ) == PPR(φ/2)`).
   [(#2414)](https://github.com/PennyLaneAI/catalyst/pull/2414)
 
+* Fixed the `catalyst` CLI tool silently listening to stdin when run without an input file, even when given flags like `--list-passes` that should override this behaviour.
+  [(2447)](https://github.com/PennyLaneAI/catalyst/pull/2447)
+
 <h3>Internal changes ⚙️</h3>
 
 * The quantum dialect MLIR and TableGen source has been refactored to place type and attribute
