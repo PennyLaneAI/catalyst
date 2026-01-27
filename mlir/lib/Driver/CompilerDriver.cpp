@@ -44,6 +44,7 @@
 #include "llvm/Transforms/Coroutines/CoroSplit.h"
 #include "llvm/Transforms/IPO/GlobalDCE.h"
 
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllExtensions.h"
@@ -68,10 +69,12 @@
 #include "Driver/Support.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientInterfaces.h"
+#include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
+#include "PauliFrame/IR/PauliFrameDialect.h"
 #include "QEC/IR/QECDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
@@ -330,6 +333,13 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
 
 } // namespace
 
+/// The upstream MLIR Test dialect does not have a header we can include
+/// We must declare the registration function, and link to the corresponding upstream target
+/// in CMake.
+namespace test {
+void registerTestDialect(mlir::DialectRegistry &);
+} // namespace test
+
 namespace {
 /// Parse an MLIR module given in textual ASM representation. Any errors during parsing will be
 /// output to diagnosticStream.
@@ -341,15 +351,16 @@ OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, const llvm::SourceMgr &s
     return parseSourceFile<ModuleOp>(sourceMgr, parserConfig);
 }
 
-/// From the MLIR module it checks if gradients operations are in the program.
-bool containsGradients(mlir::ModuleOp moduleOp)
+/// Detect whether Enzyme differentiation is needed for the module.
+bool containsGradients(const llvm::Module &llvmModule)
 {
-    bool contain = false;
-    moduleOp.walk([&](catalyst::gradient::GradientOpInterface op) {
-        contain = true;
-        return WalkResult::interrupt();
-    });
-    return contain;
+    // This will match both declarations and definitions
+    for (const llvm::Function &func : llvmModule.functions()) {
+        if (func.getName().starts_with("__enzyme_autodiff")) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /// Parse an LLVM module given in textual representation. Any parse errors will be output to
@@ -367,6 +378,7 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     // MLIR Core dialects
     registerAllDialects(registry);
     registerAllExtensions(registry);
+    ::test::registerTestDialect(registry);
 
     // HLO
     stablehlo::registerAllDialects(registry);
@@ -380,6 +392,7 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     registry.insert<rtio::RTIODialect>();
     registry.insert<gradient::GradientDialect>();
     registry.insert<mitigation::MitigationDialect>();
+    registry.insert<pauli_frame::PauliFrameDialect>();
 }
 } // namespace
 
@@ -748,10 +761,6 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     }
     parserTiming.stop();
 
-    // Enzyme always happens after O2Opt. If the checkpoint is O2Opt, enzymeRun must be set to
-    // true so that the enzyme pass can be executed.
-    bool enzymeRun = options.checkpointStage == "O2Opt";
-
     bool runAll = (options.loweringAction == Action::All);
     bool runOpt = (options.loweringAction == Action::OPT) || runAll;
     bool runTranslate = (options.loweringAction == Action::Translate) || runAll;
@@ -759,10 +768,6 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
     if (runOpt && (inType == InputType::MLIR)) {
         TimingScope optTiming = timing.nest("Optimization");
-        // TODO: The enzymeRun flag will not travel correctly in the case where different
-        // stages of compilation are executed independently via the Catalyst CLI.
-        // Ideally, It should be added to the IR via an attribute.
-        enzymeRun = containsGradients(*mlirModule);
         if (failed(runLowering(options, &ctx, *mlirModule, output, optTiming))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return failure();
@@ -835,6 +840,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             catalyst::utils::LinesCount::Module(*llvmModule.get());
         }
 
+        bool enzymeRun = containsGradients(*llvmModule);
         if (enzymeRun) {
             TimingScope o2PassesTiming = llcTiming.nest("LLVM O2 passes");
             if (failed(timer::timer(runO2LLVMPasses, "runO2LLVMPasses", /* add_endl */ false,

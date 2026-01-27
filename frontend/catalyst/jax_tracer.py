@@ -34,7 +34,7 @@ from jax._src.lax.lax import _extract_tracers_dyn_shape
 from jax._src.pjit import jit_p
 from jax._src.source_info_util import current as current_source_info
 from jax.api_util import debug_info as jdb
-from jax.core import get_aval
+from jax.core import Tracer, get_aval
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
 from pennylane.measurements import (
@@ -49,7 +49,6 @@ from pennylane.measurements import (
 from pennylane.operation import Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
-from pennylane.transforms.core import TransformProgram
 
 import catalyst
 from catalyst.api_extensions.callbacks import MemrefCallable
@@ -413,8 +412,8 @@ class QRegPromise:
         from cache"""
         # pylint: disable=consider-iterating-dictionary
         qrp = self
-        cached_tracers = {w for w in qrp.cache.keys() if not isinstance(w, int)}
-        requested_tracers = {w for w in wires if not isinstance(w, int)}
+        cached_tracers = {w for w in qrp.cache.keys() if isinstance(w, Tracer)}
+        requested_tracers = {w for w in wires if isinstance(w, Tracer)}
         if cached_tracers != requested_tracers:
             qrp.actualize()
         qubits = []
@@ -1081,8 +1080,8 @@ def trace_quantum_measurements(
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
             if shots_obj.has_partitioned_shots and not isinstance(output, SampleMP):
                 raise NotImplementedError(
-                    f"Measurement {type(output).__name__} does not support shot-vectors. "
-                    "Use qml.sample() instead."
+                    f"The {type(output).__name__} measurement process does not support "
+                    "shot-vectors. Please consider using qml.sample() instead."
                 )
 
             if device.wires is None:
@@ -1526,9 +1525,9 @@ def _trace_classical_phase(
             config = _make_execution_config(qnode)
             device_program, config = device.preprocess(ctx, execution_config=config, shots=shots)
         else:
-            device_program = TransformProgram()
+            device_program = qml.CompilePipeline()
 
-        qnode_program = qnode.transform_program if qnode else TransformProgram()
+        qnode_program = qnode.compile_pipeline if qnode else qml.CompilePipeline()
 
         tapes, post_processing, tracing_mode = apply_transforms(
             qnode_program,

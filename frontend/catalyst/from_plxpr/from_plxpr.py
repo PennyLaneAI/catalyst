@@ -29,8 +29,10 @@ from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 from pennylane.capture.primitives import transform_prim
+from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
 from pennylane.transforms import commute_controlled as pl_commute_controlled
 from pennylane.transforms import decompose as pl_decompose
+from pennylane.transforms import gridsynth as pl_gridsynth
 from pennylane.transforms import merge_amplitude_embedding as pl_merge_amplitude_embedding
 from pennylane.transforms import single_qubit_fusion as pl_single_qubit_fusion
 from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
@@ -238,6 +240,18 @@ def handle_grad(self, *args, jaxpr, n_consts, **kwargs):
     )
 
 
+@WorkflowInterpreter.register_primitive(pl_vjp_prim)
+def handle_vjp(self, *args, jaxpr, **kwargs):
+    """Translate a grad equation."""
+    f = partial(copy(self).eval, jaxpr, [])
+    new_jaxpr = jax.make_jaxpr(f)(*args[: -len(jaxpr.outvars)])
+
+    new_args = (*new_jaxpr.consts, *args)
+    j = new_jaxpr.jaxpr
+    new_j = j.replace(constvars=(), invars=j.constvars + j.invars)
+    return pl_vjp_prim.bind(*new_args, jaxpr=new_j, **kwargs)
+
+
 # pylint: disable=unused-argument, too-many-arguments
 @WorkflowInterpreter.register_primitive(qnode_prim)
 def handle_qnode(
@@ -267,17 +281,12 @@ def handle_qnode(
 
     graph_succeeded = False
     if self.requires_decompose_lowering:
-        # Determine if autograph is enabled in the qnode
-        # If so, we need to enable it in the decomposition rules as well
-        # TODO: enable autograph per decomposition rule instead of globally
-        ag_enabled = getattr(qnode, "ag_module", None) is not None
 
         closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
             inner_jaxpr=closed_jaxpr.jaxpr,
             consts=closed_jaxpr.consts,
             tkwargs=self.decompose_tkwargs,
             ncargs=non_const_args,
-            ag_enabled=ag_enabled,
         )
 
         # Fallback to the legacy decomposition if the graph-based decomposition failed
@@ -338,6 +347,7 @@ transforms_to_passes = {
     pl_merge_amplitude_embedding: (None, True),
     pl_single_qubit_fusion: (None, False),
     pl_unitary_to_rot: (None, False),
+    pl_gridsynth: ("gridsynth", False),
 }
 
 
@@ -576,7 +586,7 @@ def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=Non
     return final_jaxpr
 
 
-def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs, ag_enabled):
+def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs):
     """Collect and compile graph solutions for a given JAXPR.
 
     This function uses the DecompRuleInterpreter to evaluate
@@ -591,13 +601,12 @@ def _collect_and_compile_graph_solutions(inner_jaxpr, consts, tkwargs, ncargs, a
         consts (list): The constants used in the JAXPR.
         tkwargs (list): The keyword arguments of the decompose transform.
         ncargs (list): Non-constant arguments for the JAXPR.
-        ag_enabled (bool): Whether to enable autograph in the decomposition rules.
 
     Returns:
         ClosedJaxpr: The decomposed JAXPR.
         bool: A flag indicating whether the graph-based decomposition was successful.
     """
-    gds_interpreter = DecompRuleInterpreter(ag_enabled=ag_enabled, **tkwargs)
+    gds_interpreter = DecompRuleInterpreter(**tkwargs)
 
     def gds_wrapper(*args):
         return gds_interpreter.eval(inner_jaxpr, consts, *args)

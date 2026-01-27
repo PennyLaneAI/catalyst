@@ -40,6 +40,7 @@ CustomOp buildCNOTGate(Value control, Value target, ConversionPatternRewriter &r
         /*in_ctrl_values=*/mlir::ValueRange());
 }
 
+// Overload for static (compile-time) parameters
 CustomOp buildSingleQubitGate(Value qubit, StringRef gateName, ArrayRef<double> params,
                               ConversionPatternRewriter &rewriter)
 {
@@ -55,6 +56,21 @@ CustomOp buildSingleQubitGate(Value qubit, StringRef gateName, ArrayRef<double> 
                                               /*out_qubits=*/mlir::TypeRange({qubit.getType()}),
                                               /*out_ctrl_qubits=*/mlir::TypeRange({}),
                                               /*params=*/mlir::ValueRange(paramValues),
+                                              /*in_qubits=*/mlir::ValueRange({qubit}),
+                                              /*gate_name=*/gateName,
+                                              /*adjoint=*/false,
+                                              /*in_ctrl_qubits=*/mlir::ValueRange({}),
+                                              /*in_ctrl_values=*/mlir::ValueRange());
+}
+
+// Version for dynamic (runtime) parameters
+CustomOp buildSingleQubitGateWithDynamicParams(Value qubit, StringRef gateName, ValueRange params,
+                                               ConversionPatternRewriter &rewriter)
+{
+    return rewriter.create<quantum::CustomOp>(qubit.getLoc(),
+                                              /*out_qubits=*/mlir::TypeRange({qubit.getType()}),
+                                              /*out_ctrl_qubits=*/mlir::TypeRange({}),
+                                              /*params=*/params,
                                               /*in_qubits=*/mlir::ValueRange({qubit}),
                                               /*gate_name=*/gateName,
                                               /*adjoint=*/false,
@@ -134,6 +150,11 @@ void constructReverseCNOTLadder(SmallVector<Value> &qubits, ConversionPatternRew
 // Emits the kernel corresponding to `op`:
 //  - `PPMeasurementOp`: measures `qubits[0]` and assigns the i1 to `measResult`.
 //  - `PPRotationOp`: applies an RZ on `qubits[0]` with angle from `getRotationKind()`.
+//  - `PPRotationArbitraryOp`: applies an RZ on `qubits[0]` with angle = 2 * arbitrary_angle.
+//
+//      PPR(theta, Z) = exp(-i * theta * Z)
+//      RZ(phi)       = exp(-i * phi/2 * Z)
+//      Therefore: phi = 2 * theta
 void constructKernelOperation(SmallVector<Value> &qubits, Value &measResult, QECOpInterface op,
                               ConversionPatternRewriter &rewriter)
 {
@@ -144,11 +165,23 @@ void constructKernelOperation(SmallVector<Value> &qubits, Value &measResult, QEC
     }
     else if (auto pprOp = dyn_cast<PPRotationOp>(op.getOperation())) {
         int16_t signedRk = static_cast<int16_t>(pprOp.getRotationKind());
-        double rk = llvm::numbers::pi / (static_cast<double>(signedRk) / 2);
+        double rk = 2 * (llvm::numbers::pi / (static_cast<double>(signedRk)));
         qubits[0] = buildSingleQubitGate(qubits[0], "RZ", {rk}, rewriter).getOutQubits().front();
     }
-    else if (isa<PPRotationArbitraryOp>(op)) {
-        op->emitError("Unsupported qec.ppr.arbitrary operation.");
+    else if (auto pprArbitraryOp = dyn_cast<PPRotationArbitraryOp>(op.getOperation())) {
+        Value angle = pprArbitraryOp.getArbitraryAngle();
+        auto loc = pprArbitraryOp.getLoc();
+
+        // Create constant 2.0 and multiply to get RZ angle
+        auto two = rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getF64Type(),
+                                                            rewriter.getF64FloatAttr(2.0));
+        auto rzAngle = rewriter.create<mlir::arith::MulFOp>(loc, angle, two.getResult());
+
+        // Create RZ gate with dynamic angle
+        qubits[0] =
+            buildSingleQubitGateWithDynamicParams(qubits[0], "RZ", {rzAngle.getResult()}, rewriter)
+                .getOutQubits()
+                .front();
     }
 }
 
@@ -234,6 +267,7 @@ template <typename TargetOp> struct PPRToMBQCLowering : public ConversionPattern
 };
 
 using PPRotationOpLowering = PPRToMBQCLowering<qec::PPRotationOp>;
+using PPRotationArbitraryOpLowering = PPRToMBQCLowering<qec::PPRotationArbitraryOp>;
 using PPMeasurementOpLowering = PPRToMBQCLowering<qec::PPMeasurementOp>;
 
 } // namespace
@@ -244,6 +278,7 @@ namespace qec {
 void populatePPRToMBQCPatterns(RewritePatternSet &patterns)
 {
     patterns.add<PPRotationOpLowering>(patterns.getContext());
+    patterns.add<PPRotationArbitraryOpLowering>(patterns.getContext());
     patterns.add<PPMeasurementOpLowering>(patterns.getContext());
 }
 

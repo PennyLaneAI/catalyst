@@ -71,6 +71,13 @@ class QMLCollector:
     @handle.register
     def _(self, xdsl_meas_op: ExpvalOp | VarianceOp | ProbsOp | SampleOp) -> MeasurementProcess:
         obs_op = xdsl_meas_op.obs.owner
+
+        if isinstance(xdsl_meas_op, (ProbsOp, SampleOp)):
+            # TODO: This doesn't logically make sense, but quantum.compbasis
+            # is obs_op and function below just pulls out the static wires
+            wires = xdsl_to_qml_measurement(obs_op)
+            return xdsl_to_qml_measurement(xdsl_meas_op, wires=None if wires == [] else wires)
+
         return xdsl_to_qml_measurement(xdsl_meas_op, xdsl_to_qml_measurement(obs_op))
 
     @handle.register

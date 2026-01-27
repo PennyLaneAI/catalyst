@@ -29,16 +29,10 @@ from mlir_quantum.dialects.catalyst import LaunchKernelOp
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
 
-def _only_single_expval(call_jaxpr: core.ClosedJaxpr) -> bool:
-    found_expval = False
+def _all_expval(call_jaxpr: core.ClosedJaxpr) -> bool:
     for eqn in call_jaxpr.eqns:
-        name = eqn.primitive.name
-        if name in {"probs", "counts", "sample"}:
+        if eqn.primitive.name in ("sample", "counts", "var", "probs", "state"):
             return False
-        elif name == "expval":
-            if found_expval:
-                return False
-            found_expval = True
     return True
 
 
@@ -49,7 +43,7 @@ def _calculate_diff_method(qn: qml.QNode, call_jaxpr: core.ClosedJaxpr):
 
     device_name = getattr(getattr(qn, "device", None), "name", None)
 
-    if device_name and "lightning" in device_name and _only_single_expval(call_jaxpr):
+    if device_name and "lightning" in device_name and _all_expval(call_jaxpr):
         return "adjoint"
     return "parameter-shift"
 
@@ -399,6 +393,11 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
                 try:
                     # pylint: disable=import-outside-toplevel
                     from catalyst.python_interface.pass_api import is_xdsl_pass
+
+                    # catalyst.python_interface.xdsl_universe collects all transforms in
+                    # catalyst.python_interface.transforms, so importing from that file
+                    # updates the global xDSL transforms registry.
+                    from catalyst.python_interface.xdsl_universe import XDSL_UNIVERSE as _
 
                     if is_xdsl_pass(name):
                         uses_xdsl_passes = True

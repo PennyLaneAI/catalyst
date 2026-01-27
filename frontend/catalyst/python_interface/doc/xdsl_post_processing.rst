@@ -8,6 +8,7 @@ Simple tutorial for injecting functions into xDSL modules
 
     import pennylane as qml
     from catalyst.python_interface.conversion import inline_module, xdsl_from_qjit, xdsl_module
+    from catalyst.python_interface.dialects.catalyst import LaunchKernelOp
 
     from xdsl import context, passes, pattern_rewriter
     from xdsl.dialects import builtin, func
@@ -107,7 +108,7 @@ builtin.module @jit_square attributes {mhlo.num_partitions = 1 : i32, mhlo.num_r
 .. code-block:: python
 
     def is_kernel_launch(op):
-        return op.name == "catalyst.launch_kernel"
+        return isinstance(op, LaunchKernelOp)
 
 
     class SquarePattern(pattern_rewriter.RewritePattern):
@@ -223,3 +224,10 @@ builtin.module @workflow {
     func.return %0 : tensor<f64>
   }
 }
+
+
+.. note::
+
+  This strategy works well if only one pass is being applied that does post-processing. However, applying
+  multiple passes like this in a general manner requires logic for composing the passes and their post-processing
+  functions, which is non-trivial. This functionality is being developed in Catalyst right now.

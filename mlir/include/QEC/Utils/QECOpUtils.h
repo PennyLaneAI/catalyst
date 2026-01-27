@@ -33,5 +33,8 @@ std::vector<mlir::Value> getInQubitReachingValuesAt(QECOpInterface srcOp, QECOpI
 // This checks commutativity of the normalized ops with the same block.
 bool commutes(QECOpInterface rhsOp, QECOpInterface lhsOp);
 
+// Recursively resolve the constant parameter of a value and returns std::nullopt if not a constant.
+std::optional<double> resolveConstantValue(mlir::Value value);
+
 } // namespace qec
 } // namespace catalyst

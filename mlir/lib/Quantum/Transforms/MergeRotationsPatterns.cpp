@@ -33,16 +33,16 @@ using namespace mlir;
 using namespace catalyst::quantum;
 using namespace catalyst::qec;
 
-static const mlir::StringSet<> fixedRotationsAndPhaseShiftsSet = {
+static const StringSet<> fixedRotationsAndPhaseShiftsSet = {
     "RX", "RY", "RZ", "PhaseShift", "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
-static const mlir::StringSet<> arbitraryRotationsSet = {"Rot", "CRot"};
+static const StringSet<> arbitraryRotationsSet = {"Rot", "CRot"};
 
 namespace {
 
-// convertOpParamsToValues: helper function for extracting CustomOp parameters as mlir::Values
-SmallVector<mlir::Value> convertOpParamsToValues(CustomOp &op, PatternRewriter &rewriter)
+// convertOpParamsToValues: helper function for extracting CustomOp parameters as Values
+SmallVector<Value> convertOpParamsToValues(CustomOp &op, PatternRewriter &rewriter)
 {
-    SmallVector<mlir::Value> values;
+    SmallVector<Value> values;
     auto params = op.getParams();
     for (auto param : params) {
         values.push_back(param);
@@ -53,7 +53,7 @@ SmallVector<mlir::Value> convertOpParamsToValues(CustomOp &op, PatternRewriter &
 // getStaticValuesOrNothing: helper function for extracting Rot or CRot parameters as:
 // - doubles, in case they are constant
 // - std::nullopt, otherwise
-std::array<std::optional<double>, 3> getStaticValuesOrNothing(const SmallVector<mlir::Value> values)
+std::array<std::optional<double>, 3> getStaticValuesOrNothing(const SmallVector<Value> values)
 {
     assert(values.size() == 3 && "found Rot or CRot operation should have exactly 3 parameters");
     auto staticValues = std::array<std::optional<double>, 3>{};
@@ -88,15 +88,14 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
         ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
 
         // Extract parameters of the op and its parent,
-        // promoting the parameters to mlir::Values if necessary
+        // promoting the parameters to Values if necessary
         auto parentParams = convertOpParamsToValues(parentOp, rewriter);
         auto params = convertOpParamsToValues(op, rewriter);
 
         auto loc = op.getLoc();
-        SmallVector<mlir::Value> sumParams;
+        SmallVector<Value> sumParams;
         for (auto [param, parentParam] : llvm::zip(params, parentParams)) {
-            mlir::Value sumParam =
-                rewriter.create<arith::AddFOp>(loc, parentParam, param).getResult();
+            Value sumParam = rewriter.create<arith::AddFOp>(loc, parentParam, param).getResult();
             sumParams.push_back(sumParam);
         }
         auto mergeOp = rewriter.create<CustomOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParams,
@@ -122,25 +121,25 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
         ValueRange parentInCtrlValues = parentOp.getInCtrlValues();
 
         // Extract parameters of the op and its parent,
-        // promoting the parameters to mlir::Values if necessary
+        // promoting the parameters to Values if necessary
         auto parentParams = convertOpParamsToValues(parentOp, rewriter);
         auto params = convertOpParamsToValues(op, rewriter);
 
         // Parent params are ϕ1, θ1, and ω1
         // Params are ϕ2, θ2, and ω2
-        mlir::Value phi1 = parentParams[0];
-        mlir::Value theta1 = parentParams[1];
-        mlir::Value omega1 = parentParams[2];
-        mlir::Value phi2 = params[0];
-        mlir::Value theta2 = params[1];
-        mlir::Value omega2 = params[2];
+        Value phi1 = parentParams[0];
+        Value theta1 = parentParams[1];
+        Value omega1 = parentParams[2];
+        Value phi2 = params[0];
+        Value theta2 = params[1];
+        Value omega2 = params[2];
 
         auto [phi1Opt, theta1Opt, omega1Opt] = getStaticValuesOrNothing(parentParams);
         auto [phi2Opt, theta2Opt, omega2Opt] = getStaticValuesOrNothing(params);
 
-        mlir::Value phiF;
-        mlir::Value thetaF;
-        mlir::Value omegaF;
+        Value phiF;
+        Value thetaF;
+        Value omegaF;
 
         // TODO: should we use an epsilon for comparing doubles here?
         bool omega1IsZero = omega1Opt.has_value() && omega1Opt.value() == 0.0;
@@ -289,7 +288,7 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
             omegaF = rewriter.create<arith::SubFOp>(loc, alphaF, betaF);
         }
 
-        auto sumParams = SmallVector<mlir::Value>{phiF, thetaF, omegaF};
+        auto sumParams = SmallVector<Value>{phiF, thetaF, omegaF};
         auto mergeOp = rewriter.create<CustomOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParams,
                                                  parentInQubits, op.getGateName(), false,
                                                  parentInCtrlQubits, parentInCtrlValues);
@@ -322,75 +321,155 @@ struct MergeRotationsRewritePattern : public OpRewritePattern<OpType> {
     }
 };
 
-struct MergePPRRewritePattern : public OpRewritePattern<PPRotationOp> {
-    using OpRewritePattern::OpRewritePattern;
+template <typename ParentOpType, typename OpType>
+struct MergePPRRewritePattern : public OpRewritePattern<OpType> {
+    using OpRewritePattern<OpType>::OpRewritePattern;
 
-    LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override
+    SmallVector<int16_t> getNonIdentityIndices(OpType op) const
+    {
+        SmallVector<int16_t> opNonIdentityIndices;
+        for (auto [i, pauli] : llvm::enumerate(op.getPauliProduct())) {
+            StringRef pauliChar = cast<StringAttr>(pauli).getValue();
+            if (pauliChar != "I") {
+                opNonIdentityIndices.push_back(i);
+            }
+        }
+        return opNonIdentityIndices;
+    }
+
+    void replaceIdentityQubitUses(OpType op, PatternRewriter &rewriter) const
+    {
+        ValueRange opOutQubits = op.getOutQubits();
+        ValueRange opInQubits = op.getInQubits();
+        for (auto [i, pauli] : llvm::enumerate(op.getPauliProduct())) {
+            StringRef pauliChar = cast<StringAttr>(pauli).getValue();
+            if (pauliChar == "I") {
+                rewriter.replaceAllUsesWith(opOutQubits[i], opInQubits[i]);
+            }
+        }
+    }
+
+    LogicalResult matchAndRewrite(OpType op, PatternRewriter &rewriter) const override
     {
         // NOTE: a bit unorthodox, but we find the *second* PPR in a pair, since it's easier to
         // look backwards by checking inQubits.getDefiningOp
-        ValueRange inQubits = op.getInQubits();
-        auto definingOp = inQubits[0].getDefiningOp();
 
-        if (!definingOp) {
+        // collect info on op
+        ValueRange opInQubits = op.getInQubits();
+        ValueRange opOutQubits = op.getOutQubits();
+        ArrayAttr opPauliProduct = op.getPauliProduct();
+        Value opCondition = op.getCondition();
+        SmallVector<int16_t> opNonIdentityIndices = getNonIdentityIndices(op);
+
+        // leave identity op as cleanup for canonicalization
+        if (opNonIdentityIndices.size() == 0) {
             return failure();
         }
 
-        auto prevOp = dyn_cast<PPRotationOp>(definingOp);
-
-        if (!prevOp) {
+        // get parent op
+        Operation *definingOp = opInQubits[opNonIdentityIndices[0]].getDefiningOp();
+        auto parentOp = dyn_cast_or_null<ParentOpType>(definingOp);
+        if (!parentOp) {
             return failure();
         }
 
-        // verify that prevOp agrees on all qubits, not just the first
-        for (auto qubit : inQubits) {
-            if (qubit.getDefiningOp() != prevOp) {
+        // collect info on parent op
+        ValueRange parentOpInQubits = parentOp.getInQubits();
+        ArrayAttr parentOpPauliProduct = parentOp.getPauliProduct();
+
+        // check compatible conditionals
+        if (opCondition != parentOp.getCondition()) {
+            return failure();
+        }
+
+        // same number of non-identity qubits
+        if (opNonIdentityIndices.size() != getNonIdentityIndices(parentOp).size()) {
+            return failure();
+        }
+
+        // When two rotations have permuted Pauli strings, we can still merge them, we just need to
+        // correctly re-map the inputs. This map stores the index of a qubit in parentOp's out
+        // qubits at the index it appears in op's in qubits.
+        // Also collect non-identity qubits for replacement after mergeOp creation
+        SmallVector<Value> opNonIdentityOutQubits;
+        std::unordered_map<int16_t, int16_t> inversePermutation;
+        for (int16_t i : opNonIdentityIndices) {
+            Value qubit = opInQubits[i];
+
+            // verify that qubit agrees on parent op
+            if (qubit.getDefiningOp() != parentOp) {
                 return failure();
             }
+
+            inversePermutation[i] = cast<OpResult>(qubit).getResultNumber();
+
+            opNonIdentityOutQubits.push_back(opOutQubits[i]);
         }
 
-        // check same pauli strings
-        if (op.getPauliProduct() != prevOp.getPauliProduct()) {
-            return failure();
+        // collect values for merged op and perform compatibility checks
+        SmallVector<Value> newInQubitsItems;
+        SmallVector<Attribute> newPauliProductItems;
+        for (int16_t i : opNonIdentityIndices) {
+            // check Pauli + qubit pairings
+            if (opPauliProduct[i] != parentOpPauliProduct[inversePermutation[i]]) {
+                return failure();
+            }
+
+            newInQubitsItems.push_back(parentOpInQubits[inversePermutation[i]]);
+            newPauliProductItems.push_back(parentOpPauliProduct[inversePermutation[i]]);
         }
 
-        // check same conditionals
-        if (op.getCondition() != prevOp.getCondition()) {
-            return failure();
+        // cast collected vectors to correct types
+        ArrayAttr newPauliProduct = rewriter.getArrayAttr(newPauliProductItems);
+        ValueRange newInQubits = ValueRange(newInQubitsItems);
+
+        // create merged op
+        Location loc = op.getLoc();
+        ValueRange mergeOpOutQubits;
+        if constexpr (std::is_same_v<OpType, PPRotationOp>) {
+            int16_t opRotation = static_cast<int16_t>(op.getRotationKind());
+            int16_t parentOpRotation = static_cast<int16_t>(parentOp.getRotationKind());
+
+            if (std::abs(opRotation) != std::abs(parentOpRotation)) {
+                return failure();
+            }
+
+            int16_t newAngle = opRotation / 2;
+
+            // remove identity operations
+            if (opRotation == -parentOpRotation || std::abs(newAngle) == 1) {
+                mergeOpOutQubits = parentOpInQubits;
+            }
+            else {
+                mergeOpOutQubits = rewriter
+                                       .create<PPRotationOp>(loc,
+                                                             /*pauli_product=*/newPauliProduct,
+                                                             /*rotationKind=*/newAngle,
+                                                             /*in_qubits=*/newInQubits,
+                                                             /*condition=*/opCondition)
+                                       .getOutQubits();
+            }
+        }
+        else if constexpr (std::is_same_v<OpType, PPRotationArbitraryOp>) {
+            Value opRotation = op.getArbitraryAngle();
+            Value parentOpRotation = parentOp.getArbitraryAngle();
+            auto newAngle =
+                rewriter.create<arith::AddFOp>(loc, opRotation, parentOpRotation).getResult();
+
+            mergeOpOutQubits = rewriter
+                                   .create<PPRotationArbitraryOp>(loc,
+                                                                  /*pauli_product=*/newPauliProduct,
+                                                                  /*arbitrary_angle=*/newAngle,
+                                                                  /*in_qubits=*/newInQubits,
+                                                                  /*condition=*/opCondition)
+                                   .getOutQubits();
         }
 
-        int16_t opRotation = static_cast<int16_t>(op.getRotationKind());
-        int16_t prevOpRotation = static_cast<int16_t>(prevOp.getRotationKind());
-
-        // cancel inverse operations
-        if (opRotation == -prevOpRotation) {
-            // erase in reverse to avoid use issues
-            ValueRange originalQubits = prevOp.getInQubits();
-            rewriter.replaceOp(op, originalQubits);
-            rewriter.eraseOp(prevOp);
-
-            return success();
-        }
-
-        if (opRotation != prevOpRotation) {
-            return failure();
-        }
-
-        int16_t newAngle = opRotation / 2;
-
-        // newAngle of 1 indicates denominator of 1
-        if (newAngle != 1 and newAngle != -1) {
-            // "replace" the operation by changing the rotationKind
-            prevOp.setRotationKind(newAngle);
-
-            // replace references to current op with prevOp
-            rewriter.replaceOp(op, prevOp);
-        }
-        else {
-            ValueRange originalQubits = prevOp.getInQubits();
-            rewriter.replaceOp(op, originalQubits);
-            rewriter.eraseOp(prevOp);
-        }
+        replaceIdentityQubitUses(op, rewriter);
+        replaceIdentityQubitUses(parentOp, rewriter);
+        rewriter.replaceAllUsesWith(opNonIdentityOutQubits, mergeOpOutQubits);
+        rewriter.eraseOp(op);
+        rewriter.eraseOp(parentOp);
 
         return success();
     }
@@ -421,7 +500,7 @@ struct MergeMultiRZRewritePattern : public OpRewritePattern<MultiRZOp> {
         auto parentTheta = parentOp.getTheta();
         auto theta = op.getTheta();
 
-        mlir::Value sumParam = rewriter.create<arith::AddFOp>(loc, parentTheta, theta).getResult();
+        Value sumParam = rewriter.create<arith::AddFOp>(loc, parentTheta, theta).getResult();
 
         auto mergeOp = rewriter.create<MultiRZOp>(loc, outQubitsTypes, outQubitsCtrlTypes, sumParam,
                                                   parentInQubits, nullptr, parentInCtrlQubits,
@@ -441,7 +520,9 @@ void populateMergeRotationsPatterns(RewritePatternSet &patterns)
 {
     patterns.add<MergeRotationsRewritePattern<CustomOp, CustomOp>>(patterns.getContext(), 1);
     patterns.add<MergeMultiRZRewritePattern>(patterns.getContext(), 1);
-    patterns.add<MergePPRRewritePattern>(patterns.getContext(), 1);
+    patterns.add<MergePPRRewritePattern<PPRotationOp, PPRotationOp>>(patterns.getContext(), 1);
+    patterns.add<MergePPRRewritePattern<PPRotationArbitraryOp, PPRotationArbitraryOp>>(
+        patterns.getContext(), 1);
 }
 
 } // namespace quantum
