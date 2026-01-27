@@ -58,6 +58,11 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The private helper `_extract_passes` of `qfunc.py` uses `BoundTransform.tape_transform`
+  instead of the deprecated `BoundTransform.transform`.
+  `jax_tracer.py` and `tracing.py` also updated accordingly.
+  [(#2440)](https://github.com/PennyLaneAI/catalyst/pull/2440)
+
 * Autograph is no longer applied to decomposition rules based on whether it's applied to the workflow itself.
   Operator developers now need to manually apply autograph to decomposition rules when needed.
   [(#2421)](https://github.com/PennyLaneAI/catalyst/pull/2421)
@@ -81,6 +86,9 @@
   into normal PPR and PPMs with SCF dialect to support runtime execution.
   [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
 
+* Increased format size for the `--mlir-timing` flag, displaying more decimals for better timing precision.
+  [(#2423)](https://github.com/PennyLaneAI/catalyst/pull/2423)
+  
 * Added global phase tracking to the `to-ppr` compiler pass. When converting quantum gates to
   Pauli Product Rotations (PPR), the pass now emits `quantum.gphase` operations to preserve
   global phase correctness.
@@ -116,9 +124,11 @@
 This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
+Yushao Chen,
 Sengthai Heng,
 David Ittah,
 Jeffrey Kam,
+River McCubbin,
 Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,

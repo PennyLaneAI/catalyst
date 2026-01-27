@@ -1,4 +1,4 @@
-// Copyright 2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023-2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -65,6 +65,7 @@
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Driver/CatalystLLVMTarget.h"
 #include "Driver/CompilerDriver.h"
+#include "Driver/HighResolutionOutputStrategy.h"
 #include "Driver/Pipelines.h"
 #include "Driver/Support.h"
 #include "Gradient/IR/GradientDialect.h"
@@ -730,11 +731,15 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
     DefaultTimingManager tm;
     applyDefaultTimingManagerCLOptions(tm);
+    if (tm.isEnabled()) {
+        auto strategy = std::make_unique<HighResolutionOutputStrategy>(llvm::errs());
+        tm.setOutput(std::move(strategy));
+    }
     TimingScope timing = tm.getRootScope();
 
     TimingScope parserTiming = timing.nest("Parser");
-    OwningOpRef<ModuleOp> mlirModule =
-        timer::timer(parseMLIRSource, "parseMLIRSource", /* add_endl */ false, &ctx, *sourceMgr);
+    OwningOpRef<ModuleOp> mlirModule = timer::timer(parseMLIRSource, "parseMLIRSource",
+                                                    /* add_endl */ false, &ctx, *sourceMgr);
 
     enum InputType inType = InputType::OTHER;
     if (mlirModule) {
@@ -832,8 +837,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
         if (options.asyncQnodes) {
             TimingScope coroLLVMPassesTiming = llcTiming.nest("LLVM coroutine passes");
-            if (failed(timer::timer(runCoroLLVMPasses, "runCoroLLVMPasses", /* add_endl */ false,
-                                    options, llvmModule, output))) {
+            if (failed(timer::timer(runCoroLLVMPasses, "runCoroLLVMPasses",
+                                    /* add_endl */ false, options, llvmModule, output))) {
                 return failure();
             }
             coroLLVMPassesTiming.stop();
