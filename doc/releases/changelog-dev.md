@@ -3,7 +3,8 @@
 <h3>New features since last release</h3>
 
 * Users can now execute circuits with `qml.PauliRot` and `qml.pauli_measure`, as well as 
-  any passes in the QEC pipeline (e.g, `to_ppr`, `ppr_to_ppm`), when program capture is enabled.
+  any passes in the QEC pipeline (e.g, `to_ppr`, `ppr_to_ppm`), using `lightning.qubit` device
+  with program capture enabled.
   For example, we can now execute the following circuit.
   ```python
   import pennylane as qml
@@ -25,8 +26,17 @@
 
   >>> [0.5 0.  0.  0.5]
   ```
-  [(#)](https://github.com/PennyLaneAI/catalyst/pull/)
-
+  [(#2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
+  [(#2389)](https://github.com/PennyLaneAI/catalyst/pull/2389)
+  [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
+  [(#2413)](https://github.com/PennyLaneAI/catalyst/pull/2413)
+  [(#2414)](https://github.com/PennyLaneAI/catalyst/pull/2414)
+  [(#2419)](https://github.com/PennyLaneAI/catalyst/pull/2419)
+  [(#2422)](https://github.com/PennyLaneAI/catalyst/pull/2422)
+  [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
+  [(#2430)](https://github.com/PennyLaneAI/catalyst/pull/2430)
+  [(#2433)](https://github.com/PennyLaneAI/catalyst/pull/2433)
+  [(#2443)](https://github.com/PennyLaneAI/catalyst/pull/2443)
 
 <h3>Improvements 🛠</h3>
 
