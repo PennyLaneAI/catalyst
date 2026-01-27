@@ -853,12 +853,6 @@ class QJIT(CatalystCallable):
                 "Access the generated LLVM IR via the '.llvmir' property."
             )
 
-        if self.compiled_function is None:
-            raise CompileError(
-                "Cannot execute function: no compiled function available. "
-                "The function must be compiled before execution."
-            )
-
         results = self.compiled_function(*args, **kwargs)
 
         # TODO: Move this to the compiled function object.
