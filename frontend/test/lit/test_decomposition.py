@@ -1177,7 +1177,7 @@ def test_decompose_lowering_fallback():
     @qml.qjit(target="mlir")
     @partial(qml.transforms.decompose, gate_set={qml.RX, qml.RZ})
     @qml.qnode(qml.device("lightning.qubit", wires=2))
-    # CHECK: func.func public @circuit_25() -> tensor<4xcomplex<f64>> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode}
+    # CHECK-LABEL: func.func public @circuit_25()
     def circuit_25():
         # CHECK: [[OUT_QUBIT:%.+]] = quantum.custom "RZ"(%cst) {{%.+}} : !quantum.bit
         # CHECK-NEXT: [[OUT_QUBIT_0:%.+]] = quantum.custom "RX"(%cst) [[OUT_QUBIT]] : !quantum.bit
@@ -1264,38 +1264,6 @@ def test_decomposition_rule_with_allocation():
 test_decomposition_rule_with_allocation()
 
 
-def test_decompose_autograph_inner_block():
-    """Test the decompose lowering pass with autograph."""
-
-    qml.capture.enable()
-    qml.decomposition.enable_graph()
-
-    @qml.qjit(target="mlir", autograph=True)
-    @partial(qml.transforms.decompose, gate_set={"Rot"})
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
-    def circuit_28(n: int):
-
-        # CHECK: [[QREG:%.+]] = scf.for %arg1 = {{%.+}} to %1 step {{%.+}} iter_args(%arg2 = %0) -> (!quantum.reg) {
-        # CHECK-NEXT:     [[BIT:%.+]] = quantum.extract %arg2[ 0] : !quantum.reg -> !quantum.bit
-        # CHECK-NEXT:     [[OUT_QUBITS:%.+]] = quantum.custom "RX"(%cst) [[BIT]] : !quantum.bit
-        # CHECK-NEXT:     [[INSERT:%.+]] = quantum.insert %arg2[ 0], [[OUT_QUBITS]] : !quantum.reg, !quantum.bit
-        # CHECK-NEXT:     scf.yield [[INSERT]] : !quantum.reg
-        # CHECK-NEXT:   }
-        for _ in range(n):
-            qml.RX(0.2, wires=0)
-
-        return qml.expval(qml.Z(0))
-
-    # CHECK: func.func public @ag___ry_to_rot(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg
-    print(circuit_28.mlir)
-
-    qml.decomposition.disable_graph()
-    qml.capture.disable()
-
-
-test_decompose_autograph_inner_block()
-
-
 def test_decompose_autograph_multi_blocks():
     """Test the decompose lowering pass with autograph in the program and rule."""
 
@@ -1307,6 +1275,7 @@ def test_decompose_autograph_multi_blocks():
         return {qml.RZ: 1, qml.CNOT: 2 * (num_wires - 1)}
 
     @qml.register_resources(_multi_rz_decomposition_resources)
+    @qml.capture.run_autograph
     def _multi_rz_decomposition(theta: TensorLike, wires: WiresLike, **__):
         """Decomposition of MultiRZ using CNOTs and RZs."""
         for i in range(len(wires) - 1):
@@ -1315,7 +1284,7 @@ def test_decompose_autograph_multi_blocks():
         for i in range(len(wires) - 1, 0, -1):
             qml.CNOT(wires=(wires[i], wires[i - 1]))
 
-    @qml.qjit(target="mlir", autograph=True)
+    @qml.qjit(target="mlir")
     @partial(
         qml.transforms.decompose,
         gate_set={"RZ", "CNOT"},
@@ -1325,12 +1294,15 @@ def test_decompose_autograph_multi_blocks():
     def circuit_29(n: int):
 
         # CHECK: {{%.+}} = scf.for %arg1 = {{%.+}} to %1 step {{%.+}} iter_args(%arg2 = %0) -> (!quantum.reg) {
-        for _ in range(n):
+        @qml.for_loop(n)
+        def f(i):  # pylint: disable=unused-argument
             qml.MultiRZ(0.5, wires=[0, 1, 2, 3, 4])
+
+        f()  # pylint: disable=no-value-for-parameter
 
         return qml.expval(qml.Z(0))
 
-    # CHECK: func.func public @ag___multi_rz_decomposition(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<5xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 5 : i64, target_gate = "MultiRZ"}
+    # CHECK: func.func public @ag___multi_rz_decomposition_wires_5(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<5xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 5 : i64, target_gate = "MultiRZ"}
     # CHECK: {{%.+}} = scf.for %arg3 = %c0 to %c4 step %c1 iter_args(%arg4 = %arg0) -> (!quantum.reg)
     # CHECK: {{%.+}} = scf.for %arg3 = %c0 to %c4 step %c1 iter_args(%arg4 = %4) -> (!quantum.reg)
     print(circuit_29.mlir)

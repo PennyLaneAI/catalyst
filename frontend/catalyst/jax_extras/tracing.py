@@ -1005,6 +1005,6 @@ def uses_transform(qnode, transform_name):
               False otherwise
     """
     compile_pipeline = getattr(qnode, "compile_pipeline", [])
-    transform_funcs = [bound_transform.transform for bound_transform in compile_pipeline]
+    transform_funcs = [bound_transform.tape_transform for bound_transform in compile_pipeline]
 
     return any(transform_name in func.__name__ for func in transform_funcs)

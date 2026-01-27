@@ -645,7 +645,7 @@ def _extract_passes(transform_program):
     pass_pipeline = transform_program[i:]
     tape_transforms = transform_program[:i]
     for t in tape_transforms:
-        if t.transform is None:
+        if t.tape_transform is None:
             raise ValueError(
                 f"{t} without a tape definition occurs before tape transform {tape_transforms[-1]}."
             )
