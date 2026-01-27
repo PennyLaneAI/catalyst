@@ -2,6 +2,32 @@
 
 <h3>New features since last release</h3>
 
+* Users can now execute circuits with `qml.PauliRot` and `qml.pauli_measure`, as well as 
+  any passes in the QEC pipeline (e.g, `to_ppr`, `ppr_to_ppm`), when program capture is enabled.
+  For example, we can now execute the following circuit.
+  ```python
+  import pennylane as qml
+
+  qml.capture.enable()
+
+  @qml.qjit
+  @qml.transform(pass_name="unroll-conditional-ppr-ppm")
+  @qml.transform(pass_name="lower-qec-init-ops")
+  @qml.transform(pass_name="decompose-arbitrary-ppr")
+  @qml.transform(pass_name="to-ppr")
+  @qml.qnode(qml.device("lightning.qubit", wires=3))
+  def circuit():
+      qml.PauliRot(0.123, pauli_word="XXY", wires=[0, 1, 2])
+      qml.pauli_measure("XYZ", wires=[0, 1, 2])
+      return qml.probs([0, 1])
+
+  print(circuit())
+
+  >>> [0.5 0.  0.  0.5]
+  ```
+  [(#)](https://github.com/PennyLaneAI/catalyst/pull/)
+
+
 <h3>Improvements 🛠</h3>
 
 * The default mcm_method for the finite-shots setting (dynamic one-shot) no longer silently falls
@@ -77,9 +103,6 @@
   into normal PPR and PPMs with SCF dialect to support runtime execution.
   [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
 
-* Increased format size for the `--mlir-timing` flag, displaying more decimals for better timing precision.
-  [(#2423)](https://github.com/PennyLaneAI/catalyst/pull/2423)
-  
 * Added global phase tracking to the `to-ppr` compiler pass. When converting quantum gates to
   Pauli Product Rotations (PPR), the pass now emits `quantum.gphase` operations to preserve
   global phase correctness.
@@ -118,7 +141,6 @@ Joey Carter,
 Sengthai Heng,
 David Ittah,
 Jeffrey Kam,
-River McCubbin,
 Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,
