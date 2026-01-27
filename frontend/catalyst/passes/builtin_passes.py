@@ -556,7 +556,7 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
 
     .. note::
 
-        The circuit generated from this pass with ``ppr_basis=True`` are currently only executable on the 
+        The circuit generated from this pass with ``ppr_basis=True`` are currently only executable on the
         ``lightning.qubit`` device with program capture enabled.
 
     **Example**
@@ -646,7 +646,7 @@ def to_ppr(qnode):
 
     .. note::
 
-        The circuits generated from this pass are currently only executable on the ``lightning.qubit`` 
+        The circuits generated from this pass are currently only executable on the ``lightning.qubit``
         device with program capture enabled.
 
     The full list of supported gates and operations are
@@ -1236,7 +1236,7 @@ def reduce_t_depth(qnode):
 
     .. note::
 
-        The circuits generated from this pass are currently only executable on the ``lightning.qubit`` 
+        The circuits generated from this pass are currently only executable on the ``lightning.qubit``
         device with program capture enabled.
 
     Args:
