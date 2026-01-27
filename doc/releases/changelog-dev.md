@@ -17,7 +17,14 @@
   length and the number of qubit operands are the same, and that all of the Pauli words are legal.
   [(#2405)](https://github.com/PennyLaneAI/catalyst/pull/2405)
 
+* `qml.vjp` can now be used with Catalyst and program capture.
+  [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
+
 <h3>Breaking changes 💔</h3>
+
+* When an integer argnums is provided to `catalyst.vjp`, a singleton dimension is now squeezed
+  out. This brings the behaviour in line with that of `grad` and `jacobian`.
+  [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
 
 * Dropped support for NumPy 1.x following its end-of-life. NumPy 2.0 or higher is now required.
   [(#2407)](https://github.com/PennyLaneAI/catalyst/pull/2407)
@@ -25,6 +32,10 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Restore the ability to differentiate multiple (expectation value) QNode results with the
+  adjoint-differentiation method.
+  [(#2428)](https://github.com/PennyLaneAI/catalyst/pull/2428)
 
 * Fixed the angle conversion when lowering `qec.ppr` and `qec.ppr.arbitrary` operations to
   `__catalyst__qis__PauliRot` runtime calls. The PPR rotation angle is now correctly multiplied
@@ -34,7 +45,15 @@
 * Fixing incorrect lowering of PPM into CAPI calls when the PPM is in the negative basis.
   [(#2422)](https://github.com/PennyLaneAI/catalyst/pull/2422)
 
+* Fixed the GlobalPhase discrepancies when executing gridsynth in the PPR basis.
+  [(#2433)](https://github.com/PennyLaneAI/catalyst/pull/2433)
+
+
 <h3>Internal changes ⚙️</h3>
+
+* Autograph is no longer applied to decomposition rules based on whether it's applied to the workflow itself.
+  Operator developers now need to manually apply autograph to decomposition rules when needed.
+  [(#2421)](https://github.com/PennyLaneAI/catalyst/pull/2421)
 
 * The quantum dialect MLIR and TableGen source has been refactored to place type and attribute
   definitions in separate file scopes.
@@ -62,19 +81,31 @@
   Pauli Product Rotations (PPR), the pass now emits `quantum.gphase` operations to preserve
   global phase correctness.
   [(#2419)](https://github.com/PennyLaneAI/catalyst/pull/2419)
-  
+
 * New qubit-type specializations have been added to Catalyst's MLIR type system. These new qubit
   types include `!quantum.bit<logical>`, `!quantum.bit<qec>` and `!quantum.bit<physical>`. The
   original `!quantum.bit` type continues to be supported and used as the default qubit type.
   [(#2369)](https://github.com/PennyLaneAI/catalyst/pull/2369)
 
+  The corresponding register-type specializations have also been added.
+  [(#2431)](https://github.com/PennyLaneAI/catalyst/pull/2431)
+
 * The upstream MLIR `Test` dialect is now available via the `catalyst` command line tool.
   [(#2417)](https://github.com/PennyLaneAI/catalyst/pull/2417)
+
+* A new compiler pass `lower-qec-init-ops` has been added to lower QEC initialization operations
+  to Quantum dialect operations. This pass converts `qec.prepare` to `quantum.custom` and
+  `qec.fabricate` to `quantum.alloc_qb` + `quantum.custom`, enabling runtime execution of
+  QEC state preparation operations.
+  [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
 
 <h3>Documentation 📝</h3>
 
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
   [(#2406)](https://github.com/PennyLaneAI/catalyst/pull/2406)
+
+* Updated the changelog and builtin_passes.py to link to https://pennylane.ai/compilation/pauli-based-computation instead.
+  [(#2409)](https://github.com/PennyLaneAI/catalyst/pull/2409)
 
 <h3>Contributors ✍️</h3>
 
@@ -82,8 +113,10 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
 Sengthai Heng,
+David Ittah,
 Jeffrey Kam,
 River McCubbin,
 Mudit Pandey,
 Andrija Paurevic,
+David D.W. Ren,
 Paul Haochen Wang.
