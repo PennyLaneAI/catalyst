@@ -11,6 +11,7 @@ file(GLOB SRC
     CancelInversesPatterns.cpp
     cancel_inverses.cpp
     SplitMultipleTapes.cpp
+    split_non_commuting.cpp
     merge_rotation.cpp
     MergeRotationsPatterns.cpp
     decompose_lowering.cpp
