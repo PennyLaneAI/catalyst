@@ -29,16 +29,10 @@ from mlir_quantum.dialects.catalyst import LaunchKernelOp
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
 
-def _only_single_expval(call_jaxpr: core.ClosedJaxpr) -> bool:
-    found_expval = False
+def _all_expval(call_jaxpr: core.ClosedJaxpr) -> bool:
     for eqn in call_jaxpr.eqns:
-        name = eqn.primitive.name
-        if name in {"probs", "counts", "sample"}:
+        if eqn.primitive.name in ("sample", "counts", "var", "probs", "state"):
             return False
-        elif name == "expval":
-            if found_expval:
-                return False
-            found_expval = True
     return True
 
 
@@ -49,7 +43,7 @@ def _calculate_diff_method(qn: qml.QNode, call_jaxpr: core.ClosedJaxpr):
 
     device_name = getattr(getattr(qn, "device", None), "name", None)
 
-    if device_name and "lightning" in device_name and _only_single_expval(call_jaxpr):
+    if device_name and "lightning" in device_name and _all_expval(call_jaxpr):
         return "adjoint"
     return "parameter-shift"
 

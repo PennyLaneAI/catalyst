@@ -26,6 +26,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Restore the ability to differentiate multiple (expectation value) QNode results with the
+  adjoint-differentiation method.
+  [(#2428)](https://github.com/PennyLaneAI/catalyst/pull/2428)
+
 * Fixed the angle conversion when lowering `qec.ppr` and `qec.ppr.arbitrary` operations to
   `__catalyst__qis__PauliRot` runtime calls. The PPR rotation angle is now correctly multiplied
   by 2 to match the PauliRot convention (`PauliRot(φ) == PPR(φ/2)`).
@@ -98,6 +102,7 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
 Sengthai Heng,
+David Ittah,
 Jeffrey Kam,
 Mudit Pandey,
 Andrija Paurevic,
