@@ -45,6 +45,9 @@
       return qml.counts(wires=0)
 
   output_elf_path = compile_to_artiq(circuit, oqd_dev.artiq_config)
+  # Output:
+  # LLVM IR file written to: /path/to/circuit.ll
+  # [ARTIQ] Generated ELF: /path/to/circuit.elf
   ```
 
 <h3>Improvements 🛠</h3>
