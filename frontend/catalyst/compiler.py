@@ -485,7 +485,7 @@ class Compiler:
         else:
             out_IR = None
 
-        if self.options.target != "llvmir":
+        if self.options.link:
             output = LinkerDriver.run(output_object_name, options=self.options)
             output = str(pathlib.Path(output).absolute())
         else:
