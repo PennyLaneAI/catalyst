@@ -17,7 +17,14 @@
   length and the number of qubit operands are the same, and that all of the Pauli words are legal.
   [(#2405)](https://github.com/PennyLaneAI/catalyst/pull/2405)
 
+* `qml.vjp` can now be used with Catalyst and program capture.
+  [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
+
 <h3>Breaking changes 💔</h3>
+
+* When an integer argnums is provided to `catalyst.vjp`, a singleton dimension is now squeezed
+  out. This brings the behaviour in line with that of `grad` and `jacobian`.
+  [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
 
 * Dropped support for NumPy 1.x following its end-of-life. NumPy 2.0 or higher is now required.
   [(#2407)](https://github.com/PennyLaneAI/catalyst/pull/2407)
@@ -37,6 +44,10 @@
 
 * Fixing incorrect lowering of PPM into CAPI calls when the PPM is in the negative basis.
   [(#2422)](https://github.com/PennyLaneAI/catalyst/pull/2422)
+
+* Fixed the GlobalPhase discrepancies when executing gridsynth in the PPR basis.
+  [(#2433)](https://github.com/PennyLaneAI/catalyst/pull/2433)
+
 
 <h3>Internal changes ⚙️</h3>
 
