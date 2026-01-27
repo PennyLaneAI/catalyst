@@ -64,8 +64,26 @@ if not INSTALLED:
 # part of 'mlir_quantum' is imported.
 # Note that '__import__' does not return the specific submodule, only the parent package.
 # pylint: disable=protected-access
-sys.modules["mlir_quantum.ir"] = __import__("jaxlib.mlir.ir").mlir.ir
+_jax_mlir_ir = __import__("jaxlib.mlir.ir").mlir.ir
+sys.modules["mlir_quantum.ir"] = _jax_mlir_ir
 sys.modules["mlir_quantum._mlir_libs"] = __import__("jaxlib.mlir._mlir_libs").mlir._mlir_libs
+
+# Jaxlib's MLIR Python builds don't expose __class_getitem__ on Value/OpResult.
+# However, Catalyst's MLIR now emits Value[Type]/OpResult[Type] annotations.
+# Provide a no-op fallback so imports work across LLVM versions.
+def _ensure_generic(cls):
+    if hasattr(cls, "__class_getitem__"):
+        return
+
+    @classmethod
+    def __class_getitem__(inner_cls, _item):
+        return inner_cls
+
+    cls.__class_getitem__ = __class_getitem__
+
+
+_ensure_generic(_jax_mlir_ir.Value)
+_ensure_generic(_jax_mlir_ir.OpResult)
 
 from catalyst import debug, logging, passes
 from catalyst.api_extensions import *
