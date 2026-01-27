@@ -211,6 +211,161 @@ func.func @test_phy_zcheck_type(%0 : !quantum.bit<physical, zcheck>) {
 // -----
 
 //===----------------------------------------------------------------------===//
+// Smoke tests for register types
+//===----------------------------------------------------------------------===//
+
+func.func @test_alloc_reg_default() {
+    %0 = quantum.alloc(1) : !quantum.reg
+    return
+}
+
+// -----
+
+func.func @test_alloc_reg_abs() {
+    %0 = quantum.alloc(1) : !quantum.reg<abstract>
+    return
+}
+
+// -----
+
+func.func @test_alloc_reg_log() {
+    %0 = quantum.alloc(1) : !quantum.reg<logical>
+    return
+}
+
+// -----
+
+func.func @test_alloc_reg_qec() {
+    %0 = quantum.alloc(1) : !quantum.reg<qec>
+    return
+}
+
+// -----
+
+func.func @test_dealloc_reg_default(%0 : !quantum.reg) {
+    quantum.dealloc %0 : !quantum.reg
+    return
+}
+
+// -----
+
+func.func @test_dealloc_reg_abs(%0 : !quantum.reg<abstract>) {
+    quantum.dealloc %0 : !quantum.reg<abstract>
+    return
+}
+
+// -----
+
+func.func @test_dealloc_reg_log(%0 : !quantum.reg<logical>) {
+    quantum.dealloc %0 : !quantum.reg<logical>
+    return
+}
+
+// -----
+
+func.func @test_dealloc_reg_qec(%0 : !quantum.reg<qec>) {
+    quantum.dealloc %0 : !quantum.reg<qec>
+    return
+}
+
+// -----
+
+func.func @test_dealloc_reg_phy(%0 : !quantum.reg<physical>) {
+    quantum.dealloc %0 : !quantum.reg<physical>
+    return
+}
+
+// -----
+
+func.func @test_extract_reg_default(%0 : !quantum.reg) {
+    %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+    return
+}
+
+// -----
+
+func.func @test_extract_reg_abs(%0 : !quantum.reg<abstract>) {
+    %1 = quantum.extract %0[0] : !quantum.reg<abstract> -> !quantum.bit<abstract>
+    return
+}
+
+// -----
+
+func.func @test_extract_reg_log(%0 : !quantum.reg<logical>) {
+    %1 = quantum.extract %0[0] : !quantum.reg<logical> -> !quantum.bit<logical>
+    return
+}
+
+// -----
+
+func.func @test_extract_reg_qec(%0 : !quantum.reg<qec>) {
+    %1 = quantum.extract %0[0] : !quantum.reg<qec> -> !quantum.bit<qec>
+    return
+}
+
+// -----
+
+func.func @test_extract_reg_qec_to_qec_data_bit(%0 : !quantum.reg<qec>) {
+    // COM: It's permitted to extract a qec qubit with a role other than
+    // COM: `null` from a qec register
+    %1 = quantum.extract %0[0] : !quantum.reg<qec> -> !quantum.bit<qec, data>
+    return
+}
+
+// -----
+
+func.func @test_extract_reg_phy(%0 : !quantum.reg<physical>) {
+    %1 = quantum.extract %0[0] : !quantum.reg<physical> -> !quantum.bit<physical>
+    return
+}
+
+// -----
+
+func.func @test_extract_reg_phy_to_phy_data_bit(%0 : !quantum.reg<physical>) {
+    // COM: It's permitted to extract a physical qubit with a role other than
+    // COM: `null` from a physical register
+    %1 = quantum.extract %0[0] : !quantum.reg<physical> -> !quantum.bit<physical, data>
+    return
+}
+
+// -----
+
+func.func @test_insert_reg_default(%0 : !quantum.reg, %q : !quantum.bit) {
+    %1 = quantum.insert %0[0], %q : !quantum.reg, !quantum.bit
+    return
+}
+
+// -----
+
+func.func @test_insert_reg_abs(%0 : !quantum.reg<abstract>, %q : !quantum.bit<abstract>) {
+    %1 = quantum.insert %0[0], %q : !quantum.reg<abstract>, !quantum.bit<abstract>
+    return
+}
+
+// -----
+
+func.func @test_insert_reg_log(%0 : !quantum.reg<logical>, %q : !quantum.bit<logical>) {
+    %1 = quantum.insert %0[0], %q : !quantum.reg<logical>, !quantum.bit<logical>
+    return
+}
+
+// -----
+
+func.func @test_insert_reg_qec(%0 : !quantum.reg<qec>, %q : !quantum.bit<qec>) {
+    %1 = quantum.insert %0[0], %q : !quantum.reg<qec>, !quantum.bit<qec>
+    return
+}
+
+// -----
+
+func.func @test_insert_reg_phy(%0 : !quantum.reg<physical>, %q : !quantum.bit<physical>) {
+    %1 = quantum.insert %0[0], %q : !quantum.reg<physical>, !quantum.bit<physical>
+    return
+}
+
+// -----
+
+//===----------------------------------------------------------------------===//
 // Verifier tests: Does incorrect usage result in expected errors?
 //===----------------------------------------------------------------------===//
 
@@ -350,5 +505,106 @@ func.func @test_abs_xcheck_type(%0 : !quantum.bit<logical, xcheck>) {
 
 func.func @test_abs_zcheck_type(%0 : !quantum.bit<logical, zcheck>) {
     // expected-error @above {{qubit role 'zcheck' is only permitted for qec and physical qubits}}
+    return
+}
+
+// -----
+
+//===----------------------------------------------------------------------===//
+// Verifier tests for register types
+//===----------------------------------------------------------------------===//
+
+func.func @test_extract_default_reg_to_log_bit(%0 : !quantum.reg) {
+    // expected-error @below {{type mismatch}}
+    %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit<logical>
+    return
+}
+
+// -----
+
+func.func @test_extract_default_reg_to_qec_bit(%0 : !quantum.reg) {
+    // expected-error @below {{type mismatch}}
+    %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit<qec>
+    return
+}
+
+// -----
+
+func.func @test_extract_default_reg_to_phy_bit(%0 : !quantum.reg) {
+    // expected-error @below {{type mismatch}}
+    %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit<physical>
+    return
+}
+
+// -----
+
+func.func @test_extract_log_reg_to_qec_bit(%0 : !quantum.reg<logical>) {
+    // expected-error @below {{type mismatch}}
+    %1 = quantum.extract %0[0] : !quantum.reg<logical> -> !quantum.bit<qec>
+    return
+}
+
+// -----
+
+func.func @test_extract_qec_reg_to_phy_bit(%0 : !quantum.reg<qec>) {
+    // expected-error @below {{type mismatch}}
+    %1 = quantum.extract %0[0] : !quantum.reg<qec> -> !quantum.bit<physical>
+    return
+}
+
+// -----
+
+func.func @test_insert_log_bit_to_default_reg(%0 : !quantum.reg, %q : !quantum.bit<logical>) {
+    // expected-error @below {{type mismatch}}
+    %1 = quantum.insert %0[0], %q : !quantum.reg, !quantum.bit<logical>
+    return
+}
+
+// -----
+
+func.func @test_insert_qec_bit_to_default_reg(%0 : !quantum.reg, %q : !quantum.bit<qec>) {
+    // expected-error @below {{type mismatch}}
+    %1 = quantum.insert %0[0], %q : !quantum.reg, !quantum.bit<qec>
+    return
+}
+// -----
+
+func.func @test_insert_phy_bit_to_default_reg(%0 : !quantum.reg, %q : !quantum.bit<physical>) {
+    // expected-error @below {{type mismatch}}
+    %1 = quantum.insert %0[0], %q : !quantum.reg, !quantum.bit<physical>
+    return
+}
+
+// -----
+
+func.func @test_insert_qec_bit_to_log_reg(%0 : !quantum.reg<logical>, %q : !quantum.bit<qec>) {
+    // expected-error @below {{type mismatch}}
+    %1 = quantum.insert %0[0], %q : !quantum.reg<logical>, !quantum.bit<qec>
+    return
+}
+
+// -----
+
+func.func @test_insert_phy_bit_to_log_reg(%0 : !quantum.reg<qec>, %q : !quantum.bit<physical>) {
+    // expected-error @below {{type mismatch}}
+    %1 = quantum.insert %0[0], %q : !quantum.reg<qec>, !quantum.bit<physical>
+    return
+}
+
+// -----
+
+func.func @test_insert_mix_types_default_log(%0 : !quantum.reg, %q : !quantum.bit) {
+    // expected-note @above {{prior use here}}
+    // expected-error @below {{expects different type than prior uses}}
+    %1 = quantum.insert %0[0], %q : !quantum.reg<logical>, !quantum.bit
+    return
+}
+
+// -----
+
+func.func @test_insert_mix_types_log_phy(%0 : !quantum.reg<logical>, %q : !quantum.bit<logical>) {
+    // expected-note @above {{prior use here}}
+    // expected-error @below {{expects different type than prior uses}}
+    %1 = quantum.insert %0[0], %q : !quantum.reg<physical>, !quantum.bit<logical>
     return
 }

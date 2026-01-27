@@ -216,7 +216,7 @@ def ExtractOp : Memory_Op<"extract", [NoMemoryEffect]> {
     let hasFolder = 1;
 }
 
-def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
+def InsertOp : Memory_Op<"insert", [NoMemoryEffect, AllTypesMatch<["in_qreg", "out_qreg"]>]> {
     let summary = "Update the qubit value of a register.";
     let description = [{
     }];
