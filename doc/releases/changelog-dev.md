@@ -4,6 +4,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* `null.qubit` resource tracking is now able to track measurements and observables. This output
+  is also reflected in `qml.specs`.
+  [(#2446)](https://github.com/PennyLaneAI/catalyst/pull/2446)
+
 * The default mcm_method for the finite-shots setting (dynamic one-shot) no longer silently falls
   back to single-branch statistics in most cases. Instead, an error message is raised pointing out
   alternatives, like explicitly selecting single-branch statistics.
@@ -118,4 +122,5 @@ Jeffrey Kam,
 Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Jake Zaia.
