@@ -68,7 +68,6 @@ _jax_mlir_ir = __import__("jaxlib.mlir.ir").mlir.ir
 sys.modules["mlir_quantum.ir"] = _jax_mlir_ir
 sys.modules["mlir_quantum._mlir_libs"] = __import__("jaxlib.mlir._mlir_libs").mlir._mlir_libs
 
-
 # Jaxlib's MLIR Python builds don't expose __class_getitem__ on Value/OpResult.
 # However, Catalyst's MLIR now emits Value[Type]/OpResult[Type] annotations.
 # Provide a no-op fallback so imports work across LLVM versions.
