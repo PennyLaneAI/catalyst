@@ -55,8 +55,9 @@ set(LIBS
 add_mlir_library(CatalystCompilerDriver
     CompilerDriver.cpp
     CatalystLLVMTarget.cpp
+    PassInstrumentation.cpp
     Pipelines.cpp
-
+    LineUtils.cpp
     LINK_LIBS PRIVATE
     ${LIBS}
 )

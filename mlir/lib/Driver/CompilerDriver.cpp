@@ -14,15 +14,10 @@
 
 #include <cassert>
 
-#include <algorithm>
-#include <filesystem>
 #include <iostream>
-#include <list>
 #include <memory>
 #include <optional>
 #include <string>
-#include <string_view>
-#include <unordered_map>
 
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
@@ -30,7 +25,6 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
@@ -57,15 +51,17 @@
 
 #include "stablehlo/dialect/Register.h"
 #include "stablehlo/integrations/c/StablehloPasses.h"
-#include "stablehlo/transforms/Passes.h"
 #include "stablehlo/transforms/optimization/Passes.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Driver/CatalystLLVMTarget.h"
 #include "Driver/CompilerDriver.h"
+#include "Driver/LineUtils.hpp"
+#include "Driver/PassInstrumentation.hpp"
 #include "Driver/Pipelines.h"
 #include "Driver/Support.h"
+#include "Driver/Timer.hpp"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientInterfaces.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
@@ -80,126 +76,11 @@
 #include "RegisterAllPasses.h"
 
 #include "Enzyme.h"
-#include "Timer.hpp"
 
 using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::driver;
 namespace cl = llvm::cl;
-
-namespace catalyst::utils {
-
-/**
- * LinesCount : A utility class to count the number of lines of embedded programs
- * in different compilation stages.
- *
- * You can dump the program-size embedded in an `Operation`, `ModuleOp`, or
- * `llvm::Module` using the static methods in this class.
- *
- * To display results, run the driver with the `ENABLE_DIAGNOSTICS=ON` variable.
- * To store results in YAML format, use `DIAGNOSTICS_RESULTS_PATH=/path/to/file.yml`
- * along with `ENABLE_DIAGNOSTICS=ON`.
- */
-class LinesCount {
-  private:
-    inline static void print(const std::string &opStrBuf, const std::string &name)
-    {
-        const auto num_lines = std::count(opStrBuf.cbegin(), opStrBuf.cend(), '\n');
-        if (!name.empty()) {
-            std::cerr << "[DIAGNOSTICS] After " << std::setw(25) << std::left << name;
-        }
-        std::cerr << "\t" << std::fixed << "programsize: " << num_lines << std::fixed << " lines\n";
-    }
-
-    inline static void store(const std::string &opStrBuf, const std::string &name,
-                             const std::filesystem::path &file_path)
-    {
-        const auto num_lines = std::count(opStrBuf.cbegin(), opStrBuf.cend(), '\n');
-
-        const std::string_view key_padding = "          ";
-        const std::string_view val_padding = "              ";
-
-        if (!std::filesystem::exists(file_path)) {
-            std::ofstream ofile(file_path);
-            assert(ofile.is_open() && "Invalid file to store timer results");
-            if (!name.empty()) {
-                ofile << key_padding << "- " << name << ":\n";
-            }
-            ofile << val_padding << "programsize: " << num_lines << "\n";
-            ofile.close();
-            return;
-        }
-        // else
-
-        // Second, update the file
-        std::ofstream ofile(file_path, std::ios::app);
-        assert(ofile.is_open() && "Invalid file to store timer results");
-        if (!name.empty()) {
-            ofile << key_padding << "- " << name << ":\n";
-        }
-        ofile << val_padding << "programsize: " << num_lines << "\n";
-        ofile.close();
-    }
-
-    inline static void dump(const std::string &opStrBuf, const std::string &name = {})
-    {
-        char *file = getenv("DIAGNOSTICS_RESULTS_PATH");
-        if (!file) {
-            print(opStrBuf, name);
-            return;
-        }
-        // else
-        store(opStrBuf, name, std::filesystem::path{file});
-    }
-
-  public:
-    [[nodiscard]] inline static bool is_diagnostics_enabled()
-    {
-        char *value = getenv("ENABLE_DIAGNOSTICS");
-        return value && std::string(value) == "ON";
-    }
-
-    static void Operation(Operation *op, const std::string &name = {})
-    {
-        if (!is_diagnostics_enabled()) {
-            return;
-        }
-
-        std::string opStrBuf;
-        llvm::raw_string_ostream rawStrBef{opStrBuf};
-        rawStrBef << *op;
-
-        dump(opStrBuf, name);
-    }
-
-    static void ModuleOp(const ModuleOp &op, const std::string &name = {})
-    {
-        if (!is_diagnostics_enabled()) {
-            return;
-        }
-
-        std::string modStrBef;
-        llvm::raw_string_ostream rawStrBef{modStrBef};
-        op->print(rawStrBef);
-
-        dump(modStrBef, name);
-    }
-
-    static void Module(const llvm::Module &llvmModule, const std::string &name = {})
-    {
-        if (!is_diagnostics_enabled()) {
-            return;
-        }
-
-        std::string modStrBef;
-        llvm::raw_string_ostream rawStrBef{modStrBef};
-        llvmModule.print(rawStrBef, nullptr);
-
-        dump(modStrBef, name);
-    }
-};
-
-} // namespace catalyst::utils
 
 namespace {
 
@@ -225,107 +106,6 @@ struct CatalystIRPrinterConfig : public PassManager::IRPrinterConfig {
         if (failed(printHandler(pass, printCallback))) {
             operation->emitError("IR printing failed");
         }
-    }
-};
-
-struct CatalystPassInstrumentation : public PassInstrumentation {
-    const CompilerOptions &options;
-    CompilerOutput &output;
-    catalyst::utils::Timer &timer;
-
-    // Store fingerprints before each pass to detect changes
-    DenseMap<Pass *, std::optional<OperationFingerPrint>> beforePassFingerprints;
-
-    CatalystPassInstrumentation(const CompilerOptions &options, CompilerOutput &output,
-                                catalyst::utils::Timer &timer)
-        : options(options), output(output), timer(timer)
-    {
-    }
-
-    void runBeforePass(Pass *pass, Operation *operation) override
-    {
-        if (this->options.verbosity >= Verbosity::Debug && !this->timer.is_active()) {
-            this->timer.start();
-        }
-        if (this->options.keepIntermediate == SaveTemps::AfterPassChanged) {
-            this->beforePassFingerprints[pass] = OperationFingerPrint(operation);
-        }
-    }
-
-    void runAfterPass(Pass *pass, Operation *operation) override
-    {
-        // Handle verbosity logging
-        if (this->options.verbosity >= Verbosity::Debug) {
-            auto pipelineName = pass->getName();
-            this->timer.dump(pipelineName.str(), /*add_endl */ false);
-            catalyst::utils::LinesCount::Operation(operation);
-        }
-
-        bool shouldDump = false;
-
-        if (this->options.keepIntermediate == SaveTemps::AfterPass) {
-            shouldDump = true;
-        }
-        else if (this->options.keepIntermediate == SaveTemps::AfterPassChanged) {
-            // If change detection is enabled, only dump if IR is changed
-            auto it = this->beforePassFingerprints.find(pass);
-            if (it != this->beforePassFingerprints.end() && it->second.has_value()) {
-                OperationFingerPrint afterFingerprint(operation);
-                shouldDump = (afterFingerprint != it->second.value());
-                this->beforePassFingerprints.erase(it);
-            }
-            else {
-                // Fingerprint not found: default to dumping to be safe
-                shouldDump = true;
-            }
-        }
-
-        if (shouldDump) {
-            this->dumpIRAfterPass(pass, operation);
-        }
-    }
-
-    void runAfterPassFailed(Pass *pass, Operation *operation) override
-    {
-        // Always dump on failure for debugging
-        this->options.diagnosticStream << "While processing '" << pass->getName().str()
-                                       << "' pass ";
-        std::string tmp;
-        llvm::raw_string_ostream s{tmp};
-        s << *operation;
-        if (this->options.keepIntermediate) {
-            dumpToFile(this->options,
-                       this->output.nextPipelineSummaryFilename(pass->getName().str() + "_FAILED"),
-                       tmp);
-        }
-
-        // Clean up fingerprint if present
-        if (this->options.keepIntermediate == SaveTemps::AfterPassChanged) {
-            this->beforePassFingerprints.erase(pass);
-        }
-    }
-
-  private:
-    void dumpIRAfterPass(Pass *pass, Operation *op)
-    {
-        auto pipelineName = pass->getName();
-
-        // Save IR after pass
-        std::string tmp;
-        llvm::raw_string_ostream s{tmp};
-        if (this->options.dumpModuleScope) {
-            mlir::ModuleOp mod = isa<mlir::ModuleOp>(op) ? cast<mlir::ModuleOp>(op)
-                                                         : op->getParentOfType<mlir::ModuleOp>();
-            s << mod;
-        }
-        else {
-            s << *op;
-        }
-        std::string fileName = pipelineName.str();
-        if (auto funcOp = dyn_cast<mlir::func::FuncOp>(op)) {
-            fileName += std::string("_") + funcOp.getName().str();
-        }
-        dumpToFile(this->options, this->output.nextPassDumpFilename(fileName), tmp);
     }
 };
 
@@ -571,7 +351,7 @@ std::string readInputFile(const std::string &filename)
 }
 
 LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options,
-                                 CompilerOutput &output, catalyst::utils::Timer &timer,
+                                 CompilerOutput &output, catalyst::utils::Timer<> &timer,
                                  TimingScope &timing)
 {
     MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
@@ -636,7 +416,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                           CompilerOutput &output, TimingScope &timing)
 
 {
-    catalyst::utils::Timer timer{};
+    catalyst::utils::Timer<> timer{};
 
     auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
     if (failed(preparePassManager(pm, options, output, timer, timing))) {
@@ -665,12 +445,12 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     std::vector<Pipeline> UserPipeline =
         clHasManualPipeline ? options.pipelinesCfg : getDefaultPipeline();
     for (auto &pipeline : UserPipeline) {
-        if (failed(catalyst::utils::Timer::timer(runPipeline, pipeline.getName(),
-                                                 /* add_endl */ false, pm, options, output,
-                                                 pipeline, clHasManualPipeline, moduleOp))) {
+        if (failed(catalyst::utils::Timer<>::timer(runPipeline, pipeline.getName(),
+                                                   /* add_endl */ false, pm, options, output,
+                                                   pipeline, clHasManualPipeline, moduleOp))) {
             return failure();
         }
-        catalyst::utils::LinesCount::ModuleOp(moduleOp);
+        catalyst::utils::LinesCount::call(moduleOp);
     }
     return success();
 }
@@ -695,7 +475,7 @@ LogicalResult verifyInputType(const CompilerOptions &options, InputType inType)
 LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &output,
                                 DialectRegistry &registry)
 {
-    using timer = catalyst::utils::Timer;
+    using timer = catalyst::utils::Timer<>;
 
     OpPrintingFlags opPrintingFlags{};
     if (options.useNameLocAsPrefix) {
@@ -736,7 +516,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     enum InputType inType = InputType::OTHER;
     if (mlirModule) {
         inType = InputType::MLIR;
-        catalyst::utils::LinesCount::ModuleOp(*mlirModule);
+        catalyst::utils::LinesCount::call(*mlirModule);
         output.isCheckpointFound = options.checkpointStage == "mlir";
     }
     else {
@@ -751,7 +531,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
         inType = InputType::LLVMIR;
         output.isCheckpointFound = options.checkpointStage == "LLVMIRTranslation";
-        catalyst::utils::LinesCount::Module(*llvmModule);
+        catalyst::utils::LinesCount::call(*llvmModule);
     }
     if (failed(verifyInputType(options, inType))) {
         return failure();
@@ -796,7 +576,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
 
         inType = InputType::LLVMIR;
-        catalyst::utils::LinesCount::Module(*llvmModule);
+        catalyst::utils::LinesCount::call(*llvmModule);
 
         if (options.keepIntermediate) {
             output.setStage("LLVMIRTranslation");
@@ -842,7 +622,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
                 return failure();
             }
             coroLLVMPassesTiming.stop();
-            catalyst::utils::LinesCount::Module(*llvmModule.get());
+            catalyst::utils::LinesCount::call(*llvmModule.get());
         }
 
         if (enzymeRun) {
@@ -852,7 +632,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
                 return failure();
             }
             o2PassesTiming.stop();
-            catalyst::utils::LinesCount::Module(*llvmModule.get());
+            catalyst::utils::LinesCount::call(*llvmModule.get());
 
             TimingScope enzymePassesTiming = llcTiming.nest("Enzyme passes");
             if (failed(timer::timer(runEnzymePasses, "runEnzymePasses", /* add_endl */ false,
@@ -860,7 +640,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
                 return failure();
             }
             enzymePassesTiming.stop();
-            catalyst::utils::LinesCount::Module(*llvmModule.get());
+            catalyst::utils::LinesCount::call(*llvmModule.get());
         }
 
         std::string errorMessage;

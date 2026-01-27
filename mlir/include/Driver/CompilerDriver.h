@@ -19,7 +19,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "mlir/IR/MLIRContext.h"
@@ -89,7 +88,7 @@ struct CompilerOptions {
 };
 
 struct CompilerOutput {
-    typedef std::unordered_map<std::string, std::string> PipelineOutputs;
+    using PipelineOutputs = std::unordered_map<std::string, std::string>;
     std::string outputFilename;
     std::string outIR;
     std::string diagnosticMessages;
