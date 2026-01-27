@@ -26,6 +26,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fix `replace_ir` for certain stages when used with gradients.
+  [(#2436)](https://github.com/PennyLaneAI/catalyst/pull/2436)
+
 * Restore the ability to differentiate multiple (expectation value) QNode results with the
   adjoint-differentiation method.
   [(#2428)](https://github.com/PennyLaneAI/catalyst/pull/2428)
