@@ -5,6 +5,9 @@
 * Users can now execute circuits with `qml.PauliRot` and `qml.pauli_measure`, as well as 
   any passes in the QEC pipeline (e.g, `to_ppr`, `ppr_to_ppm`), using `lightning.qubit` device
   with program capture enabled.
+  Note that one needs to apply `@qml.transform(pass_name="unroll-conditional-ppr-ppm")` and 
+  `@qml.transform(pass_name="lower-qec-init-ops")` after passes that introduce conditional PPR/PPMs
+  as well as any `qec.prepare` and `qec.fabricate` operations in the MLIR.
   For example, we can now execute the following circuit.
   ```python
   import pennylane as qml
