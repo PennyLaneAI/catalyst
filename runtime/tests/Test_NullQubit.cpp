@@ -981,13 +981,14 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
     auto obs2 = sim->Observable(ObsId::PauliX, {}, {});
     sim->Observable(ObsId::PauliY, {}, {});
     sim->Observable(ObsId::Hadamard, {}, {});
+    sim->Observable(ObsId::Hermitian, {}, {});
     sim->Observable(ObsId::Identity, {}, {});
     auto obs3 = sim->TensorObservable({obs1, obs2});
     auto obs4 = sim->HamiltonianObservable({}, {obs1, obs2});
     CHECK(obs1 == 1);
     CHECK(obs2 == 2);
-    CHECK(obs3 == 6);
-    CHECK(obs4 == 7);
+    CHECK(obs3 == 7);
+    CHECK(obs4 == 8);
 
     // Test expectation value on each observable type
     sim->Expval(obs1);
