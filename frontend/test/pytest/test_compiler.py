@@ -267,7 +267,7 @@ class TestCompilerState:
 
         assert f.jaxpr is None
         assert f.mlir is None
-        assert f.qir is None
+        assert f.llvmir is None
         assert f.compiled_function is None
 
     def test_callable_without_name(self):
