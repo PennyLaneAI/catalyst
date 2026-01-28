@@ -35,8 +35,7 @@
 #include "Driver/Pipelines.h"
 #include "Driver/Timer.hpp"
 
-namespace catalyst {
-namespace driver {
+namespace catalyst::driver {
 
 /// Verbosity level
 // TODO: Adjust the number of levels according to our needs. MLIR seems to print few really
@@ -45,27 +44,27 @@ enum class Verbosity { Silent = 0, Urgent = 1, Debug = 2, All = 3 };
 
 /**
  * @brief Controls the stage for dumping the IR.
- * 
+ *
  */
 enum SaveTemps { None, AfterPipeline, AfterPassChanged, AfterPass };
 
 /**
  * @brief Defines the different functional stages of the driver.
- * 
+ *
  */
 enum Action { OPT, Translate, LLC, All };
 
 /**
  * @brief Defines the format of the input data.
- * 
+ *
  */
 enum InputType { MLIR, LLVMIR, OTHER };
 
 /**
  * @brief Provides enum-defined error codes for the compiler driver.
- * 
+ *
  */
-enum class ErrorCode : int { Success = 0, Failure = 1};
+enum class ErrorCode : int { Success = 0, Failure = 1 };
 
 /// Helper verbose reporting macro.
 #define CO_MSG(opt, level, op)                                                                     \
@@ -76,7 +75,7 @@ enum class ErrorCode : int { Success = 0, Failure = 1};
     } while (0)
 
 /**
- * @brief Optional parametersfor the compiler, for which we provide reasonable default values.
+ * @brief Optional parameters for the compiler, for which we provide reasonable default values.
  *
  */
 struct CompilerOptions {
@@ -140,6 +139,80 @@ struct CompilerOutput {
 };
 
 /**
+ * @brief Parse an MLIR module given in textual ASM representation. Any errors during parsing will
+ * be output to diagnosticStream.
+ *
+ */
+mlir::OwningOpRef<mlir::ModuleOp> parseMLIRSource(mlir::MLIRContext *ctx,
+                                                  const llvm::SourceMgr &sourceMgr);
+
+/**
+ * @brief Checks if the program contains gradient operations in the input MLIR module. Used to
+ * identify validity of the program with given passes.
+ *
+ * @param moduleOp
+ * @return true Gradient operations are present in the program.
+ * @return false Gradient operations are not present in the program.
+ */
+bool containsGradients(mlir::ModuleOp moduleOp);
+
+/**
+ * @brief Parse an LLVM module given in textual representation. Any parse errors will be output to
+ * the provided SMDiagnostic.
+ *
+ * @param context
+ * @param source
+ * @param moduleName
+ * @param err
+ * @return std::shared_ptr<llvm::Module>
+ */
+std::shared_ptr<llvm::Module> parseLLVMSource(llvm::LLVMContext &context, llvm::StringRef source,
+                                              llvm::StringRef moduleName, llvm::SMDiagnostic &err);
+
+/**
+ * @brief Register all dialects required by the Catalyst compiler to the given MLIR dialect
+ * registry.
+ *
+ * @param registry Reference to the given MLIR dialect registry. Will be modified in-place with the
+ * defined dialects.
+ */
+void registerAllCatalystDialects(mlir::DialectRegistry &registry);
+
+/**
+ * @brief Determines if the compilation stage should be executed if a checkpointStage is provided to
+ * the compiler options. This will ensure the compiler will execute only after reaching the given
+ * checkpoint.
+ *
+ * @param options Compiler configuration options.
+ * @param output Compiler output object. Modified in-place if checkpoint is not found to indicate if
+ * the current stage matches the provided stage name.
+ * @param stageName The name of the compiler stage to treat as a checkpoint.
+ * @return true Indicates the compiler should run the given stage.
+ * @return false Indicates the compiler should not run the given stage.
+ */
+bool shouldRunStage(const CompilerOptions &options, CompilerOutput &output,
+                    const std::string &stageName);
+
+/**
+ * @brief Run LLVM passes defined for asynchronous QNode execution.
+ * @details These passes are applied when making use of asynchronous QNodes when
+ * `qjit(async_qnodes=True), allowing for independent execution of multiple QNodes defined in a
+ * given program (where supported). This stage makes use of LLVM coroutine-specific passes, and
+ * provides the most benefit when having multiple QNodes in the program that can be independently
+ * executed.
+ *
+ * @param options Compiler configuration options.
+ * @param llvmModule
+ * @param output
+ * @return llvm::LogicalResult
+ */
+llvm::LogicalResult runCoroLLVMPasses(const CompilerOptions &options,
+                                      std::shared_ptr<llvm::Module> llvmModule,
+                                      CompilerOutput &output);
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
  * @brief Parse input pipelines to return a compatible compilation pipeline stage.
  *
  * @param catalystPipeline List of the pipeline stages in textual format
@@ -160,85 +233,102 @@ parsePipelines(const llvm::cl::list<std::string> &catalystPipeline);
 size_t findMatchingClosingParen(llvm::StringRef str, size_t openParenPos);
 
 /**
- * @brief
+ * @brief Ensure the compiler options and input data type match their semantic use.
  *
- * @param options
- * @param inType
+ * @param options Catalyst compiler options.
+ * @param inType Denote the expected input type.
  * @return llvm::LogicalResult
  */
 llvm::LogicalResult verifyInputType(const CompilerOptions &options, InputType inType);
+
+/**
+ * @brief Apply all MLIR lowering passes on the given module.
+ *
+ * @param options Compiler configuration options.
+ * @param ctx MLIR context for all operations.
+ * @param moduleOp Top-level MLIR module container.
+ * @param output Compiler output object. Modified in-place.
+ * @param timing Timer object for instrumentation of pass execution.
+ * @return llvm::LogicalResult
+ */
 llvm::LogicalResult runLowering(const CompilerOptions &options, mlir::MLIRContext *ctx,
                                 mlir::ModuleOp moduleOp, CompilerOutput &output,
                                 mlir::TimingScope &timing);
+
+/**
+ * @brief Run the given compiler pipeline...
+ *
+ * @param pm
+ * @param options Compiler configuration options.
+ * @param output
+ * @param pipeline
+ * @param clHasManualPipeline
+ * @param moduleOp
+ * @return llvm::LogicalResult
+ */
 llvm::LogicalResult runPipeline(mlir::PassManager &pm, const CompilerOptions &options,
                                 CompilerOutput &output, Pipeline &pipeline,
                                 bool clHasManualPipeline, mlir::ModuleOp moduleOp);
+
+/**
+ * @brief
+ *
+ * @param pm
+ * @param options Compiler configuration options.
+ * @param pipeline
+ * @param clHasManualPipeline
+ * @return llvm::LogicalResult
+ */
 llvm::LogicalResult configurePipeline(mlir::PassManager &pm, const CompilerOptions &options,
                                       Pipeline &pipeline, bool clHasManualPipeline);
+
+/**
+ * @brief
+ *
+ * @param pm
+ * @param options Compiler configuration options.
+ * @param output
+ * @param timer
+ * @param timing
+ * @return llvm::LogicalResult
+ */
 llvm::LogicalResult preparePassManager(mlir::PassManager &pm, const CompilerOptions &options,
                                        CompilerOutput &output, catalyst::utils::Timer<> &timer,
                                        mlir::TimingScope &timing);
+
+/**
+ * @brief
+ *
+ * @param filename
+ * @return std::string
+ */
 std::string readInputFile(const std::string &filename);
+
+/**
+ * @brief
+ *
+ * @param options Compiler configuration options.
+ * @param llvmModule
+ * @param output
+ * @return llvm::LogicalResult
+ */
 llvm::LogicalResult runEnzymePasses(const CompilerOptions &options,
                                     std::shared_ptr<llvm::Module> llvmModule,
                                     CompilerOutput &output);
+
+/**
+ * @brief Run optimization passes at the -O2 level on the program representation.
+ *
+ * @param options Compiler configuration options.
+ * @param llvmModule
+ * @param output
+ * @return llvm::LogicalResult
+ */
 llvm::LogicalResult runO2LLVMPasses(const CompilerOptions &options,
                                     std::shared_ptr<llvm::Module> llvmModule,
                                     CompilerOutput &output);
-llvm::LogicalResult runCoroLLVMPasses(const CompilerOptions &options,
-                                      std::shared_ptr<llvm::Module> llvmModule,
-                                      CompilerOutput &output);
 
-/**
- * @brief 
- * 
- * @param options 
- * @param output 
- * @param stageName 
- * @return true 
- * @return false 
- */
-bool shouldRunStage(const CompilerOptions &options, CompilerOutput &output,
-                    const std::string &stageName);
-
-/**
- * @brief Register all dialects required by the Catalyst compiler to the given MLIR dialect registry.
- * 
- * @param registry Reference to the given MLIR dialect registry. Will be modified in-place with the defined dialects.
- */
-void registerAllCatalystDialects(mlir::DialectRegistry &registry);
-
-/**
- * @brief Parse an LLVM module given in textual representation. Any parse errors will be output to the provided SMDiagnostic.
- * 
- * @param context 
- * @param source 
- * @param moduleName 
- * @param err 
- * @return std::shared_ptr<llvm::Module> 
- */
-std::shared_ptr<llvm::Module> parseLLVMSource(llvm::LLVMContext &context, llvm::StringRef source,
-                                              llvm::StringRef moduleName, llvm::SMDiagnostic &err);
-
-/**
- * @brief Checks if the program contains gradient operations in the input MLIR module. Used to identify validity of the program with given passes.
- *
- * @param moduleOp
- * @return true Gradient operations are present in the program.
- * @return false Gradient operations are not present in the program.
- */
-bool containsGradients(mlir::ModuleOp moduleOp);
-
-/**
- * @brief Parse an MLIR module given in textual ASM representation. Any errors during parsing will
- * be output to diagnosticStream.
- *
- */
-mlir::OwningOpRef<mlir::ModuleOp> parseMLIRSource(mlir::MLIRContext *ctx,
-                                                  const llvm::SourceMgr &sourceMgr);
-
-}; // namespace driver
-}; // namespace catalyst
+}; // namespace catalyst::driver
 
 /**
  * @brief Entry point to the MLIR portion of the compiler.
@@ -253,35 +343,10 @@ mlir::LogicalResult QuantumDriverMain(const catalyst::driver::CompilerOptions &o
                                       mlir::DialectRegistry &registry);
 
 /**
- * @brief Entry point to the MLIR portion of the compiler using the command-line interface. 
+ * @brief Entry point to the MLIR portion of the compiler using the command-line interface.
  *
  * @param argc `main` function argc
  * @param argv `main` function argv
- * @return int Return code of execution. 
+ * @return int Return code of execution.
  */
 catalyst::driver::ErrorCode QuantumDriverMainFromCL(int argc, char **argv);
-
-/**
- * @brief Entry point to the MLIR portion of the compiler with fine grained control over the input
- * arguments.
- *
- * @param source
- * @param workspace
- * @param moduleName
- * @param keepIntermediate
- * @param useNamelocAsPrefix
- * @param asyncQNodes
- * @param verbose
- * @param lowerToLLVM
- * @param passPipelines
- * @param checkpointStage
- * @param output
- * @return int
- */
-catalyst::driver::ErrorCode QuantumDriverMainFromArgs(const std::string &source, const std::string &workspace,
-                              const std::string &moduleName, bool keepIntermediate,
-                              bool useNamelocAsPrefix, bool asyncQNodes, bool verbose,
-                              bool lowerToLLVM,
-                              const std::vector<catalyst::driver::Pipeline> &passPipelines,
-                              const std::string &checkpointStage,
-                              catalyst::driver::CompilerOutput &output);
