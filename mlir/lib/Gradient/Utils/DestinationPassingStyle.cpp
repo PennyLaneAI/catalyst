@@ -76,7 +76,7 @@ LogicalResult catalyst::convertToDestinationPassingStyle(func::FuncOp callee, Op
                 BlockArgument output = callee.getArgument(idx + dpsOutputIdx);
                 // We need a linalg.copy instead of a memref.copy here because it provides better
                 // type information at the LLVM level for Enzyme.
-                builder.create<linalg::CopyOp>(returnOp.getLoc(), operand, output);
+                linalg::CopyOp::create(builder, returnOp.getLoc(), operand, output);
                 idx++;
             }
             else {

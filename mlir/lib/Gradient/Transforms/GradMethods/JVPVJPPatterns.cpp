@@ -92,12 +92,12 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
     assert(grad_result_types.size() == func_diff_operand_indices.size() * funcResultTypes.size() &&
            "GradOp does't seem to return a tuple of Jacobians");
 
-    auto fCallOp = rewriter.create<func::CallOp>(loc, calleeOp, calleeOperands);
+    auto fCallOp = func::CallOp::create(rewriter, loc, calleeOp, calleeOperands);
 
-    auto gradOp = rewriter.create<GradOp>(loc, grad_result_types, op.getMethod(), op.getCallee(),
-                                          calleeOperands, op.getDiffArgIndicesAttr(),
-                                          op.getFiniteDiffParamAttr(), /*arg_attrs=*/nullptr,
-                                          /*res_attrs=*/nullptr);
+    auto gradOp = GradOp::create(rewriter, loc, grad_result_types, op.getMethod(), op.getCallee(),
+                                 calleeOperands, op.getDiffArgIndicesAttr(),
+                                 op.getFiniteDiffParamAttr(), /*arg_attrs=*/nullptr,
+                                 /*res_attrs=*/nullptr);
 
     std::vector<Value> einsumResults;
     for (size_t nout = 0; nout < funcResultTypes.size(); nout++) {
@@ -158,8 +158,9 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
             }
             else {
                 assert(acc.value().getType() == res.getType());
-                auto addOp = rewriter.create<linalg::AddOp>(
-                    loc, res.getType(), ValueRange{acc.value(), res}, ValueRange{acc.value()});
+                auto addOp =
+                    linalg::AddOp::create(rewriter, loc, res.getType(),
+                                          ValueRange{acc.value(), res}, ValueRange{acc.value()});
                 acc = addOp.getResultTensors()[0];
             }
         }
@@ -210,12 +211,12 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
     assert(grad_result_types.size() == func_diff_operand_indices.size() * funcResultTypes.size() &&
            "GradOp does't seem to return a tuple of Jacobians");
 
-    auto fCallOp = rewriter.create<func::CallOp>(loc, calleeOp, calleeOperands);
+    auto fCallOp = func::CallOp::create(rewriter, loc, calleeOp, calleeOperands);
 
-    auto gradOp = rewriter.create<GradOp>(loc, grad_result_types, op.getMethod(), op.getCallee(),
-                                          calleeOperands, op.getDiffArgIndicesAttr(),
-                                          op.getFiniteDiffParamAttr(), /*arg_attrs=*/nullptr,
-                                          /*res_attrs=*/nullptr);
+    auto gradOp = GradOp::create(rewriter, loc, grad_result_types, op.getMethod(), op.getCallee(),
+                                 calleeOperands, op.getDiffArgIndicesAttr(),
+                                 op.getFiniteDiffParamAttr(), /*arg_attrs=*/nullptr,
+                                 /*res_attrs=*/nullptr);
 
     std::vector<Value> einsumResults;
     for (size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {
@@ -272,8 +273,9 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
             else {
                 assert(acc.value().getType() == res.getType());
 
-                auto addOp = rewriter.create<linalg::AddOp>(
-                    loc, res.getType(), ValueRange{acc.value(), res}, ValueRange{acc.value()});
+                auto addOp =
+                    linalg::AddOp::create(rewriter, loc, res.getType(),
+                                          ValueRange{acc.value(), res}, ValueRange{acc.value()});
                 acc = addOp.getResultTensors()[0];
             }
         }

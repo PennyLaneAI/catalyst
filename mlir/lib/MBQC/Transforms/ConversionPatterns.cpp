@@ -61,18 +61,19 @@ struct MeasureInBasisOpPattern : public OpConversionPattern<MeasureInBasisOp> {
         // Extract the integer value for the plane attribute from its enum
         const auto planeValueInt = static_cast<uint32_t>(op.getPlane());
         Value planeValue =
-            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI32IntegerAttr(planeValueInt));
+            LLVM::ConstantOp::create(rewriter, loc, rewriter.getI32IntegerAttr(planeValueInt));
 
         // Create the postselect value. If not given, it defaults to NO_POSTSELECT
-        LLVM::ConstantOp postselect = rewriter.create<LLVM::ConstantOp>(
-            loc, op.getPostselect() ? op.getPostselectAttr()
-                                    : rewriter.getI32IntegerAttr(NO_POSTSELECT));
+        LLVM::ConstantOp postselect = LLVM::ConstantOp::create(
+            rewriter, loc,
+            op.getPostselect() ? op.getPostselectAttr()
+                               : rewriter.getI32IntegerAttr(NO_POSTSELECT));
 
         // Add values as arguments of the CallOp
         SmallVector<Value> args = {adaptor.getInQubit(), planeValue, op.getAngle(), postselect};
 
-        Value resultPtr = rewriter.create<LLVM::CallOp>(loc, fnDecl, args).getResult();
-        Value mres = rewriter.create<LLVM::LoadOp>(loc, IntegerType::get(ctx, 1), resultPtr);
+        Value resultPtr = LLVM::CallOp::create(rewriter, loc, fnDecl, args).getResult();
+        Value mres = LLVM::LoadOp::create(rewriter, loc, IntegerType::get(ctx, 1), resultPtr);
         rewriter.replaceOp(op, {mres, adaptor.getInQubit()});
 
         return success();

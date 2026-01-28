@@ -75,8 +75,8 @@ struct DLCustomOpPattern : public OpRewritePattern<CustomOp> {
 
         auto callOperands = analyzer.prepareCallOperands(decompFunc, rewriter, op.getLoc());
         auto callOp =
-            rewriter.create<func::CallOp>(op.getLoc(), decompFunc.getFunctionType().getResults(),
-                                          decompFunc.getSymName(), callOperands);
+            func::CallOp::create(rewriter, op.getLoc(), decompFunc.getFunctionType().getResults(),
+                                 decompFunc.getSymName(), callOperands);
 
         // Replace the op with the call op and adjust the insert ops for the qreg mode
         if (callOp.getNumResults() == 1 && isa<quantum::QuregType>(callOp.getResult(0).getType())) {
@@ -149,8 +149,8 @@ struct DLMultiRZOpPattern : public OpRewritePattern<MultiRZOp> {
 
         auto callOperands = analyzer.prepareCallOperands(decompFunc, rewriter, op.getLoc());
         auto callOp =
-            rewriter.create<func::CallOp>(op.getLoc(), decompFunc.getFunctionType().getResults(),
-                                          decompFunc.getSymName(), callOperands);
+            func::CallOp::create(rewriter, op.getLoc(), decompFunc.getFunctionType().getResults(),
+                                 decompFunc.getSymName(), callOperands);
 
         // Replace the op with the call op and adjust the insert ops for the qreg mode
         if (callOp.getNumResults() == 1 && isa<quantum::QuregType>(callOp.getResult(0).getType())) {

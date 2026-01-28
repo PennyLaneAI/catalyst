@@ -17,6 +17,7 @@
 
 * (Compiler integrators only) The versions of StableHLO/LLVM/Enzyme used by Catalyst have been updated.
   [(#2415)](https://github.com/PennyLaneAI/catalyst/pull/2415)
+  [(#2416)](https://github.com/PennyLaneAI/catalyst/pull/2416)
 
   - The StableHLO version has been updated to
   [v1.13.7](https://github.com/openxla/stablehlo/tree/v1.13.7).

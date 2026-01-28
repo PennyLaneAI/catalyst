@@ -54,25 +54,25 @@ struct LowerSelectPPM : public OpRewritePattern<SelectPPMeasurementOp> {
             resultTypes.push_back(qubit.getType());
         }
 
-        auto ifOp = rewriter.create<scf::IfOp>(loc, resultTypes, selectSwitch, true);
+        auto ifOp = scf::IfOp::create(rewriter, loc, resultTypes, selectSwitch, true);
         {
             OpBuilder::InsertionGuard guard(rewriter);
             rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
-            auto ppm0 = rewriter.create<PPMeasurementOp>(loc, pauliProduct0, inQubits);
+            auto ppm0 = PPMeasurementOp::create(rewriter, loc, pauliProduct0, inQubits);
             SmallVector<mlir::Value> yieldValues;
             yieldValues.push_back(ppm0.getMres());
             yieldValues.append(ppm0.getOutQubits().begin(), ppm0.getOutQubits().end());
-            rewriter.create<scf::YieldOp>(loc, yieldValues);
+            scf::YieldOp::create(rewriter, loc, yieldValues);
         }
 
         {
             OpBuilder::InsertionGuard guard(rewriter);
             rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
-            auto ppm1 = rewriter.create<PPMeasurementOp>(loc, pauliProduct1, inQubits);
+            auto ppm1 = PPMeasurementOp::create(rewriter, loc, pauliProduct1, inQubits);
             SmallVector<mlir::Value> yieldValues;
             yieldValues.push_back(ppm1.getMres());
             yieldValues.append(ppm1.getOutQubits().begin(), ppm1.getOutQubits().end());
-            rewriter.create<scf::YieldOp>(loc, yieldValues);
+            scf::YieldOp::create(rewriter, loc, yieldValues);
         }
 
         rewriter.replaceOp(op, ifOp.getResults());
@@ -113,20 +113,20 @@ struct LowerCondPPR : public OpRewritePattern<PPRotationOp> {
             resultTypes.push_back(qubit.getType());
         }
 
-        auto ifOp = rewriter.create<scf::IfOp>(loc, resultTypes, condition, true);
+        auto ifOp = scf::IfOp::create(rewriter, loc, resultTypes, condition, true);
         {
             OpBuilder::InsertionGuard guard(rewriter);
             rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
-            auto ppr = rewriter.create<PPRotationOp>(loc, resultTypes, pauliProduct, rotationKind,
-                                                     inQubits);
-            rewriter.create<scf::YieldOp>(loc, ppr.getOutQubits());
+            auto ppr = PPRotationOp::create(rewriter, loc, resultTypes, pauliProduct, rotationKind,
+                                            inQubits);
+            scf::YieldOp::create(rewriter, loc, ppr.getOutQubits());
         }
 
         {
             // Unchanged else block
             OpBuilder::InsertionGuard guard(rewriter);
             rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
-            rewriter.create<scf::YieldOp>(loc, inQubits);
+            scf::YieldOp::create(rewriter, loc, inQubits);
         }
 
         rewriter.replaceOp(op, ifOp.getResults());

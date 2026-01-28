@@ -126,8 +126,8 @@ void moveCliffordPastNonClifford(const PauliStringWrapper &lhsPauli,
 
     // Create the new PPR
     auto nonCliffordOp =
-        rewriter.create<PPRotationOp>(rhs->getLoc(), newOutQubitsTypesList, pauliProduct,
-                                      rhs.getRotationKindAttr(), newRHSOperands);
+        PPRotationOp::create(rewriter, rhs->getLoc(), newOutQubitsTypesList, pauliProduct,
+                             rhs.getRotationKindAttr(), newRHSOperands);
     rewriter.moveOpBefore(nonCliffordOp, rhs);
 
     // Update the use of value in newRHSOperands

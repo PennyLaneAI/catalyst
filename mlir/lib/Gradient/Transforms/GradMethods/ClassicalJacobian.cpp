@@ -58,7 +58,7 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
         // their gate parameters instead.
         rewriter.setInsertionPointAfter(callee);
         paramCountFn =
-            rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
+            func::FuncOp::create(rewriter, loc, fnName, fnType, visibility, nullptr, nullptr);
         rewriter.cloneRegionBefore(callee.getBody(), paramCountFn.getBody(), paramCountFn.end());
 
         PatternRewriter::InsertionGuard insertGuard(rewriter);
@@ -68,8 +68,8 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
         // for updated parameter counts from arbitrary regions/ops.
         MemRefType paramCountType = MemRefType::get({}, rewriter.getIndexType());
         Value paramCountBuffer = getStaticMemrefAlloca(loc, rewriter, paramCountType);
-        Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
-        rewriter.create<memref::StoreOp>(loc, cZero, paramCountBuffer);
+        Value cZero = index::ConstantOp::create(rewriter, loc, 0);
+        memref::StoreOp::create(rewriter, loc, cZero, paramCountBuffer);
 
         paramCountFn.walk([&](Operation *op) {
             // For each quantum gate add the number of parameters to the counter.
@@ -79,10 +79,10 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
 
                 ValueRange diffParams = gate.getDiffParams();
                 if (!diffParams.empty()) {
-                    Value currCount = rewriter.create<memref::LoadOp>(loc, paramCountBuffer);
-                    Value numParams = rewriter.create<index::ConstantOp>(loc, diffParams.size());
-                    Value newCount = rewriter.create<index::AddOp>(loc, currCount, numParams);
-                    rewriter.create<memref::StoreOp>(loc, newCount, paramCountBuffer);
+                    Value currCount = memref::LoadOp::create(rewriter, loc, paramCountBuffer);
+                    Value numParams = index::ConstantOp::create(rewriter, loc, diffParams.size());
+                    Value newCount = index::AddOp::create(rewriter, loc, currCount, numParams);
+                    memref::StoreOp::create(rewriter, loc, newCount, paramCountBuffer);
                 }
 
                 rewriter.replaceOp(gate, gate.getQubitOperands());
@@ -110,7 +110,7 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
                 rewriter.setInsertionPoint(op);
 
-                Value paramCount = rewriter.create<memref::LoadOp>(loc, paramCountBuffer);
+                Value paramCount = memref::LoadOp::create(rewriter, loc, paramCountBuffer);
                 op->setOperands(paramCount);
             }
         });
@@ -139,7 +139,7 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
         // First copy the original function as is, then we can replace all quantum ops by collecting
         // their gate parameters in a memory buffer instead. This buffer is passed into a modified
         // qnodeQuantum.
-        splitFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
+        splitFn = func::FuncOp::create(rewriter, loc, fnName, fnType, visibility, nullptr, nullptr);
         rewriter.cloneRegionBefore(qnode.getBody(), splitFn.getBody(), splitFn.end());
         Block &argMapBlock = splitFn.getFunctionBody().front();
         SmallVector<Value> qnodeQuantumArgs{argMapBlock.getArguments()};
@@ -147,16 +147,17 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
         Value paramCount = argMapBlock.addArgument(rewriter.getIndexType(), loc);
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointToStart(&splitFn.getBody().front());
-        Value paramsBuffer = rewriter.create<memref::AllocOp>(loc, paramsBufferType, paramCount);
-        Value paramsTensor = rewriter.create<bufferization::ToTensorOp>(
-            loc, memref::getTensorTypeFromMemRefType(paramsBuffer.getType()), paramsBuffer, true);
+        Value paramsBuffer = memref::AllocOp::create(rewriter, loc, paramsBufferType, paramCount);
+        Value paramsTensor = bufferization::ToTensorOp::create(
+            rewriter, loc, memref::getTensorTypeFromMemRefType(paramsBuffer.getType()),
+            paramsBuffer, true);
 
         qnodeQuantumArgs.push_back(paramsTensor);
         MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());
         Value paramsProcessed = getStaticMemrefAlloca(loc, rewriter, paramsProcessedType);
-        Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
-        rewriter.create<memref::StoreOp>(loc, cZero, paramsProcessed);
-        Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
+        Value cZero = index::ConstantOp::create(rewriter, loc, 0);
+        memref::StoreOp::create(rewriter, loc, cZero, paramsProcessed);
+        Value cOne = index::ConstantOp::create(rewriter, loc, 1);
 
         splitFn.walk([&](Operation *op) {
             // Insert gate parameters into the params buffer.
@@ -166,12 +167,12 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
 
                 ValueRange diffParams = gate.getDiffParams();
                 if (!diffParams.empty()) {
-                    Value paramIdx = rewriter.create<memref::LoadOp>(loc, paramsProcessed);
+                    Value paramIdx = memref::LoadOp::create(rewriter, loc, paramsProcessed);
                     for (auto param : diffParams) {
-                        rewriter.create<memref::StoreOp>(loc, param, paramsBuffer, paramIdx);
-                        paramIdx = rewriter.create<index::AddOp>(loc, paramIdx, cOne);
+                        memref::StoreOp::create(rewriter, loc, param, paramsBuffer, paramIdx);
+                        paramIdx = index::AddOp::create(rewriter, loc, paramIdx, cOne);
                     }
-                    rewriter.create<memref::StoreOp>(loc, paramIdx, paramsProcessed);
+                    memref::StoreOp::create(rewriter, loc, paramIdx, paramsProcessed);
                 }
 
                 rewriter.replaceOp(op, gate.getQubitOperands());
@@ -199,7 +200,7 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
                 PatternRewriter::InsertionGuard insertionGuard(rewriter);
                 rewriter.setInsertionPoint(returnOp);
                 auto modifiedCall =
-                    rewriter.create<func::CallOp>(loc, qnodeQuantum, qnodeQuantumArgs);
+                    func::CallOp::create(rewriter, loc, qnodeQuantum, qnodeQuantumArgs);
 
                 returnOp.getOperandsMutable().assign(modifiedCall.getResults());
             }

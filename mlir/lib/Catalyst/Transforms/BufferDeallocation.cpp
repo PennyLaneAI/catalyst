@@ -618,7 +618,7 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
         }
         else {
             // Build a "default" DeallocOp for unknown allocation sources.
-            builder.create<memref::DeallocOp>(alloc.getLoc(), alloc);
+            memref::DeallocOp::create(builder, alloc.getLoc(), alloc);
         }
         return success();
     }
@@ -641,7 +641,7 @@ class BufferDeallocation : public BufferPlacementTransformationBase {
                                                       "are not supported");
         }
         // Build a "default" CloneOp for unknown allocation sources.
-        return builder.create<bufferization::CloneOp>(alloc.getLoc(), alloc).getResult();
+        return bufferization::CloneOp::create(builder, alloc.getLoc(), alloc).getResult();
     }
 
     /// The dominator info to find the appropriate start operation to move the

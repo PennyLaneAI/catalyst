@@ -390,13 +390,14 @@ In C++ it will look as follows:
         // performs C+=A*B
         // so we need to create a zero matrix of the desired type and shape first
         tensor::EmptyOp zeromat =
-            rewriter.create<tensor::EmptyOp>(op.getLoc(), MatrixType, ValueRange{});
+            tensor::EmptyOp::create(rewriter, op.getLoc(), MatrixType, ValueRange{});
 
-        // The first argument to the `create` need to be a `Location`
+        // The first argument to the `create` method is the `OpBuilder` (rewriter)
+        // The second argument to the `create` need to be a `Location`
         // which can usually just be a `getLoc()` from any operation you have handy
-        // The second argument needs to be (a list of) type(s) of the operation's output
-        // The third argument needs to be (a list of) input value(s) to the operation
-        linalg::MatmulOp matmul = rewriter.create<linalg::MatmulOp>(
+        // The third argument needs to be (a list of) type(s) of the operation's output
+        // The fourth argument needs to be (a list of) input value(s) to the operation
+        linalg::MatmulOp matmul = linalg::MatmulOp::create(rewriter,
             op.getLoc(), TypeRange{MatrixType}, ValueRange{m1, m2}, ValueRange{zeromat});
 
         // Some peculiarity for the matmul operation; no need to worry about it here
@@ -427,26 +428,27 @@ changes (also called the insertion point). Let's have a look at some of these el
 
 - **Constructing new operations**:
 
-  New operations are created via the ``rewriter.create`` method. Here we want to generate a matrix
+  New operations are created via the ``OpTy::create`` method. Here we want to generate a matrix
   multiplication instruction from the ``linalg`` dialect. C++ namespaces usually correspond to the
-  dialect name. The first thing the rewriter needs is always a `location object <https://mlir.llvm.org/docs/Diagnostics/#source-locations>`_,
+  dialect name. The first argument to ``create`` is always the ``OpBuilder`` (or ``PatternRewriter``),
+  followed by a `location object <https://mlir.llvm.org/docs/Diagnostics/#source-locations>`_,
   which is used in debugging to refer back to the original source code line, for example.
-  Following this, we need to provide the right arguments to instantiate the operation. So-called
-  operation builders are automatically defined for this purpose, whose source can be referenced to
+  Following this, we need to provide the right arguments to instantiate the operation. The ``create``
+  methods are automatically defined for this purpose, whose source can be referenced to
   consult which arguments are required. Looking into ``LinalgStructuredOps.h.inc`` for example
   reveals the following options:
 
   .. code-block:: cpp
 
-    static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, ValueRange inputs, ValueRange outputs, ArrayRef<NamedAttribute> attributes = {});
-    static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, TypeRange resultTensorTypes, ValueRange inputs, ValueRange outputs, ArrayRef<NamedAttribute> attributes = {});
-    static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, TypeRange resultTensorTypes, ValueRange operands, ArrayRef<NamedAttribute> attributes = {});
-    static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, TypeRange resultTensorTypes, ValueRange inputs, ValueRange outputs, Attribute cast, ArrayRef<NamedAttribute> attributes = {});
+    static MatmulOp create(::mlir::OpBuilder &builder, ::mlir::Location location, ValueRange inputs, ValueRange outputs, ArrayRef<NamedAttribute> attributes = {});
+    static MatmulOp create(::mlir::OpBuilder &builder, ::mlir::Location location, TypeRange resultTensorTypes, ValueRange inputs, ValueRange outputs, ArrayRef<NamedAttribute> attributes = {});
+    static MatmulOp create(::mlir::OpBuilder &builder, ::mlir::Location location, TypeRange resultTensorTypes, ValueRange operands, ArrayRef<NamedAttribute> attributes = {});
+    static MatmulOp create(::mlir::OpBuilder &builder, ::mlir::Location location, TypeRange resultTensorTypes, ValueRange inputs, ValueRange outputs, Attribute cast, ArrayRef<NamedAttribute> attributes = {});
 
-  We can always ignore the first two arguments, ``odsBuilder`` and ``odsState``, but the remaining
-  ones are the arguments we'll need to provide to the rewriter. We chose the simplest one which
-  only requires specifying a range of values for the operation ``inputs`` (two to be precise). We
-  can ignore ``outputs`` argument for now as it is a peculiarity of the ``linalg`` dialect.
+  The first argument is always the ``OpBuilder`` (or ``PatternRewriter``), and the second is the ``Location``.
+  The remaining arguments depend on the specific operation. We chose the version which
+  requires specifying result types, input values, and output values. We can ignore ``outputs``
+  argument for now as it is a peculiarity of the ``linalg`` dialect.
   If necessary, the result types of an operation may be specified as can be seen in the second
   version, but for ``matmul`` the result types can be automatically deduced.
 
@@ -618,7 +620,7 @@ For the rewriting part we'll want to introduce a few new elements, such as looki
             // The function type should be identical to the type signature of the grad operation.
             FunctionType fnType = rewriter.getFunctionType(op.getOperandTypes(), op.getResultTypes());
 
-            gradFn = rewriter.create<func::FuncOp>(op.getLoc(), fnName, fnType, visibility, nullptr, nullptr);
+            gradFn = func::FuncOp::create(rewriter, op.getLoc(), fnName, fnType, visibility, nullptr, nullptr);
 
             // Now we just to populate the actual body of the function. First create an empty body.
             Block *fnBody = gradFn.addEntryBlock();
@@ -678,30 +680,30 @@ In code:
         ValueRange callArgs = gradFn.getArguments();
 
         // We can reuse the same f(x, y, z) evaluation for all partial derivatives.
-        func::CallOp callOp = rewriter.create<func::CallOp>(loc, callee, callArgs);
+        func::CallOp callOp = func::CallOp::create(rewriter, loc, callee, callArgs);
 
         // Loop through x, y, z to collect the partial derivatives.
         std::vector<Value> gradient;
         for (auto [idx, arg] : llvm::enumerate(callArgs)) {
 
             FloatAttr hAttr = rewriter.getF64FloatAttr(0.1); // or another small fd parameter
-            Value hValue = rewriter.create<arith::ConstantOp>(loc, hAttr);
+            Value hValue = arith::ConstantOp::create(rewriter, loc, hAttr);
 
-            Value argPlusH = rewriter.create<arith::AddFOp>(loc, arg, hValue);
+            Value argPlusH = arith::AddFOp::create(rewriter, loc, arg, hValue);
 
             // Make a copy of arguments to replace the argument with it's shifted value.
             std::vector<Value> callArgsForward(callArgs.begin(), callArgs.end());
             callArgsForward[idx] = argPlusH;
             func::CallOp callOpForward =
-                rewriter.create<func::CallOp>(loc, callee, callArgsForward);
+                func::CallOp::create(rewriter, loc, callee, callArgsForward);
 
             // Compute the finite difference.
-            Value difference = rewriter.create<arith::SubFOp>(loc, callOpForward.getResult(0), callOp.getResult(0));
-            Value partialDerivative = rewriter.create<arith::DivFOp>(loc, difference, hValue);
+            Value difference = arith::SubFOp::create(rewriter, loc, callOpForward.getResult(0), callOp.getResult(0));
+            Value partialDerivative = arith::DivFOp::create(rewriter, loc, difference, hValue);
             gradient.push_back(partialDerivative);
         }
 
-        rewriter.create<func::ReturnOp>(loc, gradient);
+        func::ReturnOp::create(rewriter, loc, gradient);
     }
 
 Alright, our function should now look something like this:

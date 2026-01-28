@@ -89,7 +89,7 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
             // Create the new function, passing the collected signature
             auto newFuncType = FunctionType::get(getContext(), newArgTypes, newResultTypes);
             newFuncOp =
-                rewriter.create<func::FuncOp>(funcOp.getLoc(), newFuncName, newFuncType, newAttrs);
+                func::FuncOp::create(rewriter, funcOp.getLoc(), newFuncName, newFuncType, newAttrs);
 
             // Map FuncOp body and return operation
             Block *newEntryBlock = newFuncOp.addEntryBlock();
@@ -134,8 +134,8 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
 
             if (isScalarTensor(oldArg.getType())) {
                 // Insert a FromElementsOp if the old argument is a scalar tensor
-                auto fromElementsOp = rewriter.create<tensor::FromElementsOp>(
-                    newArg.getLoc(), oldArg.getType(), newArg);
+                auto fromElementsOp = tensor::FromElementsOp::create(rewriter, newArg.getLoc(),
+                                                                     oldArg.getType(), newArg);
                 mapper.map(oldArg, fromElementsOp.getResult());
             }
             else {
@@ -157,15 +157,15 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
             Value newOperand = mapper.lookup(operand);
             if (isScalarTensor(newOperand.getType())) {
                 // Insert ExtractOp if the operand is a scalar tensor
-                auto extractOp = rewriter.create<tensor::ExtractOp>(oldReturnOp.getLoc(),
-                                                                    newOperand, ValueRange{});
+                auto extractOp = tensor::ExtractOp::create(rewriter, oldReturnOp.getLoc(),
+                                                           newOperand, ValueRange{});
                 newReturnOperands.push_back(extractOp.getResult());
             }
             else {
                 newReturnOperands.push_back(newOperand);
             }
         }
-        rewriter.create<func::ReturnOp>(oldReturnOp.getLoc(), newReturnOperands);
+        func::ReturnOp::create(rewriter, oldReturnOp.getLoc(), newReturnOperands);
     }
 
     void replaceCallOp(PatternRewriter &rewriter, func::CallOp &callOp,
@@ -178,7 +178,7 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
             // function
             if (isScalarTensor(operand.getType())) {
                 auto extractOp =
-                    rewriter.create<tensor::ExtractOp>(callOp.getLoc(), operand, ValueRange{});
+                    tensor::ExtractOp::create(rewriter, callOp.getLoc(), operand, ValueRange{});
                 newOperands.push_back(extractOp.getResult());
             }
             else {
@@ -186,7 +186,7 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
             }
         }
 
-        auto newCallOp = rewriter.create<func::CallOp>(callOp.getLoc(), newFuncOp, newOperands);
+        auto newCallOp = func::CallOp::create(rewriter, callOp.getLoc(), newFuncOp, newOperands);
 
         SmallVector<Value> newResults;
         for (size_t i = 0; i < callOp.getNumResults(); ++i) {
@@ -195,8 +195,8 @@ struct DetensorizeCallSitePattern : public OpRewritePattern<func::CallOp> {
             if (isScalarTensor(oldResult.getType())) {
                 // Insert a FromElementsOp if the old result is a scalar tensor to bridge the
                 // detensorized function
-                auto fromElementsOp = rewriter.create<tensor::FromElementsOp>(
-                    callOp.getLoc(), oldResult.getType(), newResult);
+                auto fromElementsOp = tensor::FromElementsOp::create(
+                    rewriter, callOp.getLoc(), oldResult.getType(), newResult);
                 newResults.push_back(fromElementsOp.getResult());
             }
             else {

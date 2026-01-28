@@ -196,12 +196,12 @@ class ConvertIotaOp : public OpRewritePattern<stablehlo::IotaOp> {
         auto intShapeType = RankedTensorType::get(
             outputType.getShape(), IntegerType::get(rewriter.getContext(), bitwidth));
         auto loc = op.getLoc();
-        auto integerConst = rewriter.create<mlir::arith::ConstantOp>(
+        auto integerConst = mlir::arith::ConstantOp::create(rewriter,
             loc, DenseIntElementsAttr::get(intShapeType, values));
 
         auto intOrFloatShapeTy = RankedTensorType::get(outputType.getShape(), intOrFloatTy);
 
-        auto iotaConst = rewriter.create<ConvertOp>(loc, intOrFloatShapeTy, integerConst);
+        auto iotaConst = ConvertOp::create(rewriter, loc, intOrFloatShapeTy, integerConst);
 
         // For int/float types we are done, replace op and return.
         if (!complexTy) {
@@ -211,9 +211,9 @@ class ConvertIotaOp : public OpRewritePattern<stablehlo::IotaOp> {
 
         // For complex types, generate a constant tensor of zeroes for the imaginary
         // part and use iota_const for real part.
-        auto zeroes = rewriter.create<mlir::arith::ConstantOp>(
+        auto zeroes = mlir::arith::ConstantOp::create(rewriter,
             loc, DenseIntElementsAttr::get(intShapeType, APInt(bitwidth, 0)));
-        auto imagZeroes = rewriter.create<ConvertOp>(loc, intOrFloatShapeTy, zeroes);
+        auto imagZeroes = ConvertOp::create(rewriter, loc, intOrFloatShapeTy, zeroes);
         rewriter.replaceOpWithNewOp<stablehlo::ComplexOp>(op, iotaConst, imagZeroes);
         return success();
     }

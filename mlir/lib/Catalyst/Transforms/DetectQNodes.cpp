@@ -224,7 +224,7 @@ LogicalResult AddExceptionHandlingTransform::matchAndRewrite(LLVM::CallOp callOp
     if (successBlock->hasNoSuccessors()) {
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointToEnd(failBlock);
-        rewriter.create<LLVM::UnreachableOp>(invokeOp->getLoc());
+        LLVM::UnreachableOp::create(rewriter, invokeOp->getLoc());
     }
     else {
         auto successor = successBlock->getSuccessor(0);
@@ -520,7 +520,7 @@ LogicalResult LivenessAnalysisDropRef::matchAndRewrite(LLVM::CallOp sink,
 
     Type llvmInt64Type = IntegerType::get(sink->getContext(), 64);
     auto one = rewriter.getIntegerAttr(llvmInt64Type, 1);
-    Value c1 = rewriter.create<LLVM::ConstantOp>(sink->getLoc(), llvmInt64Type, one);
+    Value c1 = LLVM::ConstantOp::create(rewriter, sink->getLoc(), llvmInt64Type, one);
 
     // We just need to await for the tokens.
     // The tokens is the aggregate of all values.
@@ -531,7 +531,7 @@ LogicalResult LivenessAnalysisDropRef::matchAndRewrite(LLVM::CallOp sink,
     for (auto awaitMe : tokens) {
         auto contains = valuesToDrop.find(awaitMe) != valuesToDrop.end();
         if (contains)
-            rewriter.create<LLVM::CallOp>(sink.getLoc(), awaitFnDecl, awaitMe);
+            LLVM::CallOp::create(rewriter, sink.getLoc(), awaitFnDecl, awaitMe);
     }
 
     // We will drop all values that were alive. Tokens and values.
@@ -541,7 +541,7 @@ LogicalResult LivenessAnalysisDropRef::matchAndRewrite(LLVM::CallOp sink,
     //     llvm.call @__catalyst__host__rt__unrecoverable_error() { catalyst.sink }
     for (auto dropMe : valuesToDrop) {
         SmallVector<Value> params = {dropMe, c1};
-        rewriter.create<LLVM::CallOp>(sink.getLoc(), dropRefFnDecl, params);
+        LLVM::CallOp::create(rewriter, sink.getLoc(), dropRefFnDecl, params);
     }
 
     // It is important that we do not cleanup the source, as other sinks
@@ -582,7 +582,7 @@ LogicalResult BranchToUnreachableTransform::matchAndRewrite(LLVM::BrOp candidate
     if (!hasAttr)
         return failure();
 
-    auto unreachable = rewriter.create<LLVM::UnreachableOp>(candidate.getLoc());
+    auto unreachable = LLVM::UnreachableOp::create(rewriter, candidate.getLoc());
     rewriter.replaceOp(candidate, unreachable);
     return success();
 }
@@ -642,7 +642,7 @@ void replaceCallsWithCallToTarget(SmallVector<LLVM::CallOp> &oldCallOps, LLVM::L
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPoint(oldCallOp);
         auto newCallOp =
-            rewriter.create<LLVM::CallOp>(oldCallOp.getLoc(), target, oldCallOp.getOperands());
+            LLVM::CallOp::create(rewriter, oldCallOp.getLoc(), target, oldCallOp.getOperands());
         rewriter.replaceOp(oldCallOp, newCallOp);
         newCalls.push_back(newCallOp);
     }
@@ -762,7 +762,7 @@ void replaceTerminatorWithUnconditionalJumpToSuccessBlock(SmallVector<Block *> a
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         auto terminator = abort->getTerminator();
         rewriter.setInsertionPoint(terminator);
-        auto brOp = rewriter.create<LLVM::BrOp>(terminator->getLoc(), success);
+        auto brOp = LLVM::BrOp::create(rewriter, terminator->getLoc(), success);
         // Make sure we clean it up later.
         AsyncUtils::annotateBrToUnreachable(brOp, rewriter);
         rewriter.replaceOp(terminator, brOp);
@@ -779,7 +779,7 @@ std::tuple<Block *, Block *, Block *> getBlocks(LLVM::CallOp callOp, PatternRewr
 
     rewriter.setInsertionPoint(callOp);
     Type ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
-    auto zeroOp = rewriter.create<LLVM::ZeroOp>(callOp.getLoc(), ptrTy);
+    auto zeroOp = LLVM::ZeroOp::create(rewriter, callOp.getLoc(), ptrTy);
     Block *unwindBlock = rewriter.createBlock(successBlock);
 
     rewriter.setInsertionPointToEnd(unwindBlock);
@@ -787,7 +787,7 @@ std::tuple<Block *, Block *, Block *> getBlocks(LLVM::CallOp callOp, PatternRewr
     std::vector<Value> operands = {zeroOp.getResult()};
     auto i32Ty = IntegerType::get(rewriter.getContext(), 32);
     auto structTy = LLVM::LLVMStructType::getLiteral(rewriter.getContext(), {ptrTy, i32Ty});
-    rewriter.create<LLVM::LandingpadOp>(callOp.getLoc(), structTy, isCleanUp, operands);
+    LLVM::LandingpadOp::create(rewriter, callOp.getLoc(), structTy, isCleanUp, operands);
 
     return std::tuple<Block *, Block *, Block *>(blockContainingCall, successBlock, unwindBlock);
 }
@@ -806,9 +806,9 @@ LLVM::InvokeOp transformCallToInvoke(LLVM::CallOp callOp, Block *successBlock, B
 {
     auto calleeAttr = callOp.getCalleeAttr();
     SmallVector<Value> unwindArgs;
-    auto invokeOp = rewriter.create<LLVM::InvokeOp>(callOp.getLoc(), callOp.getResultTypes(),
-                                                    calleeAttr, callOp.getOperands(), successBlock,
-                                                    ValueRange(), failBlock, unwindArgs);
+    auto invokeOp = LLVM::InvokeOp::create(rewriter, callOp.getLoc(), callOp.getResultTypes(),
+                                           calleeAttr, callOp.getOperands(), successBlock,
+                                           ValueRange(), failBlock, unwindArgs);
     rewriter.replaceOp(callOp, invokeOp);
     return invokeOp;
 }
@@ -856,7 +856,7 @@ void insertCallToMlirAsyncRuntimeErrorFunction(Value value, LLVM::LLVMFuncOp fnD
     PatternRewriter::InsertionGuard insertGuard(rewriter);
     rewriter.setInsertionPointToEnd(failBlock);
     SmallVector<Value> operands = {value};
-    rewriter.create<LLVM::CallOp>(fnDecl.getLoc(), fnDecl, operands);
+    LLVM::CallOp::create(rewriter, fnDecl.getLoc(), fnDecl, operands);
 }
 
 void insertErrorCalls(std::vector<Value> tokens, std::vector<Value> values, Block *failBlock,
@@ -895,7 +895,7 @@ void insertBranchFromFailToSuccessor(Block *fail, Block *success, PatternRewrite
     auto landingPad = fail->begin();
     auto loc = landingPad->getLoc();
 
-    rewriter.create<LLVM::BrOp>(loc, success);
+    LLVM::BrOp::create(rewriter, loc, success);
 }
 
 } // namespace

@@ -163,7 +163,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPoint(TapeOps.front());
         scf::ExecuteRegionOp executeRegionOp =
-            builder.create<scf::ExecuteRegionOp>(loc, ArrayRef(RetTypes));
+            scf::ExecuteRegionOp::create(builder, loc, ArrayRef(RetTypes));
 
         builder.setInsertionPointToStart(&executeRegionOp.getRegion().emplaceBlock());
         mlir::Block::iterator it = executeRegionOp.getRegion().front().end();
@@ -172,7 +172,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         }
 
         builder.setInsertionPointAfter(&executeRegionOp.getRegion().front().back());
-        scf::YieldOp y = builder.create<scf::YieldOp>(loc, ArrayRef(RetValues));
+        scf::YieldOp y = scf::YieldOp::create(builder, loc, ArrayRef(RetValues));
 
         return std::make_pair(executeRegionOp, y);
     } // wrapTapeOpsInSCFRegion()
