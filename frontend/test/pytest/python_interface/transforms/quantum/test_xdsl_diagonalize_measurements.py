@@ -162,21 +162,21 @@ class TestDiagonalizeFinalMeasurementsPass:
                 // CHECK: [[q_y:%.*]] =  quantum.namedobs [[q0_3]][PauliZ]
                 // CHECK-NOT: quantum.namedobs [[q:%.+]][PauliY]
                 %3 = quantum.namedobs %0[PauliY] : !quantum.obs
-                
+
                 // CHECK: [[q1_1:%.*]] = quantum.custom "Hadamard"() [[q1]]
                 // CHECK: [[q_x:%.*]] = quantum.namedobs [[q1_1]][PauliZ]
                 // CHECK-NOT: quantum.namedobs [[q:%.+]][PauliX]
                 %4 = quantum.namedobs %1[PauliX] : !quantum.obs
-                
+
                 // CHECK: [[tensor0:%.*]] = quantum.tensor [[q_y]], [[q_x]] : !quantum.obs
                 %5 = quantum.tensor %3, %4 : !quantum.obs
-                
+
                 // CHECK: [[q_z:%.*]] = quantum.namedobs [[q2]][PauliZ] : !quantum.obs
                 %6 = quantum.namedobs %2[PauliZ] : !quantum.obs
-                
+
                 // CHECK: [[size:%.*]] = "test.op"() : () -> tensor<2xf64>
                 %size_info = "test.op"() : () -> tensor<2xf64>
-                
+
                 // CHECK: quantum.hamiltonian([[size]] : tensor<2xf64>) [[tensor0]], [[q_z]] : !quantum.obs
                 %7 = quantum.hamiltonian(%size_info : tensor<2xf64>) %5, %6 : !quantum.obs
 
@@ -203,7 +203,7 @@ class TestDiagonalizeFinalMeasurementsPass:
             func.func @test_func() {
                 %0 = "test.op"() : () -> !quantum.bit
                 %1 = "test.op"() : () -> !quantum.bit
-    
+
                 // CHECK: quantum.custom "PauliZ"()
                 // CHECK-NEXT: quantum.custom "S"()
                 // CHECK-NEXT: quantum.custom "Hadamard"()
@@ -211,12 +211,12 @@ class TestDiagonalizeFinalMeasurementsPass:
                 %2 = quantum.namedobs %0[PauliY] : !quantum.obs
                 // CHECK: quantum.var
                 %3 = quantum.var %2 : f64
-                
-    
+
+
                 // CHECK: quantum.custom "Hadamard"()
                 // CHECK-NEXT: quantum.namedobs [[q:%.+]][PauliZ]
                 %4 = quantum.namedobs %1[PauliX] : !quantum.obs
-    
+
                 // CHECK: quantum.expval
                 %5 = quantum.expval %4 : f64
                 return

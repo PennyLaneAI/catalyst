@@ -23,8 +23,8 @@ NodeUID: TypeAlias = str
 class DAGBuilder(ABC):
     """An abstract base class for building Directed Acyclic Graphs (DAGs).
 
-    This class provides a simple interface with three core methods 
-    (`add_node`, `add_edge` and `add_cluster`). You can override these methods to implement any 
+    This class provides a simple interface with three core methods
+    (`add_node`, `add_edge` and `add_cluster`). You can override these methods to implement any
     backend, like `pydot` or `graphviz` or even `matplotlib`.
 
     Outputting your graph can be done by overriding `to_file` and `to_string`.
@@ -44,12 +44,11 @@ class DAGBuilder(ABC):
         Args:
             uid (str): Unique node ID to identify this node.
             label (str): The text to display on the node when rendered.
-            cluster_uid (str | None): Optional unique ID of the cluster this node belongs to. 
+            cluster_uid (str | None): Optional unique ID of the cluster this node belongs to.
                 If `None`, this node gets added on the base graph.
             **attrs (Any): Any additional styling keyword arguments.
 
         """
-        raise NotImplementedError
 
     @abstractmethod
     def add_edge(self, from_uid: NodeUID, to_uid: NodeUID, **attrs: Any) -> None:
@@ -61,7 +60,6 @@ class DAGBuilder(ABC):
             **attrs (Any): Any additional styling keyword arguments.
 
         """
-        raise NotImplementedError
 
     @abstractmethod
     def add_cluster(
@@ -85,7 +83,6 @@ class DAGBuilder(ABC):
             **attrs (Any): Any additional styling keyword arguments.
 
         """
-        raise NotImplementedError
 
     @property
     @abstractmethod
@@ -93,10 +90,9 @@ class DAGBuilder(ABC):
         """Retrieve the current set of nodes in the graph.
 
         Returns:
-            nodes (dict[str, dict[str, Any]]): A dictionary that maps the 
+            nodes (dict[str, dict[str, Any]]): A dictionary that maps the
                 node's ID to its node information.
         """
-        raise NotImplementedError
 
     @property
     @abstractmethod
@@ -104,10 +100,9 @@ class DAGBuilder(ABC):
         """Retrieve the current set of edges in the graph.
 
         Returns:
-            edges (list[dict[str, Any]]): A list of edges where each element in the list contains 
+            edges (list[dict[str, Any]]): A list of edges where each element in the list contains
                 a dictionary of edge information.
         """
-        raise NotImplementedError
 
     @property
     @abstractmethod
@@ -115,10 +110,9 @@ class DAGBuilder(ABC):
         """Retrieve the current set of clusters in the graph.
 
         Returns:
-            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID to 
+            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID to
                 its cluster information.
         """
-        raise NotImplementedError
 
     @abstractmethod
     def to_file(self, output_filename: str) -> None:
@@ -131,7 +125,6 @@ class DAGBuilder(ABC):
             output_filename (str): Desired filename for the graph.
 
         """
-        raise NotImplementedError
 
     @abstractmethod
     def to_string(self) -> str:
@@ -142,4 +135,3 @@ class DAGBuilder(ABC):
         Returns:
             str: A string representation of the graph.
         """
-        raise NotImplementedError
