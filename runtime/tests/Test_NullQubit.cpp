@@ -229,13 +229,14 @@ TEST_CASE("Test a NullQubit circuit with num_qubits=4 and observables", "[NullQu
     sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
 
     ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[0]});
-
     ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[1]});
     ObsIdType h = sim->Observable(ObsId::Hadamard, {}, {Qs[0]});
+    ObsIdType t = sim->TensorObservable({pz, px});
 
     sim->Var(h);
     sim->Var(px);
     sim->Expval(pz);
+    sim->Expval(t);
 
     auto &&[num_ops, num_obs, num_params, op_names, obs_keys] = sim->CacheManagerInfo();
     CHECK(num_ops == 0);
@@ -977,9 +978,16 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
 
     // Test adding all types of observables
     auto obs1 = sim->Observable(ObsId::PauliZ, {}, {});
-    auto obs2 = sim->Observable(ObsId::PauliZ, {}, {});
+    auto obs2 = sim->Observable(ObsId::PauliX, {}, {});
+    sim->Observable(ObsId::PauliY, {}, {});
+    sim->Observable(ObsId::Hadamard, {}, {});
+    sim->Observable(ObsId::Identity, {}, {});
     auto obs3 = sim->TensorObservable({obs1, obs2});
     auto obs4 = sim->HamiltonianObservable({}, {obs1, obs2});
+    CHECK(obs1 == 1);
+    CHECK(obs2 == 2);
+    CHECK(obs3 == 6);
+    CHECK(obs4 == 7);
 
     // Test expectation value on each observable type
     sim->Expval(obs1);
