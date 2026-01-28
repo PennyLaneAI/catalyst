@@ -560,6 +560,9 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
 std::string readInputFile(const std::string &filename)
 {
     if (filename == "-") {
+        if (llvm::errs().is_displayed()) {
+            llvm::errs() << "(processing input from stdin now, hit ctrl-c/ctrl-d to interrupt)\n";
+        }
         std::stringstream buffer;
         std::istreambuf_iterator<char> begin(std::cin), end;
         buffer << std::string(begin, end);
@@ -1045,17 +1048,29 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     llvm::InitLLVM y(argc, argv);
     MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
 
-    // Read the input IR file
-    std::string source = readInputFile(inputFilename);
-    if (source.empty()) {
-        llvm::errs() << "Error: Unable to read input file: " << inputFilename << "\n";
-        return 1;
+    if (config.shouldShowDialects()) {
+        llvm::outs() << "Available Dialects: ";
+        interleave(registry.getDialectNames(), llvm::outs(), ",");
+        llvm::outs() << "\n";
+        return 0;
+    }
+
+    if (config.shouldListPasses()) {
+        mlir::printRegisteredPasses();
+        return 0;
     }
 
     std::unique_ptr<CompilerOutput> output(new CompilerOutput());
     assert(output);
     output->outputFilename = outputFilename;
     llvm::raw_string_ostream errStream{output->diagnosticMessages};
+
+    // Read the input IR file
+    std::string source = readInputFile(inputFilename);
+    if (source.empty()) {
+        llvm::errs() << "Error: Unable to read input file: " << inputFilename << "\n";
+        return 1;
+    }
 
     CompilerOptions options{.source = source,
                             .workspace = WorkspaceDir,

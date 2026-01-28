@@ -93,6 +93,9 @@
   by 2 to match the PauliRot convention (`PauliRot(φ) == PPR(φ/2)`).
   [(#2414)](https://github.com/PennyLaneAI/catalyst/pull/2414)
 
+* Fixed the `catalyst` CLI tool silently listening to stdin when run without an input file, even when given flags like `--list-passes` that should override this behaviour.
+  [(2447)](https://github.com/PennyLaneAI/catalyst/pull/2447)
+  
 * Fixing incorrect lowering of PPM into CAPI calls when the PPM is in the negative basis.
   [(#2422)](https://github.com/PennyLaneAI/catalyst/pull/2422)
 
@@ -101,6 +104,14 @@
 
 
 <h3>Internal changes ⚙️</h3>
+
+* `catalyst.python_interface.xdsl_universe.XDSL_UNIVERSE` has been renamed to `CATALYST_XDSL_UNIVERSE`.
+  [(#2435)](https://github.com/PennyLaneAI/catalyst/pull/2435)
+
+* The private helper `_extract_passes` of `qfunc.py` uses `BoundTransform.tape_transform`
+  instead of the deprecated `BoundTransform.transform`.
+  `jax_tracer.py` and `tracing.py` also updated accordingly.
+  [(#2440)](https://github.com/PennyLaneAI/catalyst/pull/2440)
 
 * Autograph is no longer applied to decomposition rules based on whether it's applied to the workflow itself.
   Operator developers now need to manually apply autograph to decomposition rules when needed.
@@ -163,6 +174,7 @@
 This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
+Yushao Chen,
 Sengthai Heng,
 David Ittah,
 Jeffrey Kam,
