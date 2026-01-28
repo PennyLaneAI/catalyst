@@ -122,7 +122,7 @@ static void autoQubitManagementAllocate(std::vector<QubitIdType> *qubit_vector_p
 extern "C" {
 
 using namespace Catalyst::Runtime;
-using timer = catalyst::utils::Timer<>;
+using timer = catalyst::utils::Timer<>; // default timing ratio of std::milli
 
 void __catalyst_inactive_callback(int64_t identifier, int64_t argc, int64_t retc, ...)
 {

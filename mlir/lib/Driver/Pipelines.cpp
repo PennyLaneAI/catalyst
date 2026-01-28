@@ -228,3 +228,19 @@ std::vector<Pipeline> getDefaultPipeline()
 
 } // namespace driver
 } // namespace catalyst
+
+namespace llvm {
+
+inline raw_ostream &operator<<(raw_ostream &oss, const catalyst::driver::Pipeline &p)
+{
+    oss << "Pipeline('" << p.getName() << "', [";
+    bool first = true;
+    for (const auto &i : p.getPasses()) {
+        oss << (first ? "" : ", ") << i;
+        first = false;
+    }
+    oss << "])";
+    return oss;
+}
+
+}; // namespace llvm

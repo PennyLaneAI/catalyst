@@ -53,6 +53,7 @@ set(LIBS
 )
 
 add_mlir_library(CatalystCompilerDriver
+    Main.cpp
     CompilerDriver.cpp
     CatalystLLVMTarget.cpp
     PassInstrumentation.cpp
