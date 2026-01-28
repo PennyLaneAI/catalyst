@@ -1623,7 +1623,6 @@ def test_adj_qubitunitary(inp, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
-@pytest.mark.xfail(reason="Need PR 332.")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_preprocessing_outside_qnode(inp, backend):
     """Test the preprocessing outside qnode."""
@@ -1703,9 +1702,9 @@ def test_ellipsis_differentiation(backend, diff_method):
     assert np.allclose(cat_res, jax_res)
 
 
-@pytest.mark.xfail(reason="First need #332, then Vmap yields wrong results when differentiated")
 def test_vmap_worflow_derivation(backend):
     """Check the gradient of a vmap workflow"""
+    pytest.xfail("Avoid segfault in CI: vmap differentiation not stable yet.")
     n_wires = 5
     data = jnp.sin(jnp.mgrid[-2:2:0.2].reshape(n_wires, -1)) ** 3
 
@@ -1759,9 +1758,9 @@ def test_vmap_worflow_derivation(backend):
     assert jnp.allclose(data_cat[1], data_jax[1])
 
 
-@pytest.mark.xfail(reason="First need #332, then Vmap yields wrong results when differentiated")
 def test_forloop_vmap_worflow_derivation(backend):
     """Test a forloop vmap."""
+    pytest.xfail("Avoid segfault in CI: vmap differentiation not stable yet.")
     n_wires = 5
     data = jnp.sin(jnp.mgrid[-2:2:0.2].reshape(n_wires, -1)) ** 3
     weights = jnp.ones([n_wires, 3])
