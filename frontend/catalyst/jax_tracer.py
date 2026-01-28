@@ -1312,7 +1312,8 @@ def apply_transforms(
         tracing_mode = TracingMode.TRANSFORM
     elif len(qnode_program) or have_measurements_changed(tape, tapes[0]):
         with_measurement_from_counts_or_samples = any(
-            "measurements_from_counts" in (transform_str := str(getattr(qnode, "transform", "")))
+            "measurements_from_counts"
+            in (transform_str := str(getattr(qnode, "tape_transform", "")))
             or "measurements_from_samples" in transform_str
             for qnode in qnode_program
         )
@@ -1527,7 +1528,7 @@ def _trace_classical_phase(
         else:
             device_program = qml.CompilePipeline()
 
-        qnode_program = qnode.transform_program if qnode else qml.CompilePipeline()
+        qnode_program = qnode.compile_pipeline if qnode else qml.CompilePipeline()
 
         tapes, post_processing, tracing_mode = apply_transforms(
             qnode_program,
