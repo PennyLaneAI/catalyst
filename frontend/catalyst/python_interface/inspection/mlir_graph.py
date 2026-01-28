@@ -70,8 +70,6 @@ def _mlir_graph_callback(previous_pass, module, next_pass, pass_level=0):
     _, dot_graph = _quantum_opt_stderr(
         "--view-op-graph", stdin=buffer.getvalue(), stderr_return=True
     )
-    # catalyst prints a line when listening to stdin, remove that here before generating the graph
-    dot_graph = dot_graph[dot_graph.index("\n") :]
     graph = GraphSource(dot_graph)
 
     out_dir = Path("mlir_generated_graphs")

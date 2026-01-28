@@ -560,7 +560,9 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
 std::string readInputFile(const std::string &filename)
 {
     if (filename == "-") {
-        llvm::errs() << "(processing input from stdin now, hit ctrl-c/ctrl-d to interrupt)\n";
+        if (llvm::errs().is_displayed()) {
+            llvm::errs() << "(processing input from stdin now, hit ctrl-c/ctrl-d to interrupt)\n";
+        }
         std::stringstream buffer;
         std::istreambuf_iterator<char> begin(std::cin), end;
         buffer << std::string(begin, end);
