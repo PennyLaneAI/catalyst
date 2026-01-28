@@ -104,7 +104,7 @@ def custom_lower_jaxpr_to_module(
     arg_shardings=None,
     result_shardings=None,
 ):
-    """Lowers a top-level jaxpr to an MHLO module.
+    """Lowers a top-level jaxpr to an MLIR module.
 
     Handles the quirks of the argument/return value passing conventions of the
     runtime.

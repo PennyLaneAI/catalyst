@@ -17,7 +17,14 @@
   length and the number of qubit operands are the same, and that all of the Pauli words are legal.
   [(#2405)](https://github.com/PennyLaneAI/catalyst/pull/2405)
 
+* `qml.vjp` can now be used with Catalyst and program capture.
+  [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
+
 <h3>Breaking changes 💔</h3>
+
+* When an integer argnums is provided to `catalyst.vjp`, a singleton dimension is now squeezed
+  out. This brings the behaviour in line with that of `grad` and `jacobian`.
+  [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
 
 * Dropped support for NumPy 1.x following its end-of-life. NumPy 2.0 or higher is now required.
   [(#2407)](https://github.com/PennyLaneAI/catalyst/pull/2407)
@@ -25,6 +32,9 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fix `replace_ir` for certain stages when used with gradients.
+  [(#2436)](https://github.com/PennyLaneAI/catalyst/pull/2436)
 
 * Restore the ability to differentiate multiple (expectation value) QNode results with the
   adjoint-differentiation method.
@@ -38,10 +48,19 @@
 * Fixing incorrect lowering of PPM into CAPI calls when the PPM is in the negative basis.
   [(#2422)](https://github.com/PennyLaneAI/catalyst/pull/2422)
 
+* Fixed the GlobalPhase discrepancies when executing gridsynth in the PPR basis.
+  [(#2433)](https://github.com/PennyLaneAI/catalyst/pull/2433)
+
+
 <h3>Internal changes ⚙️</h3>
 
 * `catalyst.python_interface.xdsl_universe.XDSL_UNIVERSE` has been renamed to `CATALYST_XDSL_UNIVERSE`.
   [(#2435)](https://github.com/PennyLaneAI/catalyst/pull/2435)
+
+* The private helper `_extract_passes` of `qfunc.py` uses `BoundTransform.tape_transform`
+  instead of the deprecated `BoundTransform.transform`.
+  `jax_tracer.py` and `tracing.py` also updated accordingly.
+  [(#2440)](https://github.com/PennyLaneAI/catalyst/pull/2440)
 
 * Autograph is no longer applied to decomposition rules based on whether it's applied to the workflow itself.
   Operator developers now need to manually apply autograph to decomposition rules when needed.
@@ -66,6 +85,9 @@
   into normal PPR and PPMs with SCF dialect to support runtime execution.
   [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
 
+* Increased format size for the `--mlir-timing` flag, displaying more decimals for better timing precision.
+  [(#2423)](https://github.com/PennyLaneAI/catalyst/pull/2423)
+  
 * Added global phase tracking to the `to-ppr` compiler pass. When converting quantum gates to
   Pauli Product Rotations (PPR), the pass now emits `quantum.gphase` operations to preserve
   global phase correctness.
@@ -101,9 +123,11 @@
 This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
+Yushao Chen,
 Sengthai Heng,
 David Ittah,
 Jeffrey Kam,
+River McCubbin,
 Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,
