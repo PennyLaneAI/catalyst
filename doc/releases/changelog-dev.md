@@ -57,6 +57,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The xDSL :class:`~catalyst.python_interface.Quantum` dialect has been split into multiple files
+  to structure operations and attributes more concretely.
+  [(#2434)](https://github.com/PennyLaneAI/catalyst/pull/2434)
+
 * `catalyst.python_interface.xdsl_universe.XDSL_UNIVERSE` has been renamed to `CATALYST_XDSL_UNIVERSE`.
   [(#2435)](https://github.com/PennyLaneAI/catalyst/pull/2435)
 
