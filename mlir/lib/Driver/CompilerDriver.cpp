@@ -1050,12 +1050,12 @@ int QuantumDriverMainFromCL(int argc, char **argv)
         llvm::outs() << "Available Dialects: ";
         interleave(registry.getDialectNames(), llvm::outs(), ",");
         llvm::outs() << "\n";
-        return 1;
+        return 0;
     }
 
     if (config.shouldListPasses()) {
         mlir::printRegisteredPasses();
-        return 1;
+        return 0;
     }
 
     std::unique_ptr<CompilerOutput> output(new CompilerOutput());
