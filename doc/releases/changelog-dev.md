@@ -54,6 +54,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* `catalyst.python_interface.xdsl_universe.XDSL_UNIVERSE` has been renamed to `CATALYST_XDSL_UNIVERSE`.
+  [(#2435)](https://github.com/PennyLaneAI/catalyst/pull/2435)
+
 * The private helper `_extract_passes` of `qfunc.py` uses `BoundTransform.tape_transform`
   instead of the deprecated `BoundTransform.transform`.
   `jax_tracer.py` and `tracing.py` also updated accordingly.
