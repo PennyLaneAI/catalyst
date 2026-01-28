@@ -104,7 +104,8 @@ class TestDeviceLevelSpecs:
             return qml.expval(qml.PauliZ(0))
 
         pl_specs = qml.specs(circuit, level="device")()
-        cat_specs = qml.specs(qjit(circuit), level="device")()
+        with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
+            cat_specs = qml.specs(qjit(circuit), level="device")()
 
         assert cat_specs["device_name"] == "lightning.qubit"
         check_specs_same(cat_specs, pl_specs, skip_measurements=True)
@@ -132,7 +133,8 @@ class TestDeviceLevelSpecs:
             return qml.probs()
 
         pl_specs = qml.specs(circuit, level="device")()
-        cat_specs = qml.specs(qjit(circuit), level="device")()
+        with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
+            cat_specs = qml.specs(qjit(circuit), level="device")()
 
         assert cat_specs["device_name"] == "lightning.qubit"
 
@@ -508,8 +510,8 @@ class TestPassByPassSpecs:
             shots=Shots(None),
             level=2,
             resources=SpecsResources(
-                gate_types={"PPR-pi/4": 3, "PPR-pi/8": 1},
-                gate_sizes={1: 4},
+                gate_types={"GlobalPhase": 2, "PPR-pi/4": 3, "PPR-pi/8": 1},
+                gate_sizes={0: 2, 1: 4},
                 measurements={},
                 num_allocs=2,
             ),

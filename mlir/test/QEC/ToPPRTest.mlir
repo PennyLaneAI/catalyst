@@ -19,11 +19,18 @@ func.func @test_clifford_t_to_ppr(%q1 : !quantum.bit, %q2 : !quantum.bit){
     // pi / 8 = 826990
     // CHECK-NOT: quantum.custom
     // CHECK: ([[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit)
+    // CHECK: [[C:%.+]] = arith.constant -0.392
+    // CHECK: [[C0:%.+]] = arith.constant -0.785
+    // CHECK: [[C1:%.+]] = arith.constant -1.570
+    // CHECK: quantum.gphase([[C1]])
     // CHECK: [[q1_0_0:%.+]] = qec.ppr ["Z"](4) [[q1]]
     // CHECK: [[q1_0_1:%.+]] = qec.ppr ["X"](4) [[q1_0_0]]
     // CHECK: [[q1_0_2:%.+]] = qec.ppr ["Z"](4) [[q1_0_1]]
+    // CHECK: quantum.gphase([[C0]])
     // CHECK: [[q1_1:%.+]] = qec.ppr ["Z"](4) [[q1_0_2]]
+    // CHECK: quantum.gphase([[C]])
     // CHECK: [[q1_2:%.+]] = qec.ppr ["Z"](8) [[q1_1]]
+    // CHECK: quantum.gphase([[C0]])
     // CHECK: [[q1_3:%.+]]:2 = qec.ppr ["Z", "X"](4) [[q1_2]], [[q2]]
     %q1_0 = quantum.custom "H"() %q1 : !quantum.bit
     %q1_1 = quantum.custom "S"() %q1_0 : !quantum.bit
@@ -39,20 +46,27 @@ func.func @test_clifford_t_to_ppr(%q1 : !quantum.bit, %q2 : !quantum.bit){
 // -----
 
 func.func public @test_clifford_t_to_ppr_1() -> (tensor<i1>, tensor<i1>) {
+    // CHECK: [[C:%.+]] = arith.constant -0.392
+    // CHECK: [[C0:%.+]] = arith.constant -1.570
+    // CHECK: [[C1:%.+]] = arith.constant -0.785
     // CHECK: [[q0:%.+]] = quantum.alloc( 2) : !quantum.reg
     %0 = quantum.alloc( 2) : !quantum.reg
     // CHECK: [[q1_0:%.+]] = quantum.extract [[q0]][ 1]
     %1 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    // CHECK: quantum.gphase([[C1]])
     // CHECK: [[q1_1:%.+]] = qec.ppr ["Z"](4) [[q1_0]]
     %out_qubits = quantum.custom "S"() %1 : !quantum.bit
     // CHECK: [[q0_0:%.+]] = quantum.extract [[q0]][ 0]
     %2 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: quantum.gphase([[C0]])
     // CHECK: [[q0_1_0:%.+]] = qec.ppr ["Z"](4) [[q0_0]]
     // CHECK: [[q0_1_1:%.+]] = qec.ppr ["X"](4) [[q0_1_0]]
     // CHECK: [[q0_1_2:%.+]] = qec.ppr ["Z"](4) [[q0_1_1]]
     %out_qubits_0 = quantum.custom "Hadamard"() %2 : !quantum.bit
+    // CHECK: quantum.gphase([[C]])
     // CHECK: [[q0_2:%.+]] = qec.ppr ["Z"](8) [[q0_1_2]]
     %out_qubits_1 = quantum.custom "T"() %out_qubits_0 : !quantum.bit
+    // CHECK: quantum.gphase([[C1]])
     // CHECK: [[q_3:%.+]]:2 = qec.ppr ["Z", "X"](4) [[q0_2]], [[q1_1]]
     // CHECK: [[q_4:%.+]] = qec.ppr ["Z"](-4) [[q_3]]#0
     // CHECK: [[q_5:%.+]] = qec.ppr ["X"](-4) [[q_3]]#1
@@ -110,7 +124,7 @@ func.func @test_standard_pauli_rot_to_ppr(%q1 : !quantum.bit){
     %extracted = tensor.extract %cst[] : tensor<f64>
     %out_qubits = quantum.paulirot ["Z"](%extracted) %q1 : !quantum.bit
     func.return
-
+    // CHECK-NOT: quantum.gphase
     // CHECK: qec.ppr ["Z"](2)
 }
 
@@ -122,9 +136,7 @@ func.func @test_arbitrary_pauli_rot_to_ppr(%q1 : !quantum.bit){
     %out_qubits = quantum.paulirot ["Z"](%extracted) %q1 : !quantum.bit
     func.return
 
-    // CHECK: [[cst_0:%.+]] = arith.constant 4.200000e-01 : f64
-    // CHECK: [[cst_1:%.+]] = arith.constant 2.000000e+00 : f64
-    // CHECK: [[div:%.+]] = arith.divf [[cst_0]], [[cst_1]] : f64
+    // CHECK: [[div:%.+]] = arith.constant 2.100000e-01 : f64
     // CHECK: [[q0:%.+]] = qec.ppr.arbitrary ["Z"]([[div]])
 }
 
@@ -135,8 +147,19 @@ func.func @test_dynamic_pauli_rot_to_ppr(%q1 : !quantum.bit, %arg0 : tensor<f64>
     %out_qubits_4 = quantum.paulirot ["Z"](%extracted) %q1 : !quantum.bit
     func.return
 
-    // CHECK: [[extracted:%.+]] = tensor.extract
     // CHECK: [[cst:%.+]] = arith.constant 2.000000e+00 : f64
+    // CHECK: [[extracted:%.+]] = tensor.extract
     // CHECK: [[div:%.+]] = arith.divf [[extracted]], [[cst]] : f64
     // CHECK: [[q0:%.+]] = qec.ppr.arbitrary ["Z"]([[div]])
+}
+
+// -----
+
+func.func @test_arbitrary_pauli_rot_to_ppr_2(%q1 : !quantum.bit, %q2 : !quantum.bit){
+    %cst = stablehlo.constant dense<0.42> : tensor<f64>
+    %extracted = tensor.extract %cst[] : tensor<f64>
+    %out_qubits:2 = quantum.paulirot ["I", "I"](%extracted) %q1, %q2: !quantum.bit, !quantum.bit
+    // CHECK-NOT: quantum.paulirot
+    // CHECK-NOT: qec.ppr.arbitrary
+    func.return
 }

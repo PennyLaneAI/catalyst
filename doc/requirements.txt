@@ -26,11 +26,12 @@ pybind11
 m2r2
 mistune==0.8.4
 sphinxext-opengraph==0.9.0
+sphinx-sitemap
 matplotlib==3.10.0
 lxml_html_clean
 
 # Pre-install PL development wheels
 --extra-index-url https://test.pypi.org/simple/
-pennylane-lightning-kokkos==0.44.0-dev26
-pennylane-lightning==0.44.0-dev26
-pennylane==0.44.0-dev72
+pennylane-lightning-kokkos==0.45.0-dev8
+pennylane-lightning==0.45.0-dev8
+pennylane==0.45.0-dev13

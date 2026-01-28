@@ -135,6 +135,7 @@ with Patcher(
 
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 from pennylane.capture.primitives import subroutine_prim as pl_subroutine_prim
+from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
 
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
@@ -918,6 +919,38 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     vjp_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
     func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums))
+
+    symbol_ref = get_symbolref(ctx, func_op)
+    return VJPOp(
+        func_result_types,
+        vjp_result_types,
+        ir.StringAttr.get(method),
+        symbol_ref,
+        mlir.flatten_ir_values(func_args),
+        mlir.flatten_ir_values(cotang_args),
+        diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
+        finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
+    ).results
+
+
+def _capture_vjp_lowering(ctx, *args, jaxpr, fn, method, argnums, h):
+    """
+    Returns:
+        MLIR results
+    """
+    args = list(args)
+    mlir_ctx = ctx.module_context.context
+    n_params = len(jaxpr.invars)
+    new_argnums = np.array(argnums)
+
+    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
+    flat_output_types = util.flatten(output_types)
+    func_args = args[:n_params]
+    cotang_args = args[n_params:]
+    func_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
+    vjp_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
+
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums), fn=fn)
 
     symbol_ref = get_symbolref(ctx, func_op)
     return VJPOp(
@@ -2844,6 +2877,7 @@ CUSTOM_LOWERING_RULES = (
     (for_p, _for_loop_lowering),
     (grad_p, _grad_lowering),
     (pl_jac_prim, _capture_grad_lowering),
+    (pl_vjp_prim, _capture_vjp_lowering),
     (func_p, _func_lowering),
     (pl_subroutine_prim, _func_lowering),
     (jvp_p, _jvp_lowering),

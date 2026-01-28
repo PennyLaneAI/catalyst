@@ -14,20 +14,31 @@
 """Unit test module for the draw function in the unified compiler inspection module."""
 # pylint: disable=unnecessary-lambda, protected-access, wrong-import-position
 
+from importlib.util import find_spec
+from shutil import which
+
 import jax
-import pytest
-
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-matplotlib = pytest.importorskip("matplotlib")
-
 import pennylane as qml
+import pytest
 
 from catalyst.python_interface.inspection import draw, draw_graph
 from catalyst.python_interface.transforms import (
     iterative_cancel_inverses_pass,
     merge_rotations_pass,
 )
+
+pytestmark = pytest.mark.xdsl
+
+
+@pytest.fixture(scope="function")
+def skip_no_graph_deps():
+    """Fixture to skip tests for catalyst.draw_graph if dependencies aren't installed."""
+    if which("dot") is None:
+        pytest.skip(reason="Graphviz isn't installed.")
+    if find_spec("matplotlib") is None:
+        pytest.skip(reason="matplotlib isn't installed.")
+    if find_spec("pydot") is None:
+        pytest.skip(reason="pydot isn't installed.")
 
 
 @pytest.mark.usefixtures("use_capture")
@@ -537,7 +548,7 @@ class TestDraw:
             print(draw(circuit)())
 
 
-@pytest.mark.usefixtures("use_both_frontend")
+@pytest.mark.usefixtures("use_both_frontend", "skip_no_graph_deps")
 class TestDrawGraph:
     """Tests the `draw_graph` frontend."""
 
@@ -564,6 +575,40 @@ class TestDrawGraph:
         with pytest.raises(TypeError, match="The 'level' argument must be an integer or 'None'"):
             _ = draw_graph(qjit_qnode, level=unsupported_level)()
 
+    def test_negative_level_integer(self):
+        """Tests that a negative integer for a level is unsupported."""
+
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(qml.device("null.qubit", wires=2))
+        def qjit_qnode():
+            qml.H(0)
+            return qml.expval(qml.Z(0))
+
+        with pytest.raises(ValueError, match="The 'level' argument must be a positive integer"):
+            _ = draw_graph(qjit_qnode, level=-1)()
+
+    # pylint: disable=line-too-long
+    def test_level_greater_than_num_of_passes(self):
+        """Tests that a user warning is raised if the level is greater than number of passes."""
+
+        @qml.qjit
+        @qml.transforms.merge_rotations
+        @qml.transforms.cancel_inverses
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def circuit():
+            qml.H(0)
+            qml.T(1)
+            qml.H(0)
+            qml.RX(0.1, wires=0)
+            qml.RX(0.2, wires=0)
+            return qml.expval(qml.X(0))
+
+        with pytest.warns(
+            UserWarning,
+            match="Level requested \\(100\\) is higher than the number of compilation passes present: 2",
+        ):
+            _ = draw_graph(circuit, level=100)()
+
     def test_unsupported_qnode(self):
         """Tests that only qjit'd qnodes are allowed to be visualized."""
 
@@ -577,6 +622,8 @@ class TestDrawGraph:
 
     def test_return_types(self):
         """Tests the return types of the function without crashing CI."""
+        # pylint: disable=import-outside-toplevel
+        import matplotlib
 
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(qml.device("null.qubit", wires=2))

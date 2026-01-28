@@ -16,8 +16,10 @@ Pytest configuration file for Catalyst test suite.
 """
 
 import os
+from importlib.util import find_spec
 from tempfile import TemporaryDirectory
 from textwrap import dedent
+from warnings import warn
 
 import pennylane as qml
 import pytest
@@ -71,6 +73,8 @@ def use_capture_dgraph():
 def use_both_frontend(request):
     """Runs the test once with capture enabled and once with it disabled."""
     if request.param == "capture":
+        if "capture_todo" in request.keywords:
+            pytest.xfail("capture todo's do not yet work with program capture.")
         qml.capture.enable()
         try:
             yield
@@ -80,17 +84,24 @@ def use_both_frontend(request):
         yield
 
 
-@pytest.fixture(scope="function")
-def requires_xdsl():
-    """Fixture that ensures xdsl is available. It skips the test if xdsl is not installed."""
-    pytest.importorskip("xdsl", reason="xdsl is not installed, skipping test")
-    pytest.importorskip("xdsl_jax", reason="xdsl-jax is not installed, skipping test")
-
-
 def pytest_collection_modifyitems(items, config):  # pylint: disable=unused-argument
     """Modify collected items as needed."""
-    # Tests that do not have a specific suite marker are marked `core`
+    xdsl_tests_skipped = "not xdsl" in config.getoption("markexpr")
+
     for item in items:
         markers = {mark.name for mark in item.iter_markers()}
-        if "xdsl" in markers and "requires_xdsl" not in item.fixturenames:
-            item.fixturenames.append("requires_xdsl")
+        # The nested conditional can be merged with this one, but we don't do that so that we can
+        # break right after the first xDSL test is found. Otherwise, we will have unnecessary
+        # iterations if filecheck is installed or xDSL tests are skipped.
+        if "xdsl" in markers:
+            # If filecheck is not installed, the xDSL lit tests get skipped silently. This
+            # warning will provide verbosity to testers.
+            if not (xdsl_tests_skipped or find_spec("filecheck")):
+                warn(
+                    "The 'filecheck' Python package must be installed to use fixtures for "
+                    "lit testing xDSL features. Otherwise, tests using the 'run_filecheck' "
+                    "or 'run_filecheck_qjit' fixtures will be skipped.",
+                    UserWarning,
+                )
+
+            break

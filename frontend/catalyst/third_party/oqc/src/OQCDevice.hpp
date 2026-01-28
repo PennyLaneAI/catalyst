@@ -84,8 +84,8 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
 
     void NamedOperation(const std::string &, const std::vector<double> &,
                         const std::vector<QubitIdType> &, bool = false,
-                        const std::vector<QubitIdType> & = {},
-                        const std::vector<bool> & = {}) override;
+                        const std::vector<QubitIdType> & = {}, const std::vector<bool> & = {},
+                        const std::vector<std::string> & = {}) override;
     auto Measure(QubitIdType, std::optional<int32_t> = std::nullopt) -> Result override;
 
     void PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,

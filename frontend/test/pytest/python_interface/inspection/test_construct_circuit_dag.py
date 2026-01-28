@@ -18,14 +18,8 @@ import re
 from unittest.mock import Mock
 
 import jax
-import pytest
-
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
-# pylint: disable=wrong-import-position
-# This import needs to be after pytest in order to prevent ImportErrors
 import pennylane as qml
+import pytest
 from xdsl.dialects import test
 from xdsl.dialects.builtin import ModuleOp
 from xdsl.ir.core import Block, Region
@@ -38,7 +32,10 @@ from catalyst.python_interface.inspection.construct_circuit_dag import (
 )
 from catalyst.python_interface.inspection.dag_builder import DAGBuilder
 
+pytestmark = pytest.mark.xdsl
 
+
+# pylint: disable=missing-function-docstring
 class FakeDAGBuilder(DAGBuilder):
     """
     A concrete implementation of DAGBuilder used ONLY for testing.
@@ -758,7 +755,12 @@ class TestGetLabel:
 
     def test_global_phase_operator(self):
         """Tests against a GlobalPhase operator instance."""
-        assert get_label(qml.GlobalPhase(0.5)) == "<name> GlobalPhase|<wire> all"
+        assert get_label(qml.GlobalPhase(0.5)) == "GlobalPhase"
+        assert (
+            get_label(qml.ctrl(qml.GlobalPhase(0.0), control=0))
+            == "<name> C(GlobalPhase)|<wire> [0]"
+        )
+        assert get_label(qml.adjoint(qml.GlobalPhase(0.0))) == "Adjoint(GlobalPhase)"
 
     @pytest.mark.parametrize(
         "meas, label",
@@ -840,7 +842,7 @@ class TestCreateStaticOperatorNodes:
         assert len(nodes) == 2  # Device node + operator
 
         # Compiler throws out the wires and they get converted to wires=[] no matter what
-        assert nodes["node1"]["label"] == get_label(qml.GlobalPhase(0.5))
+        assert nodes["node1"]["label"] == "GlobalPhase"
 
     def test_qubit_unitary_op(self):
         """Test that QubitUnitary operations can be handled."""
@@ -850,7 +852,8 @@ class TestCreateStaticOperatorNodes:
         @qml.qjit(autograph=True, target="mlir")
         @qml.qnode(dev)
         def my_circuit():
-            qml.QubitUnitary(jax.numpy.array([[0, 1], [1, 0]]), wires=0)
+            qml.QubitUnitary(jax.numpy.array([[0, 1], [1, 0]]), wires=0)  # real
+            qml.QubitUnitary(jax.numpy.array([[1, 0], [0, 1j]]), wires=0)  # complex
 
         module = my_circuit()
 
@@ -860,9 +863,10 @@ class TestCreateStaticOperatorNodes:
 
         # Ensure DAG only has one node
         nodes = utility.dag_builder.nodes
-        assert len(nodes) == 2  # Device node + operator
+        assert len(nodes) == 3  # Device node + operators
 
         assert nodes["node1"]["label"] == get_label(qml.QubitUnitary([[0, 1], [1, 0]], wires=0))
+        assert nodes["node2"]["label"] == get_label(qml.QubitUnitary([[1, 0], [0, 1j]], wires=0))
 
     def test_multi_rz_op(self):
         """Test that MultiRZ operations can be handled."""
@@ -1517,6 +1521,42 @@ class TestCreateDynamicMeasurementNodes:
 @pytest.mark.usefixtures("use_both_frontend")
 class TestOperatorConnectivity:
     """Tests that operators are properly connected."""
+
+    def test_global_phase_connectivity(self):
+        """Tests the connectivity of the global phase operator."""
+
+        dev = qml.device("null.qubit", wires=1)
+
+        @xdsl_from_qjit
+        @qml.qjit(autograph=True, target="mlir")
+        @qml.qnode(dev)
+        def my_circuit():
+            qml.X(0)
+            qml.GlobalPhase(0.5)
+            qml.adjoint(qml.GlobalPhase(0.5))
+            qml.ctrl(qml.GlobalPhase, control=0)(0.5)
+            qml.Y(0)
+
+        module = my_circuit()
+
+        # Construct DAG
+        utility = ConstructCircuitDAG(FakeDAGBuilder())
+        utility.construct(module)
+
+        edges = utility.dag_builder.edges
+        nodes = utility.dag_builder.nodes
+
+        # Ensure disjoint globalphase nodes show up
+        assert "GlobalPhase" in nodes["node2"]["label"]
+        assert "Adjoint(GlobalPhase)" in nodes["node3"]["label"]
+
+        # Ensure proper connectivity
+        expected_edges = (
+            ("NullQubit", "PauliX"),
+            ("PauliX", "C(GlobalPhase)"),
+            ("C(GlobalPhase)", "PauliY"),
+        )
+        assert_dag_structure(nodes, edges, expected_edges)
 
     def test_static_connection_within_cluster(self):
         """Tests that connections can be made within the same cluster."""
@@ -2642,6 +2682,7 @@ class TestCtrl:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
@@ -2666,6 +2707,7 @@ class TestCtrl:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
@@ -2690,6 +2732,7 @@ class TestCtrl:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
@@ -2716,6 +2759,7 @@ class TestCtrl:
         utility.construct(module)
 
         nodes = utility.dag_builder.nodes
+        assert len(nodes) == 3
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
@@ -2753,6 +2797,8 @@ class TestAdjoint:
         clusters = utility.dag_builder.clusters
         nodes = utility.dag_builder.nodes
 
+        assert len(nodes) == 2
+
         # cluster0 -> qjit
         # cluster1 -> my_workflow
         assert clusters["cluster2"]["label"] == "adjoint"
@@ -2778,6 +2824,7 @@ class TestAdjoint:
 
         clusters = utility.dag_builder.clusters
         nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow
@@ -2804,6 +2851,7 @@ class TestAdjoint:
 
         clusters = utility.dag_builder.clusters
         nodes = utility.dag_builder.nodes
+        assert len(nodes) == 2
 
         # cluster0 -> qjit
         # cluster1 -> my_workflow

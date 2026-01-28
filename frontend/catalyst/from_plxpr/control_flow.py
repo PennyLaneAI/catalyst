@@ -81,8 +81,8 @@ def _calling_convention(
 
     # The new interpreter's recorder needs to be updated to include the qreg args
     # of this scope, instead of the outer qregs
-    if qreg_map:
-        for k, outer_dynqreg_handler in interpreter.qubit_index_recorder.map.items():
+    for k, outer_dynqreg_handler in interpreter.qubit_index_recorder.map.items():
+        if outer_dynqreg_handler in qreg_map:
             converter.qubit_index_recorder[k] = qreg_map[outer_dynqreg_handler]
 
     retvals = converter(closed_jaxpr, *args)

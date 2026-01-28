@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "ppm-compilation"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -52,6 +53,8 @@ struct PPMCompilationPass : public impl::PPMCompilationPassBase<PPMCompilationPa
 
             // Conversion target is QECDialect
             target.addLegalDialect<qec::QECDialect>();
+            target.addLegalDialect<mlir::arith::ArithDialect>();
+            target.addLegalOp<quantum::GlobalPhaseOp>();
 
             RewritePatternSet patterns(ctx);
             populateToPPRPatterns(patterns);

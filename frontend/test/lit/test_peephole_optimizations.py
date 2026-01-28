@@ -102,7 +102,7 @@ def test_transform_lowering():
         qml.Hadamard(wires=[1])
         return qml.expval(qml.PauliY(wires=0))
 
-    # CHECK: pipeline=(<cancel_inverses((), {})>, <merge_rotations((), {})>)
+    # CHECK: pipeline=(<cancel_inverses()>, <merge_rotations()>)
     print_jaxpr(test_pipeline_lowering_workflow, 1.2)
 
     # CHECK: transform.named_sequence @__transform_main

@@ -185,6 +185,14 @@ func.func public @commute_ppr_ppm_pi_2_rotation_test_2(%q1: !quantum.bit) -> (te
     return %from_elements, %out_qubits : tensor<i1>, !quantum.bit
 }
 
+func.func public @merge_ppr_ppm_different_size_test(%q1: !quantum.bit, %q2: !quantum.bit, %q3: !quantum.bit) -> (tensor<i1>, !quantum.bit) {
+    // CHECK: qec.ppm ["Z"](-1)
+    %0:3 = qec.ppr ["X", "Y", "Z"](2) %q1, %q2, %q3 : !quantum.bit, !quantum.bit, !quantum.bit
+    %mres, %out_qubits = qec.ppm ["Z"] %0#0 : i1, !quantum.bit
+    %from_elements = tensor.from_elements %mres : tensor<i1>
+    return %from_elements, %out_qubits : tensor<i1>, !quantum.bit
+}
+
 func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit, %arg2: !quantum.bit, %arg3: !quantum.bit) {
 
     // q1

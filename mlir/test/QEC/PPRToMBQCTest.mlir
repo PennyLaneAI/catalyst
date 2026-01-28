@@ -222,3 +222,60 @@ func.func @test_ppr_to_mbqc_4(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantu
 
     func.return %m, %0, %1, %2, %3 : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
 }
+
+// -----
+
+// Test PPRotationArbitraryOp lowering to MBQC
+func.func @test_ppr_arbitrary_to_mbqc(%q0: !quantum.bit, %angle: f64) -> !quantum.bit {
+    // CHECK: func.func @test_ppr_arbitrary_to_mbqc([[q0:%.+]]: !quantum.bit, [[angle:%.+]]: f64)
+    
+    // For single-qubit Z rotation:
+    // PPR(theta, Z) = exp(-i * theta * Z)
+    // RZ(phi) = exp(-i * phi/2 * Z)
+    // Therefore: phi = 2 * theta
+    
+    // CHECK: [[two:%.+]] = arith.constant 2.0
+    // CHECK: [[rz_angle:%.+]] = arith.mulf [[angle]], [[two]]
+    // CHECK: [[q0_out:%.+]] = quantum.custom "RZ"([[rz_angle]]) [[q0]]
+    %0 = qec.ppr.arbitrary ["Z"](%angle) %q0 : !quantum.bit
+    
+    func.return %0 : !quantum.bit
+}
+
+// -----
+
+// Test PPRotationArbitraryOp with X Pauli lowering to MBQC
+func.func @test_ppr_arbitrary_x_to_mbqc(%q0: !quantum.bit, %angle: f64) -> !quantum.bit {
+    // CHECK: func.func @test_ppr_arbitrary_x_to_mbqc([[q0:%.+]]: !quantum.bit, [[angle:%.+]]: f64)
+    
+    // For X Pauli: H • RZ • H
+    // CHECK: [[q0_0:%.+]] = quantum.custom "Hadamard"() [[q0]]
+    // CHECK: [[two:%.+]] = arith.constant 2.0
+    // CHECK: [[rz_angle:%.+]] = arith.mulf [[angle]], [[two]]
+    // CHECK: [[q0_1:%.+]] = quantum.custom "RZ"([[rz_angle]]) [[q0_0]]
+    // CHECK: [[q0_2:%.+]] = quantum.custom "Hadamard"() [[q0_1]]
+    %0 = qec.ppr.arbitrary ["X"](%angle) %q0 : !quantum.bit
+    
+    func.return %0 : !quantum.bit
+}
+
+// -----
+
+// Test multi-qubit PPRotationArbitraryOp lowering to MBQC
+func.func @test_ppr_arbitrary_multi_to_mbqc(%q0: !quantum.bit, %q1: !quantum.bit, %angle: f64) -> (!quantum.bit, !quantum.bit) {
+    // CHECK: func.func @test_ppr_arbitrary_multi_to_mbqc([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[angle:%.+]]: f64)
+    
+    // For X ⊗ Z Pauli:
+    // H(q0) • CNOT(q1, q0) • RZ(2*angle) • CNOT(q1, q0) • H(q0)
+    
+    // CHECK: [[q0_0:%.+]] = quantum.custom "Hadamard"() [[q0]]
+    // CHECK: [[cnot1:%.+]]:2 = quantum.custom "CNOT"() [[q1]], [[q0_0]]
+    // CHECK: [[two:%.+]] = arith.constant 2.0
+    // CHECK: [[rz_angle:%.+]] = arith.mulf [[angle]], [[two]]
+    // CHECK: [[q0_1:%.+]] = quantum.custom "RZ"([[rz_angle]]) [[cnot1]]#1
+    // CHECK: [[cnot2:%.+]]:2 = quantum.custom "CNOT"() [[cnot1]]#0, [[q0_1]]
+    // CHECK: [[q0_2:%.+]] = quantum.custom "Hadamard"() [[cnot2]]#1
+    %0, %1 = qec.ppr.arbitrary ["X", "Z"](%angle) %q0, %q1 : !quantum.bit, !quantum.bit
+    
+    func.return %0, %1 : !quantum.bit, !quantum.bit
+}

@@ -2,6 +2,8 @@ set(LIBRARY_NAME qec-transforms)
 
 
 file(GLOB SRC
+    UnrollConditionalPPRPPM.cpp
+    unroll_conditional_ppr_ppm.cpp
     ToPPR.cpp
     to_ppr.cpp
     CommutePPR.cpp
@@ -22,6 +24,8 @@ file(GLOB SRC
     PPRToMBQC.cpp
     decompose_arbitrary_ppr.cpp
     DecomposeArbitraryPPR.cpp
+    lower_qec_init_ops.cpp
+    LowerQECInitOps.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
