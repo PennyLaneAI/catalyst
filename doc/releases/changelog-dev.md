@@ -2,14 +2,22 @@
 
 <h3>New features since last release</h3>
 
-* Users can now execute circuits with `qml.PauliRot` and `qml.pauli_measure`, as well as 
-  any passes in the QEC pipeline (e.g, `to_ppr`, `ppr_to_ppm`), using `lightning.qubit` device
-  with program capture enabled.
-  Note that one needs to apply `@qml.transform(pass_name="unroll-conditional-ppr-ppm")` and 
-  `@qml.transform(pass_name="lower-qec-init-ops")` after passes that introduce conditional PPR/PPMs
-  as well as any `qec.prepare` and `qec.fabricate` operations in the MLIR.
+* Users can now execute circuits that are compiled with :func:`pennylane.transforms.to_ppr`, 
+  :func:`pennylane.transforms.commute_ppr`, :func:`pennylane.transforms.ppr_to_ppm`, 
+  :func:`pennylane.transforms.merge_ppr_ppm`, :func:`pennylane.transforms.reduce_t_depth`,
+  and :func:`pennylane.transforms.decompose_arbitrary_ppr` using `lightning.qubit` device and
+  with program capture enabled (:func:`pennylane.capture.enable`).
+  [(#2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
+  [(#2389)](https://github.com/PennyLaneAI/catalyst/pull/2389)
+  [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
+  [(#2413)](https://github.com/PennyLaneAI/catalyst/pull/2413)
+  [(#2414)](https://github.com/PennyLaneAI/catalyst/pull/2414)
+  [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
+  [(#2443)](https://github.com/PennyLaneAI/catalyst/pull/2443)
   
-  For example, we can now execute the following circuit.
+  Previously, circuits compiled with these transforms were only inspectable via 
+  :func:`pennylane.specs` and :func:`catalyst.draw`. Now, such circuits can be executed:
+
   ```python
   import pennylane as qml
 
@@ -25,18 +33,17 @@
       qml.PauliRot(0.123, pauli_word="XXY", wires=[0, 1, 2])
       qml.pauli_measure("XYZ", wires=[0, 1, 2])
       return qml.probs([0, 1])
-
-  print(circuit())
-
-  >>> [0.5 0.  0.  0.5]
   ```
-  [(#2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
-  [(#2389)](https://github.com/PennyLaneAI/catalyst/pull/2389)
-  [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
-  [(#2413)](https://github.com/PennyLaneAI/catalyst/pull/2413)
-  [(#2414)](https://github.com/PennyLaneAI/catalyst/pull/2414)
-  [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
-  [(#2443)](https://github.com/PennyLaneAI/catalyst/pull/2443)
+
+  ```
+  >>> print(circuit())
+  [0.5 0.  0.  0.5]
+  ```
+
+  Note that support for conditional PPRs or PPMs is only supported when applying 
+  `@qml.transform(pass_name="unroll-conditional-ppr-ppm")` and 
+  `@qml.transform(pass_name="lower-qec-init-ops")` after passes that introduce conditional PPR/PPMs, 
+  `qec.prepare`, or `qec.fabricate` operations in the MLIR, as shown in the example above.
 
 <h3>Improvements 🛠</h3>
 
