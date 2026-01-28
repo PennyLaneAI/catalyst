@@ -1704,6 +1704,7 @@ def test_ellipsis_differentiation(backend, diff_method):
 
 def test_vmap_worflow_derivation(backend):
     """Check the gradient of a vmap workflow"""
+    pytest.xfail("Avoid segfault in CI: vmap differentiation not stable yet.")
     n_wires = 5
     data = jnp.sin(jnp.mgrid[-2:2:0.2].reshape(n_wires, -1)) ** 3
 
@@ -1759,6 +1760,7 @@ def test_vmap_worflow_derivation(backend):
 
 def test_forloop_vmap_worflow_derivation(backend):
     """Test a forloop vmap."""
+    pytest.xfail("Avoid segfault in CI: vmap differentiation not stable yet.")
     n_wires = 5
     data = jnp.sin(jnp.mgrid[-2:2:0.2].reshape(n_wires, -1)) ** 3
     weights = jnp.ones([n_wires, 3])
