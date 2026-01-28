@@ -13,7 +13,8 @@
 # limitations under the License.
 """Core API for registering xDSL transforms for use with PennyLane and Catalyst."""
 
-from collections.abc import Callable, Sequence
+from abc import abstractmethod
+from collections.abc import Callable
 from inspect import signature
 from types import UnionType
 from typing import ClassVar, Union, get_args, get_origin
@@ -74,22 +75,30 @@ class CompilationPass(ModulePass):
     will only apply the first action that modifies the input module.
     ``True`` by default."""
 
-    _rewrite_patterns: ClassVar[dict[Operation, RewritePattern]] = {}
-    r"""Dictionary of registered actions. The keys are operations for which we have
-    registered actions, and the values are the corresponding ``RewritePattern``\ s."""
+    _rewrite_patterns: ClassVar[list[RewritePattern]] = []
+    r"""List of registered actions. The stored values are ``RewritePattern``\ s
+    used to implement the registered actions."""
+
+    def __init_subclass__(cls: type["CompilationPass"]) -> None:
+        cls._rewrite_patterns = []
+        cls.add_action(cls.action)
+
+    @abstractmethod
+    def action(self, op: Operation, rewriter: PatternRewriter) -> None:
+        """The action that performs the transformation on an input operation."""
 
     @classmethod
-    def action(
+    def add_action(
         cls, action: Callable[["CompilationPass", Operation, PatternRewriter], None]
     ) -> None:
-        """Register an "action" that performs a transformation on an input operation.
+        """Register an action that performs a transformation on an input operation.
 
         The action must type hint which operation is being rewritten. It must have
         the following signature:
 
         .. code-block:: python
 
-            @CompilationPass.action
+            @CompilationPass.add_action
             def rewrite_myop(self, op: MyOperation, rewriter: PatternRewriter) -> None:
                 ...
 
@@ -101,7 +110,7 @@ class CompilationPass(ModulePass):
 
         .. code-block:: python
 
-            @CompilationPass.action
+            @CompilationPass.add_action
             def rewrite_myop(
                 self, op: MyOperation1 | MyOperation2 | MyOperation3, rewriter: PatternRewriter
             ) -> None:
@@ -110,9 +119,7 @@ class CompilationPass(ModulePass):
         .. note::
 
             If an action for the provided operation already exists, the old action
-            will get overwritten. For actions that were annotated with a union of
-            multiple operation types, registered actions for all of the operations
-            in the union will be overwritten. To see all registered actions, use the
+            will get priority over the new one. To see all registered actions, use the
             :meth:`~.CompilationPass.actions` property.
 
         Args:
@@ -128,11 +135,15 @@ class CompilationPass(ModulePass):
 
         # If a type hint for the op we're trying to match isn't provided, match all ops
         hint = Operation if params[-2].name not in action.__annotations__ else params[-2].annotation
-        expected_types = get_args(hint) if get_origin(hint) in (Union, UnionType) else (hint,)
-        rewrite_pattern = _create_rewrite_pattern(expected_types, action)
 
-        for et in expected_types:
-            cls._rewrite_patterns[et] = rewrite_pattern
+        expected_types = get_args(hint) if get_origin(hint) in (Union, UnionType) else (hint,)
+        if not all(issubclass(e, Operation) for e in expected_types):
+            raise TypeError(
+                "Only Operation types or unions of Operation types can be used to register actions."
+            )
+        rewrite_pattern = _create_rewrite_pattern(hint, action)
+
+        cls._rewrite_patterns.append(rewrite_pattern)
 
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:  # pylint: disable=unused-argument
         """Apply the transformation to the input module.
@@ -155,26 +166,20 @@ class CompilationPass(ModulePass):
         """
         if self.greedy:
             pattern = GreedyRewritePatternApplier(
-                rewrite_patterns=[rp(self) for rp in self._rewrite_patterns.values()]
+                rewrite_patterns=[rp(self) for rp in self._rewrite_patterns]
             )
             walker = PatternRewriteWalker(pattern=pattern, apply_recursively=self.recursive)
             walker.rewrite_module(op)
 
         else:
-            for rp in self._rewrite_patterns.values():
+            for rp in self._rewrite_patterns:
                 walker = PatternRewriteWalker(pattern=rp(self), apply_recursively=self.recursive)
                 walker.rewrite_module(op)
 
 
-def _update_type_hints(expected_types: Sequence[type[Operation]]) -> Callable:
-    """Update the signature of a ``match_and_rewrite`` method to use the provided operation
-    as the first argument's type hint."""
-
-    if not all(issubclass(e, Operation) for e in expected_types):
-        raise TypeError(
-            "Only Operation types or unions of Operation types can be used to register actions."
-        )
-    hint = expected_types[0] if len(expected_types) == 1 else Union[*expected_types]
+def _update_op_type_hint(hint: type[Operation]) -> Callable:
+    """Update the signature of a ``match_and_rewrite`` method to use the provided type hint
+    for the ``op`` argument."""
 
     def _update_match_and_rewrite(method: Callable) -> Callable:
         params = tuple(signature(method).parameters)
@@ -188,15 +193,13 @@ def _update_type_hints(expected_types: Sequence[type[Operation]]) -> Callable:
     return _update_match_and_rewrite
 
 
-def _create_rewrite_pattern(
-    expected_types: Sequence[type[Operation]], action: Callable
-) -> RewritePattern:
+def _create_rewrite_pattern(hint: type[Operation], action: Callable) -> RewritePattern:
     """Given an action defined as a function, create a ``RewritePattern`` which
     can be used with xDSL's pass API."""
 
     # pylint: disable=too-few-public-methods, arguments-differ
-    class _RewritePattern(RewritePattern):
-        """Anonymous rewrite pattern for transforming a matched operation."""
+    class LocalRewritePattern(RewritePattern):
+        """Rewrite pattern for transforming a matched operation."""
 
         _pass: CompilationPass
 
@@ -205,8 +208,8 @@ def _create_rewrite_pattern(
             super().__init__()
 
         @op_type_rewrite_pattern
-        @_update_type_hints(expected_types)
+        @_update_op_type_hint(hint)
         def match_and_rewrite(self, op: Operation, rewriter: PatternRewriter) -> None:
             action(self._pass, op, rewriter)
 
-    return _RewritePattern
+    return LocalRewritePattern

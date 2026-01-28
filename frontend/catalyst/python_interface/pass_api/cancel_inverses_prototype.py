@@ -55,52 +55,50 @@ class CancelInverses(CompilationPass):
 
         return False
 
+    def action(self, op: quantum.CustomOp, rewriter):
+        """Rewrite rule for CustomOp."""
+        while isinstance(op, quantum.CustomOp) and op.gate_name.data in self.self_inverses:
+            next_user = None
+            for use in op.results[0].uses:
+                user = use.operation
+                if self.can_cancel(op, user):
+                    next_user: quantum.CustomOp = user
+                    break
 
-@CancelInverses.action
-def rewrite_custom_op(self, op: quantum.CustomOp, rewriter):
-    """Rewrite rule for CustomOp."""
-    while isinstance(op, quantum.CustomOp) and op.gate_name.data in self.self_inverses:
-        next_user = None
-        for use in op.results[0].uses:
-            user = use.operation
-            if self.can_cancel(op, user):
-                next_user: quantum.CustomOp = user
+            if next_user is None:
                 break
 
-        if next_user is None:
-            break
-
-        for q1, q2 in zip(op.in_qubits, next_user.out_qubits, strict=True):
-            rewriter.replace_all_uses_with(q2, q1)
-        for cq1, cq2 in zip(op.in_ctrl_qubits, next_user.out_ctrl_qubits, strict=True):
-            rewriter.replace_all_uses_with(cq2, cq1)
-        rewriter.erase_op(next_user)
-        rewriter.erase_op(op)
-        op = op.in_qubits[0].owner
+            for q1, q2 in zip(op.in_qubits, next_user.out_qubits, strict=True):
+                rewriter.replace_all_uses_with(q2, q1)
+            for cq1, cq2 in zip(op.in_ctrl_qubits, next_user.out_ctrl_qubits, strict=True):
+                rewriter.replace_all_uses_with(cq2, cq1)
+            rewriter.erase_op(next_user)
+            rewriter.erase_op(op)
+            op = op.in_qubits[0].owner
 
 
 # We can register more rewrite rules as needed. Here are some
 # dummy rewrite rules to illustrate:
-@CancelInverses.action
+@CancelInverses.add_action
 def rewrite_insert_op(self, op: quantum.InsertOp, rewriter):
     """Rewrite rule for InsertOp."""
     return
 
 
-@CancelInverses.action
+@CancelInverses.add_action
 def rewrite_extract_op(self, op: quantum.ExtractOp, rewriter):
     """Rewrite rule for ExtractOp."""
     return
 
 
-@CancelInverses.action
+@CancelInverses.add_action
 def rewrite_mid_measure_op(self, op: quantum.MeasureOp, rewriter):
     """Rewrite rule for MeasureOp."""
     return
 
 
 # Unions of operation types can also be used
-@CancelInverses.action
+@CancelInverses.add_action
 def rewrite_observable_op(
     self,
     op: (
