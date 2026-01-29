@@ -57,6 +57,11 @@ from .qubit_handler import (
 )
 
 
+from catalyst.device.decomposition import catalyst_acceptance
+from catalyst.jax_primitives_utils import _calculate_diff_method
+from catalyst.device.qjit_device import _load_device_capabilities
+
+
 def _tuple_to_slice(t):
     """Convert a tuple representation of a slice back to a slice object.
 
@@ -258,7 +263,24 @@ def handle_qnode(
     self, *args, qnode, device, shots_len, execution_config, qfunc_jaxpr, n_consts, batch_dims=None
 ):
     """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
+    # print("execution config", execution_config)
+    print("qnode", qnode)
+    # grad_method = None
+    # if qnode.diff_method:
+    #     grad_method = _calculate_diff_method(qnode.diff_method)
+    capabilities = _load_device_capabilities(device)
 
+    # TODO: 
+    # 1. diff_method = "best" is not supported in this implementation
+    # 2. We are using internal functions from catalyst.device, which may be deprecated?
+    # 3. How are we handling cases where stopping condition is not met, but we reach the target gateset?
+    stopping_condition = lambda op: catalyst_acceptance(op, capabilities, qnode.diff_method)
+    
+    print("capabilities", capabilities)
+    print("qnode.diff_method", qnode.diff_method)
+    print("stopping_condition", stopping_condition)
+    print("self.decompose_tkwargs", self.decompose_tkwargs)
+    
     self.qubit_index_recorder = QubitIndexRecorder()
 
     if shots_len > 1:
@@ -276,6 +298,7 @@ def handle_qnode(
             consts=consts,
             ncargs=non_const_args,
             tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
+            stopping_condition=stopping_condition,
         )
     )
 
@@ -300,6 +323,7 @@ def handle_qnode(
                 consts=closed_jaxpr.consts,
                 ncargs=non_const_args,
                 tkwargs=self.decompose_tkwargs,
+                stopping_condition=stopping_condition,
             )
 
     def calling_convention(*args):
@@ -538,7 +562,7 @@ def trace_from_pennylane(
     return jaxpr, out_type, out_treedef, sig
 
 
-def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=None, tkwargs=None):
+def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=None, tkwargs=None, stopping_condition=None):
     """Apply the compiler-specific decomposition for a given JAXPR.
 
     This function first disables the graph-based decomposition optimization
@@ -579,7 +603,8 @@ def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=Non
         if tgateset
         else tkwargs
     )
-    final_jaxpr = qml.transforms.decompose.plxpr_transform(inner_jaxpr, consts, (), kwargs, *ncargs)
+    # TODO: I assume this is calling decompose_plxpr_to_plxpr() in the DecomposeInterpreter class in pennylane.
+    final_jaxpr = qml.transforms.decompose.plxpr_transform(inner_jaxpr, consts, (), kwargs, *ncargs, stopping_condition=stopping_condition)
 
     qml.decomposition.enable_graph()
 
