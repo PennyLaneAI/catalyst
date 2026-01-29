@@ -29,18 +29,20 @@ jobs:
 
     steps:
     - name: Checkout Catalyst repo
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ needs.constants.outputs.primary_python_version }}
 
     - name: Install Deps
+      env:
+          EXPECTED_PYTHON_VERSION: ${{ needs.constants.outputs.primary_python_version }}
       run: |
         sudo apt-get update
-        sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
-        python --version | grep ${{ needs.constants.outputs.primary_python_version }}
+        sudo apt-get install -y cmake ninja-build ccache clang lld
+        python --version | grep $EXPECTED_PYTHON_VERSION
         python -m pip install numpy nanobind pybind11
 
     - name: Get Cached LLVM Source
@@ -115,7 +117,7 @@ jobs:
         make dialects
 
     - name: Upload Quantum Build Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: quantum-build-${{ matrix.compiler }}
         path: |
