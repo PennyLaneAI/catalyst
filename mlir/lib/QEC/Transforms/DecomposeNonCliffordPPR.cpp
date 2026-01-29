@@ -85,7 +85,12 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
     SmallVector<StringRef> extendedPauliP = pauliP;
     extendedPauliP.emplace_back("Z");                   // extend Z for the axillary qubit -> [P, Z]
     inQubits.emplace_back(magic.getOutQubits().back()); // [input qubits, |m⟩]
-    auto ppmPZ = rewriter.create<PPMeasurementOp>(loc, extendedPauliP, inQubits);
+
+    uint16_t rotationSign = 1;
+    if (op.getRotationKind() < 0) {
+        rotationSign = -1;
+    }
+    auto ppmPZ = rewriter.create<PPMeasurementOp>(loc, extendedPauliP, rotationSign, inQubits);
 
     auto ppmPZRes = ppmPZ.getMres();
     int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
@@ -177,6 +182,20 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
 ///   * The measurement results are stored as i1 values.
 ///   * Measuring -1 corresponds to storing `true = 1` and 1 corresponds to storing `false = 0`.
 ///   - If Z⊗Y and X measurement yield different result, then apply P(π/2) on the input qubits
+///
+/// FIXME: The result from the circuit above is non-deterministic. Test and reimplement Guillermo's
+/// decomposition
+/// ─────┌───┐─────────────────────────┌───────┐──
+/// ─────| P |─────────────────────────| P(π/2)|──
+/// ─────|   |─────────────────────────└───╦───┘──
+///      |   ╠════════════════════╗        ║
+///      |   |  ┌───┐             ║  ┌───┐ ║
+/// |m⟩──| Z |──| Z |─────────────║──| X ╠═╣
+///      └───┘  |   |             ║  └───┘ ║
+///             |   ╠═════╗(+1)   ║        ║
+///             |   | ┌───╩───┐   ║  ┌───┐ ║
+/// |0⟩─────────| Y |─| Z(π/2)|───╚══╣X/Z╠═╝
+///             └───┘ └───────┘      └───┘
 void decomposeAutoCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op,
                                        PatternRewriter &rewriter)
 {
@@ -253,6 +272,7 @@ void decomposeAutoCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op,
 ///   * The measurement results are stored as i1 values.
 ///   * Measuring -1 corresponds to storing `true = 1` and 1 corresponds to storing `false = 0`.
 /// - If X measurement yields -1 then apply P(π/2)
+/// FIXME: The expected value output is non-deterministic.
 void decomposeInjectMagicStatePiOverEight(PPRotationOp op, PatternRewriter &rewriter)
 {
     auto loc = op.getLoc();

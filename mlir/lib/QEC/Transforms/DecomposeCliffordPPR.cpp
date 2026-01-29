@@ -68,12 +68,25 @@ PPRotationOp decompose_pi_over_four_flattening(bool avoidPauliYMeasure, PPRotati
     SmallVector<StringRef> pauliP = extractPauliString(op);
     pauliP.emplace_back(pauliForAxillaryQubit);
 
+    int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
+    if (rotationKind < 0) {
+        // flip rotation sign
+        rotationSign = -rotationSign;
+    }
+
     auto ppmPZ =
         rewriter.create<PPMeasurementOp>(loc, pauliP, rotationSign, m1InQubits, measResult);
 
     SmallVector<StringRef> pauliX = {"X"};
     auto ppmX =
         rewriter.create<PPMeasurementOp>(loc, pauliX, ppmPZ.getOutQubits().back(), measResult);
+
+    // FIXME: Check global phase on this decomposition
+    // auto phaseValue = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(-M_PI /
+    // 4)); rewriter.create<GlobalPhaseOp>(loc, /*out_ctrl_qubits=*/TypeRange{},
+    //                                /*params=*/phaseValue,
+    //                                /*adjoint=*/false, /*in_ctrl_qubits=*/ValueRange{},
+    //                                /*in_ctrl_values=*/ValueRange{});
 
     auto cond = rewriter.create<arith::XOrIOp>(loc, ppmPZ.getMres(), ppmX.getMres());
 
