@@ -58,7 +58,7 @@
   `decompose-clifford-ppr` and `decompose-non-clifford-ppr` passes. The rotation sign is now
   correctly flipped when decomposing negative rotation kinds (e.g., `-π/4` from adjoint gates
   like `T†` or `S†`) to PPM (Pauli Product Measurement) operations.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#2454)](https://github.com/PennyLaneAI/catalyst/pull/2454)
 
 <h3>Internal changes ⚙️</h3>
 
