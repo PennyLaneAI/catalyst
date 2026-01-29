@@ -108,67 +108,70 @@ class QubitType(ParametrizedAttribute, TypeAttribute):
 
     role: QubitRoleAttr
 
-    # def __init__(self, *args):
-    #     self._default_level = False
-    #     self._default_role = False
+    _default_level: bool
+    _default_role: bool
 
-    #     match len(args):
-    #         case 0:
-    #             args = (QubitLevelAttr(QubitLevel.Abstract), QubitRoleAttr(QubitRole.Null))
-    #             self._default_level = True
-    #             self._default_role = True
+    def __init__(self, *args):
+        self._default_level = False
+        self._default_role = False
 
-    #         case 1:
-    #             if isinstance(args[0], QubitLevelAttr):
-    #                 args = (args[0], QubitRoleAttr(QubitRole.Null))
-    #                 self._default_role = True
-    #             elif isinstance(args[0], QubitRoleAttr):
-    #                 args = (QubitLevelAttr(QubitLevel.Abstract), args[0])
-    #                 self._default_level = True
+        match len(args):
+            case 0:
+                args = (QubitLevelAttr(QubitLevel.Abstract), QubitRoleAttr(QubitRole.Null))
+                self._default_level = True
+                self._default_role = True
 
-    #         case _:
-    #             pass
+            case 1:
+                if isinstance(args[0], QubitLevelAttr):
+                    args = (args[0], QubitRoleAttr(QubitRole.Null))
+                    self._default_role = True
+                elif isinstance(args[0], QubitRoleAttr):
+                    args = (QubitLevelAttr(QubitLevel.Abstract), args[0])
+                    self._default_level = True
 
-    #     super().__init__(self, *args)
+            case _:
+                pass
 
-    # @classmethod
-    # def new(cls, params):
-    #     return cls(*params)
+        super().__init__(self, *args)
 
-    # def print_parameters(self, printer: Printer) -> None:
-    #     attrs_to_print = []
+    @classmethod
+    def new(cls, params):
+        return cls(*params)
 
-    #     if not self._default_level:
-    #         attrs_to_print.append(self.level.data.value)
-    #     if not self._default_role:
-    #         attrs_to_print.append(self.role.data.value)
+    def print_parameters(self, printer: Printer) -> None:
+        attrs_to_print = []
 
-    #     # if attrs_to_print:
-    #     #     with printer.in_angle_brackets():
-    #     #         printer.print_list(
-    #     #             attrs_to_print, print_fn=printer.print_identifier_or_string_literal
-    #     #         )
-    #     printer.print_paramattr_parameters(attrs_to_print, always_print_brackets=False)
+        if not self._default_level:
+            attrs_to_print.append(self.level.data.value)
+        if not self._default_role:
+            attrs_to_print.append(self.role.data.value)
 
-    # @classmethod
-    # def parse_parameters(cls, parser: AttrParser) -> list[Attribute]:
+        # if attrs_to_print:
+        #     with printer.in_angle_brackets():
+        #         printer.print_list(
+        #             attrs_to_print, print_fn=printer.print_identifier_or_string_literal
+        #         )
+        printer.print_paramattr_parameters(attrs_to_print, always_print_brackets=False)
 
-    #     def parse_fn():
-    #         try:
-    #             res = parser.parse_optional_str_enum(QubitLevel)
-    #         except ParseError:
-    #             try:
-    #                 res = parser.parse_optional_str_enum(QubitRole)
-    #             except ParseError:
-    #                 res = None
+    @classmethod
+    def parse_parameters(cls, parser: AttrParser) -> list[Attribute]:
 
-    #         return res
+        def parse_fn():
+            try:
+                res = parser.parse_optional_str_enum(QubitLevel)
+            except ParseError:
+                try:
+                    res = parser.parse_optional_str_enum(QubitRole)
+                except ParseError:
+                    res = None
 
-    #     optional_params = parser.parse_optional_comma_separated_list(
-    #         delimiter=parser.Delimiter.ANGLE, parse=parse_fn
-    #     )
+            return res
 
-    #     return optional_params
+        optional_params = parser.parse_optional_comma_separated_list(
+            delimiter=parser.Delimiter.ANGLE, parse=parse_fn
+        )
+
+        return optional_params
 
 
 @irdl_attr_definition

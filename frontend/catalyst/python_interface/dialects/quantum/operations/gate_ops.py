@@ -99,19 +99,19 @@ class CustomOp(UnitaryGateOp):
 
     params = var_operand_def(Float64Type())
 
-    in_qubits = var_operand_def(QubitType)
+    in_qubits = var_operand_def(QubitType())
 
     gate_name = prop_def(StringAttr)
 
     adjoint = opt_prop_def(UnitAttr)
 
-    in_ctrl_qubits = var_operand_def(QubitType)
+    in_ctrl_qubits = var_operand_def(QubitType())
 
     in_ctrl_values = var_operand_def(i1)
 
-    out_qubits = var_result_def(QubitType)
+    out_qubits = var_result_def(QubitType())
 
-    out_ctrl_qubits = var_result_def(QubitType)
+    out_ctrl_qubits = var_result_def(QubitType())
 
     traits = traits_def(
         NoMemoryEffect(),
