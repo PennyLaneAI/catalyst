@@ -146,6 +146,7 @@ from catalyst.jax_extras import (
     switch_expansion_strategy,
     while_loop_expansion_strategy,
 )
+from catalyst.tracing.contexts import CaptureContext
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
@@ -411,7 +412,7 @@ def subroutine(func):
     @functools.wraps(inside, assigned=WRAPPER_ASSIGNMENTS)
     def wrapper(*args, **kwargs):
 
-        if not qml.capture.enabled():
+        if not CaptureContext.is_capture_enabled():
             msg = "Subroutine is only available with capture enabled."
             raise CompileError(msg)
 

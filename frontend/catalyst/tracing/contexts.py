@@ -120,6 +120,72 @@ class AccelerateContext:
         return AccelerateContext._am_inside_accelerate > 0
 
 
+class CaptureContext:
+    """Context manager for tracking the local capture mode within a QJIT invocation.
+
+    This class allows QJIT instances to override the global ``qml.capture.enabled()`` setting
+    locally. The capture mode can be:
+
+    - ``"global"``: Defer to ``qml.capture.enabled()`` (default behavior)
+    - ``True``: Force program capture mode on, regardless of global setting
+    - ``False``: Force program capture mode off, regardless of global setting
+
+    This enables users to enable program capture for specific QJIT instances without
+    affecting the global PennyLane capture state.
+    """
+
+    # Stack to track nested capture mode settings.
+    # Each entry is one of: "global", True, False
+    _capture_stack: list = []
+
+    def __init__(self, capture_mode):
+        """Initialize the capture context with a capture mode setting.
+
+        Args:
+            capture_mode: One of "global", True, or False
+        """
+        self.capture_mode = capture_mode
+
+    def __enter__(self):
+        CaptureContext._capture_stack.append(self.capture_mode)
+
+    def __exit__(self, _exc_type, _exc, _exc_tb):
+        CaptureContext._capture_stack.pop()
+
+    @staticmethod
+    def is_capture_enabled():
+        """Determine if program capture is enabled for the current context.
+
+        Returns:
+            bool: True if capture is enabled, False otherwise.
+
+        This method checks the local capture context stack first. If no local
+        context is set or if the mode is "global", it falls back to the global
+        ``qml.capture.enabled()`` setting.
+        """
+        import pennylane as qml  # pylint: disable=import-outside-toplevel
+
+        if not CaptureContext._capture_stack:
+            # No local context, use global setting
+            return qml.capture.enabled()
+
+        current_mode = CaptureContext._capture_stack[-1]
+        if current_mode == "global":
+            return qml.capture.enabled()
+        return current_mode
+
+    @staticmethod
+    def get_current_mode():
+        """Get the current capture mode setting.
+
+        Returns:
+            The current capture mode ("global", True, or False), or None if no context is active.
+        """
+        if not CaptureContext._capture_stack:
+            return None
+        return CaptureContext._capture_stack[-1]
+
+
 class EvaluationMode(Enum):
     """Enumerate the evaluation modes supported by Catalyst:
     INTERPRETATION - native Python execution of a Catalyst program
