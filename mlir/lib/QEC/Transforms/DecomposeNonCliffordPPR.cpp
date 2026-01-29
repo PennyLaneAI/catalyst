@@ -86,14 +86,14 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
     extendedPauliP.emplace_back("Z");                   // extend Z for the axillary qubit -> [P, Z]
     inQubits.emplace_back(magic.getOutQubits().back()); // [input qubits, |m⟩]
 
+    int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
     uint16_t rotationSign = 1;
-    if (op.getRotationKind() < 0) {
+    if (rotationKind < 0) {
         rotationSign = -1;
     }
     auto ppmPZ = rewriter.create<PPMeasurementOp>(loc, extendedPauliP, rotationSign, inQubits);
 
     auto ppmPZRes = ppmPZ.getMres();
-    int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
     if (avoidPauliYMeasure) {
         auto YBuilder = [&](OpBuilder &builder, Location loc) {
             // Initialize |Y⟩ state
@@ -272,7 +272,7 @@ void decomposeAutoCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op,
 ///   * The measurement results are stored as i1 values.
 ///   * Measuring -1 corresponds to storing `true = 1` and 1 corresponds to storing `false = 0`.
 /// - If X measurement yields -1 then apply P(π/2)
-/// FIXME: The expected value output is non-deterministic -- presumably caused by global phase. 
+/// FIXME: The expected value output is non-deterministic -- presumably caused by global phase.
 void decomposeInjectMagicStatePiOverEight(PPRotationOp op, PatternRewriter &rewriter)
 {
     auto loc = op.getLoc();
