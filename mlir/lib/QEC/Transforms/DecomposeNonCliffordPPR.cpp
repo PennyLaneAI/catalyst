@@ -184,7 +184,7 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
 ///   - If Z⊗Y and X measurement yield different result, then apply P(π/2) on the input qubits
 ///
 /// FIXME: The result from the circuit above is non-deterministic. Test and reimplement Guillermo's
-/// decomposition
+/// decomposition.
 /// ─────┌───┐─────────────────────────┌───────┐──
 /// ─────| P |─────────────────────────| P(π/2)|──
 /// ─────|   |─────────────────────────└───╦───┘──
@@ -272,7 +272,7 @@ void decomposeAutoCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op,
 ///   * The measurement results are stored as i1 values.
 ///   * Measuring -1 corresponds to storing `true = 1` and 1 corresponds to storing `false = 0`.
 /// - If X measurement yields -1 then apply P(π/2)
-/// FIXME: The expected value output is non-deterministic.
+/// FIXME: The expected value output is non-deterministic -- presumably caused by global phase. 
 void decomposeInjectMagicStatePiOverEight(PPRotationOp op, PatternRewriter &rewriter)
 {
     auto loc = op.getLoc();
