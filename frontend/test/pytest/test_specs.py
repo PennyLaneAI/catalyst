@@ -556,6 +556,40 @@ class TestPassByPassSpecs:
         actual = qml.specs(circ, level=2)()
         check_specs_same(actual, expected)
 
+    @pytest.mark.usefixtures("use_capture")
+    def test_arbitrary_ppr(self):
+        """Test that PPRs are handled correctly."""
+
+        @qml.qjit(target="mlir")
+        @qml.transforms.decompose_arbitrary_ppr
+        @qml.transforms.to_ppr
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def circ():
+            qml.PauliRot(0.1, pauli_word="XY", wires=[0, 1])
+
+        expected = CircuitSpecs(
+            device_name="null.qubit",
+            num_device_wires=3,
+            shots=Shots(None),
+            level=3,
+            resources=SpecsResources(
+                gate_types={
+                    "qec.prepare": 1,
+                    "PPM-w3": 1,
+                    "PPM-w1": 1,
+                    "PPR-pi/2-w1": 1,
+                    "PPR-pi/2-w2": 1,
+                    "PPR-Phi-w1": 1,
+                },
+                gate_sizes={1: 4, 2: 1, 3: 1},
+                measurements={},
+                num_allocs=4,
+            ),
+        )
+
+        actual = qml.specs(circ, level=3)()
+        check_specs_same(actual, expected)
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
