@@ -33,7 +33,6 @@ class TestMeasurementsFromSamplesPass:
 
     def test_no_shots_raises_error(self, run_filecheck):
         """Test that when no shots are provided, the pass raises an error"""
-
         program = """
         builtin.module @module_circuit {
             // CHECK-LABEL: circuit
@@ -45,8 +44,9 @@ class TestMeasurementsFromSamplesPass:
         """
 
         pipeline = (MeasurementsFromSamplesPass(),)
-
-        with pytest.raises(ValueError, match="measurements_from_samples pass requires non-zero shots"):
+        with pytest.raises(
+            ValueError, match="measurements_from_samples pass requires non-zero shots"
+        ):
             run_filecheck(program, pipeline)
 
     def test_1_wire_expval(self, run_filecheck):
@@ -456,9 +456,10 @@ class TestMeasurementsFromSamplesIntegration:
             qml.X(0)
             return qml.expval(qml.Z(0))
 
-        with pytest.raises(ValueError, match="measurements_from_samples pass requires non-zero shots"):
+        with pytest.raises(
+            ValueError, match="measurements_from_samples pass requires non-zero shots"
+        ):
             qml.qjit(measurements_from_samples_pass(circuit_ref))
-
 
     @pytest.mark.parametrize("shots", [1, 2])
     @pytest.mark.parametrize(
