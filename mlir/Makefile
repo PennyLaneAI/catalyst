@@ -66,6 +66,9 @@ llvm:
 	@if cd llvm-project; git apply --check $(MK_DIR)/patches/llvm-bufferization-segfault.patch; then \
 		git apply $(MK_DIR)/patches/llvm-bufferization-segfault.patch; \
 	fi
+	@if cd llvm-project; git apply --check $(MK_DIR)/patches/llvm-python-bindinggen-annotations.patch; then \
+		git apply $(MK_DIR)/patches/llvm-python-bindinggen-annotations.patch; \
+	fi
 
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
