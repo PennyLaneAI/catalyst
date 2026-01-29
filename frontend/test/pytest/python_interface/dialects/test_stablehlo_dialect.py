@@ -24,75 +24,75 @@ def test_all_unary_operations(run_filecheck):
     program = r"""
     // CHECK: %[[tf32:.*]] = "test.op"() : () -> tensor<f32>
     %tf32 = "test.op"() : () -> tensor<f32>
-    
+
     // CHECK: %[[tf64:.*]] = "test.op"() : () -> tensor<f64>
     %tf64 = "test.op"() : () -> tensor<f64>
-    
+
     // CHECK: %[[tcomplex:.*]] = "test.op"() : () -> tensor<complex<f32>>
     %tcomplex = "test.op"() : () -> tensor<complex<f32>>
-    
+
     // CHECK: %convert = "stablehlo.convert"(%[[tf32]]) : (tensor<f32>) -> tensor<f64>
     %convert = "stablehlo.convert"(%tf32) : (tensor<f32>) -> tensor<f64>
-    
+
     // CHECK: %cos = "stablehlo.cosine"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %cos = "stablehlo.cosine"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %exp = "stablehlo.exponential"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %exp = "stablehlo.exponential"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %exponential_minus_one = "stablehlo.exponential_minus_one"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %exponential_minus_one = "stablehlo.exponential_minus_one"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %floor = "stablehlo.floor"(%[[tf64]]) : (tensor<f64>) -> tensor<f64>
     %floor = "stablehlo.floor"(%tf64) : (tensor<f64>) -> tensor<f64>
-    
+
     // CHECK: %imag = "stablehlo.imag"(%[[tcomplex]]) : (tensor<complex<f32>>) -> tensor<f32>
     %imag = "stablehlo.imag"(%tcomplex) : (tensor<complex<f32>>) -> tensor<f32>
-    
+
     // CHECK: %is_finite = "stablehlo.is_finite"(%[[tf32]]) : (tensor<f32>) -> tensor<i1>
     %is_finite = "stablehlo.is_finite"(%tf32) : (tensor<f32>) -> tensor<i1>
-    
+
     // CHECK: %log = "stablehlo.log"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %log = "stablehlo.log"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %log_plus_one = "stablehlo.log_plus_one"(%[[tf64]]) : (tensor<f64>) -> tensor<f64>
     %log_plus_one = "stablehlo.log_plus_one"(%tf64) : (tensor<f64>) -> tensor<f64>
-    
+
     // CHECK: %logistic = "stablehlo.logistic"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %logistic = "stablehlo.logistic"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %negate = "stablehlo.negate"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %negate = "stablehlo.negate"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %real = "stablehlo.real"(%[[tcomplex]]) : (tensor<complex<f32>>) -> tensor<f32>
     %real = "stablehlo.real"(%tcomplex) : (tensor<complex<f32>>) -> tensor<f32>
-    
+
     // CHECK: %round_afz = "stablehlo.round_nearest_afz"(%[[tf64]]) : (tensor<f64>) -> tensor<f64>
     %round_afz = "stablehlo.round_nearest_afz"(%tf64) : (tensor<f64>) -> tensor<f64>
-    
+
     // CHECK: %round_even = "stablehlo.round_nearest_even"(%[[tf64]]) : (tensor<f64>) -> tensor<f64>
     %round_even = "stablehlo.round_nearest_even"(%tf64) : (tensor<f64>) -> tensor<f64>
-    
+
     // CHECK: %rsqrt = "stablehlo.rsqrt"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %rsqrt = "stablehlo.rsqrt"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %sign = "stablehlo.sign"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %sign = "stablehlo.sign"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %sin = "stablehlo.sine"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %sin = "stablehlo.sine"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %sqrt = "stablehlo.sqrt"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %sqrt = "stablehlo.sqrt"(%tf32) : (tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %tan = "stablehlo.tan"(%[[tf64]]) : (tensor<f64>) -> tensor<f64>
     %tan = "stablehlo.tan"(%tf64) : (tensor<f64>) -> tensor<f64>
-    
+
     // CHECK: %tanh = "stablehlo.tanh"(%[[tf32]]) : (tensor<f32>) -> tensor<f32>
     %tanh = "stablehlo.tanh"(%tf32) : (tensor<f32>) -> tensor<f32>
     """
 
-    run_filecheck(program, roundtrip=True, verify=True)
+    run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_all_binary_operations(run_filecheck):
@@ -100,36 +100,36 @@ def test_all_binary_operations(run_filecheck):
     program = r"""
     // CHECK: %[[tf32_1:.*]] = "test.op"() : () -> tensor<f32>
     %tf32_1 = "test.op"() : () -> tensor<f32>
-    
+
     // CHECK: %[[tf32_2:.*]] = "test.op"() : () -> tensor<f32>
     %tf32_2 = "test.op"() : () -> tensor<f32>
-    
+
     // CHECK: %[[tf64_1:.*]] = "test.op"() : () -> tensor<f64>
     %tf64_1 = "test.op"() : () -> tensor<f64>
-    
+
     // CHECK: %[[tf64_2:.*]] = "test.op"() : () -> tensor<f64>
     %tf64_2 = "test.op"() : () -> tensor<f64>
 
     // CHECK: %complex = "stablehlo.complex"(%[[tf32_1]], %[[tf32_2]]) : (tensor<f32>, tensor<f32>) -> tensor<complex<f32>>
     %complex = "stablehlo.complex"(%tf32_1, %tf32_2) : (tensor<f32>, tensor<f32>) -> tensor<complex<f32>>
-    
+
     // CHECK: %divide = "stablehlo.divide"(%[[tf32_1]], %[[tf32_2]]) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     %divide = "stablehlo.divide"(%tf32_1, %tf32_2) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %maximum = "stablehlo.maximum"(%[[tf32_1]], %[[tf32_2]]) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     %maximum = "stablehlo.maximum"(%tf32_1, %tf32_2) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %minimum = "stablehlo.minimum"(%[[tf32_1]], %[[tf32_2]]) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     %minimum = "stablehlo.minimum"(%tf32_1, %tf32_2) : (tensor<f32>, tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %power = "stablehlo.power"(%[[tf64_1]], %[[tf64_2]]) : (tensor<f64>, tensor<f64>) -> tensor<f64>
     %power = "stablehlo.power"(%tf64_1, %tf64_2) : (tensor<f64>, tensor<f64>) -> tensor<f64>
-    
+
     // CHECK: %remainder = "stablehlo.remainder"(%[[tf32_1]], %[[tf32_2]]) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     %remainder = "stablehlo.remainder"(%tf32_1, %tf32_2) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     """
 
-    run_filecheck(program, roundtrip=True, verify=True)
+    run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_all_other_operations(run_filecheck):
@@ -146,10 +146,10 @@ def test_all_other_operations(run_filecheck):
 
     // CHECK: %clamp = "stablehlo.clamp"(%[[tf32]], %[[tf32]], %[[tf32]]) : (tensor<f32>, tensor<f32>, tensor<f32>) -> tensor<f32>
     %clamp = "stablehlo.clamp"(%tf32, %tf32, %tf32) : (tensor<f32>, tensor<f32>, tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %compare = stablehlo.compare EQ, %[[tf32]], %[[tf32]] : (tensor<f32>, tensor<f32>) -> tensor<i1>
     %compare = "stablehlo.compare"(%tf32, %tf32) {comparison_direction = #stablehlo<comparison_direction EQ>} : (tensor<f32>, tensor<f32>) -> tensor<i1>
-    
+
     // CHECK: %map = "stablehlo.map"(%[[tf32]], %[[tf32]]) ({
     // CHECK:   ^[[bb0:.*]](%arg0 : tensor<f32>, %arg1 : tensor<f32>):
     // CHECK:     %0 = "stablehlo.multiply"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
@@ -162,10 +162,10 @@ def test_all_other_operations(run_filecheck):
     }) {
       dimensions = array<i64: 0, 1>
     } : (tensor<f32>, tensor<f32>) -> tensor<f32>
-    
+
     // CHECK: %reduce_precision = "stablehlo.reduce_precision"(%[[tf64]]) {exponent_bits = 5 : i32, mantissa_bits = 10 : i32} : (tensor<f64>) -> tensor<f64>
     %reduce_precision = "stablehlo.reduce_precision"(%tf64) {exponent_bits = 5 : i32, mantissa_bits = 10 : i32} : (tensor<f64>) -> tensor<f64>
-    
+
     // CHECK: %select = "stablehlo.select"(%[[ti1]], %[[tf32]], %[[tf32]]) : (tensor<i1>, tensor<f32>, tensor<f32>) -> tensor<f32>
     %select = "stablehlo.select"(%ti1, %tf32, %tf32) : (tensor<i1>, tensor<f32>, tensor<f32>) -> tensor<f32>
 
@@ -173,7 +173,7 @@ def test_all_other_operations(run_filecheck):
     %constant1 = "stablehlo.constant"() <{value = dense<[[0.0, 1.0], [2.0, 3.0]]> : tensor<2x2xf32>}> : () -> tensor<2x2xf32>
     """
 
-    run_filecheck(program, roundtrip=True, verify=True)
+    run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_invalid_ir_shape_mismatch(run_filecheck):
@@ -181,7 +181,7 @@ def test_invalid_ir_shape_mismatch(run_filecheck):
     program = r"""
     %tf32_2x3 = "test.op"() : () -> tensor<2x3xf32>
     %tf64_3x2 = "test.op"() : () -> tensor<3x2xf64>
-    
+
     // This should fail verification due to shape mismatch
     %convert = "stablehlo.convert"(%tf32_2x3) : (tensor<2x3xf32>) -> tensor<3x2xf64>
     """
@@ -189,20 +189,20 @@ def test_invalid_ir_shape_mismatch(run_filecheck):
     with pytest.raises(
         Exception, match="all non-scalar operands/results must have the same shape and base type"
     ):
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_invalid_ir_type_mismatch(run_filecheck):
     """Test that operations with type mismatches are properly rejected."""
     program = r"""
     %ti32 = "test.op"() : () -> tensor<2x3xi32>
-    
+
     // This should fail verification due to type mismatch (cosine expects float/complex)
     %cos = "stablehlo.cosine"(%ti32) : (tensor<2x3xi32>) -> tensor<2x3xi32>
     """
 
     with pytest.raises(Exception, match="'operand' at position 0 does not verify"):
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_invalid_ir_missing_operands(run_filecheck):
@@ -212,7 +212,7 @@ def test_invalid_ir_missing_operands(run_filecheck):
     """
 
     with pytest.raises(Exception, match="Expected 1 operand"):
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_invalid_ir_trait_verification_failure(run_filecheck):
@@ -220,20 +220,20 @@ def test_invalid_ir_trait_verification_failure(run_filecheck):
     program = r"""
     %tf32_2x3 = "test.op"() : () -> tensor<2x3xf32>
     %tf64_3x2 = "test.op"() : () -> tensor<3x2xf64>
-    
+
     // This should fail verification due to shape mismatch between operands
     %complex = "stablehlo.complex"(%tf32_2x3, %tf64_3x2) : (tensor<2x3xf32>, tensor<3x2xf64>) -> tensor<2x3xcomplex<f32>>
     """
 
     with pytest.raises(Exception, match="requires the same shape"):
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_invalid_ir_operand_result_shape_mismatch(run_filecheck):
     """Test that operations with operand vs result shape mismatches are properly rejected."""
     program = r"""
     %tf32_2x3 = "test.op"() : () -> tensor<2x3xf32>
-    
+
     // This should fail verification due to shape mismatch between operand and result
     %convert = "stablehlo.convert"(%tf32_2x3) : (tensor<2x3xf32>) -> tensor<3x2xf64>
     """
@@ -241,17 +241,17 @@ def test_invalid_ir_operand_result_shape_mismatch(run_filecheck):
     with pytest.raises(
         Exception, match="all non-scalar operands/results must have the same shape and base type"
     ):
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_control_flow_operations(run_filecheck):
     """Test the IfOp operation."""
     program = r"""
     // Test IfOp:
-    
+
     // CHECK:   %[[pred:.*]] = "test.op"() : () -> tensor<i1>
     %pred = "test.op"() : () -> tensor<i1>
-    
+
     // CHECK:   %[[result:.*]] = "stablehlo.if"(%[[pred]]) ({
     // CHECK:     "stablehlo.return"(%[[pred]]) : (tensor<i1>) -> ()
     // CHECK:   }, {
@@ -262,21 +262,21 @@ def test_control_flow_operations(run_filecheck):
     }, {
         "stablehlo.return"(%pred) : (tensor<i1>) -> ()
     }) : (tensor<i1>) -> tensor<i1>
-    
+
     // Test WhileOp:
 
     // CHECK:   %[[init_i:.*]] = "test.op"() : () -> tensor<i64>
     %init_i = "test.op"() : () -> tensor<i64>
-    
+
     // CHECK:   %[[init_sum:.*]] = "test.op"() : () -> tensor<i64>
     %init_sum = "test.op"() : () -> tensor<i64>
-    
+
     // CHECK:   %[[ten:.*]] = "test.op"() : () -> tensor<i64>
     %ten = "test.op"() : () -> tensor<i64>
-    
+
     // CHECK:   %[[one:.*]] = "test.op"() : () -> tensor<i64>
     %one = "test.op"() : () -> tensor<i64>
-    
+
     // CHECK:   %[[results:.*]], %[[results_1:.*]] = "stablehlo.while"(%[[init_i]], %[[init_sum]]) ({
     // CHECK:   ^{{.*}}(%[[arg0:.*]] : tensor<i64>, %[[arg1:.*]] : tensor<i64>):
     // CHECK:     %[[cond:.*]] = stablehlo.compare LT, %[[arg0]], %[[ten]] : (tensor<i64>, tensor<i64>) -> tensor<i1>
@@ -297,17 +297,17 @@ def test_control_flow_operations(run_filecheck):
       %new_i = "stablehlo.add"(%arg0, %one) : (tensor<i64>, tensor<i64>) -> tensor<i64>
       "stablehlo.return"(%new_i, %new_sum) : (tensor<i64>, tensor<i64>) -> ()
     }) : (tensor<i64>, tensor<i64>) -> (tensor<i64>, tensor<i64>)
-    
+
     // Test OptimizationBarrierOp:
 
     // CHECK:   %[[operand:.*]] = "test.op"() : () -> tensor<i1>
     %operand = "test.op"() : () -> tensor<i1>
-    
+
     // CHECK:   %[[result2:.*]] = "stablehlo.optimization_barrier"(%[[operand]]) : (tensor<i1>) -> tensor<i1>
     %result2 = "stablehlo.optimization_barrier"(%operand) : (tensor<i1>) -> tensor<i1>
     """
 
-    run_filecheck(program, roundtrip=True, verify=True)
+    run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_data_movement_operations(run_filecheck):
@@ -316,40 +316,40 @@ def test_data_movement_operations(run_filecheck):
     ////////////////// Setup test operations //////////////////
     // CHECK: %[[input1:.*]] = "test.op"() : () -> tensor<3x2xi64>
     %input1 = "test.op"() : () -> tensor<3x2xi64>
-    
+
     // CHECK: %[[input2:.*]] = "test.op"() : () -> tensor<1x2xi64>
     %input2 = "test.op"() : () -> tensor<1x2xi64>
-    
+
     // CHECK: %[[operand:.*]] = "test.op"() : () -> tensor<2x3x4x2xi32>
     %operand = "test.op"() : () -> tensor<2x3x4x2xi32>
-    
+
     // CHECK: %[[start_indices:.*]] = "test.op"() : () -> tensor<2x2x3x2xi64>
     %start_indices = "test.op"() : () -> tensor<2x2x3x2xi64>
-    
+
     // CHECK: %[[reshape_input:.*]] = "test.op"() : () -> tensor<2xf32>
     %reshape_input = "test.op"() : () -> tensor<2xf32>
-    
+
     // CHECK: %[[scatter_input:.*]] = "test.op"() : () -> tensor<2x3x4x2xi64>
     %scatter_input = "test.op"() : () -> tensor<2x3x4x2xi64>
-    
+
     // CHECK: %[[scatter_indices:.*]] = "test.op"() : () -> tensor<2x2x3x2xi64>
     %scatter_indices = "test.op"() : () -> tensor<2x2x3x2xi64>
-    
+
     // CHECK: %[[scatter_updates:.*]] = "test.op"() : () -> tensor<2x2x3x2x2xi64>
     %scatter_updates = "test.op"() : () -> tensor<2x2x3x2x2xi64>
-    
+
     // CHECK: %[[slice_input:.*]] = "test.op"() : () -> tensor<3x4xi64>
     %slice_input = "test.op"() : () -> tensor<3x4xi64>
-    
+
     // CHECK: %[[broadcast_input:.*]] = "test.op"() : () -> tensor<1x3xi32>
     %broadcast_input = "test.op"() : () -> tensor<1x3xi32>
-    
+
     ////////////////// Test ConcatenateOp //////////////////
     // CHECK: %concatenate = "stablehlo.concatenate"(%[[input1]], %[[input2]]) <{dimension = 0 : i64}> : (tensor<3x2xi64>, tensor<1x2xi64>) -> tensor<4x2xi64>
     %concatenate = "stablehlo.concatenate"(%input1, %input2) {dimension = 0 : i64} : (tensor<3x2xi64>, tensor<1x2xi64>) -> tensor<4x2xi64>
-    
+
     ////////////////// Test GatherOp //////////////////
-    // CHECK: %gather = "stablehlo.gather"(%[[operand]], %[[start_indices]]) 
+    // CHECK: %gather = "stablehlo.gather"(%[[operand]], %[[start_indices]])
     // CHECK-SAME: dimension_numbers = #stablehlo.gather<
     // CHECK-NEXT:   offset_dims = [3, 4],
     // CHECK-NEXT:   collapsed_slice_dims = [1],
@@ -369,13 +369,13 @@ def test_data_movement_operations(run_filecheck):
       slice_sizes = array<i64: 1, 1, 2, 2>,
       indices_are_sorted = false
     } : (tensor<2x3x4x2xi32>, tensor<2x2x3x2xi64>) -> tensor<2x2x3x2x2xi32>
-    
+
     ////////////////// Test ReshapeOp //////////////////
     // CHECK: %reshape = stablehlo.reshape %[[reshape_input]] : (tensor<2xf32>) -> tensor<1x2xf32>
     %reshape = "stablehlo.reshape"(%reshape_input) : (tensor<2xf32>) -> tensor<1x2xf32>
-    
+
     ////////////////// Test ScatterOp //////////////////
-    // CHECK: %scatter = "stablehlo.scatter"(%[[scatter_input]], %[[scatter_indices]], %[[scatter_updates]]) 
+    // CHECK: %scatter = "stablehlo.scatter"(%[[scatter_input]], %[[scatter_indices]], %[[scatter_updates]])
     // CHECK-SAME: scatter_dimension_numbers = #stablehlo.scatter<
     // CHECK-NEXT:   update_window_dims = [3, 4],
     // CHECK-NEXT:   inserted_window_dims = [1],
@@ -402,7 +402,7 @@ def test_data_movement_operations(run_filecheck):
       indices_are_sorted = false,
       unique_indices = false
     } : (tensor<2x3x4x2xi64>, tensor<2x2x3x2xi64>, tensor<2x2x3x2x2xi64>) -> tensor<2x3x4x2xi64>
-    
+
     ////////////////// Test SliceOp //////////////////
     // CHECK: %slice = "stablehlo.slice"(%[[slice_input]])
     // CHECK-SAME:   start_indices = array<i64: 1, 2>,
@@ -414,7 +414,7 @@ def test_data_movement_operations(run_filecheck):
       limit_indices = array<i64: 3, 4>,
       strides = array<i64: 1, 1>
     } : (tensor<3x4xi64>) -> tensor<2x2xi64>
-    
+
     ////////////////// Test BroadcastInDimOp //////////////////
     // CHECK: %broadcast = stablehlo.broadcast_in_dim %[[broadcast_input]], dims = [2, 1] : (tensor<1x3xi32>) -> tensor<2x3x2xi32>
     %broadcast = "stablehlo.broadcast_in_dim"(%broadcast_input) {broadcast_dimensions = array<i64: 2, 1>} : (tensor<1x3xi32>) -> tensor<2x3x2xi32>
@@ -437,7 +437,7 @@ def test_data_movement_operations(run_filecheck):
     } : (tensor<4x4xi32>, tensor<i64>, tensor<i64>) -> tensor<2x3xi32>
     """
 
-    run_filecheck(program, roundtrip=True, verify=True)
+    run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_invalid_slice_operations(run_filecheck):
@@ -459,7 +459,7 @@ def test_invalid_slice_operations(run_filecheck):
         Exception,
         match="all of \\{start_indices, limit_indices, strides\\} must have the same size: got sizes 2, 3, 2",
     ):
-        run_filecheck(program_slice_mismatch, roundtrip=True, verify=True)
+        run_filecheck(program_slice_mismatch, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_invalid_slice_element_type_mismatch(run_filecheck):
@@ -479,7 +479,7 @@ def test_invalid_slice_element_type_mismatch(run_filecheck):
     with pytest.raises(
         Exception, match="requires the same element type for all operands and results"
     ):
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_invalid_gather_element_type_mismatch(run_filecheck):
@@ -506,7 +506,7 @@ def test_invalid_gather_element_type_mismatch(run_filecheck):
     with pytest.raises(
         Exception, match=r"all of \{operand, result\} must have the same element type"
     ):
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_invalid_reshape_operations(run_filecheck):
@@ -519,7 +519,7 @@ def test_invalid_reshape_operations(run_filecheck):
     """
 
     with pytest.raises(Exception, match="number of output elements"):
-        run_filecheck(program_reshape_mismatch, roundtrip=True, verify=True)
+        run_filecheck(program_reshape_mismatch, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_invalid_broadcast_in_dim_operations(run_filecheck):
@@ -533,7 +533,9 @@ def test_invalid_broadcast_in_dim_operations(run_filecheck):
     """
 
     with pytest.raises(Exception, match="broadcast_dimensions size .* does not match operand rank"):
-        run_filecheck(program_broadcast_dims_size_mismatch, roundtrip=True, verify=True)
+        run_filecheck(
+            program_broadcast_dims_size_mismatch, roundtrip=True, to_mlir=False, verify=True
+        )
 
     # Test duplicate dims.
     program_broadcast_duplicate_dims = r"""
@@ -544,7 +546,7 @@ def test_invalid_broadcast_in_dim_operations(run_filecheck):
     """
 
     with pytest.raises(Exception, match="broadcast_dimensions should not have duplicates"):
-        run_filecheck(program_broadcast_duplicate_dims, roundtrip=True, verify=True)
+        run_filecheck(program_broadcast_duplicate_dims, roundtrip=True, to_mlir=False, verify=True)
 
     # Test dim index out of bounds.
     program_broadcast_dim_oob = r"""
@@ -555,7 +557,7 @@ def test_invalid_broadcast_in_dim_operations(run_filecheck):
     """
 
     with pytest.raises(Exception, match="broadcast_dimensions contains invalid value"):
-        run_filecheck(program_broadcast_dim_oob, roundtrip=True, verify=True)
+        run_filecheck(program_broadcast_dim_oob, roundtrip=True, to_mlir=False, verify=True)
 
     # Test operand dim not 1 and not equal to result dim.
     program_broadcast_dim_mismatch = r"""
@@ -569,7 +571,7 @@ def test_invalid_broadcast_in_dim_operations(run_filecheck):
         Exception,
         match="size of operand dimension .* is not equal to 1 or size of result dimension",
     ):
-        run_filecheck(program_broadcast_dim_mismatch, roundtrip=True, verify=True)
+        run_filecheck(program_broadcast_dim_mismatch, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_dynamism_operations(run_filecheck):
@@ -589,7 +591,7 @@ def test_dynamism_operations(run_filecheck):
     } : (tensor<1x3xi64>, tensor<3xi64>) -> tensor<2x3x2xi64>
     """
 
-    run_filecheck(program, roundtrip=True, verify=True)
+    run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_reduction_operations(run_filecheck):
@@ -615,7 +617,7 @@ def test_reduction_operations(run_filecheck):
     }) {dimensions = array<i64: 1>} : (tensor<1x6xi64>, tensor<i64>) -> tensor<1xi64>
     """
 
-    run_filecheck(program, roundtrip=True, verify=True)
+    run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_invalid_reduction_operations(run_filecheck):
@@ -634,7 +636,7 @@ def test_invalid_reduction_operations(run_filecheck):
     """
 
     with pytest.raises(Exception, match=r"dimensions should not have duplicates"):
-        run_filecheck(program_dup_dims, roundtrip=True, verify=True)
+        run_filecheck(program_dup_dims, roundtrip=True, to_mlir=False, verify=True)
 
     # Dimension out of range
     program_dim_oob = r"""
@@ -649,7 +651,7 @@ def test_invalid_reduction_operations(run_filecheck):
     """
 
     with pytest.raises(Exception, match=r"dimensions contains an invalid value"):
-        run_filecheck(program_dim_oob, roundtrip=True, verify=True)
+        run_filecheck(program_dim_oob, roundtrip=True, to_mlir=False, verify=True)
 
     # Input/init element type mismatch
     program_elem_mismatch = r"""
@@ -664,7 +666,7 @@ def test_invalid_reduction_operations(run_filecheck):
     """
 
     with pytest.raises(Exception, match=r"input and init_value must have the same element type"):
-        run_filecheck(program_elem_mismatch, roundtrip=True, verify=True)
+        run_filecheck(program_elem_mismatch, roundtrip=True, to_mlir=False, verify=True)
 
     # Reducer wrong arity (expects 2 args per input; give 1)
     program_wrong_arity = r"""
@@ -678,7 +680,7 @@ def test_invalid_reduction_operations(run_filecheck):
     """
 
     with pytest.raises(Exception, match=r"reducer must take 2 arguments, got 1"):
-        run_filecheck(program_wrong_arity, roundtrip=True, verify=True)
+        run_filecheck(program_wrong_arity, roundtrip=True, to_mlir=False, verify=True)
 
     # Reducer arg wrong rank (should be 0D)
     program_arg_rank = r"""
@@ -693,7 +695,7 @@ def test_invalid_reduction_operations(run_filecheck):
     """
 
     with pytest.raises(Exception, match=r"reducer arguments must be rank-0 tensors"):
-        run_filecheck(program_arg_rank, roundtrip=True, verify=True)
+        run_filecheck(program_arg_rank, roundtrip=True, to_mlir=False, verify=True)
 
     # Reducer return wrong count
     program_return_count = r"""
@@ -707,7 +709,7 @@ def test_invalid_reduction_operations(run_filecheck):
     """
 
     with pytest.raises(Exception, match=r"reducer must return exactly one value per input"):
-        run_filecheck(program_return_count, roundtrip=True, verify=True)
+        run_filecheck(program_return_count, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_custom_call_basic(run_filecheck):
@@ -726,7 +728,7 @@ def test_custom_call_basic(run_filecheck):
     } : (tensor<2x3xi32>) -> tensor<2x3xi32>
     """
 
-    run_filecheck(program, roundtrip=True, verify=True)
+    run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_custom_call_with_layouts(run_filecheck):
@@ -747,7 +749,7 @@ def test_custom_call_with_layouts(run_filecheck):
     } : (tensor<2x3xi32>) -> tensor<2x3xi32>
     """
 
-    run_filecheck(program, roundtrip=True, verify=True)
+    run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_custom_call_missing_result_layouts(run_filecheck):
@@ -767,7 +769,7 @@ def test_custom_call_missing_result_layouts(run_filecheck):
         Exception,
         match=r"either both operands and results or none",
     ):
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_custom_call_layouts_mismatch(run_filecheck):
@@ -788,7 +790,7 @@ def test_custom_call_layouts_mismatch(run_filecheck):
     with pytest.raises(
         Exception, match=r"Number of operands must match the number of operand layouts"
     ):
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_custom_call_incorrect_layout_perm(run_filecheck):
@@ -806,7 +808,7 @@ def test_custom_call_incorrect_layout_perm(run_filecheck):
     """
 
     with pytest.raises(Exception, match=r"layout must be a permutation of \[0, 2\)"):
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_custom_call_single_tuple_result_with_element_layouts(run_filecheck):
@@ -830,7 +832,7 @@ def test_custom_call_single_tuple_result_with_element_layouts(run_filecheck):
       output_operand_aliases = []
     } : (tensor<2x3xi32>) -> tuple<tensor<2x3xi32>, tensor<1xi32>>
     """
-    run_filecheck(program, roundtrip=True, verify=True)
+    run_filecheck(program, roundtrip=True, to_mlir=False, verify=True)
 
 
 def test_invalid_dynamic_broadcast_in_dim_operations(run_filecheck):
@@ -849,7 +851,7 @@ def test_invalid_dynamic_broadcast_in_dim_operations(run_filecheck):
     with pytest.raises(
         Exception, match=r"broadcast_dimensions size \(1\) does not match operand rank \(2\)"
     ):
-        run_filecheck(program_dims_size_mismatch, roundtrip=True, verify=True)
+        run_filecheck(program_dims_size_mismatch, roundtrip=True, to_mlir=False, verify=True)
 
     # result rank < operand rank (c3)
     program_result_rank_too_small = r"""
@@ -862,7 +864,7 @@ def test_invalid_dynamic_broadcast_in_dim_operations(run_filecheck):
     """
 
     with pytest.raises(Exception, match=r"result rank \(1\) is less than operand rank \(2\)"):
-        run_filecheck(program_result_rank_too_small, roundtrip=True, verify=True)
+        run_filecheck(program_result_rank_too_small, roundtrip=True, to_mlir=False, verify=True)
 
     # duplicate dims (c4)
     program_duplicate_dims = r"""
@@ -875,7 +877,7 @@ def test_invalid_dynamic_broadcast_in_dim_operations(run_filecheck):
     """
 
     with pytest.raises(Exception, match=r"broadcast_dimensions should not have duplicates"):
-        run_filecheck(program_duplicate_dims, roundtrip=True, verify=True)
+        run_filecheck(program_duplicate_dims, roundtrip=True, to_mlir=False, verify=True)
 
     # dim index out of bounds (c5 bounds)
     program_dim_oob = r"""
@@ -890,7 +892,7 @@ def test_invalid_dynamic_broadcast_in_dim_operations(run_filecheck):
     with pytest.raises(
         Exception, match=r"broadcast_dimensions contains invalid value 2 for result with rank 2"
     ):
-        run_filecheck(program_dim_oob, roundtrip=True, verify=True)
+        run_filecheck(program_dim_oob, roundtrip=True, to_mlir=False, verify=True)
 
     # per-dimension size compatibility (c5 compatibility)
     program_dim_incompatible = r"""
@@ -906,7 +908,7 @@ def test_invalid_dynamic_broadcast_in_dim_operations(run_filecheck):
         Exception,
         match=r"size of operand dimension 0 \(2\) is not compatible with size of result dimension 0 \(4\)",
     ):
-        run_filecheck(program_dim_incompatible, roundtrip=True, verify=True)
+        run_filecheck(program_dim_incompatible, roundtrip=True, to_mlir=False, verify=True)
 
     # output_dimensions length incompatible with result rank when static (c7)
     program_outlen_mismatch = r"""
@@ -922,7 +924,7 @@ def test_invalid_dynamic_broadcast_in_dim_operations(run_filecheck):
         Exception,
         match=r"length of output_dimensions \(2\) is not compatible with result rank \(3\)",
     ):
-        run_filecheck(program_outlen_mismatch, roundtrip=True, verify=True)
+        run_filecheck(program_outlen_mismatch, roundtrip=True, to_mlir=False, verify=True)
 
     # duplicate expansion hints across both lists (c8)
     program_dup_hints = r"""
@@ -939,7 +941,7 @@ def test_invalid_dynamic_broadcast_in_dim_operations(run_filecheck):
     with pytest.raises(
         Exception, match=r"duplicate expansion hint for at least one operand dimension"
     ):
-        run_filecheck(program_dup_hints, roundtrip=True, verify=True)
+        run_filecheck(program_dup_hints, roundtrip=True, to_mlir=False, verify=True)
 
     # hint refers to invalid operand dimension (c9/c10)
     program_hint_oob = r"""
@@ -956,4 +958,4 @@ def test_invalid_dynamic_broadcast_in_dim_operations(run_filecheck):
         Exception,
         match=r"hint for expanding dimension 5 does not refer to a valid operand dimension",
     ):
-        run_filecheck(program_hint_oob, roundtrip=True, verify=True)
+        run_filecheck(program_hint_oob, roundtrip=True, to_mlir=False, verify=True)

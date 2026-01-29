@@ -396,19 +396,26 @@ class TestIntegration:
         assert check_cache(inner)
         assert fn(3) == tuple([jax.numpy.array(2.0), jax.numpy.array(6.0)])
 
+    @pytest.mark.usefixtures("use_both_frontend")
     @pytest.mark.parametrize("vjp_func", [vjp, qml.vjp])
     def test_vjp_wrapper(self, vjp_func):
         """Test conversion is happening succesfully on functions wrapped with 'vjp'."""
 
+        if qml.capture.enabled() and vjp_func == vjp:  # pylint: disable=comparison-with-callable
+            pytest.xfail("program capture autograph doesn't work with catalyst.vjp")
+
         def inner(x):
-            return 2 * x, x**2
+            if x > 0:
+                return 2 * x, x**2
+            return 4 * x, x**8
 
         @qjit(autograph=True)
         def fn(x: float):
             return vjp_func(inner, (x,), (1.0, 1.0))
 
         assert hasattr(fn.user_function, "ag_unconverted")
-        assert check_cache(inner)
+        if not qml.capture.enabled():
+            assert check_cache(inner)
         assert np.allclose(fn(3)[0], tuple([jnp.array(6.0), jnp.array(9.0)]))
         assert np.allclose(fn(3)[1], jnp.array(8.0))
 

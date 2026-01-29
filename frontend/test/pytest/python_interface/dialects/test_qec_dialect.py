@@ -61,11 +61,14 @@ def test_all_attributes_names(attr):
     assert attr.name == expected_name
 
 
-def test_assembly_format(run_filecheck):
+@pytest.mark.parametrize(
+    "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
+)
+def test_assembly_format(run_filecheck, pretty_print):
     """Test the assembly format of the qec ops."""
     program = """
-    // CHECK: [[QUBIT:%.+]] = "test.op"() : () -> !quantum.bit
-    %qubit = "test.op"() : () -> !quantum.bit
+    // CHECK: [[Q0:%.+]], [[Q1:%.+]], [[Q2:%.+]] = "test.op"() : () -> (!quantum.bit
+    %q0, %q1, %q2 = "test.op"() : () -> (!quantum.bit, !quantum.bit, !quantum.bit)
 
     // CHECK: [[PARAM:%.+]] = "test.op"() : () -> f64
     %param = "test.op"() : () -> f64
@@ -73,27 +76,27 @@ def test_assembly_format(run_filecheck):
     // CHECK: [[COND:%.+]] = "test.op"() : () -> i1
     %cond = "test.op"() : () -> i1
 
-    // CHECK: [[FABRICATED:%.+]] = qec.fabricate magic : !quantum.bit
+    // CHECK: {{%.+}} = qec.fabricate magic : !quantum.bit
     %fabricated = qec.fabricate magic : !quantum.bit
 
-    // CHECK: [[PREPARED:%.+]] = qec.prepare zero [[QUBIT]] : !quantum.bit
-    %prepared = qec.prepare zero %qubit : !quantum.bit
+    // CHECK: {{%.+}} = qec.prepare zero [[Q0]] : !quantum.bit
+    %prepared = qec.prepare zero %q0 : !quantum.bit
 
-    // CHECK: [[ROTATED_ARB:%.+]] = qec.ppr.arbitrary ["X", "Y", "Z"]([[PARAM]]) [[QUBIT]] : !quantum.bit
-    %rotated_arb = qec.ppr.arbitrary ["X", "Y", "Z"](%param) %qubit : !quantum.bit
+    // CHECK: {{%.+}}, {{%.+}} = qec.ppr.arbitrary ["X", "Y"]([[PARAM]]) [[Q0]], [[Q1]] : !quantum.bit,
+    %arb0, %arb1 = qec.ppr.arbitrary ["X", "Y"](%param) %q0, %q1 : !quantum.bit, !quantum.bit
 
-    // CHECK: [[ROTATED:%.+]] = qec.ppr ["X", "I", "Z"](4) [[QUBIT]] : !quantum.bit
-    %rotated = qec.ppr ["X", "I", "Z"](4) %qubit : !quantum.bit
+    // CHECK: {{%.+}}, {{%.+}} = qec.ppr ["X", "I"](4) [[Q0]], [[Q1]] : !quantum.bit,
+    %r0, %r1 = qec.ppr ["X", "I"](4) %q0, %q1 : !quantum.bit, !quantum.bit
 
-    // CHECK: [[MEASURED:%.+]], [[OUT_QUBITS:%.+]] = qec.ppm ["X", "I", "Z"] [[QUBIT]] : i1, !quantum.bit
-    %measured, %out_qubits = qec.ppm ["X", "I", "Z"] %qubit : i1, !quantum.bit
+    // CHECK: {{%.+}}, {{%.+}}, {{%.+}} = qec.ppm ["X", "Z"] [[Q0]], [[Q1]] : i1, !quantum.bit,
+    %measured, %m0, %m1 = qec.ppm ["X", "Z"] %q0, %q1 : i1, !quantum.bit, !quantum.bit
 
-    // CHECK: [[MEASURED_COND:%.+]], [[OUT_QUBITS_COND:%.+]] = qec.ppm ["X", "I", "Z"] [[QUBIT]] cond([[COND]]) : i1, !quantum.bit
-    %measured_cond, %out_qubits_cond = qec.ppm ["X", "I", "Z"] %qubit cond(%cond) : i1, !quantum.bit
+    // CHECK: {{%.+}}, {{%.+}}, {{%.+}} = qec.ppm ["I", "Z"] [[Q0]], [[Q1]] cond([[COND]]) : i1, !quantum.bit,
+    %measured_cond, %c0, %c1 = qec.ppm ["I", "Z"] %q0, %q1 cond(%cond) : i1, !quantum.bit, !quantum.bit
 
-    // CHECK: [[SELECT_MEASURED:%.+]], [[SELECT_OUT:%.+]] = qec.select.ppm([[COND]], ["X"], ["Z"]) [[QUBIT]] : i1, !quantum.bit
-    %select_measured, %select_out = qec.select.ppm (%cond, ["X"], ["Z"]) %qubit : i1, !quantum.bit
+    // CHECK: {{%.+}}, {{%.+}} = qec.select.ppm([[COND]], ["X"], ["Z"]) [[Q0]] : i1, !quantum.bit
+    %select_measured, %select_out = qec.select.ppm (%cond, ["X"], ["Z"]) %q0 : i1, !quantum.bit
 
     """
 
-    run_filecheck(program)
+    run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)

@@ -248,6 +248,7 @@ def test_dynamic_wire_alloc_cond_outside(cond, expected, backend):
         with qml.allocate(1) as q1:
             with qml.allocate(1) as q2:
                 qml.X(q1[0])
+                qml.Identity(0)
                 if c:
                     qml.CNOT(wires=[q1[0], 1])  # |01>
                 else:
