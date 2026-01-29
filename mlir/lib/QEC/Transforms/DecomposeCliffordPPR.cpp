@@ -82,11 +82,6 @@ PPRotationOp decompose_pi_over_four_flattening(bool avoidPauliYMeasure, PPRotati
         rewriter.create<PPMeasurementOp>(loc, pauliX, ppmPZ.getOutQubits().back(), measResult);
 
     // FIXME: Check global phase on this decomposition
-    // auto phaseValue = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(-M_PI /
-    // 4)); rewriter.create<GlobalPhaseOp>(loc, /*out_ctrl_qubits=*/TypeRange{},
-    //                                /*params=*/phaseValue,
-    //                                /*adjoint=*/false, /*in_ctrl_qubits=*/ValueRange{},
-    //                                /*in_ctrl_values=*/ValueRange{});
 
     auto cond = rewriter.create<arith::XOrIOp>(loc, ppmPZ.getMres(), ppmX.getMres());
 
