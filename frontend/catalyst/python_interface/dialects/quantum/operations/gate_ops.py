@@ -63,16 +63,6 @@ class GateOp(IRDLOperation):
 class UnitaryGateOp(GateOp):
     """Base class for operations representing unitary gates."""
 
-    irdl_options = (AttrSizedOperandSegments(as_property=True),)
-
-    adjoint = opt_prop_def(UnitAttr)
-
-    in_ctrl_qubits = var_operand_def(QubitType)
-
-    in_ctrl_values = var_operand_def(i1)
-
-    out_ctrl_qubits = var_result_def(QubitType)
-
 
 ###########################################
 ############## Unitary Gates ##############
@@ -94,7 +84,10 @@ class CustomOp(UnitaryGateOp):
         `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     """
 
-    irdl_options = (AttrSizedResultSegments(as_property=True),)
+    irdl_options = (
+        AttrSizedOperandSegments(as_property=True),
+        AttrSizedResultSegments(as_property=True),
+    )
 
     params = var_operand_def(Float64Type())
 
@@ -102,7 +95,15 @@ class CustomOp(UnitaryGateOp):
 
     gate_name = prop_def(StringAttr)
 
+    adjoint = opt_prop_def(UnitAttr)
+
+    in_ctrl_qubits = var_operand_def(QubitType)
+
+    in_ctrl_values = var_operand_def(i1)
+
     out_qubits = var_result_def(QubitType)
+
+    out_ctrl_qubits = var_result_def(QubitType)
 
     traits = traits_def(NoMemoryEffect())
 
@@ -168,9 +169,17 @@ class GlobalPhaseOp(UnitaryGateOp):
         `:` (`ctrls` type($out_ctrl_qubits)^ )?
     """
 
-    irdl_options = (ParsePropInAttrDict(),)
+    irdl_options = (AttrSizedOperandSegments(as_property=True), ParsePropInAttrDict())
 
     params = operand_def(Float64Type())
+
+    adjoint = opt_prop_def(UnitAttr)
+
+    in_ctrl_qubits = var_operand_def(QubitType)
+
+    in_ctrl_values = var_operand_def(i1)
+
+    out_ctrl_qubits = var_result_def(QubitType)
 
     def __init__(
         self,
@@ -220,13 +229,24 @@ class MultiRZOp(UnitaryGateOp):
         `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     """
 
-    irdl_options = (AttrSizedResultSegments(as_property=True),)
+    irdl_options = (
+        AttrSizedOperandSegments(as_property=True),
+        AttrSizedResultSegments(as_property=True),
+    )
 
     theta = operand_def(Float64Type())
 
     in_qubits = var_operand_def(QubitType)
 
+    adjoint = opt_prop_def(UnitAttr)
+
+    in_ctrl_qubits = var_operand_def(QubitType)
+
+    in_ctrl_values = var_operand_def(i1)
+
     out_qubits = var_result_def(QubitType)
+
+    out_ctrl_qubits = var_result_def(QubitType)
 
     traits = traits_def(NoMemoryEffect())
 
@@ -286,7 +306,10 @@ class PauliRotOp(UnitaryGateOp):
 
     VALID_PAULIS: ClassVar[tuple[str]] = ("X", "Y", "Z", "I")
 
-    irdl_options = (AttrSizedResultSegments(as_property=True),)
+    irdl_options = (
+        AttrSizedOperandSegments(as_property=True),
+        AttrSizedResultSegments(as_property=True),
+    )
 
     angle = operand_def(Float64Type())
 
@@ -294,7 +317,15 @@ class PauliRotOp(UnitaryGateOp):
 
     in_qubits = var_operand_def(QubitType)
 
+    adjoint = opt_prop_def(UnitAttr)
+
+    in_ctrl_qubits = var_operand_def(QubitType)
+
+    in_ctrl_values = var_operand_def(i1)
+
     out_qubits = var_result_def(QubitType)
+
+    out_ctrl_qubits = var_result_def(QubitType)
 
     traits = traits_def(NoMemoryEffect())
 
@@ -367,7 +398,10 @@ class PCPhaseOp(UnitaryGateOp):
         `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     """
 
-    irdl_options = (AttrSizedResultSegments(as_property=True),)
+    irdl_options = (
+        AttrSizedOperandSegments(as_property=True),
+        AttrSizedResultSegments(as_property=True),
+    )
 
     theta = operand_def(Float64Type())
 
@@ -375,7 +409,15 @@ class PCPhaseOp(UnitaryGateOp):
 
     in_qubits = var_operand_def(QubitType)
 
+    adjoint = opt_prop_def(UnitAttr)
+
+    in_ctrl_qubits = var_operand_def(QubitType)
+
+    in_ctrl_values = var_operand_def(i1)
+
     out_qubits = var_result_def(QubitType)
+
+    out_ctrl_qubits = var_result_def(QubitType)
 
     traits = traits_def(NoMemoryEffect())
 
@@ -434,7 +476,10 @@ class QubitUnitaryOp(UnitaryGateOp):
         `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
     """
 
-    irdl_options = (AttrSizedResultSegments(as_property=True),)
+    irdl_options = (
+        AttrSizedOperandSegments(as_property=True),
+        AttrSizedResultSegments(as_property=True),
+    )
 
     matrix = operand_def(
         (TensorConstraint(element_type=ComplexType(Float64Type()), rank=2))
@@ -443,7 +488,15 @@ class QubitUnitaryOp(UnitaryGateOp):
 
     in_qubits = var_operand_def(QubitType)
 
+    adjoint = opt_prop_def(UnitAttr)
+
+    in_ctrl_qubits = var_operand_def(QubitType)
+
+    in_ctrl_values = var_operand_def(i1)
+
     out_qubits = var_result_def(QubitType)
+
+    out_ctrl_qubits = var_result_def(QubitType)
 
     traits = traits_def(NoMemoryEffect())
 
