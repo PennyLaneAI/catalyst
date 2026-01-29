@@ -394,7 +394,6 @@ class QJITDevice(qml.devices.Device):
         capabilities = filter_device_capabilities_with_shots(
             capabilities=self.capabilities,
             shots_present=bool(shots),
-            unitary_support=getattr(self.original_device, "_to_matrix_ops", None),
         )
 
         # measurement transforms may change operations on the tape to accommodate
@@ -553,24 +552,13 @@ def _load_device_capabilities(device) -> DeviceCapabilities:
     return capabilities
 
 
-def filter_device_capabilities_with_shots(
-    capabilities, shots_present, unitary_support=None
-) -> DeviceCapabilities:
+def filter_device_capabilities_with_shots(capabilities, shots_present) -> DeviceCapabilities:
     """
     Process the device capabilities depending on whether shots are present in the user program,
     and whether device supports QubitUnitary ops.
     """
 
     device_capabilities = capabilities.filter(finite_shots=shots_present)
-
-    # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
-    #       when customizable multi-pathway decomposition is implemented. (Epic 74474)
-    if unitary_support is not None:
-        _to_matrix_ops = unitary_support
-        setattr(device_capabilities, "to_matrix_ops", _to_matrix_ops)
-        if _to_matrix_ops and not device_capabilities.supports_operation("QubitUnitary"):
-            raise CompileError("The device that specifies to_matrix_ops must support QubitUnitary.")
-
     return device_capabilities
 
 
@@ -591,9 +579,7 @@ def get_device_capabilities(device, shots=False) -> DeviceCapabilities:
 
     assert not isinstance(device, QJITDevice)
 
-    return filter_device_capabilities_with_shots(
-        _load_device_capabilities(device), bool(shots), getattr(device, "_to_matrix_ops", None)
-    )
+    return filter_device_capabilities_with_shots(_load_device_capabilities(device), bool(shots))
 
 
 def is_dynamic_wires(wires: qml.wires.Wires):
