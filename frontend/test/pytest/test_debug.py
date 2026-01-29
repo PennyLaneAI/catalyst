@@ -410,7 +410,19 @@ class TestCProgramGeneration:
         shutil.rmtree(str(jit_f.workspace), ignore_errors=True)
         assert old_result * data == new_result
 
-    @pytest.mark.parametrize("pass_name", ["HLOLoweringStage", "O2Opt", "Enzyme"])
+    @pytest.mark.parametrize(
+        "pass_name",
+        [
+            "QuantumCompilationStage",
+            "HLOLoweringStage",
+            "GradientLoweringStage",
+            "BufferizationStage",
+            "MLIRToLLVMDialectConversion",
+            "LLVMIRTranslation",
+            "O2Opt",
+            "Enzyme",
+        ],
+    )
     def test_modify_ir_file_generation(self, pass_name):
         """Test if recompilation rerun the same pass."""
 
@@ -429,7 +441,7 @@ class TestCProgramGeneration:
         replace_ir(jit_grad_f, pass_name, ir)
         jit_grad_f(3.0)
         file_list = os.listdir(str(jit_grad_f.workspace))
-        res = [i for i in file_list if pass_name in i]
+        res = [file_name for file_name in file_list if pass_name in file_name]
 
         shutil.rmtree(old_workspace, ignore_errors=True)
         shutil.rmtree(str(jit_grad_f.workspace), ignore_errors=True)
