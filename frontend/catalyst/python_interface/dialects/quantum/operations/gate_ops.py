@@ -166,7 +166,7 @@ class GlobalPhaseOp(UnitaryGateOp):
         attr-dict
         ( `ctrls` `(` $in_ctrl_qubits^ `)` )?
         ( `ctrlvals` `(` $in_ctrl_values^ `)` )?
-        `:` type(results)
+        `:` (`ctrls` type($out_ctrl_qubits)^ )?
     """
 
     irdl_options = (AttrSizedOperandSegments(as_property=True), ParsePropInAttrDict())
