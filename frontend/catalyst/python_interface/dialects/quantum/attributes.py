@@ -14,7 +14,6 @@
 """Attributes for the xDSL Quantum dialect, which mirrors Catalyst's MLIR
 Quantum dialect."""
 
-from functools import partial
 from typing import TypeAlias
 
 from xdsl.dialects.builtin import ArrayAttr, StringAttr
