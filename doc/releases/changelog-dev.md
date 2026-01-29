@@ -125,6 +125,9 @@
   into normal PPR and PPMs with SCF dialect to support runtime execution.
   [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
 
+* Increased format size for the `--mlir-timing` flag, displaying more decimals for better timing precision.
+  [(#2423)](https://github.com/PennyLaneAI/catalyst/pull/2423)
+
 * Added global phase tracking to the `to-ppr` compiler pass. When converting quantum gates to
   Pauli Product Rotations (PPR), the pass now emits `quantum.gphase` operations to preserve
   global phase correctness.
@@ -164,6 +167,7 @@ Yushao Chen,
 Sengthai Heng,
 David Ittah,
 Jeffrey Kam,
+River McCubbin,
 Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,
