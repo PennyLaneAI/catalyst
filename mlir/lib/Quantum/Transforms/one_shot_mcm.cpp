@@ -14,6 +14,8 @@
 
 #define DEBUG_TYPE "one-shot-mcm"
 
+#include <algorithm>
+
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
@@ -183,13 +185,96 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         builder.create<func::ReturnOp>(loc, divOp.getResult());
     }
 
+    SmallVector<int64_t> editKernelSampleShapes(func::FuncOp qkernel, ShapedType fullSampleType)
+    {
+        // Change the one-shot kernel's sample op, and its users, to return one-shot shaped results
+
+        SmallVector<int64_t> oneShotSampleShape = {1, fullSampleType.getShape()[1]};
+        auto oneShotSampleType =
+            RankedTensorType::get(oneShotSampleShape, fullSampleType.getElementType());
+        qkernel.setFunctionType(FunctionType::get(
+            qkernel->getContext(), qkernel.getFunctionType().getInputs(), {oneShotSampleType}));
+
+        // Start from the return, and visit back the operand chain until the sample op
+        auto sampleOp = *qkernel.getOps<quantum::SampleOp>().begin();
+        SetVector<Operation *> sampleOpForwardSlice;
+        getForwardSlice(sampleOp, &sampleOpForwardSlice);
+        sampleOpForwardSlice.insert(sampleOp);
+
+        // Safety check: since we edited the function type, we must also edit the return
+        auto retOp = cast<func::ReturnOp>(qkernel.getBody().back().getTerminator());
+        assert(sampleOpForwardSlice.contains(retOp) &&
+               "Expected the quantum kernel to return the samples");
+
+        for (Operation *op : sampleOpForwardSlice) {
+            for (Value v : op->getOpResults()) {
+                ShapedType oldType = dyn_cast<ShapedType>(v.getType());
+                if (oldType.getShape() == fullSampleType.getShape()) {
+                    SmallVector<int64_t> newShape = {1, oldType.getShape()[1]};
+                    v.setType(RankedTensorType::get(newShape, oldType.getElementType()));
+                }
+            }
+        }
+        return oneShotSampleShape;
+    }
+
+    void handleSampleOneShot(IRRewriter &builder, func::FuncOp qfunc, Value shots, Operation *mod)
+    {
+        // Total sample is the sample of each shot concatenated together.
+        // We inialize an empty tensor, then insert sample results of each shot
+        // Sample's return shape is tensor<shots X num_qubits>
+
+        OpBuilder::InsertionGuard guard(builder);
+        Location loc = mod->getLoc();
+
+        // Type f64Type = builder.getF64Type();
+        auto fullSampleType = dyn_cast<ShapedType>(qfunc.getResultTypes()[0]);
+        assert(fullSampleType.getShape().size() == 2 &&
+               "Expected sample result type to be a tensor of size shot X num_qubits");
+
+        // Create one shot quantum kernel, and change the shot dimension in sample's return shape to
+        // one
+        func::FuncOp qkernel = createOneShotKernel(builder, qfunc, shots, mod);
+        SmallVector<int64_t> oneShotSampleShape = editKernelSampleShapes(qkernel, fullSampleType);
+
+        // Create the for loop.
+        // Each loop iteration inserts its sample to the total sample result tensor.
+        builder.setInsertionPointToEnd(&qfunc.getBody().front());
+        auto fullSampleResults = builder.create<tensor::EmptyOp>(loc, fullSampleType.getShape(),
+                                                                 fullSampleType.getElementType());
+        scf::ForOp newForOp = createForLoop(builder, shots, ValueRange{fullSampleResults});
+
+        // Each loop iteration calls the one-shot kernel and adds to the sum
+        // Since the kernel was a clone of the original qfunc, their arguments are the same!
+        builder.setInsertionPointToEnd(newForOp.getBody());
+        auto kernalCallOp = builder.create<func::CallOp>(
+            loc, qkernel.getFunctionType().getResults(), qkernel.getSymName(),
+            qfunc.getBody().front().getArguments());
+
+        auto zero = builder.getIndexAttr(0);
+        auto one = builder.getIndexAttr(1);
+        SmallVector<OpFoldResult> offsets = {newForOp.getInductionVar(), zero};
+        SmallVector<OpFoldResult> sizes = {builder.getIndexAttr(oneShotSampleShape[0]),
+                                           builder.getIndexAttr(oneShotSampleShape[1])};
+        SmallVector<OpFoldResult> strides = {one, one};
+
+        auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
+            loc, kernalCallOp.getResult(0), newForOp.getRegionIterArg(0), offsets, sizes, strides);
+
+        builder.create<scf::YieldOp>(loc, insertSliceOp.getResult());
+
+        // Return the full samples
+        builder.setInsertionPointToEnd(&qfunc.getBody().front());
+        builder.create<func::ReturnOp>(loc, newForOp.getResult(0));
+    }
+
     void runOnOperation() override
     {
         Operation *mod = getOperation();
         IRRewriter builder(mod->getContext());
 
-        bool illegalMP = false, isExpval = false,
-             isProbs = false; //, isSample = false, isCounts = false;
+        bool illegalMP = false, isExpval = false, isProbs = false,
+             isSample = false; //, isCounts = false;
         func::FuncOp qfunc;
         mod->walk([&](MeasurementProcess mp) {
             if (isa<quantum::ExpvalOp>(mp)) {
@@ -198,6 +283,10 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
             }
             else if (isa<quantum::ProbsOp>(mp)) {
                 isProbs = true;
+                qfunc = mp->getParentOfType<func::FuncOp>();
+            }
+            else if (isa<quantum::SampleOp>(mp)) {
+                isSample = true;
                 qfunc = mp->getParentOfType<func::FuncOp>();
             }
             else if (isa<quantum::VarianceOp>(mp)) {
@@ -226,6 +315,9 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
 
         if (isExpval || isProbs) {
             handleExpvalOrProbsOneShot(builder, qfunc, shots, mod);
+        }
+        else if (isSample) {
+            handleSampleOneShot(builder, qfunc, shots, mod);
         }
     }
 };
