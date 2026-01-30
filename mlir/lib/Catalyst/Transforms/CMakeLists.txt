@@ -30,6 +30,7 @@ get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 set(LIBS
     ${dialect_libs}
     ${conversion_libs}
+    ExternalStablehloLib
 )
 
 set(DEPENDS

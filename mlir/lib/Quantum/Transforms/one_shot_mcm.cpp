@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "one-shot-mcm"
 
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
@@ -32,15 +33,25 @@ using namespace stablehlo;
 using namespace catalyst;
 
 namespace {
-void clearFuncExceptShots(func::FuncOp qfunc, Operation *shotsDefOp)
+void clearFuncExceptShots(func::FuncOp qfunc, Value shots)
 {
-    // Delete the body of a funcop, except the operation that produces the shots value
+    // Delete the body of a funcop, except the operations that produce the shots value
     // We need triple loop to explicitly iterate in reverse order, due to erasure.
+
+    SetVector<Operation *> backwardSlice;
+    BackwardSliceOptions options;
+    LogicalResult bsr = getBackwardSlice(shots, &backwardSlice, options);
+    assert(bsr.succeeded() && "expected a backward slice");
+
+    // For whatever reason, upstream mlir decided to not include the op itself into its backward
+    // slice
+    backwardSlice.insert(shots.getDefiningOp());
+
     SmallVector<Operation *> eraseWorklist;
     for (auto &region : qfunc->getRegions()) {
         for (auto &block : region.getBlocks()) {
             for (auto op = block.rbegin(); op != block.rend(); ++op) {
-                if (&*op != shotsDefOp) {
+                if (!backwardSlice.contains(&*op)) {
                     eraseWorklist.push_back(&*op);
                 }
             }
@@ -64,7 +75,7 @@ func::FuncOp createOneShotKernel(IRRewriter &builder, func::FuncOp qfunc, Value 
     // 1. Clone the original quantum function and give it a new name
     // Because we need to make sure the current qfunc name is reserved as entry point
     // Set the number of shots in the new kernel to one.
-    builder.setInsertionPointToStart(&mod->getRegion(0).front());
+    builder.setInsertionPointToStart(&qfunc->getParentOfType<ModuleOp>()->getRegion(0).front());
     auto qkernel = cast<func::FuncOp>(qfunc->clone());
     qkernel.setSymNameAttr(StringAttr::get(ctx, qfunc.getSymName() + ".quantum_kernel"));
     builder.insert(qkernel);
@@ -81,7 +92,7 @@ func::FuncOp createOneShotKernel(IRRewriter &builder, func::FuncOp qfunc, Value 
     // 2. Clear the original qfunc. Its new contents will be the one-shot logic.
     // Keep the SSA value for the shots. It needs to be used as the upper bound of the for
     // loop.
-    clearFuncExceptShots(qfunc, shots.getDefiningOp());
+    clearFuncExceptShots(qfunc, shots);
     return qkernel;
 }
 
