@@ -24,6 +24,10 @@
 * `qml.vjp` can now be used with Catalyst and program capture.
   [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
 
+* The `measurements_from_samples` pass no longer results in `nan`s and cryptic error messages when   
+  `shots` aren't set. Instead, an informative error message is raised.
+  [(#2456)](https://github.com/PennyLaneAI/catalyst/pull/2456)
+
 <h3>Breaking changes 💔</h3>
 
 * When an integer argnums is provided to `catalyst.vjp`, a singleton dimension is now squeezed
@@ -60,6 +64,10 @@
 
 
 <h3>Internal changes ⚙️</h3>
+
+* The xDSL :class:`~catalyst.python_interface.Quantum` dialect has been split into multiple files
+  to structure operations and attributes more concretely.
+  [(#2434)](https://github.com/PennyLaneAI/catalyst/pull/2434)
 
 * `catalyst.python_interface.xdsl_universe.XDSL_UNIVERSE` has been renamed to `CATALYST_XDSL_UNIVERSE`.
   [(#2435)](https://github.com/PennyLaneAI/catalyst/pull/2435)
@@ -131,6 +139,7 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
 Yushao Chen,
+Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
 Jeffrey Kam,
