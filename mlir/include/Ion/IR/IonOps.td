@@ -213,7 +213,7 @@ def ParallelProtocolOp : Ion_Op<"parallelprotocol", [SingleBlockImplicitTerminat
 
     let builders = [
       OpBuilder<(ins
-        CArg<"mlir::ValueRange", "std::nullopt">:$in_qubits,
+        CArg<"mlir::ValueRange", "{}">:$in_qubits,
         CArg<"llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange)>",
             "nullptr">)>
     ];
