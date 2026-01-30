@@ -451,15 +451,17 @@ class TestMeasurementsFromSamplesIntegration:
     def test_no_shots_raises_error(self):
         """Test that when no shots are provided, the pass raises an error"""
 
+        @qml.qjit
+        @measurements_from_samples_pass
         @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def circuit_ref():
-            qml.X(0)
+        def circuit(x):
+            qml.RX(x, 0)
             return qml.expval(qml.Z(0))
 
         with pytest.raises(
             ValueError, match="measurements_from_samples pass requires non-zero shots"
         ):
-            qml.qjit(measurements_from_samples_pass(circuit_ref))
+            circuit(1.2)
 
     @pytest.mark.parametrize("shots", [1, 2])
     @pytest.mark.parametrize(
