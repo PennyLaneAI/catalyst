@@ -375,10 +375,15 @@ class TestInliningUtils:
     """Unit tests for utilities for inlining operations into xDSL modules."""
 
     @pytest.mark.parametrize("change_main_to", ["foo", None])
-    def test_inline_module(self, change_main_to):
+    @pytest.mark.parametrize("entrypoint_name", ["entrypoint", "main"])
+    def test_inline_module(self, entrypoint_name, change_main_to):
         """Test that the inline_module function works correctly."""
+        if entrypoint_name != "main":
+            expected_name = entrypoint_name
+        else:
+            expected_name = change_main_to or "main"
 
-        mod1_main = func.FuncOp(name="main", function_type=((), ()))
+        mod1_main = func.FuncOp(name=entrypoint_name, function_type=((), ()))
         mod1_func = func.FuncOp(name="not_main", function_type=((), ()))
         mod1_ops = [test.TestPureOp(), mod1_main, mod1_func]
         mod1 = builtin.ModuleOp(mod1_ops)
@@ -392,19 +397,19 @@ class TestInliningUtils:
         expected_ops = [
             test.TestOp(),
             test.TestPureOp(),
-            func.FuncOp(name=change_main_to or "main", function_type=((), ())),
+            func.FuncOp(name=expected_name, function_type=((), ())),
             func.FuncOp(name="not_main", function_type=((), ())),
         ]
         expected_mod2 = builtin.ModuleOp(expected_ops)
         assert mod2.is_structurally_equivalent(expected_mod2)
-        expected_names = {"not_main", change_main_to or "main"}
+        expected_names = {"not_main", expected_name}
         actual_names = set(op.sym_name.data for op in mod2.ops if isinstance(op, func.FuncOp))
         assert actual_names == expected_names
 
         # Check that mod1 is unchanged
         expected_mod1 = builtin.ModuleOp(ops=[op.clone() for op in mod1_ops])
         assert mod1.is_structurally_equivalent(expected_mod1)
-        original_names = {"not_main", "main"}
+        original_names = {"not_main", entrypoint_name}
         actual_mod1_names = set(op.sym_name.data for op in mod1.ops if isinstance(op, func.FuncOp))
         assert actual_mod1_names == original_names
 

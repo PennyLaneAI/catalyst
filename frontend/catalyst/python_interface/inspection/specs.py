@@ -23,8 +23,8 @@ from pennylane.workflow.qnode import QNode
 
 from catalyst.jit import QJIT
 from catalyst.passes.pass_api import PassPipelineWrapper
+from catalyst.python_interface.compiler import Compiler
 
-from ..compiler import Compiler
 from .specs_collector import ResourcesResult, specs_collect
 from .xdsl_conversion import get_mlir_module
 

@@ -63,9 +63,9 @@ class OutlineStateEvolutionPattern(pattern_rewriter.RewritePattern):
     def _get_parent_module(self, op: func.FuncOp) -> builtin.ModuleOp:
         """Get the first ancestral builtin.ModuleOp op of a given func.func op."""
         while (op := op.parent_op()) and not isinstance(op, builtin.ModuleOp):
-            pass
+            pass  # pragma: no cover
         if op is None:
-            raise RuntimeError(
+            raise RuntimeError(  # pragma: no cover
                 "The given qnode func is not nested within a builtin.module. Please ensure the "
                 "qnode func is defined in a builtin.module."
             )

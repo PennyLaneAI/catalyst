@@ -21,7 +21,7 @@ import io
 import subprocess
 from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from xdsl.printer import Printer
 
@@ -30,9 +30,8 @@ from catalyst.python_interface.compiler import Compiler
 
 from .xdsl_conversion import get_mlir_module
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from pennylane import QNode
-    from pennylane.typing import Callable
 
 try:
     from graphviz import Source as GraphSource
@@ -56,8 +55,8 @@ def _catalyst(*args, stdin=None, stderr_return=False):
         result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=True)
         if stderr_return:
             return result.stdout, result.stderr
-        return result.stdout
-    except subprocess.CalledProcessError as e:
+        return result.stdout  # pragma: no cover
+    except subprocess.CalledProcessError as e:  # pragma: no cover
         raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
 
