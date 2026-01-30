@@ -121,6 +121,7 @@ class CompileOptions:
     verbose: Optional[bool] = False
     logfile: Optional[TextIOWrapper] = sys.stderr
     target: Optional[str] = "binary"
+    link: Optional[bool] = True
     keep_intermediate: Optional[Union[str, int, bool, KeepIntermediateLevel]] = False
     use_nameloc: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
@@ -141,6 +142,10 @@ class CompileOptions:
     def __post_init__(self):
         # Convert keep_intermediate to Enum
         self.keep_intermediate = _parse_keep_intermediate(self.keep_intermediate)
+
+        # If target is "llvmir", implicitly set link=False
+        if self.target == "llvmir":
+            self.link = False
 
         # Check that async runs must not be seeded
         if self.async_qnodes and self.seed is not None:

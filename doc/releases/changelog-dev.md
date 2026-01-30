@@ -2,6 +2,54 @@
 
 <h3>New features since last release</h3>
 
+* OQD (Open Quantum Design) end-to-end pipeline is added to Catalyst.
+  The pipeline supports compilation to LLVM IR with `target="llvmir"`. Allowing integration with ARTIQ's cross-compilation toolchain via the `compile_to_artiq()` function in `catalyst.third_party.oqd` to generate ARTIQ's binary.
+  [(#2299)](https://github.com/PennyLaneAI/catalyst/pull/2299)
+
+  see `frontend/test/test_oqd/oqd/test_oqd_artiq_llvmir.py` for more details.
+
+  For example:
+  ```python
+  import os
+  import numpy as np
+  import pennylane as qml
+
+  from catalyst import qjit
+  from catalyst.third_party.oqd import OQDDevice, OQDDevicePipeline, compile_to_artiq
+
+  OQD_PIPELINES = OQDDevicePipeline(
+      os.path.join("calibration_data", "device.toml"),
+      os.path.join("calibration_data", "qubit.toml"),
+      os.path.join("calibration_data", "gate.toml"),
+      os.path.join("device_db", "device_db.json"),
+  )
+
+  artiq_config = {
+      "kernel_ld": "/path/to/kernel.ld",
+      "llc_path": "/path/to/llc",
+      "lld_path": "/path/to/ld.lld",
+  }
+
+  oqd_dev = OQDDevice(
+      backend="default",
+      shots=4,
+      wires=1,
+      artiq_config=artiq_config
+  )
+  qml.capture.enable()
+
+  @qjit(pipelines=OQD_PIPELINES, target="llvmir")
+  @qml.qnode(oqd_dev)
+  def circuit():
+      qml.RX(0.5, wires=0)
+      return qml.counts(wires=0)
+
+  output_elf_path = compile_to_artiq(circuit, oqd_dev.artiq_config)
+  # Output:
+  # LLVM IR file written to: /path/to/circuit.ll
+  # [ARTIQ] Generated ELF: /path/to/circuit.elf
+  ```
+
 <h3>Improvements 🛠</h3>
 
 * The default mcm_method for the finite-shots setting (dynamic one-shot) no longer silently falls
@@ -138,4 +186,5 @@ River McCubbin,
 Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,
-Paul Haochen Wang.
+Paul Haochen Wang,
+Hongsheng Zheng.
