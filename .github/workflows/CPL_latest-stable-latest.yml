@@ -1,4 +1,4 @@
-name: Check CPL stable/stable/latest
+name: Check CPL latest/stable/latest
 
 on:
   schedule:
@@ -7,9 +7,9 @@ on:
 
 jobs:
   build-config:
-    name: CPL stable/stable/latest
-    uses: ./.github/workflows/check-pl-compat.yaml
+    name: CPL latest/stable/latest
+    uses: ./.github/workflows/check-pl-compat.yml
     with:
-      catalyst: stable
+      catalyst: latest
       pennylane: stable
       lightning: latest
