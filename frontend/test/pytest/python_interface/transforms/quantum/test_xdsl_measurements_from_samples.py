@@ -31,6 +31,24 @@ pytestmark = pytest.mark.xdsl
 class TestMeasurementsFromSamplesPass:
     """Unit tests for the measurements-from-samples pass."""
 
+    def test_no_shots_raises_error(self, run_filecheck):
+        """Test that when no shots are provided, the pass raises an error"""
+        program = """
+        builtin.module @module_circuit {
+            // CHECK-LABEL: circuit
+            func.func public @circuit() -> (tensor<f64>) {
+                %0 = arith.constant 0 : i64
+                quantum.device shots(%0) ["", "", ""]
+            }
+        }
+        """
+
+        pipeline = (MeasurementsFromSamplesPass(),)
+        with pytest.raises(
+            ValueError, match="measurements_from_samples pass requires non-zero shots"
+        ):
+            run_filecheck(program, pipeline)
+
     def test_1_wire_expval(self, run_filecheck):
         """Test the measurements-from-samples pass on a 1-wire circuit terminating with an expval(Z)
         measurement.
@@ -429,6 +447,21 @@ class TestMeasurementsFromSamplesIntegration:
     """Tests of the execution of simple workloads with the xDSL-based MeasurementsFromSamplesPass
     transform.
     """
+
+    def test_no_shots_raises_error(self):
+        """Test that when no shots are provided, the pass raises an error"""
+
+        @qml.qjit
+        @measurements_from_samples_pass
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(x):
+            qml.RX(x, 0)
+            return qml.expval(qml.Z(0))
+
+        with pytest.raises(
+            ValueError, match="measurements_from_samples pass requires non-zero shots"
+        ):
+            circuit(1.2)
 
     @pytest.mark.parametrize("shots", [1, 2])
     @pytest.mark.parametrize(
