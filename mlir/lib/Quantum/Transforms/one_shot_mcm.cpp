@@ -114,9 +114,10 @@ namespace quantum {
 struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
     using impl::OneShotMCMPassBase<OneShotMCMPass>::OneShotMCMPassBase;
 
-    void handleExpvalOneShot(IRRewriter &builder, func::FuncOp qfunc, Value shots, Operation *mod)
+    void handleExpvalOrProbsOneShot(IRRewriter &builder, func::FuncOp qfunc, Value shots,
+                                    Operation *mod)
     {
-        // Add the expval result from each shot, and divide by the number of shots.
+        // Add the result from each shot, and divide by the number of shots.
         // We simply perform the addition in the for loop body: no need to initialize a big
         // empty tensor to hold all the results.
         // This way we save some space, generate fewer ops, and also this method works for
@@ -128,16 +129,18 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         Type f64Type = builder.getF64Type();
 
         // Each expval result is a tensor<f64>
-        auto expvalType = dyn_cast<ShapedType>(qfunc.getResultTypes()[0]);
+        // Each probs result is a tensor<blahxf64>
+        auto expvalOrProbsType = dyn_cast<ShapedType>(qfunc.getResultTypes()[0]);
 
         func::FuncOp qkernel = createOneShotKernel(builder, qfunc, shots, mod);
 
         // Create the for loop.
-        // Each loop iteration adds to the total expval sum.
+        // Each loop iteration adds to the total expval or probs sum.
         builder.setInsertionPointToEnd(&qfunc.getBody().front());
-        auto expvalSum = builder.create<stablehlo::ConstantOp>(
-            loc, expvalType, DenseElementsAttr::get(expvalType, builder.getFloatAttr(f64Type, 0)));
-        scf::ForOp newForOp = createForLoop(builder, shots, ValueRange{expvalSum});
+        auto expvalOrProbsSum = builder.create<stablehlo::ConstantOp>(
+            loc, expvalOrProbsType,
+            DenseElementsAttr::get(expvalOrProbsType, builder.getFloatAttr(f64Type, 0)));
+        scf::ForOp newForOp = createForLoop(builder, shots, ValueRange{expvalOrProbsSum});
 
         // Each loop iteration calls the one-shot kernel and adds to the sum
         // Since the kernel was a clone of the original qfunc, their arguments are the same!
@@ -154,12 +157,18 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         // Divide and return
         builder.setInsertionPointToEnd(&qfunc.getBody().front());
 
-        // shots Value is I64, need to turn into tensor<f64> for division
+        // shots Value is I64, need to turn into tensor<f64> then broadcast for division
         auto int2floatCastOp = builder.create<arith::SIToFPOp>(loc, f64Type, shots);
         auto shotsFromElementsOp = builder.create<tensor::FromElementsOp>(
             loc, RankedTensorType::get({}, f64Type), int2floatCastOp.getResult());
+
+        // TODO: no need to broadcast if it's expval
+        auto broadcastedShots = builder.create<stablehlo::BroadcastInDimOp>(
+            loc, expvalOrProbsType, shotsFromElementsOp.getResult(),
+            builder.getDenseI64ArrayAttr({}));
+
         auto divOp = builder.create<stablehlo::DivOp>(loc, newForOp->getResult(0),
-                                                      shotsFromElementsOp->getResult(0));
+                                                      broadcastedShots->getResult(0));
         builder.create<func::ReturnOp>(loc, divOp.getResult());
     }
 
@@ -168,12 +177,16 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         Operation *mod = getOperation();
         IRRewriter builder(mod->getContext());
 
-        bool illegalMP = false,
-             isExpval = false; //, isProbs = false, isSample = false, isCounts = false;
+        bool illegalMP = false, isExpval = false,
+             isProbs = false; //, isSample = false, isCounts = false;
         func::FuncOp qfunc;
         mod->walk([&](MeasurementProcess mp) {
             if (isa<quantum::ExpvalOp>(mp)) {
                 isExpval = true;
+                qfunc = mp->getParentOfType<func::FuncOp>();
+            }
+            else if (isa<quantum::ProbsOp>(mp)) {
+                isProbs = true;
                 qfunc = mp->getParentOfType<func::FuncOp>();
             }
             else if (isa<quantum::VarianceOp>(mp)) {
@@ -200,8 +213,8 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         auto deviceInitOp = *qfunc.getOps<quantum::DeviceInitOp>().begin();
         Value shots = deviceInitOp.getShots();
 
-        if (isExpval) {
-            handleExpvalOneShot(builder, qfunc, shots, mod);
+        if (isExpval || isProbs) {
+            handleExpvalOrProbsOneShot(builder, qfunc, shots, mod);
         }
     }
 };

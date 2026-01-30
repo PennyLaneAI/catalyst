@@ -47,5 +47,45 @@ func.func public @test_expval(%arg0: f64) -> tensor<f64> {
 // CHECK:     scf.yield [[add]] : tensor<f64>
 // CHECK:   [[castShots:%.+]] = arith.sitofp [[shots]] : i64 to f64
 // CHECK:   [[fromElem:%.+]] = tensor.from_elements [[castShots]] : tensor<f64>
-// CHECK:   [[div:%.+]] = stablehlo.divide [[totalSum]], [[fromElem]] : tensor<f64>
+// CHECK:   [[broadcastShots:%.+]] = stablehlo.broadcast_in_dim [[fromElem]], dims = [] : (tensor<f64>) -> tensor<f64>
+// CHECK:   [[div:%.+]] = stablehlo.divide [[totalSum]], [[broadcastShots]] : tensor<f64>
 // CHECK:   return [[div]] : tensor<f64>
+
+
+// -----
+
+
+func.func public @test_probs(%arg0: f64) -> tensor<4xf64> {
+  %1000 = arith.constant 1000 : i64
+  quantum.device shots(%1000) ["", "", ""]
+  %0 = quantum.alloc( 2) : !quantum.reg
+  %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+  %out_qubits = quantum.custom "RX"(%arg0) %1 : !quantum.bit
+  %mres, %out_qubit = quantum.measure %out_qubits : i1, !quantum.bit
+  %2 = quantum.insert %0[ 0], %out_qubit : !quantum.reg, !quantum.bit
+  %3 = quantum.compbasis qreg %2 : !quantum.obs
+  %4 = quantum.probs %3 : tensor<4xf64>
+  quantum.dealloc %2 : !quantum.reg
+  quantum.device_release
+  return %4 : tensor<4xf64>
+}
+
+// CHECK: func.func public @test_probs.quantum_kernel(%arg0: f64) -> tensor<4xf64>
+// CHECK:  [[one:%.+]] = arith.constant 1 : i64
+// CHECK:  quantum.device shots([[one]]) ["", "", ""]
+
+// CHECK: func.func public @test_probs(%arg0: f64) -> tensor<4xf64> {
+// CHECK:   [[shots:%.+]] = arith.constant 1000 : i64
+// CHECK:   [[loopIterSum:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<4xf64>
+// CHECK:   [[lb:%.+]] = arith.constant 0 : index
+// CHECK:   [[step:%.+]] = arith.constant 1 : index
+// CHECK:   [[ub:%.+]] = index.casts [[shots]] : i64 to index
+// CHECK:   [[totalSum:%.+]] = scf.for %arg1 = [[lb]] to [[ub]] step [[step]] iter_args(%arg2 = [[loopIterSum]]) -> (tensor<4xf64>) {
+// CHECK:     [[call:%.+]] = func.call @test_probs.quantum_kernel(%arg0) : (f64) -> tensor<4xf64>
+// CHECK:     [[add:%.+]] = stablehlo.add [[call]], %arg2 : tensor<4xf64>
+// CHECK:     scf.yield [[add]] : tensor<4xf64>
+// CHECK:   [[castShots:%.+]] = arith.sitofp [[shots]] : i64 to f64
+// CHECK:   [[fromElem:%.+]] = tensor.from_elements [[castShots]] : tensor<f64>
+// CHECK:   [[broadcastShots:%.+]] = stablehlo.broadcast_in_dim [[fromElem]], dims = [] : (tensor<f64>) -> tensor<4xf64>
+// CHECK:   [[div:%.+]] = stablehlo.divide [[totalSum]], [[broadcastShots]] : tensor<4xf64>
+// CHECK:   return [[div]] : tensor<4xf64>
