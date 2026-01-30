@@ -15,6 +15,7 @@
 """
 This module contains debug functions to interact with the compiler and compiled functions.
 """
+import inspect
 import logging
 import os
 import platform
@@ -124,8 +125,8 @@ def get_cmain(fn, *args):
     requires_promotion = fn.jit_compile(args)
 
     if requires_promotion:
-        dynamic_args = filter_static_args(args, fn.compile_options.static_argnums)
-        args = promote_arguments(fn.c_sig, dynamic_args)
+        dynamic_args = filter_static_args(args, {}, fn.compile_options.static_argnums)
+        args = promote_arguments(fn.c_call_sig, args, {})
 
     return fn.compiled_function.get_cmain(*args)
 

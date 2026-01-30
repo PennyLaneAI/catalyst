@@ -488,6 +488,7 @@ def make_jaxpr2(
         return in_type, in_tree
 
     register_lowering(gather2_p, _gather_lower)
+    # print("registered lowering")
 
     jax._src.interpreters.batching.primitive_batchers[gather2_p] = (
         jax._src.interpreters.batching.primitive_batchers[gather_p]
@@ -495,24 +496,36 @@ def make_jaxpr2(
 
     @wraps(fun)
     def make_jaxpr_f(*args, **kwargs):
+        # print(f"make_jaxpr_f with args {args} and kwargs {kwargs}")
         # TODO: re-use `deduce_avals` here.
         with Patcher(
             (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
             (jax._src.lax.slicing, "gather_p", gather2_p),
         ), ExitStack():
             f = wrap_init(fun, debug_info=debug_info)
+            flat_args, in_tree = tree_flatten((args, kwargs))
             if static_argnums:
-                argnums = [static_argnums] if isinstance(static_argnums, int) else static_argnums
-                dynamic_argnums = [i for i in range(len(args)) if i not in argnums]
-                f, args = jax._src.api_util.argnums_partial(f, dynamic_argnums, args)
+                dynamic_argnums = [i for i in range(len(flat_args)) if i not in static_argnums]
+                # print(f"dynamic argnums: {dynamic_argnums}")
+                # print(f"static argnums: {static_argnums}")
+                # print(flat_args)
+                f, args = jax._src.api_util.argnums_partial(f, dynamic_argnums, flat_args)
+                # print(f"partialed, now args is {args}")
             in_type, in_tree = abstractify(args, kwargs)
+            # print(f"abstracted shape is {in_tree}")
             f, out_tree_promise = flatten_fun(f, in_tree)
+            # print(f"flattened to function {f}")
             f = annotate(f, in_type)
+            # print(f"annotated with in_types {in_type}")
             jaxpr, out_type, consts = trace_to_jaxpr_dynamic2(f)
+            # print("dynamically traced")
         closed_jaxpr = ClosedJaxpr(jaxpr, consts)
+        # print("closed")
         return closed_jaxpr, out_type, out_tree_promise()
 
+    # print("setting name")
     make_jaxpr_f.__name__ = f"make_jaxpr2({make_jaxpr2.__name__})"
+    # print("set name, making")
     return make_jaxpr_f
 
 

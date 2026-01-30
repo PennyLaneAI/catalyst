@@ -159,7 +159,7 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
 
         plxpr = jax.make_jaxpr(circuit)(0.5)
 
-        print(from_plxpr(plxpr)(0.5))
+        #printfrom_plxpr(plxpr)(0.5))
 
     .. code-block:: none
 
@@ -456,9 +456,7 @@ def handle_transform(
 
 
 # pylint: disable=too-many-positional-arguments
-def trace_from_pennylane(
-    fn, static_argnums, dynamic_args, abstracted_axes, sig, kwargs, debug_info=None
-):
+def trace_from_pennylane(fn, static_argnums, abstracted_axes, args, kwargs, debug_info=None):
     """Capture the JAX program representation (JAXPR) of the wrapped function, using
     PL capure module.
 
@@ -476,7 +474,7 @@ def trace_from_pennylane(
         sig(Sequence[Any]): a tuple indicating the argument signature of the function. Static arguments
             are indicated with their literal values, and dynamic arguments are indicated by abstract
             values.
-        kwargs(Dict[str, Any]): keyword argumemts to the function.
+        kwargs(Dict[str, Any]): keyword arguments to the function.
         debug_info(jax.api_util.debug_info): a source debug information object required by jaxprs.
 
     Returns:
@@ -522,9 +520,8 @@ def trace_from_pennylane(
             "debug_info": debug_info,
         }
 
-        args = sig
-
         if isinstance(fn, qml.QNode) and static_argnums:
+            # print"found qnode, overwriting static argnums")
             # `make_jaxpr2` sees the qnode
             # The static_argnum on the wrapped function takes precedence over the
             # one in `make_jaxpr`
@@ -532,10 +529,11 @@ def trace_from_pennylane(
             # Therefore we need to coordinate them manually
             fn.static_argnums = static_argnums
 
+        # printf"making plxpr with args {args} and kwargs {kwargs}")
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
         jaxpr = from_plxpr(plxpr)(*plxpr.in_avals)
 
-    return jaxpr, out_type, out_treedef, sig
+    return jaxpr, out_type, out_treedef
 
 
 def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=None, tkwargs=None):

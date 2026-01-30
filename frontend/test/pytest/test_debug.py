@@ -316,7 +316,7 @@ class TestCProgramGeneration:
         template = get_cmain(f, 1)
 
         assert "main" in template
-        assert "buff_0 = 1.0" in template  # argument was automaatically promoted
+        assert "buff_0 = 1.0" in template  # argument was automatically promoted
 
     def test_raises_error_if_tracing(self):
         """Test errors if c program generation requested during tracing."""

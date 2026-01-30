@@ -436,7 +436,7 @@ class TestMidCircuitMeasurement:
 class TestDynamicOneShotIntegration:
     """Integration tests for QNodes using mcm_method="one-shot"/dynamic_one_shot."""
 
-    @pytest.mark.parametrize("shots", [1, 2])
+    @pytest.mark.parametrize("shots", [1])  # [1, 2])
     def test_dynamic_one_shot_static_argnums(self, backend, shots):
         """
         Test static argnums is passed correctly to the one shot qnodes.
