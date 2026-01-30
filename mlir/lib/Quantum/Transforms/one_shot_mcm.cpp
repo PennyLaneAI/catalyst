@@ -14,8 +14,6 @@
 
 #define DEBUG_TYPE "one-shot-mcm"
 
-#include <algorithm>
-
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
@@ -227,7 +225,6 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         OpBuilder::InsertionGuard guard(builder);
         Location loc = mod->getLoc();
 
-        // Type f64Type = builder.getF64Type();
         auto fullSampleType = dyn_cast<ShapedType>(qfunc.getResultTypes()[0]);
         assert(fullSampleType.getShape().size() == 2 &&
                "Expected sample result type to be a tensor of size shot X num_qubits");
