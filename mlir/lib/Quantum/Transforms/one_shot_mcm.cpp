@@ -195,7 +195,7 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         qkernel.setFunctionType(FunctionType::get(
             qkernel->getContext(), qkernel.getFunctionType().getInputs(), {oneShotSampleType}));
 
-        // Start from the return, and visit back the operand chain until the sample op
+        // Start from the sample op, and visit down the operand chain until the return op
         auto sampleOp = *qkernel.getOps<quantum::SampleOp>().begin();
         SetVector<Operation *> sampleOpForwardSlice;
         getForwardSlice(sampleOp, &sampleOpForwardSlice);
