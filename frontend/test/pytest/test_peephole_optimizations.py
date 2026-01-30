@@ -654,9 +654,8 @@ class TestLowerQECInitOps:
             (lambda: qml.H(0)),
             (lambda: (qml.H(0), qml.T(0))),
             (lambda: (qml.H(0), qml.S(0))),
-            # TODO: enable this when ppr_to_ppm fix adjoint.
-            # (lambda: (qml.H(0), qml.adjoint(qml.T(0), lazy=False))),
-            # (lambda: (qml.H(0), qml.adjoint(qml.S(0), lazy=False))),
+            (lambda: (qml.H(0), qml.adjoint(qml.T(0), lazy=False))),
+            (lambda: (qml.H(0), qml.adjoint(qml.S(0), lazy=False))),
         ],
     )
     def test_lower_qec_init_ops_preserves_states(self, gates):
