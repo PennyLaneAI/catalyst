@@ -14,10 +14,12 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+import numpy as np
 import pennylane as qml
 
 from catalyst import measure, qjit
-from catalyst.passes import merge_rotations
+from catalyst.debug import get_compilation_stage
+from catalyst.passes import apply_pass, merge_rotations
 
 
 @qjit(target="mlir")
@@ -30,6 +32,9 @@ def circuit(x: float):
 
 
 print(circuit.mlir)
+
+
+# -----
 
 
 @qjit(static_argnums=0)
@@ -66,6 +71,9 @@ test_one_shot_with_static_argnums(10)
 print(test_one_shot_with_static_argnums.mlir)
 
 
+# -----
+
+
 @qjit(target="mlir")
 def test_one_shot_with_passes():
     """
@@ -95,3 +103,76 @@ def test_one_shot_with_passes():
 
 
 print(test_one_shot_with_passes.mlir)
+
+
+# -----
+
+
+@qjit(keep_intermediate=True)
+@apply_pass("one-shot-mcm")
+@qml.qnode(qml.device("lightning.qubit", wires=2), shots=1000)
+def test_mlir_one_shot_pass_probs():
+    """
+    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with probs
+    """
+
+    # CHECK: transform.apply_registered_pass "one-shot-mcm"
+    qml.Hadamard(wires=0)
+    return qml.probs()  # only has probablilities in |00> and |10>
+
+
+print(test_mlir_one_shot_pass_probs.mlir)
+
+# CHECK: func.func public @test_mlir_one_shot_pass_probs.quantum_kernel
+# CHECK:    [[one:%.+]] = arith.constant 1 : i64
+# CHECK:    quantum.device shots([[one]])
+# CHECK:    Hadamard
+# CHECK:    probs
+# CHECK: func.func public @test_mlir_one_shot_pass_probs
+# CHECK:    index.constant 1000
+# CHECK:    scf.for
+# CHECK:    func.call @test_mlir_one_shot_pass_probs.quantum_kernel
+# CHECK:    stablehlo.add
+# CHECK:    stablehlo.divide
+print(get_compilation_stage(test_mlir_one_shot_pass_probs, "QuantumCompilationStage"))
+
+res = test_mlir_one_shot_pass_probs()
+assert res[1] == 0
+assert res[3] == 0
+assert np.allclose(sum(res), 1.0)
+
+
+# -----
+
+
+@qjit(keep_intermediate=True)
+@apply_pass("one-shot-mcm")
+@qml.qnode(qml.device("lightning.qubit", wires=2), shots=1000)
+def test_mlir_one_shot_pass_sample():
+    """
+    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with sample
+    """
+
+    # CHECK: transform.apply_registered_pass "one-shot-mcm"
+    qml.Hadamard(wires=0)
+    return qml.sample()  # only has samples in |00> and |10>
+
+
+print(test_mlir_one_shot_pass_sample.mlir)
+
+# CHECK: func.func public @test_mlir_one_shot_pass_sample.quantum_kernel
+# CHECK:    [[one:%.+]] = arith.constant 1 : i64
+# CHECK:    quantum.device shots([[one]])
+# CHECK:    Hadamard
+# CHECK:    sample
+# CHECK: func.func public @test_mlir_one_shot_pass_sample
+# CHECK:    index.constant 1000
+# CHECK:    scf.for
+# CHECK:    func.call @test_mlir_one_shot_pass_sample.quantum_kernel
+# CHECK:    tensor.insert_slice
+print(get_compilation_stage(test_mlir_one_shot_pass_sample, "QuantumCompilationStage"))
+
+res = test_mlir_one_shot_pass_sample()
+assert res.shape == (1000, 2)
+for sample in res:
+    assert sample[1] == 0
