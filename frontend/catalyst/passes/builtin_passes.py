@@ -556,9 +556,8 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
 
     .. note::
 
-        The circuit generated from this pass with ``ppr_basis=True`` are currently not executable on any backend.
-        This is only for analysis with the ``null.qubit`` device and potential future execution
-        when a suitable backend is available.
+        The circuit generated from this pass with ``ppr_basis=True`` are currently only executable on the
+        ``lightning.qubit`` device with program capture enabled.
 
     **Example**
 
@@ -647,9 +646,8 @@ def to_ppr(qnode):
 
     .. note::
 
-        The circuits that generated from this pass are currently not executable on any backend.
-        This pass is only for analysis with the ``null.qubit`` device and potential future execution
-        when a suitable backend is available.
+        The circuits generated from this pass are currently only executable on the ``lightning.qubit``
+        device with program capture enabled.
 
     The full list of supported gates and operations are
     ``qml.H``,
@@ -692,10 +690,6 @@ def to_ppr(qnode):
 
         print(circuit.mlir_opt)
 
-    Because Catalyst does not currently support execution of Pauli-based computation operations, we
-    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-    passes will be applied to the initial MLIR, without attempting to further compile for execution.
-
     Example MLIR Representation:
 
     .. code-block:: mlir
@@ -710,7 +704,6 @@ def to_ppr(qnode):
         %8 = qec.ppr ["X"](-4) %6#1 : !quantum.bit
         %9 = qec.ppr ["Z"](8) %7 : !quantum.bit
         . . .
-
     """
     return PassPipelineWrapper(qnode, "to-ppr")
 
@@ -764,10 +757,6 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
             return
 
         print(circuit.mlir_opt)
-
-    Because Catalyst does not currently support execution of Pauli-based computation operations, we
-    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
     Example MLIR Representation:
 
@@ -876,10 +865,6 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
 
         print(circuit.mlir_opt)
 
-    Because Catalyst does not currently support execution of Pauli-based computation operations, we
-    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-    passes will be applied to the initial MLIR, without attempting to further compile for execution.
-
     Example MLIR Representation:
 
     .. code-block:: mlir
@@ -987,10 +972,6 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
 
         print(circuit.mlir_opt)
 
-    Because Catalyst does not currently support execution of Pauli-based computation operations, we
-    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-    passes will be applied to the initial MLIR, without attempting to further compile for execution.
-
     Example MLIR Representation:
 
     .. code-block:: mlir
@@ -1090,10 +1071,6 @@ def ppm_compilation(
             return catalyst.measure(0), catalyst.measure(1)
 
         print(circuit.mlir_opt)
-
-    Because Catalyst does not currently support execution of Pauli-based computation operations, we
-    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
     Example MLIR Representation:
 
@@ -1201,10 +1178,6 @@ def ppm_specs(fn):
         ppm_specs = catalyst.passes.ppm_specs(circuit)
         print(ppm_specs)
 
-    Because Catalyst does not currently support execution of Pauli-based computation operations, we
-    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-    passes will be applied to the initial MLIR, without attempting to further compile for execution.
-
     Example PPM Specs:
 
     .. code-block:: pycon
@@ -1263,9 +1236,8 @@ def reduce_t_depth(qnode):
 
     .. note::
 
-        The circuits that generated from this pass are currently not executable on any backend.
-        This pass is only for analysis with the ``null.qubit`` device and potential future execution
-        when a suitable backend is available.
+        The circuits generated from this pass are currently only executable on the ``lightning.qubit``
+        device with program capture enabled.
 
     Args:
         qnode (QNode): QNode to apply the pass to.
@@ -1307,10 +1279,6 @@ def reduce_t_depth(qnode):
                 qml.T(wires=i)
 
             return catalyst.measure(0), catalyst.measure(1), catalyst.measure(2)
-
-    Because Catalyst does not currently support execution of Pauli-based computation operations, we
-    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
     >>> print(circuit.mlir_opt)
 
@@ -1364,8 +1332,7 @@ def ppr_to_mbqc(qnode):
     .. note::
 
         This pass expects PPR/PPM operations to be present. In practice, use it
-        after :func:`~.passes.to_ppr` and/or :func:`~.passes.commute_ppr` and/or
-        :func:`~.passes.merge_ppr_ppm`.
+        after :func:`~.passes.to_ppr`.
 
     Args:
         fn (QNode): QNode to apply the pass to.
@@ -1396,10 +1363,6 @@ def ppr_to_mbqc(qnode):
             return
 
         print(circuit.mlir_opt)
-
-    Because Catalyst does not currently support execution of Pauli-based computation operations, we
-    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
     Example MLIR excerpt (structure only):
 
@@ -1469,23 +1432,19 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
         @qml.qnode(qml.device("null.qubit", wires=3))
         def circuit():
             qml.PauliRot(0.123, pauli_word="XXY", wires=[0, 1, 2])
-            return catalyst.measure(0), catalyst.measure(1), catalyst.measure(2)
-
-    Because Catalyst does not currently support execution of Pauli-based computation operations, we
-    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-    passes will be applied to the initial MLIR, without attempting to further compile for execution.
+            return qml.probs()
 
     >>> print(circuit.mlir_opt)
-    ...
-    %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
-    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-    %out_qubits_2 = quantum.custom "Hadamard"() %2 : !quantum.bit
-    %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
-    %out_qubits_3 = quantum.custom "RX"(%cst_1) %3 : !quantum.bit
-    %out_qubits_4:3 = quantum.multirz(%cst_0) %out_qubits, %out_qubits_2, %out_qubits_3 : !quantum.bit, !quantum.bit, !quantum.bit
-    %out_qubits_5 = quantum.custom "Hadamard"() %out_qubits_4#0 : !quantum.bit
-    %mres, %out_qubit = quantum.measure %out_qubits_5 : i1, !quantum.bit
-    %from_elements = tensor.from_elements %mres : tensor<i1>
-    %out_qubits_6 = quantum.custom "Hadamard"() %out_qubits_4#1 : !quantum.bit
+
+    Example MLIR excerpt (structure only):
+
+    .. code-block:: mlir
+        ...
+        %mres, %out_qubits:4 = qec.ppm ["X", "X", "Y", "Z"] %1, %2, %3, %5 : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+        %6 = qec.ppr ["X"](2) %out_qubits#3 cond(%mres) : !quantum.bit
+        %7 = qec.ppr.arbitrary ["Z"](%cst) %6 : !quantum.bit
+        %mres_0, %out_qubits_1 = qec.ppm ["X"] %7 : i1, !quantum.bit
+        %8:3 = qec.ppr ["X", "X", "Y"](2) %out_qubits#0, %out_qubits#1, %out_qubits#2 cond(%mres_0) : !quantum.bit, !quantum.bit, !quantum.bit
+        ...
     """
     return PassPipelineWrapper(qnode, "decompose-arbitrary-ppr")
