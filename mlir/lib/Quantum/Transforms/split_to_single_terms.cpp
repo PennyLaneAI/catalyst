@@ -14,12 +14,19 @@
 
 #define DEBUG_TYPE "split-to-single-terms"
 
+#include "llvm/ADT/DenseMap.h"
+
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/Pass/Pass.h"
 
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "stablehlo/dialect/StablehloOps.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -33,9 +40,409 @@ namespace quantum {
 struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToSingleTermsPass> {
     using impl::SplitToSingleTermsPassBase<SplitToSingleTermsPass>::SplitToSingleTermsPassBase;
 
+    /// Information collected for each Hamiltonian expval that needs to be split
+    struct HamiltonianExpvalInfo {
+        ExpvalOp expvalOp;
+        Value hamiltonianObs;
+        SmallVector<Value> leafObservables;
+        tensor::FromElementsOp fromElementsWrapper;
+    };
+
+    /// Recursively collect all leaf observables from a potentially nested Hamiltonian
+    void collectLeafObservables(Value obs, SmallVectorImpl<Value> &leafObs)
+    {
+        Operation *defOp = obs.getDefiningOp();
+
+        if (auto hamOp = dyn_cast_or_null<HamiltonianOp>(defOp)) {
+            for (Value term : hamOp.getTerms()) {
+                collectLeafObservables(term, leafObs);
+            }
+        }
+        else {
+            leafObs.push_back(obs);
+        }
+    }
+
+    /// Recursively collect coefficients from Hamiltonian.
+    /// This creates coefficient computation operations in the current insertion point
+    void buildCoefficientsExpr(Value obs, Value coeffMultiplier, OpBuilder &builder, Location loc,
+                               SmallVectorImpl<Value> &coefficients)
+    {
+        Operation *defOp = obs.getDefiningOp();
+
+        if (auto hamOp = dyn_cast_or_null<HamiltonianOp>(defOp)) {
+            Value coeffs = hamOp.getCoeffs();
+            auto termOperands = hamOp.getTerms();
+
+            // coeffs can be either tensor<Nxf64> or memref<Nxf64>
+            auto coeffsType = cast<ShapedType>(coeffs.getType());
+            int64_t numTerms = coeffsType.getDimSize(0);
+            bool isTensor = isa<RankedTensorType>(coeffsType);
+
+            for (int64_t i = 0; i < numTerms; i++) {
+                Value idx = builder.create<arith::ConstantIndexOp>(loc, i);
+
+                Value coeff;
+                if (isTensor) {
+                    coeff = builder.create<tensor::ExtractOp>(loc, coeffs, ValueRange{idx});
+                }
+                else {
+                    coeff = builder.create<memref::LoadOp>(loc, coeffs, ValueRange{idx});
+                }
+
+                Value coeffTensor = builder.create<tensor::FromElementsOp>(
+                    loc, RankedTensorType::get({}, builder.getF64Type()), ValueRange{coeff});
+
+                Value finalCoeff;
+                if (coeffMultiplier) {
+                    finalCoeff =
+                        builder.create<stablehlo::MulOp>(loc, coeffMultiplier, coeffTensor);
+                }
+                else {
+                    finalCoeff = coeffTensor;
+                }
+
+                buildCoefficientsExpr(termOperands[i], finalCoeff, builder, loc, coefficients);
+            }
+        }
+        else {
+            if (!coeffMultiplier) {
+                Value one = builder.create<arith::ConstantOp>(loc, builder.getF64FloatAttr(1.0));
+                coeffMultiplier = builder.create<tensor::FromElementsOp>(
+                    loc, RankedTensorType::get({}, builder.getF64Type()), ValueRange{one});
+            }
+            coefficients.push_back(coeffMultiplier);
+        }
+    }
+
+    /// Create the post-processing computation: weighted sum of expval results
+    ///
+    /// Given:
+    ///   - expvalResults = [<Z x X>, <Y>]  (individual expectation values from call)
+    ///   - coefficients  = [c0, c1]        (extracted from Hamiltonian structure)
+    ///
+    /// Computes:
+    ///   result = c0 * <Z x X> + c1 * <Y>
+    ///
+    /// Generated MLIR (example with 2 terms):
+    ///   %w0 = stablehlo.multiply %c0, %expval0 : tensor<f64>   // c0 * <Z x X>
+    ///   %w1 = stablehlo.multiply %c1, %expval1 : tensor<f64>   // c1 * <Y>
+    ///   %b0 = stablehlo.broadcast_in_dim %w0 : tensor<f64> -> tensor<1xf64>
+    ///   %b1 = stablehlo.broadcast_in_dim %w1 : tensor<f64> -> tensor<1xf64>
+    ///   %concat = stablehlo.concatenate %b0, %b1 : tensor<2xf64>
+    ///   %zero = stablehlo.constant 0.0 : tensor<f64>
+    ///   %result = stablehlo.reduce(%concat init: %zero) applies stablehlo.add
+    ///
+    Value createPostProcessing(OpBuilder &builder, Location loc, ValueRange expvalResults,
+                               ValueRange coefficients)
+    {
+        assert(expvalResults.size() == coefficients.size());
+
+        SmallVector<Value> weightedExpvals;
+        for (size_t i = 0; i < expvalResults.size(); i++) {
+            Value weighted =
+                builder.create<stablehlo::MulOp>(loc, coefficients[i], expvalResults[i]);
+            weightedExpvals.push_back(weighted);
+        }
+
+        if (weightedExpvals.size() == 1) {
+            return weightedExpvals[0];
+        }
+
+        // Broadcast, concatenate, reduce
+        auto tensor1xf64Type = RankedTensorType::get({1}, builder.getF64Type());
+        auto tensorNxf64Type = RankedTensorType::get({static_cast<int64_t>(weightedExpvals.size())},
+                                                     builder.getF64Type());
+
+        SmallVector<Value> broadcastedValues;
+        for (Value v : weightedExpvals) {
+            Value broadcasted = builder.create<stablehlo::BroadcastInDimOp>(
+                loc, tensor1xf64Type, v, builder.getDenseI64ArrayAttr({}));
+            broadcastedValues.push_back(broadcasted);
+        }
+
+        Value concatenated = builder.create<stablehlo::ConcatenateOp>(
+            loc, tensorNxf64Type, broadcastedValues, /*dimension=*/0);
+
+        auto zeroAttr = DenseElementsAttr::get(RankedTensorType::get({}, builder.getF64Type()),
+                                               builder.getF64FloatAttr(0.0).getValue());
+        Value zero = builder.create<stablehlo::ConstantOp>(loc, zeroAttr);
+
+        auto reduceOp = builder.create<stablehlo::ReduceOp>(
+            loc, TypeRange{RankedTensorType::get({}, builder.getF64Type())},
+            ValueRange{concatenated}, ValueRange{zero}, builder.getDenseI64ArrayAttr({0}));
+
+        {
+            OpBuilder::InsertionGuard guard(builder);
+            Block *reduceBody = builder.createBlock(&reduceOp.getBody());
+            auto scalarF64Type = RankedTensorType::get({}, builder.getF64Type());
+            reduceBody->addArgument(scalarF64Type, loc);
+            reduceBody->addArgument(scalarF64Type, loc);
+
+            builder.setInsertionPointToStart(reduceBody);
+            Value addResult = builder.create<stablehlo::AddOp>(loc, reduceBody->getArgument(0),
+                                                               reduceBody->getArgument(1));
+            builder.create<stablehlo::ReturnOp>(loc, ValueRange{addResult});
+        }
+
+        return reduceOp.getResult(0);
+    }
+
+    /// Remove dead operations before a given operation in a block
+    /// Iteratively removes ops with no users until no more can be removed
+    void removeDeadOpsBeforeOp(func::FuncOp func, Operation *boundaryOp)
+    {
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            SmallVector<Operation *> deadOps;
+
+            Block &block = func.getBody().front();
+            for (auto it = block.rbegin(); it != block.rend(); ++it) {
+                Operation *op = &(*it);
+
+                if (op->hasTrait<OpTrait::IsTerminator>() || op == boundaryOp ||
+                    !op->isBeforeInBlock(boundaryOp)) {
+                    continue;
+                }
+
+                // Check if all results are unused
+                bool allResultsUnused =
+                    llvm::all_of(op->getResults(), [](Value result) { return result.use_empty(); });
+
+                if (allResultsUnused) {
+                    deadOps.push_back(op);
+                }
+            }
+
+            for (Operation *op : deadOps) {
+                op->erase();
+                changed = true;
+            }
+        }
+    }
+
+    /// Information about how return values are mapped after transformation
+    struct ReturnValueMappingInfo {
+        SmallVector<std::pair<bool, size_t>> mapping; // (isHamiltonian, numValues)
+        SmallVector<Type> newReturnTypes;
+    };
+
+    /// Modify the quantum function to return individual expvals instead of Hamiltonian expvals
+    ///
+    /// Before: quantumFunc returns (<H>, <Z>) where <H> is Hamiltonian expval
+    ///         where <H> = c0 * <Z x X> + c1 * <Y>
+    /// After:  quantumFunc returns (<Z x X>, <Y>, <Z>) individual leaf expvals
+    ///
+    /// Returns the mapping info needed for the entry function transformation
+    LogicalResult rewriteQuantumFunc(func::FuncOp quantumFunc, Location loc,
+                                     ReturnValueMappingInfo &mappingInfo)
+    {
+        // Collect hamiltonian-expval pairs
+        SmallVector<std::pair<ExpvalOp, Value>> hamiltonianExpvalPairs;
+        quantumFunc.walk([&](ExpvalOp expvalOp) {
+            Value obs = expvalOp.getObs();
+            if (isa_and_nonnull<HamiltonianOp>(obs.getDefiningOp())) {
+                hamiltonianExpvalPairs.push_back(std::make_pair(expvalOp, obs));
+            }
+        });
+
+        // Track which return values need to be replaced
+        DenseMap<Value, SmallVector<Value>> replacementMap;
+
+        for (auto &[expvalOp, obs] : hamiltonianExpvalPairs) {
+            OpBuilder builder(expvalOp);
+
+            // Collect leaf observables
+            SmallVector<Value> leafObs;
+            collectLeafObservables(obs, leafObs);
+
+            // Create individual expvals with from_elements wrappers
+            SmallVector<Value> newExpvalTensors;
+            for (Value leaf : leafObs) {
+                Value expval = builder.create<ExpvalOp>(loc, builder.getF64Type(), leaf);
+                Value tensor = builder.create<tensor::FromElementsOp>(
+                    loc, RankedTensorType::get({}, builder.getF64Type()), ValueRange{expval});
+                newExpvalTensors.push_back(tensor);
+            }
+
+            // expval should have exactly one user
+            if (!expvalOp.getResult().hasOneUse()) {
+                expvalOp.emitError() << "expval result is expected to have exactly one user";
+                return failure();
+            }
+
+            // Replace the expval result with the new expval tensors
+            Operation *user = *expvalOp.getResult().getUsers().begin();
+            if (auto fromElementsOp = dyn_cast<tensor::FromElementsOp>(user)) {
+                replacementMap[fromElementsOp.getResult()] = newExpvalTensors;
+            }
+            else {
+                replacementMap[expvalOp.getResult()] = newExpvalTensors;
+            }
+        }
+
+        // Update quantum function's return
+        auto quantumReturnOp =
+            dyn_cast<func::ReturnOp>(quantumFunc.getBody().front().getTerminator());
+        if (!quantumReturnOp) {
+            emitError(loc) << "quantum function does not have a return op";
+            return failure();
+        }
+
+        SmallVector<Value> newReturnValues;
+
+        // Build return value mapping
+        for (Value oldRetVal : quantumReturnOp.getOperands()) {
+            if (replacementMap.count(oldRetVal)) {
+                size_t numNewVals = replacementMap[oldRetVal].size();
+                mappingInfo.mapping.push_back({true, numNewVals});
+                for (Value newVal : replacementMap[oldRetVal]) {
+                    newReturnValues.push_back(newVal);
+                    mappingInfo.newReturnTypes.push_back(newVal.getType());
+                }
+            }
+            else {
+                mappingInfo.mapping.push_back({false, 1});
+                newReturnValues.push_back(oldRetVal);
+                mappingInfo.newReturnTypes.push_back(oldRetVal.getType());
+            }
+        }
+
+        OpBuilder returnBuilder(quantumReturnOp);
+        returnBuilder.create<func::ReturnOp>(quantumReturnOp.getLoc(), newReturnValues);
+        quantumReturnOp.erase();
+
+        auto quantumFuncType =
+            FunctionType::get(quantumFunc.getContext(), quantumFunc.getFunctionType().getInputs(),
+                              mappingInfo.newReturnTypes);
+        quantumFunc.setFunctionType(quantumFuncType);
+
+        return success();
+    }
+
+    /// Rewrite the entry function to call quantumFunc and do post-processing
+    ///
+    /// Before: origFunc contains quantum ops and returns (<H>, <Z>)
+    /// After:  origFunc calls quantumFunc, computes weighted sum, returns (<H>, <Z>)
+    LogicalResult rewriteEntryFunc(func::FuncOp origFunc, func::FuncOp quantumFunc, Location loc,
+                                   const ReturnValueMappingInfo &mappingInfo)
+    {
+        // Find Hamiltonian expvals in original function (for coefficient extraction)
+        SmallVector<std::pair<ExpvalOp, Value>> hamiltonianExpvalPairs;
+        origFunc.walk([&](ExpvalOp expvalOp) {
+            Value obs = expvalOp.getObs();
+            if (isa_and_nonnull<HamiltonianOp>(obs.getDefiningOp())) {
+                hamiltonianExpvalPairs.push_back(std::make_pair(expvalOp, obs));
+            }
+        });
+
+        auto origReturnOp = dyn_cast<func::ReturnOp>(origFunc.getBody().front().getTerminator());
+        if (!origReturnOp) {
+            emitError(loc) << "original function does not have a return op";
+            return failure();
+        }
+
+        // Insert call to quantumFunc before the return
+        OpBuilder builder(origReturnOp);
+        SmallVector<Value> callArgs;
+        Block &origBlock = origFunc.getBody().front();
+        for (BlockArgument arg : origBlock.getArguments()) {
+            callArgs.push_back(arg);
+        }
+
+        auto callOp = builder.create<func::CallOp>(loc, quantumFunc.getName(),
+                                                   mappingInfo.newReturnTypes, callArgs);
+
+        // Post-processing:
+        // For Hamiltonian results: collect coefficients and compute weighted sum
+        // For non-Hamiltonian results: pass through from call results
+        SmallVector<Value> finalResults;
+        size_t callResultIdx = 0;
+        size_t hamIdx = 0;
+
+        for (auto [isHamiltonian, numValues] : mappingInfo.mapping) {
+            if (isHamiltonian) {
+                // Get expval results from call for this Hamiltonian
+                SmallVector<Value> expvalResults;
+                for (size_t i = 0; i < numValues; i++) {
+                    expvalResults.push_back(callOp.getResult(callResultIdx + i));
+                }
+                callResultIdx += numValues;
+
+                // Build coefficients expression from original function's Hamiltonian structure
+                Value obs = hamiltonianExpvalPairs[hamIdx].second;
+                SmallVector<Value> coefficients;
+                buildCoefficientsExpr(obs, /*coeffMultiplier=*/nullptr, builder, loc, coefficients);
+
+                Value result = createPostProcessing(builder, loc, expvalResults, coefficients);
+                finalResults.push_back(result);
+                hamIdx++;
+            }
+            else {
+                // Non-Hamiltonian result: pass through from call
+                finalResults.push_back(callOp.getResult(callResultIdx));
+                callResultIdx++;
+            }
+        }
+
+        builder.create<func::ReturnOp>(origReturnOp.getLoc(), finalResults);
+        origReturnOp.erase();
+
+        // Clean up dead ops before the call
+        removeDeadOpsBeforeOp(origFunc, callOp.getOperation());
+
+        return success();
+    }
+
     void runOnOperation() override
     {
-        // Empty
+        Operation *moduleOp = getOperation();
+
+        // Find all qnode functions with Hamiltonian expvals
+        SmallVector<func::FuncOp> funcsToProcess;
+        moduleOp->walk([&](func::FuncOp funcOp) {
+            if (!funcOp->hasAttr("qnode")) {
+                return;
+            }
+
+            bool hasHamiltonian = false;
+            funcOp.walk([&](ExpvalOp expvalOp) {
+                if (isa_and_nonnull<HamiltonianOp>(expvalOp.getObs().getDefiningOp())) {
+                    hasHamiltonian = true;
+                    return WalkResult::interrupt();
+                }
+                return WalkResult::advance();
+            });
+
+            if (hasHamiltonian) {
+                funcsToProcess.push_back(funcOp);
+            }
+        });
+
+        for (func::FuncOp origFunc : funcsToProcess) {
+            Location loc = origFunc.getLoc();
+            OpBuilder moduleBuilder(origFunc);
+
+            // Clone origFunc -> quantumFunc (<circuit_name>.quantum)
+            // quantumFunc will contain the quantum operations and return individual expvals
+            // origFunc will be the entry point that calls quantumFunc and does post-processing
+            IRMapping cloneMapping;
+            std::string quantumFuncName = origFunc.getName().str() + ".quantum";
+            auto quantumFunc = cast<func::FuncOp>(moduleBuilder.clone(*origFunc, cloneMapping));
+            quantumFunc.setName(quantumFuncName);
+
+            // Modify quantumFunc to return individual expvals
+            ReturnValueMappingInfo mappingInfo;
+            if (failed(rewriteQuantumFunc(quantumFunc, loc, mappingInfo))) {
+                return signalPassFailure();
+            }
+
+            // Modify origFunc to call quantumFunc and do post-processing
+            if (failed(rewriteEntryFunc(origFunc, quantumFunc, loc, mappingInfo))) {
+                return signalPassFailure();
+            }
+        }
     }
 };
 
