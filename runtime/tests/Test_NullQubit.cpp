@@ -1029,8 +1029,6 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
         sim->PartialSample(sample_view, {Qs[0], Qs[2]});
     }
 
-    // sim->Counts();
-
     sim->ReleaseQubits(Qs);
 
     // Check no prior steps actually wrote the resource file
