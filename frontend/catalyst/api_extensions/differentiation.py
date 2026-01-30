@@ -554,7 +554,7 @@ def vjp(f: Callable, params, cotangents, *, method=None, h=None, argnums=None):
         if not isinstance(x, Sequence):
             raise ValueError(f"vjp '{hint}' argument must be a Sequence, not {type(x)}")
 
-    check_is_iterable(params, "params")
+    check_is_Sequence(params, "params")
 
     if EvaluationContext.is_tracing():
         scalar_out = False
