@@ -17,6 +17,7 @@
 import pennylane as qml
 import pytest
 
+from catalyst import qjit
 from catalyst.third_party.oqd import OQDDevice
 
 
@@ -49,14 +50,14 @@ class TestOQDDevice:
         """Test the device preprocessing"""
         dev = OQDDevice(backend="default", wires=8)
         tranform_program, _ = dev.preprocess()
-        assert tranform_program == qml.transforms.core.TransformProgram()
+        assert tranform_program == qml.CompilePipeline()
 
     def test_preprocess_with_config(self):
         """Test the device preprocessing by explicitly passing an execution config"""
         dev = OQDDevice(backend="default", wires=8)
         execution_config = qml.devices.ExecutionConfig()
         tranform_program, config = dev.preprocess(execution_config)
-        assert tranform_program == qml.transforms.core.TransformProgram()
+        assert tranform_program == qml.CompilePipeline()
         assert config == execution_config
 
     def test_get_c_interface(self):
@@ -64,6 +65,16 @@ class TestOQDDevice:
         dev = OQDDevice(backend="default", wires=8)
         name, _ = dev.get_c_interface()
         assert name == "oqd"
+
+    def test_unsupported_one_shot_device(self):
+        """Test unsupported device edge case."""
+
+        @qml.qnode(OQDDevice(backend="default", wires=1), shots=10, mcm_method="one-shot")
+        def circuit():
+            return qml.sample()
+
+        with pytest.raises(ValueError, match="'one-shot' is not supported in the chosen device"):
+            qjit(circuit)
 
 
 if __name__ == "__main__":

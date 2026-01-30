@@ -11,25 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Unit and integration tests for the unified compiler `measurements_from_samples` transform."""
-
-# pylint: disable=wrong-import-position,line-too-long
+# pylint: disable=line-too-long
 
 from functools import partial
 
 import numpy as np
-import pytest
-
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
 import pennylane as qml
+import pytest
 
 from catalyst.python_interface.transforms import (
     MeasurementsFromSamplesPass,
     measurements_from_samples_pass,
 )
+
+pytestmark = pytest.mark.xdsl
 
 
 class TestMeasurementsFromSamplesPass:
@@ -847,9 +843,8 @@ class TestMeasurementsFromSamplesIntegration:
         @measurements_from_samples_pass
         @partial(
             qml.transforms.decompose,
-            gate_set={"X", "Y", "Z", "S", "H", "CNOT", "RZ", "GlobalPhase"},
+            gate_set={"X", "Y", "Z", "S", "H", "CNOT", "RZ", "RY", "GlobalPhase"},
         )
-        @qml.set_shots(1000)
         @qml.qnode(dev, shots=1000)
         def circuit():
             qml.CRX(0.1, wires=[0, 1])

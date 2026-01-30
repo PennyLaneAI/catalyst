@@ -554,8 +554,7 @@ def vjp(f: Callable, params, cotangents, *, method=None, h=None, argnums=None):
         if not isinstance(x, Sequence):
             raise ValueError(f"vjp '{hint}' argument must be a Sequence, not {type(x)}")
 
-    check_is_Sequence(params, "params")
-    check_is_Sequence(cotangents, "cotangents")
+    check_is_iterable(params, "params")
 
     if EvaluationContext.is_tracing():
         scalar_out = False
@@ -567,7 +566,10 @@ def vjp(f: Callable, params, cotangents, *, method=None, h=None, argnums=None):
         grad_params = _check_grad_params(method, scalar_out, h, argnums, len(args_flatten), in_tree)
 
         args_argnums = tuple(params[i] for i in grad_params.argnums)
-        _, in_tree = tree_flatten(args_argnums)
+        if isinstance(argnums, int) or argnums is None:
+            _, in_tree = tree_flatten(0)
+        else:
+            _, in_tree = tree_flatten(args_argnums)
 
         jaxpr, out_tree = _make_jaxpr_check_differentiable(fn, grad_params, *params)
 

@@ -28,26 +28,23 @@ class TestOQCDevice:
     def test_entrypoint(self, set_dummy_oqc_env):
         """Test the initialization."""
 
-        device = qml.device("oqc.cloud", backend="lucy", shots=1000, wires=8)
+        device = qml.device("oqc.cloud", backend="lucy", wires=8)
 
         assert device.backend == "lucy"
-        assert device.shots == qml.measurements.Shots(1000)
         assert device.wires == qml.wires.Wires(range(0, 8))
 
     def test_initialization(self, set_dummy_oqc_env):
         """Test the initialization."""
         from catalyst.third_party.oqc import OQCDevice
 
-        device = OQCDevice(backend="lucy", shots=1000, wires=8)
+        device = OQCDevice(backend="lucy", wires=8)
 
         assert device.backend == "lucy"
-        assert device.shots == qml.measurements.Shots(1000)
         assert device.wires == qml.wires.Wires(range(0, 8))
 
-        device = OQCDevice(backend="toshiko", shots=1000, wires=32)
+        device = OQCDevice(backend="toshiko", wires=32)
 
         assert device.backend == "toshiko"
-        assert device.shots == qml.measurements.Shots(1000)
         assert device.wires == qml.wires.Wires(range(0, 32))
 
     def test_wrong_backend(self, set_dummy_oqc_env):
@@ -55,39 +52,39 @@ class TestOQCDevice:
         from catalyst.third_party.oqc import OQCDevice
 
         with pytest.raises(ValueError, match="The backend falcon is not supported."):
-            OQCDevice(backend="falcon", shots=1000, wires=8)
+            OQCDevice(backend="falcon", wires=8)
 
     def test_execute_not_implemented(self, set_dummy_oqc_env):
         """Test the python execute is not implemented."""
         from catalyst.third_party.oqc import OQCDevice
 
         with pytest.raises(NotImplementedError, match="The OQC device only supports Catalyst."):
-            dev = OQCDevice(backend="lucy", shots=1000, wires=8)
+            dev = OQCDevice(backend="lucy", wires=8)
             dev.execute([], [])
 
     def test_preprocess(self, set_dummy_oqc_env):
         """Test the device preprocessing"""
         from catalyst.third_party.oqc import OQCDevice
 
-        dev = OQCDevice(backend="lucy", shots=1000, wires=8)
+        dev = OQCDevice(backend="lucy", wires=8)
         tranform_program, _ = dev.preprocess()
-        assert tranform_program == qml.transforms.core.TransformProgram()
+        assert tranform_program == qml.CompilePipeline()
 
     def test_preprocess_with_config(self, set_dummy_oqc_env):
         """Test the device preprocessing by explicitly passing an execution config"""
         from catalyst.third_party.oqc import OQCDevice
 
-        dev = OQCDevice(backend="lucy", shots=1000, wires=8)
+        dev = OQCDevice(backend="lucy", wires=8)
         execution_config = qml.devices.ExecutionConfig()
         tranform_program, config = dev.preprocess(execution_config)
-        assert tranform_program == qml.transforms.core.TransformProgram()
+        assert tranform_program == qml.CompilePipeline()
         assert config == execution_config
 
     def test_get_c_interface(self, set_dummy_oqc_env):
         """Test the device get_c_interface method."""
         from catalyst.third_party.oqc import OQCDevice
 
-        dev = OQCDevice(backend="lucy", shots=1000, wires=8)
+        dev = OQCDevice(backend="lucy", wires=8)
         name, _ = dev.get_c_interface()
         assert name == "oqc"
 
@@ -96,7 +93,7 @@ class TestOQCDevice:
         from catalyst.third_party.oqc import OQCDevice
 
         with pytest.raises(ValueError, match="OQC credentials not found in environment variables."):
-            OQCDevice(backend="lucy", shots=1000, wires=8)
+            OQCDevice(backend="lucy", wires=8)
 
 
 class TestOQCCircuit:

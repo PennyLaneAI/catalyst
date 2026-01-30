@@ -15,44 +15,14 @@
 #ifndef QUANTUM_OPS
 #define QUANTUM_OPS
 
-include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
+include "Quantum/IR/QuantumAttrDefs.td"
 include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumInterfaces.td"
-
-//===----------------------------------------------------------------------===//
-// Quantum dialect enums.
-//===----------------------------------------------------------------------===//
-
-def NamedObservable : I32EnumAttr<"NamedObservable",
-    "Known named observables",
-    [
-        I32EnumAttrCase<"Identity", 0>,
-        I32EnumAttrCase<"PauliX",   1>,
-        I32EnumAttrCase<"PauliY",   2>,
-        I32EnumAttrCase<"PauliZ",   3>,
-        I32EnumAttrCase<"Hadamard", 4>,
-    ]> {
-    let cppNamespace = "catalyst::quantum";
-    let genSpecializedAttr = 0;
-}
-
-
-//===----------------------------------------------------------------------===//
-// Quantum dialect traits.
-//===----------------------------------------------------------------------===//
-
-def Unitary : NativeOpTrait<"UnitaryTrait">;
-def Hermitian : NativeOpTrait<"HermitianTrait">;
-
-//===----------------------------------------------------------------------===//
-// Quantum dialect attributes.
-//===----------------------------------------------------------------------===//
-
-def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_observable">;
+include "Quantum/IR/QuantumTypes.td"
 
 //===----------------------------------------------------------------------===//
 // Quantum dialect operations.
@@ -246,7 +216,7 @@ def ExtractOp : Memory_Op<"extract", [NoMemoryEffect]> {
     let hasFolder = 1;
 }
 
-def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
+def InsertOp : Memory_Op<"insert", [NoMemoryEffect, AllTypesMatch<["in_qreg", "out_qreg"]>]> {
     let summary = "Update the qubit value of a register.";
     let description = [{
     }];
@@ -376,7 +346,7 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def SetStateOp : Gate_Op<"set_state"> {
+def SetStateOp : Gate_Op<"set_state", [AllTypesMatch<["in_qubits", "out_qubits"]>]> {
     let summary = "Set state to a complex vector.";
     let description = [{
         This operation is useful for simulators implementing state preparation.
@@ -407,7 +377,7 @@ def SetStateOp : Gate_Op<"set_state"> {
 
 }
 
-def SetBasisStateOp : Gate_Op<"set_basis_state"> {
+def SetBasisStateOp : Gate_Op<"set_basis_state", [AllTypesMatch<["in_qubits", "out_qubits"]>]> {
     let summary = "Set basis state.";
     let description = [{
         This operation is useful for simulators implementing set basis state.
@@ -440,7 +410,9 @@ def SetBasisStateOp : Gate_Op<"set_basis_state"> {
 }
 
 def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
-                                         AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                         AttrSizedOperandSegments, AttrSizedResultSegments,
+                                         AllTypesMatch<["in_qubits", "out_qubits"]>,
+                                         AllTypesMatch<["in_ctrl_qubits", "out_ctrl_qubits"]>]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
     }];
@@ -564,7 +536,49 @@ def CustomOp : UnitaryGate_Op<"custom", [DifferentiableGate, NoMemoryEffect,
     let hasVerifier = 1;
 }
 
-def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments]> {
+def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
+                                             AttrSizedOperandSegments, AttrSizedResultSegments,
+                                             AllTypesMatch<["in_qubits", "out_qubits"]>,
+                                             AllTypesMatch<["in_ctrl_qubits", "out_ctrl_qubits"]>]> {
+    let summary = "Apply a Pauli Product Rotation";
+    let description = [{
+        The `quantum.paulirot` operation applies a rotation around a Pauli product
+        operator to the state-vector.
+        The arguments are the rotation angle `angle`, a string representing the
+        Pauli product operator, and a set of qubits the operation acts on.
+        Note that this operation is currently not excutable. There isn't a valid
+        lowering path to the LLVM IR.
+    }];
+
+    let arguments = (ins
+        F64:$angle,
+        PauliWord:$pauli_product,
+        Variadic<QubitType>:$in_qubits,
+        UnitAttr:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
+    );
+
+    let assemblyFormat = [{
+        $pauli_product `(` $angle `)` $in_qubits (`adj` $adjoint^)? attr-dict ( `ctrls` `(` $in_ctrl_qubits^ `)` )?  ( `ctrlvals` `(` $in_ctrl_values^ `)` )? `:` type($out_qubits) (`ctrls` type($out_ctrl_qubits)^ )?
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getAllParams() {
+            return getODSOperands(getParamOperandIdx());
+        }
+    }];
+
+    let hasVerifier = 1;
+}
+
+def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOperandSegments,
+                                              AllTypesMatch<["in_ctrl_qubits", "out_ctrl_qubits"]>]> {
     let summary = "Global Phase.";
 
     let description = [{
@@ -605,7 +619,9 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [DifferentiableGate, AttrSizedOpera
 }
 
 def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
-                                           AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                           AttrSizedOperandSegments, AttrSizedResultSegments,
+                                           AllTypesMatch<["in_qubits", "out_qubits"]>,
+                                           AllTypesMatch<["in_ctrl_qubits", "out_ctrl_qubits"]>]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -644,7 +660,9 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [DifferentiableGate, NoMemoryEffect,
 }
 
 def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
-                                           AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                           AttrSizedOperandSegments, AttrSizedResultSegments,
+                                           AllTypesMatch<["in_qubits", "out_qubits"]>,
+                                           AllTypesMatch<["in_ctrl_qubits", "out_ctrl_qubits"]>]> {
     let summary = "Apply a projector-controlled phase gate";
     let description = [{
         This gate is built from simpler gates like `PhaseShift` and `PauliX` and acts on a group
@@ -694,7 +712,9 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [DifferentiableGate, NoMemoryEffect,
 
 
 def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, NoMemoryEffect,
-                                                AttrSizedOperandSegments, AttrSizedResultSegments]> {
+                                                AttrSizedOperandSegments, AttrSizedResultSegments,
+                                                AllTypesMatch<["in_qubits", "out_qubits"]>,
+                                                AllTypesMatch<["in_ctrl_qubits", "out_ctrl_qubits"]>]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `quantum.unitary` operation applies an arbitrary fixed unitary matrix to the
@@ -949,7 +969,7 @@ def HamiltonianOp : Observable_Op<"hamiltonian"> {
 class Measurement_Op<string mnemonic, list<Trait> traits = []> :
         Quantum_Op<mnemonic, traits # [MeasurementProcess]>;
 
-def MeasureOp : Quantum_Op<"measure"> {
+def MeasureOp : Quantum_Op<"measure", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
     let summary = "A single-qubit projective measurement in the computational basis.";
     let description = [{
     }];

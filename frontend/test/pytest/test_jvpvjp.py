@@ -628,7 +628,7 @@ def test_jvpvjp_argument_checks(diff_method):
         def C_workflow_bad1():
             return qml.jvp(f, 33, tuple(t), argnums=list(range(len(x))))
 
-    with pytest.raises(ValueError, match="must be a Sequence"):
+    with pytest.raises(TypeError, match="function output params and cotangents arguments"):
 
         @qjit
         def C_workflow_bad2():
@@ -733,8 +733,7 @@ def test_vjp_against_jax_argnum0_case_TT_TT(diff_method):
             return f(a, *x[1:])
 
         y, ft = J_vjp(_f, *x[0:1])
-        ct2 = tree_unflatten(tree_flatten(y)[1], ct)
-        return (y, ft(ct2))
+        return (y, ft(tuple(ct))[0])
 
     ra = C_workflowA()
     rb = C_workflowB()
@@ -745,7 +744,10 @@ def test_vjp_against_jax_argnum0_case_TT_TT(diff_method):
     res_jax, tree_jax = jax.tree_util.tree_flatten(rj)
 
     assert tree_cat_a == tree_jax
-    assert tree_cat_a == tree_cat_b
+    # argnums = 0
+    assert tree_cat_a == jax.tree_util.tree_structure(((0, 0), 0))
+    # argnums = [0]
+    assert tree_cat_b == jax.tree_util.tree_structure(((0, 0), (0,)))
 
     for r_j, r_c in zip(res_cat_a, res_cat_b):
         assert_allclose(r_j, r_c)
@@ -899,7 +901,7 @@ def test_jvp_argument_type_checks_incompatible_n_inputs(diff_method):
 
         @qjit
         def C_workflow():
-            # If `f` takes one differentiable param (argnum=[0]), then `tangents` must have length 1
+            # If `f` takes 1 differentiable param (argnums=[0]), then `tangents` must have length 1
             x = (1.0,)
             tangents = (1.0, 1.0)
             return qml.jvp(f_R1_to_R2, x, tangents, method=diff_method, argnums=[0])

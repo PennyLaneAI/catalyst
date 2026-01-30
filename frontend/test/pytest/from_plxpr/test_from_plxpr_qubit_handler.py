@@ -346,7 +346,9 @@ class TestQubitValues:
         with take_current_trace() as trace:
             # Checking via jaxpr internals is a bit tedious here
             # So let's just check the string...
-            observed_jaxpr = str(trace.to_jaxpr([], None, None)[0])
+            # pytest context messes with jax's debug info, ignore warning
+            with pytest.warns(DeprecationWarning, match="core.Jaxpr is missing a DebugInfo object"):
+                observed_jaxpr = str(trace.to_jaxpr([], None, None)[0])
             expected = """\
             { lambda ; . let
                 a:AbstractQreg() = qalloc 42:i64[]
@@ -431,8 +433,9 @@ class TestQregAndQubit:
         assert qubit_handler[0] is other_out_qubits[0]
 
         with take_current_trace() as trace:
-            # Check full jaxpr
-            observed_jaxpr = str(trace.to_jaxpr([], None, None)[0])
+            # pytest context messes with jax's debug info, ignore warning
+            with pytest.warns(DeprecationWarning, match="core.Jaxpr is missing a DebugInfo object"):
+                observed_jaxpr = str(trace.to_jaxpr([], None, None)[0])
             expected = """\
             { lambda ; . let
                 a:AbstractQreg() = qalloc 42:i64[]
