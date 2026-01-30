@@ -124,14 +124,16 @@ def test_mlir_one_shot_pass():
 print(test_mlir_one_shot_pass.mlir)
 
 # CHECK: func.func public @test_mlir_one_shot_pass.quantum_kernel
-# CHECK: Hadamard
-# CHECK: probs
+# CHECK:    [[one:%.+]] = arith.constant 1 : i64
+# CHECK:    quantum.device shots([[one]])
+# CHECK:    Hadamard
+# CHECK:    probs
 # CHECK: func.func public @test_mlir_one_shot_pass
-# CHECK: index.constant 1000
-# CHECK: scf.for
-# CHECK: func.call @test_mlir_one_shot_pass.quantum_kernel
-# CHECK: stablehlo.add
-# CHECK: stablehlo.divide
+# CHECK:    index.constant 1000
+# CHECK:    scf.for
+# CHECK:    func.call @test_mlir_one_shot_pass.quantum_kernel
+# CHECK:    stablehlo.add
+# CHECK:    stablehlo.divide
 print(get_compilation_stage(test_mlir_one_shot_pass, "QuantumCompilationStage"))
 
 res = test_mlir_one_shot_pass()
