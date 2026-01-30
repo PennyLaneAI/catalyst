@@ -30,39 +30,22 @@ func.func public @test_expval(%arg0: f64) -> tensor<f64> {
   return %from_elements : tensor<f64>
 }
 
-// CHECK: scf.for
-// CHECK: func.call @test_expval.quantum_kernel
-// module {
-//   func.func public @test_expval.quantum_kernel(%arg0: f64) -> tensor<f64> {
-//     %c1_i64 = arith.constant 1 : i64
-//     quantum.device shots(%c1_i64) ["", "", ""]
-//     %0 = quantum.alloc( 2) : !quantum.reg
-//     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-//     %out_qubits = quantum.custom "RX"(%arg0) %1 : !quantum.bit
-//     %mres, %out_qubit = quantum.measure %out_qubits : i1, !quantum.bit
-//     %2 = quantum.namedobs %out_qubit[ PauliZ] : !quantum.obs
-//     %3 = quantum.expval %2 : f64
-//     %from_elements = tensor.from_elements %3 : tensor<f64>
-//     %4 = quantum.insert %0[ 0], %out_qubit : !quantum.reg, !quantum.bit
-//     quantum.dealloc %4 : !quantum.reg
-//     quantum.device_release
-//     return %from_elements : tensor<f64>
-//   }
-//   func.func public @test_expval(%arg0: f64) -> tensor<f64> {
-//     %c1000_i64 = arith.constant 1000 : i64
-//     %cst = arith.constant 0.000000e+00 : f64
-//     %c0 = arith.constant 0 : index
-//     %c1 = arith.constant 1 : index
-//     %0 = index.casts %c1000_i64 : i64 to index
-//     %1 = scf.for %arg1 = %c0 to %0 step %c1 iter_args(%arg2 = %cst) -> (f64) {
-//       %4 = func.call @test_expval.quantum_kernel(%arg0) : (f64) -> tensor<f64>
-//       %extracted = tensor.extract %4[] : tensor<f64>
-//       %5 = arith.addf %extracted, %arg2 : f64
-//       scf.yield %5 : f64
-//     }
-//     %2 = arith.sitofp %c1000_i64 : i64 to f64
-//     %3 = arith.divf %1, %2 : f64
-//     %from_elements = tensor.from_elements %3 : tensor<f64>
-//     return %from_elements : tensor<f64>
-//   }
-// }
+
+// CHECK: func.func public @test_expval.quantum_kernel(%arg0: f64) -> tensor<f64>
+// CHECK:  [[one:%.+]] = arith.constant 1 : i64
+// CHECK:  quantum.device shots([[one]]) ["", "", ""]
+
+// CHECK: func.func public @test_expval(%arg0: f64) -> tensor<f64> {
+// CHECK:   [[shots:%.+]] = arith.constant 1000 : i64
+// CHECK:   [[loopIterSum:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
+// CHECK:   [[lb:%.+]] = arith.constant 0 : index
+// CHECK:   [[step:%.+]] = arith.constant 1 : index
+// CHECK:   [[ub:%.+]] = index.casts [[shots]] : i64 to index
+// CHECK:   [[totalSum:%.+]] = scf.for %arg1 = [[lb]] to [[ub]] step [[step]] iter_args(%arg2 = [[loopIterSum]]) -> (tensor<f64>) {
+// CHECK:     [[call:%.+]] = func.call @test_expval.quantum_kernel(%arg0) : (f64) -> tensor<f64>
+// CHECK:     [[add:%.+]] = stablehlo.add [[call]], %arg2 : tensor<f64>
+// CHECK:     scf.yield [[add]] : tensor<f64>
+// CHECK:   [[castShots:%.+]] = arith.sitofp [[shots]] : i64 to f64
+// CHECK:   [[fromElem:%.+]] = tensor.from_elements [[castShots]] : tensor<f64>
+// CHECK:   [[div:%.+]] = stablehlo.divide [[totalSum]], [[fromElem]] : tensor<f64>
+// CHECK:   return [[div]] : tensor<f64>

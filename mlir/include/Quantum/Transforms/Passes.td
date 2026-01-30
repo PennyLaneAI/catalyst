@@ -140,7 +140,8 @@ def OneShotMCMPass : Pass<"one-shot-mcm"> {
     let dependentDialects = [
         "index::IndexDialect",
         "tensor::TensorDialect",
-        "scf::SCFDialect"
+        "scf::SCFDialect",
+        "stablehlo::StablehloDialect"
     ];
 }
 
