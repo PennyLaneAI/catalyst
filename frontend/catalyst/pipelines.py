@@ -116,6 +116,11 @@ class CompileOptions:
             Default is ``None``.
         pass_plugins (Optional[Iterable[Path]]): List of paths to pass plugins.
         dialect_plugins (Optional[Iterable[Path]]): List of paths to dialect plugins.
+        capture (Optional[Union[str, bool]]): Controls whether to use PennyLane program capture.
+
+            - ``"global"`` (default): Defer to ``qml.capture.enabled()``
+            - ``True``: Force program capture on, regardless of global setting
+            - ``False``: Force program capture off (use old frontend)
     """
 
     verbose: Optional[bool] = False
@@ -137,6 +142,7 @@ class CompileOptions:
     circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
     pass_plugins: Optional[Set[Path]] = None
     dialect_plugins: Optional[Set[Path]] = None
+    capture: Optional[Union[str, bool]] = "global"
 
     def __post_init__(self):
         # Convert keep_intermediate to Enum
@@ -178,6 +184,14 @@ class CompileOptions:
             self.dialect_plugins = set()
         else:
             self.dialect_plugins = set(self.dialect_plugins)
+
+        # Validate capture parameter
+        valid_capture_values = ("global", True, False)
+        if self.capture not in valid_capture_values:
+            raise ValueError(
+                f"Invalid value for capture: {self.capture!r}. "
+                f"Valid values are: 'global', True, False."
+            )
 
     def __deepcopy__(self, memo):
         """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
