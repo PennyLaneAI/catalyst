@@ -2,7 +2,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
-#include "Driver/CompilerDriver.h"
+#include "Driver/CompilerDriver.hpp"
 #include "Driver/LineUtils.hpp"
 #include "Driver/PassInstrumentation.hpp"
 #include "Driver/Support.h"

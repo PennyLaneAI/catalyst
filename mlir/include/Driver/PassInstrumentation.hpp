@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Driver/CompilerDriver.h"
+#include "Driver/CompilerDriver.hpp"
 #include "Timer.hpp"
 #include "mlir/Pass/PassInstrumentation.h"
 
