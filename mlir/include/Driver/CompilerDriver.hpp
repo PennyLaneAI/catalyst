@@ -129,10 +129,12 @@ struct CompilerOutput {
     bool isCheckpointFound;
 
     // Gets the next pass dump file name within a pipeline folder
-    std::string nextPassDumpFilename(std::string pipelineName, std::string ext = ".mlir");
+    std::string nextPassDumpFilename(const std::string &pipelineName,
+                                     const std::string &ext = ".mlir");
 
     // Gets the root-level pipeline summary file name
-    std::string nextPipelineSummaryFilename(std::string pipelineName, std::string ext = ".mlir");
+    std::string nextPipelineSummaryFilename(const std::string &pipelineName,
+                                            const std::string &ext = ".mlir");
 
     // Set the current compilation stage for organizing output files
     void setStage(const std::string &stageName);

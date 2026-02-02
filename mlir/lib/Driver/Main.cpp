@@ -1,23 +1,41 @@
+#include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Driver/Support.h"
-#include "mlir/IR/BuiltinOps.h"         // mlir::ModuleOp
-#include "mlir/IR/Diagnostics.h"        // mlir::Diagnostic
-#include "mlir/IR/MLIRContext.h"        // mlir::MLIRContext
-#include "mlir/IR/OwningOpRef.h"        // mlir::OwningOpRef
-#include "mlir/Support/Timing.h"        // mlir::DefaultTimingManager, mlir::TimingScope
-#include "llvm/IR/LLVMContext.h"        // llvm::LLVMContext
+#include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
+#include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
+#include "mlir/IR/BuiltinOps.h"  // mlir::ModuleOp
+#include "mlir/IR/Diagnostics.h" // mlir::Diagnostic
+#include "mlir/IR/MLIRContext.h" // mlir::MLIRContext
+#include "mlir/IR/OwningOpRef.h" // mlir::OwningOpRef
+#include "mlir/Support/Timing.h" // mlir::DefaultTimingManager, mlir::TimingScope
+#include "llvm/IR/LLVMContext.h" // llvm::LLVMContext
+#include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/LogicalResult.h" // llvm::LogicalResult
 #include "llvm/Support/MemoryBuffer.h"  // llvm::MemoryBuffer
 #include "llvm/Support/SMLoc.h"         // llvm::SMLoc
 #include "llvm/Support/SourceMgr.h"     // llvm::SourceMgr
 #include "llvm/Support/TargetSelect.h"
-#include "llvm/MC/TargetRegistry.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Host.h"
+#include <llvm/ADT/STLForwardCompat.h>
+#include <llvm/Support/ToolOutputFile.h>
+
+#include <mlir/InitAllPasses.h>
 
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
 
+#include "mlir/Support/FileUtilities.h"
+
+#include "stablehlo/integrations/c/StablehloPasses.h"
+
+#include "RegisterAllPasses.h"
+
+#include "Driver/CatalystLLVMTarget.h"
 #include "Driver/CompilerDriver.hpp"
 #include "Driver/LineUtils.hpp"
 #include "Driver/Timer.hpp"
+#include "stablehlo/transforms/optimization/Passes.h"
 
 namespace {
 using namespace catalyst;
@@ -196,7 +214,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
         }
 
         std::string errorMessage;
-        auto outfile = openOutputFile(output.outputFilename, &errorMessage);
+        auto outfile = mlir::openOutputFile(output.outputFilename, &errorMessage);
         if (output.outputFilename == "-" && llvmModule) {
             // Do not generate file if outputting to stdout.
             outfile->os() << *llvmModule;
@@ -211,8 +229,9 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
             outIRStream << *llvmModule;
         }
 
-        if (failed(timer::timer(compileObjectFile, "compileObjFile", /* add_endl */ true, options,
-                                llvmModule, targetMachine, options.getObjectFile()))) {
+        if (failed(timer::timer(catalyst::driver::compileObjectFile, "compileObjFile",
+                                /* add_endl */ true, options, llvmModule, targetMachine,
+                                options.getObjectFile()))) {
             return llvm::failure();
         }
         outputTiming.stop();
@@ -220,7 +239,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
     }
 
     std::string errorMessage;
-    auto outfile = openOutputFile(output.outputFilename, &errorMessage);
+    auto outfile = mlir::openOutputFile(output.outputFilename, &errorMessage);
     if (!outfile) {
         llvm::errs() << errorMessage << "\n";
         return llvm::failure();
@@ -243,6 +262,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
 
 int QuantumDriverMainFromCL(int argc, char **argv)
 {
+    namespace cl = llvm::cl;
     // Command-line options
 
     // ATTENTION
@@ -296,7 +316,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
                                   cl::init(true), cl::cat(CatalystCat));
 
     // Create dialect registry
-    DialectRegistry registry;
+    mlir::DialectRegistry registry;
     mlir::registerAllPasses();
     catalyst::registerAllPasses();
     registerAllCatalystPipelines();
@@ -326,7 +346,7 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     std::string source = readInputFile(inputFilename);
     if (source.empty()) {
         llvm::errs() << "Error: Unable to read input file: " << inputFilename << "\n";
-        return ErrorCode::Failure;
+        return llvm::to_underlying(ErrorCode::Failure);
     }
 
     std::unique_ptr<CompilerOutput> output(new CompilerOutput());
@@ -354,10 +374,10 @@ int QuantumDriverMainFromCL(int argc, char **argv)
 
     if (mlir::failed(result)) {
         llvm::errs() << "Compilation failed:\n" << output->diagnosticMessages << "\n";
-        return ErrorCode::Failure;
+        return llvm::to_underlying(ErrorCode::Failure);
     }
 
     if (Verbose)
         llvm::outs() << "Compilation successful:\n" << output->diagnosticMessages << "\n";
-    return std::to_underlying(ErrorCode::Success);
+    return llvm::to_underlying(ErrorCode::Success);
 }

@@ -207,6 +207,7 @@ template <IsRatio Duration = std::milli> class Timer {
     }
 
     template <typename Function, typename... Args>
+        requires std::is_invocable_v<Function, Args...>
     static auto timer(Function func, const std::string &name, bool add_endl, Args &&...args)
     {
         if (!enable_debug_timer()) {

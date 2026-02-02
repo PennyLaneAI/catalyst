@@ -174,8 +174,8 @@ void registerAllCatalystDialects(DialectRegistry &registry)
 } // namespace catalyst::driver
 
 // Determines if the compilation stage should be executed if a checkpointStage is given
-bool shouldRunStage(const CompilerOptions &options, CompilerOutput &output,
-                    const std::string &stageName)
+bool catalyst::driver::shouldRunStage(const CompilerOptions &options, CompilerOutput &output,
+                                      const std::string &stageName)
 {
     if (options.checkpointStage.empty()) {
         return true;
@@ -187,10 +187,11 @@ bool shouldRunStage(const CompilerOptions &options, CompilerOutput &output,
     return true;
 }
 
-LogicalResult runCoroLLVMPasses(const CompilerOptions &options,
-                                std::shared_ptr<llvm::Module> llvmModule, CompilerOutput &output)
+llvm::LogicalResult catalyst::driver::runCoroLLVMPasses(const CompilerOptions &options,
+                                                        std::shared_ptr<llvm::Module> llvmModule,
+                                                        CompilerOutput &output)
 {
-    if (!shouldRunStage(options, output, "CoroOpt")) {
+    if (!catalyst::driver::shouldRunStage(options, output, "CoroOpt")) {
         return success();
     }
 
@@ -231,13 +232,14 @@ LogicalResult runCoroLLVMPasses(const CompilerOptions &options,
     return success();
 }
 
-LogicalResult runO2LLVMPasses(const CompilerOptions &options,
-                              std::shared_ptr<llvm::Module> llvmModule, CompilerOutput &output)
+llvm::LogicalResult catalyst::driver::runO2LLVMPasses(const CompilerOptions &options,
+                                                      std::shared_ptr<llvm::Module> llvmModule,
+                                                      CompilerOutput &output)
 {
     // opt -O2
     // As seen here:
     // https://llvm.org/docs/NewPassManager.html#just-tell-me-how-to-run-the-default-optimization-pipeline-with-the-new-pass-manager
-    if (!shouldRunStage(options, output, "O2Opt")) {
+    if (!catalyst::driver::shouldRunStage(options, output, "O2Opt")) {
         return success();
     }
 
@@ -284,10 +286,11 @@ LogicalResult runO2LLVMPasses(const CompilerOptions &options,
     return success();
 }
 
-LogicalResult runEnzymePasses(const CompilerOptions &options,
-                              std::shared_ptr<llvm::Module> llvmModule, CompilerOutput &output)
+llvm::LogicalResult catalyst::driver::runEnzymePasses(const CompilerOptions &options,
+                                                      std::shared_ptr<llvm::Module> llvmModule,
+                                                      CompilerOutput &output)
 {
-    if (!shouldRunStage(options, output, "Enzyme")) {
+    if (!catalyst::driver::shouldRunStage(options, output, "Enzyme")) {
         return success();
     }
 
@@ -333,7 +336,7 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
     return success();
 }
 
-std::string readInputFile(const std::string &filename)
+std::string catalyst::driver::readInputFile(const std::string &filename)
 {
     if (filename == "-") {
         std::stringstream buffer;
@@ -350,9 +353,11 @@ std::string readInputFile(const std::string &filename)
     return buffer.str();
 }
 
-LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options,
-                                 CompilerOutput &output, catalyst::utils::Timer<> &timer,
-                                 TimingScope &timing)
+llvm::LogicalResult catalyst::driver::preparePassManager(PassManager &pm,
+                                                         const CompilerOptions &options,
+                                                         CompilerOutput &output,
+                                                         catalyst::utils::Timer<> &timer,
+                                                         TimingScope &timing)
 {
     MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
     pm.enableVerifier(config.shouldVerifyPasses());
@@ -367,8 +372,10 @@ LogicalResult preparePassManager(PassManager &pm, const CompilerOptions &options
     return success();
 }
 
-LogicalResult configurePipeline(PassManager &pm, const CompilerOptions &options, Pipeline &pipeline,
-                                bool clHasManualPipeline)
+llvm::LogicalResult catalyst::driver::configurePipeline(PassManager &pm,
+                                                        const CompilerOptions &options,
+                                                        Pipeline &pipeline,
+                                                        bool clHasManualPipeline)
 {
     pm.clear();
     if (!clHasManualPipeline && failed(pipeline.addPipeline(pm))) {
@@ -386,16 +393,18 @@ LogicalResult configurePipeline(PassManager &pm, const CompilerOptions &options,
     return success();
 }
 
-LogicalResult runPipeline(PassManager &pm, const CompilerOptions &options, CompilerOutput &output,
-                          Pipeline &pipeline, bool clHasManualPipeline, ModuleOp moduleOp)
+llvm::LogicalResult catalyst::driver::runPipeline(PassManager &pm, const CompilerOptions &options,
+                                                  CompilerOutput &output, Pipeline &pipeline,
+                                                  bool clHasManualPipeline, ModuleOp moduleOp)
 {
-    if (!shouldRunStage(options, output, pipeline.getName()) || pipeline.getPasses().size() == 0) {
+    if (!catalyst::driver::shouldRunStage(options, output, pipeline.getName()) ||
+        pipeline.getPasses().size() == 0) {
         return success();
     }
 
     output.setStage(pipeline.getName());
 
-    if (failed(configurePipeline(pm, options, pipeline, clHasManualPipeline))) {
+    if (failed(catalyst::driver::configurePipeline(pm, options, pipeline, clHasManualPipeline))) {
         llvm::errs() << "Failed to run pipeline: " << pipeline.getName() << "\n";
         return failure();
     }
@@ -412,14 +421,15 @@ LogicalResult runPipeline(PassManager &pm, const CompilerOptions &options, Compi
     return success();
 }
 
-LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, ModuleOp moduleOp,
-                          CompilerOutput &output, TimingScope &timing)
+llvm::LogicalResult catalyst::driver::runLowering(const CompilerOptions &options, MLIRContext *ctx,
+                                                  ModuleOp moduleOp, CompilerOutput &output,
+                                                  TimingScope &timing)
 
 {
     catalyst::utils::Timer<> timer{};
 
     auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
-    if (failed(preparePassManager(pm, options, output, timer, timing))) {
+    if (failed(catalyst::driver::preparePassManager(pm, options, output, timer, timing))) {
         llvm::errs() << "Failed to setup pass manager\n";
         return failure();
     }
@@ -445,7 +455,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     std::vector<Pipeline> UserPipeline =
         clHasManualPipeline ? options.pipelinesCfg : getDefaultPipeline();
     for (auto &pipeline : UserPipeline) {
-        if (failed(catalyst::utils::Timer<>::timer(runPipeline, pipeline.getName(),
+        if (failed(catalyst::utils::Timer<>::timer(catalyst::driver::runPipeline,
+                                                   pipeline.getName(),
                                                    /* add_endl */ false, pm, options, output,
                                                    pipeline, clHasManualPipeline, moduleOp))) {
             return failure();
@@ -455,7 +466,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     return success();
 }
 
-LogicalResult verifyInputType(const CompilerOptions &options, InputType inType)
+llvm::LogicalResult catalyst::driver::verifyInputType(const CompilerOptions &options,
+                                                      InputType inType)
 {
     if (inType == InputType::OTHER) {
         CO_MSG(options, Verbosity::Urgent, "Wrong or unsupported input\n");
@@ -472,7 +484,7 @@ LogicalResult verifyInputType(const CompilerOptions &options, InputType inType)
     return success();
 }
 
-size_t findMatchingClosingParen(llvm::StringRef str, size_t openParenPos)
+size_t catalyst::driver::findMatchingClosingParen(llvm::StringRef str, size_t openParenPos)
 {
     int parenCount = 1;
     for (size_t pos = openParenPos + 1; pos < str.size(); pos++) {
@@ -489,7 +501,8 @@ size_t findMatchingClosingParen(llvm::StringRef str, size_t openParenPos)
     return llvm::StringRef::npos;
 }
 
-std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeline)
+std::vector<Pipeline>
+catalyst::driver::parsePipelines(const cl::list<std::string> &catalystPipeline)
 {
     std::vector<Pipeline> allPipelines;
     for (const auto &pipelineStr : catalystPipeline) {
@@ -500,7 +513,8 @@ std::vector<Pipeline> parsePipelines(const cl::list<std::string> &catalystPipeli
         }
 
         size_t openParenPos = pipelineRef.find('(');
-        size_t closeParenPos = findMatchingClosingParen(pipelineRef, openParenPos);
+        size_t closeParenPos =
+            catalyst::driver::findMatchingClosingParen(pipelineRef, openParenPos);
 
         if (openParenPos == llvm::StringRef::npos || closeParenPos == llvm::StringRef::npos) {
             llvm::errs() << "Error: Invalid pipeline format: " << pipelineStr << "\n";
@@ -534,16 +548,16 @@ std::string CompilerOptions::getObjectFile() const
     return path(workspace.str()) / path(moduleName.str() + ".o");
 }
 
-std::string CompilerOutput::nextPassDumpFilename(std::string pipelineName,
-                                                 std::string ext = ".mlir")
+std::string CompilerOutput::nextPassDumpFilename(const std::string &pipelineName,
+                                                 const std::string &ext)
 {
     return std::filesystem::path(currentStage) /
            std::filesystem::path(std::to_string(this->passCounter++) + "_" + pipelineName)
                .replace_extension(ext);
 }
 
-std::string CompilerOutput::nextPipelineSummaryFilename(std::string pipelineName,
-                                                        std::string ext = ".mlir")
+std::string CompilerOutput::nextPipelineSummaryFilename(const std::string &pipelineName,
+                                                        const std::string &ext)
 {
     return std::filesystem::path(std::to_string(this->globalPipelineCounter) + "_After" +
                                  pipelineName)
