@@ -56,7 +56,7 @@
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Driver/CatalystLLVMTarget.h"
-#include "Driver/CompilerDriver.h"
+#include "Driver/CompilerDriver.hpp"
 #include "Driver/LineUtils.hpp"
 #include "Driver/PassInstrumentation.hpp"
 #include "Driver/Pipelines.h"
