@@ -240,7 +240,7 @@ LogicalResult convertIGate(CustomOp op, ConversionPatternRewriter &rewriter)
 
 LogicalResult convertCNOTGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
-    applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 4, rewriter);
+    applyGlobalPhase(op->getLoc(), llvm::numbers::pi / 4, rewriter);
     return controlledConversion(op, "Z", "X", rewriter);
 }
 
