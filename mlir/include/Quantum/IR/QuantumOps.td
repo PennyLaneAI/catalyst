@@ -867,6 +867,38 @@ def NamedObsOp : Observable_Op<"namedobs"> {
     }];
 }
 
+def MCMObsOp : Observable_Op<"mcmobs"> {
+    let summary = "Define a pseudo-observable of mid-circuit measurements for use in terminal measurements";
+    let description = [{
+        The `quantum.mcmobs` operation defines a quantum observable from a mid-circuit measurement,
+        to be used by other operations such as measurement processes.
+
+        The only argument is the boolean result value of the mid-circuit measurement.
+
+        Example:
+
+        ```mlir
+        func.func @foo(%mcm: i1)
+        {
+            %obs = quantum.mcmobs %mcm : !quantum.obs
+            func.return
+        }
+        ```
+    }];
+
+    let arguments = (ins
+        I1:$mcm
+    );
+
+    let results = (outs
+        ObservableType:$obs
+    );
+
+    let assemblyFormat = [{
+        $mcm attr-dict `:` type(results)
+    }];
+}
+
 def HermitianOp : Observable_Op<"hermitian"> {
     let summary = "Define a Hermitian observable for use in measurements";
     let description = [{

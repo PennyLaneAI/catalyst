@@ -125,8 +125,49 @@ namespace quantum {
 struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
     using impl::OneShotMCMPassBase<OneShotMCMPass>::OneShotMCMPassBase;
 
-    void handleExpvalOrProbsOneShot(IRRewriter &builder, func::FuncOp qfunc, Value shots,
-                                    Operation *mod)
+    void editKernelMCMExpval(IRRewriter &builder, func::FuncOp qfunc, quantum::MCMObsOp mcmobs)
+    {
+        // If the kernel returns expval on a mcm,
+        // the single-shot expval of a mcm is just the mcm boolean result itself
+        // So we just cast it to the correct type and return it.
+
+        OpBuilder::InsertionGuard guard(builder);
+        Location loc = qfunc->getLoc();
+
+        // Erase all users of the mcm obs: they new return does not need them.
+        // We need to use a SetVector, since during the erasure we have to delete from bottom up
+        // So we need an ordered container
+        SetVector<Operation *> mcmobsForwardSlice;
+        getForwardSlice(mcmobs.getObs(), &mcmobsForwardSlice);
+
+        // Safety check: the old return should also be erased
+        auto retOp = cast<func::ReturnOp>(qfunc.getBody().back().getTerminator());
+        assert(mcmobsForwardSlice.contains(retOp) &&
+               "Expected the multi-shot expval of the mcm to be erased in the one-shot kernel.");
+
+        for (auto op = mcmobsForwardSlice.rbegin(); op != mcmobsForwardSlice.rend(); ++op) {
+            (*op)->erase();
+        }
+
+        // Cast the I1 mcm to the correct type and return it
+        // MCM itself is I1
+        // Expval kernel returns tensor<f64>
+        // We need to cast as I1 -> I64 -> F64 -> tensor<f64>
+        builder.setInsertionPointToEnd(&qfunc.getBody().back());
+        Value mcm = mcmobs.getMcm();
+        auto extuiOp = builder.create<arith::ExtUIOp>(loc, builder.getI64Type(), mcm);
+        auto int2floatCastOp =
+            builder.create<arith::SIToFPOp>(loc, builder.getF64Type(), extuiOp.getOut());
+        auto fromElementsOp = builder.create<tensor::FromElementsOp>(
+            loc, RankedTensorType::get({}, builder.getF64Type()), int2floatCastOp.getResult());
+
+        builder.create<func::ReturnOp>(loc, fromElementsOp.getResult());
+
+        mcmobs->erase();
+    }
+
+    void handleExpvalOrProbsOneShot(IRRewriter &builder, func::FuncOp qfunc, MeasurementProcess mp,
+                                    Value shots, Operation *mod, bool isExpval)
     {
         // Add the result from each shot, and divide by the number of shots.
         // We simply perform the addition in the for loop body: no need to initialize a big
@@ -136,6 +177,13 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
 
         OpBuilder::InsertionGuard guard(builder);
         Location loc = mod->getLoc();
+
+        Operation *MPSourceOp = mp.getObs().getDefiningOp();
+        if (isa<quantum::MCMObsOp>(MPSourceOp)) {
+            if (isExpval) {
+                editKernelMCMExpval(builder, qfunc, cast<quantum::MCMObsOp>(MPSourceOp));
+            }
+        }
 
         Type f64Type = builder.getF64Type();
 
@@ -323,31 +371,36 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         bool illegalMP = false, isExpval = false, isProbs = false, isSample = false,
              isCounts = false;
         func::FuncOp qfunc;
-        mod->walk([&](MeasurementProcess mp) {
-            if (isa<quantum::ExpvalOp>(mp)) {
+        MeasurementProcess mp;
+        mod->walk([&](MeasurementProcess _mp) {
+            if (isa<quantum::ExpvalOp>(_mp)) {
                 isExpval = true;
-                qfunc = mp->getParentOfType<func::FuncOp>();
+                qfunc = _mp->getParentOfType<func::FuncOp>();
+                mp = _mp;
             }
-            else if (isa<quantum::ProbsOp>(mp)) {
+            else if (isa<quantum::ProbsOp>(_mp)) {
                 isProbs = true;
-                qfunc = mp->getParentOfType<func::FuncOp>();
+                qfunc = _mp->getParentOfType<func::FuncOp>();
+                mp = _mp;
             }
-            else if (isa<quantum::SampleOp>(mp)) {
+            else if (isa<quantum::SampleOp>(_mp)) {
                 isSample = true;
-                qfunc = mp->getParentOfType<func::FuncOp>();
+                qfunc = _mp->getParentOfType<func::FuncOp>();
+                mp = _mp;
             }
-            else if (isa<quantum::CountsOp>(mp)) {
+            else if (isa<quantum::CountsOp>(_mp)) {
                 isCounts = true;
-                qfunc = mp->getParentOfType<func::FuncOp>();
+                qfunc = _mp->getParentOfType<func::FuncOp>();
+                mp = _mp;
             }
-            else if (isa<quantum::VarianceOp>(mp)) {
-                mp->emitOpError(
+            else if (isa<quantum::VarianceOp>(_mp)) {
+                _mp->emitOpError(
                     "VarianceOp is not currently supported for conversion to one-shot MCM.");
                 illegalMP = true;
             }
-            else if (isa<quantum::StateOp>(mp)) {
-                mp->emitOpError("StateOp is not compatible with shot-based execution, and has no "
-                                "valid conversion to one-shot MCM.");
+            else if (isa<quantum::StateOp>(_mp)) {
+                _mp->emitOpError("StateOp is not compatible with shot-based execution, and has no "
+                                 "valid conversion to one-shot MCM.");
                 illegalMP = true;
             }
             return WalkResult::interrupt();
@@ -366,7 +419,7 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         Value shots = deviceInitOp.getShots();
 
         if (isExpval || isProbs) {
-            handleExpvalOrProbsOneShot(builder, qfunc, shots, mod);
+            handleExpvalOrProbsOneShot(builder, qfunc, mp, shots, mod, isExpval);
         }
         else if (isSample) {
             handleSampleOneShot(builder, qfunc, shots, mod);

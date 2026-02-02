@@ -106,6 +106,7 @@ with Patcher(
         HamiltonianOp,
         HermitianOp,
         InsertOp,
+        MCMObsOp,
         MeasureOp,
         MultiRZOp,
         NamedObsOp,
@@ -303,6 +304,7 @@ measure_p = Primitive("measure")
 measure_p.multiple_results = True
 compbasis_p = Primitive("compbasis")
 namedobs_p = Primitive("namedobs")
+mcmobs_p = Primitive("mcmobs")
 hermitian_p = Primitive("hermitian")
 tensorobs_p = Primitive("tensorobs")
 hamiltonian_p = Primitive("hamiltonian")
@@ -1765,6 +1767,21 @@ def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, kind
 
 
 #
+# mcm observable
+#
+@mcmobs_p.def_abstract_eval
+def _mcmobs_abstract_eval(mcm):
+    return AbstractObs()
+
+
+def _mcm_obs_lowering(jax_ctx: mlir.LoweringRuleContext, mcm: ir.Value):
+    ctx = jax_ctx.module_context.context
+    result_type = ir.OpaqueType.get("quantum", "obs", ctx)
+    extracted = extract_scalar(mcm, "mcmobs")
+    return MCMObsOp(result_type, extracted).results
+
+
+#
 # hermitian observable
 #
 @hermitian_p.def_abstract_eval
@@ -2828,6 +2845,7 @@ CUSTOM_LOWERING_RULES = (
     (measure_p, _measure_lowering),
     (compbasis_p, _compbasis_lowering),
     (namedobs_p, _named_obs_lowering),
+    (mcmobs_p, _mcm_obs_lowering),
     (hermitian_p, _hermitian_lowering),
     (tensorobs_p, _tensor__obs_lowering),
     (hamiltonian_p, _hamiltonian_lowering),

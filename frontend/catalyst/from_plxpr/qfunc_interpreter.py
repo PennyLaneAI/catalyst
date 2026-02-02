@@ -48,6 +48,7 @@ from catalyst.jax_primitives import (
     gphase_p,
     hamiltonian_p,
     hermitian_p,
+    mcmobs_p,
     measure_in_basis_p,
     measure_p,
     namedobs_p,
@@ -279,17 +280,18 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             raise NotImplementedError(
                 "from_plxpr does not yet support measurements with manual eigvals."
             )
-        if (
-            measurement.mv is not None
-            or measurement.obs is not None
-            and not isinstance(measurement.obs, qml.operation.Operator)
-        ):
-            raise NotImplementedError("Measurements of mcms are not yet supported.")
 
         if measurement.obs:
             obs = self._obs(measurement.obs)
         else:
-            obs = self._compbasis_obs(*measurement.wires)
+            if (
+                measurement.mv is not None
+                or measurement.obs is not None
+                and not isinstance(measurement.obs, qml.operation.Operator)
+            ):
+                obs = mcmobs_p.bind(measurement.mv)
+            else:
+                obs = self._compbasis_obs(*measurement.wires)
 
         shape, dtype = measurement._abstract_eval(
             n_wires=len(measurement.wires),
