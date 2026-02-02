@@ -569,7 +569,6 @@ class QJIT(CatalystCallable):
                 fn, compile_options.static_argnames, compile_options.static_argnums
             )
 
-        # Determine target capture state for this QJIT instance
         target_capture_state = self._resolve_capture_state()
 
         # Use temporary_capture_state to set capture mode during pre_compilation
@@ -773,7 +772,13 @@ class QJIT(CatalystCallable):
         if target_capture_state is not None:
             with temporary_capture_state(target_capture_state):
                 return self._trace_with_current_capture_state(
-                    static_argnums, abstracted_axes, dynamic_args, dynamic_sig, full_sig, kwargs, dbg
+                    static_argnums,
+                    abstracted_axes,
+                    dynamic_args,
+                    dynamic_sig,
+                    full_sig,
+                    kwargs,
+                    dbg,
                 )
         else:
             # Use global state as-is
