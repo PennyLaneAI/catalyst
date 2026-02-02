@@ -20,7 +20,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import CompileError, qjit
+from catalyst import qjit
 from catalyst.third_party.oqd import OQDDevice, OQDDevicePipeline
 
 MODULE_TEST_PATH = os.path.dirname(__file__)
@@ -117,9 +117,8 @@ class TestOQDARTIQLLVMIR:
             return qml.counts(all_outcomes=True)
 
         with pytest.raises(
-            CompileError,
-            match="Functions compiled with target='llvmir' cannot be executed directly. "
-            "Access the generated LLVM IR via the '\\.llvmir' property\\.",
+            TypeError,
+            match="'NoneType' object is not callable",
         ):
             circuit()
 

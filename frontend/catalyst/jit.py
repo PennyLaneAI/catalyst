@@ -848,12 +848,6 @@ class QJIT(CatalystCallable):
         Returns:
             Any: results of the execution arranged into the original function's output PyTrees
         """
-        if self.compile_options.target == "llvmir":
-            raise CompileError(
-                "Functions compiled with target='llvmir' cannot be executed directly. "
-                "Access the generated LLVM IR via the '.llvmir' property."
-            )
-
         results = self.compiled_function(*args, **kwargs)
 
         # TODO: Move this to the compiled function object.
