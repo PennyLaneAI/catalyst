@@ -129,3 +129,42 @@ func.func public @test_sample(%arg0: f64) -> tensor<1000x2xi64> {
 // CHECK:      [[insert:%.+]] = tensor.insert_slice [[call]] into %arg2[%arg1, 0] [1, 2] [1, 1] : tensor<1x2xi64> into tensor<1000x2xi64>
 // CHECK:      scf.yield [[insert]] : tensor<1000x2xi64>
 // CHECK:    return [[fullSamples]] : tensor<1000x2xi64>
+
+
+// -----
+
+
+func.func public @test_counts(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) {
+  %1000 = arith.constant 1000 : i64
+  quantum.device shots(%1000) ["", "", ""]
+  %0 = quantum.alloc( 2) : !quantum.reg
+  %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+  %out_qubits = quantum.custom "RX"(%arg0) %1 : !quantum.bit
+  %mres, %out_qubit = quantum.measure %out_qubits : i1, !quantum.bit
+  %2 = quantum.insert %0[ 0], %out_qubit : !quantum.reg, !quantum.bit
+  %3 = quantum.compbasis qreg %2 : !quantum.obs
+  %eigvals, %counts = quantum.counts %3 : tensor<4xf64>, tensor<4xi64>
+  %4 = stablehlo.convert %eigvals : (tensor<4xf64>) -> tensor<4xi64>
+  quantum.dealloc %2 : !quantum.reg
+  quantum.device_release
+  return %4, %counts : tensor<4xi64>, tensor<4xi64>
+}
+
+
+// CHECK: func.func public @test_counts.quantum_kernel(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>)
+// CHECK:   [[one:%.+]] = arith.constant 1 : i64
+// CHECK:   quantum.device shots([[one]]) ["", "", ""]
+
+// CHECK: func.func public @test_counts(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) {
+// CHECK:   [[shots:%.+]] = arith.constant 1000 : i64
+// CHECK:   [[countsSum:%.+]] = stablehlo.constant dense<0> : tensor<4xi64>
+// CHECK:   [[eigens:%.+]] = tensor.empty() : tensor<4xi64>
+// CHECK:   [[lb:%.+]] = arith.constant 0 : index
+// CHECK:   [[step:%.+]] = arith.constant 1 : index
+// CHECK:   [[ub:%.+]] = index.casts [[shots]] : i64 to index
+// CHECK:   [[forOut:%.+]]:2 = scf.for %arg1 = [[lb]] to [[ub]] step [[step]]
+// CHECK-SAME:   (%arg2 = [[eigens]], %arg3 = [[countsSum]]) -> (tensor<4xi64>, tensor<4xi64>)
+// CHECK:     [[call:%.+]]:2 = func.call @test_counts.quantum_kernel(%arg0) : (f64) -> (tensor<4xi64>, tensor<4xi64>)
+// CHECK:     [[add:%.+]] = stablehlo.add [[call]]#1, %arg3 : tensor<4xi64>
+// CHECK:     scf.yield [[call]]#0, [[add]] : tensor<4xi64>, tensor<4xi64>
+// CHECK:   return [[forOut]]#0, [[forOut]]#1 : tensor<4xi64>, tensor<4xi64>

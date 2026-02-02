@@ -176,3 +176,43 @@ res = test_mlir_one_shot_pass_sample()
 assert res.shape == (1000, 2)
 for sample in res:
     assert sample[1] == 0
+
+
+# -----
+
+
+@qjit(keep_intermediate=True)
+@apply_pass("one-shot-mcm")
+@qml.qnode(qml.device("lightning.qubit", wires=2), shots=1000)
+def test_mlir_one_shot_pass_counts():
+    """
+    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with counts
+    """
+
+    # CHECK: transform.apply_registered_pass "one-shot-mcm"
+    qml.Hadamard(wires=0)
+    return qml.counts()  # only has samples in |00> and |10>
+
+
+print(test_mlir_one_shot_pass_counts.mlir)
+
+# CHECK: func.func public @test_mlir_one_shot_pass_counts.quantum_kernel
+# CHECK:    [[one:%.+]] = arith.constant 1 : i64
+# CHECK:    quantum.device shots([[one]])
+# CHECK:    Hadamard
+# CHECK:    counts
+# CHECK: func.func public @test_mlir_one_shot_pass_counts
+# CHECK:    index.constant 1000
+# CHECK:    scf.for
+# CHECK:    func.call @test_mlir_one_shot_pass_counts.quantum_kernel
+# CHECK:    stablehlo.add
+print(get_compilation_stage(test_mlir_one_shot_pass_counts, "QuantumCompilationStage"))
+
+res = test_mlir_one_shot_pass_counts()
+eigs, counts = res
+assert eigs.shape == (4,)
+assert np.allclose(eigs, [0, 1, 2, 3])
+assert counts.shape == (4,)
+assert sum(counts) == 1000
+assert counts[1] == 0
+assert counts[3] == 0

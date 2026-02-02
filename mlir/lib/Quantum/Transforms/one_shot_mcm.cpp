@@ -265,13 +265,63 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         builder.create<func::ReturnOp>(loc, newForOp.getResult(0));
     }
 
+    void handleCountsOneShot(IRRewriter &builder, func::FuncOp qfunc, Value shots, Operation *mod)
+    {
+        // Add the counts from each shot
+        // Very similar to expval and probs, but with two differences
+        // First of all, counts kernel returns 2 result values instead of 1, so the loop yields
+        // two results from the kernel call
+        // Second of all, counts does not need a division at the end
+
+        OpBuilder::InsertionGuard guard(builder);
+        Location loc = mod->getLoc();
+
+        auto eigensType = dyn_cast<ShapedType>(qfunc.getResultTypes()[0]);
+        auto countsType = dyn_cast<ShapedType>(qfunc.getResultTypes()[1]);
+
+        func::FuncOp qkernel = createOneShotKernel(builder, qfunc, shots, mod);
+
+        // Create the for loop.
+        // Each loop iteration adds to the total counts.
+        // counts return type is <blah x i64>, for both eigens and counts
+        builder.setInsertionPointToEnd(&qfunc.getBody().front());
+        auto countsSum = builder.create<stablehlo::ConstantOp>(
+            loc, countsType,
+            DenseElementsAttr::get(countsType, builder.getIntegerAttr(builder.getI64Type(), 0)));
+
+        // We also need to yield the eigens from the kernel call inside the loop body
+        // However, this requries the loop to have an iteration argument for the eigens tensor
+        // We just initialize an empty one.
+        auto eigensPlaceholder = builder.create<tensor::EmptyOp>(loc, eigensType.getShape(),
+                                                                 eigensType.getElementType());
+        scf::ForOp newForOp =
+            createForLoop(builder, shots, ValueRange{eigensPlaceholder, countsSum});
+
+        // Each loop iteration calls the one-shot kernel and adds to the sum
+        // Since the kernel was a clone of the original qfunc, their arguments are the same!
+        builder.setInsertionPointToEnd(newForOp.getBody());
+        auto kernalCallOp = builder.create<func::CallOp>(
+            loc, qkernel.getFunctionType().getResults(), qkernel.getSymName(),
+            qfunc.getBody().front().getArguments());
+
+        auto addOp = builder.create<stablehlo::AddOp>(loc, kernalCallOp.getResult(1),
+                                                      newForOp.getRegionIterArg(1));
+
+        // Eigens are the same every loop iteration, so just yield it, no need to do anything
+        builder.create<scf::YieldOp>(loc, ValueRange{kernalCallOp.getResult(0), addOp.getResult()});
+
+        // Return the results
+        builder.setInsertionPointToEnd(&qfunc.getBody().front());
+        builder.create<func::ReturnOp>(loc, newForOp.getResults());
+    }
+
     void runOnOperation() override
     {
         Operation *mod = getOperation();
         IRRewriter builder(mod->getContext());
 
-        bool illegalMP = false, isExpval = false, isProbs = false,
-             isSample = false; //, isCounts = false;
+        bool illegalMP = false, isExpval = false, isProbs = false, isSample = false,
+             isCounts = false;
         func::FuncOp qfunc;
         mod->walk([&](MeasurementProcess mp) {
             if (isa<quantum::ExpvalOp>(mp)) {
@@ -284,6 +334,10 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
             }
             else if (isa<quantum::SampleOp>(mp)) {
                 isSample = true;
+                qfunc = mp->getParentOfType<func::FuncOp>();
+            }
+            else if (isa<quantum::CountsOp>(mp)) {
+                isCounts = true;
                 qfunc = mp->getParentOfType<func::FuncOp>();
             }
             else if (isa<quantum::VarianceOp>(mp)) {
@@ -303,7 +357,8 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
             return signalPassFailure();
         }
 
-        assert(qfunc.getResultTypes().size() == 1 &&
+        size_t numReturns = isCounts ? 2 : 1;
+        assert(qfunc.getResultTypes().size() == numReturns &&
                "Multiple terminal MPs not yet supported in one shot transform");
 
         // Get the shots SSA value. It is an oeprand to the device init op.
@@ -315,6 +370,9 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         }
         else if (isSample) {
             handleSampleOneShot(builder, qfunc, shots, mod);
+        }
+        else if (isCounts) {
+            handleCountsOneShot(builder, qfunc, shots, mod);
         }
     }
 };
