@@ -733,7 +733,7 @@ class QJIT(CatalystCallable):
     def pre_compilation(self):
         """Perform pre-processing tasks on the Python function, such as AST transformations."""
         if self.compile_options.autograph:
-            if self._is_capture_enabled():
+            if qml.capture.enabled():
                 if self.compile_options.autograph_include:
                     raise NotImplementedError(
                         "capture autograph does not yet support autograph_include."

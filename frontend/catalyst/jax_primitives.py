@@ -410,7 +410,6 @@ def subroutine(func):
 
     @functools.wraps(inside, assigned=WRAPPER_ASSIGNMENTS)
     def wrapper(*args, **kwargs):
-        import pennylane as qml  # pylint: disable=import-outside-toplevel
 
         if not qml.capture.enabled():
             msg = "Subroutine is only available with capture enabled."
