@@ -22,6 +22,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/IR/CatalystOps.h"
+#include "QEC/IR/QECOps.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/QuantumSplitting.h"
 
@@ -203,6 +204,9 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
         }
         else if (isa<QuantumDialect>(op.getDialect())) {
             // Any quantum op other than a parametrized gate/insert/extract is ignored.
+        }
+        else if (isa<qec::PPRotationOp>(op)) {
+            // PPRs are ignored
         }
         else if (isClassicalSCFOp(op)) {
             // Purely classical SCF ops should be treated as any other purely classical op, but

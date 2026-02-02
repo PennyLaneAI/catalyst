@@ -7,7 +7,6 @@ file(GLOB SRC
     emit_catalyst_pyface.cpp
     cp_global_buffers.cpp
     adjoint_lowering.cpp
-    annotate_function.cpp
     AdjointPatterns.cpp
     CancelInversesPatterns.cpp
     cancel_inverses.cpp
@@ -16,6 +15,8 @@ file(GLOB SRC
     MergeRotationsPatterns.cpp
     decompose_lowering.cpp
     DecomposeLoweringPatterns.cpp
+    gridsynth.cpp
+    GridsynthPatterns.cpp
     DisentangleSWAP.cpp
     DisentangleCNOT.cpp
     ions_decompositions.cpp

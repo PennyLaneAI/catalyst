@@ -26,12 +26,15 @@ from functools import partial, reduce
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import jax
+import jax._src.interpreters.partial_eval as pe
 import jax.numpy as jnp
 import pennylane as qml
+from jax._src.lax import lax
 from jax._src.lax.lax import _extract_tracers_dyn_shape
+from jax._src.pjit import jit_p
 from jax._src.source_info_util import current as current_source_info
 from jax.api_util import debug_info as jdb
-from jax.core import get_aval
+from jax.core import Tracer, get_aval
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
 from pennylane.measurements import (
@@ -39,13 +42,13 @@ from pennylane.measurements import (
     ExpectationMP,
     MeasurementProcess,
     ProbabilityMP,
+    SampleMP,
     StateMP,
     VarianceMP,
 )
 from pennylane.operation import Operation, Operator, Wires
 from pennylane.ops import Adjoint, Controlled, ControlledOp
 from pennylane.tape import QuantumTape
-from pennylane.transforms.core import TransformProgram
 
 import catalyst
 from catalyst.api_extensions.callbacks import MemrefCallable
@@ -74,6 +77,12 @@ from catalyst.jax_extras import (
     tree_structure,
     tree_unflatten,
     wrap_init,
+)
+from catalyst.jax_extras.patches import (
+    patched_drop_unused_vars,
+    patched_dyn_shape_staging_rule,
+    patched_make_eqn,
+    patched_pjit_staging_rule,
 )
 from catalyst.jax_extras.tracing import uses_transform
 from catalyst.jax_primitives import (
@@ -106,6 +115,7 @@ from catalyst.jax_primitives import (
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.patching import DictPatchWrapper, Patcher
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -134,6 +144,17 @@ def mark_gradient_tracing(method: str):
         yield
     finally:
         TRACING_GRADIENTS.pop()
+
+
+def _get_eqn_from_tracing_eqn(eqn_or_callable):
+    """Helper function to extract the actual equation from JAX 0.7's TracingEqn wrapper."""
+    if callable(eqn_or_callable):
+        actual_eqn = eqn_or_callable()
+        if actual_eqn is None:  # pragma: no cover
+            raise RuntimeError("TracingEqn weakref was garbage collected")
+        return actual_eqn
+    else:  # pragma: no cover
+        return eqn_or_callable
 
 
 def _make_execution_config(qnode):
@@ -237,7 +258,7 @@ KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamar
 # Take care when adding primitives to this set in order to avoid introducing a quadratic number of
 # edges to the jaxpr equation graph in ``sort_eqns()``. Each equation with a primitive in this set
 # is constrained to occur before all subsequent equations in the quantum operations trace.
-FORCED_ORDER_PRIMITIVES = {device_init_p, gphase_p}
+FORCED_ORDER_PRIMITIVES = {device_init_p, gphase_p, set_basis_state_p, set_state_p}
 
 PAULI_NAMED_MAP = {
     "I": "Identity",
@@ -391,8 +412,8 @@ class QRegPromise:
         from cache"""
         # pylint: disable=consider-iterating-dictionary
         qrp = self
-        cached_tracers = {w for w in qrp.cache.keys() if not isinstance(w, int)}
-        requested_tracers = {w for w in wires if not isinstance(w, int)}
+        cached_tracers = {w for w in qrp.cache.keys() if isinstance(w, Tracer)}
+        requested_tracers = {w for w in wires if isinstance(w, Tracer)}
         if cached_tracers != requested_tracers:
             qrp.actualize()
         qubits = []
@@ -516,13 +537,14 @@ class HybridOp(Operator):
         as-is.
         """
         assert self.binder is not None, "HybridOp should set a binder"
+
         # Here, we are binding any of the possible hybrid ops.
         # which includes: for_loop, while_loop, cond, measure.
         # This will place an equation at the very end of the current list of equations.
         out_quantum_tracer = self.binder(*in_expanded_tracers, **kwargs)[-1]
 
         trace = EvaluationContext.get_current_trace()
-        eqn = trace.frame.eqns[-1]
+        eqn = _get_eqn_from_tracing_eqn(trace.frame.tracing_eqns[-1])
         frame = trace.frame
 
         assert len(eqn.outvars[:-1]) == len(
@@ -532,22 +554,26 @@ class HybridOp(Operator):
         jaxpr_variables = cached_vars.get(frame, set())
         if not jaxpr_variables:
             # We get all variables in the current frame
-            outvars = itertools.chain.from_iterable([e.outvars for e in frame.eqns])
+            outvars = itertools.chain.from_iterable(
+                [_get_eqn_from_tracing_eqn(e).outvars for e in frame.tracing_eqns]
+            )
             jaxpr_variables = set(outvars)
             jaxpr_variables.update(frame.invars)
             jaxpr_variables.update(frame.constvar_to_val.keys())
             cached_vars[frame] = jaxpr_variables
 
-        for outvar in frame.eqns[-1].outvars:
+        last_eqn = _get_eqn_from_tracing_eqn(frame.tracing_eqns[-1])
+        for outvar in last_eqn.outvars:
             # With the exception of the output variables from the current equation.
             jaxpr_variables.discard(outvar)
 
         for i, t in enumerate(out_expanded_tracers):
             # We look for what were the previous output tracers.
             # If they haven't changed, then we leave them unchanged.
-            if trace.getvar(t) in jaxpr_variables:
+            if t.val in jaxpr_variables:
                 continue
 
+            # For other hybrid ops, use the original logic
             # If the variable cannot be found in the current frame
             # it is because we have created it via new_inner_tracer
             # which uses JAX internals to create a tracer without associating
@@ -587,7 +613,7 @@ class HybridOp(Operator):
             #            qrp2 = op.trace_quantum(ctx, device, trace, qrp, **kwargs)
             #
             # So it should be safe to cache the tracers as we are doing it.
-            eqn.outvars[i] = trace.getvar(t)
+            eqn.outvars[i] = t.val
 
         # Now, the output variables can be considered as part of the current frame.
         # This allows us to avoid importing all equations again next time.
@@ -642,7 +668,19 @@ def trace_to_jaxpr(func, static_argnums, abstracted_axes, args, kwargs, debug_in
         PyTreeDef: PyTree-shape of the return values in ``PyTreeDef``
     """
 
-    with transient_jax_config({"jax_dynamic_shapes": True}):
+    with transient_jax_config(
+        {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
+    ), Patcher(
+        (pe, "_drop_unused_vars", patched_drop_unused_vars),
+        (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
+        (lax, "_dyn_shape_staging_rule", patched_dyn_shape_staging_rule),
+        (
+            jax._src.pjit,  # pylint: disable=protected-access
+            "pjit_staging_rule",
+            patched_pjit_staging_rule,
+        ),
+        (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
+    ):
         make_jaxpr_kwargs = {
             "static_argnums": static_argnums,
             "abstracted_axes": abstracted_axes,
@@ -671,7 +709,20 @@ def lower_jaxpr_to_mlir(jaxpr, func_name, arg_names):
 
     MemrefCallable.clearcache()
 
-    with transient_jax_config({"jax_dynamic_shapes": True}):
+    # Apply JAX 0.7.0 compatibility patches during MLIR lowering.
+    # JAX internally calls trace_to_jaxpr_dynamic2 during lowering of nested @jit primitives
+    # (e.g., in jax.scipy.linalg.expm and jax.scipy.linalg.solve), which triggers two bugs:
+    # 1. make_eqn signature changed to include out_tracers parameter
+    # 2. pjit_staging_rule creates JaxprEqn instead of TracingEqn
+    #   (AssertionError at partial_eval.py:1790)
+    with transient_jax_config(
+        {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
+    ), Patcher(
+        # Fix make_eqn signature change (handles both old/new JAX versions)
+        (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
+        # Fix pjit_staging_rule creating wrong equation type
+        (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
+    ):
         mlir_module, ctx = jaxpr_to_mlir(jaxpr, func_name, arg_names)
 
     return mlir_module, ctx
@@ -883,7 +934,7 @@ def trace_quantum_operations(
         assert qrp2 is not None
         qrp = qrp2
     trace = EvaluationContext.get_current_trace()
-    trace.frame.eqns = sort_eqns(trace.frame.eqns, FORCED_ORDER_PRIMITIVES)  # [1]
+    trace.frame.tracing_eqns = sort_eqns(trace.frame.tracing_eqns, FORCED_ORDER_PRIMITIVES)  # [1]
     return qrp
 
 
@@ -1027,12 +1078,10 @@ def trace_quantum_measurements(
         if isinstance(output, MeasurementProcess):
 
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
-            if shots_obj.has_partitioned_shots and not isinstance(
-                output, qml.measurements.SampleMP
-            ):
+            if shots_obj.has_partitioned_shots and not isinstance(output, SampleMP):
                 raise NotImplementedError(
-                    f"Measurement {type(output).__name__} does not support shot-vectors. "
-                    "Use qml.sample() instead."
+                    f"The {type(output).__name__} measurement process does not support "
+                    "shot-vectors. Please consider using qml.sample() instead."
                 )
 
             if device.wires is None:
@@ -1058,7 +1107,7 @@ def trace_quantum_measurements(
                     "(expval, var, probs, counts) on mid circuit measurements."
                 )
 
-            if isinstance(output, qml.measurements.SampleMP):
+            if isinstance(output, SampleMP):
 
                 if shots is None:  # needed for old device API only
                     raise ValueError(
@@ -1263,7 +1312,8 @@ def apply_transforms(
         tracing_mode = TracingMode.TRANSFORM
     elif len(qnode_program) or have_measurements_changed(tape, tapes[0]):
         with_measurement_from_counts_or_samples = any(
-            "measurements_from_counts" in (transform_str := str(getattr(qnode, "transform", "")))
+            "measurements_from_counts"
+            in (transform_str := str(getattr(qnode, "tape_transform", "")))
             or "measurements_from_samples" in transform_str
             for qnode in qnode_program
         )
@@ -1476,9 +1526,9 @@ def _trace_classical_phase(
             config = _make_execution_config(qnode)
             device_program, config = device.preprocess(ctx, execution_config=config, shots=shots)
         else:
-            device_program = TransformProgram()
+            device_program = qml.CompilePipeline()
 
-        qnode_program = qnode.transform_program if qnode else TransformProgram()
+        qnode_program = qnode.compile_pipeline if qnode else qml.CompilePipeline()
 
         tapes, post_processing, tracing_mode = apply_transforms(
             qnode_program,

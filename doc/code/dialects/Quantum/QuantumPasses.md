@@ -6,9 +6,9 @@
 
 _Lower adjoint regions containing a single quantum operations._
 
-### `-annotate-function`
+### `-annotate-invalid-gradient-functions`
 
-_Annotate functions that contain a measurement operation._
+_Annotate functions that contain operations invalid for automatic gradient computation._
 
 ### `-convert-quantum-to-llvm`
 

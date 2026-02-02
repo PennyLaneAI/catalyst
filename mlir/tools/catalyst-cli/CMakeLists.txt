@@ -38,11 +38,15 @@ set(LIBS
     mbqc-transforms
     MLIRMitigation
     mitigation-transforms
+    MLIRPauliFrame
+    pauli-frame-transforms
     MLIRIon
     ion-transforms
+    MLIRRTIO
     MLIRCatalystTest
     ${ENZYME_LIB}
     CatalystCompilerDriver
+    MLIRTestDialect
 )
 
 add_mlir_tool(catalyst-cli catalyst-cli.cpp SUPPORT_PLUGINS)

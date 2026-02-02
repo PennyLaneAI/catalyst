@@ -82,8 +82,8 @@ Select the tool to run individually. The default is ``all``.
 * ``llc``: Run ``llc`` on the LLVM IR input.
 * ``all``: Run all of ``opt``, ``translate`` and ``llc`` on the MLIR input.
 
-``--save-ir-after-each=<pass|pipeline>``
-""""""""""""""""""""""""""""""""""""""""
+``--save-ir-after-each=<pass|pipeline|changed>``
+"""""""""""""""""""""""""""""""""""""""""""""""
 
 Keep intermediate files after each pass or after each pipeline in the compilation. By default, no
 intermediate files are saved.
@@ -91,6 +91,8 @@ intermediate files are saved.
 * ``pass``: Keep intermediate files after each transformation/optimization pass.
 * ``pipeline``: Keep intermediate files after each pipeline, where a *pipeline* is a sequence of
   transformation/optimization passes.
+* ``changed``: Keep intermediate files after each transformation/optimization pass, but only if the
+  IR was modified by that pass.
 
 ``--keep-intermediate[=<true|false>]``
 """"""""""""""""""""""""""""""""""""""
@@ -113,11 +115,11 @@ Enable a specific pass. For example, to enable the ``cancel-inverses`` pass, use
 Catalyst's main ``mlir`` stage is split up into a sequence of pass pipelines that can also be run
 individually via this option. In that case, the name of the pipeline is substituted for the pass
 name. Currently, the following pipelines are available:
-``enforce-runtime-invariants-pipeline``,
-``hlo-lowering-pipeline``,
-``quantum-compilation-pipeline``,
-``bufferization-pipeline``,
-``llvm-dialect-lowering-pipeline``, and finally
+``quantum-compilation-stage``,
+``hlo-lowering-stage``,
+``gradient-lowering-stage``,
+``bufferization-stage``,
+``llvm-dialect-lowering-stage``, and finally
 ``default-catalyst-pipeline`` which encompasses all the above as the default pipeline used by the
 Catalyst CLI tool if no pass option is specified.
 
@@ -166,7 +168,7 @@ given stage. The stages that are currently available are:
 * MLIR: ``mlir`` (start with first MLIR stage), ``{pipeline}`` such as any of the built-in pipeline
   names described under the ``--{passname}`` option, OR any custom pipeline names if the
   ``--catalyst-pipeline={pipeline(...),...}`` option is used.
-* LLVM: ``llvm_ir`` (start with first LLVM stage), ``CoroOpt``, ``O2Opt``, ``Enzyme``.
+* LLVM: ``LLVMIRTranslation`` (start with first LLVM stage), ``CoroOpt``, ``O2Opt``, ``Enzyme``.
   Note that ``CoroOpt`` (Coroutine lowering), ``O2Opt`` (O2 optimization), and ``Enzyme``
   (automatic differentiation) passes are only run conditionally as needed.
 

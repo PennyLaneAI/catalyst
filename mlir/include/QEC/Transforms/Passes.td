@@ -1,4 +1,4 @@
-// Copyright 2025 Xanadu Quantum Technologies Inc.
+// Copyright 2025-2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ def AvoidYMeasureOption : Option<
 //                               Passes
 //===----------------------------------------------------------------------===//
 
-def CliffordTToPPRPass : Pass<"to-ppr"> {
+def ToPPRPass : Pass<"to-ppr"> {
     let summary = "Convert quantum dialects to the QEC dialect.";
 
     let dependentDialects = [ "catalyst::qec::QECDialect" ];
@@ -110,7 +110,7 @@ def DecomposeCliffordPPRPass : Pass<"decompose-clifford-ppr"> {
 }
 
 def PPRToPPMPass : Pass<"ppr-to-ppm"> {
-    let summary = "Convert CliffordT operations to Pauli Product Measurement operations.";
+    let summary = "Convert PPRotation operations to Pauli Product Measurement operations.";
 
     let dependentDialects = [ "catalyst::qec::QECDialect" ];
 
@@ -139,6 +139,22 @@ def TLayerReductionPass : Pass<"reduce-t-depth"> {
 
 def PPRToMBQCPass : Pass<"ppr-to-mbqc"> {
     let summary = "Convert PPR/PPM operations to MBQC operations.";
+}
+
+def DecomposeArbitraryPPRPass : Pass<"decompose-arbitrary-ppr"> {
+    let summary = "Decompose an arbitrary angle PPR into a collection of PPRs, PPMs and a single-qubit arbitrary PPR in the Z basis.";
+}
+
+def UnrollConditionalPPRPPMPass : Pass<"unroll-conditional-ppr-ppm"> {
+    let summary = "Lower conditional PPR/PPM operations into normal PPR/PPM using scf conditional dialect.";
+    
+    let dependentDialects = [ "catalyst::qec::QECDialect", "scf::SCFDialect" ];
+}
+
+def LowerQECInitOpsPass : Pass<"lower-qec-init-ops"> {
+    let summary = "Lower QEC initialization ops (prepare, fabricate) to quantum dialect op (set_basis_state).";
+    
+    let dependentDialects = [ "catalyst::qec::QECDialect"];
 }
 
 #endif // QEC_PASSES

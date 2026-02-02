@@ -120,5 +120,48 @@ class Test2QubitStatePrep:
         assert np.allclose(result_obs, result_exp)
 
 
+class TestTrotterProduct:
+    """
+    Test state prep and basis state when used with TrotterProduct.
+    https://github.com/PennyLaneAI/catalyst/issues/2235
+    """
+
+    def test_state_prep_trotter(self, backend):
+        """
+        Test state prep.
+        """
+
+        @qml.qnode(qml.device(backend, wires=3))
+        def circ():
+            H = qml.Hamiltonian([1, 1], [qml.PauliZ(0), qml.PauliZ(1)])
+            qml.StatePrep([0, 0, 0, 1], wires=[0, 1])
+            qml.Hadamard(wires=2)
+            qml.ctrl(
+                qml.TrotterProduct(H, 1, n=3, order=2),
+                control=2,
+            )
+            return qml.probs(wires=[2])
+
+        assert np.allclose(circ(), qjit(circ)())
+
+    def test_basis_state_trotter(self, backend):
+        """
+        Test basis state.
+        """
+
+        @qml.qnode(qml.device(backend, wires=3))
+        def circ():
+            H = qml.Hamiltonian([1, 1], [qml.PauliZ(0), qml.PauliZ(1)])
+            qml.BasisState(np.array([1, 1]), wires=[0, 1])
+            qml.Hadamard(wires=2)
+            qml.ctrl(
+                qml.TrotterProduct(H, 1, n=3, order=2),
+                control=2,
+            )
+            return qml.probs(wires=[2])
+
+        assert np.allclose(circ(), qjit(circ)())
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

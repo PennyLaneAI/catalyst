@@ -22,13 +22,13 @@ import numpy as np
 import pennylane as qml
 import pytest
 from jax.tree_util import tree_flatten
-from pennylane import exceptions
+from pennylane import exceptions, measure
 from pennylane.transforms.dynamic_one_shot import fill_in_value
 
 import catalyst
 from catalyst import CompileError, cond, grad
 from catalyst import jvp as C_jvp
-from catalyst import measure, qjit, value_and_grad
+from catalyst import qjit, value_and_grad
 from catalyst import vjp as C_vjp
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
@@ -39,20 +39,11 @@ from catalyst import vjp as C_vjp
 class TestMidCircuitMeasurement:
     """Tests for mid-circuit behaviour."""
 
-    def test_pl_measure(self, backend):
-        """Test PL measure."""
-
-        def circuit():
-            return qml.measure(0)
-
-        with pytest.raises(CompileError, match="Must use 'measure' from Catalyst"):
-            qjit(qml.qnode(qml.device(backend, wires=1))(circuit))()
-
     def test_measure_outside_qjit(self):
         """Test measure outside qjit."""
 
         def circuit():
-            return measure(0)
+            return catalyst.measure(0)
 
         with pytest.raises(CompileError, match="can only be used from within @qjit"):
             circuit()
@@ -257,7 +248,7 @@ class TestMidCircuitMeasurement:
             return qml.expval(qml.Z(0))
 
         with pytest.raises(
-            ValueError, match="Cannot use the 'one-shot' method for mid-circuit measurements"
+            ValueError, match="mcm_method='one-shot' is not supported in analytic shot mode"
         ):
             _ = circuit(1.8)
 
@@ -276,7 +267,7 @@ class TestMidCircuitMeasurement:
 
         with pytest.raises(
             ValueError,
-            match=("Cannot use postselect_mode='hw-like' with Catalyst when"),
+            match=("'hw-like' post-selection requires mcm_method='one-shot'"),
         ):
             _ = circuit(1.8)
 
@@ -549,8 +540,8 @@ class TestDynamicOneShotIntegration:
             return qml.classical_shadow(wires=0)
 
         with pytest.raises(
-            TypeError,
-            match="Native mid-circuit measurement mode does not support",
+            NotImplementedError,
+            match="measurement process is not compatible with the chosen or default mcm_method",
         ):
             func(param)
 
@@ -682,7 +673,9 @@ class TestDynamicOneShotIntegration:
             params = jnp.pi / 2.1 * jnp.ones(2)
 
         if measure_f == qml.var and not isinstance(meas_obj, str):
-            with pytest.raises(TypeError, match="qml.var\\(obs\\) cannot be returned when"):
+            with pytest.raises(
+                NotImplementedError, match=r"qml.var\(\) cannot be used on observables"
+            ):
                 func(*params)
             return
 
@@ -850,9 +843,10 @@ class TestDynamicOneShotIntegration:
 
     def test_dynamic_one_shot_with_classical_return_values(self):
         """Test classical return values with one-shot"""
-        dev = qml.device("lightning.qubit", wires=1, shots=12)
+        dev = qml.device("lightning.qubit", wires=1)
 
         @qjit
+        @qml.set_shots(12)
         @qml.qnode(dev, mcm_method="one-shot")
         def circuit():
             qml.Hadamard(0)

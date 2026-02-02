@@ -2,14 +2,14 @@ name: Build Release Branch Nightly for TestPyPI
 
 on:
   schedule:
-    # Run from October 7th to October 12th at 02:00 UTC (10:00 PM EDT)
-    - cron: "0 2 7-12 10 *"
+    # Run from Jan 6th to Jan 11th at 02:00 UTC (10:00 PM EDT)
+    - cron: "0 2 6-11 1 *"
   workflow_dispatch:
     inputs:
       branch:
         description: 'Branch to build from'
         required: true
-        default: 'v0.13.0-rc'
+        default: 'v0.14.0-rc'
 
 jobs:
   setup:
@@ -20,7 +20,7 @@ jobs:
     steps:
     - name: Set branch
       id: set_branch
-      run: echo "branch=${{ github.event.inputs.branch || 'v0.13.0-rc' }}" >> $GITHUB_OUTPUT
+      run: echo "branch=${{ github.event.inputs.branch || 'v0.14.0-rc' }}" >> $GITHUB_OUTPUT
 
     - name: Checkout Catalyst repo release branch
       uses: actions/checkout@v4

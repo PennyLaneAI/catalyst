@@ -32,9 +32,13 @@ namespace Catalyst::Runtime {
  */
 struct ResourceTracker final {
   private:
+    std::unordered_map<ObsIdType, std::string> observable_names_;
+
     std::unordered_map<std::string, std::size_t> gate_types_;
     std::unordered_map<std::size_t, std::size_t> gate_sizes_;
     std::unordered_map<QubitIdType, std::size_t> wire_depths_;
+    std::unordered_map<std::string, std::size_t> measurements_;
+
     std::size_t max_num_wires_;
     std::size_t curr_num_wires_;
     std::size_t total_allocd_wires_;
@@ -122,6 +126,7 @@ struct ResourceTracker final {
      *
      * @param gate_name Optional specific gate name to count. If empty, returns total count of all
      * gates
+     *
      * @return The count of gates matching the specified name, or total gate count if no name
      * provided
      */
@@ -136,6 +141,28 @@ struct ResourceTracker final {
             num_gates += count;
         }
         return num_gates;
+    }
+
+    /**
+     * @brief Returns the number of measurements used since the last time this object was reset
+     *
+     * @param meas_name Optional specific measurement name to count. If empty, returns total count
+     * of all measurements
+     *
+     * @return The count of measurements matching the specified name, or total measurement count if
+     * no name provided
+     */
+    auto GetNumMeasurements(const std::string &meas_name = "") -> std::size_t
+    {
+        if (meas_name != "") {
+            return measurements_[meas_name];
+        }
+
+        std::size_t num_measurements = 0;
+        for (const auto &[meas_type, count] : measurements_) {
+            num_measurements += count;
+        }
+        return num_measurements;
     }
 
     /**
@@ -319,6 +346,114 @@ struct ResourceTracker final {
     }
 
     /**
+     * @brief Records a state preparation operation for resource tracking
+     *
+     * @param wires The target wires the operation acts upon
+     */
+    void SetState(const std::vector<QubitIdType> &wires)
+    {
+        RecordOperation("StatePrep", wires, {});
+    }
+
+    /**
+     * @brief Records a basis state preparation operation for resource tracking
+     *
+     * @param wires The target wires the operation acts upon
+     */
+    void SetBasisState(const std::vector<QubitIdType> &wires)
+    {
+        RecordOperation("BasisState", wires, {});
+    }
+
+    /**
+     * @brief Registers an observable with a given id
+     *
+     * @param obs_id The observable identifier (e.g., Identity, PauliZ, Hadamard)
+     * @return ObsIdType An identifier for the created observable
+     */
+    auto Observable(ObsId obs_id) -> ObsIdType
+    {
+        ObsIdType id = static_cast<ObsIdType>(observable_names_.size() + 1);
+        std::string name = "Observable";
+        switch (obs_id) {
+        case ObsId::Identity:
+            name = "Identity";
+            break;
+        case ObsId::PauliX:
+            name = "PauliX";
+            break;
+        case ObsId::PauliY:
+            name = "PauliY";
+            break;
+        case ObsId::PauliZ:
+            name = "PauliZ";
+            break;
+        case ObsId::Hadamard:
+            name = "Hadamard";
+            break;
+        case ObsId::Hermitian:
+            name = "Hermitian";
+            break;
+        }
+        observable_names_[id] = name;
+
+        return id;
+    }
+
+    /**
+     * @brief Registers a combined observable with a given number of terms
+     *
+     * @param obs_type The type of combination (e.g. "Prod" or "Hamiltonian")
+     * @param num_terms The number of terms in the combined observable
+     * @return ObsIdType An identifier for the created observable
+     */
+    auto CombinedObservable(std::string obs_type, std::size_t num_terms) -> ObsIdType
+    {
+        ObsIdType id = static_cast<ObsIdType>(observable_names_.size() + 1);
+        std::string name = obs_type + "(num_terms=" + std::to_string(num_terms) + ")";
+        observable_names_[id] = name;
+
+        return id;
+    }
+
+    /**
+     * @brief Records a measurement of an observable for resource tracking
+     *
+     * @param meas_type The type of measurement (e.g., "expval", "var", "sample")
+     * @param obs_id The identifier of the observable being measured
+     */
+    void ObsMeasurement(std::string meas_type, ObsIdType obs_id)
+    {
+        std::string obs_name = "";
+        auto it = observable_names_.find(obs_id);
+        if (it != observable_names_.end()) {
+            obs_name = it->second;
+        }
+
+        std::string full_meas_name = meas_type + "(" + obs_name + ")";
+        measurements_[full_meas_name]++;
+    }
+
+    /**
+     * @brief Records a measurement of multiple wires for resource tracking
+     *
+     * @param meas_type The type of measurement (e.g., "state", "probs")
+     * @param n_wires The number of wires involved in the measurement (or "all")
+     */
+    void AnalyticalMeasurement(std::string meas_type, std::string n_wires)
+    {
+        std::string full_meas_name = meas_type + "(" + n_wires + " wires)";
+        measurements_[full_meas_name]++;
+    }
+
+    /**
+     * @brief Records a mid-circuit measurement for resource tracking
+     *
+     * Increments the count of mid-circuit measurements performed.
+     */
+    void MidMeasurement() { measurements_["MidMeasure"]++; }
+
+    /**
      * @brief Prints resource usage statistics in JSON format to the specified file
      *
      * Outputs comprehensive resource tracking data including number of wires,
@@ -341,6 +476,9 @@ struct ResourceTracker final {
         resources << ",\n";
         resources << "  \"gate_sizes\": ";
         pretty_print_dict(gate_sizes_, 2, resources);
+        resources << ",\n";
+        resources << "  \"measurements\": ";
+        pretty_print_dict(measurements_, 2, resources);
         resources << ",\n";
         if (compute_depth_) {
             resources << "  \"depth\": " << GetDepth();

@@ -37,10 +37,10 @@ def flush_peephole_opted_mlir_to_iostream(QJIT):
     The QJIT compiler does not offer a direct interface to access an intermediate mlir in the pipeline.
     The `QJIT.mlir` is the mlir before any passes are run, i.e. the "0_<qnode_name>.mlir".
     Since the QUANTUM_COMPILATION_PASS is located in the middle of the pipeline, we need
-    to retrieve it with keep_intermediate=True and manually access the "2_QuantumCompilationPass.mlir".
+    to retrieve it with keep_intermediate=True and manually access the "2_QuantumCompilationStage.mlir".
     Then we delete the kept intermediates to avoid pollution of the workspace
     """
-    print(get_compilation_stage(QJIT, "QuantumCompilationPass"))
+    print(get_compilation_stage(QJIT, "QuantumCompilationStage"))
 
 
 #
@@ -85,6 +85,42 @@ def test_pipeline_lowering():
 
 
 test_pipeline_lowering()
+
+
+def test_transform_lowering():
+    """
+    Basic pipeline lowering on one qnode.
+    """
+
+    @qjit(keep_intermediate=True)
+    @qml.transforms.merge_rotations
+    @qml.transforms.cancel_inverses
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def test_pipeline_lowering_workflow(x):
+        qml.RX(x, wires=[0])
+        qml.Hadamard(wires=[1])
+        qml.Hadamard(wires=[1])
+        return qml.expval(qml.PauliY(wires=0))
+
+    # CHECK: pipeline=(<cancel_inverses()>, <merge_rotations()>)
+    print_jaxpr(test_pipeline_lowering_workflow, 1.2)
+
+    # CHECK: transform.named_sequence @__transform_main
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "cancel-inverses" to {{%.+}}
+    # CHECK-NEXT: {{%.+}} = transform.apply_registered_pass "merge-rotations" to {{%.+}}
+    # CHECK-NEXT: transform.yield
+    print_mlir(test_pipeline_lowering_workflow, 1.2)
+
+    # CHECK: {{%.+}} = call @test_pipeline_lowering_workflow_0(
+    # CHECK: func.func public @test_pipeline_lowering_workflow_0(
+    # CHECK: {{%.+}} = quantum.custom "RX"({{%.+}}) {{%.+}} : !quantum.bit
+    # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    # CHECK-NOT: {{%.+}} = quantum.custom "Hadamard"() {{%.+}} : !quantum.bit
+    test_pipeline_lowering_workflow(42.42)
+    flush_peephole_opted_mlir_to_iostream(test_pipeline_lowering_workflow)
+
+
+test_transform_lowering()
 
 
 def test_pipeline_lowering_keep_original():

@@ -18,7 +18,6 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "QEC/IR/QECDialect.h"
 #include "QEC/Transforms/Patterns.h"
 
 using namespace llvm;
@@ -28,6 +27,7 @@ using namespace catalyst::qec;
 
 namespace catalyst {
 namespace qec {
+
 #define GEN_PASS_DECL_PPRTOPPMPASS
 #define GEN_PASS_DEF_PPRTOPPMPASS
 #include "QEC/Transforms/Passes.h.inc"

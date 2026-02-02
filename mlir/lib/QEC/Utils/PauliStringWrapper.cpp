@@ -17,6 +17,7 @@
 #include <stim/stabilizers/pauli_string.h>
 
 #include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOps.h"
 #include "QEC/Utils/PauliStringWrapper.h"
 
 namespace catalyst {
@@ -150,8 +151,21 @@ PauliWordPair normalizePPROps(QECOpInterface lhs, QECOpInterface rhs, ValueRange
     lhsPSWrapper.op = lhs;
     rhsPSWrapper.op = rhs;
 
-    lhsPSWrapper.updateSign((int16_t)lhs.getRotationKind() < 0);
-    rhsPSWrapper.updateSign((int16_t)rhs.getRotationKind() < 0);
+    auto applySignFromOp = [](PauliStringWrapper &wrapper, QECOpInterface qecOp) {
+        Operation *operation = qecOp.getOperation();
+
+        if (auto pprOp = dyn_cast<PPRotationOp>(operation)) {
+            wrapper.updateSign(static_cast<int16_t>(pprOp.getRotationKind()) < 0);
+            return;
+        }
+
+        if (auto ppmOp = dyn_cast<PPMeasurementOp>(operation)) {
+            wrapper.updateSign(static_cast<int16_t>(ppmOp.getRotationSign()) < 0);
+        }
+    };
+
+    applySignFromOp(lhsPSWrapper, lhs);
+    applySignFromOp(rhsPSWrapper, rhs);
 
     return std::make_pair(std::move(lhsPSWrapper), std::move(rhsPSWrapper));
 }
@@ -162,11 +176,13 @@ SmallVector<StringRef> removeIdentityPauli(QECOpInterface op, SmallVector<Value>
 
     auto pauliProduct = op.getPauliProduct();
     SmallVector<StringRef> pauliProductArrayRef;
+    int erased = 0;
 
     for (auto [i, pauli] : llvm::enumerate(pauliProduct)) {
         auto pauliStr = mlir::cast<mlir::StringAttr>(pauli).getValue();
         if (pauliStr == "I" || pauliStr == "_") {
-            qubits.erase(qubits.begin() + i);
+            qubits.erase(qubits.begin() + i - erased);
+            erased++;
             continue;
         }
         pauliProductArrayRef.push_back(pauliStr);
@@ -210,10 +226,17 @@ void updatePauliWord(QECOpInterface op, const PauliWord &newPauliWord, PatternRe
 
 void updatePauliWordSign(QECOpInterface op, bool isNegated, PatternRewriter &rewriter)
 {
-    int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
-    int16_t sign = isNegated ? -1 : 1;
-    rotationKind = (rotationKind < 0 ? -rotationKind : rotationKind) * sign;
-    op.setRotationKind(rotationKind);
+    if (auto pprOp = dyn_cast<PPRotationOp>(op.getOperation())) {
+        int16_t rotationKind = static_cast<int16_t>(pprOp.getRotationKind());
+        int16_t sign = isNegated ? -1 : 1;
+        rotationKind = (rotationKind < 0 ? -rotationKind : rotationKind) * sign;
+        pprOp.setRotationKind(rotationKind);
+    }
+    else if (auto ppmOp = dyn_cast<PPMeasurementOp>(op.getOperation())) {
+        int16_t rotationSign = static_cast<int16_t>(ppmOp.getRotationSign());
+        rotationSign = (rotationSign < 0 ? -rotationSign : rotationSign) * (isNegated ? -1 : 1);
+        ppmOp.setRotationSign(rotationSign);
+    }
 }
 
 SmallVector<StringRef> extractPauliString(QECOpInterface op)

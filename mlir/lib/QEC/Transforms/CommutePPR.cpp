@@ -16,8 +16,8 @@
 
 #include "mlir/Analysis/TopologicalSortUtils.h"
 
-#include "QEC/IR/QECDialect.h"
 #include "QEC/IR/QECOpInterfaces.h"
+#include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
 #include "QEC/Utils/PauliStringWrapper.h"
 
@@ -132,7 +132,11 @@ void moveCliffordPastNonClifford(const PauliStringWrapper &lhsPauli,
 
     // Update the use of value in newRHSOperands
     for (unsigned i = 0; i < newRHSOperands.size(); i++) {
-        newRHSOperands[i].replaceAllUsesExcept(nonCliffordOp.getOutQubits()[i], nonCliffordOp);
+        newRHSOperands[i].replaceUsesWithIf(
+            nonCliffordOp.getOutQubits()[i], [&](OpOperand &operand) {
+                return operand.getOwner() != nonCliffordOp &&
+                       operand.getOwner()->getBlock() == lhs->getBlock();
+            });
     }
 
     rewriter.replaceOp(rhs, rhs.getInQubits());

@@ -224,7 +224,12 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param state The state vector data (ignored)
      * @param wires The qubits to prepare (ignored)
      */
-    void SetState(DataView<std::complex<double>, 1> &, std::vector<QubitIdType> &) {}
+    void SetState(DataView<std::complex<double>, 1> &, std::vector<QubitIdType> &wires)
+    {
+        if (this->track_resources_) {
+            this->resource_tracker_.SetState(wires);
+        }
+    }
 
     /**
      * @brief No-op implementation for computational basis state preparation
@@ -235,7 +240,12 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @param basis_state The computational basis state (ignored)
      * @param wires The qubits to prepare (ignored)
      */
-    void SetBasisState(DataView<int8_t, 1> &, std::vector<QubitIdType> &) {}
+    void SetBasisState(DataView<int8_t, 1> &, std::vector<QubitIdType> &wires)
+    {
+        if (this->track_resources_) {
+            this->resource_tracker_.SetBasisState(wires);
+        }
+    }
 
     /**
      * @brief No-op implementation for a named quantum operation
@@ -253,7 +263,8 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     void NamedOperation(const std::string &name, [[maybe_unused]] const std::vector<double> &params,
                         const std::vector<QubitIdType> &wires, bool inverse,
                         const std::vector<QubitIdType> &controlled_wires = {},
-                        const std::vector<bool> &controlled_values = {})
+                        [[maybe_unused]] const std::vector<bool> &controlled_values = {},
+                        [[maybe_unused]] const std::vector<std::string> &optional_params = {})
     {
         if (this->track_resources_) {
             this->resource_tracker_.NamedOperation(name, inverse, wires, controlled_wires);
@@ -286,17 +297,21 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @brief Creates a null observable and returns a dummy identifier
      *
      * The null device doesn't perform actual observable construction or measurement.
-     * This method always returns 0 to satisfy the interface requirements.
+     * Always returns 0 unless resource tracking is enabled, in which case it returns
+     * an identifier tracked by the ResourceTracker.
      *
      * @param obs_id The type of observable (Identity, PauliX, PauliY, PauliZ, Hadamard, or
      * Hermitian)
      * @param matrix The matrix representation for Hermitian observables (ignored)
      * @param wires The qubits the observable acts on (ignored)
-     * @return ObsIdType Always returns 0
+     * @return ObsIdType A dummy identifier for the created observable
      */
-    auto Observable(ObsId, const std::vector<std::complex<double>> &,
+    auto Observable(ObsId obs_id, const std::vector<std::complex<double>> &,
                     const std::vector<QubitIdType> &) -> ObsIdType
     {
+        if (this->track_resources_) {
+            return this->resource_tracker_.Observable(obs_id);
+        }
         return 0;
     }
 
@@ -304,26 +319,37 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * @brief Creates a null tensor product observable and returns a dummy identifier
      *
      * The null device doesn't perform actual tensor product construction.
-     * This method always returns 0 to satisfy the interface requirements.
+     * Always returns 0 unless resource tracking is enabled, in which case it returns
+     * an identifier tracked by the ResourceTracker.
      *
-     * @param obs_ids Vector of observable identifiers to combine (ignored)
-     * @return ObsIdType Always returns 0
+     * @param obs_ids Vector of observable identifiers to combine
+     * @return ObsIdType A dummy identifier for the created observable
      */
-    auto TensorObservable(const std::vector<ObsIdType> &) -> ObsIdType { return 0; }
+    auto TensorObservable(const std::vector<ObsIdType> &obs_ids) -> ObsIdType
+    {
+        if (this->track_resources_) {
+            return this->resource_tracker_.CombinedObservable("Prod", obs_ids.size());
+        }
+        return 0;
+    }
 
     /**
      * @brief Creates a null Hamiltonian observable and returns a dummy identifier
      *
      * The null device doesn't perform actual Hamiltonian construction.
-     * This method always returns 0 to satisfy the interface requirements.
+     * Always returns 0 unless resource tracking is enabled, in which case it returns
+     * an identifier tracked by the ResourceTracker.
      *
      * @param coeffs Coefficients for the Hamiltonian terms (ignored)
-     * @param obs_ids Observable identifiers for the Hamiltonian terms (ignored)
-     * @return ObsIdType Always returns 0
+     * @param obs_ids Observable identifiers for the Hamiltonian terms
+     * @return ObsIdType A dummy identifier for the created observable
      */
-    auto HamiltonianObservable(const std::vector<double> &, const std::vector<ObsIdType> &)
+    auto HamiltonianObservable(const std::vector<double> &, const std::vector<ObsIdType> &obs_ids)
         -> ObsIdType
     {
+        if (this->track_resources_) {
+            return this->resource_tracker_.CombinedObservable("Hamiltonian", obs_ids.size());
+        }
         return 0;
     }
 
@@ -333,10 +359,17 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * The null device doesn't compute actual expectation values since it maintains
      * no quantum state. Always returns 0 for consistency.
      *
-     * @param obs_id The observable identifier (ignored)
+     * @param obs_id The observable identifier
      * @return double Always returns 0
      */
-    auto Expval(ObsIdType) -> double { return 0; }
+    auto Expval(ObsIdType obs_id) -> double
+    {
+        if (this->track_resources_) {
+            this->resource_tracker_.ObsMeasurement("expval", obs_id);
+        }
+
+        return 0;
+    }
 
     /**
      * @brief Returns a dummy variance value (always 0)
@@ -344,10 +377,17 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * The null device doesn't compute actual variances since it maintains
      * no quantum state. Always returns 0 for consistency.
      *
-     * @param obs_id The observable identifier (ignored)
+     * @param obs_id The observable identifier
      * @return double Always returns 0
      */
-    auto Var(ObsIdType) -> double { return 0; }
+    auto Var(ObsIdType obs_id) -> double
+    {
+        if (this->track_resources_) {
+            this->resource_tracker_.ObsMeasurement("var", obs_id);
+        }
+
+        return 0;
+    }
 
     /**
      * @brief Fills the state vector with the computational ground state
@@ -360,6 +400,10 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      */
     void State(DataView<std::complex<double>, 1> &state)
     {
+        if (this->track_resources_) {
+            this->resource_tracker_.AnalyticalMeasurement("state", "all");
+        }
+
         auto iter = state.begin();
         *iter = 1.0;
         if (num_qubits_ > 0) {
@@ -379,12 +423,11 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      */
     void Probs(DataView<double, 1> &probs)
     {
-        auto iter = probs.begin();
-        *iter = 1.0;
-        if (num_qubits_ > 0) {
-            ++iter;
-            std::fill(iter, probs.end(), 0.0);
+        if (this->track_resources_) {
+            this->resource_tracker_.AnalyticalMeasurement("probs", "all");
         }
+
+        MakeProbsDummyReturn(probs);
     }
 
     /**
@@ -394,11 +437,15 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * the ground state regardless of which subset of qubits is measured.
      *
      * @param probs The probability array to fill
-     * @param wires The subset of qubits to compute probabilities for (ignored)
+     * @param wires The subset of qubits to compute probabilities for
      */
-    void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &)
+    void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires)
     {
-        Probs(probs);
+        if (this->track_resources_) {
+            this->resource_tracker_.AnalyticalMeasurement("probs", std::to_string(wires.size()));
+        }
+
+        MakeProbsDummyReturn(probs);
     }
 
     /**
@@ -411,10 +458,11 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      */
     void Sample(DataView<double, 2> &samples)
     {
-        // If num_qubits == 0, the samples array is unallocated (shape=(shots, 0)), so don't fill
-        if (num_qubits_ > 0) {
-            std::fill(samples.begin(), samples.end(), 0.0);
+        if (this->track_resources_) {
+            this->resource_tracker_.AnalyticalMeasurement("sample", "all");
         }
+
+        MakeSampleDummyReturn(samples);
     }
 
     /**
@@ -424,11 +472,15 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      * the ground state regardless of which subset of qubits is measured.
      *
      * @param samples The 2D sample array to fill (shape: shots × num_target_wires)
-     * @param wires The subset of qubits to sample from (ignored)
+     * @param wires The subset of qubits to sample from
      */
-    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &)
+    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires)
     {
-        Sample(samples);
+        if (this->track_resources_) {
+            this->resource_tracker_.AnalyticalMeasurement("sample", std::to_string(wires.size()));
+        }
+
+        MakeSampleDummyReturn(samples);
     }
 
     /**
@@ -444,18 +496,11 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      */
     void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts)
     {
-        auto iter_eigvals = eigvals.begin();
-        *iter_eigvals = 0.0;
-        ++iter_eigvals;
-
-        auto iter_counts = counts.begin();
-        *iter_counts = GetDeviceShots();
-        ++iter_counts;
-
-        if (num_qubits_ > 0) {
-            std::iota(iter_eigvals, eigvals.end(), 1.0);
-            std::fill(iter_counts, counts.end(), 0);
+        if (this->track_resources_) {
+            this->resource_tracker_.AnalyticalMeasurement("counts", "all");
         }
+
+        MakeCountsDummyReturn(eigvals, counts);
     }
 
     /**
@@ -466,12 +511,16 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      *
      * @param eigvals Array to fill with possible measurement outcomes
      * @param counts Array to fill with count statistics
-     * @param wires The subset of qubits to measure (ignored)
+     * @param wires The subset of qubits to measure
      */
     void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                       const std::vector<QubitIdType> &)
+                       const std::vector<QubitIdType> &wires)
     {
-        Counts(eigvals, counts);
+        if (this->track_resources_) {
+            this->resource_tracker_.AnalyticalMeasurement("counts", std::to_string(wires.size()));
+        }
+
+        MakeCountsDummyReturn(eigvals, counts);
     }
 
     /**
@@ -486,6 +535,9 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
      */
     auto Measure(QubitIdType, std::optional<int32_t>) -> Result
     {
+        if (this->track_resources_) {
+            this->resource_tracker_.MidMeasurement();
+        }
         return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
     }
 
@@ -534,6 +586,40 @@ struct NullQubit final : public Catalyst::Runtime::QuantumDevice {
     auto IsTrackingResources() const -> bool { return track_resources_; }
 
   private:
+    void MakeProbsDummyReturn(DataView<double, 1> &probs)
+    {
+        auto iter = probs.begin();
+        *iter = 1.0;
+        if (num_qubits_ > 0) {
+            ++iter;
+            std::fill(iter, probs.end(), 0.0);
+        }
+    }
+
+    void MakeSampleDummyReturn(DataView<double, 2> &samples)
+    {
+        // If num_qubits == 0, the samples array is unallocated (shape=(shots, 0)), so don't fill
+        if (num_qubits_ > 0) {
+            std::fill(samples.begin(), samples.end(), 0.0);
+        }
+    }
+
+    void MakeCountsDummyReturn(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts)
+    {
+        auto iter_eigvals = eigvals.begin();
+        *iter_eigvals = 0.0;
+        ++iter_eigvals;
+
+        auto iter_counts = counts.begin();
+        *iter_counts = GetDeviceShots();
+        ++iter_counts;
+
+        if (num_qubits_ > 0) {
+            std::iota(iter_eigvals, eigvals.end(), 1.0);
+            std::fill(iter_counts, counts.end(), 0);
+        }
+    }
+
     bool track_resources_{false};
     ResourceTracker resource_tracker_;
     std::size_t num_qubits_{0};

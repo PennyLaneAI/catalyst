@@ -62,7 +62,7 @@ def get_program_length(reference_tracers):
 
     if EvaluationContext.is_tracing():  # pragma: no branch
         jaxpr_frame = EvaluationContext.find_jaxpr_frame(reference_tracers)
-        num_jaxpr_eqns = len(jaxpr_frame.eqns)
+        num_jaxpr_eqns = len(jaxpr_frame.tracing_eqns)
 
     if EvaluationContext.is_quantum_tracing():
         quantum_queue = EvaluationContext.find_quantum_queue()
@@ -79,8 +79,8 @@ def reset_program_to_length(reference_tracers, num_jaxpr_eqns, num_tape_ops):
 
     if EvaluationContext.is_tracing():  # pragma: no branch
         jaxpr_frame = EvaluationContext.find_jaxpr_frame(reference_tracers)
-        while len(jaxpr_frame.eqns) > num_jaxpr_eqns:
-            jaxpr_frame.eqns.pop()
+        while len(jaxpr_frame.tracing_eqns) > num_jaxpr_eqns:
+            jaxpr_frame.tracing_eqns.pop()
 
     if EvaluationContext.is_quantum_tracing():
         quantum_queue = EvaluationContext.find_quantum_queue()
@@ -532,11 +532,17 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
             qml.prod,
             catalyst.ctrl,
             qml.ctrl,
+            qml.grad,
+            qml.jacobian,
+            qml.vjp,
+            qml.jvp,
             catalyst.grad,
             catalyst.value_and_grad,
             catalyst.jacobian,
             catalyst.vjp,
+            qml.vjp,
             catalyst.jvp,
+            qml.jvp,
             catalyst.vmap,
             catalyst.mitigate_with_zne,
         )

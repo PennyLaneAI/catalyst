@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline="builtin.module(ppr-to-ppm)" --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK
+// RUN: quantum-opt --ppr-to-ppm --split-input-file -verify-diagnostics %s | FileCheck %s --check-prefix=CHECK
 
 func.func @test_ppr_to_ppm_clifford(%q1 : !quantum.bit) {
     %0 = qec.ppr ["Z"](4) %q1 : !quantum.bit
@@ -26,8 +26,8 @@ func.func @test_ppr_to_ppm_clifford(%q1 : !quantum.bit) {
 
     // CHECK: [[QREG:%.+]]: !quantum.bit) {
     // CHECK: [[q_2:%.+]] = quantum.alloc_qb : !quantum.bit
-    // CHECK: [[M1:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[QREG]], [[q_2]]
-    // CHECK: [[M2:%.+]], [[out_1:%.+]] = qec.ppm ["X"] [[out_0]]#1 : !quantum.bit
+    // CHECK: [[M1:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[QREG]], [[q_2]] : i1, !quantum.bit, !quantum.bit
+    // CHECK: [[M2:%.+]], [[out_1:%.+]] = qec.ppm ["X"] [[out_0]]#1 : i1, !quantum.bit
     // CHECK: [[q_3:%.+]] = arith.xori [[M1]], [[M2]] : i1
     // CHECK: [[q_4:%.+]] = qec.ppr ["Z"](2) [[out_0]]#0 cond([[q_3]]) : !quantum.bit
 }
@@ -40,8 +40,8 @@ func.func @test_ppr_to_ppm_multi_clifford(%q1 : !quantum.bit, %q2 : !quantum.bit
 
     // CHECK: [[arg0:%.+]]: !quantum.bit, [[arg1:%.+]]: !quantum.bit, [[arg2:%.+]]: !quantum.bit)
     // CHECK: [[q_0:%.+]] = quantum.alloc_qb : !quantum.bit
-    // CHECK: [[m1:%.+]], [[o1:%.+]]:4 = qec.ppm ["X", "Y", "Z", "Y"](-1) [[arg0]], [[arg1]], [[arg2]], [[q_0]]
-    // CHECK: [[m2:%.+]], {{.*}} = qec.ppm ["X"] [[o1]]#3 : !quantum.bit
+    // CHECK: [[m1:%.+]], [[o1:%.+]]:4 = qec.ppm ["X", "Y", "Z", "Y"](-1) [[arg0]], [[arg1]], [[arg2]], [[q_0]] : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK: [[m2:%.+]], {{.*}} = qec.ppm ["X"] [[o1]]#3 : i1, !quantum.bit
     // CHECK: [[q_1:%.+]] = arith.xori [[m1]], [[m2]] : i1
     // CHECK: {{.*}} = qec.ppr ["X", "Y", "Z"](2) {{.*}} cond([[q_1]]) : !quantum.bit
 }
@@ -61,8 +61,8 @@ func.func @test_ppr_to_ppm_non_clifford(%q1 : !quantum.bit) {
     // PPR[P](2) on Q if cond(m1) is true
 
     // CHECK: [[magic:%.+]] = qec.fabricate  magic
-    // CHECK: [[m_0:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Z"] %arg0, [[magic]] : !quantum.bit, !quantum.bit
-    // CHECK: [[m_1:%.+]], [[out_1:%.+]] = qec.select.ppm([[m_0]], ["Y"], ["X"]) [[out_0]]#1 : !quantum.bit
+    // CHECK: [[m_0:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Z"] %arg0, [[magic]] : i1, !quantum.bit, !quantum.bit
+    // CHECK: [[m_1:%.+]], [[out_1:%.+]] = qec.select.ppm([[m_0]], ["Y"], ["X"]) [[out_0]]#1 : i1, !quantum.bit
     // CHECK: [[q0_1:%.+]]  = qec.ppr ["Z"](2) [[out_0]]#0 cond([[m_1]]) : !quantum.bit
 }
 
@@ -74,13 +74,13 @@ func.func @test_ppr_to_ppm_mixed_clifford_non_clifford(%q1 : !quantum.bit) {
     return
 
     // CHECK: [[magic:%.+]] = qec.fabricate  magic
-    // CHECK: [[m_0:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Z"] %arg0, [[magic]] : !quantum.bit, !quantum.bit
-    // CHECK: [[m_1:%.+]], [[out_1:%.+]] = qec.select.ppm([[m_0]], ["Y"], ["X"]) [[out_0]]#1 : !quantum.bit
+    // CHECK: [[m_0:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Z"] %arg0, [[magic]] : i1, !quantum.bit, !quantum.bit
+    // CHECK: [[m_1:%.+]], [[out_1:%.+]] = qec.select.ppm([[m_0]], ["Y"], ["X"]) [[out_0]]#1 : i1, !quantum.bit
     // CHECK: [[q_0:%.+]]  = qec.ppr ["Z"](2) [[out_0]]#0 cond([[m_1]]) : !quantum.bit
 
     // CHECK: [[q_1:%.+]] = quantum.alloc_qb : !quantum.bit
-    // CHECK: [[M1:%.+]], [[out_2:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[q_0]], [[q_1]]
-    // CHECK: [[M2:%.+]], [[out_3:%.+]] = qec.ppm ["X"] [[out_2]]#1 : !quantum.bit
+    // CHECK: [[M1:%.+]], [[out_2:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[q_0]], [[q_1]] : i1, !quantum.bit, !quantum.bit
+    // CHECK: [[M2:%.+]], [[out_3:%.+]] = qec.ppm ["X"] [[out_2]]#1 : i1, !quantum.bit
     // CHECK: [[q_2:%.+]] = arith.xori [[M1]], [[M2]] : i1
     // CHECK: [[q_3:%.+]] = qec.ppr ["Z"](2) [[out_2]]#0 cond([[q_2]]) : !quantum.bit
 }
@@ -88,14 +88,14 @@ func.func @test_ppr_to_ppm_mixed_clifford_non_clifford(%q1 : !quantum.bit) {
 // -----
 
 func.func @test_ppr_to_ppm_with_condition(%q0 : !quantum.bit, %q1 : !quantum.bit, %q2 : !quantum.bit, %q3 : !quantum.bit) {
-    %m, %0 = qec.ppm ["Z"] %q0 : !quantum.bit
+    %m, %0 = qec.ppm ["Z"] %q0 : i1, !quantum.bit
     %1:3 = qec.ppr ["X", "Y", "Z"](4) %q1, %q2, %q3 cond(%m) : !quantum.bit, !quantum.bit, !quantum.bit
     return
 
     // CHECK: [[m0:%.+]], {{.*}} = qec.ppm ["Z"]
     // CHECK: quantum.alloc_qb : !quantum.bit
-    // CHECK: [[m1:%.+]], [[q1:%.+]]:4 = qec.ppm ["X", "Y", "Z", "Y"](-1) {{.*}} cond([[m0]])
-    // CHECK: [[m2:%.+]], {{.*}} = qec.ppm ["X"] [[q1]]#3 cond([[m0]])
+    // CHECK: [[m1:%.+]], [[q1:%.+]]:4 = qec.ppm ["X", "Y", "Z", "Y"](-1) {{.*}} cond([[m0]]) : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK: [[m2:%.+]], {{.*}} = qec.ppm ["X"] [[q1]]#3 cond([[m0]]) : i1, !quantum.bit
     // CHECK: [[q_1:%.+]] = arith.xori [[m1]], [[m2]] : i1
     // CHECK: {{.*}} = qec.ppr ["X", "Y", "Z"](2) {{.*}} cond([[q_1]]) : !quantum.bit
 }

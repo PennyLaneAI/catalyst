@@ -16,7 +16,7 @@ import platform
 
 import pennylane as qml
 import pytest
-from conftest import CONFIG_CUSTOM_DEVICE
+from utils import CONFIG_CUSTOM_DEVICE
 
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path

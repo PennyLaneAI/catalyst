@@ -42,8 +42,12 @@ set(LIBS
     mbqc-transforms
     MLIRMitigation
     mitigation-transforms
+    MLIRPauliFrame
+    pauli-frame-transforms
     MLIRIon
     ion-transforms
+    MLIRRTIO
+    rtio-transforms
     MLIRCatalystTest
     ${ENZYME_LIB}
 )
@@ -52,7 +56,9 @@ add_mlir_library(CatalystCompilerDriver
     CompilerDriver.cpp
     CatalystLLVMTarget.cpp
     Pipelines.cpp
+    HighResolutionOutputStrategy.cpp
 
     LINK_LIBS PRIVATE
     ${LIBS}
+    MLIRSupport
 )
