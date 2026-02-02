@@ -226,6 +226,9 @@ def get_quantum_compilation_stage(_options: CompileOptions) -> List[str]:
         # keep inlining modules targeting the Catalyst runtime.
         # But qnodes targeting other backends may choose to lower
         # this into something else.
+        # TODO: Remove these once PBC has its own pipeline
+        "lower-qec-init-ops",
+        "unroll-conditional-ppr-ppm",
         "inline-nested-module",
         "lower-mitigation",
         "adjoint-lowering",
@@ -345,6 +348,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
         "finalize-memref-to-llvm{use-generic-functions}",
         "convert-index-to-llvm",
         "convert-catalyst-to-llvm",
+        "convert-qec-to-llvm",  # TODO: Remove this once PBC has its own pipeline
         "convert-quantum-to-llvm",
         # There should be no identical code folding
         # (`mergeIdenticalBlocks` in the MLIR source code)
