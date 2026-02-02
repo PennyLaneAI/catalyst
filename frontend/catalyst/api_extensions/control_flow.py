@@ -65,7 +65,7 @@ from catalyst.jax_tracer import (
     trace_quantum_operations,
     unify_convert_result_types,
 )
-from catalyst.tracing.contexts import CaptureContext, EvaluationContext, EvaluationMode
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 from catalyst.utils.patching import Patcher
 
@@ -248,7 +248,7 @@ def cond(pred: DynamicJaxprTracer):
                     return x ** 2
                 return qml.cond(x > 1.0)(cond_fn)()
     """
-    if CaptureContext.is_capture_enabled():
+    if qml.capture.enabled():
         raise PlxprCaptureCFCompatibilityError("cond")
 
     def _decorator(true_fn: Callable):
@@ -411,7 +411,7 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
                     return v + 1
                 return qml.for_loop(0, 10, 1)(loop_fn)(0)
     """
-    if CaptureContext.is_capture_enabled():
+    if qml.capture.enabled():
         raise PlxprCaptureCFCompatibilityError("for_loop")
 
     def _decorator(body_fn):
@@ -550,7 +550,7 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
                     return x + 1
                 return qml.while_loop(lambda x: x < 5)(loop_fn)(0)
     """
-    if CaptureContext.is_capture_enabled():
+    if qml.capture.enabled():
         raise PlxprCaptureCFCompatibilityError("while_loop")
 
     def _decorator(body_fn):
@@ -678,7 +678,7 @@ def switch(index_var: int):
         enabled.
     """
 
-    if CaptureContext.is_capture_enabled():
+    if qml.capture.enabled():
         raise PlxprCaptureCFCompatibilityError("switch")
 
     def _decorator(branch):

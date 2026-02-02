@@ -19,7 +19,7 @@ import pytest
 
 import catalyst
 from catalyst import qjit
-from catalyst.tracing.contexts import CaptureContext
+from catalyst.tracing.contexts import temporary_capture_state
 
 
 class TestCaptureKwarg:
@@ -60,92 +60,89 @@ class TestCaptureKwarg:
             def f(x):
                 return x * 2
 
-    def test_capture_context_fallback_to_global(self):
-        """Test that CaptureContext falls back to qml.capture.enabled() when no local context."""
-        # When no capture context is active, should follow global setting
-        qml.capture.disable()
-        assert not CaptureContext.is_capture_enabled()
 
-        qml.capture.enable()
-        try:
-            assert CaptureContext.is_capture_enabled()
-        finally:
-            qml.capture.disable()
+class TestTemporaryCaptureState:
+    """Test suite for the temporary_capture_state context manager."""
 
-    def test_capture_context_local_true_overrides_global(self):
-        """Test that local capture=True overrides global disable."""
+    def test_enable_capture_when_disabled(self):
+        """Test that temporary_capture_state(True) enables capture when globally disabled."""
         qml.capture.disable()
         assert not qml.capture.enabled()
 
-        with CaptureContext(True):
-            assert CaptureContext.is_capture_enabled()
+        with temporary_capture_state(True):
+            assert qml.capture.enabled()
 
-        # After context exits, should revert
-        assert not CaptureContext.is_capture_enabled()
+        # After context exits, should be restored to disabled
+        assert not qml.capture.enabled()
 
-    def test_capture_context_local_false_overrides_global(self):
-        """Test that local capture=False overrides global enable and pauses global capture."""
+    def test_disable_capture_when_enabled(self):
+        """Test that temporary_capture_state(False) disables capture when globally enabled."""
         qml.capture.enable()
         try:
             assert qml.capture.enabled()
 
-            with CaptureContext(False):
-                # Both local check and global should be False
-                assert not CaptureContext.is_capture_enabled()
-                # Crucially, qml.capture.enabled() should also be False (paused)
-                assert not qml.capture.enabled(), "Global capture should be paused"
-
-            # After context exits, should revert
-            assert CaptureContext.is_capture_enabled()
-            assert qml.capture.enabled(), "Global capture should be restored"
-        finally:
-            qml.capture.disable()
-
-    def test_capture_context_pause_isolation(self):
-        """Test that capture=False properly pauses PennyLane's global capture."""
-        qml.capture.enable()
-        try:
-            # Before: global is enabled
-            assert qml.capture.enabled()
-
-            with CaptureContext(False):
-                # Inside: global should be paused
+            with temporary_capture_state(False):
                 assert not qml.capture.enabled()
 
-                # This ensures PennyLane won't produce AbstractMeasurement objects
-                # which would break the old tracing pathway
-
-            # After: global should be restored
+            # After context exits, should be restored to enabled
             assert qml.capture.enabled()
         finally:
             qml.capture.disable()
 
-    def test_capture_context_global_follows_global(self):
-        """Test that capture='global' follows the global setting."""
-        with CaptureContext("global"):
+    def test_no_op_when_already_in_target_state_enabled(self):
+        """Test that temporary_capture_state(True) is a no-op when already enabled."""
+        qml.capture.enable()
+        try:
+            assert qml.capture.enabled()
+
+            with temporary_capture_state(True):
+                assert qml.capture.enabled()
+
+            assert qml.capture.enabled()
+        finally:
             qml.capture.disable()
-            assert not CaptureContext.is_capture_enabled()
 
-            qml.capture.enable()
-            try:
-                assert CaptureContext.is_capture_enabled()
-            finally:
-                qml.capture.disable()
-
-    def test_capture_context_nesting(self):
-        """Test that capture contexts can be nested."""
+    def test_no_op_when_already_in_target_state_disabled(self):
+        """Test that temporary_capture_state(False) is a no-op when already disabled."""
         qml.capture.disable()
+        assert not qml.capture.enabled()
 
-        with CaptureContext(True):
-            assert CaptureContext.is_capture_enabled()
+        with temporary_capture_state(False):
+            assert not qml.capture.enabled()
 
-            with CaptureContext(False):
-                assert not CaptureContext.is_capture_enabled()
+        assert not qml.capture.enabled()
 
-            # After inner context exits, outer context's mode should apply
-            assert CaptureContext.is_capture_enabled()
+    def test_nesting_different_states(self):
+        """Test that nested contexts properly restore their respective states."""
+        qml.capture.disable()
+        assert not qml.capture.enabled()
 
-        assert not CaptureContext.is_capture_enabled()
+        with temporary_capture_state(True):
+            assert qml.capture.enabled()
+
+            with temporary_capture_state(False):
+                assert not qml.capture.enabled()
+
+            # After inner context exits, should be restored to True
+            assert qml.capture.enabled()
+
+        # After outer context exits, should be restored to disabled
+        assert not qml.capture.enabled()
+
+    def test_exception_safety(self):
+        """Test that state is restored even if an exception is raised."""
+        qml.capture.disable()
+        assert not qml.capture.enabled()
+
+        try:
+            with temporary_capture_state(True):
+                assert qml.capture.enabled()
+                raise ValueError("Test exception")
+        except ValueError:
+            pass
+
+        # State should still be restored
+        assert not qml.capture.enabled()
 
 
 class TestCaptureKwargIntegration:

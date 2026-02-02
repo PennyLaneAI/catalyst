@@ -44,7 +44,7 @@ from catalyst.jax_primitives import (
     vjp_p,
 )
 from catalyst.jax_tracer import Function, mark_gradient_tracing
-from catalyst.tracing.contexts import CaptureContext, EvaluationContext, GradContext
+from catalyst.tracing.contexts import EvaluationContext, GradContext
 from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.types import get_shape
@@ -547,7 +547,7 @@ def vjp(f: Callable, params, cotangents, *, method=None, h=None, argnums=None):
     (Array([0.09983342, 0.04      , 0.02      ], dtype=float64),
      (Array([-0.43750208,  0.07      ], dtype=float64),))
     """
-    if CaptureContext.is_capture_enabled():
+    if qml.capture.enabled():
         return qml.vjp(f, params, cotangents, method=method, h=h, argnums=argnums)
 
     def check_is_iterable(x, hint):

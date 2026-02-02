@@ -120,88 +120,52 @@ class AccelerateContext:
         return AccelerateContext._am_inside_accelerate > 0
 
 
-class CaptureContext:
-    """Context manager for tracking the local capture mode within a QJIT invocation.
+@contextmanager
+def temporary_capture_state(target_state: bool):
+    """Temporarily set the PennyLane capture state with guaranteed restoration.
 
-    This class allows QJIT instances to override the global ``qml.capture.enabled()`` setting
-    locally. The capture mode can be:
+    This context manager safely transitions the global ``qml.capture`` state to
+    the requested ``target_state`` and ensures the previous state is restored
+    when exiting, even if an exception occurs.
 
-    - ``"global"``: Defer to ``qml.capture.enabled()`` (default behavior)
-    - ``True``: Force program capture mode on, regardless of global setting
-    - ``False``: Force program capture mode off, regardless of global setting
+    This is the recommended way to implement local capture control in ``@qjit``,
+    as it handles nested calls and exception safety automatically.
 
-    This enables users to enable program capture for specific QJIT instances without
-    affecting the global PennyLane capture state.
+    Args:
+        target_state (bool): The desired capture state within the context.
+            - ``True``: Enable PennyLane capture (use new capture pathway)
+            - ``False``: Disable PennyLane capture (use legacy pathway)
 
-    When ``capture=False`` is set and PennyLane's global capture is enabled, this
-    context manager will use ``qml.capture.pause()`` to temporarily disable capture
-    to ensure proper isolation from the capture pathway.
+    Example:
+        >>> import pennylane as qml
+        >>> qml.capture.disable()
+        >>> with temporary_capture_state(True):
+        ...     assert qml.capture.enabled()  # Capture is enabled inside
+        >>> assert not qml.capture.enabled()  # Restored to disabled outside
+
+    Note:
+        This context manager is re-entrant safe. Nested calls will each
+        restore to their own previous state.
     """
+    import pennylane as qml  # pylint: disable=import-outside-toplevel
 
-    # Stack to track nested capture mode settings.
-    # Each entry is one of: "global", True, False
-    _capture_stack: list = []
+    # 1. Snapshot current state
+    previous_state = qml.capture.enabled()
 
-    def __init__(self, capture_mode):
-        """Initialize the capture context with a capture mode setting.
+    # 2. Transition to target state (only if needed)
+    if target_state and not previous_state:
+        qml.capture.enable()
+    elif not target_state and previous_state:
+        qml.capture.disable()
 
-        Args:
-            capture_mode: One of "global", True, or False
-        """
-        self.capture_mode = capture_mode
-        self._pause_context = None
-
-    def __enter__(self):
-        import pennylane as qml  # pylint: disable=import-outside-toplevel
-
-        CaptureContext._capture_stack.append(self.capture_mode)
-
-        # If capture=False but global capture is enabled, we need to pause it
-        # to prevent PennyLane from producing AbstractMeasurement objects
-        if self.capture_mode is False and qml.capture.enabled():
-            self._pause_context = qml.capture.pause()
-            self._pause_context.__enter__()
-
-    def __exit__(self, _exc_type, _exc, _exc_tb):
-        # Restore the pause context if we created one
-        if self._pause_context is not None:
-            self._pause_context.__exit__(_exc_type, _exc, _exc_tb)
-            self._pause_context = None
-
-        CaptureContext._capture_stack.pop()
-
-    @staticmethod
-    def is_capture_enabled():
-        """Determine if program capture is enabled for the current context.
-
-        Returns:
-            bool: True if capture is enabled, False otherwise.
-
-        This method checks the local capture context stack first. If no local
-        context is set or if the mode is "global", it falls back to the global
-        ``qml.capture.enabled()`` setting.
-        """
-        import pennylane as qml  # pylint: disable=import-outside-toplevel
-
-        if not CaptureContext._capture_stack:
-            # No local context, use global setting
-            return qml.capture.enabled()
-
-        current_mode = CaptureContext._capture_stack[-1]
-        if current_mode == "global":
-            return qml.capture.enabled()
-        return current_mode
-
-    @staticmethod
-    def get_current_mode():
-        """Get the current capture mode setting.
-
-        Returns:
-            The current capture mode ("global", True, or False), or None if no context is active.
-        """
-        if not CaptureContext._capture_stack:
-            return None
-        return CaptureContext._capture_stack[-1]
+    try:
+        yield
+    finally:
+        # 3. Restore previous state
+        if previous_state and not qml.capture.enabled():
+            qml.capture.enable()
+        elif not previous_state and qml.capture.enabled():
+            qml.capture.disable()
 
 
 class EvaluationMode(Enum):

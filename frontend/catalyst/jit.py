@@ -39,7 +39,7 @@ from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.qfunc import QFunc
-from catalyst.tracing.contexts import CaptureContext, EvaluationContext
+from catalyst.tracing.contexts import EvaluationContext, temporary_capture_state
 from catalyst.tracing.type_signatures import (
     filter_static_args,
     get_abstract_signature,
@@ -569,8 +569,14 @@ class QJIT(CatalystCallable):
                 fn, compile_options.static_argnames, compile_options.static_argnums
             )
 
-        # Use capture context for pre_compilation
-        with CaptureContext(self.compile_options.capture):
+        # Determine target capture state for this QJIT instance
+        target_capture_state = self._resolve_capture_state()
+
+        # Use temporary_capture_state to set capture mode during pre_compilation
+        if target_capture_state is not None:
+            with temporary_capture_state(target_capture_state):
+                self.user_function = self.pre_compilation()
+        else:
             self.user_function = self.pre_compilation()
 
         # Static arguments require values, so we cannot AOT compile.
@@ -579,15 +585,19 @@ class QJIT(CatalystCallable):
 
         super().__init__("user_function")
 
-    def _is_capture_enabled(self):
-        """Check if program capture is enabled for this QJIT instance.
+    def _resolve_capture_state(self):
+        """Resolve the target capture state for this QJIT instance.
 
         Returns:
-            bool: True if capture is enabled, False otherwise.
+            bool or None: The target capture state.
+                - True: Force capture pathway (enable qml.capture)
+                - False: Force legacy pathway (disable qml.capture)
+                - None: Use global qml.capture.enabled() state (no local override)
         """
         capture_mode = self.compile_options.capture
         if capture_mode == "global":
-            return qml.capture.enabled()
+            # No local override - use current global state as-is
+            return None
         return capture_mode
 
     @property
@@ -756,49 +766,68 @@ class QJIT(CatalystCallable):
 
         dbg = debug_info("qjit_capture", self.user_function, args, kwargs)
 
-        # Use CaptureContext to set local capture mode during tracing.
-        # CaptureContext also handles pausing qml.capture when capture=False
-        # to ensure proper isolation from the capture pathway.
-        with CaptureContext(self.compile_options.capture):
-            if self._is_capture_enabled():
-                return trace_from_pennylane(
-                    self.user_function,
-                    static_argnums,
-                    dynamic_args,
-                    abstracted_axes,
-                    full_sig,
-                    kwargs,
-                    debug_info=dbg,
+        # Determine target capture state for this QJIT instance
+        target_capture_state = self._resolve_capture_state()
+
+        # If we have a local override, use temporary_capture_state to set it
+        if target_capture_state is not None:
+            with temporary_capture_state(target_capture_state):
+                return self._trace_with_current_capture_state(
+                    static_argnums, abstracted_axes, dynamic_args, dynamic_sig, full_sig, kwargs, dbg
                 )
+        else:
+            # Use global state as-is
+            return self._trace_with_current_capture_state(
+                static_argnums, abstracted_axes, dynamic_args, dynamic_sig, full_sig, kwargs, dbg
+            )
 
-            def closure(qnode, *args, **kwargs):
-                params = {}
-                params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
-                params["_out_tree_expected"] = []
-                params["_classical_return_indices"] = []
-                params["_num_mcm_expected"] = []
-                default_pass_pipeline = self.compile_options.circuit_transform_pipeline
-                pass_pipeline = params.get("pass_pipeline", default_pass_pipeline)
-                params["pass_pipeline"] = pass_pipeline
-                params["debug_info"] = dbg
+    def _trace_with_current_capture_state(
+        self, static_argnums, abstracted_axes, dynamic_args, dynamic_sig, full_sig, kwargs, dbg
+    ):
+        """Internal helper to trace the function with the current capture state.
 
-                return QFunc.__call__(
-                    qnode,
-                    *args,
-                    **dict(params, **kwargs),
-                )
+        This method assumes qml.capture.enabled() already reflects the desired state
+        (either set by temporary_capture_state or already correct globally).
+        """
+        if qml.capture.enabled():
+            return trace_from_pennylane(
+                self.user_function,
+                static_argnums,
+                dynamic_args,
+                abstracted_axes,
+                full_sig,
+                kwargs,
+                debug_info=dbg,
+            )
 
-            with Patcher(
-                (qml.QNode, "__call__", closure),
-            ):
-                # TODO: improve PyTree handling
-                jaxpr, out_type, treedef, plugins = trace_to_jaxpr(
-                    self.user_function, static_argnums, abstracted_axes, full_sig, kwargs, dbg
-                )
-                self.compile_options.pass_plugins.update(plugins)
-                self.compile_options.dialect_plugins.update(plugins)
+        def closure(qnode, *args, **kwargs):
+            params = {}
+            params["static_argnums"] = kwargs.pop("static_argnums", static_argnums)
+            params["_out_tree_expected"] = []
+            params["_classical_return_indices"] = []
+            params["_num_mcm_expected"] = []
+            default_pass_pipeline = self.compile_options.circuit_transform_pipeline
+            pass_pipeline = params.get("pass_pipeline", default_pass_pipeline)
+            params["pass_pipeline"] = pass_pipeline
+            params["debug_info"] = dbg
 
-            return jaxpr, out_type, treedef, dynamic_sig
+            return QFunc.__call__(
+                qnode,
+                *args,
+                **dict(params, **kwargs),
+            )
+
+        with Patcher(
+            (qml.QNode, "__call__", closure),
+        ):
+            # TODO: improve PyTree handling
+            jaxpr, out_type, treedef, plugins = trace_to_jaxpr(
+                self.user_function, static_argnums, abstracted_axes, full_sig, kwargs, dbg
+            )
+            self.compile_options.pass_plugins.update(plugins)
+            self.compile_options.dialect_plugins.update(plugins)
+
+        return jaxpr, out_type, treedef, dynamic_sig
 
     @instrument(size_from=0, has_finegrained=True)
     @debug_logger
