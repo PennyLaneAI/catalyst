@@ -23,23 +23,23 @@
 //   - expval(Z) on qubit 1 (non-Hamiltonian)
 //
 // After transformation:
-//   - circ1.quantum: returns individual expvals [<Z x X>, <Y>, <Z>]
-//   - circ1: calls circ1.quantum, computes weighted sum, returns [<H>, <Z>]
+//   - circ.quantum: returns individual expvals [<Z x X>, <Y>, <Z>]
+//   - circ: calls circ.quantum, computes weighted sum, returns [<H>, <Z>]
 
-module @circ1 {
-  func.func public @jit_circ1() -> (tensor<f64>, tensor<f64>) attributes {llvm.emit_c_interface} {
+module @circ {
+  func.func public @jit_circ() -> (tensor<f64>, tensor<f64>) attributes {llvm.emit_c_interface} {
     %c = stablehlo.constant dense<2> : tensor<1xi64>
-    %0:2 = catalyst.launch_kernel @module_circ1::@circ1(%c) : (tensor<1xi64>) -> (tensor<f64>, tensor<f64>)
+    %0:2 = catalyst.launch_kernel @module_circ::@circ(%c) : (tensor<1xi64>) -> (tensor<f64>, tensor<f64>)
     return %0#0, %0#1 : tensor<f64>, tensor<f64>
   }
-  module @module_circ1 {
+  module @module_circ {
     module attributes {transform.with_named_sequence} {
       transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
         transform.yield
       }
     }
 
-    // CHECK-LABEL: func.func public @circ1.quantum
+    // CHECK-LABEL: func.func public @circ.quantum
     // CHECK-SAME: (%arg0: tensor<1xi64>) -> (tensor<f64>, tensor<f64>, tensor<f64>)
     // CHECK: quantum.device
     // CHECK: quantum.alloc
@@ -58,10 +58,10 @@ module @circ1 {
     // CHECK: quantum.device_release
     // CHECK: return %[[TENSOR_ZX]], %[[TENSOR_Y]], %[[TENSOR_Z]]
 
-    // CHECK-LABEL: func.func public @circ1
+    // CHECK-LABEL: func.func public @circ
     // CHECK-SAME: (%arg0: tensor<1xi64>) -> (tensor<f64>, tensor<f64>)
     // CHECK: %[[COEFFS:.*]] = stablehlo.broadcast_in_dim
-    // CHECK: %[[CALL:.*]]:3 = call @circ1.quantum(%arg0)
+    // CHECK: %[[CALL:.*]]:3 = call @circ.quantum(%arg0)
     // CHECK: %[[C0:.*]] = arith.constant 0 : index
     // CHECK: %[[COEFF0:.*]] = tensor.extract %[[COEFFS]][%[[C0]]]
     // CHECK: %[[C1:.*]] = arith.constant 1 : index
@@ -76,7 +76,7 @@ module @circ1 {
     // CHECK: %[[RESULT:.*]] = stablehlo.reduce(%[[CONCAT]] init: %[[ZERO]]) applies stablehlo.add
     // CHECK: return %[[RESULT]], %[[CALL]]#2
 
-    func.func public @circ1(%arg0: tensor<1xi64>) -> (tensor<f64>, tensor<f64>) attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode} {
+    func.func public @circ(%arg0: tensor<1xi64>) -> (tensor<f64>, tensor<f64>) attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode} {
       %cst = stablehlo.constant dense<1.000000e+00> : tensor<f64>
       %c0_i64 = arith.constant 0 : i64
       quantum.device shots(%c0_i64) ["/path/to/lightning.dylib", "LightningSimulator", "{}"]
@@ -101,6 +101,120 @@ module @circ1 {
       quantum.dealloc %0 : !quantum.reg
       quantum.device_release
       return %from_elements, %from_elements_0 : tensor<f64>, tensor<f64>
+    }
+  }
+  func.func @setup() {
+    quantum.init
+    return
+  }
+  func.func @teardown() {
+    quantum.finalize
+    return
+  }
+}
+
+// -----
+
+// Test Split Hamiltonian expval with Identity observable
+//
+// Input circuit has:
+//   - Hamiltonian H = 1.0 * Z(0) + 2.0 * X(1) + 0.7 * Identity(2)
+//
+// After transformation:
+//   - circ.quantum: returns individual expvals [<Z(0)>, <X(1)>, 1.0]
+//   - circ: calls circ.quantum, computes weighted sum, returns <H>
+
+module @circ {
+  func.func public @jit_circ() -> tensor<f64> attributes {llvm.emit_c_interface} {
+    %c = stablehlo.constant dense<2> : tensor<1xi64>
+    %cst = stablehlo.constant dense<0.69999999999999996> : tensor<1xf64>
+    %0 = catalyst.launch_kernel @module_circ::@circ(%c, %cst) : (tensor<1xi64>, tensor<1xf64>) -> tensor<f64>
+    return %0 : tensor<f64>
+  }
+  module @module_circ {
+    module attributes {transform.with_named_sequence} {
+      transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">) {
+        transform.yield
+      }
+    }
+
+    // CHECK-LABEL: func.func public @circ.quantum
+    // CHECK-SAME: (%arg0: tensor<1xi64>, %arg1: tensor<1xf64>) -> (tensor<f64>, tensor<f64>, tensor<f64>)
+    // CHECK: quantum.device
+    // CHECK: quantum.alloc
+    // CHECK: %[[OBS_Z:.*]] = quantum.namedobs %{{.*}}[ PauliZ]
+    // CHECK: %[[OBS_X:.*]] = quantum.namedobs %{{.*}}[ PauliX]
+    // CHECK: %[[EXPVAL_Z:.*]] = quantum.expval %[[OBS_Z]]
+    // CHECK: %[[TENSOR_Z:.*]] = tensor.from_elements %[[EXPVAL_Z]]
+    // CHECK: %[[EXPVAL_X:.*]] = quantum.expval %[[OBS_X]]
+    // CHECK: %[[TENSOR_X:.*]] = tensor.from_elements %[[EXPVAL_X]]
+    // CHECK-NOT: quantum.namedobs.*Identity
+    // CHECK-NOT: quantum.expval.*Identity
+    // CHECK: %[[ONE:.*]] = arith.constant 1.000000e+00 : f64
+    // CHECK: %[[TENSOR_IDENTITY:.*]] = tensor.from_elements %[[ONE]]
+    // CHECK: quantum.dealloc
+    // CHECK: quantum.device_release
+    // CHECK: return %[[TENSOR_Z]], %[[TENSOR_X]], %[[TENSOR_IDENTITY]]
+
+    // CHECK-LABEL: func.func public @circ
+    // CHECK-SAME: (%arg0: tensor<1xi64>, %arg1: tensor<1xf64>) -> tensor<f64>
+    // CHECK: %[[CALL:.*]]:3 = call @circ.quantum(%arg0, %arg1)
+    // CHECK: %[[C0:.*]] = arith.constant 0 : index
+    // CHECK: %[[EXTRACTED_0:.*]] = tensor.extract %{{.*}}[%[[C0]]]
+    // CHECK: %[[COEFF0:.*]] = tensor.from_elements %[[EXTRACTED_0]]
+    // CHECK: %[[C1:.*]] = arith.constant 1 : index
+    // CHECK: %[[EXTRACTED_1:.*]] = tensor.extract %{{.*}}[%[[C1]]]
+    // CHECK: %[[COEFF1_TEMP:.*]] = tensor.from_elements %[[EXTRACTED_1]]
+    // CHECK: %[[C0_3:.*]] = arith.constant 0 : index
+    // CHECK: %[[EXTRACTED_4:.*]] = tensor.extract %{{.*}}[%[[C0_3]]]
+    // CHECK: %[[COEFF1_NESTED:.*]] = tensor.from_elements %[[EXTRACTED_4]]
+    // CHECK: %[[COEFF1:.*]] = stablehlo.multiply %[[COEFF1_TEMP]], %[[COEFF1_NESTED]]
+    // CHECK: %[[C2:.*]] = arith.constant 2 : index
+    // CHECK: %[[EXTRACTED_6:.*]] = tensor.extract %{{.*}}[%[[C2]]]
+    // CHECK: %[[COEFF2_TEMP:.*]] = tensor.from_elements %[[EXTRACTED_6]]
+    // CHECK: %[[C0_8:.*]] = arith.constant 0 : index
+    // CHECK: %[[EXTRACTED_9:.*]] = tensor.extract %arg1[%[[C0_8]]]
+    // CHECK: %[[COEFF2_NESTED:.*]] = tensor.from_elements %[[EXTRACTED_9]]
+    // CHECK: %[[COEFF2:.*]] = stablehlo.multiply %[[COEFF2_TEMP]], %[[COEFF2_NESTED]]
+    // CHECK: %[[W0:.*]] = stablehlo.multiply %[[COEFF0]], %[[CALL]]#0
+    // CHECK: %[[W1:.*]] = stablehlo.multiply %[[COEFF1]], %[[CALL]]#1
+    // CHECK: %[[W2:.*]] = stablehlo.multiply %[[COEFF2]], %[[CALL]]#2
+    // CHECK: stablehlo.broadcast_in_dim
+    // CHECK: stablehlo.broadcast_in_dim
+    // CHECK: stablehlo.broadcast_in_dim
+    // CHECK: %[[CONCAT:.*]] = stablehlo.concatenate
+    // CHECK: %[[ZERO:.*]] = stablehlo.constant dense<0.000000e+00>
+    // CHECK: %[[RESULT:.*]] = stablehlo.reduce(%[[CONCAT]] init: %[[ZERO]]) applies stablehlo.add
+    // CHECK: return %[[RESULT]]
+
+    func.func public @circ(%arg0: tensor<1xi64>, %arg1: tensor<1xf64>) -> tensor<f64> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode} {
+      %c = stablehlo.constant dense<0> : tensor<i64>
+      %extracted = tensor.extract %c[] : tensor<i64>
+      quantum.device shots(%extracted) ["/path/to/lightning.dylib", "LightningSimulator", "{}"]
+      %c_0 = stablehlo.constant dense<3> : tensor<i64>
+      %0 = quantum.alloc( 3) : !quantum.reg
+      %extracted_1 = tensor.extract %c[] : tensor<i64>
+      %1 = quantum.extract %0[%extracted_1] : !quantum.reg -> !quantum.bit
+      %2 = quantum.namedobs %1[ PauliZ] : !quantum.obs
+      %c_2 = stablehlo.constant dense<1> : tensor<i64>
+      %extracted_3 = tensor.extract %c_2[] : tensor<i64>
+      %3 = quantum.extract %0[%extracted_3] : !quantum.reg -> !quantum.bit
+      %4 = quantum.namedobs %3[ PauliX] : !quantum.obs
+      %5 = stablehlo.convert %arg0 : (tensor<1xi64>) -> tensor<1xf64>
+      %6 = quantum.hamiltonian(%5 : tensor<1xf64>) %4 : !quantum.obs
+      %c_4 = stablehlo.constant dense<2> : tensor<i64>
+      %extracted_5 = tensor.extract %c_4[] : tensor<i64>
+      %7 = quantum.extract %0[%extracted_5] : !quantum.reg -> !quantum.bit
+      %8 = quantum.namedobs %7[ Identity] : !quantum.obs
+      %9 = quantum.hamiltonian(%arg1 : tensor<1xf64>) %8 : !quantum.obs
+      %cst = stablehlo.constant dense<1.000000e+00> : tensor<f64>
+      %10 = stablehlo.broadcast_in_dim %cst, dims = [] : (tensor<f64>) -> tensor<3xf64>
+      %11 = quantum.hamiltonian(%10 : tensor<3xf64>) %2, %6, %9 : !quantum.obs
+      %12 = quantum.expval %11 : f64
+      %from_elements = tensor.from_elements %12 : tensor<f64>
+      quantum.dealloc %0 : !quantum.reg
+      quantum.device_release
+      return %from_elements : tensor<f64>
     }
   }
   func.func @setup() {

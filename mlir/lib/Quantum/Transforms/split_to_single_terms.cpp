@@ -48,6 +48,15 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
         tensor::FromElementsOp fromElementsWrapper;
     };
 
+    /// Check if an observable is Identity
+    bool isIdentityObservable(Value obs)
+    {
+        if (auto namedObsOp = obs.getDefiningOp<NamedObsOp>()) {
+            return namedObsOp.getType() == NamedObservable::Identity;
+        }
+        return false;
+    }
+
     /// Recursively collect all leaf observables from a potentially nested Hamiltonian
     void collectLeafObservables(Value obs, SmallVectorImpl<Value> &leafObs)
     {
@@ -118,18 +127,20 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
     /// Create the post-processing computation: weighted sum of expval results
     ///
     /// Given:
-    ///   - expvalResults = [<Z x X>, <Y>]  (individual expectation values from call)
-    ///   - coefficients  = [c0, c1]        (extracted from Hamiltonian structure)
+    ///   - expvalResults = [<Z x X>, <Y>, 1.0]  (individual expectation values, Identity = 1.0)
+    ///   - coefficients  = [c0, c1, c_id]      (extracted from Hamiltonian structure)
     ///
     /// Computes:
-    ///   result = c0 * <Z x X> + c1 * <Y>
+    ///   result = c0 * <Z x X> + c1 * <Y> + c_id * 1.0
     ///
-    /// Generated MLIR (example with 2 terms):
+    /// Generated MLIR (example with 3 terms including Identity):
     ///   %w0 = stablehlo.multiply %c0, %expval0 : tensor<f64>   // c0 * <Z x X>
     ///   %w1 = stablehlo.multiply %c1, %expval1 : tensor<f64>   // c1 * <Y>
+    ///   %w2 = stablehlo.multiply %c_id, %one : tensor<f64>    // c_id * 1.0
     ///   %b0 = stablehlo.broadcast_in_dim %w0 : tensor<f64> -> tensor<1xf64>
     ///   %b1 = stablehlo.broadcast_in_dim %w1 : tensor<f64> -> tensor<1xf64>
-    ///   %concat = stablehlo.concatenate %b0, %b1 : tensor<2xf64>
+    ///   %b2 = stablehlo.broadcast_in_dim %w2 : tensor<f64> -> tensor<1xf64>
+    ///   %concat = stablehlo.concatenate %b0, %b1, %b2 : tensor<3xf64>
     ///   %zero = stablehlo.constant 0.0 : tensor<f64>
     ///   %result = stablehlo.reduce(%concat init: %zero) applies stablehlo.add
     ///
@@ -137,6 +148,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
                                ValueRange coefficients)
     {
         assert(expvalResults.size() == coefficients.size());
+        assert(expvalResults.size() > 0 && "Hamiltonian must have at least one observable");
 
         SmallVector<Value> weightedExpvals;
         for (size_t i = 0; i < expvalResults.size(); i++) {
@@ -145,6 +157,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
             weightedExpvals.push_back(weighted);
         }
 
+        // Single value: return the weighted expval
         if (weightedExpvals.size() == 1) {
             return weightedExpvals[0];
         }
@@ -200,6 +213,10 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
             Block &block = func.getBody().front();
             for (auto it = block.rbegin(); it != block.rend(); ++it) {
                 Operation *op = &(*it);
+
+                if (isa<DeviceReleaseOp, DeallocOp, DeviceInitOp>(op)) {
+                    continue;
+                }
 
                 if (op->hasTrait<OpTrait::IsTerminator>() || op == boundaryOp ||
                     !op->isBeforeInBlock(boundaryOp)) {
@@ -258,11 +275,22 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
             collectLeafObservables(obs, leafObs);
 
             // Create individual expvals with from_elements wrappers
+            // For Identity observables, use constant 1.0 instead of computing expval
             SmallVector<Value> newExpvalTensors;
             for (Value leaf : leafObs) {
-                Value expval = builder.create<ExpvalOp>(loc, builder.getF64Type(), leaf);
-                Value tensor = builder.create<tensor::FromElementsOp>(
-                    loc, RankedTensorType::get({}, builder.getF64Type()), ValueRange{expval});
+                Value tensor;
+                if (isIdentityObservable(leaf)) {
+                    // Identity expval is always 1.0
+                    Value one =
+                        builder.create<arith::ConstantOp>(loc, builder.getF64FloatAttr(1.0));
+                    tensor = builder.create<tensor::FromElementsOp>(
+                        loc, RankedTensorType::get({}, builder.getF64Type()), ValueRange{one});
+                }
+                else {
+                    Value expval = builder.create<ExpvalOp>(loc, builder.getF64Type(), leaf);
+                    tensor = builder.create<tensor::FromElementsOp>(
+                        loc, RankedTensorType::get({}, builder.getF64Type()), ValueRange{expval});
+                }
                 newExpvalTensors.push_back(tensor);
             }
 
@@ -317,6 +345,14 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
             FunctionType::get(quantumFunc.getContext(), quantumFunc.getFunctionType().getInputs(),
                               mappingInfo.newReturnTypes);
         quantumFunc.setFunctionType(quantumFuncType);
+
+        // Find the last quantum dealloc
+        Operation *lastDeallocOp = nullptr;
+        quantumFunc.walk(
+            [&](quantum::DeallocOp deallocOp) { lastDeallocOp = deallocOp.getOperation(); });
+        if (lastDeallocOp) {
+            removeDeadOpsBeforeOp(quantumFunc, lastDeallocOp);
+        }
 
         return success();
     }
