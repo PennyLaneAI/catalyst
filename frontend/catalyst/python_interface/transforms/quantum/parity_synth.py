@@ -288,7 +288,7 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
         rewritten phase polynomials dependent on the order in which we walk over the operations.
         """
         # The attribute is used so we don't transform the same op multiple times
-        if len(matchedOp.regions) == 0 or hasattr(matchedOp, "parity_synth_done"):
+        if len(matchedOp.regions) == 0 or matchedOp.attributes.get("parity_synth_done", None):
             return
 
         for region in matchedOp.regions:
