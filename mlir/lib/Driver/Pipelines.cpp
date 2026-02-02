@@ -57,6 +57,7 @@ void createQuantumCompilationStage(OpPassManager &pm)
 {
     pm.addPass(catalyst::quantum::createSplitMultipleTapesPass());
     pm.addNestedPass<ModuleOp>(catalyst::createApplyTransformSequencePass());
+    // TODO: Remove these once PBC has its own pipeline
     pm.addPass(catalyst::qec::createLowerQECInitOpsPass());
     pm.addPass(catalyst::qec::createUnrollConditionalPPRPPMPass());
     pm.addPass(catalyst::createInlineNestedModulePass());
