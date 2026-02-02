@@ -132,6 +132,10 @@ class CaptureContext:
 
     This enables users to enable program capture for specific QJIT instances without
     affecting the global PennyLane capture state.
+
+    When ``capture=False`` is set and PennyLane's global capture is enabled, this
+    context manager will use ``qml.capture.pause()`` to temporarily disable capture
+    to ensure proper isolation from the capture pathway.
     """
 
     # Stack to track nested capture mode settings.
@@ -145,11 +149,25 @@ class CaptureContext:
             capture_mode: One of "global", True, or False
         """
         self.capture_mode = capture_mode
+        self._pause_context = None
 
     def __enter__(self):
+        import pennylane as qml  # pylint: disable=import-outside-toplevel
+
         CaptureContext._capture_stack.append(self.capture_mode)
 
+        # If capture=False but global capture is enabled, we need to pause it
+        # to prevent PennyLane from producing AbstractMeasurement objects
+        if self.capture_mode is False and qml.capture.enabled():
+            self._pause_context = qml.capture.pause()
+            self._pause_context.__enter__()
+
     def __exit__(self, _exc_type, _exc, _exc_tb):
+        # Restore the pause context if we created one
+        if self._pause_context is not None:
+            self._pause_context.__exit__(_exc_type, _exc, _exc_tb)
+            self._pause_context = None
+
         CaptureContext._capture_stack.pop()
 
     @staticmethod

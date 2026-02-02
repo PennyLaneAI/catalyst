@@ -84,16 +84,39 @@ class TestCaptureKwarg:
         assert not CaptureContext.is_capture_enabled()
 
     def test_capture_context_local_false_overrides_global(self):
-        """Test that local capture=False overrides global enable."""
+        """Test that local capture=False overrides global enable and pauses global capture."""
         qml.capture.enable()
         try:
             assert qml.capture.enabled()
 
             with CaptureContext(False):
+                # Both local check and global should be False
                 assert not CaptureContext.is_capture_enabled()
+                # Crucially, qml.capture.enabled() should also be False (paused)
+                assert not qml.capture.enabled(), "Global capture should be paused"
 
             # After context exits, should revert
             assert CaptureContext.is_capture_enabled()
+            assert qml.capture.enabled(), "Global capture should be restored"
+        finally:
+            qml.capture.disable()
+
+    def test_capture_context_pause_isolation(self):
+        """Test that capture=False properly pauses PennyLane's global capture."""
+        qml.capture.enable()
+        try:
+            # Before: global is enabled
+            assert qml.capture.enabled()
+
+            with CaptureContext(False):
+                # Inside: global should be paused
+                assert not qml.capture.enabled()
+
+                # This ensures PennyLane won't produce AbstractMeasurement objects
+                # which would break the old tracing pathway
+
+            # After: global should be restored
+            assert qml.capture.enabled()
         finally:
             qml.capture.disable()
 

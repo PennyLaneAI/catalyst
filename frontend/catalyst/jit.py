@@ -756,7 +756,9 @@ class QJIT(CatalystCallable):
 
         dbg = debug_info("qjit_capture", self.user_function, args, kwargs)
 
-        # Use CaptureContext to set local capture mode during tracing
+        # Use CaptureContext to set local capture mode during tracing.
+        # CaptureContext also handles pausing qml.capture when capture=False
+        # to ensure proper isolation from the capture pathway.
         with CaptureContext(self.compile_options.capture):
             if self._is_capture_enabled():
                 return trace_from_pennylane(

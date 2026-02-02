@@ -501,39 +501,52 @@ def trace_from_pennylane(
     )
     from catalyst.utils.patching import DictPatchWrapper
 
-    with transient_jax_config(
-        {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
-    ), Patcher(
-        (pe, "_drop_unused_vars", patched_drop_unused_vars),
-        (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
-        (lax, "_dyn_shape_staging_rule", patched_dyn_shape_staging_rule),
-        (
-            jax._src.pjit,  # pylint: disable=protected-access
-            "pjit_staging_rule",
-            patched_pjit_staging_rule,
-        ),
-        (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
-        (pe, "get_aval", get_aval2),
-    ):
+    # Temporarily enable PennyLane capture if not already enabled.
+    # This is needed because when `capture=True` is set locally in @qjit,
+    # we need qml.capture.enabled() to return True so that QNode uses the
+    # capture pathway during JAX tracing.
+    was_capture_enabled = qml.capture.enabled()
+    if not was_capture_enabled:
+        qml.capture.enable()
 
-        make_jaxpr_kwargs = {
-            "static_argnums": static_argnums,
-            "abstracted_axes": abstracted_axes,
-            "debug_info": debug_info,
-        }
+    try:
+        with transient_jax_config(
+            {"jax_dynamic_shapes": True, "jax_use_shardy_partitioner": False}
+        ), Patcher(
+            (pe, "_drop_unused_vars", patched_drop_unused_vars),
+            (DynamicJaxprTrace, "make_eqn", patched_make_eqn),
+            (lax, "_dyn_shape_staging_rule", patched_dyn_shape_staging_rule),
+            (
+                jax._src.pjit,  # pylint: disable=protected-access
+                "pjit_staging_rule",
+                patched_pjit_staging_rule,
+            ),
+            (DictPatchWrapper(pe.custom_staging_rules, jit_p), "value", patched_pjit_staging_rule),
+            (pe, "get_aval", get_aval2),
+        ):
 
-        args = sig
+            make_jaxpr_kwargs = {
+                "static_argnums": static_argnums,
+                "abstracted_axes": abstracted_axes,
+                "debug_info": debug_info,
+            }
 
-        if isinstance(fn, qml.QNode) and static_argnums:
-            # `make_jaxpr2` sees the qnode
-            # The static_argnum on the wrapped function takes precedence over the
-            # one in `make_jaxpr`
-            # https://github.com/jax-ml/jax/blob/636691bba40b936b8b64a4792c1d2158296e9dd4/jax/_src/linear_util.py#L231
-            # Therefore we need to coordinate them manually
-            fn.static_argnums = static_argnums
+            args = sig
 
-        plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-        jaxpr = from_plxpr(plxpr)(*plxpr.in_avals)
+            if isinstance(fn, qml.QNode) and static_argnums:
+                # `make_jaxpr2` sees the qnode
+                # The static_argnum on the wrapped function takes precedence over the
+                # one in `make_jaxpr`
+                # https://github.com/jax-ml/jax/blob/636691bba40b936b8b64a4792c1d2158296e9dd4/jax/_src/linear_util.py#L231
+                # Therefore we need to coordinate them manually
+                fn.static_argnums = static_argnums
+
+            plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
+            jaxpr = from_plxpr(plxpr)(*plxpr.in_avals)
+    finally:
+        # Restore the previous capture state
+        if not was_capture_enabled:
+            qml.capture.disable()
 
     return jaxpr, out_type, out_treedef, sig
 
