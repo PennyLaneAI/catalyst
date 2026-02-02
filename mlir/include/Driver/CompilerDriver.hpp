@@ -26,7 +26,7 @@
 #include "mlir/IR/BuiltinOps.h"         // mlir::ModuleOp
 #include "mlir/IR/DialectRegistry.h"    // mlir::DialectRegistry
 #include "mlir/IR/MLIRContext.h"        // mlir::MLIRContext
-#include "mlir/IR/OwningRefOp.h"        // mlir::OwningRefOp
+#include "mlir/IR/OwningOpRef.h"        // mlir::OwningOpRef
 #include "mlir/Pass/PassManager.h"      // mlir::PassManager
 #include "mlir/Support/LogicalResult.h" // llvm::LogicalResult
 #include "mlir/Support/Timing.h"
@@ -129,10 +129,10 @@ struct CompilerOutput {
     bool isCheckpointFound;
 
     // Gets the next pass dump file name within a pipeline folder
-    std::string nextPassDumpFilename(std::string pipelineName, std::string ext);
+    std::string nextPassDumpFilename(std::string pipelineName, std::string ext = ".mlir");
 
     // Gets the root-level pipeline summary file name
-    std::string nextPipelineSummaryFilename(std::string pipelineName, std::string ext);
+    std::string nextPipelineSummaryFilename(std::string pipelineName, std::string ext = ".mlir");
 
     // Set the current compilation stage for organizing output files
     void setStage(const std::string &stageName);
@@ -349,4 +349,4 @@ mlir::LogicalResult QuantumDriverMain(const catalyst::driver::CompilerOptions &o
  * @param argv `main` function argv
  * @return int Return code of execution.
  */
-catalyst::driver::ErrorCode QuantumDriverMainFromCL(int argc, char **argv);
+int QuantumDriverMainFromCL(int argc, char **argv);
