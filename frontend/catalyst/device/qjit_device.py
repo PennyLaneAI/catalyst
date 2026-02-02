@@ -44,6 +44,7 @@ from catalyst.device.decomposition import (
     catalyst_decompose,
     measurements_from_counts,
     measurements_from_samples,
+    remove_multictrl_rz,
 )
 from catalyst.device.verification import (
     validate_measurements,
@@ -409,6 +410,12 @@ class QJITDevice(qml.devices.Device):
             ctx=ctx,
             capabilities=capabilities,
             grad_method=config.gradient_method,
+        )
+
+        pipeline.add_transform(
+            remove_multictrl_rz,
+            ctx=ctx,
+            capabilities=capabilities,
         )
 
         # Catalyst program verification and validation

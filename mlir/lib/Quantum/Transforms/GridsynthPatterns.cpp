@@ -386,6 +386,10 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
             return failure();
         }
 
+        if (!(op.getQubitOperands().size() == 1 && op.getAllParams().size() == 1)) {
+            return failure();
+        }
+
         assert(op.getQubitOperands().size() == 1 && op.getAllParams().size() == 1 &&
                "only RZ and PhaseShift are allowed in Gridsynth decomposition");
 
