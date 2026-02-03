@@ -1234,8 +1234,8 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
                 return op.emitOpError("PPRotationArbitraryOp with condition is not supported.");
             }
             // multiply by 2 to get the rotation angle
-            thetaValue = LLVM::FMulOp::create(rewriter, loc,
-                loc, adaptor.getArbitraryAngle(),
+            thetaValue = LLVM::FMulOp::create(
+                rewriter, loc, adaptor.getArbitraryAngle(),
                 LLVM::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0)));
         }
         else if constexpr (std::is_same_v<T, PauliRotOp>) {
@@ -1306,7 +1306,7 @@ struct PPMeasurementOpPattern : public OpConversionPattern<PPMeasurementOp> {
         // if the uint16_t rotation_sign is -1, we need to negate the measurement result
         if (static_cast<int16_t>(op.getRotationSign()) == -1) {
             Value one = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI1Type(),
-                                                          rewriter.getBoolAttr(true));
+                                                 rewriter.getBoolAttr(true));
             mres = LLVM::XOrOp::create(rewriter, loc, mres, one);
         }
 

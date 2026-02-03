@@ -31,14 +31,14 @@ Value createGate(Location loc, PatternRewriter &rewriter, Value inQubit, StringR
 {
     auto outQubitType = inQubit.getType();
     auto gateOp = CustomOp::create(rewriter, loc,
-                                            /*out_qubits=*/TypeRange{outQubitType},
-                                            /*out_ctrl_qubits=*/TypeRange{},
-                                            /*params=*/ValueRange{},
-                                            /*in_qubits=*/ValueRange{inQubit},
-                                            /*gate_name=*/gateName,
-                                            /*adjoint=*/adjoint,
-                                            /*in_ctrl_qubits=*/ValueRange{},
-                                            /*in_ctrl_values=*/ValueRange{});
+                                   /*out_qubits=*/TypeRange{outQubitType},
+                                   /*out_ctrl_qubits=*/TypeRange{},
+                                   /*params=*/ValueRange{},
+                                   /*in_qubits=*/ValueRange{inQubit},
+                                   /*gate_name=*/gateName,
+                                   /*adjoint=*/adjoint,
+                                   /*in_ctrl_qubits=*/ValueRange{},
+                                   /*in_ctrl_values=*/ValueRange{});
     return gateOp.getOutQubits().front();
 }
 
