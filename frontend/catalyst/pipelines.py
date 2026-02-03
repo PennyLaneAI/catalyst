@@ -226,12 +226,12 @@ def get_quantum_compilation_stage(_options: CompileOptions) -> List[str]:
         # keep inlining modules targeting the Catalyst runtime.
         # But qnodes targeting other backends may choose to lower
         # this into something else.
-        # TODO: Remove these once PBC has its own pipeline
-        "lower-qec-init-ops",
-        "unroll-conditional-ppr-ppm",
         "inline-nested-module",
         "lower-mitigation",
         "adjoint-lowering",
+        # TODO: We can remove 2 passes below once PBC has its own pipeline.
+        "lower-qec-init-ops",
+        "unroll-conditional-ppr-ppm",
         "disable-assertion" if _options.disable_assertions else None,
     ]
     return list(filter(partial(is_not, None), user_transform_passes))

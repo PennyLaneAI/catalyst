@@ -57,12 +57,12 @@ void createQuantumCompilationStage(OpPassManager &pm)
 {
     pm.addPass(catalyst::quantum::createSplitMultipleTapesPass());
     pm.addNestedPass<ModuleOp>(catalyst::createApplyTransformSequencePass());
-    // TODO: Remove these once PBC has its own pipeline
-    pm.addPass(catalyst::qec::createLowerQECInitOpsPass());
-    pm.addPass(catalyst::qec::createUnrollConditionalPPRPPMPass());
     pm.addPass(catalyst::createInlineNestedModulePass());
     pm.addPass(catalyst::mitigation::createMitigationLoweringPass());
     pm.addPass(catalyst::quantum::createAdjointLoweringPass());
+    // TODO: We can remove 2 passes below once PBC has its own pipeline.
+    pm.addPass(catalyst::qec::createLowerQECInitOpsPass());
+    pm.addPass(catalyst::qec::createUnrollConditionalPPRPPMPass());
     pm.addPass(catalyst::createDisableAssertionPass());
 }
 void createHloLoweringStage(OpPassManager &pm)
