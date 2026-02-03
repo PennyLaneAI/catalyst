@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 #include "Quantum/IR/QuantumDialect.h"
@@ -351,6 +352,12 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
             FunctionType::get(quantumFunc.getContext(), quantumFunc.getFunctionType().getInputs(),
                               mappingInfo.newReturnTypes);
         quantumFunc.setFunctionType(quantumFuncType);
+
+        // Update res_attrs to match the new number of return values
+        unsigned numResults = quantumFuncType.getNumResults();
+        SmallVector<DictionaryAttr> newResAttrs(numResults,
+                                                DictionaryAttr::get(quantumFunc.getContext()));
+        function_interface_impl::setAllResultAttrDicts(quantumFunc, newResAttrs);
 
         // Find the last quantum dealloc
         Operation *lastDeallocOp = nullptr;
