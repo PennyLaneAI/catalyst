@@ -83,14 +83,14 @@ void applyGlobalPhase(Location loc, Value phaseValue, ConversionPatternRewriter 
     //   ::mlir::TypeRange out_ctrl_qubits, ::mlir::Value params, /*optional*/bool adjoint,
     //   ::mlir::ValueRange in_ctrl_qubits, ::mlir::ValueRange in_ctrl_values);
 
-    rewriter.create<GlobalPhaseOp>(loc, /*out_ctrl_qubits=*/TypeRange{}, /*params=*/phaseValue,
+    GlobalPhaseOp::create(rewriter, loc, /*out_ctrl_qubits=*/TypeRange{}, /*params=*/phaseValue,
                                    /*adjoint=*/false, /*in_ctrl_qubits*/ ValueRange{},
                                    /*in_ctrl_values*/ ValueRange{});
 }
 
 void applyGlobalPhase(Location loc, const double phase, ConversionPatternRewriter &rewriter)
 {
-    Value paramValue = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(phase));
+    Value paramValue = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(phase));
     applyGlobalPhase(loc, paramValue, rewriter);
 }
 
