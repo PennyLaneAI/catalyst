@@ -13,7 +13,6 @@
 # limitations under the License.
 """Core API for registering xDSL transforms for use with PennyLane and Catalyst."""
 
-from abc import abstractmethod
 from collections.abc import Callable
 from inspect import signature
 from types import UnionType
@@ -81,9 +80,10 @@ class CompilationPass(ModulePass):
 
     def __init_subclass__(cls: type["CompilationPass"]) -> None:
         cls._rewrite_patterns = []
-        cls.add_action(cls.action)
 
-    @abstractmethod
+        if cls.action is not CompilationPass.action:
+            cls.add_action(cls.action)
+
     def action(self, op: Operation, rewriter: PatternRewriter) -> None:
         """The action that performs the transformation on an input operation."""
 
