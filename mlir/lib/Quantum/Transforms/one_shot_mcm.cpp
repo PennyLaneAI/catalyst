@@ -315,6 +315,32 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         return oneShotSampleShape;
     }
 
+    void editKernelMCMSample(IRRewriter &builder, func::FuncOp qkernel, quantum::MCMObsOp mcmobs)
+    {
+        // If the kernel returns sample on a mcm,
+        // the single-shot sample of a mcm is just the mcm boolean result itself
+        // So we just cast it to the correct type and return it.
+
+        OpBuilder::InsertionGuard guard(builder);
+        Location loc = qkernel->getLoc();
+
+        // Erase all users of the mcm obs: the new return does not need them.
+        eraseAllUsers(mcmobs.getObs(), qkernel.getBody().back().getTerminator());
+
+        // Cast the I1 mcm to the correct type and return it
+        // MCM itself is I1
+        // Sample kernel returns tensor<1x1xi64>
+        builder.setInsertionPointToEnd(&qkernel.getBody().back());
+        Value mcm = mcmobs.getMcm();
+        auto extuiOp = builder.create<arith::ExtUIOp>(loc, builder.getI64Type(), mcm);
+        auto fromElementsOp = builder.create<tensor::FromElementsOp>(
+            loc, qkernel.getFunctionType().getResults()[0], extuiOp.getOut());
+
+        builder.create<func::ReturnOp>(loc, fromElementsOp.getResult());
+
+        mcmobs->erase();
+    }
+
     void handleSampleOneShot(IRRewriter &builder, func::FuncOp qfunc, Value shots, Operation *mod)
     {
         // Total sample is the sample of each shot concatenated together.
@@ -332,6 +358,13 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         // one
         func::FuncOp qkernel = createOneShotKernel(builder, qfunc, shots, mod);
         SmallVector<int64_t> oneShotSampleShape = editKernelSampleShapes(qkernel, fullSampleType);
+
+        // If the sample MP is on a MCM, we need to massage the one-shot kernel a bit
+        auto kernelSampleOp = *qkernel.getOps<quantum::SampleOp>().begin();
+        Operation *MPSourceOp = kernelSampleOp.getObs().getDefiningOp();
+        if (isa<quantum::MCMObsOp>(MPSourceOp)) {
+            editKernelMCMSample(builder, qkernel, cast<quantum::MCMObsOp>(MPSourceOp));
+        }
 
         // Create the for loop.
         // Each loop iteration inserts its sample to the total sample result tensor.

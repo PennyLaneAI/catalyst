@@ -213,6 +213,41 @@ func.func public @test_sample(%arg0: f64) -> tensor<1000x2xi64> {
 // -----
 
 
+func.func public @test_sample_mcm(%arg0: f64) -> tensor<1000x1xi64> {
+  %1000 = arith.constant 1000 : i64
+  quantum.device shots(%1000) ["", "", ""]
+  %0 = quantum.alloc( 2) : !quantum.reg
+  %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+  %out_qubits = quantum.custom "RX"(%arg0) %1 : !quantum.bit
+  %mres, %out_qubit = quantum.measure %out_qubits : i1, !quantum.bit
+  %2 = quantum.insert %0[ 0], %out_qubit : !quantum.reg, !quantum.bit
+  %3 = quantum.mcmobs %mres : !quantum.obs
+  %4 = quantum.sample %3 : tensor<1000x1xf64>
+  %5 = stablehlo.convert %4 : (tensor<1000x1xf64>) -> tensor<1000x1xi64>
+  quantum.dealloc %2 : !quantum.reg
+  quantum.device_release
+  return %5 : tensor<1000x1xi64>
+}
+
+// CHECK:   func.func public @test_sample_mcm.quantum_kernel(%arg0: f64) -> tensor<1x1xi64>
+// CHECK:     [[one:%.+]] = arith.constant 1 : i64
+// CHECK:     quantum.device shots([[one]]) ["", "", ""]
+// CHECK:     [[mres:%.+]], {{%.+}} = quantum.measure {{%.+}} : i1, !quantum.bit
+// CHECK-NOT:    quantum.mcmobs
+// CHECK-NOT:    quantum.sample
+// CHECK:     [[extend:%.+]] = arith.extui [[mres]] : i1 to i64
+// CHECK:     [[fromElements:%.+]] = tensor.from_elements [[extend]] : tensor<1x1xi64>
+// CHECK:     return [[fromElements]] : tensor<1x1xi64>
+//
+// CHECK:   func.func public @test_sample_mcm(%arg0: f64) -> tensor<1000x1xi64>
+// CHECK:      scf.for
+// CHECK:      func.call @test_sample_mcm.quantum_kernel(%arg0)
+// CHECK:      tensor.insert_slice
+
+
+// -----
+
+
 func.func public @test_counts(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
