@@ -246,6 +246,11 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
         SmallVector<Type> newReturnTypes;
     };
 
+    /// Information about which arguments were removed from the quantum function
+    struct ArgumentRemovalInfo {
+        SmallVector<unsigned> removedArgIndices; // Sorted indices of removed arguments
+    };
+
     /// Modify the quantum function to return individual expvals instead of Hamiltonian expvals
     ///
     /// Before: quantumFunc returns (<H>, <Z>) where <H> is Hamiltonian expval
@@ -358,12 +363,47 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
         return success();
     }
 
+    /// Remove unused arguments from the quantum function
+    /// And update information in the removalInfo to indicate which arguments were removed
+    void removeUnusedArguments(func::FuncOp quantumFunc, ArgumentRemovalInfo &removalInfo)
+    {
+        Block &entryBlock = quantumFunc.getBody().front();
+        SmallVector<unsigned> argsToRemove;
+
+        // Find unused arguments
+        for (auto [idx, arg] : llvm::enumerate(entryBlock.getArguments())) {
+            if (arg.use_empty()) {
+                argsToRemove.push_back(idx);
+            }
+        }
+
+        // Remove arguments, we do it in the reverse order to maintain correct indices
+        for (unsigned idx : llvm::reverse(argsToRemove)) {
+            entryBlock.eraseArgument(idx);
+            removalInfo.removedArgIndices.push_back(idx);
+        }
+
+        llvm::sort(removalInfo.removedArgIndices);
+
+        // Update function signature
+        if (!argsToRemove.empty()) {
+            SmallVector<Type> newInputTypes;
+            for (auto [idx, arg] : llvm::enumerate(entryBlock.getArguments())) {
+                newInputTypes.push_back(arg.getType());
+            }
+            auto newFuncType = FunctionType::get(quantumFunc.getContext(), newInputTypes,
+                                                 quantumFunc.getFunctionType().getResults());
+            quantumFunc.setFunctionType(newFuncType);
+        }
+    }
+
     /// Rewrite the entry function to call quantumFunc and do post-processing
     ///
     /// Before: origFunc contains quantum ops and returns (<H>, <Z>)
     /// After:  origFunc calls quantumFunc, computes weighted sum, returns (<H>, <Z>)
     LogicalResult rewriteEntryFunc(func::FuncOp origFunc, func::FuncOp quantumFunc, Location loc,
-                                   const ReturnValueMappingInfo &mappingInfo)
+                                   const ReturnValueMappingInfo &mappingInfo,
+                                   const ArgumentRemovalInfo &removalInfo)
     {
         // Find Hamiltonian expvals in original function (for coefficient extraction)
         SmallVector<std::pair<ExpvalOp, Value>> hamiltonianExpvalPairs;
@@ -384,8 +424,12 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
         OpBuilder builder(origReturnOp);
         SmallVector<Value> callArgs;
         Block &origBlock = origFunc.getBody().front();
-        for (BlockArgument arg : origBlock.getArguments()) {
-            callArgs.push_back(arg);
+
+        // Only pass arguments that weren't removed from quantumFunc
+        for (auto [idx, arg] : llvm::enumerate(origBlock.getArguments())) {
+            if (!llvm::is_contained(removalInfo.removedArgIndices, idx)) {
+                callArgs.push_back(arg);
+            }
         }
 
         auto callOp = builder.create<func::CallOp>(loc, quantumFunc.getName(),
@@ -475,8 +519,12 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
                 return signalPassFailure();
             }
 
+            // Remove unused arguments from quantumFunc
+            ArgumentRemovalInfo removalInfo;
+            removeUnusedArguments(quantumFunc, removalInfo);
+
             // Modify origFunc to call quantumFunc and do post-processing
-            if (failed(rewriteEntryFunc(origFunc, quantumFunc, loc, mappingInfo))) {
+            if (failed(rewriteEntryFunc(origFunc, quantumFunc, loc, mappingInfo, removalInfo))) {
                 return signalPassFailure();
             }
         }

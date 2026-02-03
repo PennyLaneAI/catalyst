@@ -40,7 +40,7 @@ module @circ {
     }
 
     // CHECK-LABEL: func.func public @circ.quantum
-    // CHECK-SAME: (%arg0: tensor<1xi64>) -> (tensor<f64>, tensor<f64>, tensor<f64>)
+    // CHECK-SAME: () -> (tensor<f64>, tensor<f64>, tensor<f64>)
     // CHECK: quantum.device
     // CHECK: quantum.alloc
     // CHECK: %[[OBS_Z:.*]] = quantum.namedobs %{{.*}}[ PauliZ]
@@ -61,7 +61,7 @@ module @circ {
     // CHECK-LABEL: func.func public @circ
     // CHECK-SAME: (%arg0: tensor<1xi64>) -> (tensor<f64>, tensor<f64>)
     // CHECK: %[[COEFFS:.*]] = stablehlo.broadcast_in_dim
-    // CHECK: %[[CALL:.*]]:3 = call @circ.quantum(%arg0)
+    // CHECK: %[[CALL:.*]]:3 = call @circ.quantum()
     // CHECK: %[[C0:.*]] = arith.constant 0 : index
     // CHECK: %[[COEFF0:.*]] = tensor.extract %[[COEFFS]][%[[C0]]]
     // CHECK: %[[C1:.*]] = arith.constant 1 : index
@@ -139,7 +139,7 @@ module @circ {
     }
 
     // CHECK-LABEL: func.func public @circ.quantum
-    // CHECK-SAME: (%arg0: tensor<1xi64>, %arg1: tensor<1xf64>) -> (tensor<f64>, tensor<f64>, tensor<f64>)
+    // CHECK-SAME: () -> (tensor<f64>, tensor<f64>, tensor<f64>)
     // CHECK: quantum.device
     // CHECK: quantum.alloc
     // CHECK: %[[OBS_Z:.*]] = quantum.namedobs %{{.*}}[ PauliZ]
@@ -158,7 +158,7 @@ module @circ {
 
     // CHECK-LABEL: func.func public @circ
     // CHECK-SAME: (%arg0: tensor<1xi64>, %arg1: tensor<1xf64>) -> tensor<f64>
-    // CHECK: %[[CALL:.*]]:3 = call @circ.quantum(%arg0, %arg1)
+    // CHECK: %[[CALL:.*]]:3 = call @circ.quantum()
     // CHECK: %[[C0:.*]] = arith.constant 0 : index
     // CHECK: %[[EXTRACTED_0:.*]] = tensor.extract %{{.*}}[%[[C0]]]
     // CHECK: %[[COEFF0:.*]] = tensor.from_elements %[[EXTRACTED_0]]
