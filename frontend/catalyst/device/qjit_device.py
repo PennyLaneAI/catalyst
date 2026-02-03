@@ -572,11 +572,11 @@ def filter_device_capabilities_with_shots(
 
     # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
     #       when customizable multi-pathway decomposition is implemented. (Epic 74474)
-    if unitary_support is not None:
-        _to_matrix_ops = unitary_support
-        setattr(device_capabilities, "to_matrix_ops", _to_matrix_ops)
-        if _to_matrix_ops and not device_capabilities.supports_operation("QubitUnitary"):
-            raise CompileError("The device that specifies to_matrix_ops must support QubitUnitary.")
+    # if unitary_support is not None:
+    #     _to_matrix_ops = unitary_support
+    #     setattr(device_capabilities, "to_matrix_ops", _to_matrix_ops)
+    #     if _to_matrix_ops and not device_capabilities.supports_operation("QubitUnitary"):
+    #         raise CompileError("The device that specifies to_matrix_ops must support QubitUnitary.")
 
     return device_capabilities
 
