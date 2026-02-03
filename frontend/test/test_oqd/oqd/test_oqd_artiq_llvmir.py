@@ -68,7 +68,7 @@ class TestOQDARTIQLLVMIR:
 
         # Get the LLVM IR
         compiled_circuit = QJIT(
-            circuit, CompileOptions(target="llvmir", link=False, pipelines=oqd_pipelines)
+            circuit, CompileOptions(link=False, pipelines=oqd_pipelines)
         )
         llvm_ir = compiled_circuit.llvmir
 
