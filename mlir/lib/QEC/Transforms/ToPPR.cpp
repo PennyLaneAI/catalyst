@@ -77,6 +77,23 @@ void applyAdjointIfNeeded(GateConversion &gateConversion, CustomOp op)
     }
 }
 
+void applyGlobalPhase(Location loc, Value phaseValue, ConversionPatternRewriter &rewriter)
+{
+    //   static GlobalPhaseOp create(::mlir::OpBuilder &builder, ::mlir::Location location,
+    //   ::mlir::TypeRange out_ctrl_qubits, ::mlir::Value params, /*optional*/bool adjoint,
+    //   ::mlir::ValueRange in_ctrl_qubits, ::mlir::ValueRange in_ctrl_values);
+
+    rewriter.create<GlobalPhaseOp>(loc, /*out_ctrl_qubits=*/TypeRange{}, /*params=*/phaseValue,
+                                   /*adjoint=*/false, /*in_ctrl_qubits*/ ValueRange{},
+                                   /*in_ctrl_values*/ ValueRange{});
+}
+
+void applyGlobalPhase(Location loc, const double phase, ConversionPatternRewriter &rewriter)
+{
+    Value paramValue = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(phase));
+    applyGlobalPhase(loc, paramValue, rewriter);
+}
+
 //===----------------------------------------------------------------------===//
 //                       Gate conversion functions
 //===----------------------------------------------------------------------===//
@@ -154,6 +171,8 @@ LogicalResult controlledConversion(CustomOp op, StringRef P1, StringRef P2,
 // H = (Z · X · Z)π/4
 LogicalResult convertHGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
+    applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 2, rewriter);
+
     auto Z0 = GateConversion({"Z"}, 4);
     auto X1 = GateConversion({"X"}, 4);
     auto Z2 = GateConversion({"Z"}, 4);
@@ -164,6 +183,8 @@ LogicalResult convertHGate(CustomOp op, ConversionPatternRewriter &rewriter)
 // S = (Z)π/4
 LogicalResult convertSGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
+    applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 4, rewriter);
+
     auto gate = GateConversion({"Z"}, 4);
     applySingleQubitConversion(op, {gate}, rewriter);
     return success();
@@ -172,6 +193,8 @@ LogicalResult convertSGate(CustomOp op, ConversionPatternRewriter &rewriter)
 // T = (Z)π/8
 LogicalResult convertTGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
+    applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 8, rewriter);
+
     auto gate = GateConversion({"Z"}, 8);
     applySingleQubitConversion(op, {gate}, rewriter);
     return success();
@@ -180,6 +203,8 @@ LogicalResult convertTGate(CustomOp op, ConversionPatternRewriter &rewriter)
 // X = (X)π/2
 LogicalResult convertXGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
+    applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 2, rewriter);
+
     auto gate = GateConversion({"X"}, 2);
     applySingleQubitConversion(op, {gate}, rewriter);
     return success();
@@ -188,6 +213,8 @@ LogicalResult convertXGate(CustomOp op, ConversionPatternRewriter &rewriter)
 // Y = (Y)π/2
 LogicalResult convertYGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
+    applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 2, rewriter);
+
     auto gate = GateConversion({"Y"}, 2);
     applySingleQubitConversion(op, {gate}, rewriter);
     return success();
@@ -196,6 +223,8 @@ LogicalResult convertYGate(CustomOp op, ConversionPatternRewriter &rewriter)
 // Z = (Z)π/2
 LogicalResult convertZGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
+    applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 2, rewriter);
+
     auto gate = GateConversion({"Z"}, 2);
     applySingleQubitConversion(op, {gate}, rewriter);
     return success();
@@ -211,6 +240,7 @@ LogicalResult convertIGate(CustomOp op, ConversionPatternRewriter &rewriter)
 
 LogicalResult convertCNOTGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
+    applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 4, rewriter);
     return controlledConversion(op, "Z", "X", rewriter);
 }
 

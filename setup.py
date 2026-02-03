@@ -127,7 +127,7 @@ requirements = [
     kokkos_dep,
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
-    "numpy!=2.0.0",
+    "numpy>2.0.0",
     "scipy-openblas32>=0.3.26",  # symbol and library name
     "diastatic-malt>=2.15.2",
     "xdsl==0.56.1",
@@ -150,7 +150,7 @@ entry_points = {
         "cuda_quantum.qjit = catalyst.third_party.cuda:cudaqjit",
     ],
     "xdsl.universe": [
-        "catalyst-xdsl-universe = catalyst.python_interface.xdsl_universe:XDSL_UNIVERSE"
+        "catalyst-xdsl-universe = catalyst.python_interface.xdsl_universe:CATALYST_XDSL_UNIVERSE"
     ],
 }
 

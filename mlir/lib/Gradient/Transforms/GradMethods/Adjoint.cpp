@@ -55,14 +55,8 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
     assert(callee.getBody().hasOneBlock() &&
            "Gradients with unstructured control flow are not supported");
 
-    // Since the return value is guaranteed to be discarded, then let's change the return type
-    // to be only the quantum register and the expval.
-    //
-    // We also need to return the expval to avoid dead code elimination downstream from
-    // removing the expval op in the body.
-    // TODO: we only support grad on expval op for now
+    // Check some prerequisites & assumptions
     SmallVector<quantum::DeallocOp> deallocs;
-    SmallVector<quantum::ExpvalOp> expvalOps;
     SmallVector<quantum::DeviceReleaseOp> deviceReleaseOps;
     for (Operation &op : callee.getBody().getOps()) {
         if (isa<quantum::DeallocOp>(op)) {
@@ -70,11 +64,7 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
             continue;
         }
         else if (isa<quantum::MeasurementProcess>(op)) {
-            if (isa<quantum::ExpvalOp>(op)) {
-                expvalOps.push_back(cast<quantum::ExpvalOp>(op));
-                continue;
-            }
-            else {
+            if (!isa<quantum::ExpvalOp>(op)) {
                 callee.emitOpError() << "Adjoint gradient is only supported on expval measurements";
                 return callee;
             }
@@ -100,14 +90,12 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         return callee;
     }
 
-    // Create clone, return type is qreg and float for the expvals
+    // Since the MP results are not returned directly in the adjoint method, change the return type
+    // to be only the quantum register.
+    // Create clone, return type is qreg
     std::string fnName = callee.getName().str() + ".nodealloc";
     Type qregType = quantum::QuregType::get(rewriter.getContext());
-    Type f64Type = rewriter.getF64Type();
-    SmallVector<Type> retTypes{qregType};
-    std::for_each(expvalOps.begin(), expvalOps.end(),
-                  [&](const quantum::ExpvalOp &) { retTypes.push_back(f64Type); });
-    FunctionType fnType = rewriter.getFunctionType(callee.getArgumentTypes(), retTypes);
+    FunctionType fnType = rewriter.getFunctionType(callee.getArgumentTypes(), qregType);
     StringAttr visibility = rewriter.getStringAttr("private");
 
     func::FuncOp unallocFn =
@@ -124,12 +112,9 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         rewriter.cloneRegionBefore(callee.getBody(), unallocFn.getBody(), unallocFn.end(), mapper);
         rewriter.setInsertionPointToStart(&unallocFn.getBody().front());
 
-        // Let's return the qreg+expval and erase the device release.
-        // Fine for now: only one block in body so only one dealloc and one expval
+        // Let's return the qreg and erase the device release.
+        // Fine for now: only one block in body so only one dealloc
         SmallVector<Value> returnVals{mapper.lookup(deallocs[0])->getOperand(0)};
-        std::for_each(expvalOps.begin(), expvalOps.end(), [&](const quantum::ExpvalOp &expval) {
-            returnVals.push_back(mapper.lookup(expval));
-        });
 
         // Create the return
         // Again, assume just one block for now
