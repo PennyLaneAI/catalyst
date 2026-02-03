@@ -24,7 +24,7 @@
 * `qml.vjp` can now be used with Catalyst and program capture.
   [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
 
-* The `measurements_from_samples` pass no longer results in `nan`s and cryptic error messages when   
+* The `measurements_from_samples` pass no longer results in `nan`s and cryptic error messages when
   `shots` aren't set. Instead, an informative error message is raised.
   [(#2456)](https://github.com/PennyLaneAI/catalyst/pull/2456)
 
@@ -40,6 +40,10 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fix a bug with the xDSL `ParitySynth` pass that caused failure when the QNode being transformed
+  contained operations with regions.
+  [(#2408)](https://github.com/PennyLaneAI/catalyst/pull/2408)
 
 * Fix `replace_ir` for certain stages when used with gradients.
   [(#2436)](https://github.com/PennyLaneAI/catalyst/pull/2436)
