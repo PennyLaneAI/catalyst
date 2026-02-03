@@ -62,8 +62,13 @@
 * Fixed the GlobalPhase discrepancies when executing gridsynth in the PPR basis.
   [(#2433)](https://github.com/PennyLaneAI/catalyst/pull/2433)
 
+* Fixed incorrect global phase when lowering CNOT gates into PPR/PPM operations.
+  [(#2459)](https://github.com/PennyLaneAI/catalyst/pull/2459)
 
 <h3>Internal changes ⚙️</h3>
+
+* Updated the integration tests for `qp.specs` to get coverage for new features
+  [(#2448)](https://github.com/PennyLaneAI/catalyst/pull/2448)
 
 * The xDSL :class:`~catalyst.python_interface.Quantum` dialect has been split into multiple files
   to structure operations and attributes more concretely.

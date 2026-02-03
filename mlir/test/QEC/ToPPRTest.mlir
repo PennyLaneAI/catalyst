@@ -19,6 +19,7 @@ func.func @test_clifford_t_to_ppr(%q1 : !quantum.bit, %q2 : !quantum.bit){
     // pi / 8 = 826990
     // CHECK-NOT: quantum.custom
     // CHECK: ([[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit)
+    // CHECK: [[C2:%.+]] = arith.constant 0.785
     // CHECK: [[C:%.+]] = arith.constant -0.392
     // CHECK: [[C0:%.+]] = arith.constant -0.785
     // CHECK: [[C1:%.+]] = arith.constant -1.570
@@ -30,7 +31,7 @@ func.func @test_clifford_t_to_ppr(%q1 : !quantum.bit, %q2 : !quantum.bit){
     // CHECK: [[q1_1:%.+]] = qec.ppr ["Z"](4) [[q1_0_2]]
     // CHECK: quantum.gphase([[C]])
     // CHECK: [[q1_2:%.+]] = qec.ppr ["Z"](8) [[q1_1]]
-    // CHECK: quantum.gphase([[C0]])
+    // CHECK: quantum.gphase([[C2]])
     // CHECK: [[q1_3:%.+]]:2 = qec.ppr ["Z", "X"](4) [[q1_2]], [[q2]]
     %q1_0 = quantum.custom "H"() %q1 : !quantum.bit
     %q1_1 = quantum.custom "S"() %q1_0 : !quantum.bit
@@ -46,6 +47,7 @@ func.func @test_clifford_t_to_ppr(%q1 : !quantum.bit, %q2 : !quantum.bit){
 // -----
 
 func.func public @test_clifford_t_to_ppr_1() -> (tensor<i1>, tensor<i1>) {
+    // CHECK: [[C2:%.+]] = arith.constant 0.785
     // CHECK: [[C:%.+]] = arith.constant -0.392
     // CHECK: [[C0:%.+]] = arith.constant -1.570
     // CHECK: [[C1:%.+]] = arith.constant -0.785
@@ -66,7 +68,7 @@ func.func public @test_clifford_t_to_ppr_1() -> (tensor<i1>, tensor<i1>) {
     // CHECK: quantum.gphase([[C]])
     // CHECK: [[q0_2:%.+]] = qec.ppr ["Z"](8) [[q0_1_2]]
     %out_qubits_1 = quantum.custom "T"() %out_qubits_0 : !quantum.bit
-    // CHECK: quantum.gphase([[C1]])
+    // CHECK: quantum.gphase([[C2]])
     // CHECK: [[q_3:%.+]]:2 = qec.ppr ["Z", "X"](4) [[q0_2]], [[q1_1]]
     // CHECK: [[q_4:%.+]] = qec.ppr ["Z"](-4) [[q_3]]#0
     // CHECK: [[q_5:%.+]] = qec.ppr ["X"](-4) [[q_3]]#1
