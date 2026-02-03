@@ -24,7 +24,7 @@
 * `qml.vjp` can now be used with Catalyst and program capture.
   [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
 
-* The `measurements_from_samples` pass no longer results in `nan`s and cryptic error messages when   
+* The `measurements_from_samples` pass no longer results in `nan`s and cryptic error messages when
   `shots` aren't set. Instead, an informative error message is raised.
   [(#2456)](https://github.com/PennyLaneAI/catalyst/pull/2456)
 
@@ -127,6 +127,53 @@
   QEC state preparation operations.
   [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
 
+* A new compiler pass `split-to-single-terms` has been added to optimize QNode functions containing
+  Hamiltonian expectation values by spliting them into individual leaf observable expvals.
+  [(#2441)](https://github.com/PennyLaneAI/catalyst/pull/2441)
+
+  ```python
+  import pennylane as qml
+  from catalyst import qjit
+  from catalyst.passes import apply_pass
+
+  @qjit
+  @apply_pass("split-to-single-terms")
+  @qml.qnode(qml.device("lightning.qubit", wires=3))
+  def circuit():
+      # Hamiltonian H = Z(0) + X(1) + 2*Y(2)
+      return qml.expval(qml.Z(0) + qml.X(1) + 2 * qml.Y(2))
+  ```
+
+  The pass transforms the function by splitting the Hamiltonian into individual observables:
+
+  **Before:**
+  ```mlir
+  func @circ1(%arg0) -> (tensor<f64>, tensor<f64>) {
+      // ... quantum ops ...
+      %H = quantum.hamiltonian(%coeffs) %obs1, %obs2 : !quantum.obs
+      %result1 = quantum.expval %H : f64   // H = c_0 * (Z x X) + c_1 * Y
+      %result2 = quantum.expval %Z : f64
+      return %result, %result2}
+  ```
+
+  After:
+  ```mlir
+  func @circ1.quantum() -> (tensor<f64>, tensor<f64>, v<f64>) {
+      // ... quantum ops ...
+      %expval0 = quantum.expval %obs1 : f64
+      %expval1 = quantum.expval %obs2 : f64
+      %other = quantum.expval %Z : f64
+      return %expval0, %expval1, %other
+  }
+  func @circ1(%arg0) -> (tensor<f64>, tensor<f64>) {
+      // ... setup ...
+      %call:3 = call @circ1.quantum()
+      // Extract coefficients and compute weighted sum
+      %result = c0 * %call#0 + c1 * %call#1
+      return %result, %call#2
+  }
+  ```
+
 <h3>Documentation 📝</h3>
 
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
@@ -150,4 +197,5 @@ Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,
 Paul Haochen Wang,
-Jake Zaia.
+Jake Zaia,
+Hongsheng Zheng.
