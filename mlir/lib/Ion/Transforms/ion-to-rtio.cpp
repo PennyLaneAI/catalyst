@@ -145,7 +145,7 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
                     return nullptr;
                 Type inputType = inputs.front().getType();
                 if (inputType != resultType) {
-                    return builder.create<UnrealizedConversionCastOp>(loc, resultType, inputs)
+                    return UnrealizedConversionCastOp::create(builder, loc, resultType, inputs)
                         .getResult(0);
                 }
                 return inputs[0];
@@ -157,7 +157,7 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
                     return nullptr;
                 Type inputType = inputs.front().getType();
                 if (inputType != resultType) {
-                    return builder.create<UnrealizedConversionCastOp>(loc, resultType, inputs)
+                    return UnrealizedConversionCastOp::create(builder, loc, resultType, inputs)
                         .getResult(0);
                 }
                 return inputs[0];
@@ -304,8 +304,8 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
 
             // Get the global memref in the function
             builder.setInsertionPointAfter(allocOp);
-            Value qubitMap = builder.create<memref::GetGlobalOp>(allocOp.getLoc(), memrefType,
-                                                                 globalOp.getSymName());
+            Value qubitMap = memref::GetGlobalOp::create(builder, allocOp.getLoc(), memrefType,
+                                                         globalOp.getSymName());
 
             qregToMemrefMap[allocOp.getResult()] = qubitMap;
         });
@@ -320,16 +320,16 @@ struct IonToRTIOPass : public impl::IonToRTIOPassBase<IonToRTIOPass> {
                         Value memrefLoadValue = nullptr;
                         if (Value idx = extractOp.getIdx()) {
                             // idx is an operand (i64), need to cast to index
-                            Value indexValue = builder.create<arith::IndexCastOp>(
-                                extractOp.getLoc(), builder.getIndexType(), idx);
-                            memrefLoadValue = builder.create<memref::LoadOp>(
-                                extractOp.getLoc(), memref, ValueRange{indexValue});
+                            Value indexValue = arith::IndexCastOp::create(
+                                builder, extractOp.getLoc(), builder.getIndexType(), idx);
+                            memrefLoadValue = memref::LoadOp::create(
+                                builder, extractOp.getLoc(), memref, ValueRange{indexValue});
                         }
                         else if (IntegerAttr idxAttr = extractOp.getIdxAttrAttr()) {
-                            Value indexValue = builder.create<arith::ConstantIndexOp>(
-                                extractOp.getLoc(), idxAttr.getInt());
-                            memrefLoadValue = builder.create<memref::LoadOp>(
-                                extractOp.getLoc(), memref, ValueRange{indexValue});
+                            Value indexValue = arith::ConstantIndexOp::create(
+                                builder, extractOp.getLoc(), idxAttr.getInt());
+                            memrefLoadValue = memref::LoadOp::create(
+                                builder, extractOp.getLoc(), memref, ValueRange{indexValue});
                         }
                         if (memrefLoadValue) {
                             qextractToMemrefMap[extractOp.getResult()] = memrefLoadValue;
