@@ -173,7 +173,7 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         mcmobs->erase();
     }
 
-    void editKernelProbsExpval(IRRewriter &builder, func::FuncOp qfunc, quantum::MCMObsOp mcmobs)
+    void editKernelMCMProbs(IRRewriter &builder, func::FuncOp qfunc, quantum::MCMObsOp mcmobs)
     {
         // If the kernel returns probs on a mcm,
         // the single-shot probs of the mcm is either [1,0] or [0,1]
@@ -232,7 +232,7 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
                 editKernelMCMExpval(builder, qfunc, cast<quantum::MCMObsOp>(MPSourceOp));
             }
             else {
-                editKernelProbsExpval(builder, qfunc, cast<quantum::MCMObsOp>(MPSourceOp));
+                editKernelMCMProbs(builder, qfunc, cast<quantum::MCMObsOp>(MPSourceOp));
             }
         }
 
