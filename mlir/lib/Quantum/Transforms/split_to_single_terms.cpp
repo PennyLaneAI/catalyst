@@ -203,7 +203,8 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
 
     /// Remove dead operations before a given operation in a block
     /// Iteratively removes ops with no users until no more can be removed
-    void removeDeadOpsBeforeOp(func::FuncOp func, Operation *boundaryOp)
+    void removeDeadOpsBeforeOp(func::FuncOp func, Operation *boundaryOp,
+                               bool reserveDeviceOps = false)
     {
         bool changed = true;
         while (changed) {
@@ -214,7 +215,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
             for (auto it = block.rbegin(); it != block.rend(); ++it) {
                 Operation *op = &(*it);
 
-                if (isa<DeviceReleaseOp, DeallocOp, DeviceInitOp>(op)) {
+                if (reserveDeviceOps && isa<DeviceInitOp, DeviceReleaseOp, DeallocOp>(op)) {
                     continue;
                 }
 
@@ -351,7 +352,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
         quantumFunc.walk(
             [&](quantum::DeallocOp deallocOp) { lastDeallocOp = deallocOp.getOperation(); });
         if (lastDeallocOp) {
-            removeDeadOpsBeforeOp(quantumFunc, lastDeallocOp);
+            removeDeadOpsBeforeOp(quantumFunc, lastDeallocOp, /*reserveDeviceOps=*/true);
         }
 
         return success();
@@ -426,7 +427,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
         origReturnOp.erase();
 
         // Clean up dead ops before the call
-        removeDeadOpsBeforeOp(origFunc, callOp.getOperation());
+        removeDeadOpsBeforeOp(origFunc, callOp.getOperation(), /*reserveDeviceOps=*/false);
 
         return success();
     }
