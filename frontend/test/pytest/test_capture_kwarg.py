@@ -18,6 +18,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
+from catalyst.compiler import CompileOptions
 from catalyst.tracing.contexts import ensure_capture_mode
 
 
@@ -236,3 +237,138 @@ class TestCaptureKwargIntegration:
         # Both should give the same result
         assert jnp.allclose(result_capture, result_old)
         assert jnp.allclose(result_capture, jnp.cos(0.5))
+
+
+class TestCaptureCompileOptionsIdentity:
+    """Test that capture flag is part of CompileOptions identity.
+
+    These tests ensure cache collisions cannot occur between capture=True
+    and capture=False compilations. Since `capture` fundamentally changes
+    the compilation pipeline (different lowering paths, different MLIR dialects),
+    it must be distinguishable in CompileOptions.
+    """
+
+    def test_capture_flag_creates_distinct_compile_options(self):
+        """Test that qjit(capture=True) and qjit(capture=False) have distinct CompileOptions."""
+        qml.capture.disable()  # Ensure global state doesn't affect the test
+
+        @qjit(capture=True)
+        def fn_capture(x):
+            return x * 2
+
+        @qjit(capture=False)
+        def fn_old(x):
+            return x * 2
+
+        @qjit(capture="global")
+        def fn_global(x):
+            return x * 2
+
+        # The compile options must be different
+        assert fn_capture.compile_options.capture != fn_old.compile_options.capture
+        assert fn_capture.compile_options.capture is True
+        assert fn_old.compile_options.capture is False
+        assert fn_global.compile_options.capture == "global"
+
+        # CompileOptions should not be equal when capture differs
+        assert fn_capture.compile_options != fn_old.compile_options
+
+    def test_aot_preserves_capture_flag(self):
+        """Test that the capture flag persists in CompileOptions for AOT compilation.
+
+        This ensures the flag isn't lost when using qjit without immediately calling it.
+        """
+        qml.capture.disable()  # Global state is disabled
+
+        @qjit(capture=True)
+        def circuit(x: float):  # Type hint enables AOT compilation
+            return x * 2
+
+        # Inspect the options BEFORE running
+        options = circuit.compile_options
+
+        # Check that it's stored and set to True (not the global state)
+        assert options.capture is True
+
+        # Should differ from the global state
+        assert options.capture != "global"
+        # If capture was accidentally defaulting to global, this would fail
+        assert options.capture != qml.capture.enabled()
+
+    def test_capture_false_aot_preserves_flag(self):
+        """Test that capture=False persists in AOT mode even when global is enabled."""
+        qml.capture.enable()
+        try:
+
+            @qjit(capture=False)
+            def circuit(x: float):  # Type hint enables AOT compilation
+                return x * 2
+
+            options = circuit.compile_options
+            assert options.capture is False
+            # Should not have defaulted to global state
+            assert options.capture != qml.capture.enabled()
+        finally:
+            qml.capture.disable()
+
+    def test_compile_options_capture_field_exists(self):
+        """Test that CompileOptions dataclass has the capture field."""
+        # Create a CompileOptions with explicit capture value
+        opts_true = CompileOptions(capture=True)
+        opts_false = CompileOptions(capture=False)
+        opts_global = CompileOptions(capture="global")
+        opts_default = CompileOptions()
+
+        assert opts_true.capture is True
+        assert opts_false.capture is False
+        assert opts_global.capture == "global"
+        assert opts_default.capture == "global"  # Default should be "global"
+
+    def test_different_capture_produces_different_qjit_objects(self, backend):
+        """Test that different capture settings produce independent QJIT objects.
+
+        This is the "collision" test - ensures that calling with different
+        capture modes doesn't accidentally reuse cached results.
+        """
+        qml.capture.disable()
+        dev = qml.device(backend, wires=1)
+
+        # Use a counter to track compilations
+        compilation_count = {"capture": 0, "old": 0}
+
+        def make_circuit_capture():
+            compilation_count["capture"] += 1
+
+            @qjit(capture=True)
+            @qml.qnode(dev)
+            def circuit(x):
+                qml.RX(x, wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            return circuit
+
+        def make_circuit_old():
+            compilation_count["old"] += 1
+
+            @qjit(capture=False)
+            @qml.qnode(dev)
+            def circuit(x):
+                qml.RX(x, wires=0)
+                return qml.expval(qml.PauliZ(0))
+
+            return circuit
+
+        # Create circuits with different capture modes
+        circuit_capture = make_circuit_capture()
+        circuit_old = make_circuit_old()
+
+        # Both should work and produce same mathematical results
+        result_capture = circuit_capture(0.5)
+        result_old = circuit_old(0.5)
+
+        assert jnp.allclose(result_capture, result_old)
+        assert jnp.allclose(result_capture, jnp.cos(0.5))
+
+        # They should be completely separate QJIT objects
+        assert circuit_capture is not circuit_old
+        assert circuit_capture.compile_options != circuit_old.compile_options
