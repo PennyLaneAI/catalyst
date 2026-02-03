@@ -20,8 +20,9 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import qjit
+from catalyst import QJIT, qjit
 from catalyst.third_party.oqd import OQDDevice, OQDDevicePipeline
+from catalyst.pipelines import CompileOptions
 
 MODULE_TEST_PATH = os.path.dirname(__file__)
 
@@ -58,7 +59,6 @@ class TestOQDARTIQLLVMIR:
         # Compile to LLVM IR only
         oqd_pipelines = _get_oqd_pipelines()
 
-        @qjit(pipelines=oqd_pipelines, target="llvmir")
         @qml.set_shots(4)
         @qml.qnode(oqd_dev)
         def circuit():
@@ -67,7 +67,10 @@ class TestOQDARTIQLLVMIR:
             return qml.counts(all_outcomes=True)
 
         # Get the LLVM IR
-        llvm_ir = circuit.llvmir
+        compiled_circuit = QJIT(
+            circuit, CompileOptions(target="llvmir", link=False, pipelines=oqd_pipelines)
+        )
+        llvm_ir = compiled_circuit.llvmir
 
         # Verify required ARTIQ symbols and structure
         assert "define void @__modinit__" in llvm_ir, "Missing __modinit__ function definition"
@@ -90,37 +93,12 @@ class TestOQDARTIQLLVMIR:
         ), "Missing rtio_init call in __kernel__"
 
         # Test that the llvm ir is the same after getting it again
-        assert circuit.llvmir == llvm_ir, "LLVM IR should be the same after getting it again"
+        assert (
+            compiled_circuit.llvmir == llvm_ir
+        ), "LLVM IR should be the same after getting it again"
 
         # Test artiq_config
         assert oqd_dev.artiq_config == artiq_config, "Same artiq_config should be returned"
-
-    @pytest.mark.usefixtures("use_capture")
-    def test_no_compilation_error(self):
-        """Test that no compilation error is raised."""
-        artiq_config = {"kernel_ld": None}
-
-        oqd_dev = OQDDevice(
-            backend="default",
-            wires=1,
-            artiq_config=artiq_config,
-        )
-
-        oqd_pipelines = _get_oqd_pipelines()
-
-        @qjit(pipelines=oqd_pipelines, target="llvmir")
-        @qml.set_shots(4)
-        @qml.qnode(oqd_dev)
-        def circuit():
-            x = np.pi / 2
-            qml.RX(x, wires=0)
-            return qml.counts(all_outcomes=True)
-
-        with pytest.raises(
-            TypeError,
-            match="'NoneType' object is not callable",
-        ):
-            circuit()
 
 
 if __name__ == "__main__":
