@@ -21,8 +21,9 @@ import pennylane as qml
 import pytest
 
 from catalyst import QJIT
-from catalyst.third_party.oqd import OQDDevice, OQDDevicePipeline
 from catalyst.pipelines import CompileOptions
+from catalyst.third_party.oqd import OQDDevice, OQDDevicePipeline
+
 
 MODULE_TEST_PATH = os.path.dirname(__file__)
 
