@@ -76,7 +76,7 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
 {
     auto loc = op.getLoc();
     // We always initialize the magic state here, not the conjugate.
-    auto magic = rewriter.create<FabricateOp>(loc, getMagicState(op));
+    auto magic = rewriter.create<FabricateOp>(loc, LogicalInitKind::magic);
 
     SmallVector<StringRef> pauliP = extractPauliString(op); // [P]
     SmallVector<Value> inQubits = op.getInQubits();         // [input qubits]
@@ -139,9 +139,8 @@ void decomposePauliCorrectedPiOverEight(bool avoidPauliYMeasure, PPRotationOp op
     else {
         SmallVector<StringRef> pauliX = {"X"};
         SmallVector<StringRef> pauliY = {"Y"};
-        auto ppmXY = rewriter.create<SelectPPMeasurementOp>(
-            loc, ppmPZRes, rotationKind > 0 ? pauliY : pauliX, rotationKind > 0 ? pauliX : pauliY,
-            ppmPZ.getOutQubits().back());
+        auto ppmXY = rewriter.create<SelectPPMeasurementOp>(loc, ppmPZRes, pauliY, pauliX,
+                                                            ppmPZ.getOutQubits().back());
         // PPR P(π/2) on input qubits if PPM (X or Y) yields -1
         SmallVector<Value> outPZQubits = ppmPZ.getOutQubits(); // [input qubits, |m⟩]
         outPZQubits.pop_back();                                // [input qubits]
