@@ -227,16 +227,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             self.init_qreg.insert_all_dangling_qubits()
             return compbasis_p.bind(self.init_qreg.get(), qreg_available=True)
 
-    # pylint: disable=too-many-branches
-    def interpret_measurement(self, measurement):
-        """Rebind a measurement as a catalyst instruction.
-
-        Args:
-            measurement (qml.measurements.MeasurementProcess): The measurement to interpret.
-
-        Returns:
-            AbstractQbit: The resulting measurement value.
-        """
+    def _check_measurement_with_dynamic_allocation(self, measurement):
+        """Check some constraints regarding dynamic allocation."""
         if self.has_dynamic_allocation:
             if len(measurement.wires) == 0:
                 raise CompileError(
@@ -271,6 +263,18 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                     )
                 )
 
+    # pylint: disable=too-many-branches
+    def interpret_measurement(self, measurement):
+        """Rebind a measurement as a catalyst instruction.
+
+        Args:
+            measurement (qml.measurements.MeasurementProcess): The measurement to interpret.
+
+        Returns:
+            AbstractQbit: The resulting measurement value.
+        """
+        self._check_measurement_with_dynamic_allocation(measurement)
+
         if type(measurement) not in measurement_map:
             raise NotImplementedError(
                 f"measurement {measurement} not yet supported for conversion."
@@ -281,25 +285,28 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                 "from_plxpr does not yet support measurements with manual eigvals."
             )
 
-        if measurement.obs:
-            obs = self._obs(measurement.obs)
+        prim = measurement_map[type(measurement)]
+        if (
+            measurement.mv is not None
+            or measurement.obs is not None
+            and not isinstance(measurement.obs, qml.operation.Operator)
+        ):
+            # MP on a MCM
+            obs = mcmobs_p.bind(measurement.mv)
+            shape, dtype = measurement._abstract_eval(n_wires=1, shots=self.shots)
+
         else:
-            if (
-                measurement.mv is not None
-                or measurement.obs is not None
-                and not isinstance(measurement.obs, qml.operation.Operator)
-            ):
-                obs = mcmobs_p.bind(measurement.mv)
+            if measurement.obs:
+                obs = self._obs(measurement.obs)
             else:
                 obs = self._compbasis_obs(*measurement.wires)
 
-        shape, dtype = measurement._abstract_eval(
-            n_wires=len(measurement.wires),
-            shots=self.shots,
-            num_device_wires=len(self.device.wires),
-        )
+            shape, dtype = measurement._abstract_eval(
+                n_wires=len(measurement.wires),
+                shots=self.shots,
+                num_device_wires=len(self.device.wires),
+            )
 
-        prim = measurement_map[type(measurement)]
         if prim is sample_p:
             num_qubits = len(measurement.wires) or len(self.device.wires)
             sample_shape = (self.shots, num_qubits)

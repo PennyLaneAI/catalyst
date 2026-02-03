@@ -156,6 +156,51 @@ qml.capture.enable()
 @qjit(keep_intermediate=True, seed=38)
 @qml.transform(pass_name="one-shot-mcm")
 @qml.qnode(qml.device("lightning.qubit", wires=2), shots=1000)
+def test_mlir_one_shot_pass_probs_mcm():
+    """
+    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with probs
+    on a mid circuit measurement
+    """
+
+    # CHECK: transform.apply_registered_pass "one-shot-mcm"
+    qml.Hadamard(wires=0)
+    m = qml.measure(0)
+    return qml.probs(op=m)
+
+
+print(test_mlir_one_shot_pass_probs_mcm.mlir)
+
+# CHECK: func.func public @test_mlir_one_shot_pass_probs_mcm.quantum_kernel
+# CHECK:    [[one:%.+]] = arith.constant 1 : i64
+# CHECK:    quantum.device shots([[one]])
+# CHECK:    Hadamard
+# CHECK:    measure
+# CHECK-NOT:   probs
+# CHECK: func.func public @test_mlir_one_shot_pass_probs_mcm
+# CHECK:    index.constant 1000
+# CHECK:    scf.for
+# CHECK:    func.call @test_mlir_one_shot_pass_probs_mcm.quantum_kernel
+# CHECK:    stablehlo.add
+# CHECK:    stablehlo.divide
+print(get_compilation_stage(test_mlir_one_shot_pass_probs_mcm, "QuantumCompilationStage"))
+
+res = test_mlir_one_shot_pass_probs_mcm()
+assert res.dtype == "float64"
+assert res.shape == (2,)
+assert np.allclose(res, [0.5, 0.5], atol=0.01, rtol=0.01)
+
+qml.capture.disable()
+
+
+# -----
+
+
+qml.capture.enable()
+
+
+@qjit(keep_intermediate=True, seed=38)
+@qml.transform(pass_name="one-shot-mcm")
+@qml.qnode(qml.device("lightning.qubit", wires=2), shots=1000)
 def test_mlir_one_shot_pass_expval_mcm():
     """
     Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with expval

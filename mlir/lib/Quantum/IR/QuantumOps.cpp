@@ -260,6 +260,11 @@ static LogicalResult verifyObservable(Value obs, std::optional<size_t> &numQubit
              obs.getDefiningOp<TensorOp>() || obs.getDefiningOp<HamiltonianOp>()) {
         return success();
     }
+    else if (obs.getDefiningOp<MCMObsOp>()) {
+        // MP shape of a single mcm is like MPs on 1 qubit
+        numQubits = 1;
+        return success();
+    }
 
     return failure();
 }

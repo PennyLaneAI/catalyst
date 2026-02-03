@@ -114,6 +114,25 @@ scf::ForOp createForLoop(IRRewriter &builder, Value shots, ValueRange loopIterAr
     return forOp;
 }
 
+void eraseAllUsers(Value v, Operation *check_erased)
+{
+    // Erase all users of a Value, and all users of these users, etc., in its forward slice.
+    // Also check that the operation `check_erased` is one of the erased ops.
+
+    // We need to use a SetVector, since during the erasure we have to delete from bottom up
+    // So we need an ordered container
+    SetVector<Operation *> forwardSlice;
+    getForwardSlice(v, &forwardSlice);
+
+    // Safety check
+    assert(forwardSlice.contains(check_erased) &&
+           "Expected the multi-shot MP of the mcm to be erased in the one-shot kernel.");
+
+    for (auto op = forwardSlice.rbegin(); op != forwardSlice.rend(); ++op) {
+        (*op)->erase();
+    }
+}
+
 } // anonymous namespace
 
 namespace catalyst {
@@ -134,20 +153,8 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         OpBuilder::InsertionGuard guard(builder);
         Location loc = qfunc->getLoc();
 
-        // Erase all users of the mcm obs: they new return does not need them.
-        // We need to use a SetVector, since during the erasure we have to delete from bottom up
-        // So we need an ordered container
-        SetVector<Operation *> mcmobsForwardSlice;
-        getForwardSlice(mcmobs.getObs(), &mcmobsForwardSlice);
-
-        // Safety check: the old return should also be erased
-        auto retOp = cast<func::ReturnOp>(qfunc.getBody().back().getTerminator());
-        assert(mcmobsForwardSlice.contains(retOp) &&
-               "Expected the multi-shot expval of the mcm to be erased in the one-shot kernel.");
-
-        for (auto op = mcmobsForwardSlice.rbegin(); op != mcmobsForwardSlice.rend(); ++op) {
-            (*op)->erase();
-        }
+        // Erase all users of the mcm obs: the new return does not need them.
+        eraseAllUsers(mcmobs.getObs(), qfunc.getBody().back().getTerminator());
 
         // Cast the I1 mcm to the correct type and return it
         // MCM itself is I1
@@ -166,6 +173,46 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         mcmobs->erase();
     }
 
+    void edirKernelProbsExpval(IRRewriter &builder, func::FuncOp qfunc, quantum::MCMObsOp mcmobs)
+    {
+        // If the kernel returns probs on a mcm,
+        // the single-shot probs of the mcm is either [1,0] or [0,1]
+
+        OpBuilder::InsertionGuard guard(builder);
+        Location loc = qfunc->getLoc();
+
+        Type f64Type = builder.getF64Type();
+
+        // Erase all users of the mcm obs: they new return does not need them.
+        eraseAllUsers(mcmobs.getObs(), qfunc.getBody().back().getTerminator());
+
+        // Create the probs tensor and write the 1 into it
+        // The location of the 1 is exactly the mcm result
+        // i.e. mcm 0, probs is [1,0]
+        // mcm 1, probs is [0,1]
+        builder.setInsertionPointToEnd(&qfunc.getBody().back());
+
+        // Create zero tensor
+        auto zero =
+            builder.create<arith::ConstantOp>(loc, f64Type, builder.getFloatAttr(f64Type, 0));
+        auto zeroTensor = builder.create<tensor::FromElementsOp>(
+            loc, RankedTensorType::get({2}, f64Type), ValueRange{zero, zero});
+
+        // Convert mcm (I1) to an index and insert 1 into the zero tensor at the index
+        Value mcm = mcmobs.getMcm();
+        auto extuiOp = builder.create<arith::ExtUIOp>(loc, builder.getI64Type(), mcm);
+        auto indexOp =
+            builder.create<arith::IndexCastOp>(loc, builder.getIndexType(), extuiOp.getOut());
+        auto one =
+            builder.create<arith::ConstantOp>(loc, f64Type, builder.getFloatAttr(f64Type, 1));
+        auto insertedTensor = builder.create<tensor::InsertOp>(loc, one.getResult(), zeroTensor,
+                                                               ValueRange{indexOp.getResult()});
+
+        builder.create<func::ReturnOp>(loc, insertedTensor.getResult());
+
+        mcmobs->erase();
+    }
+
     void handleExpvalOrProbsOneShot(IRRewriter &builder, func::FuncOp qfunc, MeasurementProcess mp,
                                     Value shots, Operation *mod, bool isExpval)
     {
@@ -178,10 +225,14 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         OpBuilder::InsertionGuard guard(builder);
         Location loc = mod->getLoc();
 
+        // If the MP is on a MCM, we need to massage the one-shot kernel a bit
         Operation *MPSourceOp = mp.getObs().getDefiningOp();
         if (isa<quantum::MCMObsOp>(MPSourceOp)) {
             if (isExpval) {
                 editKernelMCMExpval(builder, qfunc, cast<quantum::MCMObsOp>(MPSourceOp));
+            }
+            else {
+                edirKernelProbsExpval(builder, qfunc, cast<quantum::MCMObsOp>(MPSourceOp));
             }
         }
 
@@ -267,7 +318,7 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
     void handleSampleOneShot(IRRewriter &builder, func::FuncOp qfunc, Value shots, Operation *mod)
     {
         // Total sample is the sample of each shot concatenated together.
-        // We inialize an empty tensor, then insert sample results of each shot
+        // We initialize an empty tensor, then insert sample results of each shot
         // Sample's return shape is tensor<shots X num_qubits>
 
         OpBuilder::InsertionGuard guard(builder);
@@ -338,7 +389,7 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
             DenseElementsAttr::get(countsType, builder.getIntegerAttr(builder.getI64Type(), 0)));
 
         // We also need to yield the eigens from the kernel call inside the loop body
-        // However, this requries the loop to have an iteration argument for the eigens tensor
+        // However, this requires the loop to have an iteration argument for the eigens tensor
         // We just initialize an empty one.
         auto eigensPlaceholder = builder.create<tensor::EmptyOp>(loc, eigensType.getShape(),
                                                                  eigensType.getElementType());
@@ -414,7 +465,7 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         assert(qfunc.getResultTypes().size() == numReturns &&
                "Multiple terminal MPs not yet supported in one shot transform");
 
-        // Get the shots SSA value. It is an oeprand to the device init op.
+        // Get the shots SSA value. It is an operand to the device init op.
         auto deviceInitOp = *qfunc.getOps<quantum::DeviceInitOp>().begin();
         Value shots = deviceInitOp.getShots();
 
