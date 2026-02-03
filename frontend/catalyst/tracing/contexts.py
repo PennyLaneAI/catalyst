@@ -24,6 +24,7 @@ from typing import ContextManager, List, Optional, Set
 
 from jax._src.interpreters.partial_eval import DynamicJaxprTrace
 from jax.core import find_top_trace, set_current_trace, take_current_trace
+from pennylane.capture import disable, enable, enabled
 from pennylane.queuing import QueuingManager
 
 from catalyst.logging import debug_logger_init
@@ -147,26 +148,21 @@ def temporary_capture_state(target_state: bool):
         This context manager is re-entrant safe. Nested calls will each
         restore to their own previous state.
     """
-    import pennylane as qml  # pylint: disable=import-outside-toplevel
+    previous_state = enabled()
 
-    # 1. Snapshot current state
-    previous_state = qml.capture.enabled()
-
-    # 2. Transition to target state (only if needed)
     if target_state and not previous_state:
-        qml.capture.enable()
+        enable()
     elif not target_state and previous_state:
-        qml.capture.disable()
+        disable()
 
     try:
         yield
     finally:
         # 3. Restore previous state
-        if previous_state and not qml.capture.enabled():
-            qml.capture.enable()
-        elif not previous_state and qml.capture.enabled():
-            qml.capture.disable()
-
+        if previous_state and not enabled():
+            enable()
+        elif not previous_state and enabled():
+            disable()
 
 class EvaluationMode(Enum):
     """Enumerate the evaluation modes supported by Catalyst:
