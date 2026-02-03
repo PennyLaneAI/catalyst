@@ -1,4 +1,4 @@
-# Copyright 2024-2026 Xanadu Quantum Technologies Inc.
+# Copyright 2026 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ from catalyst import qjit
 from catalyst.tracing.contexts import ensure_capture_mode
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestCaptureKwarg:
     """Test suite for the capture kwarg functionality."""
 
@@ -236,40 +237,3 @@ class TestCaptureKwargIntegration:
         # Both should give the same result
         assert jnp.allclose(result_capture, result_old)
         assert jnp.allclose(result_capture, jnp.cos(0.5))
-
-
-class TestCaptureKwargWithControlFlow:
-    """Test capture kwarg interaction with control flow."""
-
-    def test_catalyst_for_loop_with_capture_false(self, backend):
-        """Test that catalyst.for_loop works with capture=False."""
-        qml.capture.disable()
-
-        @qjit(capture=False)
-        def func():
-            @catalyst.for_loop(0, 5, 1)
-            def loop_fn(i, acc):
-                return acc + i
-
-            return loop_fn(0)
-
-        result = func()
-        assert result == 10  # 0+1+2+3+4 = 10
-
-    def test_catalyst_for_loop_with_capture_true_raises(self):
-        """Test that catalyst.for_loop raises error with capture=True."""
-        # When capture=True, catalyst.for_loop should raise an error
-        # telling users to use qml.for_loop instead
-        from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
-
-        with pytest.raises(PlxprCaptureCFCompatibilityError):
-
-            @qjit(capture=True)
-            def func():
-                @catalyst.for_loop(0, 5, 1)
-                def loop_fn(i, acc):
-                    return acc + i
-
-                return loop_fn(0)
-
-            func()

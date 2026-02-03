@@ -170,6 +170,7 @@ def ensure_capture_mode(enable_capture: bool):
         else:
             disable()
 
+
 class EvaluationMode(Enum):
     """Enumerate the evaluation modes supported by Catalyst:
     INTERPRETATION - native Python execution of a Catalyst program
