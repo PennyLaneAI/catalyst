@@ -473,6 +473,9 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
         // Clean up dead ops before the call
         removeDeadOpsBeforeOp(origFunc, callOp.getOperation(), /*reserveDeviceOps=*/false);
 
+        // Remove qnode attribute
+        origFunc->removeAttr("qnode");
+
         return success();
     }
 
