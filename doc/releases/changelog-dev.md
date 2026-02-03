@@ -148,7 +148,7 @@
 
   **Before:**
   ```mlir
-  func @circ1(%arg0) -> (tensor<f64>, tensor<f64>) {
+  func @circ1(%arg0) -> (tensor<f64>, tensor<f64>) {qnode} {
       // ... quantum ops ...
       %H = quantum.hamiltonian(%coeffs) %obs1, %obs2 : !quantum.obs
       %result1 = quantum.expval %H : f64   // H = c_0 * (Z x X) + c_1 * Y
@@ -158,7 +158,7 @@
 
   After:
   ```mlir
-  func @circ1.quantum() -> (tensor<f64>, tensor<f64>, v<f64>) {
+  func @circ1.quantum() -> (tensor<f64>, tensor<f64>, v<f64>) {qnode} {
       // ... quantum ops ...
       %expval0 = quantum.expval %obs1 : f64
       %expval1 = quantum.expval %obs2 : f64
