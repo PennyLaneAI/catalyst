@@ -19,7 +19,7 @@ import pytest
 
 import catalyst
 from catalyst import qjit
-from catalyst.tracing.contexts import temporary_capture_state
+from catalyst.tracing.contexts import ensure_capture_mode
 
 
 class TestCaptureKwarg:
@@ -61,27 +61,27 @@ class TestCaptureKwarg:
                 return x * 2
 
 
-class TestTemporaryCaptureState:
-    """Test suite for the temporary_capture_state context manager."""
+class TestEnsureCaptureMode:
+    """Test suite for the ensure_capture_mode context manager (Scope Enforcement pattern)."""
 
     def test_enable_capture_when_disabled(self):
-        """Test that temporary_capture_state(True) enables capture when globally disabled."""
+        """Test that ensure_capture_mode(True) enables capture when globally disabled."""
         qml.capture.disable()
         assert not qml.capture.enabled()
 
-        with temporary_capture_state(True):
+        with ensure_capture_mode(True):
             assert qml.capture.enabled()
 
         # After context exits, should be restored to disabled
         assert not qml.capture.enabled()
 
     def test_disable_capture_when_enabled(self):
-        """Test that temporary_capture_state(False) disables capture when globally enabled."""
+        """Test that ensure_capture_mode(False) disables capture when globally enabled."""
         qml.capture.enable()
         try:
             assert qml.capture.enabled()
 
-            with temporary_capture_state(False):
+            with ensure_capture_mode(False):
                 assert not qml.capture.enabled()
 
             # After context exits, should be restored to enabled
@@ -90,12 +90,12 @@ class TestTemporaryCaptureState:
             qml.capture.disable()
 
     def test_no_op_when_already_in_target_state_enabled(self):
-        """Test that temporary_capture_state(True) is a no-op when already enabled."""
+        """Test that ensure_capture_mode(True) is a no-op when already enabled."""
         qml.capture.enable()
         try:
             assert qml.capture.enabled()
 
-            with temporary_capture_state(True):
+            with ensure_capture_mode(True):
                 assert qml.capture.enabled()
 
             assert qml.capture.enabled()
@@ -103,24 +103,24 @@ class TestTemporaryCaptureState:
             qml.capture.disable()
 
     def test_no_op_when_already_in_target_state_disabled(self):
-        """Test that temporary_capture_state(False) is a no-op when already disabled."""
+        """Test that ensure_capture_mode(False) is a no-op when already disabled."""
         qml.capture.disable()
         assert not qml.capture.enabled()
 
-        with temporary_capture_state(False):
+        with ensure_capture_mode(False):
             assert not qml.capture.enabled()
 
         assert not qml.capture.enabled()
 
     def test_nesting_different_states(self):
-        """Test that nested contexts properly restore their respective states."""
+        """Test that nested contexts properly restore their respective states (snapshot pattern)."""
         qml.capture.disable()
         assert not qml.capture.enabled()
 
-        with temporary_capture_state(True):
+        with ensure_capture_mode(True):
             assert qml.capture.enabled()
 
-            with temporary_capture_state(False):
+            with ensure_capture_mode(False):
                 assert not qml.capture.enabled()
 
             # After inner context exits, should be restored to True
@@ -135,7 +135,7 @@ class TestTemporaryCaptureState:
         assert not qml.capture.enabled()
 
         try:
-            with temporary_capture_state(True):
+            with ensure_capture_mode(True):
                 assert qml.capture.enabled()
                 raise ValueError("Test exception")
         except ValueError:

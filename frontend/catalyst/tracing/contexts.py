@@ -122,46 +122,52 @@ class AccelerateContext:
 
 
 @contextmanager
-def temporary_capture_state(target_state: bool):
-    """Temporarily set the PennyLane capture state with guaranteed restoration.
+def ensure_capture_mode(enable_capture: bool):
+    """Enforce the PennyLane capture state for the duration of the context.
 
     This context manager safely transitions the global ``qml.capture`` state to
-    the requested ``target_state`` and ensures the previous state is restored
-    when exiting, even if an exception occurs.
+    the requested state and guarantees restoration of the previous state upon
+    exit, regardless of exceptions.
 
-    This is the recommended way to implement local capture control in ``@qjit``,
-    as it handles nested calls and exception safety automatically.
+    This implements "scope enforcement" rather than "state management": you don't
+    care what the global state *was*; you only care what it *must be* for the
+    duration of this scope. The context manager handles all toggling automatically.
 
     Args:
-        target_state (bool): The desired capture state within the context.
+        enable_capture (bool): The desired capture state within the context.
             - ``True``: Enable PennyLane capture (use new capture pathway)
             - ``False``: Disable PennyLane capture (use legacy pathway)
 
     Example:
         >>> import pennylane as qml
         >>> qml.capture.disable()
-        >>> with temporary_capture_state(True):
+        >>> with ensure_capture_mode(True):
         ...     assert qml.capture.enabled()  # Capture is enabled inside
         >>> assert not qml.capture.enabled()  # Restored to disabled outside
 
     Note:
-        This context manager is re-entrant safe. Nested calls will each
-        restore to their own previous state.
+        This context manager is re-entrant and nesting-safe. Nested calls will
+        each restore to their own previous state, protecting against nested
+        toggles drifting out of sync.
     """
-    previous_state = enabled()
+    # 1. Snapshot the pre-existing state
+    was_enabled = enabled()
 
-    if target_state and not previous_state:
+    # 2. Enforce the requested state (only toggle if necessary)
+    if enable_capture and not was_enabled:
         enable()
-    elif not target_state and previous_state:
+    elif not enable_capture and was_enabled:
         disable()
 
     try:
         yield
     finally:
-        # 3. Restore previous state
-        if previous_state and not enabled():
+        # 3. Restore the original state directly from snapshot
+        # We restore 'was_enabled' directly rather than just toggling back,
+        # which protects against nested toggles drifting out of sync.
+        if was_enabled:
             enable()
-        elif not previous_state and enabled():
+        else:
             disable()
 
 class EvaluationMode(Enum):

@@ -39,7 +39,7 @@ from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.qfunc import QFunc
-from catalyst.tracing.contexts import EvaluationContext, temporary_capture_state
+from catalyst.tracing.contexts import EvaluationContext, ensure_capture_mode
 from catalyst.tracing.type_signatures import (
     filter_static_args,
     get_abstract_signature,
@@ -569,13 +569,9 @@ class QJIT(CatalystCallable):
                 fn, compile_options.static_argnames, compile_options.static_argnums
             )
 
-        target_capture_state = self._resolve_capture_state()
-
-        # Use temporary_capture_state to set capture mode during pre_compilation
-        if target_capture_state is not None:
-            with temporary_capture_state(target_capture_state):
-                self.user_function = self.pre_compilation()
-        else:
+        # Resolve effective capture mode and enforce it during pre_compilation
+        target_mode = self._get_effective_capture_mode()
+        with ensure_capture_mode(target_mode):
             self.user_function = self.pre_compilation()
 
         # Static arguments require values, so we cannot AOT compile.
@@ -584,20 +580,24 @@ class QJIT(CatalystCallable):
 
         super().__init__("user_function")
 
-    def _resolve_capture_state(self):
-        """Resolve the target capture state for this QJIT instance.
+    def _get_effective_capture_mode(self):
+        """Calculate the effective capture mode for this QJIT instance.
+
+        This implements the 'scope enforcement' pattern: rather than managing
+        state transitions, we simply determine what the capture mode *must be*
+        for this QJIT and let the context manager handle the rest.
 
         Returns:
-            bool or None: The target capture state.
-                - True: Force capture pathway (enable qml.capture)
-                - False: Force legacy pathway (disable qml.capture)
-                - None: Use global qml.capture.enabled() state (no local override)
+            bool: The effective capture mode.
+                - If capture='global', use current qml.capture.enabled() state
+                - If capture=True/False, use that explicit value
         """
-        capture_mode = self.compile_options.capture
-        if capture_mode == "global":
-            # No local override - use current global state as-is
-            return None
-        return capture_mode
+        capture_option = self.compile_options.capture
+        if capture_option == "global":
+            # Defer to current global state
+            return qml.capture.enabled()
+        # Explicit True/False override
+        return capture_option
 
     @property
     def mlir(self):
@@ -765,45 +765,35 @@ class QJIT(CatalystCallable):
 
         dbg = debug_info("qjit_capture", self.user_function, args, kwargs)
 
-        # Determine target capture state for this QJIT instance
-        target_capture_state = self._resolve_capture_state()
-
-        # If we have a local override, use temporary_capture_state to set it
-        if target_capture_state is not None:
-            with temporary_capture_state(target_capture_state):
-                return self._trace_with_current_capture_state(
+        # Scope Enforcement: Calculate effective mode and enter scope.
+        # The context manager handles ALL enabling/disabling/restoring.
+        target_mode = self._get_effective_capture_mode()
+        with ensure_capture_mode(target_mode):
+            if target_mode:
+                # New capture pathway
+                return trace_from_pennylane(
+                    self.user_function,
                     static_argnums,
-                    abstracted_axes,
                     dynamic_args,
-                    dynamic_sig,
+                    abstracted_axes,
                     full_sig,
                     kwargs,
-                    dbg,
+                    debug_info=dbg,
                 )
-        else:
-            # Use global state as-is
-            return self._trace_with_current_capture_state(
-                static_argnums, abstracted_axes, dynamic_args, dynamic_sig, full_sig, kwargs, dbg
-            )
+            else:
+                # Legacy pathway
+                return self._trace_legacy_pathway(
+                    static_argnums, abstracted_axes, dynamic_sig, full_sig, kwargs, dbg
+                )
 
-    def _trace_with_current_capture_state(
-        self, static_argnums, abstracted_axes, dynamic_args, dynamic_sig, full_sig, kwargs, dbg
+    def _trace_legacy_pathway(
+        self, static_argnums, abstracted_axes, dynamic_sig, full_sig, kwargs, dbg
     ):
-        """Internal helper to trace the function with the current capture state.
+        """Trace the function using the legacy (non-capture) pathway.
 
-        This method assumes qml.capture.enabled() already reflects the desired state
-        (either set by temporary_capture_state or already correct globally).
+        This method is used when qml.capture is disabled, using the old
+        QNode patching approach.
         """
-        if qml.capture.enabled():
-            return trace_from_pennylane(
-                self.user_function,
-                static_argnums,
-                dynamic_args,
-                abstracted_axes,
-                full_sig,
-                kwargs,
-                debug_info=dbg,
-            )
 
         def closure(qnode, *args, **kwargs):
             params = {}
