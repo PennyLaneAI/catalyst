@@ -17,7 +17,6 @@ import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
-import catalyst
 from catalyst import qjit
 from catalyst.tracing.contexts import ensure_capture_mode
 

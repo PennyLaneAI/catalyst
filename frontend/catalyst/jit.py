@@ -16,6 +16,8 @@
 compilation of hybrid quantum-classical functions using Catalyst.
 """
 
+# pylint: disable=too-many-lines
+
 import copy
 import functools
 import inspect
@@ -788,7 +790,7 @@ class QJIT(CatalystCallable):
 
     def _trace_legacy_pathway(
         self, static_argnums, abstracted_axes, dynamic_sig, full_sig, kwargs, dbg
-    ):
+    ):  # pylint: disable=too-many-arguments, too-many-positional-arguments
         """Trace the function using the legacy (non-capture) pathway.
 
         This method is used when qml.capture is disabled, using the old
