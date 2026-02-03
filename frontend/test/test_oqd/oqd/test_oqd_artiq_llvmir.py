@@ -20,7 +20,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import QJIT, qjit
+from catalyst import QJIT
 from catalyst.third_party.oqd import OQDDevice, OQDDevicePipeline
 from catalyst.pipelines import CompileOptions
 
