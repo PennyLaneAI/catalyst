@@ -46,8 +46,7 @@ from catalyst.python_interface.dialects.quantum import (
     NamedObsOp,
     QubitUnitaryOp,
 )
-
-from ...pass_api import compiler_transform
+from catalyst.python_interface.pass_api import compiler_transform
 
 
 def _generate_mapping():
@@ -72,7 +71,9 @@ def _diagonalize(obs: NamedObsOp) -> bool:
         return False
     if obs.type.data in _gate_map:
         return True
-    raise NotImplementedError(f"Observable {obs.type.data} is not supported for diagonalization")
+    raise NotImplementedError(
+        f"Observable {obs.type.data} is not supported for diagonalization"
+    )  # pragma: no cover
 
 
 class DiagonalizeFinalMeasurementsPattern(

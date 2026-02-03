@@ -23,7 +23,7 @@ try:
     import networkx as nx
 
     has_networkx = True
-except ModuleNotFoundError as networkx_import_error:
+except ModuleNotFoundError as networkx_import_error:  # pragma: no cover
     has_networkx = False
 
 import numpy as np
@@ -60,15 +60,10 @@ def _apply_dfs_po_circuit(tree, source, P, inv_synth_matrix=None):
     """
     dfs_po = list(nx.dfs_postorder_nodes(tree, source=source))
     sub_circuit = []
-    if inv_synth_matrix is None:
-        for i, j in zip(dfs_po[:-1], dfs_po[1:]):
-            sub_circuit.append((i, j))
-            P[i] += P[j]
-    else:
-        for i, j in zip(dfs_po[:-1], dfs_po[1:]):
-            sub_circuit.append((i, j))
-            P[i] += P[j]
-            inv_synth_matrix[:, i] += inv_synth_matrix[:, j]
+    for i, j in zip(dfs_po[:-1], dfs_po[1:]):
+        sub_circuit.append((i, j))
+        P[i] += P[j]
+        inv_synth_matrix[:, i] += inv_synth_matrix[:, j]
     P %= 2
     return sub_circuit
 
@@ -293,7 +288,7 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
         rewritten phase polynomials dependent on the order in which we walk over the operations.
         """
         # The attribute is used so we don't transform the same op multiple times
-        if len(matchedOp.regions) == 0 or hasattr(matchedOp, "parity_synth_done"):
+        if len(matchedOp.regions) == 0 or matchedOp.attributes.get("parity_synth_done", None):
             return
 
         for region in matchedOp.regions:
@@ -311,9 +306,8 @@ class ParitySynthPattern(pattern_rewriter.RewritePattern):
                         if len(op.regions) != 0:
                             # Do phase polynomial rewriting up to this point
                             self.rewrite_phase_polynomial(rewriter)
-                            # Rewrite regions of this operation; Creating a new PatternRewriter
-                            # so its matched operation is `op`, not `matchedOp`
-                            self.match_and_rewrite(op, pattern_rewriter.PatternRewriter(op))
+                            # Rewrite regions of this operation
+                            self.match_and_rewrite(op, rewriter)
                         continue
 
                     if isinstance(op, CustomOp) and op.gate_name.data in valid_phase_polynomial_ops:

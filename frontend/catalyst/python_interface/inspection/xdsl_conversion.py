@@ -40,8 +40,7 @@ from catalyst.python_interface.dialects.qec import (
     PPRotationArbitraryOp,
     PPRotationOp,
 )
-
-from ..dialects.quantum import (
+from catalyst.python_interface.dialects.quantum import (
     CustomOp,
     ExtractOp,
     GlobalPhaseOp,
