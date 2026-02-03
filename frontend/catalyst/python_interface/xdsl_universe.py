@@ -27,7 +27,8 @@ shared_dialects = ("stablehlo",)
 names_to_dialects = {}
 for name in dialects.__all__:
     if (d := getattr(dialects, name)).name not in shared_dialects:
-        def dialect_accessor(dialect):
+
+        def dialect_accessor(dialect):  # pylint: disable=missing-function-docstring
             return dialect
 
         # We use partial so that the correct value of `d` is returned by the function.
@@ -42,7 +43,8 @@ for name in dialects.__all__:
 names_to_passes = {}
 for name in transforms.__all__:
     if isinstance((t := getattr(transforms, name)), type) and issubclass(t, ModulePass):
-        def transform_accessor(transform):
+
+        def transform_accessor(transform):  # pylint: disable=missing-function-docstring
             return transform
 
         # We use partial so that the correct value of `t` is returned by the function.
