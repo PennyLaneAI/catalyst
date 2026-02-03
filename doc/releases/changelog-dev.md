@@ -66,6 +66,12 @@
 * Fixed the GlobalPhase discrepancies when executing gridsynth in the PPR basis.
   [(#2433)](https://github.com/PennyLaneAI/catalyst/pull/2433)
 
+* Fixed incorrect decomposition of negative PPR (Pauli Product Rotation) operations in the
+  `decompose-clifford-ppr` and `decompose-non-clifford-ppr` passes. The rotation sign is now
+  correctly flipped when decomposing negative rotation kinds (e.g., `-π/4` from adjoint gates
+  like `T†` or `S†`) to PPM (Pauli Product Measurement) operations.
+  [(#2454)](https://github.com/PennyLaneAI/catalyst/pull/2454)
+
 * Fixed incorrect global phase when lowering CNOT gates into PPR/PPM operations.
   [(#2459)](https://github.com/PennyLaneAI/catalyst/pull/2459)
 
