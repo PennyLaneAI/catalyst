@@ -23,20 +23,21 @@ from .dag_builder import DAGBuilder
 HAS_PYDOT = True
 try:
     from pydot import Cluster, Dot, Edge, Graph, Node
-except ImportError:
+except ImportError:  # pragma: no cover
     HAS_PYDOT = False
 
 
 HAS_GRAPHVIZ = True
-if which("dot") is None:
+if which("dot") is None:  # pragma: no cover
     HAS_GRAPHVIZ = False
+
 
 # pylint: disable=too-many-instance-attributes
 class PyDotDAGBuilder(DAGBuilder):
     """A Directed Acyclic Graph builder for the PyDot backend.
 
     Args:
-        attrs (dict | None): User default attributes to be used for all elements 
+        attrs (dict | None): User default attributes to be used for all elements
             (nodes, edges, clusters) in the graph.
         node_attrs (dict | None): User default attributes for a node.
         edge_attrs (dict | None): User default attributes for an edge.
@@ -67,16 +68,15 @@ class PyDotDAGBuilder(DAGBuilder):
         edge_attrs: dict | None = None,
         cluster_attrs: dict | None = None,
     ) -> None:
-        if not HAS_GRAPHVIZ:
+        if not HAS_GRAPHVIZ:  # pragma: no cover
             raise ImportError(
                 "The 'Graphviz' package is not found. Please install it for your system by "
                 "following the instructions found here: https://graphviz.org/download/"
             )
-        if not HAS_PYDOT:
+        if not HAS_PYDOT:  # pragma: no cover
             raise ImportError(
                 "The 'pydot' package is not found. Please install with 'pip install pydot'."
             )
-
 
         # Initialize the pydot graph:
         # - graph_type="digraph": Create a directed graph (edges have arrows).
@@ -200,9 +200,7 @@ class PyDotDAGBuilder(DAGBuilder):
 
         self.graph.add_edge(edge)
 
-        self._edges.append(
-            {"from_uid": from_uid, "to_uid": to_uid, "attrs": dict(edge_attrs)}
-        )
+        self._edges.append({"from_uid": from_uid, "to_uid": to_uid, "attrs": dict(edge_attrs)})
 
     def add_cluster(
         self,
@@ -219,7 +217,7 @@ class PyDotDAGBuilder(DAGBuilder):
         Args:
             uid (str): Unique cluster ID to identify this cluster.
             label (str | None): Optional text to display as a label on the cluster when rendered.
-            cluster_uid (str | None): Optional unique ID of the cluster this cluster belongs to. 
+            cluster_uid (str | None): Optional unique ID of the cluster this cluster belongs to.
                 If `None`, the cluster will be positioned on the base graph.
             **attrs (Any): Any additional styling keyword arguments.
 
@@ -264,7 +262,7 @@ class PyDotDAGBuilder(DAGBuilder):
         """Retrieve the current set of edges in the graph.
 
         Returns:
-            edges (list[dict[str, Any]]): A list of edges where each element in the list 
+            edges (list[dict[str, Any]]): A list of edges where each element in the list
                 contains a dictionary of edge information.
         """
         return self._edges
@@ -274,7 +272,7 @@ class PyDotDAGBuilder(DAGBuilder):
         """Retrieve the current set of clusters in the graph.
 
         Returns:
-            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID 
+            clusters (dict[str, dict[str, Any]]): A dictionary that maps the cluster's ID
                 to its cluster information.
         """
         return self._clusters
@@ -282,7 +280,7 @@ class PyDotDAGBuilder(DAGBuilder):
     def to_file(self, output_filename: str) -> None:
         """Save the graph to a file.
 
-        This method will infer the file's format (e.g., 'png', 'svg') from this filename's 
+        This method will infer the file's format (e.g., 'png', 'svg') from this filename's
         extension. If no extension is provided, the 'png' format will be the default.
 
         Args:
@@ -296,7 +294,7 @@ class PyDotDAGBuilder(DAGBuilder):
 
         file_format = output_filename_path.suffix[1:].lower()
 
-        self.graph.write(str(output_filename_path), format=file_format)
+        self.graph.write(str(output_filename_path), format=file_format)  # pragma: no cover
 
     def to_string(self) -> str:
         """Return the graph as a string.

@@ -37,6 +37,7 @@ from xdsl.dialects.builtin import (
 )
 from xdsl.ir import Dialect, EnumAttribute, Operation, SpacedOpaqueSyntaxAttribute, SSAValue
 from xdsl.irdl import (
+    IntSetConstraint,
     IRDLOperation,
     irdl_attr_definition,
     irdl_op_definition,
@@ -45,7 +46,6 @@ from xdsl.irdl import (
     prop_def,
     result_def,
 )
-from xdsl.utils.exceptions import VerifyException
 from xdsl.utils.str_enum import StrEnum  # StrEnum is standard in Python>=3.11
 
 from catalyst.python_interface.xdsl_extras import MemRefConstraint, TensorConstraint
@@ -86,7 +86,9 @@ class MeasureInBasisOp(IRDLOperation):
 
     angle = operand_def(Float64Type())
 
-    postselect = opt_prop_def(IntegerAttr[I32])
+    postselect = opt_prop_def(
+        IntegerAttr.constr(type=I32, value=IntSetConstraint(frozenset((0, 1))))
+    )
 
     mres = result_def(IntegerType(1))
 
@@ -112,14 +114,6 @@ class MeasureInBasisOp(IRDLOperation):
             properties=properties,
             result_types=(IntegerType(1), QubitType()),
         )
-
-    def verify_(self):
-        """Verify operation when rewriting."""
-        if self.postselect is None:
-            return
-
-        if self.postselect.value.data not in [0, 1]:  # pylint: disable=no-member
-            raise VerifyException("'postselect' must be 0 or 1.")
 
 
 @irdl_op_definition
