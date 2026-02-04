@@ -36,8 +36,8 @@ class StopCompilation(Exception):
 def mlir_specs(
     qnode: QJIT,
     level: int | tuple[int] | list[int] | Literal["all"],
-    level_to_marker: dict[int, str] | None = None,
     *args,
+    level_to_marker: dict[int, str] | None = None,
     **kwargs,
 ) -> ResourcesResult | dict[str, ResourcesResult]:
     """Compute the specs used for a circuit at the level of an MLIR pass.
