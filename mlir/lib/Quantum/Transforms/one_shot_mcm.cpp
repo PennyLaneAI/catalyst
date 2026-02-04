@@ -85,7 +85,7 @@ func::FuncOp createOneShotKernel(IRRewriter &builder, func::FuncOp qfunc, Value 
 
     builder.setInsertionPointToStart(&qkernel.getBody().front());
     auto kernelDeviceInitOp = *qkernel.getOps<quantum::DeviceInitOp>().begin();
-    auto one = builder.create<arith::ConstantOp>(loc, i64Type, builder.getIntegerAttr(i64Type, 1));
+    auto one = arith::ConstantOp::create(builder, loc, i64Type, builder.getIntegerAttr(i64Type, 1));
     Value originalKernelShots = kernelDeviceInitOp.getShots();
     kernelDeviceInitOp->setOperand(0, one);
     if (originalKernelShots.getNumUses() == 0) {
@@ -108,11 +108,11 @@ scf::ForOp createForLoop(IRRewriter &builder, Value shots, ValueRange loopIterAr
     Type indexType = builder.getIndexType();
 
     auto lb =
-        builder.create<arith::ConstantOp>(loc, indexType, builder.getIntegerAttr(indexType, 0));
+        arith::ConstantOp::create(builder, loc, indexType, builder.getIntegerAttr(indexType, 0));
     auto step =
-        builder.create<arith::ConstantOp>(loc, indexType, builder.getIntegerAttr(indexType, 1));
-    auto ub = builder.create<index::CastSOp>(loc, builder.getIndexType(), shots);
-    auto forOp = builder.create<scf::ForOp>(loc, lb, ub, step, loopIterArgs);
+        arith::ConstantOp::create(builder, loc, indexType, builder.getIntegerAttr(indexType, 1));
+    auto ub = index::CastSOp::create(builder, loc, builder.getIndexType(), shots);
+    auto forOp = scf::ForOp::create(builder, loc, lb, ub, step, loopIterArgs);
 
     return forOp;
 }
@@ -191,11 +191,12 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         builder.setInsertionPoint(retOp);
 
         Value mcm = mcmobs.getMcm();
-        auto extuiOp = builder.create<arith::ExtUIOp>(loc, builder.getI64Type(), mcm);
+        auto extuiOp = arith::ExtUIOp::create(builder, loc, builder.getI64Type(), mcm);
         auto int2floatCastOp =
-            builder.create<arith::SIToFPOp>(loc, builder.getF64Type(), extuiOp.getOut());
-        auto fromElementsOp = builder.create<tensor::FromElementsOp>(
-            loc, RankedTensorType::get({}, builder.getF64Type()), int2floatCastOp.getResult());
+            arith::SIToFPOp::create(builder, loc, builder.getF64Type(), extuiOp.getOut());
+        auto fromElementsOp = tensor::FromElementsOp::create(
+            builder, loc, RankedTensorType::get({}, builder.getF64Type()),
+            int2floatCastOp.getResult());
 
         // Return the new mcm expval
         retOp->setOperand(retIdx, fromElementsOp.getResult());
@@ -224,19 +225,19 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
 
         // Create zero tensor
         auto zero =
-            builder.create<arith::ConstantOp>(loc, f64Type, builder.getFloatAttr(f64Type, 0));
-        auto zeroTensor = builder.create<tensor::FromElementsOp>(
-            loc, RankedTensorType::get({2}, f64Type), ValueRange{zero, zero});
+            arith::ConstantOp::create(builder, loc, f64Type, builder.getFloatAttr(f64Type, 0));
+        auto zeroTensor = tensor::FromElementsOp::create(
+            builder, loc, RankedTensorType::get({2}, f64Type), ValueRange{zero, zero});
 
         // Convert mcm (I1) to an index and insert 1 into the zero tensor at the index
         Value mcm = mcmobs.getMcm();
-        auto extuiOp = builder.create<arith::ExtUIOp>(loc, builder.getI64Type(), mcm);
+        auto extuiOp = arith::ExtUIOp::create(builder, loc, builder.getI64Type(), mcm);
         auto indexOp =
-            builder.create<arith::IndexCastOp>(loc, builder.getIndexType(), extuiOp.getOut());
+            arith::IndexCastOp::create(builder, loc, builder.getIndexType(), extuiOp.getOut());
         auto one =
-            builder.create<arith::ConstantOp>(loc, f64Type, builder.getFloatAttr(f64Type, 1));
-        auto insertedTensor = builder.create<tensor::InsertOp>(loc, one.getResult(), zeroTensor,
-                                                               ValueRange{indexOp.getResult()});
+            arith::ConstantOp::create(builder, loc, f64Type, builder.getFloatAttr(f64Type, 1));
+        auto insertedTensor = tensor::InsertOp::create(builder, loc, one.getResult(), zeroTensor,
+                                                       ValueRange{indexOp.getResult()});
 
         retOp->setOperand(retIdx, insertedTensor.getResult());
 
@@ -262,9 +263,9 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         builder.setInsertionPoint(retOp);
 
         Value mcm = mcmobs.getMcm();
-        auto extuiOp = builder.create<arith::ExtUIOp>(loc, builder.getI64Type(), mcm);
-        auto fromElementsOp = builder.create<tensor::FromElementsOp>(
-            loc, oneShotKernel.getFunctionType().getResults()[retIdx], extuiOp.getOut());
+        auto extuiOp = arith::ExtUIOp::create(builder, loc, builder.getI64Type(), mcm);
+        auto fromElementsOp = tensor::FromElementsOp::create(
+            builder, loc, oneShotKernel.getFunctionType().getResults()[retIdx], extuiOp.getOut());
 
         retOp->setOperand(retIdx, fromElementsOp.getResult());
 
@@ -378,7 +379,6 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
                 }
 
                 else if (isa<quantum::ExpvalOp>(mp)) {
-
                     // The one shot kernel itself might need some massaging if the MP is on a MCM.
                     Operation *MPSourceOp = mp.getObs().getDefiningOp();
                     if (isa<quantum::MCMObsOp>(MPSourceOp)) {
@@ -388,15 +388,14 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
 
                     // Each expval result is a tensor<f64>
                     auto expvalType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[i]);
-                    auto expvalSum = builder.create<stablehlo::ConstantOp>(
-                        loc, expvalType,
+                    auto expvalSum = stablehlo::ConstantOp::create(
+                        builder, loc, expvalType,
                         DenseElementsAttr::get(expvalType, builder.getFloatAttr(f64Type, 0)));
                     loopIterArgs.push_back(expvalSum);
                     loopIterArgsMPKinds.push_back("expval");
                 }
 
                 else if (isa<quantum::ProbsOp>(mp)) {
-
                     // The one shot kernel itself might need some massaging if the MP is on a MCM.
                     Operation *MPSourceOp = mp.getObs().getDefiningOp();
                     if (isa<quantum::MCMObsOp>(MPSourceOp)) {
@@ -406,15 +405,14 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
 
                     // Each probs result is a tensor<blahxf64>
                     auto probsType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[i]);
-                    auto probsSum = builder.create<stablehlo::ConstantOp>(
-                        loc, probsType,
+                    auto probsSum = stablehlo::ConstantOp::create(
+                        builder, loc, probsType,
                         DenseElementsAttr::get(probsType, builder.getFloatAttr(f64Type, 0)));
                     loopIterArgs.push_back(probsSum);
                     loopIterArgsMPKinds.push_back("probs");
                 }
 
                 else if (isa<quantum::SampleOp>(mp)) {
-
                     auto fullSampleType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[i]);
                     assert(fullSampleType.getShape().size() == 2 &&
                            "Expected sample result type to be a tensor of size shot X num_qubits");
@@ -428,8 +426,8 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
                         editKernelMCMSample(builder, oneShotKernel,
                                             cast<quantum::MCMObsOp>(MPSourceOp), i);
                     }
-                    auto fullSampleResults = builder.create<tensor::EmptyOp>(
-                        loc, fullSampleType.getShape(), fullSampleType.getElementType());
+                    auto fullSampleResults = tensor::EmptyOp::create(
+                        builder, loc, fullSampleType.getShape(), fullSampleType.getElementType());
 
                     loopIterArgs.push_back(fullSampleResults);
                     loopIterArgsMPKinds.push_back("sample");
@@ -441,16 +439,16 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
                         auto countsType =
                             dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[i + 1]);
 
-                        auto countsSum = builder.create<stablehlo::ConstantOp>(
-                            loc, countsType,
+                        auto countsSum = stablehlo::ConstantOp::create(
+                            builder, loc, countsType,
                             DenseElementsAttr::get(
                                 countsType, builder.getIntegerAttr(builder.getI64Type(), 0)));
 
                         // We also need to yield the eigens from the kernel call inside the loop
                         // body However, this requires the loop to have an iteration argument for
                         // the eigens tensor We just initialize an empty one.
-                        auto eigensPlaceholder = builder.create<tensor::EmptyOp>(
-                            loc, eigensType.getShape(), eigensType.getElementType());
+                        auto eigensPlaceholder = tensor::EmptyOp::create(
+                            builder, loc, eigensType.getShape(), eigensType.getElementType());
 
                         loopIterArgs.push_back(eigensPlaceholder);
                         loopIterArgs.push_back(countsSum);
@@ -465,25 +463,24 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
             // Each loop iteration calls the one-shot kernel
             // Since the kernel was a clone of the original qfunc, their arguments are the same!
             builder.setInsertionPointToEnd(forOp.getBody());
-            auto kernalCallOp = builder.create<func::CallOp>(
-                loc, oneShotKernel.getFunctionType().getResults(), oneShotKernel.getSymName(),
-                qnodeFunc.getBody().front().getArguments());
+            auto kernalCallOp = func::CallOp::create(
+                builder, loc, oneShotKernel.getFunctionType().getResults(),
+                oneShotKernel.getSymName(), qnodeFunc.getBody().front().getArguments());
 
             // Perform each MP's necessary handling inside the loop body
             SmallVector<Value> loopYields;
             for (auto [i, mpKind] : llvm::enumerate(loopIterArgsMPKinds)) {
-
                 if (mpKind == "expval") {
                     // Add the expval from each iteration
-                    auto addOp = builder.create<stablehlo::AddOp>(loc, kernalCallOp.getResult(i),
-                                                                  forOp.getRegionIterArg(i));
+                    auto addOp = stablehlo::AddOp::create(builder, loc, kernalCallOp.getResult(i),
+                                                          forOp.getRegionIterArg(i));
                     loopYields.push_back(addOp.getResult());
                 }
 
                 else if (mpKind == "probs") {
                     // Add the probs from each iteration
-                    auto addOp = builder.create<stablehlo::AddOp>(loc, kernalCallOp.getResult(i),
-                                                                  forOp.getRegionIterArg(i));
+                    auto addOp = stablehlo::AddOp::create(builder, loc, kernalCallOp.getResult(i),
+                                                          forOp.getRegionIterArg(i));
                     loopYields.push_back(addOp.getResult());
                 }
 
@@ -496,9 +493,9 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
                                                        builder.getIndexAttr(oneShotSampleShape[1])};
                     SmallVector<OpFoldResult> strides = {one, one};
 
-                    auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
-                        loc, kernalCallOp.getResult(i), forOp.getRegionIterArg(i), offsets, sizes,
-                        strides);
+                    auto insertSliceOp = tensor::InsertSliceOp::create(
+                        builder, loc, kernalCallOp.getResult(i), forOp.getRegionIterArg(i), offsets,
+                        sizes, strides);
 
                     loopYields.push_back(insertSliceOp.getResult());
                 }
@@ -508,28 +505,28 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
                 }
 
                 else if (mpKind == "counts") {
-                    auto addOp = builder.create<stablehlo::AddOp>(loc, kernalCallOp.getResult(i),
-                                                                  forOp.getRegionIterArg(i));
+                    auto addOp = stablehlo::AddOp::create(builder, loc, kernalCallOp.getResult(i),
+                                                          forOp.getRegionIterArg(i));
                     loopYields.push_back(addOp.getResult());
                 }
             }
 
-            builder.create<scf::YieldOp>(loc, loopYields);
+            scf::YieldOp::create(builder, loc, loopYields);
 
             // Perform each MP's necessary handling outside the loop body
             builder.setInsertionPointToEnd(&qnodeFunc.getBody().front());
             SmallVector<Value> retVals;
             for (auto [i, mpKind] : llvm::enumerate(loopIterArgsMPKinds)) {
-
                 if (mpKind == "expval") {
                     // Divide the sum by shots
                     // shots Value is I64, need to turn into tensor<f64> for division
-                    auto int2floatCastOp = builder.create<arith::SIToFPOp>(loc, f64Type, shots);
-                    auto shotsFromElementsOp = builder.create<tensor::FromElementsOp>(
-                        loc, RankedTensorType::get({}, f64Type), int2floatCastOp.getResult());
+                    auto int2floatCastOp = arith::SIToFPOp::create(builder, loc, f64Type, shots);
+                    auto shotsFromElementsOp = tensor::FromElementsOp::create(
+                        builder, loc, RankedTensorType::get({}, f64Type),
+                        int2floatCastOp.getResult());
 
-                    auto divOp = builder.create<stablehlo::DivOp>(loc, forOp->getResult(i),
-                                                                  shotsFromElementsOp.getResult());
+                    auto divOp = stablehlo::DivOp::create(builder, loc, forOp->getResult(i),
+                                                          shotsFromElementsOp.getResult());
                     retVals.push_back(divOp.getResult());
                 }
 
@@ -537,17 +534,18 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
                     // Divide the sum by shots
                     // shots Value is I64, need to turn into tensor<f64> and then broadcast for
                     // division
-                    auto int2floatCastOp = builder.create<arith::SIToFPOp>(loc, f64Type, shots);
-                    auto shotsFromElementsOp = builder.create<tensor::FromElementsOp>(
-                        loc, RankedTensorType::get({}, f64Type), int2floatCastOp.getResult());
+                    auto int2floatCastOp = arith::SIToFPOp::create(builder, loc, f64Type, shots);
+                    auto shotsFromElementsOp = tensor::FromElementsOp::create(
+                        builder, loc, RankedTensorType::get({}, f64Type),
+                        int2floatCastOp.getResult());
 
                     auto probsType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[i]);
-                    auto broadcastedShots = builder.create<stablehlo::BroadcastInDimOp>(
-                        loc, probsType, shotsFromElementsOp.getResult(),
+                    auto broadcastedShots = stablehlo::BroadcastInDimOp::create(
+                        builder, loc, probsType, shotsFromElementsOp.getResult(),
                         builder.getDenseI64ArrayAttr({}));
 
-                    auto divOp = builder.create<stablehlo::DivOp>(loc, forOp->getResult(i),
-                                                                  broadcastedShots.getResult());
+                    auto divOp = stablehlo::DivOp::create(builder, loc, forOp->getResult(i),
+                                                          broadcastedShots.getResult());
                     retVals.push_back(divOp.getResult());
                 }
 
@@ -562,7 +560,7 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
                 }
             }
 
-            builder.create<func::ReturnOp>(loc, retVals);
+            func::ReturnOp::create(builder, loc, retVals);
         }
     } // runOnOperation()
 };
