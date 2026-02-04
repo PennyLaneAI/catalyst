@@ -19,7 +19,7 @@ import pytest
 
 from catalyst import qjit
 from catalyst.compiler import CompileOptions
-from catalyst.tracing.contexts import ensure_capture_mode
+from catalyst.jit import _ensure_capture_mode as ensure_capture_mode
 
 
 @pytest.mark.usefixtures("use_both_frontend")

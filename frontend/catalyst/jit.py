@@ -19,6 +19,7 @@ compilation of hybrid quantum-classical functions using Catalyst.
 # pylint: disable=too-many-lines
 
 import copy
+from contextlib import contextmanager
 import functools
 import inspect
 import logging
@@ -41,7 +42,7 @@ from catalyst.from_plxpr import trace_from_pennylane
 from catalyst.jax_tracer import lower_jaxpr_to_mlir, trace_to_jaxpr
 from catalyst.logging import debug_logger, debug_logger_init
 from catalyst.qfunc import QFunc
-from catalyst.tracing.contexts import EvaluationContext, ensure_capture_mode
+from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import (
     filter_static_args,
     get_abstract_signature,
@@ -69,6 +70,49 @@ setattr(jax.interpreters.partial_eval.DynamicJaxprTracer, "__hash__", lambda x: 
 # This flag cannot be set in ``QJIT.get_mlir()`` because values created before
 # that function is called must be consistent with the JAX configuration value.
 jax.config.update("jax_enable_x64", True)
+
+
+@contextmanager
+def _ensure_capture_mode(enable_capture: bool):
+    """Enforce the PennyLane capture state for the duration of the context.
+
+    This context manager safely transitions the global ``qml.capture`` state to
+    the requested state and guarantees restoration of the previous state upon
+    exit, regardless of exceptions.
+
+    This implements "scope enforcement" rather than "state management": you don't
+    care what the global state *was*; you only care what it *must be* for the
+    duration of this scope. The context manager handles all toggling automatically.
+
+    Args:
+        enable_capture (bool): The desired capture state within the context.
+            - ``True``: Enable PennyLane capture (use new capture pathway)
+            - ``False``: Disable PennyLane capture (use legacy pathway)
+
+    Note:
+        This context manager is re-entrant and nesting-safe. Nested calls will
+        each restore to their own previous state, protecting against nested
+        toggles drifting out of sync.
+    """
+    # 1. Snapshot the pre-existing state
+    was_enabled = qml.capture.enabled()
+
+    # 2. Enforce the requested state (only toggle if necessary)
+    if enable_capture and not was_enabled:
+        qml.capture.enable()
+    elif not enable_capture and was_enabled:
+        qml.capture.disable()
+
+    try:
+        yield
+    finally:
+        # 3. Restore the original state directly from snapshot
+        # We restore 'was_enabled' directly rather than just toggling back,
+        # which protects against nested toggles drifting out of sync.
+        if was_enabled:
+            qml.capture.enable()
+        else:
+            qml.capture.disable()
 
 
 ## API ##
@@ -573,7 +617,7 @@ class QJIT(CatalystCallable):
 
         # Resolve effective capture mode and enforce it during pre_compilation
         target_mode = self._get_effective_capture_mode()
-        with ensure_capture_mode(target_mode):
+        with _ensure_capture_mode(target_mode):
             self.user_function = self.pre_compilation()
 
         # Static arguments require values, so we cannot AOT compile.
@@ -770,7 +814,7 @@ class QJIT(CatalystCallable):
         # Scope Enforcement: Calculate effective mode and enter scope.
         # The context manager handles ALL enabling/disabling/restoring.
         target_mode = self._get_effective_capture_mode()
-        with ensure_capture_mode(target_mode):
+        with _ensure_capture_mode(target_mode):
             if target_mode:
                 # New capture pathway
                 return trace_from_pennylane(
