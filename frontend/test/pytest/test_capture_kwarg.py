@@ -178,6 +178,7 @@ class TestCaptureKwargIntegration:
             @qjit(capture=False)
             @qml.qnode(dev)
             def circuit(theta):
+                assert not qml.capture.enabled()
                 qml.RX(theta, wires=0)
                 qml.CNOT(wires=[0, 1])
                 return qml.expval(qml.PauliZ(1))
