@@ -1501,14 +1501,8 @@ def test_pytrees_return_classical_function(backend, diff_method):
     psi = 0.1
     phi = 0.2
 
-    if diff_method == "adjoint":
-        # Adjoint method does not support multiple return values
-        if qml.capture.enabled():
-            pytest.xfail("TODO")
-        # TODO: specify error message and/or fix, currently MLIR Assertion error
-        #       "invalid qfunc symbol in adjoint op" which doesn't seem right
-        with pytest.raises(CompileError):
-            qjit(qml.jacobian(circuit, argnums=[0, 1]))(psi, phi)
+    if diff_method == "adjoint" and qml.capture.enabled():
+        pytest.xfail("TODO")
     else:
         result = qjit(qml.jacobian(circuit, argnums=[0, 1]))(psi, phi)
 
@@ -1519,6 +1513,32 @@ def test_pytrees_return_classical_function(backend, diff_method):
         assert len(result[0]["expval0"]) == 2
         assert isinstance(result[1], tuple)
         assert len(result[1]) == 2
+
+
+@pytest.mark.xfail(reason="issue #1335 in lightning")
+@pytest.mark.usefixtures("use_both_frontend")
+@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
+def test_multiple_expval_cost_fun(backend, diff_method):
+    """Test that we produce correct results with multiple results being differentiated."""
+
+    @qml.qnode(qml.device(backend, wires=2), diff_method=diff_method)
+    def circuit(weights, data):
+
+        qml.RY(weights[0], wires=0)
+        qml.RX(data[0], wires=0)
+        qml.RY(weights[1], wires=1)
+        qml.RX(data[1], wires=1)
+
+        return qml.expval(qml.Z(0)), qml.expval(qml.Z(0))
+
+    def loss_fn(weights, data):
+        return jnp.array(circuit(weights, data))
+
+    result = qjit(grad(loss_fn, argnums=[0, 1]))(jnp.array([0.1, 0.2]), jnp.array([0.3, 0.4]))
+    expected = jax.grad(loss_fn, argnums=[0, 1])(jnp.array([0.1, 0.2]), jnp.array([0.3, 0.4]))
+
+    assert np.allclose(result[0], expected[0])
+    assert np.allclose(result[1], expected[1])
 
 
 @pytest.mark.usefixtures("use_both_frontend")
@@ -1623,7 +1643,6 @@ def test_adj_qubitunitary(inp, backend):
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
-@pytest.mark.xfail(reason="Need PR 332.")
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_preprocessing_outside_qnode(inp, backend):
     """Test the preprocessing outside qnode."""
@@ -1703,9 +1722,9 @@ def test_ellipsis_differentiation(backend, diff_method):
     assert np.allclose(cat_res, jax_res)
 
 
-@pytest.mark.xfail(reason="First need #332, then Vmap yields wrong results when differentiated")
 def test_vmap_worflow_derivation(backend):
     """Check the gradient of a vmap workflow"""
+    pytest.xfail("Avoid segfault in CI: vmap differentiation not stable yet.")
     n_wires = 5
     data = jnp.sin(jnp.mgrid[-2:2:0.2].reshape(n_wires, -1)) ** 3
 
@@ -1759,9 +1778,9 @@ def test_vmap_worflow_derivation(backend):
     assert jnp.allclose(data_cat[1], data_jax[1])
 
 
-@pytest.mark.xfail(reason="First need #332, then Vmap yields wrong results when differentiated")
 def test_forloop_vmap_worflow_derivation(backend):
     """Test a forloop vmap."""
+    pytest.xfail("Avoid segfault in CI: vmap differentiation not stable yet.")
     n_wires = 5
     data = jnp.sin(jnp.mgrid[-2:2:0.2].reshape(n_wires, -1)) ** 3
     weights = jnp.ones([n_wires, 3])
@@ -2517,8 +2536,8 @@ def test_best_diff_method_multi_expval():
     qjit_jacobian = qjit(jacobian(circuit, argnums=[0, 1]))
     _ = qjit_jacobian(0.1, 0.2)
 
-    assert "parameter-shift" in qjit_jacobian.mlir
-    assert "adjoint" not in qjit_jacobian.mlir
+    assert "parameter-shift" not in qjit_jacobian.mlir
+    assert "adjoint" in qjit_jacobian.mlir
 
 
 @pytest.mark.usefixtures("use_both_frontend")

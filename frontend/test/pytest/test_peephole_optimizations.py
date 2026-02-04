@@ -641,6 +641,69 @@ def test_decompose_arbitrary_ppr():
     assert 'qec.ppr ["X", "Y", "Z"](2)' in ir_opt
 
 
+@pytest.mark.usefixtures("use_capture")
+class TestLowerQECInitOps:
+    """Test that the lower-qec-init-ops pass correctly lowers fabricate/prepare ops to gates."""
+
+    @pytest.mark.parametrize(
+        "gates",
+        [
+            (lambda: qml.Identity(0)),
+            (lambda: qml.PauliX(0)),
+            (lambda: (qml.H(0), qml.PauliZ(0))),
+            (lambda: qml.H(0)),
+            (lambda: (qml.H(0), qml.T(0))),
+            (lambda: (qml.H(0), qml.S(0))),
+            (lambda: (qml.H(0), qml.adjoint(qml.T(0), lazy=False))),
+            (lambda: (qml.H(0), qml.adjoint(qml.S(0), lazy=False))),
+        ],
+    )
+    def test_lower_qec_init_ops_preserves_states(self, gates):
+        """Test that lower-qec-init-ops correctly lowers states through the PPR/PPM pipeline."""
+
+        @qml.qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def baseline_circuit():
+            gates()
+            return (
+                qml.expval(qml.PauliX(0)),
+                qml.expval(qml.PauliY(0)),
+                qml.expval(qml.PauliZ(0)),
+            )
+
+        @qml.qjit
+        @qml.transform(pass_name="to-ppr")
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def to_ppr_circuit():
+            gates()
+            return (
+                qml.expval(qml.PauliX(0)),
+                qml.expval(qml.PauliY(0)),
+                qml.expval(qml.PauliZ(0)),
+            )
+
+        @qml.qjit
+        @qml.transform(pass_name="unroll-conditional-ppr-ppm")
+        @qml.transform(pass_name="lower-qec-init-ops")
+        @qml.transform(pass_name="ppr-to-ppm")
+        @qml.transform(pass_name="to-ppr")
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def lowered_circuit():
+            gates()
+            return (
+                qml.expval(qml.PauliX(0)),
+                qml.expval(qml.PauliY(0)),
+                qml.expval(qml.PauliZ(0)),
+            )
+
+        baseline_result = baseline_circuit()
+        to_ppr_result = to_ppr_circuit()
+        lowered_result = lowered_circuit()
+
+        assert np.allclose(baseline_result, to_ppr_result)
+        assert np.allclose(to_ppr_result, lowered_result)
+
+
 class TestPPMSpecsErrors:
     """Test if errors are caught when calling ppm_specs"""
 

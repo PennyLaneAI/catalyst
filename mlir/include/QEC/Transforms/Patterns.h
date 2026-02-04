@@ -34,5 +34,6 @@ void populateDecomposeCliffordPPRPatterns(mlir::RewritePatternSet &, bool avoidY
 void populatePPRToMBQCPatterns(mlir::RewritePatternSet &);
 void populateDecomposeArbitraryPPRPatterns(mlir::RewritePatternSet &);
 void populateUnrollConditionalPPRPPMPatterns(mlir::RewritePatternSet &);
+void populateLowerQECInitOpsPatterns(mlir::RewritePatternSet &);
 } // namespace qec
 } // namespace catalyst

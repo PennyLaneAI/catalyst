@@ -58,8 +58,8 @@ struct DetensorizeForOp : public OpRewritePattern<scf::ForOp> {
             if (isScalarTensor(opOperand.get())) {
                 OpBuilder::InsertionGuard g(rewriter);
                 rewriter.setInsertionPoint(forOp);
-                Value value = rewriter.create<tensor::ExtractOp>(forOp->getLoc(), opOperand.get(),
-                                                                 ValueRange{});
+                Value value = tensor::ExtractOp::create(rewriter, forOp->getLoc(), opOperand.get(),
+                                                        ValueRange{});
                 newIterOperands.push_back(value);
                 newIterOperandsIndices.push_back(it.index());
                 continue;
@@ -71,8 +71,8 @@ struct DetensorizeForOp : public OpRewritePattern<scf::ForOp> {
         OpBuilder::InsertionGuard forOpInsertionGuard(rewriter);
         rewriter.setInsertionPoint(forOp);
         scf::ForOp newForOp =
-            rewriter.create<scf::ForOp>(forOp.getLoc(), forOp.getLowerBound(),
-                                        forOp.getUpperBound(), forOp.getStep(), newIterOperands);
+            scf::ForOp::create(rewriter, forOp.getLoc(), forOp.getLowerBound(),
+                               forOp.getUpperBound(), forOp.getStep(), newIterOperands);
         newForOp->setAttrs(forOp->getAttrs());
 
         // 3. Copy body
@@ -87,8 +87,8 @@ struct DetensorizeForOp : public OpRewritePattern<scf::ForOp> {
             OpBuilder::InsertionGuard g(rewriter);
             rewriter.setInsertionPoint(&newBlock, newBlock.begin());
             for (std::size_t index : newIterOperandsIndices) {
-                Value value = rewriter.create<tensor::FromElementsOp>(
-                    newForOp->getLoc(),
+                Value value = tensor::FromElementsOp::create(
+                    rewriter, newForOp->getLoc(),
                     RankedTensorType::get({}, newForOp.getRegionIterArg(index).getType()),
                     newForOp.getRegionIterArg(index));
                 rewriter.replaceUsesWithIf(
@@ -104,10 +104,11 @@ struct DetensorizeForOp : public OpRewritePattern<scf::ForOp> {
             OpBuilder::InsertionGuard g(rewriter);
             rewriter.setInsertionPoint(clonedYieldOp);
             for (std::size_t index : newIterOperandsIndices) {
-                newYieldOperands[index] = rewriter.create<tensor::ExtractOp>(
-                    clonedYieldOp->getLoc(), clonedYieldOp->getOperand(index), ValueRange{});
+                newYieldOperands[index] =
+                    tensor::ExtractOp::create(rewriter, clonedYieldOp->getLoc(),
+                                              clonedYieldOp->getOperand(index), ValueRange{});
             }
-            rewriter.create<scf::YieldOp>(newForOp.getLoc(), newYieldOperands);
+            scf::YieldOp::create(rewriter, newForOp.getLoc(), newYieldOperands);
             rewriter.eraseOp(clonedYieldOp);
         }
 
@@ -117,8 +118,8 @@ struct DetensorizeForOp : public OpRewritePattern<scf::ForOp> {
             rewriter.setInsertionPointAfter(forOp);
             for (std::size_t index : newIterOperandsIndices) {
                 Value for_result = newForOp->getResult(index);
-                Value value = rewriter.create<tensor::FromElementsOp>(
-                    newForOp->getLoc(), RankedTensorType::get({}, for_result.getType()),
+                Value value = tensor::FromElementsOp::create(
+                    rewriter, newForOp->getLoc(), RankedTensorType::get({}, for_result.getType()),
                     for_result);
                 rewriter.replaceUsesWithIf(forOp->getResult(index), value, [&](OpOperand &op) {
                     return !isa<tensor::FromElementsOp>(op.getOwner());
@@ -151,8 +152,8 @@ struct DetensorizeIfOp : public OpRewritePattern<scf::IfOp> {
                 Value operand = it.value();
                 // Detensorize operand: extract tensor element before yielding
                 if (isScalarTensor(operand)) {
-                    Value value = rewriter.create<tensor::ExtractOp>(yield_op->getLoc(), operand,
-                                                                     ValueRange{});
+                    Value value = tensor::ExtractOp::create(rewriter, yield_op->getLoc(), operand,
+                                                            ValueRange{});
                     yield_op.setOperand(it.index(), value);
                 }
             }
@@ -172,7 +173,7 @@ struct DetensorizeIfOp : public OpRewritePattern<scf::IfOp> {
         OpBuilder::InsertionGuard ifOpInsertionGuard(rewriter);
         rewriter.setInsertionPoint(ifOp);
         auto newIfOp =
-            rewriter.create<scf::IfOp>(ifOp.getLoc(), newResultTypes, ifOp.getCondition());
+            scf::IfOp::create(rewriter, ifOp.getLoc(), newResultTypes, ifOp.getCondition());
         newIfOp.getThenRegion().takeBody(ifOp.getThenRegion());
         newIfOp.getElseRegion().takeBody(ifOp.getElseRegion());
 
@@ -184,8 +185,9 @@ struct DetensorizeIfOp : public OpRewritePattern<scf::IfOp> {
                 auto oldResult = std::get<0>(results);
                 auto newResult = std::get<1>(results);
                 if (isScalarTensor(oldResult)) {
-                    Value value = rewriter.create<tensor::FromElementsOp>(
-                        ifOp->getLoc(), RankedTensorType::get({}, newResult.getType()), newResult);
+                    Value value = tensor::FromElementsOp::create(
+                        rewriter, ifOp->getLoc(), RankedTensorType::get({}, newResult.getType()),
+                        newResult);
                     rewriter.replaceAllUsesWith(oldResult, value);
                 }
             }
@@ -218,7 +220,7 @@ struct DetensorizeWhileOp : public OpRewritePattern<scf::WhileOp> {
                 OpBuilder::InsertionGuard g(rewriter);
                 rewriter.setInsertionPoint(whileOp);
                 Value value =
-                    rewriter.create<tensor::ExtractOp>(whileOp->getLoc(), opOperand, ValueRange{});
+                    tensor::ExtractOp::create(rewriter, whileOp->getLoc(), opOperand, ValueRange{});
                 newIterOperands.push_back(value);
                 newIterOperandsIndices.push_back(it.index());
                 continue;
@@ -242,8 +244,8 @@ struct DetensorizeWhileOp : public OpRewritePattern<scf::WhileOp> {
         OpBuilder::InsertionGuard newWhileOpInsertionGuard(rewriter);
         rewriter.setInsertionPoint(whileOp);
         scf::WhileOp newWhileOp =
-            rewriter.create<scf::WhileOp>(whileOp.getLoc(), newResultTypes, newIterOperands,
-                                          /*beforeBody*/ nullptr, /*afterBody*/ nullptr);
+            scf::WhileOp::create(rewriter, whileOp.getLoc(), newResultTypes, newIterOperands,
+                                 /*beforeBody*/ nullptr, /*afterBody*/ nullptr);
 
         // 3. Copy body
         Block &newBeforeBlock = *newWhileOp.getBeforeBody();
@@ -257,8 +259,8 @@ struct DetensorizeWhileOp : public OpRewritePattern<scf::WhileOp> {
             {
                 OpBuilder::InsertionGuard g(rewriter);
                 rewriter.setInsertionPoint(&newBeforeBlock, newBeforeBlock.begin());
-                Value value = rewriter.create<tensor::FromElementsOp>(
-                    newWhileOp->getLoc(),
+                Value value = tensor::FromElementsOp::create(
+                    rewriter, newWhileOp->getLoc(),
                     RankedTensorType::get({}, newBeforeBlock.getArgument(index).getType()),
                     newBeforeBlock.getArgument(index));
                 rewriter.replaceUsesWithIf(
@@ -271,8 +273,8 @@ struct DetensorizeWhileOp : public OpRewritePattern<scf::WhileOp> {
             {
                 OpBuilder::InsertionGuard g(rewriter);
                 rewriter.setInsertionPoint(&newAfterBlock, newAfterBlock.begin());
-                Value value = rewriter.create<tensor::FromElementsOp>(
-                    newWhileOp->getLoc(),
+                Value value = tensor::FromElementsOp::create(
+                    rewriter, newWhileOp->getLoc(),
                     RankedTensorType::get({}, newAfterBlock.getArgument(index).getType()),
                     newAfterBlock.getArgument(index));
                 rewriter.replaceUsesWithIf(
@@ -291,8 +293,8 @@ struct DetensorizeWhileOp : public OpRewritePattern<scf::WhileOp> {
             for (const auto &it : llvm::enumerate(condOpArgs)) {
                 Value condOpArg = it.value();
                 if (isScalarTensor(condOpArg)) {
-                    Value value = rewriter.create<tensor::ExtractOp>(condOp->getLoc(), condOpArg,
-                                                                     ValueRange{});
+                    Value value = tensor::ExtractOp::create(rewriter, condOp->getLoc(), condOpArg,
+                                                            ValueRange{});
                     newCondOpArgs.push_back(value);
                 }
                 else {
@@ -310,10 +312,11 @@ struct DetensorizeWhileOp : public OpRewritePattern<scf::WhileOp> {
             OpBuilder::InsertionGuard g(rewriter);
             rewriter.setInsertionPoint(clonedYieldOp);
             for (std::size_t index : newIterOperandsIndices) {
-                newYieldOperands[index] = rewriter.create<tensor::ExtractOp>(
-                    clonedYieldOp->getLoc(), clonedYieldOp->getOperand(index), ValueRange{});
+                newYieldOperands[index] =
+                    tensor::ExtractOp::create(rewriter, clonedYieldOp->getLoc(),
+                                              clonedYieldOp->getOperand(index), ValueRange{});
             }
-            rewriter.create<scf::YieldOp>(newWhileOp.getLoc(), newYieldOperands);
+            scf::YieldOp::create(rewriter, newWhileOp.getLoc(), newYieldOperands);
             rewriter.eraseOp(clonedYieldOp);
         }
 
@@ -323,8 +326,8 @@ struct DetensorizeWhileOp : public OpRewritePattern<scf::WhileOp> {
             rewriter.setInsertionPointAfter(whileOp);
             for (std::size_t index : newResultIndices) {
                 Value for_result = newWhileOp->getResult(index);
-                Value value = rewriter.create<tensor::FromElementsOp>(
-                    newWhileOp->getLoc(), RankedTensorType::get({}, for_result.getType()),
+                Value value = tensor::FromElementsOp::create(
+                    rewriter, newWhileOp->getLoc(), RankedTensorType::get({}, for_result.getType()),
                     for_result);
                 rewriter.replaceUsesWithIf(whileOp->getResult(index), value, [&](OpOperand &op) {
                     return !isa<tensor::FromElementsOp>(op.getOwner());

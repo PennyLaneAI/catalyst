@@ -1,4 +1,4 @@
-// Copyright 2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023-2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -44,6 +44,7 @@
 #include "llvm/Transforms/Coroutines/CoroSplit.h"
 #include "llvm/Transforms/IPO/GlobalDCE.h"
 
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllExtensions.h"
@@ -64,10 +65,12 @@
 #include "Catalyst/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Driver/CatalystLLVMTarget.h"
 #include "Driver/CompilerDriver.h"
+#include "Driver/HighResolutionOutputStrategy.h"
 #include "Driver/Pipelines.h"
 #include "Driver/Support.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientInterfaces.h"
+#include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
@@ -349,15 +352,16 @@ OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, const llvm::SourceMgr &s
     return parseSourceFile<ModuleOp>(sourceMgr, parserConfig);
 }
 
-/// From the MLIR module it checks if gradients operations are in the program.
-bool containsGradients(mlir::ModuleOp moduleOp)
+/// Detect whether Enzyme differentiation is needed for the module.
+bool containsGradients(const llvm::Module &llvmModule)
 {
-    bool contain = false;
-    moduleOp.walk([&](catalyst::gradient::GradientOpInterface op) {
-        contain = true;
-        return WalkResult::interrupt();
-    });
-    return contain;
+    // This will match both declarations and definitions
+    for (const llvm::Function &func : llvmModule.functions()) {
+        if (func.getName().starts_with("__enzyme_autodiff")) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /// Parse an LLVM module given in textual representation. Any parse errors will be output to
@@ -556,6 +560,9 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
 std::string readInputFile(const std::string &filename)
 {
     if (filename == "-") {
+        if (llvm::errs().is_displayed()) {
+            llvm::errs() << "(processing input from stdin now, hit ctrl-c/ctrl-d to interrupt)\n";
+        }
         std::stringstream buffer;
         std::istreambuf_iterator<char> begin(std::cin), end;
         buffer << std::string(begin, end);
@@ -727,11 +734,15 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
     DefaultTimingManager tm;
     applyDefaultTimingManagerCLOptions(tm);
+    if (tm.isEnabled()) {
+        auto strategy = std::make_unique<HighResolutionOutputStrategy>(llvm::errs());
+        tm.setOutput(std::move(strategy));
+    }
     TimingScope timing = tm.getRootScope();
 
     TimingScope parserTiming = timing.nest("Parser");
-    OwningOpRef<ModuleOp> mlirModule =
-        timer::timer(parseMLIRSource, "parseMLIRSource", /* add_endl */ false, &ctx, *sourceMgr);
+    OwningOpRef<ModuleOp> mlirModule = timer::timer(parseMLIRSource, "parseMLIRSource",
+                                                    /* add_endl */ false, &ctx, *sourceMgr);
 
     enum InputType inType = InputType::OTHER;
     if (mlirModule) {
@@ -758,10 +769,6 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     }
     parserTiming.stop();
 
-    // Enzyme always happens after O2Opt. If the checkpoint is O2Opt, enzymeRun must be set to
-    // true so that the enzyme pass can be executed.
-    bool enzymeRun = options.checkpointStage == "O2Opt";
-
     bool runAll = (options.loweringAction == Action::All);
     bool runOpt = (options.loweringAction == Action::OPT) || runAll;
     bool runTranslate = (options.loweringAction == Action::Translate) || runAll;
@@ -769,10 +776,6 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
     if (runOpt && (inType == InputType::MLIR)) {
         TimingScope optTiming = timing.nest("Optimization");
-        // TODO: The enzymeRun flag will not travel correctly in the case where different
-        // stages of compilation are executed independently via the Catalyst CLI.
-        // Ideally, It should be added to the IR via an attribute.
-        enzymeRun = containsGradients(*mlirModule);
         if (failed(runLowering(options, &ctx, *mlirModule, output, optTiming))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return failure();
@@ -837,14 +840,15 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
         if (options.asyncQnodes) {
             TimingScope coroLLVMPassesTiming = llcTiming.nest("LLVM coroutine passes");
-            if (failed(timer::timer(runCoroLLVMPasses, "runCoroLLVMPasses", /* add_endl */ false,
-                                    options, llvmModule, output))) {
+            if (failed(timer::timer(runCoroLLVMPasses, "runCoroLLVMPasses",
+                                    /* add_endl */ false, options, llvmModule, output))) {
                 return failure();
             }
             coroLLVMPassesTiming.stop();
             catalyst::utils::LinesCount::Module(*llvmModule.get());
         }
 
+        bool enzymeRun = containsGradients(*llvmModule);
         if (enzymeRun) {
             TimingScope o2PassesTiming = llcTiming.nest("LLVM O2 passes");
             if (failed(timer::timer(runO2LLVMPasses, "runO2LLVMPasses", /* add_endl */ false,
@@ -1044,17 +1048,29 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     llvm::InitLLVM y(argc, argv);
     MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
 
-    // Read the input IR file
-    std::string source = readInputFile(inputFilename);
-    if (source.empty()) {
-        llvm::errs() << "Error: Unable to read input file: " << inputFilename << "\n";
-        return 1;
+    if (config.shouldShowDialects()) {
+        llvm::outs() << "Available Dialects: ";
+        interleave(registry.getDialectNames(), llvm::outs(), ",");
+        llvm::outs() << "\n";
+        return 0;
+    }
+
+    if (config.shouldListPasses()) {
+        mlir::printRegisteredPasses();
+        return 0;
     }
 
     std::unique_ptr<CompilerOutput> output(new CompilerOutput());
     assert(output);
     output->outputFilename = outputFilename;
     llvm::raw_string_ostream errStream{output->diagnosticMessages};
+
+    // Read the input IR file
+    std::string source = readInputFile(inputFilename);
+    if (source.empty()) {
+        llvm::errs() << "Error: Unable to read input file: " << inputFilename << "\n";
+        return 1;
+    }
 
     CompilerOptions options{.source = source,
                             .workspace = WorkspaceDir,
