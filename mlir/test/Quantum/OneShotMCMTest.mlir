@@ -281,3 +281,82 @@ func.func public @test_counts(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) {
 // CHECK:     [[add:%.+]] = stablehlo.add [[call]]#1, %arg3 : tensor<4xi64>
 // CHECK:     scf.yield [[call]]#0, [[add]] : tensor<4xi64>, tensor<4xi64>
 // CHECK:   return [[forOut]]#0, [[forOut]]#1 : tensor<4xi64>, tensor<4xi64>
+
+
+// -----
+
+
+func.func public @test_many_MPs(%arg0: f64) -> (tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>) {
+  %1000 = arith.constant 1000 : i64
+  quantum.device shots(%1000) ["", "", ""]
+
+  // circuit
+  %0 = quantum.alloc( 2) : !quantum.reg
+  %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+  %out_qubits = quantum.custom "RX"(%arg0) %1 : !quantum.bit
+  %2 = quantum.insert %0[0], %out_qubits : !quantum.reg, !quantum.bit
+
+  // sample
+  %3 = quantum.compbasis qreg %2 : !quantum.obs
+  %4 = quantum.sample %3 : tensor<1000x2xf64>
+  %sample = stablehlo.convert %4 : (tensor<1000x2xf64>) -> tensor<1000x2xi64>
+
+  // counts
+  %6 = quantum.compbasis qreg %2 : !quantum.obs
+  %eigvals, %counts = quantum.counts %6 : tensor<4xf64>, tensor<4xi64>
+  %7 = stablehlo.convert %eigvals : (tensor<4xf64>) -> tensor<4xi64>
+
+  // expval
+  %8 = quantum.extract %2[0] : !quantum.reg -> !quantum.bit
+  %9 = quantum.namedobs %8[ PauliX] : !quantum.obs
+  %10 = quantum.expval %9 : f64
+  %expval = tensor.from_elements %10 : tensor<f64>
+
+  // probs
+  %11 = quantum.insert %2[0], %8 : !quantum.reg, !quantum.bit
+  %12 = quantum.compbasis qreg %11 : !quantum.obs
+  %probs = quantum.probs %12 : tensor<4xf64>
+
+  quantum.dealloc %11 : !quantum.reg
+  quantum.device_release
+
+  return %sample, %7, %counts, %expval, %probs : tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>
+}
+
+
+// CHECK: func.func public @test_many_MPs.quantum_kernel(%arg0: f64) -> (tensor<1x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>)
+// CHECK:   [[one:%.+]] = arith.constant 1 : i64
+// CHECK:   quantum.device shots([[one]]) ["", "", ""]
+
+// CHECK: func.func public @test_many_MPs(%arg0: f64) -> (tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>) {
+// CHECK:   [[shots:%.+]] = arith.constant 1000 : i64
+// CHECK:   [[sampleFull:%.+]] = tensor.empty() : tensor<1000x2xi64>
+// CHECK:   [[countsSum:%.+]] = stablehlo.constant dense<0> : tensor<4xi64>
+// CHECK:   [[eigens:%.+]] = tensor.empty() : tensor<4xi64>
+// CHECK:   [[expvalSum:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
+// CHECK:   [[probsSum:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<4xf64>
+//
+// CHECK:   [[lb:%.+]] = arith.constant 0 : index
+// CHECK:   [[step:%.+]] = arith.constant 1 : index
+// CHECK:   [[ub:%.+]] = index.casts [[shots]] : i64 to index
+//
+// CHECK:   [[forOut:%.+]]:5 = scf.for %arg1 = [[lb]] to [[ub]] step [[step]] iter_args
+// CHECK-SAME:   (%arg2 = [[sampleFull]], %arg3 = [[eigens]], %arg4 = [[countsSum]], %arg5 = [[expvalSum]], %arg6 = [[probsSum]])
+// CHECK-SAME:   -> (tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>)
+// CHECK:     [[call:%.+]]:5 = func.call @test_many_MPs.quantum_kernel(%arg0) :
+// CHECK-SAME:   (f64) -> (tensor<1x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>)
+// CHECK:     [[sample_insert_slice:%.+]] = tensor.insert_slice [[call]]#0 into %arg2[%arg1, 0] [1, 2] [1, 1] : tensor<1x2xi64> into tensor<1000x2xi64>
+// CHECK:     [[countsAdd:%.+]] = stablehlo.add [[call]]#2, %arg4 : tensor<4xi64>
+// CHECK:     [[expvalAdd:%.+]] = stablehlo.add [[call]]#3, %arg5 : tensor<f64>
+// CHECK:     [[probsAdd:%.+]] = stablehlo.add [[call]]#4, %arg6 : tensor<4xf64>
+// CHECK:     scf.yield [[sample_insert_slice]], [[call]]#1, [[countsAdd]], [[expvalAdd]], [[probsAdd]]
+// CHECK-SAME:   tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>
+//
+// CHECK:    [[shotsCast:%.+]] = arith.sitofp [[shots]] : i64 to f64
+// CHECK:    [[shotsTensor:%.+]] = tensor.from_elements [[shotsCast]] : tensor<f64>
+// CHECK:    [[expvalDivide:%.+]] = stablehlo.divide [[forOut]]#3, [[shotsTensor]] : tensor<f64>
+// CHECK:    [[shotsCast:%.+]] = arith.sitofp [[shots]] : i64 to f64
+// CHECK:    [[shotsTensor:%.+]] = tensor.from_elements [[shotsCast]] : tensor<f64>
+// CHECK:    [[shotsBroadcast:%.+]] = stablehlo.broadcast_in_dim [[shotsTensor]], dims = [] : (tensor<f64>) -> tensor<4xf64>
+// CHECK:    [[probsDivide:%.+]] = stablehlo.divide [[forOut]]#4, [[shotsBroadcast]] : tensor<4xf64>
+// CHECK:    return [[forOut]]#0, [[forOut]]#1, [[forOut]]#2, [[expvalDivide]], %8 : tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>

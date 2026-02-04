@@ -365,3 +365,57 @@ assert counts[1] == 0
 assert counts[3] == 0
 
 qml.capture.disable()
+
+
+# -----
+
+
+qml.capture.enable()
+
+
+@qjit(keep_intermediate=True, seed=42)
+@qml.transform(pass_name="one-shot-mcm")
+@qml.qnode(qml.device("lightning.qubit", wires=2), shots=1000)
+def test_mlir_one_shot_pass_MP_family():
+    """
+    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with
+    multiple MPs
+    """
+
+    # CHECK: transform.apply_registered_pass "one-shot-mcm"
+    qml.Hadamard(wires=0)
+    return qml.sample(), qml.counts(), qml.expval(qml.X(0)), qml.probs()
+
+
+print(test_mlir_one_shot_pass_MP_family.mlir)
+
+# CHECK: func.func public @test_mlir_one_shot_pass_MP_family.quantum_kernel
+# CHECK:    [[one:%.+]] = arith.constant 1 : i64
+# CHECK:    quantum.device shots([[one]])
+# CHECK:    Hadamard
+# CHECK: func.func public @test_mlir_one_shot_pass_MP_family
+# CHECK:    index.constant 1000
+# CHECK:    scf.for
+# CHECK:    func.call @test_mlir_one_shot_pass_MP_family.quantum_kernel
+print(get_compilation_stage(test_mlir_one_shot_pass_MP_family, "QuantumCompilationStage"))
+
+res = test_mlir_one_shot_pass_MP_family()
+samples, eigs_and_counts, expval, probs = res
+eigens, counts = eigs_and_counts
+
+assert samples.shape == (1000, 2)
+for sample in samples:
+    assert sample[1] == 0
+
+assert eigens.shape == (4,)
+assert np.allclose(eigens, [0, 1, 2, 3])
+assert counts.shape == (4,)
+assert sum(counts) == 1000
+assert counts[1] == 0
+assert counts[3] == 0
+
+assert np.allclose(expval, 1.0)
+
+assert np.allclose(probs, [0.5, 0, 0.5, 0], atol=0.01, rtol=0.01)
+
+qml.capture.disable()
