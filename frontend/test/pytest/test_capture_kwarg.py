@@ -198,6 +198,7 @@ class TestCaptureKwargIntegration:
         @qjit(capture="global")
         @qml.qnode(dev)
         def circuit_old_pathway(theta):
+            assert not qml.capture.enabled()
             qml.RX(theta, wires=0)
             return qml.expval(qml.PauliZ(0))
 
