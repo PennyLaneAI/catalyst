@@ -46,8 +46,7 @@ func.func public @test_expval(%arg0: f64) -> tensor<f64> {
 // CHECK:     scf.yield [[add]] : tensor<f64>
 // CHECK:   [[castShots:%.+]] = arith.sitofp [[shots]] : i64 to f64
 // CHECK:   [[fromElem:%.+]] = tensor.from_elements [[castShots]] : tensor<f64>
-// CHECK:   [[broadcastShots:%.+]] = stablehlo.broadcast_in_dim [[fromElem]], dims = [] : (tensor<f64>) -> tensor<f64>
-// CHECK:   [[div:%.+]] = stablehlo.divide [[totalSum]], [[broadcastShots]] : tensor<f64>
+// CHECK:   [[div:%.+]] = stablehlo.divide [[totalSum]], [[fromElem]] : tensor<f64>
 // CHECK:   return [[div]] : tensor<f64>
 
 

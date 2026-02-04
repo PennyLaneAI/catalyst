@@ -14,6 +14,8 @@
 
 #define DEBUG_TYPE "one-shot-mcm"
 
+#include <optional>
+
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
@@ -24,6 +26,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "stablehlo/dialect/StablehloOps.h"
+#include "llvm/ADT/SmallSet.h"
 
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -114,19 +117,16 @@ scf::ForOp createForLoop(IRRewriter &builder, Value shots, ValueRange loopIterAr
     return forOp;
 }
 
-void eraseAllUsers(Value v, Operation *check_erased)
+void eraseAllUsersExcept(Value v, Operation *exception)
 {
-    // Erase all users of a Value, and all users of these users, etc., in its forward slice.
-    // Also check that the operation `check_erased` is one of the erased ops.
+    // Erase all users of a Value, and all users of these users, etc., in its forward slice,
+    // except the marked exception.
 
     // We need to use a SetVector, since during the erasure we have to delete from bottom up
     // So we need an ordered container
     SetVector<Operation *> forwardSlice;
     getForwardSlice(v, &forwardSlice);
-
-    // Safety check
-    assert(forwardSlice.contains(check_erased) &&
-           "Expected the multi-shot MP of the mcm to be erased in the one-shot kernel.");
+    forwardSlice.remove(exception);
 
     for (auto op = forwardSlice.rbegin(); op != forwardSlice.rend(); ++op) {
         (*op)->erase();
@@ -138,29 +138,58 @@ void eraseAllUsers(Value v, Operation *check_erased)
 namespace catalyst {
 namespace quantum {
 
+std::optional<MeasurementProcess> getMPFromValue(Value v)
+{
+    // Get the MP operation that produces a Value v somewhere in the MP's forward slice.
+    // In other words, get the MP operations that a Value v comes from.
+    // Because an MP and the corresponding returned Value is usually not super far away, doing
+    // an entire backslice would not be ideal, since that could possibly backslice to the very
+    // beginning of a function.
+    // So we just depth-first search from the Value directly.
+
+    Operation *defOp = v.getDefiningOp();
+    if (!defOp) {
+        // Reached a block argument
+        return std::nullopt;
+    }
+
+    if (isa<MeasurementProcess>(defOp)) {
+        return cast<MeasurementProcess>(defOp);
+    }
+
+    for (Value operand : defOp->getOperands()) {
+        std::optional<MeasurementProcess> candidate = getMPFromValue(operand);
+        if (candidate.has_value()) {
+            return candidate;
+        }
+    }
+
+    return std::nullopt;
+}
+
 #define GEN_PASS_DEF_ONESHOTMCMPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
 struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
     using impl::OneShotMCMPassBase<OneShotMCMPass>::OneShotMCMPassBase;
 
-    void editKernelMCMExpval(IRRewriter &builder, func::FuncOp qfunc, quantum::MCMObsOp mcmobs)
+    void editKernelMCMExpval(IRRewriter &builder, func::FuncOp oneShotKernel,
+                             quantum::MCMObsOp mcmobs, size_t retIdx)
     {
         // If the kernel returns expval on a mcm,
         // the single-shot expval of a mcm is just the mcm boolean result itself
         // So we just cast it to the correct type and return it.
 
         OpBuilder::InsertionGuard guard(builder);
-        Location loc = qfunc->getLoc();
-
-        // Erase all users of the mcm obs: the new return does not need them.
-        eraseAllUsers(mcmobs.getObs(), qfunc.getBody().back().getTerminator());
+        Location loc = oneShotKernel->getLoc();
 
         // Cast the I1 mcm to the correct type and return it
         // MCM itself is I1
         // Expval kernel returns tensor<f64>
         // We need to cast as I1 -> I64 -> F64 -> tensor<f64>
-        builder.setInsertionPointToEnd(&qfunc.getBody().back());
+        Operation *retOp = oneShotKernel.getBody().back().getTerminator();
+        builder.setInsertionPoint(retOp);
+
         Value mcm = mcmobs.getMcm();
         auto extuiOp = builder.create<arith::ExtUIOp>(loc, builder.getI64Type(), mcm);
         auto int2floatCastOp =
@@ -168,29 +197,30 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         auto fromElementsOp = builder.create<tensor::FromElementsOp>(
             loc, RankedTensorType::get({}, builder.getF64Type()), int2floatCastOp.getResult());
 
-        builder.create<func::ReturnOp>(loc, fromElementsOp.getResult());
+        // Return the new mcm expval
+        retOp->setOperand(retIdx, fromElementsOp.getResult());
 
+        // Erase all users of the mcm obs: the new return does not need them.
+        eraseAllUsersExcept(mcmobs.getObs(), retOp);
         mcmobs->erase();
     }
 
-    void editKernelMCMProbs(IRRewriter &builder, func::FuncOp qfunc, quantum::MCMObsOp mcmobs)
+    void editKernelMCMProbs(IRRewriter &builder, func::FuncOp oneShotKernel,
+                            quantum::MCMObsOp mcmobs, size_t retIdx)
     {
         // If the kernel returns probs on a mcm,
         // the single-shot probs of the mcm is either [1,0] or [0,1]
 
         OpBuilder::InsertionGuard guard(builder);
-        Location loc = qfunc->getLoc();
-
+        Location loc = oneShotKernel->getLoc();
         Type f64Type = builder.getF64Type();
-
-        // Erase all users of the mcm obs: they new return does not need them.
-        eraseAllUsers(mcmobs.getObs(), qfunc.getBody().back().getTerminator());
 
         // Create the probs tensor and write the 1 into it
         // The location of the 1 is exactly the mcm result
         // i.e. mcm 0, probs is [1,0]
         // mcm 1, probs is [0,1]
-        builder.setInsertionPointToEnd(&qfunc.getBody().back());
+        Operation *retOp = oneShotKernel.getBody().back().getTerminator();
+        builder.setInsertionPoint(retOp);
 
         // Create zero tensor
         auto zero =
@@ -208,98 +238,66 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         auto insertedTensor = builder.create<tensor::InsertOp>(loc, one.getResult(), zeroTensor,
                                                                ValueRange{indexOp.getResult()});
 
-        builder.create<func::ReturnOp>(loc, insertedTensor.getResult());
+        retOp->setOperand(retIdx, insertedTensor.getResult());
 
+        // Erase all users of the mcm obs: they new return does not need them.
+        eraseAllUsersExcept(mcmobs.getObs(), retOp);
         mcmobs->erase();
     }
 
-    void handleExpvalOrProbsOneShot(IRRewriter &builder, func::FuncOp qfunc, MeasurementProcess mp,
-                                    Value shots, Operation *mod, bool isExpval)
+    void editKernelMCMSample(IRRewriter &builder, func::FuncOp oneShotKernel,
+                             quantum::MCMObsOp mcmobs, size_t retIdx)
     {
-        // Add the result from each shot, and divide by the number of shots.
-        // We simply perform the addition in the for loop body: no need to initialize a big
-        // empty tensor to hold all the results.
-        // This way we save some space, generate fewer ops, and also this method works for
-        // both static and dynamic shots.
+        // If the kernel returns sample on a mcm,
+        // the single-shot sample of a mcm is just the mcm boolean result itself
+        // So we just cast it to the correct type and return it.
 
         OpBuilder::InsertionGuard guard(builder);
-        Location loc = mod->getLoc();
+        Location loc = oneShotKernel->getLoc();
 
-        // If the MP is on a MCM, we need to massage the one-shot kernel a bit
-        Operation *MPSourceOp = mp.getObs().getDefiningOp();
-        if (isa<quantum::MCMObsOp>(MPSourceOp)) {
-            if (isExpval) {
-                editKernelMCMExpval(builder, qfunc, cast<quantum::MCMObsOp>(MPSourceOp));
-            }
-            else {
-                editKernelMCMProbs(builder, qfunc, cast<quantum::MCMObsOp>(MPSourceOp));
-            }
-        }
+        // Cast the I1 mcm to the correct type and return it
+        // MCM itself is I1
+        // Sample kernel returns tensor<1x1xi64>
+        Operation *retOp = oneShotKernel.getBody().back().getTerminator();
+        builder.setInsertionPoint(retOp);
 
-        Type f64Type = builder.getF64Type();
+        Value mcm = mcmobs.getMcm();
+        auto extuiOp = builder.create<arith::ExtUIOp>(loc, builder.getI64Type(), mcm);
+        auto fromElementsOp = builder.create<tensor::FromElementsOp>(
+            loc, oneShotKernel.getFunctionType().getResults()[retIdx], extuiOp.getOut());
 
-        // Each expval result is a tensor<f64>
-        // Each probs result is a tensor<blahxf64>
-        auto expvalOrProbsType = dyn_cast<ShapedType>(qfunc.getResultTypes()[0]);
+        retOp->setOperand(retIdx, fromElementsOp.getResult());
 
-        func::FuncOp qkernel = createOneShotKernel(builder, qfunc, shots, mod);
-
-        // Create the for loop.
-        // Each loop iteration adds to the total expval or probs sum.
-        builder.setInsertionPointToEnd(&qfunc.getBody().front());
-        auto expvalOrProbsSum = builder.create<stablehlo::ConstantOp>(
-            loc, expvalOrProbsType,
-            DenseElementsAttr::get(expvalOrProbsType, builder.getFloatAttr(f64Type, 0)));
-        scf::ForOp newForOp = createForLoop(builder, shots, ValueRange{expvalOrProbsSum});
-
-        // Each loop iteration calls the one-shot kernel and adds to the sum
-        // Since the kernel was a clone of the original qfunc, their arguments are the same!
-        builder.setInsertionPointToEnd(newForOp.getBody());
-        auto kernalCallOp = builder.create<func::CallOp>(
-            loc, qkernel.getFunctionType().getResults(), qkernel.getSymName(),
-            qfunc.getBody().front().getArguments());
-
-        auto addOp = builder.create<stablehlo::AddOp>(loc, kernalCallOp.getResult(0),
-                                                      newForOp.getRegionIterArg(0));
-
-        builder.create<scf::YieldOp>(loc, addOp.getResult());
-
-        // Divide and return
-        builder.setInsertionPointToEnd(&qfunc.getBody().front());
-
-        // shots Value is I64, need to turn into tensor<f64> then broadcast for division
-        auto int2floatCastOp = builder.create<arith::SIToFPOp>(loc, f64Type, shots);
-        auto shotsFromElementsOp = builder.create<tensor::FromElementsOp>(
-            loc, RankedTensorType::get({}, f64Type), int2floatCastOp.getResult());
-
-        // TODO: no need to broadcast if it's expval
-        auto broadcastedShots = builder.create<stablehlo::BroadcastInDimOp>(
-            loc, expvalOrProbsType, shotsFromElementsOp.getResult(),
-            builder.getDenseI64ArrayAttr({}));
-
-        auto divOp = builder.create<stablehlo::DivOp>(loc, newForOp->getResult(0),
-                                                      broadcastedShots->getResult(0));
-        builder.create<func::ReturnOp>(loc, divOp.getResult());
+        // Erase all users of the mcm obs: the new return does not need them.
+        eraseAllUsersExcept(mcmobs.getObs(), retOp);
+        mcmobs->erase();
     }
 
-    SmallVector<int64_t> editKernelSampleShapes(func::FuncOp qkernel, ShapedType fullSampleType)
+    SmallVector<int64_t> editKernelSampleShapes(func::FuncOp oneShotKernel,
+                                                ShapedType fullSampleType,
+                                                quantum::SampleOp sampleOp, size_t retIdx)
     {
         // Change the one-shot kernel's sample op, and its users, to return one-shot shaped results
 
         SmallVector<int64_t> oneShotSampleShape = {1, fullSampleType.getShape()[1]};
         auto oneShotSampleType =
             RankedTensorType::get(oneShotSampleShape, fullSampleType.getElementType());
-        qkernel.setFunctionType(FunctionType::get(
-            qkernel->getContext(), qkernel.getFunctionType().getInputs(), {oneShotSampleType}));
+
+        auto oldFunctionType = oneShotKernel.getFunctionType();
+        SmallVector<Type> oneShotKernelOutTypes(
+            oldFunctionType.getResults().begin(),
+            oldFunctionType.getResults().end()); // getFunctionType() returns ArrayRef
+        oneShotKernelOutTypes[retIdx] = oneShotSampleType;
+        oneShotKernel.setFunctionType(FunctionType::get(
+            oneShotKernel->getContext(), oldFunctionType.getInputs(), oneShotKernelOutTypes));
 
         // Start from the sample op, and visit down the operand chain until the return op
-        auto sampleOp = *qkernel.getOps<quantum::SampleOp>().begin();
         SetVector<Operation *> sampleOpForwardSlice;
         getForwardSlice(sampleOp, &sampleOpForwardSlice);
         sampleOpForwardSlice.insert(sampleOp);
 
         // Safety check: since we edited the function type, we must also edit the return
-        auto retOp = cast<func::ReturnOp>(qkernel.getBody().back().getTerminator());
+        auto retOp = cast<func::ReturnOp>(oneShotKernel.getBody().back().getTerminator());
         assert(sampleOpForwardSlice.contains(retOp) &&
                "Expected the quantum kernel to return the samples");
 
@@ -315,203 +313,258 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
         return oneShotSampleShape;
     }
 
-    void editKernelMCMSample(IRRewriter &builder, func::FuncOp qkernel, quantum::MCMObsOp mcmobs)
-    {
-        // If the kernel returns sample on a mcm,
-        // the single-shot sample of a mcm is just the mcm boolean result itself
-        // So we just cast it to the correct type and return it.
-
-        OpBuilder::InsertionGuard guard(builder);
-        Location loc = qkernel->getLoc();
-
-        // Erase all users of the mcm obs: the new return does not need them.
-        eraseAllUsers(mcmobs.getObs(), qkernel.getBody().back().getTerminator());
-
-        // Cast the I1 mcm to the correct type and return it
-        // MCM itself is I1
-        // Sample kernel returns tensor<1x1xi64>
-        builder.setInsertionPointToEnd(&qkernel.getBody().back());
-        Value mcm = mcmobs.getMcm();
-        auto extuiOp = builder.create<arith::ExtUIOp>(loc, builder.getI64Type(), mcm);
-        auto fromElementsOp = builder.create<tensor::FromElementsOp>(
-            loc, qkernel.getFunctionType().getResults()[0], extuiOp.getOut());
-
-        builder.create<func::ReturnOp>(loc, fromElementsOp.getResult());
-
-        mcmobs->erase();
-    }
-
-    void handleSampleOneShot(IRRewriter &builder, func::FuncOp qfunc, Value shots, Operation *mod)
-    {
-        // Total sample is the sample of each shot concatenated together.
-        // We initialize an empty tensor, then insert sample results of each shot
-        // Sample's return shape is tensor<shots X num_qubits>
-
-        OpBuilder::InsertionGuard guard(builder);
-        Location loc = mod->getLoc();
-
-        auto fullSampleType = dyn_cast<ShapedType>(qfunc.getResultTypes()[0]);
-        assert(fullSampleType.getShape().size() == 2 &&
-               "Expected sample result type to be a tensor of size shot X num_qubits");
-
-        // Create one shot quantum kernel, and change the shot dimension in sample's return shape to
-        // one
-        func::FuncOp qkernel = createOneShotKernel(builder, qfunc, shots, mod);
-        SmallVector<int64_t> oneShotSampleShape = editKernelSampleShapes(qkernel, fullSampleType);
-
-        // If the sample MP is on a MCM, we need to massage the one-shot kernel a bit
-        auto kernelSampleOp = *qkernel.getOps<quantum::SampleOp>().begin();
-        Operation *MPSourceOp = kernelSampleOp.getObs().getDefiningOp();
-        if (isa<quantum::MCMObsOp>(MPSourceOp)) {
-            editKernelMCMSample(builder, qkernel, cast<quantum::MCMObsOp>(MPSourceOp));
-        }
-
-        // Create the for loop.
-        // Each loop iteration inserts its sample to the total sample result tensor.
-        builder.setInsertionPointToEnd(&qfunc.getBody().front());
-        auto fullSampleResults = builder.create<tensor::EmptyOp>(loc, fullSampleType.getShape(),
-                                                                 fullSampleType.getElementType());
-        scf::ForOp newForOp = createForLoop(builder, shots, ValueRange{fullSampleResults});
-
-        // Each loop iteration calls the one-shot kernel and adds to the sum
-        // Since the kernel was a clone of the original qfunc, their arguments are the same!
-        builder.setInsertionPointToEnd(newForOp.getBody());
-        auto kernalCallOp = builder.create<func::CallOp>(
-            loc, qkernel.getFunctionType().getResults(), qkernel.getSymName(),
-            qfunc.getBody().front().getArguments());
-
-        auto zero = builder.getIndexAttr(0);
-        auto one = builder.getIndexAttr(1);
-        SmallVector<OpFoldResult> offsets = {newForOp.getInductionVar(), zero};
-        SmallVector<OpFoldResult> sizes = {builder.getIndexAttr(oneShotSampleShape[0]),
-                                           builder.getIndexAttr(oneShotSampleShape[1])};
-        SmallVector<OpFoldResult> strides = {one, one};
-
-        auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
-            loc, kernalCallOp.getResult(0), newForOp.getRegionIterArg(0), offsets, sizes, strides);
-
-        builder.create<scf::YieldOp>(loc, insertSliceOp.getResult());
-
-        // Return the full samples
-        builder.setInsertionPointToEnd(&qfunc.getBody().front());
-        builder.create<func::ReturnOp>(loc, newForOp.getResult(0));
-    }
-
-    void handleCountsOneShot(IRRewriter &builder, func::FuncOp qfunc, Value shots, Operation *mod)
-    {
-        // Add the counts from each shot
-        // Very similar to expval and probs, but with two differences
-        // First of all, counts kernel returns 2 result values instead of 1, so the loop yields
-        // two results from the kernel call
-        // Second of all, counts does not need a division at the end
-
-        OpBuilder::InsertionGuard guard(builder);
-        Location loc = mod->getLoc();
-
-        auto eigensType = dyn_cast<ShapedType>(qfunc.getResultTypes()[0]);
-        auto countsType = dyn_cast<ShapedType>(qfunc.getResultTypes()[1]);
-
-        func::FuncOp qkernel = createOneShotKernel(builder, qfunc, shots, mod);
-
-        // Create the for loop.
-        // Each loop iteration adds to the total counts.
-        // counts return type is <blah x i64>, for both eigens and counts
-        builder.setInsertionPointToEnd(&qfunc.getBody().front());
-        auto countsSum = builder.create<stablehlo::ConstantOp>(
-            loc, countsType,
-            DenseElementsAttr::get(countsType, builder.getIntegerAttr(builder.getI64Type(), 0)));
-
-        // We also need to yield the eigens from the kernel call inside the loop body
-        // However, this requires the loop to have an iteration argument for the eigens tensor
-        // We just initialize an empty one.
-        auto eigensPlaceholder = builder.create<tensor::EmptyOp>(loc, eigensType.getShape(),
-                                                                 eigensType.getElementType());
-        scf::ForOp newForOp =
-            createForLoop(builder, shots, ValueRange{eigensPlaceholder, countsSum});
-
-        // Each loop iteration calls the one-shot kernel and adds to the sum
-        // Since the kernel was a clone of the original qfunc, their arguments are the same!
-        builder.setInsertionPointToEnd(newForOp.getBody());
-        auto kernalCallOp = builder.create<func::CallOp>(
-            loc, qkernel.getFunctionType().getResults(), qkernel.getSymName(),
-            qfunc.getBody().front().getArguments());
-
-        auto addOp = builder.create<stablehlo::AddOp>(loc, kernalCallOp.getResult(1),
-                                                      newForOp.getRegionIterArg(1));
-
-        // Eigens are the same every loop iteration, so just yield it, no need to do anything
-        builder.create<scf::YieldOp>(loc, ValueRange{kernalCallOp.getResult(0), addOp.getResult()});
-
-        // Return the results
-        builder.setInsertionPointToEnd(&qfunc.getBody().front());
-        builder.create<func::ReturnOp>(loc, newForOp.getResults());
-    }
-
     void runOnOperation() override
     {
         Operation *mod = getOperation();
+        Location loc = mod->getLoc();
         IRRewriter builder(mod->getContext());
 
-        bool illegalMP = false, isExpval = false, isProbs = false, isSample = false,
-             isCounts = false;
-        func::FuncOp qfunc;
-        MeasurementProcess mp;
+        Type f64Type = builder.getF64Type();
+
+        // Collect all qnode functions.
+        // We find qnode functions by identifying the parent function ops of MPs
+        SetVector<func::FuncOp> qnodeFuncs;
         mod->walk([&](MeasurementProcess _mp) {
-            if (isa<quantum::ExpvalOp>(_mp)) {
-                isExpval = true;
-                qfunc = _mp->getParentOfType<func::FuncOp>();
-                mp = _mp;
-            }
-            else if (isa<quantum::ProbsOp>(_mp)) {
-                isProbs = true;
-                qfunc = _mp->getParentOfType<func::FuncOp>();
-                mp = _mp;
-            }
-            else if (isa<quantum::SampleOp>(_mp)) {
-                isSample = true;
-                qfunc = _mp->getParentOfType<func::FuncOp>();
-                mp = _mp;
-            }
-            else if (isa<quantum::CountsOp>(_mp)) {
-                isCounts = true;
-                qfunc = _mp->getParentOfType<func::FuncOp>();
-                mp = _mp;
-            }
-            else if (isa<quantum::VarianceOp>(_mp)) {
-                _mp->emitOpError(
-                    "VarianceOp is not currently supported for conversion to one-shot MCM.");
-                illegalMP = true;
-            }
-            else if (isa<quantum::StateOp>(_mp)) {
-                _mp->emitOpError("StateOp is not compatible with shot-based execution, and has no "
-                                 "valid conversion to one-shot MCM.");
-                illegalMP = true;
-            }
-            return WalkResult::interrupt();
+            qnodeFuncs.insert(_mp->getParentOfType<func::FuncOp>());
         });
 
-        if (illegalMP) {
-            return signalPassFailure();
-        }
+        // For each qnode function, find the returned MPs
+        // Then handle the one shot logic for each MP type
+        for (auto qnodeFunc : qnodeFuncs) {
+            // Get the shots SSA value. It is an operand to the device init op.
+            auto deviceInitOp = *qnodeFunc.getOps<quantum::DeviceInitOp>().begin();
+            Value shots = deviceInitOp.getShots();
 
-        size_t numReturns = isCounts ? 2 : 1;
-        assert(qfunc.getResultTypes().size() == numReturns &&
-               "Multiple terminal MPs not yet supported in one shot transform");
+            // Clone the qnode function and give it a new name.
+            // Because we need to make sure the current qfunc name is reserved as entry point
+            // Set the number of shots in the new kernel to one.
+            // Also clear the original qnode function. Its new contents will be the one-shot logic.
+            // Keep the SSA value for the shots. It needs to be used as the upper bound of the for
+            // loop.
+            func::FuncOp oneShotKernel = createOneShotKernel(builder, qnodeFunc, shots, mod);
 
-        // Get the shots SSA value. It is an operand to the device init op.
-        auto deviceInitOp = *qfunc.getOps<quantum::DeviceInitOp>().begin();
-        Value shots = deviceInitOp.getShots();
+            // Create the for loop
+            // Depending on the MP, the for loop might need some iteration arguments
+            Operation *retOp = oneShotKernel.getBody().back().getTerminator();
+            assert(isa<func::ReturnOp>(retOp) && "Expected a qnode function to return values");
 
-        if (isExpval || isProbs) {
-            handleExpvalOrProbsOneShot(builder, qfunc, mp, shots, mod, isExpval);
+            SmallVector<MeasurementProcess> qnodeMPs;
+            for (Value returnValue : retOp->getOperands()) {
+                qnodeMPs.push_back(*getMPFromValue(returnValue));
+            }
+            llvm::SmallSet<quantum::CountsOp, 8> handledCountsOps;
+
+            builder.setInsertionPointToEnd(&qnodeFunc.getBody().front());
+            SmallVector<Value> loopIterArgs;
+            SmallVector<std::string> loopIterArgsMPKinds;
+
+            SmallVector<int64_t> oneShotSampleShape;
+
+            for (auto [i, _mp] : llvm::enumerate(qnodeMPs)) {
+                // llvm::enumerate() marks the iterators with const
+                auto mp = const_cast<catalyst::quantum::MeasurementProcess &>(_mp);
+
+                if (isa<quantum::StateOp>(mp)) {
+                    mp->emitOpError(
+                        "StateOp is not compatible with shot-based execution, and has no "
+                        "valid conversion to one-shot MCM.");
+                    return signalPassFailure();
+                }
+
+                else if (isa<quantum::VarianceOp>(mp)) {
+                    mp->emitOpError(
+                        "VarianceOp is not currently supported for conversion to one-shot MCM.");
+                    return signalPassFailure();
+                }
+
+                else if (isa<quantum::ExpvalOp>(mp)) {
+
+                    // The one shot kernel itself might need some massaging if the MP is on a MCM.
+                    Operation *MPSourceOp = mp.getObs().getDefiningOp();
+                    if (isa<quantum::MCMObsOp>(MPSourceOp)) {
+                        editKernelMCMExpval(builder, oneShotKernel,
+                                            cast<quantum::MCMObsOp>(MPSourceOp), i);
+                    }
+
+                    // Each expval result is a tensor<f64>
+                    auto expvalType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[i]);
+                    auto expvalSum = builder.create<stablehlo::ConstantOp>(
+                        loc, expvalType,
+                        DenseElementsAttr::get(expvalType, builder.getFloatAttr(f64Type, 0)));
+                    loopIterArgs.push_back(expvalSum);
+                    loopIterArgsMPKinds.push_back("expval");
+                }
+
+                else if (isa<quantum::ProbsOp>(mp)) {
+
+                    // The one shot kernel itself might need some massaging if the MP is on a MCM.
+                    Operation *MPSourceOp = mp.getObs().getDefiningOp();
+                    if (isa<quantum::MCMObsOp>(MPSourceOp)) {
+                        editKernelMCMProbs(builder, oneShotKernel,
+                                           cast<quantum::MCMObsOp>(MPSourceOp), i);
+                    }
+
+                    // Each probs result is a tensor<blahxf64>
+                    auto probsType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[i]);
+                    auto probsSum = builder.create<stablehlo::ConstantOp>(
+                        loc, probsType,
+                        DenseElementsAttr::get(probsType, builder.getFloatAttr(f64Type, 0)));
+                    loopIterArgs.push_back(probsSum);
+                    loopIterArgsMPKinds.push_back("probs");
+                }
+
+                else if (isa<quantum::SampleOp>(mp)) {
+
+                    auto fullSampleType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[i]);
+                    assert(fullSampleType.getShape().size() == 2 &&
+                           "Expected sample result type to be a tensor of size shot X num_qubits");
+
+                    oneShotSampleShape = editKernelSampleShapes(oneShotKernel, fullSampleType,
+                                                                cast<quantum::SampleOp>(mp), i);
+
+                    // If the sample MP is on a MCM, we need to massage the one-shot kernel a bit
+                    Operation *MPSourceOp = mp.getObs().getDefiningOp();
+                    if (isa<quantum::MCMObsOp>(MPSourceOp)) {
+                        editKernelMCMSample(builder, oneShotKernel,
+                                            cast<quantum::MCMObsOp>(MPSourceOp), i);
+                    }
+                    auto fullSampleResults = builder.create<tensor::EmptyOp>(
+                        loc, fullSampleType.getShape(), fullSampleType.getElementType());
+
+                    loopIterArgs.push_back(fullSampleResults);
+                    loopIterArgsMPKinds.push_back("sample");
+                }
+
+                else if (isa<quantum::CountsOp>(mp)) {
+                    if (!handledCountsOps.contains(cast<quantum::CountsOp>(mp))) {
+                        auto eigensType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[i]);
+                        auto countsType =
+                            dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[i + 1]);
+
+                        auto countsSum = builder.create<stablehlo::ConstantOp>(
+                            loc, countsType,
+                            DenseElementsAttr::get(
+                                countsType, builder.getIntegerAttr(builder.getI64Type(), 0)));
+
+                        // We also need to yield the eigens from the kernel call inside the loop
+                        // body However, this requires the loop to have an iteration argument for
+                        // the eigens tensor We just initialize an empty one.
+                        auto eigensPlaceholder = builder.create<tensor::EmptyOp>(
+                            loc, eigensType.getShape(), eigensType.getElementType());
+
+                        loopIterArgs.push_back(eigensPlaceholder);
+                        loopIterArgs.push_back(countsSum);
+                        loopIterArgsMPKinds.push_back("eigens");
+                        loopIterArgsMPKinds.push_back("counts");
+                        handledCountsOps.insert(cast<quantum::CountsOp>(mp));
+                    }
+                }
+            }
+            scf::ForOp forOp = createForLoop(builder, shots, loopIterArgs);
+
+            // Each loop iteration calls the one-shot kernel
+            // Since the kernel was a clone of the original qfunc, their arguments are the same!
+            builder.setInsertionPointToEnd(forOp.getBody());
+            auto kernalCallOp = builder.create<func::CallOp>(
+                loc, oneShotKernel.getFunctionType().getResults(), oneShotKernel.getSymName(),
+                qnodeFunc.getBody().front().getArguments());
+
+            // Perform each MP's necessary handling inside the loop body
+            SmallVector<Value> loopYields;
+            for (auto [i, mpKind] : llvm::enumerate(loopIterArgsMPKinds)) {
+
+                if (mpKind == "expval") {
+                    // Add the expval from each iteration
+                    auto addOp = builder.create<stablehlo::AddOp>(loc, kernalCallOp.getResult(i),
+                                                                  forOp.getRegionIterArg(i));
+                    loopYields.push_back(addOp.getResult());
+                }
+
+                else if (mpKind == "probs") {
+                    // Add the probs from each iteration
+                    auto addOp = builder.create<stablehlo::AddOp>(loc, kernalCallOp.getResult(i),
+                                                                  forOp.getRegionIterArg(i));
+                    loopYields.push_back(addOp.getResult());
+                }
+
+                else if (mpKind == "sample") {
+                    // Insert the one shot kernel's sample into the full sample result tensor
+                    auto zero = builder.getIndexAttr(0);
+                    auto one = builder.getIndexAttr(1);
+                    SmallVector<OpFoldResult> offsets = {forOp.getInductionVar(), zero};
+                    SmallVector<OpFoldResult> sizes = {builder.getIndexAttr(oneShotSampleShape[0]),
+                                                       builder.getIndexAttr(oneShotSampleShape[1])};
+                    SmallVector<OpFoldResult> strides = {one, one};
+
+                    auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
+                        loc, kernalCallOp.getResult(i), forOp.getRegionIterArg(i), offsets, sizes,
+                        strides);
+
+                    loopYields.push_back(insertSliceOp.getResult());
+                }
+
+                else if (mpKind == "eigens") {
+                    loopYields.push_back(kernalCallOp.getResult(i));
+                }
+
+                else if (mpKind == "counts") {
+                    auto addOp = builder.create<stablehlo::AddOp>(loc, kernalCallOp.getResult(i),
+                                                                  forOp.getRegionIterArg(i));
+                    loopYields.push_back(addOp.getResult());
+                }
+            }
+
+            builder.create<scf::YieldOp>(loc, loopYields);
+
+            // Perform each MP's necessary handling outside the loop body
+            builder.setInsertionPointToEnd(&qnodeFunc.getBody().front());
+            SmallVector<Value> retVals;
+            for (auto [i, mpKind] : llvm::enumerate(loopIterArgsMPKinds)) {
+
+                if (mpKind == "expval") {
+                    // Divide the sum by shots
+                    // shots Value is I64, need to turn into tensor<f64> for division
+                    auto int2floatCastOp = builder.create<arith::SIToFPOp>(loc, f64Type, shots);
+                    auto shotsFromElementsOp = builder.create<tensor::FromElementsOp>(
+                        loc, RankedTensorType::get({}, f64Type), int2floatCastOp.getResult());
+
+                    auto divOp = builder.create<stablehlo::DivOp>(loc, forOp->getResult(i),
+                                                                  shotsFromElementsOp.getResult());
+                    retVals.push_back(divOp.getResult());
+                }
+
+                else if (mpKind == "probs") {
+                    // Divide the sum by shots
+                    // shots Value is I64, need to turn into tensor<f64> and then broadcast for
+                    // division
+                    auto int2floatCastOp = builder.create<arith::SIToFPOp>(loc, f64Type, shots);
+                    auto shotsFromElementsOp = builder.create<tensor::FromElementsOp>(
+                        loc, RankedTensorType::get({}, f64Type), int2floatCastOp.getResult());
+
+                    auto probsType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[i]);
+                    auto broadcastedShots = builder.create<stablehlo::BroadcastInDimOp>(
+                        loc, probsType, shotsFromElementsOp.getResult(),
+                        builder.getDenseI64ArrayAttr({}));
+
+                    auto divOp = builder.create<stablehlo::DivOp>(loc, forOp->getResult(i),
+                                                                  broadcastedShots.getResult());
+                    retVals.push_back(divOp.getResult());
+                }
+
+                else if (mpKind == "sample") {
+                    retVals.push_back(forOp->getResult(i));
+                }
+                else if (mpKind == "eigens") {
+                    retVals.push_back(forOp->getResult(i));
+                }
+                else if (mpKind == "counts") {
+                    retVals.push_back(forOp->getResult(i));
+                }
+            }
+
+            builder.create<func::ReturnOp>(loc, retVals);
         }
-        else if (isSample) {
-            handleSampleOneShot(builder, qfunc, shots, mod);
-        }
-        else if (isCounts) {
-            handleCountsOneShot(builder, qfunc, shots, mod);
-        }
-    }
+    } // runOnOperation()
 };
 
 } // namespace quantum
