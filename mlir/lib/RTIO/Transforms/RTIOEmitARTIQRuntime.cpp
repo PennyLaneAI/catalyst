@@ -104,7 +104,7 @@ struct RTIOEmitARTIQRuntimePass
 
         // Create entry function: void @__modinit__(ptr %self)
         auto modinitTy = LLVM::LLVMFunctionType::get(voidTy, {ptrTy});
-        auto modinitFunc = builder.create<LLVM::LLVMFuncOp>(loc, ARTIQRuntime::modinit, modinitTy);
+        auto modinitFunc = LLVM::LLVMFuncOp::create(builder, loc, ARTIQRuntime::modinit, modinitTy);
         modinitFunc.setLinkage(LLVM::Linkage::External);
 
         // Set personality function for exception handling
@@ -121,26 +121,26 @@ struct RTIOEmitARTIQRuntimePass
         for (Type argTy : kernelFuncTy.getParams()) {
             // Create zero/null values for each argument type
             if (isa<LLVM::LLVMPointerType>(argTy)) {
-                callArgs.push_back(builder.create<LLVM::ZeroOp>(loc, ptrTy));
+                callArgs.push_back(LLVM::ZeroOp::create(builder, loc, ptrTy));
             }
             else if (argTy.isInteger(64)) {
                 callArgs.push_back(
-                    builder.create<LLVM::ConstantOp>(loc, i64Ty, builder.getI64IntegerAttr(0)));
+                    LLVM::ConstantOp::create(builder, loc, i64Ty, builder.getI64IntegerAttr(0)));
             }
             else if (argTy.isInteger(32)) {
                 callArgs.push_back(
-                    builder.create<LLVM::ConstantOp>(loc, i32Ty, builder.getI32IntegerAttr(0)));
+                    LLVM::ConstantOp::create(builder, loc, i32Ty, builder.getI32IntegerAttr(0)));
             }
             else {
                 // For other types, use null pointer as fallback
-                callArgs.push_back(builder.create<LLVM::ZeroOp>(loc, ptrTy));
+                callArgs.push_back(LLVM::ZeroOp::create(builder, loc, ptrTy));
             }
         }
 
-        auto callOp = builder.create<LLVM::CallOp>(loc, kernelFunc, callArgs);
+        auto callOp = LLVM::CallOp::create(builder, loc, kernelFunc, callArgs);
         callOp.setTailCallKind(LLVM::TailCallKind::Tail);
 
-        builder.create<LLVM::ReturnOp>(loc, ValueRange{});
+        LLVM::ReturnOp::create(builder, loc, ValueRange{});
 
         return success();
     }
@@ -154,8 +154,8 @@ struct RTIOEmitARTIQRuntimePass
 
         Type i32Ty = IntegerType::get(builder.getContext(), 32);
         auto personalityTy = LLVM::LLVMFunctionType::get(i32Ty, {}, /*isVarArg=*/true);
-        builder.create<LLVM::LLVMFuncOp>(loc, ARTIQRuntime::artiqPersonality, personalityTy,
-                                         LLVM::Linkage::External);
+        LLVM::LLVMFuncOp::create(builder, loc, ARTIQRuntime::artiqPersonality, personalityTy,
+                                 LLVM::Linkage::External);
     }
 };
 
