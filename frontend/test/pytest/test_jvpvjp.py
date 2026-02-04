@@ -896,7 +896,7 @@ def test_jvp_argument_type_checks_incompatible_n_inputs(diff_method):
 
     with pytest.raises(
         TypeError,
-        match=("number of tangent and number of differentiable parameters in"),
+        match=("number of tangents and number of differentiable parameters in"),
     ):
 
         @qjit

@@ -458,7 +458,7 @@ def jvp(f: Callable, params, tangents, *, method=None, h=None, argnums=None):
 
         if len(tangents_flatten) != len(grad_params.expanded_argnums):
             raise TypeError(
-                "number of tangent and number of differentiable parameters in catalyst.jvp do not "
+                "number of tangents and number of differentiable parameters in catalyst.jvp do not "
                 "match; the number of parameters must be equal. "
                 f"Got {len(grad_params.expanded_argnums)} differentiable parameters and so expected "
                 f"as many tangents, but got {len(tangents_flatten)} instead."
