@@ -90,23 +90,24 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
             bool isTensor = isa<RankedTensorType>(coeffsType);
 
             for (int64_t i = 0; i < numTerms; i++) {
-                Value idx = builder.create<arith::ConstantIndexOp>(loc, i);
+                Value idx = arith::ConstantIndexOp::create(builder, loc, i);
 
                 Value coeff;
                 if (isTensor) {
-                    coeff = builder.create<tensor::ExtractOp>(loc, coeffs, ValueRange{idx});
+                    coeff = tensor::ExtractOp::create(builder, loc, coeffs, ValueRange{idx});
                 }
                 else {
-                    coeff = builder.create<memref::LoadOp>(loc, coeffs, ValueRange{idx});
+                    coeff = memref::LoadOp::create(builder, loc, coeffs, ValueRange{idx});
                 }
 
-                Value coeffTensor = builder.create<tensor::FromElementsOp>(
-                    loc, RankedTensorType::get({}, builder.getF64Type()), ValueRange{coeff});
+                Value coeffTensor = tensor::FromElementsOp::create(
+                    builder, loc, RankedTensorType::get({}, builder.getF64Type()),
+                    ValueRange{coeff});
 
                 Value finalCoeff;
                 if (coeffMultiplier) {
                     finalCoeff =
-                        builder.create<stablehlo::MulOp>(loc, coeffMultiplier, coeffTensor);
+                        stablehlo::MulOp::create(builder, loc, coeffMultiplier, coeffTensor);
                 }
                 else {
                     finalCoeff = coeffTensor;
@@ -117,9 +118,9 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
         }
         else {
             if (!coeffMultiplier) {
-                Value one = builder.create<arith::ConstantOp>(loc, builder.getF64FloatAttr(1.0));
-                coeffMultiplier = builder.create<tensor::FromElementsOp>(
-                    loc, RankedTensorType::get({}, builder.getF64Type()), ValueRange{one});
+                Value one = arith::ConstantOp::create(builder, loc, builder.getF64FloatAttr(1.0));
+                coeffMultiplier = tensor::FromElementsOp::create(
+                    builder, loc, RankedTensorType::get({}, builder.getF64Type()), ValueRange{one});
             }
             coefficients.push_back(coeffMultiplier);
         }
@@ -154,7 +155,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
         SmallVector<Value> weightedExpvals;
         for (size_t i = 0; i < expvalResults.size(); i++) {
             Value weighted =
-                builder.create<stablehlo::MulOp>(loc, coefficients[i], expvalResults[i]);
+                stablehlo::MulOp::create(builder, loc, coefficients[i], expvalResults[i]);
             weightedExpvals.push_back(weighted);
         }
 
@@ -170,20 +171,20 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
 
         SmallVector<Value> broadcastedValues;
         for (Value v : weightedExpvals) {
-            Value broadcasted = builder.create<stablehlo::BroadcastInDimOp>(
-                loc, tensor1xf64Type, v, builder.getDenseI64ArrayAttr({}));
+            Value broadcasted = stablehlo::BroadcastInDimOp::create(
+                builder, loc, tensor1xf64Type, v, builder.getDenseI64ArrayAttr({}));
             broadcastedValues.push_back(broadcasted);
         }
 
-        Value concatenated = builder.create<stablehlo::ConcatenateOp>(
-            loc, tensorNxf64Type, broadcastedValues, /*dimension=*/0);
+        Value concatenated = stablehlo::ConcatenateOp::create(builder, loc, tensorNxf64Type,
+                                                              broadcastedValues, /*dimension=*/0);
 
         auto zeroAttr = DenseElementsAttr::get(RankedTensorType::get({}, builder.getF64Type()),
                                                builder.getF64FloatAttr(0.0).getValue());
-        Value zero = builder.create<stablehlo::ConstantOp>(loc, zeroAttr);
+        Value zero = stablehlo::ConstantOp::create(builder, loc, zeroAttr);
 
-        auto reduceOp = builder.create<stablehlo::ReduceOp>(
-            loc, TypeRange{RankedTensorType::get({}, builder.getF64Type())},
+        auto reduceOp = stablehlo::ReduceOp::create(
+            builder, loc, TypeRange{RankedTensorType::get({}, builder.getF64Type())},
             ValueRange{concatenated}, ValueRange{zero}, builder.getDenseI64ArrayAttr({0}));
 
         {
@@ -194,9 +195,9 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
             reduceBody->addArgument(scalarF64Type, loc);
 
             builder.setInsertionPointToStart(reduceBody);
-            Value addResult = builder.create<stablehlo::AddOp>(loc, reduceBody->getArgument(0),
-                                                               reduceBody->getArgument(1));
-            builder.create<stablehlo::ReturnOp>(loc, ValueRange{addResult});
+            Value addResult = stablehlo::AddOp::create(builder, loc, reduceBody->getArgument(0),
+                                                       reduceBody->getArgument(1));
+            stablehlo::ReturnOp::create(builder, loc, ValueRange{addResult});
         }
 
         return reduceOp.getResult(0);
@@ -289,14 +290,16 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
                 if (isIdentityObservable(leaf)) {
                     // Identity expval is always 1.0
                     Value one =
-                        builder.create<arith::ConstantOp>(loc, builder.getF64FloatAttr(1.0));
-                    tensor = builder.create<tensor::FromElementsOp>(
-                        loc, RankedTensorType::get({}, builder.getF64Type()), ValueRange{one});
+                        arith::ConstantOp::create(builder, loc, builder.getF64FloatAttr(1.0));
+                    tensor = tensor::FromElementsOp::create(
+                        builder, loc, RankedTensorType::get({}, builder.getF64Type()),
+                        ValueRange{one});
                 }
                 else {
-                    Value expval = builder.create<ExpvalOp>(loc, builder.getF64Type(), leaf);
-                    tensor = builder.create<tensor::FromElementsOp>(
-                        loc, RankedTensorType::get({}, builder.getF64Type()), ValueRange{expval});
+                    Value expval = ExpvalOp::create(builder, loc, builder.getF64Type(), leaf);
+                    tensor = tensor::FromElementsOp::create(
+                        builder, loc, RankedTensorType::get({}, builder.getF64Type()),
+                        ValueRange{expval});
                 }
                 newExpvalTensors.push_back(tensor);
             }
@@ -345,7 +348,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
         }
 
         OpBuilder returnBuilder(quantumReturnOp);
-        returnBuilder.create<func::ReturnOp>(quantumReturnOp.getLoc(), newReturnValues);
+        func::ReturnOp::create(returnBuilder, quantumReturnOp.getLoc(), newReturnValues);
         quantumReturnOp.erase();
 
         auto quantumFuncType =
@@ -439,8 +442,8 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
             }
         }
 
-        auto callOp = builder.create<func::CallOp>(loc, quantumFunc.getName(),
-                                                   mappingInfo.newReturnTypes, callArgs);
+        auto callOp = func::CallOp::create(builder, loc, quantumFunc.getName(),
+                                           mappingInfo.newReturnTypes, callArgs);
 
         // Post-processing:
         // For Hamiltonian results: collect coefficients and compute weighted sum
@@ -474,7 +477,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
             }
         }
 
-        builder.create<func::ReturnOp>(origReturnOp.getLoc(), finalResults);
+        func::ReturnOp::create(builder, origReturnOp.getLoc(), finalResults);
         origReturnOp.erase();
 
         // Clean up dead ops before the call

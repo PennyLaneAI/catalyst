@@ -34,6 +34,7 @@ from catalyst.passes import apply_pass
         ],
     ],
 )
+@pytest.mark.usefixtures("use_both_frontend")
 def test_split_to_single_terms_integration(hamiltonian):
     """
     Test that split-to-single-terms pass produces the same results as
@@ -48,12 +49,20 @@ def test_split_to_single_terms_integration(hamiltonian):
     @apply_pass("split-to-single-terms")
     @qml.qnode(dev)
     def circ1():
+        # Add rotations to make observables non-zero
+        qml.RY(0.5, wires=0)
+        qml.RX(0.3, wires=1)
+        qml.RZ(0.7, wires=2)
         return qml.expval(hamiltonian_obs), qml.expval(qml.Z(1))
 
     # Manual implementation: split into individual terms and compute weighted sum
     @qjit
     @qml.qnode(dev)
     def circ2():
+        # Add same rotations to make observables non-zero
+        qml.RY(0.5, wires=0)
+        qml.RX(0.3, wires=1)
+        qml.RZ(0.7, wires=2)
         return (
             qml.expval(qml.Z(0)),
             qml.expval(qml.X(1)),
@@ -65,6 +74,10 @@ def test_split_to_single_terms_integration(hamiltonian):
         term1, term2, term3, term4 = circ2()
         # Compute weighted sum using the post-processing function
         return post_process_fn(term1, term2, term3), term4
+
+    # Validate that the pass was applied
+    assert "hamiltonian" in circ1.mlir
+    assert "hamiltonian" not in circ1.mlir_opt
 
     # Compare results
     result1 = circ1()
@@ -83,16 +96,25 @@ def test_split_to_single_terms_with_tensor_product():
     @apply_pass("split-to-single-terms")
     @qml.qnode(dev)
     def circ1():
+        qml.RY(0.4, wires=0)
+        qml.RX(0.6, wires=1)
+        qml.RZ(0.8, wires=2)
         return qml.expval(2 * (qml.Z(0) @ qml.X(1)) + 3 * qml.Y(2)), qml.expval(qml.Z(1))
 
     @qjit
     @qml.qnode(dev)
     def circ2():
+        qml.RY(0.4, wires=0)
+        qml.RX(0.6, wires=1)
+        qml.RZ(0.8, wires=2)
         return qml.expval(qml.Z(0) @ qml.X(1)), qml.expval(qml.Y(2)), qml.expval(qml.Z(1))
 
     def post_processing():
         term1, term2, term3 = circ2()
         return 2 * term1 + 3 * term2, term3
+
+    assert "hamiltonian" in circ1.mlir
+    assert "hamiltonian" not in circ1.mlir_opt
 
     result1 = circ1()
     result2 = post_processing()
@@ -100,6 +122,8 @@ def test_split_to_single_terms_with_tensor_product():
     assert np.allclose(result1, result2), f"Results don't match: {result1} vs {result2}"
 
 
+@pytest.mark.capture_todo
+@pytest.mark.usefixtures("use_both_frontend")
 def test_split_to_single_terms_with_Identity():
     """
     Test split-to-single-terms with Identity observables.
@@ -112,17 +136,24 @@ def test_split_to_single_terms_with_Identity():
     @apply_pass("split-to-single-terms")
     @qml.qnode(dev)
     def circ1():
+        qml.RY(0.5, wires=0)
+        qml.RX(0.3, wires=1)
         return qml.expval(qml.Z(0) + 2 * qml.X(1) + 0.7 * qml.Identity(2))
 
     @qjit
     @qml.qnode(dev)
     def circ2():
+        qml.RY(0.5, wires=0)
+        qml.RX(0.3, wires=1)
         return qml.expval(qml.Z(0)), qml.expval(qml.X(1))
 
     def post_processing():
         term1, term2 = circ2()
         # Compute weighted sum: term1 + 2*term2 + 0.7
         return term1 + 2 * term2 + 0.7
+
+    assert "hamiltonian" in circ1.mlir
+    assert "hamiltonian" not in circ1.mlir_opt
 
     result1 = circ1()
     result2 = post_processing()
