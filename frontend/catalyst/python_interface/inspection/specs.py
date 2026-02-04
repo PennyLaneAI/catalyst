@@ -34,7 +34,11 @@ class StopCompilation(Exception):
 
 
 def mlir_specs(
-    qnode: QJIT, level: int | tuple[int] | list[int] | Literal["all"], level_to_marker: dict[int, str], *args, **kwargs
+    qnode: QJIT,
+    level: int | tuple[int] | list[int] | Literal["all"],
+    level_to_marker: dict[int, str],
+    *args,
+    **kwargs,
 ) -> ResourcesResult | dict[str, ResourcesResult]:
     """Compute the specs used for a circuit at the level of an MLIR pass.
 
@@ -109,7 +113,11 @@ def mlir_specs(
             raise ValueError(
                 f"Requested specs levels {', '.join(missing)} not found in MLIR pass list."
             )
-        return {level_to_marker.get(lvl, f"{cache[lvl][1]} (MLIR-{lvl})"): cache[lvl][0] for lvl in level if lvl in cache}
+        return {
+            level_to_marker.get(lvl, f"{cache[lvl][1]} (MLIR-{lvl})"): cache[lvl][0]
+            for lvl in level
+            if lvl in cache
+        }
 
     # Just one level was specified
     if level not in cache:
