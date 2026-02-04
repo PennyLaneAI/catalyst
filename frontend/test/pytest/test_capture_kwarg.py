@@ -210,6 +210,7 @@ class TestCaptureKwargIntegration:
 
         @qjit(capture=True)
         def classical_fn(x, y):
+            assert qml.capture.enabled()
             return x**2 + y**2
 
         result = classical_fn(3.0, 4.0)
