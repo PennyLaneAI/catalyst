@@ -142,7 +142,7 @@ class CompileOptions:
     circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
     pass_plugins: Optional[Set[Path]] = None
     dialect_plugins: Optional[Set[Path]] = None
-    capture: Optional[Union[str, bool]] = "global"
+    capture: bool | Literal['global'] = "global"
 
     def __post_init__(self):
         # Convert keep_intermediate to Enum
