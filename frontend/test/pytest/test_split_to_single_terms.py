@@ -49,20 +49,18 @@ def test_split_to_single_terms_integration(hamiltonian):
     @apply_pass("split-to-single-terms")
     @qml.qnode(dev)
     def circ1():
-        # Add rotations to make observables non-zero
-        qml.RY(0.5, wires=0)
-        qml.RX(0.3, wires=1)
-        qml.RZ(0.7, wires=2)
+        qml.Rot(0.3, 0.5, 0.7, wires=0)
+        qml.Rot(0.2, 0.4, 0.6, wires=1)
+        qml.Rot(0.1, 0.8, 0.9, wires=2)
         return qml.expval(hamiltonian_obs), qml.expval(qml.Z(1))
 
     # Manual implementation: split into individual terms and compute weighted sum
     @qjit
     @qml.qnode(dev)
     def circ2():
-        # Add same rotations to make observables non-zero
-        qml.RY(0.5, wires=0)
-        qml.RX(0.3, wires=1)
-        qml.RZ(0.7, wires=2)
+        qml.Rot(0.3, 0.5, 0.7, wires=0)
+        qml.Rot(0.2, 0.4, 0.6, wires=1)
+        qml.Rot(0.1, 0.8, 0.9, wires=2)
         return (
             qml.expval(qml.Z(0)),
             qml.expval(qml.X(1)),
@@ -96,17 +94,17 @@ def test_split_to_single_terms_with_tensor_product():
     @apply_pass("split-to-single-terms")
     @qml.qnode(dev)
     def circ1():
-        qml.RY(0.4, wires=0)
-        qml.RX(0.6, wires=1)
-        qml.RZ(0.8, wires=2)
+        qml.Rot(0.4, 0.3, 0.2, wires=0)
+        qml.Rot(0.6, 0.5, 0.4, wires=1)
+        qml.Rot(0.8, 0.7, 0.6, wires=2)
         return qml.expval(2 * (qml.Z(0) @ qml.X(1)) + 3 * qml.Y(2)), qml.expval(qml.Z(1))
 
     @qjit
     @qml.qnode(dev)
     def circ2():
-        qml.RY(0.4, wires=0)
-        qml.RX(0.6, wires=1)
-        qml.RZ(0.8, wires=2)
+        qml.Rot(0.4, 0.3, 0.2, wires=0)
+        qml.Rot(0.6, 0.5, 0.4, wires=1)
+        qml.Rot(0.8, 0.7, 0.6, wires=2)
         return qml.expval(qml.Z(0) @ qml.X(1)), qml.expval(qml.Y(2)), qml.expval(qml.Z(1))
 
     def post_processing():
@@ -136,15 +134,15 @@ def test_split_to_single_terms_with_Identity():
     @apply_pass("split-to-single-terms")
     @qml.qnode(dev)
     def circ1():
-        qml.RY(0.5, wires=0)
-        qml.RX(0.3, wires=1)
+        qml.Rot(0.5, 0.3, 0.2, wires=0)
+        qml.Rot(0.4, 0.6, 0.1, wires=1)
         return qml.expval(qml.Z(0) + 2 * qml.X(1) + 0.7 * qml.Identity(2))
 
     @qjit
     @qml.qnode(dev)
     def circ2():
-        qml.RY(0.5, wires=0)
-        qml.RX(0.3, wires=1)
+        qml.Rot(0.5, 0.3, 0.2, wires=0)
+        qml.Rot(0.4, 0.6, 0.1, wires=1)
         return qml.expval(qml.Z(0)), qml.expval(qml.X(1))
 
     def post_processing():
