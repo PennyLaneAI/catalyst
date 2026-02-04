@@ -34,12 +34,12 @@ mlir::OpResult initializeZeroOrPlusI(bool avoidPauliYMeasure, mlir::Location loc
 {
     if (avoidPauliYMeasure) {
         // Fabricate |Y⟩
-        auto plusIOp = rewriter.create<FabricateOp>(loc, LogicalInitKind::plus_i);
+        auto plusIOp = FabricateOp::create(rewriter, loc, LogicalInitKind::plus_i);
         return plusIOp.getOutQubits().back();
     }
 
     // Initialize |0⟩
-    auto allocatedQubit = rewriter.create<quantum::AllocQubitOp>(loc);
+    auto allocatedQubit = quantum::AllocQubitOp::create(rewriter, loc);
     return allocatedQubit.getOutQubit();
 }
 
