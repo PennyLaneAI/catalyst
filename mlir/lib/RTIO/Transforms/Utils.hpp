@@ -57,7 +57,7 @@ inline mlir::Value computeChannelDeviceAddr(mlir::OpBuilder &builder, mlir::Oper
            "only static channels are supported");
     int64_t channelId = channelIdAPInt.getSExtValue();
     int32_t addr = static_cast<int32_t>((channelId + channelBase) << 8);
-    return builder.create<mlir::arith::ConstantOp>(loc, builder.getI32IntegerAttr(addr));
+    return mlir::arith::ConstantOp::create(builder, loc, builder.getI32IntegerAttr(addr));
 }
 
 } // namespace rtio
