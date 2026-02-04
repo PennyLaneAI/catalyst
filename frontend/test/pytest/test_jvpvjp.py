@@ -634,7 +634,7 @@ def test_jvpvjp_argument_checks(diff_method):
         def C_workflow_bad2():
             return qml.vjp(f, list(x), 33, argnums=list(range(len(x))))
 
-    with pytest.raises(ValueError, match="argnums should be integer or a list of integers"):
+    with pytest.raises(ValueError, match="argnums should be an integer or a Sequence of integers"):
 
         @qjit
         def C_workflow_bad3():

@@ -751,7 +751,7 @@ def _check_grad_params(
     elif isinstance(argnums, list) and all(isinstance(i, int) for i in argnums):
         argnum_list = argnums
     else:
-        raise ValueError(f"argnums should be integer or a list of integers, not {argnums}")
+        raise ValueError(f"argnums should be an integer or a Sequence of integers, not {argnums}")
     # Compute the argnums of the pytree arg
     total_argnums = list(range(0, len_flatten_args))
     argnum_unflatten = tree_unflatten(in_tree, total_argnums)
