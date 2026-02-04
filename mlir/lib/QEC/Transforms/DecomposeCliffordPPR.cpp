@@ -82,7 +82,7 @@ PPRotationOp decompose_pi_over_four_flattening(bool avoidPauliYMeasure, PPRotati
         PPMeasurementOp::create(rewriter, loc, pauliX, ppmPZ.getOutQubits().back(), measResult);
 
     // FIXME: Check global phase on this decomposition
-  
+
     auto cond = arith::XOrIOp::create(rewriter, loc, ppmPZ.getMres(), ppmX.getMres());
 
     SmallVector<Value> outPZQubits = ppmPZ.getOutQubits();
