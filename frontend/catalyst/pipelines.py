@@ -33,7 +33,7 @@ from functools import partial
 from io import TextIOWrapper
 from operator import is_not
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, Iterable, List, Literal, Optional, Set, Tuple, Union
 
 from catalyst.utils.exceptions import CompileError
 
@@ -142,7 +142,7 @@ class CompileOptions:
     circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
     pass_plugins: Optional[Set[Path]] = None
     dialect_plugins: Optional[Set[Path]] = None
-    capture: bool | Literal['global'] = "global"
+    capture: bool | Literal["global"] = "global"
 
     def __post_init__(self):
         # Convert keep_intermediate to Enum

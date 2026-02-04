@@ -19,12 +19,12 @@ compilation of hybrid quantum-classical functions using Catalyst.
 # pylint: disable=too-many-lines
 
 import copy
-from contextlib import contextmanager
 import functools
 import inspect
 import logging
 import os
 import warnings
+from contextlib import contextmanager
 
 import jax
 import jax.numpy as jnp
