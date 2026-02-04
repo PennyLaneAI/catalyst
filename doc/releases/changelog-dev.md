@@ -130,8 +130,8 @@
   QEC state preparation operations.
   [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
 
-* A new compiler pass `split-to-single-terms` has been added to optimize QNode functions containing
-  Hamiltonian expectation values by spliting them into individual leaf observable expvals.
+* A new compiler pass `split-to-single-terms` has been added for QNode functions containing
+  Hamiltonian expectation values. It facilitates execution on devices that don't natively support expectation values of sums of observables by splitting them into individual leaf observable expvals.
   [(#2441)](https://github.com/PennyLaneAI/catalyst/pull/2441)
 
   ```python
