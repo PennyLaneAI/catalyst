@@ -24,7 +24,7 @@
 * `qml.vjp` can now be used with Catalyst and program capture.
   [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
 
-* The `measurements_from_samples` pass no longer results in `nan`s and cryptic error messages when   
+* The `measurements_from_samples` pass no longer results in `nan`s and cryptic error messages when
   `shots` aren't set. Instead, an informative error message is raised.
   [(#2456)](https://github.com/PennyLaneAI/catalyst/pull/2456)
 
@@ -54,6 +54,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fix a bug with the xDSL `ParitySynth` pass that caused failure when the QNode being transformed
+  contained operations with regions.
+  [(#2408)](https://github.com/PennyLaneAI/catalyst/pull/2408)
+
 * Fix `replace_ir` for certain stages when used with gradients.
   [(#2436)](https://github.com/PennyLaneAI/catalyst/pull/2436)
 
@@ -75,10 +79,19 @@
 * Fixed the GlobalPhase discrepancies when executing gridsynth in the PPR basis.
   [(#2433)](https://github.com/PennyLaneAI/catalyst/pull/2433)
 
+* Fixed incorrect decomposition of negative PPR (Pauli Product Rotation) operations in the
+  `decompose-clifford-ppr` and `decompose-non-clifford-ppr` passes. The rotation sign is now
+  correctly flipped when decomposing negative rotation kinds (e.g., `-π/4` from adjoint gates
+  like `T†` or `S†`) to PPM (Pauli Product Measurement) operations.
+  [(#2454)](https://github.com/PennyLaneAI/catalyst/pull/2454)
+
 * Fixed incorrect global phase when lowering CNOT gates into PPR/PPM operations.
   [(#2459)](https://github.com/PennyLaneAI/catalyst/pull/2459)
 
 <h3>Internal changes ⚙️</h3>
+
+* Updated the integration tests for `qp.specs` to get coverage for new features
+  [(#2448)](https://github.com/PennyLaneAI/catalyst/pull/2448)
 
 * The xDSL :class:`~catalyst.python_interface.Quantum` dialect has been split into multiple files
   to structure operations and attributes more concretely.
