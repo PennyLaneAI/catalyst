@@ -36,7 +36,7 @@ class StopCompilation(Exception):
 def mlir_specs(
     qnode: QJIT,
     level: int | tuple[int] | list[int] | Literal["all"],
-    level_to_marker: dict[int, str],
+    level_to_marker: dict[int, str] | None = None,
     *args,
     **kwargs,
 ) -> ResourcesResult | dict[str, ResourcesResult]:
@@ -52,6 +52,9 @@ def mlir_specs(
         ResourcesResult | dict[str, ResourcesResult]: The resources for the circuit at the
           specified level
     """
+
+    if level_to_marker is None:
+        level_to_marker = {}
 
     if not isinstance(qnode, QJIT) or (
         not isinstance(qnode.original_function, QNode)
