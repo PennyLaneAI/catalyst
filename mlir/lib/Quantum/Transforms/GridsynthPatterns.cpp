@@ -63,7 +63,7 @@ Value createGateChain(PatternRewriter &rewriter, Location loc, Value qbitIn,
             rewriter.getNamedAttr("resultSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0})));
 
         auto newOp =
-            rewriter.create<CustomOp>(loc, qbitType, ValueRange{currentQbit}, newAttrs.getAttrs());
+            CustomOp::create(rewriter, loc, qbitType, ValueRange{currentQbit}, newAttrs.getAttrs());
         currentQbit = newOp.getResult(0);
     }
 
@@ -110,7 +110,7 @@ void populateCliffordTSwitchCases(PatternRewriter &rewriter, Location loc,
 
         // Pass the qubit through the chain
         Value qbitOut = createGateChain(rewriter, loc, qbitIn, config.first, config.second);
-        rewriter.create<scf::YieldOp>(loc, qbitOut);
+        scf::YieldOp::create(rewriter, loc, qbitOut);
     }
 
     // Populate Default Case
@@ -119,7 +119,7 @@ void populateCliffordTSwitchCases(PatternRewriter &rewriter, Location loc,
     rewriter.setInsertionPointToStart(&defaultRegion.front());
     static StringRef gatesDefault[] = {"Identity"};
     Value qbitDefault = createGateChain(rewriter, loc, qbitIn, gatesDefault, /*isAdjoint=*/false);
-    rewriter.create<scf::YieldOp>(loc, qbitDefault);
+    scf::YieldOp::create(rewriter, loc, qbitDefault);
 }
 
 /**
@@ -141,8 +141,8 @@ void populatePPRBasisSwitchCases(PatternRewriter &rewriter, Location loc,
         // We need to cast back to uint16_t for the C++ builder signature
         uint16_t finalRotationArg = static_cast<uint16_t>(signedRotation);
 
-        auto pprOp = builder.create<catalyst::qec::PPRotationOp>(loc, pauliWord, finalRotationArg,
-                                                                 ValueRange{currentQbit}, nullptr);
+        auto pprOp = catalyst::qec::PPRotationOp::create(builder, loc, pauliWord, finalRotationArg,
+                                                         ValueRange{currentQbit}, nullptr);
 
         return pprOp->getResult(0);
     };
@@ -187,14 +187,14 @@ void populatePPRBasisSwitchCases(PatternRewriter &rewriter, Location loc,
                                           : createPPROp(rewriter, config.pauli, config.n,
                                                         config.isAdjoint, qbitIn);
 
-        rewriter.create<scf::YieldOp>(loc, qbitOut);
+        scf::YieldOp::create(rewriter, loc, qbitOut);
     }
 
     // Default Case
     Region &defaultRegion = switchOp.getDefaultRegion();
     defaultRegion.push_back(new Block());
     rewriter.setInsertionPointToStart(&defaultRegion.front());
-    rewriter.create<scf::YieldOp>(loc, qbitIn);
+    scf::YieldOp::create(rewriter, loc, qbitIn);
 }
 
 struct DecompositionExternalFuncs {
@@ -235,12 +235,12 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
                              Value gatesMemref, Value numGates, double epsilon, bool pprBasis)
 {
     auto qbitType = QubitType::get(rewriter.getContext());
-    Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    Value c1 = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+    Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    Value c1 = arith::ConstantIndexOp::create(rewriter, loc, 1);
 
     // Create the scf.for loop over gate sequence indices
     // The loop carries the Qubit as an argument
-    auto forOp = rewriter.create<scf::ForOp>(loc, c0, numGates, c1, ValueRange{qbitIn});
+    auto forOp = scf::ForOp::create(rewriter, loc, c0, numGates, c1, ValueRange{qbitIn});
 
     // Add attribute to the for op to indicate the estimated iterations of the loop
     auto estimatedRanges = static_cast<int64_t>(std::ceil(10 * std::log2(1 / epsilon)));
@@ -253,7 +253,7 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
         Value iv = forOp.getInductionVar();
         Value currentQbit = forOp.getRegionIterArg(0);
 
-        Value currentGateIndex = rewriter.create<memref::LoadOp>(loc, gatesMemref, ValueRange{iv});
+        Value currentGateIndex = memref::LoadOp::create(rewriter, loc, gatesMemref, ValueRange{iv});
 
         // 19 cases for PPR basis: Identity + (X, Y, Z) x (2, 4, 8) x (normal, adjoint)
         // 10 cases for Clifford+T basis: {T, H T, S H T, I, X, Y, Z, H, S, adjS}
@@ -266,8 +266,9 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
 
         // Create the switch operation inside the loop
         DenseI64ArrayAttr caseValuesAttr = rewriter.getDenseI64ArrayAttr(caseValues);
-        auto switchOp = rewriter.create<scf::IndexSwitchOp>(
-            loc, TypeRange{qbitType}, currentGateIndex, caseValuesAttr, caseValues.size());
+        auto switchOp =
+            scf::IndexSwitchOp::create(rewriter, loc, TypeRange{qbitType}, currentGateIndex,
+                                       caseValuesAttr, caseValues.size());
 
         // Populate Switch Cases
         if (pprBasis) {
@@ -279,7 +280,7 @@ Value buildDecompositionLoop(PatternRewriter &rewriter, Location loc, Value qbit
 
         // Yield the result of the switch op from the for loop
         rewriter.setInsertionPointAfter(switchOp);
-        rewriter.create<scf::YieldOp>(loc, switchOp->getResults());
+        scf::YieldOp::create(rewriter, loc, switchOp->getResults());
     }
 
     // Return the result of the loop (the final qubit state)
@@ -314,7 +315,7 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
 
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointToStart(module.getBody());
-    func = rewriter.create<func::FuncOp>(module.getLoc(), funcName, funcType);
+    func = func::FuncOp::create(rewriter, module.getLoc(), funcName, funcType);
     func.setPrivate();
 
     // Get or declare external functions (GetSize, GetGates, GetPhase)
@@ -330,25 +331,25 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
     Value angle = entryBlock->getArgument(1);
 
     // Parameters for compilation
-    Value epsilonVal = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(epsilon));
-    Value pprBasisVal = rewriter.create<arith::ConstantOp>(loc, rewriter.getBoolAttr(pprBasis));
+    Value epsilonVal = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(epsilon));
+    Value pprBasisVal = arith::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(pprBasis));
 
     // Call GetSize
-    auto callGetSizeOp = rewriter.create<func::CallOp>(loc, extFuncs.getSize,
-                                                       ValueRange{angle, epsilonVal, pprBasisVal});
+    auto callGetSizeOp = func::CallOp::create(rewriter, loc, extFuncs.getSize,
+                                              ValueRange{angle, epsilonVal, pprBasisVal});
     Value num_gates = callGetSizeOp->getResult(0);
 
     // Call GetGates
     // Use memref.alloc (Heap) instead of alloca (Stack) because num_gates is dynamic.
     auto gatesMemRefType = MemRefType::get({ShapedType::kDynamic}, rewriter.getIndexType());
-    Value gatesMemref = rewriter.create<memref::AllocOp>(loc, gatesMemRefType, num_gates);
+    Value gatesMemref = memref::AllocOp::create(rewriter, loc, gatesMemRefType, num_gates);
 
-    rewriter.create<func::CallOp>(loc, extFuncs.getGates,
-                                  ValueRange{gatesMemref, angle, epsilonVal, pprBasisVal});
+    func::CallOp::create(rewriter, loc, extFuncs.getGates,
+                         ValueRange{gatesMemref, angle, epsilonVal, pprBasisVal});
 
     // Call GetPhase
-    auto callGetPhaseOp = rewriter.create<func::CallOp>(loc, extFuncs.getPhase,
-                                                        ValueRange{angle, epsilonVal, pprBasisVal});
+    auto callGetPhaseOp = func::CallOp::create(rewriter, loc, extFuncs.getPhase,
+                                               ValueRange{angle, epsilonVal, pprBasisVal});
     Value runtimePhase = callGetPhaseOp->getResult(0);
 
     // Build the Loop logic
@@ -356,10 +357,10 @@ func::FuncOp getOrCreateDecompositionFunc(ModuleOp module, PatternRewriter &rewr
         buildDecompositionLoop(rewriter, loc, qbitIn, gatesMemref, num_gates, epsilon, pprBasis);
 
     // Clean up heap memory
-    rewriter.create<memref::DeallocOp>(loc, gatesMemref);
+    memref::DeallocOp::create(rewriter, loc, gatesMemref);
 
     // Return the final qubit and the computed runtime phase
-    rewriter.create<func::ReturnOp>(loc, ValueRange{finalQbit, runtimePhase});
+    func::ReturnOp::create(rewriter, loc, ValueRange{finalQbit, runtimePhase});
 
     return func;
 }
@@ -404,7 +405,7 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
 
         // Call the function using the qubit directly
         auto callDecompOp =
-            rewriter.create<func::CallOp>(loc, decompFunc, ValueRange{qbitOperand, angle});
+            func::CallOp::create(rewriter, loc, decompFunc, ValueRange{qbitOperand, angle});
 
         Value finalQbitResult = callDecompOp->getResult(0);
         Value runtimePhase = callDecompOp.getResult(1);
@@ -413,9 +414,9 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
         Value finalPhase;
         if (isPhaseShift) {
             // PhaseShift(phi) = RZ(phi) * GlobalPhase(-phi/2)
-            Value c2 = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(2.0));
-            Value halfAngle = rewriter.create<arith::DivFOp>(loc, angle, c2);
-            finalPhase = rewriter.create<arith::SubFOp>(loc, runtimePhase, halfAngle);
+            Value c2 = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0));
+            Value halfAngle = arith::DivFOp::create(rewriter, loc, angle, c2);
+            finalPhase = arith::SubFOp::create(rewriter, loc, runtimePhase, halfAngle);
         }
         else {
             finalPhase = runtimePhase;
@@ -424,8 +425,8 @@ struct DecomposeCustomOpPattern : public OpRewritePattern<CustomOp> {
         NamedAttrList gphaseAttrs;
         gphaseAttrs.append(
             rewriter.getNamedAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 0})));
-        rewriter.create<GlobalPhaseOp>(loc, TypeRange{}, ValueRange{finalPhase},
-                                       gphaseAttrs.getAttrs());
+        GlobalPhaseOp::create(rewriter, loc, TypeRange{}, ValueRange{finalPhase},
+                              gphaseAttrs.getAttrs());
 
         // Replace the RZ/PhaseShift op with the resulting qubit
         rewriter.replaceOp(op, finalQbitResult);
@@ -468,13 +469,13 @@ struct DecomposePPRArbitraryOpPattern
         // PPR(theta, Z) = exp(-i * theta * Z)
         // RZ(phi)       = exp(-i * phi/2 * Z)
         // phi = 2 * theta
-        Value cMinus2 = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(2.0));
-        Value rzAngle = rewriter.create<arith::MulFOp>(loc, angle, cMinus2);
+        Value cMinus2 = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0));
+        Value rzAngle = arith::MulFOp::create(rewriter, loc, angle, cMinus2);
 
         func::FuncOp decompFunc = getOrCreateDecompositionFunc(mod, rewriter, epsilon, pprBasis);
 
         auto callDecompOp =
-            rewriter.create<func::CallOp>(loc, decompFunc, ValueRange{qbitOperand, rzAngle});
+            func::CallOp::create(rewriter, loc, decompFunc, ValueRange{qbitOperand, rzAngle});
 
         Value finalQbitResult = callDecompOp->getResult(0);
         Value runtimePhase = callDecompOp.getResult(1);
@@ -482,8 +483,8 @@ struct DecomposePPRArbitraryOpPattern
         NamedAttrList gphaseAttrs;
         gphaseAttrs.append(
             rewriter.getNamedAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 0})));
-        rewriter.create<GlobalPhaseOp>(loc, TypeRange{}, ValueRange{runtimePhase},
-                                       gphaseAttrs.getAttrs());
+        GlobalPhaseOp::create(rewriter, loc, TypeRange{}, ValueRange{runtimePhase},
+                              gphaseAttrs.getAttrs());
 
         rewriter.replaceOp(op, finalQbitResult);
         return success();

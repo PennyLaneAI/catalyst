@@ -52,11 +52,11 @@ struct PreprocessForwardOp : public OpRewritePattern<ForwardOp> {
         auto implResTy = implOp.getResultTypes();
         Location loc = op.getLoc();
 
-        auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, inputs);
+        auto callOp = func::CallOp::create(rewriter, loc, impl, implResTy, inputs);
         SmallVector<Value> outputs(callOp.getResults());
 
         auto F = rewriter.getIntegerAttr(rewriter.getI1Type(), 0);
-        rewriter.create<catalyst::gradient::ReturnOp>(loc, outputs, F);
+        catalyst::gradient::ReturnOp::create(rewriter, loc, outputs, F);
 
         return success();
     }
@@ -96,11 +96,11 @@ struct PreprocessReverseOp : public OpRewritePattern<ReverseOp> {
         auto implResTy = implOp.getResultTypes();
         Location loc = op.getLoc();
 
-        auto callOp = rewriter.create<func::CallOp>(loc, impl, implResTy, tapeInputs);
+        auto callOp = func::CallOp::create(rewriter, loc, impl, implResTy, tapeInputs);
         SmallVector<Value> outputs(callOp.getResults());
 
         auto T = rewriter.getIntegerAttr(rewriter.getI1Type(), 1);
-        rewriter.create<catalyst::gradient::ReturnOp>(loc, outputs, T);
+        catalyst::gradient::ReturnOp::create(rewriter, loc, outputs, T);
 
         return success();
     }
