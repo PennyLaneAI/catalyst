@@ -107,6 +107,8 @@ Quantum = Dialect(
 )
 
 __all__ = [
+    # Main dialect
+    "Quantum",
     # Attributes
     "NamedObservable",
     "NamedObservableAttr",
