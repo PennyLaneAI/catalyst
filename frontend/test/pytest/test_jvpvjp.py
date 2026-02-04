@@ -914,9 +914,7 @@ def test_jvp_argument_type_checks_incompatible_input_types(diff_method):
     params and tangent arguments are incompatible.
     """
 
-    with pytest.raises(
-        TypeError, match="function params and tangents arguments to "
-    ):
+    with pytest.raises(TypeError, match="function params and tangents arguments to "):
 
         @qjit
         def C_workflow():

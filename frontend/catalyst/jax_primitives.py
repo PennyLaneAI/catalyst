@@ -882,6 +882,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
 
+
 def _capture_jvp_lowering(ctx, *args, jaxpr, fn, method, argnums, h):
     """
     Returns:
@@ -914,7 +915,6 @@ def _capture_jvp_lowering(ctx, *args, jaxpr, fn, method, argnums, h):
         diffArgIndices=ir.DenseIntElementsAttr.get(array_argnums),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
-
 
 
 @vjp_p.def_impl
