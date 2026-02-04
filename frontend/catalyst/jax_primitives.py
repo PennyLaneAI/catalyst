@@ -134,8 +134,8 @@ with Patcher(
     )
 
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
-from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
 from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
+from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
 
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (

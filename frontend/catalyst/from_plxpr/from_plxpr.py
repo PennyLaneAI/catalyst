@@ -28,9 +28,9 @@ from jax.extend.linear_util import wrap_init
 from pennylane.capture import PlxprInterpreter, qnode_prim
 from pennylane.capture.expand_transforms import ExpandTransformsInterpreter
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
+from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
 from pennylane.capture.primitives import transform_prim
 from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
-from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
 from pennylane.transforms import commute_controlled as pl_commute_controlled
 from pennylane.transforms import decompose as pl_decompose
 from pennylane.transforms import gridsynth as pl_gridsynth

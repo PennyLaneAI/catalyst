@@ -21,7 +21,7 @@ of gradients, jacobians, jacobian-vector products, and more.
 import copy
 import functools
 import numbers
-from typing import Callable, Sequence, List, Optional, Union
+from typing import Callable, List, Optional, Sequence, Union
 
 import jax
 import pennylane as qml
