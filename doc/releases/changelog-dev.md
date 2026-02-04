@@ -2,6 +2,13 @@
 
 <h3>New features since last release</h3>
 
+* Added `capture` keyword argument to the `@qjit` decorator for per-function control over
+  PennyLane's program capture frontend. This allows selective use of the new capture-based
+  compilation pathway without affecting the global `qml.capture.enabled()` state. The parameter
+  accepts `"global"` (default, defer to global state), `True` (force capture on), or `False`
+  (force capture off). This enables safe testing and gradual migration to the capture system.
+  [(#2457)](https://github.com/PennyLaneAI/catalyst/pull/2457)
+
 <h3>Improvements 🛠</h3>
 
 * `null.qubit` resource tracking is now able to track measurements and observables. This output
