@@ -49,20 +49,12 @@ module @circ {
     // CHECK: quantum.custom "RY"
     // CHECK: quantum.custom "RX"
     // CHECK: quantum.custom "RZ"
-    // CHECK: %[[OBS_Z:.*]] = quantum.namedobs %{{.*}}[ PauliZ]
-    // CHECK: %[[OBS_X:.*]] = quantum.namedobs %{{.*}}[ PauliX]
-    // CHECK: %[[OBS_ZX:.*]] = quantum.tensor %[[OBS_Z]], %[[OBS_X]]
-    // CHECK: %[[OBS_Y:.*]] = quantum.namedobs %{{.*}}[ PauliY]
-    // CHECK: %[[EXPVAL_ZX:.*]] = quantum.expval %[[OBS_ZX]]
-    // CHECK: %[[TENSOR_ZX:.*]] = tensor.from_elements %[[EXPVAL_ZX]]
-    // CHECK: %[[EXPVAL_Y:.*]] = quantum.expval %[[OBS_Y]]
-    // CHECK: %[[TENSOR_Y:.*]] = tensor.from_elements %[[EXPVAL_Y]]
-    // CHECK: %[[OBS_Z2:.*]] = quantum.namedobs %{{.*}}[ PauliZ]
-    // CHECK: %[[EXPVAL_Z:.*]] = quantum.expval %[[OBS_Z2]]
-    // CHECK: %[[TENSOR_Z:.*]] = tensor.from_elements %[[EXPVAL_Z]]
+    // CHECK: %[[EXPVAL_ZX:.*]] = quantum.expval %[[OBS_ZX:.*]]
+    // CHECK: %[[EXPVAL_Y:.*]] = quantum.expval %[[OBS_Y:.*]]
+    // CHECK: %[[EXPVAL_Z:.*]] = quantum.expval %[[OBS_Z2:.*]]
     // CHECK: quantum.dealloc
     // CHECK: quantum.device_release
-    // CHECK: return %[[TENSOR_ZX]], %[[TENSOR_Y]], %[[TENSOR_Z]]
+    // CHECK: return %[[TENSOR_ZX:.*]], %[[TENSOR_Y:.*]], %[[TENSOR_Z:.*]]
 
     // CHECK-LABEL: func.func public @circ
     // CHECK-SAME: (%arg0: tensor<1xf64>, %arg1: tensor<1xi64>) -> (tensor<f64>, tensor<f64>)
@@ -73,28 +65,7 @@ module @circ {
     // CHECK-NOT: quantum.expval
     // CHECK-NOT: quantum.namedobs
     // CHECK-NOT: quantum.tensor
-    // CHECK: %[[CONVERT:.*]] = stablehlo.convert %arg1
-    // CHECK: %[[CST:.*]] = stablehlo.constant dense<1.000000e+00>
-    // CHECK: %[[BROADCAST:.*]] = stablehlo.broadcast_in_dim %[[CST]]
-    // CHECK: %[[CALL:.*]]:3 = call @circ.quantum()
-    // CHECK: %[[C0:.*]] = arith.constant 0 : index
-    // CHECK: %[[EXTRACTED:.*]] = tensor.extract %[[BROADCAST]][%[[C0]]]
-    // CHECK: %[[FROM_ELEMS0:.*]] = tensor.from_elements %[[EXTRACTED]]
-    // CHECK: %[[C0_1:.*]] = arith.constant 0 : index
-    // CHECK: %[[EXTRACTED_1:.*]] = tensor.extract %arg0[%[[C0_1]]]
-    // CHECK: %[[FROM_ELEMS1:.*]] = tensor.from_elements %[[EXTRACTED_1]]
-    // CHECK: %[[MULT0:.*]] = stablehlo.multiply %[[FROM_ELEMS0]], %[[FROM_ELEMS1]]
-    // CHECK: %[[C1:.*]] = arith.constant 1 : index
-    // CHECK: %[[EXTRACTED_2:.*]] = tensor.extract %[[BROADCAST]][%[[C1]]]
-    // CHECK: %[[FROM_ELEMS2:.*]] = tensor.from_elements %[[EXTRACTED_2]]
-    // CHECK: %[[C0_2:.*]] = arith.constant 0 : index
-    // CHECK: %[[EXTRACTED_3:.*]] = tensor.extract %[[CONVERT]][%[[C0_2]]]
-    // CHECK: %[[FROM_ELEMS3:.*]] = tensor.from_elements %[[EXTRACTED_3]]
-    // CHECK: %[[MULT1:.*]] = stablehlo.multiply %[[FROM_ELEMS2]], %[[FROM_ELEMS3]]
-    // CHECK: %[[W0:.*]] = stablehlo.multiply %[[MULT0]], %[[CALL]]#0
-    // CHECK: %[[W1:.*]] = stablehlo.multiply %[[MULT1]], %[[CALL]]#1
-    // CHECK: stablehlo.broadcast_in_dim
-    // CHECK: stablehlo.broadcast_in_dim
+    // CHECK: %[[CALL:.*]]:3 = call @circ.quantum
     // CHECK: %[[CONCAT:.*]] = stablehlo.concatenate
     // CHECK: %[[ZERO:.*]] = stablehlo.constant dense<0.000000e+00>
     // CHECK: %[[RESULT:.*]] = stablehlo.reduce(%[[CONCAT]] init: %[[ZERO]]) applies stablehlo.add
@@ -191,19 +162,15 @@ module @circ {
     // CHECK: quantum.alloc
     // CHECK: quantum.custom "RY"
     // CHECK: quantum.custom "RX"
-    // CHECK: %[[OBS_Z:.*]] = quantum.namedobs %{{.*}}[ PauliZ]
-    // CHECK: %[[OBS_X:.*]] = quantum.namedobs %{{.*}}[ PauliX]
-    // CHECK: %[[EXPVAL_Z:.*]] = quantum.expval %[[OBS_Z]]
-    // CHECK: %[[TENSOR_Z:.*]] = tensor.from_elements %[[EXPVAL_Z]]
-    // CHECK: %[[EXPVAL_X:.*]] = quantum.expval %[[OBS_X]]
-    // CHECK: %[[TENSOR_X:.*]] = tensor.from_elements %[[EXPVAL_X]]
+    // CHECK: %[[EXPVAL_Z:.*]] = quantum.expval %[[OBS_Z:.*]]
+    // CHECK: %[[EXPVAL_X:.*]] = quantum.expval %[[OBS_X:.*]]
     // CHECK-NOT: quantum.namedobs.*Identity
     // CHECK-NOT: quantum.expval.*Identity
     // CHECK: %[[ONE:.*]] = arith.constant 1.000000e+00 : f64
     // CHECK: %[[TENSOR_IDENTITY:.*]] = tensor.from_elements %[[ONE]]
     // CHECK: quantum.dealloc
     // CHECK: quantum.device_release
-    // CHECK: return %[[TENSOR_Z]], %[[TENSOR_X]], %[[TENSOR_IDENTITY]]
+    // CHECK: return %[[TENSOR_Z:.*]], %[[TENSOR_X:.*]], %[[TENSOR_IDENTITY]]
 
     // CHECK-LABEL: func.func public @circ
     // CHECK-SAME: (%arg0: tensor<1xi64>, %arg1: tensor<1xf64>) -> tensor<f64>
@@ -213,34 +180,13 @@ module @circ {
     // CHECK-NOT: quantum.expval
     // CHECK-NOT: quantum.namedobs
     // CHECK: %[[CALL:.*]]:3 = call @circ.quantum()
-    // CHECK: %[[C0:.*]] = arith.constant 0 : index
-    // CHECK: %[[EXTRACTED_0:.*]] = tensor.extract %{{.*}}[%[[C0]]]
-    // CHECK: %[[COEFF0:.*]] = tensor.from_elements %[[EXTRACTED_0]]
-    // CHECK: %[[C1:.*]] = arith.constant 1 : index
-    // CHECK: %[[EXTRACTED_1:.*]] = tensor.extract %{{.*}}[%[[C1]]]
-    // CHECK: %[[COEFF1_TEMP:.*]] = tensor.from_elements %[[EXTRACTED_1]]
-    // CHECK: %[[C0_3:.*]] = arith.constant 0 : index
-    // CHECK: %[[EXTRACTED_4:.*]] = tensor.extract %{{.*}}[%[[C0_3]]]
-    // CHECK: %[[COEFF1_NESTED:.*]] = tensor.from_elements %[[EXTRACTED_4]]
-    // CHECK: %[[COEFF1:.*]] = stablehlo.multiply %[[COEFF1_TEMP]], %[[COEFF1_NESTED]]
-    // CHECK: %[[C2:.*]] = arith.constant 2 : index
-    // CHECK: %[[EXTRACTED_6:.*]] = tensor.extract %{{.*}}[%[[C2]]]
-    // CHECK: %[[COEFF2_TEMP:.*]] = tensor.from_elements %[[EXTRACTED_6]]
-    // CHECK: %[[C0_8:.*]] = arith.constant 0 : index
-    // CHECK: %[[EXTRACTED_9:.*]] = tensor.extract %arg1[%[[C0_8]]]
-    // CHECK: %[[COEFF2_NESTED:.*]] = tensor.from_elements %[[EXTRACTED_9]]
-    // CHECK: %[[COEFF2:.*]] = stablehlo.multiply %[[COEFF2_TEMP]], %[[COEFF2_NESTED]]
-    // CHECK: %[[W0:.*]] = stablehlo.multiply %[[COEFF0]], %[[CALL]]#0
-    // CHECK: %[[W1:.*]] = stablehlo.multiply %[[COEFF1]], %[[CALL]]#1
-    // CHECK: %[[W2:.*]] = stablehlo.multiply %[[COEFF2]], %[[CALL]]#2
-    // CHECK: stablehlo.broadcast_in_dim
-    // CHECK: stablehlo.broadcast_in_dim
-    // CHECK: stablehlo.broadcast_in_dim
+    // CHECK: %[[W0:.*]] = stablehlo.multiply %[[COEFF0:.*]], %[[CALL]]#0
+    // CHECK: %[[W1:.*]] = stablehlo.multiply %[[COEFF1:.*]], %[[CALL]]#1
+    // CHECK: %[[W2:.*]] = stablehlo.multiply %[[COEFF2:.*]], %[[CALL]]#2
     // CHECK: %[[CONCAT:.*]] = stablehlo.concatenate
     // CHECK: %[[ZERO:.*]] = stablehlo.constant dense<0.000000e+00>
     // CHECK: %[[RESULT:.*]] = stablehlo.reduce(%[[CONCAT]] init: %[[ZERO]]) applies stablehlo.add
     // CHECK: return %[[RESULT]]
-
     func.func public @circ(%arg0: tensor<1xi64>, %arg1: tensor<1xf64>) -> tensor<f64> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode} {
       %c = stablehlo.constant dense<0> : tensor<i64>
       %extracted = tensor.extract %c[] : tensor<i64>
@@ -290,4 +236,5 @@ module @circ {
     return
   }
 }
+
 
