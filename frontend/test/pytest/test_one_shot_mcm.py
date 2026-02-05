@@ -207,6 +207,45 @@ def test_mlir_one_shot_pass_multiple_MPs(backend):
 
 
 @pytest.mark.usefixtures("use_capture")
+def test_mlir_one_shot_pass_multiple_MPs_mcms(backend):
+    """
+    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with
+    multiple MPs on MCMs
+    """
+
+    @qjit(seed=12345)
+    @qml.transform(pass_name="one-shot-mcm")
+    @qml.qnode(qml.device(backend, wires=2), shots=1000)
+    def circuit():
+        qml.Hadamard(wires=0)
+        m_0 = qml.measure(0)
+        m_1 = qml.measure(1)
+        return (
+            qml.sample([m_0, m_1]),
+            qml.expval(m_0),
+            qml.probs(op=[m_0, m_1]),
+            qml.counts(wires=0),
+        )
+
+    res = circuit()
+    samples, expval, probs, eigs_and_counts = res
+    eigens, counts = eigs_and_counts
+
+    assert samples.shape == (1000, 2)
+    for sample in samples:
+        assert sample[1] == 0
+
+    assert np.allclose(expval, 0.5, atol=0.01, rtol=0.01)
+
+    assert np.allclose(probs, [0.5, 0, 0.5, 0], atol=0.01, rtol=0.01)
+
+    assert eigens.shape == (2,)
+    assert np.allclose(eigens, [0, 1])
+    assert counts.shape == (2,)
+    assert sum(counts) == 1000
+
+
+@pytest.mark.usefixtures("use_capture")
 def test_mlir_one_shot_pass_dynamic_shots(backend):
     """
     Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with a
