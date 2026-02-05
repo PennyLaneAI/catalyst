@@ -16,8 +16,8 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 import warnings
+from collections import defaultdict
 from typing import Literal
 
 from pennylane.workflow.qnode import QNode
@@ -118,7 +118,7 @@ def mlir_specs(
                 f"Requested specs levels {', '.join(missing)} not found in MLIR pass list."
             )
         return {
-            ', '.join(level_to_markers.get(lvl, f"{cache[lvl][1]} (MLIR-{lvl})")): cache[lvl][0]
+            ", ".join(level_to_markers.get(lvl, f"{cache[lvl][1]} (MLIR-{lvl})")): cache[lvl][0]
             for lvl in level
             if lvl in cache
         }
