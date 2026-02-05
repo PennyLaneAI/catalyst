@@ -280,6 +280,47 @@ class TestPassByPassSpecs:
             check_specs_header_same(actual, single_level_specs, skip_level=True)
             check_specs_resources_same(res, single_level_specs["resources"])
 
+    def test_redundant_marker(self, simple_circuit):
+        """Test that two markers on the same level generate the same specs."""
+
+        simple_circuit = partial(qml.marker, level="m0")(simple_circuit)
+        simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
+        simple_circuit = partial(qml.marker, level="m1")(simple_circuit)
+        simple_circuit = partial(qml.marker, level="m1-duplicate")(simple_circuit)
+
+        simple_circuit = qjit(simple_circuit)
+
+        expected = CircuitSpecs(
+            device_name="lightning.qubit",
+            num_device_wires=2,
+            shots=Shots(None),
+            level=["m0", "m1", "m1-duplicate"],
+            resources={
+                "m0": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
+                    gate_sizes={1: 6, 2: 2},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "m1": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+                "m1-duplicate": SpecsResources(
+                    gate_types={"RX": 2, "RZ": 2},
+                    gate_sizes={1: 4},
+                    measurements={"probs(all wires)": 1},
+                    num_allocs=2,
+                ),
+            },
+        )
+
+        actual = qml.specs(simple_circuit, level=["m0", "m1", "m1-duplicate"])()
+
+        check_specs_same(actual, expected)
+            
     def test_marker(self, simple_circuit):
         """Test that qml.marker can be used appropriately."""
 
