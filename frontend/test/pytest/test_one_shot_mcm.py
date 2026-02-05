@@ -206,5 +206,41 @@ def test_mlir_one_shot_pass_multiple_MPs(backend):
     assert np.allclose(probs, [0.5, 0, 0.5, 0], atol=0.01, rtol=0.01)
 
 
+@pytest.mark.usefixtures("use_capture")
+def test_mlir_one_shot_pass_dynamic_shots(backend):
+    """
+    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with a
+    dynamic number of shots
+    """
+
+    @qjit(seed=12345)
+    def workflow(shots):
+        @qml.transform(pass_name="one-shot-mcm")
+        @qml.qnode(qml.device(backend, wires=2), shots=shots)
+        def circuit():
+            qml.Hadamard(wires=0)
+            return qml.counts()
+
+        return circuit()
+
+    res = workflow(1000)
+    eigs, counts = res
+    assert eigs.shape == (4,)
+    assert np.allclose(eigs, [0, 1, 2, 3])
+    assert counts.shape == (4,)
+    assert sum(counts) == 1000
+    assert counts[1] == 0
+    assert counts[3] == 0
+
+    res = workflow(500)
+    eigs, counts = res
+    assert eigs.shape == (4,)
+    assert np.allclose(eigs, [0, 1, 2, 3])
+    assert counts.shape == (4,)
+    assert sum(counts) == 500
+    assert counts[1] == 0
+    assert counts[3] == 0
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
