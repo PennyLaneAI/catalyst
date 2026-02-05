@@ -27,7 +27,6 @@ from catalyst.passes import (
     disentangle_swap,
     merge_ppr_ppm,
     merge_rotations,
-    ppm_compilation,
     ppm_specs,
     ppr_to_ppm,
     to_ppr,
@@ -550,15 +549,15 @@ def test_clifford_to_ppm():
             qml.T(idx + 1)
         return [qml.expval(qml.PauliZ(idx)) for idx in range(5)]
 
-    ppm_compilation = qml.transform(pass_name="ppm-compilation")
+    ppm_transform = qml.transform(pass_name="ppm-compilation")
 
-    auto_corrected_cir = ppm_compilation(decompose_method="auto-corrected")(cir)
+    auto_corrected_cir = ppm_transform(decompose_method="auto-corrected")(cir)
 
-    clifford_corrected_cir = ppm_compilation(
+    clifford_corrected_cir = ppm_transform(
         decompose_method="clifford-corrected", avoid_y_measure=True, max_pauli_size=2
     )(cir)
 
-    pauli_corrected_cir = ppm_compilation(decompose_method="pauli-corrected", max_pauli_size=2)(cir)
+    pauli_corrected_cir = ppm_transform(decompose_method="pauli-corrected", max_pauli_size=2)(cir)
 
     auto_qjit_cir = qml.qjit(auto_corrected_cir)
     clifford_qjit_cir = qml.qjit(clifford_corrected_cir)
