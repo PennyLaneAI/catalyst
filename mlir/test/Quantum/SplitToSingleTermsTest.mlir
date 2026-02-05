@@ -28,7 +28,7 @@
 //   - circ: calls circ.quantum, computes weighted sum, returns [<H>, <Z>]
 
 // CHECK-LABEL: func.func public @circ.quantum
-// CHECK-SAME: () -> (tensor<f64>, tensor<f64>, tensor<f64>)
+// CHECK-SAME: () -> (tensor<f64>, tensor<f64>, tensor<f64>) attributes {qnode}
 // CHECK: quantum.device
 // CHECK: quantum.alloc
 // CHECK: quantum.custom "RY"
@@ -43,6 +43,7 @@
 
 // CHECK-LABEL: func.func public @circ
 // CHECK-SAME: (%arg0: tensor<1xf64>, %arg1: tensor<1xf64>) -> (tensor<f64>, tensor<f64>)
+// CHECK-NOT: attributes {qnode}
 // CHECK-NOT: quantum.hamiltonian
 // CHECK-NOT: quantum.custom "RY"
 // CHECK-NOT: quantum.custom "RX"
@@ -102,7 +103,7 @@ module {
 //   - circ: calls circ.quantum, computes weighted sum, returns <H>
 
 // CHECK-LABEL: func.func public @circ.quantum
-// CHECK-SAME: () -> (tensor<f64>, tensor<f64>, tensor<f64>)
+// CHECK-SAME: () -> (tensor<f64>, tensor<f64>, tensor<f64>) attributes {qnode}
 // CHECK: quantum.device
 // CHECK: quantum.alloc
 // CHECK: quantum.custom "RY"
@@ -119,6 +120,7 @@ module {
 
 // CHECK-LABEL: func.func public @circ
 // CHECK-SAME: (%arg0: tensor<1xf64>, %arg1: tensor<1xf64>) -> tensor<f64>
+// CHECK-NOT: attributes {qnode}
 // CHECK-NOT: quantum.hamiltonian
 // CHECK-NOT: quantum.custom "RY"
 // CHECK-NOT: quantum.custom "RX"
