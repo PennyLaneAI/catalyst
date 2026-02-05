@@ -394,7 +394,6 @@ void OneShotMCMPass::prepareForLoopProbsArgs(IRRewriter &builder, func::FuncOp o
                                              SmallVector<Value> &loopIterArgs,
                                              SmallVector<std::string> &loopIterArgsMPKinds)
 {
-
     OpBuilder::InsertionGuard guard(builder);
     Location loc = oneShotKernel->getLoc();
     Type f64Type = builder.getF64Type();
