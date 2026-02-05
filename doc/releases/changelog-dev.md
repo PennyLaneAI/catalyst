@@ -183,7 +183,7 @@ Consider the following example:
       return %result, %result2}
   ```
 
-  After:
+  **After:**
   ```mlir
   func @circ1.quantum() -> (tensor<f64>, tensor<f64>, v<f64>) {qnode} {
       // ... quantum ops ...
