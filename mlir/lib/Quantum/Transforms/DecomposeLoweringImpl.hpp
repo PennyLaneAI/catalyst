@@ -184,8 +184,8 @@ class BaseSignatureAnalyzer {
             for (auto [i, qubit] : llvm::enumerate(signature.inQubits)) {
                 const QubitIndex &index = signature.inWireIndices[i];
                 updatedQreg =
-                    rewriter.create<quantum::InsertOp>(loc, updatedQreg.getType(), updatedQreg,
-                                                       index.getValue(), index.getAttr(), qubit);
+                    quantum::InsertOp::create(rewriter, loc, updatedQreg.getType(), updatedQreg,
+                                              index.getValue(), index.getAttr(), qubit);
             }
             operands[operandIdx++] = updatedQreg;
 
@@ -253,9 +253,9 @@ class BaseSignatureAnalyzer {
 
         for (const auto &indices : {signature.outQubitIndices, signature.outCtrlQubitIndices}) {
             for (const auto &index : indices) {
-                auto extractOp = rewriter.create<quantum::ExtractOp>(
-                    callOp.getLoc(), rewriter.getType<quantum::QubitType>(), qreg, index.getValue(),
-                    index.getAttr());
+                auto extractOp = quantum::ExtractOp::create(
+                    rewriter, callOp.getLoc(), rewriter.getType<quantum::QubitType>(), qreg,
+                    index.getValue(), index.getAttr());
                 newResults.emplace_back(extractOp.getResult());
             }
         }
@@ -267,7 +267,7 @@ class BaseSignatureAnalyzer {
     Value fromTensorOrAsIs(ValueRange values, Type type, PatternRewriter &rewriter, Location loc)
     {
         if (isa<RankedTensorType>(type)) {
-            return rewriter.create<tensor::FromElementsOp>(loc, type, values);
+            return tensor::FromElementsOp::create(rewriter, loc, type, values);
         }
         return values.front();
     }
@@ -332,13 +332,13 @@ class BaseSignatureAnalyzer {
             }
             else if (index.isAttr()) {
                 auto attr = index.getAttr();
-                auto constantValue = rewriter.create<arith::ConstantOp>(loc, attr.getType(), attr);
+                auto constantValue = arith::ConstantOp::create(rewriter, loc, attr.getType(), attr);
                 values.emplace_back(constantValue);
             }
         }
 
         if (isa<RankedTensorType>(type)) {
-            return rewriter.create<tensor::FromElementsOp>(loc, type, values);
+            return tensor::FromElementsOp::create(rewriter, loc, type, values);
         }
 
         assert(values.size() == 1 && "number of values should be 1 for non-tensor type");

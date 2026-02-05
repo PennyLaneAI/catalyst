@@ -36,6 +36,19 @@
 
 <h3>Breaking changes 💔</h3>
 
+* (Compiler integrators only) The versions of StableHLO/LLVM/Enzyme used by Catalyst have been updated.
+  [(#2415)](https://github.com/PennyLaneAI/catalyst/pull/2415)
+  [(#2416)](https://github.com/PennyLaneAI/catalyst/pull/2416)
+  [(#2444)](https://github.com/PennyLaneAI/catalyst/pull/2444)
+  [(#2445)](https://github.com/PennyLaneAI/catalyst/pull/2445)
+
+  - The StableHLO version has been updated to
+  [v1.13.7](https://github.com/openxla/stablehlo/tree/v1.13.7).
+  - The LLVM version has been updated to
+  [commit 8f26458](https://github.com/llvm/llvm-project/tree/8f264586d7521b0e305ca7bb78825aa3382ffef7).
+  - The Enzyme version has been updated to
+  [v0.0.238](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.238).
+
 * When an integer argnums is provided to `catalyst.vjp`, a singleton dimension is now squeezed
   out. This brings the behaviour in line with that of `grad` and `jacobian`.
   [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
@@ -164,6 +177,7 @@ Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
 Jeffrey Kam,
+Mehrdad Malekmohammadi,
 River McCubbin,
 Mudit Pandey,
 Andrija Paurevic,
