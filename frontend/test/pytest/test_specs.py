@@ -294,7 +294,7 @@ class TestPassByPassSpecs:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level=["m0", "m1", "m1-duplicate"],
+            level=["m0", ("m1", "m1-duplicate")],
             resources={
                 "m0": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
@@ -302,13 +302,7 @@ class TestPassByPassSpecs:
                     measurements={"probs(all wires)": 1},
                     num_allocs=2,
                 ),
-                "m1": SpecsResources(
-                    gate_types={"RX": 2, "RZ": 2},
-                    gate_sizes={1: 4},
-                    measurements={"probs(all wires)": 1},
-                    num_allocs=2,
-                ),
-                "m1-duplicate": SpecsResources(
+                ("m1", "m1-duplicate"): SpecsResources(
                     gate_types={"RX": 2, "RZ": 2},
                     gate_sizes={1: 4},
                     measurements={"probs(all wires)": 1},
@@ -320,7 +314,7 @@ class TestPassByPassSpecs:
         actual = qml.specs(simple_circuit, level=["m0", "m1", "m1-duplicate"])()
 
         check_specs_same(actual, expected)
-            
+
     def test_marker(self, simple_circuit):
         """Test that qml.marker can be used appropriately."""
 
