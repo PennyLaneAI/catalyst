@@ -79,6 +79,7 @@ class BaseSignatureAnalyzer {
     bool isValid = true;
 
     llvm::SmallVector<mlir::Value, 4> paramsStorage;
+    PatternRewriter &rewriter;
 
     // Unified Signature Structure: All parameters, regardless of source (params or theta),
     // are stored in a ValueRange for generalized processing.
@@ -95,13 +96,16 @@ class BaseSignatureAnalyzer {
         llvm::SmallVector<QubitIndex> inCtrlWireIndices;
         llvm::SmallVector<QubitIndex> outQubitIndices;
         llvm::SmallVector<QubitIndex> outCtrlQubitIndices;
+
+        // Qreg mode specific information
+        bool needAllocQreg = false;
     } signature;
 
     BaseSignatureAnalyzer(mlir::Operation *op, mlir::ValueRange params, mlir::ValueRange inQubits,
                           mlir::ValueRange inCtrlQubits, mlir::ValueRange inCtrlValues,
                           mlir::ValueRange outQubits, mlir::ValueRange outCtrlQubits,
-                          bool enableQregMode)
-        : paramsStorage(params.begin(), params.end()),
+                          bool enableQregMode, PatternRewriter &rewriter)
+        : paramsStorage(params.begin(), params.end()), rewriter(rewriter),
           signature(Signature{.params = mlir::ValueRange(paramsStorage),
                               .inQubits = inQubits,
                               .inCtrlQubits = inCtrlQubits,
@@ -112,6 +116,7 @@ class BaseSignatureAnalyzer {
                               .inCtrlWireIndices = {},
                               .outQubitIndices = {},
                               .outCtrlQubitIndices = {}})
+
     {
         initializeQregMode(op, enableQregMode);
     }
@@ -119,18 +124,18 @@ class BaseSignatureAnalyzer {
     BaseSignatureAnalyzer(mlir::Operation *op, Value param, mlir::ValueRange inQubits,
                           mlir::ValueRange inCtrlQubits, mlir::ValueRange inCtrlValues,
                           mlir::ValueRange outQubits, mlir::ValueRange outCtrlQubits,
-                          bool enableQregMode)
+                          bool enableQregMode, PatternRewriter &rewriter)
         : paramsStorage(mlir::ValueRange(param).begin(), mlir::ValueRange(param).end()),
-          signature(Signature{.params = mlir::ValueRange(paramsStorage),
-                              .inQubits = inQubits,
-                              .inCtrlQubits = inCtrlQubits,
-                              .inCtrlValues = inCtrlValues,
-                              .outQubits = outQubits,
-                              .outCtrlQubits = outCtrlQubits,
-                              .inWireIndices = {},
-                              .inCtrlWireIndices = {},
-                              .outQubitIndices = {},
-                              .outCtrlQubitIndices = {}})
+          rewriter(rewriter), signature(Signature{.params = mlir::ValueRange(paramsStorage),
+                                                  .inQubits = inQubits,
+                                                  .inCtrlQubits = inCtrlQubits,
+                                                  .inCtrlValues = inCtrlValues,
+                                                  .outQubits = outQubits,
+                                                  .outCtrlQubits = outCtrlQubits,
+                                                  .inWireIndices = {},
+                                                  .inCtrlWireIndices = {},
+                                                  .outQubitIndices = {},
+                                                  .outCtrlQubitIndices = {}})
     {
         initializeQregMode(op, enableQregMode);
     }
@@ -143,21 +148,30 @@ class BaseSignatureAnalyzer {
 
     Value getUpdatedQreg(PatternRewriter &rewriter, Location loc)
     {
-        // FIXME: This will cause an issue when the decomposition function has cross-qreg
-        // inputs and outputs. Now, we just assume has only one qreg input, the global one exists.
-        // raise an error if the qreg is not the same
-        Value qreg = signature.inWireIndices[0].getReg();
+        if (signature.needAllocQreg) {
+            // allocate a new qreg with the number of qubits
+            auto nqubits = signature.inWireIndices.size() + signature.inCtrlWireIndices.size();
+            IntegerAttr nqubitsAttr = IntegerAttr::get(rewriter.getI64Type(), nqubits);
+            auto allocOp = rewriter.create<quantum::AllocOp>(
+                loc, quantum::QuregType::get(rewriter.getContext()), nullptr, nqubitsAttr);
+            return allocOp.getQreg();
+        }
 
-        bool sameQreg = true;
-        for (const auto &index : signature.inWireIndices) {
-            sameQreg &= index.getReg() == qreg;
-        }
-        for (const auto &index : signature.inCtrlWireIndices) {
-            sameQreg &= index.getReg() == qreg;
-        }
+        // Verify the qreg of the input wires are the same when needAllocQreg is false
+        assert((!signature.inWireIndices.empty() || !signature.inCtrlWireIndices.empty()) &&
+               "inWireIndices or inCtrlWireIndices should not be empty");
+
+        Value refQreg = !signature.inWireIndices.empty() ? signature.inWireIndices[0].getReg()
+                                                         : signature.inCtrlWireIndices[0].getReg();
+
+        bool sameQreg =
+            std::all_of(signature.inWireIndices.begin(), signature.inWireIndices.end(),
+                        [refQreg](const QubitIndex &idx) { return idx.getReg() == refQreg; }) &&
+            std::all_of(signature.inCtrlWireIndices.begin(), signature.inCtrlWireIndices.end(),
+                        [refQreg](const QubitIndex &idx) { return idx.getReg() == refQreg; });
 
         assert(sameQreg && "The qreg of the input wires should be the same");
-        return qreg;
+        return refQreg;
     }
 
     // Prepare the operands for calling the decomposition function
@@ -187,6 +201,13 @@ class BaseSignatureAnalyzer {
                     quantum::InsertOp::create(rewriter, loc, updatedQreg.getType(), updatedQreg,
                                               index.getValue(), index.getAttr(), qubit);
             }
+            for (auto [i, qubit] : llvm::enumerate(signature.inCtrlQubits)) {
+                const QubitIndex &index = signature.inCtrlWireIndices[i];
+                updatedQreg =
+                    rewriter.create<quantum::InsertOp>(loc, updatedQreg.getType(), updatedQreg,
+                                                       index.getValue(), index.getAttr(), qubit);
+            }
+
             operands[operandIdx++] = updatedQreg;
 
             if (!signature.params.empty()) {
@@ -258,6 +279,10 @@ class BaseSignatureAnalyzer {
                     index.getValue(), index.getAttr());
                 newResults.emplace_back(extractOp.getResult());
             }
+        }
+
+        if (signature.needAllocQreg) {
+            rewriter.create<quantum::DeallocOp>(callOp.getLoc(), qreg);
         }
 
         return newResults;
@@ -375,6 +400,31 @@ class BaseSignatureAnalyzer {
         assert((signature.inWireIndices.size() + signature.inCtrlWireIndices.size()) > 0 &&
                "inWireIndices or inCtrlWireIndices should not be empty");
 
+        // Get the first qreg as reference
+        Value refQreg = !signature.inWireIndices.empty() ? signature.inWireIndices[0].getReg()
+                                                         : signature.inCtrlWireIndices[0].getReg();
+
+        // Check if any qreg is different
+        signature.needAllocQreg =
+            std::any_of(signature.inWireIndices.begin(), signature.inWireIndices.end(),
+                        [refQreg](const QubitIndex &idx) { return idx.getReg() != refQreg; }) ||
+            std::any_of(signature.inCtrlWireIndices.begin(), signature.inCtrlWireIndices.end(),
+                        [refQreg](const QubitIndex &idx) { return idx.getReg() != refQreg; });
+
+        // If needAllocQreg, the indices should be updated to from 0 to nqubits - 1
+        // Since we will use the new qreg for the indices
+        if (signature.needAllocQreg) {
+            for (auto [i, index] : llvm::enumerate(signature.inWireIndices)) {
+                auto attr = IntegerAttr::get(rewriter.getI64Type(), i);
+                signature.inWireIndices[i] = QubitIndex(attr, index.getReg());
+            }
+            for (auto [i, index] : llvm::enumerate(signature.inCtrlWireIndices)) {
+                auto attr =
+                    IntegerAttr::get(rewriter.getI64Type(), i + signature.inWireIndices.size());
+                signature.inCtrlWireIndices[i] = QubitIndex(attr, index.getReg());
+            }
+        }
+
         // Output qubit indices are the same as input qubit indices
         signature.outQubitIndices = signature.inWireIndices;
         signature.outCtrlQubitIndices = signature.inCtrlWireIndices;
@@ -422,11 +472,11 @@ class CustomOpSignatureAnalyzer : public BaseSignatureAnalyzer {
   public:
     CustomOpSignatureAnalyzer() = delete;
 
-    CustomOpSignatureAnalyzer(CustomOp op, bool enableQregMode)
+    CustomOpSignatureAnalyzer(CustomOp op, bool enableQregMode, PatternRewriter &rewriter)
         : BaseSignatureAnalyzer(op, op.getParams(), op.getNonCtrlQubitOperands(),
                                 op.getCtrlQubitOperands(), op.getCtrlValueOperands(),
                                 op.getNonCtrlQubitResults(), op.getCtrlQubitResults(),
-                                enableQregMode)
+                                enableQregMode, rewriter)
     {
     }
 };
@@ -435,11 +485,11 @@ class MultiRZOpSignatureAnalyzer : public BaseSignatureAnalyzer {
   public:
     MultiRZOpSignatureAnalyzer() = delete;
 
-    MultiRZOpSignatureAnalyzer(MultiRZOp op, bool enableQregMode)
+    MultiRZOpSignatureAnalyzer(MultiRZOp op, bool enableQregMode, PatternRewriter &rewriter)
         : BaseSignatureAnalyzer(op, op.getTheta(), op.getNonCtrlQubitOperands(),
                                 op.getCtrlQubitOperands(), op.getCtrlValueOperands(),
                                 op.getNonCtrlQubitResults(), op.getCtrlQubitResults(),
-                                enableQregMode)
+                                enableQregMode, rewriter)
     {
     }
 };
