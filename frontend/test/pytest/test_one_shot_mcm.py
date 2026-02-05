@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for seeded qjit runs in Catalyst"""
+
+"""End-to-end tests for one-shot mcm transform in MLIR"""
 
 import numpy as np
 import pennylane as qml
