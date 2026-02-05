@@ -109,10 +109,6 @@ class OQDDevice(Device):
         wires: The number of wires/qubits.
         backend: Backend name (default: "default").
         openapl_file_name: Output file name for OpenAPL.
-        artiq_config: ARTIQ cross-compilation configuration dict with keys:
-            - kernel_ld: Path to ARTIQ's kernel.ld linker script
-            - llc_path: Path to llc
-            - lld_path: Path to ld.lld
     """
 
     config_filepath = get_lib_path("oqd_runtime", "OQD_LIB_DIR") + "/backend" + "/oqd.toml"
@@ -135,7 +131,6 @@ class OQDDevice(Device):
         wires,
         backend="default",
         openapl_file_name="__openapl__output.json",
-        artiq_config=None,
         **kwargs,
     ):
         self._backend = backend
@@ -145,12 +140,6 @@ class OQDDevice(Device):
         self.device_kwargs = {
             "openapl_file_name": self._openapl_file_name,
         }
-        self._artiq_config = artiq_config
-
-    @property
-    def artiq_config(self):
-        """ARTIQ cross-compilation configuration."""
-        return self._artiq_config
 
     @property
     def openapl_file_name(self):

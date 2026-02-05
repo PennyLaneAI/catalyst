@@ -48,13 +48,7 @@ class TestOQDARTIQLLVMIR:
     @pytest.mark.usefixtures("use_capture")
     def test_rx_gate_llvmir_contains_artiq_symbols(self):
         """Test that LLVM IR contains required ARTIQ symbols (__modinit__ and __kernel__)."""
-        artiq_config = {"kernel_ld": None}
-
-        oqd_dev = OQDDevice(
-            backend="default",
-            wires=1,
-            artiq_config=artiq_config,
-        )
+        oqd_dev = OQDDevice(backend="default", wires=1)
 
         # Compile to LLVM IR only
         oqd_pipelines = _get_oqd_pipelines()
@@ -94,9 +88,6 @@ class TestOQDARTIQLLVMIR:
         assert (
             compiled_circuit.llvmir == llvm_ir
         ), "LLVM IR should be the same after getting it again"
-
-        # Test artiq_config
-        assert oqd_dev.artiq_config == artiq_config, "Same artiq_config should be returned"
 
 
 if __name__ == "__main__":
