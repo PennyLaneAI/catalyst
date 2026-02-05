@@ -54,6 +54,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fix a bug caused by a change in queuing behaviour in PennyLane in 
+  [PL #8131](https://github.com/PennyLaneAI/pennylane/pull/8131)
+  [(#2408)](https://github.com/PennyLaneAI/catalyst/pull/2408)
+
 * Fix a bug with the xDSL `ParitySynth` pass that caused failure when the QNode being transformed
   contained operations with regions.
   [(#2408)](https://github.com/PennyLaneAI/catalyst/pull/2408)
@@ -177,4 +181,5 @@ Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,
 Paul Haochen Wang,
+David Wierichs,
 Jake Zaia.
