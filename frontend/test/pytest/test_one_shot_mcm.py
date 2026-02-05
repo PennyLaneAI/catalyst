@@ -31,7 +31,7 @@ def test_mlir_one_shot_pass_probs(backend):
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
         qml.Hadamard(wires=0)
-        return qml.probs()  # only has probablilities in |00> and |10>
+        return qml.probs()  # only has probabilities in |00> and |10>
 
     res = circuit()
     assert res.dtype == "float64"
