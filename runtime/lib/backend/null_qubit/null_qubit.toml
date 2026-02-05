@@ -1,4 +1,6 @@
-# Based on Lightning's lightning_qubit.toml. It is better if we keep it updated.
+# Decompose to Clifford-T + RY
+# Note this only works with custom decomposiiton patches to ops/qubit/parametric_ops_single_qubit.py
+
 schema = 3
 
 # The set of all gate types supported at the runtime execution interface of the
@@ -23,42 +25,23 @@ schema = 3
 [operators.gates]
 
 CNOT                   = { properties = [ "invertible",                 "differentiable" ] }
-ControlledPhaseShift   = { properties = [ "invertible",                 "differentiable" ] }
-CRot                   = { properties = [ "invertible"                                   ] }
-CRX                    = { properties = [ "invertible",                 "differentiable" ] }
-CRY                    = { properties = [ "invertible",                 "differentiable" ] }
-CRZ                    = { properties = [ "invertible",                 "differentiable" ] }
 CSWAP                  = { properties = [ "invertible",                 "differentiable" ] }
 CY                     = { properties = [ "invertible",                 "differentiable" ] }
 CZ                     = { properties = [ "invertible",                 "differentiable" ] }
-DoubleExcitationMinus  = { properties = [ "invertible", "controllable", "differentiable" ] }
-DoubleExcitationPlus   = { properties = [ "invertible", "controllable", "differentiable" ] }
-DoubleExcitation       = { properties = [ "invertible", "controllable", "differentiable" ] }
 GlobalPhase            = { properties = [ "invertible", "controllable", "differentiable" ] }
 Hadamard               = { properties = [ "invertible", "controllable", "differentiable" ] }
 Identity               = { properties = [ "invertible",                 "differentiable" ] }
-IsingXX                = { properties = [ "invertible", "controllable", "differentiable" ] }
-IsingXY                = { properties = [ "invertible", "controllable", "differentiable" ] }
-IsingYY                = { properties = [ "invertible", "controllable", "differentiable" ] }
-IsingZZ                = { properties = [ "invertible", "controllable", "differentiable" ] }
-MultiRZ                = { properties = [ "invertible", "controllable", "differentiable" ] }
 PauliX                 = { properties = [ "invertible", "controllable", "differentiable" ] }
 PauliY                 = { properties = [ "invertible", "controllable", "differentiable" ] }
 PauliZ                 = { properties = [ "invertible", "controllable", "differentiable" ] }
-PhaseShift             = { properties = [ "invertible", "controllable", "differentiable" ] }
-QubitUnitary           = { properties = [ "invertible", "controllable"                   ] }
-Rot                    = { properties = [ "invertible", "controllable"                   ] }
-RX                     = { properties = [ "invertible", "controllable", "differentiable" ] }
-RY                     = { properties = [ "invertible", "controllable", "differentiable" ] }
-RZ                     = { properties = [ "invertible", "controllable", "differentiable" ] }
-SingleExcitationMinus  = { properties = [ "invertible", "controllable", "differentiable" ] }
-SingleExcitationPlus   = { properties = [ "invertible", "controllable", "differentiable" ] }
-SingleExcitation       = { properties = [ "invertible", "controllable", "differentiable" ] }
 S                      = { properties = [ "invertible", "controllable", "differentiable" ] }
-SWAP                   = { properties = [ "invertible", "controllable", "differentiable" ] }
+SX                      = { properties = [ "invertible", "controllable", "differentiable" ] }
+SWAP                   = { properties = [ "invertible", "controllable","differentiable" ] }
+ISWAP                   = { properties = [ "invertible", "controllable", "differentiable" ] }
 Toffoli                = { properties = [ "invertible",                 "differentiable" ] }
 T                      = { properties = [ "invertible", "controllable", "differentiable" ] }
-PCPhase                = { properties = [ "invertible", "controllable",                  ] }
+RZ                     = { properties = [ "invertible", "controllable", "differentiable" ] }
+CRZ                     = { properties = [ "invertible", "controllable", "differentiable" ] }
 
 # Observables supported by the device
 [operators.observables]
@@ -102,4 +85,4 @@ dynamic_qubit_management = false
 # in a single execution
 non_commuting_observables = true
 # Whether the device supports (arbitrary) initial state preparation.
-initial_state_prep = true
+initial_state_prep = false
