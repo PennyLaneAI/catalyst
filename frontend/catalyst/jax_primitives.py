@@ -427,7 +427,7 @@ def subroutine(func):
     return wrapper
 
 
-def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None):
+def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None, target_gate=None):
     """
     Denotes the creation of a quantum definition in the intermediate representation.
     """
@@ -437,13 +437,22 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None
     ), "Decomposition rules with `qreg` do not require `num_params`."
 
     if func is None:
-        return functools.partial(decomposition_rule, is_qreg=is_qreg, num_params=num_params)
+        return functools.partial(
+            decomposition_rule,
+            is_qreg=is_qreg,
+            num_params=num_params,
+            pauli_word=pauli_word,
+            target_gate=target_gate,
+        )
 
     if pauli_word is not None:
         func = functools.partial(func, pauli_word=pauli_word)
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        if getattr(func, "target_gate", None) is None:
+            setattr(func, "target_gate", target_gate)
+
         if pauli_word is not None:
             jaxpr = jax.make_jaxpr(func)(theta=args[0], wires=args[1], **kwargs)
         else:
@@ -2238,7 +2247,7 @@ def _cond_lowering(
             if_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend("if"))
             with ir.InsertionPoint(if_block):
                 # recursively generate the mlir for the if block
-                (out, _) = mlir.jaxpr_subcomp(
+                out, _ = mlir.jaxpr_subcomp(
                     if_ctx.module_context,
                     true_jaxpr.jaxpr,
                     if_ctx.name_stack,
@@ -2259,7 +2268,7 @@ def _cond_lowering(
                 # Base case: reached the otherwise block
                 otherwise_jaxpr = branch_jaxprs[-1]
                 with ir.InsertionPoint(else_block):
-                    (out, _) = mlir.jaxpr_subcomp(
+                    out, _ = mlir.jaxpr_subcomp(
                         else_ctx.module_context,
                         otherwise_jaxpr.jaxpr,
                         else_ctx.name_stack,
@@ -2330,7 +2339,7 @@ def _switch_lowering(
         with ir.InsertionPoint(scf_switch_op.caseRegions[i].blocks.append()):
             branch_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend(f"branch {i}"))
             branch_jaxpr = branch_jaxprs[i]
-            (out, _) = mlir.jaxpr_subcomp(
+            out, _ = mlir.jaxpr_subcomp(
                 branch_ctx.module_context,
                 branch_jaxpr.jaxpr,
                 branch_ctx.name_stack,
@@ -2346,7 +2355,7 @@ def _switch_lowering(
     with ir.InsertionPoint(scf_switch_op.defaultRegion.blocks.append()):
         branch_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend("default branch"))
         branch_jaxpr = branch_jaxprs[-1]
-        (out, _) = mlir.jaxpr_subcomp(
+        out, _ = mlir.jaxpr_subcomp(
             branch_ctx.module_context,
             branch_jaxpr.jaxpr,
             branch_ctx.name_stack,
@@ -2439,7 +2448,7 @@ def _while_loop_lowering(
         params = cond_consts + cond_args
 
         # recursively generate the mlir for the while cond
-        ((pred,), _) = mlir.jaxpr_subcomp(
+        (pred,), _ = mlir.jaxpr_subcomp(
             cond_ctx.module_context,
             cond_jaxpr.jaxpr,
             cond_ctx.name_stack,
@@ -2830,13 +2839,10 @@ def subroutine_lowering(*args, **kwargs):
         retval = _pjit_lowering(*args, **kwargs)
     except NotImplementedError as e:
         if "MLIR translation rule for primitive" in str(e):
-            msg = (
-                str(e)
-                + """
+            msg = str(e) + """
                 This error sometimes occurs when using quantum operations
                 inside subroutines but calling them outside a qnode
             """
-            )
             raise NotImplementedError(msg) from e
         raise e
 
