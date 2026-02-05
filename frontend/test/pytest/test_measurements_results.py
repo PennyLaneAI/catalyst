@@ -435,8 +435,8 @@ class TestExpval:
         )
         obs = qml.Hermitian(obs_matrix, wires=[0, 1])
         coeff = np.array([0.8, 0.2])
-        obs2 = qml.Hamiltonian(coeff, [obs, qml.Hamiltonian([1, 1], [qml.PauliX(0), qml.PauliZ(1)])])
-        obs3 = obs2 @ qml.PauliZ(2)
+        obs2 = qml.Hamiltonian(coeff, [obs, qml.Hamiltonian([1, 1], [qml.X(0), qml.Z(1)])])
+        obs3 = obs2 @ qml.Z(2)
 
         @qjit
         @qml.qnode(qml.device(backend, wires=3))
