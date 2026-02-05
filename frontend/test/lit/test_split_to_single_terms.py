@@ -23,8 +23,8 @@ Tests the split-to-single-terms pass for different types of Hamiltonian expectat
 import pennylane as qml
 
 from catalyst import qjit
-from catalyst.passes import apply_pass
 from catalyst.debug import get_compilation_stage
+from catalyst.passes import apply_pass
 
 
 def test_split_to_single_terms_basic():
