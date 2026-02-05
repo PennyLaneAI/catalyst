@@ -518,7 +518,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
             Location loc = origFunc.getLoc();
             OpBuilder moduleBuilder(origFunc);
 
-            // Clone origFunc -> quantumFunc (<circuit_name>.quantum)
+            // Clone origFunc -> origFunc.quantum (<circuit_name>.quantum)
             // quantumFunc will contain the quantum operations and return individual expvals
             // origFunc will be the entry point that calls quantumFunc and does post-processing
             IRMapping cloneMapping;
