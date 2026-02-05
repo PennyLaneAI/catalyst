@@ -30,15 +30,15 @@ Value createGate(Location loc, PatternRewriter &rewriter, Value inQubit, StringR
                  bool adjoint = false)
 {
     auto outQubitType = inQubit.getType();
-    auto gateOp = rewriter.create<CustomOp>(loc,
-                                            /*out_qubits=*/TypeRange{outQubitType},
-                                            /*out_ctrl_qubits=*/TypeRange{},
-                                            /*params=*/ValueRange{},
-                                            /*in_qubits=*/ValueRange{inQubit},
-                                            /*gate_name=*/gateName,
-                                            /*adjoint=*/adjoint,
-                                            /*in_ctrl_qubits=*/ValueRange{},
-                                            /*in_ctrl_values=*/ValueRange{});
+    auto gateOp = CustomOp::create(rewriter, loc,
+                                   /*out_qubits=*/TypeRange{outQubitType},
+                                   /*out_ctrl_qubits=*/TypeRange{},
+                                   /*params=*/ValueRange{},
+                                   /*in_qubits=*/ValueRange{inQubit},
+                                   /*gate_name=*/gateName,
+                                   /*adjoint=*/adjoint,
+                                   /*in_ctrl_qubits=*/ValueRange{},
+                                   /*in_ctrl_values=*/ValueRange{});
     return gateOp.getOutQubits().front();
 }
 
@@ -95,7 +95,7 @@ template <typename OpType> struct LowerQECInitOpPattern : public OpRewritePatter
             }
             else {
                 // FabricateOp: allocate a new qubit
-                auto allocOp = rewriter.create<AllocQubitOp>(loc);
+                auto allocOp = AllocQubitOp::create(rewriter, loc);
                 qubit = allocOp.getResult();
             }
 

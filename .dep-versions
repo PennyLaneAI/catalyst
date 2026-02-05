@@ -1,16 +1,14 @@
 # Always update the version check in catalyst.__init__ when changing the JAX version.
-# To update JAX version alongside compatible dependency tags, run the following script:
-# python3 .github/workflows/set_dep_versions.py {JAX_version}
 jax=0.7.1
-stablehlo=0a4440a5c8de45c4f9649bf3eb4913bf3f97da0d
-llvm=113f01aa82d055410f22a9d03b3468fa68600589
-enzyme=v0.0.203
+stablehlo=v1.13.7
+llvm=8f264586d7521b0e305ca7bb78825aa3382ffef7
+enzyme=v0.0.238
 
 # Always remove custom PL/LQ versions before release.
 
 # For a custom PL version, update the package version here and at
 # 'doc/requirements.txt'
-pennylane=0.45.0-dev13
+pennylane=0.45.0-dev22
 
 # For a custom LQ/LK version, update the package version here and at
 # 'doc/requirements.txt'

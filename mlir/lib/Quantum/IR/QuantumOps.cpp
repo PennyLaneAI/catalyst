@@ -57,7 +57,7 @@ LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewrite
             auto params = op.getParams();
             SmallVector<Value> paramsNeg;
             for (auto param : params) {
-                auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), param);
+                auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), param);
                 paramsNeg.push_back(paramNeg);
             }
 
@@ -75,7 +75,7 @@ LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewrite
 LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewriter)
 {
     if (op.getAdjoint()) {
-        auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), op.getTheta());
+        auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
 
         rewriter.replaceOpWithNewOp<MultiRZOp>(
             op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramNeg,
@@ -89,7 +89,7 @@ LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewri
 LogicalResult PCPhaseOp::canonicalize(PCPhaseOp op, mlir::PatternRewriter &rewriter)
 {
     if (op.getAdjoint()) {
-        auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), op.getTheta());
+        auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
 
         rewriter.replaceOpWithNewOp<PCPhaseOp>(
             op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramNeg,

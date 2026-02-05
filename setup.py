@@ -150,7 +150,7 @@ entry_points = {
         "cuda_quantum.qjit = catalyst.third_party.cuda:cudaqjit",
     ],
     "xdsl.universe": [
-        "catalyst-xdsl-universe = catalyst.python_interface.xdsl_universe:XDSL_UNIVERSE"
+        "catalyst-xdsl-universe = catalyst.python_interface.xdsl_universe:CATALYST_XDSL_UNIVERSE"
     ],
 }
 
