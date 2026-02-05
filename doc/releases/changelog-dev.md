@@ -2,6 +2,50 @@
 
 <h3>New features since last release</h3>
 
+* A new MLIR transformation pass `--one-shot-mcm` is available.
+  Devices that natively support mid-circuit measurements can evaluate dynamic circuits by executing
+  them one shot at a time, sampling a dynamic execution path for each shot. The `--one-shot-mcm`
+  pass first transforms the circuit so that each circuit execution only contains a singular shot,
+  then performs the appropriate classical statistical postprocessing across the execution results
+  from all shots.
+  [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
+
+  With this new MLIR pass, one shot execution mode is now available when capture is enabled.
+
+  ```python
+  qml.capture.enable()
+
+  dev = qml.device("lightning.qubit", wires=2)
+
+  @qjit
+  @qml.transform(pass_name="one-shot-mcm")
+  @qml.qnode(dev, shots=10)
+  def circuit():
+      qml.Hadamard(wires=0)
+      m_0 = qml.measure(0)
+      m_1 = qml.measure(1)
+      return qml.sample([m_0, m_1]), qml.expval(m_0), qml.probs(op=[m_0,m_1]), qml.counts(wires=0)
+  ```
+
+  ```pycon
+  >>> circuit()
+  (Array([[1, 0],
+         [0, 0],
+         [1, 0],
+         [1, 0],
+         [0, 0],
+         [0, 0],
+         [1, 0],
+         [1, 0],
+         [1, 0],
+         [0, 0]], dtype=int64), Array(0.6, dtype=float64), Array([0.4, 0. , 0.6, 0. ], dtype=float64),
+         (Array([0, 1], dtype=int64), Array([4, 6], dtype=int64)))
+  ```
+
+  Note that although the one-shot transform is motivated from the context of mid-circuit measurements,
+  this pass also supports terminal measurement processes that are performed on wires, instead of
+  mid-circuit measurement results.
+
 <h3>Improvements 🛠</h3>
 
 * `null.qubit` resource tracking is now able to track measurements and observables. This output
