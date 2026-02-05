@@ -111,7 +111,7 @@ print(test_one_shot_with_passes.mlir)
 qml.capture.enable()
 
 
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, seed=42)
 @qml.transform(pass_name="one-shot-mcm")
 @qml.qnode(qml.device("lightning.qubit", wires=2), shots=1000)
 def test_mlir_one_shot_pass_probs():
@@ -140,9 +140,9 @@ print(test_mlir_one_shot_pass_probs.mlir)
 print(get_compilation_stage(test_mlir_one_shot_pass_probs, "QuantumCompilationStage"))
 
 res = test_mlir_one_shot_pass_probs()
-assert res[1] == 0
-assert res[3] == 0
-assert np.allclose(sum(res), 1.0)
+assert res.dtype == "float64"
+assert res.shape == (4,)
+assert np.allclose(res, [0.5, 0, 0.5, 0], atol=0.01, rtol=0.01)
 
 qml.capture.disable()
 
@@ -153,7 +153,7 @@ qml.capture.disable()
 qml.capture.enable()
 
 
-@qjit(keep_intermediate=True, seed=38)
+@qjit(keep_intermediate=True, seed=42)
 @qml.transform(pass_name="one-shot-mcm")
 @qml.qnode(qml.device("lightning.qubit", wires=2), shots=1000)
 def test_mlir_one_shot_pass_probs_mcm():
@@ -164,8 +164,9 @@ def test_mlir_one_shot_pass_probs_mcm():
 
     # CHECK: transform.apply_registered_pass "one-shot-mcm"
     qml.Hadamard(wires=0)
-    m = qml.measure(0)
-    return qml.probs(op=m)
+    m0 = qml.measure(0)
+    m1 = qml.measure(1)
+    return qml.probs(op=[m0, m1])
 
 
 print(test_mlir_one_shot_pass_probs_mcm.mlir)
@@ -174,6 +175,7 @@ print(test_mlir_one_shot_pass_probs_mcm.mlir)
 # CHECK:    [[one:%.+]] = arith.constant 1 : i64
 # CHECK:    quantum.device shots([[one]])
 # CHECK:    Hadamard
+# CHECK:    measure
 # CHECK:    measure
 # CHECK-NOT:   probs
 # CHECK: func.func public @test_mlir_one_shot_pass_probs_mcm
@@ -186,8 +188,8 @@ print(get_compilation_stage(test_mlir_one_shot_pass_probs_mcm, "QuantumCompilati
 
 res = test_mlir_one_shot_pass_probs_mcm()
 assert res.dtype == "float64"
-assert res.shape == (2,)
-assert np.allclose(res, [0.5, 0.5], atol=0.01, rtol=0.01)
+assert res.shape == (4,)
+assert np.allclose(res, [0.5, 0, 0.5, 0], atol=0.01, rtol=0.01)
 
 qml.capture.disable()
 
@@ -284,7 +286,7 @@ qml.capture.disable()
 qml.capture.enable()
 
 
-@qjit(keep_intermediate=True, seed=38)
+@qjit(keep_intermediate=True, seed=42)
 @qml.transform(pass_name="one-shot-mcm")
 @qml.qnode(qml.device("lightning.qubit", wires=2), shots=1000)
 def test_mlir_one_shot_pass_sample_mcm():
@@ -295,16 +297,19 @@ def test_mlir_one_shot_pass_sample_mcm():
 
     # CHECK: transform.apply_registered_pass "one-shot-mcm"
     qml.Hadamard(wires=0)
-    m = qml.measure(0)
-    return qml.sample(m)
+    m0 = qml.measure(0)
+    m1 = qml.measure(1)
+    return qml.sample([m0, m1])
 
 
 print(test_mlir_one_shot_pass_sample_mcm.mlir)
 
 # CHECK: func.func public @test_mlir_one_shot_pass_sample_mcm.one_shot_kernel
+# CHECK-SAME:   -> tensor<1x2xi64>
 # CHECK:    [[one:%.+]] = arith.constant 1 : i64
 # CHECK:    quantum.device shots([[one]])
 # CHECK:    Hadamard
+# CHECK:    measure
 # CHECK:    measure
 # CHECK-NOT:   sample
 # CHECK: func.func public @test_mlir_one_shot_pass_sample_mcm
@@ -316,8 +321,11 @@ print(get_compilation_stage(test_mlir_one_shot_pass_sample_mcm, "QuantumCompilat
 
 res = test_mlir_one_shot_pass_sample_mcm()
 assert res.dtype == "int64"
-assert res.shape == (1000, 1)
-assert np.allclose(sum(res) / 1000, 0.5, atol=0.01, rtol=0.01)
+assert res.shape == (1000, 2)
+for sample in res:
+    assert sample[1] == 0
+wire0_sum = res[:, 0].sum()
+assert np.allclose(wire0_sum / 1000, 0.5, atol=0.01, rtol=0.01)
 
 qml.capture.disable()
 

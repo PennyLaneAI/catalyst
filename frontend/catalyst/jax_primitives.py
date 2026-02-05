@@ -1803,14 +1803,14 @@ def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, kind
 # mcm observable
 #
 @mcmobs_p.def_abstract_eval
-def _mcmobs_abstract_eval(mcm):
+def _mcmobs_abstract_eval(*mcms):
     return AbstractObs()
 
 
-def _mcm_obs_lowering(jax_ctx: mlir.LoweringRuleContext, mcm: ir.Value):
+def _mcm_obs_lowering(jax_ctx: mlir.LoweringRuleContext, *mcms: list[ir.Value]):
     ctx = jax_ctx.module_context.context
     result_type = ir.OpaqueType.get("quantum", "obs", ctx)
-    extracted = extract_scalar(mcm, "mcmobs")
+    extracted = [extract_scalar(mcm, "mcmobs") for mcm in mcms]
     return MCMObsOp(result_type, extracted).results
 
 

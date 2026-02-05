@@ -870,10 +870,10 @@ def NamedObsOp : Observable_Op<"namedobs"> {
 def MCMObsOp : Observable_Op<"mcmobs"> {
     let summary = "Define a pseudo-observable of mid-circuit measurements for use in terminal measurements";
     let description = [{
-        The `quantum.mcmobs` operation defines a quantum observable from a mid-circuit measurement,
+        The `quantum.mcmobs` operation defines a quantum observable from mid-circuit measurements,
         to be used by other operations such as measurement processes.
 
-        The only argument is the boolean result value of the mid-circuit measurement.
+        The only argument is a sequence of boolean result values of mid-circuit measurements.
 
         Example:
 
@@ -887,7 +887,7 @@ def MCMObsOp : Observable_Op<"mcmobs"> {
     }];
 
     let arguments = (ins
-        I1:$mcm
+        Variadic<I1>:$mcms
     );
 
     let results = (outs
@@ -895,7 +895,7 @@ def MCMObsOp : Observable_Op<"mcmobs"> {
     );
 
     let assemblyFormat = [{
-        $mcm attr-dict `:` type(results)
+        $mcms attr-dict `:` type(results)
     }];
 }
 

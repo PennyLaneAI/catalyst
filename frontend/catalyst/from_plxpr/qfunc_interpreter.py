@@ -292,8 +292,13 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             and not isinstance(measurement.obs, qml.operation.Operator)
         ):
             mp_is_on_mcm = True
-            obs = mcmobs_p.bind(measurement.mv)
-            shape, dtype = measurement._abstract_eval(n_wires=1, shots=self.shots)
+            if isinstance(measurement.mv, list):
+                num_mcms = len(measurement.mv)
+                obs = mcmobs_p.bind(*measurement.mv)
+            else:
+                num_mcms = 1
+                obs = mcmobs_p.bind(measurement.mv)
+            shape, dtype = measurement._abstract_eval(n_wires=num_mcms, shots=self.shots)
 
         else:
             mp_is_on_mcm = False
@@ -310,7 +315,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
 
         if prim is sample_p:
             if mp_is_on_mcm:
-                sample_shape = (self.shots, 1)
+                sample_shape = (self.shots, num_mcms)
             else:
                 num_qubits = len(measurement.wires) or len(self.device.wires)
                 sample_shape = (self.shots, num_qubits)

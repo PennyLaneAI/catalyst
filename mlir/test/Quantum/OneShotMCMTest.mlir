@@ -132,37 +132,53 @@ func.func public @test_probs(%arg0: f64) -> tensor<4xf64> {
 // -----
 
 
-func.func public @test_probs_mcm(%arg0: f64) -> tensor<2xf64> {
+func.func public @test_probs_mcm(%arg0: f64) -> tensor<4xf64> {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
   %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
   %out_qubits = quantum.custom "RX"(%arg0) %1 : !quantum.bit
-  %mres, %out_qubit = quantum.measure %out_qubits : i1, !quantum.bit
-  %2 = quantum.mcmobs %mres : !quantum.obs
-  %3 = quantum.probs %2 : tensor<2xf64>
-  %4 = quantum.insert %0[ 0], %out_qubit : !quantum.reg, !quantum.bit
-  quantum.dealloc %4 : !quantum.reg
+  %mres_0, %out_qubit = quantum.measure %out_qubits : i1, !quantum.bit
+  %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+  %mres_1, %out_qubit_1 = quantum.measure %2 : i1, !quantum.bit
+  %3 = quantum.mcmobs %mres_0, %mres_1 : !quantum.obs
+  %4 = quantum.probs %3 : tensor<4xf64>
+  %5 = quantum.insert %0[ 0], %out_qubit : !quantum.reg, !quantum.bit
+  %6 = quantum.insert %0[ 1], %out_qubit_1 : !quantum.reg, !quantum.bit
+  quantum.dealloc %6 : !quantum.reg
   quantum.device_release
-  return %3 : tensor<2xf64>
+  return %4 : tensor<4xf64>
 }
 
 
-// CHECK:   func.func public @test_probs_mcm.one_shot_kernel(%arg0: f64) -> tensor<2xf64>
+// CHECK:   func.func public @test_probs_mcm.one_shot_kernel(%arg0: f64) -> tensor<4xf64>
 // CHECK:     [[one:%.+]] = arith.constant 1 : i64
 // CHECK:     quantum.device shots([[one]]) ["", "", ""]
-// CHECK:     [[mres:%.+]], {{%.+}} = quantum.measure {{%.+}} : i1, !quantum.bit
+// CHECK:     [[mres0:%.+]], {{%.+}} = quantum.measure {{%.+}} : i1, !quantum.bit
+// CHECK:     [[mres1:%.+]], {{%.+}} = quantum.measure {{%.+}} : i1, !quantum.bit
 // CHECK-NOT:    quantum.mcmobs
 // CHECK-NOT:    quantum.probs
-// CHECK:     [[zero:%.+]] = arith.constant 0
-// CHECK:     [[zeroTensor:%.+]] = tensor.from_elements [[zero]], [[zero]] : tensor<2xf64>
-// CHECK:     [[extend:%.+]] = arith.extui [[mres]] : i1 to i64
-// CHECK:     [[cast:%.+]] = arith.index_cast [[extend]] : i64 to index
-// CHECK:     [[one:%.+]] = arith.constant 1
-// CHECK:     [[inserted:%.+]] = tensor.insert [[one]] into [[zeroTensor]][[[cast]]] : tensor<2xf64>
-// CHECK:     return [[inserted]] : tensor<2xf64>
 //
-// CHECK:   func.func public @test_probs_mcm(%arg0: f64) -> tensor<2xf64>
+// CHECK:     [[zero:%.+]] = arith.constant 0
+// CHECK:     [[zeroTensor:%.+]] = tensor.from_elements [[zero]], [[zero]], [[zero]], [[zero]] : tensor<4xf64>
+// CHECK:     [[totalIndexBase:%.+]] = arith.constant 0 : i64
+//
+// CHECK:     [[mcm_bit0_extend:%.+]] = arith.extui [[mres1]] : i1 to i64
+// CHECK:     [[bit0ShiftSize:%.+]] = arith.constant 0 : i64
+// CHECK:     [[mcm_bit0_shifted:%.+]] = arith.shli [[mcm_bit0_extend]], [[bit0ShiftSize]] : i64
+// CHECK:     [[mcm_bit0_ormask:%.+]] = arith.ori [[totalIndexBase]], [[mcm_bit0_shifted]] : i64
+//
+// CHECK:     [[mcm_bit1_extend:%.+]] = arith.extui [[mres0]] : i1 to i64
+// CHECK:     [[bit1ShiftSize:%.+]] = arith.constant 1 : i64
+// CHECK:     [[mcm_bit1_shifted:%.+]] = arith.shli [[mcm_bit1_extend]], [[bit1ShiftSize]] : i64
+// CHECK:     [[mcm_bit1_ormask:%.+]] = arith.ori [[mcm_bit0_ormask]], [[mcm_bit1_shifted]] : i64
+//
+// CHECK:     [[indexCast:%.+]] = arith.index_cast [[mcm_bit1_ormask]] : i64 to index
+// CHECK:     [[one:%.+]] = arith.constant 1.000000e+00 : f64
+// CHECK:     [[inserted:%.+]] = tensor.insert [[one]] into [[zeroTensor]][[[indexCast]]] : tensor<4xf64>
+// CHECK:     return [[inserted]] : tensor<4xf64>
+//
+// CHECK:   func.func public @test_probs_mcm(%arg0: f64) -> tensor<4xf64>
 // CHECK:      scf.for
 // CHECK:      func.call @test_probs_mcm.one_shot_kernel(%arg0)
 // CHECK:      stablehlo.add

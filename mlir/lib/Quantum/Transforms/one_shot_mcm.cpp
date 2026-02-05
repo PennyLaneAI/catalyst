@@ -246,7 +246,9 @@ void OneShotMCMPass::editKernelMCMExpval(IRRewriter &builder, func::FuncOp oneSh
     Operation *retOp = oneShotKernel.getBody().back().getTerminator();
     builder.setInsertionPoint(retOp);
 
-    Value mcm = mcmobs.getMcm();
+    assert(mcmobs.getMcms().size() == 1 &&
+           "qml.expval does not support measuring sequences of measurements or observables");
+    Value mcm = mcmobs.getMcms()[0];
     auto extuiOp = arith::ExtUIOp::create(builder, loc, builder.getI64Type(), mcm);
     auto int2floatCastOp =
         arith::SIToFPOp::create(builder, loc, builder.getF64Type(), extuiOp.getOut());
@@ -264,30 +266,56 @@ void OneShotMCMPass::editKernelMCMExpval(IRRewriter &builder, func::FuncOp oneSh
 void OneShotMCMPass::editKernelMCMProbs(IRRewriter &builder, func::FuncOp oneShotKernel,
                                         quantum::MCMObsOp mcmobs, size_t retIdx)
 {
-    // If the kernel returns probs on a mcm,
-    // the single-shot probs of the mcm is either [1,0] or [0,1]
+    // If the kernel returns probs on MCMs,
+    // the single-shot probs of the MCM is a zero tensor, with a single one at
+    // the index specified by the MCM results
+    // e.g. one MCM
+    // MCM 0, probs is [1,0]
+    // MCM 1, probs is [0,1]
+    // e.g. two MCMs
+    // MCM 00, probs is [1,0,0,0]
+    // MCM 01, probs is [0,1,0,0]
+    // MCM 10, probs is [0,0,1,0]
+    // MCM 11, probs is [0,0,0,1]
 
     OpBuilder::InsertionGuard guard(builder);
     Location loc = oneShotKernel->getLoc();
     Type f64Type = builder.getF64Type();
+    Type i64Type = builder.getI64Type();
 
-    // Create the probs tensor and write the 1 into it
-    // The location of the 1 is exactly the mcm result
-    // i.e. mcm 0, probs is [1,0]
-    // mcm 1, probs is [0,1]
     Operation *retOp = oneShotKernel.getBody().back().getTerminator();
     builder.setInsertionPoint(retOp);
 
     // Create zero tensor
+    auto probsType =
+        dyn_cast<RankedTensorType>(oneShotKernel.getFunctionType().getResults()[retIdx]);
+    SmallVector<Value> zeros;
+    int64_t probsSize = cast<ShapedType>(probsType).getShape()[0];
     auto zero = arith::ConstantOp::create(builder, loc, f64Type, builder.getFloatAttr(f64Type, 0));
-    auto zeroTensor = tensor::FromElementsOp::create(
-        builder, loc, RankedTensorType::get({2}, f64Type), ValueRange{zero, zero});
+    for (int64_t i = 0; i < probsSize; i++) {
+        zeros.push_back(zero.getResult());
+    }
+    auto zeroTensor = tensor::FromElementsOp::create(builder, loc, probsType, zeros);
+
+    // Calculate the index position
+    auto totalIndex =
+        arith::ConstantOp::create(builder, loc, i64Type, builder.getIntegerAttr(i64Type, 0));
+    Operation *loopUpdater = totalIndex;
+    for (auto [i, mcm] : llvm::enumerate(llvm::reverse(mcmobs.getMcms()))) {
+        // Power of 2 for this bit position
+        auto extuiOp = arith::ExtUIOp::create(builder, loc, builder.getI64Type(), mcm);
+        auto shiftSize =
+            arith::ConstantOp::create(builder, loc, i64Type, builder.getIntegerAttr(i64Type, i));
+        auto shiftedOne =
+            arith::ShLIOp::create(builder, loc, extuiOp.getOut(), shiftSize.getResult());
+        auto orOp =
+            arith::OrIOp::create(builder, loc, loopUpdater->getResult(0), shiftedOne.getResult());
+        loopUpdater = orOp;
+    }
 
     // Convert mcm (I1) to an index and insert 1 into the zero tensor at the index
-    Value mcm = mcmobs.getMcm();
-    auto extuiOp = arith::ExtUIOp::create(builder, loc, builder.getI64Type(), mcm);
     auto indexOp =
-        arith::IndexCastOp::create(builder, loc, builder.getIndexType(), extuiOp.getOut());
+        arith::IndexCastOp::create(builder, loc, builder.getIndexType(), loopUpdater->getResult(0));
     auto one = arith::ConstantOp::create(builder, loc, f64Type, builder.getFloatAttr(f64Type, 1));
     auto insertedTensor = tensor::InsertOp::create(builder, loc, one.getResult(), zeroTensor,
                                                    ValueRange{indexOp.getResult()});
@@ -302,27 +330,28 @@ void OneShotMCMPass::editKernelMCMProbs(IRRewriter &builder, func::FuncOp oneSho
 void OneShotMCMPass::editKernelMCMSample(IRRewriter &builder, func::FuncOp oneShotKernel,
                                          quantum::MCMObsOp mcmobs, size_t retIdx)
 {
-    // If the kernel returns sample on a mcm,
-    // the single-shot sample of a mcm is just the mcm boolean result itself
+    // If the kernel returns sample on MCMs,
+    // the single-shot sample of a MCM is just the MCM boolean result itself
     // So we just cast it to the correct type and return it.
 
     OpBuilder::InsertionGuard guard(builder);
     Location loc = oneShotKernel->getLoc();
 
-    // Cast the I1 mcm to the correct type and return it
-    // MCM itself is I1
-    // Sample kernel returns tensor<1x1xi64>
+    // Cast the I1 MCMs to the correct type and return it
     Operation *retOp = oneShotKernel.getBody().back().getTerminator();
     builder.setInsertionPoint(retOp);
 
-    Value mcm = mcmobs.getMcm();
-    auto extuiOp = arith::ExtUIOp::create(builder, loc, builder.getI64Type(), mcm);
-    auto fromElementsOp = tensor::FromElementsOp::create(
-        builder, loc, oneShotKernel.getFunctionType().getResults()[retIdx], extuiOp.getOut());
+    SmallVector<Value> castedMCMs;
+    for (Value mcm : mcmobs.getMcms()) {
+        auto extuiOp = arith::ExtUIOp::create(builder, loc, builder.getI64Type(), mcm);
+        castedMCMs.push_back(extuiOp.getResult());
+    }
 
+    auto fromElementsOp = tensor::FromElementsOp::create(
+        builder, loc, oneShotKernel.getFunctionType().getResults()[retIdx], castedMCMs);
     retOp->setOperand(retIdx, fromElementsOp.getResult());
 
-    // Erase all users of the mcm obs: the new return does not need them.
+    // Erase all users of the MCM obs: the new return does not need them.
     eraseAllUsersExcept(mcmobs.getObs(), retOp);
     mcmobs->erase();
 }
