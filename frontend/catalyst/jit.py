@@ -72,49 +72,6 @@ setattr(jax.interpreters.partial_eval.DynamicJaxprTracer, "__hash__", lambda x: 
 jax.config.update("jax_enable_x64", True)
 
 
-@contextmanager
-def _ensure_capture_mode(enable_capture: bool):
-    """Enforce the PennyLane capture state for the duration of the context.
-
-    This context manager safely transitions the global ``qml.capture`` state to
-    the requested state and guarantees restoration of the previous state upon
-    exit, regardless of exceptions.
-
-    This implements "scope enforcement" rather than "state management": you don't
-    care what the global state *was*; you only care what it *must be* for the
-    duration of this scope. The context manager handles all toggling automatically.
-
-    Args:
-        enable_capture (bool): The desired capture state within the context.
-            - ``True``: Enable PennyLane capture (use new capture pathway)
-            - ``False``: Disable PennyLane capture (use legacy pathway)
-
-    Note:
-        This context manager is re-entrant and nesting-safe. Nested calls will
-        each restore to their own previous state, protecting against nested
-        toggles drifting out of sync.
-    """
-    # 1. Snapshot the pre-existing state
-    was_enabled = qml.capture.enabled()
-
-    # 2. Enforce the requested state (only toggle if necessary)
-    if enable_capture and not was_enabled:
-        qml.capture.enable()
-    elif not enable_capture and was_enabled:
-        qml.capture.disable()
-
-    try:
-        yield
-    finally:
-        # 3. Restore the original state directly from snapshot
-        # We restore 'was_enabled' directly rather than just toggling back,
-        # which protects against nested toggles drifting out of sync.
-        if was_enabled:
-            qml.capture.enable()
-        else:
-            qml.capture.disable()
-
-
 ## API ##
 @debug_logger
 def qjit(
@@ -1071,3 +1028,46 @@ class JAX_QJIT:
     @debug_logger
     def __call__(self, *args, **kwargs):
         return self.jaxed_function(*args, **kwargs)
+
+
+@contextmanager
+def _ensure_capture_mode(enable_capture: bool):
+    """Enforce the PennyLane capture state for the duration of the context.
+
+    This context manager safely transitions the global ``qml.capture`` state to
+    the requested state and guarantees restoration of the previous state upon
+    exit, regardless of exceptions.
+
+    This implements "scope enforcement" rather than "state management": you don't
+    care what the global state *was*; you only care what it *must be* for the
+    duration of this scope. The context manager handles all toggling automatically.
+
+    Args:
+        enable_capture (bool): The desired capture state within the context.
+            - ``True``: Enable PennyLane capture (use new capture pathway)
+            - ``False``: Disable PennyLane capture (use legacy pathway)
+
+    Note:
+        This context manager is re-entrant and nesting-safe. Nested calls will
+        each restore to their own previous state, protecting against nested
+        toggles drifting out of sync.
+    """
+    # 1. Snapshot the pre-existing state
+    was_enabled = qml.capture.enabled()
+
+    # 2. Enforce the requested state (only toggle if necessary)
+    if enable_capture and not was_enabled:
+        qml.capture.enable()
+    elif not enable_capture and was_enabled:
+        qml.capture.disable()
+
+    try:
+        yield
+    finally:
+        # 3. Restore the original state directly from snapshot
+        # We restore 'was_enabled' directly rather than just toggling back,
+        # which protects against nested toggles drifting out of sync.
+        if was_enabled:
+            qml.capture.enable()
+        else:
+            qml.capture.disable()
