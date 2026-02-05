@@ -425,30 +425,25 @@ class TestExpval:
 
     def test_hamiltonian_4(self, backend):
         """Test expval with TensorObs and nested Hamiltonian observables."""
+        obs_matrix = np.array(
+            [
+                [0.5, 1.0j, 0.0, -3j],
+                [-1.0j, -1.1, 0.0, -0.1],
+                [0.0, 0.0, -0.9, 12.0],
+                [3j, -0.1, 12.0, 0.0],
+            ]
+        )
+        obs = qml.Hermitian(obs_matrix, wires=[0, 1])
+        coeff = np.array([0.8, 0.2])
+        obs2 = qml.Hamiltonian(coeff, [obs, qml.Hamiltonian([1, 1], [qml.PauliX(0), qml.PauliZ(1)])])
+        obs3 = obs2 @ qml.PauliZ(2)
 
         @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def expval(x: float):
             qml.RX(x, wires=0)
             qml.RX(x + 1.0, wires=2)
-
-            coeff = np.array([0.8, 0.2])
-            obs_matrix = np.array(
-                [
-                    [0.5, 1.0j, 0.0, -3j],
-                    [-1.0j, -1.1, 0.0, -0.1],
-                    [0.0, 0.0, -0.9, 12.0],
-                    [3j, -0.1, 12.0, 0.0],
-                ]
-            )
-
-            obs = qml.Hermitian(obs_matrix, wires=[0, 1])
-            return qml.expval(
-                qml.Hamiltonian(
-                    coeff, [obs, qml.Hamiltonian([1, 1], [qml.PauliX(0), qml.PauliZ(1)])]
-                )
-                @ qml.PauliZ(2)
-            )
+            return qml.expval(obs3)
 
         expected = np.array(-0.09284557)
         observed = expval(np.pi / 4)
