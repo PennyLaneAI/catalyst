@@ -286,36 +286,29 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             )
 
         prim = measurement_map[type(measurement)]
-        if (
-            measurement.mv is not None
-            or measurement.obs is not None
-            and not isinstance(measurement.obs, qml.operation.Operator)
-        ):
-            mp_is_on_mcm = True
-            if isinstance(measurement.mv, list):
-                num_mcms = len(measurement.mv)
-                obs = mcmobs_p.bind(*measurement.mv)
-            else:
-                num_mcms = 1
-                obs = mcmobs_p.bind(measurement.mv)
-            shape, dtype = measurement._abstract_eval(n_wires=num_mcms, shots=self.shots)
+        mcm_mv = measurement.mv
+        mcm_obs = measurement.obs
+        mp_is_on_mcm = (mcm_mv is not None) or (
+            mcm_obs is not None and not isinstance(mcm_obs, qml.operation.Operator)
+        )
 
+        if mp_is_on_mcm:
+            mcm_list = mcm_mv if isinstance(mcm_mv, list) else [mcm_mv]
+            obs = mcmobs_p.bind(*mcm_list)
+            n_wires = len(mcm_list)
+            _abstract_eval_kwargs = {}
         else:
-            mp_is_on_mcm = False
-            if measurement.obs:
-                obs = self._obs(measurement.obs)
-            else:
-                obs = self._compbasis_obs(*measurement.wires)
+            obs = self._obs(mcm_obs) if mcm_obs else self._compbasis_obs(*measurement.wires)
+            n_wires = len(measurement.wires)
+            _abstract_eval_kwargs = {"num_device_wires": len(self.device.wires)}
 
-            shape, dtype = measurement._abstract_eval(
-                n_wires=len(measurement.wires),
-                shots=self.shots,
-                num_device_wires=len(self.device.wires),
-            )
+        shape, dtype = measurement._abstract_eval(
+            n_wires=n_wires, shots=self.shots, **_abstract_eval_kwargs
+        )
 
         if prim is sample_p:
             if mp_is_on_mcm:
-                sample_shape = (self.shots, num_mcms)
+                sample_shape = (self.shots, n_wires)
             else:
                 num_qubits = len(measurement.wires) or len(self.device.wires)
                 sample_shape = (self.shots, num_qubits)
