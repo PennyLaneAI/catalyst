@@ -126,7 +126,7 @@ def test_mlir_one_shot_pass_probs():
 
 print(test_mlir_one_shot_pass_probs.mlir)
 
-# CHECK: func.func public @test_mlir_one_shot_pass_probs.quantum_kernel
+# CHECK: func.func public @test_mlir_one_shot_pass_probs.one_shot_kernel
 # CHECK:    [[one:%.+]] = arith.constant 1 : i64
 # CHECK:    quantum.device shots([[one]])
 # CHECK:    Hadamard
@@ -134,7 +134,7 @@ print(test_mlir_one_shot_pass_probs.mlir)
 # CHECK: func.func public @test_mlir_one_shot_pass_probs
 # CHECK:    index.constant 1000
 # CHECK:    scf.for
-# CHECK:    func.call @test_mlir_one_shot_pass_probs.quantum_kernel
+# CHECK:    func.call @test_mlir_one_shot_pass_probs.one_shot_kernel
 # CHECK:    stablehlo.add
 # CHECK:    stablehlo.divide
 print(get_compilation_stage(test_mlir_one_shot_pass_probs, "QuantumCompilationStage"))
@@ -170,7 +170,7 @@ def test_mlir_one_shot_pass_probs_mcm():
 
 print(test_mlir_one_shot_pass_probs_mcm.mlir)
 
-# CHECK: func.func public @test_mlir_one_shot_pass_probs_mcm.quantum_kernel
+# CHECK: func.func public @test_mlir_one_shot_pass_probs_mcm.one_shot_kernel
 # CHECK:    [[one:%.+]] = arith.constant 1 : i64
 # CHECK:    quantum.device shots([[one]])
 # CHECK:    Hadamard
@@ -179,7 +179,7 @@ print(test_mlir_one_shot_pass_probs_mcm.mlir)
 # CHECK: func.func public @test_mlir_one_shot_pass_probs_mcm
 # CHECK:    index.constant 1000
 # CHECK:    scf.for
-# CHECK:    func.call @test_mlir_one_shot_pass_probs_mcm.quantum_kernel
+# CHECK:    func.call @test_mlir_one_shot_pass_probs_mcm.one_shot_kernel
 # CHECK:    stablehlo.add
 # CHECK:    stablehlo.divide
 print(get_compilation_stage(test_mlir_one_shot_pass_probs_mcm, "QuantumCompilationStage"))
@@ -215,7 +215,7 @@ def test_mlir_one_shot_pass_expval_mcm():
 
 print(test_mlir_one_shot_pass_expval_mcm.mlir)
 
-# CHECK: func.func public @test_mlir_one_shot_pass_expval_mcm.quantum_kernel
+# CHECK: func.func public @test_mlir_one_shot_pass_expval_mcm.one_shot_kernel
 # CHECK:    [[one:%.+]] = arith.constant 1 : i64
 # CHECK:    quantum.device shots([[one]])
 # CHECK:    Hadamard
@@ -224,7 +224,7 @@ print(test_mlir_one_shot_pass_expval_mcm.mlir)
 # CHECK: func.func public @test_mlir_one_shot_pass_expval_mcm
 # CHECK:    index.constant 1000
 # CHECK:    scf.for
-# CHECK:    func.call @test_mlir_one_shot_pass_expval_mcm.quantum_kernel
+# CHECK:    func.call @test_mlir_one_shot_pass_expval_mcm.one_shot_kernel
 # CHECK:    stablehlo.add
 # CHECK:    stablehlo.divide
 print(get_compilation_stage(test_mlir_one_shot_pass_expval_mcm, "QuantumCompilationStage"))
@@ -258,7 +258,7 @@ def test_mlir_one_shot_pass_sample():
 
 print(test_mlir_one_shot_pass_sample.mlir)
 
-# CHECK: func.func public @test_mlir_one_shot_pass_sample.quantum_kernel
+# CHECK: func.func public @test_mlir_one_shot_pass_sample.one_shot_kernel
 # CHECK:    [[one:%.+]] = arith.constant 1 : i64
 # CHECK:    quantum.device shots([[one]])
 # CHECK:    Hadamard
@@ -266,7 +266,7 @@ print(test_mlir_one_shot_pass_sample.mlir)
 # CHECK: func.func public @test_mlir_one_shot_pass_sample
 # CHECK:    index.constant 1000
 # CHECK:    scf.for
-# CHECK:    func.call @test_mlir_one_shot_pass_sample.quantum_kernel
+# CHECK:    func.call @test_mlir_one_shot_pass_sample.one_shot_kernel
 # CHECK:    tensor.insert_slice
 print(get_compilation_stage(test_mlir_one_shot_pass_sample, "QuantumCompilationStage"))
 
@@ -301,7 +301,7 @@ def test_mlir_one_shot_pass_sample_mcm():
 
 print(test_mlir_one_shot_pass_sample_mcm.mlir)
 
-# CHECK: func.func public @test_mlir_one_shot_pass_sample_mcm.quantum_kernel
+# CHECK: func.func public @test_mlir_one_shot_pass_sample_mcm.one_shot_kernel
 # CHECK:    [[one:%.+]] = arith.constant 1 : i64
 # CHECK:    quantum.device shots([[one]])
 # CHECK:    Hadamard
@@ -310,7 +310,7 @@ print(test_mlir_one_shot_pass_sample_mcm.mlir)
 # CHECK: func.func public @test_mlir_one_shot_pass_sample_mcm
 # CHECK:    index.constant 1000
 # CHECK:    scf.for
-# CHECK:    func.call @test_mlir_one_shot_pass_sample_mcm.quantum_kernel
+# CHECK:    func.call @test_mlir_one_shot_pass_sample_mcm.one_shot_kernel
 # CHECK:    tensor.insert_slice
 print(get_compilation_stage(test_mlir_one_shot_pass_sample_mcm, "QuantumCompilationStage"))
 
@@ -343,7 +343,7 @@ def test_mlir_one_shot_pass_counts():
 
 print(test_mlir_one_shot_pass_counts.mlir)
 
-# CHECK: func.func public @test_mlir_one_shot_pass_counts.quantum_kernel
+# CHECK: func.func public @test_mlir_one_shot_pass_counts.one_shot_kernel
 # CHECK:    [[one:%.+]] = arith.constant 1 : i64
 # CHECK:    quantum.device shots([[one]])
 # CHECK:    Hadamard
@@ -351,7 +351,7 @@ print(test_mlir_one_shot_pass_counts.mlir)
 # CHECK: func.func public @test_mlir_one_shot_pass_counts
 # CHECK:    index.constant 1000
 # CHECK:    scf.for
-# CHECK:    func.call @test_mlir_one_shot_pass_counts.quantum_kernel
+# CHECK:    func.call @test_mlir_one_shot_pass_counts.one_shot_kernel
 # CHECK:    stablehlo.add
 print(get_compilation_stage(test_mlir_one_shot_pass_counts, "QuantumCompilationStage"))
 
@@ -389,14 +389,14 @@ def test_mlir_one_shot_pass_MP_family():
 
 print(test_mlir_one_shot_pass_MP_family.mlir)
 
-# CHECK: func.func public @test_mlir_one_shot_pass_MP_family.quantum_kernel
+# CHECK: func.func public @test_mlir_one_shot_pass_MP_family.one_shot_kernel
 # CHECK:    [[one:%.+]] = arith.constant 1 : i64
 # CHECK:    quantum.device shots([[one]])
 # CHECK:    Hadamard
 # CHECK: func.func public @test_mlir_one_shot_pass_MP_family
 # CHECK:    index.constant 1000
 # CHECK:    scf.for
-# CHECK:    func.call @test_mlir_one_shot_pass_MP_family.quantum_kernel
+# CHECK:    func.call @test_mlir_one_shot_pass_MP_family.one_shot_kernel
 print(get_compilation_stage(test_mlir_one_shot_pass_MP_family, "QuantumCompilationStage"))
 
 res = test_mlir_one_shot_pass_MP_family()
