@@ -157,6 +157,7 @@
   Hamiltonian expectation values. It facilitates execution on devices that don't natively support expectation values of sums of observables by splitting them into individual leaf observable expvals.
   [(#2441)](https://github.com/PennyLaneAI/catalyst/pull/2441)
 
+Consider the following example:
   ```python
   import pennylane as qml
   from catalyst import qjit
