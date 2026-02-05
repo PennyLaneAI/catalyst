@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
@@ -525,6 +526,10 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
             std::string quantumFuncName = origFunc.getName().str() + ".quantum";
             auto quantumFunc = cast<func::FuncOp>(moduleBuilder.clone(*origFunc, cloneMapping));
             quantumFunc.setName(quantumFuncName);
+
+            // Insert into SymbolTable, which will automatically handle name collisions
+            SymbolTable modSymTable(origFunc->getParentOfType<ModuleOp>());
+            modSymTable.insert(quantumFunc);
 
             // Modify quantumFunc to return individual expvals
             ReturnValueMappingInfo mappingInfo;
