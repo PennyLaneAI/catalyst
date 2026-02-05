@@ -105,7 +105,7 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointAfter(callee);
         unallocFn =
-            rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
+            func::FuncOp::create(rewriter, loc, fnName, fnType, visibility, nullptr, nullptr);
 
         // Clone the body.
         IRMapping mapper;
@@ -153,14 +153,14 @@ func::FuncOp AdjointLowering::genQGradFunction(PatternRewriter &rewriter, Locati
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointAfter(callee);
 
-        qGradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
+        qGradFn = func::FuncOp::create(rewriter, loc, fnName, fnType, visibility, nullptr, nullptr);
         rewriter.setInsertionPointToStart(qGradFn.addEntryBlock());
 
-        AdjointOp qGradOp = rewriter.create<AdjointOp>(
-            loc, computeQGradTypes(callee), SymbolRefAttr::get(unallocFn),
+        AdjointOp qGradOp = AdjointOp::create(
+            rewriter, loc, computeQGradTypes(callee), SymbolRefAttr::get(unallocFn),
             qGradFn.getArguments().back(), qGradFn.getArguments().drop_back(), ValueRange{});
 
-        rewriter.create<func::ReturnOp>(loc, qGradOp.getResults());
+        func::ReturnOp::create(rewriter, loc, qGradOp.getResults());
     }
 
     return qGradFn;
