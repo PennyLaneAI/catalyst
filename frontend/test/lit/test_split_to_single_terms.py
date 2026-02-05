@@ -14,17 +14,25 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+"""
+Lit tests for the split-to-single-terms pass.
+
+Tests the split-to-single-terms pass for different types of Hamiltonian expectation values.
+"""
+
 import pennylane as qml
 
 from catalyst import qjit
 from catalyst.passes import apply_pass
 from catalyst.debug import get_compilation_stage
 
+
 def test_split_to_single_terms_basic():
     """
     Test basic Hamiltonian splitting
     H = Z(0) + X(1) + 2 * Y(2)
     """
+
     @qjit(keep_intermediate=True)
     @apply_pass("split-to-single-terms")
     @qml.qnode(qml.device("lightning.qubit", wires=3))
@@ -69,6 +77,7 @@ def test_split_to_single_terms_tensor_product():
     Test tensor product Hamiltonian splitting
     H = Z(0) @ X(1) + 2 * Y(2)
     """
+
     @qjit(keep_intermediate=True)
     @apply_pass("split-to-single-terms")
     @qml.qnode(qml.device("lightning.qubit", wires=3))
@@ -108,15 +117,18 @@ def test_split_to_single_terms_tensor_product():
     # CHECK: return %[[RESULT]]
     print(get_compilation_stage(circuit, "QuantumCompilationStage"))
 
+
 test_split_to_single_terms_tensor_product()
 
 # -----
+
 
 def test_split_to_single_terms_identity():
     """
     Test identity Hamiltonian splitting
     H = Z(0) + 2 * X(1) + 0.7 * Identity(2)
     """
+
     @qjit(keep_intermediate=True)
     @apply_pass("split-to-single-terms")
     @qml.qnode(qml.device("lightning.qubit", wires=3))
@@ -158,5 +170,6 @@ def test_split_to_single_terms_identity():
     # CHECK: %[[RESULT:.*]] = stablehlo.reduce(%[[CONCAT]] init: {{%.+}}) applies stablehlo.add
     # CHECK: return %[[RESULT]]
     print(get_compilation_stage(circuit, "QuantumCompilationStage"))
+
 
 test_split_to_single_terms_identity()
