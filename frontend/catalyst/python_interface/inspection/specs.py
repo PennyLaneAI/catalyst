@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 import warnings
 from typing import Literal
 
@@ -37,7 +38,7 @@ def mlir_specs(
     qnode: QJIT,
     level: int | tuple[int] | list[int] | Literal["all"],
     *args,
-    level_to_marker: dict[int, str] | None = None,
+    level_to_markers: dict[int, tuple(str)] | None = None,
     **kwargs,
 ) -> ResourcesResult | dict[str, ResourcesResult]:
     """Compute the specs used for a circuit at the level of an MLIR pass.
@@ -53,8 +54,8 @@ def mlir_specs(
           specified level
     """
 
-    if level_to_marker is None:
-        level_to_marker = {}
+    if level_to_markers is None:
+        level_to_markers = defaultdict(tuple)
 
     if not isinstance(qnode, QJIT) or (
         not isinstance(qnode.original_function, QNode)
@@ -117,7 +118,7 @@ def mlir_specs(
                 f"Requested specs levels {', '.join(missing)} not found in MLIR pass list."
             )
         return {
-            level_to_marker.get(lvl, f"{cache[lvl][1]} (MLIR-{lvl})"): cache[lvl][0]
+            ', '.join(level_to_markers.get(lvl, f"{cache[lvl][1]} (MLIR-{lvl})")): cache[lvl][0]
             for lvl in level
             if lvl in cache
         }
