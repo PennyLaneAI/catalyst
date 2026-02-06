@@ -106,6 +106,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fix a bug in the bind call function for `PCPhase` where the signature did not match what was 
+  expected in `jax_primitives`.
+  [(#2467)](https://github.com/PennyLaneAI/catalyst/pull/2467)
+
 * Fix a bug with the xDSL `ParitySynth` pass that caused failure when the QNode being transformed
   contained operations with regions.
   [(#2408)](https://github.com/PennyLaneAI/catalyst/pull/2408)
@@ -219,6 +223,7 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
 Yushao Chen,
+Marcus Edwards,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
