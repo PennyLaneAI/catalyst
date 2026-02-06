@@ -116,6 +116,8 @@ def test_mcm_obs():
     # CHECK:  [[probs:%.+]] = quantum.probs [[probsObs]] : tensor<4xf64>
     # CHECK:  [[varObs:%.+]] = quantum.mcmobs [[m0]] : !quantum.obs
     # CHECK:  [[var:%.+]] = quantum.var [[varObs]] : f64
+    # CHECK:  [[countsObs:%.+]] = quantum.mcmobs [[m0]], [[m1]] : !quantum.obs
+    # CHECK:  [[counts:%.+]] = quantum.counts [[countsObs]] : tensor<4xf64>, tensor<4xi64>
 
     dev = qml.device("lightning.qubit", wires=2)
 
@@ -123,7 +125,13 @@ def test_mcm_obs():
     def circ():
         m0 = qml.measure(0)
         m1 = qml.measure(1)
-        return qml.expval(m0), qml.sample([m0, m1]), qml.probs(op=[m0, m1]), qml.var(m0)
+        return (
+            qml.expval(m0),
+            qml.sample([m0, m1]),
+            qml.probs(op=[m0, m1]),
+            qml.var(m0),
+            qml.counts([m0, m1]),
+        )
 
     return circ()
 

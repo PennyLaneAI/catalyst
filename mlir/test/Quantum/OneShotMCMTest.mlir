@@ -344,6 +344,63 @@ func.func public @test_counts(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) {
 // -----
 
 
+func.func public @test_counts_mcm(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) {
+  %1000 = arith.constant 1000 : i64
+  quantum.device shots(%1000) ["", "", ""]
+  %0 = quantum.alloc( 2) : !quantum.reg
+  %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+  %out_qubits = quantum.custom "RX"(%arg0) %1 : !quantum.bit
+  %mres0, %out_qubit = quantum.measure %out_qubits : i1, !quantum.bit
+  %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+  %mres1, %out_qubit_1 = quantum.measure %2 : i1, !quantum.bit
+  %3 = quantum.mcmobs %mres0, %mres1 : !quantum.obs
+  %eigvals, %counts = quantum.counts %3 : tensor<4xf64>, tensor<4xi64>
+  %4 = stablehlo.convert %eigvals : (tensor<4xf64>) -> tensor<4xi64>
+  %5 = quantum.insert %0[ 0], %out_qubit : !quantum.reg, !quantum.bit
+  %6 = quantum.insert %5[ 1], %out_qubit_1 : !quantum.reg, !quantum.bit
+  quantum.dealloc %6 : !quantum.reg
+  quantum.device_release
+  return %4, %counts : tensor<4xi64>, tensor<4xi64>
+}
+
+
+// CHECK:   func.func public @test_counts_mcm.one_shot_kernel(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>)
+// CHECK:     [[one:%.+]] = arith.constant 1 : i64
+// CHECK:     quantum.device shots([[one]]) ["", "", ""]
+// CHECK:     [[mres0:%.+]], {{%.+}} = quantum.measure {{%.+}} : i1, !quantum.bit
+// CHECK:     [[mres1:%.+]], {{%.+}} = quantum.measure {{%.+}} : i1, !quantum.bit
+// CHECK-NOT:    quantum.mcmobs
+// CHECK-NOT:    quantum.counts
+//
+// CHECK:     [[iota:%.+]] = stablehlo.iota dim = 0 : tensor<4xi64>
+// CHECK:     [[zero:%.+]] = arith.constant 0
+// CHECK:     [[zeroTensor:%.+]] = tensor.from_elements [[zero]], [[zero]], [[zero]], [[zero]] : tensor<4xi64>
+// CHECK:     [[totalIndexBase:%.+]] = arith.constant 0 : i64
+//
+// CHECK:     [[mcm_bit0_extend:%.+]] = arith.extui [[mres1]] : i1 to i64
+// CHECK:     [[bit0ShiftSize:%.+]] = arith.constant 0 : i64
+// CHECK:     [[mcm_bit0_shifted:%.+]] = arith.shli [[mcm_bit0_extend]], [[bit0ShiftSize]] : i64
+// CHECK:     [[mcm_bit0_ormask:%.+]] = arith.ori [[totalIndexBase]], [[mcm_bit0_shifted]] : i64
+//
+// CHECK:     [[mcm_bit1_extend:%.+]] = arith.extui [[mres0]] : i1 to i64
+// CHECK:     [[bit1ShiftSize:%.+]] = arith.constant 1 : i64
+// CHECK:     [[mcm_bit1_shifted:%.+]] = arith.shli [[mcm_bit1_extend]], [[bit1ShiftSize]] : i64
+// CHECK:     [[mcm_bit1_ormask:%.+]] = arith.ori [[mcm_bit0_ormask]], [[mcm_bit1_shifted]] : i64
+//
+// CHECK:     [[indexCast:%.+]] = arith.index_cast [[mcm_bit1_ormask]] : i64 to index
+// CHECK:     [[one:%.+]] = arith.constant 1 : i64
+// CHECK:     [[inserted:%.+]] = tensor.insert [[one]] into [[zeroTensor]][[[indexCast]]] : tensor<4xi64>
+// CHECK:     return [[iota]], [[inserted]] : tensor<4xi64>, tensor<4xi64>
+//
+// CHECK:   func.func public @test_counts_mcm(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>)
+// CHECK:      scf.for
+// CHECK:      func.call @test_counts_mcm.one_shot_kernel(%arg0)
+// CHECK:      stablehlo.add
+
+
+// -----
+
+
 func.func public @test_many_MPs(%arg0: f64) -> (tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>) {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]

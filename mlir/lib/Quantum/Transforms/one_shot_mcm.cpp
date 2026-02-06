@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "one-shot-mcm"
 
+#include <functional>
 #include <optional>
 
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -146,6 +147,7 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
     void editKernelMCMProbs(IRRewriter &, func::FuncOp, quantum::MCMObsOp, size_t retIdx);
     void editKernelMCMSample(IRRewriter &, func::FuncOp, quantum::MCMObsOp, size_t retIdx);
     void editKernelSampleShapes(func::FuncOp, ShapedType, quantum::SampleOp, size_t retIdx);
+    void editKernelMCMCounts(IRRewriter &, func::FuncOp, quantum::MCMObsOp, size_t retIdx);
 
     // Methods to prepare the initial arguments to the for loop
     void prepareForLoopInitArgs(IRRewriter &, func::FuncOp oneShotKernel, func::FuncOp qnodeFunc,
@@ -294,11 +296,20 @@ void OneShotMCMPass::editKernelMCMProbs(IRRewriter &builder, func::FuncOp oneSho
     // Create zero tensor
     auto probsType =
         dyn_cast<RankedTensorType>(oneShotKernel.getFunctionType().getResults()[retIdx]);
-    SmallVector<Value> zeros;
     int64_t probsSize = cast<ShapedType>(probsType).getShape()[0];
-    auto zero = arith::ConstantOp::create(builder, loc, f64Type, builder.getFloatAttr(f64Type, 0));
+    bool isInt = isa<IntegerType>(probsType.getElementType());
+    bool isFloat = isa<FloatType>(probsType.getElementType());
+
+    SmallVector<Value> zeros;
+    Value zero;
+    if (isInt) {
+        zero = arith::ConstantOp::create(builder, loc, i64Type, builder.getIntegerAttr(i64Type, 0));
+    }
+    else if (isFloat) {
+        zero = arith::ConstantOp::create(builder, loc, f64Type, builder.getFloatAttr(f64Type, 0));
+    }
     for (int64_t i = 0; i < probsSize; i++) {
-        zeros.push_back(zero.getResult());
+        zeros.push_back(zero);
     }
     auto zeroTensor = tensor::FromElementsOp::create(builder, loc, probsType, zeros);
 
@@ -321,9 +332,15 @@ void OneShotMCMPass::editKernelMCMProbs(IRRewriter &builder, func::FuncOp oneSho
     // Convert mcm (I1) to an index and insert 1 into the zero tensor at the index
     auto indexOp =
         arith::IndexCastOp::create(builder, loc, builder.getIndexType(), loopUpdater->getResult(0));
-    auto one = arith::ConstantOp::create(builder, loc, f64Type, builder.getFloatAttr(f64Type, 1));
-    auto insertedTensor = tensor::InsertOp::create(builder, loc, one.getResult(), zeroTensor,
-                                                   ValueRange{indexOp.getResult()});
+    Value one;
+    if (isInt) {
+        one = arith::ConstantOp::create(builder, loc, i64Type, builder.getIntegerAttr(i64Type, 1));
+    }
+    else if (isFloat) {
+        one = arith::ConstantOp::create(builder, loc, f64Type, builder.getFloatAttr(f64Type, 1));
+    }
+    auto insertedTensor =
+        tensor::InsertOp::create(builder, loc, one, zeroTensor, ValueRange{indexOp.getResult()});
 
     retOp->setOperand(retIdx, insertedTensor.getResult());
 
@@ -397,6 +414,30 @@ void OneShotMCMPass::editKernelSampleShapes(func::FuncOp oneShotKernel, ShapedTy
             }
         }
     }
+}
+
+void OneShotMCMPass::editKernelMCMCounts(IRRewriter &builder, func::FuncOp oneShotKernel,
+                                         quantum::MCMObsOp mcmobs, size_t retIdx)
+{
+    // If the kernel returns counts on MCMs,
+    // the single-shot counts of the MCM is a zero tensor, with a single one at
+    // the index specified by the MCM results
+    // This is exactly the same as the single shot probs on MCMs
+    // We only need to create a tensor for the eigenvalues.
+    // The eigenvalues are simply consecutive integers starting from 0, and can be created with
+    // https://openxla.org/stablehlo/spec#iota
+
+    OpBuilder::InsertionGuard guard(builder);
+    Location loc = oneShotKernel->getLoc();
+
+    Operation *retOp = oneShotKernel.getBody().back().getTerminator();
+    builder.setInsertionPoint(retOp);
+
+    auto eigensType =
+        dyn_cast<RankedTensorType>(oneShotKernel.getFunctionType().getResults()[retIdx]);
+    auto iotaOp = stablehlo::IotaOp::create(builder, loc, eigensType, 0);
+    retOp->setOperand(retIdx, iotaOp.getOutput());
+    editKernelMCMProbs(builder, oneShotKernel, mcmobs, retIdx + 1);
 }
 
 void OneShotMCMPass::prepareForLoopExpvalArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
@@ -530,13 +571,19 @@ void OneShotMCMPass::prepareForLoopCountsArgs(IRRewriter &builder, func::FuncOp 
     auto eigensType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[retIdx]);
     auto countsType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[retIdx + 1]);
 
+    // The one shot kernel itself might need some massaging if the MP is on a MCM.
+    Operation *MPSourceOp = countsOp.getObs().getDefiningOp();
+    if (isa<quantum::MCMObsOp>(MPSourceOp)) {
+        editKernelMCMCounts(builder, oneShotKernel, cast<quantum::MCMObsOp>(MPSourceOp), retIdx);
+    }
+
     auto countsSum = stablehlo::ConstantOp::create(
         builder, loc, countsType,
         DenseElementsAttr::get(countsType, builder.getIntegerAttr(builder.getI64Type(), 0)));
 
-    // We also need to yield the eigens from the kernel call inside the loop
-    // body However, this requires the loop to have an iteration argument for
-    // the eigens tensor We just initialize an empty one.
+    // We also need to yield the eigens from the kernel call inside the loop body.
+    // However, this requires the loop to have an iteration argument for the eigens tensor.
+    // We just initialize an empty one.
     auto eigensPlaceholder =
         tensor::EmptyOp::create(builder, loc, eigensType.getShape(), eigensType.getElementType());
 

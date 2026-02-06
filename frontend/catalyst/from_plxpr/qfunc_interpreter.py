@@ -451,6 +451,16 @@ def interpret_counts(self, *wires, all_outcomes):
     return keys, vals
 
 
+# pylint: disable=unused-argument
+@PLxPRToQuantumJaxprInterpreter.register_primitive(CountsMP._mcm_primitive)
+def interpret_counts(self, *mcms, single_mcm, all_outcomes):
+    """Interpret a CountsMP MCM primitive as the catalyst version."""
+    obs = mcmobs_p.bind(*mcms)
+    keys, vals = counts_p.bind(obs, static_shape=(2 ** len(mcms),))
+    keys = jax.lax.convert_element_type(keys, int)
+    return keys, vals
+
+
 def _subroutine_kernel(
     interpreter,
     jaxpr,

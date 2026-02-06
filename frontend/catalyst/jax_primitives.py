@@ -1804,7 +1804,7 @@ def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, kind
 #
 @mcmobs_p.def_abstract_eval
 def _mcmobs_abstract_eval(*mcms):
-    return AbstractObs()
+    return AbstractObs(len(mcms), mcmobs_p)
 
 
 def _mcm_obs_lowering(jax_ctx: mlir.LoweringRuleContext, *mcms: list[ir.Value]):
@@ -2000,7 +2000,7 @@ def counts_staging_rule(jaxpr_trace, _src, obs, *dynamic_shape, static_shape):
     """
 
     shape = _merge_dyn_shape(static_shape, dynamic_shape)
-    if obs.primitive is compbasis_p:
+    if obs.primitive in (compbasis_p, mcmobs_p):
         if obs.num_qubits:
             if isinstance(shape[0], int):
                 assert shape == (2**obs.num_qubits,)

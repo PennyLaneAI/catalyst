@@ -437,6 +437,10 @@ LogicalResult CountsOp::verify()
         // In the computational basis, the "eigenvalues" are all possible bistrings one can measure.
         numEigvals = std::pow(2, numQubits.value());
     }
+    else if (getObs().getDefiningOp<MCMObsOp>()) {
+        // When counting MCMs, the "eigenvalues" are all possible bistrings one can measure.
+        numEigvals = std::pow(2, numQubits.value());
+    }
     else {
         return emitOpError("cannot determine the number of eigenvalues for general observable");
     }
