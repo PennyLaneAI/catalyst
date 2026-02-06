@@ -103,7 +103,7 @@ def test_mlir_one_shot_pass_expval_mcm(backend):
 
 
 @pytest.mark.usefixtures("use_capture")
-def test_mlir_one_shot_pass_expval_mcm(backend):
+def test_mlir_one_shot_pass_var_mcm(backend):
     """
     Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with variance
     on a mid circuit measurement
