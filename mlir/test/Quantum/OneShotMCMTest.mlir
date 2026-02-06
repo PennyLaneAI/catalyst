@@ -93,6 +93,48 @@ func.func public @test_expval_mcm(%arg0: f64) -> tensor<f64> {
 // -----
 
 
+func.func public @test_var_mcm(%arg0: f64) -> tensor<f64> {
+  %1000 = arith.constant 1000 : i64
+  quantum.device shots(%1000) ["", "", ""]
+  %0 = quantum.alloc( 2) : !quantum.reg
+  %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+  %out_qubits = quantum.custom "RX"(%arg0) %1 : !quantum.bit
+  %mres, %out_qubit = quantum.measure %out_qubits : i1, !quantum.bit
+  %2 = quantum.mcmobs %mres : !quantum.obs
+  %3 = quantum.var %2 : f64
+  %from_elements = tensor.from_elements %3 : tensor<f64>
+  %4 = quantum.insert %0[ 0], %out_qubit : !quantum.reg, !quantum.bit
+  quantum.dealloc %4 : !quantum.reg
+  quantum.device_release
+  return %from_elements : tensor<f64>
+}
+
+// CHECK:   func.func public @test_var_mcm.one_shot_kernel(%arg0: f64) -> tensor<f64>
+// CHECK:     [[one:%.+]] = arith.constant 1 : i64
+// CHECK:     quantum.device shots([[one]]) ["", "", ""]
+// CHECK:     [[mres:%.+]], {{%.+}} = quantum.measure {{%.+}} : i1, !quantum.bit
+// CHECK-NOT:    quantum.mcmobs
+// CHECK-NOT:    quantum.expval
+// CHECK:     quantum.dealloc %2 : !quantum.reg
+// CHECK:     quantum.device_release
+// CHECK:     [[extend:%.+]] = arith.extui [[mres]] : i1 to i64
+// CHECK:     [[cast:%.+]] = arith.sitofp [[extend]] : i64 to f64
+// CHECK:     [[fromElements:%.+]] = tensor.from_elements [[cast]] : tensor<f64>
+// CHECK:     return [[fromElements]] : tensor<f64>
+//
+// CHECK:   func.func public @test_var_mcm(%arg0: f64) -> tensor<f64>
+// CHECK:      scf.for
+// CHECK:      func.call @test_var_mcm.one_shot_kernel(%arg0)
+// CHECK:      stablehlo.add
+// CHECK:      [[expval:%.+]] = stablehlo.divide
+// CHECK:      [[square:%.+]] = stablehlo.multiply [[expval]], [[expval]]
+// CHECK:      [[variance:%.+]] = stablehlo.subtract [[expval]], [[square]]
+// CHECK:      return [[variance]]
+
+
+// -----
+
+
 func.func public @test_probs(%arg0: f64) -> tensor<4xf64> {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]

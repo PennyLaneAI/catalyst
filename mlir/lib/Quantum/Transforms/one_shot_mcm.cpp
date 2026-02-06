@@ -157,6 +157,11 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
                                   SmallVector<Value> &loopIterArgs,
                                   SmallVector<std::string> &loopIterArgsMPKinds);
 
+    LogicalResult prepareForLoopVarianceArgs(IRRewriter &, func::FuncOp oneShotKernel,
+                                             quantum::VarianceOp varianceOp, size_t retIdx,
+                                             SmallVector<Value> &loopIterArgs,
+                                             SmallVector<std::string> &loopIterArgsMPKinds);
+
     void prepareForLoopProbsArgs(IRRewriter &, func::FuncOp oneShotKernel, quantum::ProbsOp probsOp,
                                  size_t retIdx, SmallVector<Value> &loopIterArgs,
                                  SmallVector<std::string> &loopIterArgsMPKinds);
@@ -418,6 +423,52 @@ void OneShotMCMPass::prepareForLoopExpvalArgs(IRRewriter &builder, func::FuncOp 
     loopIterArgsMPKinds.push_back("expval");
 }
 
+LogicalResult OneShotMCMPass::prepareForLoopVarianceArgs(
+    IRRewriter &builder, func::FuncOp oneShotKernel, quantum::VarianceOp varianceOp, size_t retIdx,
+    SmallVector<Value> &loopIterArgs, SmallVector<std::string> &loopIterArgsMPKinds)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    Location loc = oneShotKernel->getLoc();
+    Type f64Type = builder.getF64Type();
+
+    // There is a limitation regarding the support of variance.
+    // The simple strategy for the one-shot MCM transform is to maintain the existing MP,
+    // but computed on a single shot now, and then average it later.
+    // However, with variance this strategy doesn't work because we cannot compute a "local"
+    // variance on 1 shot.
+    // What would be required is to turn the var(obs) MP into a sample(obs) MP, and then
+    // compute the variance from the samples.
+    // The only issue is that we don't support sampling observables in Catalyst yet.
+    //
+    // We can however support var on MCMs, since we do not run into the above problem when
+    // the 1 shot kernel returns a boolean MCM result, instead of a sample on an observable.
+
+    Operation *MPSourceOp = varianceOp.getObs().getDefiningOp();
+    if (!isa<quantum::MCMObsOp>(MPSourceOp)) {
+        varianceOp->emitOpError("Conversion of VarianceOp to one-shot is only supported when "
+                                "computing variance of MCMs");
+        return failure();
+    }
+
+    // To compute the variance of a set of MCMs, we use the following formula
+    // For a random variable RV, its variance can be computed via
+    // Var(RV) = Exp(RV^2) - (Exp(RV))^2
+    // But each MCM is just 0 or 1, so squaring them doesn't change them!
+    // So we have
+    // Var(a set of MCMs) = Exp(a set of MCMs) - Exp(a set of MCMs)^2
+    // Therefore, we only need to do the same treatment as expval, and only apply this formula
+    // in the post processing after the for loop over the shots, when the expval across all shots
+    // have become available.
+    editKernelMCMExpval(builder, oneShotKernel, cast<quantum::MCMObsOp>(MPSourceOp), retIdx);
+    auto expvalType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[retIdx]);
+    auto expvalSum = stablehlo::ConstantOp::create(
+        builder, loc, expvalType,
+        DenseElementsAttr::get(expvalType, builder.getFloatAttr(f64Type, 0)));
+    loopIterArgs.push_back(expvalSum);
+    loopIterArgsMPKinds.push_back("variance");
+    return success();
+}
+
 void OneShotMCMPass::prepareForLoopProbsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
                                              quantum::ProbsOp probsOp, size_t retIdx,
                                              SmallVector<Value> &loopIterArgs,
@@ -524,9 +575,11 @@ void OneShotMCMPass::prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp on
         }
 
         else if (isa<quantum::VarianceOp>(mp)) {
-            mp->emitOpError(
-                "VarianceOp is not currently supported for conversion to one-shot MCM.");
-            return signalPassFailure();
+            if (failed(prepareForLoopVarianceArgs(builder, oneShotKernel,
+                                                  cast<quantum::VarianceOp>(mp), i, loopIterArgs,
+                                                  loopIterArgsMPKinds))) {
+                return signalPassFailure();
+            }
         }
 
         else if (isa<quantum::ExpvalOp>(mp)) {
@@ -575,7 +628,7 @@ void OneShotMCMPass::constructForLoopBody(IRRewriter &builder, scf::ForOp forOp,
     SmallVector<Value> loopYields;
 
     for (auto [i, mpKind] : llvm::enumerate(loopIterArgsMPKinds)) {
-        if (mpKind == "expval") {
+        if (mpKind == "expval" || mpKind == "variance") {
             // Add the expval from each iteration
             auto addOp = stablehlo::AddOp::create(builder, loc, kernalCallOp.getResult(i),
                                                   forOp.getRegionIterArg(i));
@@ -631,7 +684,7 @@ void OneShotMCMPass::postProcessLoopResults(IRRewriter &builder, scf::ForOp forO
     Type f64Type = builder.getF64Type();
 
     for (auto [i, mpKind] : llvm::enumerate(loopIterArgsMPKinds)) {
-        if (mpKind == "expval") {
+        if (mpKind == "expval" || mpKind == "variance") {
             // Divide the sum by shots
             // shots Value is I64, need to turn into tensor<f64> for division
             auto int2floatCastOp = arith::SIToFPOp::create(builder, loc, f64Type, shots);
@@ -640,7 +693,17 @@ void OneShotMCMPass::postProcessLoopResults(IRRewriter &builder, scf::ForOp forO
 
             auto divOp = stablehlo::DivOp::create(builder, loc, forOp->getResult(i),
                                                   shotsFromElementsOp.getResult());
-            retVals.push_back(divOp.getResult());
+            if (mpKind == "expval") {
+                retVals.push_back(divOp.getResult());
+            }
+            else if (mpKind == "variance") {
+                // Var(a set of MCMs) = Exp(a set of MCMs) - Exp(a set of MCMs)^2
+                auto multiplyOp =
+                    stablehlo::MulOp::create(builder, loc, divOp.getResult(), divOp.getResult());
+                auto subtractOp = stablehlo::SubtractOp::create(builder, loc, divOp.getResult(),
+                                                                multiplyOp.getResult());
+                retVals.push_back(subtractOp.getResult());
+            }
         }
 
         else if (mpKind == "probs") {

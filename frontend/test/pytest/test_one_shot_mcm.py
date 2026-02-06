@@ -103,6 +103,27 @@ def test_mlir_one_shot_pass_expval_mcm(backend):
 
 
 @pytest.mark.usefixtures("use_capture")
+def test_mlir_one_shot_pass_expval_mcm(backend):
+    """
+    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with variance
+    on a mid circuit measurement
+    """
+
+    @qjit(seed=38)
+    @qml.transform(pass_name="one-shot-mcm")
+    @qml.qnode(qml.device(backend, wires=2), shots=1000)
+    def circuit():
+        qml.Hadamard(wires=0)
+        m_0 = qml.measure(0)
+        m_1 = qml.measure(1)
+        return qml.var(m_0), qml.var(m_1)
+
+    res = circuit()
+    assert np.allclose(res[0], 0.25, atol=0.01, rtol=0.01)
+    assert np.allclose(res[1], 0, atol=0.01, rtol=0.01)
+
+
+@pytest.mark.usefixtures("use_capture")
 def test_mlir_one_shot_pass_sample(backend):
     """
     Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with sample
