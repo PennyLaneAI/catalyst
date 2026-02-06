@@ -46,7 +46,11 @@ from xdsl.irdl import (
 from xdsl.traits import NoMemoryEffect
 from xdsl.utils.hints import isa
 
-from catalyst.python_interface.xdsl_extras import MemRefConstraint, TensorConstraint
+from catalyst.python_interface.xdsl_extras import (
+    AllMatchSameOperatorTrait,
+    MemRefConstraint,
+    TensorConstraint,
+)
 
 from ..attributes import PauliWord, QubitSSAValue, QubitType
 
@@ -66,6 +70,10 @@ class UnitaryGateOp(GateOp):
 ###########################################
 ############## Unitary Gates ##############
 ###########################################
+
+
+def qubit_attrs_to_check(attr: QubitType):
+    return attr.level, attr.role, attr._default_level, attr._default_role
 
 
 @irdl_op_definition
@@ -90,21 +98,25 @@ class CustomOp(UnitaryGateOp):
 
     params = var_operand_def(Float64Type())
 
-    in_qubits = var_operand_def(QubitType)
+    in_qubits = var_operand_def(QubitType())
 
     gate_name = prop_def(StringAttr)
 
     adjoint = opt_prop_def(UnitAttr)
 
-    in_ctrl_qubits = var_operand_def(QubitType)
+    in_ctrl_qubits = var_operand_def(QubitType())
 
     in_ctrl_values = var_operand_def(i1)
 
-    out_qubits = var_result_def(QubitType)
+    out_qubits = var_result_def(QubitType())
 
-    out_ctrl_qubits = var_result_def(QubitType)
+    out_ctrl_qubits = var_result_def(QubitType())
 
-    traits = traits_def(NoMemoryEffect())
+    traits = traits_def(
+        NoMemoryEffect(),
+        AllMatchSameOperatorTrait(("in_qubits", "out_qubits"), qubit_attrs_to_check, ""),
+        AllMatchSameOperatorTrait(("in_ctrl_qubits", "out_ctrl_qubits"), qubit_attrs_to_check, ""),
+    )
 
     # pylint: disable=too-many-arguments
     def __init__(
