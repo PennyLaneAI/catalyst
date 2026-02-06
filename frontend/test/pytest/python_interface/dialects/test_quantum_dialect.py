@@ -15,14 +15,15 @@
 
 import pytest
 from xdsl.dialects.builtin import (
-    I32,
     ArrayAttr,
     ComplexType,
     Float64Type,
+    IntegerAttr,
     StringAttr,
     TensorType,
     UnitAttr,
     i1,
+    i64,
 )
 from xdsl.dialects.test import TestOp
 from xdsl.ir import AttributeCovT, Block, Operation, OpResult, Region
@@ -105,13 +106,15 @@ theta = create_ssa_value(Float64Type())
 dim = create_ssa_value(Float64Type())
 pauli_x = NamedObservableAttr("PauliX")
 obs = create_ssa_value(ObservableType())
-i = create_ssa_value(I32)
-matrix = create_ssa_value(TensorType(element_type=Float64Type, shape=(2, 2)))
+bool_ssa = create_ssa_value(i1)
+matrix = create_ssa_value(TensorType(element_type=Float64Type(), shape=(2, 2)))
 coeffs = create_ssa_value(TensorType(Float64Type(), shape=(10,)))
 samples = create_ssa_value(TensorType(Float64Type(), shape=(8, 7)))
 basis_state = create_ssa_value(TensorType(i1, shape=(8,)))
 state = create_ssa_value(TensorType(ComplexType(Float64Type()), shape=(16,)))
 pauli_word = ArrayAttr([StringAttr("X"), StringAttr("Y"), StringAttr("Z")])
+int_ssa = create_ssa_value(i64)
+int_attr = IntegerAttr(0, 32)
 
 expected_ops_init_kwargs = {
     "AdjointOp": [
@@ -120,57 +123,94 @@ expected_ops_init_kwargs = {
             "region": Region(Block((CustomOp(gate_name="CNOT", in_qubits=(q0, q1)),))),
         }
     ],
-    "AllocOp": [{"nqubits": 3}],
+    "AllocOp": [{"nqubits": 3}, {"nqubits": int_ssa}, {"nqubits": IntegerAttr(3, 64)}],
     "AllocQubitOp": [{}],
     "ComputationalBasisOp": [{"operands": (q0, None), "result_types": (obs,)}],
     "CountsOp": [
         {
-            "operands": (obs, i, None, None),
-            "result_types": (TensorType(Float64Type(), shape=(1,)), TensorType(I32, shape=(1,))),
+            "operands": (obs, int_ssa, None, None),
+            "result_types": (TensorType(Float64Type(), shape=(1,)), TensorType(i64, shape=(1,))),
         }
     ],
     "CustomOp": [
         {
             "gate_name": "RX",
+            "params": (theta,),
             "in_qubits": (q0, q1),
             "in_ctrl_qubits": (q2,),
-            "params": (theta,),
+            "in_ctrl_values": (bool_ssa,),
             "adjoint": True,
-        }
+        },
+        {
+            "gate_name": StringAttr("RX"),
+            "params": theta,
+            "in_qubits": q0,
+            "in_ctrl_qubits": q2,
+            "in_ctrl_values": bool_ssa,
+        },
     ],
     "DeallocOp": [{"qreg": qreg}],
     "DeallocQubitOp": [{"qubit": q0}],
     "DeviceInitOp": [
         {
-            "operands": (i,),
+            "operands": (int_ssa,),
             "properties": {"lib": StringAttr("lib"), "device_name": StringAttr("my_device")},
         }
     ],
     "DeviceReleaseOp": [{}],
     "ExpvalOp": [{"obs": obs}],
-    "ExtractOp": [{"qreg": qreg, "idx": i}],
+    "ExtractOp": [
+        {"qreg": qreg, "idx": int_ssa},
+        {"qreg": qreg, "idx": int_attr},
+        {"qreg": qreg, "idx": 0},
+    ],
     "FinalizeOp": [{}],
-    "GlobalPhaseOp": [{"params": theta, "in_ctrl_qubits": q0}],
+    "GlobalPhaseOp": [
+        {"params": theta, "in_ctrl_qubits": (q0,), "in_ctrl_values": (bool_ssa,)},
+        {"params": theta, "in_ctrl_qubits": q0, "in_ctrl_values": bool_ssa},
+    ],
     "HamiltonianOp": [{"operands": (coeffs, (obs,)), "result_types": (obs,)}],
     "HermitianOp": [{"operands": (matrix, (q0, q1)), "result_types": (obs,)}],
     "InitializeOp": [{}],
-    "InsertOp": [{"in_qreg": qreg, "idx": i, "qubit": q1}],
-    "MeasureOp": [{"in_qubit": q0, "postselect": i}],
+    "InsertOp": [
+        {"in_qreg": qreg, "idx": int_ssa, "qubit": q1},
+        {"in_qreg": qreg, "idx": int_attr, "qubit": q1},
+        {"in_qreg": qreg, "idx": 0, "qubit": q1},
+    ],
+    "MeasureOp": [
+        {"in_qubit": q0, "postselect": int_ssa},
+        {"in_qubit": q0},
+        {"in_qubit": q0, "postselect": 1},
+    ],
     "MultiRZOp": [
         {
             "theta": theta,
             "in_qubits": (q1, q0),
             "in_ctrl_qubits": (q2,),
-            "in_ctrl_values": (i,),
+            "in_ctrl_values": (bool_ssa,),
             "adjoint": UnitAttr(),
-        }
+        },
+        {
+            "theta": theta,
+            "in_qubits": q1,
+            "in_ctrl_qubits": q2,
+            "in_ctrl_values": bool_ssa,
+            "adjoint": UnitAttr(),
+        },
     ],
     "NamedObsOp": [{"qubit": q0, "obs_type": pauli_x}],
-    "NumQubitsOp": [{"result_types": (i,)}],
+    "NumQubitsOp": [{"result_types": (int_ssa,)}],
     "PauliRotOp": [
         {"angle": theta, "pauli_product": "XYZ", "in_qubits": (q0,)},
         {"angle": theta, "pauli_product": ["X", "Y", "Z"], "in_qubits": (q0,)},
         {"angle": theta, "pauli_product": pauli_word, "in_qubits": (q0,)},
+        {
+            "angle": theta,
+            "pauli_product": pauli_word,
+            "in_qubits": q0,
+            "in_ctrl_qubits": q2,
+            "in_ctrl_values": bool_ssa,
+        },
     ],
     "PCPhaseOp": [
         {
@@ -178,21 +218,31 @@ expected_ops_init_kwargs = {
             "dim": dim,
             "in_qubits": (q1, q0),
             "in_ctrl_qubits": (q2,),
-            "in_ctrl_values": (i,),
+            "in_ctrl_values": (bool_ssa,),
             "adjoint": False,
-        }
+        },
+        {
+            "theta": theta,
+            "dim": dim,
+            "in_qubits": q1,
+            "in_ctrl_qubits": q2,
+            "in_ctrl_values": bool_ssa,
+        },
     ],
     "ProbsOp": [
         {
-            "operands": (obs, i, None),
+            "operands": (obs, int_ssa, None),
             "result_types": (TensorType(Float64Type(), shape=(8,)),),
         }
     ],
-    "QubitUnitaryOp": [{"matrix": matrix, "in_qubits": (q2,), "adjoint": True}],
-    "SampleOp": [{"operands": (obs, i, samples), "result_types": (samples,)}],
+    "QubitUnitaryOp": [
+        {"matrix": matrix, "in_qubits": (q2,), "adjoint": True},
+        {"matrix": matrix, "in_qubits": q2, "in_ctrl_qubits": q1, "in_ctrl_values": bool_ssa},
+    ],
+    "SampleOp": [{"operands": (obs, int_ssa, samples), "result_types": (samples,)}],
     "SetBasisStateOp": [{"operands": (basis_state, (q0, q2)), "result_types": ((q1, q2),)}],
     "SetStateOp": [{"operands": (state, (q0, q1)), "result_types": ((q0, q1),)}],
-    "StateOp": [{"operands": (obs, i, state), "result_types": (state,)}],
+    "StateOp": [{"operands": (obs, int_ssa, state), "result_types": (state,)}],
     "TensorOp": [{"operands": ((obs, obs),), "result_types": (obs,)}],
     "VarianceOp": [{"obs": (obs,)}],
     "YieldOp": [{"operands": (qreg,)}],
@@ -268,11 +318,14 @@ class TestCustomVerifiers:
             op.verify()
 
 
+@pytest.mark.parametrize(
+    "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
+)
 class TestAssemblyFormat:
     """Lit tests for assembly format of operations/attributes in the Quantum
     dialect."""
 
-    def test_qubit_qreg_operations(self, run_filecheck):
+    def test_qubit_qreg_operations(self, run_filecheck, pretty_print):
         """Test that the assembly format for operations for allocation/deallocation of
         qubits/quantum registers works correctly."""
 
@@ -330,9 +383,9 @@ class TestAssemblyFormat:
         %qreg2 = quantum.insert %qreg1[%dyn_index], %dyn_qubit1 : !quantum.reg, !quantum.bit
         """
 
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
 
-    def test_quantum_ops(self, run_filecheck):
+    def test_quantum_ops(self, run_filecheck, pretty_print):
         """Test that the assembly format for quantum non-terminal operations works correctly."""
 
         # Tests for CustomOp, GlobalPhaseOp, MeasureOp, MultiRZOp, QubitUnitaryOp
@@ -393,12 +446,12 @@ class TestAssemblyFormat:
         quantum.gphase(%param1) :
 
         // Control wires and values
-        // CHECK: {{%.+}}, {{%.+}} = quantum.gphase([[PARAM1]]) ctrls([[Q0]], [[Q1]]) ctrlvals([[FALSE_CST]], [[TRUE_CST]]) : !quantum.bit, !quantum.bit
-        %qg1, %qg2 = quantum.gphase(%param1) ctrls(%q0, %q1) ctrlvals(%false_cst, %true_cst) : !quantum.bit, !quantum.bit
+        // CHECK: {{%.+}}, {{%.+}} = quantum.gphase([[PARAM1]]) ctrls([[Q0]], [[Q1]]) ctrlvals([[FALSE_CST]], [[TRUE_CST]]) : ctrls !quantum.bit, !quantum.bit
+        %qg1, %qg2 = quantum.gphase(%param1) ctrls(%q0, %q1) ctrlvals(%false_cst, %true_cst) : ctrls !quantum.bit, !quantum.bit
 
         // Adjoint
-        // CHECK: {{%.+}} = quantum.gphase([[PARAM1]]) {adjoint} ctrls([[Q0]]) ctrlvals([[TRUE_CST]]) : !quantum.bit
-        %qg3 = quantum.gphase(%param1) {adjoint} ctrls(%q0) ctrlvals(%true_cst) : !quantum.bit
+        // CHECK: {{%.+}} = quantum.gphase([[PARAM1]]) {adjoint} ctrls([[Q0]]) ctrlvals([[TRUE_CST]]) : ctrls !quantum.bit
+        %qg3 = quantum.gphase(%param1) {adjoint} ctrls(%q0) ctrlvals(%true_cst) : ctrls !quantum.bit
 
         ////////////////// **MultiRZOp tests** //////////////////
         // No control wires
@@ -468,9 +521,9 @@ class TestAssemblyFormat:
         %mres3, %mqubit3 = quantum.measure %q2 postselect 1 : i1, !quantum.bit
         """
 
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
 
-    def test_state_prep(self, run_filecheck):
+    def test_state_prep(self, run_filecheck, pretty_print):
         """Test that the assembly format for state prep operations works correctly."""
 
         # Tests for SetBasisStateOp, SetStateOp
@@ -510,9 +563,9 @@ class TestAssemblyFormat:
         %q8, %q9 = quantum.set_state(%state_memref) %q6, %q7 : (memref<4xcomplex<f64>>, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
         """
 
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
 
-    def test_observables(self, run_filecheck):
+    def test_observables(self, run_filecheck, pretty_print):
         """Test that the assembly format for observable operations works correctly."""
 
         # Tests for observables: ComputationalBasisOp, HamiltonianOp, HermitianOp,
@@ -588,9 +641,9 @@ class TestAssemblyFormat:
         %cb_all = quantum.compbasis qreg %qreg : !quantum.obs
         """
 
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
 
-    def test_measurements(self, run_filecheck):
+    def test_measurements(self, run_filecheck, pretty_print):
         """Test that the assembly format for measurement operations works correctly."""
 
         # Tests for measurements: CountsOp, ExpvalOp, MeasureOp, ProbsOp, SampleOp,
@@ -599,8 +652,17 @@ class TestAssemblyFormat:
         ///////////////////////////////////////////////////
         //////////// Observables and constants ////////////
         ///////////////////////////////////////////////////
-        // CHECK: [[OBS:%.+]] = "test.op"() : () -> !quantum.obs
-        %obs = "test.op"() : () -> !quantum.obs
+        // CHECK: [[Q0:%.+]], [[Q1:%.+]], [[Q2:%.+]] = "test.op"() : () -> (!quantum.bit
+        %q0, %q1, %q2 = "test.op"() : () -> (!quantum.bit, !quantum.bit, !quantum.bit)
+        // CHECK: [[QREG:%.+]] = "test.op"() : () -> !quantum.reg
+        %qreg = "test.op"() : () -> !quantum.reg
+
+        // CHECK: [[X_OBS:%.+]] = quantum.namedobs [[Q0]][PauliX] : !quantum.obs
+        %x_obs = quantum.namedobs %q0[PauliX] : !quantum.obs
+        // CHECK: [[C_OBS:%.+]] = quantum.compbasis qubits [[Q0]], [[Q1]], [[Q2]] : !quantum.obs
+        %c_obs = quantum.compbasis qubits %q0, %q1, %q2 : !quantum.obs
+        // CHECK: [[C_OBS_ALL:%.+]] = quantum.compbasis qreg [[QREG]] : !quantum.obs
+        %c_obs_all = quantum.compbasis qreg %qreg : !quantum.obs
 
         // CHECK: [[DYN_WIRES:%.+]] = "test.op"() : () -> i64
         %dyn_wires = "test.op"() : () -> i64
@@ -612,87 +674,87 @@ class TestAssemblyFormat:
         ///////////////////////////////////////////////
 
         ///////////////////// **ExpvalOp** /////////////////////
-        // CHECK: {{%.+}} = quantum.expval [[OBS]] : f64
-        %expval = quantum.expval %obs : f64
+        // CHECK: {{%.+}} = quantum.expval [[X_OBS]] : f64
+        %expval = quantum.expval %x_obs : f64
 
         ///////////////////// **VarianceOp** /////////////////////
-        // CHECK: {{%.+}} = quantum.var [[OBS]] : f64
-        %var = quantum.var %obs : f64
+        // CHECK: {{%.+}} = quantum.var [[X_OBS]] : f64
+        %var = quantum.var %x_obs : f64
 
         ///////////////////// **CountsOp** /////////////////////
         // Counts with static shape
-        // CHECK: {{%.+}}, {{%.+}} = quantum.counts [[OBS]] : tensor<6xf64>, tensor<6xi64>
-        %eigvals1, %counts1 = quantum.counts %obs : tensor<6xf64>, tensor<6xi64>
+        // CHECK: {{%.+}}, {{%.+}} = quantum.counts [[X_OBS]] : tensor<2xf64>, tensor<2xi64>
+        %eigvals1, %counts1 = quantum.counts %x_obs : tensor<2xf64>, tensor<2xi64>
 
         // Counts with dynamic shape
-        // CHECK: {{%.+}}, {{%.+}} = quantum.counts [[OBS]] shape [[DYN_WIRES]] : tensor<?xf64>, tensor<?xi64>
-        %eigvals2, %counts2 = quantum.counts %obs shape %dyn_wires : tensor<?xf64>, tensor<?xi64>
+        // CHECK: {{%.+}}, {{%.+}} = quantum.counts [[C_OBS_ALL]] shape [[DYN_WIRES]] : tensor<?xf64>, tensor<?xi64>
+        %eigvals2, %counts2 = quantum.counts %c_obs_all shape %dyn_wires : tensor<?xf64>, tensor<?xi64>
 
         // Counts with no results (mutate memref in-place)
-        // CHECK: [[EIGVALS_IN:%.+]] = "test.op"() : () -> memref<16xf64>
-        // CHECK: [[COUNTS_IN:%.+]] = "test.op"() : () -> memref<16xi64>
-        // CHECK: quantum.counts [[OBS]] in([[EIGVALS_IN]] : memref<16xf64>, [[COUNTS_IN]] : memref<16xi64>)
-        %eigvals_in = "test.op"() : () -> memref<16xf64>
-        %counts_in = "test.op"() : () -> memref<16xi64>
-        quantum.counts %obs in(%eigvals_in : memref<16xf64>, %counts_in : memref<16xi64>)
+        // CHECK: [[EIGVALS_IN:%.+]] = "test.op"() : () -> memref<8xf64>
+        // CHECK: [[COUNTS_IN:%.+]] = "test.op"() : () -> memref<8xi64>
+        // CHECK: quantum.counts [[C_OBS]] in([[EIGVALS_IN]] : memref<8xf64>, [[COUNTS_IN]] : memref<8xi64>)
+        %eigvals_in = "test.op"() : () -> memref<8xf64>
+        %counts_in = "test.op"() : () -> memref<8xi64>
+        quantum.counts %c_obs in(%eigvals_in : memref<8xf64>, %counts_in : memref<8xi64>)
 
         ///////////////////// **ProbsOp** /////////////////////
         // Probs with static shape
-        // CHECK: {{%.+}} = quantum.probs [[OBS]] : tensor<8xf64>
-        %probs1 = quantum.probs %obs : tensor<8xf64>
+        // CHECK: {{%.+}} = quantum.probs [[C_OBS]] : tensor<8xf64>
+        %probs1 = quantum.probs %c_obs : tensor<8xf64>
 
         // Probs with dynamic shape
-        // CHECK: {{%.+}} = quantum.probs [[OBS]] shape [[DYN_WIRES]] : tensor<?xf64>
-        %probs2 = quantum.probs %obs shape %dyn_wires : tensor<?xf64>
+        // CHECK: {{%.+}} = quantum.probs [[C_OBS_ALL]] shape [[DYN_WIRES]] : tensor<?xf64>
+        %probs2 = quantum.probs %c_obs_all shape %dyn_wires : tensor<?xf64>
 
         // Probs with no results (mutate memref in-place)
-        // CHECK: [[PROBS_IN:%.+]] = "test.op"() : () -> memref<16xf64>
-        // CHECK: quantum.probs [[OBS]] in([[PROBS_IN]] : memref<16xf64>)
-        %probs_in = "test.op"() : () -> memref<16xf64>
-        quantum.probs %obs in(%probs_in : memref<16xf64>)
+        // CHECK: [[PROBS_IN:%.+]] = "test.op"() : () -> memref<8xf64>
+        // CHECK: quantum.probs [[C_OBS]] in([[PROBS_IN]] : memref<8xf64>)
+        %probs_in = "test.op"() : () -> memref<8xf64>
+        quantum.probs %c_obs in(%probs_in : memref<8xf64>)
 
         ///////////////////// **StateOp** /////////////////////
         // State with static shape
-        // CHECK: {{%.+}} = quantum.state [[OBS]] : tensor<8xcomplex<f64>>
-        %state1 = quantum.state %obs : tensor<8xcomplex<f64>>
+        // CHECK: {{%.+}} = quantum.state [[C_OBS_ALL]] : tensor<8xcomplex<f64>>
+        %state1 = quantum.state %c_obs_all : tensor<8xcomplex<f64>>
 
         // State with dynamic shape
-        // CHECK: {{%.+}} = quantum.state [[OBS]] shape [[DYN_WIRES]] : tensor<?xcomplex<f64>>
-        %state2 = quantum.state %obs shape %dyn_wires : tensor<?xcomplex<f64>>
+        // CHECK: {{%.+}} = quantum.state [[C_OBS_ALL]] shape [[DYN_WIRES]] : tensor<?xcomplex<f64>>
+        %state2 = quantum.state %c_obs_all shape %dyn_wires : tensor<?xcomplex<f64>>
 
         // State with no results (mutate memref in-place)
-        // CHECK: [[STATE_IN:%.+]] = "test.op"() : () -> memref<16xcomplex<f64>>
-        // CHECK: quantum.state [[OBS]] in([[STATE_IN]] : memref<16xcomplex<f64>>)
-        %state_in = "test.op"() : () -> memref<16xcomplex<f64>>
-        quantum.state %obs in(%state_in : memref<16xcomplex<f64>>)
+        // CHECK: [[STATE_IN:%.+]] = "test.op"() : () -> memref<8xcomplex<f64>>
+        // CHECK: quantum.state [[C_OBS_ALL]] in([[STATE_IN]] : memref<8xcomplex<f64>>)
+        %state_in = "test.op"() : () -> memref<8xcomplex<f64>>
+        quantum.state %c_obs_all in(%state_in : memref<8xcomplex<f64>>)
 
         ///////////////////// **SampleOp** /////////////////////
         // Samples with static shape
-        // CHECK: {{%.+}} = quantum.sample [[OBS]] : tensor<10x3xf64>
-        %samples1 = quantum.sample %obs : tensor<10x3xf64>
+        // CHECK: {{%.+}} = quantum.sample [[C_OBS]] : tensor<10x3xf64>
+        %samples1 = quantum.sample %c_obs : tensor<10x3xf64>
 
         // Samples with dynamic wires
-        // CHECK: {{%.+}} = quantum.sample [[OBS]] shape [[DYN_WIRES]] : tensor<10x?xf64>
-        %samples2 = quantum.sample %obs shape %dyn_wires : tensor<10x?xf64>
+        // CHECK: {{%.+}} = quantum.sample [[C_OBS_ALL]] shape [[DYN_WIRES]] : tensor<10x?xf64>
+        %samples2 = quantum.sample %c_obs_all shape %dyn_wires : tensor<10x?xf64>
 
         // Samples with dynamic shots
-        // CHECK: {{%.+}} = quantum.sample [[OBS]] shape [[DYN_SHOTS]] : tensor<?x3xf64>
-        %samples3 = quantum.sample %obs shape %dyn_shots : tensor<?x3xf64>
+        // CHECK: {{%.+}} = quantum.sample [[C_OBS]] shape [[DYN_SHOTS]] : tensor<?x3xf64>
+        %samples3 = quantum.sample %c_obs shape %dyn_shots : tensor<?x3xf64>
 
         // Samples with dynamic wires and shots
-        // CHECK: {{%.+}} = quantum.sample [[OBS]] shape [[DYN_SHOTS]], [[DYN_WIRES]] : tensor<?x?xf64>
-        %samples4 = quantum.sample %obs shape %dyn_shots, %dyn_wires : tensor<?x?xf64>
+        // CHECK: {{%.+}} = quantum.sample [[C_OBS_ALL]] shape [[DYN_SHOTS]], [[DYN_WIRES]] : tensor<?x?xf64>
+        %samples4 = quantum.sample %c_obs_all shape %dyn_shots, %dyn_wires : tensor<?x?xf64>
 
         // Samples with no results (mutate memref in-place)
-        // CHECK: [[SAMPLES_IN:%.+]] = "test.op"() : () -> memref<7x4xf64>
-        // CHECK: quantum.sample [[OBS]] in([[SAMPLES_IN]] : memref<7x4xf64>)
-        %samples_in = "test.op"() : () -> memref<7x4xf64>
-        quantum.sample %obs in(%samples_in : memref<7x4xf64>)
+        // CHECK: [[SAMPLES_IN:%.+]] = "test.op"() : () -> memref<7x3xf64>
+        // CHECK: quantum.sample [[C_OBS]] in([[SAMPLES_IN]] : memref<7x3xf64>)
+        %samples_in = "test.op"() : () -> memref<7x3xf64>
+        quantum.sample %c_obs in(%samples_in : memref<7x3xf64>)
         """
 
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
 
-    def test_miscellaneous_operations(self, run_filecheck):
+    def test_miscellaneous_operations(self, run_filecheck, pretty_print):
         """Test that the assembly format for miscelleneous operations
         works correctly."""
 
@@ -745,7 +807,7 @@ class TestAssemblyFormat:
         %nqubits = quantum.num_qubits : i64
         """
 
-        run_filecheck(program, roundtrip=True, verify=True)
+        run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
 
 
 if __name__ == "__main__":

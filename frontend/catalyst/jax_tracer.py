@@ -34,7 +34,7 @@ from jax._src.lax.lax import _extract_tracers_dyn_shape
 from jax._src.pjit import jit_p
 from jax._src.source_info_util import current as current_source_info
 from jax.api_util import debug_info as jdb
-from jax.core import get_aval
+from jax.core import Tracer, get_aval
 from pennylane import QubitUnitary, QueuingManager
 from pennylane.devices import QubitDevice
 from pennylane.measurements import (
@@ -412,8 +412,8 @@ class QRegPromise:
         from cache"""
         # pylint: disable=consider-iterating-dictionary
         qrp = self
-        cached_tracers = {w for w in qrp.cache.keys() if not isinstance(w, int)}
-        requested_tracers = {w for w in wires if not isinstance(w, int)}
+        cached_tracers = {w for w in qrp.cache.keys() if isinstance(w, Tracer)}
+        requested_tracers = {w for w in wires if isinstance(w, Tracer)}
         if cached_tracers != requested_tracers:
             qrp.actualize()
         qubits = []
@@ -1080,8 +1080,8 @@ def trace_quantum_measurements(
             # Check if the measurement is supported shot-vector where num_of_total_copies > 1
             if shots_obj.has_partitioned_shots and not isinstance(output, SampleMP):
                 raise NotImplementedError(
-                    f"Measurement {type(output).__name__} does not support shot-vectors. "
-                    "Use qml.sample() instead."
+                    f"The {type(output).__name__} measurement process does not support "
+                    "shot-vectors. Please consider using qml.sample() instead."
                 )
 
             if device.wires is None:
@@ -1312,7 +1312,8 @@ def apply_transforms(
         tracing_mode = TracingMode.TRANSFORM
     elif len(qnode_program) or have_measurements_changed(tape, tapes[0]):
         with_measurement_from_counts_or_samples = any(
-            "measurements_from_counts" in (transform_str := str(getattr(qnode, "transform", "")))
+            "measurements_from_counts"
+            in (transform_str := str(getattr(qnode, "tape_transform", "")))
             or "measurements_from_samples" in transform_str
             for qnode in qnode_program
         )
@@ -1527,7 +1528,7 @@ def _trace_classical_phase(
         else:
             device_program = qml.CompilePipeline()
 
-        qnode_program = qnode.transform_program if qnode else qml.CompilePipeline()
+        qnode_program = qnode.compile_pipeline if qnode else qml.CompilePipeline()
 
         tapes, post_processing, tracing_mode = apply_transforms(
             qnode_program,

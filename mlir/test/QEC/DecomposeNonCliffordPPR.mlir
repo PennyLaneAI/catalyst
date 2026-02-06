@@ -35,13 +35,13 @@ func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
 // CHECK-INJECT: [[magic:%.+]] = qec.fabricate  magic
 
 // // PPM P⊗Z on Q and |m⟩ => m0
-// CHECK-INJECT: [[m_0:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Z"] %arg0, [[magic]] : !quantum.bit, !quantum.bit
+// CHECK-INJECT: [[m_0:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Z"] %arg0, [[magic]] : i1, !quantum.bit, !quantum.bit
 
 // // PPR[Z](4) on Q if cond(m0) is true
 // CHECK-INJECT: [[q0:%.+]] = qec.ppr ["Z"](4) [[out_0]]#0 cond([[m_0]]) : !quantum.bit
 
 // // PPM X on |m⟩ => m1
-// CHECK-INJECT: [[m_1:%.+]], [[out_1:%.+]] = qec.ppm ["X"] [[out_0]]#1 : !quantum.bit
+// CHECK-INJECT: [[m_1:%.+]], [[out_1:%.+]] = qec.ppm ["X"] [[out_0]]#1 : i1, !quantum.bit
 
 // // PPR[Z](2) on Q if cond(m1) is true
 // CHECK-INJECT: [[q0_1:%.+]]  = qec.ppr ["Z"](2) [[q0]] cond([[m_1]]) : !quantum.bit
@@ -64,16 +64,16 @@ func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
 // CHECK-AUTO: [[magic_1:%.+]] = qec.fabricate  magic
 
 // // PPM P⊗Z on Q and |m⟩   => m0
-// CHECK-AUTO: [[m_0:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Z"] %arg0, [[magic_1]] : !quantum.bit, !quantum.bit
+// CHECK-AUTO: [[m_0:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Z"] %arg0, [[magic_1]] : i1, !quantum.bit, !quantum.bit
 
 // // PPM Z⊗Y on |m⟩ and |0⟩ => m1
-// CHECK-AUTO: [[m_1:%.+]], [[out_1:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[out_0]]#1, [[zero_1]] : !quantum.bit, !quantum.bit
+// CHECK-AUTO: [[m_1:%.+]], [[out_1:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[out_0]]#1, [[zero_1]] : i1, !quantum.bit, !quantum.bit
 
 // // PPM X on |m⟩ => m2
-// CHECK-AUTO: [[m_2:%.+]], [[out_2:%.+]] = qec.ppm ["X"] [[out_1]]#0 : !quantum.bit
+// CHECK-AUTO: [[m_2:%.+]], [[out_2:%.+]] = qec.ppm ["X"] [[out_1]]#0 : i1, !quantum.bit
 
 // // PPM X or Z on |0⟩ if cond(m0) is true
-// CHECK-AUTO: [[m_3:%.+]], [[out_3:%.+]] = qec.select.ppm([[m_0]], ["X"], ["Z"]) [[out_1]]#1 : !quantum.bit
+// CHECK-AUTO: [[m_3:%.+]], [[out_3:%.+]] = qec.select.ppm([[m_0]], ["X"], ["Z"]) [[out_1]]#1 : i1, !quantum.bit
 
 // // Compute XOR to check if m2 and m1 are different and m3 is true
 // CHECK-AUTO: [[cond:%.+]] = arith.xori [[m_1]], [[m_2]] : i1
@@ -93,29 +93,29 @@ func.func @test_ppr_to_ppm(%q1 : !quantum.bit) {
 // CHECK-PAULI: [[magic:%.+]] = qec.fabricate  magic
 
 // // PPM P⊗Z on Q and |m⟩ => m0
-// CHECK-PAULI: [[m_0:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Z"] %arg0, [[magic]] : !quantum.bit, !quantum.bit
+// CHECK-PAULI: [[m_0:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Z"] %arg0, [[magic]] : i1, !quantum.bit, !quantum.bit
 
 // // PPM X or Y on |m⟩ => m1
-// CHECK-PAULI: [[m_1:%.+]], [[out_1:%.+]] = qec.select.ppm([[m_0]], ["Y"], ["X"]) [[out_0]]#1 : !quantum.bit
+// CHECK-PAULI: [[m_1:%.+]], [[out_1:%.+]] = qec.select.ppm([[m_0]], ["Y"], ["X"]) [[out_0]]#1 : i1, !quantum.bit
 
 // // PPR[Z](2) on Q if cond(m1) is true
 // CHECK-PAULI: [[q0_1:%.+]]  = qec.ppr ["Z"](2) [[out_0]]#0 cond([[m_1]]) : !quantum.bit
 
 // Decompose via the pauli-corrected method but avoids Y measurements
 // CHECK-PAULI-AVOID-Y: [[magic:%.+]] = qec.fabricate  magic
-// CHECK-PAULI-AVOID-Y: [[m_0:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Z"] %arg0, [[magic]] : !quantum.bit, !quantum.bit
+// CHECK-PAULI-AVOID-Y: [[m_0:%.+]], [[out_0:%.+]]:2 = qec.ppm ["Z", "Z"] %arg0, [[magic]] : i1, !quantum.bit, !quantum.bit
 // CHECK-PAULI-AVOID-Y: [[q_0:%.+]] = scf.if [[m_0]] -> (!quantum.bit) {
 // // Decompose Y measurement on |m⟩ when ZZ measurement returns true
 // CHECK-PAULI-AVOID-Y:   [[plus_i:%.+]]  = qec.fabricate  plus_i : !quantum.bit
-// CHECK-PAULI-AVOID-Y:   [[m_1:%.+]], [[out_1:%.+]]:2 = qec.ppm ["Z", "Z"] [[out_0]]#1, [[plus_i]] : !quantum.bit, !quantum.bit
-// CHECK-PAULI-AVOID-Y:   [[m_2:%.+]], [[out_2:%.+]]:2 = qec.ppm ["X", "X"] [[out_1]]#0, [[out_1]]#1 : !quantum.bit, !quantum.bit
+// CHECK-PAULI-AVOID-Y:   [[m_1:%.+]], [[out_1:%.+]]:2 = qec.ppm ["Z", "Z"] [[out_0]]#1, [[plus_i]] : i1, !quantum.bit, !quantum.bit
+// CHECK-PAULI-AVOID-Y:   [[m_2:%.+]], [[out_2:%.+]]:2 = qec.ppm ["X", "X"] [[out_1]]#0, [[out_1]]#1 : i1, !quantum.bit, !quantum.bit
 // CHECK-PAULI-AVOID-Y:   [[q_1:%.+]] = qec.ppr ["Z"](2) [[out_0]]#0 cond([[m_2]]) : !quantum.bit
 // CHECK-PAULI-AVOID-Y:   quantum.dealloc_qb [[out_0]]#1 : !quantum.bit
 // CHECK-PAULI-AVOID-Y:   quantum.dealloc_qb [[plus_i]] : !quantum.bit
 // CHECK-PAULI-AVOID-Y:   scf.yield [[q_1]] : !quantum.bit
 // CHECK-PAULI-AVOID-Y: } else {
 // // Use the usual X measurement on |m⟩ when ZZ measurement returns false
-// CHECK-PAULI-AVOID-Y:   [[m_3:%.+]], [[out_3:%.+]] = qec.ppm ["X"] [[out_0]]#1 : !quantum.bit
+// CHECK-PAULI-AVOID-Y:   [[m_3:%.+]], [[out_3:%.+]] = qec.ppm ["X"] [[out_0]]#1 : i1, !quantum.bit
 // CHECK-PAULI-AVOID-Y:   [[q_2:%.+]] = qec.ppr ["Z"](2) [[out_0]]#0 cond([[m_3]]) : !quantum.bit
 // CHECK-PAULI-AVOID-Y:   quantum.dealloc_qb [[out_3]] : !quantum.bit
 // CHECK-PAULI-AVOID-Y:   scf.yield [[q_2]] : !quantum.bit
@@ -211,13 +211,13 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // PPR Z, Z, Y, Z -> Q2, Q1, Q3, Q0
     %3:4 = qec.ppr ["Z", "Z", "Y", "Z"](-8) %2#0, %2#1, %1, %0 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
     // PPM Z, Z, Y, Y -> Q2, Q1, Q0, Q3
-    %mres, %out_qubits:4 = qec.ppm ["Z", "Z", "Y", "Y"] %3#0, %3#1, %3#3, %3#2 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    %mres, %out_qubits:4 = qec.ppm ["Z", "Z", "Y", "Y"] %3#0, %3#1, %3#3, %3#2 : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
     // PPM X, X -> Q1, Q0
-    %mres_0, %out_qubits_1:2 = qec.ppm ["X", "X"] %out_qubits#1, %out_qubits#2 : !quantum.bit, !quantum.bit
+    %mres_0, %out_qubits_1:2 = qec.ppm ["X", "X"] %out_qubits#1, %out_qubits#2 : i1, !quantum.bit, !quantum.bit
     // PPM Z(-1) -> Q2
-    %mres_2, %out_qubits_3 = qec.ppm ["Z"](-1) %out_qubits#0 : !quantum.bit
+    %mres_2, %out_qubits_3 = qec.ppm ["Z"](-1) %out_qubits#0 : i1, !quantum.bit
     // PPM X, X -> Q0, Q3
-    %mres_4, %out_qubits_5:2 = qec.ppm ["X", "X"] %out_qubits_1#1, %out_qubits#3 : !quantum.bit, !quantum.bit
+    %mres_4, %out_qubits_5:2 = qec.ppm ["X", "X"] %out_qubits_1#1, %out_qubits#3 : i1, !quantum.bit, !quantum.bit
     return
     
     /////// Inject magic state Method ///////
@@ -226,20 +226,20 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     
     // CHECK-INJECT: [[Q0:%.+]]: !quantum.bit, [[Q1:%.+]]: !quantum.bit, [[Q2:%.+]]: !quantum.bit, [[Q3:%.+]]: !quantum.bit) {
     // CHECK-INJECT: [[q2:%.+]]     = qec.fabricate  magic
-    // CHECK-INJECT: [[M:%.+]], [[out:%.+]]:2 = qec.ppm ["Z", "Z"] [[Q0]], [[q2]] : !quantum.bit, !quantum.bit
+    // CHECK-INJECT: [[M:%.+]], [[out:%.+]]:2 = qec.ppm ["Z", "Z"] [[Q0]], [[q2]] : i1, !quantum.bit, !quantum.bit
 
     // CHECK-INJECT: [[q3:%.+]]  = qec.ppr ["Z"](4) [[out]]#0 cond([[M]]) : !quantum.bit
 
-    // CHECK-INJECT: [[M1:%.+]], [[out_0:%.+]] = qec.ppm ["X"] [[out]]#1 : !quantum.bit
+    // CHECK-INJECT: [[M1:%.+]], [[out_0:%.+]] = qec.ppm ["X"] [[out]]#1 : i1, !quantum.bit
     // CHECK-INJECT: [[q4:%.+]]     = qec.ppr ["Z"](2) [[q3]] cond([[M1]]) : !quantum.bit
 
     // // Q0 -> %q4
 
     // // PPR ["Y"](-8) %Q3 
     // CHECK-INJECT: [[q7:%.+]]     = qec.fabricate  magic_conj
-    // CHECK-INJECT: [[mres_0:%.+]], [[out:%.+]]:2 = qec.ppm ["Y", "Z"] [[Q3]], [[q7]] : !quantum.bit, !quantum.bit
+    // CHECK-INJECT: [[mres_0:%.+]], [[out:%.+]]:2 = qec.ppm ["Y", "Z"] [[Q3]], [[q7]] : i1, !quantum.bit, !quantum.bit
     // CHECK-INJECT: [[q8:%.+]]     = qec.ppr ["Y"](4) [[out]]#0 cond([[mres_0]]) : !quantum.bit
-    // CHECK-INJECT: [[mres_1:%.+]], [[out_1:%.+]] = qec.ppm ["X"] [[out]]#1 : !quantum.bit
+    // CHECK-INJECT: [[mres_1:%.+]], [[out_1:%.+]] = qec.ppm ["X"] [[out]]#1 : i1, !quantum.bit
     // CHECK-INJECT: [[q9:%.+]]     = qec.ppr ["Y"](2) [[q8]] cond([[mres_1]]) : !quantum.bit
 
     // // Q3 -> %q9
@@ -248,7 +248,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-INJECT: [[q12:%.+]] = qec.fabricate  magic
     // CHECK-INJECT: [[mres_2:%.+]], [[out_2:%.+]]:3 = qec.ppm ["Y", "X", "Z"] [[Q2]], [[Q1]], [[q12]]
     // CHECK-INJECT: [[q13:%.+]]:2 = qec.ppr ["Y", "X"](4) [[out_2]]#0, [[out_2]]#1 cond([[mres_2]])
-    // CHECK-INJECT: [[mres_3:%.+]], [[out_3:%.+]] = qec.ppm ["X"] [[out_2]]#2 : !quantum.bit
+    // CHECK-INJECT: [[mres_3:%.+]], [[out_3:%.+]] = qec.ppm ["X"] [[out_2]]#2 : i1, !quantum.bit
     // CHECK-INJECT: [[q14:%.+]]:2 = qec.ppr ["Y", "X"](2) [[q13]]#0, [[q13]]#1 cond([[mres_3]]) : !quantum.bit, !quantum.bit
 
     // // Q2 -> %q14#0
@@ -259,7 +259,7 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     ////// PPM ["Z", "Z", "Y", "Z", "Z"] Q2, Q1, Q3, Q0, conj |m⟩
     // CHECK-INJECT: [[mres_4:%.+]], [[out_4:%.+]]:5 = qec.ppm ["Z", "Z", "Y", "Z", "Z"] [[q14]]#0, [[q14]]#1, [[q9]], [[q4]], [[q17]]
     // CHECK-INJECT: [[q18:%.+]]:4 = qec.ppr ["Z", "Z", "Y", "Z"](4) [[out_4]]#0, [[out_4]]#1, [[out_4]]#2, [[out_4]]#3 cond([[mres_4]])
-    // CHECK-INJECT: [[mres_5:%.+]], [[out_5:%.+]] = qec.ppm ["X"] [[out_4]]#4 : !quantum.bit
+    // CHECK-INJECT: [[mres_5:%.+]], [[out_5:%.+]] = qec.ppm ["X"] [[out_4]]#4 : i1, !quantum.bit
     // CHECK-INJECT: [[q19:%.+]]:4 = qec.ppr ["Z", "Z", "Y", "Z"](2) [[q18]]#0, [[q18]]#1, [[q18]]#2, [[q18]]#3 cond([[mres_5]]) 
 
     // // Q2 -> %q19#0
@@ -276,15 +276,15 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // // Q3 -> %out_6#3
 
     // // PPM X, X -> Q1, Q0
-    // CHECK-INJECT: [[mres_7:%.+]], [[out_7:%.+]]:2 = qec.ppm ["X", "X"] [[out_6]]#1, [[out_6]]#2 : !quantum.bit, !quantum.bit
+    // CHECK-INJECT: [[mres_7:%.+]], [[out_7:%.+]]:2 = qec.ppm ["X", "X"] [[out_6]]#1, [[out_6]]#2 : i1, !quantum.bit, !quantum.bit
 
     // // Q0 -> %out_7#1
 
     // // PPM Z(-1) -> Q2
-    // CHECK-INJECT: [[mres_8:%.+]], [[out_8:%.+]] = qec.ppm ["Z"](-1) [[out_6]]#0 : !quantum.bit
+    // CHECK-INJECT: [[mres_8:%.+]], [[out_8:%.+]] = qec.ppm ["Z"](-1) [[out_6]]#0 : i1, !quantum.bit
 
     // // PPM X, X -> Q0, Q3
-    // CHECK-INJECT: [[mres_9:%.+]], [[out_9:%.+]]:2 = qec.ppm ["X", "X"] [[out_7]]#1, [[out_6]]#3 : !quantum.bit, !quantum.bit
+    // CHECK-INJECT: [[mres_9:%.+]], [[out_9:%.+]]:2 = qec.ppm ["X", "X"] [[out_7]]#1, [[out_6]]#3 : i1, !quantum.bit, !quantum.bit
 
 
     /////// Auto-Corrected Method ///////
@@ -297,10 +297,10 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-AUTO: [[Q0:%.+]]: !quantum.bit, [[Q1:%.+]]: !quantum.bit, [[Q2:%.+]]: !quantum.bit, [[Q3:%.+]]: !quantum.bit) {
     // CHECK-AUTO: [[Q_3:%.+]] = quantum.alloc_qb : !quantum.bit
     // CHECK-AUTO: [[Q_4:%.+]] = qec.fabricate  magic
-    // CHECK-AUTO: [[M:%.+]], [[OUT:%.+]]:2 = qec.ppm ["Z", "Z"] [[Q0]], [[Q_4]] : !quantum.bit, !quantum.bit
-    // CHECK-AUTO: [[M_0:%.+]], [[OUT_1:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[OUT]]#1, [[Q_3]] : !quantum.bit, !quantum.bit
-    // CHECK-AUTO: [[M_2:%.+]], [[OUT_3:%.+]] = qec.ppm ["X"] [[OUT_1]]#0 : !quantum.bit
-    // CHECK-AUTO: [[M_4:%.+]], [[OUT_5:%.+]] = qec.select.ppm([[M]], ["X"], ["Z"]) [[OUT_1]]#1 : !quantum.bit
+    // CHECK-AUTO: [[M:%.+]], [[OUT:%.+]]:2 = qec.ppm ["Z", "Z"] [[Q0]], [[Q_4]] : i1, !quantum.bit, !quantum.bit
+    // CHECK-AUTO: [[M_0:%.+]], [[OUT_1:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[OUT]]#1, [[Q_3]] : i1, !quantum.bit, !quantum.bit
+    // CHECK-AUTO: [[M_2:%.+]], [[OUT_3:%.+]] = qec.ppm ["X"] [[OUT_1]]#0 : i1, !quantum.bit
+    // CHECK-AUTO: [[M_4:%.+]], [[OUT_5:%.+]] = qec.select.ppm([[M]], ["X"], ["Z"]) [[OUT_1]]#1 : i1, !quantum.bit
     // CHECK-AUTO: [[Q_5:%.+]] = arith.xori [[M_0]], [[M_2]] : i1
     // CHECK-AUTO: [[Q_6:%.+]] = qec.ppr ["Z"](2) [[OUT]]#0 cond([[Q_5]]) : !quantum.bit
 
@@ -310,10 +310,10 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
 
     // CHECK-AUTO: [[Q_10:%.+]] = quantum.alloc_qb : !quantum.bit
     // CHECK-AUTO: [[Q_11:%.+]] = qec.fabricate  magic_conj
-    // CHECK-AUTO: [[M_6:%.+]], [[OUT_7:%.+]]:2 = qec.ppm ["Y", "Z"] [[Q3]], [[Q_11]] : !quantum.bit, !quantum.bit
-    // CHECK-AUTO: [[M_8:%.+]], [[OUT_9:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[OUT_7]]#1, [[Q_10]] : !quantum.bit, !quantum.bit
-    // CHECK-AUTO: [[M_10:%.+]], [[OUT_11:%.+]] = qec.ppm ["X"] [[OUT_9]]#0 : !quantum.bit
-    // CHECK-AUTO: [[M_12:%.+]], [[OUT_13:%.+]] = qec.select.ppm([[M_6]], ["X"], ["Z"]) [[OUT_9]]#1 : !quantum.bit
+    // CHECK-AUTO: [[M_6:%.+]], [[OUT_7:%.+]]:2 = qec.ppm ["Y", "Z"] [[Q3]], [[Q_11]] : i1, !quantum.bit, !quantum.bit
+    // CHECK-AUTO: [[M_8:%.+]], [[OUT_9:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[OUT_7]]#1, [[Q_10]] : i1, !quantum.bit, !quantum.bit
+    // CHECK-AUTO: [[M_10:%.+]], [[OUT_11:%.+]] = qec.ppm ["X"] [[OUT_9]]#0 : i1, !quantum.bit
+    // CHECK-AUTO: [[M_12:%.+]], [[OUT_13:%.+]] = qec.select.ppm([[M_6]], ["X"], ["Z"]) [[OUT_9]]#1 : i1, !quantum.bit
     // CHECK-AUTO: [[Q_12:%.+]] = arith.xori [[M_8]], [[M_10]] : i1
     // CHECK-AUTO: [[Q_13:%.+]] = qec.ppr ["Y"](2) [[OUT_7]]#0 cond([[Q_12]]) : !quantum.bit
 
@@ -325,9 +325,9 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-AUTO: [[Q_18:%.+]] = qec.fabricate  magic
     ///// PPM ["Y", "X", "Z"] Q2, Q1, conj |m⟩
     // CHECK-AUTO: [[M_14:%.+]], [[OUT_15:%.+]]:3 = qec.ppm ["Y", "X", "Z"] [[Q2]], [[Q1]], [[Q_18]]
-    // CHECK-AUTO: [[M_16:%.+]], [[OUT_17:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[OUT_15]]#2, [[Q_17]] : !quantum.bit, !quantum.bit
-    // CHECK-AUTO: [[M_18:%.+]], [[OUT_19:%.+]] = qec.ppm ["X"] [[OUT_17]]#0 : !quantum.bit
-    // CHECK-AUTO: [[M_20:%.+]], [[OUT_21:%.+]] = qec.select.ppm([[M_14]], ["X"], ["Z"]) [[OUT_17]]#1 : !quantum.bit
+    // CHECK-AUTO: [[M_16:%.+]], [[OUT_17:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[OUT_15]]#2, [[Q_17]] : i1, !quantum.bit, !quantum.bit
+    // CHECK-AUTO: [[M_18:%.+]], [[OUT_19:%.+]] = qec.ppm ["X"] [[OUT_17]]#0 : i1, !quantum.bit
+    // CHECK-AUTO: [[M_20:%.+]], [[OUT_21:%.+]] = qec.select.ppm([[M_14]], ["X"], ["Z"]) [[OUT_17]]#1 : i1, !quantum.bit
     // CHECK-AUTO: [[Q_19:%.+]] = arith.xori [[M_16]], [[M_18]] : i1
     // CHECK-AUTO: [[Q_20:%.+]]:2 = qec.ppr ["Y", "X"](2) [[OUT_15]]#0, [[OUT_15]]#1 cond([[Q_19]]) : !quantum.bit, !quantum.bit
 
@@ -341,9 +341,9 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     // CHECK-AUTO: [[Q_25:%.+]] = qec.fabricate  magic_conj
     ///// PPM ["Z", "Z", "Y", "Z", "Z"] Q2, Q1, Q3, Q0, conj |m⟩
     // CHECK-AUTO: [[M_22:%.+]], [[OUT_23:%.+]]:5 = qec.ppm ["Z", "Z", "Y", "Z", "Z"] [[Q_20]]#0, [[Q_20]]#1, [[Q_13]], [[Q_6]], [[Q_25]]
-    // CHECK-AUTO: [[M_24:%.+]], [[OUT_25:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[OUT_23]]#4, [[Q_24]] : !quantum.bit, !quantum.bit
-    // CHECK-AUTO: [[M_26:%.+]], [[OUT_27:%.+]] = qec.ppm ["X"] [[OUT_25]]#0 : !quantum.bit
-    // CHECK-AUTO: [[M_28:%.+]], [[OUT_29:%.+]] = qec.select.ppm([[M_22]], ["X"], ["Z"]) [[OUT_25]]#1 : !quantum.bit
+    // CHECK-AUTO: [[M_24:%.+]], [[OUT_25:%.+]]:2 = qec.ppm ["Z", "Y"](-1) [[OUT_23]]#4, [[Q_24]] : i1, !quantum.bit, !quantum.bit
+    // CHECK-AUTO: [[M_26:%.+]], [[OUT_27:%.+]] = qec.ppm ["X"] [[OUT_25]]#0 : i1, !quantum.bit
+    // CHECK-AUTO: [[M_28:%.+]], [[OUT_29:%.+]] = qec.select.ppm([[M_22]], ["X"], ["Z"]) [[OUT_25]]#1 : i1, !quantum.bit
     // CHECK-AUTO: [[Q_26:%.+]] = arith.xori [[M_24]], [[M_26]] : i1
     // CHECK-AUTO: [[Q_27:%.+]]:4 = qec.ppr ["Z", "Z", "Y", "Z"](2) [[OUT_23]]#0, [[OUT_23]]#1, [[OUT_23]]#2, [[OUT_23]]#3 cond([[Q_26]]) 
 
@@ -357,8 +357,8 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
 
     // CHECK-AUTO: [[M_30:%.+]], [[OUT_31:%.+]]:4 = qec.ppm ["Z", "Z", "Y", "Y"] [[Q_27]]#0, [[Q_27]]#1, [[Q_27]]#3, [[Q_27]]#2
     // CHECK-AUTO: [[M_32:%.+]], [[OUT_33:%.+]]:2 = qec.ppm ["X", "X"] [[OUT_31]]#1, [[OUT_31]]#2
-    // CHECK-AUTO: [[M_34:%.+]], [[OUT_35:%.+]] = qec.ppm ["Z"](-1) [[OUT_31]]#0 : !quantum.bit
-    // CHECK-AUTO: [[M_36:%.+]], [[OUT_37:%.+]]:2 = qec.ppm ["X", "X"] [[OUT_33]]#1, [[OUT_31]]#3 : !quantum.bit, !quantum.bit
+    // CHECK-AUTO: [[M_34:%.+]], [[OUT_35:%.+]] = qec.ppm ["Z"](-1) [[OUT_31]]#0 : i1, !quantum.bit
+    // CHECK-AUTO: [[M_36:%.+]], [[OUT_37:%.+]]:2 = qec.ppm ["X", "X"] [[OUT_33]]#1, [[OUT_31]]#3 : i1, !quantum.bit, !quantum.bit
 
 
     /////// Pauli-Corrected Method ///////
@@ -370,37 +370,37 @@ func.func public @game_of_surface_code(%arg0: !quantum.bit, %arg1: !quantum.bit,
     
     // CHECK-PAULI: [[Q0:%.+]]: !quantum.bit, [[Q1:%.+]]: !quantum.bit, [[Q2:%.+]]: !quantum.bit, [[Q3:%.+]]: !quantum.bit) {
     // CHECK-PAULI: [[Q4:%.+]]     = qec.fabricate  magic
-    // CHECK-PAULI: [[M:%.+]], [[out:%.+]]:2 = qec.ppm ["Z", "Z"] [[Q0]], [[Q4]] : !quantum.bit, !quantum.bit
-    // CHECK-PAULI: [[M1:%.+]], [[out_0:%.+]] = qec.select.ppm([[M]], ["Y"], ["X"]) [[out]]#1 : !quantum.bit
+    // CHECK-PAULI: [[M:%.+]], [[out:%.+]]:2 = qec.ppm ["Z", "Z"] [[Q0]], [[Q4]] : i1, !quantum.bit, !quantum.bit
+    // CHECK-PAULI: [[M1:%.+]], [[out_0:%.+]] = qec.select.ppm([[M]], ["Y"], ["X"]) [[out]]#1 : i1, !quantum.bit
     // CHECK-PAULI: [[Q5:%.+]]  = qec.ppr ["Z"](2) [[out]]#0 cond([[M1]]) : !quantum.bit
 
     // // PPR ["Y"](-8) Q3
     // CHECK-PAULI: [[Q6:%.+]]     = qec.fabricate  magic
-    // CHECK-PAULI: [[M2:%.+]], [[out_2:%.+]]:2 = qec.ppm ["Y", "Z"] [[Q3]], [[Q6]] : !quantum.bit, !quantum.bit
-    // CHECK-PAULI: [[M3:%.+]], [[out_3:%.+]] = qec.select.ppm([[M2]], ["X"], ["Y"]) [[out_2]]#1 : !quantum.bit
+    // CHECK-PAULI: [[M2:%.+]], [[out_2:%.+]]:2 = qec.ppm ["Y", "Z"](-1) [[Q3]], [[Q6]] : i1, !quantum.bit, !quantum.bit
+    // CHECK-PAULI: [[M3:%.+]], [[out_3:%.+]] = qec.select.ppm([[M2]], ["Y"], ["X"]) [[out_2]]#1 : i1, !quantum.bit
     // CHECK-PAULI: [[Q7:%.+]]  = qec.ppr ["Y"](2) [[out_2]]#0 cond([[M3]]) : !quantum.bit
 
     // // PPR ["Y", "X"](8) Q2, Q1
     // CHECK-PAULI: [[Q8:%.+]]     = qec.fabricate  magic
-    // CHECK-PAULI: [[M4:%.+]], [[out_4:%.+]]:3 = qec.ppm ["Y", "X", "Z"] [[Q2]], [[Q1]], [[Q8]] : !quantum.bit, !quantum.bit, !quantum.bit
-    // CHECK-PAULI: [[M5:%.+]], [[out_5:%.+]] = qec.select.ppm([[M4]], ["Y"], ["X"]) [[out_4]]#2 : !quantum.bit
+    // CHECK-PAULI: [[M4:%.+]], [[out_4:%.+]]:3 = qec.ppm ["Y", "X", "Z"] [[Q2]], [[Q1]], [[Q8]] : i1, !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK-PAULI: [[M5:%.+]], [[out_5:%.+]] = qec.select.ppm([[M4]], ["Y"], ["X"]) [[out_4]]#2 : i1, !quantum.bit
     // CHECK-PAULI: [[Q9:%.+]]:2  = qec.ppr ["Y", "X"](2) [[out_4]]#0, [[out_4]]#1 cond([[M5]]) : !quantum.bit, !quantum.bit
 
     // // PPR ["Z", "Z", "Y", "Z"](-8) Q2, Q1, Q3, Q0
     // CHECK-PAULI: [[Q10:%.+]] = qec.fabricate  magic
-    // CHECK-PAULI: [[M6:%.+]], [[out_6:%.+]]:5 = qec.ppm ["Z", "Z", "Y", "Z", "Z"] [[Q9]]#0, [[Q9]]#1, [[Q7]], [[Q5]], [[Q10]] : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
-    // CHECK-PAULI: [[M7:%.+]], [[out_7:%.+]] = qec.select.ppm([[M6]], ["X"], ["Y"]) [[out_6]]#4 : !quantum.bit
-    // CHECK-PAULI: [[Q11:%.+]]:4  = qec.ppr ["Z", "Z", "Y", "Z"](2) [[out_6]]#0, [[out_6]]#1, [[out_6]]#2, [[out_6]]#3 cond([[M7]]) : !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK-PAULI: [[M6:%.+]], [[out_6:%.+]]:5 = qec.ppm ["Z", "Z", "Y", "Z", "Z"](-1) [[Q9]]#0, [[Q9]]#1, [[Q7]], [[Q5]], [[Q10]] : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK-PAULI: [[M7:%.+]], [[out_7:%.+]] = qec.select.ppm([[M6]], ["Y"], ["X"]) [[out_6]]#4 : i1, !quantum.bit
+    // CHECK-PAULI: [[Q11:%.+]]:4  = qec.ppr ["Z", "Z", "Y", "Z"](2) [[out_6]]#0, [[out_6]]#1, [[out_6]]#2, [[out_6]]#3 cond([[M7]]) : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
 
     // // PPM Z, Z, Y, Y -> Q2, Q1, Q0, Q3
-    // CHECK-PAULI: [[M8:%.+]], [[out_8:%.+]]:4 = qec.ppm ["Z", "Z", "Y", "Y"] [[Q11]]#0, [[Q11]]#1, [[Q11]]#3, [[Q11]]#2 : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK-PAULI: [[M8:%.+]], [[out_8:%.+]]:4 = qec.ppm ["Z", "Z", "Y", "Y"] [[Q11]]#0, [[Q11]]#1, [[Q11]]#3, [[Q11]]#2 : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
 
     // // PPM X, X -> Q1, Q0
-    // CHECK-PAULI: [[M9:%.+]], [[out_9:%.+]]:2 = qec.ppm ["X", "X"] [[out_8]]#1, [[out_8]]#2 : !quantum.bit, !quantum.bit
+    // CHECK-PAULI: [[M9:%.+]], [[out_9:%.+]]:2 = qec.ppm ["X", "X"] [[out_8]]#1, [[out_8]]#2 : i1, !quantum.bit, !quantum.bit
 
     // // PPM Z(-1) -> Q2
-    // CHECK-PAULI: [[M10:%.+]], [[out_10:%.+]] = qec.ppm ["Z"](-1) [[out_8]]#0 : !quantum.bit
+    // CHECK-PAULI: [[M10:%.+]], [[out_10:%.+]] = qec.ppm ["Z"](-1) [[out_8]]#0 : i1, !quantum.bit
 
     // // PPM X, X -> Q0, Q3
-    // CHECK-PAULI: [[M11:%.+]], [[out_11:%.+]]:2 = qec.ppm ["X", "X"] [[out_9]]#1, [[out_8]]#3 : !quantum.bit, !quantum.bit
+    // CHECK-PAULI: [[M11:%.+]], [[out_11:%.+]]:2 = qec.ppm ["X", "X"] [[out_9]]#1, [[out_8]]#3 : i1, !quantum.bit, !quantum.bit
 }

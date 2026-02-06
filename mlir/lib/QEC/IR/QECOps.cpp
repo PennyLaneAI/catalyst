@@ -35,36 +35,44 @@ using namespace catalyst::qec;
 #include "QEC/IR/QECOps.cpp.inc"
 
 //===----------------------------------------------------------------------===//
+// QEC op canonicalizers/verifiers helper methods.
+//===----------------------------------------------------------------------===//
+
+template <typename OpType> LogicalResult canonicalizePPROp(OpType op, PatternRewriter &rewriter)
+{
+    bool allIdentity = llvm::all_of(op.getPauliProduct(), [](mlir::Attribute attr) {
+        auto pauliStr = llvm::cast<mlir::StringAttr>(attr);
+        return pauliStr.getValue() == "I";
+    });
+
+    if (allIdentity) {
+        rewriter.replaceOp(op, op.getInQubits());
+        return mlir::success();
+    }
+    return mlir::failure();
+}
+
+template <typename OpType> LogicalResult verifyPPROp(OpType op)
+{
+    size_t numPauliProduct = op.getPauliProduct().size();
+
+    if (numPauliProduct == 0) {
+        return op.emitOpError("Pauli string must be non-empty");
+    }
+
+    if (numPauliProduct != op.getInQubits().size()) {
+        return op.emitOpError("Number of qubits must match number of pauli operators");
+    }
+    return mlir::success();
+}
+
+//===----------------------------------------------------------------------===//
 // QEC op verifiers.
 //===----------------------------------------------------------------------===//
 
-LogicalResult PPRotationOp::verify()
-{
-    size_t numPauliProduct = getPauliProduct().size();
+LogicalResult PPRotationOp::verify() { return verifyPPROp(*this); }
 
-    if (numPauliProduct == 0) {
-        return emitOpError("Pauli string must be non-empty");
-    }
-
-    if (numPauliProduct != getInQubits().size()) {
-        return emitOpError("Number of qubits must match number of pauli operators");
-    }
-    return mlir::success();
-}
-
-LogicalResult PPRotationArbitraryOp::verify()
-{
-    size_t numPauliProduct = getPauliProduct().size();
-
-    if (numPauliProduct == 0) {
-        return emitOpError("Pauli string must be non-empty");
-    }
-
-    if (numPauliProduct != getInQubits().size()) {
-        return emitOpError("Number of qubits must match number of pauli operators");
-    }
-    return mlir::success();
-}
+LogicalResult PPRotationArbitraryOp::verify() { return verifyPPROp(*this); }
 
 LogicalResult PPMeasurementOp::verify()
 {
@@ -105,35 +113,13 @@ LogicalResult FabricateOp::verify()
 
 LogicalResult PPRotationOp::canonicalize(PPRotationOp op, PatternRewriter &rewriter)
 {
-    auto pauliProduct = op.getPauliProduct();
-
-    bool allIdentity = llvm::all_of(pauliProduct, [](mlir::Attribute attr) {
-        auto pauliStr = llvm::cast<mlir::StringAttr>(attr);
-        return pauliStr.getValue() == "I";
-    });
-
-    if (allIdentity) {
-        rewriter.replaceOp(op, op.getInQubits());
-        return mlir::success();
-    }
-    return mlir::failure();
+    return canonicalizePPROp(op, rewriter);
 }
 
 LogicalResult PPRotationArbitraryOp::canonicalize(PPRotationArbitraryOp op,
                                                   PatternRewriter &rewriter)
 {
-    auto pauliProduct = op.getPauliProduct();
-
-    bool allIdentity = llvm::all_of(pauliProduct, [](mlir::Attribute attr) {
-        auto pauliStr = llvm::cast<mlir::StringAttr>(attr);
-        return pauliStr.getValue() == "I";
-    });
-
-    if (allIdentity) {
-        rewriter.replaceOp(op, op.getInQubits());
-        return mlir::success();
-    }
-    return mlir::failure();
+    return canonicalizePPROp(op, rewriter);
 }
 
 void LayerOp::build(OpBuilder &builder, OperationState &result, ValueRange inValues,

@@ -40,8 +40,7 @@ from catalyst.python_interface.dialects.qec import (
     PPRotationArbitraryOp,
     PPRotationOp,
 )
-
-from ..dialects.quantum import (
+from catalyst.python_interface.dialects.quantum import (
     CustomOp,
     ExtractOp,
     GlobalPhaseOp,
@@ -144,9 +143,15 @@ def resolve_measurement(name: str) -> MeasurementProcess:
 
 def _tensor_shape_from_ssa(ssa: SSAValue) -> list[int]:
     """Extract the concrete shape from an SSA tensor value."""
-    # pylint: disable= protected-access
-    tensor_abstr_shape = ssa.owner.operand._type.shape.data
-    return [dim.data for dim in tensor_abstr_shape]
+    ssa_type = ssa.type
+
+    if hasattr(ssa_type, "shape") and hasattr(ssa_type.shape, "data"):
+        return [dim.data for dim in ssa_type.shape.data]
+
+    raise AttributeError(
+        f"Could not extract tensor shape from {ssa.type}. "
+        f"SSA type {ssa.type} does not have expected shape data."
+    )
 
 
 def _extract(op, attr: str, resolver: Callable, single: bool = False):

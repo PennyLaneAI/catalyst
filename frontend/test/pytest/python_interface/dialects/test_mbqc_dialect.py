@@ -17,12 +17,21 @@
 import pytest
 from xdsl.context import Context
 from xdsl.dialects import arith, builtin, test
+from xdsl.ir import AttributeCovT, Operation, OpResult, Region
 from xdsl.parser import Parser
 from xdsl.utils.exceptions import VerifyException
 
-from catalyst.python_interface.dialects import Quantum, mbqc
+from catalyst.python_interface.dialects import mbqc, quantum
 
 pytestmark = pytest.mark.xdsl
+
+
+# Test function taken from xdsl/utils/test_value.py
+def create_ssa_value(t: AttributeCovT) -> OpResult[AttributeCovT]:
+    """Create a single SSA value with the given type for testing purposes."""
+    op = test.TestOp(result_types=(t,))
+    return op.results[0]
+
 
 all_ops = list(mbqc.MBQC.operations)
 all_attrs = list(mbqc.MBQC.attributes)
@@ -34,6 +43,31 @@ expected_ops_names = {
 
 expected_attrs_names = {
     "MeasurementPlaneAttr": "mbqc.measurement_plane",
+}
+
+
+qubit = create_ssa_value(quantum.QubitType())
+xy = mbqc.MeasurementPlaneAttr("XY")
+float_ssa = create_ssa_value(builtin.Float64Type())
+int_attr = builtin.IntegerAttr(0, 32)
+tensor = create_ssa_value(builtin.TensorType(builtin.i1, shape=(8,)))
+memref = create_ssa_value(builtin.MemRefType(builtin.i1, shape=(8,)))
+
+
+expected_ops_init_kwargs = {
+    "GraphStatePrepOp": [
+        {
+            "adj_matrix": tensor,
+            "init_op": builtin.StringAttr("Hadamard"),
+            "entangle_op": builtin.StringAttr("CZ"),
+        },
+        {"adj_matrix": memref, "init_op": "Hadamard", "entangle_op": "CZ"},
+    ],
+    "MeasureInBasisOp": [
+        {"in_qubit": qubit, "plane": xy, "angle": float_ssa},
+        {"in_qubit": qubit, "plane": xy, "angle": float_ssa, "postselect": 0},
+        {"in_qubit": qubit, "plane": xy, "angle": float_ssa, "postselect": int_attr},
+    ],
 }
 
 
@@ -60,7 +94,21 @@ def test_all_attributes_names(attr):
     assert attr.name == expected_name
 
 
-def test_assembly_format(run_filecheck):
+@pytest.mark.parametrize("op", all_ops)
+def test_op_constructors(op):
+    """Test that operations can be constructed correctly."""
+    kwargs_list = expected_ops_init_kwargs[op.__name__]
+    for kwargs in kwargs_list:
+        cloned_kwargs = {
+            k: v.clone() if isinstance(v, (Operation, Region)) else v for k, v in kwargs.items()
+        }
+        _ = op(**cloned_kwargs)
+
+
+@pytest.mark.parametrize(
+    "pretty_print", [pytest.param(True, id="pretty_print"), pytest.param(False, id="generic_print")]
+)
+def test_assembly_format(run_filecheck, pretty_print):
     """Test the assembly format of the mbqc ops."""
     program = r"""
     // CHECK: [[angle:%.+]] = "test.op"() : () -> f64
@@ -94,7 +142,7 @@ def test_assembly_format(run_filecheck):
     %graph_reg = mbqc.graph_state_prep (%adj_matrix : tensor<6xi1>) [init "Hadamard", entangle "CZ"] : !quantum.reg
     """
 
-    run_filecheck(program, roundtrip=True)
+    run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
 
 
 class TestMeasureInBasisOp:
@@ -115,7 +163,7 @@ class TestMeasureInBasisOp:
 
         ctx.load_dialect(builtin.Builtin)
         ctx.load_dialect(test.Test)
-        ctx.load_dialect(Quantum)
+        ctx.load_dialect(quantum.Quantum)
         ctx.load_dialect(mbqc.MBQC)
 
         module = Parser(ctx, program).parse_module()
@@ -146,7 +194,7 @@ class TestMeasureInBasisOp:
 
         ctx.load_dialect(builtin.Builtin)
         ctx.load_dialect(test.Test)
-        ctx.load_dialect(Quantum)
+        ctx.load_dialect(quantum.Quantum)
         ctx.load_dialect(mbqc.MBQC)
 
         module = Parser(ctx, program).parse_module()
@@ -154,8 +202,8 @@ class TestMeasureInBasisOp:
         measure_in_basis_op: mbqc.MeasureInBasisOp = module.ops.last
         assert isinstance(measure_in_basis_op, mbqc.MeasureInBasisOp)
 
-        with pytest.raises(VerifyException, match="'postselect' must be 0 or 1"):
-            measure_in_basis_op.verify_()
+        with pytest.raises(VerifyException, match="expected one of {0, 1}"):
+            measure_in_basis_op.verify()
 
     @pytest.mark.parametrize("init_op", ["Hadamard", builtin.StringAttr(data="Hadamard")])
     @pytest.mark.parametrize("entangle_op", ["CZ", builtin.StringAttr(data="CZ")])

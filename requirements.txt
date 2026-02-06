@@ -5,7 +5,7 @@ pip>=22.3
 # Build dependencies for non-Python components
 # Do not allow NumPy 2.0.0 due to a bug with their C API that blocks the usage of the Stable ABI;
 # this bug was fixed in 2.0.1 (https://github.com/numpy/numpy/pull/26995)
-numpy!=2.0.0
+numpy>2.0.0
 # llvm requires nanobind 2.9 or higher
 nanobind>=2.9
 pybind11>=2.12.0
@@ -35,8 +35,6 @@ filecheck
 # optional rt/test dependencies
 pennylane-lightning-kokkos
 amazon-braket-pennylane-plugin>1.27.1; python_version < "3.14"
-xdsl
-xdsl-jax
 pydot # Graph visualization backend requirement
 matplotlib # Graph visualization frontend requirement
 graphviz # Graph visualization backend requirement

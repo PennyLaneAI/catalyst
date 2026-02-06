@@ -66,6 +66,11 @@ llvm:
 	@if cd llvm-project; git apply --check $(MK_DIR)/patches/llvm-bufferization-segfault.patch; then \
 		git apply $(MK_DIR)/patches/llvm-bufferization-segfault.patch; \
 	fi
+	# Patch mlir python bindinggen annotations
+	# Remove patch after JAX is updated to v0.8.2 or later
+	@if cd llvm-project; git apply --check $(MK_DIR)/patches/llvm-python-bindinggen-annotations.patch; then \
+		git apply $(MK_DIR)/patches/llvm-python-bindinggen-annotations.patch; \
+	fi
 
 	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
@@ -92,7 +97,8 @@ llvm:
 	# Note: the upstream lit test llvm-project/mlir/test/python/execution_engine.py requries
 	# the python package `ml_dtypes`. We don't actually use the execution engine, so we skip the
 	# test to reduce unnecessary dependencies.
-	LIT_FILTER_OUT="Bytecode|tosa-to-tensor|execution_engine" cmake --build $(LLVM_BUILD_DIR) --target $(LLVM_TARGETS)
+	# Note: python_test.py fails with Python 3.14 due to type hint representation changes
+	LIT_FILTER_OUT="Bytecode|tosa-to-tensor|execution_engine|python_test" cmake --build $(LLVM_BUILD_DIR) --target $(LLVM_TARGETS)
 
 .PHONY: stablehlo
 stablehlo:
@@ -242,6 +248,7 @@ clean-enzyme:
 
 clean-plugin:
 	@echo "clean plugin"
+	rm -rf standalone
 	rm -rf standalone/build
 	rm -rf $(DIALECTS_BUILD_DIR)/lib/StandalonePlugin.*
 

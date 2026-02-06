@@ -430,6 +430,7 @@ class Compiler:
         )
         return cmd
 
+    # pylint: disable=too-many-branches
     @debug_logger
     def run_from_ir(self, ir: str, module_name: str, workspace: Directory):
         """Compile a shared object from a textual IR (MLIR or LLVM).
@@ -484,8 +485,11 @@ class Compiler:
         else:
             out_IR = None
 
-        output = LinkerDriver.run(output_object_name, options=self.options)
-        output_object_name = str(pathlib.Path(output).absolute())
+        if self.options.link:
+            output = LinkerDriver.run(output_object_name, options=self.options)
+            output = str(pathlib.Path(output).absolute())
+        else:
+            output = None
 
         # Clean up temporary files
         if os.path.exists(tmp_infile_name):
@@ -493,7 +497,7 @@ class Compiler:
         if os.path.exists(output_ir_name):
             os.remove(output_ir_name)
 
-        return output_object_name, out_IR
+        return output, out_IR
 
     def has_xdsl_passes_in_transform_modules(self, mlir_module):
         """Check if the MLIR module contains xDSL passes in transform dialect.

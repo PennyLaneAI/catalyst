@@ -1138,7 +1138,9 @@ def test_trace_to_jaxpr():
 
         return sz
 
-    r = circuit(3)
+    # pytest context messes with jax's debug info, ignore warning
+    with pytest.warns(DeprecationWarning, match="core.Jaxpr is missing a DebugInfo object"):
+        r = circuit(3)
     assert r == 3
 
 
