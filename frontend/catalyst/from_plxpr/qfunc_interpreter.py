@@ -345,21 +345,13 @@ def _pcphase_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint, h
     wires = invals[:qubits_len]
     angle = invals[qubits_len]
 
-    # This is a temporary workaround to properly capture
-    # the dimension of the subspace for the PCPhase operation
-    # which does not follow the same pattern as `qinst_p`.
-    # We will revisit this once we have a better solution for
-    # supporting general PL operations in the capture framework.
-    # See https://docs.pennylane.ai/en/stable/code/api/pennylane.PCPhase.html
-    dim = hyperparameters["dimension"][0]
-    params_len += 1
-
     ctrl_inputs = invals[qubits_len + 2 :]
+    ctrl_wires = invals[qubits_len + 1: -len(ctrl_inputs)]
 
     return qinst_p.bind(
         *wires,
         angle,
-        dim,
+        *ctrl_wires,
         *ctrl_inputs,
         op=op,
         qubits_len=qubits_len,
