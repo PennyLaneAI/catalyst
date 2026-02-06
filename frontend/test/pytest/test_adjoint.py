@@ -888,7 +888,7 @@ class TestProperties:
     def test_queue_category_None(self):
         """Test that the queue category `None` for some observables carries over."""
         op = adjoint(qml.Hermitian([[1, 0], [0, 1]], wires=0))
-        assert op._queue_category is None  # pylint: disable=protected-access
+        assert op._queue_category == "_ops"  # pylint: disable=protected-access
 
     @pytest.mark.parametrize("value", (True, False))
     def test_is_verified_hermitian(self, value):

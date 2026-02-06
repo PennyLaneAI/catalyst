@@ -21,7 +21,7 @@ of gradients, jacobians, jacobian-vector products, and more.
 import copy
 import functools
 import numbers
-from typing import Callable, Iterable, List, Optional, Union
+from typing import Callable, List, Optional, Sequence, Union
 
 import jax
 import pennylane as qml
@@ -442,12 +442,12 @@ def jvp(f: Callable, params, tangents, *, method=None, h=None, argnums=None):
     (Array(0.78766064, dtype=float64), Array(-0.7011436, dtype=float64))
     """
 
-    def check_is_iterable(x, hint):
-        if not isinstance(x, Iterable):
-            raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
+    def check_is_Sequence(x, hint):
+        if not isinstance(x, Sequence):
+            raise ValueError(f"vjp '{hint}' argument must be a Sequence, not {type(x)}")
 
-    check_is_iterable(params, "params")
-    check_is_iterable(tangents, "tangents")
+    check_is_Sequence(params, "params")
+    check_is_Sequence(tangents, "tangents")
 
     if EvaluationContext.is_tracing():
         scalar_out = False
@@ -458,7 +458,7 @@ def jvp(f: Callable, params, tangents, *, method=None, h=None, argnums=None):
 
         if len(tangents_flatten) != len(grad_params.expanded_argnums):
             raise TypeError(
-                "number of tangent and number of differentiable parameters in catalyst.jvp do not "
+                "number of tangents and number of differentiable parameters in catalyst.jvp do not "
                 "match; the number of parameters must be equal. "
                 f"Got {len(grad_params.expanded_argnums)} differentiable parameters and so expected "
                 f"as many tangents, but got {len(tangents_flatten)} instead."
@@ -550,11 +550,11 @@ def vjp(f: Callable, params, cotangents, *, method=None, h=None, argnums=None):
     if qml.capture.enabled():
         return qml.vjp(f, params, cotangents, method=method, h=h, argnums=argnums)
 
-    def check_is_iterable(x, hint):
-        if not isinstance(x, Iterable):
-            raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
+    def check_is_Sequence(x, hint):
+        if not isinstance(x, Sequence):
+            raise ValueError(f"vjp '{hint}' argument must be a Sequence, not {type(x)}")
 
-    check_is_iterable(params, "params")
+    check_is_Sequence(params, "params")
 
     if EvaluationContext.is_tracing():
         scalar_out = False
@@ -751,7 +751,7 @@ def _check_grad_params(
     elif isinstance(argnums, list) and all(isinstance(i, int) for i in argnums):
         argnum_list = argnums
     else:
-        raise ValueError(f"argnums should be integer or a list of integers, not {argnums}")
+        raise ValueError(f"argnums should be an integer or a Sequence of integers, not {argnums}")
     # Compute the argnums of the pytree arg
     total_argnums = list(range(0, len_flatten_args))
     argnum_unflatten = tree_unflatten(in_tree, total_argnums)
