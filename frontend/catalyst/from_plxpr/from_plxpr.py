@@ -572,7 +572,7 @@ def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=Non
     # Besides, the graph-based decomposition is not supported
     # yet in from_plxpr for most gates and templates.
     # TODO: Enable the graph-based decomposition
-    qml.decomposition.disable_graph()
+    # qml.decomposition.disable_graph()
 
     kwargs = (
         {"gate_set": set(COMPILER_OPS_FOR_DECOMPOSITION.keys()).union(tgateset)}
@@ -581,7 +581,7 @@ def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=Non
     )
     final_jaxpr = qml.transforms.decompose.plxpr_transform(inner_jaxpr, consts, (), kwargs, *ncargs)
 
-    qml.decomposition.enable_graph()
+    # qml.decomposition.enable_graph()
 
     return final_jaxpr
 
