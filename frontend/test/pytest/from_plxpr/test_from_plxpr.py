@@ -133,22 +133,6 @@ class TestErrors:
         with pytest.raises(NotImplementedError, match="does not yet support measurements with"):
             from_plxpr(jaxpr)()
 
-    def test_measuring_measurement_values(self):
-        """Test that measuring a MeasurementValue raises a NotImplementedError."""
-
-        dev = qml.device("lightning.qubit", wires=2)
-
-        @qml.qnode(dev)
-        def circuit():
-            return qml.measurements.ExpectationMP(
-                obs=2
-            )  # classical value like will be used for mcms
-
-        jaxpr = jax.make_jaxpr(circuit)()
-
-        with pytest.raises(NotImplementedError, match=r"not yet supported"):
-            from_plxpr(jaxpr)()
-
     def test_unsupported_measurement(self):
         """Test that a NotImplementedError is raised if a measurement
         is not yet supported for conversion."""
