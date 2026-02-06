@@ -22,7 +22,15 @@ from functools import partial
 import jax
 import jax._src.interpreters.partial_eval as pe
 from jax._src import config, core, source_info_util
-from jax._src.core import JaxprEqnContext, abstractify, standard_vma_rule
+from jax._src.core import (
+    JaxprEqnContext,
+    abstractify,
+    standard_vma_rule,
+    InDBIdx,
+    OutDBIdx,
+    Var,
+    DShapedArray,
+)
 from jax._src.interpreters import mlir
 from jax._src.interpreters.partial_eval import (
     DynamicJaxprTracer,
@@ -56,6 +64,7 @@ __all__ = (
     "patched_dyn_shape_staging_rule",
     "patched_pjit_staging_rule",
     "patched_multi_broadcast_in_dim",
+    "patched_add_implicit_outputs",
 )
 
 
@@ -409,3 +418,35 @@ def patched_pjit_staging_rule(trace, source_info, *args, **params):
     else:
         out_tracers = trace.default_process_primitive(jit_p, args, params, source_info=source_info)
     return out_tracers
+
+
+def patched_add_implicit_outputs(jaxpr: Jaxpr) -> tuple[Jaxpr, OutputType]:
+    """
+    A patched version of jax/_src/interpreters/partial_eval.py/_add_implicit_outputs
+    Starting from v0.7.1, the dynamic dimension is actually no longer necessary to return.
+    Sometimes, the dynamic dimension might actually be a leaked Var from an inner scope jaxpr,
+    causing issues.
+    We just patch this method to not add any implicit outputs.
+    """
+    invars = [*jaxpr.constvars, *jaxpr.invars]
+    expl_outvars = jaxpr.outvars
+    outvars = expl_outvars
+
+    in_map: dict[Var, InDBIdx] = {v: InDBIdx(i) for i, v in enumerate(invars)}
+    out_map: dict[Var, OutDBIdx] = {x: OutDBIdx(i) for i, x in enumerate(outvars) if type(x) is Var}
+    out_avals_ = (x.aval for x in outvars)
+    out_avals = [
+        (
+            a.update(
+                shape=tuple(in_map.get(d, out_map.get(d)) if type(d) is Var else d for d in a.shape)
+            )
+            if type(a) is DShapedArray
+            else a
+        )
+        for a in out_avals_
+    ]
+    kept_outs = [True] * len(expl_outvars)
+    out_type = tuple(zip(out_avals, kept_outs))
+
+    new_jaxpr = jaxpr.replace(outvars=outvars)
+    return new_jaxpr, out_type

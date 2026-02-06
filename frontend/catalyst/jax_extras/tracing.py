@@ -62,7 +62,7 @@ from jax.lax import convert_element_type
 from jax.tree_util import PyTreeDef, tree_flatten, tree_structure, tree_unflatten, treedef_is_leaf
 from jaxlib._jax.pytree import PyTreeRegistry
 
-from catalyst.jax_extras.patches import gather2_p, get_aval2
+from catalyst.jax_extras.patches import gather2_p, get_aval2, patched_add_implicit_outputs
 from catalyst.logging import debug_logger
 from catalyst.tracing.type_signatures import verify_static_argnums_type
 from catalyst.utils.exceptions import CompileError
@@ -498,6 +498,11 @@ def make_jaxpr2(
         # TODO: re-use `deduce_avals` here.
         with Patcher(
             (jax._src.interpreters.partial_eval, "get_aval", get_aval2),
+            (
+                jax._src.interpreters.partial_eval,
+                "_add_implicit_outputs",
+                patched_add_implicit_outputs,
+            ),
             (jax._src.lax.slicing, "gather_p", gather2_p),
         ), ExitStack():
             f = wrap_init(fun, debug_info=debug_info)
