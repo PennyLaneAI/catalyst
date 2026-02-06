@@ -427,7 +427,7 @@ def subroutine(func):
     return wrapper
 
 
-def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None, target_gate=None):
+def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None, op_type=None):
     """
     Denotes the creation of a quantum definition in the intermediate representation.
     """
@@ -442,7 +442,7 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None
             is_qreg=is_qreg,
             num_params=num_params,
             pauli_word=pauli_word,
-            target_gate=target_gate,
+            op_type=op_type,
         )
 
     if pauli_word is not None:
@@ -450,8 +450,9 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        # TODO change this name to op_type
         if getattr(func, "target_gate", None) is None:
-            setattr(func, "target_gate", target_gate)
+            setattr(func, "target_gate", op_type)
 
         if pauli_word is not None:
             jaxpr = jax.make_jaxpr(func)(theta=args[0], wires=args[1], **kwargs)
