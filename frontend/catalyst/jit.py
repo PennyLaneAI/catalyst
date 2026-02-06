@@ -128,7 +128,7 @@ def qjit(
             - :attr:`~.QJIT.jaxpr`: JAX program representation
             - :attr:`~.QJIT.mlir`: MLIR representation after canonicalization
             - :attr:`~.QJIT.mlir_opt`: MLIR representation after optimization
-            - :attr:`~.QJIT.qir`: QIR in LLVM IR form
+            - :attr:`~.QJIT.llvmir`: LLVM IR representation
         use_nameloc (bool): If ``True``, function parameter names are added to the IR as name
             locations.
         verbose (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
@@ -537,7 +537,8 @@ class QJIT(CatalystCallable):
                              object to compile, as is, without any modifications
     :ivar jaxpr: This attribute stores the Jaxpr compiled from the function as a string.
     :ivar mlir: This attribute stores the MLIR compiled from the function as a string.
-    :ivar qir: This attribute stores the QIR in LLVM IR form compiled from the function as a string.
+    :ivar llvmir: This attribute stores the LLVM IR representation compiled from the function as
+                  a string.
     """
 
     @debug_logger_init
@@ -559,6 +560,7 @@ class QJIT(CatalystCallable):
         # IRs are only available for the most recently traced function.
         self.jaxpr = None
         self.mlir_module = None
+        self.llvm_ir = None
         self.out_type = None
         self.overwrite_ir = None
         self.use_cwd_for_workspace = self.compile_options.keep_intermediate
@@ -658,29 +660,34 @@ class QJIT(CatalystCallable):
         self.workspace = self._get_workspace()
 
         # TODO: awkward, refactor or redesign the target feature
-        if self.compile_options.target in ("jaxpr", "mlir", "binary"):
+        if self.compile_options.target in ("jaxpr", "mlir", "llvmir", "binary"):
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
                 self.user_sig or ()
             )
 
-        if self.compile_options.target in ("mlir", "binary"):
+        if self.compile_options.target in ("mlir", "llvmir", "binary"):
             self.mlir_module = self.generate_ir()
 
-        if self.compile_options.target in ("binary",):
-            self.compiled_function, _ = self.compile()
+        if self.compile_options.target in ("llvmir", "binary"):
+            self.compiled_function, self.llvm_ir = self.compile()
+
+        if self.compile_options.target in ("binary",) and self.compile_options.link:
             self.fn_cache.insert(
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
 
     @property
-    def qir(self):
+    def llvmir(self):
         """LLVMIR textual representation."""
+        if self.llvm_ir is not None:
+            return self.llvm_ir
+
         if not self.mlir_module:
-            # TODO: Should we go through the translation?
             return None
 
         _mlir = str(self.mlir_module)
-        return to_llvmir(stdin=_mlir, options=self.compile_options)
+        self.llvm_ir = to_llvmir(stdin=_mlir, options=self.compile_options)
+        return self.llvm_ir
 
     @debug_logger
     def jit_compile(self, args, **kwargs):
@@ -712,7 +719,7 @@ class QJIT(CatalystCallable):
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
 
             self.mlir_module = self.generate_ir()
-            self.compiled_function, _ = self.compile()
+            self.compiled_function, self.llvm_ir = self.compile()
 
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
@@ -876,10 +883,12 @@ class QJIT(CatalystCallable):
         else:
             shared_object, llvm_ir = self.compiler.run(self.mlir_module, self.workspace)
 
+        if not self.compile_options.link:
+            return None, llvm_ir
+
         compiled_fn = CompiledFunction(
             shared_object, func_name, restype, self.out_type, self.compile_options
         )
-
         return compiled_fn, llvm_ir
 
     @instrument(has_finegrained=True)

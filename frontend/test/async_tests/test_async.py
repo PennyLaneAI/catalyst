@@ -59,7 +59,7 @@ def test_qnode_execution(backend):
     compiled = qjit(async_qnodes=True)(multiple_qnodes)
     observed = compiled(params)
     expected = qjit(multiple_qnodes)(params)
-    assert "async_execute_fn" in compiled.qir
+    assert "async_execute_fn" in compiled.llvmir
     assert np.allclose(expected, observed)
 
 
@@ -86,7 +86,7 @@ def test_gradient(inp, diff_methods, backend):
         h = qml.grad(g, argnums=0)
         return h(x)
 
-    assert "async_execute_fn" in compiled.qir
+    assert "async_execute_fn" in compiled.llvmir
     assert np.allclose(compiled(inp), interpreted(inp))
 
 

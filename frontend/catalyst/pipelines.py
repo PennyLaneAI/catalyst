@@ -126,6 +126,7 @@ class CompileOptions:
     verbose: Optional[bool] = False
     logfile: Optional[TextIOWrapper] = sys.stderr
     target: Optional[str] = "binary"
+    link: Optional[bool] = True
     keep_intermediate: Optional[Union[str, int, bool, KeepIntermediateLevel]] = False
     use_nameloc: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
