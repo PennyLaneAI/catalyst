@@ -34,6 +34,8 @@ set(LIBS
     catalyst-transforms
     MLIRQuantum
     quantum-transforms
+    MLIRQRef
+    ref-quantum-transforms
     MLIRQEC
     qec-transforms
     MLIRGradient
