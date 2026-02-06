@@ -22,7 +22,6 @@ from xdsl.dialects.builtin import (
     ArrayAttr,
     ComplexType,
     Float64Type,
-    FloatAttr,
     IntegerType,
     MemRefType,
     StringAttr,
@@ -196,7 +195,7 @@ class GlobalPhaseOp(UnitaryGateOp):
     def __init__(
         self,
         *,
-        params: float | SSAValue[Float64Type],
+        params: SSAValue[Float64Type],
         in_ctrl_qubits: (
             QubitSSAValue | Operation | Sequence[QubitSSAValue | Operation] | None
         ) = None,
@@ -208,8 +207,6 @@ class GlobalPhaseOp(UnitaryGateOp):
             | None
         ) = None,
     ):
-        if isinstance(params, float):
-            params = FloatAttr(data=params, type=Float64Type())
         in_ctrl_qubits = () if in_ctrl_qubits is None else in_ctrl_qubits
         in_ctrl_values = () if in_ctrl_values is None else in_ctrl_values
 

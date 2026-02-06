@@ -134,7 +134,7 @@ struct PostprocessForwardOp : public OpRewritePattern<ForwardOp> {
             for (Value operand : returnOp.getOperands()) {
                 if (isa<MemRefType>(operand.getType()) && idx < resc) {
                     BlockArgument output = op.getArgument(idx * 2 + argc * 2);
-                    rewriter.create<memref::CopyOp>(returnOp.getLoc(), operand, output);
+                    memref::CopyOp::create(rewriter, returnOp.getLoc(), operand, output);
                     idx++;
                 }
                 else {
@@ -226,7 +226,7 @@ struct PostprocessReverseOp : public OpRewritePattern<ReverseOp> {
             for (Value operand : returnOp.getOperands()) {
                 if (isa<MemRefType>(operand.getType()) && idx < forwardArgc) {
                     BlockArgument output = op.getArgument(2 * idx + 1);
-                    rewriter.create<memref::CopyOp>(returnOp.getLoc(), operand, output);
+                    memref::CopyOp::create(rewriter, returnOp.getLoc(), operand, output);
                     idx++;
                 }
             }

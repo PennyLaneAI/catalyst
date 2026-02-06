@@ -118,6 +118,7 @@ jobs:
       run: |
         cd $GITHUB_WORKSPACE/mlir/llvm-project
         git apply $GITHUB_WORKSPACE/mlir/patches/llvm-bufferization-segfault.patch
+        git apply $GITHUB_WORKSPACE/mlir/patches/llvm-python-bindinggen-annotations.patch
 
     - name: Clone Stablehlo Submodule
       if: steps.cache-stablehlo-source.outputs.cache-hit != 'true'
