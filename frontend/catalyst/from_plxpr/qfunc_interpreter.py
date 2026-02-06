@@ -346,7 +346,7 @@ def _pcphase_bind_call(*invals, op, qubits_len, params_len, ctrl_len, adjoint, h
     angle = invals[qubits_len]
 
     ctrl_inputs = invals[qubits_len + 2 :]
-    ctrl_wires = invals[qubits_len + 1: -len(ctrl_inputs)]
+    ctrl_wires = invals[qubits_len + 1 : -len(ctrl_inputs)]
 
     return qinst_p.bind(
         *wires,
