@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import warnings
+from collections import defaultdict
 from typing import Literal
 
 from pennylane.workflow.qnode import QNode
@@ -34,7 +35,11 @@ class StopCompilation(Exception):
 
 
 def mlir_specs(
-    qnode: QJIT, level: int | tuple[int] | list[int] | Literal["all"], *args, **kwargs
+    qnode: QJIT,
+    level: int | tuple[int] | list[int] | Literal["all"],
+    *args,
+    level_to_markers: dict[int, tuple(str)] | None = None,
+    **kwargs,
 ) -> ResourcesResult | dict[str, ResourcesResult]:
     """Compute the specs used for a circuit at the level of an MLIR pass.
 
@@ -48,6 +53,9 @@ def mlir_specs(
         ResourcesResult | dict[str, ResourcesResult]: The resources for the circuit at the
           specified level
     """
+
+    if level_to_markers is None:
+        level_to_markers = defaultdict(tuple)
 
     if not isinstance(qnode, QJIT) or (
         not isinstance(qnode.original_function, QNode)
@@ -109,7 +117,11 @@ def mlir_specs(
             raise ValueError(
                 f"Requested specs levels {', '.join(missing)} not found in MLIR pass list."
             )
-        return {f"{cache[lvl][1]} (MLIR-{lvl})": cache[lvl][0] for lvl in level if lvl in cache}
+        return {
+            ", ".join(level_to_markers.get(lvl, f"{cache[lvl][1]} (MLIR-{lvl})")): cache[lvl][0]
+            for lvl in level
+            if lvl in cache
+        }
 
     # Just one level was specified
     if level not in cache:
