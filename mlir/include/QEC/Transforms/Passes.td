@@ -157,4 +157,13 @@ def LowerQECInitOpsPass : Pass<"lower-qec-init-ops"> {
     let dependentDialects = [ "catalyst::qec::QECDialect"];
 }
 
+def QECConversionPass : Pass<"convert-qec-to-llvm"> {
+    let summary = "Perform a dialect conversion from QEC to LLVM";
+
+    let dependentDialects = [
+       "mlir::LLVM::LLVMDialect",
+       "catalyst::quantum::QuantumDialect",
+    ];
+}
+
 #endif // QEC_PASSES
