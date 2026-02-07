@@ -394,5 +394,27 @@ def test_dynamic_shots_and_wires(capfd):
     assert out.count("compiling...") == 1
 
 
+@pytest.mark.usefixtures("use_capture")
+def test_dynamic_shots_with_sample_and_pass_on_capture(backend):
+    """
+    Test that dynamic number of shots with qml.sample() can be used when a pass is applied.
+    """
+
+    @catalyst.qjit
+    def workflow(shots: int):
+        @qml.transform(pass_name="cancel-inverses")
+        @qml.qnode(qml.device(backend, wires=2), shots=shots)
+        def aloha():
+            return qml.sample()
+
+        return aloha()
+
+    res = workflow(1000)
+    assert res.shape == (1000, 2)
+
+    res = workflow(500)
+    assert res.shape == (500, 2)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
