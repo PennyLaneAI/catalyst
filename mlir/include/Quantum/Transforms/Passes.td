@@ -66,6 +66,10 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let summary = "Given a qnode containing multiple tapes, split each tape into its own function.";
 }
 
+def SplitToSingleTermsPass : Pass<"split-to-single-terms"> {
+    let summary = "Split quantum functions into single-term observables.";
+}
+
 // ----- Quantum circuit transformation passes begin ----- //
 // For example, automatic compiler peephole opts, etc.
 
@@ -85,7 +89,7 @@ def GridsynthPass : Pass<"gridsynth"> {
         /*CLI name=*/"epsilon",
         /*Type=*/"double",
        /*Default=*/"1e-4",
-       /*Description=*/"Maximum error tolerance for per-gate discretization.">, 
+       /*Description=*/"Maximum error tolerance for per-gate discretization.">,
         Option<
         /*C++ var name=*/"pprBasis",
         /*CLI name=*/"ppr-basis",
