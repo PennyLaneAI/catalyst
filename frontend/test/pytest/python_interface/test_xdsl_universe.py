@@ -13,6 +13,7 @@
 # limitations under the License.
 """Unit tests for the xDSL universe."""
 from subprocess import check_call
+
 import pytest
 from xdsl.passes import ModulePass
 from xdsl.universe import Universe as xUniverse
