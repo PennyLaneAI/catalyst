@@ -57,26 +57,35 @@ def compiler_transform(module_pass: ModulePass) -> CompilerTransform:
 
 
 class CompilationPass(ModulePass):
-    """An xdsl ``ModulePass`` subclass for defining passes."""
+    """A base class used to define compilation passes using xDSL modules as the
+    transformation target.
+
+    ``CompilationPass`` subclasses xDSL's ``ModulePass`` to abstract away details
+    that would otherwise need to be provided manually.
+
+    TODO: Update docstring
+    """
 
     name: ClassVar[str]
-    """String mnemonic for a compilation pass."""
+    """str: String mnemonic for a compilation pass."""
 
     recursive: ClassVar[bool] = True
-    """Whether or not the actions should be applied recursively. If ``True``,
+    """bool: Whether or not the actions should be applied recursively. If ``True``,
     the actions will be applied repeatedly until a steady-state is reached.
     ``True`` by default.
     """
 
     greedy: ClassVar[bool] = True
-    """Whether or not the actions should be applied greedily. If ``True``,
+    """bool: Whether or not the actions should be applied greedily. If ``True``,
     each iteration of the actions' application (if ``recursive == True``)
     will only apply the first action that modifies the input module.
-    ``True`` by default."""
+    ``True`` by default.
+    """
 
     _rewrite_patterns: ClassVar[list[RewritePattern]] = []
-    r"""List of registered actions. The stored values are ``RewritePattern``\ s
-    used to implement the registered actions."""
+    r"""list[xdsl.pattern_rewriter.RewritePattern]: List of registered actions. The
+    stored values are ``RewritePattern``\ s used to implement the registered actions.
+    """
 
     def __init_subclass__(cls: type["CompilationPass"]) -> None:
         cls._rewrite_patterns = []
@@ -85,7 +94,15 @@ class CompilationPass(ModulePass):
             cls.add_action(cls.action)
 
     def action(self, op: Operation, rewriter: PatternRewriter) -> None:
-        """The action that performs the transformation on an input operation."""
+        """The action that performs the transformation on an input operation.
+
+        Args:
+            op (xdsl.ir.Operation): the operation currently being transformed. If
+                a type hint for the operation is provided, this method will _only_
+                be invoked if the input operation matches the type hint
+            rewriter (xdsl.pattern_rewriter.PatternRewriter): a ``PatternRewriter``
+                that provides methods for transforming operations.
+        """
 
     @classmethod
     def add_action(
