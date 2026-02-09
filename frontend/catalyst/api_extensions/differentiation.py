@@ -21,7 +21,7 @@ of gradients, jacobians, jacobian-vector products, and more.
 import copy
 import functools
 import numbers
-from typing import Callable, List, Optional, Sequence, Union
+from collections.abc import Callable, Sequence
 
 import jax
 import pennylane as qml
@@ -49,7 +49,7 @@ from catalyst.utils.callables import CatalystCallable
 from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.types import get_shape
 
-Differentiable = Union[Function, QNode]
+Differentiable = Function | QNode
 
 
 ## API ##
@@ -442,12 +442,12 @@ def jvp(f: Callable, params, tangents, *, method=None, h=None, argnums=None):
     (Array(0.78766064, dtype=float64), Array(-0.7011436, dtype=float64))
     """
 
-    def check_is_Sequence(x, hint):
+    def check_is_sequence(x, hint):
         if not isinstance(x, Sequence):
-            raise ValueError(f"vjp '{hint}' argument must be a Sequence, not {type(x)}")
+            raise ValueError(f"jvp '{hint}' argument must be a Sequence, not {type(x)}")
 
-    check_is_Sequence(params, "params")
-    check_is_Sequence(tangents, "tangents")
+    check_is_sequence(params, "params")
+    check_is_sequence(tangents, "tangents")
 
     if EvaluationContext.is_tracing():
         scalar_out = False
@@ -723,8 +723,8 @@ class GradCallable(CatalystCallable):
 def _check_grad_params(
     method: str,
     scalar_out: bool,
-    h: Optional[float],
-    argnums: Optional[Union[int, List[int]]],
+    h: float | None,
+    argnums: int | list[int] | None,
     len_flatten_args: int,
     in_tree: PyTreeDef,
     with_value: bool = False,
