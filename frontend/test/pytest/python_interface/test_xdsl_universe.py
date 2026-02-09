@@ -80,4 +80,4 @@ def test_xdsl_opt(_transform):
     """
 
     cmd = ["xdsl-opt", "-p", _transform.name]
-    _ = run(cmd, input=mod_string, text=True)
+    _ = run(cmd, input=mod_string, text=True, check=True)
