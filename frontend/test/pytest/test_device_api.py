@@ -38,17 +38,17 @@ def test_qjit_device():
 
     # Check the preprocess of the new device
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-        transform_program, _ = device_qjit.preprocess(ctx)
-    assert transform_program
-    assert len(transform_program) == 3
-    assert transform_program[-2].transform.__name__ == "verify_operations"
-    assert transform_program[-1].transform.__name__ == "validate_measurements"
+        compile_pipeline, _ = device_qjit.preprocess(ctx)
+    assert compile_pipeline
+    assert len(compile_pipeline) == 3
+    assert compile_pipeline[-2].tape_transform.__name__ == "verify_operations"
+    assert compile_pipeline[-1].tape_transform.__name__ == "validate_measurements"
 
     # TODO: readd when we do not discard device preprocessing
-    # t = transform_program[0].transform.__name__
+    # t = compile_pipeline[0].tape_transform.__name__
     # assert t == "split_non_commuting"
 
-    t = transform_program[0].transform.__name__
+    t = compile_pipeline[0].tape_transform.__name__
     assert t == "catalyst_decompose"
 
     # Check that the device cannot execute tapes

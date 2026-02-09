@@ -356,7 +356,7 @@ class TestOutput:
 
     @pytest.mark.parametrize(
         "filename, file_format",
-        [("my_graph", None), ("my_graph", "png"), ("prototype.trial1", "png")],
+        [("my_graph", ""), ("my_graph", ".png"), ("prototype.trial1", ".png")],
     )
     def test_to_file(self, monkeypatch, filename, file_format):
         """Tests that the `to_file` method works correctly."""
@@ -365,11 +365,11 @@ class TestOutput:
         # mock out the graph writing functionality
         mock_write = MagicMock()
         monkeypatch.setattr(dag_builder.graph, "write", mock_write)
-        dag_builder.to_file(filename + "." + (file_format or "png"))
+        dag_builder.to_file(filename + file_format)
 
         # make sure the function handles extensions correctly
         mock_write.assert_called_once_with(
-            filename + "." + (file_format or "png"), format=file_format or "png"
+            filename + (file_format or ".png"), format="png"
         )
 
     @pytest.mark.parametrize("file_format", ["pdf", "svg", "jpeg"])
