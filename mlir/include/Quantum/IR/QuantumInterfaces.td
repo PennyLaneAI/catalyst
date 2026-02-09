@@ -79,11 +79,26 @@ def QuantumOperation : OpInterface<"QuantumOperation"> {
 
     let verify = [{
         auto gate = mlir::cast<ConcreteOp>($_op);
+        auto operands = gate.getQubitOperands();
+        auto results = gate.getQubitResults();
 
-        if (gate.getQubitOperands().size() != gate.getQubitResults().size())
+        if (operands.size() != results.size()) {
             return $_op->emitError() <<
-                "number of qubits in input (" << gate.getQubitOperands().size() << ") " <<
-                "and output (" << gate.getQubitResults().size() << ") must be the same";
+                "number of qubits in input (" << operands.size() << ") " <<
+                "and output (" << results.size() << ") must be the same";
+        }
+
+        if (!operands.empty()) {
+            mlir::Type refType = operands[0].getType();
+
+            // Check if all operands and results have the same type as refType
+            auto allMatch = [&](auto value) { return value.getType() == refType; };
+
+            if (!llvm::all_of(operands, allMatch) || !llvm::all_of(results, allMatch)) {
+                return $_op->emitOpError()
+                    << "requires all qubit operands and results to have the same type";
+            }
+        }
 
         return mlir::success();
     }];

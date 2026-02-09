@@ -18,7 +18,7 @@ from xdsl.passes import ModulePass
 from xdsl.universe import Universe as xUniverse
 
 from catalyst.python_interface import dialects, transforms
-from catalyst.python_interface.xdsl_universe import XDSL_UNIVERSE, shared_dialects
+from catalyst.python_interface.xdsl_universe import CATALYST_XDSL_UNIVERSE, shared_dialects
 
 pytestmark = pytest.mark.xdsl
 
@@ -35,12 +35,12 @@ def test_correct_universe():
     """Test that all the available dialects and transforms are available in the universe."""
     for d in all_dialects:
         if d.name not in shared_dialects:
-            assert d.name in XDSL_UNIVERSE.all_dialects
-            assert XDSL_UNIVERSE.all_dialects[d.name] == d
+            assert d.name in CATALYST_XDSL_UNIVERSE.all_dialects
+            assert CATALYST_XDSL_UNIVERSE.all_dialects[d.name] == d
 
     for t in all_transforms:
-        assert t.name in XDSL_UNIVERSE.all_passes
-        assert XDSL_UNIVERSE.all_passes[t.name] == t
+        assert t.name in CATALYST_XDSL_UNIVERSE.all_passes
+        assert CATALYST_XDSL_UNIVERSE.all_passes[t.name] == t
 
 
 def test_correct_multiverse():

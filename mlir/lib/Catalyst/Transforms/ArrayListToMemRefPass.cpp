@@ -38,7 +38,7 @@ struct ArrayListBuilder {
             return failure();
         }
 
-        auto unpacked = b.create<UnrealizedConversionCastOp>(loc, resultTypes, list);
+        auto unpacked = UnrealizedConversionCastOp::create(b, loc, resultTypes, list);
         return ArrayListBuilder{.dataField = unpacked.getResult(0),
                                 .sizeField = unpacked.getResult(1),
                                 .capacityField = unpacked.getResult(2),
@@ -62,7 +62,7 @@ struct ArrayListBuilder {
             ctx, /*inputs=*/
             {dataField.getType(), sizeField.getType(), capacityField.getType(), elementType},
             /*outputs=*/{});
-        auto pushFn = b.create<func::FuncOp>(loc, funcName, pushFnType);
+        auto pushFn = func::FuncOp::create(b, loc, funcName, pushFnType);
         pushFn.setPrivate();
 
         Block *entryBlock = pushFn.addEntryBlock();
@@ -72,31 +72,32 @@ struct ArrayListBuilder {
         BlockArgument capacityField = pushFn.getArgument(2);
         BlockArgument value = pushFn.getArgument(3);
 
-        Value sizeVal = b.create<memref::LoadOp>(loc, sizeField);
-        Value capacityVal = b.create<memref::LoadOp>(loc, capacityField);
+        Value sizeVal = memref::LoadOp::create(b, loc, sizeField);
+        Value capacityVal = memref::LoadOp::create(b, loc, capacityField);
 
         Value predicate =
-            b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq, sizeVal, capacityVal);
-        b.create<scf::IfOp>(loc, predicate, [&](OpBuilder &thenBuilder, Location loc) {
-            Value two = thenBuilder.create<arith::ConstantIndexOp>(loc, 2);
-            Value newCapacity = thenBuilder.create<arith::MulIOp>(loc, capacityVal, two);
-            Value oldElements = thenBuilder.create<memref::LoadOp>(loc, elementsField);
-            Value newElements = thenBuilder.create<memref::ReallocOp>(
-                loc, cast<MemRefType>(oldElements.getType()), oldElements, newCapacity);
-            thenBuilder.create<memref::StoreOp>(loc, newElements, elementsField);
-            thenBuilder.create<memref::StoreOp>(loc, newCapacity, capacityField);
-            thenBuilder.create<scf::YieldOp>(loc);
+            arith::CmpIOp::create(b, loc, arith::CmpIPredicate::eq, sizeVal, capacityVal);
+        scf::IfOp::create(b, loc, predicate, [&](OpBuilder &thenBuilder, Location loc) {
+            Value two = arith::ConstantIndexOp::create(thenBuilder, loc, 2);
+            Value newCapacity = arith::MulIOp::create(thenBuilder, loc, capacityVal, two);
+            Value oldElements = memref::LoadOp::create(thenBuilder, loc, elementsField);
+            Value newElements =
+                memref::ReallocOp::create(thenBuilder, loc, cast<MemRefType>(oldElements.getType()),
+                                          oldElements, newCapacity);
+            memref::StoreOp::create(thenBuilder, loc, newElements, elementsField);
+            memref::StoreOp::create(thenBuilder, loc, newCapacity, capacityField);
+            scf::YieldOp::create(thenBuilder, loc);
         });
 
-        Value elementsVal = b.create<memref::LoadOp>(loc, elementsField);
-        b.create<memref::StoreOp>(loc, value, elementsVal,
-                                  /*indices=*/sizeVal);
+        Value elementsVal = memref::LoadOp::create(b, loc, elementsField);
+        memref::StoreOp::create(b, loc, value, elementsVal,
+                                /*indices=*/sizeVal);
 
-        Value one = b.create<arith::ConstantIndexOp>(loc, 1);
-        Value newSize = b.create<arith::AddIOp>(loc, sizeVal, one);
+        Value one = arith::ConstantIndexOp::create(b, loc, 1);
+        Value newSize = arith::AddIOp::create(b, loc, sizeVal, one);
 
-        b.create<memref::StoreOp>(loc, newSize, sizeField);
-        b.create<func::ReturnOp>(loc);
+        memref::StoreOp::create(b, loc, newSize, sizeField);
+        func::ReturnOp::create(b, loc);
         return SymbolRefAttr::get(ctx, funcName);
     }
 
@@ -118,7 +119,7 @@ struct ArrayListBuilder {
             FunctionType::get(ctx, /*inputs=*/
                               {dataField.getType(), sizeField.getType(), capacityField.getType()},
                               /*outputs=*/elementType);
-        auto popFn = builder.create<func::FuncOp>(loc, funcName, popFnType);
+        auto popFn = func::FuncOp::create(builder, loc, funcName, popFnType);
         popFn.setPrivate();
 
         Block *entryBlock = popFn.addEntryBlock();
@@ -128,28 +129,28 @@ struct ArrayListBuilder {
         BlockArgument elementsField = arguments[0];
         BlockArgument sizeField = arguments[1];
 
-        Value elementsVal = builder.create<memref::LoadOp>(loc, elementsField);
-        Value sizeVal = builder.create<memref::LoadOp>(loc, sizeField);
-        Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-        Value newSize = builder.create<arith::SubIOp>(loc, sizeVal, one);
-        Value poppedVal = builder.create<memref::LoadOp>(loc, elementsVal, newSize);
+        Value elementsVal = memref::LoadOp::create(builder, loc, elementsField);
+        Value sizeVal = memref::LoadOp::create(builder, loc, sizeField);
+        Value one = arith::ConstantIndexOp::create(builder, loc, 1);
+        Value newSize = arith::SubIOp::create(builder, loc, sizeVal, one);
+        Value poppedVal = memref::LoadOp::create(builder, loc, elementsVal, newSize);
 
-        builder.create<memref::StoreOp>(loc, newSize, sizeField);
-        builder.create<func::ReturnOp>(loc, poppedVal);
+        memref::StoreOp::create(builder, loc, newSize, sizeField);
+        func::ReturnOp::create(builder, loc, poppedVal);
         return SymbolRefAttr::get(ctx, funcName);
     }
 
     void emitPush(Location loc, Value value, OpBuilder &b, FlatSymbolRefAttr pushFn) const
     {
-        b.create<func::CallOp>(loc, pushFn, /*results=*/TypeRange{},
-                               /*operands=*/ValueRange{dataField, sizeField, capacityField, value});
+        func::CallOp::create(b, loc, pushFn, /*results=*/TypeRange{},
+                             /*operands=*/ValueRange{dataField, sizeField, capacityField, value});
     }
 
     Value emitPop(Location loc, OpBuilder &builder, FlatSymbolRefAttr popFn) const
     {
-        auto callOp = builder.create<func::CallOp>(
-            loc, popFn, /*results=*/elementType,
-            /*operands=*/ValueRange{dataField, sizeField, capacityField});
+        auto callOp =
+            func::CallOp::create(builder, loc, popFn, /*results=*/elementType,
+                                 /*operands=*/ValueRange{dataField, sizeField, capacityField});
         return callOp.getResult(0);
     }
 };
@@ -165,20 +166,20 @@ struct LowerListInit : public OpConversionPattern<ListInitOp> {
             op.emitError() << "Failed to convert type " << op.getType();
             return failure();
         }
-        Value capacity = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 32);
-        Value initialSize = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+        Value capacity = arith::ConstantIndexOp::create(rewriter, op.getLoc(), 32);
+        Value initialSize = arith::ConstantIndexOp::create(rewriter, op.getLoc(), 0);
         auto dataType = cast<MemRefType>(resultTypes[0]);
         auto sizeType = cast<MemRefType>(resultTypes[1]);
         auto capacityType = cast<MemRefType>(resultTypes[2]);
-        Value buffer = rewriter.create<memref::AllocOp>(op.getLoc(),
-                                                        cast<MemRefType>(dataType.getElementType()),
-                                                        /*dynamicSize=*/capacity);
-        Value bufferField = rewriter.create<memref::AllocOp>(op.getLoc(), dataType);
-        Value sizeField = rewriter.create<memref::AllocOp>(op.getLoc(), sizeType);
-        Value capacityField = rewriter.create<memref::AllocOp>(op.getLoc(), capacityType);
-        rewriter.create<memref::StoreOp>(op.getLoc(), buffer, bufferField);
-        rewriter.create<memref::StoreOp>(op.getLoc(), initialSize, sizeField);
-        rewriter.create<memref::StoreOp>(op.getLoc(), capacity, capacityField);
+        Value buffer = memref::AllocOp::create(rewriter, op.getLoc(),
+                                               cast<MemRefType>(dataType.getElementType()),
+                                               /*dynamicSize=*/capacity);
+        Value bufferField = memref::AllocOp::create(rewriter, op.getLoc(), dataType);
+        Value sizeField = memref::AllocOp::create(rewriter, op.getLoc(), sizeType);
+        Value capacityField = memref::AllocOp::create(rewriter, op.getLoc(), capacityType);
+        memref::StoreOp::create(rewriter, op.getLoc(), buffer, bufferField);
+        memref::StoreOp::create(rewriter, op.getLoc(), initialSize, sizeField);
+        memref::StoreOp::create(rewriter, op.getLoc(), capacity, capacityField);
         rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
             op, op.getType(), ValueRange{bufferField, sizeField, capacityField});
         return success();
@@ -198,11 +199,11 @@ struct LowerListDealloc : public OpConversionPattern<ListDeallocOp> {
             return failure();
         }
 
-        Value data = rewriter.create<memref::LoadOp>(op.getLoc(), arraylistBuilder->dataField);
-        rewriter.create<memref::DeallocOp>(op.getLoc(), data);
-        rewriter.create<memref::DeallocOp>(op.getLoc(), arraylistBuilder->dataField);
-        rewriter.create<memref::DeallocOp>(op.getLoc(), arraylistBuilder->sizeField);
-        rewriter.create<memref::DeallocOp>(op.getLoc(), arraylistBuilder->capacityField);
+        Value data = memref::LoadOp::create(rewriter, op.getLoc(), arraylistBuilder->dataField);
+        memref::DeallocOp::create(rewriter, op.getLoc(), data);
+        memref::DeallocOp::create(rewriter, op.getLoc(), arraylistBuilder->dataField);
+        memref::DeallocOp::create(rewriter, op.getLoc(), arraylistBuilder->sizeField);
+        memref::DeallocOp::create(rewriter, op.getLoc(), arraylistBuilder->capacityField);
         rewriter.eraseOp(op);
         return success();
     }
@@ -266,14 +267,14 @@ struct LowerListLoadData : public OpConversionPattern<ListLoadDataOp> {
         // Ensure the result memref has the correct underlying size (which may be different than the
         // list's underlying memref due to the geometric reallocation).
         Value data =
-            rewriter.create<memref::LoadOp>(op.getLoc(), arraylistBuilder.value().dataField);
+            memref::LoadOp::create(rewriter, op.getLoc(), arraylistBuilder.value().dataField);
         auto memrefType = cast<MemRefType>(data.getType());
         Value size =
-            rewriter.create<memref::LoadOp>(op.getLoc(), arraylistBuilder.value().sizeField);
+            memref::LoadOp::create(rewriter, op.getLoc(), arraylistBuilder.value().sizeField);
         SmallVector<OpFoldResult> offsets{rewriter.getIndexAttr(0)}, sizes{size},
             strides{rewriter.getIndexAttr(1)};
-        Value dataView = rewriter.create<memref::SubViewOp>(op.getLoc(), memrefType, data, offsets,
-                                                            sizes, strides);
+        Value dataView = memref::SubViewOp::create(rewriter, op.getLoc(), memrefType, data, offsets,
+                                                   sizes, strides);
         rewriter.replaceOp(op, dataView);
         return success();
     }

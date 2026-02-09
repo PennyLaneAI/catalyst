@@ -45,6 +45,7 @@ set(LIBS
     MLIRIon
     ion-transforms
     MLIRRTIO
+    rtio-transforms
     MLIRCatalystTest
     ${ENZYME_LIB}
     CatalystCompilerDriver

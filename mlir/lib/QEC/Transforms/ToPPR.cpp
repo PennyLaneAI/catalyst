@@ -77,6 +77,23 @@ void applyAdjointIfNeeded(GateConversion &gateConversion, CustomOp op)
     }
 }
 
+void applyGlobalPhase(Location loc, Value phaseValue, ConversionPatternRewriter &rewriter)
+{
+    //   static GlobalPhaseOp create(::mlir::OpBuilder &builder, ::mlir::Location location,
+    //   ::mlir::TypeRange out_ctrl_qubits, ::mlir::Value params, /*optional*/bool adjoint,
+    //   ::mlir::ValueRange in_ctrl_qubits, ::mlir::ValueRange in_ctrl_values);
+
+    GlobalPhaseOp::create(rewriter, loc, /*out_ctrl_qubits=*/TypeRange{}, /*params=*/phaseValue,
+                          /*adjoint=*/false, /*in_ctrl_qubits*/ ValueRange{},
+                          /*in_ctrl_values*/ ValueRange{});
+}
+
+void applyGlobalPhase(Location loc, const double phase, ConversionPatternRewriter &rewriter)
+{
+    Value paramValue = arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(phase));
+    applyGlobalPhase(loc, paramValue, rewriter);
+}
+
 //===----------------------------------------------------------------------===//
 //                       Gate conversion functions
 //===----------------------------------------------------------------------===//
@@ -94,8 +111,8 @@ void applySingleQubitConversion(CustomOp op, const ArrayRef<GateConversion> &gat
         applyAdjointIfNeeded(gateConversion, op);
 
         ArrayAttr pauliProduct = rewriter.getStrArrayAttr(gateConversion.pauliOperators);
-        pprOp = rewriter.create<PPRotationOp>(loc, types, pauliProduct, gateConversion.rotationKind,
-                                              inQubits);
+        pprOp = PPRotationOp::create(rewriter, loc, types, pauliProduct,
+                                     gateConversion.rotationKind, inQubits);
         inQubits = pprOp.getOutQubits();
         types = pprOp.getOutQubits().getType();
     }
@@ -128,24 +145,24 @@ LogicalResult controlledConversion(CustomOp op, StringRef P1, StringRef P2,
     auto inQubitsValues = op.getInQubits();
     auto outQubitsTypesList = op.getOutQubits().getType();
 
-    auto G0 = rewriter.create<PPRotationOp>(loc, outQubitsTypesList, pauliProduct, g0.rotationKind,
-                                            inQubitsValues);
+    auto G0 = PPRotationOp::create(rewriter, loc, outQubitsTypesList, pauliProduct, g0.rotationKind,
+                                   inQubitsValues);
 
     // G1 = (P1 ⊗ 1)−π/4
     pauliProduct = rewriter.getStrArrayAttr(g1.pauliOperators);
     SmallVector<Value> inQubitsValues1{G0.getOutQubits()[0]};
     SmallVector<Type> outQubitsTypesList1{G0.getOutQubits()[0].getType()};
 
-    auto G1 = rewriter.create<PPRotationOp>(loc, outQubitsTypesList1, pauliProduct, g1.rotationKind,
-                                            inQubitsValues1);
+    auto G1 = PPRotationOp::create(rewriter, loc, outQubitsTypesList1, pauliProduct,
+                                   g1.rotationKind, inQubitsValues1);
 
     // G2 = (1 ⊗ P2)−π/4
     pauliProduct = rewriter.getStrArrayAttr(g2.pauliOperators);
     SmallVector<Value> inQubitsValues2{G0.getOutQubits()[1]};
     SmallVector<Type> inQubitsTypesList2{G0.getOutQubits()[1].getType()};
 
-    auto G2 = rewriter.create<PPRotationOp>(loc, inQubitsTypesList2, pauliProduct, g1.rotationKind,
-                                            inQubitsValues2);
+    auto G2 = PPRotationOp::create(rewriter, loc, inQubitsTypesList2, pauliProduct, g1.rotationKind,
+                                   inQubitsValues2);
 
     rewriter.replaceOp(op, {G1.getOutQubits()[0], G2.getOutQubits()[0]});
     return success();
@@ -154,6 +171,8 @@ LogicalResult controlledConversion(CustomOp op, StringRef P1, StringRef P2,
 // H = (Z · X · Z)π/4
 LogicalResult convertHGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
+    applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 2, rewriter);
+
     auto Z0 = GateConversion({"Z"}, 4);
     auto X1 = GateConversion({"X"}, 4);
     auto Z2 = GateConversion({"Z"}, 4);
@@ -164,6 +183,8 @@ LogicalResult convertHGate(CustomOp op, ConversionPatternRewriter &rewriter)
 // S = (Z)π/4
 LogicalResult convertSGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
+    applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 4, rewriter);
+
     auto gate = GateConversion({"Z"}, 4);
     applySingleQubitConversion(op, {gate}, rewriter);
     return success();
@@ -172,6 +193,8 @@ LogicalResult convertSGate(CustomOp op, ConversionPatternRewriter &rewriter)
 // T = (Z)π/8
 LogicalResult convertTGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
+    applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 8, rewriter);
+
     auto gate = GateConversion({"Z"}, 8);
     applySingleQubitConversion(op, {gate}, rewriter);
     return success();
@@ -180,6 +203,8 @@ LogicalResult convertTGate(CustomOp op, ConversionPatternRewriter &rewriter)
 // X = (X)π/2
 LogicalResult convertXGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
+    applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 2, rewriter);
+
     auto gate = GateConversion({"X"}, 2);
     applySingleQubitConversion(op, {gate}, rewriter);
     return success();
@@ -188,6 +213,8 @@ LogicalResult convertXGate(CustomOp op, ConversionPatternRewriter &rewriter)
 // Y = (Y)π/2
 LogicalResult convertYGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
+    applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 2, rewriter);
+
     auto gate = GateConversion({"Y"}, 2);
     applySingleQubitConversion(op, {gate}, rewriter);
     return success();
@@ -196,6 +223,8 @@ LogicalResult convertYGate(CustomOp op, ConversionPatternRewriter &rewriter)
 // Z = (Z)π/2
 LogicalResult convertZGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
+    applyGlobalPhase(op->getLoc(), -llvm::numbers::pi / 2, rewriter);
+
     auto gate = GateConversion({"Z"}, 2);
     applySingleQubitConversion(op, {gate}, rewriter);
     return success();
@@ -211,6 +240,7 @@ LogicalResult convertIGate(CustomOp op, ConversionPatternRewriter &rewriter)
 
 LogicalResult convertCNOTGate(CustomOp op, ConversionPatternRewriter &rewriter)
 {
+    applyGlobalPhase(op->getLoc(), llvm::numbers::pi / 4, rewriter);
     return controlledConversion(op, "Z", "X", rewriter);
 }
 
@@ -227,8 +257,8 @@ LogicalResult convertMeasureOpToPPM(MeasureOp op, StringRef axis,
     Type mresType = op.getMres().getType();
     SmallVector<Type> outQubitTypes({qubitType});
 
-    auto ppmOp = rewriter.create<PPMeasurementOp>(loc, mresType, outQubitTypes, pauliProduct,
-                                                  nullptr, inQubits);
+    auto ppmOp = PPMeasurementOp::create(rewriter, loc, mresType, outQubitTypes, pauliProduct,
+                                         nullptr, inQubits);
 
     rewriter.replaceOp(op, ppmOp);
     return success();
@@ -270,8 +300,8 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
                 if (op.getAdjoint()) {
                     rotationKind = -rotationKind;
                 }
-                auto pprOp = rewriter.create<PPRotationOp>(loc, outQubitTypes, pauliProduct,
-                                                           rotationKind, inQubits);
+                auto pprOp = PPRotationOp::create(rewriter, loc, outQubitTypes, pauliProduct,
+                                                  rotationKind, inQubits);
                 rewriter.replaceOp(op, pprOp.getOutQubits());
                 return success();
             }
@@ -282,15 +312,15 @@ LogicalResult convertPauliRotGate(PauliRotOp op, ConversionPatternRewriter &rewr
     Value constResult;
     if (op.getAdjoint()) {
         constResult =
-            rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(-2.0)).getResult();
+            arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(-2.0)).getResult();
     }
     else {
         constResult =
-            rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(2.0)).getResult();
+            arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0)).getResult();
     }
-    auto result = rewriter.create<arith::DivFOp>(loc, angleValue, constResult).getResult();
+    auto result = arith::DivFOp::create(rewriter, loc, angleValue, constResult).getResult();
     auto pprArbitraryOp =
-        rewriter.create<PPRotationArbitraryOp>(loc, outQubitTypes, pauliProduct, result, inQubits);
+        PPRotationArbitraryOp::create(rewriter, loc, outQubitTypes, pauliProduct, result, inQubits);
 
     rewriter.replaceOp(op, pprArbitraryOp.getOutQubits());
 
