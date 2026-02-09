@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit tests for the xDSL universe."""
-from subprocess import check_call
+from subprocess import run
 
 import pytest
 from xdsl.passes import ModulePass
@@ -80,4 +80,4 @@ def test_xdsl_opt(_transform):
     """
 
     cmd = ["xdsl-opt", "-p", _transform.name]
-    _ = check_call(cmd, input=mod_string.encode())
+    _ = run(cmd, input=mod_string, text=True)
