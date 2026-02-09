@@ -803,7 +803,7 @@ class TestControlledProperties:
         op = C_ctrl(DummyOp(1), 0)
         assert op.has_diagonalizing_gates is value
 
-    @pytest.mark.parametrize("value", ("_ops", None))
+    @pytest.mark.parametrize("value", ("_ops", "_measurements"))
     def test_queue_cateogry(self, value):
         """Test that `catalyst.ctrl` defers `_queue_category` to base operator."""
 
@@ -1388,13 +1388,13 @@ class TestDecomposition:
         op = C_ctrl(qml.RZ(1.2, wires=0), (1, 2, 3, 4))
         decomp = op.decomposition()
 
-        assert qml.equal(decomp[0], qml.Toffoli(wires=(1, 2, 0)))
+        assert qml.equal(decomp[0], qml.MultiControlledX(wires=(1, 2, 0), work_wires=(3, 4)))
         assert isinstance(decomp[1], qml.QubitUnitary)
-        assert qml.equal(decomp[2], qml.Toffoli(wires=(3, 4, 0)))
+        assert qml.equal(decomp[2], qml.MultiControlledX(wires=(3, 4, 0), work_wires=(1, 2)))
         assert isinstance(decomp[3].base, qml.QubitUnitary)
-        assert qml.equal(decomp[4], qml.Toffoli(wires=(1, 2, 0)))
+        assert qml.equal(decomp[4], qml.MultiControlledX(wires=(1, 2, 0), work_wires=(3, 4)))
         assert isinstance(decomp[5], qml.QubitUnitary)
-        assert qml.equal(decomp[6], qml.Toffoli(wires=(3, 4, 0)))
+        assert qml.equal(decomp[6], qml.MultiControlledX(wires=(3, 4, 0), work_wires=(1, 2)))
         assert isinstance(decomp[7].base, qml.QubitUnitary)
 
         decomp_mat = qml.matrix(op.decomposition, wire_order=op.wires)()
