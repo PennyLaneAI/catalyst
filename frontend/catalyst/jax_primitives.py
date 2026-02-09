@@ -132,12 +132,12 @@ with Patcher(
         lower_jaxpr,
     )
 
-from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
-from pennylane.capture.primitives import quantum_subroutine_prim
-from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
-from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
 # subroutine got upstreamed to pennylane
-from pennylane.capture import subroutine # pylint: disable=unused-import
+from pennylane.capture import subroutine  # pylint: disable=unused-import
+from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
+from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
+from pennylane.capture.primitives import quantum_subroutine_prim
+from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
 
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
@@ -541,6 +541,7 @@ def _func_lowering(ctx, *args, call_jaxpr, fn):
     func_op = lower_callable(ctx, fn, call_jaxpr)
     call_op = create_call_op(ctx, func_op, *args)
     return call_op.results
+
 
 #
 # Decomp rule

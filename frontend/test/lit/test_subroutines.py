@@ -18,8 +18,9 @@
 
 from functools import partial
 
-from jax import numpy as jnp
 import pennylane as qml
+from jax import numpy as jnp
+
 
 def test_basic_subroutine():
     """Test the most simple subroutine."""
@@ -29,7 +30,7 @@ def test_basic_subroutine():
         qml.RX(x, wires)
 
     @qml.qjit(capture=True, target="mlir")
-    @qml.qnode(qml.device('null.qubit', wires=1))
+    @qml.qnode(qml.device("null.qubit", wires=1))
     # CHECK: module @circuit
     def circuit(x):
         # CHECK: [[QREG:%.+]] = quantum.alloc
@@ -38,7 +39,6 @@ def test_basic_subroutine():
         # CHECK: quantum.compbasis qreg [[QREG_1]] : !quantum.obs
         f(x, 0)
         return qml.probs()
-    
 
     # CHECK: func.func private @f(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg
     # CHECK: [[QUBIT_1:%.+]] = quantum.custom "RX"
@@ -47,12 +47,13 @@ def test_basic_subroutine():
     circuit(0.5)
     print(circuit.mlir)
 
+
 test_basic_subroutine()
 
 
 def test_multiple_metadata():
     """Test a subroutine with metadata becomes multiple functions.
-    
+
     Each metadata should get its own function.
     """
 
@@ -66,7 +67,7 @@ def test_multiple_metadata():
             qml.Z(wires)
 
     @qml.qjit(capture=True, target="mlir")
-    @qml.qnode(qml.device('null.qubit', wires=1))
+    @qml.qnode(qml.device("null.qubit", wires=1))
     # CHECK: module @circuit
     def circuit():
         # CHECK: [[QREG:%.+]] = quantum.alloc
@@ -79,9 +80,8 @@ def test_multiple_metadata():
         f(0, "X")
         f(0, "Y")
         f(0, "Z")
-        f(0, "X") # check reusing the first call to the function
+        f(0, "X")  # check reusing the first call to the function
         return qml.probs()
-    
 
     # CHECK: func.func private @f(%arg0: !quantum.reg, %arg1: tensor<1xi64>) -> !quantum.reg
     # CHECK: [[QUBIT_1:%.+]] = quantum.custom "PauliX"
@@ -99,11 +99,12 @@ def test_multiple_metadata():
     # CHECK-NEXT: return [[REG_1]] : !quantum.reg
     print(circuit.mlir)
 
+
 test_multiple_metadata()
 
+
 def test_different_shapes():
-    """Test a subroutine with different shape inputs get their own function.  
-    """
+    """Test a subroutine with different shape inputs get their own function."""
 
     @qml.templates.Subroutine
     def my_subroutine(data, wires):
@@ -114,7 +115,7 @@ def test_different_shapes():
         loop()
 
     @qml.qjit(capture=True, target="mlir")
-    @qml.qnode(qml.device('null.qubit', wires=1))
+    @qml.qnode(qml.device("null.qubit", wires=1))
     # CHECK: module @circuit
     def circuit():
         # CHECK: [[QREG:%.+]] = quantum.alloc
@@ -123,11 +124,10 @@ def test_different_shapes():
         # CHECK: [[QREG_3:%.+]] = call @my_subroutine_0([[QREG_2]], %arg2, %14) : (!quantum.reg, tensor<2xf64>, tensor<3xi64>) -> !quantum.reg
 
         # CHECK: quantum.compbasis qreg [[QREG_3]] : !quantum.obs
-        my_subroutine(jnp.array([0.0, 0.1, 0.2]), [0,1,2])
-        my_subroutine(jnp.array([0.0, 0.1, 0.2]), [0,1,2])
+        my_subroutine(jnp.array([0.0, 0.1, 0.2]), [0, 1, 2])
+        my_subroutine(jnp.array([0.0, 0.1, 0.2]), [0, 1, 2])
         my_subroutine(jnp.array([0.5, 1.2]), [0, 1, 2])
         return qml.probs()
-    
 
     # CHECK: func.func private @my_subroutine(%arg0: !quantum.reg, %arg1: tensor<3xf64>, %arg2: tensor<3xi64>) -> !quantum.reg
     # CHECK: arith.constant 3 : index
@@ -140,5 +140,6 @@ def test_different_shapes():
     # CHECK: [[QUBIT_1:%.+]] = quantum.custom "RX"
 
     print(circuit.mlir)
+
 
 test_different_shapes()

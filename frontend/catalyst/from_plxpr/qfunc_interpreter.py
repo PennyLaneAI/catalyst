@@ -31,8 +31,7 @@ from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
-from pennylane.capture.primitives import transform_prim
-from pennylane.capture.primitives import quantum_subroutine_prim
+from pennylane.capture.primitives import quantum_subroutine_prim, transform_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.measurements import CountsMP
 
