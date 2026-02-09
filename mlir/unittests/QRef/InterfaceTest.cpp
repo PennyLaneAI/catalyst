@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <iterator>
 #include <vector>
 
 #include "gtest/gtest.h"
@@ -30,6 +31,39 @@
 using namespace mlir;
 
 namespace {
+
+TEST(ParserTests, dynamicAllocationSize)
+{
+    std::string moduleStr = R"mlir(
+func.func @test_alloc(%arg0 : i64) {
+    %0 = qref.alloc(2) : !qref.reg<2>
+    %1 = qref.alloc(%arg0) : !qref.reg<?>
+    return
+}
+  )mlir";
+
+    // Parsing boilerplate
+    DialectRegistry registry;
+    registry.insert<func::FuncDialect, catalyst::qref::QRefDialect>();
+    MLIRContext context(registry);
+    ParserConfig config(&context, /*verifyAfterParse=*/false);
+    OwningOpRef<ModuleOp> mod = parseSourceString<ModuleOp>(moduleStr, config);
+
+    // Parse ops
+    func::FuncOp f = *(*mod).getOps<func::FuncOp>().begin();
+    catalyst::qref::AllocOp staticAllocOp = *f.getOps<catalyst::qref::AllocOp>().begin();
+    catalyst::qref::AllocOp dynamicAllocOp =
+        *(std::next(f.getOps<catalyst::qref::AllocOp>().begin(), 1));
+
+    // Run checks
+    catalyst::qref::QuregType staticType = staticAllocOp.getAllocation().getType();
+    ASSERT_TRUE(staticType.isStatic());
+    ASSERT_TRUE(staticType.getSize().getInt() == 2);
+
+    catalyst::qref::QuregType dynamicType = dynamicAllocOp.getAllocation().getType();
+    ASSERT_TRUE(!dynamicType.isStatic());
+    ASSERT_TRUE(dynamicType.getSize().getInt() == mlir::ShapedType::kDynamic);
+}
 
 TEST(InterfaceTests, Getters)
 {

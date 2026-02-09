@@ -28,6 +28,44 @@ using namespace catalyst::qref;
 
 #include "QRef/IR/QRefOpsDialect.cpp.inc"
 
+static ParseResult parseQuregTypeBody(AsmParser &parser, IntegerAttr &size)
+{
+    // Parse allocation size: `?` or non-negative integer
+    if (succeeded(parser.parseOptionalQuestion())) {
+        size = parser.getBuilder().getI64IntegerAttr(ShapedType::kDynamic);
+        return success();
+    }
+
+    int64_t id = -1;
+    if (failed(parser.parseInteger(id))) {
+        return failure();
+    }
+
+    if (id < 0) {
+        return parser.emitError(parser.getCurrentLocation(),
+                                "Static allocation size must be non-negative");
+    }
+
+    size = parser.getBuilder().getI64IntegerAttr(id);
+    return success();
+}
+
+static void printQuregTypeBody(AsmPrinter &printer, IntegerAttr size)
+{
+    if (size) {
+        int64_t id = size.getInt();
+        if (id >= 0) {
+            printer << id;
+        }
+        else {
+            printer << "?";
+        }
+    }
+    else {
+        printer << "?";
+    }
+}
+
 void QRefDialect::initialize()
 {
     addTypes<

@@ -31,9 +31,25 @@ class QRef_Type<string name, string typeMnemonic, list<Trait> traits = []>
 def QRefQuregType : QRef_Type<"Qureg", "reg"> {
     let summary = "A container value for qubit references.";
 
-    let parameters = (ins "unsigned":$size);
+    let parameters = (ins OptionalParameter<"mlir::IntegerAttr">:$size);
 
-    let assemblyFormat = "`<` $size `>`";
+    let assemblyFormat = [{
+        `<` custom<QuregTypeBody>($size) `>`
+    }];
+
+    let extraClassDeclaration = [{
+        bool isStatic() const {
+            auto size = getSize();
+            if (!size) {
+                return false;
+            }
+            return size.getInt() != mlir::ShapedType::kDynamic;
+        }
+
+        bool isDynamic() const {
+            return !isStatic();
+        }
+    }];
 }
 
 def QRefQubitType : QRef_Type<"Qubit", "bit"> {

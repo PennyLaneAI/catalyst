@@ -42,11 +42,6 @@ def AllocOp : Memory_Op<"alloc"> {
     let summary = "Allocate n qubits.";
     let description = [{
         This operation represents the allocations of some number of qubits.
-
-        To distinguish from the quantum registers in the value semantics quantum dialect, which are
-        lowered to arrays of qubit IDs in runtime, the result of this operation in reference
-        semantics is an SSA value of `Allocation` type, whose entire purpose is to serve as an
-        operand to the `MakeReference` operation to produce a qubit reference value.
     }];
 
     let arguments = (ins
