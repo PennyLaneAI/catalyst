@@ -14,6 +14,7 @@
 """Attributes for the xDSL Quantum dialect, which mirrors Catalyst's MLIR
 Quantum dialect."""
 
+from functools import partial
 from typing import TypeAlias
 
 from xdsl.dialects.builtin import ArrayAttr, StringAttr
@@ -26,7 +27,7 @@ from xdsl.ir import (
     StrEnum,
     TypeAttribute,
 )
-from xdsl.irdl import irdl_attr_definition, param_def
+from xdsl.irdl import irdl_attr_definition, param_def, ParamAttrConstraint
 from xdsl.parser import AttrParser, GenericParser
 from xdsl.printer import Printer
 from xdsl.utils.exceptions import ParseError
@@ -107,51 +108,6 @@ class QubitType(ParametrizedAttribute, TypeAttribute):
 
     role: QubitRoleAttr
 
-    _default_level: bool
-    _default_role: bool
-
-    def __init__(self, *args):
-        self._default_level = False
-        self._default_role = False
-
-        match len(args):
-            case 0:
-                args = (QubitLevelAttr(QubitLevel.Abstract), QubitRoleAttr(QubitRole.Null))
-                self._default_level = True
-                self._default_role = True
-
-            case 1:
-                if isinstance(args[0], QubitLevelAttr):
-                    args = (args[0], QubitRoleAttr(QubitRole.Null))
-                    self._default_role = True
-                elif isinstance(args[0], QubitRoleAttr):
-                    args = (QubitLevelAttr(QubitLevel.Abstract), args[0])
-                    self._default_level = True
-
-            case _:
-                pass
-
-        super().__init__(self, *args)
-
-    @classmethod
-    def new(cls, params):
-        return cls(*params)
-
-    def print_parameters(self, printer: Printer) -> None:
-        attrs_to_print = []
-
-        if not self._default_level:
-            attrs_to_print.append(self.level.data.value)
-        if not self._default_role:
-            attrs_to_print.append(self.role.data.value)
-
-        # if attrs_to_print:
-        #     with printer.in_angle_brackets():
-        #         printer.print_list(
-        #             attrs_to_print, print_fn=printer.print_identifier_or_string_literal
-        #         )
-        printer.print_paramattr_parameters(attrs_to_print, always_print_brackets=False)
-
     @classmethod
     def parse_parameters(cls, parser: AttrParser) -> list[Attribute]:
 
@@ -170,8 +126,20 @@ class QubitType(ParametrizedAttribute, TypeAttribute):
             delimiter=parser.Delimiter.ANGLE, parse=parse_fn
         )
 
-        return optional_params
+        final_params = []
+        match len(optional_params):
+            case 0:
+                final_params = [QubitLevelAttr(QubitLevel.Abstract), QubitRoleAttr(QubitRole.Null)]
+            case 1:
+                level = QubitLevelAttr(optional_params[0] if isinstance(optional_params[0], QubitLevel) else QubitLevel.Abstract)
+                role = QubitRoleAttr(optional_params[0] if isinstance(optional_params[0], QubitRole) else QubitRole.Null)
+                final_params = [level, role]
+            case 2:
+                final_params = optional_params
+            case _:
+                raise ParseError(f"Expected 2 or less parameters for QubitType, got {optional_params}.")
 
+        return final_params
 
 @irdl_attr_definition
 class QuregType(ParametrizedAttribute, TypeAttribute):
@@ -180,6 +148,21 @@ class QuregType(ParametrizedAttribute, TypeAttribute):
     name = "quantum.reg"
 
     level: QubitLevelAttr
+
+    @classmethod
+    def parse_parameters(cls, parser: AttrParser) -> list[Attribute]:
+        parse_fn = partial(parser.parse_optional_str_enum, QubitLevel)
+        optional_params = parser.parse_optional_comma_separated_list(
+            delimiter=parser.Delimiter.ANGLE, parse=parse_fn
+        )
+
+        if len(optional_params) > 1:
+            raise ParseError(f"Expected 1 or less parameters for QuregType, got {optional_params}.")
+
+        if len(optional_params) == 1:
+            return [QubitLevelAttr(optional_params[0])]
+
+        return [QubitLevelAttr(QubitLevel.Abstract)]
 
 
 @irdl_attr_definition
@@ -199,3 +182,7 @@ QubitSSAValue: TypeAlias = SSAValue[QubitType]
 QuregSSAValue: TypeAlias = SSAValue[QuregType]
 ObservableSSAValue: TypeAlias = SSAValue[ObservableType]
 PauliWord: TypeAlias = ArrayAttr[StringAttr]
+
+# Constraints
+AnyQubitTypeConstr = ParamAttrConstraint(base_attr=QubitType, param_constrs=(None, None))
+AnyQuregTypeConstr = ParamAttrConstraint(base_attr=QuregType, param_constrs=(None,))
