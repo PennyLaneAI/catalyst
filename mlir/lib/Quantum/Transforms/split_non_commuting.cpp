@@ -35,6 +35,8 @@
 
 #define DEBUG_TYPE "split-non-commuting"
 
+#include <deque>
+
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 
