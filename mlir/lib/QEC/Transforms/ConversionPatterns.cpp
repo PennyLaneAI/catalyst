@@ -95,16 +95,16 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
             // rotation_kind can be ±1, ±2, ±4, ±8
             int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
             double theta = 2 * (llvm::numbers::pi / static_cast<double>(rotationKind));
-            thetaValue = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64FloatAttr(theta));
+            thetaValue = LLVM::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(theta));
         }
         else if constexpr (std::is_same_v<T, PPRotationArbitraryOp>) {
             if (op.getCondition()) {
                 return op.emitOpError("PPRotationArbitraryOp with condition is not supported.");
             }
             // multiply by 2 to get the rotation angle
-            thetaValue = rewriter.create<LLVM::FMulOp>(
-                loc, adaptor.getArbitraryAngle(),
-                rewriter.create<LLVM::ConstantOp>(loc, rewriter.getF64FloatAttr(2.0)));
+            thetaValue = LLVM::FMulOp::create(
+                rewriter, loc, adaptor.getArbitraryAngle(),
+                LLVM::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0)));
         }
         else if constexpr (std::is_same_v<T, PauliRotOp>) {
             // Use the arbitrary angle directly
@@ -116,12 +116,12 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
         SmallVector<Value> args;
         args.push_back(pauliWordPtr);
         args.push_back(thetaValue);
-        args.push_back(rewriter.create<LLVM::ZeroOp>(loc, ptrType));
+        args.push_back(LLVM::ZeroOp::create(rewriter, loc, ptrType));
         args.push_back(
-            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
+            LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
         args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
 
-        rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
+        LLVM::CallOp::create(rewriter, loc, fnDecl, args);
 
         // Replace the op with the input qubits
         SmallVector<Value> values;
@@ -162,20 +162,20 @@ struct PPMeasurementOpPattern : public OpConversionPattern<PPMeasurementOp> {
         SmallVector<Value> args;
         args.push_back(pauliWordPtr);
         args.push_back(
-            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
+            LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
         args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
 
         // Call the function and get the result pointer
-        Value resultPtr = rewriter.create<LLVM::CallOp>(loc, fnDecl, args).getResult();
+        Value resultPtr = LLVM::CallOp::create(rewriter, loc, fnDecl, args).getResult();
 
         // Load the measurement result (i1) from the result pointer
-        Value mres = rewriter.create<LLVM::LoadOp>(loc, IntegerType::get(ctx, 1), resultPtr);
+        Value mres = LLVM::LoadOp::create(rewriter, loc, IntegerType::get(ctx, 1), resultPtr);
 
         // if the uint16_t rotation_sign is -1, we need to negate the measurement result
         if (static_cast<int16_t>(op.getRotationSign()) == -1) {
-            Value one = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI1Type(),
-                                                          rewriter.getBoolAttr(true));
-            mres = rewriter.create<LLVM::XOrOp>(loc, mres, one);
+            Value one = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI1Type(),
+                                                 rewriter.getBoolAttr(true));
+            mres = LLVM::XOrOp::create(rewriter, loc, mres, one);
         }
 
         // Replace the op with the measurement result and the input qubits
