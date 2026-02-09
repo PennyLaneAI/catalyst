@@ -14,7 +14,6 @@
 
 #define DEBUG_TYPE "one-shot-mcm"
 
-#include <functional>
 #include <optional>
 
 #include "mlir/Analysis/SliceAnalysis.h"
