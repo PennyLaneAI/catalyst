@@ -21,8 +21,9 @@
   length and the number of qubit operands are the same, and that all of the Pauli words are legal.
   [(#2405)](https://github.com/PennyLaneAI/catalyst/pull/2405)
 
-* `qml.vjp` can now be used with Catalyst and program capture.
+* `qml.vjp`  and `qml.jvp` can now be used with Catalyst and program capture.
   [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
+  [(#2316)](https://github.com/PennyLaneAI/catalyst/pull/2316)
 
 * The `measurements_from_samples` pass no longer results in `nan`s and cryptic error messages when
   `shots` aren't set. Instead, an informative error message is raised.
