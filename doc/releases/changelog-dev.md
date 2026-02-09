@@ -2,6 +2,58 @@
 
 <h3>New features since last release</h3>
 
+* OQD (Open Quantum Design) end-to-end pipeline is added to Catalyst.
+  The pipeline supports compilation to LLVM IR using the `QJIT` constructor with `link=False`, enabling integration with ARTIQ's cross-compilation toolchain. The generated LLVM IR can be used with the internal `compile_to_artiq()` function from the third-party OQD repository to produce ARTIQ binaries.
+  [(#2299)](https://github.com/PennyLaneAI/catalyst/pull/2299)
+
+  see `frontend/test/test_oqd/oqd/test_oqd_artiq_llvmir.py` for more details.
+  Note: This PR only covers LLVM IR generation; the `compile_to_artiq` function itself is not included.
+
+  For example:
+  ```python
+  import os
+  import numpy as np
+  import pennylane as qml
+
+  from catalyst import qjit
+  from catalyst.third_party.oqd import OQDDevice, OQDDevicePipeline
+
+  OQD_PIPELINES = OQDDevicePipeline(
+      os.path.join("calibration_data", "device.toml"),
+      os.path.join("calibration_data", "qubit.toml"),
+      os.path.join("calibration_data", "gate.toml"),
+      os.path.join("device_db", "device_db.json"),
+  )
+
+  oqd_dev = OQDDevice(
+      backend="default",
+      shots=4,
+      wires=1
+  )
+  qml.capture.enable()
+
+  # Compile to LLVM IR only
+  @qml.qnode(oqd_dev)
+  def circuit():
+      x = np.pi / 2
+      qml.RX(x, wires=0)
+      return qml.counts(wires=0)
+
+  compiled_circuit = QJIT(circuit, CompileOptions(link=False, pipelines=OQD_PIPELINES))
+
+  # Compile to ARTIQ ELF
+  artiq_config = {
+      "kernel_ld": "/path/to/kernel.ld",
+      "llc_path": "/path/to/llc",
+      "lld_path": "/path/to/ld.lld",
+  }
+
+  output_elf_path = compile_to_artiq(compiled_circuit, artiq_config)
+  # Output:
+  # LLVM IR file written to: /path/to/circuit.ll
+  # [ARTIQ] Generated ELF: /path/to/circuit.elf
+  ```
+
 <h3>Improvements 🛠</h3>
 
 * `null.qubit` resource tracking is now able to track measurements and observables. This output
@@ -178,4 +230,5 @@ Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,
 Paul Haochen Wang,
-Jake Zaia.
+Jake Zaia,
+Hongsheng Zheng.

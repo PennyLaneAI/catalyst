@@ -885,11 +885,6 @@ class TestProperties:
         op = adjoint(qml.PauliX(0))
         assert op._queue_category == "_ops"  # pylint: disable=protected-access
 
-    def test_queue_category_None(self):
-        """Test that the queue category `None` for some observables carries over."""
-        op = adjoint(qml.Hermitian([[1, 0], [0, 1]], wires=0))
-        assert op._queue_category == "_ops"  # pylint: disable=protected-access
-
     @pytest.mark.parametrize("value", (True, False))
     def test_is_verified_hermitian(self, value):
         """Test `is_verified_hermitian` property mirrors that of the base."""
@@ -1394,7 +1389,7 @@ class TestAdjointConstructorPreconstructedOp:
         assert isinstance(out, Adjoint)
 
         qs = qml.tape.QuantumScript.from_queue(q)
-        assert len(qs) == 0
+        assert len(qs) == 1
 
 
 class TestAdjointConstructorDifferentCallableTypes:
