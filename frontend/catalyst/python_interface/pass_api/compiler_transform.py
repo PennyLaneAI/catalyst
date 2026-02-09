@@ -194,10 +194,12 @@ class CompilationPass(ModulePass):
                 walker.rewrite_module(op)
 
 
+# pylint: disable=missing-function-docstring
+
+
 def _update_op_type_hint(hint: type[Operation]) -> Callable:
     """Update the signature of a ``match_and_rewrite`` method to use the provided type hint
     for the ``op`` argument."""
-    # pylint: disable=missing-function-docstring
 
     def _update_match_and_rewrite(method: Callable) -> Callable:
         params = tuple(signature(method).parameters)
@@ -215,7 +217,7 @@ def _create_rewrite_pattern(hint: type[Operation], action: Callable) -> RewriteP
     """Given an action defined as a function, create a ``RewritePattern`` which
     can be used with xDSL's pass API."""
 
-    # pylint: disable=too-few-public-methods, arguments-differ
+    # pylint: disable=too-few-public-methods
     class LocalRewritePattern(RewritePattern):
         """Rewrite pattern for transforming a matched operation."""
 
@@ -227,7 +229,7 @@ def _create_rewrite_pattern(hint: type[Operation], action: Callable) -> RewriteP
 
         @op_type_rewrite_pattern
         @_update_op_type_hint(hint)
-        def match_and_rewrite(self, op: Operation, rewriter: PatternRewriter) -> None:
+        def match_and_rewrite(self, op: Operation, rewriter: PatternRewriter, /) -> None:
             action(self._pass, op, rewriter)
 
     return LocalRewritePattern
