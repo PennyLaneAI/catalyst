@@ -162,7 +162,7 @@ class CompilationPass(ModulePass):
 
         cls._rewrite_patterns.append(rewrite_pattern)
 
-    def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
+    def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:  # pylint: disable=unused-argument
         """Apply the transformation to the input module.
 
         If ``greedy`` is ``True``, the actions will be applied greedily, i.e., for each
@@ -197,9 +197,9 @@ class CompilationPass(ModulePass):
 def _update_op_type_hint(hint: type[Operation]) -> Callable:
     """Update the signature of a ``match_and_rewrite`` method to use the provided type hint
     for the ``op`` argument."""
+    # pylint: disable=missing-function-docstring
 
     def _update_match_and_rewrite(method: Callable) -> Callable:
-        """Update annotations of match_and_rewrite function."""
         params = tuple(signature(method).parameters)
         # Update type hint of operation argument
         # TODO: Is it fine to mutate in-place or should we return a new function?
