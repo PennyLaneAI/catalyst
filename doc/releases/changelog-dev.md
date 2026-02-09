@@ -205,6 +205,70 @@
   QEC state preparation operations.
   [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
 
+* A new compiler pass `split-to-single-terms` has been added for QNode functions containing
+  Hamiltonian expectation values. It facilitates execution on devices that don't natively support expectation values of sums of observables by splitting them into individual leaf observable expvals.
+  [(#2441)](https://github.com/PennyLaneAI/catalyst/pull/2441)
+
+  Consider the following example:
+  ```python
+  import pennylane as qml
+  from catalyst import qjit
+  from catalyst.passes import apply_pass
+
+  @qjit
+  @apply_pass("split-to-single-terms")
+  @qml.qnode(qml.device("lightning.qubit", wires=3))
+  def circuit():
+      # Hamiltonian H = Z(0) @ X(1) + 2*Y(2)
+      return qml.expval(qml.Z(0) @ qml.X(1) + 2 * qml.Y(2))
+  ```
+
+  The pass transforms the function by splitting the Hamiltonian into individual observables:
+
+  **Before:**
+  ```mlir
+  func @circ1(%arg0) -> (tensor<f64>) {qnode} {
+      // ... quantum ops ...
+      // Z(0) @ X(1)
+      %obs0 = quantum.namedobs %qubit0[ PauliZ] : !quantum.obs
+      %obs1 = quantum.namedobs %qubit1[ PauliX] : !quantum.obs
+      %T0 = quantum.tensor %obs0, %obs1 : !quantum.obs
+
+      // Y(2)
+      %obs2 = quantum.namedobs %qubit2[ PauliY] : !quantum.obs
+      %H0 = quantum.hamiltonian(%8 : tensor<1xf64>) %obs2 : !quantum.obs
+
+      %H = quantum.hamiltonian(%coeffs_2xf64) %T0, %H0 : !quantum.obs
+      %result = quantum.expval %H : f64   // H = c_0 * (Z @ X) + c_1 * Y
+
+      // ... to tensor ...
+      %tensor_result = tensor.from_elements %result : tensor<f64>
+      return %tensor_result
+  }
+  ```
+
+  **After:**
+  ```mlir
+  func @circ1.quantum() -> (tensor<f64>, tensor<f64>) {qnode} {
+      // ... quantum ops ...
+      %expval0 = quantum.expval %T0 : f64
+      %expval1 = quantum.expval %obs2 : f64
+
+      // ... to tensor ...
+      %tensor0 = tensor.from_elements %expval0 : tensor<f64>
+      %tensor1 = tensor.from_elements %expval1 : tensor<f64>
+      return %tensor0, %tensor1
+  }
+  func @circ1(%arg0) -> (tensor<f64>, tensor<f64>) {
+      // ... setup ...
+      %call:2 = call @circ1.quantum()
+
+      // Extract coefficients and compute weighted sum
+      %result = c0 * %call#0 + c1 * %call#1
+      return %result
+  }
+  ```
+
 <h3>Documentation 📝</h3>
 
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
