@@ -52,7 +52,6 @@ __all__ = [
     "MergeRotationsPass",
     "ParitySynthPass",
     "parity_synth_pass",
-
     # MBQC
     "convert_to_mbqc_formalism_pass",
     "ConvertToMBQCFormalismPass",
