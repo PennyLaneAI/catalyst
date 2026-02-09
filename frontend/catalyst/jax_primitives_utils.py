@@ -140,7 +140,6 @@ def get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline, metadata=None, pu
     if callable_ is not None:
         if func_op := get_cached(ctx, key):
             return func_op
-    print("not cached ")
     func_op = lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=public)
     cache(ctx, key, func_op)
     return func_op
