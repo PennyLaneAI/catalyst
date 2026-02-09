@@ -116,7 +116,7 @@
 
 * Fix `CATALYST_XDSL_UNIVERSE` to correctly define the available dialects and transforms, allowing
   tools like `xdsl-opt` to work with Catalyst's custom Python dialects.
-  [(#____)](https://github.com/PennyLaneAI/catalyst/pull/____)
+  [(#2471)](https://github.com/PennyLaneAI/catalyst/pull/2471)
 
 
 * Fix a bug with the xDSL `ParitySynth` pass that caused failure when the QNode being transformed
