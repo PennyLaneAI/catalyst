@@ -16,12 +16,15 @@
 compilation of hybrid quantum-classical functions using Catalyst.
 """
 
+# pylint: disable=too-many-lines
+
 import copy
 import functools
 import inspect
 import logging
 import os
 import warnings
+from contextlib import contextmanager
 
 import jax
 import jax.numpy as jnp
@@ -91,6 +94,7 @@ def qjit(
     circuit_transform_pipeline=None,
     pass_plugins=None,
     dialect_plugins=None,
+    capture="global",
 ):  # pylint: disable=too-many-arguments,unused-argument
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -124,7 +128,7 @@ def qjit(
             - :attr:`~.QJIT.jaxpr`: JAX program representation
             - :attr:`~.QJIT.mlir`: MLIR representation after canonicalization
             - :attr:`~.QJIT.mlir_opt`: MLIR representation after optimization
-            - :attr:`~.QJIT.qir`: QIR in LLVM IR form
+            - :attr:`~.QJIT.llvmir`: LLVM IR representation
         use_nameloc (bool): If ``True``, function parameter names are added to the IR as name
             locations.
         verbose (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
@@ -167,6 +171,17 @@ def qjit(
             If not specified, the default pass pipeline will be applied.
         pass_plugins (Optional[List[Path]]): List of paths to pass plugins.
         dialect_plugins (Optional[List[Path]]): List of paths to dialect plugins.
+        capture (str or bool): Controls whether to use PennyLane program capture for tracing.
+            This allows enabling capture locally for this QJIT without affecting the global
+            ``qml.capture.enabled()`` state.
+
+            - ``"global"`` (default): Defer to ``qml.capture.enabled()`` to decide whether
+              to use program capture.
+            - ``True``: Force program capture on for this QJIT, regardless of the global setting.
+              This allows using the new capture-based frontend without calling
+              ``qml.capture.enable()`` globally.
+            - ``False``: Force program capture off for this QJIT, using the old frontend,
+              regardless of the global setting.
 
     Returns:
         QJIT object.
@@ -522,7 +537,8 @@ class QJIT(CatalystCallable):
                              object to compile, as is, without any modifications
     :ivar jaxpr: This attribute stores the Jaxpr compiled from the function as a string.
     :ivar mlir: This attribute stores the MLIR compiled from the function as a string.
-    :ivar qir: This attribute stores the QIR in LLVM IR form compiled from the function as a string.
+    :ivar llvmir: This attribute stores the LLVM IR representation compiled from the function as
+                  a string.
     """
 
     @debug_logger_init
@@ -544,6 +560,7 @@ class QJIT(CatalystCallable):
         # IRs are only available for the most recently traced function.
         self.jaxpr = None
         self.mlir_module = None
+        self.llvm_ir = None
         self.out_type = None
         self.overwrite_ir = None
         self.use_cwd_for_workspace = self.compile_options.keep_intermediate
@@ -557,13 +574,35 @@ class QJIT(CatalystCallable):
                 fn, compile_options.static_argnames, compile_options.static_argnums
             )
 
-        self.user_function = self.pre_compilation()
+        # Resolve effective capture mode and enforce it during pre_compilation
+        target_mode = self._get_effective_capture_mode()
+        with _ensure_capture_mode(target_mode):
+            self.user_function = self.pre_compilation()
 
         # Static arguments require values, so we cannot AOT compile.
         if self.user_sig is not None and not self.compile_options.static_argnums:
             self.aot_compile()
 
         super().__init__("user_function")
+
+    def _get_effective_capture_mode(self):
+        """Calculate the effective capture mode for this QJIT instance.
+
+        This implements the 'scope enforcement' pattern: rather than managing
+        state transitions, we simply determine what the capture mode *must be*
+        for this QJIT and let the context manager handle the rest.
+
+        Returns:
+            bool: The effective capture mode.
+                - If capture='global', use current qml.capture.enabled() state
+                - If capture=True/False, use that explicit value
+        """
+        capture_option = self.compile_options.capture
+        if capture_option == "global":
+            # Defer to current global state
+            return qml.capture.enabled()
+        # Explicit True/False override
+        return capture_option
 
     @property
     def mlir(self):
@@ -621,29 +660,34 @@ class QJIT(CatalystCallable):
         self.workspace = self._get_workspace()
 
         # TODO: awkward, refactor or redesign the target feature
-        if self.compile_options.target in ("jaxpr", "mlir", "binary"):
+        if self.compile_options.target in ("jaxpr", "mlir", "llvmir", "binary"):
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(
                 self.user_sig or ()
             )
 
-        if self.compile_options.target in ("mlir", "binary"):
+        if self.compile_options.target in ("mlir", "llvmir", "binary"):
             self.mlir_module = self.generate_ir()
 
-        if self.compile_options.target in ("binary",):
-            self.compiled_function, _ = self.compile()
+        if self.compile_options.target in ("llvmir", "binary"):
+            self.compiled_function, self.llvm_ir = self.compile()
+
+        if self.compile_options.target in ("binary",) and self.compile_options.link:
             self.fn_cache.insert(
                 self.compiled_function, self.user_sig, self.out_treedef, self.workspace
             )
 
     @property
-    def qir(self):
+    def llvmir(self):
         """LLVMIR textual representation."""
+        if self.llvm_ir is not None:
+            return self.llvm_ir
+
         if not self.mlir_module:
-            # TODO: Should we go through the translation?
             return None
 
         _mlir = str(self.mlir_module)
-        return to_llvmir(stdin=_mlir, options=self.compile_options)
+        self.llvm_ir = to_llvmir(stdin=_mlir, options=self.compile_options)
+        return self.llvm_ir
 
     @debug_logger
     def jit_compile(self, args, **kwargs):
@@ -675,7 +719,7 @@ class QJIT(CatalystCallable):
             self.jaxpr, self.out_type, self.out_treedef, self.c_sig = self.capture(args, **kwargs)
 
             self.mlir_module = self.generate_ir()
-            self.compiled_function, _ = self.compile()
+            self.compiled_function, self.llvm_ir = self.compile()
 
             self.fn_cache.insert(self.compiled_function, args, self.out_treedef, self.workspace)
 
@@ -731,16 +775,35 @@ class QJIT(CatalystCallable):
 
         dbg = debug_info("qjit_capture", self.user_function, args, kwargs)
 
-        if qml.capture.enabled():
-            return trace_from_pennylane(
-                self.user_function,
-                static_argnums,
-                dynamic_args,
-                abstracted_axes,
-                full_sig,
-                kwargs,
-                debug_info=dbg,
-            )
+        # Scope Enforcement: Calculate effective mode and enter scope.
+        # The context manager handles ALL enabling/disabling/restoring.
+        target_mode = self._get_effective_capture_mode()
+        with _ensure_capture_mode(target_mode):
+            if target_mode:
+                # New capture pathway
+                return trace_from_pennylane(
+                    self.user_function,
+                    static_argnums,
+                    dynamic_args,
+                    abstracted_axes,
+                    full_sig,
+                    kwargs,
+                    debug_info=dbg,
+                )
+            else:
+                # Legacy pathway
+                return self._trace_legacy_pathway(
+                    static_argnums, abstracted_axes, dynamic_sig, full_sig, kwargs, dbg
+                )
+
+    def _trace_legacy_pathway(
+        self, static_argnums, abstracted_axes, dynamic_sig, full_sig, kwargs, dbg
+    ):  # pylint: disable=too-many-arguments, too-many-positional-arguments
+        """Trace the function using the legacy (non-capture) pathway.
+
+        This method is used when qml.capture is disabled, using the old
+        QNode patching approach.
+        """
 
         def closure(qnode, *args, **kwargs):
             params = {}
@@ -820,10 +883,12 @@ class QJIT(CatalystCallable):
         else:
             shared_object, llvm_ir = self.compiler.run(self.mlir_module, self.workspace)
 
+        if not self.compile_options.link:
+            return None, llvm_ir
+
         compiled_fn = CompiledFunction(
             shared_object, func_name, restype, self.out_type, self.compile_options
         )
-
         return compiled_fn, llvm_ir
 
     @instrument(has_finegrained=True)
@@ -972,3 +1037,46 @@ class JAX_QJIT:
     @debug_logger
     def __call__(self, *args, **kwargs):
         return self.jaxed_function(*args, **kwargs)
+
+
+@contextmanager
+def _ensure_capture_mode(enable_capture: bool):
+    """Enforce the PennyLane capture state for the duration of the context.
+
+    This context manager safely transitions the global ``qml.capture`` state to
+    the requested state and guarantees restoration of the previous state upon
+    exit, regardless of exceptions.
+
+    This implements "scope enforcement" rather than "state management": you don't
+    care what the global state *was*; you only care what it *must be* for the
+    duration of this scope. The context manager handles all toggling automatically.
+
+    Args:
+        enable_capture (bool): The desired capture state within the context.
+            - ``True``: Enable PennyLane capture (use new capture pathway)
+            - ``False``: Disable PennyLane capture (use legacy pathway)
+
+    Note:
+        This context manager is re-entrant and nesting-safe. Nested calls will
+        each restore to their own previous state, protecting against nested
+        toggles drifting out of sync.
+    """
+    # 1. Snapshot the pre-existing state
+    was_enabled = qml.capture.enabled()
+
+    # 2. Enforce the requested state (only toggle if necessary)
+    if enable_capture and not was_enabled:
+        qml.capture.enable()
+    elif not enable_capture and was_enabled:
+        qml.capture.disable()
+
+    try:
+        yield
+    finally:
+        # 3. Restore the original state directly from snapshot
+        # We restore 'was_enabled' directly rather than just toggling back,
+        # which protects against nested toggles drifting out of sync.
+        if was_enabled:
+            qml.capture.enable()
+        else:
+            qml.capture.disable()

@@ -42,7 +42,7 @@ Value awaitEvents(ArrayRef<Value> events, PatternRewriter &rewriter)
         return events.front();
     }
     auto eventType = rtio::EventType::get(rewriter.getContext());
-    return rewriter.create<rtio::RTIOSyncOp>(rewriter.getUnknownLoc(), eventType, events);
+    return rtio::RTIOSyncOp::create(rewriter, rewriter.getUnknownLoc(), eventType, events);
 }
 
 //===----------------------------------------------------------------------===//
@@ -100,7 +100,7 @@ struct ParallelProtocolToRTIOPattern : public OpConversionPattern<ion::ParallelP
         // create events for each qubit
         auto events = llvm::map_range(inQubits, [&](Value qubit) {
             auto eventType = rtio::EventType::get(ctx);
-            return rewriter.create<UnrealizedConversionCastOp>(loc, eventType, qubit).getResult(0);
+            return UnrealizedConversionCastOp::create(rewriter, loc, eventType, qubit).getResult(0);
         });
 
         Value inputSyncEvent = awaitEvents(llvm::to_vector(events), rewriter);
@@ -167,8 +167,8 @@ struct ParallelProtocolToRTIOPattern : public OpConversionPattern<ion::ParallelP
         SmallVector<Value> results;
         for (Value result : op.getResults()) {
             // unrealized conversion cast sync event to result type
-            auto event =
-                rewriter.create<UnrealizedConversionCastOp>(loc, result.getType(), outputSyncEvent);
+            auto event = UnrealizedConversionCastOp::create(rewriter, loc, result.getType(),
+                                                            outputSyncEvent);
             results.push_back(event.getResult(0));
         }
 
@@ -235,8 +235,9 @@ struct PulseToRTIOPattern : public OpConversionPattern<ion::PulseOp> {
         int64_t transitionIndex = beamAttr.getTransitionIndex().getInt();
         double frequency = calculateFrequency(transitionIndex, detuning, ionInfo);
         Value freqValue =
-            rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(frequency));
-        Value phaseValue = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(phase));
+            arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(frequency));
+        Value phaseValue =
+            arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(phase));
 
         // Convert the qubit to a channel
         ArrayAttr qualifiers = rewriter.getArrayAttr({rewriter.getI64IntegerAttr(transitionIndex)});
@@ -257,12 +258,12 @@ struct PulseToRTIOPattern : public OpConversionPattern<ion::PulseOp> {
         }
 
         Value channel =
-            rewriter.create<rtio::RTIOQubitToChannelOp>(loc, channelType, memrefLoadValue);
+            rtio::RTIOQubitToChannelOp::create(rewriter, loc, channelType, memrefLoadValue);
 
         // Create rtio.pulse
         auto eventType = rtio::EventType::get(ctx);
-        Value event = rewriter.create<rtio::RTIOPulseOp>(loc, eventType, channel, duration,
-                                                         freqValue, phaseValue, nullptr);
+        Value event = rtio::RTIOPulseOp::create(rewriter, loc, eventType, channel, duration,
+                                                freqValue, phaseValue, nullptr);
         rewriter.replaceOp(op, event);
 
         return success();
@@ -363,7 +364,7 @@ struct ResolveChannelMappingPattern : public OpRewritePattern<rtio::RTIOQubitToC
         auto resolvedChannelType =
             rtio::ChannelType::get(rewriter.getContext(), kind, qualifiers, channelIdAttr);
 
-        Value channel = rewriter.create<rtio::RTIOChannelOp>(loc, resolvedChannelType);
+        Value channel = rtio::RTIOChannelOp::create(rewriter, loc, resolvedChannelType);
 
         rewriter.replaceOp(op, channel);
 
@@ -431,7 +432,7 @@ struct PropagateEventsPattern : public OpRewritePattern<UnrealizedConversionCast
 
         if (reachedAllocOp && events.empty()) {
             auto eventType = rtio::EventType::get(ctx);
-            Value emptyEvent = rewriter.create<rtio::RTIOEmptyOp>(op.getLoc(), eventType);
+            Value emptyEvent = rtio::RTIOEmptyOp::create(rewriter, op.getLoc(), eventType);
             rewriter.replaceOp(op, emptyEvent);
             return success();
         }
