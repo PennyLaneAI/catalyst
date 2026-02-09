@@ -36,11 +36,11 @@ def test_correct_universe():
     for d in all_dialects:
         if d.name not in shared_dialects:
             assert d.name in CATALYST_XDSL_UNIVERSE.all_dialects
-            assert CATALYST_XDSL_UNIVERSE.all_dialects[d.name] == d
+            assert CATALYST_XDSL_UNIVERSE.all_dialects[d.name]() == d
 
     for t in all_transforms:
         assert t.name in CATALYST_XDSL_UNIVERSE.all_passes
-        assert CATALYST_XDSL_UNIVERSE.all_passes[t.name] == t
+        assert CATALYST_XDSL_UNIVERSE.all_passes[t.name]() == t
 
 
 def test_correct_multiverse():
@@ -50,8 +50,8 @@ def test_correct_multiverse():
     for d in all_dialects:
         assert d.name in multiverse.all_dialects
         if d.name not in shared_dialects:
-            assert multiverse.all_dialects[d.name] == d
+            assert multiverse.all_dialects[d.name]() == d
 
     for t in all_transforms:
         assert t.name in multiverse.all_passes
-        assert multiverse.all_passes[t.name] == t
+        assert multiverse.all_passes[t.name]() == t
