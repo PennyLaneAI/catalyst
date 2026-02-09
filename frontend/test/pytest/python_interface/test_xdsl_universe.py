@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit tests for the xDSL universe."""
-from subprocess import check_output
+from subprocess import check_call
 import pytest
 from xdsl.passes import ModulePass
 from xdsl.universe import Universe as xUniverse
@@ -57,16 +57,16 @@ def test_correct_multiverse():
         assert multiverse.all_passes[t.name]() == t
 
 
-@pytest.mark.parametrize("transform", all_transforms)
-def test_xdsl_opt(transform):
+@pytest.mark.parametrize("_transform", all_transforms)
+def test_xdsl_opt(_transform):
     """Test that Catalyst's dialects and transforms are available through xdsl-opt"""
     # quantum.device_init is needed for some passes to work correctly
-    mod_string = f"""
+    mod_string = """
         %shots = arith.constant 1 : i64
         %angle, %q0 = "test.op"() : () -> (f64, !quantum.bit)
 
         // For checking that the Quantum dialect is loaded correctly
-        quantum.device shots(%shots) ["dummy_lib", "dummy.device", "{{'dummy_kwarg': 0}}"]
+        quantum.device shots(%shots) ["dummy_lib", "dummy.device", "{'dummy_kwarg': 0}"]
 
         // For checking that the Catalyst dialect is loaded correctly
         %list = catalyst.list_init : !catalyst.arraylist<i64>
@@ -78,5 +78,5 @@ def test_xdsl_opt(transform):
         %q2 = qec.fabricate zero : !quantum.bit
     """
 
-    cmd = ["xdsl-opt", "-p", transform.name]
-    res = check_output(cmd, input=mod_string.encode())
+    cmd = ["xdsl-opt", "-p", _transform.name]
+    _ = check_call(cmd, input=mod_string.encode())
