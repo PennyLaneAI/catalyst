@@ -587,7 +587,6 @@ def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode, pipeline=None):
     Returns:
       List[mlir.Value] corresponding
     """
-    print("in quantum kernel lowering")
     assert isinstance(qnode, qml.QNode), "This function expects qnodes"
     if pipeline is None:
         pipeline = tuple()
