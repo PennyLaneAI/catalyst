@@ -15,15 +15,16 @@
 
 import pytest
 
-from xdsl.ir import Operation
-
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.pass_api import CompilationPass
-from catalyst.python_interface.conversion import parse_generic_to_xdsl_module
+
+
+pytestmark = pytest.mark.xdsl
 
 
 def create_test_pass(greedy: bool, recursive: bool) -> CompilationPass:
     """Helper to create a compilation pass for testing"""
+    # pylint: disable=unused-argument
 
     class MyPass(CompilationPass):
         """Compilation pass for testing."""

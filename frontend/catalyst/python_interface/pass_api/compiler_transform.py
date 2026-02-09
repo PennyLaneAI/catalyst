@@ -146,7 +146,7 @@ class CompilationPass(ModulePass):
         # xdsl.pattern_rewriter.op_type_rewrite_pattern was used as a reference to
         # implement the type hint collection. Source:
         # https://github.com/xdslproject/xdsl/blob/main/xdsl/pattern_rewriter.py
-        params = [param for param in signature(action, eval_str=True).parameters.values()]
+        params = list(signature(action, eval_str=True).parameters.values())
         if len(params) != 3 or params[0].name != "self":
             raise ValueError("The action must have 3 arguments, with the first one being 'self'.")
 
@@ -199,6 +199,7 @@ def _update_op_type_hint(hint: type[Operation]) -> Callable:
     for the ``op`` argument."""
 
     def _update_match_and_rewrite(method: Callable) -> Callable:
+        """Update annotations of match_and_rewrite function."""
         params = tuple(signature(method).parameters)
         # Update type hint of operation argument
         # TODO: Is it fine to mutate in-place or should we return a new function?
