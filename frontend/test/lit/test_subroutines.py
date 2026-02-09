@@ -15,7 +15,7 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 """Lit tests for subroutines with program capture."""
-
+# pylint: disable=line-too-long
 from functools import partial
 
 import pennylane as qml
@@ -112,7 +112,7 @@ def test_different_shapes():
         def loop(i):
             qml.RX(data[i], wires[i])
 
-        loop()
+        loop() # pylint: disable=no-value-for-parameter
 
     @qml.qjit(capture=True, target="mlir")
     @qml.qnode(qml.device("null.qubit", wires=1))
