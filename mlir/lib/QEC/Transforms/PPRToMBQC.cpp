@@ -28,8 +28,8 @@ namespace {
 
 CustomOp buildCNOTGate(Value control, Value target, ConversionPatternRewriter &rewriter)
 {
-    return rewriter.create<quantum::CustomOp>(
-        control.getLoc(),
+    return quantum::CustomOp::create(
+        rewriter, control.getLoc(),
         /*out_qubits=*/mlir::TypeRange({control.getType(), target.getType()}),
         /*out_ctrl_qubits=*/mlir::TypeRange({}),
         /*params=*/mlir::ValueRange(),
@@ -47,44 +47,44 @@ CustomOp buildSingleQubitGate(Value qubit, StringRef gateName, ArrayRef<double> 
     SmallVector<Value, 1> paramValues;
     auto f64Ty = rewriter.getF64Type();
     for (double p : params) {
-        auto cst = rewriter.create<mlir::arith::ConstantOp>(qubit.getLoc(), f64Ty,
-                                                            rewriter.getF64FloatAttr(p));
+        auto cst = mlir::arith::ConstantOp::create(rewriter, qubit.getLoc(), f64Ty,
+                                                   rewriter.getF64FloatAttr(p));
         paramValues.push_back(cst.getResult());
     }
 
-    return rewriter.create<quantum::CustomOp>(qubit.getLoc(),
-                                              /*out_qubits=*/mlir::TypeRange({qubit.getType()}),
-                                              /*out_ctrl_qubits=*/mlir::TypeRange({}),
-                                              /*params=*/mlir::ValueRange(paramValues),
-                                              /*in_qubits=*/mlir::ValueRange({qubit}),
-                                              /*gate_name=*/gateName,
-                                              /*adjoint=*/false,
-                                              /*in_ctrl_qubits=*/mlir::ValueRange({}),
-                                              /*in_ctrl_values=*/mlir::ValueRange());
+    return quantum::CustomOp::create(rewriter, qubit.getLoc(),
+                                     /*out_qubits=*/mlir::TypeRange({qubit.getType()}),
+                                     /*out_ctrl_qubits=*/mlir::TypeRange({}),
+                                     /*params=*/mlir::ValueRange(paramValues),
+                                     /*in_qubits=*/mlir::ValueRange({qubit}),
+                                     /*gate_name=*/gateName,
+                                     /*adjoint=*/false,
+                                     /*in_ctrl_qubits=*/mlir::ValueRange({}),
+                                     /*in_ctrl_values=*/mlir::ValueRange());
 }
 
 // Version for dynamic (runtime) parameters
 CustomOp buildSingleQubitGateWithDynamicParams(Value qubit, StringRef gateName, ValueRange params,
                                                ConversionPatternRewriter &rewriter)
 {
-    return rewriter.create<quantum::CustomOp>(qubit.getLoc(),
-                                              /*out_qubits=*/mlir::TypeRange({qubit.getType()}),
-                                              /*out_ctrl_qubits=*/mlir::TypeRange({}),
-                                              /*params=*/params,
-                                              /*in_qubits=*/mlir::ValueRange({qubit}),
-                                              /*gate_name=*/gateName,
-                                              /*adjoint=*/false,
-                                              /*in_ctrl_qubits=*/mlir::ValueRange({}),
-                                              /*in_ctrl_values=*/mlir::ValueRange());
+    return quantum::CustomOp::create(rewriter, qubit.getLoc(),
+                                     /*out_qubits=*/mlir::TypeRange({qubit.getType()}),
+                                     /*out_ctrl_qubits=*/mlir::TypeRange({}),
+                                     /*params=*/params,
+                                     /*in_qubits=*/mlir::ValueRange({qubit}),
+                                     /*gate_name=*/gateName,
+                                     /*adjoint=*/false,
+                                     /*in_ctrl_qubits=*/mlir::ValueRange({}),
+                                     /*in_ctrl_values=*/mlir::ValueRange());
 }
 
 MeasureOp buildMeasurementOp(Value qubit, ConversionPatternRewriter &rewriter)
 {
-    return rewriter.create<quantum::MeasureOp>(qubit.getLoc(),
-                                               /*mres=*/rewriter.getI1Type(),
-                                               /*out_qubits=*/qubit.getType(),
-                                               /*in_qubits=*/qubit,
-                                               /*postselect=*/nullptr);
+    return quantum::MeasureOp::create(rewriter, qubit.getLoc(),
+                                      /*mres=*/rewriter.getI1Type(),
+                                      /*out_qubits=*/qubit.getType(),
+                                      /*in_qubits=*/qubit,
+                                      /*postselect=*/nullptr);
 }
 
 // Applies per-qubit conjugations that map the provided Pauli string to the Z
@@ -173,9 +173,9 @@ void constructKernelOperation(SmallVector<Value> &qubits, Value &measResult, QEC
         auto loc = pprArbitraryOp.getLoc();
 
         // Create constant 2.0 and multiply to get RZ angle
-        auto two = rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getF64Type(),
-                                                            rewriter.getF64FloatAttr(2.0));
-        auto rzAngle = rewriter.create<mlir::arith::MulFOp>(loc, angle, two.getResult());
+        auto two = mlir::arith::ConstantOp::create(rewriter, loc, rewriter.getF64Type(),
+                                                   rewriter.getF64FloatAttr(2.0));
+        auto rzAngle = mlir::arith::MulFOp::create(rewriter, loc, angle, two.getResult());
 
         // Create RZ gate with dynamic angle
         qubits[0] =

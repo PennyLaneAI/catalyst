@@ -498,7 +498,7 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
                 return self._rotxzx_measurements(graph_qubit_dict, params)
             case "CNOT":
                 return self._cnot_measurements(graph_qubit_dict)
-            case _:
+            case _:  # pragma: no cover
                 raise ValueError(
                     f"{gate_name} is not supported in the MBQC formalism. Please decompose it "
                     "into the MBQC gate set."
@@ -530,7 +530,7 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
                 return self._rot_corrections(mres, qubits)
             case "CNOT":
                 return self._cnot_corrections(mres, qubits)
-            case _:
+            case _:  # pragma: no cover
                 raise ValueError(
                     f"{gate_name} is not supported in the MBQC formalism. Please decompose it "
                     "into the MBQC gate set."
@@ -545,7 +545,9 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
             The corresponding subroutine (func.FuncOp).
         """
         if gate_name not in _MBQC_ONE_QUBIT_GATES:
-            raise NotImplementedError(f"Subroutine for the {gate_name} gate is not supported.")
+            raise NotImplementedError(
+                f"Subroutine for the {gate_name} gate is not supported."
+            )  # pragma: no cover
         # ensure the order of parameters are aligned with customOp
         input_types = ()
         if gate_name == "RZ":

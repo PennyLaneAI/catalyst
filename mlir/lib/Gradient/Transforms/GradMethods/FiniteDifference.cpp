@@ -56,7 +56,7 @@ LogicalResult FiniteDiffLowering::matchAndRewrite(GradOp op, PatternRewriter &re
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointAfter(callee);
 
-        gradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
+        gradFn = func::FuncOp::create(rewriter, loc, fnName, fnType, visibility, nullptr, nullptr);
         rewriter.setInsertionPointToStart(gradFn.addEntryBlock());
 
         computeFiniteDiff(rewriter, loc, gradFn, callee, diffArgIndices, hValue);
@@ -75,7 +75,7 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
     std::vector<Value> gradients;
     gradients.reserve(gradFn.getNumResults());
 
-    func::CallOp callOp = rewriter.create<func::CallOp>(loc, callee, callArgs);
+    func::CallOp callOp = func::CallOp::create(rewriter, loc, callee, callArgs);
     for (size_t diffResIdx = 0; diffResIdx < callee.getNumResults(); ++diffResIdx) {
         for (size_t diffArgIdxIdx = 0; diffArgIdxIdx < diffArgIndices.size(); ++diffArgIdxIdx) {
             size_t diffArgIdx = diffArgIndices[diffArgIdxIdx];
@@ -111,45 +111,45 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
             std::vector<Value> dynamicDimSizes;
             for (int64_t j = 0; j < resultRank; j++) {
                 if (resultShape[j] == ShapedType::kDynamic) {
-                    dynamicDimSizes.push_back(rewriter.create<tensor::DimOp>(loc, callRes, j));
+                    dynamicDimSizes.push_back(tensor::DimOp::create(rewriter, loc, callRes, j));
                 }
             }
             for (int64_t i = 0; i < operandRank; i++) {
                 if (operandShape[i] == ShapedType::kDynamic) {
-                    dynamicDimSizes.push_back(rewriter.create<tensor::DimOp>(loc, diffArg, i));
+                    dynamicDimSizes.push_back(tensor::DimOp::create(rewriter, loc, diffArg, i));
                 }
             }
 
             TypedAttr shiftForResult = rewriter.getFloatAttr(baseResultTy, hValue);
-            Value hForResult = rewriter.create<arith::ConstantOp>(loc, shiftForResult);
+            Value hForResult = arith::ConstantOp::create(rewriter, loc, shiftForResult);
             if (isGradientTensor && cast<TensorType>(gradientTy).hasStaticShape()) {
-                hForResult = rewriter.create<tensor::SplatOp>(loc, hForResult, gradientTy);
+                hForResult = tensor::SplatOp::create(rewriter, loc, hForResult, gradientTy);
             }
             else if (isGradientTensor) {
-                Value outTensor = rewriter.create<tensor::EmptyOp>(loc, gradientShape, baseResultTy,
-                                                                   dynamicDimSizes);
+                Value outTensor = tensor::EmptyOp::create(rewriter, loc, gradientShape,
+                                                          baseResultTy, dynamicDimSizes);
                 hForResult =
-                    rewriter.create<linalg::FillOp>(loc, hForResult, outTensor).getResult(0);
+                    linalg::FillOp::create(rewriter, loc, hForResult, outTensor).getResult(0);
             }
 
             TypedAttr shiftForOperand =
                 isOperandScalarTensor
                     ? (TypedAttr)DenseFPElementsAttr::get(cast<ShapedType>(operandTy), hValue)
                     : (TypedAttr)rewriter.getFloatAttr(baseOperandTy, hValue);
-            Value hForOperand = rewriter.create<arith::ConstantOp>(loc, shiftForOperand);
+            Value hForOperand = arith::ConstantOp::create(rewriter, loc, shiftForOperand);
 
             Value gradient;
             if (!isOperandTensor || isOperandScalarTensor) {
-                Value diffArgShifted = rewriter.create<arith::AddFOp>(loc, diffArg, hForOperand);
+                Value diffArgShifted = arith::AddFOp::create(rewriter, loc, diffArg, hForOperand);
 
                 std::vector<Value> callArgsForward(callArgs.begin(), callArgs.end());
                 callArgsForward[diffArgIdx] = diffArgShifted;
 
                 func::CallOp callOpForward =
-                    rewriter.create<func::CallOp>(loc, callee, callArgsForward);
+                    func::CallOp::create(rewriter, loc, callee, callArgsForward);
                 Value callResForward = callOpForward.getResult(diffResIdx);
 
-                gradient = rewriter.create<arith::SubFOp>(loc, callResForward, callRes);
+                gradient = arith::SubFOp::create(rewriter, loc, callResForward, callRes);
             }
             else {
                 auto bodyBuilder = [&](OpBuilder &rewriter, Location loc,
@@ -165,49 +165,51 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
                     auto memrefTy = bufferization::getMemRefTypeWithStaticIdentityLayout(
                         cast<TensorType>(tensorTy));
                     auto toBufferOp =
-                        rewriter.create<bufferization::ToBufferOp>(loc, memrefTy, diffArg);
+                        bufferization::ToBufferOp::create(rewriter, loc, memrefTy, diffArg);
 
-                    auto cloneOp = rewriter.create<bufferization::CloneOp>(loc, toBufferOp);
+                    auto cloneOp = bufferization::CloneOp::create(rewriter, loc, toBufferOp);
 
-                    auto toTensorOp = rewriter.create<bufferization::ToTensorOp>(
-                        loc, memref::getTensorTypeFromMemRefType(cloneOp.getOutput().getType()),
-                        cloneOp, true);
+                    auto toTensorOp = bufferization::ToTensorOp::create(
+                        rewriter, loc,
+                        memref::getTensorTypeFromMemRefType(cloneOp.getOutput().getType()), cloneOp,
+                        true);
 
                     auto diffArgCopy = toTensorOp.getResult();
 
-                    Value diffArgElem = rewriter.create<tensor::ExtractOp>(
-                        loc, diffArgCopy, tensorIndices.take_back(operandRank));
+                    Value diffArgElem = tensor::ExtractOp::create(
+                        rewriter, loc, diffArgCopy, tensorIndices.take_back(operandRank));
                     Value diffArgElemShifted =
-                        rewriter.create<arith::AddFOp>(loc, diffArgElem, hForOperand);
-                    Value diffArgShifted = rewriter.create<tensor::InsertOp>(
-                        loc, diffArgElemShifted, diffArgCopy, tensorIndices.take_back(operandRank));
+                        arith::AddFOp::create(rewriter, loc, diffArgElem, hForOperand);
+                    Value diffArgShifted =
+                        tensor::InsertOp::create(rewriter, loc, diffArgElemShifted, diffArgCopy,
+                                                 tensorIndices.take_back(operandRank));
 
                     std::vector<Value> callArgsForward(callArgs.begin(), callArgs.end());
                     callArgsForward[diffArgIdx] = diffArgShifted;
 
                     func::CallOp callOpForward =
-                        rewriter.create<func::CallOp>(loc, callee, callArgsForward);
+                        func::CallOp::create(rewriter, loc, callee, callArgsForward);
                     Value callResForward = callOpForward.getResult(diffResIdx);
 
-                    Value result = rewriter.create<arith::SubFOp>(loc, callResForward, callRes);
+                    Value result = arith::SubFOp::create(rewriter, loc, callResForward, callRes);
                     if (isResultTensor) {
-                        result = rewriter.create<tensor::ExtractOp>(
-                            loc, result, tensorIndices.take_front(resultRank));
+                        result = tensor::ExtractOp::create(rewriter, loc, result,
+                                                           tensorIndices.take_front(resultRank));
                     }
 
-                    rewriter.create<tensor::YieldOp>(loc, result);
+                    tensor::YieldOp::create(rewriter, loc, result);
                 };
 
-                gradient = rewriter.create<tensor::GenerateOp>(loc, gradientTy, dynamicDimSizes,
-                                                               bodyBuilder);
+                gradient = tensor::GenerateOp::create(rewriter, loc, gradientTy, dynamicDimSizes,
+                                                      bodyBuilder);
             }
 
-            gradient = rewriter.create<arith::DivFOp>(loc, gradient, hForResult);
+            gradient = arith::DivFOp::create(rewriter, loc, gradient, hForResult);
             gradients.push_back(gradient);
         }
     }
 
-    rewriter.create<func::ReturnOp>(loc, gradients);
+    func::ReturnOp::create(rewriter, loc, gradients);
 }
 
 } // namespace gradient
