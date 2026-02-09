@@ -68,6 +68,9 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
 
 def SplitNonCommutingPass : Pass<"split-non-commuting"> {
     let summary = "Split quantum functions non-commuting observables into multiple executions.";
+
+def SplitToSingleTermsPass : Pass<"split-to-single-terms"> {
+    let summary = "Split quantum functions into single-term observables.";
 }
 
 // ----- Quantum circuit transformation passes begin ----- //

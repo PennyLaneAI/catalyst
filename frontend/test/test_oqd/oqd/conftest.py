@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 """
 Pytest configuration file for OQD test suite.
 """
 import os
 from tempfile import TemporaryDirectory
 
+import pennylane as qml
 import pytest
 
 
@@ -28,3 +28,13 @@ def tmp_openapl_file_name():
     with TemporaryDirectory() as temp_dir:
         openapl_file_name = os.path.join(temp_dir, "__openapl__output.json")
         yield openapl_file_name
+
+
+@pytest.fixture
+def use_capture():
+    """Enable capture before and disable capture after the test."""
+    qml.capture.enable()
+    try:
+        yield
+    finally:
+        qml.capture.disable()
