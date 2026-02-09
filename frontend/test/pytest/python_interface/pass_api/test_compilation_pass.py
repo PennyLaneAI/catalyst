@@ -18,7 +18,6 @@ import pytest
 from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.pass_api import CompilationPass
 
-
 pytestmark = pytest.mark.xdsl
 
 

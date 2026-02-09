@@ -162,7 +162,7 @@ class CompilationPass(ModulePass):
 
         cls._rewrite_patterns.append(rewrite_pattern)
 
-    def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:  # pylint: disable=unused-argument
+    def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         """Apply the transformation to the input module.
 
         If ``greedy`` is ``True``, the actions will be applied greedily, i.e., for each
