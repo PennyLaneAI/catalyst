@@ -63,6 +63,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* Catalyst with program capture can now be used with the new `qml.templates.Subroutine` class and the associated
+  `qml.capture.subroutine` upstreamed from `catalyst.jax_primitives.subroutine`.
+  [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
+
 * `null.qubit` resource tracking is now able to track measurements and observables. This output
   is also reflected in `qml.specs`.
   [(#2446)](https://github.com/PennyLaneAI/catalyst/pull/2446)

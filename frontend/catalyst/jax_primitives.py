@@ -31,7 +31,7 @@ from jax._src.interpreters import partial_eval as pe
 from jax._src.lax.lax import _merge_dyn_shape, _nary_lower_hlo, cos_p, sin_p
 from jax._src.lib.mlir import ir
 from jax._src.lib.mlir.dialects import hlo
-from jax._src.pjit import _pjit_lowering, jit_p
+from jax._src.pjit import _pjit_lowering
 from jax.core import AbstractValue
 from jax.extend.core import Primitive
 from jax.interpreters import mlir
@@ -136,7 +136,8 @@ from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 from pennylane.capture.primitives import quantum_subroutine_prim
 from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
 from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
-from pennylane.capture import subroutine
+# subroutine got upstreamed to pennylane
+from pennylane.capture import subroutine # pylint: disable=unused-import
 
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
@@ -149,7 +150,6 @@ from catalyst.jax_extras import (
     while_loop_expansion_strategy,
 )
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
-from catalyst.utils.exceptions import CompileError
 from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 from catalyst.utils.types import convert_shaped_arrays_to_tensors
 
