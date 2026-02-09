@@ -21,7 +21,6 @@ from functools import partial
 import jax
 from jax.extend.core import ClosedJaxpr
 from jax.interpreters.partial_eval import convert_constvars_jaxpr
-from pennylane.capture.primitives import subroutine_prim
 from pennylane.capture.primitives import cond_prim as plxpr_cond_prim
 from pennylane.capture.primitives import for_loop_prim as plxpr_for_loop_prim
 from pennylane.capture.primitives import while_loop_prim as plxpr_while_loop_prim
@@ -469,38 +468,6 @@ def handle_while_loop(
     # Update the current qreg and remove it from the output values.
     self.init_qreg.set(outvals.pop())
 
-    for dyn_qreg in reversed(dynalloced_qregs):
-        dyn_qreg.set(outvals.pop())
-
-    # Return only the output values that match the plxpr output values
-    return outvals
-
-@PLxPRToQuantumJaxprInterpreter.register_primitive(subroutine_prim)
-def handle_subroutine(self, *invals, call_jaxpr, fn):
-
-    self.init_qreg.insert_all_dangling_qubits()
-
-    dynalloced_qregs, dynalloced_wire_global_indices = _get_dynamically_allocated_qregs(
-        invals, self.qubit_index_recorder, self.init_qreg
-    )
-    args_plus_qreg = [
-        *invals,
-        *[dyn_qreg.get() for dyn_qreg in dynalloced_qregs],
-        self.init_qreg.get(),
-    ]
-    closed_jaxpr = ClosedJaxpr(call_jaxpr, ())
-    f = partial(_calling_convention, self, closed_jaxpr, outer_dynqreg_handlers=dynalloced_qregs)
-    converted_jaxpr = jax.make_jaxpr(f)(*args_plus_qreg)
-    consts = converted_jaxpr.consts
-    j = converted_jaxpr.jaxpr
-    no_consts_jaxpr = j.replace(constvars=(), invars=j.constvars + j.invars)
-
-    outvals = subroutine_prim.bind(*consts, *args_plus_qreg, call_jaxpr=no_consts_jaxpr, fn=fn)
-
-    # Output structure:
-    # First a list of dynamically allocated qregs, then the global qreg
-    # Update the current qreg and remove it from the output values.
-    self.init_qreg.set(outvals.pop())
     for dyn_qreg in reversed(dynalloced_qregs):
         dyn_qreg.set(outvals.pop())
 

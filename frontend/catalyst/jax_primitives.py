@@ -15,7 +15,6 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
-import copy
 import functools
 import sys
 from dataclasses import dataclass
@@ -134,9 +133,10 @@ with Patcher(
     )
 
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
-from pennylane.capture.primitives import subroutine_prim as pl_subroutine_prim
+from pennylane.capture.primitives import quantum_subroutine_prim
 from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
 from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
+from pennylane.capture import subroutine
 
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
@@ -352,81 +352,6 @@ measure_in_basis_p = Primitive("measure_in_basis")
 measure_in_basis_p.multiple_results = True
 decomprule_p = core.Primitive("decomposition_rule")
 decomprule_p.multiple_results = True
-
-quantum_subroutine_p = copy.deepcopy(jit_p)
-quantum_subroutine_p.name = "quantum_subroutine_p"
-subroutine_cache: dict[callable, callable] = {}
-
-
-def subroutine(func):
-    """
-    Denotes the creation of a function in the intermediate representation.
-
-    May be used to reduce compilation times. Instead of repeatedly compiling
-    inlined versions of the function passed as a parameter, when functions
-    are annotated with a subroutine, a single version of the function
-    will be compiled and called from potentially multiple callsites.
-
-    .. note::
-
-        Subroutines are only available when using the PLxPR program capture
-        interface.
-
-
-    **Example**
-
-    .. code-block:: python
-
-        @subroutine
-        def Hadamard_on_wire_0():
-            qml.Hadamard(0)
-
-        qml.capture.enable()
-
-        @qjit
-        @qml.qnode(dev)
-        def main():
-            Hadamard_on_wire_0()
-            Hadamard_on_wire_0()
-            return qml.state()
-
-        print(main.mlir)
-        qml.capture.disable()
-    """
-
-    # pylint: disable-next=import-outside-toplevel
-    from catalyst.api_extensions.callbacks import WRAPPER_ASSIGNMENTS
-
-    old_jit_p = jax._src.pjit.jit_p
-
-    @functools.wraps(func, assigned=WRAPPER_ASSIGNMENTS)
-    def inside(*args, **kwargs):
-        with Patcher(
-            (
-                jax._src.pjit,
-                "jit_p",
-                old_jit_p,
-            ),
-        ):
-            return func(*args, **kwargs)
-
-    @functools.wraps(inside, assigned=WRAPPER_ASSIGNMENTS)
-    def wrapper(*args, **kwargs):
-
-        if not qml.capture.enabled():
-            msg = "Subroutine is only available with capture enabled."
-            raise CompileError(msg)
-
-        with Patcher(
-            (
-                jax._src.pjit,
-                "jit_p",
-                quantum_subroutine_p,
-            ),
-        ):
-            return jax.jit(inside)(*args, **kwargs)
-
-    return wrapper
 
 
 def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None):
@@ -2914,7 +2839,6 @@ CUSTOM_LOWERING_RULES = (
     (pl_vjp_prim, _capture_vjp_lowering),
     (pl_jvp_prim, _capture_jvp_lowering),
     (func_p, _func_lowering),
-    (pl_subroutine_prim, _func_lowering),
     (jvp_p, _jvp_lowering),
     (vjp_p, _vjp_lowering),
     (adjoint_p, _adjoint_lowering),
@@ -2927,7 +2851,7 @@ CUSTOM_LOWERING_RULES = (
     (sin_p, _sin_lowering2),
     (cos_p, _cos_lowering2),
     (quantum_kernel_p, _quantum_kernel_lowering),
-    (quantum_subroutine_p, subroutine_lowering),
+    (quantum_subroutine_prim, subroutine_lowering),
     (measure_in_basis_p, _measure_in_basis_lowering),
     (decomprule_p, _decomposition_rule_lowering),
 )
