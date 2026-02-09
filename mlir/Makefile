@@ -248,6 +248,7 @@ clean-enzyme:
 
 clean-plugin:
 	@echo "clean plugin"
+	rm -rf standalone
 	rm -rf standalone/build
 	rm -rf $(DIALECTS_BUILD_DIR)/lib/StandalonePlugin.*
 
