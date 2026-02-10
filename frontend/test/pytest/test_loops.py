@@ -29,9 +29,6 @@ from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
 # pylint: disable=no-value-for-parameter,unused-argument
 
-# Run all tests with both capture enabled and disabled
-pytestmark = pytest.mark.usefixtures("use_both_frontend")
-
 
 def measure(*args, **kwargs):
     """Wrapper that uses qml.measure with capture enabled, catalyst.measure otherwise."""
@@ -44,7 +41,7 @@ def measure(*args, **kwargs):
 class TestLoopToJaxpr:
     """Collection of tests that examine the generated JAXPR of loops."""
 
-    def test_while_loop(self):
+    def test_while_loop(self, capture_mode):
         """Check the while loop JAXPR."""
 
         expected = dedent(
@@ -66,7 +63,7 @@ class TestLoopToJaxpr:
             """
         )
 
-        @qjit
+        @qjit(capture=capture_mode)
         def circuit(x: float):
             @c_while_loop(lambda v: v[0] < 10)
             def loop(v):
@@ -76,7 +73,7 @@ class TestLoopToJaxpr:
 
         assert expected.strip() == str(circuit.jaxpr).strip()
 
-    def test_for_loop(self):
+    def test_for_loop(self, capture_mode):
         """Check the for loop JAXPR."""
 
         expected = dedent(
@@ -95,7 +92,7 @@ class TestLoopToJaxpr:
         """
         )
 
-        @qjit
+        @qjit(capture=capture_mode)
         def circuit(x: float, n: int):
             @c_for_loop(0, n, 1)
             def loop(_, v):
@@ -109,10 +106,10 @@ class TestLoopToJaxpr:
 class TestWhileLoops:
     """Test the Catalyst while_loop operation."""
 
-    def test_alternating_loop(self, backend):
+    def test_alternating_loop(self, backend, capture_mode):
         """Test simple while loop, using expval for capture compatibility."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             @while_loop(lambda v: v[0] < v[1])
@@ -130,11 +127,11 @@ class TestWhileLoops:
         assert circuit(4) == 1  # 4 X → |0⟩
 
     @pytest.mark.old_frontend
-    def test_non_bool_condition_error(self, backend):
+    def test_non_bool_condition_error(self, backend, capture_mode):
         """Test error messages issues when the non-bool conditions are provided."""
 
         def workflow(R):
-            @qjit
+            @qjit(capture=capture_mode)
             @qml.qnode(qml.device(backend, wires=1))
             def circuit():
                 @c_while_loop(lambda i: R)
@@ -152,10 +149,10 @@ class TestWhileLoops:
         with pytest.raises(TypeError, match="boolean scalar was expected, got the value"):
             workflow(33)
 
-    def test_closure_condition_fn(self, backend):
+    def test_closure_condition_fn(self, backend, capture_mode):
         """Test while loop with captured values (closures) in the condition function."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             @while_loop(lambda i: i < n)
@@ -172,10 +169,10 @@ class TestWhileLoops:
         assert circuit(3) == -1
         assert circuit(4) == 1
 
-    def test_closure_body_fn(self, backend):
+    def test_closure_body_fn(self, backend, capture_mode):
         """Test while loop with captured values (closures) in the body function."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             my_const = 1
@@ -197,10 +194,10 @@ class TestWhileLoops:
         assert circuit(3) == -1
         assert circuit(4) == 1
 
-    def test_assert_joint_closure(self, backend):
+    def test_assert_joint_closure(self, backend, capture_mode):
         """Test while loop with captured values (closures) in both body and condition functions."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             my_const = 1
@@ -220,13 +217,13 @@ class TestWhileLoops:
         assert circuit(4) == 1
 
     @pytest.mark.old_frontend
-    def test_assert_reference_outside_measure(self, backend):
+    def test_assert_reference_outside_measure(self, backend, capture_mode):
         """Test while loop in conjunction with the measure op.
 
         This test uses MCM value inside the loop, which is old frontend specific.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             m = c_measure(wires=0)
@@ -244,10 +241,10 @@ class TestWhileLoops:
         assert circuit(3)
         assert not circuit(4)
 
-    def test_multiple_loop_arguments(self, backend):
+    def test_multiple_loop_arguments(self, backend, capture_mode):
         """Test while loop with multiple (loop-carried) arguments."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n: int):
             @while_loop(lambda v, _: v[0] < v[1])
@@ -265,14 +262,14 @@ class TestWhileLoops:
         assert circuit(4) == 1
 
     @pytest.mark.capture_todo
-    def test_nested_loops(self, backend):
+    def test_nested_loops(self, backend, capture_mode):
         """Test nested while loops.
 
         Marked capture_todo because returning classical values from qnode
         is not supported with capture.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n, m):
             @while_loop(lambda i, _: i < n)
@@ -340,13 +337,13 @@ class TestForLoops:
     """Test the Catalyst for_loop operation."""
 
     @pytest.mark.old_frontend
-    def test_required_index(self, backend):
+    def test_required_index(self, backend, capture_mode):
         """Check for loop error message when the iteration index is missing.
 
         Marked old_frontend because it tests specific error message from old frontend.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             @c_for_loop(0, n, 1)
@@ -359,10 +356,10 @@ class TestForLoops:
         with pytest.raises(TypeError, match="takes 0 positional arguments but 1 was given"):
             circuit(5)
 
-    def test_basic_loop(self, backend):
+    def test_basic_loop(self, backend, capture_mode):
         """Test simple for loop."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             @for_loop(0, n, 1)
@@ -376,10 +373,10 @@ class TestForLoops:
         assert circuit(1) == -1
         assert circuit(2) == 1
 
-    def test_loop_caried_values(self, backend):
+    def test_loop_caried_values(self, backend, capture_mode):
         """Test for loop with updating loop carried values."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             @for_loop(0, n, 1)
@@ -395,10 +392,10 @@ class TestForLoops:
         assert np.allclose(circuit(3), -np.sqrt(0.5))
         assert np.allclose(circuit(4), 0.0)
 
-    def test_dynamic_wires(self, backend):
+    def test_dynamic_wires(self, backend, capture_mode):
         """Test for loops with iteration index-dependant wires."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=6))
         def circuit(n: int):
             qml.Hadamard(wires=0)
@@ -415,10 +412,10 @@ class TestForLoops:
 
         assert np.allclose(circuit(6), expected)
 
-    def test_closure(self, backend):
+    def test_closure(self, backend, capture_mode):
         """Test for loop with captured values (closures)."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
             y = 2 * x
@@ -432,10 +429,10 @@ class TestForLoops:
 
         assert np.allclose(circuit(np.pi / 4), 0.0)
 
-    def test_nested_loops(self, backend):
+    def test_nested_loops(self, backend, capture_mode):
         """Test nested for loops."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=4))
         def circuit(n):
             # Input state: equal superposition
@@ -462,10 +459,10 @@ class TestForLoops:
 
         assert np.allclose(circuit(4), np.eye(2**4)[0])
 
-    def test_negative_step(self, backend):
+    def test_negative_step(self, backend, capture_mode):
         """Test loops with a negative step size."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             @for_loop(n, 0, -1)
@@ -481,7 +478,7 @@ class TestForLoops:
 
     @pytest.mark.old_frontend
     @pytest.mark.usefixtures("disable_capture")
-    def test_for_loop_raises_compatibility_error_with_capture(self):
+    def test_for_loop_raises_compatibility_error_with_capture(self, capture_mode):
         """Test that for_loop raises PlxprCaptureCFCompatibilityError when
         capture mode is enabled."""
         # Enable capture mode
@@ -499,7 +496,7 @@ class TestForLoops:
 
     @pytest.mark.old_frontend
     @pytest.mark.usefixtures("disable_capture")
-    def test_for_loop_raises_compatibility_error_with_capture_integration(self):
+    def test_for_loop_raises_compatibility_error_with_capture_integration(self, capture_mode):
         """Test that for_loop raises PlxprCaptureCFCompatibilityError when
         capture mode is enabled."""
         # Enable capture mode
@@ -527,10 +524,10 @@ class TestClassicalCompilation:
     """Test that Catalyst loops can be used outside of quantum functions."""
 
     @pytest.mark.parametrize("x,n", [(2, 3), (4, 5)])
-    def test_while_loop(self, x, n):
+    def test_while_loop(self, x, n, capture_mode):
         """Test while loop in classical function."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         def mulc(x: int, n: int):
             @while_loop(lambda v, _: v < n)
             def loop(v, i):
@@ -543,10 +540,10 @@ class TestClassicalCompilation:
         assert mulc(x, n) == x * n
 
     @pytest.mark.parametrize("x,n", [(2, 3), (4, 5)])
-    def test_while_nested_loop(self, x, n):
+    def test_while_nested_loop(self, x, n, capture_mode):
         """Test nested while loops in classical function."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         def mulc(x: int, n: int):
             @while_loop(lambda i, _: i < x)
             def loop(i, accum):
@@ -562,10 +559,10 @@ class TestClassicalCompilation:
         assert mulc(x, n) == x * n
 
     @pytest.mark.parametrize("x,n", [(2, 3), (4, 5)])
-    def test_for_loop(self, x, n):
+    def test_for_loop(self, x, n, capture_mode):
         """Test for loop in classical function."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         def mulc(x: int, n: int):
             @for_loop(0, n, 1)
             def loop(_, agg):
@@ -578,10 +575,10 @@ class TestClassicalCompilation:
         assert mulc(x, n) == x * n
 
     @pytest.mark.parametrize("x,n", [(2, 3), (4, 5)])
-    def test_nested_for_loop(self, x, n):
+    def test_nested_for_loop(self, x, n, capture_mode):
         """Test nested for loops in classical function."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         def mulc(x: int, n: int):
             @for_loop(0, x, 1)
             def loop(_, counter):
@@ -598,10 +595,10 @@ class TestClassicalCompilation:
         assert mulc(x, n) == x * n
 
     @pytest.mark.parametrize("x,n", [(2, 4), (4, 6)])
-    def test_for_loop_2(self, x, n):
+    def test_for_loop_2(self, x, n, capture_mode):
         """Test for loop in classical function with different step size."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         def mulc(x: int, n: int):
             @for_loop(0, n, 2)
             def loop(_, agg):
@@ -619,13 +616,13 @@ class TestClassicalCompilation:
         assert mulc.mlir
         assert mulc(x, n) == muli(x, n)
 
-    def test_for_loop_inf(self):
+    def test_for_loop_inf(self, capture_mode):
         """
         Test for loop with a negative step size (that would produce an infinite range) iterates 0
         times.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def revc():
             @for_loop(5, 10, -1)
             def loop(i, agg):
@@ -636,13 +633,13 @@ class TestClassicalCompilation:
         assert revc.mlir
         assert revc() == 27
 
-    def test_for_loop_neg_step_expression(self):
+    def test_for_loop_neg_step_expression(self, capture_mode):
         """
         Test for loop in classical function with a nontrivial expression that evaluates to a
         negative step, but is constant w.r.t. function args.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         def revc(m: int):
             y = 7
             x = y * 7
@@ -660,7 +657,7 @@ class TestClassicalCompilation:
 class TestInterpretationControlFlow:
     """Test that the loops' executions are semantically equivalent when compiled and interpreted."""
 
-    def test_while_loop(self):
+    def test_while_loop(self, capture_mode):
         """Test simple while loop."""
 
         def muli(x: int, n: int):
@@ -671,10 +668,10 @@ class TestInterpretationControlFlow:
             _, x_times_n = loop(0, 0)
             return x_times_n
 
-        mulc = qjit(muli)
+        mulc = qjit(muli, capture=capture_mode)
         assert mulc(1, 2) == muli(1, 2)
 
-    def test_for_loop(self):
+    def test_for_loop(self, capture_mode):
         """Test simple for loop."""
 
         def muli(x: int, n: int):
@@ -685,10 +682,10 @@ class TestInterpretationControlFlow:
             x_times_n = loop(0)
             return x_times_n
 
-        mulc = qjit(muli)
+        mulc = qjit(muli, capture=capture_mode)
         assert np.allclose(mulc(1, 2), muli(1, 2))
 
-    def test_qnode_with_while_loop(self, backend):
+    def test_qnode_with_while_loop(self, backend, capture_mode):
         """Test while loop inside QNode."""
         num_wires = 2
         device = qml.device(backend, wires=num_wires)
@@ -703,10 +700,10 @@ class TestInterpretationControlFlow:
             loop(0)
             return qml.state()
 
-        compiled_circuit = qjit(interpreted_circuit)
+        compiled_circuit = qjit(interpreted_circuit, capture=capture_mode)
         assert np.allclose(compiled_circuit(num_wires), interpreted_circuit(num_wires))
 
-    def test_qnode_with_for_loop(self, backend):
+    def test_qnode_with_for_loop(self, backend, capture_mode):
         """Test for loop inside QNode."""
         num_wires = 2
         device = qml.device(backend, wires=num_wires)
@@ -721,7 +718,7 @@ class TestInterpretationControlFlow:
             loop()
             return qml.state()
 
-        compiled_circuit = qjit(interpreted_circuit)
+        compiled_circuit = qjit(interpreted_circuit, capture=capture_mode)
         assert np.allclose(compiled_circuit(num_wires), interpreted_circuit(num_wires))
 
 
@@ -841,10 +838,10 @@ class TestForLoopOperatorAccess:
     Marked old_frontend because .operation attribute is catalyst-specific.
     """
 
-    def test_for_loop_access_quantum(self, backend):
+    def test_for_loop_access_quantum(self, backend, capture_mode):
         """Test ForLoop operation access in quantum context."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit():
             @c_for_loop(0, 4, 1)
@@ -859,10 +856,10 @@ class TestForLoopOperatorAccess:
 
         assert np.allclose(circuit(), [1, 0])
 
-    def test_for_loop_access_classical(self):
+    def test_for_loop_access_classical(self, capture_mode):
         """Test ForLoop operation access in classical context."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         def circuit(x):
             @c_for_loop(0, 10, 1)
             def body(i, accum):
@@ -883,7 +880,7 @@ class TestForLoopOperatorAccess:
         assert circuit(5) == 50
         assert circuit(3) == 30
 
-    def test_for_loop_access_interpreted(self):
+    def test_for_loop_access_interpreted(self, capture_mode):
         """Test ForLoop operation access in interpreted context."""
 
         def func(n):
@@ -915,10 +912,10 @@ class TestWhileLoopOperatorAccess:
     Marked old_frontend because .operation attribute is catalyst-specific.
     """
 
-    def test_while_loop_access_quantum(self, backend):
+    def test_while_loop_access_quantum(self, backend, capture_mode):
         """Test WhileLoop operation access in quantum context."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit():
             @c_while_loop(lambda i: i < 5)
@@ -933,10 +930,10 @@ class TestWhileLoopOperatorAccess:
 
         assert np.allclose(circuit(), [0, 1])
 
-    def test_while_loop_access_classical(self):
+    def test_while_loop_access_classical(self, capture_mode):
         """Test WhileLoop operation access in classical context."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         def circuit(x):
             @c_while_loop(lambda i, _: i < 10)
             def body(i, accum):
@@ -957,7 +954,7 @@ class TestWhileLoopOperatorAccess:
         assert circuit(5) == 50
         assert circuit(3) == 30
 
-    def test_while_loop_access_interpreted(self):
+    def test_while_loop_access_interpreted(self, capture_mode):
         """Test WhileLoop operation access in interpreted context."""
 
         def func(n):
