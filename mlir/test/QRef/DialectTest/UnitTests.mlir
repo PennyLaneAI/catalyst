@@ -242,7 +242,7 @@ func.func @test_hermitian_op(%q0: !qref.bit, %matrix: tensor<2x2xcomplex<f64>>) 
 // -----
 
 func.func @test_measure_op(%q0: !qref.bit) {
-    %mres, %out_qubit = qref.measure %q0 : i1, !qref.bit
+    %mres = qref.measure %q0 : i1
     func.return
 }
 

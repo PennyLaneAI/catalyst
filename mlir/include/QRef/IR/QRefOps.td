@@ -477,6 +477,32 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOpera
 
     let hasVerifier = 1;
 }
+
+// -----
+
+// class Region_Op<string mnemonic, list<Trait> traits = []> :
+//         QRef_Op<mnemonic, traits # [NoMemoryEffect]>;
+
+// def AdjointOp : Region_Op<"adjoint", [QuantumRegion, SingleBlockImplicitTerminator<"YieldOp">]> {
+//     let summary = "Calculate the adjoint of the enclosed operations";
+
+//     let regions = (region SizedRegion<1>:$region);
+
+//     let arguments = (ins
+//         QuregType:$qreg
+//     );
+
+//     let results = (outs
+//         QuregType:$out_qreg
+//     );
+
+//     let assemblyFormat = [{
+//         `(` $qreg `)` attr-dict `:` type(operands) $region
+//     }];
+
+//     let hasVerifier = 1;
+// }
+
 // -----
 
 // Observable ops are not meaningful on their own: their purpose is to be sent into a measurement
@@ -583,7 +609,7 @@ def HermitianOp : Observable_Op<"hermitian"> {
 class Measurement_Op<string mnemonic, list<Trait> traits = []> :
         QRef_Op<mnemonic, traits>;
 
-def MeasureOp : QRef_Op<"measure", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+def MeasureOp : QRef_Op<"measure"> {
     let summary = "A single-qubit projective measurement in the computational basis.";
     let description = [{
     }];
@@ -594,8 +620,7 @@ def MeasureOp : QRef_Op<"measure", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
     );
 
     let results = (outs
-        I1:$mres,
-        QRefQubitType:$out_qubit
+        I1:$mres
     );
 
     let assemblyFormat = [{
