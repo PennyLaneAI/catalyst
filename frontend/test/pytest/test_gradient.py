@@ -1702,6 +1702,26 @@ def test_gradient_slice(backend):
     assert np.allclose(cat_res, jax_res)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
+@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
+def test_ellipsis_differentiation(backend, diff_method):
+    """Test circuit diff with ellipsis in the preprocessing."""
+    dev = qml.device(backend, wires=3)
+
+    @qml.qnode(dev, diff_method=diff_method)
+    def circuit(weights):
+        r = weights[..., 1, 2, 0]
+        qml.RY(r, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    weights = jnp.ones([5, 3, 3])
+
+    cat_res = qjit(grad(circuit, argnums=0))(weights)
+    qml.capture.disable()
+    jax_res = jax.grad(circuit, argnums=0)(weights)
+    assert np.allclose(cat_res, jax_res)
+
+
 def test_vmap_worflow_derivation(backend):
     """Check the gradient of a vmap workflow"""
     pytest.xfail(reason="Vmap yields wrong results or segfaults when differentiated")
@@ -1756,26 +1776,6 @@ def test_vmap_worflow_derivation(backend):
     assert pytree_enzyme == pytree_fd
     assert jnp.allclose(data_enzyme[0], data_jax[0])
     assert jnp.allclose(data_enzyme[1], data_jax[1])
-
-
-@pytest.mark.usefixtures("use_both_frontend")
-@pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
-def test_ellipsis_differentiation(backend, diff_method):
-    """Test circuit diff with ellipsis in the preprocessing."""
-    dev = qml.device(backend, wires=3)
-
-    @qml.qnode(dev, diff_method=diff_method)
-    def circuit(weights):
-        r = weights[..., 1, 2, 0]
-        qml.RY(r, wires=0)
-        return qml.expval(qml.PauliZ(0))
-
-    weights = jnp.ones([5, 3, 3])
-
-    cat_res = qjit(grad(circuit, argnums=0))(weights)
-    qml.capture.disable()
-    jax_res = jax.grad(circuit, argnums=0)(weights)
-    assert np.allclose(cat_res, jax_res)
 
 
 def test_forloop_vmap_worflow_derivation(backend):
