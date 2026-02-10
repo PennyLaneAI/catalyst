@@ -1702,9 +1702,9 @@ def test_gradient_slice(backend):
     assert np.allclose(cat_res, jax_res)
 
 
-@pytest.mark.xfail(reason="Vmap yields wrong results when differentiated")
 def test_vmap_worflow_derivation(backend):
     """Check the gradient of a vmap workflow"""
+    pytest.xfail(reason="Vmap yields wrong results or segfaults when differentiated")
     n_wires = 5
     data = jnp.sin(jnp.mgrid[-2:2:0.2].reshape(n_wires, -1)) ** 3
 
