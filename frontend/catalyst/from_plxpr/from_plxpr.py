@@ -56,11 +56,7 @@ from .qubit_handler import (
     QubitIndexRecorder,
 )
 
-
-from catalyst.device.decomposition import catalyst_acceptance
-from catalyst.jax_primitives_utils import _calculate_diff_method
-from catalyst.device.qjit_device import _load_device_capabilities
-
+from catalyst.from_plxpr.decompose_utils import get_device_capabilities, catalyst_acceptance, calculate_diff_method
 
 def _tuple_to_slice(t):
     """Convert a tuple representation of a slice back to a slice object.
@@ -262,25 +258,7 @@ def handle_vjp(self, *args, jaxpr, **kwargs):
 def handle_qnode(
     self, *args, qnode, device, shots_len, execution_config, qfunc_jaxpr, n_consts, batch_dims=None
 ):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
-    # print("execution config", execution_config)
-    print("qnode", qnode)
-    # grad_method = None
-    # if qnode.diff_method:
-    #     grad_method = _calculate_diff_method(qnode.diff_method)
-    capabilities = _load_device_capabilities(device)
-
-    # TODO: 
-    # 1. diff_method = "best" is not supported in this implementation
-    # 2. We are using internal functions from catalyst.device, which may be deprecated?
-    # 3. How are we handling cases where stopping condition is not met, but we reach the target gateset?
-    stopping_condition = lambda op: catalyst_acceptance(op, capabilities, qnode.diff_method)
-    
-    print("capabilities", capabilities)
-    print("qnode.diff_method", qnode.diff_method)
-    print("stopping_condition", stopping_condition)
-    print("self.decompose_tkwargs", self.decompose_tkwargs)
-    
+    """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""    
     self.qubit_index_recorder = QubitIndexRecorder()
 
     if shots_len > 1:
@@ -290,41 +268,65 @@ def handle_qnode(
     consts = args[shots_len : n_consts + shots_len]
     non_const_args = args[shots_len + n_consts :]
 
-    closed_jaxpr = (
-        ClosedJaxpr(qfunc_jaxpr, consts)
-        if not self.requires_decompose_lowering
-        else _apply_compiler_decompose_to_plxpr(
-            inner_jaxpr=qfunc_jaxpr,
-            consts=consts,
-            ncargs=non_const_args,
-            tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
-            stopping_condition=stopping_condition,
-        )
+    print("self.decompose_tkwargs", self.decompose_tkwargs)
+
+    use_device_specific_decomposition = (not self.requires_decompose_lowering or self.decompose_tkwargs.get("gate_set", None) is not None)
+    device_capabilities = get_device_capabilities(device, execution_config, shots_len)
+    device_diff_method = calculate_diff_method(qnode, qfunc_jaxpr)
+    device_stopping_condition = lambda op: catalyst_acceptance(op, device_capabilities, device_diff_method)
+
+    if use_device_specific_decomposition:
+        # Use the device-specific stopping condition.
+        stopping_condition = device_stopping_condition
+    else:
+        # Use the user-provided stopping condition.
+        stopping_condition = self.decompose_tkwargs.get("stopping_condition")
+
+
+    closed_jaxpr = _apply_compiler_decompose_to_plxpr(
+        inner_jaxpr=qfunc_jaxpr,
+        consts=consts,
+        ncargs=non_const_args,
+        tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
+        stopping_condition=stopping_condition,
     )
 
     graph_succeeded = False
-    if self.requires_decompose_lowering:
 
+    if use_device_specific_decomposition:
+        # Use graph-based decomposition on device-specific gate set.
+        device_specific_gate_set = device_capabilities.operations.keys()
+        gateset = {"gate_set": device_specific_gate_set}
+        closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
+            inner_jaxpr=closed_jaxpr.jaxpr,
+            consts=closed_jaxpr.consts,
+            tkwargs=gateset,
+            ncargs=non_const_args,
+        )
+    elif self.requires_decompose_lowering and not stopping_condition:
+        # Use the user-provided gate set.
         closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
             inner_jaxpr=closed_jaxpr.jaxpr,
             consts=closed_jaxpr.consts,
             tkwargs=self.decompose_tkwargs,
             ncargs=non_const_args,
         )
+    elif self.requires_decompose_lowering and stopping_condition:
+        print("Graph based decomposition is not supported when an arbitrary stopping condition is provided. Using fallback decomposition.")
 
-        # Fallback to the legacy decomposition if the graph-based decomposition failed
-        if not graph_succeeded:
-            # Remove the decompose-lowering pass from the pipeline
-            self._pass_pipeline = [
-                p for p in self._pass_pipeline if p.pass_name != "decompose-lowering"
-            ]
-            closed_jaxpr = _apply_compiler_decompose_to_plxpr(
-                inner_jaxpr=closed_jaxpr.jaxpr,
-                consts=closed_jaxpr.consts,
-                ncargs=non_const_args,
-                tkwargs=self.decompose_tkwargs,
-                stopping_condition=stopping_condition,
-            )
+    # Fallback to the legacy decomposition if the graph-based decomposition failed
+    if not graph_succeeded:
+        # Remove the decompose-lowering pass from the pipeline
+        self._pass_pipeline = [
+            p for p in self._pass_pipeline if p.pass_name != "decompose-lowering"
+        ]
+        closed_jaxpr = _apply_compiler_decompose_to_plxpr(
+            inner_jaxpr=closed_jaxpr.jaxpr,
+            consts=closed_jaxpr.consts,
+            ncargs=non_const_args,
+            tkwargs=self.decompose_tkwargs,
+            stopping_condition=stopping_condition,
+        )
 
     def calling_convention(*args):
         device_init_p.bind(
@@ -603,8 +605,12 @@ def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=Non
         if tgateset
         else tkwargs
     )
-    # TODO: I assume this is calling decompose_plxpr_to_plxpr() in the DecomposeInterpreter class in pennylane.
-    final_jaxpr = qml.transforms.decompose.plxpr_transform(inner_jaxpr, consts, (), kwargs, *ncargs, stopping_condition=stopping_condition)
+
+    # TODO [Jeffrey]: I assume this is calling decompose_plxpr_to_plxpr() in the DecomposeInterpreter class in pennylane.
+    if stopping_condition:
+        kwargs["stopping_condition"] = stopping_condition
+
+    final_jaxpr = qml.transforms.decompose.plxpr_transform(inner_jaxpr, consts, (), kwargs, *ncargs)
 
     qml.decomposition.enable_graph()
 
