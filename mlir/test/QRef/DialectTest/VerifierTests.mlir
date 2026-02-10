@@ -187,3 +187,17 @@ func.func @test_alloc_bad_static_size() {
     %0 = qref.alloc(2) : !qref.reg<37>
     return
 }
+
+// -----
+
+func.func @test_adjoint_op_no_MP(%r: !qref.reg<2>)
+{
+    // expected-error@+1 {{quantum measurements are not allowed in the adjoint regions}}
+    qref.adjoint(%r) : !qref.reg<2> {
+    ^bb0(%arg0: !qref.reg<2>):
+        %q1 = qref.get %arg0[1] : !qref.reg<2> -> !qref.bit
+        %obs = qref.namedobs %q1 [ PauliX] : !quantum.obs
+        %expval = quantum.expval %obs : f64
+    }
+    return
+}

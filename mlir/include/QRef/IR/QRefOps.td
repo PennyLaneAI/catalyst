@@ -526,8 +526,7 @@ def AdjointOp : Region_Op<"adjoint", [QuantumRegion, NoTerminator]> {
         `(` $qreg `)` attr-dict `:` type(operands) $region
     }];
 
-    // TODO
-    // let hasVerifier = 1;
+    let hasVerifier = 1;
 }
 
 // -----

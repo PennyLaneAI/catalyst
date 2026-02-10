@@ -19,6 +19,7 @@
 
 #include "QRef/IR/QRefDialect.h"
 #include "QRef/IR/QRefOps.h"
+#include "Quantum/IR/QuantumInterfaces.h"
 
 using namespace mlir;
 using namespace catalyst::qref;
@@ -195,6 +196,18 @@ LogicalResult QubitUnitaryOp::verify()
     size_t dim = 1 << getQubits().size();
     if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim))) {
         return emitOpError("The Unitary matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
+    }
+
+    return success();
+}
+
+LogicalResult AdjointOp::verify()
+{
+    auto res = this->getRegion().walk(
+        [](catalyst::quantum::MeasurementProcess op) { return WalkResult::interrupt(); });
+
+    if (res.wasInterrupted()) {
+        return emitOpError("quantum measurements are not allowed in the adjoint regions");
     }
 
     return success();
