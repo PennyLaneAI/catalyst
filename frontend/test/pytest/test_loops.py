@@ -30,13 +30,6 @@ from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 # pylint: disable=no-value-for-parameter,unused-argument
 
 
-def measure(*args, **kwargs):
-    """Wrapper that uses qml.measure with capture enabled, catalyst.measure otherwise."""
-    if qml.capture.enabled():
-        return qml.measure(*args, **kwargs)
-    return c_measure(*args, **kwargs)
-
-
 @pytest.mark.old_frontend
 class TestLoopToJaxpr:
     """Collection of tests that examine the generated JAXPR of loops."""
