@@ -201,3 +201,11 @@ func.func @test_adjoint_op_no_MP(%r: !qref.reg<2>)
     }
     return
 }
+
+// -----
+
+func.func @test_hermitian_bad_matrix_shape(%q0: !qref.bit, %matrix: tensor<20x20xcomplex<f64>>) {
+    // expected-error@+1 {{The Hermitian matrix must be of size 2^(num_qubits) * 2^(num_qubits)}}
+    %obs = qref.hermitian(%matrix : tensor<20x20xcomplex<f64>>) %q0 : !quantum.obs
+    return
+}

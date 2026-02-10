@@ -223,4 +223,13 @@ LogicalResult ComputationalBasisOp::verify()
     return success();
 }
 
+LogicalResult HermitianOp::verify()
+{
+    size_t dim = std::pow(2, getQubits().size());
+    if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim)))
+        return emitOpError("The Hermitian matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
+
+    return success();
+}
+
 } // namespace catalyst::qref

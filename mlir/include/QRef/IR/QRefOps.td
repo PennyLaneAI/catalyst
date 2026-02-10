@@ -625,8 +625,7 @@ def HermitianOp : Observable_Op<"hermitian"> {
         `(` $matrix `:` type($matrix) `)` $qubits attr-dict `:` type(results)
     }];
 
-    // TODO
-    // let hasVerifier = 1;
+    let hasVerifier = 1;
 }
 
 // -----
