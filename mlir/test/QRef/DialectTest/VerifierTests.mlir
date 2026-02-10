@@ -16,8 +16,6 @@
 //
 // RUN: quantum-opt --split-input-file --verify-diagnostics %s
 
-// -----
-
 func.func @test_controlled1(%q0: !qref.bit, %q1: !qref.bit) {
     %true = llvm.mlir.constant (1 : i1) :i1
     // expected-error@+1 {{number of controlling qubits in input (1) and controlling values (2) must be the same}}

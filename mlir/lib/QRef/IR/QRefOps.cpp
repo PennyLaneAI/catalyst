@@ -77,7 +77,11 @@ static const mlir::StringSet<> validPauliWords = {"X", "Y", "Z", "I"};
 
 LogicalResult AllocOp::verify()
 {
-    if (getNqubits() && getNqubitsAttr()) {
+    if (!(getNqubits() || getNqubitsAttr().has_value())) {
+        return emitOpError() << "expected op to have a non-null allocation size";
+    }
+
+    if (getNqubits() && getNqubitsAttr().has_value()) {
         return emitOpError() << "must have a single allocation size";
     }
 
@@ -116,6 +120,14 @@ LogicalResult PauliRotOp::verify()
         return emitOpError() << "Only \"X\", \"Y\", \"Z\", and \"I\" are valid Pauli words.";
     }
 
+    return success();
+}
+
+LogicalResult CustomOp::verify()
+{
+    if (getQubits().size() == 0) {
+        return emitOpError("expected op to have at least one qubit");
+    }
     return success();
 }
 

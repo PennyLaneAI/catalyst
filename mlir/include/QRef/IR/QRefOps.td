@@ -124,7 +124,7 @@ def GetOp : Memory_Op<"get", [NoMemoryEffect]> {
     }];
 
     let arguments = (ins
-        QRefQuregType:$allocation,
+        QRefQuregType:$qreg,
         Optional<I64>:$idx,
         OptionalAttr<ConfinedAttr<I64Attr, [IntNonNegative]>>:$idx_attr
     );
@@ -134,13 +134,8 @@ def GetOp : Memory_Op<"get", [NoMemoryEffect]> {
     );
 
     let assemblyFormat = [{
-        $allocation `[` ($idx^):($idx_attr)? `]` attr-dict `:` type(operands) `->` type(results)
+        $qreg `[` ($idx^):($idx_attr)? `]` attr-dict `:` type(operands) `->` type(results)
     }];
-
-    // TODO
-    // let hasCanonicalizeMethod = 1;
-    // let hasVerifier = 1;
-    // let hasFolder = 1;
 }
 
 // -----
@@ -302,8 +297,6 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
         Variadic<I1>:$ctrl_values
     );
 
-    // TODO: add convenience builders
-
     let assemblyFormat = [{
         $gate_name `(` $params `)` $qubits (`adj` $adjoint^)? attr-dict
         ( `ctrls` `(` $ctrl_qubits^ `)` )?
@@ -319,7 +312,7 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
 
     // TODO: anything needed here?
     // let hasCanonicalizeMethod = 1;
-    // let hasVerifier = 1;
+    let hasVerifier = 1;
 }
 
 def PauliRotOp : UnitaryGate_Op<"paulirot", [ParametrizedGate, AttrSizedOperandSegments]> {
