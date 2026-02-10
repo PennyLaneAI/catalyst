@@ -44,6 +44,7 @@ from catalyst.device.decomposition import (
     catalyst_decompose,
     measurements_from_counts,
     measurements_from_samples,
+    remove_multictrl_rz,
 )
 from catalyst.device.verification import (
     validate_measurements,
@@ -411,6 +412,12 @@ class QJITDevice(qml.devices.Device):
             grad_method=config.gradient_method,
         )
 
+        pipeline.add_transform(
+            remove_multictrl_rz,
+            ctx=ctx,
+            capabilities=capabilities,
+        )
+
         # Catalyst program verification and validation
         pipeline.add_transform(
             verify_operations, grad_method=config.gradient_method, qjit_device=self
@@ -565,11 +572,11 @@ def filter_device_capabilities_with_shots(
 
     # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
     #       when customizable multi-pathway decomposition is implemented. (Epic 74474)
-    if unitary_support is not None:
-        _to_matrix_ops = unitary_support
-        setattr(device_capabilities, "to_matrix_ops", _to_matrix_ops)
-        if _to_matrix_ops and not device_capabilities.supports_operation("QubitUnitary"):
-            raise CompileError("The device that specifies to_matrix_ops must support QubitUnitary.")
+    # if unitary_support is not None:
+    #     _to_matrix_ops = unitary_support
+    #     setattr(device_capabilities, "to_matrix_ops", _to_matrix_ops)
+    #     if _to_matrix_ops and not device_capabilities.supports_operation("QubitUnitary"):
+    #         raise CompileError("The device that specifies to_matrix_ops must support QubitUnitary.")
 
     return device_capabilities
 

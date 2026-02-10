@@ -87,6 +87,50 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     return op.decomposition()
 
 
+def decompose_multi_ctrl_rz(theta, control_wires, target_wire):
+    n = len(control_wires)
+    gates = []
+    if n == 0:
+        gates.append(qml.RZ(theta, wires=target_wire))
+    elif n == 1:
+        gates.extend(
+            [
+                qml.RZ(theta / 2, wires=target_wire),
+                qml.CNOT(wires=[target_wire, control_wires[0]]),
+                qml.RZ(-theta / 2, wires=target_wire),
+                qml.CNOT(wires=[target_wire, control_wires[0]]),
+            ]
+        )
+    else:
+        remaining_controls = control_wires[:-1]  # First (n-1) control wires
+        last_control = control_wires[-1]  # n-th control wire
+
+        gates.extend(decompose_multi_ctrl_rz(theta / 2, remaining_controls, target_wire))
+        gates.append(qml.CNOT(wires=[last_control, target_wire]))
+        gates.extend(decompose_multi_ctrl_rz(-theta / 2, remaining_controls, target_wire))
+        gates.append(qml.CNOT(wires=[last_control, target_wire]))
+
+    return gates
+
+
+@transform
+@debug_logger
+def remove_multictrl_rz(
+    tape: qml.tape.QuantumTape, ctx, capabilities: DeviceCapabilities, grad_method: str = None
+):
+    new_ops = []
+    for op in tape.operations:
+        new_ops.extend(
+            decompose_multi_ctrl_rz(op.parameters[0], op.wires[1:], op.wires[0])
+            if op.name == "C(RZ)"
+            else [op]
+        )
+
+    tape = tape.copy(operations=new_ops)
+
+    return (tape,), lambda x: x[0]
+
+
 @transform
 @debug_logger
 def catalyst_decompose(
