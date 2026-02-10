@@ -58,6 +58,50 @@ def AllocOp : Memory_Op<"alloc"> {
     // let hasCanonicalizeMethod = 1;
 }
 
+def AllocQubitOp : Memory_Op<"alloc_qb"> {
+    let summary = "Allocate a single qubit.";
+    let description = [{
+    }];
+
+    let results = (outs
+        QRefQubitType:$qubit
+    );
+
+    let assemblyFormat = [{
+        attr-dict `:` type(results)
+    }];
+
+    let builders = [
+        OpBuilder<(ins),[{
+            AllocQubitOp::build($_builder, $_state,
+            /*qubit=*/ $_builder.getType<QubitType>()
+            );
+        }]>,
+    ];
+
+    code extraBaseClassDeclaration = [{
+        mlir::OpResult getOutQubit() {
+            return getODSResults(0).front();
+        }
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration;
+}
+
+def DeallocQubitOp : Memory_Op<"dealloc_qb"> {
+    let summary = "Deallocate a single qubit.";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        QRefQubitType:$qubit
+    );
+
+    let assemblyFormat = [{
+        $qubit attr-dict `:` type(operands)
+    }];
+}
+
 def DeallocOp : Memory_Op<"dealloc"> {
     let summary = "Deallocate an allocation.";
     let description = [{

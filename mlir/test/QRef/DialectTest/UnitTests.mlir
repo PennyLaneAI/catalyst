@@ -30,6 +30,20 @@ func.func @test_alloc(%arg0 : i64) {
 
 // -----
 
+func.func @test_alloc_qb() {
+    %q = qref.alloc_qb : !qref.bit
+    return
+}
+
+// -----
+
+func.func @test_dealloc_qb(%q : !qref.bit) {
+    qref.dealloc_qb %q : !qref.bit
+    return
+}
+
+// -----
+
 func.func @test_dealloc(%arg0 : !qref.reg<10>) {
     qref.dealloc %arg0 : !qref.reg<10>
     return
