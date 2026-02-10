@@ -310,8 +310,7 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
         }
     }];
 
-    // TODO: anything needed here?
-    // let hasCanonicalizeMethod = 1;
+    let hasCanonicalizeMethod = 1;
     let hasVerifier = 1;
 }
 

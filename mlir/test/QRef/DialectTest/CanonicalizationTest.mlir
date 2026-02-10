@@ -1,4 +1,4 @@
-// Copyright 2026 Xanadu Quantum Technologies Inc.
+// Copyright 2026 Xanadu qref Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -53,4 +53,31 @@ func.func @test_alloc_dealloc_no_fold() -> !qref.bit {
     %q = qref.get %r[0] : !qref.reg<3> -> !qref.bit
     qref.dealloc %r : !qref.reg<3>
     return %q : !qref.bit<3>
+}
+
+// -----
+
+// CHECK-LABEL: test_hermitian_adjoint_canonicalize
+func.func @test_hermitian_adjoint_canonicalize() {
+    %0 = qref.alloc( 1) : !qref.reg<1>
+    %1 = qref.get %0[ 0] : !qref.reg<1> -> !qref.bit
+    // CHECK: [[reg:%.+]] = qref.alloc( 1) : !qref.reg<1>
+    // CHECK: [[qubit:%.+]] = qref.get [[reg]][ 0] : !qref.reg<1> -> !qref.bit
+    qref.custom "Hadamard"() %1 {adjoint}: !qref.bit
+    // CHECK:  qref.custom "Hadamard"() [[qubit]] : !qref.bit
+    return
+}
+
+// -----
+
+// CHECK-LABEL: test_rotation_adjoint_canonicalize
+func.func @test_rotation_adjoint_canonicalize(%arg0: f64) {
+    %0 = qref.alloc( 1) : !qref.reg<1>
+    %1 = qref.get %0[ 0] : !qref.reg<1> -> !qref.bit
+    // CHECK: [[reg:%.+]] = qref.alloc( 1) : !qref.reg<1>
+    // CHECK: [[qubit:%.+]] = qref.get [[reg]][ 0] : !qref.reg<1> -> !qref.bit
+    qref.custom "RX"(%arg0) %1 {adjoint}: !qref.bit
+    // CHECK: [[arg0neg:%.+]] = arith.negf %arg0 : f64
+    // CHECK:  qref.custom "RX"([[arg0neg]]) [[qubit]] : !qref.bit
+    return
 }
