@@ -14,5 +14,4 @@
 
 """MLIR Dialect for mitigation dialect."""
 
-from .._mlir_libs._quantumDialects.mitigation import *  # noqa: F401
 from ._mitigation_ops_gen import *  # noqa: F401

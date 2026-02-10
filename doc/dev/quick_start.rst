@@ -8,8 +8,8 @@ ultimately leverages modern compilation tools to speed up quantum applications.
 You can imagine compiling a function once in advance and then benefit from faster
 execution on all subsequent calls of the function, similar to the ``jax.jit`` functionality.
 However, compared to JAX we are also able to compile the quantum code natively without having
-to rely on callbacks to any Python-based PennyLane devices. We can thus compile/execute entire workflows
-(such as variational algorithms) as a single program or unit, without having to go back and forth between
+to rely on callbacks to any Python-based PennyLane devices. We can thus compile/execute entire workflows 
+as a single program or unit, without having to go back and forth between
 device execution and the Python interpreter.
 
 .. raw:: html
@@ -41,7 +41,7 @@ PennyLane. However, some of PennyLane's features may not be fully supported yet,
 .. warning::
 
     Not all PennyLane devices currently work with Catalyst. Supported backend devices include
-    ``lightning.qubit``, ``lightning.kokkos``, and ``braket.aws.qubit``. For
+    ``lightning.qubit``, ``lightning.kokkos``, ``lightning.amdgpu``, ``lightning.gpu``, and ``braket.aws.qubit``. For
     a full of supported devices, please see :doc:`/dev/devices`.
 
 PennyLane tapes are still used internally by Catalyst and you can express your circuits in the
@@ -112,7 +112,7 @@ more complex quantum circuits.
    decompose quite differently).
    However, Catalyst's decomposition logic will differ in the following cases:
 
-   1. All :class:`qml.Controlled <pennylane.ops.op_math.Controlled>` operations will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
+   1. For devices without native controlled gates support (e.g., ``lightning.kokkos`` and ``lightning.gpu``), all :class:`qml.Controlled <pennylane.ops.op_math.Controlled>` operations will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
    2. The set of operations supported by Catalyst itself can in some instances lead to additional decompositions compared to the device itself.
 
 
@@ -136,6 +136,8 @@ a tensor product of a :class:`qml.PauliX <pennylane.PauliX>`, :class:`qml.Hadama
             [complex(2.0, 0.0), complex(-1.0, 0.0)]]
         )
         return qml.expval(qml.PauliX(0) @ qml.Hadamard(1) @ qml.Hermitian(h_matrix, 2))
+
+.. _measurements:
 
 Measurements
 ------------
@@ -328,6 +330,7 @@ the compilation of arbitrarily parametrized circuits.
     :nosignatures:
 
     ~catalyst.cond
+    ~catalyst.switch
     ~catalyst.for_loop
     ~catalyst.while_loop
 
@@ -373,6 +376,39 @@ decorator.
 .. warning::
 
     The conditional functions can only return JAX compatible data types.
+
+:func:`~.switch` is a functional index-switch for Catalyst, meaning that each branch of the switch is provided as a separate function.
+It carries some similarities to Python's ``match`` statement, but must be cased by integer values.
+It is also similar to the ``jax.lax.switch`` function, but :func:`~.switch` has a relaxed set of constraints, and is optimized for use with quantum programs in PennyLane.
+When used with :func:`~.qjit` each function is traced at compile time, but only the branch corresponding to the given case will be executed at runtime.
+
+Note that :func:`~.switch` can also be used outside of :func:`~.qjit` for better interoperability with PennyLane.
+
+Values produced inside the scope of a switch can be returned to the outside context, but the return type signature of each branch must be identical.
+Refer to the example below to learn more about the syntax of this decorator.
+
+.. code-block:: python
+
+    def circuit(i):
+        @switch(i) # create a switch on variable i
+        def my_switch(): # this is the default branch
+            return 12
+
+        @my_switch.branch(4) # optionally specify a branch on case i = 4
+        def my_branch():
+            return 4
+
+        @my_switch.branch(2) # optionally specify a branch on case i = 2
+        def my_default_branch():
+            return 0
+
+        # ... optionally specify branches on other cases
+
+        return my_switch() # must invoke the switch
+
+.. warning::
+
+    Switch functions are not currently compatible with program capture or autograph.
 
 Loops
 -----

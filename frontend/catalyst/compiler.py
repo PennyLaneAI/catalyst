@@ -16,6 +16,7 @@ MLIR/LLVM representations.
 """
 import glob
 import importlib
+import io
 import logging
 import os
 import pathlib
@@ -23,19 +24,16 @@ import platform
 import shutil
 import subprocess
 import sys
+import tempfile
 import warnings
-from copy import deepcopy
-from dataclasses import dataclass
-from io import TextIOWrapper
 from os import path
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
-
-from mlir_quantum.compiler_driver import run_compiler_driver
+from typing import List, Optional
 
 from catalyst.logging import debug_logger, debug_logger_init
+from catalyst.pipelines import CompileOptions, KeepIntermediateLevel
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.filesystem import Directory
-from catalyst.utils.runtime_environment import get_lib_path
+from catalyst.utils.runtime_environment import get_cli_path, get_lib_path
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -43,106 +41,6 @@ logger.addHandler(logging.NullHandler())
 package_root = os.path.dirname(__file__)
 
 DEFAULT_CUSTOM_CALLS_LIB_PATH = path.join(package_root, "utils")
-
-
-# pylint: disable=too-many-instance-attributes
-@dataclass
-class CompileOptions:
-    """Generic compilation options, for which reasonable default values exist.
-
-    Args:
-        verbose (Optional[bool]): flag indicating whether to enable verbose output.
-            Default is ``False``
-        logfile (Optional[TextIOWrapper]): the logfile to write output to.
-            Default is ``sys.stderr``
-        keep_intermediate (Optional[bool]): flag indicating whether to keep intermediate results.
-            Default is ``False``
-        pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples. The first entry of the
-            tuple corresponds to the name of a pipeline. The second entry of the tuple corresponds
-            to a list of MLIR passes.
-        autograph (Optional[bool]): flag indicating whether experimental autograph support is to
-            be enabled.
-        autograph_include (Optional[Iterable[str]]): A list of (sub)modules to be allow-listed
-        for autograph conversion.
-        async_qnodes (Optional[bool]): flag indicating whether experimental asynchronous execution
-            of QNodes support is to be enabled.
-        lower_to_llvm (Optional[bool]): flag indicating whether to attempt the LLVM lowering after
-            the main compilation pipeline is complete. Default is ``True``.
-        static_argnums (Optional[Union[int, Iterable[int]]]): indices of static arguments.
-            Default is ``None``.
-        abstracted_axes (Optional[Any]): store the abstracted_axes value. Defaults to ``None``.
-        disable_assertions (Optional[bool]): disables all assertions. Default is ``False``.
-        seed (Optional[int]) : the seed for random operations in a qjit call.
-            Default is None.
-    """
-
-    verbose: Optional[bool] = False
-    logfile: Optional[TextIOWrapper] = sys.stderr
-    target: Optional[str] = "binary"
-    keep_intermediate: Optional[bool] = False
-    pipelines: Optional[List[Any]] = None
-    autograph: Optional[bool] = False
-    autograph_include: Optional[Iterable[str]] = ()
-    async_qnodes: Optional[bool] = False
-    static_argnums: Optional[Union[int, Iterable[int]]] = None
-    abstracted_axes: Optional[Union[Iterable[Iterable[str]], Dict[int, str]]] = None
-    lower_to_llvm: Optional[bool] = True
-    checkpoint_stage: Optional[str] = ""
-    disable_assertions: Optional[bool] = False
-    seed: Optional[int] = None
-
-    def __post_init__(self):
-        # Check that async runs must not be seeded
-        if self.async_qnodes and self.seed != None:
-            raise CompileError(
-                """
-                Seeding has no effect on asyncronous qnodes,
-                as the execution order of parallel runs is not guaranteed.
-                As such, seeding an asynchronous run is not supported.
-                """
-            )
-
-        # Check that seed is 32-bit unsigned int
-        if (self.seed != None) and (self.seed < 0 or self.seed > 2**32 - 1):
-            raise ValueError(
-                """
-                Seed must be an unsigned 32-bit integer!
-                """
-            )
-
-        # Make the format of static_argnums easier to handle.
-        static_argnums = self.static_argnums
-        if static_argnums is None:
-            self.static_argnums = ()
-        elif isinstance(static_argnums, int):
-            self.static_argnums = (static_argnums,)
-        elif isinstance(static_argnums, Iterable):
-            self.static_argnums = tuple(static_argnums)
-
-    def __deepcopy__(self, memo):
-        """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
-        copied directly"""
-        return CompileOptions(
-            **{
-                k: (deepcopy(v) if k != "logfile" else self.logfile)
-                for k, v in self.__dict__.items()
-                if k != "logfile"
-            }
-        )
-
-    def get_pipelines(self) -> List[Tuple[str, List[str]]]:
-        """Get effective pipelines"""
-        if self.pipelines:
-            return self.pipelines
-        elif self.async_qnodes:
-            return DEFAULT_ASYNC_PIPELINES  # pragma: nocover
-        if self.disable_assertions:
-            if "disable-assertion" not in QUANTUM_COMPILATION_PASS[1]:
-                QUANTUM_COMPILATION_PASS[1].append("disable-assertion")
-        else:
-            if "disable-assertion" in QUANTUM_COMPILATION_PASS[1]:
-                QUANTUM_COMPILATION_PASS[1].remove("disable-assertion")
-        return DEFAULT_PIPELINES
 
 
 @debug_logger
@@ -159,163 +57,13 @@ def run_writing_command(command: List[str], compile_options: Optional[CompileOpt
     subprocess.run(command, check=True)
 
 
-TAPE_SPLITTING_PASS = (
-    # We clump multiple tapes into a single function and split them
-    # in mlir with a pass (frontend/jax_tracer.py).
-    # Therefore before the splitting the quantum mlir is "illegal",
-    # as each function will have multiple devices.
-    # Thus, the split must be the very first pass before anything else
-    # happens.
-    "QuantumTapeSplittingPass",
-    [
-        "split-multiple-tapes",
-    ],
-)
-
-HLO_LOWERING_PASS = (
-    "HLOLoweringPass",
-    [
-        "canonicalize",
-        "func.func(chlo-legalize-to-hlo)",
-        "stablehlo-legalize-to-hlo",
-        "func.func(mhlo-legalize-control-flow)",
-        "func.func(hlo-legalize-to-linalg)",
-        "func.func(mhlo-legalize-to-std)",
-        "func.func(hlo-legalize-sort)",
-        "convert-to-signless",
-        "canonicalize",
-        "scatter-lowering",
-        "hlo-custom-call-lowering",
-        "cse",
-        "func.func(linalg-detensorize{aggressive-mode})",
-    ],
-)
-
-QUANTUM_COMPILATION_PASS = (
-    "QuantumCompilationPass",
-    [
-        "apply-transform-sequence",  # Run the transform sequence defined in the MLIR module
-        "annotate-function",
-        "lower-mitigation",
-        "lower-gradients",
-        "adjoint-lowering",
-        "disable-assertion",
-    ],
-)
-
-BUFFERIZATION_PASS = (
-    "BufferizationPass",
-    [
-        "one-shot-bufferize{dialect-filter=memref}",
-        "inline",
-        "gradient-bufferize",
-        "scf-bufferize",
-        "convert-tensor-to-linalg",  # tensor.pad
-        "convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
-        "arith-bufferize",
-        "empty-tensor-to-alloc-tensor",
-        "func.func(bufferization-bufferize)",
-        "func.func(tensor-bufferize)",
-        "catalyst-bufferize",  # Must be run before -- func.func(linalg-bufferize)
-        "func.func(linalg-bufferize)",
-        "func.func(tensor-bufferize)",
-        "quantum-bufferize",
-        "func-bufferize",
-        "func.func(finalizing-bufferize)",
-        "canonicalize",  # Remove dead memrefToTensorOp's
-        # introduced during gradient-bufferize of callbacks
-        "func.func(buffer-hoisting)",
-        "func.func(buffer-loop-hoisting)",
-        "func.func(buffer-deallocation)",
-        "convert-arraylist-to-memref",
-        "convert-bufferization-to-memref",
-        "canonicalize",  # Must be after convert-bufferization-to-memref
-        # otherwise there are issues in lowering of dynamic tensors.
-        # "cse",
-        "cp-global-memref",
-    ],
-)
-
-
-MLIR_TO_LLVM_PASS = (
-    "MLIRToLLVMDialect",
-    [
-        "expand-realloc",
-        "convert-gradient-to-llvm",
-        "memrefcpy-to-linalgcpy",
-        "func.func(convert-linalg-to-loops)",
-        "convert-scf-to-cf",
-        # This pass expands memref ops that modify the metadata of a memref (sizes, offsets,
-        # strides) into a sequence of easier to analyze constructs. In particular, this pass
-        # transforms ops into explicit sequence of operations that model the effect of this
-        # operation on the different metadata. This pass uses affine constructs to materialize
-        # these effects. Concretely, expanded-strided-metadata is used to decompose
-        # memref.subview as it has no lowering in -finalize-memref-to-llvm.
-        "expand-strided-metadata",
-        "lower-affine",
-        "arith-expand",  # some arith ops (ceildivsi) require expansion to be lowered to llvm
-        "convert-complex-to-standard",  # added for complex.exp lowering
-        "convert-complex-to-llvm",
-        "convert-math-to-llvm",
-        # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
-        "convert-math-to-libm",
-        "convert-arith-to-llvm",
-        "finalize-memref-to-llvm{use-generic-functions}",
-        "convert-index-to-llvm",
-        "convert-catalyst-to-llvm",
-        "convert-quantum-to-llvm",
-        # There should be no identical code folding
-        # (`mergeIdenticalBlocks` in the MLIR source code)
-        # between convert-async-to-llvm and
-        # add-exception-handling.
-        # So, if there's a pass from the beginning
-        # of this list to here that does folding
-        # add-exception-handling will fail to add async.drop_ref
-        # correctly. See https://github.com/PennyLaneAI/catalyst/pull/995
-        "add-exception-handling",
-        "emit-catalyst-py-interface",
-        # Remove any dead casts as the final pass expects to remove all existing casts,
-        # but only those that form a loop back to the original type.
-        "canonicalize",
-        "reconcile-unrealized-casts",
-        "gep-inbounds",
-        "register-inactive-callback",
-    ],
-)
-
-
-DEFAULT_PIPELINES = [
-    TAPE_SPLITTING_PASS,
-    HLO_LOWERING_PASS,
-    QUANTUM_COMPILATION_PASS,
-    BUFFERIZATION_PASS,
-    MLIR_TO_LLVM_PASS,
-]
-
-MLIR_TO_LLVM_ASYNC_PASS = deepcopy(MLIR_TO_LLVM_PASS)
-MLIR_TO_LLVM_ASYNC_PASS[1][:0] = [
-    "qnode-to-async-lowering",
-    "async-func-to-async-runtime",
-    "async-to-async-runtime",
-    "convert-async-to-llvm",
-]
-
-DEFAULT_ASYNC_PIPELINES = [
-    TAPE_SPLITTING_PASS,
-    HLO_LOWERING_PASS,
-    QUANTUM_COMPILATION_PASS,
-    BUFFERIZATION_PASS,
-    MLIR_TO_LLVM_ASYNC_PASS,
-]
-
-
 class LinkerDriver:
     """Compiler used to drive the linking stage.
     In order to avoid relying on a single linker at run time and allow the user some flexibility,
     this class defines a compiler resolution order where multiple known compilers are attempted.
     The order is defined as follows:
     1. A user specified compiler via the environment variable CATALYST_CC. It is expected that the
-        user provided compiler is flag compatilble with GCC/Clang.
+        user provided compiler is flag compatible with GCC/Clang.
     2. clang: Priority is given to clang to maintain an LLVM toolchain through most of the process.
     3. gcc: Usually configured to link with LD.
     4. c99: Usually defaults to gcc, but no linker interface is specified.
@@ -369,36 +117,29 @@ class LinkerDriver:
 
         # Discover the LAPACK library provided by scipy & add link against it.
         # Doing this here ensures we will always have the correct library name.
+        lib_name = "openblas"
+        package_name = "scipy_openblas32"
+        path_within_package = "lib"
+        file_extension = ".so" if platform.system() == "Linux" else ".dylib"  # pragma: no branch
 
-        if platform.system() == "Linux":
-            file_path_within_package = "../scipy.libs/"
-            file_extension = ".so"
-        else:  # pragma: nocover
-            msg = "Attempting to use catalyst on an unsupported system"
-            assert platform.system() == "Darwin", msg
-            file_path_within_package = ".dylibs/"
-            file_extension = ".dylib"
+        if platform.system() == "Darwin" and platform.machine() == "arm64":  # pragma: nocover
+            # use our own build of LAPACKe to interface with Accelerate
+            lapack_lib_name = "lapacke.3"
+        else:
+            package_spec = importlib.util.find_spec(package_name)
+            package_directory = path.dirname(package_spec.origin)
+            lapack_lib_path = path.join(package_directory, path_within_package)
 
-        package_name = "scipy"
-        scipy_package = importlib.util.find_spec(package_name)
-        package_directory = path.dirname(scipy_package.origin)
-        scipy_lib_path = path.join(package_directory, file_path_within_package)
+            search_pattern = path.join(lapack_lib_path, f"lib*{lib_name}*{file_extension}")
+            search_result = glob.glob(search_pattern)
+            if not search_result:  # pragma: nocover
+                raise CompileError(
+                    f'Unable to find OpenBLAS library at "{search_pattern}". '
+                    "Please ensure that scipy is installed and available via pip."
+                )
 
-        file_prefix = "libopenblas"
-        search_pattern = path.join(scipy_lib_path, f"{file_prefix}*{file_extension}")
-        search_result = glob.glob(search_pattern)
-        if not search_result:
-            raise CompileError(
-                f'Unable to find OpenBLAS library at "{search_pattern}". '
-                "Please ensure that SciPy is installed and available via pip."
-            )
-        openblas_so_file = search_result[0]
-        openblas_lib_name = path.basename(openblas_so_file)[3 : -len(file_extension)]
-
-        lib_path_flags += [
-            f"-Wl,-rpath,{scipy_lib_path}",
-            f"-L{scipy_lib_path}",
-        ]
+            lib_path_flags += [f"-Wl,-rpath,{lapack_lib_path}", f"-L{lapack_lib_path}"]
+            lapack_lib_name = path.basename(search_result[0])[3 : -len(file_extension)]
 
         system_flags = []
         if platform.system() == "Linux":
@@ -406,7 +147,8 @@ class LinkerDriver:
             # RPATH influences search paths globally while RUNPATH only works for
             # a single file, but not its dependencies.
             system_flags += ["-Wl,-no-as-needed", "-Wl,--disable-new-dtags"]
-        elif platform.system() == "Darwin":  # pragma: nocover
+        else:  # pragma: nocover
+            assert platform.system() == "Darwin", f"Unsupported OS {platform.system()}"
             system_flags += ["-Wl,-arch_errors_fatal"]
 
         # The exception handling mechanism requires linking against
@@ -425,10 +167,17 @@ class LinkerDriver:
             "-lrt_capi",
             "-lpthread",
             "-lmlir_c_runner_utils",  # required for memref.copy
-            f"-l{openblas_lib_name}",  # required for custom_calls lib
+            f"-l{lapack_lib_name}",  # required for custom_calls lib
             "-lcustom_calls",
             "-lmlir_async_runtime",
+            "-lrt_rsdecomp",
         ]
+
+        # If OQD runtime capi is built, link to it as well
+        # TODO: This is not ideal and should be replaced when the compiler is device aware
+        if os.path.isfile(os.path.join(rt_lib_path, "librt_OQD_capi" + file_extension)):
+            default_flags.append("-lrt_OQD_capi")
+
         return default_flags
 
     @staticmethod
@@ -517,14 +266,171 @@ class LinkerDriver:
         raise CompileError(msg)
 
 
+def _get_catalyst_cli_cmd(*args, stdin=None):
+    """Just get the command, do not run it"""
+    cli_path = get_cli_path()
+    if not path.isfile(cli_path):
+        raise FileNotFoundError("catalyst executable was not found.")  # pragma: nocover
+
+    cmd = [cli_path]
+    for arg in args:
+        if not isinstance(arg, str):
+            cmd += [str(x) for x in arg]
+        else:
+            cmd += [str(arg)]
+
+    if stdin:
+        cmd += ["-"]
+
+    return cmd
+
+
+def _catalyst(*args, stdin=None):
+    """Raw interface to catalyst
+
+    echo ${stdin} | catalyst *args -
+    catalyst *args
+    """
+    cmd = _get_catalyst_cli_cmd(*args, stdin=stdin)
+    try:
+        result = subprocess.run(cmd, input=stdin, check=True, capture_output=True, text=True)
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
+
+
+def _quantum_opt(*args, stdin=None):
+    """Raw interface to quantum-opt
+
+    echo ${stdin} | catalyst --tool=opt *args -
+    catalyst --tool=opt *args
+    """
+    return _catalyst(("--tool", "opt"), *args, stdin=stdin)
+
+
+def canonicalize(*args, stdin=None, options: Optional[CompileOptions] = None):
+    """Run opt with canonicalization
+
+    echo ${stdin} | catalyst --tool=opt \
+            --catalyst-pipeline='builtin.module(canonicalize)' *args -
+    catalyst --tool=opt \
+            --catalyst-pipeline='builtin.module(canonicalize)' *args
+
+    Returns stdout string
+    """
+    opts = ["--pass-pipeline", "builtin.module(canonicalize)"]
+    if options and options.use_nameloc:
+        opts.append("--use-nameloc-as-prefix")
+
+    return _quantum_opt(*opts, *args, stdin=stdin)
+
+
+def _options_to_cli_flags(options):
+    """CompileOptions -> list[str|Tuple[str, str]]"""
+
+    extra_args = []
+    pipelines = options.get_pipelines()
+    pipeline_str = ""
+
+    for pipeline in pipelines:
+        pipeline_name, passes = pipeline
+        passes_str = ";".join(passes)
+        pipeline_str += f"{pipeline_name}({passes_str}),"
+    extra_args += ["--catalyst-pipeline", pipeline_str]
+
+    for plugin in options.pass_plugins:
+        extra_args += [("--load-pass-plugin", plugin)]
+    for plugin in options.dialect_plugins:
+        extra_args += [("--load-dialect-plugin", plugin)]
+    if options.checkpoint_stage:
+        extra_args += [("--checkpoint-stage", options.checkpoint_stage)]
+
+    if not options.lower_to_llvm:
+        extra_args += [("--tool", "opt")]
+
+    if options.keep_intermediate:
+        extra_args += ["--keep-intermediate"]
+
+    match options.keep_intermediate:
+        case KeepIntermediateLevel.CHANGED:
+            extra_args += ["--save-ir-after-each=changed", "--dump-module-scope"]
+        case KeepIntermediateLevel.PASS:
+            extra_args += ["--save-ir-after-each=pass", "--dump-module-scope"]
+        case _:
+            pass
+
+    if options.use_nameloc:
+        extra_args += ["--use-nameloc-as-prefix"]
+
+    if options.verbose:
+        extra_args += ["--verbose"]
+
+    if options.async_qnodes:  # pragma: nocover
+        extra_args += ["--async-qnodes"]
+
+    return extra_args
+
+
+def to_llvmir(*args, stdin=None, options: Optional[CompileOptions] = None):
+    """echo ${input} | catalyst *args -"""
+    # These are the options that may affect compilation
+    if not options:
+        return _catalyst(*args, stdin=stdin)
+
+    opts = _options_to_cli_flags(options)
+    return _catalyst(*opts, *args, stdin=stdin)
+
+
+def to_mlir_opt(
+    *args, stdin=None, options: Optional[CompileOptions] = None, using_python_compiler=False
+):
+    """echo ${input} | catalyst --tool=opt *args *opts -"""
+    # Check if we need to use the Python interface for xDSL passes
+    if using_python_compiler:
+        # Use the Python interface path for xDSL passes
+        # pylint: disable-next=import-outside-toplevel
+        from catalyst.python_interface import Compiler as UnifiedCompiler
+
+        compiler = UnifiedCompiler()
+        stdin = compiler.run(stdin, callback=None)
+
+    # These are the options that may affect compilation
+    if not options:
+        return _quantum_opt(*args, stdin=stdin)
+
+    opts = _options_to_cli_flags(options)
+    return _quantum_opt(*opts, *args, stdin=stdin)
+
+
 class Compiler:
     """Compiles MLIR modules to shared objects by executing the Catalyst compiler driver library."""
 
     @debug_logger_init
     def __init__(self, options: Optional[CompileOptions] = None):
         self.options = options if options is not None else CompileOptions()
-        self.last_compiler_output = None
 
+    @debug_logger
+    def get_cli_command(self, tmp_infile_name, output_ir_name, module_name, workspace):
+        """Prepare the command to run the Catalyst CLI to compile the file.
+
+        Args:
+            module_name (str): Module name to use for naming
+            workspace (Directory): directory that holds output files and/or debug dumps.
+        Returns:
+            cmd (str): The command to be executed.
+        """
+        opts = _options_to_cli_flags(self.options)
+        cmd = _get_catalyst_cli_cmd(
+            ("-o", output_ir_name),
+            ("--module-name", module_name),
+            ("--workspace", str(workspace)),
+            "-verify-each=false",
+            *opts,
+            tmp_infile_name,
+        )
+        return cmd
+
+    # pylint: disable=too-many-branches
     @debug_logger
     def run_from_ir(self, ir: str, module_name: str, workspace: Directory):
         """Compile a shared object from a textual IR (MLIR or LLVM).
@@ -536,57 +442,202 @@ class Compiler:
 
         Returns:
             output_filename (str): Output file name. For the default pipeline this would be the
-                                   shard object library path.
+                                   shared object library path.
             out_IR (str): Output IR in textual form. For the default pipeline this would be the
                           LLVM IR.
-            A list of:
-               func_name (str) Inferred name of the main function
-               ret_type_name (str) Inferred main function result type name
         """
         assert isinstance(
             workspace, Directory
         ), f"Compiler expects a Directory type, got {type(workspace)}."
         assert workspace.is_dir(), f"Compiler expects an existing directory, got {workspace}."
-
-        lower_to_llvm = (
-            self.options.lower_to_llvm if self.options.lower_to_llvm is not None else False
-        )
+        assert (
+            self.options.lower_to_llvm
+        ), "lower_to_llvm must be set to True in order to compile to a shared object"
 
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".mlir", dir=str(workspace), delete=False
+        ) as tmp_infile:
+            tmp_infile_name = tmp_infile.name
+            tmp_infile.write(ir)
+
+        output_object_name = os.path.join(str(workspace), f"{module_name}.o")
+        output_ir_name = os.path.join(str(workspace), f"{module_name}.ll")
+
+        cmd = self.get_cli_command(tmp_infile_name, output_ir_name, module_name, workspace)
         try:
-            compiler_output = run_compiler_driver(
-                ir,
-                str(workspace),
-                module_name,
-                keep_intermediate=self.options.keep_intermediate,
-                async_qnodes=self.options.async_qnodes,
-                verbose=self.options.verbose,
-                pipelines=self.options.get_pipelines(),
-                lower_to_llvm=lower_to_llvm,
-                checkpoint_stage=self.options.checkpoint_stage,
-            )
-        except RuntimeError as e:
-            raise CompileError(*e.args) from e
+            if self.options.verbose:
+                print(f"[SYSTEM] {' '.join(cmd)}", file=self.options.logfile)
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            if self.options.verbose or os.getenv("ENABLE_DIAGNOSTICS"):
+                if result.stdout:
+                    print(result.stdout.strip(), file=self.options.logfile)
+                if result.stderr:
+                    print(result.stderr.strip(), file=self.options.logfile)
+        except subprocess.CalledProcessError as e:  # pragma: nocover
+            raise CompileError(f"catalyst failed with error code {e.returncode}: {e.stderr}") from e
 
-        if self.options.verbose:
-            for line in compiler_output.get_diagnostic_messages().strip().split("\n"):
-                print(f"[LIB] {line}", file=self.options.logfile)
-
-        filename = compiler_output.get_object_filename()
-        out_IR = compiler_output.get_output_ir()
-        func_name = compiler_output.get_function_attributes().get_function_name()
-        ret_type_name = compiler_output.get_function_attributes().get_return_type()
-
-        if lower_to_llvm:
-            output = LinkerDriver.run(filename, options=self.options)
-            output_filename = str(pathlib.Path(output).absolute())
+        if os.path.exists(output_ir_name):
+            with open(output_ir_name, "r", encoding="utf-8") as f:
+                out_IR = f.read()
         else:
-            output_filename = filename
+            out_IR = None
 
-        self.last_compiler_output = compiler_output
-        return output_filename, out_IR, [func_name, ret_type_name]
+        if self.options.link:
+            output = LinkerDriver.run(output_object_name, options=self.options)
+            output = str(pathlib.Path(output).absolute())
+        else:
+            output = None
+
+        # Clean up temporary files
+        if os.path.exists(tmp_infile_name):
+            os.remove(tmp_infile_name)
+        if os.path.exists(output_ir_name):
+            os.remove(output_ir_name)
+
+        return output, out_IR
+
+    def has_xdsl_passes_in_transform_modules(self, mlir_module):
+        """Check if the MLIR module contains xDSL passes in transform dialect.
+
+        This checks for the 'catalyst.uses_xdsl_passes' attribute that is set during
+        lowering on transform modules when xDSL passes are added to the transform pipeline.
+
+        Args:
+            mlir_module: MLIR module to check for xDSL passes
+
+        Returns:
+            bool: True if xDSL passes detected in any transform module
+        """
+
+        def has_both_attributes(attrs):
+            """Check if attributes dict has both required keys."""
+            try:
+                has_transform = (
+                    "transform.with_named_sequence" in attrs
+                    or "transform.with_named_sequence" in getattr(attrs, "keys", lambda: [])()
+                )
+                has_xdsl = (
+                    "catalyst.uses_xdsl_passes" in attrs
+                    or "catalyst.uses_xdsl_passes" in getattr(attrs, "keys", lambda: [])()
+                )
+                return has_transform and has_xdsl
+            except (AttributeError, KeyError, TypeError):
+                return False
+
+        def check_nested_operations(op):
+            """Check if any nested operation has the required attributes."""
+            regions = getattr(op, "regions", [])
+            if not regions:
+                return False
+
+            try:
+                for nested_op in regions[0].blocks[0].operations:
+                    attrs = getattr(nested_op, "attributes", None)
+                    if attrs and has_both_attributes(attrs):
+                        return True
+            except (AttributeError, IndexError):
+                pass
+            return False
+
+        try:
+            return any(
+                check_nested_operations(op)
+                for op in mlir_module.operation.regions[0].blocks[0].operations
+            )
+        except Exception:  # pylint: disable=broad-except
+            # If we can't check the attribute, assume no xDSL passes
+            return False
+
+    @debug_logger
+    def is_using_python_compiler(self, mlir_module=None):
+        """Returns true if we need the Python interface path.
+
+        This happens when:
+        1. xDSL plugin is explicitly loaded (legacy), OR
+        2. Module has xDSL passes in transform modules (detected via attribute)
+
+        Will also modify self.options.pass_plugins and self.options.dialect_plugins to remove
+        the xdsl plugin.
+
+        Args:
+            mlir_module: Optional MLIR module to check for xDSL passes attribute
+        """
+        xdsl_path = pathlib.Path("xdsl-does-not-use-a-real-path")
+
+        has_plugin = (
+            xdsl_path in self.options.pass_plugins or xdsl_path in self.options.dialect_plugins
+        )
+
+        if not has_plugin and mlir_module is None:
+            return False
+
+        has_xdsl_passes = mlir_module is not None and self.has_xdsl_passes_in_transform_modules(
+            mlir_module
+        )
+
+        if not has_plugin and not has_xdsl_passes:
+            return False
+
+        # Remove the fake plugin path from options before returning
+        if xdsl_path in self.options.pass_plugins:
+            plugins = self.options.pass_plugins
+            self.options.pass_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
+
+        if xdsl_path in self.options.dialect_plugins:
+            plugins = self.options.dialect_plugins
+            self.options.dialect_plugins = tuple(elem for elem in plugins if elem != xdsl_path)
+
+        return True
+
+    def _create_xdsl_pass_save_callback(self, workspace):
+        """Create a callback function to save IR after each xdsl pass.
+
+        Args:
+            workspace: The workspace directory path
+
+        Returns:
+            Callable or None: The callback function if intermediate saving is enabled, None
+            otherwise
+        """
+        if not (workspace and self.options.keep_intermediate >= KeepIntermediateLevel.CHANGED):
+            return None
+
+        # pylint: disable-next=import-outside-toplevel
+        from xdsl.printer import Printer
+
+        user_transform_dir = os.path.join(str(workspace), "0_QuantumCompilationStage")
+        os.makedirs(user_transform_dir, exist_ok=True)
+
+        class SavePassIRCallback:
+            """Callback to save IR after each pass in python_interface."""
+
+            def __init__(self, transform_dir):
+                self.transform_dir = transform_dir
+                self.counter = 1
+
+            def __call__(self, previous_pass, module, _next_pass=None, **_kwargs):
+                """Save IR after each pass."""
+                # Only save after a pass has run (when previous_pass is not None)
+                if previous_pass is None:
+                    return
+
+                pass_name = (
+                    previous_pass.name if hasattr(previous_pass, "name") else str(previous_pass)
+                )
+                buffer = io.StringIO()
+                Printer(stream=buffer, print_generic_format=False).print_op(module)
+                ir_file = os.path.join(
+                    self.transform_dir,
+                    f"{self.counter}_{pass_name}.mlir",
+                )
+                with open(ir_file, "w", encoding="utf-8") as f:
+                    f.write(buffer.getvalue())
+                self.counter += 1
+
+        return SavePassIRCallback(user_transform_dir)
 
     @debug_logger
     def run(self, mlir_module, *args, **kwargs):
@@ -603,18 +654,39 @@ class Compiler:
         Returns:
             (str): filename of shared object
         """
+        using_python_compiler = self.is_using_python_compiler(mlir_module)
+        workspace = args[0] if args else kwargs.get("workspace")
+        module_name = str(mlir_module.operation.attributes["sym_name"]).replace('"', "")
+        ir = mlir_module.operation.get_asm(
+            binary=False, print_generic_op_form=using_python_compiler, assume_verified=True
+        )
+
+        # Save intermediate IR before any compiler transformation is applied
+        if workspace and self.options.keep_intermediate:
+            initial_ir_file = os.path.join(str(workspace), f"0_{module_name}.mlir")
+            with open(initial_ir_file, "w", encoding="utf-8") as f:
+                # We need to canonicalize the IR to get the pretty format
+                f.write(canonicalize(stdin=ir, options=self.options))
+
+        if using_python_compiler:
+            # We keep this module here to keep xDSL requirement optional
+            # Only move this is it has been decided that xDSL is no longer optional.
+            # pylint: disable-next=import-outside-toplevel
+            from catalyst.python_interface import Compiler as UnifiedCompiler
+
+            callback = self._create_xdsl_pass_save_callback(workspace)
+            compiler = UnifiedCompiler()
+            ir = compiler.run(ir, callback=callback)
 
         return self.run_from_ir(
-            mlir_module.operation.get_asm(
-                binary=False, print_generic_op_form=False, assume_verified=True
-            ),
-            str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
+            ir,
+            module_name,
             *args,
             **kwargs,
         )
 
     @debug_logger
-    def get_output_of(self, pipeline) -> Optional[str]:
+    def get_output_of(self, pipeline, workspace) -> Optional[str]:
         """Get the output IR of a pipeline.
         Args:
             pipeline (str): name of pass class
@@ -622,12 +694,41 @@ class Compiler:
         Returns
             (Optional[str]): output IR
         """
-        if not self.last_compiler_output or not self.last_compiler_output.get_pipeline_output(
-            pipeline
-        ):
+        file_content = None
+        for dirpath, _, filenames in os.walk(str(workspace)):
+            filenames = [f for f in filenames if f.endswith(".mlir") or f.endswith(".ll")]
+            if not filenames:
+                break
+            filenames_no_ext = [os.path.splitext(f)[0] for f in filenames]
+            if pipeline == "mlir":
+                # Sort files and pick the first one
+                selected_file = [
+                    sorted(filenames)[0],
+                ]
+            elif pipeline == "last":
+                # Sort files and pick the last one
+                selected_file = [
+                    sorted(filenames)[-1],
+                ]
+            else:
+                selected_file = [
+                    f
+                    for f, name_no_ext in zip(filenames, filenames_no_ext)
+                    if pipeline in name_no_ext
+                ]
+            if len(selected_file) != 1:
+                msg = f"Attempting to get output for pipeline: {pipeline},"
+                msg += " but no or more than one file was found.\n"
+                raise CompileError(msg)
+            filename = selected_file[0]
+
+            full_path = os.path.join(dirpath, filename)
+            with open(full_path, "r", encoding="utf-8") as file:
+                file_content = file.read()
+
+        if file_content is None:
             msg = f"Attempting to get output for pipeline: {pipeline},"
             msg += " but no file was found.\n"
             msg += "Are you sure the file exists?"
             raise CompileError(msg)
-
-        return self.last_compiler_output.get_pipeline_output(pipeline)
+        return file_content

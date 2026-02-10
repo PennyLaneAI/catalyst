@@ -22,7 +22,7 @@ from catalyst import qjit
 
 
 # Non-root nodes have internal linkage.
-# CHECK-DAG: func.func private @qnode{{.*}} {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+# CHECK-DAG: func.func public @qnode{{.*}} {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
 @qml.qnode(qml.device("lightning.qubit", wires=2), diff_method="parameter-shift")
 def qnode(x):
     qml.RX(x, wires=0)
@@ -33,7 +33,7 @@ def qnode(x):
 # The entry point has no internal linkage.
 # CHECK-DAG: func.func public @jit_workload(%arg0: tensor<f64>) -> tensor<4xcomplex<f64>> attributes {llvm.emit_c_interface} {
 def workload(x: float):
-    y = x * qml.numpy.pi
+    y = x * qml.numpy.pi  # pylint: disable=no-member
     return qnode(y)
 
 

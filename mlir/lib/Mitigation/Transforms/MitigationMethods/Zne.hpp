@@ -16,6 +16,7 @@
 
 #include "Mitigation/IR/MitigationOps.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
 
@@ -27,19 +28,17 @@ namespace mitigation {
 struct ZneLowering : public OpRewritePattern<mitigation::ZneOp> {
     using OpRewritePattern<mitigation::ZneOp>::OpRewritePattern;
 
-    LogicalResult match(mitigation::ZneOp op) const override;
-    void rewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const override;
+    LogicalResult matchAndRewrite(mitigation::ZneOp op, PatternRewriter &rewriter) const override;
 
   private:
     static FlatSymbolRefAttr getOrInsertFoldedCircuit(Location loc, PatternRewriter &builder,
-                                                      mitigation::ZneOp op,
-                                                      Folding foldingAlgorithm);
+                                                      func::FuncOp op, Folding foldingAlgorithm);
     static FlatSymbolRefAttr getOrInsertQuantumAlloc(Location loc, PatternRewriter &rewriter,
-                                                     mitigation::ZneOp op);
+                                                     func::FuncOp op);
     static FlatSymbolRefAttr
-    getOrInsertFnWithoutMeasurements(Location loc, PatternRewriter &rewriter, mitigation::ZneOp op);
+    getOrInsertFnWithoutMeasurements(Location loc, PatternRewriter &rewriter, func::FuncOp op);
     static FlatSymbolRefAttr getOrInsertFnWithMeasurements(Location loc, PatternRewriter &rewriter,
-                                                           mitigation::ZneOp op);
+                                                           func::FuncOp op);
 };
 
 } // namespace mitigation

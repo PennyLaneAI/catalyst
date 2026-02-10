@@ -3,16 +3,24 @@
 pip>=22.3
 
 # Build dependencies for non-Python components
-numpy<2
-pybind11>=2.8.0
+# Do not allow NumPy 2.0.0 due to a bug with their C API that blocks the usage of the Stable ABI;
+# this bug was fixed in 2.0.1 (https://github.com/numpy/numpy/pull/26995)
+numpy>2.0.0
+# llvm requires nanobind 2.9 or higher
+nanobind>=2.9
+pybind11>=2.12.0
 PyYAML
 
+# Compiler toolchain available via PIP
+cmake>=3.26
+ninja
+
 # formatting/linting
-black
-clang-format==14.*
-clang-tidy==14.*
-pylint
-isort
+black==25.9.0
+clang-format~=20.1
+clang-tidy~=20.1
+pylint~=4.0.0
+isort~=7.0.0
 
 # testing
 flaky
@@ -22,9 +30,11 @@ pytest-xdist
 pytest-cov
 pytest-mock
 nbmake
+filecheck
 
 # optional rt/test dependencies
 pennylane-lightning-kokkos
-amazon-braket-pennylane-plugin>1.27.1
-# TODO: remove pin once we support jax>=0.4.27
-optax<0.2.3
+amazon-braket-pennylane-plugin>1.27.1; python_version < "3.14"
+pydot # Graph visualization backend requirement
+matplotlib # Graph visualization frontend requirement
+graphviz # Graph visualization backend requirement

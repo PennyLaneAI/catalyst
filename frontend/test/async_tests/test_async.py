@@ -58,8 +58,8 @@ def test_qnode_execution(backend):
     params = jnp.array([1.0, 2.0])
     compiled = qjit(async_qnodes=True)(multiple_qnodes)
     observed = compiled(params)
-    expected = qjit()(multiple_qnodes)(params)
-    assert "async_execute_fn" in compiled.qir
+    expected = qjit(multiple_qnodes)(params)
+    assert "async_execute_fn" in compiled.llvmir
     assert np.allclose(expected, observed)
 
 
@@ -83,10 +83,10 @@ def test_gradient(inp, diff_methods, backend):
     def interpreted(x):
         device = qml.device("default.qubit", wires=1)
         g = qml.QNode(f, device, diff_method="backprop")
-        h = qml.grad(g, argnum=0)
+        h = qml.grad(g, argnums=0)
         return h(x)
 
-    assert "async_execute_fn" in compiled.qir
+    assert "async_execute_fn" in compiled.llvmir
     assert np.allclose(compiled(inp), interpreted(inp))
 
 
@@ -322,7 +322,7 @@ def test_qnode_exception_dependency(order, backend):
 # TODO: add the following diff_methods once issue #419 is fixed:
 # ("parameter-shift", "auto"), ("adjoint", "auto")]
 @pytest.mark.parametrize("diff_methods", [("finite-diff", "fd")])
-@pytest.mark.parametrize("inp", [(1.0)])
+@pytest.mark.parametrize("inp", [1.0])
 def test_gradient_exception(inp, diff_methods, backend):
     """Parameter shift and finite diff generate multiple QNode that are run async."""
 

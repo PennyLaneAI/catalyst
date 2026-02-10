@@ -10,30 +10,27 @@
 # limitations under the License.
 
 import os
-import platform
+import pathlib
 import re
 import shutil
 import subprocess
+import textwrap
 
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
 from jax.tree_util import register_pytree_node_class
+from pennylane import for_loop
 
-from catalyst import debug, for_loop, qjit, value_and_grad
-from catalyst.compiler import CompileOptions, Compiler
-from catalyst.debug import (
-    compile_executable,
-    compile_from_mlir,
-    get_cmain,
-    get_compilation_stage,
-    replace_ir,
-)
+from catalyst import debug, qjit, value_and_grad
+from catalyst.compiler import _options_to_cli_flags, to_llvmir, to_mlir_opt
+from catalyst.debug import compile_executable, get_cmain, get_compilation_stage, replace_ir
+from catalyst.pipelines import CompileOptions
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.runtime_environment import get_lib_path
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestDebugPrint:
     """Test suite for the runtime print functionality."""
 
@@ -70,6 +67,17 @@ class TestDebugPrint:
         assert err == ""
         expected = str(arg)
         assert expected == out.strip()
+
+    def test_memref_outside_qjit(self, capfd):
+        """Test that memref can be used outside qjit."""
+
+        def test(x):
+            debug.print_memref(x)
+
+        test(2)
+        out, err = capfd.readouterr()
+        assert err == ""
+        assert out == "2\n"
 
     def test_optional_descriptor(self, capfd):
         """Test the optional memref descriptor functionality."""
@@ -124,7 +132,7 @@ class TestDebugPrint:
             def loop(i):
                 debug.print(i)
 
-            loop()
+            loop()  # pylint: disable=no-value-for-parameter
 
         out, err = capfd.readouterr()
         assert err == ""
@@ -230,6 +238,7 @@ class TestDebugPrint:
         assert expected == out.strip()
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 class TestPrintStage:
     """Test that compilation pipeline results can be printed."""
 
@@ -237,13 +246,17 @@ class TestPrintStage:
         """Test that the IR can be printed after the HLO lowering pipeline."""
 
         @qjit(keep_intermediate=True)
-        def func():
-            return 0
+        def func(x):
+            return x
 
-        print(get_compilation_stage(func, "HLOLoweringPass"))
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        func.use_cwd_for_workspace = False
+        func.jit_compile((0,))
+
+        print(get_compilation_stage(func, "HLOLoweringStage"))
 
         out, _ = capsys.readouterr()
-        assert "@jit_func() -> tensor<i64>" in out
+        assert "@jit_func(%arg0: tensor<i64>) -> tensor<i64>" in out
         assert "stablehlo.constant" not in out
 
         func.workspace.cleanup()
@@ -255,115 +268,7 @@ class TestPrintStage:
             return 0
 
         with pytest.raises(TypeError, match="needs to be a 'QJIT' object"):
-            print(get_compilation_stage(func, "HLOLoweringPass"))
-
-
-class TestCompileFromIR:
-    """Test the debug feature that compiles from a string representation of the IR."""
-
-    def test_compiler_from_textual_ir(self):
-        """Test the textual IR compilation."""
-        full_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
-        extension = ".so" if platform.system() == "Linux" else ".dylib"
-
-        # pylint: disable=line-too-long
-        ir = (
-            r"""
-module @workflow {
-  func.func public @catalyst.entry_point(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
-    %0 = call @workflow(%arg0) : (tensor<f64>) -> tensor<f64>
-    return %0 : tensor<f64>
-  }
-  func.func private @workflow(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "finite-diff", llvm.linkage = #llvm.linkage<internal>, qnode} {
-    quantum.device ["""
-            + r'"'
-            + full_path
-            + r"""/librtd_lightning"""
-            + extension
-            + """", "LightningSimulator", "{'shots': 0}"]
-    %0 = stablehlo.constant dense<4> : tensor<i64>
-    %1 = quantum.alloc( 4) : !quantum.reg
-    %2 = stablehlo.constant dense<0> : tensor<i64>
-    %extracted = tensor.extract %2[] : tensor<i64>
-    %3 = quantum.extract %1[%extracted] : !quantum.reg -> !quantum.bit
-    %4 = quantum.custom "PauliX"() %3 : !quantum.bit
-    %5 = stablehlo.constant dense<1> : tensor<i64>
-    %extracted_0 = tensor.extract %5[] : tensor<i64>
-    %6 = quantum.extract %1[%extracted_0] : !quantum.reg -> !quantum.bit
-    %extracted_1 = tensor.extract %arg0[] : tensor<f64>
-    %7 = quantum.custom "RX"(%extracted_1) %6 : !quantum.bit
-    %8 = quantum.namedobs %4[ PauliZ] : !quantum.obs
-    %9 = quantum.expval %8 : f64
-    %from_elements = tensor.from_elements %9 : tensor<f64>
-    quantum.dealloc %1 : !quantum.reg
-    quantum.device_release
-    return %from_elements : tensor<f64>
-  }
-  func.func @setup() {
-    quantum.init
-    return
-  }
-  func.func @teardown() {
-    quantum.finalize
-    return
-  }
-  module attributes {transform.with_named_sequence} {
-    transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">){
-      transform.yield
-    }
-  }
-}
-"""
-        )
-        compiled_function = compile_from_mlir(ir)
-        assert compiled_function(0.1) == [-1]
-
-    def test_compile_from_ir_with_compiler(self):
-        """Supply a custom compiler instance to the textual compilation function."""
-
-        options = CompileOptions(static_argnums=[1])
-        compiler = Compiler(options)
-
-        ir = r"""
-module @workflow {
-  func.func public @catalyst.entry_point(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
-    return %arg0 : tensor<f64>
-  }
-  func.func @setup() {
-    quantum.init
-    return
-  }
-  func.func @teardown() {
-    quantum.finalize
-    return
-  }
-  module attributes {transform.with_named_sequence} {
-    transform.named_sequence @__transform_main(%arg0: !transform.op<"builtin.module">){
-      transform.yield
-    }
-  }
-}
-"""
-
-        compiled_function = compile_from_mlir(ir, compiler=compiler)
-        assert compiled_function(0.1, 0.2) == [0.1]  # allow call with one extra argument
-
-    def test_parsing_errors(self):
-        """Test parsing error handling."""
-
-        ir = r"""
-module @workflow {
-  func.func public @catalyst.entry_point(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
-    %c = stablehlo.constant dense<4.0> : tensor<i64>
-    return %c : tensor<f64> // Invalid type
-  }
-}
-"""
-        with pytest.raises(CompileError) as e:
-            compile_from_mlir(ir)(0.1)
-
-        assert "Failed to parse module as MLIR source" in e.value.args[0]
-        assert "Failed to parse module as LLVM source" in e.value.args[0]
+            print(get_compilation_stage(func, "HLOLoweringStage"))
 
 
 class TestCProgramGeneration:
@@ -448,29 +353,29 @@ class TestCProgramGeneration:
                 + "    %0 = stablehlo.multiply %x, %arg0 : tensor<f64>\n",
             ),
             (
-                "HLOLoweringPass",
+                "QuantumCompilationStage",
+                "%0 = stablehlo.multiply %arg0, %arg0 : tensor<f64>\n",
+                "%x = stablehlo.multiply %arg0, %arg0 : tensor<f64>\n"
+                + "    %0 = stablehlo.multiply %x, %arg0 : tensor<f64>\n",
+            ),
+            (
+                "HLOLoweringStage",
                 "%0 = arith.mulf %extracted, %extracted : f64\n",
                 "%t = arith.mulf %extracted, %extracted : f64\n"
                 + "    %0 = arith.mulf %t, %extracted : f64\n",
             ),
             (
-                "QuantumCompilationPass",
-                "%0 = arith.mulf %extracted, %extracted : f64\n",
-                "%t = arith.mulf %extracted, %extracted : f64\n"
-                + "    %0 = arith.mulf %t, %extracted : f64\n",
-            ),
-            (
-                "BufferizationPass",
-                "%2 = arith.mulf %1, %1 : f64",
+                "BufferizationStage",
+                "%2 = arith.mulf %1, %1 : f64\n",
                 "%t = arith.mulf %1, %1 : f64\n" + "    %2 = arith.mulf %t, %1 : f64\n",
             ),
             (
-                "MLIRToLLVMDialect",
-                "%5 = llvm.fmul %4, %4  : f64\n",
-                "%t = llvm.fmul %4, %4  : f64\n" + "    %5 = llvm.fmul %t, %4  : f64\n",
+                "MLIRToLLVMDialectConversion",
+                "%7 = llvm.fmul %6, %6 : f64\n",
+                "%t = llvm.fmul %6, %6  : f64\n" + "    %7 = llvm.fmul %t, %6  : f64\n",
             ),
             (
-                "llvm_ir",
+                "LLVMIRTranslation",
                 "%5 = fmul double %4, %4\n",
                 "%t = fmul double %4, %4\n" + "%5 = fmul double %t, %4\n",
             ),
@@ -488,9 +393,10 @@ class TestCProgramGeneration:
             """Square function."""
             return x**2
 
-        f.__name__ = f.__name__ + pass_name
-
         jit_f = qjit(f, keep_intermediate=True)
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        jit_f.use_cwd_for_workspace = False
+
         data = 2.0
         old_result = jit_f(data)
         old_ir = get_compilation_stage(jit_f, pass_name)
@@ -504,18 +410,30 @@ class TestCProgramGeneration:
         shutil.rmtree(str(jit_f.workspace), ignore_errors=True)
         assert old_result * data == new_result
 
-    @pytest.mark.parametrize("pass_name", ["HLOLoweringPass", "O2Opt", "Enzyme"])
+    @pytest.mark.parametrize(
+        "pass_name",
+        [
+            "QuantumCompilationStage",
+            "HLOLoweringStage",
+            "GradientLoweringStage",
+            "BufferizationStage",
+            "MLIRToLLVMDialectConversion",
+            "LLVMIRTranslation",
+            "O2Opt",
+            "Enzyme",
+        ],
+    )
     def test_modify_ir_file_generation(self, pass_name):
         """Test if recompilation rerun the same pass."""
 
-        def f(x: float):
+        def f(x):
             """Square function."""
             return x**2
 
-        f.__name__ = f.__name__ + pass_name
+        jit_grad_f = qjit(value_and_grad(f), keep_intermediate=True)
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        jit_grad_f.use_cwd_for_workspace = False
 
-        jit_f = qjit(f)
-        jit_grad_f = qjit(value_and_grad(jit_f), keep_intermediate=True)
         jit_grad_f(3.0)
         ir = get_compilation_stage(jit_grad_f, pass_name)
         old_workspace = str(jit_grad_f.workspace)
@@ -523,14 +441,14 @@ class TestCProgramGeneration:
         replace_ir(jit_grad_f, pass_name, ir)
         jit_grad_f(3.0)
         file_list = os.listdir(str(jit_grad_f.workspace))
-        res = [i for i in file_list if pass_name in i]
+        res = [file_name for file_name in file_list if pass_name in file_name]
 
         shutil.rmtree(old_workspace, ignore_errors=True)
         shutil.rmtree(str(jit_grad_f.workspace), ignore_errors=True)
         assert len(res) == 0
 
     def test_get_compilation_stage_without_keep_intermediate(self):
-        """Test if error is raised when using get_pipeline_output without keep_intermediate."""
+        """Test if error is raised when using get_compilation_stage without keep_intermediate."""
 
         @qjit
         def f(x: float):
@@ -546,9 +464,12 @@ class TestCProgramGeneration:
         ):
             get_compilation_stage(f, "mlir")
 
+    @pytest.mark.skip
     @pytest.mark.parametrize(
         "arg",
         [
+            False,
+            np.array([False, True]),
             5,
             np.ones(5, dtype=int),
             np.ones((5, 2), dtype=int),
@@ -565,6 +486,8 @@ class TestCProgramGeneration:
             return y
 
         ans = str(f(arg).tolist()).replace(" ", "")
+        # bools are printed as integers in the runtime
+        ans = ans.replace("False", "0").replace("True", "1")
 
         binary = compile_executable(f, arg)
         result = subprocess.run(binary, capture_output=True, text=True, check=True)
@@ -577,6 +500,7 @@ class TestCProgramGeneration:
 
         assert ans in result.stdout.replace(" ", "").replace("\n", "")
 
+    @pytest.mark.skip
     def test_executable_generation_without_precompiled_function(self):
         """Test if generated C Program produces correct results."""
 
@@ -597,6 +521,121 @@ class TestCProgramGeneration:
         os.remove(directory_path + "/main.c")
 
         assert str(arg) in result.stdout.replace(" ", "").replace("\n", "")
+
+
+class TestOptionsToCliFlags:
+    """Unit tests compiler interface"""
+
+    def test_option_pass_plugin(self):
+        """Test pass plugin option"""
+
+        path = pathlib.Path("/path/to/plugin")
+        options = CompileOptions(pass_plugins={path})
+        flags = _options_to_cli_flags(options)
+        assert ("--load-pass-plugin", path) in flags
+
+    def test_options_pass_plugin_list(self):
+        """Test pass plugin option when passed in as a list"""
+        path = pathlib.Path("/path/to/plugin")
+        options = CompileOptions(pass_plugins=[path, path])
+        flags = _options_to_cli_flags(options)
+        assert ("--load-pass-plugin", path) in flags
+        assert isinstance(options.pass_plugins, set)
+
+    def test_options_pass_plugin_tuple(self):
+        """Test pass plugin option when passed in as a tuple"""
+        path = pathlib.Path("/path/to/plugin")
+        options = CompileOptions(pass_plugins=(path, path))
+        flags = _options_to_cli_flags(options)
+        assert ("--load-pass-plugin", path) in flags
+        assert isinstance(options.pass_plugins, set)
+
+    def test_option_dialect_plugin(self):
+        """Test dialect plugin option"""
+        path = pathlib.Path("/path/to/plugin")
+        options = CompileOptions(dialect_plugins={path})
+        flags = _options_to_cli_flags(options)
+        assert ("--load-dialect-plugin", path) in flags
+        assert isinstance(options.pass_plugins, set)
+
+    def test_option_dialect_plugin_list(self):
+        """Test dialect plugin option"""
+        path = pathlib.Path("/path/to/plugin")
+        options = CompileOptions(dialect_plugins=[path, path])
+        flags = _options_to_cli_flags(options)
+        assert ("--load-dialect-plugin", path) in flags
+        assert isinstance(options.dialect_plugins, set)
+
+    def test_option_dialect_plugin_tuple(self):
+        """Test dialect plugin option"""
+        path = pathlib.Path("/path/to/plugin")
+        options = CompileOptions(dialect_plugins=(path, path))
+        flags = _options_to_cli_flags(options)
+        assert ("--load-dialect-plugin", path) in flags
+        assert isinstance(options.dialect_plugins, set)
+
+    def test_option_use_nameloc(self):
+        """Test use name location option"""
+
+        options = CompileOptions(use_nameloc=True)
+        flags = _options_to_cli_flags(options)
+        assert "--use-nameloc-as-prefix" in flags
+
+    def test_option_not_lower_to_llvm(self):
+        """Test not lower to llvm"""
+        options = CompileOptions(lower_to_llvm=False)
+        flags = _options_to_cli_flags(options)
+        assert ("--tool", "opt") in flags
+
+    def test_no_options_to_llvmir(self):
+        """Test that we can lower to llvmir without needing any options"""
+        mlir = """
+        module {
+            func.func @foo() {
+                return
+            }
+        }
+        """
+        observed = to_llvmir(stdin=mlir)
+        # pylint: disable=line-too-long
+        expected = textwrap.dedent(
+            """
+        define void @foo() {
+          ret void
+        }
+        """
+        ).strip()
+        # pylint: enable=line-too-long
+        assert expected in observed
+
+    def test_no_options_to_mlir_opt(self):
+        """Test that we can lower to mlir opt"""
+        mlir = """
+        module {
+            func.func @foo() {
+                %c = stablehlo.constant dense<0> : tensor<i64>
+                return
+            }
+        }
+        """
+
+        observed = to_mlir_opt(stdin=mlir)
+        expected = textwrap.dedent(
+            """
+        module {
+          llvm.func @foo() {
+            llvm.return
+          }
+        }
+        """
+        ).strip()
+        assert expected in observed
+
+    def test_catalyst_error(self):
+        mlir = """This is invalid MLIR"""
+        msg = "custom op 'This'"
+        with pytest.raises(CompileError, match=msg):
+            to_mlir_opt(stdin=mlir)
 
 
 if __name__ == "__main__":

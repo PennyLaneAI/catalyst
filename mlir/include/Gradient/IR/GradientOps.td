@@ -17,6 +17,8 @@
 
 include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/BuiltinAttributes.td"
 include "mlir/IR/OpBase.td"
@@ -26,7 +28,7 @@ include "Gradient/IR/GradientInterfaces.td"
 
 def GradOp : Gradient_Op<"grad", [
         DeclareOpInterfaceMethods<CallOpInterface>,
-        DeclareOpInterfaceMethods<SymbolUserOpInterface>, 
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>,
         GradientOpInterface
         ]> {
     let summary = "Compute the gradient of a function.";
@@ -35,7 +37,7 @@ def GradOp : Gradient_Op<"grad", [
         using the finite difference method.
 
         This operation acts much like the `func.call` operation, taking a
-        symbol reference and arguments to the original functionan as input.
+        symbol reference and arguments to the original function as input.
         However, instead of the function result, the gradient of the function
         is returned.
 
@@ -54,10 +56,12 @@ def GradOp : Gradient_Op<"grad", [
 
     let arguments = (ins
         StrAttr:$method,
-        FlatSymbolRefAttr:$callee,
+        SymbolRefAttr:$callee,
         Variadic<AnyType>:$operands,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
     let results = (outs Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>);
 
@@ -78,10 +82,12 @@ def ValueAndGradOp : Gradient_Op<"value_and_grad", [
 
     let arguments = (ins
         StrAttr:$method,
-        FlatSymbolRefAttr:$callee,
+        SymbolRefAttr:$callee,
         Variadic<AnyType>:$operands,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
 
     let results = (outs
@@ -103,7 +109,7 @@ def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
     let summary = "Perform quantum AD using the adjoint method on a device.";
 
     let arguments = (ins
-        FlatSymbolRefAttr:$callee,
+        SymbolRefAttr:$callee,
         Index:$gradSize,
         Variadic<AnyType>:$args,
         Variadic<MemRefOf<[AnyFloat]>>:$data_in
@@ -133,7 +139,7 @@ def BackpropOp : Gradient_Op<"backprop", [
     let summary = "Perform classic automatic differentiation using Enzyme AD.";
 
     let arguments = (ins
-        FlatSymbolRefAttr:$callee,
+        SymbolRefAttr:$callee,
         Variadic<AnyType>:$args,
         Variadic<MemRefOf<[AnyFloat]>>:$diffArgShadows,
         Variadic<MemRefOf<[AnyFloat]>>:$calleeResults,
@@ -179,11 +185,13 @@ def JVPOp : Gradient_Op<"jvp", [
 
     let arguments = (ins
         StrAttr:$method,
-        FlatSymbolRefAttr:$callee,
+        SymbolRefAttr:$callee,
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$tangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
 
     let results = (outs
@@ -212,11 +220,13 @@ def VJPOp : Gradient_Op<"vjp", [
 
     let arguments = (ins
         StrAttr:$method,
-        FlatSymbolRefAttr:$callee,
+        SymbolRefAttr:$callee,
         Variadic<AnyType>:$params,
         Variadic<AnyType>:$cotangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
-        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
 
     let results = (outs
@@ -235,7 +245,7 @@ def VJPOp : Gradient_Op<"vjp", [
 def ForwardOp : Gradient_Op<"forward",
     [FunctionOpInterface, IsolatedFromAbove]> {
 
-  let summary = "Operation denoting the forwrad pass that is registered with Enzyme.";
+  let summary = "Operation denoting the forward pass that is registered with Enzyme.";
 
   let description = [{
     Wrapper around the concrete function. This wrapper ensures calling convention.
@@ -277,7 +287,7 @@ def ForwardOp : Gradient_Op<"forward",
     Then:
 
         followed by the original return type, if any.
-    
+
     since there is none, then:
 
         %returnTy = { %tape }
@@ -292,7 +302,7 @@ def ForwardOp : Gradient_Op<"forward",
      One thing that was found experimentally and through tests in Enzyme is that the tape can also be a pointer.
      We use this in the case when there is no tape to return. Instead of returning an empty struct, we return a null
      pointer that is just never dereferenced.
-    
+
   }];
 
   let arguments = (ins
@@ -306,12 +316,22 @@ def ForwardOp : Gradient_Op<"forward",
      OptionalAttr<DictArrayAttr>: $res_attrs
   );
 
-  let regions = (region AnyRegion: $body);
+  let regions = (region MaxSizedRegion<1>: $body);
 
   let builders = [OpBuilder<(ins
     "mlir::StringRef":$name, "mlir::FunctionType":$type,
-    CArg<"mlir::ArrayRef<mlir::NamedAttribute>", "{}">:$attrs)
-  >];
+    CArg<"mlir::ArrayRef<mlir::NamedAttribute>", "{}">:$attrs), [{
+      $_state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
+                           $_builder.getStringAttr(name));
+      $_state.addAttribute("function_type", mlir::TypeAttr::get(type));
+      $_state.addAttribute("implementation", mlir::FlatSymbolRefAttr::get($_builder.getStringAttr("")));
+      $_state.addAttribute("argc", $_builder.getI64IntegerAttr(0));
+      $_state.addAttribute("resc", $_builder.getI64IntegerAttr(0));
+      $_state.addAttribute("tape", $_builder.getI64IntegerAttr(0));
+      $_state.attributes.append(attrs.begin(), attrs.end());
+      $_state.addRegion();
+    }]>
+  ];
 
   let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
@@ -348,7 +368,6 @@ def ReverseOp : Gradient_Op<"reverse",
 
         %returnTy = { %tape }
 
-    
   }];
 
   let arguments = (ins
@@ -362,12 +381,22 @@ def ReverseOp : Gradient_Op<"reverse",
      OptionalAttr<DictArrayAttr>: $res_attrs
   );
 
-  let regions = (region AnyRegion: $body);
+  let regions = (region MaxSizedRegion<1>: $body);
 
   let builders = [OpBuilder<(ins
     "mlir::StringRef":$name, "mlir::FunctionType":$type,
-    CArg<"mlir::ArrayRef<mlir::NamedAttribute>", "{}">:$attrs)
-  >];
+    CArg<"mlir::ArrayRef<mlir::NamedAttribute>", "{}">:$attrs), [{
+      $_state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
+                           $_builder.getStringAttr(name));
+      $_state.addAttribute("function_type", mlir::TypeAttr::get(type));
+      $_state.addAttribute("implementation", mlir::FlatSymbolRefAttr::get($_builder.getStringAttr("")));
+      $_state.addAttribute("argc", $_builder.getI64IntegerAttr(0));
+      $_state.addAttribute("resc", $_builder.getI64IntegerAttr(0));
+      $_state.addAttribute("tape", $_builder.getI64IntegerAttr(0));
+      $_state.attributes.append(attrs.begin(), attrs.end());
+      $_state.addRegion();
+    }]>
+  ];
 
   let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
@@ -388,12 +417,12 @@ def ReverseOp : Gradient_Op<"reverse",
 }
 
 def ReturnOp : Gradient_Op<"return",
-    [Terminator, ParentOneOf<["ForwardOp", "ReverseOp"]>]> {
+    [ReturnLike, Terminator, ParentOneOf<["ForwardOp", "ReverseOp"]>]> {
 
   let summary = "Return tapes or nothing";
 
   let arguments = (ins
-    Variadic<AnyTypeOf<[MemRefOf<[AnyType]>]>>: $tape,
+    Variadic<AnyTypeOf<[AnyRankedTensor, MemRefOf<[AnyType]>]>>: $tape,
     I1Attr: $empty
   );
 

@@ -17,10 +17,10 @@
 import numpy as np
 import pennylane as qml
 import pytest
+from pennylane import cond, qjit
 
-from catalyst import cond, qjit
 
-
+@pytest.mark.usefixtures("use_both_frontend")
 def test_global_phase(backend):
     """Test vanilla global phase"""
     dev = qml.device(backend, wires=1)
@@ -36,6 +36,7 @@ def test_global_phase(backend):
     assert np.allclose(expected, observed)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("inp", [True, False])
 def test_global_phase_in_region(backend, inp):
     """Test global phase in region"""
@@ -52,15 +53,17 @@ def test_global_phase_in_region(backend, inp):
         cir()
         return qml.state()
 
-    expected = qnn(inp)
     observed = qjit(qnn)(inp)
+    qml.capture.disable()
+    expected = qnn(inp)
     assert np.allclose(expected, observed)
 
 
+@pytest.mark.usefixtures("use_both_frontend")
 def test_global_phase_control(backend):
     """Test global phase controlled"""
 
-    if backend == "lightning.kokkos":
+    if backend in ("lightning.kokkos", "lightning.gpu"):
         pytest.skip("control phase is unsupported in kokkos or at least its toml file.")
 
     dev = qml.device(backend, wires=2)

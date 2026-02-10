@@ -20,40 +20,31 @@
 #include <bitset>
 #include <memory>
 #include <numeric>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-#include "Exception.hpp"
 #include "QuantumDevice.hpp"
-
-#include "CacheManager.hpp"
 #include "QubitManager.hpp"
-#include "Utils.hpp"
-
-#include <pybind11/embed.h>
 
 #include "OpenQasmBuilder.hpp"
 #include "OpenQasmObsManager.hpp"
-#include "OpenQasmRunner.hpp" // <pybind11/embed.h>
+#include "OpenQasmRunner.hpp"
 
 namespace Catalyst::Runtime::Device {
 class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
   private:
-    // static constants for RESULT values
-    static constexpr bool GLOBAL_RESULT_TRUE_CONST{true};
-    static constexpr bool GLOBAL_RESULT_FALSE_CONST{false};
-
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
     std::unique_ptr<OpenQasm::OpenQasmBuilder> builder;
     std::unique_ptr<OpenQasm::OpenQasmRunner> runner;
 
-    Catalyst::Runtime::CacheManager<std::complex<double>> cache_manager{};
-    bool tape_recording{false};
     size_t device_shots;
 
     OpenQasm::OpenQasmObsManager obs_manager{};
     OpenQasm::BuilderType builder_type;
+
+    std::set<QubitIdType> initial_allocated_QubitIds;
     std::unordered_map<std::string, std::string> device_kwargs;
 
     inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
@@ -76,9 +67,6 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
         const std::string &kwargs = "{device_type : braket.local.qubit, backend : default}")
     {
         device_kwargs = Catalyst::Runtime::parse_kwargs(kwargs);
-        device_shots = device_kwargs.contains("shots")
-                           ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
-                           : 0;
 
         if (device_kwargs.contains("device_type")) {
             if (device_kwargs["device_type"] == "braket.aws.qubit") {
@@ -111,10 +99,38 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     }
     ~OpenQasmDevice() = default;
 
-    QUANTUM_DEVICE_DEL_DECLARATIONS(OpenQasmDevice);
+    auto AllocateQubits(size_t) -> std::vector<QubitIdType> override;
+    void ReleaseQubits(const std::vector<QubitIdType> &) override;
+    auto GetNumQubits() const -> size_t override;
+    void SetDeviceShots(size_t) override;
+    auto GetDeviceShots() const -> size_t override;
 
-    QUANTUM_DEVICE_RT_DECLARATIONS;
-    QUANTUM_DEVICE_QIS_DECLARATIONS;
+    void NamedOperation(const std::string &, const std::vector<double> &,
+                        const std::vector<QubitIdType> &, bool = false,
+                        const std::vector<QubitIdType> & = {}, const std::vector<bool> & = {},
+                        const std::vector<std::string> & = {}) override;
+    void MatrixOperation(const std::vector<std::complex<double>> &,
+                         const std::vector<QubitIdType> &, bool = false,
+                         const std::vector<QubitIdType> & = {},
+                         const std::vector<bool> & = {}) override;
+    auto Measure(QubitIdType, std::optional<int32_t> = std::nullopt) -> Result override;
+
+    auto Observable(ObsId, const std::vector<std::complex<double>> &,
+                    const std::vector<QubitIdType> &) -> ObsIdType override;
+    auto TensorObservable(const std::vector<ObsIdType> &) -> ObsIdType override;
+    auto HamiltonianObservable(const std::vector<double> &, const std::vector<ObsIdType> &)
+        -> ObsIdType override;
+
+    void Sample(DataView<double, 2> &) override;
+    void PartialSample(DataView<double, 2> &, const std::vector<QubitIdType> &) override;
+    void Counts(DataView<double, 1> &, DataView<int64_t, 1> &) override;
+    void PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,
+                       const std::vector<QubitIdType> &) override;
+    void Probs(DataView<double, 1> &) override;
+    void PartialProbs(DataView<double, 1> &, const std::vector<QubitIdType> &) override;
+    auto Expval(ObsIdType) -> double override;
+    auto Var(ObsIdType) -> double override;
+    void State(DataView<std::complex<double>, 1> &) override;
 
     // Circuit RT
     [[nodiscard]] auto Circuit() const -> std::string { return builder->toOpenQasm(); }

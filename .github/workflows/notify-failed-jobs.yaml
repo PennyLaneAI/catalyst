@@ -9,11 +9,12 @@ on:
       - Build Catalyst Wheel on Linux (arm64)
       - Build Catalyst Wheel on Linux (x86_64)
       - Build Catalyst Wheel on macOS (arm64)
-      - Build Catalyst Wheel on macOS (x86_64)
+      - Build nightly Catalyst releases for TestPyPI
+      - Run Catalyst pytests for weekly flaky test checking
 
 jobs:
   on-failure:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.event.workflow_run.conclusion == 'failure' || github.event.workflow_run.conclusion == 'timed_out'
     steps:
       - uses: ravsamhq/notify-slack-action@v2

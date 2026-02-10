@@ -18,13 +18,11 @@
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallSet.h"
-#include "llvm/Support/Debug.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Types.h"
@@ -38,6 +36,8 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace catalyst {
+namespace quantum {
+
 #define GEN_PASS_DEF_SPLITMULTIPLETAPESPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
@@ -163,7 +163,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPoint(TapeOps.front());
         scf::ExecuteRegionOp executeRegionOp =
-            builder.create<scf::ExecuteRegionOp>(loc, ArrayRef(RetTypes));
+            scf::ExecuteRegionOp::create(builder, loc, ArrayRef(RetTypes));
 
         builder.setInsertionPointToStart(&executeRegionOp.getRegion().emplaceBlock());
         mlir::Block::iterator it = executeRegionOp.getRegion().front().end();
@@ -172,7 +172,7 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
         }
 
         builder.setInsertionPointAfter(&executeRegionOp.getRegion().front().back());
-        scf::YieldOp y = builder.create<scf::YieldOp>(loc, ArrayRef(RetValues));
+        scf::YieldOp y = scf::YieldOp::create(builder, loc, ArrayRef(RetValues));
 
         return std::make_pair(executeRegionOp, y);
     } // wrapTapeOpsInSCFRegion()
@@ -328,9 +328,5 @@ struct SplitMultipleTapesPass : public impl::SplitMultipleTapesPassBase<SplitMul
     } // runOnOperation()
 };
 
-std::unique_ptr<Pass> createSplitMultipleTapesPass()
-{
-    return std::make_unique<SplitMultipleTapesPass>();
-}
-
+} // namespace quantum
 } // namespace catalyst

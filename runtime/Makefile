@@ -1,49 +1,62 @@
-PYTHON?=$(shell which python3)
-C_COMPILER?=$(shell which clang)
-CXX_COMPILER?=$(shell which clang++)
-COMPILER_LAUNCHER?=$(shell which ccache)
-NPROC?=$(shell python3 -c "import os; print(os.cpu_count())")
+PYTHON ?= $(shell which python3)
+PYTHON_PREFIX := $(shell $(PYTHON) -c "import sys; print(sys.prefix)")
+PYTHON_VERSION := $(shell $(PYTHON) -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+C_COMPILER ?= $(shell which clang)
+CXX_COMPILER ?= $(shell which clang++)
+COMPILER_LAUNCHER ?= $(shell which ccache)
+NPROC ?= $(shell python3 -c "import os; print(os.cpu_count())")
 
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
-RT_BUILD_DIR?=$(MK_DIR)/build
-CODE_COVERAGE?=OFF
-BUILD_TYPE?=RelWithDebInfo
-ENABLE_WARNINGS?=ON
-ENABLE_LIGHTNING?=ON
-ENABLE_LIGHTNING_KOKKOS?=ON
-ENABLE_OPENQASM?=ON
-ENABLE_ASAN?=OFF
-LIGHTNING_GIT_TAG_VALUE?=latest_release
-ENABLE_LAPACK?=OFF
+RT_BUILD_DIR ?= $(MK_DIR)/build
+CODE_COVERAGE ?= OFF
+BUILD_TYPE ?= RelWithDebInfo
+ENABLE_OPENQASM ?= ON
+ENABLE_OQD ?= OFF
+ENABLE_ASAN ?= OFF
+STRICT_WARNINGS ?= ON
+LLVM_DIR ?= $(MK_DIR)/../mlir/llvm-project/
 
-BUILD_TARGETS := rt_capi rtd_dummy
-TEST_TARGETS := ""
+PLATFORM := $(shell uname -s)
 
-ifeq ($(ENABLE_LIGHTNING), ON)
-	BUILD_TARGETS += rtd_lightning
-	TEST_TARGETS += runner_tests_lightning
+# Since we build executables for all test targets in this file, there is no reason to preload.
+# Preloading while the ASAN RT is already embedded in the executable can lead to the "incompatible
+# ASAN runtimes detected" error, at least on Linux (macOS seemed okay with it).
+# If necessary, add ASAN flags here to fine-tune behaviour (e.g. ASAN_OPTIONS="...").
+ASAN_COMMAND :=
+
+# Note: ASAN replaces dlopen calls, which means that when we open other libraries via dlopen that
+#       relied on the parent's library's RPATH, these libraries are no longer found.
+#         e.g. `dlopen(openqasm_python_module.so)` from OpenQASMRunner.hpp
+#       We can fix this using LD_LIBRARY_PATH (for dev builds).
+ifeq ($(PLATFORM), Linux)
+ASAN_FLAGS = LD_LIBRARY_PATH="$(RT_BUILD_DIR)/lib:$(LD_LIBRARY_PATH)"
+# Python tests can generally produce leaks, here observed on Linux. OpenQASM tests call into Python.
+PY_ASAN_OPTIONS := ASAN_OPTIONS="detect_leaks=0"
 endif
+
+# Deferred assignment since RT_BUILD_DIR can be modified by the targets.
+ifeq ($(ENABLE_ASAN), ON)
+ASAN_COMMAND = $(ASAN_FLAGS)
+endif
+
+BUILD_TARGETS := rt_capi rtd_null_qubit rt_rsdecomp
+TEST_TARGETS := runner_tests_qir_runtime runner_tests_mbqc_runtime runner_tests_rsdecomp_runtime
 
 ifeq ($(ENABLE_OPENQASM), ON)
 	BUILD_TARGETS += rtd_openqasm
 	TEST_TARGETS += runner_tests_openqasm
 endif
 
-LIGHTNING_ENABLE_OPENMP?=OFF
-
-coverage: CODE_COVERAGE=ON
-coverage: BUILD_TYPE=Debug
-coverage: C_COMPILER=$(shell which gcc)
-coverage: CXX_COMPILER=$(shell which g++)
-test: CODE_COVERAGE=OFF
-test: BUILD_TYPE?=RelWithDebInfo
+ifeq ($(ENABLE_OQD), ON)
+	BUILD_TARGETS += rt_OQD_capi rtd_oqd_device
+	TEST_TARGETS += runner_tests_oqd
+endif
 
 .PHONY: help
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
 	@echo "  all                to build Catalyst Runtime"
-	@echo "  runtime            to build Catalyst Runtime with PennyLane-Lightning"
 	@echo "  coverage           to generate a coverage report using lcov"
 	@echo "  clean              to delete all temporary, cache, and build files"
 	@echo "  test               to run the Catalyst runtime test suite"
@@ -51,107 +64,89 @@ help:
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 	@echo "  check-tidy         to build Catalyst Runtime with RUNTIME_CLANG_TIDY=ON (requires clang-tidy)"
 
-.PHONY: all
-all: runtime
-
 .PHONY: configure
 configure:
 	@echo "Configure Catalyst Runtime"
 
-	# TODO: Removing CMakeCache.txt before each cmake configuration will ensure that Catalyst Runtime
-	# is always built with proper cmake values. There is currently an issue with caching the
-	# PL_BACKEND variable by PennyLane-Lightning which can be fixed here:
-	rm -f $(RT_BUILD_DIR)/CMakeCache.txt
-
 	cmake -G Ninja -B $(RT_BUILD_DIR) . \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$(RT_BUILD_DIR)/lib \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
+		-DMLIR_INCLUDE_DIRS=$(LLVM_DIR)/mlir/include \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
-		-DENABLE_LIGHTNING=$(ENABLE_LIGHTNING) \
 		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
-		-DENABLE_OPENMP=$(LIGHTNING_ENABLE_OPENMP) \
+		-DENABLE_OQD=$(ENABLE_OQD) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
-		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
-		-DENABLE_WARNINGS=OFF \
-		-DPYTHON_EXECUTABLE=$(PYTHON) \
-		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
+		-DPython_EXECUTABLE=$(PYTHON) \
 		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
-		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
-		-DENABLE_LAPACK=$(ENABLE_LAPACK) \
-		$(CMAKE_ARGS)
-
-lq_configure:
-	@echo "Configure Catalyst Runtime"
-
-	# TODO: Removing CMakeCache.txt before each cmake configuration will ensure that Catalyst Runtime
-	# is always built with proper cmake values. There is currently an issue with caching the
-	# PL_BACKEND variable by PennyLane-Lightning which can be fixed here:
-	rm -f $(RT_BUILD_DIR)/CMakeCache.txt
-
-	cmake -G Ninja -B $(RT_BUILD_DIR) . \
-		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
-		-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$(RT_BUILD_DIR)/lib \
-		-DCMAKE_C_COMPILER=$(C_COMPILER) \
-		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
-		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
-		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
-		-DENABLE_OPENMP=$(LIGHTNING_ENABLE_OPENMP) \
-		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
-		-DRUNTIME_ENABLE_WARNINGS=$(ENABLE_WARNINGS) \
-		-DENABLE_WARNINGS=OFF \
-		-DPYTHON_EXECUTABLE=$(PYTHON) \
-		-Dpybind11_DIR=$(shell $(PYTHON) -c "import pybind11; print(pybind11.get_cmake_dir())") \
-		-DENABLE_ADDRESS_SANITIZER=$(ENABLE_ASAN) \
-		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
-		-DENABLE_LAPACK=$(ENABLE_LAPACK) \
-		$(CMAKE_ARGS)
-
-lq_target: lq_configure
-	cmake --build $(RT_BUILD_DIR) --target rt_capi rtd_lightning -j$(NPROC)
+		-DRUNTIME_ENABLE_WARNINGS=$(STRICT_WARNINGS)
 
 .PHONY: runtime
 runtime: configure
 	cmake --build $(RT_BUILD_DIR) --target $(BUILD_TARGETS) -j$(NPROC)
 
-$(RT_BUILD_DIR)/tests/runner_tests_lightning: configure
+.PHONY: test_runner
+test_runner: configure
 	cmake --build $(RT_BUILD_DIR) --target $(TEST_TARGETS) -j$(NPROC)
 
-.PHONY: dummy_device
-dummy_device:
-	cmake --build $(RT_BUILD_DIR) --target rtd_dummy -j$(NPROC)
-
 .PHONY: test
-test: $(RT_BUILD_DIR)/tests/runner_tests_lightning
-	@echo "test the Catalyst runtime test suite"
+test: CODE_COVERAGE=OFF
+test: BUILD_TYPE?=RelWithDebInfo
+test: test_runner
+	@echo "Catalyst runtime test suite - NullQubit"
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
+	@echo "Catalyst MBQC runtime test suite"
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_mbqc_runtime
+	@echo "Catalyst RSDecomp runtime test suite"
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_rsdecomp_runtime
 ifeq ($(ENABLE_OPENQASM), ON)
 	# Test the OpenQasm devices C++ tests
-	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
+	$(ASAN_COMMAND) $(PY_ASAN_OPTIONS) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
 endif
-	# Test the Lightning suite C++ tests
-	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_lightning
+ifeq ($(ENABLE_OQD), ON)
+	# Test the OQD devices C++ tests
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
+endif
 
 .PHONY: coverage
-coverage: lq_target
+coverage: RT_BUILD_DIR := $(RT_BUILD_DIR)_cov
+coverage: CODE_COVERAGE=ON
+coverage: BUILD_TYPE=Debug
+coverage: C_COMPILER=$(shell which gcc)
+coverage: CXX_COMPILER=$(shell which g++)
+coverage: export LLVM_PROFILE_FILE := $(RT_BUILD_DIR)/tests/%m.profraw
+coverage: test_runner
 	@echo "check C++ code coverage"
-
-	cmake --build $(RT_BUILD_DIR) --target runner_tests_lightning -j$(NPROC)
-	$(RT_BUILD_DIR)/tests/runner_tests_lightning
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_qir_runtime
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_mbqc_runtime
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_rsdecomp_runtime
+ifeq ($(ENABLE_OPENQASM), ON)
+	$(ASAN_COMMAND) $(PY_ASAN_OPTIONS) $(RT_BUILD_DIR)/tests/runner_tests_openqasm
+endif
+ifeq ($(ENABLE_OQD), ON)
+	$(ASAN_COMMAND) $(RT_BUILD_DIR)/tests/runner_tests_oqd
+endif
+ifeq ($(PLATFORM),Linux)
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
-	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' '*/mlir/*' --output-file $(RT_BUILD_DIR)/coverage.info
-	genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4
-
-.PHONY: examples
-examples: lq_target
-	$(MAKE) -C examples all
+	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' '*/mlir/*' --output-file $(RT_BUILD_DIR)/coverage.info -q
+	genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4  -q
+else
+	xcrun llvm-profdata merge $(RT_BUILD_DIR)/tests/*.profraw -o $(RT_BUILD_DIR)/tests/rt_test_coverage.profdata
+	xcrun llvm-cov show -instr-profile $(RT_BUILD_DIR)/tests/rt_test_coverage.profdata \
+		-object $(RT_BUILD_DIR)/tests/runner_tests_openqasm \
+		$(RT_BUILD_DIR)/tests/runner_tests_qir_runtime \
+		$(RT_BUILD_DIR)/tests/runner_tests_mbqc_runtime \
+		$(RT_BUILD_DIR)/tests/runner_tests_rsdecomp_runtime \
+		-format=html -output-dir=$(RT_BUILD_DIR)/coverage_html \
+		$(MK_DIR)/include $(MK_DIR)/lib $(MK_DIR)/tests
+endif
 
 .PHONY: clean
 clean:
 	@echo "clean build files"
-	rm -rf $(RT_BUILD_DIR) cov coverage.info $(MK_DIR)/BuildTidy
-	$(MAKE) -C examples clean
+	rm -rf $(RT_BUILD_DIR) $(RT_BUILD_DIR)_cov cov coverage.info $(MK_DIR)/BuildTidy
 
 .PHONY: format
 format:
@@ -168,6 +163,7 @@ check-tidy:
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
+		-DMLIR_INCLUDE_DIRS="$(abspath $(LLVM_DIR))/mlir/include" \
 		-DRUNTIME_CLANG_TIDY=ON
 
 	cmake --build $(MK_DIR)/BuildTidy --target rt_capi -j$(NPROC)

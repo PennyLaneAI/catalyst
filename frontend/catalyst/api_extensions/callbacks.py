@@ -27,14 +27,9 @@ from typing import Any, Callable
 
 import jax
 import jax.numpy as jnp
-from jax._src.api_util import shaped_abstractify
-from jax._src.tree_util import (
-    Partial,
-    tree_flatten,
-    tree_leaves,
-    tree_map,
-    tree_unflatten,
-)
+from jax._src.core import shaped_abstractify
+from jax._src.tree_util import Partial, tree_flatten, tree_leaves, tree_map, tree_unflatten
+from pennylane.capture import enabled as capture_enabled
 
 from catalyst.jax_extras import transient_jax_config
 from catalyst.jax_primitives import python_callback_p
@@ -294,9 +289,9 @@ class AnnotatedFunctionImpl(AnnotatedFunction):
     """Callable with result_type field."""
 
     def __init__(self, func, result_type):
+        functools.update_wrapper(self, func, assigned=WRAPPER_ASSIGNMENTS)
         self.func = func
         self.result_type = result_type
-        functools.update_wrapper(self, func, assigned=WRAPPER_ASSIGNMENTS)
 
     def __call__(self, *args, **kwargs):
         return self.func(*args, **kwargs)
@@ -367,7 +362,7 @@ def accelerate_impl(users_func=None, *, dev=None):
         absextra, absargs, abskwargs = tree_map(shaped_abstractify, (context, args, kwargs))
         try:
             # Find the shape of the return value
-            with transient_jax_config({"jax_dynamic_shapes": False}):
+            with transient_jax_config({"jax_dynamic_shapes": False}), AccelerateContext():
                 _, returnshape = jax.make_jaxpr(jitted_fn, return_shape=True)(
                     absextra, *absargs, **abskwargs
                 )
@@ -407,9 +402,9 @@ class CallbackWithCustomGrad(AnnotatedFunction):
 
     def __init__(self, func, forward, reverse, device):
         assert func and forward and reverse
+        assert isinstance(func, AnnotatedFunction)
         functools.update_wrapper(self, func, assigned=WRAPPER_ASSIGNMENTS)
         self.func = func
-        assert isinstance(func, AnnotatedFunction)
         self.restype = func.getResultTypes()
         self._fwd = forward
         self._fwd_jaxpr = None
@@ -482,7 +477,7 @@ class CallbackWithPotentialCustomGrad:
         self._bwd = func
 
     def __call__(self, *args, **kwargs):
-        if not EvaluationContext.is_tracing():
+        if not capture_enabled() and not EvaluationContext.is_tracing():
             # If we are not in the tracing context, just evaluate the function.
             return self.func(*args, **kwargs)
 
@@ -512,7 +507,11 @@ def base_callback_impl(func: AnnotatedFunction, device=None, custom_grad=None):
     # Since we are building this feature step by step.
     @functools.wraps(func, assigned=WRAPPER_ASSIGNMENTS)
     def bind_callback(*args, **kwargs):
-        if not EvaluationContext.is_tracing():
+        if (
+            not capture_enabled()
+            and not EvaluationContext.is_tracing()
+            or AccelerateContext.am_inside_accelerate()
+        ):
             # If we are not in the tracing context, just evaluate the function.
             return func(*args, **kwargs)
 
@@ -528,8 +527,8 @@ class FlatCallable:
     a flat list."""
 
     def __init__(self, func, *params, **kwparams):
-        self.func = func
         functools.update_wrapper(self, func, assigned=WRAPPER_ASSIGNMENTS)
+        self.func = func
         self.flat_params, self.shape = tree_flatten((params, kwparams))
 
     def __call__(self, flat_args):
@@ -688,3 +687,10 @@ def callback_implementation(
         results_aval=tuple(flat_results_aval),
     )
     return tree_unflatten(out_tree, out_flat)
+
+
+# pylint: disable=unused-argument
+@python_callback_p.def_impl
+def _python_callback_def_impl(*args, callback, custom_grad, results_aval):
+    """Concrete evaluation"""
+    return FlatCallable.__call__(callback, args)

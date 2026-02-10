@@ -11,11 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" This file defines certain high-level routines, such as the data collection cycle, data loading
-and the plotting. Measurement ranges and scales are all defined here as global dictionaries. """
+"""This file defines certain high-level routines, such as the data collection cycle, data loading
+and the plotting. Measurement ranges and scales are all defined here as global dictionaries."""
 
 import sys
-from argparse import ArgumentParser
+from argparse import ArgumentParser, BooleanOptionalAction
 from argparse import Namespace as ParsedArguments
 from collections import defaultdict
 from copy import deepcopy
@@ -32,12 +32,7 @@ import altair as alt
 import pandas as pd
 import vl_convert as vlc
 from altair import Chart
-from catalyst_benchmark.types import (
-    BenchmarkResult,
-    BenchmarkResultV1,
-    BooleanOptionalAction,
-    Sysinfo,
-)
+from catalyst_benchmark.types import BenchmarkResult, BenchmarkResultV1, Sysinfo
 from pandas import DataFrame
 
 # fmt:off

@@ -16,9 +16,7 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import pennylane as qml
-
-from catalyst import pure_callback
+from catalyst import pure_callback, qjit
 
 
 def i(x):
@@ -27,7 +25,7 @@ def i(x):
 
 
 # CHECK-LABEL: module @one_callback_cached
-@qml.qjit
+@qjit
 # CHECK-NOT: catalyst.callback @callback
 # CHECK-LABEL: func.func public @jit_one_callback_cached
 def one_callback_cached(x: float):
@@ -51,7 +49,7 @@ def always_return_float(x) -> float:
 
 
 # CHECK-LABEL: module @test2
-@qml.qjit
+@qjit
 # CHECK-NOT: catalyst.callback @callback
 # CHECK-LABEL: func.func public @jit_test2
 def test2():
@@ -73,7 +71,7 @@ def custom_name(x) -> float:
     return x
 
 
-@qml.qjit
+@qjit
 def test3(x: float) -> float:
     """Tests that custom_name will be in the IR"""
     return custom_name(x)

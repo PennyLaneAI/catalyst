@@ -100,12 +100,11 @@ def CustomCallOp: Catalyst_Op<"custom_call",
     A custom call invokes code external to Catalyst. The `inputs` are passed to the
     external code, and the external code is expected to produce a result of the
     given type.
-    ```
   }];
   let arguments = (ins
     Variadic<AnyType>:$inputs,
     StrAttr:$call_target_name,
-    OptionalAttr<DenseI32ArrayAttr>: $number_original_arg
+    OptionalAttr<I32Attr>: $number_original_arg
   );
   let results = (outs Variadic<AnyType>);
 
@@ -139,8 +138,17 @@ def CallbackOp : Catalyst_Op<"callback",
 
   let builders = [OpBuilder<(ins
     "mlir::StringRef":$name, "mlir::FunctionType":$type,
-    CArg<"mlir::ArrayRef<mlir::NamedAttribute>", "{}">:$attrs)
-  >];
+    CArg<"mlir::ArrayRef<mlir::NamedAttribute>", "{}">:$attrs), [{
+      $_state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
+                           $_builder.getStringAttr(name));
+      $_state.addAttribute("function_type", mlir::TypeAttr::get(type));
+      $_state.addAttribute("id", $_builder.getI64IntegerAttr(0));
+      $_state.addAttribute("argc", $_builder.getI64IntegerAttr(type.getNumInputs()));
+      $_state.addAttribute("resc", $_builder.getI64IntegerAttr(type.getNumResults()));
+      $_state.attributes.append(attrs.begin(), attrs.end());
+      $_state.addRegion();
+    }]>
+  ];
 
   let extraClassDeclaration = [{
     //===------------------------------------------------------------------===//
@@ -170,13 +178,43 @@ def CallbackCallOp : Catalyst_Op<"callback_call",
 
   let arguments = (ins
         FlatSymbolRefAttr:$callee,
-        Variadic<AnyTypeOf<[AnyRankedTensor, MemRefOf<[AnyType]>]>>:$inputs
+        Variadic<AnyTypeOf<[AnyRankedTensor, MemRefOf<[AnyType]>]>>:$inputs,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
   );
 
   let results = (outs Variadic<AnyType>);
 
   let assemblyFormat = [{
     $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
+  }];
+
+}
+
+def LaunchKernelOp : Catalyst_Op<"launch_kernel",
+    [DeclareOpInterfaceMethods<CallOpInterface>,
+     DeclareOpInterfaceMethods<SymbolUserOpInterface>
+    ]> {
+
+  let arguments = (ins
+        SymbolRefAttr:$callee,
+        Variadic<AnyTypeOf<[AnyRankedTensor, MemRefOf<[AnyType]>]>>:$inputs,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
+  );
+
+  let results = (outs Variadic<AnyType>);
+
+  let assemblyFormat = [{
+    $callee `(` $inputs `)` attr-dict `:` functional-type($inputs, results)
+  }];
+
+  let extraClassDeclaration = [{
+    /// The name of the kernel's containing module.
+    mlir::StringAttr getCalleeModuleName();
+
+    /// The name of the kernel.
+    mlir::StringAttr getCalleeName();
   }];
 
 }

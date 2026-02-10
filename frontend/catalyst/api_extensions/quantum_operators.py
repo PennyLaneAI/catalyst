@@ -21,11 +21,14 @@ import copy
 import sys
 from collections.abc import Sized
 from contextlib import nullcontext
+from functools import partial
 from typing import Any, Callable, List, Optional, Union
 
 import jax
 import pennylane as qml
+from jax._src.source_info_util import current as current_source_info
 from jax._src.tree_util import tree_flatten
+from jax.api_util import debug_info
 from jax.core import get_aval
 from pennylane import QueuingManager
 from pennylane.operation import Operator
@@ -42,7 +45,7 @@ from catalyst.jax_extras import (
     deduce_avals,
     new_inner_tracer,
 )
-from catalyst.jax_primitives import AbstractQreg, adjoint_p, qmeasure_p
+from catalyst.jax_primitives import AbstractQreg, adjoint_p, measure_p
 from catalyst.jax_tracer import (
     HybridOp,
     HybridOpRegion,
@@ -146,7 +149,7 @@ def measure(
     EvaluationContext.check_is_quantum_tracing(
         "catalyst.measure can only be used from within a qml.qnode."
     )
-    ctx = EvaluationContext.get_main_tracing_context()
+    cur_trace = EvaluationContext.get_current_trace()
     wires = list(wires) if isinstance(wires, (list, tuple)) else [wires]
     if len(wires) != 1:
         raise TypeError(f"Only one element is supported for the 'wires' parameter, got {wires}.")
@@ -161,7 +164,7 @@ def measure(
     if postselect is not None and postselect not in [0, 1]:
         raise TypeError(f"postselect must be '0' or '1', got {postselect}")
 
-    m = new_inner_tracer(ctx.trace, get_aval(True))
+    m = new_inner_tracer(cur_trace, get_aval(True))
     MidCircuitMeasure(
         in_classical_tracers=in_classical_tracers,
         out_classical_tracers=[m],
@@ -323,7 +326,7 @@ def ctrl(
 class MidCircuitMeasure(HybridOp):
     """Operation representing a mid-circuit measurement."""
 
-    binder = qmeasure_p.bind
+    binder = measure_p.bind
 
     # pylint: disable=too-many-arguments
     def __init__(
@@ -344,14 +347,12 @@ class MidCircuitMeasure(HybridOp):
         qubit = qrp.extract(self.wires)[0]
         if postselect_mode == "hw-like":
             qubit2 = self.bind_overwrite_classical_tracers(
-                ctx,
                 trace,
                 in_expanded_tracers=[qubit],
                 out_expanded_tracers=self.out_classical_tracers,
             )
         else:
             qubit2 = self.bind_overwrite_classical_tracers(
-                ctx,
                 trace,
                 in_expanded_tracers=[qubit],
                 out_expanded_tracers=self.out_classical_tracers,
@@ -405,11 +406,13 @@ class AdjointCallable:
             return create_adjoint_op(base_op, self.lazy)
 
         tracing_artifacts = self.trace_body(args, kwargs)
-
-        return HybridAdjoint(*tracing_artifacts)
+        dbg = tracing_artifacts[3]
+        return HybridAdjoint(*tracing_artifacts[0:3], debug_info=dbg)
 
     def trace_body(self, args, kwargs):
         """Generate a HybridOpRegion for use by Catalyst."""
+
+        dbg = debug_info("AdjointCallable", self.target, args, kwargs)
 
         # Allow the creation of HybridAdjoint instances outside of any contexts.
         # Don't create a JAX context here as otherwise we could be dealing with escaped tracers.
@@ -420,18 +423,19 @@ class AdjointCallable:
 
             adjoint_region = HybridOpRegion(None, quantum_tape, [], [])
 
-            return [], [], [adjoint_region]
+            return [], [], [adjoint_region], dbg
 
         # Create a nested jaxpr scope for the body of the adjoint.
-        ctx = EvaluationContext.get_main_tracing_context()
-        with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
+        with EvaluationContext.frame_tracing_context(debug_info=dbg) as inner_trace:
             in_classical_tracers, _ = tree_flatten((args, kwargs))
-            wffa, in_avals, _, _ = deduce_avals(self.target, args, kwargs)
-            arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
+            wffa, in_avals, _, _ = deduce_avals(self.target, args, kwargs, debug_info=dbg)
+            arg_classical_tracers = _input_type_to_tracers(
+                partial(inner_trace.new_arg, source_info=current_source_info()), in_avals
+            )
             with QueuingManager.stop_recording(), QuantumTape() as quantum_tape:
-                # FIXME: move all full_raise calls into a separate function
+                # FIXME: move all to_jaxpr_tracer calls into a separate function
                 res_classical_tracers = [
-                    inner_trace.full_raise(t)
+                    inner_trace.to_jaxpr_tracer(t, source_info=current_source_info())
                     for t in wffa.call_wrapped(*arg_classical_tracers)
                     if isinstance(t, DynamicJaxprTracer)
                 ]
@@ -442,7 +446,7 @@ class AdjointCallable:
                 inner_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
             )
 
-        return in_classical_tracers, [], [adjoint_region]
+        return in_classical_tracers, [], [adjoint_region], wffa.debug_info
 
 
 class HybridAdjoint(HybridOp):
@@ -457,19 +461,22 @@ class HybridAdjoint(HybridOp):
         body_trace = op.regions[0].trace
         body_tape = op.regions[0].quantum_tape
         res_classical_tracers = op.regions[0].res_classical_tracers
+        dbg = op.debug_info
 
         # Handle ops that were instantiated outside of a tracing context.
         if body_trace is None:
-            frame_ctx = EvaluationContext.frame_tracing_context(ctx)
+            frame_ctx = EvaluationContext.frame_tracing_context(debug_info=dbg)
         else:
-            frame_ctx = EvaluationContext.frame_tracing_context(ctx, body_trace)
+            frame_ctx = EvaluationContext.frame_tracing_context(body_trace)
 
         with frame_ctx as body_trace:
-            qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
+            qreg_in = _input_type_to_tracers(
+                partial(body_trace.new_arg, source_info=current_source_info()), [AbstractQreg()]
+            )[0]
             qrp_out = trace_quantum_operations(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
-            body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
-                res_classical_tracers + [qreg_out]
+            body_jaxpr, _, body_consts = body_trace.frame.to_jaxpr2(
+                res_classical_tracers + [qreg_out], dbg
             )
 
         qreg = qrp.actualize()
@@ -657,9 +664,9 @@ def ctrl_distribute(
 
     # Allow decompositions outside of a Catalyst context.
     if EvaluationContext.is_tracing():
-        ctx = EvaluationContext.get_main_tracing_context()
+        cur_trace = EvaluationContext.get_current_trace()
     else:
-        ctx = None
+        cur_trace = None
 
     new_ops = []
     for op in tape.operations:
@@ -675,8 +682,8 @@ def ctrl_distribute(
             else:
                 for region in [region for region in op.regions if region.quantum_tape is not None]:
                     # Re-enter a JAXPR frame but do not create a new one is none exists.
-                    if ctx and region.trace:
-                        trace_manager = EvaluationContext.frame_tracing_context(ctx, region.trace)
+                    if cur_trace and region.trace:
+                        trace_manager = EvaluationContext.frame_tracing_context(region.trace)
                     else:
                         trace_manager = nullcontext
 
@@ -712,14 +719,15 @@ def ctrl_distribute(
 def _check_no_measurements(tape: QuantumTape) -> None:
     """Check the nested quantum tape for the absense of quantum measurements of any kind"""
 
-    msg = "Quantum measurements are not allowed"
-
     if len(tape.measurements) > 0:
-        raise ValueError(msg)
+        raise ValueError("Measurement process cannot be used within an adjoint() or ctrl() region.")
     for op in tape.operations:
         if has_nested_tapes(op):
             for r in [r for r in op.regions if r.quantum_tape is not None]:
                 _check_no_measurements(r.quantum_tape)
         else:
             if isinstance(op, MidCircuitMeasure):
-                raise ValueError(msg)
+                raise ValueError(
+                    "Mid-circuit measurements cannot be used "
+                    "within an adjoint() or ctrl() region."
+                )

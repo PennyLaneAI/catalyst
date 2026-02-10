@@ -1,18 +1,15 @@
 # Always update the version check in catalyst.__init__ when changing the JAX version.
-jax=0.4.28
-mhlo=89a891c986650c33df76885f5620e0a92150d90f
-llvm=3a8316216807d64a586b971f51695e23883331f7
-enzyme=v0.0.130
+jax=0.7.1
+stablehlo=v1.13.7
+llvm=8f264586d7521b0e305ca7bb78825aa3382ffef7
+enzyme=v0.0.238
 
 # Always remove custom PL/LQ versions before release.
 
 # For a custom PL version, update the package version here and at
-# 'doc/requirements.txt
-pennylane=0.39.0.dev10
+# 'doc/requirements.txt'
+pennylane=0.45.0-dev23
 
 # For a custom LQ/LK version, update the package version here and at
-# 'doc/requirements.txt'. Also, update the 'LIGHTNING_GIT_TAG' at
-# 'runtime/Makefile' and at all GitHub workflows, using the exact
-# commit hash corresponding to the merged PR that implements the
-# desired feature.
-lightning=0.38.0
+# 'doc/requirements.txt'
+lightning=0.45.0-dev8

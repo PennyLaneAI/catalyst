@@ -35,25 +35,23 @@
     CLASSNAME &operator=(CLASSNAME &&) = delete;
 
 #define QUANTUM_DEVICE_RT_DECLARATIONS                                                             \
-    auto AllocateQubit()->QubitIdType override;                                                    \
-    auto AllocateQubits(size_t num_qubits)->std::vector<QubitIdType> override;                     \
+    auto AllocateQubit() -> QubitIdType override;                                                  \
+    auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override;                   \
     void ReleaseQubit(QubitIdType q) override;                                                     \
-    void ReleaseAllQubits() override;                                                              \
-    [[nodiscard]] auto GetNumQubits() const->size_t override;                                      \
+    void ReleaseQubits(const std::vector<QubitIdType> &) override;                                 \
+    [[nodiscard]] auto GetNumQubits() const -> size_t override;                                    \
     void StartTapeRecording() override;                                                            \
     void StopTapeRecording() override;                                                             \
     void SetDeviceShots(size_t shots) override;                                                    \
-    [[nodiscard]] auto GetDeviceShots() const->size_t override;                                    \
-    void PrintState() override;                                                                    \
-    [[nodiscard]] auto Zero() const->Result override;                                              \
-    [[nodiscard]] auto One() const->Result override;
+    [[nodiscard]] auto GetDeviceShots() const -> size_t override;
 
 #define QUANTUM_DEVICE_QIS_DECLARATIONS                                                            \
     void NamedOperation(                                                                           \
         const std::string &name, const std::vector<double> &params,                                \
         const std::vector<QubitIdType> &wires, [[maybe_unused]] bool inverse = false,              \
         [[maybe_unused]] const std::vector<QubitIdType> &controlled_wires = {},                    \
-        [[maybe_unused]] const std::vector<bool> &controlled_values = {}) override;                \
+        [[maybe_unused]] const std::vector<bool> &controlled_values = {},                          \
+        [[maybe_unused]] const std::vector<std::string> &optional_params = {}) override;           \
     using Catalyst::Runtime::QuantumDevice::MatrixOperation;                                       \
     void MatrixOperation(                                                                          \
         const std::vector<std::complex<double>> &matrix, const std::vector<QubitIdType> &wires,    \
@@ -61,30 +59,52 @@
         [[maybe_unused]] const std::vector<QubitIdType> &controlled_wires = {},                    \
         [[maybe_unused]] const std::vector<bool> &controlled_values = {}) override;                \
     auto Observable(ObsId id, const std::vector<std::complex<double>> &matrix,                     \
-                    const std::vector<QubitIdType> &wires)                                         \
-        ->ObsIdType override;                                                                      \
-    auto TensorObservable(const std::vector<ObsIdType> &obs)->ObsIdType override;                  \
+                    const std::vector<QubitIdType> &wires) -> ObsIdType override;                  \
+    auto TensorObservable(const std::vector<ObsIdType> &obs) -> ObsIdType override;                \
     auto HamiltonianObservable(const std::vector<double> &coeffs,                                  \
-                               const std::vector<ObsIdType> &obs)                                  \
-        ->ObsIdType override;                                                                      \
-    auto Expval(ObsIdType obsKey)->double override;                                                \
-    auto Var(ObsIdType obsKey)->double override;                                                   \
+                               const std::vector<ObsIdType> &obs) -> ObsIdType override;           \
+    auto Expval(ObsIdType obsKey) -> double override;                                              \
+    auto Var(ObsIdType obsKey) -> double override;                                                 \
     void State(DataView<std::complex<double>, 1> &state) override;                                 \
     void Probs(DataView<double, 1> &probs) override;                                               \
     void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires) override; \
-    void Sample(DataView<double, 2> &samples, size_t shots) override;                              \
-    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires,        \
-                       size_t shots) override;                                                     \
-    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots)          \
+    void Sample(DataView<double, 2> &samples) override;                                            \
+    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires)        \
         override;                                                                                  \
+    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts) override;              \
     void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,                 \
-                       const std::vector<QubitIdType> &wires, size_t shots) override;              \
+                       const std::vector<QubitIdType> &wires) override;                            \
     auto Measure(QubitIdType wire, std::optional<int32_t> postselect = std::nullopt)               \
-        ->Result override;                                                                         \
+        -> Result override;                                                                        \
     void Gradient(std::vector<DataView<double, 1>> &gradients,                                     \
                   const std::vector<size_t> &trainParams) override;
 
 namespace Catalyst::Runtime {
+static inline bool has_nested_curly_braces(const std::string &kwargs)
+{
+    // We disallow nested dictionaries in the kwargs string.
+    // To check this, we check that there are no nested curly braces.
+
+    int openBraceCount = 0;
+    for (char c : kwargs) {
+        if (c == '{') {
+            openBraceCount++;
+            // If we see an opening brace and we already have one open, it's nested
+            if (openBraceCount > 1) {
+                return true;
+            }
+        }
+        else if (c == '}') {
+            openBraceCount--;
+            if (openBraceCount < 0) {
+                // This case handles malformed strings like "}{"
+                RT_FAIL("Device kwargs string is malformed.");
+            }
+        }
+    }
+    return false;
+}
+
 static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::string, std::string>
 {
     // cleaning kwargs
@@ -95,14 +115,18 @@ static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::s
     std::unordered_map<std::string, std::string> map;
     size_t s3_pos = kwargs.find("\'s3_destination_folder\'");
     if (s3_pos != std::string::npos) {
-        auto opening_pos = kwargs.find("(", s3_pos);
+        auto opening_pos = kwargs.find('(', s3_pos);
         RT_ASSERT(opening_pos != std::string::npos);
-        auto closing_pos = kwargs.find(")", opening_pos);
+        auto closing_pos = kwargs.find(')', opening_pos);
         RT_ASSERT(closing_pos != std::string::npos);
         map["s3_destination_folder"] = kwargs.substr(opening_pos, closing_pos - opening_pos + 1);
     }
 
     auto kwargs_end_iter = (s3_pos == std::string::npos) ? kwargs.end() : kwargs.begin() + s3_pos;
+
+    std::string kwargs_without_s3(kwargs.begin(), kwargs_end_iter);
+    RT_FAIL_IF(has_nested_curly_braces(kwargs_without_s3),
+               "Nested dictionaries in device kwargs are not supported.");
 
     kwargs.erase(std::remove_if(kwargs.begin(), kwargs_end_iter,
                                 [](char c) {
@@ -130,6 +154,25 @@ static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::s
     }
 
     return map;
+}
+
+template <class K, class V>
+void pretty_print_dict(const std::unordered_map<K, V> &map, size_t leadingSpaces = 0,
+                       std::ostream &out = std::cout)
+{
+    const std::string indent(leadingSpaces, ' ');
+    const std::string innerIndent = indent + "  ";
+
+    out << indent << "{\n";
+    auto it = map.begin();
+    while (it != map.end()) {
+        out << innerIndent << "\"" << it->first << "\": " << it->second;
+        if (++it != map.end()) {
+            out << ",";
+        }
+        out << "\n";
+    }
+    out << indent << "}";
 }
 
 enum class MeasurementsT : uint8_t {
@@ -271,14 +314,16 @@ constexpr auto has_gate(const SimulatorGateInfoDataT<size> &arr, const std::stri
     return false;
 }
 
-static inline auto simulateDraw(const std::vector<double> &probs, std::optional<int32_t> postselect,
-                                std::mt19937 *gen = nullptr) -> bool
+static inline auto
+simulateDraw(const std::vector<double> &probs, std::optional<int32_t> postselect,
+             std::mt19937 *gen = nullptr) // NOLINT(readability-non-const-parameter)
+    -> bool
 {
     if (postselect) {
         auto postselect_value = postselect.value();
         RT_FAIL_IF(postselect_value < 0 || postselect_value > 1, "Invalid postselect value");
         RT_FAIL_IF(probs[postselect_value] == 0, "Probability of postselect value is 0");
-        return postselect_value == 1 ? true : false;
+        return static_cast<bool>(postselect_value == 1);
     }
 
     // Normal flow, no post-selection
@@ -286,7 +331,7 @@ static inline auto simulateDraw(const std::vector<double> &probs, std::optional<
     std::uniform_real_distribution<> dis(0., 1.);
 
     float draw;
-    if (gen) {
+    if (gen != nullptr) {
         draw = dis(*gen);
         (*gen)();
     }

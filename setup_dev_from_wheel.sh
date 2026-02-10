@@ -3,6 +3,9 @@
 # Python environment path
 PYTHON_ENV_PATH=$1
 
+# Branch to switch to
+BRANCH=$2
+
 # Exit on any error
 set -e
 
@@ -50,8 +53,7 @@ checkout_nightly_build(){
 
     # Search for the commit corresponding to latest available Wheel at TestPyPI
     git log --grep="bump nightly version" | grep "commit" | cut -d " " -f 2 | while read -r NIGHTLY_BUMP; do
-        # The commit right before the nightly bump must have the same version as the Wheel
-        git checkout $NIGHTLY_BUMP^1; 
+        git checkout $NIGHTLY_BUMP; 
         export DIFF=$(diff $CATALYST_WHEEL/_version.py $CATALYST_FRONTEND_SRC/_version.py)
         if [ -z "${DIFF}" ]; then
             export CATALYST_WHEEL_COMMIT=$(git log -1 --format="%h")
@@ -69,6 +71,11 @@ checkout_nightly_build(){
 
 link_repo_to_wheel(){
     echo "Linking Catalyst repository to Catalyst Wheel..."
+    
+    # switch to branch if given
+    if [ ! -z "${BRANCH}" ]; then
+        git switch $BRANCH
+    fi
 
     export SITEPKGS=$(python3 -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
     export CATALYST_WHEEL=$SITEPKGS/catalyst
@@ -81,7 +88,7 @@ restore_catalyst_config(){
     # After linking the Wheel sources, _configuration.py will contain the entry: 'INSTALLED=True'.
     # Hence, we restore the file from the repository.
     cd $CATALYST_DIR
-    git checkout frontend/catalyst/_configuration.py
+    git checkout frontend/catalyst/_configuration.py frontend/catalyst/_version.py
 }
 
 report_changed_files(){

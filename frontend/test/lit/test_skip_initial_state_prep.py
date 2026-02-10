@@ -19,8 +19,10 @@
 import jax.numpy as jnp
 import pennylane as qml
 
+from catalyst import qjit
 
-@qml.qjit(target="mlir")
+
+@qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def state_prep_example():
     """Test example from
@@ -33,12 +35,12 @@ def state_prep_example():
     return qml.state()
 
 
-# CHECK-LABEL: func.func private @state_prep_example
+# CHECK-LABEL: func.func public @state_prep_example
 #       CHECK: quantum.set_state
 print(state_prep_example.mlir)
 
 
-@qml.qjit(target="mlir")
+@qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def basis_state_example():
     """Test example from
@@ -51,12 +53,12 @@ def basis_state_example():
     return qml.state()
 
 
-# CHECK-LABEL: func.func private @basis_state_example
+# CHECK-LABEL: func.func public @basis_state_example
 #       CHECK: quantum.set_basis_state
 print(basis_state_example.mlir)
 
 
-@qml.qjit(target="mlir")
+@qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def state_prep_example_double():
     """What happens if we have two? It shouldn't be repeated because
@@ -67,7 +69,53 @@ def state_prep_example_double():
     return qml.state()
 
 
-# CHECK-LABEL: func.func private @state_prep_example_double
+# CHECK-LABEL: func.func public @state_prep_example_double
 #       CHECK:   quantum.set_state
 #   CHECK-NOT:   quantum.set_state
 print(state_prep_example_double.mlir)
+
+
+@qjit(target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=2))
+def state_prep_trotter():
+    """
+    Test state prep used with Trotter Product.
+    https://github.com/PennyLaneAI/catalyst/issues/2235
+    """
+    H = qml.Hamiltonian([1, 1], [qml.PauliZ(0), qml.PauliZ(1)])
+    qml.StatePrep([0, 0, 0, 1], wires=[0, 1])
+    qml.Hadamard(wires=2)
+    qml.ctrl(
+        qml.TrotterProduct(H, 1, n=3, order=2),
+        control=2,
+    )
+    return qml.probs(wires=[2])
+
+
+# CHECK-LABEL: func.func public @state_prep_trotter
+# CHECK: quantum.set_state
+# CHECK: quantum.custom "Hadamard"
+print(state_prep_trotter.mlir)
+
+
+@qjit(target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=2))
+def basis_state_trotter():
+    """
+    Test basis state used with Trotter Product.
+    https://github.com/PennyLaneAI/catalyst/issues/2235
+    """
+    H = qml.Hamiltonian([1, 1], [qml.PauliZ(0), qml.PauliZ(1)])
+    qml.BasisState([1, 1], wires=[0, 1])
+    qml.Hadamard(wires=2)
+    qml.ctrl(
+        qml.TrotterProduct(H, 1, n=3, order=2),
+        control=2,
+    )
+    return qml.probs(wires=[2])
+
+
+# CHECK-LABEL: func.func public @basis_state_trotter
+# CHECK: quantum.set_basis_state
+# CHECK: quantum.custom "Hadamard"
+print(basis_state_trotter.mlir)

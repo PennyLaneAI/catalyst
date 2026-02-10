@@ -28,7 +28,6 @@ Catalyst
             Catalyst is an experimental package that enables just-in-time (JIT)
             compilation of PennyLane programs. Compile the entire quantum-classical workflow.
         </p>
-        <img src="_static/catalyst.png" style="max-width: 700px; width: 100%;">
       <div class="row mt-3">
 
 .. index-card::
@@ -52,17 +51,21 @@ Catalyst
    </div>
    <br>
 
-.. mdinclude:: ../README.md
-  :start-line: 20
-  :end-line: 73
+.. image:: _static/pl-catalyst-logo-lightmode.png
+    :align: center
+    :width: 700px
+    :target: javascript:void(0);
 
 .. mdinclude:: ../README.md
-  :start-line: 142
-  :end-line: 163
+  :start-line: 20
+  :end-line: 72
+
+.. mdinclude:: ../README.md
+  :start-line: 134
+  :end-line: 167
 
 .. toctree::
    :maxdepth: 2
-   :titlesonly:
    :hidden:
 
    dev/installation
@@ -84,6 +87,7 @@ Catalyst
    Compiler Core <modules/mlir>
    MLIR Dialects <dev/dialects>
    Compiler Passes <dev/transforms>
+   Compiler Plugins <dev/plugins>
    Quantum Runtime <modules/runtime>
    dev/debugging
    dev/custom_devices
@@ -94,10 +98,14 @@ Catalyst
    :caption: Examples
    :hidden:
 
-   demos/magic_distillation_demo
-   demos/adaptive_circuits_demo
-   demos/qml/tutorial_qubit_rotation
-   QML Optimization with Optax <demos/qml_optimization>
+    Magic State Distillation <https://pennylane.ai/qml/demos/tutorial_magic_state_distillation>
+    Variational Quantum Eigensolver <https://pennylane.ai/qml/demos/tutorial_how_to_quantum_just_in_time_compile_vqe_catalyst>
+    QML Optimization with Optax <https://pennylane.ai/qml/demos/tutorial_How_to_optimize_QML_model_using_JAX_catalyst_and_Optax>
+    Shor's Algorithm <https://pennylane.ai/qml/demos/tutorial_shors_algorithm_catalyst>
+    Catalyst and Lightning GPU <https://pennylane.ai/qml/demos/how_to_catalyst_lightning_gpu>
+    Grover's Algorithm <https://pennylane.ai/qml/demos/tutorial_qjit_compile_grovers_algorithm_with_catalyst>
+    
+
 
 .. toctree::
    :maxdepth: 1
@@ -105,5 +113,6 @@ Catalyst
    :hidden:
 
    code/__init__
-   Runtime Device Interface <api/file_runtime_include_QuantumDevice.hpp>
-   QIR C-API <api/file_runtime_include_RuntimeCAPI.h>
+   catalyst-cli/catalyst-cli.rst
+   Runtime Device Interface <api/structCatalyst_1_1Runtime_1_1QuantumDevice>
+   code/dialects/__init__

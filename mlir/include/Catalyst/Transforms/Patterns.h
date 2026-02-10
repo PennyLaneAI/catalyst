@@ -14,22 +14,20 @@
 
 #pragma once
 
+#include "Catalyst/Transforms/TBAAUtils.h"
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace catalyst {
-
-void populateBufferizationPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
-
-void populateScatterPatterns(mlir::RewritePatternSet &);
-
-void populateHloCustomCallPatterns(mlir::RewritePatternSet &);
 
 void populateQnodeToAsyncPatterns(mlir::RewritePatternSet &);
 
 void populateDisableAssertionPatterns(mlir::RewritePatternSet &);
 
 void populateGEPInboundsPatterns(mlir::RewritePatternSet &);
+
+void populateTBAATagsPatterns(TBAATree &, mlir::LLVMTypeConverter &, mlir::RewritePatternSet &);
 
 void populateMemrefCopyToLinalgCopyPatterns(mlir::RewritePatternSet &);
 

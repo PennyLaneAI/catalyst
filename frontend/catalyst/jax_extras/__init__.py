@@ -1,4 +1,4 @@
-# Copyright 2024 Xanadu Quantum Technologies Inc.
+# Copyright 2024-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Catalyst additions to the Jax library """
+"""Catalyst additions to the Jax library"""
 
 from catalyst.jax_extras.lowering import custom_lower_jaxpr_to_module, jaxpr_to_mlir
 from catalyst.jax_extras.patches import (
@@ -21,7 +21,6 @@ from catalyst.jax_extras.patches import (
 )
 from catalyst.jax_extras.tracing import (
     ClosedJaxpr,
-    ConcreteArray,
     DBIdx,
     DShapedArray,
     DynamicJaxprTrace,
@@ -38,7 +37,6 @@ from catalyst.jax_extras.tracing import (
     PyTreeRegistry,
     ShapedArray,
     ShapeDtypeStruct,
-    _abstractify,
     _extract_implicit_args,
     _initial_style_jaxpr,
     _input_type_to_tracers,
@@ -59,12 +57,13 @@ from catalyst.jax_extras.tracing import (
     infer_output_type_python,
     input_type_to_tracers,
     jaxpr_pad_consts,
+    make_from_node_data_and_children,
     make_jaxpr2,
     make_jaxpr_effects,
-    new_dynamic_main2,
     new_inner_tracer,
     output_type_to_tracers,
     sort_eqns,
+    switch_expansion_strategy,
     trace_to_jaxpr,
     transient_jax_config,
     tree_flatten,

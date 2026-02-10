@@ -32,13 +32,17 @@ from catalyst.tracing.type_signatures import (
     params_are_annotated,
     typecheck_signatures,
 )
+from catalyst.utils.exceptions import CompileError
+
+# pylint: disable=too-many-lines
 
 
 def f_aot_builder(backend, wires=1, shots=1000):
     """Test AOT builder."""
 
     @qjit
-    @qml.qnode(qml.device(backend, wires=wires, shots=shots))
+    @qml.set_shots(shots)
+    @qml.qnode(qml.device(backend, wires=wires))
     def f(x: float) -> bool:
         qml.RY(x, wires=0)
         return measure(wires=0)
@@ -50,7 +54,8 @@ def f_jit_builder(backend, wires=1, shots=1000):
     """Test JIT builder."""
 
     @qjit
-    @qml.qnode(qml.device(backend, wires=wires, shots=shots))
+    @qml.set_shots(shots)
+    @qml.qnode(qml.device(backend, wires=wires))
     def f(x):
         qml.RY(x, wires=0)
         return measure(wires=0)
@@ -62,7 +67,8 @@ def fsample_aot_builder(backend, wires=1, shots=1000):
     """Test AOT builder with the sample measurement process."""
 
     @qjit
-    @qml.qnode(qml.device(backend, wires=wires, shots=shots))
+    @qml.set_shots(shots)
+    @qml.qnode(qml.device(backend, wires=wires))
     def f(x: float):
         qml.RY(x, wires=0)
         return qml.sample()
@@ -454,10 +460,10 @@ class TestCaching:
         def g(x: float):
             return f(x) + f(x)
 
-        assert "func.func private @f(" in g.mlir
-        assert g.mlir.count("call @f(") == 2
+        assert "func.func public @f(" in g.mlir
+        assert g.mlir.count("launch_kernel @module_f::@f") == 2
         # Duplicate function generation results in a "_0" suffix
-        assert not "func.func private @f_0(" in g.mlir
+        assert not "func.func public @f_0(" in g.mlir
 
 
 class TestShots:
@@ -486,7 +492,7 @@ class TestShots:
             wires = random.randint(1, max_wires)
             expected_shape = (shots, wires)
             f_aot = fsample_aot_builder(backend, wires=wires)
-            observed_val = f_aot(0.0, shots=shots)
+            observed_val = f_aot(0.0, shots=shots)  # pylint: disable=unexpected-keyword-arg
             observed_shape = jnp.shape(observed_val)
             # We are failing this test because of the type system.
             # If shots is specified AOT, we would need to recompile
@@ -846,7 +852,7 @@ class TestTracingQJITAnnotatedFunctions:
         mlir_v1 = workflow.mlir
 
         @qjit
-        def workflow(phi: float):
+        def workflow(phi: float):  # pylint: disable=function-redefined
             g = grad(qjit(circuit))
             return g(phi)
 
@@ -859,26 +865,72 @@ class TestDefaultAvailableIR:
     def test_mlir(self):
         """Test mlir."""
 
-        @qjit
+        @qjit  # Note that we are using the default qjit
         def f():
             return 1
 
         assert f.mlir
 
-    def test_qir(self, backend):
-        """Test qir."""
+    def test_llvmir(self, backend):
+        """Test llvmir."""
 
         @qml.qnode(qml.device(backend, wires=1))
         def f(x: float):
             qml.RX(x, wires=0)
             return qml.state()
 
-        @qjit
+        @qjit  # Note that we are using the default qjit
         def g(x: float):
             return f(x)
 
-        assert g.qir
-        assert "__catalyst__qis" in g.qir
+        assert g.llvmir
+        assert "__catalyst__qis" in g.llvmir
+
+    def test_mlir_opt(self, backend):
+        """Test mlir opt."""
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def f(x: float):
+            qml.RX(x, wires=0)
+            return qml.state()
+
+        @qjit  # Note that we are using the default qjit
+        def g(x: float):
+            return f(x)
+
+        assert g.mlir_opt
+        assert "__catalyst__qis" in g.mlir_opt
+
+    @pytest.mark.xdsl
+    @pytest.mark.usefixtures("use_capture")
+    def test_mlir_opt_using_xdsl_passes(self, backend):
+        """Test mlir opt using xDSL passes."""
+        # pylint: disable-next=import-outside-toplevel
+        from catalyst.python_interface.transforms import iterative_cancel_inverses_pass
+
+        @qjit
+        @iterative_cancel_inverses_pass
+        @qml.qnode(qml.device(backend, wires=1))
+        def f():
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=0)
+            return qml.state()
+
+        mlir_opt = f.mlir_opt
+        assert mlir_opt
+        assert not "__catalyst__qis__Hadamard" in mlir_opt
+
+    def test_jaxpr_target(self, backend):
+        """Test no mlir is generated for jaxpr target."""
+
+        @qjit(target="jaxpr")
+        @qml.qnode(qml.device(backend, wires=1))
+        def f(x: float):
+            qml.RX(x, wires=0)
+            return qml.state()
+
+        assert f.mlir_opt is None
+        assert f.mlir is None
 
 
 class TestAvoidVerification:
@@ -993,6 +1045,30 @@ class TestParamsAnnotations:
         def foo(hello: "BAD ANNOTATION"): ...
 
         assert not params_are_annotated(foo)
+
+
+class TestErrorNestedQNode:
+    """Test error is raised with nested qnodes"""
+
+    def test_nested_qnode(self):
+        """Test autograph on a QNode raises error."""
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(dev)
+        def inner():
+            return qml.state()
+
+        @qml.qnode(dev)
+        def outer():
+            inner()
+            return qml.state()
+
+        with pytest.raises(CompileError):
+
+            @qjit
+            def fn():
+                return outer()
 
 
 if __name__ == "__main__":

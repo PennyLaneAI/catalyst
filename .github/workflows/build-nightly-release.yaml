@@ -5,11 +5,17 @@ on:
     # Run every weekday at 23:40 EDT (cron is in UTC)
     - cron: "40 3 * * 2-6"
   workflow_dispatch:
+    inputs:
+      build-linux-arm:
+        description: 'Publish ARM wheels for Linux'
+        default: false
+        required: false
+        type: boolean
 
 jobs:
   setup:
     name: Setup the release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
@@ -35,25 +41,22 @@ jobs:
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
 
-  # linux-aarch:
-  #   name: Build on Linux aarch64
-  #   needs: [setup]
-  #   uses: ./.github/workflows/build-wheel-linux-arm64.yaml
+  linux-aarch:
+    if: ${{ inputs.build-linux-arm }}
+    name: Build on Linux aarch64
+    needs: [setup]
+    uses: ./.github/workflows/build-wheel-linux-arm64.yaml
 
   macos-arm:
     name: Build on macOS arm64
     needs: [setup]
     uses: ./.github/workflows/build-wheel-macos-arm64.yaml
 
-  # macos-x86:
-  #   name: Build on macOS x86-64
-  #   needs: [setup]
-  #   uses: ./.github/workflows/build-wheel-macos-x86_64.yaml
-
   upload:
     name: Prepare & Upload wheels to TestPyPI
-    needs: [linux-x86, macos-arm]  # linux-aarch, macos-x86
-    runs-on: ubuntu-latest
+    if: ${{ !failure() && !cancelled() }}  # needed in case linux-aarch is skipped
+    needs: [linux-x86, macos-arm, linux-aarch]
+    runs-on: ubuntu-24.04
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
 
@@ -70,13 +73,13 @@ jobs:
 
     - name: Prepare wheels
       run: |
-        rename "s/linux/manylinux_2_28/" dist/PennyLane_Catalyst-*
-        rename "s/macosx_12_0_universal2/macosx_12_0_x86_64/" dist/PennyLane_Catalyst-*
-        rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/PennyLane_Catalyst-*
-        rename "s/macosx_14/macosx_13/" dist/PennyLane_Catalyst-*
+        rename "s/linux/manylinux_2_28/" dist/pennylane_catalyst-*
+        rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/pennylane_catalyst-*
+        rename "s/macosx_14/macosx_13/" dist/pennylane_catalyst-*
 
     - name: Upload wheels
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         repository-url: https://test.pypi.org/legacy/
         packages-dir: dist
+        verbose: true

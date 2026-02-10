@@ -17,16 +17,22 @@
 
 include "mlir/Pass/PassBase.td"
 
-def GradientBufferizationPass : Pass<"gradient-bufferize"> {
-    let summary = "Bufferize tensors in quantum operations.";
+def GradientPreprocessingPass : Pass<"gradient-preprocess"> {
+    let summary = "Insert Func.CallOp for ForwardOp and ReverseOp.";
 
     let dependentDialects = [
-        "bufferization::BufferizationDialect",
+        "index::IndexDialect"
+    ];
+}
+
+def GradientPostprocessingPass : Pass<"gradient-postprocess"> {
+    let summary = "Make the signatures of ForwardOp and ReverseOp compatible"
+        "to Enzyme.";
+
+    let dependentDialects = [
         "memref::MemRefDialect",
         "index::IndexDialect"
     ];
-
-    let constructor = "catalyst::createGradientBufferizationPass()";
 }
 
 def GradientLoweringPass : Pass<"lower-gradients"> {
@@ -41,8 +47,6 @@ def GradientLoweringPass : Pass<"lower-gradients"> {
         "bufferization::BufferizationDialect",
         "catalyst::CatalystDialect"
     ];
-
-    let constructor = "catalyst::createGradientLoweringPass()";
 }
 
 def GradientConversionPass : Pass<"convert-gradient-to-llvm"> {
@@ -56,8 +60,6 @@ def GradientConversionPass : Pass<"convert-gradient-to-llvm"> {
         "catalyst::quantum::QuantumDialect"
     ];
 
-    let constructor = "catalyst::createGradientConversionPass()";
-
     let options = [
         Option<
             /*C++ var name=*/"useGenericFunctions",
@@ -68,6 +70,16 @@ def GradientConversionPass : Pass<"convert-gradient-to-llvm"> {
             "Use generic allocation and deallocation functions instead of the "
             "classic 'malloc', 'aligned_alloc' and 'free' functions"
         >
+    ];
+}
+
+def AnnotateInvalidGradientFunctionsPass : Pass<"annotate-invalid-gradient-functions"> {
+    let summary = "Annotate functions that contain operations invalid for automatic gradient computation.";
+
+    let dependentDialects = [
+        "catalyst::CatalystDialect",
+        "func::FuncDialect",
+        "catalyst::quantum::QuantumDialect"
     ];
 }
 

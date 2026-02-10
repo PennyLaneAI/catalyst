@@ -14,44 +14,12 @@
 """
 This file contains a couple of tests for the capture of measurement primitives into jaxpr.
 """
+
+# pylint: disable=line-too-long
+
 import jax
 
-from catalyst.jax_primitives import (
-    compbasis_p,
-    counts_p,
-    expval_p,
-    probs_p,
-    sample_p,
-    state_p,
-    var_p,
-)
-
-
-def test_sample():
-    """Test that the sample primitive can be captured into jaxpr."""
-
-    def f():
-        obs = compbasis_p.bind()
-        return sample_p.bind(obs, shots=5, shape=(5, 0))
-
-    jaxpr = jax.make_jaxpr(f)().jaxpr
-    assert jaxpr.eqns[1].primitive == sample_p
-    assert jaxpr.eqns[1].params == {"shape": (5, 0), "shots": 5}
-    assert jaxpr.eqns[1].outvars[0].aval.shape == (5, 0)
-
-
-def test_counts():
-    """Test that the counts primitive can be captured by jaxpr."""
-
-    def f():
-        obs = compbasis_p.bind()
-        return counts_p.bind(obs, shots=5, shape=(1,))
-
-    jaxpr = jax.make_jaxpr(f)()
-    assert jaxpr.eqns[1].primitive == counts_p
-    assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
-    assert jaxpr.eqns[1].outvars[0].aval.shape == (1,)
-    assert jaxpr.eqns[1].outvars[1].aval.shape == (1,)
+from catalyst.jax_primitives import compbasis_p, expval_p, probs_p, state_p, var_p
 
 
 def test_expval():
@@ -59,11 +27,11 @@ def test_expval():
 
     def f():
         obs = compbasis_p.bind()
-        return expval_p.bind(obs, shots=5, shape=(1,))
+        return expval_p.bind(obs, shape=(1,))
 
     jaxpr = jax.make_jaxpr(f)()
     assert jaxpr.eqns[1].primitive == expval_p
-    assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
+    assert jaxpr.eqns[1].params == {"shape": (1,)}
     assert jaxpr.eqns[1].outvars[0].aval.shape == ()
 
 
@@ -72,11 +40,11 @@ def test_var():
 
     def f():
         obs = compbasis_p.bind()
-        return var_p.bind(obs, shots=5, shape=(1,))
+        return var_p.bind(obs, shape=(1,))
 
     jaxpr = jax.make_jaxpr(f)()
     assert jaxpr.eqns[1].primitive == var_p
-    assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
+    assert jaxpr.eqns[1].params == {"shape": (1,)}
     assert jaxpr.eqns[1].outvars[0].aval.shape == ()
 
 
@@ -85,11 +53,11 @@ def test_probs():
 
     def f():
         obs = compbasis_p.bind()
-        return probs_p.bind(obs, shots=5, shape=(1,))
+        return probs_p.bind(obs, static_shape=(1,))
 
     jaxpr = jax.make_jaxpr(f)()
     assert jaxpr.eqns[1].primitive == probs_p
-    assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
+    assert jaxpr.eqns[1].params == {"static_shape": (1,)}
     assert jaxpr.eqns[1].outvars[0].aval.shape == (1,)
 
 
@@ -98,9 +66,9 @@ def test_state():
 
     def f():
         obs = compbasis_p.bind()
-        return state_p.bind(obs, shots=5, shape=(1,))
+        return state_p.bind(obs, static_shape=(1,))
 
     jaxpr = jax.make_jaxpr(f)()
     assert jaxpr.eqns[1].primitive == state_p
-    assert jaxpr.eqns[1].params == {"shape": (1,), "shots": 5}
+    assert jaxpr.eqns[1].params == {"static_shape": (1,)}
     assert jaxpr.eqns[1].outvars[0].aval.shape == (1,)

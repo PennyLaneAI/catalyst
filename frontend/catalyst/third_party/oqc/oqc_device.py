@@ -15,9 +15,11 @@
 """This module contains the OQC device."""
 
 import os
+import platform
+from typing import Optional
 
-from pennylane.devices import DefaultExecutionConfig, Device, ExecutionConfig
-from pennylane.transforms.core import TransformProgram
+from pennylane import CompilePipeline
+from pennylane.devices import Device, ExecutionConfig
 
 try:
     from qcaas_client.client import OQCClient  # pylint: disable=unused-import
@@ -35,7 +37,7 @@ class OQCDevice(Device):
     """The OQC device allows to access the hardware devices from OQC using
     Catalyst."""
 
-    config = get_lib_path("oqc_runtime", "OQC_LIB_DIR") + "/backend" + "/oqc.toml"
+    config_filepath = get_lib_path("oqc_runtime", "OQC_LIB_DIR") + "/backend" + "/oqc.toml"
 
     @staticmethod
     def get_c_interface():
@@ -43,14 +45,15 @@ class OQCDevice(Device):
         the location to the shared object with the C/C++ device implementation.
         """
 
-        # TODO: Replace with the oqc shared library
-        return "oqc", get_lib_path("oqc_runtime", "OQC_LIB_DIR") + "/librtd_oqc.so"
+        system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+        lib_path = get_lib_path("oqc_runtime", "OQC_LIB_DIR") + "/librtd_oqc" + system_extension
+        return "oqc", lib_path
 
-    def __init__(self, wires, backend, shots=1024, **kwargs):
+    def __init__(self, wires, backend, **kwargs):
         self._backend = backend
         _check_backend(backend=backend)
         _check_envvar()
-        super().__init__(wires=wires, shots=shots, **kwargs)
+        super().__init__(wires=wires, **kwargs)
 
     @property
     def backend(self):
@@ -59,14 +62,17 @@ class OQCDevice(Device):
 
     def preprocess(
         self,
-        execution_config: ExecutionConfig = DefaultExecutionConfig,
+        execution_config: Optional[ExecutionConfig] = None,
     ):
         """This function defines the device transform program to be applied and an
         updated device configuration."""
-        transform_program = TransformProgram()
+        if execution_config is None:
+            execution_config = ExecutionConfig()
+
+        compile_pipeline = CompilePipeline()
         # TODO: Add transforms (check wires, check shots, no sample, only commuting measurements,
         # measurement from counts)
-        return transform_program, execution_config
+        return compile_pipeline, execution_config
 
     def execute(self, circuits, execution_config):
         """Non-implemented python execution."""
@@ -86,4 +92,9 @@ def _check_envvar():
     email = os.getenv("OQC_EMAIL")
     password = os.getenv("OQC_PASSWORD")
     if not all((url, email, password)):
-        raise ValueError("You must set url, email and password as environment variables.")
+        raise ValueError(
+            """
+            OQC credentials not found in environment variables.
+            Please set the environment variables `OQC_EMAIL`, `OQC_PASSWORD` and `OQC_URL`.
+            """
+        )

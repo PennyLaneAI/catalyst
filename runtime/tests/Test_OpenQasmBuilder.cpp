@@ -1,4 +1,4 @@
-// Copyright 2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023-2025 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,12 +16,15 @@
 #include <string>
 #include <typeinfo>
 
-#include "OpenQasmBuilder.hpp"
+#include <catch2/catch_template_test_macros.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
-#include <catch2/catch.hpp>
+#include "OpenQasmBuilder.hpp"
 
 #define TYPE_INFO(x) std::string(typeid(x).name())
 
+using namespace Catch::Matchers;
 using namespace Catalyst::Runtime::Device::OpenQasm;
 
 TEST_CASE("Test lookup openqasm gate names from QIR -> OpenQasm map", "[openqasm]")
@@ -36,7 +39,7 @@ TEST_CASE("Test lookup openqasm gate names from QIR -> OpenQasm map", "[openqasm
     // Check lookup an unsupported gate
     REQUIRE_THROWS_WITH(
         lookup_qasm_gate_name("ABC"),
-        Catch::Contains("The given QIR gate name is not supported by the OpenQASM builder"));
+        ContainsSubstring("The given QIR gate name is not supported by the OpenQASM builder"));
 }
 
 TEST_CASE("Test QasmVariable(type=Float) from OpenQasmBuilder", "[openqasm]")
@@ -52,7 +55,7 @@ TEST_CASE("Test QasmVariable(type=Float) from OpenQasmBuilder", "[openqasm]")
     auto var_buggy = QasmVariable(static_cast<VariableType>(2), "beta");
     REQUIRE_THROWS_WITH(
         var_buggy.toOpenQasm(),
-        Catch::Contains(
+        ContainsSubstring(
             "[Function:toOpenQasm] Error in Catalyst Runtime: Unsupported OpenQasm variable type"));
 }
 
@@ -85,12 +88,12 @@ TEST_CASE("Test QasmRegister(type=Qubit) from OpenQasmBuilder", "[openqasm]")
     // Check edge cases
     REQUIRE_THROWS_WITH(
         reg.toOpenQasm(RegisterMode::Slice, {0, 10}),
-        Catch::Contains(
+        ContainsSubstring(
             "[Function:toOpenQasm] Error in Catalyst Runtime: Assertion: isValidSlice(slice)"));
 
     REQUIRE_THROWS_WITH(reg.toOpenQasm(static_cast<RegisterMode>(4), {0, 5}),
-                        Catch::Contains("[Function:toOpenQasm] Error in Catalyst Runtime: "
-                                        "Unsupported OpenQasm register mode"));
+                        ContainsSubstring("[Function:toOpenQasm] Error in Catalyst Runtime: "
+                                          "Unsupported OpenQasm register mode"));
 }
 
 TEST_CASE("Test QasmRegister(type=Bit) from OpenQasmBuilder", "[openqasm]")
@@ -122,17 +125,17 @@ TEST_CASE("Test QasmRegister(type=Bit) from OpenQasmBuilder", "[openqasm]")
     // Check edge cases
     auto reg_buggy = QasmRegister(static_cast<RegisterType>(3), "random", 5);
     REQUIRE_THROWS_WITH(reg_buggy.toOpenQasm(RegisterMode::Alloc, {}),
-                        Catch::Contains("[Function:toOpenQasm] Error in Catalyst Runtime: "
-                                        "Unsupported OpenQasm register type"));
+                        ContainsSubstring("[Function:toOpenQasm] Error in Catalyst Runtime: "
+                                          "Unsupported OpenQasm register type"));
 
     REQUIRE_THROWS_WITH(
         reg.toOpenQasm(RegisterMode::Slice, {0, 10}),
-        Catch::Contains(
+        ContainsSubstring(
             "[Function:toOpenQasm] Error in Catalyst Runtime: Assertion: isValidSlice(slice)"));
 
     REQUIRE_THROWS_WITH(reg.toOpenQasm(static_cast<RegisterMode>(4), {0, 5}),
-                        Catch::Contains("[Function:toOpenQasm] Error in Catalyst Runtime: "
-                                        "Unsupported OpenQasm register mode"));
+                        ContainsSubstring("[Function:toOpenQasm] Error in Catalyst Runtime: "
+                                          "Unsupported OpenQasm register mode"));
 }
 
 TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]")
@@ -198,13 +201,14 @@ TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]")
     // Check edge cases
     REQUIRE_THROWS_WITH(
         QasmGate("ABC", {}, {}, {}, true),
-        Catch::Contains("[Function:lookup_qasm_gate_name] Error in Catalyst Runtime: The given QIR "
-                        "gate name is not supported by the OpenQASM builder"));
+        ContainsSubstring(
+            "[Function:lookup_qasm_gate_name] Error in Catalyst Runtime: The given QIR "
+            "gate name is not supported by the OpenQASM builder"));
 
     REQUIRE_THROWS_WITH(
         QasmGate("RX", {0.314}, {"gamma"}, {2}, false),
-        Catch::Contains("[Function:QasmGate] Error in Catalyst Runtime: Parametric gates are "
-                        "currently supported via either their values or names but not both."));
+        ContainsSubstring("[Function:QasmGate] Error in Catalyst Runtime: Parametric gates are "
+                          "currently supported via either their values or names but not both."));
 }
 
 TEST_CASE("Test QasmMeasure from OpenQasmBuilder", "[openqasm]")
@@ -329,7 +333,7 @@ TEST_CASE("Test QasmTensorObs from OpenQasmBuilder", "[openqasm]")
 
     REQUIRE_THROWS_WITH(
         QasmTensorObs(obs_z, obs_x2),
-        Catch::Contains(
+        ContainsSubstring(
             "[Function:QasmTensorObs] Error in Catalyst Runtime: Invalid list of total wires"));
 }
 
@@ -357,9 +361,10 @@ TEST_CASE("Test QasmHamiltonianObs from OpenQasmBuilder", "[openqasm]")
     CHECK(hl_mix->toOpenQasm(qubits) ==
           "0.3 * y(q[1]) + 0.5 * z(q[2]) + 0.1 * x(q[0]) @ x(q[2]) @ h(q[3])");
 
-    REQUIRE_THROWS_WITH(QasmHamiltonianObs::create({0.3}, {obs_y, obs_z}),
-                        Catch::Contains("[Function:QasmHamiltonianObs] Error in Catalyst Runtime: "
-                                        "Assertion: obs.size() == coeffs.size()"));
+    REQUIRE_THROWS_WITH(
+        QasmHamiltonianObs::create({0.3}, {obs_y, obs_z}),
+        ContainsSubstring("[Function:QasmHamiltonianObs] Error in Catalyst Runtime: "
+                          "Assertion: obs.size() == coeffs.size()"));
 }
 
 TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping the circuit header", "[openqasm]",
@@ -387,8 +392,8 @@ TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping the circuit header", "[ope
     builder.Register(RegisterType::Qubit, "qubits2", 3);
 
     REQUIRE_THROWS_WITH(builder.toOpenQasm(),
-                        Catch::Contains("[Function:toOpenQasm] Error in Catalyst Runtime: Invalid"
-                                        " number of quantum registers"));
+                        ContainsSubstring("[Function:toOpenQasm] Error in Catalyst Runtime: Invalid"
+                                          " number of quantum registers"));
 }
 
 TEMPLATE_TEST_CASE("Test OpenQasmBuilder with invalid number of measurement results registers",
@@ -408,12 +413,12 @@ TEMPLATE_TEST_CASE("Test OpenQasmBuilder with invalid number of measurement resu
 
     // Check edge cases
     REQUIRE_THROWS_WITH(builder.toOpenQasm(),
-                        Catch::Contains("[Function:toOpenQasm] Error in Catalyst Runtime: Invalid"
-                                        " number of measurement results registers"));
+                        ContainsSubstring("[Function:toOpenQasm] Error in Catalyst Runtime: Invalid"
+                                          " number of measurement results registers"));
 
     REQUIRE_THROWS_WITH(
         builder.Register(static_cast<RegisterType>(3), "qubits", 5),
-        Catch::Contains(
+        ContainsSubstring(
             "[Function:Register] Error in Catalyst Runtime: Unsupported OpenQasm register type"));
 }
 
@@ -523,7 +528,7 @@ TEMPLATE_TEST_CASE("Test OpenQasmBuilder with custom instructions", "[openqasm]"
     if (TYPE_INFO(TestType) == TYPE_INFO(OpenQasmBuilder)) {
         REQUIRE_THROWS_WITH(
             builder.toOpenQasmWithCustomInstructions(""),
-            Catch::Contains("Error in Catalyst Runtime: Unsupported functionality"));
+            ContainsSubstring("Error in Catalyst Runtime: Unsupported functionality"));
     }
     else if (TYPE_INFO(TestType) == TYPE_INFO(BraketBuilder)) {
         std::string toqasm = "OPENQASM 3.0;\n"

@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Catalyst/IR/CatalystDialect.h"
-#include "Catalyst/IR/CatalystOps.h"
+#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
+
+#include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Transforms/InliningUtils.h"
-#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
+
+#include "Catalyst/IR/CatalystDialect.h"
+#include "Catalyst/IR/CatalystOps.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -40,6 +43,9 @@ void CatalystDialect::initialize()
 #define GET_OP_LIST
 #include "Catalyst/IR/CatalystOps.cpp.inc"
         >();
+
+    declarePromisedInterfaces<bufferization::BufferizableOpInterface, PrintOp, CustomCallOp,
+                              CallbackCallOp, CallbackOp>();
 }
 
 //===----------------------------------------------------------------------===//
@@ -75,12 +81,34 @@ CallInterfaceCallable CallbackCallOp::getCallableForCallee()
 
 void CallbackCallOp::setCalleeFromCallable(CallInterfaceCallable callee)
 {
-    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
 }
 
 Operation::operand_range CallbackCallOp::getArgOperands() { return getInputs(); }
 
 MutableOperandRange CallbackCallOp::getArgOperandsMutable() { return getInputsMutable(); }
+
+//===----------------------------------------------------------------------===//
+// LaunchKernelOp
+//===----------------------------------------------------------------------===//
+
+CallInterfaceCallable LaunchKernelOp::getCallableForCallee()
+{
+    return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+}
+
+void LaunchKernelOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
+    (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+}
+
+Operation::operand_range LaunchKernelOp::getArgOperands() { return getInputs(); }
+
+MutableOperandRange LaunchKernelOp::getArgOperandsMutable() { return getInputsMutable(); }
+
+StringAttr LaunchKernelOp::getCalleeModuleName() { return getCallee().getRootReference(); }
+
+StringAttr LaunchKernelOp::getCalleeName() { return getCallee().getLeafReference(); }
 
 //===----------------------------------------------------------------------===//
 // Catalyst type definitions.

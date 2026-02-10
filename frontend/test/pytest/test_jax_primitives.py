@@ -26,10 +26,10 @@ from jax._src.lib.mlir import ir
 from jax.interpreters.mlir import ir_constant, make_ir_context
 
 from catalyst.jax_primitives import (
-    _get_call_jaxpr,
     _qextract_lowering,
     _qinsert_lowering,
     extract_scalar,
+    get_call_jaxpr,
     safe_cast_to_f64,
 )
 
@@ -136,14 +136,14 @@ class TestHelpers:
 
 
 def test_get_call_jaxpr():
-    """Test _get_call_jaxpr raises AsserionError if no function primitive exists."""
+    """Test get_call_jaxpr raises AsserionError if no function primitive exists."""
 
     def f(x):
         return x * x
 
     jaxpr = make_jaxpr(f)(2.0)
     with pytest.raises(AssertionError, match="No call_jaxpr found in the JAXPR"):
-        _ = _get_call_jaxpr(jaxpr)
+        _ = get_call_jaxpr(jaxpr)
 
 
 if __name__ == "__main__":

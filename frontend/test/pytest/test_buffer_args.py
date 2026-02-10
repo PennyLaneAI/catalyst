@@ -70,13 +70,13 @@ class TestReturnValues:
             qml.SingleExcitation(params[1], wires=[0, 2])
             return qml.expval(qml.PauliZ(2))
 
-        @qjit()
+        @qjit
         def order1(params):
             diff = grad(circuit, argnums=0)
             h = diff(params)
             return h[0], params
 
-        @qjit()
+        @qjit
         def order2(params):
             diff = grad(circuit, argnums=0)
             h = diff(params)
@@ -116,7 +116,7 @@ class TestReturnValues:
 
         assert isinstance(identity(1.0), jax.Array)
 
-    @pytest.mark.parametrize("dtype", [(jnp.float16)])
+    @pytest.mark.parametrize("dtype", [jnp.float16])
     def test_types_which_are_unhandled(self, dtype):
         """Test that there's a nice error message when a function returns an f16."""
 

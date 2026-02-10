@@ -31,7 +31,8 @@ The directory is structured as follows:
     The core modules of the runtime are structured into ``lib/capi`` and ``lib/backend``.
     `lib/capi <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/capi>`_  implements the semantics for
     QIR instructions lowered to our custom runtime. `lib/backend <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/backend>`_
-    contains implementations of the ``QuantumDevice`` API for backend simulators.
+    contains implementations of the ``QuantumDevice`` API for backend simulators. An additional module
+    `lib/RSDecompRuntime` implements the runtime component of the Ross-Selinger Gridsynth algorithm for decomposing single-qubit RZ and PhaseShift gates, which is used by the `gridsynth` compilation pass.
 
 - `tests <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/tests>`_:
     A collection of C++ tests for modules and methods in the runtime.
@@ -47,32 +48,32 @@ The following table shows the available devices along with supported features:
    :header-rows: 0
 
    * - **Features**
-     - **PennyLane-Lightning**
-     - **PennyLane-Lightning-Kokkos**
+     - **PennyLane-Lightning-Qubit**
+     - **PennyLane-Lightning-Kokkos**, **PennyLane-Lightning-AMDGPU** and **PennyLane-Lightning-GPU**
      - **Amazon-Braket-OpenQasm**
    * - Qubit Management
      - Dynamic allocation/deallocation
      - Static allocation/deallocation
      - Static allocation/deallocation
    * - Gate Operations
-     - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/core/src/gates/GateOperation.hpp>`_
-     - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/core/src/gates/GateOperation.hpp>`_
+     - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/core/gates/GateOperation.hpp>`_
+     - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/core/gates/GateOperation.hpp>`_
      - `Braket operations <https://github.com/PennyLaneAI/catalyst/blob/e812afbadbd777209862d5c76f394e3f0c43ffb6/runtime/lib/backend/openqasm/OpenQasmBuilder.hpp#L49>`_
    * - Quantum Observables
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, and Tensor Product of Observables
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, and Tensor Product of Observables
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, and Tensor Product of Observables
    * - Expectation Value
-     - All observables; Finite-shots supported except for ``Hermitian``
-     - All observables; Finite-shots supported except for ``Hermitian``
+     - All observables; Finite-shots supported
+     - All observables; Finite-shots supported
      - All observables; Finite-shots supported
    * - Variance
-     - All observables; Finite-shots supported except for ``Hermitian``
-     - All observables; Finite-shots supported except for ``Hermitian``
+     - All observables; Finite-shots supported
+     - All observables; Finite-shots supported
      - All observables; Finite-shots supported
    * - Probability
-     - Only for the computational basis on the supplied qubits; Finite-shots supported except for ``Hermitian``
-     - Only for the computational basis on the supplied qubits; Finite-shots supported except for ``Hermitian``
+     - Only for the computational basis on the supplied qubits; Finite-shots supported
+     - Only for the computational basis on the supplied qubits; Finite-shots supported
      - The computational basis on all active qubits; Finite-shots supported
    * - Sampling
      - Only for the computational basis on the supplied qubits

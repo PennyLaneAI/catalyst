@@ -40,7 +40,7 @@ CallInterfaceCallable ZneOp::getCallableForCallee() { return getCalleeAttr(); }
 
 void ZneOp::setCalleeFromCallable(CallInterfaceCallable callee)
 {
-    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
 };
 
 Operation::operand_range ZneOp::getArgOperands() { return getOperands(); }
@@ -57,9 +57,6 @@ LogicalResult ZneOp::verifySymbolUses(SymbolTableCollection &symbolTable)
         symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(), callee);
     if (!fn) {
         return this->emitOpError("invalid function name specified: ") << callee;
-    }
-    if (!fn->hasAttrOfType<UnitAttr>("qnode")) {
-        return this->emitOpError("ZNE can only be applied on QNodes: ") << callee;
     }
     return success();
 }

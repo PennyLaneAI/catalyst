@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test that the jax linear algebra functions yield correct results when compiled with qml.qjit"""
+"""Test that the jax linear algebra functions yield correct results when compiled with catalyst.qjit"""
 
 import numpy as np
 import pytest
+from jax import lax as lax
 from jax import numpy as jnp
 from jax import scipy as jsp
 
@@ -151,6 +152,7 @@ class MatrixGenerator:
 
         return A + 1j * B
 
+    @staticmethod
     def random_real_symmetric_matrix(n, positive=False, seed=42, dtype=None):
         """
         Generate a random n x n real symmetric matrix.
@@ -191,6 +193,7 @@ class MatrixGenerator:
 
         return S
 
+    @staticmethod
     def random_real_symmetric_positive_definite_matrix(n, seed=42, dtype=None):
         """
         Generate a random n x n real symmetric positive-definite matrix.
@@ -225,6 +228,7 @@ class MatrixGenerator:
 
         return S
 
+    @staticmethod
     def random_complex_hermitian_matrix(n, seed=42, dtype=None):
         """
         Generate a random n x n complex Hermitian matrix.
@@ -265,6 +269,7 @@ class MatrixGenerator:
 
         return H
 
+    @staticmethod
     def random_complex_hermitian_positive_definite_matrix(n, seed=42, dtype=None):
         """
         Generate a random n x n complex Hermitian positive-definite matrix.
@@ -313,6 +318,7 @@ class TestCholesky:
     and similarly where U is an upper-triangular matrix.
     """
 
+    # pylint: disable=line-too-long
     @pytest.mark.parametrize(
         "A",
         [
@@ -348,6 +354,7 @@ class TestCholesky:
         assert np.allclose(L_exp @ L_exp.T.conj(), A)  # Check jax solution is correct
         assert jnp.allclose(L_obs, L_exp)
 
+    # pylint: disable=line-too-long
     @pytest.mark.parametrize(
         "A",
         [
@@ -716,6 +723,7 @@ class TestPolar:
         assert jnp.allclose(U_obs, U_exp)
         assert jnp.allclose(P_obs, P_exp)
 
+    # pylint: disable=line-too-long
     @pytest.mark.parametrize(
         "A",
         [
@@ -1070,3 +1078,40 @@ class TestSVD:
         assert jnp.allclose(U_obs, U_exp)
         assert jnp.allclose(S_obs, S_exp)
         assert jnp.allclose(Vt_obs, Vt_exp)
+
+
+class TestTridiagonal:
+    """Test results of jax.lax.linalg.tridiagonal are numerically correct when qjit compiled.
+
+    See: https://jax.readthedocs.io/en/latest/_autosummary/jax.lax.linalg.tridiagonal.html
+
+    Tridiagonal Reduction: Reduces a symmetric/Hermitian matrix to tridiagonal form.
+    """
+
+    @pytest.mark.parametrize(
+        "A",
+        [
+            jnp.array(MatrixGenerator.random_real_symmetric_matrix(3, seed=11)),
+            jnp.array(MatrixGenerator.random_complex_hermitian_matrix(5, seed=12)),
+        ],
+    )
+    def test_tridiagonal_numerical(self, A):
+        """Test basic numerical correctness of jax.lax.linalg.tridiagonal for matrices
+        of various data types and sizes.
+        """
+
+        @qjit
+        def f(X):
+            return lax.linalg.tridiagonal(X)
+
+        a_tridiag_obs, d_obs, e_obs, taus_obs = f(A)
+        a_tridiag_exp, d_exp, e_exp, taus_exp = lax.linalg.tridiagonal(A)
+
+        assert jnp.allclose(a_tridiag_obs, a_tridiag_exp)
+        assert jnp.allclose(d_obs, d_exp)
+        assert jnp.allclose(e_obs, e_exp)
+        assert jnp.allclose(taus_obs, taus_exp)
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

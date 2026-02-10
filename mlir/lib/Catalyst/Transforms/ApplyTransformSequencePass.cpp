@@ -17,19 +17,131 @@
 
 #define DEBUG_TYPE "applytransformsequence"
 
-#include "Catalyst/IR/CatalystDialect.h"
-#include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/Pass/Pass.h"
-#include "llvm/Support/Debug.h"
-
 #include <cassert>
+
+#include "mlir/Dialect/Transform/IR/TransformOps.h"
+#include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
+#include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/Pass/AnalysisManager.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassInstrumentation.h"
+#include "mlir/Pass/PassManager.h"
 
 using namespace llvm;
 using namespace mlir;
-using namespace catalyst;
 
 namespace catalyst {
+
+/// Generate a meaningful name for a transform operation for pass instrumentation
+static std::string getTransformOpName(transform::TransformOpInterface transformOp)
+{
+    std::string baseName = transformOp->getName().getStringRef().str();
+
+    if (auto applyPassOp = dyn_cast<transform::ApplyRegisteredPassOp>(transformOp.getOperation())) {
+        if (auto passName = applyPassOp.getPassName(); !passName.empty()) {
+            return "transform_" + passName.str();
+        }
+    }
+
+    // convert "." to "_"
+    std::replace(baseName.begin(), baseName.end(), '.', '_');
+    return baseName;
+}
+
+/// A fake pass wrapper that represents a single transform operation. Allowing it to be tracked by
+/// pass instrumentation.
+class TransformOpSubPass : public OperationPass<> {
+  private:
+    transform::TransformOpInterface transformOp;
+    std::string opNameStr;
+
+  public:
+    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TransformOpSubPass)
+
+    TransformOpSubPass(transform::TransformOpInterface op)
+        : OperationPass(TypeID::get<TransformOpSubPass>()), transformOp(op),
+          opNameStr(getTransformOpName(op))
+    {
+    }
+
+    void runOnOperation() override
+    {
+        llvm_unreachable("TransformOpSubPass should not be executed");
+    }
+
+    StringRef getName() const override { return opNameStr; }
+    StringRef getArgument() const override { return opNameStr; }
+    StringRef getDescription() const override { return "Transform dialect operation"; }
+
+    std::unique_ptr<Pass> clonePass() const override
+    {
+        return std::make_unique<TransformOpSubPass>(transformOp);
+    }
+
+    transform::TransformOpInterface getTransformOp() const { return transformOp; }
+};
+
+/// Apply transforms with individual subpass tracking by executing each transform operation
+/// individually with instrumentation hooks. This implements a custom sequence
+/// execution that mirrors the logic in NamedSequenceOp::apply but with instrumentation.
+/// Reference to transform::NamedSequenceOp::apply in
+/// https://github.com/llvm/llvm-project/blob/334e9bf2dd01fbbfe785624c0de477b725cde6f2/mlir/lib/
+/// Dialect/Transform/IR/TransformOps.cpp#L2378
+LogicalResult applyTransformsWithSubpassTracking(Operation *payload,
+                                                 transform::NamedSequenceOp namedSequence,
+                                                 PassInstrumentor *passInstrumentor)
+{
+    // TODO: We currently only expect to have a single block in the sequence. It may change in the
+    // future.
+    assert(namedSequence.getBody().hasOneBlock() &&
+           "Expected exactly one transform op in the sequence block");
+
+    Block &sequenceBlock = namedSequence.getBody().front();
+    if (sequenceBlock.without_terminator().empty()) {
+        return success();
+    }
+
+    transform::TransformState state =
+        transform::detail::makeTransformStateForTesting(namedSequence->getParentRegion(), payload);
+
+    // Map the entry block argument to the list of operations.
+    // Note: this is the same implementation as PossibleTopLevelTransformOp but
+    // without attaching the interface / trait since that is tailored to a
+    // dangling top-level op that does not get "called".
+    auto scope = state.make_region_scope(namedSequence.getBody());
+    if (failed(transform::detail::mapPossibleTopLevelTransformOpBlockArguments(
+            state, namedSequence, namedSequence.getBody()))) {
+        return failure();
+    }
+
+    for (Operation &transformOp : sequenceBlock.without_terminator()) {
+        if (auto transformInterface = dyn_cast<transform::TransformOpInterface>(transformOp)) {
+            auto subPass = std::make_unique<TransformOpSubPass>(transformInterface);
+
+            // hook before pass
+            passInstrumentor->runBeforePass(subPass.get(), payload);
+
+            DiagnosedSilenceableFailure result = state.applyTransform(transformInterface);
+
+            if (result.isDefiniteFailure()) {
+                // hook after pass failed
+                passInstrumentor->runAfterPassFailed(subPass.get(), payload);
+                return failure();
+            }
+
+            if (result.isSilenceableFailure()) {
+                (void)result.silence();
+            }
+
+            // hook after pass
+            passInstrumentor->runAfterPass(subPass.get(), payload);
+        }
+    }
+
+    return success();
+}
+
 #define GEN_PASS_DEF_APPLYTRANSFORMSEQUENCEPASS
 #include "Catalyst/Transforms/Passes.h.inc"
 
@@ -69,27 +181,29 @@ struct ApplyTransformSequencePass
         // a valid transform with the transform dialect
         // We need to extract the transform.named_sequence in the
         // transformer module.
-        Operation *transformer_main_sequence;
-        transformer->walk([&](Operation *op) {
-            if (op->getName().getStringRef() == "transform.named_sequence") {
-                transformer_main_sequence = op;
-            }
+        transform::NamedSequenceOp transformer_main_sequence;
+        transformer->walk([&](transform::NamedSequenceOp op) {
+            assert(!transformer_main_sequence &&
+                   "expected only one transform sequence in the transform module");
+            transformer_main_sequence = op;
         });
 
-        // Perform the transform
-        if (failed(mlir::transform::applyTransforms(
-                payload, cast<mlir::transform::TransformOpInterface>(transformer_main_sequence), {},
-                mlir::transform::TransformOptions(), false))) {
-            return signalPassFailure();
-        };
+        if (PassInstrumentor *passInstrumentor = getAnalysisManager().getPassInstrumentor()) {
+            // Manually execute the transform sequence with individual subpass tracking
+            if (failed(applyTransformsWithSubpassTracking(payload, transformer_main_sequence,
+                                                          passInstrumentor))) {
+                return signalPassFailure();
+            }
+        }
+        else {
+            if (failed(transform::applyTransforms(payload, transformer_main_sequence, {},
+                                                  transform::TransformOptions(), false))) {
+                return signalPassFailure();
+            }
+        }
 
         transformer.erase();
     }
 };
-
-std::unique_ptr<Pass> createApplyTransformSequencePass()
-{
-    return std::make_unique<ApplyTransformSequencePass>();
-}
 
 } // namespace catalyst

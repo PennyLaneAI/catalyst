@@ -1,0 +1,118 @@
+# OQD Gate-Decomposition Parameters
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
+# A database containing parameters relating to decompositions of gates to pulse operations used in
+# an Open Quantum Design (OQD) trapped-ion quantum computer device.
+
+oqd_config_schema = "v0.1"
+
+
+# Beams
+# A beam contains 4 properties that will be calibrated:
+#    rabi = float,
+#    detuning = float,
+#    polarization = int array,
+#    wavevector = int array,
+#
+# A pulse operation will consist of a beam, a transition, a phase, a time (duration of application), and a target qubit
+# A list of beams is recorded in this toml.
+#
+# `beams1` are the beams used for single-qubit gates.
+# The i-th beams1 is usable on the i-th qubit.
+#
+# `beams2` are the beams used for 2-qubit gates.
+# In a system with n qubits, there are (n choose 2) = n*(n-1)/2 possible two-qubit
+# combinations. Each combination is represented by a unique index. For example, in a 4-qubit system, where the qubits are indexed as [0, 1, 2, 3],
+# the possible two-qubit combinations and their indices are:
+#   0: (0, 1)
+#   1: (0, 2)
+#   2: (0, 3)
+#   3: (1, 2)
+#   4: (1, 3)
+#   5: (2, 3)
+# The i-th beams2 is usable on a gate whose input qubit indices
+# correspond to i in the above encoding combination.
+# -------
+
+[[beams1]]
+rabi = 62831853071.79586
+detuning = 208570336271826.38
+polarization = [1, 0, 0]
+wavevector = [0, 1, 0]
+
+[[beams1]]
+rabi = 62831853071.79586
+detuning = 208570336271826.38
+polarization = [1, 0, 0]
+wavevector = [0, 1, 0]
+
+[[beams1]]
+rabi = 62831853071.79586
+detuning = 208570336271826.38
+polarization = [1, 0, 0]
+wavevector = [0, 1, 0]
+
+
+[[beams2]]
+rabi = 8885765876.316732
+detuning = 208570336271826.38
+polarization = [0, 1, 0]
+wavevector = [-1, 0, 0]
+
+[[beams2]]
+rabi = 6283185307.179586
+detuning = 208570329925809.22
+polarization = [0, 1, 0]
+wavevector = [1, 0, 0]
+
+[[beams2]]
+rabi = 6283185307.179586
+detuning = 208570342617843.53
+polarization = [0, 1, 0]
+wavevector = [1, 0, 0]
+
+
+# Phonon modes
+# Each qubit has a phonon triplet (x,y,z)
+# A list of phonon triplets, one triplet per qubit, is stored here
+# On a single direction, a phonon has a calibrated energy.
+# phonons1 are the phonons used for single-qubit gates.
+# phonons2 are the phonons used for 2-qubit gates.
+# -------
+
+[[phonons1]]
+energy = 6283185.307179586
+eigenvector = [1.0, 0.0, 0.0]
+
+[[phonons1]]
+energy = 5026548.245743669
+eigenvector = [0.0, 1.0, 0.0]
+
+[[phonons1]]
+energy = 1256637.0614359172
+eigenvector = [0.0, 0.0, 1.0]
+
+
+[[phonons2]]
+energy = 6283185.307179586
+eigenvector = [0.7071067811865475, 0.0, 0.0, 0.7071067811865475, 0.0, 0.0]
+
+[[phonons2]]
+energy = 5026548.245743669
+eigenvector = [0.0, 0.7071067811865475, 0.0, 0.0, 0.7071067811865475, 0.0]
+
+[[phonons2]]
+energy = 1256637.0614359172
+eigenvector = [0.0, 0.0, 0.7071067811865475, 0.0, 0.0, 0.7071067811865475]
+
+[[phonons2]]
+energy = 5654866.776461627
+eigenvector = [0.7071067811865475, 0.0, 0.0, -0.7071067811865475, 0.0, 0.0]
+
+[[phonons2]]
+energy = 4398229.71502571
+eigenvector = [0.0, 0.7071067811865475, 0.0, 0.0, -0.7071067811865475, 0.0]
+
+[[phonons2]]
+energy = 2513274.1228718343
+eigenvector = [0.0, 0.0, 0.7071067811865475, 0.0, 0.0, -0.7071067811865475]

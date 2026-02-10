@@ -14,12 +14,14 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mlir/Pass/Pass.h"
 
 namespace catalyst {
+namespace mitigation {
 
-std::unique_ptr<mlir::Pass> createMitigationLoweringPass();
+#define GEN_PASS_DECL
+#define GEN_PASS_REGISTRATION
+#include "Mitigation/Transforms/Passes.h.inc"
 
+} // namespace mitigation
 } // namespace catalyst

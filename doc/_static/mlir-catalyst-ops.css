@@ -1,0 +1,10 @@
+/* Custom CSS to override header fonts for MLIR Catalyst documentation */
+
+/* restyle the Op and Attribute headers since they appear too large*/
+h1 {
+    font-size: x-large;
+}
+
+h2 {
+    font-size: large;
+}

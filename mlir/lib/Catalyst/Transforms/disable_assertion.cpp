@@ -38,15 +38,10 @@ struct DisableAssertionPass : impl::DisableAssertionPassBase<DisableAssertionPas
     {
         RewritePatternSet patterns(&getContext());
         populateDisableAssertionPatterns(patterns);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
     }
 };
-
-std::unique_ptr<Pass> createDisableAssertionPass()
-{
-    return std::make_unique<DisableAssertionPass>();
-}
 
 } // namespace catalyst

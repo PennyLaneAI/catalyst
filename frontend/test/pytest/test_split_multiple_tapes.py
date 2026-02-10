@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-This file performs the frontend pytest checking that multi-tape transforms retain 
+This file performs the frontend pytest checking that multi-tape transforms retain
 correct funcitonality after splitting each tape into a separate function in mlir.
 """
 

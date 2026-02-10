@@ -14,5 +14,4 @@
 
 """MLIR Dialect for Quantum dialect."""
 
-from .._mlir_libs._quantumDialects.quantum import *  # noqa: F401
 from ._quantum_ops_gen import *  # noqa: F401

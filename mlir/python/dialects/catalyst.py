@@ -14,5 +14,4 @@
 
 """MLIR Dialect for Catalyst dialect."""
 
-from .._mlir_libs._quantumDialects.catalyst import *  # noqa: F401
 from ._catalyst_ops_gen import *  # noqa: F401

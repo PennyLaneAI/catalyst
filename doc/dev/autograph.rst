@@ -333,7 +333,6 @@ after the if statement will result in an error:
 >>> f(0.5)
 TypeError: Value 'a' with type <class 'str'> is not a valid JAX type
 
-
 For loops
 ---------
 
@@ -464,6 +463,36 @@ for instance by indexing a Python list with it. In that case, the list should be
 To understand different types of JAX tracing errors, please refer to the guide at: https://jax.readthedocs.io/en/latest/errors.html
 If you did not intend for the conversion to happen, you may safely ignore this warning.
 
+Something similar will also happen with list manipulations/operations:
+
+>>> @qjit(autograph=True)
+... def f():
+...     my_list = []
+...     for i in range(2):
+...         my_list.append(i)
+...     return my_list
+...
+>>> f()
+UserWarning: Tracing of an AutoGraph converted for loop failed with an exception:
+AutoGraphError: The variable 'my_list' was initialized with type <class 'list'>, which is not compatible with JAX. Typically, this is the case for
+non-numeric values. You may still use such a variable as a constant inside a loop, but it cannot be updated from one iteration to the next, 
+or accessed outside the loop scope if it was defined inside of it.
+...
+[Array(0, dtype=int64), Array(1, dtype=int64)]
+
+In this case, the code still executes, but AutoGraph is telling us that it fell back to executing the loop at compile time. Instead, results can be accumulated by indexing into a pre-allocated JAX array, provided the type and size are known ahead of time:
+
+>>> @qjit(autograph=True)
+... def f():
+...     my_list = jnp.empty(2, dtype=int)
+...     for i in range(2):
+...         my_list[i] = i
+...     return my_list
+...
+>>> f()
+Array([0, 1], dtype=int64)
+
+Here, AutoGraph is able to properly capture the for loop.
 
 .. note::
 
@@ -948,8 +977,8 @@ Notice that ``autograph=True`` must be set in order to process the
 ``autograph_include`` list, otherwise an error will be reported.
 
 
-In-place JAX array assignments
-------------------------------
+In-place JAX array updates
+--------------------------
 
 To update array values when using JAX, the `JAX syntax for array assignment
 <https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html#array-updates-x-at-idx-set-y>`__
@@ -987,3 +1016,42 @@ of standard Python array assignment syntax:
 Array([25.,  2.,  0.,  2.75,  0.,  3.5,  0.,  4.25,  0., 5.,  0.], dtype=float64)
 
 Under the hood, Catalyst converts anything coming in the latter notation into the former one.
+
+Similarly, to update array values with an operation when using JAX, the JAX syntax for array
+update (which uses the array `at` and the `add`, `multiply`, etc. methods) must be used:
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     first_dim = x.shape[0]
+...     result = jnp.copy(x)
+...
+...     for i in range(first_dim):
+...         result = result.at[i].multiply(2)
+...
+...     return result
+
+Again, if updating a single index or slice of the array, then Autograph supports conversion of
+standard Python array operator assignment syntax for the equivalent in-place expressions
+listed in the `JAX documentation for jax.numpy.ndarray.at
+<https://jax.readthedocs.io/en/latest/_autosummary/jax.numpy.ndarray.at.html#jax.numpy.ndarray.at>`__:
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     first_dim = x.shape[0]
+...     result = jnp.copy(x)
+...
+...     for i in range(first_dim):
+...         result[i] *= 2
+...
+...     return result
+
+Under the hood, Catalyst converts anything coming in the latter notation into the former one.
+
+The list of supported operators includes:
+
+- ``=`` (set)
+- ``+=`` (add)
+- ``-=`` (add with negation)
+- ``*=`` (multiply)
+- ``/=`` (divide)
+- ``**=`` (power)

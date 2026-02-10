@@ -12,41 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <string>
+#include "llvm/Support/MathExtras.h" // for llvm::numbers::pi
 
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "Catalyst/Utils/EnsureFunctionDeclaration.h"
+#include "Catalyst/Utils/StaticAllocas.h"
+#include "QEC/IR/QECOps.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
+using namespace catalyst::qec;
 
 namespace {
 
 constexpr int64_t UNKNOWN = ShapedType::kDynamic;
 constexpr int32_t NO_POSTSELECT = -1;
-
-LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op,
-                                           StringRef fnSymbol, Type fnType)
-{
-    Operation *fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
-
-    if (!fnDecl) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        ModuleOp mod = op->getParentOfType<ModuleOp>();
-        rewriter.setInsertionPointToStart(mod.getBody());
-
-        fnDecl = rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), fnSymbol, fnType);
-    }
-    else {
-        assert(isa<LLVM::LLVMFuncOp>(fnDecl) && "QIR function declaration is not a LLVMFuncOp");
-    }
-
-    return cast<LLVM::LLVMFuncOp>(fnDecl);
-}
 
 Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRef value,
                       ModuleOp mod)
@@ -56,12 +41,12 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
     if (!glb) {
         OpBuilder::InsertionGuard guard(rewriter); // to reset the insertion point
         rewriter.setInsertionPointToStart(mod.getBody());
-        glb = rewriter.create<LLVM::GlobalOp>(loc, type, true, LLVM::Linkage::Internal, key,
-                                              rewriter.getStringAttr(value));
+        glb = LLVM::GlobalOp::create(rewriter, loc, type, true, LLVM::Linkage::Internal, key,
+                                     rewriter.getStringAttr(value));
     }
-    return rewriter.create<LLVM::GEPOp>(loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
-                                        type, rewriter.create<LLVM::AddressOfOp>(loc, glb),
-                                        ArrayRef<LLVM::GEPArg>{0, 0}, true);
+    return LLVM::GEPOp::create(rewriter, loc, LLVM::LLVMPointerType::get(rewriter.getContext()),
+                               type, LLVM::AddressOfOp::create(rewriter, loc, glb),
+                               ArrayRef<LLVM::GEPArg>{0, 0}, LLVM::GEPNoWrapFlags::inbounds);
 }
 
 /**
@@ -74,7 +59,7 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
  * @param controlledQubits list of controlled qubits
  * @param controlledValues list of controlled values
  */
-Value getModifiersPtr(Location loc, OpBuilder &rewriter, const TypeConverter *conv, bool adjoint,
+Value getModifiersPtr(Location loc, RewriterBase &rewriter, const TypeConverter *conv, bool adjoint,
                       ValueRange controlledQubits, ValueRange controlledValues)
 {
     assert(controlledQubits.size() == controlledValues.size() &&
@@ -87,55 +72,59 @@ Value getModifiersPtr(Location loc, OpBuilder &rewriter, const TypeConverter *co
 
     auto ptrType = LLVM::LLVMPointerType::get(ctx);
 
-    Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-    Value nullPtr = rewriter.create<LLVM::ZeroOp>(loc, ptrType);
+    Value nullPtr = LLVM::ZeroOp::create(rewriter, loc, ptrType);
 
     if (!adjoint && controlledQubits.empty() && controlledValues.empty()) {
         return nullPtr;
     }
 
-    auto adjointVal = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getBoolAttr(adjoint));
-    auto numControlledVal =
-        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(controlledQubits.size()))
-            .getResult();
+    auto adjointVal = LLVM::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(adjoint));
     auto structType = LLVM::LLVMStructType::getLiteral(ctx, {boolType, sizeType, ptrType, ptrType});
-    auto modifiersPtr = rewriter.create<LLVM::AllocaOp>(loc, ptrType, structType, c1).getResult();
-    auto adjointPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, structType, modifiersPtr,
-                                                   llvm::ArrayRef<LLVM::GEPArg>{0, 0}, true);
-    auto numControlledPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, structType, modifiersPtr,
-                                                         llvm::ArrayRef<LLVM::GEPArg>{0, 1}, true);
-    auto controlledWiresPtr = rewriter.create<LLVM::GEPOp>(
-        loc, ptrType, structType, modifiersPtr, llvm::ArrayRef<LLVM::GEPArg>{0, 2}, true);
-    auto controlledValuesPtr = rewriter.create<LLVM::GEPOp>(
-        loc, ptrType, structType, modifiersPtr, llvm::ArrayRef<LLVM::GEPArg>{0, 3}, true);
+    auto modifiersPtr = catalyst::getStaticAlloca(loc, rewriter, structType, 1).getResult();
+    auto adjointPtr =
+        LLVM::GEPOp::create(rewriter, loc, ptrType, structType, modifiersPtr,
+                            llvm::ArrayRef<LLVM::GEPArg>{0, 0}, LLVM::GEPNoWrapFlags::inbounds);
+    auto numControlledPtr =
+        LLVM::GEPOp::create(rewriter, loc, ptrType, structType, modifiersPtr,
+                            llvm::ArrayRef<LLVM::GEPArg>{0, 1}, LLVM::GEPNoWrapFlags::inbounds);
+    auto controlledWiresPtr =
+        LLVM::GEPOp::create(rewriter, loc, ptrType, structType, modifiersPtr,
+                            llvm::ArrayRef<LLVM::GEPArg>{0, 2}, LLVM::GEPNoWrapFlags::inbounds);
+    auto controlledValuesPtr =
+        LLVM::GEPOp::create(rewriter, loc, ptrType, structType, modifiersPtr,
+                            llvm::ArrayRef<LLVM::GEPArg>{0, 3}, LLVM::GEPNoWrapFlags::inbounds);
 
     Value ctrlPtr = nullPtr;
     Value valuePtr = nullPtr;
     if (!controlledQubits.empty()) {
         ctrlPtr =
-            rewriter.create<LLVM::AllocaOp>(loc, ptrType, ptrType, numControlledVal).getResult();
+            catalyst::getStaticAlloca(loc, rewriter, ptrType, controlledQubits.size()).getResult();
         valuePtr =
-            rewriter.create<LLVM::AllocaOp>(loc, ptrType, boolType, numControlledVal).getResult();
-        for (size_t i = 0; i < controlledQubits.size(); i++) {
+            catalyst::getStaticAlloca(loc, rewriter, boolType, controlledQubits.size()).getResult();
+        for (int i = 0; static_cast<size_t>(i) < controlledQubits.size(); i++) {
             {
-                auto itemPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, ptrType, ctrlPtr,
-                                                            llvm::ArrayRef<LLVM::GEPArg>{i}, true);
+                auto itemPtr = LLVM::GEPOp::create(rewriter, loc, ptrType, ptrType, ctrlPtr,
+                                                   llvm::ArrayRef<LLVM::GEPArg>{i},
+                                                   LLVM::GEPNoWrapFlags::inbounds);
                 auto qubit = controlledQubits[i];
-                rewriter.create<LLVM::StoreOp>(loc, qubit, itemPtr);
+                LLVM::StoreOp::create(rewriter, loc, qubit, itemPtr);
             }
             {
-                auto itemPtr = rewriter.create<LLVM::GEPOp>(loc, ptrType, boolType, valuePtr,
-                                                            llvm::ArrayRef<LLVM::GEPArg>{i}, true);
+                auto itemPtr = LLVM::GEPOp::create(rewriter, loc, ptrType, boolType, valuePtr,
+                                                   llvm::ArrayRef<LLVM::GEPArg>{i},
+                                                   LLVM::GEPNoWrapFlags::inbounds);
                 auto value = controlledValues[i];
-                rewriter.create<LLVM::StoreOp>(loc, value, itemPtr);
+                LLVM::StoreOp::create(rewriter, loc, value, itemPtr);
             }
         }
     }
 
-    rewriter.create<LLVM::StoreOp>(loc, adjointVal, adjointPtr);
-    rewriter.create<LLVM::StoreOp>(loc, numControlledVal, numControlledPtr);
-    rewriter.create<LLVM::StoreOp>(loc, ctrlPtr, controlledWiresPtr);
-    rewriter.create<LLVM::StoreOp>(loc, valuePtr, controlledValuesPtr);
+    LLVM::StoreOp::create(rewriter, loc, adjointVal, adjointPtr);
+    auto ctrlQubits = LLVM::ConstantOp::create(rewriter, loc,
+                                               rewriter.getI64IntegerAttr(controlledQubits.size()));
+    LLVM::StoreOp::create(rewriter, loc, ctrlQubits, numControlledPtr);
+    LLVM::StoreOp::create(rewriter, loc, ctrlPtr, controlledWiresPtr);
+    LLVM::StoreOp::create(rewriter, loc, valuePtr, controlledValuesPtr);
 
     return modifiersPtr;
 }
@@ -165,26 +154,26 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
                 IRRewriter::InsertPoint ip = rewriter.saveInsertionPoint();
                 OpBuilder::InsertionGuard guard(rewriter); // to reset the insertion point
                 rewriter.setInsertionPointToStart(mod.getBody());
-                LLVM::GlobalOp seed_glb = rewriter.create<LLVM::GlobalOp>(
-                    loc, IntegerType::get(ctx, 32), true, LLVM::Linkage::Internal, "seed",
+                LLVM::GlobalOp seed_glb = LLVM::GlobalOp::create(
+                    rewriter, loc, IntegerType::get(ctx, 32), true, LLVM::Linkage::Internal, "seed",
                     cast<IntegerAttr>(op->getAttr("seed")));
                 rewriter.restoreInsertionPoint(ip);
-                seed_val = rewriter.create<LLVM::AddressOfOp>(loc, seed_glb);
+                seed_val = LLVM::AddressOfOp::create(rewriter, loc, seed_glb);
             }
             else {
                 // Set seed argument to nullptr for unseeded runs
-                seed_val = rewriter.create<LLVM::ZeroOp>(loc, intPtrType);
+                seed_val = LLVM::ZeroOp::create(rewriter, loc, intPtrType);
             }
-            LLVM::LLVMFuncOp fnDecl =
-                ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+            LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+                rewriter, op, qirName, qirSignature);
             SmallVector<Value> operands = {seed_val};
             rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, operands);
         }
         else {
             qirName = "__catalyst__rt__finalize";
             Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {});
-            LLVM::LLVMFuncOp fnDecl =
-                ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+            LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+                rewriter, op, qirName, qirSignature);
             rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ValueRange{});
         }
 
@@ -205,14 +194,19 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
         StringRef qirName = "__catalyst__rt__device_init"; // (int8_t *, int8_t *, int8_t *) -> void
 
         Type charPtrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+        Type int64Type = IntegerType::get(rewriter.getContext(), 64);
+        Type int1Type = IntegerType::get(rewriter.getContext(), 1);
         Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
                                                         {/* rtd_lib = */ charPtrType,
                                                          /* rtd_name = */ charPtrType,
-                                                         /* rtd_kwargs = */ charPtrType});
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+                                                         /* rtd_kwargs = */ charPtrType,
+                                                         /* shots = */ int64Type,
+                                                         /*auto_qubit_management = */ int1Type});
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
 
         auto rtd_lib = op.getLib().str();
-        auto rtd_name = op.getName().str();
+        auto rtd_name = op.getDeviceName().str();
         auto rtd_kwargs = op.getKwargs().str();
 
         auto rtd_lib_gs = getGlobalString(loc, rewriter, rtd_lib,
@@ -224,7 +218,20 @@ struct DeviceInitOpPattern : public OpConversionPattern<DeviceInitOp> {
 
         SmallVector<Value> operands = {rtd_lib_gs, rtd_name_gs, rtd_kwargs_gs};
 
-        rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
+        Value shots = op.getShots();
+        if (!shots) {
+            auto zeroShots = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(0));
+            operands.push_back(zeroShots);
+        }
+        else {
+            operands.push_back(shots);
+        }
+
+        Value autoQubitManagement = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI1Type(),
+                                                             op.getAutoQubitManagement());
+        operands.push_back(autoQubitManagement);
+
+        LLVM::CallOp::create(rewriter, loc, fnDecl, operands);
 
         rewriter.eraseOp(op);
 
@@ -244,7 +251,29 @@ struct DeviceReleaseOpPattern : public OpConversionPattern<DeviceReleaseOp> {
 
         Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {});
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
+
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ValueRange{});
+
+        return success();
+    }
+};
+
+struct NumQubitsOpPattern : public OpConversionPattern<NumQubitsOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(NumQubitsOp op, NumQubitsOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        MLIRContext *ctx = this->getContext();
+
+        StringRef qirName = "__catalyst__rt__num_qubits";
+
+        Type qirSignature = LLVM::LLVMFunctionType::get(IntegerType::get(ctx, 64), {});
+
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
 
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ValueRange{});
 
@@ -270,14 +299,36 @@ struct AllocOpPattern : public OpConversionPattern<AllocOp> {
         Type qirSignature = LLVM::LLVMFunctionType::get(conv->convertType(QuregType::get(ctx)),
                                                         IntegerType::get(ctx, 64));
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
 
         Value nQubits = adaptor.getNqubits();
         if (!nQubits) {
-            nQubits = rewriter.create<LLVM::ConstantOp>(loc, op.getNqubitsAttrAttr());
+            nQubits = LLVM::ConstantOp::create(rewriter, loc, op.getNqubitsAttrAttr());
         }
 
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, nQubits);
+
+        return success();
+    }
+};
+
+struct AllocQubitOpPattern : public OpConversionPattern<AllocQubitOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(AllocQubitOp op, AllocQubitOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        MLIRContext *ctx = getContext();
+        const TypeConverter *conv = getTypeConverter();
+
+        StringRef qirName = "__catalyst__rt__qubit_allocate";
+        Type qirSignature = LLVM::LLVMFunctionType::get(conv->convertType(QubitType::get(ctx)), {});
+
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
+
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ValueRange{});
 
         return success();
     }
@@ -296,7 +347,30 @@ struct DeallocOpPattern : public OpConversionPattern<DeallocOp> {
         Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
                                                         conv->convertType(QuregType::get(ctx)));
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
+
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, adaptor.getOperands());
+
+        return success();
+    }
+};
+
+struct DeallocQubitOpPattern : public OpConversionPattern<DeallocQubitOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(DeallocQubitOp op, DeallocQubitOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        MLIRContext *ctx = getContext();
+        const TypeConverter *conv = getTypeConverter();
+
+        StringRef qirName = "__catalyst__rt__qubit_release";
+        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
+                                                        conv->convertType(QubitType::get(ctx)));
+
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
 
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, adaptor.getOperands());
 
@@ -319,15 +393,16 @@ struct ExtractOpPattern : public OpConversionPattern<ExtractOp> {
             LLVM::LLVMPointerType::get(rewriter.getContext()),
             {conv->convertType(QuregType::get(ctx)), IntegerType::get(ctx, 64)});
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
 
         Value index = adaptor.getIdx();
         if (!index) {
-            index = rewriter.create<LLVM::ConstantOp>(loc, op.getIdxAttrAttr());
+            index = LLVM::ConstantOp::create(rewriter, loc, op.getIdxAttrAttr());
         }
         SmallVector<Value> operands = {adaptor.getQreg(), index};
 
-        Value elemPtr = rewriter.create<LLVM::CallOp>(loc, fnDecl, operands).getResult();
+        Value elemPtr = LLVM::CallOp::create(rewriter, loc, fnDecl, operands).getResult();
         rewriter.replaceOpWithNewOp<LLVM::LoadOp>(op, conv->convertType(QubitType::get(ctx)),
                                                   elemPtr);
 
@@ -335,7 +410,7 @@ struct ExtractOpPattern : public OpConversionPattern<ExtractOp> {
     }
 };
 
-struct InsertOpPattern : public OpConversionPattern<InsertOp> {
+struct InsertOpDefaultPattern : public OpConversionPattern<InsertOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(InsertOp op, InsertOpAdaptor adaptor,
@@ -343,6 +418,40 @@ struct InsertOpPattern : public OpConversionPattern<InsertOp> {
     {
         // Unravel use-def chain of quantum register values, converting back to reference semantics.
         rewriter.replaceOp(op, adaptor.getInQreg());
+        return success();
+    }
+};
+
+struct InsertOpArrayBackedPattern : public OpConversionPattern<InsertOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(InsertOp op, InsertOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = getContext();
+        const TypeConverter *conv = getTypeConverter();
+
+        StringRef qirName = "__catalyst__rt__array_update_element_1d";
+        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
+                                                        {conv->convertType(QuregType::get(ctx)),
+                                                         IntegerType::get(ctx, 64),
+                                                         conv->convertType(QubitType::get(ctx))});
+
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
+
+        Value index = adaptor.getIdx();
+        if (!index) {
+            index = LLVM::ConstantOp::create(rewriter, loc, op.getIdxAttrAttr());
+        }
+        SmallVector<Value> operands = {adaptor.getInQreg(), index, adaptor.getQubit()};
+
+        LLVM::CallOp::create(rewriter, loc, fnDecl, operands);
+
+        SmallVector<Value> values = {adaptor.getInQreg()};
+        rewriter.replaceOp(op, values);
+
         return success();
     }
 };
@@ -364,22 +473,47 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
         auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(),
                                             adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
 
+        // TODO: Might be better to have corresponding attribute for those custom op with variadic
+        // input qubits, so we don't need to explicity check any op gate name here
+        const auto hasVariadicInputQbits = (op.getGateName() == "Identity");
+
         std::string qirName = "__catalyst__qis__" + op.getGateName().str();
         SmallVector<Type> argTypes;
         argTypes.insert(argTypes.end(), adaptor.getParams().getTypes().begin(),
                         adaptor.getParams().getTypes().end());
-        argTypes.insert(argTypes.end(), adaptor.getInQubits().getTypes().begin(),
-                        adaptor.getInQubits().getTypes().end());
-        argTypes.insert(argTypes.end(), modifiersPtr.getType());
-        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        if (hasVariadicInputQbits) {
+            // Since input qubits would be extracted through va_list in C,
+            // thus we should add an additional information for number of qubits
+            argTypes.insert(argTypes.end(), modifiersPtr.getType());
+            argTypes.insert(argTypes.end(), IntegerType::get(ctx, 64));
+        }
+        else {
+            argTypes.insert(argTypes.end(), adaptor.getInQubits().getTypes().begin(),
+                            adaptor.getInQubits().getTypes().end());
+            argTypes.insert(argTypes.end(), modifiersPtr.getType());
+        }
+
+        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes,
+                                                        /*isVarArg=*/hasVariadicInputQbits);
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
 
         SmallVector<Value> args;
         args.insert(args.end(), adaptor.getParams().begin(), adaptor.getParams().end());
-        args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-        args.insert(args.end(), modifiersPtr);
+        if (hasVariadicInputQbits) {
+            // get the number of qbuits and place the input qubits at the end of the arguments.
+            int64_t numQubits = op.getOutQubits().size();
+            args.insert(args.end(), modifiersPtr);
+            args.insert(args.end(), LLVM::ConstantOp::create(
+                                        rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
+            args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        }
+        else {
+            args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+            args.insert(args.end(), modifiersPtr);
+        }
 
-        rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
+        LLVM::CallOp::create(rewriter, loc, fnDecl, args);
         SmallVector<Value> values;
         values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
         values.insert(values.end(), adaptor.getInCtrlQubits().begin(),
@@ -406,13 +540,13 @@ struct GlobalPhaseOpPattern : public OpConversionPattern<GlobalPhaseOp> {
         Type qirSignature = LLVM::LLVMFunctionType::get(
             LLVM::LLVMVoidType::get(ctx), {Float64Type::get(ctx), modifiersPtr.getType()});
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
-
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
         SmallVector<Value> args;
         args.insert(args.end(), adaptor.getParams());
         args.insert(args.end(), modifiersPtr);
 
-        rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
+        LLVM::CallOp::create(rewriter, loc, fnDecl, args);
         rewriter.eraseOp(op);
 
         return success();
@@ -437,16 +571,59 @@ struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
             {Float64Type::get(ctx), modifiersPtr.getType(), IntegerType::get(ctx, 64)},
             /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
 
         int64_t numQubits = op.getOutQubits().size();
         SmallVector<Value> args;
         args.insert(args.end(), adaptor.getTheta());
         args.insert(args.end(), modifiersPtr);
         args.insert(args.end(),
-                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
+                    LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
         args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-        rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
+        LLVM::CallOp::create(rewriter, loc, fnDecl, args);
+
+        SmallVector<Value> values;
+        values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        values.insert(values.end(), adaptor.getInCtrlQubits().begin(),
+                      adaptor.getInCtrlQubits().end());
+        rewriter.replaceOp(op, values);
+
+        return success();
+    }
+};
+
+struct PCPhaseOpPattern : public OpConversionPattern<PCPhaseOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(PCPhaseOp op, PCPhaseOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = getContext();
+        const TypeConverter *conv = getTypeConverter();
+        auto modifiersPtr = getModifiersPtr(loc, rewriter, conv, op.getAdjointFlag(),
+                                            adaptor.getInCtrlQubits(), adaptor.getInCtrlValues());
+
+        std::string qirName = "__catalyst__qis__PCPhase";
+        Type qirSignature =
+            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
+                                        {Float64Type::get(ctx), Float64Type::get(ctx),
+                                         modifiersPtr.getType(), IntegerType::get(ctx, 64)},
+                                        /*isVarArg=*/true);
+
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
+
+        int64_t numQubits = op.getOutQubits().size();
+        SmallVector<Value> args;
+        args.insert(args.end(), adaptor.getTheta());
+        args.insert(args.end(), adaptor.getDim());
+        args.insert(args.end(), modifiersPtr);
+        args.insert(args.end(),
+                    LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
+        args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        LLVM::CallOp::create(rewriter, loc, fnDecl, args);
 
         SmallVector<Value> values;
         values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
@@ -483,20 +660,19 @@ struct QubitUnitaryOpPattern : public OpConversionPattern<QubitUnitaryOp> {
                                          modifiersPtr.getType(), IntegerType::get(ctx, 64)},
                                         /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
 
         int64_t numQubits = adaptor.getInQubits().size();
         SmallVector<Value> args = adaptor.getOperands();
         args.insert(args.begin() + 1,
-                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
+                    LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
         args.insert(args.begin() + 1, modifiersPtr);
         // Replace the memref argument (LLVM struct) with a pointer to memref.
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        args[0] = rewriter.create<LLVM::AllocaOp>(
-            loc, LLVM::LLVMPointerType::get(rewriter.getContext()), matrixType, c1);
-        rewriter.create<LLVM::StoreOp>(loc, adaptor.getMatrix(), args[0]);
+        args[0] = catalyst::getStaticAlloca(loc, rewriter, matrixType, 1);
+        LLVM::StoreOp::create(rewriter, loc, adaptor.getMatrix(), args[0]);
 
-        rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
+        LLVM::CallOp::create(rewriter, loc, fnDecl, args);
 
         SmallVector<Value> values;
         values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
@@ -518,6 +694,17 @@ struct ComputationalBasisOpPattern : public OpConversionPattern<ComputationalBas
     LogicalResult matchAndRewrite(ComputationalBasisOp op, ComputationalBasisOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
+        // We use a temporary unrealized conversion op to send the SSA values
+        // of the compbasis op to the measurement ops
+        // This is because as a full dialect conversion pass, we cannot simply
+        // keep the original compbasis op in the quantum dialect
+
+        // In runtime capi, the measurement stubs can take in one of two things:
+        // 1. An explicit list of qubits, for partial measurements
+        // 2. No qubits, to measure all qubits on the device
+        // Therefore, for the qubit case, let the unrealized cast op carry the list of qubits
+        // and for qreg case, let the unrealized cast op carry no arguments
+
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();
 
@@ -543,11 +730,12 @@ struct NamedObsOpPattern : public OpConversionPattern<NamedObsOp> {
             conv->convertType(ObservableType::get(ctx)),
             {IntegerType::get(ctx, 64), conv->convertType(QubitType::get(ctx))});
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
 
         auto obsTypeInt = static_cast<uint32_t>(op.getType());
         Value obsType =
-            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(obsTypeInt));
+            LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(obsTypeInt));
         SmallVector<Value> args = {obsType, adaptor.getQubit()};
 
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, args);
@@ -578,17 +766,16 @@ struct HermitianOpPattern : public OpConversionPattern<HermitianOp> {
             {LLVM::LLVMPointerType::get(rewriter.getContext()), IntegerType::get(ctx, 64)},
             /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
 
         int64_t numQubits = op.getQubits().size();
         SmallVector<Value> args = adaptor.getOperands();
         args.insert(args.begin() + 1,
-                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
+                    LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
         // Replace the memref argument (LLVM struct) with a pointer to memref.
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        args[0] = rewriter.create<LLVM::AllocaOp>(
-            loc, LLVM::LLVMPointerType::get(rewriter.getContext()), matrixType, c1);
-        rewriter.create<LLVM::StoreOp>(loc, adaptor.getMatrix(), args[0]);
+        args[0] = catalyst::getStaticAlloca(loc, rewriter, matrixType, 1);
+        LLVM::StoreOp::create(rewriter, loc, adaptor.getMatrix(), args[0]);
 
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, args);
 
@@ -611,12 +798,13 @@ struct TensorOpPattern : public OpConversionPattern<TensorOp> {
             LLVM::LLVMFunctionType::get(conv->convertType(ObservableType::get(ctx)),
                                         IntegerType::get(ctx, 64), /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
 
         int64_t numTerms = op.getTerms().size();
         SmallVector<Value> args = adaptor.getOperands();
         args.insert(args.begin(),
-                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numTerms)));
+                    LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numTerms)));
 
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, args);
 
@@ -645,17 +833,16 @@ struct HamiltonianOpPattern : public OpConversionPattern<HamiltonianOp> {
             {LLVM::LLVMPointerType::get(rewriter.getContext()), IntegerType::get(ctx, 64)},
             /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
 
         int64_t numTerms = op.getTerms().size();
         SmallVector<Value> args = adaptor.getOperands();
         args.insert(args.begin() + 1,
-                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numTerms)));
+                    LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numTerms)));
         // Replace the memref argument (LLVM struct) with a pointer to memref.
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        args[0] = rewriter.create<LLVM::AllocaOp>(
-            loc, LLVM::LLVMPointerType::get(rewriter.getContext()), vectorType, c1);
-        rewriter.create<LLVM::StoreOp>(loc, adaptor.getCoeffs(), args[0]);
+        args[0] = catalyst::getStaticAlloca(loc, rewriter, vectorType, 1);
+        LLVM::StoreOp::create(rewriter, loc, adaptor.getCoeffs(), args[0]);
 
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, args);
 
@@ -686,18 +873,20 @@ struct MeasureOpPattern : public OpConversionPattern<MeasureOp> {
         Type qirSignature =
             LLVM::LLVMFunctionType::get(conv->convertType(ResultType::get(ctx)), argSignatures);
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
 
         // Create the postselect value. If not given, it defaults to NO_POSTSELECT
-        LLVM::ConstantOp postselect = rewriter.create<LLVM::ConstantOp>(
-            loc, op.getPostselect() ? op.getPostselectAttr()
-                                    : rewriter.getI32IntegerAttr(NO_POSTSELECT));
+        LLVM::ConstantOp postselect = LLVM::ConstantOp::create(
+            rewriter, loc,
+            op.getPostselect() ? op.getPostselectAttr()
+                               : rewriter.getI32IntegerAttr(NO_POSTSELECT));
 
         // Add qubit and postselect values as arguments of the CallOp
         SmallVector<Value> args = {adaptor.getInQubit(), postselect};
 
-        Value resultPtr = rewriter.create<LLVM::CallOp>(loc, fnDecl, args).getResult();
-        Value mres = rewriter.create<LLVM::LoadOp>(loc, IntegerType::get(ctx, 1), resultPtr);
+        Value resultPtr = LLVM::CallOp::create(rewriter, loc, fnDecl, args).getResult();
+        Value mres = LLVM::LoadOp::create(rewriter, loc, IntegerType::get(ctx, 1), resultPtr);
         rewriter.replaceOp(op, {mres, adaptor.getInQubit()});
 
         return success();
@@ -714,19 +903,17 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
 
-        Type qirSignature =
-            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
-                                        {LLVM::LLVMPointerType::get(rewriter.getContext()),
-                                         IntegerType::get(ctx, 64), IntegerType::get(ctx, 64)},
-                                        /*isVarArg=*/true);
+        Type qirSignature = LLVM::LLVMFunctionType::get(
+            LLVM::LLVMVoidType::get(ctx),
+            {LLVM::LLVMPointerType::get(rewriter.getContext()), IntegerType::get(ctx, 64)},
+            /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
 
         // We need to handle the C ABI convention of passing the result memref
         // as a struct pointer in the first argument to the C function.
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        Value structPtr = rewriter.create<LLVM::AllocaOp>(
-            loc, LLVM::LLVMPointerType::get(rewriter.getContext()), structType, c1);
+        Value structPtr = catalyst::getStaticAlloca(loc, rewriter, structType, 1);
 
         // For now obtain the qubit values from an unrealized cast created by the
         // ComputationalBasisOp lowering. Improve this once the runtime interface changes to
@@ -734,25 +921,24 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         assert(isa<UnrealizedConversionCastOp>(adaptor.getObs().getDefiningOp()));
         ValueRange qubits = adaptor.getObs().getDefiningOp()->getOperands();
 
-        Value numShots = rewriter.create<LLVM::ConstantOp>(loc, op.getShotsAttr());
         Value numQubits =
-            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits.size()));
-        SmallVector<Value> args = {structPtr, numShots, numQubits};
+            LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(qubits.size()));
+        SmallVector<Value> args = {structPtr, numQubits};
         args.insert(args.end(), qubits.begin(), qubits.end());
 
         if constexpr (std::is_same_v<T, SampleOp>) {
-            rewriter.create<LLVM::StoreOp>(loc, adaptor.getInData(), structPtr);
+            LLVM::StoreOp::create(rewriter, loc, adaptor.getInData(), structPtr);
         }
         else if constexpr (std::is_same_v<T, CountsOp>) {
-            auto aStruct = rewriter.create<LLVM::UndefOp>(loc, structType);
-            auto bStruct =
-                rewriter.create<LLVM::InsertValueOp>(loc, aStruct, adaptor.getInEigvals(), 0);
-            auto cStruct =
-                rewriter.create<LLVM::InsertValueOp>(loc, bStruct, adaptor.getInCounts(), 1);
-            rewriter.create<LLVM::StoreOp>(loc, cStruct, structPtr);
+            auto aStruct = LLVM::UndefOp::create(rewriter, loc, structType);
+            auto bStruct = LLVM::InsertValueOp::create(
+                rewriter, loc, aStruct, adaptor.getInEigvals(), SmallVector<int64_t>{0});
+            auto cStruct = LLVM::InsertValueOp::create(
+                rewriter, loc, bStruct, adaptor.getInCounts(), SmallVector<int64_t>{1});
+            LLVM::StoreOp::create(rewriter, loc, cStruct, structPtr);
         }
 
-        rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
+        LLVM::CallOp::create(rewriter, loc, fnDecl, args);
 
         return structPtr;
     };
@@ -825,7 +1011,8 @@ template <typename T> struct StatsBasedPattern : public OpConversionPattern<T> {
         Type qirSignature = LLVM::LLVMFunctionType::get(
             Float64Type::get(ctx), conv->convertType(ObservableType::get(ctx)));
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
 
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, adaptor.getObs());
 
@@ -863,14 +1050,13 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
             {LLVM::LLVMPointerType::get(rewriter.getContext()), IntegerType::get(ctx, 64)},
             /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
 
         // We need to handle the C ABI convention of passing the result memref
         // as a struct pointer in the first argument to the C function.
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        Value structPtr = rewriter.create<LLVM::AllocaOp>(
-            loc, LLVM::LLVMPointerType::get(rewriter.getContext()), vectorType, c1);
-        rewriter.create<LLVM::StoreOp>(loc, adaptor.getStateIn(), structPtr);
+        Value structPtr = catalyst::getStaticAlloca(loc, rewriter, vectorType, 1);
+        LLVM::StoreOp::create(rewriter, loc, adaptor.getStateIn(), structPtr);
 
         // For now obtain the qubit values from an unrealized cast created by the
         // ComputationalBasisOp lowering. Improve this once the runtime interface changes to
@@ -881,18 +1067,19 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
         SmallVector<Value> args = {structPtr};
         if constexpr (std::is_same_v<T, ProbsOp>) {
             Value numQubits =
-                rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(qubits.size()));
+                LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(qubits.size()));
             args.push_back(numQubits);
             args.insert(args.end(), qubits.begin(), qubits.end());
         }
         else {
             // __catalyst__qis__State does not support individual qubit measurements yet, so it must
             // be invoked without specific specific qubits (i.e. measure the whole register).
-            Value numQubits = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(0));
+            Value numQubits =
+                LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(0));
             args.push_back(numQubits);
         }
 
-        rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
+        LLVM::CallOp::create(rewriter, loc, fnDecl, args);
         rewriter.eraseOp(op);
 
         return success();
@@ -911,30 +1098,29 @@ struct SetStateOpPattern : public OpConversionPattern<SetStateOp> {
         auto voidTy = LLVM::LLVMVoidType::get(ctx);
         auto ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-        auto func = mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetState",
-                                                 {ptrTy, i64}, voidTy, isVarArg);
+        auto func = mlir::LLVM::lookupOrCreateFn(rewriter, moduleOp, "__catalyst__qis__SetState",
+                                                 {ptrTy, i64}, voidTy, isVarArg)
+                        .value();
 
         SmallVector<Value> args;
 
         auto structTy = adaptor.getInState().getType();
 
         Location loc = op.getLoc();
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
 
-        auto allocaOp = rewriter.create<LLVM::AllocaOp>(
-            loc, LLVM::LLVMPointerType::get(rewriter.getContext()), structTy, c1);
+        auto allocaOp = catalyst::getStaticAlloca(loc, rewriter, structTy, 1);
         auto allocaPtr = allocaOp.getResult();
 
         auto size = adaptor.getInQubits().size();
-        Value c = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(size));
+        Value c = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(size));
         args.push_back(allocaPtr);
         args.push_back(c);
         args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-        rewriter.create<LLVM::StoreOp>(loc, adaptor.getInState(), allocaPtr);
+        LLVM::StoreOp::create(rewriter, loc, adaptor.getInState(), allocaPtr);
 
         SmallVector<Value> values;
         values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-        rewriter.create<LLVM::CallOp>(loc, func, args);
+        LLVM::CallOp::create(rewriter, loc, func, args);
         rewriter.replaceOp(op, values);
         return success();
     }
@@ -952,31 +1138,184 @@ struct SetBasisStateOpPattern : public OpConversionPattern<SetBasisStateOp> {
         auto voidTy = LLVM::LLVMVoidType::get(ctx);
         auto ptrTy = LLVM::LLVMPointerType::get(rewriter.getContext());
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-        auto func = mlir::LLVM::lookupOrCreateFn(moduleOp, "__catalyst__qis__SetBasisState",
-                                                 {ptrTy, i64}, voidTy, isVarArg);
+        auto func =
+            mlir::LLVM::lookupOrCreateFn(rewriter, moduleOp, "__catalyst__qis__SetBasisState",
+                                         {ptrTy, i64}, voidTy, isVarArg)
+                .value();
 
         SmallVector<Value> args;
 
         auto structTy = adaptor.getBasisState().getType();
 
         Location loc = op.getLoc();
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
 
-        auto allocaOp = rewriter.create<LLVM::AllocaOp>(
-            loc, LLVM::LLVMPointerType::get(rewriter.getContext()), structTy, c1);
+        auto allocaOp = catalyst::getStaticAlloca(loc, rewriter, structTy, 1);
         auto allocaPtr = allocaOp.getResult();
 
         auto size = adaptor.getInQubits().size();
-        Value c = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(size));
+        Value c = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(size));
         args.push_back(allocaPtr);
         args.push_back(c);
         args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-        rewriter.create<LLVM::StoreOp>(loc, adaptor.getBasisState(), allocaPtr);
+        LLVM::StoreOp::create(rewriter, loc, adaptor.getBasisState(), allocaPtr);
 
         SmallVector<Value> values;
         values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-        rewriter.create<LLVM::CallOp>(loc, func, args);
+        LLVM::CallOp::create(rewriter, loc, func, args);
         rewriter.replaceOp(op, values);
+        return success();
+    }
+};
+
+//////////////////////////////////////////
+// Pauli-based Computational Operations //
+//////////////////////////////////////////
+
+/// Helper function to convert a Pauli product ArrayAttr to a string
+// (e.g., ["X", "I", "Z"] -> "XIZ")
+std::string pauliProductToString(ArrayAttr pauliProduct)
+{
+    std::string result;
+    for (auto attr : pauliProduct) {
+        result += cast<StringAttr>(attr).getValue().str();
+    }
+    return result;
+}
+
+Value getPauliProductPtr(Location loc, ConversionPatternRewriter &rewriter, ModuleOp mod,
+                         ArrayAttr pauliProduct)
+{
+    std::string pauliWord = pauliProductToString(pauliProduct);
+    std::string pauliWordKey = "pauli_word_" + pauliWord;
+    return getGlobalString(loc, rewriter, pauliWordKey,
+                           StringRef(pauliWord.c_str(), pauliWord.length() + 1), mod);
+}
+
+template <typename T> struct PPRotationBasedPattern : public OpConversionPattern<T> {
+    using OpConversionPattern<T>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(T op, typename T::Adaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = this->getContext();
+        ModuleOp mod = op->template getParentOfType<ModuleOp>();
+
+        // Create a global string for the Pauli word
+        Value pauliWordPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct());
+
+        // void __catalyst__qis__PauliRot(const char* pauliStr, double theta,
+        //                                 const Modifiers*, int64_t numQubits, ...qubits)
+        StringRef qirName = "__catalyst__qis__PauliRot";
+        Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+        Type qirSignature = LLVM::LLVMFunctionType::get(
+            LLVM::LLVMVoidType::get(ctx),
+            {ptrType, Float64Type::get(ctx), ptrType, IntegerType::get(ctx, 64)},
+            /*isVarArg=*/true);
+
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
+
+        // Get the rotation angle based on the op type
+        // Since the qml.PauliRot(phi) == PPR(phi/2), this rotation_kind is multiplied by 2.
+        Value thetaValue;
+        if constexpr (std::is_same_v<T, PPRotationOp>) {
+            if (op.getCondition()) {
+                return op.emitOpError("PPRotationOp with condition is not supported.");
+            }
+            // Compute the rotation angle: theta = π / rotation_kind
+            // rotation_kind can be ±1, ±2, ±4, ±8
+            int16_t rotationKind = static_cast<int16_t>(op.getRotationKind());
+            double theta = 2 * (llvm::numbers::pi / static_cast<double>(rotationKind));
+            thetaValue = LLVM::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(theta));
+        }
+        else if constexpr (std::is_same_v<T, PPRotationArbitraryOp>) {
+            if (op.getCondition()) {
+                return op.emitOpError("PPRotationArbitraryOp with condition is not supported.");
+            }
+            // multiply by 2 to get the rotation angle
+            thetaValue = LLVM::FMulOp::create(
+                rewriter, loc, adaptor.getArbitraryAngle(),
+                LLVM::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(2.0)));
+        }
+        else if constexpr (std::is_same_v<T, PauliRotOp>) {
+            // Use the arbitrary angle directly
+            thetaValue = adaptor.getAngle();
+        }
+
+        // Build the arguments: pauliStr, theta, modifiers, numQubits, qubits...
+        int64_t numQubits = adaptor.getInQubits().size();
+        SmallVector<Value> args;
+        args.push_back(pauliWordPtr);
+        args.push_back(thetaValue);
+        args.push_back(LLVM::ZeroOp::create(rewriter, loc, ptrType));
+        args.push_back(
+            LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
+        args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+
+        LLVM::CallOp::create(rewriter, loc, fnDecl, args);
+
+        // Replace the op with the input qubits
+        SmallVector<Value> values;
+        values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        rewriter.replaceOp(op, values);
+
+        return success();
+    }
+};
+
+struct PPMeasurementOpPattern : public OpConversionPattern<PPMeasurementOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(PPMeasurementOp op, PPMeasurementOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = getContext();
+        const TypeConverter *conv = getTypeConverter();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+
+        // Create a global string for the Pauli word
+        Value pauliWordPtr = getPauliProductPtr(loc, rewriter, mod, op.getPauliProduct());
+
+        // RESULT* __catalyst__qis__PauliMeasure(const char* pauliWord, int64_t numQubits,
+        // ...qubits)
+        StringRef qirName = "__catalyst__qis__PauliMeasure";
+        Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
+        Type qirSignature = LLVM::LLVMFunctionType::get(conv->convertType(ResultType::get(ctx)),
+                                                        {ptrType, IntegerType::get(ctx, 64)},
+                                                        /*isVarArg=*/true);
+
+        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, qirName, qirSignature);
+
+        // Build the arguments
+        int64_t numQubits = adaptor.getInQubits().size();
+        SmallVector<Value> args;
+        args.push_back(pauliWordPtr);
+        args.push_back(
+            LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
+        args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+
+        // Call the function and get the result pointer
+        Value resultPtr = LLVM::CallOp::create(rewriter, loc, fnDecl, args).getResult();
+
+        // Load the measurement result (i1) from the result pointer
+        Value mres = LLVM::LoadOp::create(rewriter, loc, IntegerType::get(ctx, 1), resultPtr);
+
+        // if the uint16_t rotation_sign is -1, we need to negate the measurement result
+        if (static_cast<int16_t>(op.getRotationSign()) == -1) {
+            Value one = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI1Type(),
+                                                 rewriter.getBoolAttr(true));
+            mres = LLVM::XOrOp::create(rewriter, loc, mres, one);
+        }
+
+        // Replace the op with the measurement result and the input qubits
+        SmallVector<Value> values;
+        values.push_back(mres);
+        values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        rewriter.replaceOp(op, values);
+
         return success();
     }
 };
@@ -986,18 +1325,28 @@ struct SetBasisStateOpPattern : public OpConversionPattern<SetBasisStateOp> {
 namespace catalyst {
 namespace quantum {
 
-void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
+void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns,
+                                   bool useArrayBackedRegisters)
 {
     patterns.add<RTBasedPattern<InitializeOp>>(typeConverter, patterns.getContext());
     patterns.add<RTBasedPattern<FinalizeOp>>(typeConverter, patterns.getContext());
     patterns.add<DeviceInitOpPattern>(typeConverter, patterns.getContext());
     patterns.add<DeviceReleaseOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<NumQubitsOpPattern>(typeConverter, patterns.getContext());
     patterns.add<AllocOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<AllocQubitOpPattern>(typeConverter, patterns.getContext());
     patterns.add<DeallocOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<DeallocQubitOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ExtractOpPattern>(typeConverter, patterns.getContext());
-    patterns.add<InsertOpPattern>(typeConverter, patterns.getContext());
+    if (useArrayBackedRegisters) {
+        patterns.add<InsertOpArrayBackedPattern>(typeConverter, patterns.getContext());
+    }
+    else {
+        patterns.add<InsertOpDefaultPattern>(typeConverter, patterns.getContext());
+    }
     patterns.add<CustomOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MultiRZOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<PCPhaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<GlobalPhaseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<QubitUnitaryOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MeasureOpPattern>(typeConverter, patterns.getContext());
@@ -1014,6 +1363,13 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<StateBasedPattern<StateOp>>(typeConverter, patterns.getContext());
     patterns.add<SetStateOpPattern>(typeConverter, patterns.getContext());
     patterns.add<SetBasisStateOpPattern>(typeConverter, patterns.getContext());
+    // Pauli-based Computational Operations
+    patterns.add<PPRotationBasedPattern<PauliRotOp>>(typeConverter, patterns.getContext());
+
+    patterns.add<PPRotationBasedPattern<PPRotationOp>>(typeConverter, patterns.getContext());
+    patterns.add<PPRotationBasedPattern<PPRotationArbitraryOp>>(typeConverter,
+                                                                patterns.getContext());
+    patterns.add<PPMeasurementOpPattern>(typeConverter, patterns.getContext());
 }
 
 } // namespace quantum

@@ -13,24 +13,30 @@ on:
         type: boolean
       runs_on:
         required: false
-        default: ubuntu-22.04
+        default: ubuntu-24.04
         type: string
     outputs:
       llvm_version:
         description: "LLVM version"
         value: ${{ jobs.set-constants.outputs.llvm_version }}
-      mhlo_version:
-        description: "MHLO version"
-        value: ${{ jobs.set-constants.outputs.mhlo_version }}
+      stablehlo_version:
+        description: "Stablehlo version"
+        value: ${{ jobs.set-constants.outputs.stablehlo_version }}
       enzyme_version:
         description: "Enzyme version"
         value: ${{ jobs.set-constants.outputs.enzyme_version }}
       python_versions:
         description: "List of Python versions"
         value: ${{ jobs.set-constants.outputs.python_versions }}
+      python_test_versions:
+        description: "List of Python test versions"
+        value: ${{ jobs.set-constants.outputs.python_test_versions }}
       primary_python_version:
         description: "Primary Python version for unrelated tests"
         value: ${{ jobs.set-constants.outputs.primary_python_version }}
+      forward_compat_python_version:
+        description: "Last build python version for forward compatibility"
+        value: ${{ jobs.set-constants.outputs.forward_compat_python_version }}
       rt_backends:
         description: "List of backends."
         value: ${{ jobs.set-constants.outputs.rt_backends }}
@@ -63,9 +69,9 @@ jobs:
         id: llvm_version
         run: echo "llvm_version=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
-      - name: MHLO version
-        id: mhlo_version
-        run: echo "mhlo_version=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+      - name: Stablehlo version
+        id: stablehlo_version
+        run: echo "stablehlo_version=$(grep stablehlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
       - name: Enzyme version
         id: enzyme_version
@@ -74,34 +80,44 @@ jobs:
       - name: Python versions
         id: python_versions
         run: |
-          echo 'python_versions=["3.10", "3.11", "3.12"]' >> $GITHUB_OUTPUT
+          echo 'python_versions=["3.11", "3.12"]' >> $GITHUB_OUTPUT
+
+      - name: Python test versions
+        id: python_test_versions
+        run: |
+          echo 'python_test_versions=["3.11", "3.12", "3.13", "3.14"]' >> $GITHUB_OUTPUT
 
       - name: Primary Python version
         id: primary_python_version
         run: |
-          echo 'primary_python_version=3.10' >> $GITHUB_OUTPUT
+          echo 'primary_python_version=3.11' >> $GITHUB_OUTPUT
+
+      - name: Get last build python version for forward compatibility
+        id: forward_compat_python_version
+        run: |
+          FORWARD_COMPAT_BASE_VERSION=$(echo '${{ steps.python_versions.outputs.python_versions }}' | jq -r '.[-1]')
+          echo "forward_compat_python_version=$FORWARD_COMPAT_BASE_VERSION" >> $GITHUB_OUTPUT
 
       - name: Runtime Backend Devices
         id: rt_backends
-        run: echo 'rt_backends=["lightning", "lightning-kokkos", "openqasm", "oqc"]' >> $GITHUB_OUTPUT
+        run: echo 'rt_backends=["lightning", "lightning-kokkos", "openqasm", "oqc", "oqd"]' >> $GITHUB_OUTPUT
 
       - name: Compilers (All)
         id: compilers
         run: |
-          # TODO: add Clang after https://github.com/actions/runner-images/issues/8659 is fixed
-          if [[ $MULTIPLE ]]; then
-            echo 'compilers=["gcc"]' >> $GITHUB_OUTPUT
+          if [[ "${{ inputs.multiple_compilers }}" == "true" ]]; then
+            echo 'compilers=["gcc", "clang"]' >> $GITHUB_OUTPUT
           else
             echo 'compilers=["gcc"]' >> $GITHUB_OUTPUT
           fi
-        env:
-          MULTIPLE: ${{ inputs.multiple_compilers }}
 
     outputs:
       llvm_version: ${{ steps.llvm_version.outputs.llvm_version }}
-      mhlo_version: ${{ steps.mhlo_version.outputs.mhlo_version }}
+      stablehlo_version: ${{ steps.stablehlo_version.outputs.stablehlo_version }}
       enzyme_version: ${{ steps.enzyme_version.outputs.enzyme_version }}
       python_versions: ${{ steps.python_versions.outputs.python_versions }}
+      python_test_versions: ${{ steps.python_test_versions.outputs.python_test_versions }}
       primary_python_version: ${{ steps.primary_python_version.outputs.primary_python_version }}
+      forward_compat_python_version: ${{ steps.forward_compat_python_version.outputs.forward_compat_python_version }}
       rt_backends: ${{ steps.rt_backends.outputs.rt_backends }}
       compilers: ${{ steps.compilers.outputs.compilers }}

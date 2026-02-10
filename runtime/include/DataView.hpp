@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include <Exception.hpp>
 
 /**
@@ -56,15 +58,15 @@ template <typename T, size_t R> class DataView {
         iterator &operator++()
         {
             int64_t next_axis = -1;
-            int64_t idx;
-            for (int64_t i = R; i > 0; --i) {
-                idx = i - 1;
-                if (indices[idx]++ < view.sizes[idx] - 1) {
-                    next_axis = idx;
+            for (int64_t axis = R - 1; axis >= 0; axis--) {
+                if (++indices[axis] < view.sizes[axis]) {
+                    next_axis = axis;
                     break;
                 }
-                indices[idx] = 0;
-                loc -= (view.sizes[idx] - 1) * view.strides[idx];
+
+                indices[axis] = 0;
+
+                loc -= view.sizes[axis] == 0 ? 0 : (view.sizes[axis] - 1) * view.strides[axis];
             }
 
             loc = next_axis == -1 ? -1 : loc + view.strides[next_axis];
@@ -72,21 +74,19 @@ template <typename T, size_t R> class DataView {
         }
         iterator operator++(int)
         {
-            auto tmp = *this;
+            auto cached_iter = *this;
             int64_t next_axis = -1;
-            int64_t idx;
-            for (int64_t i = R; i > 0; --i) {
-                idx = i - 1;
-                if (indices[idx]++ < view.sizes[idx] - 1) {
-                    next_axis = idx;
+            for (int64_t axis = R - 1; axis >= 0; axis--) {
+                if (++indices[axis] < view.sizes[axis]) {
+                    next_axis = axis;
                     break;
                 }
-                indices[idx] = 0;
-                loc -= (view.sizes[idx] - 1) * view.strides[idx];
+                indices[axis] = 0;
+                loc -= view.sizes[axis] == 0 ? 0 : (view.sizes[axis] - 1) * view.strides[axis];
             }
 
             loc = next_axis == -1 ? -1 : loc + view.strides[next_axis];
-            return tmp;
+            return cached_iter;
         }
         bool operator==(const iterator &other) const
         {
@@ -102,11 +102,12 @@ template <typename T, size_t R> class DataView {
         strides[0] = 1;
     }
 
-    explicit DataView(T *_data_aligned, size_t _offset, size_t *_sizes, size_t *_strides)
+    explicit DataView(T *_data_aligned, size_t _offset, const size_t *_sizes,
+                      const size_t *_strides)
         : data_aligned(_data_aligned), offset(_offset)
     {
         static_assert(R > 0, "[Class: DataView] Assertion: R > 0");
-        if (_sizes && _strides) {
+        if (_sizes != nullptr && _strides != nullptr) {
             for (size_t i = 0; i < R; i++) {
                 sizes[i] = _sizes[i];
                 strides[i] = _strides[i];
@@ -135,13 +136,15 @@ template <typename T, size_t R> class DataView {
 
         size_t loc = offset;
         for (size_t axis = 0; axis < R; axis++) {
-            RT_ASSERT(indices[axis] < sizes[axis]);
             loc += indices[axis] * strides[axis];
         }
         return data_aligned[loc];
     }
 
-    iterator begin() { return iterator{*this, static_cast<int64_t>(offset)}; }
+    iterator begin()
+    {
+        return iterator{*this, (*this).size() == 0 ? -1 : static_cast<int64_t>(offset)};
+    }
 
     iterator end() { return iterator{*this, -1}; }
 };

@@ -13,20 +13,23 @@
 # limitations under the License.
 
 # RUN: %PYTHON %s | FileCheck %s
-""" Test the lowering cases involving quantum control """
+"""Test the lowering cases involving quantum control"""
 
+import os
+import pathlib
+import platform
 from copy import deepcopy
 
 import jax.numpy as jnp
 import pennylane as qml
+from pennylane.devices.capabilities import OperatorProperties
 
 from catalyst import qjit
+from catalyst.compiler import get_lib_path
 from catalyst.device import get_device_capabilities
-from catalyst.utils.toml import (
-    OperationProperties,
-    ProgramFeatures,
-    pennylane_operation_set,
-)
+
+TEST_PATH = os.path.dirname(__file__)
+CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device.toml")
 
 
 def get_custom_qjit_device(num_wires, discards, additions):
@@ -36,41 +39,27 @@ def get_custom_qjit_device(num_wires, discards, additions):
         """Custom Gate Set Device"""
 
         name = "lightning.qubit"
-        pennylane_requires = "0.35.0"
-        version = "0.0.2"
-        author = "Tester"
+        config_filepath = CONFIG_CUSTOM_DEVICE
 
-        lightning_device = qml.device("lightning.qubit", wires=0)
-
-        backend_name = "default"
-        backend_lib = "default"
-        backend_kwargs = {}
-
-        def __init__(self, shots=None, wires=None):
-            super().__init__(wires=wires, shots=shots)
-            program_features = ProgramFeatures(shots_present=bool(shots))
-            lightning_capabilities = get_device_capabilities(
-                self.lightning_device, program_features
-            )
-            custom_capabilities = deepcopy(lightning_capabilities)
+        def __init__(self, wires=None):
+            super().__init__(wires=wires)
+            self.qjit_capabilities = get_device_capabilities(self)
             for gate in discards:
-                custom_capabilities.native_ops.pop(gate)
-            custom_capabilities.native_ops.update(additions)
-            self.qjit_capabilities = custom_capabilities
+                self.qjit_capabilities.operations.pop(gate, None)
+            self.qjit_capabilities.operations.update(additions)
 
-        @property
-        def operations(self):
-            """Get PennyLane operations."""
-            return (
-                pennylane_operation_set(self.qjit_capabilities.native_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_decomp_ops)
-                | pennylane_operation_set(self.qjit_capabilities.to_matrix_ops)
+        @staticmethod
+        def get_c_interface():
+            """Returns a tuple consisting of the device name, and
+            the location to the shared object with the C/C++ device implementation.
+            """
+
+            system_extension = ".dylib" if platform.system() == "Darwin" else ".so"
+            # Borrowing the NullQubit library:
+            lib_path = (
+                get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/librtd_null_qubit" + system_extension
             )
-
-        @property
-        def observables(self):
-            """Get PennyLane observables."""
-            return pennylane_operation_set(self.qjit_capabilities.native_obs)
+            return "NullQubit", lib_path
 
         def execute(self, circuits, execution_config):
             """Exececute the device (no)."""
@@ -103,7 +92,7 @@ test_named_controlled()
 
 def test_native_controlled_custom():
     """Test native control of a custom operation."""
-    dev = get_custom_qjit_device(3, set(), {"Rot": OperationProperties(True, True, False)})
+    dev = get_custom_qjit_device(3, set(), {"Rot": OperatorProperties(True, True, False)})
 
     @qjit(target="mlir")
     @qml.qnode(dev)
@@ -153,7 +142,7 @@ test_native_controlled_unitary()
 
 def test_native_controlled_multirz():
     """Test native control of the multirz operation."""
-    dev = get_custom_qjit_device(3, set(), {"MultiRZ": OperationProperties(True, True, True)})
+    dev = get_custom_qjit_device(3, set(), {"MultiRZ": OperatorProperties(True, True, True)})
 
     @qjit(target="mlir")
     @qml.qnode(dev)
@@ -169,3 +158,23 @@ def test_native_controlled_multirz():
 
 
 test_native_controlled_multirz()
+
+
+def test_native_controlled_pcphase():
+    """Test native control of the PCPhase operation."""
+    dev = get_custom_qjit_device(3, set(), {"PCPhase": OperatorProperties(True, True, False)})
+
+    @qjit(target="mlir")
+    @qml.qnode(dev)
+    # CHECK-LABEL: public @jit_native_controlled_pcphase
+    def native_controlled_pcphase():
+        # CHECK: [[out:%.+]]:2, [[out_ctrl:%.+]] = quantum.pcphase
+        # CHECK-SAME: ctrls
+        # CHECK-SAME: ctrlvals(%true)
+        qml.ctrl(qml.PCPhase(0.5, dim=2, wires=[0, 2]), control=[1])
+        return qml.state()
+
+    print(native_controlled_pcphase.mlir)
+
+
+test_native_controlled_pcphase()

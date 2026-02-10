@@ -21,10 +21,10 @@ func.func @test_alloc_dce() {
     return
 }
 
-// CHECK-LABEL: test_alloc_cse
-func.func @test_alloc_cse() -> (!quantum.reg, !quantum.reg){
+// CHECK-LABEL: test_alloc_no_cse
+func.func @test_alloc_no_cse() -> (!quantum.reg, !quantum.reg){
     // CHECK: quantum.alloc
-    // CHECK-NOT: quantum.alloc
+    // CHECK-NEXT: quantum.alloc
     %r1 = quantum.alloc(4) : !quantum.reg
     %r2 = quantum.alloc(4) : !quantum.reg
     return %r1, %r2 : !quantum.reg, !quantum.reg
@@ -83,8 +83,7 @@ func.func @test_extract_insert_no_fold_static(%r1: !quantum.reg, %i1: i64, %i2: 
     %q2 = quantum.extract %r2[0] : !quantum.reg -> !quantum.bit
     %r3 = quantum.insert %r2[%i1], %q2 : !quantum.reg, !quantum.bit
 
-    // CHECK: quantum.extract
-    // CHECK: quantum.insert
+
     %q3 = quantum.extract %r3[%i1] : !quantum.reg -> !quantum.bit
     %r4 = quantum.insert %r3[%i2], %q3 : !quantum.reg, !quantum.bit
 
@@ -117,4 +116,85 @@ func.func @test_insert_canonicalize(%r1: !quantum.reg, %i: i64) -> !quantum.bit 
     // CHECK:  quantum.dealloc
     quantum.dealloc %r2 : !quantum.reg
     return %4 : !quantum.bit
+}
+
+// CHECK-LABEL: test_num_qubits_dce
+func.func @test_num_qubits_dce() {
+    // CHECK-NOT: quantum.num_qubits
+    %n = quantum.num_qubits : i64
+    return
+}
+
+// CHECK-LABEL: test_num_qubits_no_cse
+func.func @test_num_qubits_no_cse() -> (i64, i64, !quantum.reg) {
+    // CHECK: quantum.num_qubits
+    // CHECK: quantum.alloc
+    // CHECK: quantum.num_qubits
+    %n1 = quantum.num_qubits : i64
+    %r = quantum.alloc(5) : !quantum.reg
+    %n2 = quantum.num_qubits : i64
+    return %n1, %n2, %r  : i64, i64, !quantum.reg
+}
+
+// CHECK-LABEL: test_hermitian_adjoint_canonicalize
+func.func @test_hermitian_adjoint_canonicalize() -> !quantum.bit {
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
+    // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.custom "Hadamard"() %1 {adjoint}: !quantum.bit
+    // CHECK:  quantum.custom "Hadamard"() [[qubit]] : !quantum.bit
+    return %2 : !quantum.bit
+}
+
+// CHECK-LABEL: test_rotation_adjoint_canonicalize
+func.func @test_rotation_adjoint_canonicalize(%arg0: f64) -> !quantum.bit {
+    %0 = quantum.alloc( 1) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[reg:%.+]] = quantum.alloc( 1) : !quantum.reg
+    // CHECK: [[qubit:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.custom "RX"(%arg0) %1 {adjoint}: !quantum.bit
+    // CHECK: [[arg0neg:%.+]] = arith.negf %arg0 : f64
+    // CHECK:  quantum.custom "RX"([[arg0neg]]) [[qubit]] : !quantum.bit
+    return %2 : !quantum.bit
+}
+
+// CHECK-LABEL: test_multirz_adjoint_canonicalize
+func.func @test_multirz_adjoint_canonicalize(%arg0: f64) -> (!quantum.bit, !quantum.bit) {
+    // CHECK: [[reg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[qubit1:%.+]] = quantum.extract [[reg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[qubit2:%.+]] = quantum.extract [[reg]][ 1] : !quantum.reg -> !quantum.bit
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[arg0neg:%.+]] = arith.negf %arg0 : f64
+    // CHECK: [[ret:%.+]]:2 = quantum.multirz([[arg0neg]]) [[qubit1]], [[qubit2]] : !quantum.bit, !quantum.bit
+    %3:2 = quantum.multirz (%arg0) %1, %2 {adjoint} : !quantum.bit, !quantum.bit
+    return %3#0, %3#1 : !quantum.bit, !quantum.bit
+}
+
+
+// CHECK-LABEL: test_interleaved_extract_insert
+func.func @test_interleaved_extract_insert() -> tensor<4xf64> {
+  %c1_i64 = arith.constant 1 : i64
+  %c0_i64 = arith.constant 0 : i64
+  quantum.device shots(%c0_i64) ["", "", ""]
+  %0 = quantum.alloc( 2) : !quantum.reg
+  // CHECK: [[QBIT:%.+]] = quantum.extract [[QREG:%.+]][
+  // CHECK: [[QBIT_1:%.+]] = quantum.custom "Hadamard"() [[QBIT]]
+  // CHECK: [[QREG_1:%.+]] = quantum.insert [[QREG]]
+  // CHECK-NOT: quantum.insert
+  // COM: check that insert op canonicalization correctly removes unnecessary extract/inserts
+  // CHECK: quantum.compbasis qreg [[QREG_1]]
+  %1 = quantum.extract %0[%c0_i64] : !quantum.reg -> !quantum.bit
+  %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
+  %2 = quantum.extract %0[%c1_i64] : !quantum.reg -> !quantum.bit
+  %3 = quantum.insert %0[%c1_i64], %2 : !quantum.reg, !quantum.bit
+  %4 = quantum.insert %3[%c0_i64], %out_qubits : !quantum.reg, !quantum.bit
+  %5 = quantum.compbasis qreg %4 : !quantum.obs
+  %6 = quantum.probs %5 : tensor<4xf64>
+  quantum.dealloc %4 : !quantum.reg
+  quantum.device_release
+  return %6 : tensor<4xf64>
 }

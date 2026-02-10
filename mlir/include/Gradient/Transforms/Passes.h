@@ -14,15 +14,14 @@
 
 #pragma once
 
-#include <memory>
-
 #include "mlir/Pass/Pass.h"
 
 namespace catalyst {
+namespace gradient {
 
-// Pass creation for use in mlir opt tools
-std::unique_ptr<mlir::Pass> createGradientBufferizationPass();
-std::unique_ptr<mlir::Pass> createGradientLoweringPass();
-std::unique_ptr<mlir::Pass> createGradientConversionPass();
+#define GEN_PASS_DECL
+#define GEN_PASS_REGISTRATION
+#include "Gradient/Transforms/Passes.h.inc"
 
+} // namespace gradient
 } // namespace catalyst

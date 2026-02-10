@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for `OpenQasmDevice` on "remote" Amazon Braket devices
-"""
+"""Unit tests for `OpenQasmDevice` on "remote" Amazon Braket devices"""
 import numpy as np
 import pennylane as qml
 import pytest
@@ -122,7 +121,7 @@ class TestBraketGates:
 
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
 
-        qjit_fn = qjit()(qml.qnode(device)(circuit))
+        qjit_fn = qjit(qml.qnode(device)(circuit))
         qml_fn = qml.qnode(qml.device("default.qubit", wires=3))(circuit)
 
         assert np.allclose(qjit_fn(), qml_fn())
@@ -149,7 +148,7 @@ class TestBraketGates:
             qml.MultiRZ(np.pi / 2, wires=[0, 1, 2])
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
 
-        qjit_fn = qjit()(qml.qnode(device)(circuit))
+        qjit_fn = qjit(qml.qnode(device)(circuit))
 
         with pytest.raises(
             RuntimeError, match="The given QIR gate name is not supported by the OpenQASM builder."
@@ -182,7 +181,7 @@ class TestBraketGates:
 
             return qml.var(qml.PauliZ(0) @ qml.PauliZ(1) @ qml.PauliZ(2))
 
-        qjit_fn = qjit()(qml.qnode(device)(circuit))
+        qjit_fn = qjit(qml.qnode(device)(circuit))
         qml_fn = qml.qnode(qml.device("default.qubit", wires=3))(circuit)
 
         assert np.allclose(qjit_fn(3.14, 0.6), qml_fn(3.14, 0.6))

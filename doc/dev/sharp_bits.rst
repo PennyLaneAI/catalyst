@@ -321,11 +321,17 @@ UserWarning: Provided arguments did not match declared signature, recompiling...
 Tracing occurring
 Array(0.16996714, dtype=float64)
 
+.. note::
+
+    An exception to the rule above regarding recompilation is when the dynamically shaped output array is a :ref:`Catalyst-supported terminal measurement <measurements>` and the output shape depends on the number of qubits. Recompilation is not triggered in these cases.
+    See :ref:`qubit-invariant compilation <qubit_invariant_compilation>`.
+
 Specifying compile-time constants
 ---------------------------------
 
 The ``@qjit`` decorator argument ``static_argnums`` allows positional arguments
-to be specified which should be treated as compile-time static arguments.
+to be specified which should be treated as compile-time static arguments (similarly,
+``static_argnames`` can be used to specify compile-time static arguments by name).
 
 This allows any hashable Python object to be passed to the function during compilation;
 the function will only be re-compiled if the hash value of the static arguments change.
@@ -573,8 +579,6 @@ A useful tool for debugging quantum algorithms is the ability to draw them. Curr
 :func:`@qjit <~.qjit>` compiled QNodes can be used as input to
 :func:`qml.draw <pennylane.draw>`, with the following caveats:
 
-- :func:`qml.draw <pennylane.draw>` call must occur outside the :func:`@qjit <.qjit>`
-
 - The ``qml.draw()`` function will only accept plain QNodes as input, *or* QNodes that have been qjit-compiled. It will not accept arbitrary hybrid functions (that may contain QNodes).
 
 - The :func:`catalyst.measure` function is not supported in drawn QNodes
@@ -736,7 +740,7 @@ a single RX gate is being applied due to the rotation gate merger:
           g:f64[1] = add d f
           h:f64[1] = slice[limit_indices=(1,) start_indices=(0,) strides=(1,)] g
           i:f64[] = squeeze[dimensions=(0,)] h
-           = qdevice[
+           = device_init[
             rtd_kwargs={'shots': 0, 'mcmc': False}
             rtd_lib=/usr/local/lib/python3.10/dist-packages/catalyst/utils/../lib/librtd_lightning.so
             rtd_name=LightningSimulator
@@ -993,7 +997,7 @@ Dynamically-shaped arrays
 -------------------------
 
 Catalyst provides experimental support for compiling functions that accept
-or contain tensors whose dimensions are not know at compile time, without
+or contain tensors whose dimensions are not known at compile time, without
 needing to recompile the function when tensor shapes change.
 
 For example, one might consider a case where a dynamic variable specifies the shape
@@ -1251,6 +1255,11 @@ Note that ``jax.vmap`` cannot be used within a qjit-compiled function:
 >>> qjit(jax.vmap(circuit))(jnp.array([0.1, 0.2]))
 NotImplementedError: Batching rule for 'qinst' not implemented
 
+In addition, shot-vectors are currently only supported in a limited manner;
+shot-vectors work with :func:`qml.sample <pennylane.sample>`, but not other
+measurement processes such as :func:`qml.expval <pennylane.expval>` and
+:func:`qml.probs <pennylane.probs>`.
+
 Functionality differences from PennyLane
 ----------------------------------------
 
@@ -1259,9 +1268,22 @@ in Python with PennyLane, and easily scale up prototypes by simply adding ``@qji
 This will require that all PennyLane functionality behaves identically whether or not
 the ``@qjit`` decorator is applied.
 
-Currently, however, this is not the case for measurements.
+Currently, however, this is not the case for the following functionalities.
 
-- **Measurement behaviour**. :func:`catalyst.measure` currently behaves
+- **Graph-based decompositions**: Graph-based decompositions can be enabled via
+  :func:`pennylane.decomposition.enable_graph`. Scenarios can happen in which 
+  the graph may use different solutions non-deterministically if there exist 
+  intermediate decompositions that have the same overall cost. This phenomenon
+  is not an issue, except for in cases where intermediate gates are not
+  executable with ``qjit`` present. An example of such a gate is 
+  ``qml.PauliRot``; if an intermediate decomposition is chosen that includes
+  a ``qml.PauliRot`` instance, Catalyst cannot execute the program. If this 
+  behaviour is encountered, this can be counteracted by adding a prohibitively
+  large penalty to the graph solution should it encounter a ``qml.PauliRot`` 
+  instance (e.g., 
+  ``qml.transforms.decomopose(..., gate_set={..., qml.PauliRot: 100_000})``).
+
+- **Measurement behaviour**: :func:`catalyst.measure` currently behaves
   differently from its PennyLane counterpart :func:`pennylane.measure`.
   In particular:
 
@@ -1272,3 +1294,77 @@ Currently, however, this is not the case for measurements.
   - Final measurement statistics occurring after :func:`catalyst.measure` will
     be post-selected on the outcome that was measured. The post-selected
     measurement will change with every execution.
+
+- **Dynamic wire allocation behaviour**: The ``qml.allocate()`` function currently
+  behaves differently when Catalyst is present or not. In particular:
+
+  - The ``state`` and ``restored`` keyword arguments of ``qml.allocate()`` are
+    ignored in Catalyst. The reason is that the only supported mode is to always allocate in the
+    zero state.
+
+  - Related to the above point, in PennyLane, dynamic wire allocations do not
+    increase the total number of wires used in the circuit. This is because
+    PennyLane treats the number of wires during device initialization (the 
+    ``qml.device("...", wires=N)``) as the device capacity. Briefly, when 
+    ``qml.allocate()`` is encountered, PennyLane looks into the pool of existing
+    wires and chooses a suitable set of wires that is currently unused as the 
+    result of the allocation, instead of requesting additional wires from the 
+    device. However, Catalyst treats device wires as completely separate from 
+    wires that are requested via ``qml.allocate``; they are two separate pools
+    of memory, where wires requested with ``qml.allocate`` are in addition to
+    initial ones from ``qml.device``. If the pool of wires from ``device`` is
+    called "device" and the pool of wires from ``qml.allocate`` is called 
+    "dynamic", future calls to ``qml.allocate`` can reuse wires from the 
+    dynamic pool, but not from the device pool. 
+     
+  - Dynamically allocated wires cannot be used in quantum adjoints yet.
+
+  .. code-block:: python
+
+    qml.capture.enable()
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit():
+        with qml.allocate(1) as q:
+            qml.adjoint(qml.X)(wires=q[0])
+        return qml.probs(wires=[0])
+
+  >>> print(circuit())
+  NotImplementedError: Dynamically allocated wires cannot be used in quantum adjoints yet.
+
+  - Usage of ``qml.allocate()`` with Catalyst prohibits returning any terminal measurement
+    *except for* ``qml.probs``. This is due to a bug in Lightning.
+    Other measurement types (``qml.sample``, ``qml.expval``, ``qml.var``, etc.)
+    will be supported in the future after the underlying bug is fixed.
+
+  .. code-block:: python
+
+    qml.capture.enable()
+
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=3, shots=10))
+    def circuit():
+        with qml.allocate(2) as qs:
+            qml.X(qs[1])
+        return qml.sample(wires=[0, 1])
+
+  >>> circuit()
+  CompileError: Only probability measurements (qml.probs) are currently supported
+  when dynamic allocations are present in the program. Other measurement
+  types (qml.sample, qml.expval, qml.var, ...etc) will be supported
+  in a future release after the underlying bug is fixed.
+
+  .. code-block:: python
+
+    qml.capture.enable()
+
+    @qml.qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit():
+        with qml.allocate(1) as q:
+            qml.X(q[0])
+        return qml.probs(wires=[0])
+
+  >>> circuit()
+  Array([1., 0.], dtype=float64)

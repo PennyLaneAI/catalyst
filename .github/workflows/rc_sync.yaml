@@ -7,9 +7,9 @@ name: Sync release candidate with main
 
 # Controls when the workflow will run
 on:
-  # Scheduled trigger every weekday at 2:47am UTC
+  # Scheduled trigger every weekday at 1:47am EST (6:47am UTC)
   schedule:
-  - cron:  '47 2 * * 1-5'
+  - cron:  '47 6 * * 1-5'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -19,7 +19,7 @@ jobs:
   # This workflow contains a single job to sync the main branch with changes from the rc
   sync:
     # The type of runner that the job will run on
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       # Import Numpy/Pybind11 because it is imported in setup.py
       - name: Install Numpy and Pybind11
         run: |
@@ -61,6 +61,8 @@ jobs:
           # Exclude some files known to be divergent during the release process from the PR
           git checkout origin/main -- frontend/catalyst/_version.py
           git checkout origin/main -- doc/dev/release_notes.rst
+          git checkout origin/main -- doc/requirements.txt
+          git checkout origin/main -- setup.py
           git config user.name "GitHub Actions Bot"
           git config user.email "<>"
           git commit -m "exclude files from pr"
@@ -82,4 +84,4 @@ jobs:
           pr_body: "Automatic sync from the release candidate to main during a feature freeze."
           pr_allow_empty: false
           pr_draft: false
-          pr_reviewer: "dime10,rauletorresc"
+          pr_reviewer: "dime10,paul0403"

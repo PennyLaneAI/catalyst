@@ -45,10 +45,12 @@ def ZneOp : Mitigation_Op<"zne", [DeclareOpInterfaceMethods<CallOpInterface>,
     }];
 
     let arguments = (ins
-        FlatSymbolRefAttr:$callee,
+        SymbolRefAttr:$callee,
         Variadic<AnyType>:$args,
         FoldingAttr:$folding,
-        RankedTensorOf<[AnySignlessIntegerOrIndex]>:$numFolds
+        RankedTensorOf<[AnySignlessIntegerOrIndex]>:$numFolds,
+        OptionalAttr<DictArrayAttr>:$arg_attrs,
+        OptionalAttr<DictArrayAttr>:$res_attrs
     );
     let results = (outs Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>);
 

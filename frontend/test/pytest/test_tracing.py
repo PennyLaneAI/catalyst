@@ -27,7 +27,7 @@ def test_jaxpr_lowering_without_dynshapes():
         return 0
 
     jaxpr = jax.make_jaxpr(f)()
-    result, _ = lower_jaxpr_to_mlir(jaxpr, "test_fn")
+    result, _ = lower_jaxpr_to_mlir(jaxpr, "test_fn", [])
 
     assert "@jit_test_fn() -> tensor<i64>" in str(result)
 

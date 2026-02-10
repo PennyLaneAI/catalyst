@@ -33,7 +33,7 @@ def GradientOpInterface : OpInterface<"GradientOpInterface">{
         >,
         InterfaceMethod<
         "Return the name of the callee, aka the function being differentiated by the gradient operation.",
-        "llvm::StringRef", "getCallee"
+        "mlir::SymbolRefAttr", "getCallee"
         >,
         InterfaceMethod<
         "Return the indices of the arguments being differentiated.",

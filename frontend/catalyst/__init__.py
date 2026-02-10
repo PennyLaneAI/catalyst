@@ -18,12 +18,11 @@ This package contains the Catalyst Python interface.
 # pylint: disable=wrong-import-position
 
 import sys
-import types
 from os.path import dirname
 
 import jaxlib as _jaxlib
 
-_jaxlib_version = "0.4.28"
+_jaxlib_version = "0.7.1"
 if _jaxlib.__version__ != _jaxlib_version:
     import warnings
 
@@ -67,21 +66,8 @@ if not INSTALLED:
 # pylint: disable=protected-access
 sys.modules["mlir_quantum.ir"] = __import__("jaxlib.mlir.ir").mlir.ir
 sys.modules["mlir_quantum._mlir_libs"] = __import__("jaxlib.mlir._mlir_libs").mlir._mlir_libs
-# C++ extensions to the dialects are mocked out.
-sys.modules["mlir_quantum._mlir_libs._quantumDialects.gradient"] = types.ModuleType(
-    "mlir_quantum._mlir_libs._quantumDialects.gradient"
-)
-sys.modules["mlir_quantum._mlir_libs._quantumDialects.quantum"] = types.ModuleType(
-    "mlir_quantum._mlir_libs._quantumDialects.quantum"
-)
-sys.modules["mlir_quantum._mlir_libs._quantumDialects.catalyst"] = types.ModuleType(
-    "mlir_quantum._mlir_libs._quantumDialects.catalyst"
-)
-sys.modules["mlir_quantum._mlir_libs._quantumDialects.mitigation"] = types.ModuleType(
-    "mlir_quantum._mlir_libs._quantumDialects.mitigation"
-)
 
-from catalyst import debug, logging
+from catalyst import debug, logging, passes
 from catalyst.api_extensions import *
 from catalyst.api_extensions import __all__ as _api_extension_list
 from catalyst.autograph import *
@@ -89,10 +75,13 @@ from catalyst.autograph import __all__ as _autograph_functions
 from catalyst.compiler import CompileOptions
 from catalyst.debug.assertion import debug_assert
 from catalyst.jit import QJIT, qjit
+from catalyst.passes.pass_api import pipeline
+from catalyst.python_interface.inspection.draw import draw_graph
 from catalyst.utils.exceptions import (
     AutoGraphError,
     CompileError,
     DifferentiableCompileError,
+    PlxprCaptureCFCompatibilityError,
 )
 
 autograph_ignore_fallbacks = False
@@ -181,11 +170,15 @@ __all__ = (
     "autograph_ignore_fallbacks",
     "autograph_strict_conversion",
     "AutoGraphError",
+    "PlxprCaptureCFCompatibilityError",
     "CompileError",
     "DifferentiableCompileError",
     "debug_assert",
     "CompileOptions",
     "debug",
+    "draw_graph",
+    "passes",
+    "pipeline",
     *_api_extension_list,
     *_autograph_functions,
 )

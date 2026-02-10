@@ -3,6 +3,7 @@
 # be loaded. Extensions are loading into the active Python interpreter and may
 # run arbitrary code
 extension-pkg-allow-list=catalyst.utils.wrapper
+ignore-patterns=.*lit.cfg.*
 
 [TYPECHECK]
 
@@ -18,7 +19,7 @@ ignored-modules=pennylane.ops,jaxlib.mlir.ir,jaxlib.xla_extension
 ; ignored-classes=
 
 # List of file/directory patters to ignore.
-ignore=test,llvm-project,mlir-hlo,Enzyme,.git,__pycache__,build,doc,_revision.py
+ignore=test,llvm-project,Enzyme,stablehlo,.git,__pycache__,build,build-docs,doc,_revision.py
 
 # List of decorators that change a function's signature. Will ignore certain errors
 # like 'no-value-for-parameter' on functions with these decorators.

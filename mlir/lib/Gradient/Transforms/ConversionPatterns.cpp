@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iostream"
-#include "llvm/Support/raw_ostream.h"
-
 #include <deque>
+#include <iostream>
 #include <string>
 #include <vector>
+
+#include "llvm/Support/raw_ostream.h"
 
 #include "mlir/Conversion/LLVMCommon/MemRefBuilder.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
@@ -33,6 +33,8 @@
 #include "mlir/IR/IRMapping.h"
 
 #include "Catalyst/Utils/CallGraph.h"
+#include "Catalyst/Utils/EnsureFunctionDeclaration.h"
+#include "Catalyst/Utils/StaticAllocas.h"
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/EnzymeConstants.h"
 #include "Gradient/Transforms/Patterns.h"
@@ -47,8 +49,8 @@ using namespace catalyst::gradient;
 
 namespace catalyst {
 namespace gradient {
-void wrapMemRefArgsFunc(func::FuncOp func, const TypeConverter *typeConverter,
-                        RewriterBase &rewriter, Location loc, bool volatileArgs = false)
+LogicalResult wrapMemRefArgsFunc(func::FuncOp func, const TypeConverter *typeConverter,
+                                 RewriterBase &rewriter, Location loc, bool volatileArgs = false)
 {
     MLIRContext *ctx = rewriter.getContext();
     auto ptrType = LLVM::LLVMPointerType::get(ctx);
@@ -57,7 +59,9 @@ void wrapMemRefArgsFunc(func::FuncOp func, const TypeConverter *typeConverter,
     for (const auto [idx, argType] : llvm::enumerate(func.getArgumentTypes())) {
         if (auto memrefType = dyn_cast<MemRefType>(argType)) {
             BlockArgument memrefArg = func.getArgument(idx);
-            func.insertArgument(idx, ptrType, DictionaryAttr::get(ctx), loc);
+            if (failed(func.insertArgument(idx, ptrType, DictionaryAttr::get(ctx), loc))) {
+                return failure();
+            }
             Value wrappedMemref = func.getArgument(idx);
             Type structType = typeConverter->convertType(memrefType);
 
@@ -67,26 +71,28 @@ void wrapMemRefArgsFunc(func::FuncOp func, const TypeConverter *typeConverter,
             // used. Otherwise, LLVM may optimize it away with a poison value.
             //   Note: both the volatile load and store are necessary. MLIR respects the store
             //   but not the load, while LLVM respects the volatile load but not the store.
-            Value replacedMemref = rewriter.create<LLVM::LoadOp>(
-                loc, structType, wrappedMemref, /*alignment*/ 0, /*isVolatile=*/volatileArgs);
+            Value replacedMemref =
+                LLVM::LoadOp::create(rewriter, loc, structType, wrappedMemref, /*alignment*/ 0,
+                                     /*isVolatile=*/volatileArgs);
             if (volatileArgs) {
-                rewriter.create<LLVM::StoreOp>(loc, replacedMemref, wrappedMemref);
+                LLVM::StoreOp::create(rewriter, loc, replacedMemref, wrappedMemref);
             }
             replacedMemref =
-                rewriter.create<UnrealizedConversionCastOp>(loc, argType, replacedMemref)
+                UnrealizedConversionCastOp::create(rewriter, loc, argType, replacedMemref)
                     .getResult(0);
             memrefArg.replaceAllUsesWith(replacedMemref);
-            func.eraseArgument(memrefArg.getArgNumber());
+            if (failed(func.eraseArgument(memrefArg.getArgNumber()))) {
+                return failure();
+            }
         }
     }
+    return success();
 }
 
 void wrapMemRefArgsCallsites(func::FuncOp func, const TypeConverter *typeConverter,
                              RewriterBase &rewriter, Location loc, bool volatileArgs = false)
 {
     ModuleOp moduleOp = func->getParentOfType<ModuleOp>();
-    MLIRContext *ctx = rewriter.getContext();
-    auto ptrType = LLVM::LLVMPointerType::get(ctx);
     std::optional<SymbolTable::UseRange> uses = func.getSymbolUses(moduleOp);
     if (uses.has_value()) {
         for (auto use : *uses) {
@@ -94,19 +100,16 @@ void wrapMemRefArgsCallsites(func::FuncOp func, const TypeConverter *typeConvert
                 PatternRewriter::InsertionGuard insertionGuard(rewriter);
                 rewriter.setInsertionPoint(callOp);
 
-                Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-
                 SmallVector<Value> operands;
                 SmallVector<Value> outputs;
                 auto wrapMemref = [&](Value memref) {
                     Type convertedType = typeConverter->convertType(memref.getType());
-                    Value space =
-                        rewriter.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
-                                                        /*elementType=*/convertedType, c1);
+                    Value space = getStaticAlloca(loc, rewriter, convertedType, 1);
+
                     Value convertedValue =
-                        rewriter.create<UnrealizedConversionCastOp>(loc, convertedType, memref)
+                        UnrealizedConversionCastOp::create(rewriter, loc, convertedType, memref)
                             .getResult(0);
-                    rewriter.create<LLVM::StoreOp>(loc, convertedValue, space);
+                    LLVM::StoreOp::create(rewriter, loc, convertedValue, space);
                     return space;
                 };
                 for (Value oldOperand : callOp.getOperands()) {
@@ -117,7 +120,7 @@ void wrapMemRefArgsCallsites(func::FuncOp func, const TypeConverter *typeConvert
                 for (Type resultType : callOp.getResultTypes()) {
                     if (auto memrefType = dyn_cast<MemRefType>(resultType)) {
                         assert(memrefType.hasStaticShape());
-                        Value memref = rewriter.create<memref::AllocOp>(loc, memrefType);
+                        Value memref = memref::AllocOp::create(rewriter, loc, memrefType);
                         outputs.push_back(memref);
 
                         memref = wrapMemref(memref);
@@ -125,7 +128,7 @@ void wrapMemRefArgsCallsites(func::FuncOp func, const TypeConverter *typeConvert
                     }
                 }
 
-                rewriter.create<func::CallOp>(callOp.getLoc(), func, operands);
+                func::CallOp::create(rewriter, callOp.getLoc(), func, operands);
                 rewriter.replaceOp(callOp, outputs);
             }
         }
@@ -148,24 +151,25 @@ LLVM::GlobalOp insertEnzymeCustomGradient(OpBuilder &builder, ModuleOp moduleOp,
 
     auto ptrType = LLVM::LLVMPointerType::get(context);
     auto resultType = LLVM::LLVMArrayType::get(ptrType, 3);
-    customGradient = builder.create<LLVM::GlobalOp>(loc, resultType,
-                                                    /*isConstant=*/false, LLVM::Linkage::External,
-                                                    key, /*address space=*/nullptr);
+    customGradient = LLVM::GlobalOp::create(builder, loc, resultType,
+                                            /*isConstant=*/false, LLVM::Linkage::External, key,
+                                            /*address space=*/nullptr);
     builder.createBlock(&customGradient.getInitializerRegion());
-    Value origFnPtr = builder.create<func::ConstantOp>(loc, originalFunc.getFunctionType(),
-                                                       originalFunc.getName());
-    Value augFnPtr = builder.create<func::ConstantOp>(loc, augmentedPrimal.getFunctionType(),
-                                                      augmentedPrimal.getName());
+    Value origFnPtr = func::ConstantOp::create(builder, loc, originalFunc.getFunctionType(),
+                                               originalFunc.getName());
+    Value augFnPtr = func::ConstantOp::create(builder, loc, augmentedPrimal.getFunctionType(),
+                                              augmentedPrimal.getName());
     Value gradFnPtr =
-        builder.create<func::ConstantOp>(loc, gradient.getFunctionType(), gradient.getName());
+        func::ConstantOp::create(builder, loc, gradient.getFunctionType(), gradient.getName());
     SmallVector<Value> fnPtrs{origFnPtr, augFnPtr, gradFnPtr};
-    Value result = builder.create<LLVM::UndefOp>(loc, resultType);
+    Value result = LLVM::UndefOp::create(builder, loc, resultType);
     for (const auto &[idx, fnPtr] : llvm::enumerate(fnPtrs)) {
-        Value casted = builder.create<UnrealizedConversionCastOp>(loc, ptrType, fnPtr).getResult(0);
-        result = builder.create<LLVM::InsertValueOp>(loc, result, casted, idx);
+        Value casted =
+            UnrealizedConversionCastOp::create(builder, loc, ptrType, fnPtr).getResult(0);
+        result = LLVM::InsertValueOp::create(builder, loc, result, casted, idx);
     }
 
-    builder.create<LLVM::ReturnOp>(loc, result);
+    LLVM::ReturnOp::create(builder, loc, result);
 
     return customGradient;
 }
@@ -174,16 +178,19 @@ LLVM::GlobalOp insertEnzymeCustomGradient(OpBuilder &builder, ModuleOp moduleOp,
 /// functions where MemRefs are passed via wrapped pointers (!llvm.ptr<struct(ptr, ptr, i64, ...)>)
 /// rather than having their fields unpacked. This function automatically transforms MemRef
 /// arguments of a function to wrapped pointers.
-void wrapMemRefArgs(func::FuncOp func, const TypeConverter *typeConverter, RewriterBase &rewriter,
-                    Location loc, bool volatileArgs = false)
+LogicalResult wrapMemRefArgs(func::FuncOp func, const TypeConverter *typeConverter,
+                             RewriterBase &rewriter, Location loc, bool volatileArgs = false)
 {
     if (llvm::none_of(func.getArgumentTypes(),
                       [](Type argType) { return isa<MemRefType>(argType); })) {
         // The memref arguments are already wrapped
-        return;
+        return success();
     }
-    wrapMemRefArgsFunc(func, typeConverter, rewriter, loc, volatileArgs);
+    if (failed(wrapMemRefArgsFunc(func, typeConverter, rewriter, loc, volatileArgs))) {
+        return failure();
+    }
     wrapMemRefArgsCallsites(func, typeConverter, rewriter, loc, volatileArgs);
+    return success();
 }
 } // namespace gradient
 } // namespace catalyst
@@ -191,25 +198,6 @@ void wrapMemRefArgs(func::FuncOp func, const TypeConverter *typeConverter, Rewri
 namespace {
 
 constexpr int64_t UNKNOWN = ShapedType::kDynamic;
-
-LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op,
-                                           StringRef fnSymbol, Type fnType)
-{
-    Operation *fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
-
-    if (!fnDecl) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        ModuleOp mod = op->getParentOfType<ModuleOp>();
-        rewriter.setInsertionPointToStart(mod.getBody());
-
-        fnDecl = rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), fnSymbol, fnType);
-    }
-    else {
-        assert(isa<LLVM::LLVMFuncOp>(fnDecl) && "QIR function declaration is not a LLVMFuncOp");
-    }
-
-    return cast<LLVM::LLVMFuncOp>(fnDecl);
-}
 
 struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
@@ -236,7 +224,7 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
         // The callee of the adjoint op must return as a single result the quantum register.
         func::FuncOp callee =
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
-        assert(callee && callee.getNumResults() == 1 && "invalid qfunc symbol in adjoint op");
+        assert(callee && callee.getNumResults() == 1 && "adjoint: nodealloc must return only qreg");
 
         StringRef cacheFnName = "__catalyst__rt__toggle_recorder";
         StringRef gradFnName = "__catalyst__qis__Gradient";
@@ -245,39 +233,39 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
         Type gradFnSignature = LLVM::LLVMFunctionType::get(
             LLVM::LLVMVoidType::get(ctx), IntegerType::get(ctx, 64), /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp cacheFnDecl =
-            ensureFunctionDeclaration(rewriter, op, cacheFnName, cacheFnSignature);
-        LLVM::LLVMFuncOp gradFnDecl =
-            ensureFunctionDeclaration(rewriter, op, gradFnName, gradFnSignature);
+        LLVM::LLVMFuncOp cacheFnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, cacheFnName, cacheFnSignature);
+        LLVM::LLVMFuncOp gradFnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, gradFnName, gradFnSignature);
 
         // Run the forward pass and cache the circuit.
-        Value c_true = rewriter.create<LLVM::ConstantOp>(
-            loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 1));
-        Value c_false = rewriter.create<LLVM::ConstantOp>(
-            loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 0));
-        rewriter.create<LLVM::CallOp>(loc, cacheFnDecl, c_true);
-        Value qreg = rewriter.create<func::CallOp>(loc, callee, op.getArgs()).getResult(0);
+        Value c_true = LLVM::ConstantOp::create(
+            rewriter, loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 1));
+        Value c_false = LLVM::ConstantOp::create(
+            rewriter, loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 0));
+        LLVM::CallOp::create(rewriter, loc, cacheFnDecl, c_true);
+        Value qreg = func::CallOp::create(rewriter, loc, callee, op.getArgs()).getResult(0);
         if (!isa<catalyst::quantum::QuregType>(qreg.getType()))
             return callee.emitOpError("qfunc must return quantum register");
-        rewriter.create<LLVM::CallOp>(loc, cacheFnDecl, c_false);
+        LLVM::CallOp::create(rewriter, loc, cacheFnDecl, c_false);
 
         // We follow the C ABI convention of passing result memrefs as struct pointers in the
         // arguments to the C function, although in this case as a variadic argument list to allow
         // for a varying number of results in a single signature.
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        Value numResults = rewriter.create<LLVM::ConstantOp>(
-            loc, rewriter.getI64IntegerAttr(op.getDataIn().size()));
+        Value c1 = LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(1));
+        Value numResults = LLVM::ConstantOp::create(
+            rewriter, loc, rewriter.getI64IntegerAttr(op.getDataIn().size()));
         SmallVector<Value> args = {numResults};
         for (Value memref : adaptor.getDataIn()) {
-            Value newArg = rewriter.create<LLVM::AllocaOp>(
-                loc, LLVM::LLVMPointerType::get(rewriter.getContext()), vectorType, c1);
-            rewriter.create<LLVM::StoreOp>(loc, memref, newArg);
+            Value newArg = LLVM::AllocaOp::create(
+                rewriter, loc, LLVM::LLVMPointerType::get(rewriter.getContext()), vectorType, c1);
+            LLVM::StoreOp::create(rewriter, loc, memref, newArg);
             args.push_back(newArg);
         }
 
-        rewriter.create<LLVM::CallOp>(loc, gradFnDecl, args);
-        rewriter.create<catalyst::quantum::DeallocOp>(loc, qreg);
-        rewriter.create<catalyst::quantum::DeviceReleaseOp>(loc);
+        LLVM::CallOp::create(rewriter, loc, gradFnDecl, args);
+        catalyst::quantum::DeallocOp::create(rewriter, loc, qreg);
+        catalyst::quantum::DeviceReleaseOp::create(rewriter, loc);
 
         rewriter.eraseOp(op);
 
@@ -312,7 +300,9 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
         assert(callee && "Expected a valid callee of type func.func");
 
-        catalyst::convertToDestinationPassingStyle(callee, rewriter);
+        if (failed(catalyst::convertToDestinationPassingStyle(callee, rewriter))) {
+            return failure();
+        }
         SymbolTableCollection symbolTable;
         catalyst::traverseCallGraph(callee, &symbolTable, [&](func::FuncOp func) {
             // Register custom gradients of quantum functions
@@ -326,9 +316,11 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 if (!func->hasAttr("unwrapped_type")) {
                     func->setAttr("unwrapped_type", TypeAttr::get(func.getFunctionType()));
                 }
-                catalyst::convertToDestinationPassingStyle(func, rewriter);
-
-                wrapMemRefArgs(func, getTypeConverter(), rewriter, loc, /*volatileArgs=*/true);
+                LogicalResult dpsr = catalyst::convertToDestinationPassingStyle(func, rewriter);
+                assert(dpsr.succeeded() && "failed to rewrite backpropOp to destination style");
+                LogicalResult wmar = wrapMemRefArgs(func, getTypeConverter(), rewriter, loc,
+                                                    /*volatileArgs=*/true);
+                assert(wmar.succeeded() && "failed to wrap backpropOp's memref args");
 
                 func::FuncOp augFwd = genAugmentedForward(func, rewriter);
                 func::FuncOp customQGrad =
@@ -340,9 +332,10 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
         LowerToLLVMOptions options = getTypeConverter()->getOptions();
         if (options.useGenericFunctions) {
-            LLVM::LLVMFuncOp allocFn =
-                LLVM::lookupOrCreateGenericAllocFn(moduleOp, getTypeConverter()->getIndexType());
-            LLVM::LLVMFuncOp freeFn = LLVM::lookupOrCreateGenericFreeFn(moduleOp);
+            LLVM::LLVMFuncOp allocFn = LLVM::lookupOrCreateGenericAllocFn(
+                                           rewriter, moduleOp, getTypeConverter()->getIndexType())
+                                           .value();
+            LLVM::LLVMFuncOp freeFn = LLVM::lookupOrCreateGenericFreeFn(rewriter, moduleOp).value();
 
             // Register the previous functions as llvm globals (for Enzyme)
             // With the following piece of metadata, shadow memory is allocated with
@@ -367,12 +360,12 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         // way to do this is to append the number of scalar results to the name of the function.
         std::string autodiff_func_name =
             enzyme_autodiff_func_name + std::to_string(op.getNumResults());
-        LLVM::LLVMFuncOp backpropFnDecl =
-            ensureFunctionDeclaration(rewriter, op, autodiff_func_name, backpropFnSignature);
+        LLVM::LLVMFuncOp backpropFnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, autodiff_func_name, backpropFnSignature);
 
         // The first argument to Enzyme is a function pointer of the function to be differentiated
         Value calleePtr =
-            rewriter.create<func::ConstantOp>(loc, callee.getFunctionType(), callee.getName());
+            func::ConstantOp::create(rewriter, loc, callee.getFunctionType(), callee.getName());
         calleePtr = castToConvertedType(calleePtr, rewriter, loc);
         SmallVector<Value> callArgs = {calleePtr};
 
@@ -381,8 +374,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         insertGlobalSymbol(rewriter, moduleOp, enzyme_dupnoneed_key, std::nullopt);
 
         ValueRange argShadows = adaptor.getDiffArgShadows();
-        Value enzymeConst = rewriter.create<LLVM::AddressOfOp>(loc, LLVM::LLVMPointerType::get(ctx),
-                                                               enzyme_const_key);
+        Value enzymeConst = LLVM::AddressOfOp::create(
+            rewriter, loc, LLVM::LLVMPointerType::get(ctx), enzyme_const_key);
         ValueRange convArgs = adaptor.getArgs();
         // Add the arguments and the argument shadows of memrefs
         for (auto [index, arg] : llvm::enumerate(op.getArgs())) {
@@ -426,7 +419,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
         // The results of backprop are in argShadows, except scalar derivatives which are in the
         // results of the enzyme call.
-        auto enzymeCall = rewriter.create<LLVM::CallOp>(loc, backpropFnDecl, callArgs);
+        auto enzymeCall = LLVM::CallOp::create(rewriter, loc, backpropFnDecl, callArgs);
         SmallVector<Value> scalarResults;
         unpackScalarResults(enzymeCall, scalarResults, rewriter, loc);
         rewriter.replaceOp(op, scalarResults);
@@ -436,8 +429,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
   private:
     Value castToConvertedType(Value value, OpBuilder &builder, Location loc) const
     {
-        auto casted = builder.create<UnrealizedConversionCastOp>(
-            loc, getTypeConverter()->convertType(value.getType()), value);
+        auto casted = UnrealizedConversionCastOp::create(
+            builder, loc, getTypeConverter()->convertType(value.getType()), value);
         return casted.getResult(0);
     }
 
@@ -448,9 +441,9 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
     {
         auto llvmPtrType = LLVM::LLVMPointerType::get(builder.getContext());
         auto memRefType = cast<MemRefType>(memRefArg.getType());
-        Value enzymeConst = builder.create<LLVM::AddressOfOp>(loc, llvmPtrType, enzyme_const_key);
+        Value enzymeConst = LLVM::AddressOfOp::create(builder, loc, llvmPtrType, enzyme_const_key);
         Value enzymeDupNoNeed =
-            builder.create<LLVM::AddressOfOp>(loc, llvmPtrType, enzyme_dupnoneed_key);
+            LLVM::AddressOfOp::create(builder, loc, llvmPtrType, enzyme_dupnoneed_key);
         Value argStruct = castToConvertedType(memRefArg, builder, loc);
         MemRefDescriptor desc(argStruct);
 
@@ -471,9 +464,9 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             if (options.zeroOut) {
                 Value bufferSizeBytes =
                     computeMemRefSizeInBytes(memRefType, shadowDesc, builder, loc);
-                Value zero = builder.create<LLVM::ConstantOp>(loc, builder.getI8Type(), 0);
-                builder.create<LLVM::MemsetOp>(loc, shadowPtr, zero, bufferSizeBytes,
-                                               /*isVolatile=*/false);
+                Value zero = LLVM::ConstantOp::create(builder, loc, builder.getI8Type(), 0);
+                LLVM::MemsetOp::create(builder, loc, shadowPtr, zero, bufferSizeBytes,
+                                       /*isVolatile=*/false);
             }
             callArgs.push_back(shadowPtr);
         }
@@ -522,7 +515,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         if (auto structType = dyn_cast<LLVM::LLVMStructType>(result.getType())) {
             size_t numResults = structType.getBody().size();
             for (size_t i = 0; i < numResults; i++) {
-                results.push_back(builder.create<LLVM::ExtractValueOp>(loc, result, i));
+                results.push_back(LLVM::ExtractValueOp::create(builder, loc, result, i));
             }
         }
     }
@@ -537,17 +530,17 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         Value bufferSize;
         Type indexType = getTypeConverter()->getIndexType();
         if (type.getRank() == 0) {
-            bufferSize = builder.create<LLVM::ConstantOp>(loc, indexType, builder.getIndexAttr(1));
+            bufferSize = LLVM::ConstantOp::create(builder, loc, indexType, builder.getIndexAttr(1));
         }
         else {
-            bufferSize = builder.create<LLVM::MulOp>(loc, descriptor.size(builder, loc, 0),
-                                                     descriptor.stride(builder, loc, 0));
+            bufferSize = LLVM::MulOp::create(builder, loc, descriptor.size(builder, loc, 0),
+                                             descriptor.stride(builder, loc, 0));
             bufferSize =
-                builder.create<LLVM::AddOp>(loc, descriptor.offset(builder, loc), bufferSize);
+                LLVM::AddOp::create(builder, loc, descriptor.offset(builder, loc), bufferSize);
         }
-        Value elementByteSize = builder.create<LLVM::ConstantOp>(
-            loc, indexType, builder.getIndexAttr(type.getElementTypeBitWidth() / 8));
-        Value bufferSizeBytes = builder.create<LLVM::MulOp>(loc, elementByteSize, bufferSize);
+        Value elementByteSize = LLVM::ConstantOp::create(
+            builder, loc, indexType, builder.getIndexAttr(type.getElementTypeBitWidth() / 8));
+        Value bufferSizeBytes = LLVM::MulOp::create(builder, loc, elementByteSize, bufferSize);
         return bufferSizeBytes;
     }
 
@@ -584,8 +577,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         auto tapeType = LLVM::LLVMPointerType::get(ctx);
         SmallVector<Type> argTypes;
         convertCustomGradArgumentTypes(qnode.getArgumentTypes(), argTypes);
-        augmentedForward = builder.create<func::FuncOp>(
-            qnode.getLoc(), augmentedName, FunctionType::get(ctx, argTypes, {tapeType}));
+        augmentedForward = func::FuncOp::create(builder, qnode.getLoc(), augmentedName,
+                                                FunctionType::get(ctx, argTypes, {tapeType}));
         augmentedForward.setPrivate();
         Location loc = qnode.getLoc();
 
@@ -598,9 +591,9 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             arguments.push_back(augmentedForward.getArgument(i * 2));
         }
 
-        builder.create<func::CallOp>(loc, qnode, arguments);
-        Value tape = builder.create<LLVM::ZeroOp>(loc, tapeType);
-        builder.create<func::ReturnOp>(loc, tape);
+        func::CallOp::create(builder, loc, qnode, arguments);
+        Value tape = LLVM::ZeroOp::create(builder, loc, tapeType);
+        func::ReturnOp::create(builder, loc, tape);
         return augmentedForward;
     }
 
@@ -635,7 +628,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPoint(qnode);
         auto funcType = FunctionType::get(ctx, argTypes, {});
-        customQGrad = builder.create<func::FuncOp>(qnode.getLoc(), customQGradName, funcType);
+        customQGrad = func::FuncOp::create(builder, qnode.getLoc(), customQGradName, funcType);
         customQGrad.setPrivate();
         Block *block = customQGrad.addEntryBlock();
         builder.setInsertionPointToStart(block);
@@ -652,8 +645,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
         auto unwrapMemRef = [&](Value wrapped, Type unwrappedType) {
             auto structType = getTypeConverter()->convertType(unwrappedType);
-            Value unwrapped = builder.create<LLVM::LoadOp>(loc, structType, wrapped);
-            unwrapped = builder.create<UnrealizedConversionCastOp>(loc, unwrappedType, unwrapped)
+            Value unwrapped = LLVM::LoadOp::create(builder, loc, structType, wrapped);
+            unwrapped = UnrealizedConversionCastOp::create(builder, loc, unwrappedType, unwrapped)
                             .getResult(0);
             return unwrapped;
         };
@@ -675,10 +668,10 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         Value gateParamShadow = unwrappedShadows.back();
         assert(cast<MemRefType>(gateParamShadow.getType()).getRank() == 1 &&
                "Expected gate parameter list to be a rank-1 memref");
-        Value pcount = builder.create<memref::DimOp>(loc, gateParamShadow, 0);
+        Value pcount = memref::DimOp::create(builder, loc, gateParamShadow, 0);
         primalInputs.push_back(pcount);
 
-        auto qgrad = builder.create<func::CallOp>(loc, qgradFn, primalInputs);
+        auto qgrad = func::CallOp::create(builder, loc, qgradFn, primalInputs);
 
         for (unsigned i = 0; i < qnodeType.getNumResults(); i++) {
             // The QNode has n inputs and m outputs (in destination-passing style).
@@ -715,7 +708,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             catalyst::einsumLinalgGeneric(builder, loc, resultDims, qgradDims, {0}, resultShadow,
                                           qgrad.getResult(i), gateParamShadow);
         }
-        builder.create<func::ReturnOp>(loc);
+        func::ReturnOp::create(builder, loc);
 
         return customQGrad;
     }
@@ -742,28 +735,30 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         auto ptrType = LLVM::LLVMPointerType::get(context);
         auto resultType = LLVM::LLVMArrayType::get(ptrType, 4);
 
-        builder.create<LLVM::GlobalOp>(loc, LLVM::LLVMArrayType::get(builder.getI8Type(), 3), true,
-                                       LLVM::Linkage::Linkonce, "dealloc_indices",
-                                       builder.getStringAttr(StringRef("-1", 3)));
-        allocationLike =
-            builder.create<LLVM::GlobalOp>(loc, resultType,
-                                           /*isConstant=*/false, LLVM::Linkage::External,
-                                           enzyme_allocation_key, /*address space=*/nullptr);
+        LLVM::GlobalOp::create(builder, loc, LLVM::LLVMArrayType::get(builder.getI8Type(), 3), true,
+                               LLVM::Linkage::Linkonce, "dealloc_indices",
+                               builder.getStringAttr(StringRef("-1", 3)));
+        allocationLike = LLVM::GlobalOp::create(builder, loc, resultType,
+                                                /*isConstant=*/false, LLVM::Linkage::External,
+                                                enzyme_allocation_key, /*address space=*/nullptr);
         builder.createBlock(&allocationLike.getInitializerRegion());
-        Value allocFn = builder.create<LLVM::AddressOfOp>(loc, ptrType, allocFuncName);
+        Value allocFn = LLVM::AddressOfOp::create(builder, loc, ptrType, allocFuncName);
         Value sizeArgIndex =
-            builder.create<LLVM::ConstantOp>(loc, indexType, builder.getIndexAttr(0));
-        Value sizeArgIndexPtr = builder.create<LLVM::IntToPtrOp>(loc, ptrType, sizeArgIndex);
+            LLVM::ConstantOp::create(builder, loc, indexType, builder.getIndexAttr(0));
+        Value sizeArgIndexPtr = LLVM::IntToPtrOp::create(builder, loc, ptrType, sizeArgIndex);
         Value deallocIndicesPtr =
-            builder.create<LLVM::AddressOfOp>(loc, ptrType, "dealloc_indices");
-        Value freeFn = builder.create<LLVM::AddressOfOp>(loc, ptrType, freeFuncName);
+            LLVM::AddressOfOp::create(builder, loc, ptrType, "dealloc_indices");
+        Value freeFn = LLVM::AddressOfOp::create(builder, loc, ptrType, freeFuncName);
 
-        Value result = builder.create<LLVM::UndefOp>(loc, resultType);
-        result = builder.create<LLVM::InsertValueOp>(loc, result, allocFn, 0);
-        result = builder.create<LLVM::InsertValueOp>(loc, result, sizeArgIndexPtr, 1);
-        result = builder.create<LLVM::InsertValueOp>(loc, result, deallocIndicesPtr, 2);
-        result = builder.create<LLVM::InsertValueOp>(loc, result, freeFn, 3);
-        builder.create<LLVM::ReturnOp>(loc, result);
+        Value result = LLVM::UndefOp::create(builder, loc, resultType);
+        result =
+            LLVM::InsertValueOp::create(builder, loc, result, allocFn, SmallVector<int64_t>{0});
+        result = LLVM::InsertValueOp::create(builder, loc, result, sizeArgIndexPtr,
+                                             SmallVector<int64_t>{1});
+        result = LLVM::InsertValueOp::create(builder, loc, result, deallocIndicesPtr,
+                                             SmallVector<int64_t>{2});
+        result = LLVM::InsertValueOp::create(builder, loc, result, freeFn, SmallVector<int64_t>{3});
+        LLVM::ReturnOp::create(builder, loc, result);
 
         return allocationLike;
     }
@@ -783,13 +778,13 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         auto shortTy = IntegerType::get(context, 8);
         if (!glb) {
             if (!value) {
-                rewriter.create<LLVM::GlobalOp>(op.getLoc(), shortTy,
-                                                /*isConstant=*/true, LLVM::Linkage::Linkonce, key,
-                                                IntegerAttr::get(shortTy, 0));
+                LLVM::GlobalOp::create(rewriter, op.getLoc(), shortTy,
+                                       /*isConstant=*/true, LLVM::Linkage::Linkonce, key,
+                                       IntegerAttr::get(shortTy, 0));
             }
             else {
-                rewriter.create<LLVM::GlobalOp>(
-                    op.getLoc(), LLVM::LLVMArrayType::get(shortTy, value->size()), true,
+                LLVM::GlobalOp::create(
+                    rewriter, op.getLoc(), LLVM::LLVMArrayType::get(shortTy, value->size()), true,
                     LLVM::Linkage::Linkonce, key, rewriter.getStringAttr(*value));
             }
         }
@@ -811,9 +806,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         if (glb) {
             return glb;
         }
-        glb = rewriter.create<LLVM::GlobalOp>(op.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2),
-                                              /*isConstant=*/false, LLVM::Linkage::External, key,
-                                              nullptr);
+        glb = LLVM::GlobalOp::create(rewriter, op.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2),
+                                     /*isConstant=*/false, LLVM::Linkage::External, key, nullptr);
 
         // Create the block and push it back in the global
         auto *contextGlb = glb.getContext();
@@ -826,19 +820,19 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         // Get original global name
         auto originalNameRefAttr = SymbolRefAttr::get(contextGlb, originalName);
         auto originalGlobal =
-            rewriter.create<LLVM::AddressOfOp>(glb.getLoc(), llvmPtr, originalNameRefAttr);
+            LLVM::AddressOfOp::create(rewriter, glb.getLoc(), llvmPtr, originalNameRefAttr);
 
         // Get global name
         auto nameRefAttr = SymbolRefAttr::get(contextGlb, name);
-        auto enzymeGlobal = rewriter.create<LLVM::AddressOfOp>(glb.getLoc(), llvmPtr, nameRefAttr);
+        auto enzymeGlobal = LLVM::AddressOfOp::create(rewriter, glb.getLoc(), llvmPtr, nameRefAttr);
 
         auto undefArray =
-            rewriter.create<LLVM::UndefOp>(glb.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2));
-        Value llvmInsert0 =
-            rewriter.create<LLVM::InsertValueOp>(glb.getLoc(), undefArray, originalGlobal, 0);
-        Value llvmInsert1 =
-            rewriter.create<LLVM::InsertValueOp>(glb.getLoc(), llvmInsert0, enzymeGlobal, 1);
-        rewriter.create<LLVM::ReturnOp>(glb.getLoc(), llvmInsert1);
+            LLVM::UndefOp::create(rewriter, glb.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2));
+        Value llvmInsert0 = LLVM::InsertValueOp::create(rewriter, glb.getLoc(), undefArray,
+                                                        originalGlobal, SmallVector<int64_t>{0});
+        Value llvmInsert1 = LLVM::InsertValueOp::create(rewriter, glb.getLoc(), llvmInsert0,
+                                                        enzymeGlobal, SmallVector<int64_t>{1});
+        LLVM::ReturnOp::create(rewriter, glb.getLoc(), llvmInsert1);
         return glb;
     }
 };
@@ -846,10 +840,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
-    LogicalResult match(ForwardOp op) const override { return success(); }
-
-    void rewrite(ForwardOp op, OpAdaptor adaptor,
-                 ConversionPatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(ForwardOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
     {
         // convert all arguments to pointers...
         auto typeConverter = getTypeConverter();
@@ -877,7 +869,7 @@ struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
         auto oldFuncTy = op.getFunctionType();
         auto funcTy = FunctionType::get(ctx, oldFuncTy.getInputs(), {retTy});
 
-        auto func = rewriter.create<func::FuncOp>(op.getLoc(), op.getSymName(), funcTy);
+        auto func = func::FuncOp::create(rewriter, op.getLoc(), op.getSymName(), funcTy);
         func.setPrivate();
 
         auto noinline = rewriter.getStringAttr("noinline");
@@ -885,18 +877,20 @@ struct ForwardOpPattern : public ConvertOpToLLVMPattern<ForwardOp> {
         func->setAttr("passthrough", ArrayAttr::get(ctx, passthrough));
 
         rewriter.inlineRegionBefore(op.getRegion(), func.getBody(), func.end());
-        catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
+        if (failed(catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter,
+                                                          op.getLoc()))) {
+            return failure();
+        }
         rewriter.eraseOp(op);
+        return success();
     }
 };
 
 struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
-    LogicalResult match(ReverseOp op) const override { return success(); }
-
-    void rewrite(ReverseOp op, OpAdaptor adaptor,
-                 ConversionPatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(ReverseOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
     {
         auto argc = op.getArgc();
         auto resc = op.getResc();
@@ -908,16 +902,12 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         auto params = op.getArguments();
 
         for (size_t i = 0; i < argc * 2; i++) {
-            bool isDup = (i % 2) != 0;
-            Value val = params[i];
-            isDup ? differentials.push_back(val) : inputs.push_back(val);
+            fillValueAndShadowWithDedup(i, params, differentials, inputs);
         }
 
         auto upperLimit = (argc * 2) + (resc * 2);
         for (size_t i = argc * 2; i < upperLimit; i++) {
-            bool isDup = (i % 2) != 0;
-            Value val = params[i];
-            isDup ? cotangents.push_back(val) : outputs.push_back(val);
+            fillValueAndShadowWithDedup(i, params, cotangents, outputs);
         }
 
         auto tapeCount = op.getTape();
@@ -927,16 +917,7 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         }
 
         SmallVector<Type> newFuncInputTys;
-
-        for (auto [in, diff] : llvm::zip(inputs, differentials)) {
-            newFuncInputTys.push_back(in.getType());
-            newFuncInputTys.push_back(diff.getType());
-        }
-
-        for (auto [out, cotan] : llvm::zip(outputs, cotangents)) {
-            newFuncInputTys.push_back(out.getType());
-            newFuncInputTys.push_back(cotan.getType());
-        }
+        getNewFuncInputTys(inputs, outputs, differentials, cotangents, newFuncInputTys);
 
         SmallVector<Type> tapeStructs;
         auto converter = getTypeConverter();
@@ -963,7 +944,7 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         PatternRewriter::InsertionGuard guard(rewriter);
         rewriter.setInsertionPointToStart(mod.getBody());
 
-        auto func = rewriter.create<func::FuncOp>(op.getLoc(), op.getSymName(), newFuncTy);
+        auto func = func::FuncOp::create(rewriter, op.getLoc(), op.getSymName(), newFuncTy);
         func.setPrivate();
 
         Block *entry = func.addEntryBlock();
@@ -980,14 +961,14 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
             for (size_t i = 0; i < tapeCount; i++) {
                 SmallVector<int64_t> pos = {0, static_cast<int64_t>(i)};
                 Value tapeStructIth =
-                    rewriter.create<LLVM::ExtractValueOp>(loc, wrappedStructValAgg, pos);
+                    LLVM::ExtractValueOp::create(rewriter, loc, wrappedStructValAgg, pos);
                 tapestructs.push_back(tapeStructIth);
             }
 
             SmallVector<Value> tapememrefs;
             for (auto [_struct, memref] : llvm::zip(tapestructs, tapeElements)) {
                 auto memrefTy = memref.getType();
-                auto castOp = rewriter.create<UnrealizedConversionCastOp>(loc, memrefTy, _struct);
+                auto castOp = UnrealizedConversionCastOp::create(rewriter, loc, memrefTy, _struct);
                 tapememrefs.push_back(castOp.getResult(0));
             }
 
@@ -1010,24 +991,53 @@ struct ReverseOpPattern : public ConvertOpToLLVMPattern<ReverseOp> {
         Block &firstBlock = func.getRegion().getBlocks().front();
         Block &lastBlock = func.getRegion().getBlocks().back();
         rewriter.mergeBlocks(&lastBlock, &firstBlock);
-        catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter, op.getLoc());
+        if (failed(catalyst::gradient::wrapMemRefArgsFunc(func, typeConverter, rewriter,
+                                                          op.getLoc()))) {
+            return failure();
+        }
 
         rewriter.eraseOp(op);
+        return success();
+    }
+
+  private:
+    static void getNewFuncInputTys(const SmallVector<Value> &inputs,
+                                   const SmallVector<Value> &outputs,
+                                   const SmallVector<Value> &differentials,
+                                   const SmallVector<Value> &cotangents,
+                                   SmallVector<Type> &newFuncInputTys)
+    {
+        for (auto [in, diff] : llvm::zip(inputs, differentials)) {
+            newFuncInputTys.push_back(in.getType());
+            newFuncInputTys.push_back(diff.getType());
+        }
+
+        for (auto [out, cotan] : llvm::zip(outputs, cotangents)) {
+            newFuncInputTys.push_back(out.getType());
+            newFuncInputTys.push_back(cotan.getType());
+        }
+    }
+
+    static void fillValueAndShadowWithDedup(size_t i, ValueRange params, SmallVector<Value> &values,
+                                            SmallVector<Value> &shadows)
+    {
+        bool isDup = (i % 2) != 0;
+        Value val = params[i];
+        isDup ? shadows.push_back(val) : values.push_back(val);
     }
 };
 
 struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
-    LogicalResult match(ReturnOp op) const override { return success(); }
-
-    void rewrite(ReturnOp op, OpAdaptor adaptor, ConversionPatternRewriter &rewriter) const override
+    LogicalResult matchAndRewrite(ReturnOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
     {
         auto loc = op.getLoc();
         if (op.getEmpty()) {
-            auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, ValueRange{});
+            auto returnOp = LLVM::ReturnOp::create(rewriter, loc, ValueRange{});
             rewriter.replaceOp(op, returnOp);
-            return;
+            return success();
         }
 
         auto tape = adaptor.getTape();
@@ -1035,10 +1045,10 @@ struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
         if (tape.empty()) {
             // Just return an empty pointer
             auto ptrType = LLVM::LLVMPointerType::get(ctx);
-            Value nullPtr = rewriter.create<LLVM::ZeroOp>(loc, ptrType);
-            auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, nullPtr);
+            Value nullPtr = LLVM::ZeroOp::create(rewriter, loc, ptrType);
+            auto returnOp = LLVM::ReturnOp::create(rewriter, loc, nullPtr);
             rewriter.replaceOp(op, returnOp);
-            return;
+            return success();
         }
 
         SmallVector<Value> tapeStructVals(tape);
@@ -1049,14 +1059,15 @@ struct ReturnOpPattern : public ConvertOpToLLVMPattern<ReturnOp> {
         // This gives me { { memref, ..., memrefn } }
         auto wrappedFlatTapeStructTy = LLVM::LLVMStructType::getLiteral(ctx, {tapeTy});
 
-        Value result = rewriter.create<LLVM::UndefOp>(loc, wrappedFlatTapeStructTy);
+        Value result = LLVM::UndefOp::create(rewriter, loc, wrappedFlatTapeStructTy);
         for (auto [idx, elem] : llvm::enumerate(tapeStructVals)) {
             SmallVector<int64_t> pos = {0, static_cast<int64_t>(idx)};
-            result = rewriter.create<LLVM::InsertValueOp>(loc, result, elem, pos);
+            result = LLVM::InsertValueOp::create(rewriter, loc, result, elem, pos);
         }
 
-        auto returnOp = rewriter.create<LLVM::ReturnOp>(loc, result);
+        auto returnOp = LLVM::ReturnOp::create(rewriter, loc, result);
         rewriter.replaceOp(op, returnOp);
+        return success();
     }
 };
 

@@ -17,11 +17,14 @@ formats:
 
 # Optionally set the build image
 build:
-  os: ubuntu-22.04
+  os: ubuntu-24.04
   tools:
-      python: "3.10"
+      python: "3.11"
   apt_packages:
     - graphviz
+    - cmake
+    - ninja-build
+    - clang
 
 # Optionally set the version of Python and requirements required to build your docs
 python:

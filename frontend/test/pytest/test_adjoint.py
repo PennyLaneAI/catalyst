@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Unit tests for the Catalyst adjoint function.
-"""
+"""Unit tests for the Catalyst adjoint function."""
 
 from functools import partial
 
@@ -23,9 +22,11 @@ import pennylane as qml
 import pennylane.numpy as pnp
 import pytest
 from numpy.testing import assert_allclose
+from pennylane import adjoint, cond, for_loop, qjit, while_loop
 from pennylane.ops.op_math.adjoint import Adjoint, AdjointOperation
 
-from catalyst import adjoint, cond, debug, for_loop, measure, qjit, while_loop
+import catalyst
+from catalyst import debug, measure, qjit
 
 # pylint: disable=too-many-lines,missing-class-docstring,missing-function-docstring,too-many-public-methods
 
@@ -51,8 +52,17 @@ class TestCatalyst:
             qml.adjoint(quantum_func)(*args)
             return qml.state()
 
-        assert_allclose(catalyst_workflow(*args), pennylane_workflow(*args))
+        capture_enabled = qml.capture.enabled()
+        qml.capture.disable()
+        try:
+            pl_res = pennylane_workflow(*args)
+        finally:
+            if capture_enabled:
+                qml.capture.enable()
 
+        assert_allclose(catalyst_workflow(*args), pl_res)
+
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_func(self, backend):
         """Ensures that catalyst.adjoint accepts simple Python functions as argument. Makes sure
         that simple quantum gates are adjointed correctly."""
@@ -83,6 +93,7 @@ class TestCatalyst:
         desired = PL_workflow()
         assert_allclose(actual, desired)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     @pytest.mark.parametrize("theta, val", [(jnp.pi, 0), (-100.0, 1)])
     def test_adjoint_op(self, theta, val, backend):
         """Ensures that catalyst.adjoint accepts single PennyLane operators classes as argument."""
@@ -92,19 +103,20 @@ class TestCatalyst:
         @qml.qnode(device)
         def C_workflow(theta, val):
             adjoint(qml.RY)(jnp.pi, val)
-            adjoint(qml.RZ)(theta, wires=val)
+            adjoint(qml.RZ)(theta, val)
             return qml.state()
 
         @qml.qnode(device)
         def PL_workflow(theta, val):
             qml.adjoint(qml.RY)(jnp.pi, val)
-            qml.adjoint(qml.RZ)(theta, wires=val)
+            qml.adjoint(qml.RZ)(theta, val)
             return qml.state()
 
         actual = C_workflow(theta, val)
         desired = PL_workflow(theta, val)
         assert_allclose(actual, desired)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     @pytest.mark.parametrize("theta, val", [(np.pi, 0), (-100.0, 2)])
     def test_adjoint_bound_op(self, theta, val, backend):
         """Ensures that catalyst.adjoint accepts single PennyLane operators objects as argument."""
@@ -130,6 +142,7 @@ class TestCatalyst:
         desired = PL_workflow(theta, val)
         assert_allclose(actual, desired, atol=1e-6, rtol=1e-6)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     @pytest.mark.parametrize("w, p", [(0, 0.5), (0, -100.0), (1, 123.22)])
     def test_adjoint_param_fun(self, w, p, backend):
         """Ensures that catalyst.adjoint accepts parameterized Python functions as arguments."""
@@ -145,14 +158,14 @@ class TestCatalyst:
         @qml.qnode(device)
         def C_workflow(w, theta):
             qml.PauliX(wires=0)
-            adjoint(func)(w, theta, theta2=theta)
+            adjoint(func)(w, theta, theta)
             qml.PauliY(wires=0)
             return qml.state()
 
         @qml.qnode(device)
         def PL_workflow(w, theta):
             qml.PauliX(wires=0)
-            qml.adjoint(func)(w, theta, theta2=theta)
+            qml.adjoint(func)(w, theta, theta)
             qml.PauliY(wires=0)
             return qml.state()
 
@@ -160,6 +173,7 @@ class TestCatalyst:
         desired = PL_workflow(w, p)
         assert_allclose(actual, desired)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_nested_fun(self, backend):
         """Ensures that catalyst.adjoint allows arbitrary nesting."""
 
@@ -187,6 +201,7 @@ class TestCatalyst:
 
         assert_allclose(C_workflow(), PL_workflow())
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_qubitunitary(self, backend):
         """Ensures that catalyst.adjoint supports QubitUnitary oprtations."""
 
@@ -205,6 +220,7 @@ class TestCatalyst:
 
         self.verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=2))
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_qubitunitary_dynamic_variable_loop(self, backend):
         """Ensures that catalyst.adjoint supports QubitUnitary oprtations."""
 
@@ -216,7 +232,7 @@ class TestCatalyst:
                 qml.QubitUnitary(gate_modified, wires=[0, 1])
                 return s + 1
 
-            loop_body(1)
+            loop_body(1)  # pylint: disable=no-value-for-parameter
 
         _input = jnp.array(
             [
@@ -229,12 +245,22 @@ class TestCatalyst:
 
         self.verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=2), _input)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_multirz(self, backend):
         """Ensures that catalyst.adjoint supports MultiRZ operations."""
 
         def func():
             qml.PauliX(0)
             qml.MultiRZ(theta=np.pi / 2, wires=[0, 1])
+
+        self.verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=2))
+
+    def test_adjoint_pcphase(self, backend):
+        """Ensures that catalyst.adjoint supports PCPhase operations."""
+
+        def func():
+            qml.PauliX(0)
+            qml.PCPhase(np.pi / 2, dim=0, wires=[0, 1])
 
         self.verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=2))
 
@@ -245,7 +271,7 @@ class TestCatalyst:
             qml.RX(np.pi / 2, wires=0)
             qml.sample()
 
-        with pytest.raises(ValueError, match="Quantum measurements are not allowed"):
+        with pytest.raises(ValueError, match="Measurement process cannot be used"):
 
             @qjit
             @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -267,6 +293,7 @@ class TestCatalyst:
 
             C_workflow()
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_classical_loop(self, backend):
         """Checks that catalyst.adjoint supports purely-classical Control-flows."""
 
@@ -275,11 +302,12 @@ class TestCatalyst:
             def loop(_i, s):
                 return s + 1
 
-            qml.PauliX(wires=loop(w))
+            qml.PauliX(wires=loop(w))  # pylint: disable=no-value-for-parameter
             qml.RX(np.pi / 2, wires=w)
 
         self.verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=3), 0)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     @pytest.mark.parametrize("pred", [True, False])
     def test_adjoint_cond(self, backend, pred):
         """Tests that the correct gates are applied in reverse in a conditional branch"""
@@ -294,6 +322,7 @@ class TestCatalyst:
         dev = qml.device(backend, wires=1)
         self.verify_catalyst_adjoint_against_pennylane(func, dev, pred, jnp.pi)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_while_loop(self, backend):
         """
         Tests that the correct gates are applied in reverse in a while loop with a statically
@@ -308,12 +337,13 @@ class TestCatalyst:
                 qml.RX(carried, wires=0)
                 return carried * 2
 
-            final = loop_body(1)
+            final = loop_body(1)  # pylint: disable=no-value-for-parameter
             qml.RZ(final, wires=0)
 
         dev = qml.device(backend, wires=1)
         self.verify_catalyst_adjoint_against_pennylane(func, dev, 10)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_for_loop(self, backend):
         """Tests the correct application of gates (with dynamic wires)"""
 
@@ -322,11 +352,12 @@ class TestCatalyst:
             def loop_body(i):
                 qml.CNOT(wires=(i, i + 1))
 
-            loop_body()
+            loop_body()  # pylint: disable=no-value-for-parameter
 
         dev = qml.device(backend, wires=5)
         self.verify_catalyst_adjoint_against_pennylane(func, dev, 4)
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_while_nested(self, backend):
         """Tests the correct handling of nested while loops."""
 
@@ -348,10 +379,10 @@ class TestCatalyst:
                     cond_fn()
                     return counter + 1
 
-                loop_inner(0)
+                loop_inner(0)  # pylint: disable=no-value-for-parameter
                 return carried + 2
 
-            final = loop_outer(1)
+            final = loop_outer(1)  # pylint: disable=no-value-for-parameter
             qml.MultiRZ(final / 30, wires=(0, 1))
 
         dev = qml.device(backend, wires=2)
@@ -359,6 +390,7 @@ class TestCatalyst:
             func, dev, 10, jnp.array([2, 4, 3, 5, 1, 7, 4, 6, 9, 10])
         )
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_nested_with_control_flow(self, backend):
         """
         Tests that nested adjoint ops produce correct results in the presence of nested control
@@ -375,11 +407,11 @@ class TestCatalyst:
                     def loop_inner(_):
                         qml.RX(theta, wires=0)
 
-                    loop_inner()
+                    loop_inner()  # pylint: disable=no-value-for-parameter
 
                 adjoint(inner_func)()
 
-            loop_outer()
+            loop_outer()  # pylint: disable=no-value-for-parameter
 
         def pl_quantum_func(theta):
             @for_loop(0, 4, 1)
@@ -391,11 +423,11 @@ class TestCatalyst:
                     def loop_inner(_):
                         qml.RX(theta, wires=0)
 
-                    loop_inner()
+                    loop_inner()  # pylint: disable=no-value-for-parameter
 
                 qml.adjoint(inner_func)()
 
-            loop_outer()
+            loop_outer()  # pylint: disable=no-value-for-parameter
 
         dev = qml.device(backend, wires=1)
 
@@ -412,6 +444,7 @@ class TestCatalyst:
 
         assert_allclose(catalyst_workflow(jnp.pi), pennylane_workflow(jnp.pi))
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_for_nested(self, backend):
         """
         Tests the adjoint op with nested and interspersed for/while loops that produce classical
@@ -428,7 +461,7 @@ class TestCatalyst:
                     qml.RY(theta, wires=0)
                     return ub + jv
 
-                ub = loop_inner(1)
+                ub = loop_inner(1)  # pylint: disable=no-value-for-parameter
 
                 qml.RX(theta / ub, wires=0)
 
@@ -437,11 +470,11 @@ class TestCatalyst:
                     qml.RZ(ub / 5, wires=0)
                     return counter + 1
 
-                final = while_loop_inner(0)
+                final = while_loop_inner(0)  # pylint: disable=no-value-for-parameter
 
                 qml.RX(theta / final, wires=0)
 
-            loop_outer()
+            loop_outer()  # pylint: disable=no-value-for-parameter
 
         dev = qml.device(backend, wires=1)
         self.verify_catalyst_adjoint_against_pennylane(func, dev, jnp.pi)
@@ -449,7 +482,7 @@ class TestCatalyst:
     def test_adjoint_wires(self, backend):
         """Test the wires property of Adjoint"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(theta):
             def func(theta):
@@ -466,7 +499,7 @@ class TestCatalyst:
     def test_adjoint_wires_qubitunitary(self, backend):
         """Test the wires property of nested Adjoint with QubitUnitary"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit():
             def func():
@@ -499,7 +532,7 @@ class TestCatalyst:
             qml.RY(theta / 2, wires=w1)
             qml.RZ(theta, wires=2)
 
-        @qml.qjit
+        @qjit
         @qml.qnode(device)
         def C_workflow(w0, w1, theta):
             qml.PauliX(wires=0)
@@ -518,7 +551,7 @@ class TestCatalyst:
     def test_adjoint_wires_controlflow(self, backend):
         """Test the wires property of Adjoint  in a conditional branch"""
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit():
             def func(pred, theta):
@@ -534,6 +567,7 @@ class TestCatalyst:
         # It returns `-1` instead of `0`
         assert circuit() == qml.wires.Wires([0])
 
+    @pytest.mark.usefixtures("use_both_frontend")
     def test_adjoint_ctrl_ctrl_subroutine(self, backend):
         """https://github.com/PennyLaneAI/catalyst/issues/589"""
 
@@ -544,8 +578,9 @@ class TestCatalyst:
             subsubroutine()
             qml.adjoint(qml.ctrl(subsubroutine, control=0))()
 
-        dev = qml.device(backend, wires=4, shots=500)
+        dev = qml.device(backend, wires=4)
 
+        @qml.set_shots(shots=500)
         @qml.qnode(dev)
         def circuit():
             qml.adjoint(subroutine)()
@@ -576,7 +611,7 @@ class TestCatalyst:
             qml.RY(x, wires=0)
             qml.Hadamard(0)
 
-        adj_op = adjoint(qfunc)(0.7)
+        adj_op = catalyst.adjoint(qfunc)(0.7)
         decomp = adj_op.decomposition()
 
         assert len(decomp) == 2
@@ -593,7 +628,7 @@ class TestCatalyst:
             qml.CNOT(wires=[1, w])
 
         with pytest.raises(ValueError, match="Eagerly computing the adjoint"):
-            adjoint(qfunc, lazy=False)(0.1, 0)
+            catalyst.adjoint(qfunc, lazy=False)(0.1, 0)
 
 
 #####################################################################################
@@ -609,21 +644,6 @@ class TestCatalyst:
 # - remove non-callable error message test (duplicates catalyst test)
 # - change string wires to integers
 # - remove pickle tetst
-
-
-@pytest.fixture(scope="function")
-def use_legacy_opmath():
-    with qml.operation.disable_new_opmath_cm() as cm:
-        yield cm
-
-
-@pytest.fixture(
-    params=[qml.operation.disable_new_opmath_cm, qml.operation.enable_new_opmath_cm],
-    scope="function",
-)
-def use_legacy_and_new_opmath(request):
-    with request.param() as cm:
-        yield cm
 
 
 # pylint: disable=too-few-public-methods
@@ -644,7 +664,6 @@ class TestInheritanceMixins:
         assert isinstance(op, Adjoint)
         assert isinstance(op, qml.operation.Operator)
         assert not isinstance(op, qml.operation.Operation)
-        assert not isinstance(op, qml.operation.Observable)
         assert not isinstance(op, AdjointOperation)
 
         # checking we can call `dir` without problems
@@ -665,39 +684,11 @@ class TestInheritanceMixins:
         assert isinstance(op, Adjoint)
         assert isinstance(op, qml.operation.Operator)
         assert isinstance(op, qml.operation.Operation)
-        assert not isinstance(op, qml.operation.Observable)
         assert isinstance(op, AdjointOperation)
 
         # check operation-specific properties made it into the mapping
         assert "grad_recipe" in dir(op)
         assert "control_wires" in dir(op)
-
-    @pytest.mark.usefixtures("use_legacy_opmath")
-    def test_observable(self):
-        """Test that when the base is an Observable, Adjoint will also inherit from Observable."""
-
-        # pylint: disable=too-few-public-methods
-        class CustomObs(qml.operation.Observable):
-            num_wires = 1
-            num_params = 0
-
-        base = CustomObs(wires=0)
-        ob0 = adjoint(base)
-
-        ob1 = adjoint(CustomObs(wires=1))
-
-        assert isinstance(ob0, Adjoint)
-        assert isinstance(ob0, qml.operation.Operator)
-        assert not isinstance(ob0, qml.operation.Operation)
-        assert isinstance(ob0, qml.operation.Observable)
-        assert not isinstance(ob0, AdjointOperation)
-
-        # Check some basic observable functionality
-        assert ob0.compare(ob0)
-        assert isinstance(1.0 * ob0 @ ob1, qml.Hamiltonian)
-
-        # check the dir
-        assert "grad_recipe" not in dir(ob0)
 
 
 class TestInitialization:
@@ -756,7 +747,6 @@ class TestInitialization:
 
         assert op.wires == qml.wires.Wires((0, 1))
 
-    @pytest.mark.usefixtures("use_legacy_opmath")
     def test_hamiltonian_base(self):
         """Test adjoint initialization for a hamiltonian."""
         base = 2.0 * qml.PauliX(0) @ qml.PauliY(1) + qml.PauliZ("b")
@@ -765,11 +755,11 @@ class TestInitialization:
 
         assert op.base is base
         assert op.hyperparameters["base"] is base
-        assert op.name == "Adjoint(Hamiltonian)"
+        assert op.name == "Adjoint(Sum)"
 
-        assert op.num_params == 2
-        assert qml.math.allclose(op.parameters, [2.0, 1.0])
-        assert qml.math.allclose(op.data, [2.0, 1.0])
+        assert op.num_params == 1
+        assert qml.math.allclose(op.parameters, [2.0])
+        assert qml.math.allclose(op.data, [2.0])
 
         assert op.wires == qml.wires.Wires([0, 1, "b"])
 
@@ -895,23 +885,17 @@ class TestProperties:
         op = adjoint(qml.PauliX(0))
         assert op._queue_category == "_ops"  # pylint: disable=protected-access
 
-    @pytest.mark.usefixtures("use_legacy_opmath")
-    def test_queue_category_None(self):
-        """Test that the queue category `None` for some observables carries over."""
-        op = adjoint(qml.PauliX(0) @ qml.PauliY(1))
-        assert op._queue_category is None  # pylint: disable=protected-access
-
     @pytest.mark.parametrize("value", (True, False))
-    def test_is_hermitian(self, value):
-        """Test `is_hermitian` property mirrors that of the base."""
+    def test_is_verified_hermitian(self, value):
+        """Test `is_verified_hermitian` property mirrors that of the base."""
 
         # pylint: disable=too-few-public-methods
         class DummyOp(qml.operation.Operator):
             num_wires = 1
-            is_hermitian = value
+            is_verified_hermitian = value
 
         op = adjoint(DummyOp(0))
-        assert op.is_hermitian == value
+        assert op.is_verified_hermitian == value
 
     def test_batching_properties(self):
         """Test the batching properties and methods."""
@@ -999,11 +983,11 @@ class TestMiscMethods:
 
     def test_repr(self):
         """Test __repr__ method."""
-        assert repr(adjoint(qml.S(0))) == "Adjoint(S(wires=[0]))"
+        assert repr(adjoint(qml.S(0))) == "Adjoint(S(0))"
 
         base = qml.S(0) + qml.T(0)
         op = adjoint(base)
-        assert repr(op) == "Adjoint(S(wires=[0]) + T(wires=[0]))"
+        assert repr(op) == "Adjoint(S(0) + T(0))"
 
     def test_label(self):
         """Test that the label method for the adjoint class adds a † to the end."""
@@ -1067,7 +1051,6 @@ class TestAdjointOperation:
 
         assert op.has_generator is False
 
-    @pytest.mark.usefixtures("use_legacy_and_new_opmath")
     def test_generator(self):
         """Assert that the generator of an Adjoint is -1.0 times the base generator."""
         base = qml.RX(1.23, wires=0)
@@ -1209,7 +1192,6 @@ class TestMatrix:
         with pytest.raises(qml.operation.MatrixUndefinedError):
             adjoint(base).matrix()
 
-    @pytest.mark.usefixtures("use_legacy_and_new_opmath")
     def test_adj_hamiltonian(self):
         """Test that a we can take the adjoint of a hamiltonian."""
         U = qml.Hamiltonian([1.0], [qml.PauliX(wires=0) @ qml.PauliZ(wires=1)])
@@ -1394,12 +1376,11 @@ class TestAdjointConstructorPreconstructedOp:
         assert len(q) == 1
         assert q.queue[0] is out
 
-    @pytest.mark.usefixtures("use_legacy_opmath")
     def test_single_observable(self):
         """Test passing a single preconstructed observable in a queuing context."""
 
         with qml.queuing.AnnotatedQueue() as q:
-            base = qml.PauliX(0) @ qml.PauliY(1)
+            base = qml.Hermitian([[1, 0], [0, 1]], wires=0)
             out = adjoint(base)
 
         assert len(q) == 1
@@ -1408,7 +1389,7 @@ class TestAdjointConstructorPreconstructedOp:
         assert isinstance(out, Adjoint)
 
         qs = qml.tape.QuantumScript.from_queue(q)
-        assert len(qs) == 0
+        assert len(qs) == 1
 
 
 class TestAdjointConstructorDifferentCallableTypes:
@@ -1469,10 +1450,6 @@ class TestAdjointConstructorDifferentCallableTypes:
         assert tape[1].data == (y,)
         assert tape[2].data == (x,)
 
-    @pytest.mark.xfail(
-        reason="Because the inner adjoint is not called it looks like the generic "
-        "callable case to the outer adjoint (which then doesn't inherit from PL)."
-    )
     def test_nested_adjoint(self):
         """Test the adjoint transform on an adjoint transform."""
         x = 4.321
@@ -1584,18 +1561,6 @@ class TestAdjointConstructorOutsideofQueuing:
         assert isinstance(out, qml.RX)
         assert out.data == (-x,)
 
-    def test_observable(self):
-        """Test providing a preconstructed Observable outside of a queuing context."""
-
-        base = 1.0 * qml.PauliX(0)
-        obs = adjoint(base)
-
-        assert isinstance(obs, Adjoint)
-        assert isinstance(base, qml.operation.Observable) == isinstance(
-            obs, qml.operation.Observable
-        )
-        assert obs.base is base
-
     def test_single_op_function(self):
         """Test the transform on a single op as a callable outside of a queuing context."""
         x = 1.234
@@ -1671,7 +1636,7 @@ class TestMidCircuitMeasurementAfterAdjoint:
         def subroutine():
             qml.Hadamard(wires=1)
 
-        @qml.qjit()
+        @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
             # Comment/uncomment to toggle bug

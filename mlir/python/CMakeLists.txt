@@ -3,9 +3,11 @@ include(AddMLIRPython)
 # TODO: Add an upstream cmake param for this vs having a global here.
 add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=mlir_quantum.")
 
+# Ignore nanobind warnings
+add_compile_options(-w)
 
 ################################################################################
-# Sources
+# Declare Dialect Sources
 ################################################################################
 
 declare_mlir_python_sources(QuantumPythonSources)
@@ -42,43 +44,24 @@ declare_mlir_dialect_python_bindings(
   dialects/mitigation.py
   DIALECT_NAME mitigation)
 
-declare_mlir_python_extension(QuantumPythonSources.Extension
-  MODULE_NAME _quantumDialects
+declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT QuantumPythonSources
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/"
+  TD_FILE dialects/MBQCOps.td
   SOURCES
-    QuantumExtension.cpp
-  PRIVATE_LINK_LIBS
-    LLVMSupport
-    MLIRIR
-  EMBED_CAPI_LINK_LIBS
-    QuantumCAPI
-)
+  dialects/mbqc.py
+  DIALECT_NAME mbqc)
+
+declare_mlir_dialect_python_bindings(
+  ADD_TO_PARENT QuantumPythonSources
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/"
+  TD_FILE dialects/QECOps.td
+  SOURCES
+  dialects/qec.py
+  DIALECT_NAME qec)
 
 ################################################################################
-# Common CAPI
-################################################################################
-
-
-add_mlir_python_common_capi_library(QuantumPythonCAPI
-  INSTALL_COMPONENT QuantumPythonModules
-  INSTALL_DESTINATION python_packages/quantum/mlir_quantum/_mlir_libs
-  OUTPUT_DIRECTORY "${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/_mlir_libs"
-  RELATIVE_INSTALL_ROOT "../../../.."
-  DECLARED_SOURCES
-    QuantumPythonSources
-    MLIRPythonExtension.RegisterEverything
-    MLIRPythonSources.Core
-)
-
-add_library(compiler_driver MODULE PyCompilerDriver.cpp)
-set_target_properties(compiler_driver PROPERTIES PREFIX "")
-
-target_link_libraries(compiler_driver PRIVATE pybind11::module CatalystCompilerDriver)
-
-set_target_properties(compiler_driver PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum)
-
-################################################################################
-# Instantiation of all Python modules
+# Build Python Bindings (without C extension)
 ################################################################################
 
 add_mlir_python_modules(QuantumPythonModules
@@ -86,8 +69,7 @@ add_mlir_python_modules(QuantumPythonModules
   INSTALL_PREFIX "python_packages/quantum/mlir_quantum/"
   DECLARED_SOURCES
     QuantumPythonSources
-    MLIRPythonExtension.RegisterEverything
-    MLIRPythonSources
-  COMMON_CAPI_LINK_LIBS
-    QuantumPythonCAPI
+    MLIRPythonSources.Dialects         # we also use upstream dialect bindings
+    MLIRPythonSources.Core.Python      # common sources, like _ods_common.py
+    MLIRPythonSources.ExecutionEngine  # for the mlir_quantum.runtime module
   )

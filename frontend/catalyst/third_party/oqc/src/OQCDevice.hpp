@@ -18,22 +18,15 @@
 #include <bitset>
 #include <memory>
 #include <numeric>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-#include "Exception.hpp"
 #include "QuantumDevice.hpp"
-
-// catalyst/runtime/lib/backend/common/
-
-#include "CacheManager.hpp"
 #include "QubitManager.hpp"
-#include "Utils.hpp"
 
-#include <pybind11/embed.h>
-
-#include "OQCRunner.hpp" // <pybind11/embed.h>
+#include "OQCRunner.hpp"
 #include "OpenQASM2Builder.hpp"
 
 using namespace Catalyst::Runtime::OpenQASM2;
@@ -41,19 +34,18 @@ using namespace Catalyst::Runtime::OpenQASM2;
 namespace Catalyst::Runtime::Device {
 class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
   private:
-    // static constants for RESULT values
-    static constexpr bool GLOBAL_RESULT_TRUE_CONST{true};
-    static constexpr bool GLOBAL_RESULT_FALSE_CONST{false};
-
     Catalyst::Runtime::QubitManager<QubitIdType, size_t> qubit_manager{};
     std::unique_ptr<OpenQASM2Builder> builder;
     std::unique_ptr<OQCRunner> runner;
 
-    Catalyst::Runtime::CacheManager<std::complex<double>> cache_manager{};
-    bool tape_recording{false};
     size_t device_shots;
 
+    std::set<QubitIdType> initial_allocated_QubitIds;
     std::unordered_map<std::string, std::string> device_kwargs;
+
+    std::string qpu_id;
+    inline static const std::unordered_map<std::string, std::string> qpu_map = {
+        {"lucy", "qpu:uk:2:d865b5a184"}, {"toshiko", "qpu:jp:3:673b1ad43c"}};
 
     inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
     {
@@ -71,17 +63,36 @@ class OQCDevice final : public Catalyst::Runtime::QuantumDevice {
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
                            : 0;
+        if (qpu_map.contains(device_kwargs["backend"])) {
+            qpu_id = qpu_map.at(device_kwargs["backend"]);
+        }
+        else {
+            std::cout << "Warning: backend not specified on OQC device, falling back to lucy "
+                         "simulator.\n";
+            qpu_id = qpu_map.at("lucy");
+        }
         builder = std::make_unique<OpenQASM2Builder>();
         runner = std::make_unique<OQCRunner>();
     }
     ~OQCDevice() = default;
 
-    QUANTUM_DEVICE_DEL_DECLARATIONS(OQCDevice);
+    auto AllocateQubits(size_t) -> std::vector<QubitIdType> override;
+    void ReleaseQubits(const std::vector<QubitIdType> &) override;
+    auto GetNumQubits() const -> size_t override;
+    void SetDeviceShots(size_t) override;
+    auto GetDeviceShots() const -> size_t override;
 
-    QUANTUM_DEVICE_RT_DECLARATIONS;
-    QUANTUM_DEVICE_QIS_DECLARATIONS;
+    void NamedOperation(const std::string &, const std::vector<double> &,
+                        const std::vector<QubitIdType> &, bool = false,
+                        const std::vector<QubitIdType> & = {}, const std::vector<bool> & = {},
+                        const std::vector<std::string> & = {}) override;
+    auto Measure(QubitIdType, std::optional<int32_t> = std::nullopt) -> Result override;
+
+    void PartialCounts(DataView<double, 1> &, DataView<int64_t, 1> &,
+                       const std::vector<QubitIdType> &) override;
 
     // Circuit RT
     [[nodiscard]] auto Circuit() const -> std::string { return builder->toOpenQASM2(); }
 };
+
 } // namespace Catalyst::Runtime::Device

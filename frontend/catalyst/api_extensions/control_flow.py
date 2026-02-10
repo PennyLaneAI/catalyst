@@ -1,4 +1,4 @@
-# Copyright 2022-2024 Xanadu Quantum Technologies Inc.
+# Copyright 2022-2025 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,11 +19,15 @@ with control flow, including conditionals, for loops, and while loops.
 
 # pylint: disable=too-many-lines
 
+from functools import partial
 from typing import Any, Callable, List
 
 import jax
 import jax.numpy as jnp
+import pennylane as qml
+from jax._src.source_info_util import current as current_source_info
 from jax._src.tree_util import PyTreeDef, tree_unflatten, treedef_is_leaf
+from jax.api_util import debug_info
 from jax.core import AbstractValue
 from pennylane import QueuingManager
 from pennylane.tape import QuantumTape
@@ -45,24 +49,25 @@ from catalyst.jax_extras import (
     jaxpr_pad_consts,
     new_inner_tracer,
     output_type_to_tracers,
+    switch_expansion_strategy,
     trace_to_jaxpr,
     unzip2,
     while_loop_expansion_strategy,
 )
-from catalyst.jax_primitives import AbstractQreg, cond_p, for_p, while_p
+from catalyst.jax_extras.patches import _drop_unused_vars2
+from catalyst.jax_primitives import AbstractQreg, cond_p, for_p, switch_p, while_p
 from catalyst.jax_tracer import (
     HybridOp,
     HybridOpRegion,
     QRegPromise,
+    _promote_jaxpr_types,
     trace_function,
     trace_quantum_operations,
     unify_convert_result_types,
 )
-from catalyst.tracing.contexts import (
-    EvaluationContext,
-    EvaluationMode,
-    JaxTracingContext,
-)
+from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
+from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
+from catalyst.utils.patching import Patcher
 
 
 ## API ##
@@ -95,9 +100,6 @@ def cond(pred: DynamicJaxprTracer):
 
     Returns:
         A callable decorator that wraps the first 'if' branch of the conditional.
-
-    Raises:
-        AssertionError: Branch functions cannot have arguments.
 
     **Example**
 
@@ -155,7 +157,8 @@ def cond(pred: DynamicJaxprTracer):
 
     The conditional function is permitted to also return values.
     Any value that is supported by JAX JIT compilation is supported as a return
-    type.
+    type. If provided, return types need to be identical or at least promotable across both
+    branches.
 
     .. code-block:: python
 
@@ -175,12 +178,16 @@ def cond(pred: DynamicJaxprTracer):
         :title: Usage details
         :href: usage-details
 
-        There are various constraints and restrictions that should be kept in mind
+        There are some constraints and restrictions that should be kept in mind
         when working with conditionals in Catalyst.
 
-        The return values of all branches of :func:`~.cond` must be the same type.
-        Returning different types, or ommitting a return value in one branch (e.g.,
+        The return values of all branches of :func:`~.cond` must be the same shape.
+        Returning different shapes, or ommitting a return value in one branch (e.g.,
         returning ``None``) but not in others will result in an error.
+
+        However, the return values of all branches of :func:`~.cond` can be different data types.
+        In this case, the return types will automatically be promoted to the next common larger
+        type.
 
         >>> @qjit
         ... def f(x: float):
@@ -189,20 +196,7 @@ def cond(pred: DynamicJaxprTracer):
         ...         return x ** 2  # float
         ...     @cond_fn.otherwise
         ...     def else_branch():
-        ...         return 6  # int
-        ...     return cond_fn()
-        TypeError: Conditional requires consistent return types across all branches, got:
-        - Branch at index 0: [ShapedArray(float64[], weak_type=True)]
-        - Branch at index 1: [ShapedArray(int64[], weak_type=True)]
-        Please specify an else branch if none was specified.
-        >>> @qjit
-        ... def f(x: float):
-        ...     @cond(x > 1.5)
-        ...     def cond_fn():
-        ...         return x ** 2  # float
-        ...     @cond_fn.otherwise
-        ...     def else_branch():
-        ...         return 6.  # float
+        ...         return 6  # int (promotable to float)
         ...     return cond_fn()
         >>> f(1.5)
         Array(6., dtype=float64)
@@ -217,10 +211,8 @@ def cond(pred: DynamicJaxprTracer):
         ...     def cond_fn():
         ...         return x ** 2
         ...     return cond_fn()
-        TypeError: Conditional requires consistent return types across all branches, got:
-        - Branch at index 0: [ShapedArray(float64[], weak_type=True)]
-        - Branch at index 1: []
-        Please specify an else branch if none was specified.
+        TypeError: Control flow requires a consistent return structure across all branches! Got
+        PyTreeDef(None) and PyTreeDef(*).
 
         >>> @qjit
         ... def f(x: float):
@@ -233,11 +225,33 @@ def cond(pred: DynamicJaxprTracer):
         ...     return cond_fn()
         >>> f(1.6)
         Array(2.56, dtype=float64)
+
+    .. note::
+
+       ``catalyst.cond`` is not supported in program capture mode. If ``qml.capture`` is enabled,
+        please use ``qml.cond`` instead.
+
+        .. code-block:: python
+
+            # This will raise an error with capture mode
+            @qjit
+            def func(x):
+                @catalyst.cond(x > 1.0)
+                def cond_fn():
+                    return x ** 2
+                return cond_fn()
+
+            # Use this instead for capture mode compatibility
+            @qjit
+            def circuit(x):
+                def cond_fn():
+                    return x ** 2
+                return qml.cond(x > 1.0)(cond_fn)()
     """
+    if qml.capture.enabled():
+        raise PlxprCaptureCFCompatibilityError("cond")
 
     def _decorator(true_fn: Callable):
-        if true_fn.__code__.co_argcount != 0:
-            raise TypeError("Conditional 'True' function is not allowed to have any arguments")
         return CondCallable(pred, true_fn)
 
     return _decorator
@@ -358,7 +372,7 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
     However, if you wish to have the for loop return differently sized arrays
     at each iteration, set ``allow_array_resizing`` to ``True``:
 
-    >>> @qjit()
+    >>> @qjit
     ... def f(N):
     ...     a = jnp.ones([N], dtype=float)
     ...     @for_loop(0, 10, 1, allow_array_resizing=True)
@@ -373,7 +387,32 @@ def for_loop(lower_bound, upper_bound, step, allow_array_resizing=False):
     between arrays of the same size are not supported.
 
     For more details on dynamically-shaped arrays, please see :ref:`dynamic-arrays`.
+
+    .. note::
+
+       ``catalyst.for_loop`` is not supported in program capture mode.
+       If ``qml.capture`` is enabled, please use ``qml.for_loop`` instead.
+
+        .. code-block:: python
+
+            qml.capture.enable()
+            # This will raise an error with capture mode
+            @qjit
+            def func():
+                @catalyst.for_loop(0, 10, 1)
+                def loop_fn(v):
+                    return v + 1
+                return loop_fn(0)
+
+            # Use this instead for capture mode compatibility
+            @qml.qnode(device)
+            def circuit():
+                def loop_fn(v):
+                    return v + 1
+                return qml.for_loop(0, 10, 1)(loop_fn)(0)
     """
+    if qml.capture.enabled():
+        raise PlxprCaptureCFCompatibilityError("for_loop")
 
     def _decorator(body_fn):
         return ForLoopCallable(lower_bound, upper_bound, step, body_fn, not allow_array_resizing)
@@ -488,7 +527,31 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
     between arrays of the same size are not supported.
 
     For more details on dynamically-shaped arrays, please see :ref:`dynamic-arrays`.
+
+    .. note::
+
+       ``catalyst.while_loop`` is not supported in program capture mode.
+       If ``qml.capture`` is enabled, please use ``qml.while_loop`` instead.
+
+        .. code-block:: python
+
+            # This will raise an error with capture mode
+            @qjit
+            def func():
+                @catalyst.while_loop(lambda x: x < 5)
+                def loop_fn(x):
+                    return x + 1
+                return loop_fn(0)
+
+            # Use this instead for capture mode compatibility
+            @qml.qnode(device)
+            def circuit():
+                def loop_fn(x):
+                    return x + 1
+                return qml.while_loop(lambda x: x < 5)(loop_fn)(0)
     """
+    if qml.capture.enabled():
+        raise PlxprCaptureCFCompatibilityError("while_loop")
 
     def _decorator(body_fn):
         return WhileLoopCallable(cond_fn, body_fn, not allow_array_resizing)
@@ -496,16 +559,144 @@ def while_loop(cond_fn, allow_array_resizing: bool = False):
     return _decorator
 
 
+def switch(index_var: int):
+    """
+    A :func:`~.qjit` compatible decorator for index-switches in PennyLane/Catalyst.
+
+    This form of control flow is a functional version of an index-switch.  This means that each
+    execution path (each branch of the switch) is provided as a separate function.  All branches are
+    traced at compile time, but only one will be executed at runtime, depending on the value of
+    ``index_var``.  The JAX equivalent of this is the ``jax.lax.switch`` function, but
+    ``catalyst.switch`` allows for arbitrary integer valued cases, does not clamp the index, has
+    default cases, and is optimized to work with quantum programs in PennyLane. The default branch
+    is provided when the switch is declared, and individual cases can be specified afterwards using
+    the :meth:`~.branch` method.
+
+    Args:
+        index_var (int): the case of the branch to be executed.
+
+    Returns:
+        A callable decorator that wraps the default branch of the switch statement.
+
+    **Example**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(i):
+            @switch(i) # create a switch indexed on variable i
+            def my_switch(): # this is the default branch (required)
+                qml.Z(0)
+
+            @my_switch.branch(3) # add a branch on case i = 3
+            def my_branch():
+                qml.H(0)
+
+            @my_switch.branch(0) # add a branch on case i = 0
+            def my_branch2():
+                qml.X(0)
+
+            my_switch() # must invoke the switch
+
+            return qml.probs()
+
+    >>> circuit(0) # case 0
+    [0. 1.]
+    >>> circuit(3) # case 3
+    [0.5 0.5]
+    >>> circuit(4) # case 4 is not defined, executes default branch
+    [1. 0.]
+
+    Values produced within the scope of the branches can be returned to the outside context, but
+    the return signature of each branch (including the default) must be identical, or be able to
+    promote to identical types. They also must be ``jax.jit`` compatible.
+
+    .. code-block:: python
+
+        @qjit
+        def foo(i):
+            @switch(i)
+            def my_switch():
+                return complex(1, 3)
+
+            @my_switch.branch(2)
+            def my_branch():
+                # this will be type-promoted
+                return 1.4
+
+            @my_switch.branch(3)
+            def my_branch2():
+                # this will also be type-promoted
+                return 2
+
+            return my_switch() # must invoke the switch
+
+    >>> foo(1) # no promotion for the highest type
+    (1+3j)
+    >>> foo(2) # promotes float to complex
+    (1.4+0j)
+    >>> foo(3) # promotes int to complex
+    (2+0j)
+
+    This form of control flow can also be called from the Python interpreter without needing to use
+    :func:`~.qjit`. In this case, the functions will be interpreted normally - return types do not
+    need to match across branches, and return types will not be promoted to match other branches.
+    Input signatures must still be equivalent.
+
+    .. code-block:: python
+
+        def foo(i, x):
+            @catalyst.switch(i)
+            def my_switch(x):
+                return x / 4
+
+            @my_switch.branch(-3)
+            def my_branch(x):
+                return str(x)
+
+            @my_switch.branch(0)
+            def my_branch(x):
+                return 0 * x
+
+            return my_switch(x)
+
+    >>> type(foo(-3, 12))
+    <class 'str'>
+    >>> type(foo(0, 111))
+    <class 'int'>
+    >>> type(foo(42, 1.9))
+    <class 'float'>
+
+    .. note::
+
+        ``catalyst.switch`` is not supported with PennyLane program capture enabled.
+        There is also currently no support for automatic conversion of native Python ``match``
+        statements to the ``catalyst.switch`` operation when using :func:`~.qjit` with AutoGraph
+        enabled.
+    """
+
+    if qml.capture.enabled():
+        raise PlxprCaptureCFCompatibilityError("switch")
+
+    def _decorator(branch):
+        return SwitchCallable(index_var, branch)
+
+    return _decorator
+
+
 ## IMPL ##
 class CondCallable:
-    """User-facing wrapper provoding "else_if" and "otherwise" public methods.
+    """User-facing wrapper providing "else_if" and "otherwise" public methods.
     Some code in this class has been adapted from the cond implementation in the JAX project at
     https://github.com/google/jax/blob/jax-v0.4.1/jax/_src/lax/control_flow/conditionals.py
     released under the Apache License, Version 2.0, with the following copyright notice:
 
     Copyright 2021 The JAX Authors.
 
-    Also provides access to the underlying "Cond" operation object.
+    Also provides access to the underlying "Cond" pennylane.Operation object.
 
     **Example**
 
@@ -552,7 +743,7 @@ class CondCallable:
     def __init__(self, pred, true_fn):
         self.preds = [self._convert_predicate_to_bool(pred)]
         self.branch_fns = [true_fn]
-        self.otherwise_fn = lambda: None
+        self.otherwise_fn = lambda *args, **kwargs: None
         self._operation = None
         self.expansion_strategy = cond_expansion_strategy()
 
@@ -584,10 +775,6 @@ class CondCallable:
         """
 
         def decorator(branch_fn):
-            if branch_fn.__code__.co_argcount != 0:
-                raise TypeError(
-                    "Conditional 'else if' function is not allowed to have any arguments"
-                )
             self.preds.append(self._convert_predicate_to_bool(pred))
             self.branch_fns.append(branch_fn)
             return self
@@ -603,8 +790,6 @@ class CondCallable:
         Returns:
             self
         """
-        if otherwise_fn.__code__.co_argcount != 0:
-            raise TypeError("Conditional 'False' function is not allowed to have any arguments")
         self.otherwise_fn = otherwise_fn
         return self
 
@@ -635,8 +820,8 @@ class CondCallable:
 
         return False
 
-    def _call_with_quantum_ctx(self, ctx):
-        outer_trace = ctx.trace
+    def _call_with_quantum_ctx(self):
+        outer_trace = EvaluationContext.get_current_trace()
         in_classical_tracers = self.preds
         regions: List[HybridOpRegion] = []
 
@@ -646,36 +831,46 @@ class CondCallable:
             quantum_tape = QuantumTape()
             # Cond branches take no arguments
             wfun, in_sig, out_sig = deduce_signatures(
-                branch_fn, [], {}, expansion_strategy=self.expansion_strategy
+                branch_fn,
+                [],
+                {},
+                expansion_strategy=self.expansion_strategy,
+                debug_info=debug_info("cond_quantum_call", branch_fn, [], {}),
             )
             assert len(in_sig.in_type) == 0
-            with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
+            with EvaluationContext.frame_tracing_context(debug_info=wfun.debug_info) as inner_trace:
                 with QueuingManager.stop_recording(), quantum_tape:
-                    res_classical_tracers = [inner_trace.full_raise(t) for t in wfun.call_wrapped()]
-
+                    with Patcher(
+                        (
+                            jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
+                            "_drop_unused_vars",
+                            _drop_unused_vars2,
+                        ),
+                    ):
+                        res_classical_tracers = [
+                            inner_trace.to_jaxpr_tracer(t, source_info=current_source_info())
+                            for t in wfun.call_wrapped()
+                        ]
             explicit_return_tys = collapse(out_sig.out_type(), res_classical_tracers)
             hybridRegion = HybridOpRegion(inner_trace, quantum_tape, [], explicit_return_tys)
             regions.append(hybridRegion)
             in_sigs.append(in_sig)
             out_sigs.append(out_sig)
-
-        _assert_cond_result_structure([s.out_tree() for s in out_sigs])
-        _assert_cond_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
+        _assert_consistent_result_structure([s.out_tree() for s in out_sigs])
+        _assert_consistent_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
         out_tree = out_sigs[-1].out_tree()
         all_consts = [s.out_consts() for s in out_sigs]
         out_types = [s.out_type() for s in out_sigs]
-        # FIXME: We want to perform the result unificaiton here:
-        # all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
-        # all_noimplouts = [s.num_implicit_outputs() for s in out_sigs]
-        # _, out_type, _, all_consts = unify_convert_result_types(
-        #     ctx, all_jaxprs, all_consts, all_noimplouts
-        # )
-        # Unfortunately, we can not do this beacuse some tracers (specifically, the results of
-        # ``qml.measure``) might not have their source Jaxpr equation yet. Thus, we delay the
-        # unification until the quantum tracing is done. The consequence of that: we have to guess
-        # the output type now and if we fail to do so, we might face MLIR type error down the
-        # pipeline.
+
+        # Select the output type of the one with the promoted dtype among all branches
         out_type = out_types[-1]
+        branch_avals = [[aval for aval, _ in branch_out_type] for branch_out_type in out_types]
+        promoted_dtypes = _promote_jaxpr_types(branch_avals)
+
+        out_type = [
+            (aval.update(dtype=dtype), expl)
+            for dtype, (aval, expl) in zip(promoted_dtypes, out_type)
+        ]
 
         # Create output tracers in the outer tracing context
         out_expanded_classical_tracers = output_type_to_tracers(
@@ -696,23 +891,26 @@ class CondCallable:
         )
         return tree_unflatten(out_tree, out_classical_tracers)
 
-    def _call_with_classical_ctx(self, ctx):
+    def _call_with_classical_ctx(self):
         in_classical_tracers = self.preds
 
         def _trace(branch_fn):
             _, in_sig, out_sig = trace_function(
-                ctx, branch_fn, *(), expansion_strategy=cond_expansion_strategy()
+                branch_fn,
+                *(),
+                expansion_strategy=cond_expansion_strategy(),
+                debug_info=debug_info("cond_classical_call", branch_fn, [], {}),
             )
             return in_sig, out_sig
 
         _, out_sigs = unzip2(_trace(fun) for fun in (*self.branch_fns, self.otherwise_fn))
-        _assert_cond_result_structure([s.out_tree() for s in out_sigs])
-        _assert_cond_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
+        _assert_consistent_result_structure([s.out_tree() for s in out_sigs])
+        _assert_consistent_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
         all_jaxprs = [s.out_initial_jaxpr() for s in out_sigs]
         all_consts = [s.out_consts() for s in out_sigs]
-        all_noimplouts = [s.num_implicit_outputs() for s in out_sigs]
+        all_num_implicit_outputs = [s.num_implicit_outputs() for s in out_sigs]
         all_jaxprs, _, _, all_consts = unify_convert_result_types(
-            ctx, all_jaxprs, all_consts, all_noimplouts
+            all_jaxprs, all_consts, all_num_implicit_outputs
         )
         branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
         # Output types from all the branches are unified by now, we use the first branch for
@@ -720,7 +918,7 @@ class CondCallable:
         out_tracers = cond_p.bind(
             *(in_classical_tracers + sum(all_consts, [])),
             branch_jaxprs=branch_jaxprs,
-            nimplicit_outputs=out_sigs[0].num_implicit_outputs(),
+            num_implicit_outputs=out_sigs[0].num_implicit_outputs(),
         )
         return tree_unflatten(out_sigs[0].out_tree(), collapse(out_sigs[0].out_type(), out_tracers))
 
@@ -730,12 +928,15 @@ class CondCallable:
                 return branch_fn()
         return self.otherwise_fn()
 
-    def __call__(self):
-        mode, ctx = EvaluationContext.get_evaluation_mode()
+    def __call__(self, *args, **kwargs):
+        self.branch_fns = [_make_argless_function(fn, args, kwargs) for fn in self.branch_fns]
+        self.otherwise_fn = _make_argless_function(self.otherwise_fn, args, kwargs)
+
+        mode = EvaluationContext.get_evaluation_mode()
         if mode == EvaluationMode.QUANTUM_COMPILATION:
-            return self._call_with_quantum_ctx(ctx)
+            return self._call_with_quantum_ctx()
         elif mode == EvaluationMode.CLASSICAL_COMPILATION:
-            return self._call_with_classical_ctx(ctx)
+            return self._call_with_classical_ctx()
         else:
             assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
             return self._call_during_interpretation()
@@ -809,28 +1010,42 @@ class ForLoopCallable:
             )
         return self._operation
 
-    def _call_with_quantum_ctx(self, ctx: JaxTracingContext, *init_state):
+    def _call_with_quantum_ctx(self, *init_state):
         quantum_tape = QuantumTape()
-        outer_trace = ctx.trace
+        outer_trace = EvaluationContext.get_current_trace()
         aux_classical_tracers = [
-            outer_trace.full_raise(t) for t in [self.lower_bound, self.upper_bound, self.step]
+            outer_trace.to_jaxpr_tracer(t, source_info=current_source_info())
+            for t in [self.lower_bound, self.upper_bound, self.step]
         ]
         wfun, in_sig, out_sig = deduce_signatures(
             self.body_fn,
             (aux_classical_tracers[0], *init_state),
             {},
             self.expansion_strategy,
+            debug_info=debug_info(
+                "forloop_quantum_call", self.body_fn, (aux_classical_tracers[0], *init_state), {}
+            ),
         )
         in_type = in_sig.in_type
 
-        with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
+        with EvaluationContext.frame_tracing_context(debug_info=wfun.debug_info) as inner_trace:
             arg_classical_tracers = input_type_to_tracers(
-                in_type, inner_trace.new_arg, inner_trace.full_raise
+                in_type,
+                partial(inner_trace.new_arg, source_info=current_source_info()),
+                partial(inner_trace.to_jaxpr_tracer, source_info=current_source_info()),
             )
             with QueuingManager.stop_recording(), quantum_tape:
-                res_classical_tracers = [
-                    inner_trace.full_raise(t) for t in wfun.call_wrapped(*arg_classical_tracers)
-                ]
+                with Patcher(
+                    (
+                        jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
+                        "_drop_unused_vars",
+                        _drop_unused_vars2,
+                    ),
+                ):
+                    res_classical_tracers = [
+                        inner_trace.to_jaxpr_tracer(t, source_info=current_source_info())
+                        for t in wfun.call_wrapped(*arg_classical_tracers)
+                    ]
                 out_type = out_sig.out_type()
                 out_tree = out_sig.out_tree()
                 out_consts = out_sig.out_consts()
@@ -861,17 +1076,20 @@ class ForLoopCallable:
         )
         return tree_unflatten(out_tree, collapse(out_type, out_expanded_classical_tracers))
 
-    def _call_with_classical_ctx(self, ctx, *init_state):
+    def _call_with_classical_ctx(self, *init_state):
         outer_trace = find_top_trace([self.lower_bound, self.upper_bound, self.step])
         aux_tracers = [
-            outer_trace.full_raise(t) for t in [self.lower_bound, self.upper_bound, self.step]
+            outer_trace.to_jaxpr_tracer(t, source_info=current_source_info())
+            for t in [self.lower_bound, self.upper_bound, self.step]
         ]
 
         _, in_sig, out_sig = trace_function(
-            ctx,
             self.body_fn,
             *(aux_tracers[0], *init_state),
             expansion_strategy=self.expansion_strategy,
+            debug_info=debug_info(
+                "forloop_classical_call", self.body_fn, (aux_tracers[0], *init_state), {}
+            ),
         )
 
         in_expanded_tracers = [
@@ -887,7 +1105,7 @@ class ForLoopCallable:
             body_jaxpr=out_sig.out_jaxpr(),
             body_nconsts=len(out_sig.out_consts()),
             apply_reverse_transform=self.apply_reverse_transform,
-            nimplicit=in_sig.num_implicit_inputs(),
+            num_implicit_inputs=in_sig.num_implicit_inputs(),
             preserve_dimensions=not self.expansion_strategy.input_unshare_variables,
         )
 
@@ -904,14 +1122,237 @@ class ForLoopCallable:
         return fn_res
 
     def __call__(self, *init_state):
-        mode, ctx = EvaluationContext.get_evaluation_mode()
+        mode = EvaluationContext.get_evaluation_mode()
         if mode == EvaluationMode.QUANTUM_COMPILATION:
-            return self._call_with_quantum_ctx(ctx, *init_state)
+            return self._call_with_quantum_ctx(*init_state)
         elif mode == EvaluationMode.CLASSICAL_COMPILATION:
-            return self._call_with_classical_ctx(ctx, *init_state)
+            return self._call_with_classical_ctx(*init_state)
         else:
             assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
             return self._call_during_interpretation(*init_state)
+
+
+class SwitchCallable:
+    """
+    User-facing wrapper for the switch decorator that provides the `branch` decorator for expanding
+    a switch.
+
+    **Example**
+
+    .. code-block:: python
+
+        @qjit
+        @qnode("lightning.qubit", wires=1)
+        def circuit(i):
+            @switch(i) # create a switch on variable i
+            def my_switch(): # default case
+                qml.RX(0, wires=0)
+
+            @my_switch.branch(2) # create a branch on case i = 2
+            def my_branch():
+                qml.RX(pi, wires=0)
+
+            @my_switch.branch(0) # create a branch on case i = 0
+            def my_branch2():
+                qml.H(0)
+
+            my_switch()
+
+            return qml.probs()
+
+        >>> circuit(0)
+        [0.5 0.5]
+        >>> circuit(2)
+        [0. 1.]
+        >>> circuit(5)
+        [1. 0.]
+    """
+
+    def __init__(
+        self, case: int, default_branch: Callable, cases: list = None, branches: list = None
+    ):
+        if default_branch == None:
+            raise ValueError("Switch requires a default branch.")
+
+        self.case = case
+        self.case_to_branch = dict(zip(cases, branches)) if cases and branches else {}
+        self.default_branch = default_branch
+        self._operation = None
+        self.expansion_strategy = switch_expansion_strategy()
+
+    @property
+    def operation(self):
+        """
+        @property for SwitchCallable.operation
+        """
+        if self._operation is None:
+            raise AttributeError(
+                "The switch() was not called (or has not been called) in a quantum"
+                " context, and thus has no associated quantum operation."
+            )
+        return self._operation
+
+    def branch(self, case: int):
+        """
+        Branch to be run if the switch's case is equivalent to the case provided here.
+
+        Args:
+            case (int): the case index of this branch.
+
+        Returns:
+            A callable decorator that wraps this case of the switch.
+        """
+
+        def decorator(branch: Callable):
+            self.case_to_branch[case] = branch
+            return self
+
+        return decorator
+
+    def _call_with_quantum_ctx(self):
+        cases, branches = (
+            map(list, zip(*self.case_to_branch.items()))
+            if len(self.case_to_branch) != 0
+            else ([], [])
+        )
+        branches.append(self.default_branch)
+
+        outer_trace = EvaluationContext.get_current_trace()
+        in_classical_tracers = [self.case] + cases
+        regions: List[HybridOpRegion] = []
+
+        in_sigs, out_sigs = [], []
+        # Do the classical tracing of every branch
+        for branch in branches:
+            quantum_tape = QuantumTape()
+
+            # branches are argless
+            wfun, in_sig, out_sig = deduce_signatures(
+                branch,
+                [],
+                {},
+                expansion_strategy=self.expansion_strategy,
+                debug_info=debug_info("switch_quantum_call", branch, [], {}),
+            )
+            assert len(in_sig.in_type) == 0
+            with EvaluationContext.frame_tracing_context(debug_info=wfun.debug_info) as inner_trace:
+                with QueuingManager.stop_recording(), quantum_tape:
+                    with Patcher(
+                        (
+                            jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
+                            "_drop_unused_vars",
+                            _drop_unused_vars2,
+                        ),
+                    ):
+                        res_classical_tracers = [
+                            inner_trace.to_jaxpr_tracer(t, source_info=current_source_info())
+                            for t in wfun.call_wrapped()
+                        ]
+            explicit_return_tys = collapse(out_sig.out_type(), res_classical_tracers)
+            hybridRegion = HybridOpRegion(inner_trace, quantum_tape, [], explicit_return_tys)
+            regions.append(hybridRegion)
+            in_sigs.append(in_sig)
+            out_sigs.append(out_sig)
+        _assert_consistent_result_structure([s.out_tree() for s in out_sigs])
+        _assert_consistent_result_types([[t[0] for t in s.out_type()] for s in out_sigs])
+        out_tree = out_sigs[-1].out_tree()
+        all_consts = [s.out_consts() for s in out_sigs]
+        out_types = [s.out_type() for s in out_sigs]
+
+        # Select the output type of the one with the promoted dtype among all branches
+        out_type = out_types[-1]
+        branch_avals = [[aval for aval, _ in branch_out_type] for branch_out_type in out_types]
+        promoted_dtypes = _promote_jaxpr_types(branch_avals)
+
+        out_type = [
+            (aval.update(dtype=dtype), expl)
+            for dtype, (aval, expl) in zip(promoted_dtypes, out_type)
+        ]
+
+        # Create output tracers in the outer tracing context
+        out_expanded_classical_tracers = output_type_to_tracers(
+            out_type,
+            sum(all_consts, []),
+            (),
+            maker=lambda aval: new_inner_tracer(outer_trace, aval),
+        )
+
+        out_classical_tracers = collapse(out_type, out_expanded_classical_tracers)
+
+        # Save tracers for futher quantum tracing
+        self._operation = Switch(
+            in_classical_tracers,
+            out_classical_tracers,
+            regions,
+            expansion_strategy=self.expansion_strategy,
+        )
+        return tree_unflatten(out_tree, out_classical_tracers)
+
+    def _call_with_classical_ctx(self):
+        # unpack dictionary to parallel lists
+        cases, branches = (
+            map(list, zip(*self.case_to_branch.items()))
+            if len(self.case_to_branch) != 0
+            else ([], [])
+        )
+        branches.append(self.default_branch)
+
+        # wraps trace to allow simple unzipping
+        def _trace(branch_fn: Callable):
+            _, in_sig, out_sig = trace_function(
+                branch_fn,
+                *(),
+                expansion_strategy=switch_expansion_strategy(),
+                debug_info=debug_info("switch_classical_call", branch_fn, [], {}),
+            )
+            return in_sig, out_sig
+
+        # trace branches to get output signatures
+        _, out_sigs = unzip2([_trace(branch) for branch in branches])
+
+        # ensure consistent output structures and types
+        _assert_consistent_result_structure([sig.out_tree() for sig in out_sigs])
+        _assert_consistent_result_types([[t[0] for t in sig.out_type()] for sig in out_sigs])
+
+        all_jaxprs = [sig.out_initial_jaxpr() for sig in out_sigs]
+        all_consts = [sig.out_consts() for sig in out_sigs]
+        all_num_implicit_outputs = [sig.num_implicit_outputs() for sig in out_sigs]
+        all_jaxprs, _, _, all_consts = unify_convert_result_types(
+            all_jaxprs, all_consts, all_num_implicit_outputs
+        )
+
+        # after this, all branches have the same signatures
+        branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
+
+        out_tracers = switch_p.bind(
+            *([self.case] + cases + sum(all_consts, [])),
+            branch_jaxprs=branch_jaxprs,
+            num_implicit_outputs=out_sigs[0].num_implicit_outputs(),
+        )
+
+        return tree_unflatten(out_sigs[0].out_tree(), collapse(out_sigs[0].out_type(), out_tracers))
+
+    def _call_during_interpretation(self):
+        # dictionary access with default value for miss
+        return self.case_to_branch.get(self.case, self.default_branch)()
+
+    def __call__(self, *args, **kwargs):
+        # convert branches to argless functions
+        for case in self.case_to_branch:
+            self.case_to_branch[case] = _make_argless_function(
+                self.case_to_branch[case], args, kwargs
+            )
+
+        self.default_branch = _make_argless_function(self.default_branch, args, kwargs)
+
+        mode = EvaluationContext.get_evaluation_mode()
+        if mode == EvaluationMode.QUANTUM_COMPILATION:
+            return self._call_with_quantum_ctx()
+        elif mode == EvaluationMode.CLASSICAL_COMPILATION:
+            return self._call_with_classical_ctx()
+        else:
+            assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
+            return self._call_during_interpretation()
 
 
 class WhileLoopCallable:
@@ -979,25 +1420,42 @@ class WhileLoopCallable:
             )
         return self._operation
 
-    def _call_with_quantum_ctx(self, ctx: JaxTracingContext, *init_state):
-        outer_trace = ctx.trace
-
+    def _call_with_quantum_ctx(self, *init_state):
+        outer_trace = EvaluationContext.get_current_trace()
         cond_wffa, _, cond_out_sig = deduce_signatures(
-            self.cond_fn, init_state, {}, self.expansion_strategy
+            self.cond_fn,
+            init_state,
+            {},
+            self.expansion_strategy,
+            debug_info=debug_info("whileloop_quantum_call_cond_fn", self.cond_fn, init_state, {}),
         )
         body_wffa, in_sig, out_sig = deduce_signatures(
-            self.body_fn, init_state, {}, self.expansion_strategy
+            self.body_fn,
+            init_state,
+            {},
+            self.expansion_strategy,
+            debug_info=debug_info("whileloop_quantum_call_body_fn", self.body_fn, init_state, {}),
         )
         in_type = in_sig.in_type
         in_expanded_classical_tracers = in_sig.in_expanded_args
 
-        with EvaluationContext.frame_tracing_context(ctx) as cond_trace:
+        with EvaluationContext.frame_tracing_context(debug_info=cond_wffa.debug_info) as cond_trace:
             arg_classical_tracers = input_type_to_tracers(
-                in_type, cond_trace.new_arg, cond_trace.full_raise
+                in_type,
+                partial(cond_trace.new_arg, source_info=current_source_info()),
+                partial(cond_trace.to_jaxpr_tracer, source_info=current_source_info()),
             )
-            res_classical_tracers = [
-                cond_trace.full_raise(t) for t in cond_wffa.call_wrapped(*arg_classical_tracers)
-            ]
+            with Patcher(
+                (
+                    jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
+                    "_drop_unused_vars",
+                    _drop_unused_vars2,
+                ),
+            ):
+                res_classical_tracers = [
+                    cond_trace.to_jaxpr_tracer(t, source_info=current_source_info())
+                    for t in cond_wffa.call_wrapped(*arg_classical_tracers)
+                ]
 
             out_type = cond_out_sig.out_type()
             out_tree = cond_out_sig.out_tree()
@@ -1012,16 +1470,26 @@ class WhileLoopCallable:
 
             _check_single_bool_value(out_tree, cond_region.res_classical_tracers)
 
-        with EvaluationContext.frame_tracing_context(ctx) as body_trace:
+        with EvaluationContext.frame_tracing_context(debug_info=body_wffa.debug_info) as body_trace:
             arg_classical_tracers = input_type_to_tracers(
-                in_type, body_trace.new_arg, body_trace.full_raise
+                in_type,
+                partial(body_trace.new_arg, source_info=current_source_info()),
+                partial(body_trace.to_jaxpr_tracer, source_info=current_source_info()),
             )
 
             quantum_tape = QuantumTape()
             with QueuingManager.stop_recording(), quantum_tape:
-                res_classical_tracers = [
-                    body_trace.full_raise(t) for t in body_wffa.call_wrapped(*arg_classical_tracers)
-                ]
+                with Patcher(
+                    (
+                        jax._src.interpreters.partial_eval,  # pylint: disable=protected-access
+                        "_drop_unused_vars",
+                        _drop_unused_vars2,
+                    ),
+                ):
+                    res_classical_tracers = [
+                        body_trace.to_jaxpr_tracer(t, source_info=current_source_info())
+                        for t in body_wffa.call_wrapped(*arg_classical_tracers)
+                    ]
 
             out_type = out_sig.out_type()
             out_tree = out_sig.out_tree()
@@ -1049,12 +1517,18 @@ class WhileLoopCallable:
         )
         return tree_unflatten(out_tree, collapse(out_type, out_expanded_classical_tracers))
 
-    def _call_with_classical_ctx(self, ctx, *init_state):
+    def _call_with_classical_ctx(self, *init_state):
         _, _, out_cond_sig = trace_function(
-            ctx, self.cond_fn, *init_state, expansion_strategy=self.expansion_strategy
+            self.cond_fn,
+            *init_state,
+            expansion_strategy=self.expansion_strategy,
+            debug_info=debug_info("whileloop_classical_call_cond_fn", self.cond_fn, init_state, {}),
         )
         _, in_body_sig, out_body_sig = trace_function(
-            ctx, self.body_fn, *init_state, expansion_strategy=self.expansion_strategy
+            self.body_fn,
+            *init_state,
+            expansion_strategy=self.expansion_strategy,
+            debug_info=debug_info("whileloop_classical_call_body_fn", self.body_fn, init_state, {}),
         )
 
         _check_single_bool_value(out_cond_sig.out_tree(), out_cond_sig.out_jaxpr().out_avals)
@@ -1071,7 +1545,7 @@ class WhileLoopCallable:
             body_jaxpr=out_body_sig.out_jaxpr(),
             cond_nconsts=len(out_cond_sig.out_consts()),
             body_nconsts=len(out_body_sig.out_consts()),
-            nimplicit=in_body_sig.num_implicit_inputs(),
+            num_implicit_inputs=in_body_sig.num_implicit_inputs(),
             preserve_dimensions=not self.expansion_strategy.input_unshare_variables,
         )
         return tree_unflatten(
@@ -1087,11 +1561,11 @@ class WhileLoopCallable:
         return fn_res
 
     def __call__(self, *init_state):
-        mode, ctx = EvaluationContext.get_evaluation_mode()
+        mode = EvaluationContext.get_evaluation_mode()
         if mode == EvaluationMode.QUANTUM_COMPILATION:
-            return self._call_with_quantum_ctx(ctx, *init_state)
+            return self._call_with_quantum_ctx(*init_state)
         elif mode == EvaluationMode.CLASSICAL_COMPILATION:
-            return self._call_with_classical_ctx(ctx, *init_state)
+            return self._call_with_classical_ctx(*init_state)
         else:
             assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
             return self._call_during_interpretation(*init_state)
@@ -1103,55 +1577,7 @@ class Cond(HybridOp):
     binder = cond_p.bind
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        jaxprs, consts, nimplouts = [], [], []
-        op = self
-        for region in op.regions:
-            with EvaluationContext.frame_tracing_context(ctx, region.trace):
-                new_qreg = AbstractQreg()
-                qreg_in = _input_type_to_tracers(region.trace.new_arg, [new_qreg])[0]
-                qreg_out = trace_quantum_operations(
-                    region.quantum_tape, device, qreg_in, ctx, region.trace
-                ).actualize()
-
-                constants = []
-                arg_expanded_classical_tracers = []
-                res_expanded_tracers, _ = expand_results(
-                    constants,
-                    arg_expanded_classical_tracers,
-                    region.res_classical_tracers + [qreg_out],
-                    expansion_strategy=self.expansion_strategy,
-                )
-
-                jaxpr, out_type, const = trace_to_jaxpr(region.trace, [], res_expanded_tracers)
-
-                jaxprs.append(jaxpr)
-                consts.append(const)
-                nimplouts.append(len(out_type) - len(region.res_classical_tracers) - 1)
-
-        qreg = qrp.actualize()
-        all_jaxprs, _, _, all_consts = unify_convert_result_types(ctx, jaxprs, consts, nimplouts)
-        branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
-
-        in_expanded_classical_tracers = [*self.in_classical_tracers, *sum(all_consts, []), qreg]
-
-        out_expanded_classical_tracers = expand_results(
-            [],
-            in_expanded_classical_tracers,
-            self.out_classical_tracers,
-            expansion_strategy=self.expansion_strategy,
-        )[0]
-
-        qrp2 = QRegPromise(
-            op.bind_overwrite_classical_tracers(
-                ctx,
-                trace,
-                in_expanded_tracers=in_expanded_classical_tracers,
-                out_expanded_tracers=out_expanded_classical_tracers,
-                branch_jaxprs=branch_jaxprs,
-                nimplicit_outputs=nimplouts[0],
-            )
-        )
-        return qrp2
+        return trace_quantum_branches(self, ctx, device, trace, qrp)
 
 
 class ForLoop(HybridOp):
@@ -1165,9 +1591,11 @@ class ForLoop(HybridOp):
         inner_tape = op.regions[0].quantum_tape
         expansion_strategy = self.expansion_strategy
 
-        with EvaluationContext.frame_tracing_context(ctx, inner_trace):
+        with EvaluationContext.frame_tracing_context(inner_trace):
             new_qreg = AbstractQreg()
-            qreg_in = _input_type_to_tracers(inner_trace.new_arg, [new_qreg])[0]
+            qreg_in = _input_type_to_tracers(
+                partial(inner_trace.new_arg, source_info=current_source_info()), [new_qreg]
+            )[0]
             qrp_out = trace_quantum_operations(inner_tape, device, qreg_in, ctx, inner_trace)
             qreg_out = qrp_out.actualize()
 
@@ -1177,22 +1605,24 @@ class ForLoop(HybridOp):
                 arg_tracers, expansion_strategy=expansion_strategy
             )
 
-            nimplicit = len(arg_expanded_tracers) - len(region.arg_classical_tracers) - 1
+            num_implicit_inputs = len(arg_expanded_tracers) - len(region.arg_classical_tracers) - 1
 
             res_classical_tracers = region.res_classical_tracers
             res_tracers = res_classical_tracers + [qreg_out]
             _, _, consts = trace_to_jaxpr(inner_trace, [], res_tracers)
             res_expanded_tracers, _ = expand_results(
-                [inner_trace.full_raise(t) for t in consts],
+                [inner_trace.to_jaxpr_tracer(t, source_info=current_source_info()) for t in consts],
                 arg_expanded_tracers,
                 res_tracers,
                 expansion_strategy=expansion_strategy,
-                num_implicit_inputs=nimplicit,
+                num_implicit_inputs=num_implicit_inputs,
             )
             jaxpr, _, _ = trace_to_jaxpr(inner_trace, arg_expanded_tracers, res_expanded_tracers)
 
         operand_tracers = op.in_classical_tracers
-        const_tracers = [trace.full_raise(c) for c in consts]
+        const_tracers = [
+            trace.to_jaxpr_tracer(c, source_info=current_source_info()) for c in consts
+        ]
         operand_expanded_tracers, _ = expand_args(
             operand_tracers, expansion_strategy=expansion_strategy
         )
@@ -1204,23 +1634,31 @@ class ForLoop(HybridOp):
             [*operand_expanded_tracers, qreg_tracer],
             self.out_classical_tracers,
             expansion_strategy=expansion_strategy,
-            num_implicit_inputs=nimplicit,
+            num_implicit_inputs=num_implicit_inputs,
         )
 
         qrp2 = QRegPromise(
             op.bind_overwrite_classical_tracers(
-                ctx,
                 trace,
                 in_expanded_tracers=in_expanded_tracers,
                 out_expanded_tracers=out_expanded_classical_tracers,
                 body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
                 body_nconsts=len(consts),
                 apply_reverse_transform=self.apply_reverse_transform,
-                nimplicit=nimplicit,
+                num_implicit_inputs=num_implicit_inputs,
                 preserve_dimensions=not expansion_strategy.input_unshare_variables,
             )
         )
         return qrp2
+
+
+class Switch(HybridOp):
+    """PennyLane's switch operation"""
+
+    binder = switch_p.bind
+
+    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
+        return trace_quantum_branches(self, ctx, device, trace, qrp)
 
 
 class WhileLoop(HybridOp):
@@ -1231,7 +1669,7 @@ class WhileLoop(HybridOp):
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         cond_trace = self.regions[0].trace
         expansion_strategy = self.expansion_strategy
-        with EvaluationContext.frame_tracing_context(ctx, cond_trace):
+        with EvaluationContext.frame_tracing_context(cond_trace):
             region = self.regions[0]
             arg_classical_tracers = region.arg_classical_tracers
             arg_expanded_classical_tracers, _ = expand_args(
@@ -1242,23 +1680,29 @@ class WhileLoop(HybridOp):
                 cond_trace, arg_expanded_classical_tracers, res_classical_tracers
             )
             res_expanded_classical_tracers, _ = expand_results(
-                [cond_trace.full_raise(t) for t in consts],
+                [cond_trace.to_jaxpr_tracer(t, source_info=current_source_info()) for t in consts],
                 arg_expanded_classical_tracers,
                 res_classical_tracers,
                 expansion_strategy=expansion_strategy,
             )
-            _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])
+            _input_type_to_tracers(
+                partial(cond_trace.new_arg, source_info=current_source_info()), [AbstractQreg()]
+            )
             cond_jaxpr, _, cond_consts = trace_to_jaxpr(
                 cond_trace, arg_expanded_classical_tracers, res_expanded_classical_tracers
             )
 
-        nimplicit = len(arg_expanded_classical_tracers) - len(self.regions[0].arg_classical_tracers)
+        num_implicit_inputs = len(arg_expanded_classical_tracers) - len(
+            self.regions[0].arg_classical_tracers
+        )
         body_trace = self.regions[1].trace
         body_tape = self.regions[1].quantum_tape
-        with EvaluationContext.frame_tracing_context(ctx, body_trace):
+        with EvaluationContext.frame_tracing_context(body_trace):
             region = self.regions[1]
             res_classical_tracers = region.res_classical_tracers
-            qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
+            qreg_in = _input_type_to_tracers(
+                partial(body_trace.new_arg, source_info=current_source_info()), [AbstractQreg()]
+            )[0]
             qrp_out = trace_quantum_operations(body_tape, device, qreg_in, ctx, body_trace)
             qreg_out = qrp_out.actualize()
             arg_expanded_tracers = expand_args(
@@ -1269,7 +1713,7 @@ class WhileLoop(HybridOp):
                 body_trace, arg_expanded_tracers, res_classical_tracers + [qreg_out]
             )
             res_expanded_tracers, _ = expand_results(
-                [body_trace.full_raise(t) for t in consts],
+                [body_trace.to_jaxpr_tracer(t, source_info=current_source_info()) for t in consts],
                 arg_expanded_tracers,
                 res_classical_tracers + [qreg_out],
                 expansion_strategy=expansion_strategy,
@@ -1279,13 +1723,19 @@ class WhileLoop(HybridOp):
             )
 
         in_expanded_tracers = [
-            *[trace.full_raise(c) for c in (cond_consts + body_consts)],
+            *[
+                trace.to_jaxpr_tracer(c, source_info=current_source_info())
+                for c in (cond_consts + body_consts)
+            ],
             *expand_args(self.in_classical_tracers, expansion_strategy=expansion_strategy)[0],
             qrp.actualize(),
         ]
 
         out_expanded_classical_tracers = expand_results(
-            [trace.full_raise(c) for c in (cond_consts + body_consts)],
+            [
+                trace.to_jaxpr_tracer(c, source_info=current_source_info())
+                for c in (cond_consts + body_consts)
+            ],
             in_expanded_tracers,
             self.out_classical_tracers,
             expansion_strategy=expansion_strategy,
@@ -1293,7 +1743,6 @@ class WhileLoop(HybridOp):
 
         qrp2 = QRegPromise(
             self.bind_overwrite_classical_tracers(
-                ctx,
                 trace,
                 in_expanded_tracers=in_expanded_tracers,
                 out_expanded_tracers=out_expanded_classical_tracers,
@@ -1301,7 +1750,7 @@ class WhileLoop(HybridOp):
                 body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
                 cond_nconsts=len(cond_consts),
                 body_nconsts=len(body_consts),
-                nimplicit=nimplicit,
+                num_implicit_inputs=num_implicit_inputs,
                 preserve_dimensions=not expansion_strategy.input_unshare_variables,
             )
         )
@@ -1309,21 +1758,26 @@ class WhileLoop(HybridOp):
 
 
 ## PRIVATE ##
-def _assert_cond_result_structure(trees: List[PyTreeDef]):
+def _assert_consistent_result_structure(trees: List[PyTreeDef]):
     """Ensure a consistent container structure across branch results."""
     expected_tree = trees[0]
     for tree in trees[1:]:
         if tree != expected_tree:
             raise TypeError(
-                "Conditional requires a consistent return structure across all branches! "
+                "Control flow requires a consistent return structure across all branches! "
                 f"Got {tree} and {expected_tree}."
             )
 
 
-def _assert_cond_result_types(signatures: List[List[AbstractValue]]):
+def _assert_consistent_result_types(signatures: List[List[AbstractValue]]):
     """Ensure a consistent type signature across branch results."""
     num_results = len(signatures[0])
-    assert all(len(sig) == num_results for sig in signatures), "mismatch: number or results"
+
+    if not all(len(sig) == num_results for sig in signatures):
+        raise TypeError(
+            "Control flow requires a consistent number of results across all branches! This can "
+            "happen when some branches return dynamic shapes and some return constant shapes."
+        )
 
     for i in range(num_results):
         aval_slice = [avals[i] for avals in signatures]
@@ -1332,8 +1786,8 @@ def _assert_cond_result_types(signatures: List[List[AbstractValue]]):
         for shape in slice_shapes:
             if shape != expected_shape:
                 raise TypeError(
-                    "Conditional requires a consistent array shape per result across all branches! "
-                    f"Got {shape} for result #{i} but expected {expected_shape}."
+                    "Control flow requires a consistent array shape per result across all branches!"
+                    f" Got {shape} for result #{i} but expected {expected_shape}."
                 )
 
 
@@ -1355,3 +1809,73 @@ def _aval_to_primitive_type(aval):
         aval = aval.dtype
     assert not isinstance(aval, (list, dict)), f"Unexpected type {aval}"
     return aval
+
+
+def _make_argless_function(fn, args, kwargs):
+    """Wrap a user function into a function without arguments to satisfy the IR representation
+    of conditionals, which always accesses values via closure (besides the predicate)."""
+
+    def argless_fn():
+        # Special case for single gates. We would like users to be able to
+        # use this familiar PL pattern, e.g. `qml.cond(p, qml.RY)(0.1, 0)`.
+        if isinstance(fn, type) and issubclass(fn, qml.operation.Operation):
+            fn(*args, **kwargs)
+            return None  # swallow return value to avoid mismatched pytrees across branches
+
+        return fn(*args, **kwargs)
+
+    return argless_fn
+
+
+def trace_quantum_branches(op, ctx, device, trace, qrp) -> QRegPromise:
+    jaxprs, consts, num_implicit_outputs = [], [], []
+    for region in op.regions:
+        with EvaluationContext.frame_tracing_context(region.trace):
+            new_qreg = AbstractQreg()
+            qreg_in = _input_type_to_tracers(
+                partial(region.trace.new_arg, source_info=current_source_info()), [new_qreg]
+            )[0]
+            qreg_out = trace_quantum_operations(
+                region.quantum_tape, device, qreg_in, ctx, region.trace
+            ).actualize()
+
+            constants = []
+            arg_expanded_classical_tracers = []
+            res_expanded_tracers, _ = expand_results(
+                constants,
+                arg_expanded_classical_tracers,
+                region.res_classical_tracers + [qreg_out],
+                expansion_strategy=op.expansion_strategy,
+            )
+            jaxpr, out_type, const = trace_to_jaxpr(region.trace, [], res_expanded_tracers)
+
+            jaxprs.append(jaxpr)
+            consts.append(const)
+            num_implicit_outputs.append(len(out_type) - len(region.res_classical_tracers) - 1)
+
+    qreg = qrp.actualize()
+    all_jaxprs, _, _, all_consts = unify_convert_result_types(jaxprs, consts, num_implicit_outputs)
+    branch_jaxprs = jaxpr_pad_consts(all_jaxprs)
+
+    in_expanded_classical_tracers = [
+        *op.in_classical_tracers,
+        *sum(all_consts, []),
+        qreg,
+    ]
+
+    out_expanded_classical_tracers = expand_results(
+        [],
+        in_expanded_classical_tracers,
+        op.out_classical_tracers,
+        expansion_strategy=op.expansion_strategy,
+    )[0]
+    qrp2 = QRegPromise(
+        op.bind_overwrite_classical_tracers(
+            trace,
+            in_expanded_tracers=in_expanded_classical_tracers,
+            out_expanded_tracers=out_expanded_classical_tracers,
+            branch_jaxprs=branch_jaxprs,
+            num_implicit_outputs=num_implicit_outputs[0],
+        )
+    )
+    return qrp2

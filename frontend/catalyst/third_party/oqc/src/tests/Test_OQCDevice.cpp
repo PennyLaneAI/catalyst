@@ -12,60 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <catch2/catch.hpp>
+#include <pybind11/embed.h>
+
 #include "OQCDevice.cpp"
 #include "OQCRunner.hpp"
-#include "Python.hpp"
 #include "RuntimeCAPI.h"
 
-PythonInterpreterGuard guard{};
-
-#include <catch2/catch.hpp>
-
 using namespace Catalyst::Runtime::Device;
-
-TEST_CASE("Test OpenQasmRunner base class", "[openqasm]")
-{
-    // check the coverage support
-    OQCRunnerBase runner{};
-    REQUIRE_THROWS_WITH(runner.runCircuit("", "", 0),
-                        Catch::Contains("[Function:runCircuit] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
-
-    REQUIRE_THROWS_WITH(runner.Probs("", "", 0, 0),
-                        Catch::Contains("[Function:Probs] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
-
-    REQUIRE_THROWS_WITH(runner.Sample("", "", 0, 0),
-                        Catch::Contains("[Function:Sample] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
-
-    REQUIRE_THROWS_WITH(runner.Expval("", "", 0),
-                        Catch::Contains("[Function:Expval] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
-
-    REQUIRE_THROWS_WITH(runner.Var("", "", 0),
-                        Catch::Contains("[Function:Var] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
-
-    REQUIRE_THROWS_WITH(runner.State("", "", 0, 0),
-                        Catch::Contains("[Function:State] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
-
-    REQUIRE_THROWS_WITH(runner.Gradient("", "", 0, 0),
-                        Catch::Contains("[Function:Gradient] Error in Catalyst Runtime: "
-                                        "Not implemented method"));
-}
 
 TEST_CASE("Test the OQCDevice constructor", "[openqasm]")
 {
     auto device = OQCDevice("{shots : 100}");
     CHECK(device.GetNumQubits() == 0);
 
-    REQUIRE_THROWS_WITH(device.PrintState(), Catch::Contains("Unsupported functionality"));
-    REQUIRE_THROWS_WITH(device.AllocateQubit(), Catch::Contains("Unsupported functionality"));
-    REQUIRE_THROWS_WITH(device.Measure(0), Catch::Contains("Unsupported functionality"));
-    REQUIRE_THROWS_WITH(device.Expval(0), Catch::Contains("Unsupported functionality"));
-    REQUIRE_THROWS_WITH(device.Var(0), Catch::Contains("Unsupported functionality"));
+    REQUIRE_THROWS_WITH(device.Measure(0), Catch::Contains("unsupported by device"));
 }
 
 TEST_CASE("Test qubits allocation OpenQasmDevice", "[openqasm]")
@@ -96,7 +57,7 @@ TEST_CASE("Test the bell pair circuit", "[openqasm]")
 
     CHECK(device->Circuit() == toqasm);
 
-    device->ReleaseAllQubits();
+    device->ReleaseQubits(wires);
     auto wiresnew = device->AllocateQubits(4);
     device->NamedOperation("CNOT", {}, {wiresnew[2], wiresnew[3]}, false);
     device->NamedOperation("Hadamard", {}, {wiresnew[2]}, false);
@@ -108,4 +69,26 @@ TEST_CASE("Test the bell pair circuit", "[openqasm]")
                               "h qubits[2];\n";
 
     CHECK(device->Circuit() == toqasmempty);
+}
+
+TEST_CASE("Test counts", "[openqasm][counts]")
+{
+    // This test needs a python interpreter to execute the OQC python script
+    // inside the `OQCDevice`'s `PartialCounts' method.
+    if (!Py_IsInitialized()) {
+        pybind11::initialize_interpreter();
+    }
+
+    std::unique_ptr<OQCDevice> device = std::make_unique<OQCDevice>("{shots : 100}");
+    auto wires = device->AllocateQubits(2);
+
+    device->NamedOperation("Hadamard", {}, {wires[0]}, false);
+
+    std::vector<double> eigvals(4);
+    std::vector<int64_t> counts(4);
+    DataView<double, 1> eigvals_view(eigvals);
+    DataView<int64_t, 1> counts_view(counts);
+
+    REQUIRE_THROWS_WITH(device->PartialCounts(eigvals_view, counts_view, {wires[0], wires[1]}),
+                        Catch::Contains("OQC credentials not found in environment variables"));
 }

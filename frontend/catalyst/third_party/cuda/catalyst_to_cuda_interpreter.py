@@ -29,7 +29,6 @@ This module also uses the CUDA-quantum API. Here is the reference:
 """
 
 import functools
-import json
 import operator
 from functools import reduce, wraps
 from typing import Hashable
@@ -39,13 +38,15 @@ import jax
 import pennylane as qml
 from jax.tree_util import tree_unflatten
 
-from catalyst.device import BackendInfo
+from catalyst.device import BackendInfo, QJITDevice
 from catalyst.jax_primitives import (
     AbstractObs,
     adjoint_p,
     compbasis_p,
     cond_p,
     counts_p,
+    device_init_p,
+    device_release_p,
     expval_p,
     for_p,
     func_p,
@@ -53,20 +54,20 @@ from catalyst.jax_primitives import (
     hamiltonian_p,
     hermitian_p,
     jvp_p,
+    measure_p,
     namedobs_p,
     print_p,
     probs_p,
     qalloc_p,
     qdealloc_p,
-    qdevice_p,
     qextract_p,
     qinsert_p,
     qinst_p,
-    qmeasure_p,
-    qunitary_p,
+    quantum_kernel_p,
     sample_p,
     state_p,
     tensorobs_p,
+    unitary_p,
     var_p,
     vjp_p,
     while_p,
@@ -122,7 +123,7 @@ def remove_host_context(jaxpr):
     { lambda ; a:i64[]. let
       b:i64[] = func[
         call_jaxpr={ lambda ; c:i64[]. let
-             = qdevice[
+             = device_init[
               rtd_kwargs={'shots': 0, 'mcmc': False}
               rtd_lib=path/to/runtime...
               rtd_name=LightningSimulator
@@ -135,10 +136,11 @@ def remove_host_context(jaxpr):
     in (b,) }
     """
     is_one_equation = len(jaxpr.jaxpr.eqns) == 1
-    is_single_equation_call = jaxpr.jaxpr.eqns[0].primitive == func_p
+    prim = jaxpr.jaxpr.eqns[0].primitive
+    is_single_equation_call = prim in {func_p, quantum_kernel_p}
     is_valid = is_one_equation and is_single_equation_call
     if is_valid:
-        return jaxpr.jaxpr.eqns[0][3]["call_jaxpr"]
+        return jaxpr.jaxpr.eqns[0].params["call_jaxpr"]
     raise CompileError("Cannot translate tapes with context.")
 
 
@@ -155,7 +157,7 @@ def get_instruction(jaxpr, primitive):
     return next((eqn for eqn in jaxpr.eqns if eqn.primitive == primitive), None)  # pragma: no cover
 
 
-class InterpreterContext:
+class InterpreterContext:  # pylint: disable=too-many-instance-attributes
     """This class keeps some state that is useful for interpreting Catalyst's JAXPR and evaluating
     it in CUDA-quantum primitives.
 
@@ -180,7 +182,7 @@ class InterpreterContext:
         if kernel is None:
             # TODO: Do we need these shots?
             # It looks like measurement operations already come with their own shots value.
-            self.kernel, _shots = change_device_to_cuda_device(self)
+            self.kernel, self.shots = change_device_to_cuda_device(self)
             change_alloc_to_cuda_alloc(self, self.kernel)
         else:
             # This is equivalent to passing a qreg into a function.
@@ -204,7 +206,7 @@ class InterpreterContext:
 
     def read(self, var):
         """Read the value of variable var."""
-        if isinstance(var, jax.core.Literal):
+        if isinstance(var, jax.extend.core.Literal):
             return var.val
         if self.variable_map.get(var):
             var = self.variable_map[var]
@@ -244,7 +246,7 @@ class InterpreterContext:
 
 
 def change_device_to_cuda_device(ctx):
-    """Map Catalyst's qdevice_p primitive to its equivalent CUDA-quantum primitive
+    """Map Catalyst's device_init_p primitive to its equivalent CUDA-quantum primitive
     as defined in this file.
 
     From here we get shots as well.
@@ -253,24 +255,15 @@ def change_device_to_cuda_device(ctx):
     # The device here might also have some important information for
     # us. For example, the number of shots.
 
-    qdevice_eqn = get_instruction(ctx.jaxpr, qdevice_p)
-
-    # These parameters are stored in a json-like string.
-    # We first convert the string to json.
-    json_like_string = qdevice_eqn.params["rtd_kwargs"]
-    json_like_string = json_like_string.replace("'", '"')
-    json_like_string = json_like_string.replace("True", "true")
-    json_string = json_like_string.replace("False", "false")
-
-    # Finally, we load it
-    parameters = json.loads(json_string)
+    qdevice_eqn = get_instruction(ctx.jaxpr, device_init_p)
 
     # Now we have the number of shots.
     # Shots are specified in PL at the very beginning, but in cuda
     # shots are not needed until the very end.
     # So, we will just return this variable
     # and it is the responsibility of the caller to propagate this information.
-    shots = parameters.get("shots")
+    assert isinstance(qdevice_eqn.invars[0], jax.extend.core.Literal)
+    shots = qdevice_eqn.invars[0].val
 
     device_name = qdevice_eqn.params.get("rtd_name")
 
@@ -500,8 +493,7 @@ def change_sample_or_counts(ctx, eqn):
     # And parameters...
     # * shots
     # * shape
-    params = eqn.params
-    shots = params["shots"]
+    shots = ctx.shots
 
     # We will deal with compbasis in the same way as
     # when we deal with the state
@@ -536,9 +528,9 @@ def change_counts(ctx, eqn):
 
 
 def change_measure(ctx, eqn):
-    """Change Catalyst's qmeasure_p to CUDA-quantum measure."""
+    """Change Catalyst's measure_p to CUDA-quantum measure."""
 
-    assert eqn.primitive == qmeasure_p
+    assert eqn.primitive == measure_p
 
     # Operands to measure_p
     # *qubit
@@ -574,13 +566,8 @@ def change_expval(ctx, eqn):
     invals = _map(ctx.read, eqn.invars)
     obs = invals[0]
 
-    # Params:
-    # * shots: Shots
-    shots = eqn.params["shots"]
-    shots = shots if shots is not None else -1
-
     # To obtain expval, we first obtain an observe object.
-    observe_results = cudaq_observe(ctx.kernel, obs, shots)
+    observe_results = cudaq_observe(ctx.kernel, obs)
     # And then we call expectation on that object.
     result = cudaq_expectation(observe_results)
     outvariables = [ctx.new_variable()]
@@ -731,7 +718,7 @@ INST_IMPL = {
     compbasis_p: change_compbasis,
     sample_p: change_sample,
     counts_p: change_counts,
-    qmeasure_p: change_measure,
+    measure_p: change_measure,
     expval_p: change_expval,
     namedobs_p: change_namedobs,
     hamiltonian_p: change_hamiltonian,
@@ -740,11 +727,12 @@ INST_IMPL = {
     # because they have been handled before or they are just
     # not necessary in the CUDA-quantum API.
     qdealloc_p: ignore_impl,
-    qdevice_p: ignore_impl,
+    device_init_p: ignore_impl,
+    device_release_p: ignore_impl,
     qalloc_p: ignore_impl,
     # These are unimplemented at the moment.
     zne_p: unimplemented_impl,
-    qunitary_p: unimplemented_impl,
+    unitary_p: unimplemented_impl,
     hermitian_p: unimplemented_impl,
     tensorobs_p: unimplemented_impl,
     var_p: unimplemented_impl,
@@ -820,7 +808,7 @@ class QJIT_CUDAQ:
             an MLIR module
         """
 
-        def cudaq_backend_info(device, _capabilities) -> BackendInfo:
+        def cudaq_backend_info(device) -> BackendInfo:
             """The extract_backend_info should not be run by the cuda compiler as it is
             catalyst-specific. We need to make this API a bit nicer for third-party compilers.
             """
@@ -837,7 +825,7 @@ class QJIT_CUDAQ:
             return BackendInfo(device_name, interface_name, "", {})
 
         with Patcher(
-            (QFunc, "extract_backend_info", cudaq_backend_info),
+            (QJITDevice, "extract_backend_info", cudaq_backend_info),
             (qml.QNode, "__call__", QFunc.__call__),
         ):
             func = self.user_function
@@ -846,7 +834,8 @@ class QJIT_CUDAQ:
             # We could also pass abstract arguments here in *args
             # the same way we do so in Catalyst.
             # But I think that is redundant now given make_jaxpr2
-            jaxpr, _, out_treedef = trace_to_jaxpr(func, static_args, abs_axes, args, {})
+            jaxpr, _, out_treedef, plugins = trace_to_jaxpr(func, static_args, abs_axes, args, {})
+            assert not plugins, "Plugins are not compatible with CUDA integration"
 
         # TODO(@erick-xanadu):
         # What about static_args?
@@ -899,7 +888,7 @@ def interpret(fun):
         #
         # So, a good solution to get rid of this call here is to just interpret the host context.
         # This is not too difficult to do. The only changes would be that we now need to provide
-        # semantics for func_p.
+        # semantics for quantum_kernel_p.
         closed_jaxpr = jax._src.core.ClosedJaxpr(catalyst_jaxpr, catalyst_jaxpr.constvars)
 
         # Because they become args...

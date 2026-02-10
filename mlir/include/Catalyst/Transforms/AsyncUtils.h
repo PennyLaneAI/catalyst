@@ -44,7 +44,9 @@ std::optional<LLVM::LLVMFuncOp> getCalleeSafe(LLVM::CallOp callOp);
 // Helper functions for matching function names
 bool isFunctionNamed(LLVM::LLVMFuncOp funcOp, llvm::StringRef expectedName);
 bool isAbort(LLVM::LLVMFuncOp funcOp);
+bool isPuts(LLVM::LLVMFuncOp funcOp);
 bool callsAbort(LLVM::CallOp callOp);
+bool callsPuts(LLVM::CallOp callOp);
 bool callsAbort(Operation *possibleCall);
 bool isMlirAsyncRuntimeCreateValue(LLVM::LLVMFuncOp funcOp);
 bool isMlirAsyncRuntimeCreateToken(LLVM::LLVMFuncOp funcOp);
@@ -58,15 +60,16 @@ bool callsMlirAsyncRuntimeIsValueError(LLVM::CallOp callOp);
 bool callsMlirAsyncRuntimeIsTokenError(Operation *possibleCall);
 bool callsMlirAsyncRuntimeIsValueError(Operation *possibleCall);
 bool hasAbortInBlock(Block *block);
+bool hasPutsInBlock(Block *block);
 
 // Helper function for creating function declarations
-LLVM::LLVMFuncOp lookupOrCreatePersonality(ModuleOp moduleOp);
-LLVM::LLVMFuncOp lookupOrCreateAbort(ModuleOp moduleOp);
-LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetValueError(ModuleOp moduleOp);
-LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetTokenError(ModuleOp moduleOp);
-LLVM::LLVMFuncOp lookupOrCreateUnrecoverableError(ModuleOp moduleOp);
-LLVM::LLVMFuncOp lookupOrCreateAwaitTokenName(ModuleOp);
-LLVM::LLVMFuncOp lookupOrCreateAwaitValueName(ModuleOp);
-LLVM::LLVMFuncOp lookupOrCreateDropRef(ModuleOp);
+LLVM::LLVMFuncOp lookupOrCreatePersonality(OpBuilder &b, ModuleOp moduleOp);
+LLVM::LLVMFuncOp lookupOrCreateAbort(OpBuilder &b, ModuleOp moduleOp);
+LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetValueError(OpBuilder &b, ModuleOp moduleOp);
+LLVM::LLVMFuncOp lookupOrCreateMlirAsyncRuntimeSetTokenError(OpBuilder &b, ModuleOp moduleOp);
+LLVM::LLVMFuncOp lookupOrCreateUnrecoverableError(OpBuilder &b, ModuleOp moduleOp);
+LLVM::LLVMFuncOp lookupOrCreateAwaitTokenName(OpBuilder &b, ModuleOp);
+LLVM::LLVMFuncOp lookupOrCreateAwaitValueName(OpBuilder &b, ModuleOp);
+LLVM::LLVMFuncOp lookupOrCreateDropRef(OpBuilder &b, ModuleOp);
 
 }; // namespace AsyncUtils

@@ -25,7 +25,7 @@ Supported backend devices include:
   * - ``lightning.qubit``
 
     - A fast state-vector qubit simulator written with a C++ backend. See the
-      `Lightning documentation <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_qubit/device.html>`__
+      `Lightning-Qubit documentation <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_qubit/device.html>`__
       for more details, as well as its
       `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_qubit/lightning_qubit.toml>`__
       for natively supported instructions.
@@ -34,9 +34,26 @@ Supported backend devices include:
 
     - A fast state-vector qubit simulator utilizing the Kokkos library for CPU and GPU accelerated
       circuit simulation. See the
-      `Lightning documentation <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_kokkos/device.html>`__
+      `Lightning-Kokkos documentation <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_kokkos/device.html>`__
       for more details, as well as its
       `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_kokkos/lightning_kokkos.toml>`__
+      for natively supported instructions.
+
+  * - ``lightning.amdgpu``
+
+    - A fast state-vector qubit simulator based on the ``lightning.kokkos`` device to give maximum performance on AMD GPUs. See the
+      `Lightning-AMDGPU documentation <https://docs.pennylane.ai/projects/lightning/en/latest/lightning_amdgpu/device.html>`__
+      for more details, as well as its
+      `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_kokkos/lightning_kokkos.toml>`__ 
+      (shared with ``lightning.kokkos``) for natively supported instructions.
+
+  * - ``lightning.gpu``
+
+    - A fast state-vector qubit simulator based on the `NVIDIA cuQuantum SDK <https://developer.nvidia.com/cuquantum-sdk>`__
+      for the GPU-accelerated quantum simulation. See the
+      `Lightning-GPU documentation <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_gpu/device.html>`__
+      for more details, as well as its
+      `Catalyst configuration file <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/lightning_gpu/lightning_gpu.toml>`__
       for natively supported instructions.
 
   * - ``braket.aws.qubit``
@@ -87,3 +104,7 @@ Supported backend devices include:
       See the `Catalyst configuration file <https://github.com/PennyLaneAI/catalyst/blob/main/frontend/catalyst/third_party/oqc/src/oqc.toml>`__
       for natively supported instructions.
 
+  * - ``null.qubit``
+
+    - A device that performs no numerical operations, useful for resource estimation and benchmarking.
+      See the `NullQubit documentation <https://pennylane.ai/devices/null-qubit>`__ for more details.

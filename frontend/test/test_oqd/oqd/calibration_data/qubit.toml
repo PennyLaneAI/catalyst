@@ -1,0 +1,91 @@
+# OQD Qubit Parameters
+# ~~~~~~~~~~~~~~~~~~~~
+#
+# A database containing parameters relating to the qubit(s) used in an Open Quantum Design (OQD)
+# trapped-ion quantum computer device.
+
+oqd_config_schema = "v0.1"
+
+# ----- TODO: Is this needed? --------------------------------------------------
+# [ion.Yb_171_II]
+# level.q0_m0 = "0"
+# level.q1_m0 = "12.643e9"
+# level.q1_m1 = "12.643e9 + 1.4e6"
+# level.q1_mneg1 = "12.643e9 - 1.4e6"
+# level.e0_m0 = "811.302e12"
+# level.e1_m0 = "811.302e12 + 2.105e9"
+# level.e1_m1 = "811.302e12 + 2.105e9 + 0.47e6"
+# level.e1_mneg1 = "811.302e12 + 2.105e9 - 0.47e6"
+# ------------------------------------------------------------------------------
+
+# Ions
+# ----
+
+[ions.Yb171]
+mass = 171.0
+charge = -1.0
+position = [0.0, 0.0, 0.0]
+
+levels.downstate.label = "downstate"
+levels.downstate.principal = 6
+levels.downstate.spin = 0.5
+levels.downstate.orbital = 0.0
+levels.downstate.nuclear = 0.5
+levels.downstate.spin_orbital = 0.5
+levels.downstate.spin_orbital_nuclear = 0.0
+levels.downstate.spin_orbital_nuclear_magnetization = 0.0
+levels.downstate.energy = 0.0
+
+levels.upstate.label = "upstate"
+levels.upstate.principal = 6
+levels.upstate.spin = 0.5
+levels.upstate.orbital = 0.0
+levels.upstate.nuclear = 0.5
+levels.upstate.spin_orbital = 0.5
+levels.upstate.spin_orbital_nuclear = 1.0
+levels.upstate.spin_orbital_nuclear_magnetization = 0.0
+levels.upstate.energy = 79438311838.67151
+
+levels.estate.label = "estate"
+levels.estate.principal = 6
+levels.estate.spin = 0.5
+levels.estate.orbital = 1.0
+levels.estate.nuclear = 0.5
+levels.estate.spin_orbital = 0.5
+levels.estate.spin_orbital_nuclear = 1.0
+levels.estate.spin_orbital_nuclear_magnetization = -1.0
+levels.estate.energy = 5097485407861727.0
+
+levels.estate2.label = "estate2"
+levels.estate2.principal = 6
+levels.estate2.spin = 0.5
+levels.estate2.orbital = 1.0
+levels.estate2.nuclear = 0.5
+levels.estate2.spin_orbital = 0.5
+levels.estate2.spin_orbital_nuclear = 1.0
+levels.estate2.spin_orbital_nuclear_magnetization = 1.0
+levels.estate2.energy = 5724861460783608.0
+
+[ions.Yb171.transitions.downstate_estate]
+level1 = "downstate"
+level2 = "estate"
+einstein_a = 1.0
+multipole = "E1"
+
+[ions.Yb171.transitions.downstate_estate2]
+level1 = "downstate"
+level2 = "estate2"
+einstein_a = 1.0
+multipole = "E1"
+
+[ions.Yb171.transitions.upstate_estate]
+level1 = "upstate"
+level2 = "estate"
+einstein_a = 1.0
+multipole = "E1"
+
+[ions.Yb171.transitions.upstate_estate2]
+level1 = "upstate"
+level2 = "estate2"
+einstein_a = 1.0
+multipole = "E1"

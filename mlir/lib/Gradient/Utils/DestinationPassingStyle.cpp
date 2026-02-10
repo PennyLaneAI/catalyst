@@ -19,11 +19,11 @@
 
 using namespace mlir;
 
-void catalyst::convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder &builder)
+LogicalResult catalyst::convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder &builder)
 {
     if (callee.getNumResults() == 0) {
         // Callee is already in destination-passing style
-        return;
+        return success();
     }
 
     MLIRContext *ctx = callee.getContext();
@@ -48,7 +48,7 @@ void catalyst::convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder &
     if (callee.isDeclaration()) {
         // If the function does not have a body, we are done after modifying the function type.
         callee.setFunctionType(dpsFunctionType);
-        return;
+        return success();
     }
 
     // Insert the new output arguments to the function.
@@ -60,7 +60,9 @@ void catalyst::convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder &
 
     // insertArguments modifies the function type, so we need to update the function type *after*
     // inserting the arguments.
-    callee.insertArguments(argIndices, memRefReturnTypes, argAttrs, argLocs);
+    if (failed(callee.insertArguments(argIndices, memRefReturnTypes, argAttrs, argLocs))) {
+        return failure();
+    }
     callee.setFunctionType(dpsFunctionType);
 
     // Update return sites to copy over the memref that would have been returned to the output.
@@ -74,7 +76,7 @@ void catalyst::convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder &
                 BlockArgument output = callee.getArgument(idx + dpsOutputIdx);
                 // We need a linalg.copy instead of a memref.copy here because it provides better
                 // type information at the LLVM level for Enzyme.
-                builder.create<linalg::CopyOp>(returnOp.getLoc(), operand, output);
+                linalg::CopyOp::create(builder, returnOp.getLoc(), operand, output);
                 idx++;
             }
             else {
@@ -83,4 +85,6 @@ void catalyst::convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder &
         }
         returnOp.getOperandsMutable().assign(nonMemRefReturns);
     });
+
+    return success();
 }

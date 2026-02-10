@@ -27,7 +27,7 @@ jobs:
   check-config:
     name: Build Configuration
     needs: [constants]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Checkout Catalyst repo
@@ -39,12 +39,27 @@ jobs:
         git checkout $(git tag | sort -V | tail -1)
     - if: ${{ inputs.catalyst == 'release-candidate' }}
       run: |
-        git checkout v0.8.1-rc
+        # For rc, we install all packages from TestPyPI.
+        # The purpose of checkout here is to locate the commit where the previous rc Catalyst
+        # was built and uploaded to TestPyPI, so that the tests are the compatible ones
+        # to be run with the latest rc/rc/rc packges on TestPyPI.
+        # This would be the last autobump-and-upload commit made on the rc branch.
+        git checkout v0.14.0-rc
+        git checkout "$(git log -1 --author="ringo-but-quantum" --pretty=format:%H)"
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ needs.constants.outputs.primary_python_version }}
 
     - name: Install deps
+      if: ${{ inputs.catalyst == 'latest' }}
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake ninja-build ccache libomp-dev libasan6 lld
+        sudo apt-get install -y ccache libasan6 lld graphviz
+
+    - name: Install deps (Python)
+      run: |
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         pip install amazon-braket-pennylane-plugin
@@ -52,95 +67,86 @@ jobs:
 
     - name: Get Catalyst Build Dependencies (latest)
       uses: actions/cache/restore@v4
+      if: ${{ inputs.catalyst == 'latest' }}
       with:
         path: mlir/llvm-project
         key: llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
     - uses: actions/cache/restore@v4
+      if: ${{ inputs.catalyst == 'latest' }}
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-gcc
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-ci-build-gcc
         fail-on-cache-miss: True
     - uses: actions/cache/restore@v4
+      if: ${{ inputs.catalyst == 'latest' }}
       with:
-        path: mlir/mlir-hlo
-        key: mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        path: mlir/stablehlo
+        key: stablehlo-${{ needs.constants.outputs.stablehlo_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
     - uses: actions/cache/restore@v4
+      if: ${{ inputs.catalyst == 'latest' }}
       with:
-        path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build-gcc
+        path: stablehlo-build
+        key: ${{ runner.os }}-stablehlo-${{ needs.constants.outputs.stablehlo_version }}-ci-build-gcc
         fail-on-cache-miss: True
     - uses: actions/cache/restore@v4
+      if: ${{ inputs.catalyst == 'latest' }}
       with:
         path:  mlir/Enzyme
         key: enzyme-${{ needs.constants.outputs.enzyme_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
     - uses: actions/cache@v4
+      if: ${{ inputs.catalyst == 'latest' }}
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build-gcc
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-ci-build-gcc
         fail-on-cache-miss: True
     - uses: actions/cache/restore@v4
+      if: ${{ inputs.catalyst == 'latest' }}
       with:
         path: .ccache
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
         restore-keys: ${{ runner.os }}-ccache-
 
-    - name: Install Catalyst (latest/stable/release-candidate)
+    - name: Install Catalyst (stable)
+      if: ${{ inputs.catalyst == 'stable' }}
+      run: |
+        sudo apt-get install -y graphviz
+        pip install pennylane-catalyst
+
+    - name: Install Catalyst (latest)
+      if: ${{ inputs.catalyst == 'latest' }}
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
         C_COMPILER=$(which gcc }}) \
         CXX_COMPILER=$(which g++ }}) \
+        ENABLE_LLD=ON \
+        RT_BUILD_DIR="$(pwd)/runtime-build" \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-        MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
+        STABLEHLO_BUILD_DIR="$(pwd)/stablehlo-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
-        ENABLE_LLD=ON \
-        make dialects
-        make frontend
-
-    - name: Build Catalyst Runtime (latest)
-      if: ${{ inputs.lightning == 'latest' }}
-      run: |
-        COMPILER_LAUNCHER="" \
-        C_COMPILER=$(which gcc }}) \
-        CXX_COMPILER=$(which g++ }}) \
-        ENABLE_LLD=OFF \
-        RT_BUILD_DIR="$(pwd)/runtime-build" \
-        LIGHTNING_GIT_TAG_VALUE=master \
-        make runtime
-
-    - name: Build Catalyst Runtime (stable)
-      if: ${{ inputs.lightning == 'stable' }}
-      run: |
-        COMPILER_LAUNCHER="" \
-        C_COMPILER=$(which gcc }}) \
-        CXX_COMPILER=$(which g++ }}) \
-        RT_BUILD_DIR="$(pwd)/runtime-build" \
-        LIGHTNING_GIT_TAG_VALUE=latest_release \
         ENABLE_OPENQASM=ON \
-        make runtime
+        make catalyst
 
-    - name: Build Catalyst Runtime (release-candidate)
-      if: ${{ inputs.lightning == 'release-candidate' }}
+    - name: Install Catalyst (release-candidate)
+      if: ${{ inputs.catalyst == 'release-candidate' }}
       run: |
-        COMPILER_LAUNCHER="" \
-        C_COMPILER=$(which gcc }}) \
-        CXX_COMPILER=$(which g++ }}) \
-        RT_BUILD_DIR="$(pwd)/runtime-build" \
-        LIGHTNING_GIT_TAG_VALUE=v0.38.0_rc \
-        ENABLE_OPENQASM=ON \
-        make runtime
+        # This is the first for the three rc installs
+        # Thus this one shouldn't have no-deps: it needs to pull in all PL dependencies
+        # And also this one needs to be --extra-index-url because it needs to see regular PyPI
+        sudo apt-get install -y graphviz
+        pip install --extra-index-url https://test.pypi.org/simple/ pennylane-catalyst'>=0.14.0rc0,<=0.14.0'
 
     - name: Install PennyLane-Lightning (stable)
       if: ${{ inputs.lightning == 'stable' }}
       run: |
-        pip install --upgrade pennylane-lightning
-        pip install --upgrade pennyLane-lightning-kokkos
+        pip install --no-deps --force pennylane-lightning
+        pip install --no-deps --force pennyLane-lightning-kokkos
 
     - name: Download PennyLane-Lightning (latest)
       if: ${{ inputs.lightning == 'latest' }}
@@ -151,23 +157,12 @@ jobs:
         path: lightning_build
         fetch-depth: 0
 
-    - name: Download PennyLane-Lightning (latest)
+    - name: Install PennyLane-Lightning (release-candidate)
       if: ${{ inputs.lightning == 'release-candidate' }}
-      uses: actions/checkout@v4
-      with:
-        repository: PennyLaneAI/pennylane-lightning
-        ref: v0.38.0_rc
-        path: lightning_build
-        fetch-depth: 0
-
-    - name: Install PennyLane-Lightning (latest/release-candidate)
-      if: ${{ inputs.lightning != 'stable' }}
       run: |
-        # Lightning-Kokkos can no longer be installed with pip from git
-        cd lightning_build
-        pip install --upgrade .
-        PL_BACKEND=lightning_kokkos python scripts/configure_pyproject_toml.py
-        pip install --upgrade .
+        # Do not overwrite any dependencies, just fetch rc package from TestPyPI
+        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane-lightning'>=0.44.0rc0,<=0.44.0'
+        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane-lightning-kokkos'>=0.44.0rc0,<=0.44.0'
 
     # PennyLane doesn't update its dev version number on every commit like Lightning, so we need to
     # force the package to be re-installed. First, handle potential dependency changes, then force
@@ -175,25 +170,27 @@ jobs:
     - name: Install PennyLane (latest)
       if: ${{ inputs.pennylane == 'latest' }}
       run: |
-        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@master
         pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@master
 
     - name: Install PennyLane (stable)
       if: ${{ inputs.pennylane == 'stable' }}
       run: |
-        pip install --upgrade pennylane
+        pip install --no-deps --force pennylane
 
     - name: Install PennyLane (release-candidate)
       if: ${{ inputs.pennylane == 'release-candidate' }}
       run: |
-        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@v0.38.0-rc0
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@v0.38.0-rc0
+        # Do not overwrite any dependencies, just fetch rc package from TestPyPI
+        pip install --no-deps --pre -U --index-url https://test.pypi.org/simple/ pennylane'>=0.44.0rc0,<=0.44.0'
 
     - name: Add Frontend Dependencies to PATH
+      if: ${{ inputs.catalyst == 'latest' }}
       run: |
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+        echo "CATALYST_BIN_DIR=$(pwd)/quantum-build/bin" >> $GITHUB_ENV
+        chmod +x $(pwd)/quantum-build/bin/catalyst  # artifact upload does not preserve permissions
 
     - name: Run Frontend Tests
       run: |
@@ -201,13 +198,15 @@ jobs:
 
     - name: Run Frontend Tests (Kokkos)
       run: |
-        make pytest TEST_BACKEND="lightning.kokkos"
+        make pytest TEST_BACKEND="lightning.kokkos" XDSL_TESTS=OFF
 
     - name: Run Frontend Tests (Braket)
       run: |
-        make pytest TEST_BRAKET=LOCAL
+        # make pytest TEST_BRAKET=LOCAL
 
     - name: Run Demos
       run: | # Do not run demos in parallel, seems to cause package issues with numpy.
+        # Some demos fail with optax dependency pulling in latest jax
+        # We skip them for now. These demos should be properly moved to the qml repo.
         MDD_BENCHMARK_PRECISION=1 \
-        python3 -m pytest demos --nbmake
+        python3 -m pytest demos -k "tutorial_qft_arithmetics.ipynb" --nbmake

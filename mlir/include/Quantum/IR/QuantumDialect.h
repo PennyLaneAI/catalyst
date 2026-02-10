@@ -16,6 +16,10 @@
 
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
+
+#include "Quantum/IR/QuantumAttrDefs.h"
+#include "Quantum/IR/QuantumTypes.h"
 
 //===----------------------------------------------------------------------===//
 // Quantum dialect declarations.
@@ -24,8 +28,25 @@
 #include "Quantum/IR/QuantumOpsDialect.h.inc"
 
 //===----------------------------------------------------------------------===//
-// Quantum type declarations.
+// Quantum resource abstractions declarations.
 //===----------------------------------------------------------------------===//
 
-#define GET_TYPEDEF_CLASSES
-#include "Quantum/IR/QuantumOpsTypes.h.inc"
+class QuantumMemory : public mlir::SideEffects::Resource::Base<QuantumMemory> {
+    llvm::StringRef getName() final { return "QuantumMemory"; }
+};
+
+//===----------------------------------------------------------------------===//
+// Quantum trait declarations.
+//===----------------------------------------------------------------------===//
+
+namespace mlir {
+namespace OpTrait {
+
+template <typename ConcreteType>
+class UnitaryTrait : public TraitBase<ConcreteType, UnitaryTrait> {};
+
+template <typename ConcreteType>
+class HermitianTrait : public TraitBase<ConcreteType, HermitianTrait> {};
+
+} // namespace OpTrait
+} // namespace mlir

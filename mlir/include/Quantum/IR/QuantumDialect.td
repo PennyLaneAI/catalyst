@@ -16,7 +16,7 @@
 #define QUANTUM_DIALECT
 
 include "mlir/IR/DialectBase.td"
-include "mlir/IR/AttrTypeBase.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // Quantum dialect.
@@ -51,25 +51,29 @@ def QuantumDialect : Dialect {
 }
 
 //===----------------------------------------------------------------------===//
-// Quantum dialect types.
+// Quantum dialect traits.
 //===----------------------------------------------------------------------===//
 
-class Quantum_Type<string name, string typeMnemonic, list<Trait> traits = []>
-        : TypeDef<QuantumDialect, name, traits> {
-    let mnemonic = typeMnemonic;
-}
+def Unitary : NativeOpTrait<"UnitaryTrait">;
+def Hermitian : NativeOpTrait<"HermitianTrait">;
 
-def QubitType : Quantum_Type<"Qubit", "bit"> {
-    let summary = "A value-semantic qubit (state).";
-}
-def QuregType : Quantum_Type<"Qureg", "reg"> {
-    let summary = "An array of value-semantic qubits (i.e. quantum register).";
-}
-def ObservableType : Quantum_Type<"Observable", "obs"> {
-    let summary = "A quantum observable for use in measurements.";
-}
-def ResultType : Quantum_Type<"Result", "res"> {
-    let summary = "A quantum measurement result.";
+//===----------------------------------------------------------------------===//
+// Quantum resource abstractions.
+//===----------------------------------------------------------------------===//
+
+def QuantumMemory : Resource<"QuantumMemory"> {
+    // This resource represents a generic piece of quantum memory. It can be used to
+    // model the resource bahavior of quantum operations, in order to help make decisions
+    // during various IR analyses.
+    //
+    // For an operation from a downstream dialect (e.g. the MBQC dialect) to use this resource,
+    // all the downstream dialect needs to do is to
+    //   `#include "Quantum/IR/QuantumDialect.h"`
+    //   `include "Quantum/IR/QuantumDialect.td"`
+    // in the downstream dialect's "Ops" cpp header tablegen file, both of which it is likely
+    // already doing.
+    //
+    // Note that `Resource` in tablegen does not have a `description` field.
 }
 
 #endif // QUANTUM_DIALECT

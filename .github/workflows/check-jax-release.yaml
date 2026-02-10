@@ -12,7 +12,7 @@ concurrency:
 jobs:
   check-jax:
     name: Build/Test Catalyst against JAX
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -25,7 +25,7 @@ jobs:
     - name: Install deps
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake ninja-build clang lld libomp-dev
+        sudo apt-get install -y clang lld
         python3 -m pip install -r requirements.txt
         echo "COMPILER_LAUNCHER=" >> $GITHUB_ENV
 
@@ -38,7 +38,7 @@ jobs:
     - name: Re-read versions
       run: |
         echo "LLVM_REVISION=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_ENV
-        echo "MHLO_REVISION=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_ENV
+        echo "STABLEHLO_REVISION=$(grep stablehlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_ENV
         echo "ENZYME_REVISION=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_ENV
 
     - name: Clone LLVM repo
@@ -48,12 +48,12 @@ jobs:
         ref: ${{ env.LLVM_REVISION }}
         path: mlir/llvm-project
 
-    - name: Clone MHLO repo
+    - name: Clone Stablehlo repo
       uses: actions/checkout@v4
       with:
-        repository: tensorflow/mlir-hlo
-        ref: ${{ env.MHLO_REVISION }}
-        path: mlir/mlir-hlo
+        repository: openxla/stablehlo
+        ref: ${{ env.STABLEHLO_REVISION }}
+        path: mlir/stablehlo
 
     - name: Clone Enzyme repo
       uses: actions/checkout@v4
@@ -70,9 +70,9 @@ jobs:
       run: |
         make llvm
 
-    - name: Build MHLO
+    - name: Build StableHLO
       run: |
-        make mhlo
+        make stablehlo
 
     - name: Build Enzyme
       run: |

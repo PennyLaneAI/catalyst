@@ -34,6 +34,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Catalyst/IR/CatalystOps.h"
+#include "QEC/IR/QECOps.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
@@ -97,8 +98,8 @@ class AdjointGenerator {
             }
             else if (auto insertOp = dyn_cast<quantum::InsertOp>(op)) {
                 Value dynamicWire = getDynamicWire(insertOp, builder);
-                auto extractOp = builder.create<quantum::ExtractOp>(
-                    insertOp.getLoc(), insertOp.getQubit().getType(),
+                auto extractOp = quantum::ExtractOp::create(
+                    builder, insertOp.getLoc(), insertOp.getQubit().getType(),
                     remappedValues.lookup(insertOp.getOutQreg()), dynamicWire,
                     insertOp.getIdxAttrAttr());
                 remappedValues.map(insertOp.getQubit(), extractOp.getResult());
@@ -107,14 +108,17 @@ class AdjointGenerator {
             }
             else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
                 Value dynamicWire = getDynamicWire(extractOp, builder);
-                auto insertOp = builder.create<quantum::InsertOp>(
-                    extractOp.getLoc(), extractOp.getQreg().getType(),
+                auto insertOp = quantum::InsertOp::create(
+                    builder, extractOp.getLoc(), extractOp.getQreg().getType(),
                     remappedValues.lookup(extractOp.getQreg()), dynamicWire,
                     extractOp.getIdxAttrAttr(), remappedValues.lookup(extractOp.getQubit()));
                 remappedValues.map(extractOp.getQreg(), insertOp.getResult());
             }
             else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
                 visitOperation(gate, builder);
+            }
+            else if (auto ppr = dyn_cast<qec::PPRotationOp>(op)) {
+                visitOperation(ppr, builder);
             }
             else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(&op)) {
                 BlockArgument regionArg = adjointOp.getRegion().getArgument(0);
@@ -135,7 +139,7 @@ class AdjointGenerator {
     {
         Value dynamicWire;
         if (!op.getIdxAttr().has_value()) {
-            dynamicWire = builder.create<ListPopOp>(op.getLoc(), cache.wireVector);
+            dynamicWire = ListPopOp::create(builder, op.getLoc(), cache.wireVector);
         }
         return dynamicWire;
     }
@@ -168,13 +172,15 @@ class AdjointGenerator {
             ValueRange params = parametrizedGate.getAllParams();
             size_t numParams = params.size();
             SmallVector<Value> cachedParams(numParams);
+            size_t idx = 0;
             // popping gives the parameters in reverse
-            for (auto [idx, param] : llvm::enumerate(llvm::reverse(params))) {
+            for (Value param : llvm::reverse(params)) {
                 Type paramType = param.getType();
                 verifyTypeIsCacheable(paramType, operation);
                 if (paramType.isF64()) {
                     cachedParams[numParams - 1 - idx] =
-                        builder.create<ListPopOp>(parametrizedGate.getLoc(), cache.paramVector);
+                        ListPopOp::create(builder, parametrizedGate.getLoc(), cache.paramVector);
+                    idx++;
                     continue;
                 }
 
@@ -184,17 +190,17 @@ class AdjointGenerator {
                 Type elementType = aTensorType.getElementType();
                 // Constants
                 auto loc = parametrizedGate.getLoc();
-                Value c0 = builder.create<index::ConstantOp>(loc, 0);
-                Value c1 = builder.create<index::ConstantOp>(loc, 1);
+                Value c0 = index::ConstantOp::create(builder, loc, 0);
+                Value c1 = index::ConstantOp::create(builder, loc, 1);
                 // TODO: Generalize to all possible dimensions
                 bool isDim0Static = ShapedType::kDynamic != shape[0];
                 bool isDim1Static = ShapedType::kDynamic != shape[1];
                 Value dim0Length = isDim0Static
-                                       ? (Value)builder.create<index::ConstantOp>(loc, shape[0])
-                                       : (Value)builder.create<tensor::DimOp>(loc, param, c0);
+                                       ? (Value)index::ConstantOp::create(builder, loc, shape[0])
+                                       : (Value)tensor::DimOp::create(builder, loc, param, c0);
                 Value dim1Length = isDim1Static
-                                       ? (Value)builder.create<index::ConstantOp>(loc, shape[1])
-                                       : (Value)builder.create<tensor::DimOp>(loc, param, c1);
+                                       ? (Value)index::ConstantOp::create(builder, loc, shape[1])
+                                       : (Value)tensor::DimOp::create(builder, loc, param, c1);
 
                 // Renaming for legibility
                 // Note: Since this is a square matrix, upperBound for both loops is the
@@ -205,13 +211,13 @@ class AdjointGenerator {
                 Value lowerBoundDim1 = c0;
                 Value upperBoundDim1 = dim1Length;
                 Value stepDim1 = c1;
-                Value beginningTensor = builder.create<tensor::EmptyOp>(loc, shape, elementType);
+                Value beginningTensor = tensor::EmptyOp::create(builder, loc, shape, elementType);
                 // This time, we are in reverse, so we need to start
                 // with N-1 since MLIR does not allow for loops with negative step sizes.
                 SmallVector<Value> initialValues = {beginningTensor};
 
-                scf::ForOp iForLoop = builder.create<scf::ForOp>(
-                    loc, lowerBoundDim0, upperBoundDim0, stepDim0, initialValues);
+                scf::ForOp iForLoop = scf::ForOp::create(builder, loc, lowerBoundDim0,
+                                                         upperBoundDim0, stepDim0, initialValues);
                 {
                     OpBuilder::InsertionGuard afterIForLoop(builder);
                     builder.setInsertionPointToStart(iForLoop.getBody());
@@ -219,13 +225,14 @@ class AdjointGenerator {
                     Value currIthTensor = iIterArgs.front();
 
                     Value i = iForLoop.getInductionVar();
-                    Value iPlusOne = builder.create<index::AddOp>(loc, i, c1);
-                    Value nMinusIMinusOne = builder.create<index::SubOp>(loc, dim0Length, iPlusOne);
+                    Value iPlusOne = index::AddOp::create(builder, loc, i, c1);
+                    Value nMinusIMinusOne =
+                        index::SubOp::create(builder, loc, dim0Length, iPlusOne);
                     // Just for legibility
                     Value iTensorIndex = nMinusIMinusOne;
 
-                    scf::ForOp jForLoop = builder.create<scf::ForOp>(
-                        loc, lowerBoundDim1, upperBoundDim1, stepDim1, currIthTensor);
+                    scf::ForOp jForLoop = scf::ForOp::create(
+                        builder, loc, lowerBoundDim1, upperBoundDim1, stepDim1, currIthTensor);
                     {
                         OpBuilder::InsertionGuard afterJForLoop(builder);
                         builder.setInsertionPointToStart(jForLoop.getBody());
@@ -234,31 +241,32 @@ class AdjointGenerator {
                                "jForLoop has more induction variables than necessary.");
                         Value currIthJthTensor = jIterArgs.front();
 
-                        Value imag = builder.create<ListPopOp>(loc, cache.paramVector);
-                        Value real = builder.create<ListPopOp>(loc, cache.paramVector);
+                        Value imag = ListPopOp::create(builder, loc, cache.paramVector);
+                        Value real = ListPopOp::create(builder, loc, cache.paramVector);
                         Value element =
-                            builder.create<complex::CreateOp>(loc, elementType, real, imag);
+                            complex::CreateOp::create(builder, loc, elementType, real, imag);
 
                         // TODO: Generalize to types which are not complex
                         Value j = jForLoop.getInductionVar();
-                        Value jPlusOne = builder.create<index::AddOp>(loc, j, c1);
+                        Value jPlusOne = index::AddOp::create(builder, loc, j, c1);
                         Value nMinusJMinusOne =
-                            builder.create<index::SubOp>(loc, dim1Length, jPlusOne);
+                            index::SubOp::create(builder, loc, dim1Length, jPlusOne);
                         // Just for legibility
                         Value jTensorIndex = nMinusJMinusOne;
                         SmallVector<Value> indices = {iTensorIndex, jTensorIndex};
 
-                        Value updatedIthJthTensor = builder.create<tensor::InsertOp>(
-                            loc, element, currIthJthTensor, indices);
-                        builder.create<scf::YieldOp>(loc, updatedIthJthTensor);
+                        Value updatedIthJthTensor = tensor::InsertOp::create(
+                            builder, loc, element, currIthJthTensor, indices);
+                        scf::YieldOp::create(builder, loc, updatedIthJthTensor);
                     }
 
                     Value ithTensor = jForLoop.getResult(0);
-                    builder.create<scf::YieldOp>(loc, ithTensor);
+                    scf::YieldOp::create(builder, loc, ithTensor);
                 }
 
                 Value recreatedTensor = iForLoop.getResult(0);
                 cachedParams[numParams - 1 - idx] = recreatedTensor;
+                idx++;
             }
             MutableOperandRange(clone, parametrizedGate.getParamOperandIdx(), params.size())
                 .assign(cachedParams);
@@ -266,6 +274,22 @@ class AdjointGenerator {
 
         for (const auto &[qubitResult, qubitOperand] :
              llvm::zip(clone.getQubitResults(), gate.getQubitOperands())) {
+            remappedValues.map(qubitOperand, qubitResult);
+        }
+    }
+
+    void visitOperation(qec::PPRotationOp ppr, OpBuilder &builder)
+    {
+        for (const auto &[qubitResult, qubitOperand] :
+             llvm::zip(ppr.getOutQubits(), ppr.getInQubits())) {
+            remappedValues.map(qubitOperand, remappedValues.lookup(qubitResult));
+        }
+
+        auto clone = cast<qec::PPRotationOp>(builder.clone(*ppr, remappedValues));
+        clone.setRotationKind(ppr.getRotationKind() * (-1));
+
+        for (const auto &[qubitResult, qubitOperand] :
+             llvm::zip(clone.getOutQubits(), ppr.getInQubits())) {
             remappedValues.map(qubitOperand, qubitResult);
         }
     }
@@ -310,7 +334,7 @@ class AdjointGenerator {
                               /*outputs=*/originalTerminator->getOperandTypes());
         std::string adjointName = funcOp.getName().str() + ".adjoint";
         Location loc = funcOp.getLoc();
-        func::FuncOp adjointFnOp = builder.create<func::FuncOp>(loc, adjointName, adjointFnType);
+        func::FuncOp adjointFnOp = func::FuncOp::create(builder, loc, adjointName, adjointFnType);
         adjointFnOp.setPrivate();
 
         // Create the block of the adjoint function
@@ -323,7 +347,7 @@ class AdjointGenerator {
         Value lastArg = adjointFnOp.getArgument(argumentsSize - 1);
         assert(isa<QuregType>(lastArg.getType()) &&
                "The last argument of the function must be the quantum register.");
-        quantum::AdjointOp adjointOp = builder.create<quantum::AdjointOp>(loc, qregType, lastArg);
+        quantum::AdjointOp adjointOp = quantum::AdjointOp::create(builder, loc, qregType, lastArg);
 
         Region *adjointRegion = &adjointOp.getRegion();
         Region &originalRegion = funcOp.getRegion();
@@ -344,13 +368,13 @@ class AdjointGenerator {
         ValueRange res = terminator->getOperands();
         TypeRange resTypes = terminator->getResultTypes();
         builder.setInsertionPointAfter(terminator);
-        builder.create<quantum::YieldOp>(loc, resTypes, res);
+        quantum::YieldOp::create(builder, loc, resTypes, res);
 
         // Return the adjoint operation in the adjoint function
         IRRewriter rewriter(builder);
         rewriter.eraseOp(terminator);
         builder.setInsertionPointAfter(adjointOp);
-        builder.create<func::ReturnOp>(loc, adjointOp.getResult());
+        func::ReturnOp::create(builder, loc, adjointOp.getResult());
 
         // Leave the adjoint func op to go back at the saved insertion
         builder.restoreInsertionPoint(insertionSaved);
@@ -361,7 +385,7 @@ class AdjointGenerator {
         args.pop_back();
         args.push_back(reversedResult);
         // Call the adjoint func op
-        auto adjointCallOp = builder.create<func::CallOp>(loc, adjointFnOp, args);
+        auto adjointCallOp = func::CallOp::create(builder, loc, adjointFnOp, args);
         ValueRange initQreg = callOp.getArgOperands();
         // Map the initial quantum register with the adjoint result
         remappedValues.map(getQuantumReg(initQreg).value(), adjointCallOp.getResult(0));
@@ -379,21 +403,22 @@ class AdjointGenerator {
         Value tape = cache.controlFlowTapes.at(forOp);
         // Popping the start, stop, and step implies that these are backwards relative to
         // the order they were pushed.
-        Value step = builder.create<ListPopOp>(forOp.getLoc(), tape);
-        Value stop = builder.create<ListPopOp>(forOp.getLoc(), tape);
-        Value start = builder.create<ListPopOp>(forOp.getLoc(), tape);
+        Value step = ListPopOp::create(builder, forOp.getLoc(), tape);
+        Value stop = ListPopOp::create(builder, forOp.getLoc(), tape);
+        Value start = ListPopOp::create(builder, forOp.getLoc(), tape);
 
         Value reversedResult = remappedValues.lookup(getQuantumReg(forOp.getResults()).value());
-        auto replacedFor = builder.create<scf::ForOp>(
-            forOp.getLoc(), start, stop, step, /*iterArgsInit=*/reversedResult,
+        auto replacedFor = scf::ForOp::create(
+            builder, forOp.getLoc(), start, stop, step, /*iterArgsInit=*/reversedResult,
             [&](OpBuilder &bodyBuilder, Location loc, Value iv, ValueRange iterArgs) {
                 OpBuilder::InsertionGuard insertionGuard(builder);
                 builder.restoreInsertionPoint(bodyBuilder.saveInsertionPoint());
 
                 remappedValues.map(yieldedQureg.value(), iterArgs[0]);
                 generateImpl(forOp.getBodyRegion(), builder);
-                builder.create<scf::YieldOp>(
-                    loc, remappedValues.lookup(getQuantumReg(forOp.getRegionIterArgs()).value()));
+                scf::YieldOp::create(
+                    builder, loc,
+                    remappedValues.lookup(getQuantumReg(forOp.getRegionIterArgs()).value()));
             });
         remappedValues.map(getQuantumReg(forOp.getInitArgs()).value(), replacedFor.getResult(0));
     }
@@ -407,8 +432,8 @@ class AdjointGenerator {
         }
 
         Value tape = cache.controlFlowTapes.at(ifOp);
-        Value condition = builder.create<ListPopOp>(ifOp.getLoc(), tape);
-        condition = builder.create<index::CastSOp>(ifOp.getLoc(), builder.getI1Type(), condition);
+        Value condition = ListPopOp::create(builder, ifOp.getLoc(), tape);
+        condition = index::CastSOp::create(builder, ifOp.getLoc(), builder.getI1Type(), condition);
         Value reversedResult = remappedValues.lookup(getQuantumReg(ifOp.getResults()).value());
 
         // The quantum register is captured from outside rather than passed in through a
@@ -432,13 +457,13 @@ class AdjointGenerator {
                     getQuantumReg(oldRegion.front().getTerminator()->getOperands());
                 remappedValues.map(yieldedQureg.value(), reversedResult);
                 generateImpl(oldRegion, builder);
-                builder.create<scf::YieldOp>(
-                    loc, remappedValues.lookup(findOldestQuregInRegion(oldRegion)));
+                scf::YieldOp::create(builder, loc,
+                                     remappedValues.lookup(findOldestQuregInRegion(oldRegion)));
             };
         };
-        auto reversedIf = builder.create<scf::IfOp>(ifOp.getLoc(), condition,
-                                                    getRegionBuilder(ifOp.getThenRegion()),
-                                                    getRegionBuilder(ifOp.getElseRegion()));
+        auto reversedIf = scf::IfOp::create(builder, ifOp.getLoc(), condition,
+                                            getRegionBuilder(ifOp.getThenRegion()),
+                                            getRegionBuilder(ifOp.getElseRegion()));
         Value startingThenQureg = findOldestQuregInRegion(ifOp.getThenRegion());
         Value startingElseQureg = findOldestQuregInRegion(ifOp.getElseRegion());
         assert(startingThenQureg == startingElseQureg &&
@@ -456,13 +481,14 @@ class AdjointGenerator {
         }
 
         Value tape = cache.controlFlowTapes.at(whileOp);
-        Value numIterations = builder.create<ListPopOp>(whileOp.getLoc(), tape);
-        Value c0 = builder.create<index::ConstantOp>(whileOp.getLoc(), 0);
-        Value c1 = builder.create<index::ConstantOp>(whileOp.getLoc(), 1);
+        Value numIterations = ListPopOp::create(builder, whileOp.getLoc(), tape);
+        Value c0 = index::ConstantOp::create(builder, whileOp.getLoc(), 0);
+        Value c1 = index::ConstantOp::create(builder, whileOp.getLoc(), 1);
 
         Value iterArgInit = remappedValues.lookup(getQuantumReg(whileOp.getResults()).value());
-        auto replacedWhile = builder.create<scf::ForOp>(
-            whileOp.getLoc(), /*start=*/c0, /*stop=*/numIterations, /*step=*/c1, iterArgInit,
+        auto replacedWhile = scf::ForOp::create(
+            builder, whileOp.getLoc(), /*start=*/c0, /*stop=*/numIterations, /*step=*/c1,
+            iterArgInit,
             /*bodyBuilder=*/
             [&](OpBuilder &bodyBuilder, Location loc, Value iv, ValueRange iterArgs) {
                 OpBuilder::InsertionGuard insertionGuard(builder);
@@ -470,9 +496,10 @@ class AdjointGenerator {
 
                 remappedValues.map(yieldedQureg.value(), iterArgs[0]);
                 generateImpl(whileOp.getAfter(), builder);
-                builder.create<scf::YieldOp>(
-                    loc, remappedValues.lookup(
-                             getQuantumReg(whileOp.getAfter().front().getArguments()).value()));
+                scf::YieldOp::create(
+                    builder, loc,
+                    remappedValues.lookup(
+                        getQuantumReg(whileOp.getAfter().front().getArguments()).value()));
             });
         remappedValues.map(getQuantumReg(whileOp.getInits()).value(), replacedWhile.getResult(0));
     }

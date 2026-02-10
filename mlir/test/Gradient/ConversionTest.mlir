@@ -62,11 +62,8 @@ module @test0 {
     // CHECK: [[in0struct:%.+]] = llvm.load [[in0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
     // CHECK: [[in0memref:%.+]] = builtin.unrealized_conversion_cast [[in0struct]] : !llvm.struct<(ptr, ptr, i64)> to memref<f64>
     // CHECK: [[diff0struct:%.+]] = llvm.load [[diff0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
-    // CHECK: [[diff0memref:%.+]] = builtin.unrealized_conversion_cast [[diff0struct]] : !llvm.struct<(ptr, ptr, i64)> to memref<f64>
     // CHECK: [[out0struct:%.+]] = llvm.load [[out0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
-    // CHECK: [[out0memref:%.+]] = builtin.unrealized_conversion_cast [[out0struct]] : !llvm.struct<(ptr, ptr, i64)> to memref<f64>
     // CHECK: [[cotan0struct:%.+]] = llvm.load [[cotan0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
-    // CHECK: [[cotan0memref:%.+]] = builtin.unrealized_conversion_cast [[cotan0struct]] : !llvm.struct<(ptr, ptr, i64)> to memref<f64>
     // CHECK: [[results:%.+]]:2 = call @fwd([[in0memref]])
 
     %1:2 = func.call @fwd(%arg0) : (memref<f64>) -> (memref<f64>, memref<f64>)
@@ -117,9 +114,7 @@ module @test1 {
   gradient.reverse @rev.rev(%arg0: memref<f64>, %arg1: memref<f64>, %arg2: memref<f64>, %arg3: memref<f64>, %arg4: memref<f64>) attributes {argc = 1 : i64, implementation = @rev, resc = 1 : i64, tape = 1 : i64} {
 
     // CHECK: [[in0struct:%.+]] = llvm.load [[in0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
-    // CHECK: [[in0memref:%.+]] = builtin.unrealized_conversion_cast [[in0struct]] : !llvm.struct<(ptr, ptr, i64)> to memref<f64>
     // CHECK: [[diff0struct:%.+]] = llvm.load [[diff0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
-    // CHECK: [[diff0memref:%.+]] = builtin.unrealized_conversion_cast [[diff0struct]] : !llvm.struct<(ptr, ptr, i64)> to memref<f64>
     // CHECK: [[out0struct:%.+]] = llvm.load [[out0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>
     // CHECK: [[out0memref:%.+]] = builtin.unrealized_conversion_cast [[out0struct]] : !llvm.struct<(ptr, ptr, i64)> to memref<f64>
     // CHECK: [[cotan0struct:%.+]] = llvm.load [[cotan0ptr]] : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64)>

@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for `OpenQasmDevice` on "local" Amazon Braket devices
-"""
+"""Unit tests for `OpenQasmDevice` on "local" Amazon Braket devices"""
 import numpy as np
 import pennylane as qml
 import pytest
@@ -23,9 +22,9 @@ from catalyst import grad, qjit
 
 try:
     qml.device("braket.local.qubit", backend="default", wires=1)
-except qml._device.DeviceError:
+except:  # pylint: disable=bare-except
     pytest.skip(
-        "skipping Braket local tests because ``amazon-braket-pennylane-plugin`` is not installed",
+        "skipping Braket local tests because ``amazon-braket-pennylane-plugin`` is not working",
         allow_module_level=True,
     )
 
@@ -99,7 +98,7 @@ class TestBraketGates:
 
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
 
-        qjit_fn = qjit()(qml.qnode(device)(circuit))
+        qjit_fn = qjit(qml.qnode(device)(circuit))
         qml_fn = qml.qnode(qml.device("default.qubit", wires=3))(circuit)
 
         assert np.allclose(qjit_fn(), qml_fn())
@@ -135,7 +134,7 @@ class TestBraketGates:
 
             return qml.var(qml.PauliZ(0) @ qml.PauliZ(1) @ qml.PauliZ(2))
 
-        qjit_fn = qjit()(qml.qnode(device)(circuit))
+        qjit_fn = qjit(qml.qnode(device)(circuit))
         qml_fn = qml.qnode(qml.device("default.qubit", wires=3))(circuit)
 
         assert np.allclose(qjit_fn(3.14, 0.6), qml_fn(3.14, 0.6))
@@ -148,19 +147,14 @@ class TestBraketSample:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.local.qubit",
-                backend="braket_sv",
-                wires=1,
-                shots=1000,
-            ),
+            qml.device("braket.local.qubit", backend="braket_sv", wires=1),
         ],
     )
     def test_sample_on_1qbit_braket(self, device):
         """Test sample on 1 qubit on braket devices."""
 
         @qjit
-        @qml.qnode(device)
+        @qml.qnode(device, shots=1000)
         def sample_1qbit(x: float):
             qml.RX(x, wires=0)
             return qml.sample()
@@ -176,19 +170,14 @@ class TestBraketSample:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.local.qubit",
-                backend="braket_sv",
-                wires=2,
-                shots=1000,
-            ),
+            qml.device("braket.local.qubit", backend="braket_sv", wires=2),
         ],
     )
     def test_sample_on_2qbits_braket(self, device):
         """Test sample on 2 qubits on braket devices."""
 
         @qjit
-        @qml.qnode(device)
+        @qml.qnode(device, shots=1000)
         def sample_2qbits(x: float):
             qml.RX(x, wires=0)
             qml.RY(x, wires=1)
@@ -209,19 +198,14 @@ class TestBraketProbs:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.local.qubit",
-                backend="braket_sv",
-                wires=1,
-                shots=1000,
-            ),
+            qml.device("braket.local.qubit", backend="braket_sv", wires=1),
         ],
     )
     def test_probs_on_1qbit_braket(self, device):
         """Test probs on 1 qubit on braket devices."""
 
         @qjit
-        @qml.qnode(device)
+        @qml.qnode(device, shots=1000)
         def probs_1qbit(x: float):
             qml.RX(x, wires=0)
             return qml.probs()
@@ -232,19 +216,14 @@ class TestBraketProbs:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.local.qubit",
-                backend="braket_sv",
-                wires=2,
-                shots=1000,
-            ),
+            qml.device("braket.local.qubit", backend="braket_sv", wires=2),
         ],
     )
     def test_probs_on_2qbits_braket(self, device):
         """Test probs on 2 qubits on braket devices."""
 
         @qjit
-        @qml.qnode(device)
+        @qml.qnode(device, shots=1000)
         def probs_2qbits(x: float):
             qml.RX(x, wires=0)
             qml.RY(x, wires=1)
@@ -261,19 +240,14 @@ class TestBraketCounts:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.local.qubit",
-                backend="braket_sv",
-                wires=1,
-                shots=1000,
-            ),
+            qml.device("braket.local.qubit", backend="braket_sv", wires=1),
         ],
     )
     def test_count_on_1qbit_braket(self, device):
         """Test counts on 1 qubits on braket devices."""
 
         @qjit
-        @qml.qnode(device)
+        @qml.qnode(device, shots=1000)
         def counts_1qbit(x: float):
             qml.RX(x, wires=0)
             return qml.counts()
@@ -289,19 +263,14 @@ class TestBraketCounts:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.local.qubit",
-                backend="braket_sv",
-                wires=2,
-                shots=1000,
-            ),
+            qml.device("braket.local.qubit", backend="braket_sv", wires=2),
         ],
     )
     def test_count_on_2qbits_braket(self, device):
         """Test counts on 2 qubits on braket devices."""
 
         @qjit
-        @qml.qnode(device)
+        @qml.qnode(device, shots=1000)
         def counts_2qbit(x: float):
             qml.RX(x, wires=0)
             qml.RY(x, wires=1)
@@ -635,18 +604,14 @@ class TestBraketMeasurementsProcess:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.local.qubit",
-                wires=1,
-                shots=100,
-            ),
+            qml.device("braket.local.qubit", wires=1),
         ],
     )
     def test_multiple_return_values_braket2(self, device):
         """Test multiple return values with shots > 0."""
 
         @qjit
-        @qml.qnode(device)
+        @qml.qnode(device, shots=100)
         def all_measurements(x):
             qml.RY(x, wires=0)
             return (
@@ -732,7 +697,7 @@ class TestBraketGradient:
         def interpreted(x):
             device = qml.device("default.qubit", wires=1)
             g = qml.QNode(f, device, diff_method="finite-diff")
-            h = qml.grad(g, argnum=0)
+            h = qml.grad(g, argnums=0)
             return h(x)
 
         assert np.allclose(compiled(inp), interpreted(inp), rtol=1e-3)
@@ -765,7 +730,7 @@ class TestBraketGradient:
         def interpreted(x, y):
             device = qml.device("default.qubit", wires=2)
             g = qml.QNode(f, device, diff_method="finite-diff")
-            h = qml.grad(g, argnum=0)
+            h = qml.grad(g, argnums=0)
             return h(x, y)
 
         assert np.allclose(compiled(*inp), interpreted(*inp), rtol=1e-3)
@@ -798,8 +763,8 @@ class TestBraketGradient:
         def interpretted_grad_default(x):
             device = qml.device("default.qubit", wires=1)
             g = qml.QNode(f, device, diff_method="backprop", max_diff=2)
-            h = qml.grad(g, argnum=0)
-            i = qml.grad(h, argnum=0)
+            h = qml.grad(g, argnums=0)
+            i = qml.grad(h, argnums=0)
             return i(x)
 
         assert_allclose(compiled_grad_default(inp), interpretted_grad_default(inp), rtol=0.1)

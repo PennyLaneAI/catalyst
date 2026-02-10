@@ -19,7 +19,11 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from jax.core import ShapedArray
-from mlir_quantum.runtime import C64, C128, as_ctype
+from mlir_quantum.runtime import (
+    C64,
+    C128,
+    as_ctype,
+)
 from mlir_quantum.runtime import (
     get_unranked_memref_descriptor as mlir_get_unranked_memref_descriptor,
 )

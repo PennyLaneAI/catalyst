@@ -1,19 +1,18 @@
 [![Tests](https://github.com/PennyLaneAI/catalyst/actions/workflows/check-catalyst.yaml/badge.svg?branch=main&event=push)](https://github.com/PennyLaneAI/catalyst/actions/workflows/check-catalyst.yaml)
-[![Coverage](https://img.shields.io/codecov/c/github/PennyLaneAI/catalyst/master.svg?logo=codecov&style=flat-square)](https://codecov.io/gh/PennyLaneAI/catalyst)
-[![Documentation](https://readthedocs.com/projects/xanaduai-catalyst/badge/?version=latest&token=e6f8607e841564d11d02baef4540523169f95d9c64fcdc656a0ecfd6564203ca)](https://docs.pennylane.ai/projects/catalyst)
+[![Coverage](https://img.shields.io/codecov/c/github/PennyLaneAI/catalyst/main.svg?logo=codecov&style=flat-square)](https://codecov.io/gh/PennyLaneAI/catalyst)
+[![Documentation](https://readthedocs.com/projects/xanaduai-catalyst/badge/?version=latest)](https://docs.pennylane.ai/projects/catalyst)
 [![DOI](https://joss.theoj.org/papers/10.21105/joss.06720/status.svg)](https://doi.org/10.21105/joss.06720)
 [![PyPI](https://img.shields.io/pypi/v/PennyLane-Catalyst.svg?style=flat-square)](https://pypi.org/project/PennyLane-Catalyst)
 [![Forum](https://img.shields.io/discourse/https/discuss.pennylane.ai/posts.svg?logo=discourse&style=flat-square)](https://discuss.pennylane.ai)
 [![License](https://img.shields.io/pypi/l/PennyLane.svg?logo=apache&style=flat-square)](https://www.apache.org/licenses/LICENSE-2.0)
-[![Dev Container](https://img.shields.io/static/v1?label=Dev%20Container&message=Launch&color=blue&logo=visualstudiocode&style=flat-square)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/PennyLaneAI/catalyst)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/PennyLaneAI/catalyst/main/doc/_static/catalyst.png#gh-light-mode-only" width="700px">
+  <img src="https://raw.githubusercontent.com/PennyLaneAI/catalyst/main/doc/_static/pl-catalyst-logo-lightmode.png#gh-light-mode-only" width="700px">
     <!--
     Use a relative import for the dark mode image. When loading on PyPI, this
     will fail automatically and show nothing.
     -->
-  <img src="./doc/_static/catalyst-dark.png#gh-dark-mode-only" width="700px" onerror="this.style.display='none'" alt=""/>
+  <img src="./doc/_static/pl-catalyst-logo-darkmode.png#gh-dark-mode-only" width="700px" onerror="this.style.display='none'" alt=""/>
 </p>
 
 Catalyst is an experimental package that enables just-in-time (JIT) compilation of hybrid
@@ -73,23 +72,27 @@ In addition, we also provide a Python frontend for [PennyLane](https://pennylane
 
 ## Installation
 
-Catalyst is officially supported on Linux (aarch64/arm64, x86_64) and macOS (aarch64/arm64, x86_64) platforms, 
-and pre-built binaries are being distributed via the Python Package Index (PyPI) for Python versions 3.10 and
+Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64) platforms,
+and pre-built binaries are being distributed via the Python Package Index (PyPI) for Python versions 3.11 and
 higher. To install it, simply run the following ``pip`` command:
 
 ```console
 pip install pennylane-catalyst
 ```
 
-Pre-built packages for Windows are not yet available, and comptability with Windows 
-is untested and cannot be guaranteed. If you are using one of these platforms, please
-try out our Docker and Dev Container images described in the [documentation](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/installation.html#dev-containers)
-or click this button:
+Catalyst no longer supports macOS with x86_64 architecture after 0.11.0. This includes Macs running on Intel processors.
+If you would like to use Catalyst on these systems, please install Catalyst version 0.11.0, PennyLane version 0.41.0, PennyLane-Lightning
+version 0.41.0, and Jax version 0.4.28:
 
-[![Dev Container](https://img.shields.io/static/v1?label=Dev%20Container&message=Launch&color=blue&logo=visualstudiocode&style=flat-square)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/PennyLaneAI/catalyst).
+```console
+pip install pennylane-catalyst==0.11.0
+pip install pennylane==0.41.0
+pip install pennylane-lightning==0.41.0
+pip install jax==0.4.28
+```
 
 If you wish to contribute to Catalyst or develop against our runtime or compiler, instructions for
-[building from source](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/installation.html#building-from-source)
+[building from source](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/installation.html#minimal-building-from-source-guide)
 are also available.
 
 ## Trying Catalyst with PennyLane
@@ -159,9 +162,27 @@ If you are doing research using Catalyst, please cite our paper:
   author = {David Ittah and Ali Asadi and Erick Ochoa Lopez and Sergei Mironov and Samuel Banning and Romain Moyard and Mai Jacob Peng and Josh Izaac},
   title = {Catalyst: a Python JIT compiler for auto-differentiable hybrid quantum programs},
   journal = {Journal of Open Source Software}
-} 
+}
 ```
 
 ## License
 
 Catalyst is **free** and **open source**, released under the Apache License, Version 2.0.
+
+## Acknowledgements
+
+Catalyst makes use of the following libraries and tools, which are under their own respective
+licenses:
+
+- [JAX](https://github.com/jax-ml/jax)
+- [TensorFlow](https://github.com/tensorflow/tensorflow)
+- [OpenXLA](https://github.com/openxla/xla)
+- [LLVM/MLIR](https://github.com/llvm/llvm-project)
+- [EnzymeAD](https://github.com/EnzymeAD/Enzyme)
+- [pybind11](https://github.com/pybind/pybind11)
+- [nanobind](https://github.com/wjakob/nanobind)
+- [accelerate-lapacke](https://github.com/lepus2589/accelerate-lapacke)
+- [LAPACK](https://github.com/Reference-LAPACK/lapack)
+- [TOML++](https://github.com/marzer/tomlplusplus)
+- [json](https://github.com/nlohmann/json)
+- [stim](https://github.com/quantumlib/Stim)

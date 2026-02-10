@@ -11,9 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Benchmarking data type definitions """
+"""Benchmarking data type definitions"""
 
-from argparse import SUPPRESS, Action
 from dataclasses import dataclass
 from multiprocessing import cpu_count
 from os import uname
@@ -141,52 +140,3 @@ class BenchmarkResult(BenchmarkResultV1):
             versions,
             float(timeout),
         )
-
-
-class BooleanOptionalAction(Action):
-    """Backported from argparse for Python3.10"""
-
-    # pylint: disable=too-many-arguments
-
-    def __init__(
-        self,
-        option_strings,
-        dest,
-        default=None,
-        type=None,
-        choices=None,
-        required=False,
-        help=None,
-        metavar=None,
-    ):
-        """A constructor"""
-        _option_strings = []
-        for option_string in option_strings:
-            _option_strings.append(option_string)
-
-            if option_string.startswith("--"):
-                option_string = "--no-" + option_string[2:]
-                _option_strings.append(option_string)
-
-        if help is not None and default is not None and default is not SUPPRESS:
-            help += " (default: %(default)s)"
-
-        super().__init__(
-            option_strings=_option_strings,
-            dest=dest,
-            nargs=0,
-            default=default,
-            type=type,
-            choices=choices,
-            required=required,
-            help=help,
-            metavar=metavar,
-        )
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        if option_string in self.option_strings:
-            setattr(namespace, self.dest, not option_string.startswith("--no-"))
-
-    def format_usage(self):
-        """Format the usage string"""
-        return " | ".join(self.option_strings)

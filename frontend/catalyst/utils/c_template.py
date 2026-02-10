@@ -258,9 +258,10 @@ class CVariable(Variable):
     def _get_array_data(array):
         rank = len(array.shape)
         if rank == 0:
-            return array
-        elements_str = str(array.tolist()).replace("[", "{").replace("]", "}")
-        return elements_str
+            elements_str = str(array)
+        else:
+            elements_str = str(array.tolist()).replace("[", "{").replace("]", "}")
+        return elements_str.replace("True", "true").replace("False", "false")
 
     @staticmethod
     def _get_sizes(array):
@@ -270,7 +271,8 @@ class CVariable(Variable):
 
     @staticmethod
     def _get_strides(array):
-        strides = [str(stride // 8) for stride in array.strides]
+        # Numpy uses units of bytes for their strides, but memrefs use number of elements.
+        strides = [str(stride // array.itemsize) for stride in array.strides]
         strides_str = ",".join(strides)
         return strides_str
 
@@ -309,6 +311,7 @@ def get_template(func_name, restype, *args):
 #include <complex.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef int64_t int64;
 typedef double float64;

@@ -24,8 +24,8 @@ extern "C" {
 
 // Quantum Runtime Instructions
 void __catalyst__rt__fail_cstr(const char *);
-void __catalyst__rt__initialize(uint32_t *seed);
-void __catalyst__rt__device_init(int8_t *, int8_t *, int8_t *);
+void __catalyst__rt__initialize(uint32_t *);
+void __catalyst__rt__device_init(int8_t *, int8_t *, int8_t *, int64_t, bool);
 void __catalyst__rt__device_release();
 void __catalyst__rt__finalize();
 void __catalyst__rt__toggle_recorder(bool);
@@ -35,6 +35,7 @@ void __catalyst__rt__print_string(char *);
 void __catalyst__rt__assert_bool(bool, char *);
 int64_t __catalyst__rt__array_get_size_1d(QirArray *);
 int8_t *__catalyst__rt__array_get_element_ptr_1d(QirArray *, int64_t);
+void __catalyst__rt__array_update_element_1d(QirArray *, int64_t, QUBIT *);
 
 QUBIT *__catalyst__rt__qubit_allocate();
 QirArray *__catalyst__rt__qubit_allocate_array(int64_t);
@@ -50,7 +51,7 @@ RESULT *__catalyst__rt__result_get_zero();
 // Quantum Gate Set Instructions
 void __catalyst__qis__SetState(MemRefT_CplxT_double_1d *, uint64_t, ...);
 void __catalyst__qis__SetBasisState(MemRefT_int8_1d *, uint64_t, ...);
-void __catalyst__qis__Identity(QUBIT *, const Modifiers *);
+void __catalyst__qis__Identity(const Modifiers *, int64_t, /* qubits */...);
 void __catalyst__qis__PauliX(QUBIT *, const Modifiers *);
 void __catalyst__qis__PauliY(QUBIT *, const Modifiers *);
 void __catalyst__qis__PauliZ(QUBIT *, const Modifiers *);
@@ -70,17 +71,23 @@ void __catalyst__qis__IsingXX(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__IsingYY(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__IsingXY(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__IsingZZ(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__SingleExcitation(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__DoubleExcitation(double, QUBIT *, QUBIT *, QUBIT *, QUBIT *,
+                                       const Modifiers *);
 void __catalyst__qis__ControlledPhaseShift(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CRX(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CRY(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CRZ(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__MS(double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CRot(double, double, double, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__CSWAP(QUBIT *, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__Toffoli(QUBIT *, QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__MultiRZ(double, const Modifiers *, int64_t, /*qubits*/...);
 void __catalyst__qis__GlobalPhase(double, const Modifiers *);
+void __catalyst__qis__PCPhase(double, double, const Modifiers *, int64_t, /*qubits*/...);
 void __catalyst__qis__ISWAP(QUBIT *, QUBIT *, const Modifiers *);
 void __catalyst__qis__PSWAP(double, QUBIT *, QUBIT *, const Modifiers *);
+void __catalyst__qis__PauliRot(const char *, double, const Modifiers *, int64_t, /*qubits*/...);
 
 // Struct pointer arguments for these instructions represent real arguments,
 // as passing structs by value is too unreliable / compiler dependant.
@@ -94,15 +101,20 @@ ObsIdType __catalyst__qis__HamiltonianObs(MemRefT_double_1d *, int64_t, /*obsKey
 
 // Struct pointers arguments here represent return values.
 RESULT *__catalyst__qis__Measure(QUBIT *, int32_t);
+RESULT *__catalyst__qis__PauliMeasure(const char *, int64_t, /*qubits*/...);
 double __catalyst__qis__Expval(ObsIdType);
 double __catalyst__qis__Variance(ObsIdType);
 void __catalyst__qis__Probs(MemRefT_double_1d *, int64_t, /*qubits*/...);
-void __catalyst__qis__Sample(MemRefT_double_2d *, int64_t, int64_t, /*qubits*/...);
-void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *, int64_t, int64_t, /*qubits*/...);
+void __catalyst__qis__Sample(MemRefT_double_2d *, int64_t, /*qubits*/...);
+void __catalyst__qis__Counts(PairT_MemRefT_double_int64_1d *, int64_t, /*qubits*/...);
 void __catalyst__qis__State(MemRefT_CplxT_double_1d *, int64_t, /*qubits*/...);
 void __catalyst__qis__Gradient(int64_t, /*results*/...);
 void __catalyst__qis__Gradient_params(MemRefT_int64_1d *, int64_t, /*results*/...);
 
+// MBQC operations
+RESULT *__catalyst__mbqc__measure_in_basis(QUBIT *, uint32_t, double, int32_t);
+
+// Async runtime error
 void __catalyst__host__rt__unrecoverable_error();
 
 #ifdef __cplusplus

@@ -17,16 +17,20 @@
 
 include "mlir/Pass/PassBase.td"
 
-def CatalystBufferizationPass : Pass<"catalyst-bufferize"> {
-    let summary = "Bufferize tensors in catalyst utility ops.";
+def DetensorizeFunctionBoundaryPass : Pass<"detensorize-function-boundary"> {
+    let summary = "Detensorize across function boundary.";
 
     let dependentDialects = [
-        "bufferization::BufferizationDialect",
-        "memref::MemRefDialect",
-        "index::IndexDialect"
+        "tensor::TensorDialect",
     ];
+}
 
-    let constructor = "catalyst::createCatalystBufferizationPass()";
+def DetensorizeSCFPass : Pass<"detensorize-scf"> {
+    let summary = "Detensorize for, if, while operations from the SCF dialect.";
+
+    let dependentDialects = [
+        "tensor::TensorDialect"
+    ];
 }
 
 def ArrayListToMemRefPass : Pass<"convert-arraylist-to-memref"> {
@@ -42,8 +46,6 @@ def ArrayListToMemRefPass : Pass<"convert-arraylist-to-memref"> {
         "mlir::memref::MemRefDialect",
         "mlir::scf::SCFDialect"
     ];
-
-    let constructor = "catalyst::createArrayListToMemRefPass()";
 }
 
 def CatalystConversionPass : Pass<"convert-catalyst-to-llvm"> {
@@ -53,32 +55,6 @@ def CatalystConversionPass : Pass<"convert-catalyst-to-llvm"> {
         "mlir::func::FuncDialect",
         "mlir::LLVM::LLVMDialect",
     ];
-
-    let constructor = "catalyst::createCatalystConversionPass()";
-}
-
-def ScatterLoweringPass : Pass<"scatter-lowering"> {
-    let summary = "Lower scatter op from Stable HLO to loops.";
-
-    let dependentDialects = [
-        "index::IndexDialect",
-        "mhlo::MhloDialect",
-        "scf::SCFDialect"
-    ];
-
-    let constructor = "catalyst::createScatterLoweringPass()";
-}
-
-def HloCustomCallLoweringPass : Pass<"hlo-custom-call-lowering"> {
-    let summary = "Lower custom calls op from Stable HLO to CallOp.";
-
-    let dependentDialects = [
-        "index::IndexDialect",
-        "mlir::func::FuncDialect",
-        "catalyst::CatalystDialect",
-    ];
-
-    let constructor = "catalyst::createHloCustomCallLoweringPass()";
 }
 
 def QnodeToAsyncLoweringPass : Pass<"qnode-to-async-lowering"> {
@@ -89,14 +65,10 @@ def QnodeToAsyncLoweringPass : Pass<"qnode-to-async-lowering"> {
         "mlir::memref::MemRefDialect",
         "bufferization::BufferizationDialect"
     ];
-
-    let constructor = "catalyst::QnodeToAsyncLoweringPass()";
 }
 
 def DisableAssertionPass : Pass<"disable-assertion"> {
     let summary = "Disable all catalyst_assertions.";
-
-    let constructor = "catalyst::createDisableAssertionPass()";
 }
 
 def AddExceptionHandlingPass : Pass<"add-exception-handling"> {
@@ -115,8 +87,6 @@ def AddExceptionHandlingPass : Pass<"add-exception-handling"> {
         "mlir::LLVM::LLVMDialect",
     ];
 
-    let constructor = "catalyst::createAddExceptionHandlingPass()";
-
     let options = [
         Option<
             /*C++ var name=*/"stopAfterStep",
@@ -133,19 +103,15 @@ def AddExceptionHandlingPass : Pass<"add-exception-handling"> {
 
 def GEPInboundsPass : Pass<"gep-inbounds"> {
     let summary = "Mark GEPOp inbounds.";
-
-    let constructor = "catalyst::GEPInboundsPass()";
 }
 
 def MemrefCopyToLinalgCopyPass : Pass<"memrefcpy-to-linalgcpy"> {
     let summary = "Switch memref.copy to linalg.copy when the layout is not the identity.";
-    
+
     let dependentDialects = [
         "memref::MemRefDialect",
         "linalg::LinalgDialect"
     ];
-
-    let constructor = "catalyst::MemrefCopyToLinalgCopyPass()";
 }
 
 def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"> {
@@ -154,15 +120,122 @@ def RegisterInactiveCallbackPass : Pass<"register-inactive-callback", "ModuleOp"
     let dependentDialects = [
         "mlir::LLVM::LLVMDialect"
     ];
+}
 
-    let constructor = "catalyst::createRegisterInactiveCallbackPass()";
+def MemrefToLLVMWithTBAAPass : Pass<"memref-to-llvm-tbaa", "mlir::ModuleOp"> {
+  let summary = "Lower the memref load and store operation to LLVM and add the TBAA tags.";
 
+  let dependentDialects = [
+        "mlir::LLVM::LLVMDialect"
+  ];
 }
 
 def ApplyTransformSequencePass : Pass<"apply-transform-sequence"> {
     let summary = "Apply the passes scheduled with the transform dialect.";
+}
 
-    let constructor = "catalyst::createApplyTransformSequencePass()";
+def InlineNestedModulePass : Pass<"inline-nested-module"> {
+    let summary = "Inline nested modules with qnode attribute.";
+
+    let dependentDialects = [
+        "mlir::func::FuncDialect"
+    ];
+
+    let options = [
+        Option<
+            /*C++ var name=*/"stopAfterStep",
+            /*CLI arg name=*/"stop-after-step",
+            /*type=*/"int",
+            /*default=*/"0",
+            /*description=*/
+            "Useful for tests. This will stop the pass after the given step has been executed "
+            "(steps run from 1 to 5). Defaults to 0 which is equivalent to running "
+            "all steps to completion."
+        >
+    ];
+}
+
+
+// Legacy buffer deallocation pass.
+//
+// This pass has been modified from its original form in the LLVM project at
+// https://github.com/llvm/llvm-project released under the Apache License, Version 2.0,
+// with the following copyright notice:
+//
+//   * Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+//   * See https://llvm.org/LICENSE.txt for license information.
+//   * SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+def BufferDeallocationPass : Pass<"buffer-deallocation", "func::FuncOp"> {
+  let summary = "Adds all required dealloc operations for all allocations in "
+                "the input program";
+  let description = [{
+    This pass implements an algorithm to automatically introduce all required
+    deallocation operations for all buffers in the input program. This ensures
+    that the resulting program does not have any memory leaks.
+
+
+    Input
+
+    ```mlir
+    #map0 = affine_map<(d0) -> (d0)>
+    module {
+      func.func @condBranch(%arg0: i1, %arg1: memref<2xf32>, %arg2: memref<2xf32>) {
+        cf.cond_br %arg0, ^bb1, ^bb2
+      ^bb1:
+        cf.br ^bb3(%arg1 : memref<2xf32>)
+      ^bb2:
+        %0 = memref.alloc() : memref<2xf32>
+        linalg.generic {
+          indexing_maps = [#map0, #map0],
+          iterator_types = ["parallel"]} %arg1, %0 {
+        ^bb0(%gen1_arg0: f32, %gen1_arg1: f32):
+          %tmp1 = exp %gen1_arg0 : f32
+          linalg.yield %tmp1 : f32
+        }: memref<2xf32>, memref<2xf32>
+        cf.br ^bb3(%0 : memref<2xf32>)
+      ^bb3(%1: memref<2xf32>):
+        "memref.copy"(%1, %arg2) : (memref<2xf32>, memref<2xf32>) -> ()
+        return
+      }
+    }
+
+    ```
+
+    Output
+
+    ```mlir
+    #map0 = affine_map<(d0) -> (d0)>
+    module {
+      func.func @condBranch(%arg0: i1, %arg1: memref<2xf32>, %arg2: memref<2xf32>) {
+        cf.cond_br %arg0, ^bb1, ^bb2
+      ^bb1:  // pred: ^bb0
+        %0 = memref.alloc() : memref<2xf32>
+        memref.copy(%arg1, %0) : memref<2xf32>, memref<2xf32>
+        cf.br ^bb3(%0 : memref<2xf32>)
+      ^bb2:  // pred: ^bb0
+        %1 = memref.alloc() : memref<2xf32>
+        linalg.generic {
+          indexing_maps = [#map0, #map0],
+          iterator_types = ["parallel"]} %arg1, %1 {
+        ^bb0(%arg3: f32, %arg4: f32):
+          %4 = exp %arg3 : f32
+          linalg.yield %4 : f32
+        }: memref<2xf32>, memref<2xf32>
+        %2 = memref.alloc() : memref<2xf32>
+        memref.copy(%1, %2) : memref<2xf32>, memref<2xf32>
+        dealloc %1 : memref<2xf32>
+        cf.br ^bb3(%2 : memref<2xf32>)
+      ^bb3(%3: memref<2xf32>):  // 2 preds: ^bb1, ^bb2
+        memref.copy(%3, %arg2) : memref<2xf32>, memref<2xf32>
+        dealloc %3 : memref<2xf32>
+        return
+      }
+
+    }
+    ```
+
+  }];
 }
 
 #endif // CATALYST_PASSES

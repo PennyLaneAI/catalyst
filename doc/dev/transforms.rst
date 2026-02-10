@@ -14,7 +14,8 @@ below for further information beyond this document.
 
 - `The structure and elements of the MLIR program representation <https://mlir.llvm.org/docs/LangRef/>`_.
 
-- `Understand the relationship of IR objects, and how they can be used to traverse the IR <https://mlir.llvm.org/docs/Tutorials/UnderstandingTheIRStructure/>`_.
+- `Understand the relationship of IR objects, and how they can be used to traverse the IR
+  <https://mlir.llvm.org/docs/Tutorials/UnderstandingTheIRStructure/>`_.
 
 - `Documentation on general MLIR transformations (or "passes") <https://mlir.llvm.org/docs/PassManagement/>`_.
 
@@ -38,10 +39,10 @@ Let's look at a simple example starting in Python:
     def circuit(x: complex):
         qml.Hadamard(wires=0)
 
-        A = np.array([1, 0], [0, np.exp(x)])
+        A = np.array([[1, 0], [0, np.exp(x)]])
         qml.QubitUnitary(A, wires=0)
 
-        B = np.array([1, 0], [0, np.exp(2*x)])
+        B = np.array([[1, 0], [0, np.exp(2*x)]])
         qml.QubitUnitary(B, wires=0)
 
         return measure(0)
@@ -55,24 +56,22 @@ The corresponding IR might look something like this (simplified):
         %c10 = complex.constant [1.0, 0.0] : complex<f64>
         %c20 = complex.constant [2.0, 0.0] : complex<f64>
 
-        %reg = quantum.alloc(1) : !quantum.reg
-        %q0 = quantum.extract %reg[0] : !quantum.bit
-
-        %q1 = quantum.custom "Hadamard"() %q0 : !quantum.bit
-
         %0 = complex.exp %arg0 : complex<f64>
-        %A = tensor.from_elements %c10, %c00, %c00, %1 : tensor<2x2xcomplex<f64>>
-        %q2 = quantum.unitary %A, %q1 : !quantum.bit
+        %A = tensor.from_elements %c10, %c00, %c00, %0 : tensor<2x2xcomplex<f64>>
 
         %1 = complex.mul %arg0, %c20 : complex<f64>
-        %2 = complex.exp %0 : complex<f64>
+        %2 = complex.exp %1 : complex<f64>
         %B = tensor.from_elements %c10, %c00, %c00, %2 : tensor<2x2xcomplex<f64>>
-        %q3 = quantum.unitary %B, %q2 : !quantum.bit
 
-        %m = quantum.measure %q3 : i1
+        %reg = quantum.alloc(1) : !quantum.reg
+        %q0 = quantum.extract %reg[ 0] : !quantum.reg -> !quantum.bit
+        %q1 = quantum.custom "Hadamard"() %q0 : !quantum.bit
+        %q2 = quantum.unitary(%A : tensor<2x2xcomplex<f64>>) %q1 : !quantum.bit
+        %q3 = quantum.unitary(%B : tensor<2x2xcomplex<f64>>) %q2 : !quantum.bit
 
-        quantum.dealloc %r : !quantum.reg
-        func.return %m : i1
+        %m, %q4 = quantum.measure %q3 : i1, !quantum.bit
+
+        return %m : i1
     }
 
 A few things you might note in this representation:
@@ -100,6 +99,130 @@ classical instructions as well as side-effecting operations (e.g., print) can al
 same representation.
 
 
+Writing and running your first Catalyst pass
+============================================
+
+If this is your first time writing an MLIR pass, the boilerplate can be quite overwhelming.
+Let's first set up the various boilerplate items required to register and run a new pass. 
+
+We'll create an empty pass in the ``Catalyst`` dialect that just prints out hello world to stdout.
+Note that the ``mlir/include`` and ``mlir/lib`` directories consist of all the available dialects,
+so if you want to write a new pass in another dialect, it should be added to the subdirectory of that dialect.
+
+The first thing to do is to create the pass object in the `tablegen <https://mlir.llvm.org/docs/PassManagement/#tablegen-specification>`_
+``mlir/include/Catalyst/Transforms/Passes.td``:
+
+.. code-block::
+
+    def MyHelloWorldPass : Pass<"my-hello-world"> {
+        let summary = "An empty pass boilerplate that prints out hello world.";
+    }
+
+When the dialect is built, this tablegen def will be built to a C++ file ``mlir/build/include/Catalyst/Transforms/Passes.h.inc``,
+containing the newly defined object called ``MyHelloWorldPassBase``,
+alongside the various necessary boilerplate methods in the MLIR infrastructure.
+For example, a ``registerMyHelloWorldPass()`` call will be added to the ``registerCatalystPasses`` function,
+and a ``createMyHelloWorldPass`` function will be declared and defined to create the pass.
+Tablegen is designed such that we don't have to write all that boilerplate ourselves. 
+
+Now we write the pass itself. Create a new file ``mlir/lib/Catalyst/Transforms/MyHelloWorldPass.cpp`` with the following content:
+
+.. code-block:: cpp
+
+    #define DEBUG_TYPE "myhelloworld"
+
+    #include "llvm/Support/Debug.h"
+
+    #include "mlir/Pass/Pass.h"
+
+    #include "Catalyst/IR/CatalystDialect.h"
+
+    using namespace llvm;
+    using namespace mlir;
+    using namespace catalyst;
+
+    namespace catalyst {
+
+    #define GEN_PASS_DECL_MYHELLOWORLDPASS
+    #define GEN_PASS_DEF_MYHELLOWORLDPASS
+    #include "Catalyst/Transforms/Passes.h.inc"
+
+    struct MyHelloWorldPass : public impl::MyHelloWorldPassBase<MyHelloWorldPass> {
+        using impl::MyHelloWorldPassBase<MyHelloWorldPass>::MyHelloWorldPassBase;
+
+        void runOnOperation() override { llvm::errs() << "Hello world!\n"; }
+    };
+
+    } // namespace catalyst
+
+We make the pass object ``MyHelloWorldPass``, which inherits from the base class ``MyHelloWorldPassBase``
+that tablegen will build in the namespace ``impl``.
+The function that determines what your pass actually does is the ``void runOnOperation()``.
+Currently, all this pass does is print out ``"Hello world!\n"``.
+Note that the ``GEN_PASS_DECL_...PASS`` macro definitions are used to enable additional declarations,
+such as pass options, and thus may not always be needed.
+
+(A sidenote on printing messages in MLIR: there are two major printing options in LLVM.
+The `more standard one <https://llvm.org/docs/ProgrammersManual.html#the-llvm-debug-macro-and-debug-option>`_ is ``dbgs()``,
+which only prints when a debug flag is set.
+The other option is the ``errs()`` used here, which will print no matter what.)
+
+This new C++ file needs to be added to the ``mlir/lib/Catalyst/Transforms/CMakeLists.txt`` file
+(or the CMakeLists.txt of whichever directory that has your new pass file):
+
+.. code-block::
+
+    file(GLOB SRC
+        ...
+        MyHelloWorldPass.cpp
+    )
+
+Now that we have written our shiny new pass, we can build it by going back to the top-level ``catalyst`` directory and
+call the command line instruction
+
+.. code-block::
+
+    make dialects
+
+The tool to run passes is the executable ``quantum-opt`` at the location ``mlir/build/bin/quantum-opt``.
+Since this is an executable, it needs to be invoked as ``./quantum-opt`` instead of just plain ``quantum-opt``
+(if you are in the ``mlir/build/bin`` directory; otherwise supply the full path).
+Alternatively, you can add ``quantum-opt``'s directory to your ``PATH`` by having the following in your ``.zshrc`` or ``.bashrc``:
+
+.. code-block::
+
+    export PATH=<path_to_catalyst_root_directory>/mlir/build/bin:$PATH
+
+We can inspect by all the available passes by running ``quantum-opt --help``:
+
+.. code-block::
+
+    OVERVIEW: Quantum optimizer driver
+    ...
+    USAGE: quantum-opt [options] <input file>
+
+    OPTIONS:
+        ...
+        --my-hello-world                   -   An empty pass boilerplate that prints out hello world.
+
+Here the displayed ``--help`` message will be the ``summary`` we wrote in the tablegen file.
+The command line option to run our new pass is the template string in the def line in the tablegen file.
+
+To run the pass, simply do 
+
+.. code-block::
+
+    ./mlir/build/bin/quantum-opt -my-hello-world input.mlir
+
+on any input mlir file ``input.mlir``. And our new pass will print out ``Hello world!``. 
+
+.. note::
+
+    If you are encoutering issues, or would like to quickly try out the hello world pass described in this
+    section, you can have a look at or cherry-pick this commit which includes all changes described
+    in this section: https://github.com/PennyLaneAI/catalyst/commit/ba7b3438667963b307c07440acd6d7082f1960f3
+
+
 Writing transformations on Catalyst's IR
 ========================================
 
@@ -110,11 +233,11 @@ they act on the same qubit in immediate succession:
 .. code-block:: mlir
 
     %0 = complex.exp %arg0 : complex<f64>
-    %A = tensor.from_elements %c10, %c00, %c00, %1 : tensor<2x2xcomplex<f64>>
+    %A = tensor.from_elements %c10, %c00, %c00, %0 : tensor<2x2xcomplex<f64>>
     %q2 = quantum.unitary %A, %q1 : !quantum.bit                                (A)
 
     %1 = complex.mul %arg0, %c20 : complex<f64>
-    %2 = complex.exp %0 : complex<f64>
+    %2 = complex.exp %1 : complex<f64>
     %B = tensor.from_elements %c10, %c00, %c00, %2 : tensor<2x2xcomplex<f64>>
     %q3 = quantum.unitary %B, %q2 : !quantum.bit                                (B)
 
@@ -122,8 +245,8 @@ Note how the value ``%q2`` links the two operations together from definition ``(
 across several other instructions.
 
 As seen in the `pattern rewriter documentation <https://mlir.llvm.org/docs/PatternRewriter/#defining-patterns>`_,
-a new rewrite pattern can be defined as a C++ class as follows, where we will focus on the ``match``
-and ``rewrite`` methods (refer to the link for the full class and up to date information):
+a new rewrite pattern can be defined as a C++ class as follows, where we will focus on the
+``matchAndRewrite`` method (refer to the link for the full class and up to date information):
 
 .. code-block:: cpp
 
@@ -131,14 +254,13 @@ and ``rewrite`` methods (refer to the link for the full class and up to date inf
     {
         ...
 
-        LogicalResult match(QubitUnitaryOp op) const override {
-            // The ``match`` method returns ``success()`` if the pattern is a match, failure
-            // otherwise.
-        }
-
-        void rewrite(QubitUnitaryOp op, PatternRewriter &rewriter) {
-            // The ``rewrite`` method performs mutations on the IR rooted at ``op`` using
-            // the provided rewriter. All mutations must go through the provided rewriter.
+        LogicalResult matchAndRewrite(QubitUnitaryOp op, PatternRewriter &rewriter) const override {
+            // The `matchAndRewrite` method performs both the pattern matching and the mutation 
+            // on the IR rooted at `op` using the provided rewriter.
+            // All mutations must go through the provided rewriter and IR mutation should only
+            // take place after the match is deemed successful. 
+            // matchAndRewrite must return "success" if and only if the IR was modified.
+            // The root operation is required to either be: updated in-place, replaced, or erased.
         }
 
         ...
@@ -156,27 +278,43 @@ the second is a list of qubits):
 
     QubitUnitary(*, QubitUnitary(*, *))
 
-Let's implement it in C++:
+Let's add the pattern-matching logic to the ``matchAndRewrite`` method:
 
 .. code-block:: cpp
 
-    LogicalResult QubitUnitaryFusion::match(QubitUnitaryOp op)
+    LogicalResult matchAndRewrite(QubitUnitaryOp op, PatternRewriter &rewriter) const override
     {
         ValueRange qbs = op.getInQubits();
         Operation *parent = qbs[0].getDefiningOp();
 
-        if (!isa<QubitUnitaryOp>(parent))
+        // Parent should be a QubitUnitaryOp
+        if (!isa<QubitUnitaryOp>(parent)) {
             return failure();
+        }
 
+        // In the line `Operation *parent = qbs[0].getDefiningOp();`,
+        // we retrived the parent `Operation`, which only has methods on the
+        // base `Operation` class
+        // https://mlir.llvm.org/doxygen/classmlir_1_1Operation.html
+        // To use the specific methods and the auto-generated getters for
+        // the specific `QubitUnitaryOp`, we need to cast it first.
         QubitUnitaryOp parentOp = cast<QubitUnitaryOp>(parent);
         ValueRange parentQbs = parentOp.getOutQubits();
 
-        if (qbs.size() != parentQbs.size())
+        // Parent's output qubits should be the current op's input qubits,
+        // and the qubits need to be in the same order
+        if (qbs.size() != parentQbs.size()) {
             return failure();
+        }
 
-        for (auto [qb1, qb2] : llvm::zip(qbs, parentQbs))
-            if (qb1 != qb2)
+        for (auto [qb1, qb2] : llvm::zip(qbs, parentQbs)) {
+            if (qb1 != qb2) {
                 return failure();
+            }
+        }
+
+        // Rewrite logic
+        // ... We have matched the pattern, now rewrite the IR here
 
         return success();
     }
@@ -215,8 +353,8 @@ MLIR will automatically generate canonical ``get*`` methods for attributes like 
 ``out_qubits``, and ``matrix``. When in doubt it's best to have a look at the generated C++ files in
 the build folder, named ``QuantumOps.h.inc`` and ``QuantumOps.cpp.inc`` in this instance.
 
-Alright, now that we have the matching part, let's implement the actual transformation via the
-``rewrite`` method. All we need to do is replace the original pattern with the following:
+Alright, now that we have the matching part, let's add the actual transformation to the
+``matchAndRewrite`` method. All we need to do is replace the original pattern with the following:
 
 .. code-block::
 
@@ -226,49 +364,91 @@ In C++ it will look as follows:
 
 .. code-block:: cpp
 
-    void QubitUnitaryFusion::rewrite(QubitUnitaryOp op, PatternRewriter &rewriter)
+    LogicalResult matchAndRewrite(QubitUnitaryOp op, PatternRewriter &rewriter) const override
     {
-        ValueRange qbs = op.getInQubits();
-        QubitUnitaryOp parentOp = cast<QubitUnitaryOp>(qbs[0].getDefiningOp());
 
-        Value m1 = op.getMatrix();
-        Value m2 = parentOp.getMatrix();
+        // Pattern matching logic
+        // ... match the pattern
 
-        linalg::MatmulOp matmul = rewriter.create<linalg::MatmulOp>(op.getLoc(), {m1, m2}, {});
-        Value res = matmul.getResult(0);
+        //////////////////////////////////////////////////
 
-        rewriter.updateRootInPlace(op, [&] {
-            op->setOperand(0, res);
+        // Rewrite logic
+
+        // In the tablegen definition of `QubitUnitaryOp`, there is a
+        // field called `$matrix`, storing the matrix for the unitary gate.
+        // Tablegen automatically generates getters for all of the fields.
+        mlir::Value m1 = op.getMatrix();
+        mlir::Value m2 = parentOp.getMatrix();
+
+        // Get the type of a 2x2 complex matrix
+        // Note that both m1 and m2 have this type already
+        mlir::Type MatrixType = m1.getType();
+
+        // Create the matrix multiplication operation
+        // The linalg.matmul op's semantics is:
+        //   linalg.matmul({A, B}, {C})
+        // performs C+=A*B
+        // so we need to create a zero matrix of the desired type and shape first
+        tensor::EmptyOp zeromat =
+            tensor::EmptyOp::create(rewriter, op.getLoc(), MatrixType, ValueRange{});
+
+        // The first argument to the `create` method is the `OpBuilder` (rewriter)
+        // The second argument to the `create` need to be a `Location`
+        // which can usually just be a `getLoc()` from any operation you have handy
+        // The third argument needs to be (a list of) type(s) of the operation's output
+        // The fourth argument needs to be (a list of) input value(s) to the operation
+        linalg::MatmulOp matmul = linalg::MatmulOp::create(rewriter,
+            op.getLoc(), TypeRange{MatrixType}, ValueRange{m1, m2}, ValueRange{zeromat});
+
+        // Some peculiarity for the matmul operation; no need to worry about it here
+        matmul->setAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({2, 1}));
+
+        // Replace the matrix for the parent unitary (which is the first unitary op)
+        // with the product matrix
+        // Note: we need to move the zero matrix
+        // and the matmul before the parent unitary
+        // so all of them are defined before being used by the parent unitary
+        zeromat->moveBefore(parentOp);
+        matmul->moveBefore(parentOp);
+        mlir::Value res = matmul.getResult(0);
+        rewriter.modifyOpInPlace(parentOp, [&] {
+            parentOp->setOperand(0, res);
         });
-        rewriter.replaceOp(parentOp, parentOp.getResults());
+
+        // The second unitary is not needed anymore
+        // Whoever uses the second unitary, use the first one instead!
+        op.replaceAllUsesWith(parentOp);
+
+        return success();
     }
 
 When writing transformations, the rewriter is the most important tool we have. It can create new
 operations for us, delete others, or change the place in the IR where we are choosing to make
-changes (also called the insertion point). Let's have look at some of these elements:
+changes (also called the insertion point). Let's have a look at some of these elements:
 
 - **Constructing new operations**:
 
-  New operations are created via the ``rewriter.create`` method. Here we want to generate a matrix
+  New operations are created via the ``OpTy::create`` method. Here we want to generate a matrix
   multiplication instruction from the ``linalg`` dialect. C++ namespaces usually correspond to the
-  dialect name. The first thing the rewriter needs is always a `location object <https://mlir.llvm.org/docs/Diagnostics/#source-locations>`_,
+  dialect name. The first argument to ``create`` is always the ``OpBuilder`` (or ``PatternRewriter``),
+  followed by a `location object <https://mlir.llvm.org/docs/Diagnostics/#source-locations>`_,
   which is used in debugging to refer back to the original source code line, for example.
-  Following this, we need to provide the right arguments to instantiate the operation. So-called
-  operation builders are automatically defined for this purpose, whose source can be referenced to
+  Following this, we need to provide the right arguments to instantiate the operation. The ``create``
+  methods are automatically defined for this purpose, whose source can be referenced to
   consult which arguments are required. Looking into ``LinalgStructuredOps.h.inc`` for example
   reveals the following options:
 
   .. code-block:: cpp
 
-    static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, ValueRange inputs, ValueRange outputs, ArrayRef<NamedAttribute> attributes = {});
-    static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, TypeRange resultTensorTypes, ValueRange inputs, ValueRange outputs, ArrayRef<NamedAttribute> attributes = {});
-    static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, TypeRange resultTensorTypes, ValueRange operands, ArrayRef<NamedAttribute> attributes = {});
-    static void build(::mlir::OpBuilder &odsBuilder, ::mlir::OperationState &odsState, TypeRange resultTensorTypes, ValueRange inputs, ValueRange outputs, Attribute cast, ArrayRef<NamedAttribute> attributes = {});
+    static MatmulOp create(::mlir::OpBuilder &builder, ::mlir::Location location, ValueRange inputs, ValueRange outputs, ArrayRef<NamedAttribute> attributes = {});
+    static MatmulOp create(::mlir::OpBuilder &builder, ::mlir::Location location, TypeRange resultTensorTypes, ValueRange inputs, ValueRange outputs, ArrayRef<NamedAttribute> attributes = {});
+    static MatmulOp create(::mlir::OpBuilder &builder, ::mlir::Location location, TypeRange resultTensorTypes, ValueRange operands, ArrayRef<NamedAttribute> attributes = {});
+    static MatmulOp create(::mlir::OpBuilder &builder, ::mlir::Location location, TypeRange resultTensorTypes, ValueRange inputs, ValueRange outputs, Attribute cast, ArrayRef<NamedAttribute> attributes = {});
 
-  We can always ignore the first two arguments, ``odsBuilder`` and ``odsState``, but the remaining
-  ones are the arguments we'll need to provide to the rewriter. We chose the simplest one which
-  only requires specifying a range of values for the operation ``inputs`` (two to be precise). We
-  can ignore ``outputs`` argument for now as it is a peculiarity of the ``linalg`` dialect.
+  The first argument is always the ``OpBuilder`` (or ``PatternRewriter``), and the second is the ``Location``.
+  The remaining arguments depend on the specific operation. We chose the version which
+  requires specifying result types, input values, and output values. We can ignore ``outputs``
+  argument for now as it is a peculiarity of the ``linalg`` dialect.
   If necessary, the result types of an operation may be specified as can be seen in the second
   version, but for ``matmul`` the result types can be automatically deduced.
 
@@ -300,16 +480,16 @@ changes (also called the insertion point). Let's have look at some of these elem
   Operation arguments and `attributes <https://mlir.llvm.org/docs/LangRef/#attributes>`_ can also
   be modified in-place (without creating a new operation). We use this to replace the matrix
   argument of our operation with the result of the multiplication. Since this mechanism doesn't
-  go through the rewriter, he have to notify it explicitly that we are making changes to an
+  go through the rewriter, we have to notify it explicitly that we are making changes to an
   operation:
 
   .. code-block:: cpp
 
-      rewriter.updateRootInPlace(op, [&] {
-          op->setOperand(0, res);
-      });
+        rewriter.modifyOpInPlace(parentOp, [&] {
+            parentOp->setOperand(0, res);
+        });
 
-  Note that in order to change to results on an operation you will need to create a copy of it
+  Note that in order to change the results on an operation you will need to create a copy of it
   and erase the existing operation, they cannot be modified in-place.
 
 Invoking transformation patterns
@@ -343,7 +523,7 @@ and other function operations, which themselves can contain other operations, an
             quantumPatterns.add<QubitUnitaryFusion>(ctx);
 
             // Apply patterns in an iterative and greedy manner.
-            if (failed(applyPatternsAndFoldGreedily(op, std::move(quantumPatterns)))) {
+            if (failed(applyPatternsGreedily(op, std::move(quantumPatterns)))) {
                 return signalPassFailure();
             }
         }
@@ -351,8 +531,14 @@ and other function operations, which themselves can contain other operations, an
 
 To apply patterns we need a `pattern applicator <https://mlir.llvm.org/docs/PatternRewriter/#common-pattern-drivers>`_.
 There a few in MLIR but typically you can just use the greedy pattern rewrite driver
-(``applyPatternsAndFoldGreedily``), which will iterative over the IR and apply patterns until a
+(``applyPatternsGreedily``), which will iterative over the IR and apply patterns until a
 fixed point is reached.
+
+.. note::
+
+    If you are encoutering issues, or would like to quickly try out the merge unitary pass described in this
+    section, you can have a look at or cherry-pick this commit which includes all changes described
+    in this section: https://github.com/PennyLaneAI/catalyst/commit/2c84b2402cb67c62a6de5137bbf5b41afaa5a328
 
 
 Writing more general transformations
@@ -390,12 +576,16 @@ gradient ops that specify the finite-difference method, indicated via the ``"fd"
 
 .. code-block:: cpp
 
-    LogicalResult FiniteDiffLowering::match(GradOp op)
+    LogicalResult FiniteDiffLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter)
     {
-        if (op.getMethod() == "fd")
-            return success();
+        // Pattern matching logic
+        if (op.getMethod() != "fd")
+            return failure();
 
-        return failure();
+        // Rewrite logic
+        // ...
+
+        return success();
     }
 
 For the rewriting part we'll want to introduce a few new elements, such as looking up symbols
@@ -403,8 +593,13 @@ For the rewriting part we'll want to introduce a few new elements, such as looki
 
 .. code-block:: cpp
 
-    void FiniteDiffLowering::rewrite(GradOp op, PatternRewriter &rewriter)
+    LogicalResult FiniteDiffLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter)
     {
+        // Pattern matching logic
+        if (op.getMethod() != "fd")
+            return failure();
+
+        // Rewrite logic
         // First let's find the function the grad operation is referencing.
         func::FuncOp callee =
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
@@ -425,7 +620,7 @@ For the rewriting part we'll want to introduce a few new elements, such as looki
             // The function type should be identical to the type signature of the grad operation.
             FunctionType fnType = rewriter.getFunctionType(op.getOperandTypes(), op.getResultTypes());
 
-            gradFn = rewriter.create<func::FuncOp>(op.getLoc(), fnName, fnType, visibility, nullptr, nullptr);
+            gradFn = func::FuncOp::create(rewriter, op.getLoc(), fnName, fnType, visibility, nullptr, nullptr);
 
             // Now we just to populate the actual body of the function. First create an empty body.
             Block *fnBody = gradFn.addEntryBlock();
@@ -434,6 +629,8 @@ For the rewriting part we'll want to introduce a few new elements, such as looki
             // Populate the function body.
             populateFiniteDiffMethod(rewriter, op, gradFn);
         }
+
+        return success();
     }
 
 Symbols are string references to IR objects, which rather than containing a physical reference or
@@ -483,30 +680,30 @@ In code:
         ValueRange callArgs = gradFn.getArguments();
 
         // We can reuse the same f(x, y, z) evaluation for all partial derivatives.
-        func::CallOp callOp = rewriter.create<func::CallOp>(loc, callee, callArgs);
+        func::CallOp callOp = func::CallOp::create(rewriter, loc, callee, callArgs);
 
         // Loop through x, y, z to collect the partial derivatives.
         std::vector<Value> gradient;
         for (auto [idx, arg] : llvm::enumerate(callArgs)) {
 
             FloatAttr hAttr = rewriter.getF64FloatAttr(0.1); // or another small fd parameter
-            Value hValue = rewriter.create<arith::ConstantOp>(loc, hAttr);
+            Value hValue = arith::ConstantOp::create(rewriter, loc, hAttr);
 
-            Value argPlusH = rewriter.create<arith::AddFOp>(loc, arg, hValue);
+            Value argPlusH = arith::AddFOp::create(rewriter, loc, arg, hValue);
 
             // Make a copy of arguments to replace the argument with it's shifted value.
             std::vector<Value> callArgsForward(callArgs.begin(), callArgs.end());
             callArgsForward[idx] = argPlusH;
             func::CallOp callOpForward =
-                rewriter.create<func::CallOp>(loc, callee, callArgsForward);
+                func::CallOp::create(rewriter, loc, callee, callArgsForward);
 
             // Compute the finite difference.
-            Value difference = rewriter.create<arith::SubFOp>(loc, callOpForward.getResult(0), callOp.getResult(0));
-            Value partialDerivative = rewriter.create<arith::DivFOp>(loc, difference, hValue);
+            Value difference = arith::SubFOp::create(rewriter, loc, callOpForward.getResult(0), callOp.getResult(0));
+            Value partialDerivative = arith::DivFOp::create(rewriter, loc, difference, hValue);
             gradient.push_back(partialDerivative);
         }
 
-        rewriter.create<func::ReturnOp>(loc, gradient);
+        func::ReturnOp::create(rewriter, loc, gradient);
     }
 
 Alright, our function should now look something like this:
@@ -536,18 +733,20 @@ Alright, our function should now look something like this:
         func.return %dx, %dy, %dz : f64, f64, f64
     }
 
-Finally, we have to amend our rewrite function to invoke the new function we created and delete the
+Finally, we have to amend our ``matchAndRewrite`` function to invoke the new function we created and delete the
 ``GradOp`` from the IR:
 
 .. code-block:: cpp
 
-    void FiniteDiffLowering::rewrite(GradOp op, PatternRewriter &rewriter)
+    LogicalResult FiniteDiffLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter)
     {
         ...
             populateFiniteDiffMethod(rewriter, op, gradFn);
         }
 
         rewriter.replaceOpWithNewOp<func::CallOp>(op, gradFn, op.getArgOperands());
+
+        return success();
     }
 
 Note how we can create a new operation, take its results, and use those to replace another operation
@@ -578,6 +777,8 @@ into:
     }
 
     %deriv:3 = func.call @my_func.finitediff(%x, %y, %z) : (f64, f64, f64) -> (f64, f64, f64)
+
+.. _catalyst-s-transformation-library:
 
 Catalyst's Transformation Library
 =================================

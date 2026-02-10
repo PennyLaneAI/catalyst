@@ -13,7 +13,7 @@ on:
         value: ${{ jobs.determine_workflow_runner.outputs.runner_group || inputs.default_runner }}
 
 env:
-  LARGE_RUNNER_GROUP_NAME: pl-4-core-large-runner
+  LARGE_RUNNER_GROUP_NAME: blacksmith-4vcpu-ubuntu-2404
 
 jobs:
   determine_workflow_runner:
@@ -22,7 +22,7 @@ jobs:
         (
           github.event_name == 'pull_request'
           && contains(github.event.pull_request.labels.*.name, 'urgent')
-        ) && 'pl-4-core-large-runner' || 'ubuntu-latest'
+        ) && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-24.04'
       }}
 
     outputs:

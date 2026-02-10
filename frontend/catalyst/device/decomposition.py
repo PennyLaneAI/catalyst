@@ -16,13 +16,16 @@
 This module contains the decomposition functions to pre-process tapes for
 compilation & execution on devices.
 """
+
 import copy
 import logging
 from functools import partial
+from typing import Union
 
 import jax
 import pennylane as qml
 from pennylane import transform
+from pennylane.devices.capabilities import DeviceCapabilities
 from pennylane.devices.preprocess import decompose
 from pennylane.measurements import (
     CountsMP,
@@ -34,25 +37,29 @@ from pennylane.measurements import (
 )
 
 from catalyst.api_extensions import HybridCtrl
+from catalyst.device.op_support import (
+    is_active,
+    is_controllable,
+    is_differentiable,
+    is_invertible,
+    is_supported,
+)
 from catalyst.jax_tracer import HybridOpRegion, has_nested_tapes
 from catalyst.logging import debug_logger
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.toml import DeviceCapabilities
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
 
 
-def check_alternative_support(op, capabilities):
+def check_alternative_support(op, capabilities: DeviceCapabilities):
     """Verify that aliased operations aren't supported via alternative definitions."""
 
-    if isinstance(op, qml.ops.Controlled):
+    if isinstance(op, qml.ops.Controlled) and type(op) is not qml.ops.ControlledOp:
         # "Cast" away the specialized class for gates like Toffoli, ControlledQubitUnitary, etc.
-        if (
-            capabilities.native_ops.get(op.base.name)
-            and capabilities.native_ops.get(op.base.name).controllable
-        ):
+        supported = capabilities.operations.get(op.base.name)
+        if supported and supported.controllable:
             return [qml.ops.Controlled(op.base, op.control_wires, op.control_values, op.work_wires)]
 
     return None
@@ -62,6 +69,7 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     """A decomposer for catalyst, to be passed to the decompose transform. Takes an operator and
     returns the default decomposition, unless the operator should decompose to a QubitUnitary.
     Raises a CompileError for MidMeasureMP"""
+
     if isinstance(op, MidMeasureMP):
         raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
 
@@ -69,11 +77,11 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
     if alternative_decomp is not None:
         return alternative_decomp
 
-    if capabilities.native_ops.get("QubitUnitary"):
-        # If the device supports unitary matrices, apply the relevant conversions and fallbacks.
-        if capabilities.to_matrix_ops.get(op.name) or (
-            op.has_matrix and isinstance(op, qml.ops.Controlled)
-        ):
+    if op.name in getattr(capabilities, "to_matrix_ops", {}):
+        return _decompose_to_matrix(op)
+
+    if isinstance(op, qml.ops.Controlled) and not op.has_decomposition:
+        if op.has_matrix and "QubitUnitary" in capabilities.operations:
             return _decompose_to_matrix(op)
 
     return op.decomposition()
@@ -82,32 +90,36 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
 @transform
 @debug_logger
 def catalyst_decompose(
-    tape: qml.tape.QuantumTape,
-    ctx,
-    stopping_condition,
-    capabilities,
-    max_expansion=None,
+    tape: qml.tape.QuantumTape, ctx, capabilities: DeviceCapabilities, grad_method: str = None
 ):
     """Decompose operations until the stopping condition is met.
 
     In a single call of the catalyst_decompose function, the PennyLane operations are decomposed
     in the same manner as in PennyLane (for each operator on the tape, checking if the operator
-    passes the stopping_condition, and using its `decompostion` method if not, called recursively
+    passes the stopping_condition, and using its `decomposition` method if not, called recursively
     until a supported operation is found or an error is hit, then moving on to the next operator
     on the tape.)
 
     Once all operators on the tape are supported operators, the resulting tape is iterated over,
-    and for each HybridOp, the catalyst_decompose function is called on each of it's regions.
+    and for each HybridOp, the catalyst_decompose function is called on each of its regions.
     This continues to call catalyst_decompose recursively until the tapes on all
     the HybridOps have been passed to the decompose function.
     """
 
+    # This if statement is needed because not all classes that inherit from qml.StatePrepBase
+    # are compatible with Catalyst's handling of initial state preparation. Currently, Catalyst
+    # only supports qml.StatePrep and qml.BasisState. A default strategy for handling any PennyLane
+    # operator of type qml.StatePrepBase will be needed before this conditional can be removed.
+    skip_initial_state_prep = False
+    if len(tape) > 0 and type(tape[0]) in (qml.StatePrep, qml.BasisState):
+        if grad_method is None or not is_active(tape[0]):
+            skip_initial_state_prep = capabilities.initial_state_prep
+
     (toplevel_tape,), _ = decompose(
         tape,
-        stopping_condition,
-        skip_initial_state_prep=capabilities.initial_state_prep_flag,
+        stopping_condition=lambda op: catalyst_acceptance(op, capabilities, grad_method),
+        skip_initial_state_prep=skip_initial_state_prep,
         decomposer=partial(catalyst_decomposer, capabilities=capabilities),
-        max_expansion=max_expansion,
         name="catalyst on this device",
         error=CompileError,
     )
@@ -115,7 +127,7 @@ def catalyst_decompose(
     new_ops = []
     for op in toplevel_tape.operations:
         if has_nested_tapes(op):
-            op = _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expansion)
+            op = _decompose_nested_tapes(op, ctx, capabilities)
         new_ops.append(op)
     tape = qml.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
 
@@ -133,19 +145,15 @@ def _decompose_to_matrix(op):
     return [op]
 
 
-def _decompose_nested_tapes(op, ctx, stopping_condition, capabilities, max_expansion):
+def _decompose_nested_tapes(op, ctx, capabilities: DeviceCapabilities):
     new_regions = []
     for region in op.regions:
         if region.quantum_tape is None:
             new_tape = None
         else:
-            with EvaluationContext.frame_tracing_context(ctx, region.trace):
+            with EvaluationContext.frame_tracing_context(region.trace):
                 tapes, _ = catalyst_decompose(
-                    region.quantum_tape,
-                    ctx=ctx,
-                    stopping_condition=stopping_condition,
-                    capabilities=capabilities,
-                    max_expansion=max_expansion,
+                    region.quantum_tape, ctx=ctx, capabilities=capabilities
                 )
                 new_tape = tapes[0]
         new_regions.append(
@@ -198,9 +206,31 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
     return [new_tape], null_postprocessing
 
 
-def catalyst_acceptance(op: qml.operation.Operator, operations) -> bool:
-    """Specify whether or not an Operator is supported."""
-    return op.name in operations
+def catalyst_acceptance(
+    op: qml.operation.Operator, capabilities: DeviceCapabilities, grad_method: Union[str, None]
+) -> Union[str, None]:
+    """Check whether an Operator is supported and returns the name of the operation or None."""
+
+    if not is_differentiable(op, capabilities, grad_method):
+        return None
+
+    if isinstance(op, qml.ops.Adjoint):
+        match = catalyst_acceptance(op.base, capabilities, grad_method)
+        if match and is_invertible(op.base, capabilities):
+            return match
+
+    # There are cases where a custom controlled gate, e.g., CH, is supported, but its
+    # base, i.e., H, is not labeled controllable. In this case, we don't want to use
+    # this branch to check the support for this operation.
+    elif type(op) is qml.ops.ControlledOp:
+        match = catalyst_acceptance(op.base, capabilities, grad_method)
+        if match and is_controllable(op.base, capabilities):
+            return match
+
+    elif is_supported(op, capabilities):
+        return op.name
+
+    return None
 
 
 @transform
@@ -222,13 +252,26 @@ def measurements_from_counts(tape, device_wires):
 
         Samples are not supported.
     """
+    changed = False
+    for meas in tape.measurements:
+        changed |= isinstance(meas, (ExpectationMP, VarianceMP, ProbabilityMP, SampleMP))
+        if isinstance(meas, CountsMP):
+            changed |= meas.obs is not None
+
+    def postprocessing(args):
+        if len(args) == 1:
+            return args[0]
+        return args
+
+    if not changed:
+        return [tape], postprocessing
 
     new_operations, measured_wires = _diagonalize_measurements(tape, device_wires=device_wires)
 
     new_tape = type(tape)(new_operations, [qml.counts(wires=measured_wires)], shots=tape.shots)
 
     def postprocessing_counts(results):
-        """A processing function to get expecation values from counts."""
+        """A processing function to get expectation values from counts."""
         states = results[0][0]
         counts_outcomes = results[0][1]
         results_processed = []
@@ -280,18 +323,31 @@ def measurements_from_samples(tape, device_wires):
 
         Counts are not supported.
     """
+    changed = False
+    for meas in tape.measurements:
+        changed |= isinstance(meas, (ExpectationMP, VarianceMP, ProbabilityMP, CountsMP))
+        if isinstance(meas, SampleMP):
+            changed |= meas.obs is not None
+
+    def postprocessing(args):
+        if len(args) == 1:
+            return args[0]
+        return args
+
+    if not changed:
+        return [tape], postprocessing
 
     new_operations, measured_wires = _diagonalize_measurements(tape, device_wires=device_wires)
 
     new_tape = type(tape)(new_operations, [qml.sample(wires=measured_wires)], shots=tape.shots)
 
     def postprocessing_samples(results):
-        """A processing function to get expecation values from samples."""
+        """A processing function to get expectation values from samples."""
         samples = results[0]
         results_processed = []
         for m in tape.measurements:
             if isinstance(m, (ExpectationMP, VarianceMP, ProbabilityMP, SampleMP)):
-                if len(tape.shots.shot_vector) > 1:
+                if tape.shots.has_partitioned_shots:
                     res = tuple(m.process_samples(s, measured_wires) for s in samples)
                 else:
                     res = m.process_samples(samples, measured_wires)

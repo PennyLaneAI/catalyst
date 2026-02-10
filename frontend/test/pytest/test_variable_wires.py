@@ -73,8 +73,12 @@ class TestBasicCircuits:
             qml.RX(arg0, wires=w1)
             return qml.sample(wires=w2)
 
-        result = qjit(qml.qnode(qml.device(backend, wires=3, shots=10))(circuit))(*args)
-        expected = qml.qnode(qml.device("default.qubit", wires=3, shots=10))(circuit)(*args)
+        result = qjit(qml.set_shots(qml.qnode(qml.device(backend, wires=3))(circuit), shots=10))(
+            *args
+        )
+        expected = qml.set_shots(
+            qml.qnode(qml.device("default.qubit", wires=3))(circuit), shots=10
+        )(*args)
         assert np.allclose(result, expected)
 
     @pytest.mark.parametrize("args", [[np.pi, 0, 0], [np.pi, 0, 1], [np.pi, 1, 0], [np.pi, 1, 1]])
@@ -85,8 +89,12 @@ class TestBasicCircuits:
             qml.RX(arg0, wires=w1)
             return qml.sample(wires=[w2 + 1])
 
-        result = qjit(qml.qnode(qml.device(backend, wires=3, shots=10))(circuit))(*args)
-        expected = qml.qnode(qml.device("default.qubit", wires=3, shots=10))(circuit)(*args)
+        result = qjit(qml.set_shots(qml.qnode(qml.device(backend, wires=3))(circuit), shots=10))(
+            *args
+        )
+        expected = qml.set_shots(
+            qml.qnode(qml.device("default.qubit", wires=3))(circuit), shots=10
+        )(*args)
         assert np.allclose(result, expected)
 
     @pytest.mark.parametrize("args", [[jnp.pi, 0, 1], [jnp.pi, 1, 0]])
@@ -155,7 +163,7 @@ class TestControlFlow:
     def test_conditional(self, args, expected, backend):
         """Test conditional."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: int, y: int):
             @cond(x > 4)
@@ -177,7 +185,7 @@ class TestControlFlow:
     def test_while_loop_with_func_arg_wires(self, args, expected, backend):
         """Test while loop with func arg wires."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(n: int, m: int):
             @while_loop(lambda v: v[0] < v[1])
@@ -204,7 +212,7 @@ class TestControlFlow:
     def test_while_loop_with_loop_arg_wires(self, args, expected, backend):
         """Test while loop with loop arg wires."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=5))
         def circuit(n: int, m: int):
             qml.RX(jnp.pi, wires=0)

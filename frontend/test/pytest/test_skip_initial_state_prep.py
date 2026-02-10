@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Test skipping iniitial state prep"""
+"""Test skipping initial state prep"""
 
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
 from catalyst import DifferentiableCompileError as DiffErr
-from catalyst import grad
+from catalyst import grad, qjit
 
 
 class TestExamplesFromWebsite:
@@ -39,7 +39,7 @@ class TestExamplesFromWebsite:
             return qml.state()
 
         expected = example_circuit()
-        observed = qml.qjit(example_circuit)()
+        observed = qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
     def test_state_prep_recycled_device(self, backend):
@@ -60,7 +60,7 @@ class TestExamplesFromWebsite:
             return example_circuit(), example_circuit_doppelganger()
 
         expected = jnp.array(main())
-        observed = jnp.array(qml.qjit(main)())
+        observed = jnp.array(qjit(main)())
         assert jnp.allclose(expected, observed)
 
     def test_state_prep_i32_array(self, backend):
@@ -75,7 +75,7 @@ class TestExamplesFromWebsite:
             return qml.state()
 
         expected = example_circuit()
-        observed = qml.qjit(example_circuit)()
+        observed = qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
     def test_basis_state(self, backend):
@@ -92,7 +92,7 @@ class TestExamplesFromWebsite:
             return qml.state()
 
         expected = example_circuit()
-        observed = qml.qjit(example_circuit)()
+        observed = qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
     def test_basis_state_recycled_device(self, backend):
@@ -113,7 +113,7 @@ class TestExamplesFromWebsite:
             return example_circuit(), example_circuit_doppelganger()
 
         expected = jnp.array(main())
-        observed = jnp.array(qml.qjit(main)())
+        observed = jnp.array(qjit(main)())
         assert jnp.allclose(expected, observed)
 
     def test_basis_state_i32_array(self, backend):
@@ -128,7 +128,7 @@ class TestExamplesFromWebsite:
             return qml.state()
 
         expected = example_circuit()
-        observed = qml.qjit(example_circuit)()
+        observed = qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
     @pytest.mark.parametrize("wires", [(0), (1), (2)])
@@ -143,7 +143,7 @@ class TestExamplesFromWebsite:
             return qml.state()
 
         expected = example_circuit()
-        observed = qml.qjit(example_circuit)()
+        observed = qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
     def test_wires_with_less_than_all_basis_state(self, backend):
@@ -159,7 +159,7 @@ class TestExamplesFromWebsite:
             return qml.state()
 
         expected = example_circuit()
-        observed = qml.qjit(example_circuit)()
+        observed = qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
 
@@ -179,14 +179,14 @@ class TestDynamicWires:
         and this optimization does not yet work for it.
         """
 
-        @qml.qjit
+        @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=3))
         def example_circuit(a: int):
             qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=[a, a + 1])
             return qml.state()
 
         expected = example_circuit(inp)
-        observed = qml.qjit(example_circuit)(inp)
+        observed = qjit(example_circuit)(inp)
         assert jnp.allclose(expected, observed)
 
     @pytest.mark.parametrize("inp", [(0), (1)])
@@ -205,7 +205,7 @@ class TestDynamicWires:
             return qml.state()
 
         expected = example_circuit(inp)
-        observed = qml.qjit(example_circuit)(inp)
+        observed = qjit(example_circuit)(inp)
         assert jnp.allclose(expected, observed)
 
 
@@ -219,7 +219,7 @@ class TestPossibleErrors:
 
         with pytest.raises(ValueError, match="State must be of length 2; got length 1"):
 
-            @qml.qjit
+            @qjit
             @qml.qnode(qml.device("lightning.qubit", wires=2))
             def example_circuit():
                 qml.BasisState(jnp.array([1]), wires=range(2))
@@ -231,7 +231,7 @@ class TestPossibleErrors:
         """Test that the same error is raised"""
         with pytest.raises(ValueError, match="State must be of length 2; got length 1"):
 
-            @qml.qjit
+            @qjit
             @qml.qnode(qml.device("lightning.qubit", wires=2))
             def example_circuit():
                 qml.StatePrep(jnp.array([0]), wires=[0])
@@ -249,7 +249,7 @@ class TestPossibleErrors:
         msg = "BasisState parameter must consist of 0 or 1 integers"
         with pytest.raises(RuntimeError, match=msg):
 
-            @qml.qjit
+            @qjit
             @qml.qnode(qml.device("lightning.qubit", wires=2))
             def example_circuit():
                 qml.BasisState(jnp.array([0, 2]), wires=range(2))
@@ -266,7 +266,7 @@ class TestGrad:
 
         with pytest.raises(DiffErr):
 
-            @qml.qjit
+            @qjit
             @grad
             @qml.qnode(qml.device(backend, wires=2))
             def example_circuit(a: float):
@@ -281,7 +281,7 @@ class TestGrad:
 
         with pytest.raises(DiffErr):
 
-            @qml.qjit
+            @qjit
             @grad
             @qml.qnode(qml.device(backend, wires=2))
             def example_circuit(a: float):
@@ -305,7 +305,7 @@ class TestControlled:
             return qml.state()
 
         expected = example_circuit()
-        observed = qml.qjit(example_circuit)()
+        observed = qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
     def test_basis_state_ctrl(self):
@@ -318,7 +318,7 @@ class TestControlled:
             return qml.state()
 
         expected = example_circuit()
-        observed = qml.qjit(example_circuit)()
+        observed = qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
 
@@ -335,7 +335,7 @@ class TestAdjoint:
             return qml.state()
 
         expected = example_circuit()
-        observed = qml.qjit(example_circuit)()
+        observed = qjit(example_circuit)()
         assert jnp.allclose(expected, observed)
 
     def test_basis_state_ctrl(self, backend):
@@ -348,5 +348,5 @@ class TestAdjoint:
             return qml.state()
 
         expected = example_circuit()
-        observed = qml.qjit(example_circuit)()
+        observed = qjit(example_circuit)()
         assert jnp.allclose(expected, observed)

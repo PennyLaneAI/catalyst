@@ -23,6 +23,7 @@
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 
+#include "Catalyst/Utils/StaticAllocas.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantum.h"
@@ -32,9 +33,9 @@ namespace gradient {
 
 /// Generate a new mlir function that counts the (runtime) number of gate parameters.
 ///
-/// This enables other functions like `genArgMapFunction` to allocate memory for vectors of gate
-/// parameters without having to deal with dynamic memory management. The function works similarly
-/// to `genArgMapFunction` by eliminating all quantum code and running the classical preprocessing,
+/// This enables other functions to allocate memory for vectors of gate
+/// parameters without having to deal with dynamic memory management. The function works
+/// by eliminating all quantum code and running the classical preprocessing,
 /// but instead of storing gate parameters it merely counts them.
 /// The impact on execution time is expected to be non-dominant, as the classical pre-processing is
 /// already run multiple times, such as to differentiate the ArgMap and on every execution of
@@ -57,7 +58,7 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
         // their gate parameters instead.
         rewriter.setInsertionPointAfter(callee);
         paramCountFn =
-            rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
+            func::FuncOp::create(rewriter, loc, fnName, fnType, visibility, nullptr, nullptr);
         rewriter.cloneRegionBefore(callee.getBody(), paramCountFn.getBody(), paramCountFn.end());
 
         PatternRewriter::InsertionGuard insertGuard(rewriter);
@@ -66,9 +67,9 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
         // Store the counter in memory since we don't want to deal with returning the SSA value
         // for updated parameter counts from arbitrary regions/ops.
         MemRefType paramCountType = MemRefType::get({}, rewriter.getIndexType());
-        Value paramCountBuffer = rewriter.create<memref::AllocaOp>(loc, paramCountType);
-        Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
-        rewriter.create<memref::StoreOp>(loc, cZero, paramCountBuffer);
+        Value paramCountBuffer = getStaticMemrefAlloca(loc, rewriter, paramCountType);
+        Value cZero = index::ConstantOp::create(rewriter, loc, 0);
+        memref::StoreOp::create(rewriter, loc, cZero, paramCountBuffer);
 
         paramCountFn.walk([&](Operation *op) {
             // For each quantum gate add the number of parameters to the counter.
@@ -78,10 +79,10 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
 
                 ValueRange diffParams = gate.getDiffParams();
                 if (!diffParams.empty()) {
-                    Value currCount = rewriter.create<memref::LoadOp>(loc, paramCountBuffer);
-                    Value numParams = rewriter.create<index::ConstantOp>(loc, diffParams.size());
-                    Value newCount = rewriter.create<index::AddOp>(loc, currCount, numParams);
-                    rewriter.create<memref::StoreOp>(loc, newCount, paramCountBuffer);
+                    Value currCount = memref::LoadOp::create(rewriter, loc, paramCountBuffer);
+                    Value numParams = index::ConstantOp::create(rewriter, loc, diffParams.size());
+                    Value newCount = index::AddOp::create(rewriter, loc, currCount, numParams);
+                    memref::StoreOp::create(rewriter, loc, newCount, paramCountBuffer);
                 }
 
                 rewriter.replaceOp(gate, gate.getQubitOperands());
@@ -109,7 +110,7 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
                 rewriter.setInsertionPoint(op);
 
-                Value paramCount = rewriter.create<memref::LoadOp>(loc, paramCountBuffer);
+                Value paramCount = memref::LoadOp::create(rewriter, loc, paramCountBuffer);
                 op->setOperands(paramCount);
             }
         });
@@ -138,7 +139,7 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
         // First copy the original function as is, then we can replace all quantum ops by collecting
         // their gate parameters in a memory buffer instead. This buffer is passed into a modified
         // qnodeQuantum.
-        splitFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
+        splitFn = func::FuncOp::create(rewriter, loc, fnName, fnType, visibility, nullptr, nullptr);
         rewriter.cloneRegionBefore(qnode.getBody(), splitFn.getBody(), splitFn.end());
         Block &argMapBlock = splitFn.getFunctionBody().front();
         SmallVector<Value> qnodeQuantumArgs{argMapBlock.getArguments()};
@@ -146,15 +147,17 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
         Value paramCount = argMapBlock.addArgument(rewriter.getIndexType(), loc);
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointToStart(&splitFn.getBody().front());
-        Value paramsBuffer = rewriter.create<memref::AllocOp>(loc, paramsBufferType, paramCount);
-        Value paramsTensor = rewriter.create<bufferization::ToTensorOp>(loc, paramsBuffer);
+        Value paramsBuffer = memref::AllocOp::create(rewriter, loc, paramsBufferType, paramCount);
+        Value paramsTensor = bufferization::ToTensorOp::create(
+            rewriter, loc, memref::getTensorTypeFromMemRefType(paramsBuffer.getType()),
+            paramsBuffer, true);
 
         qnodeQuantumArgs.push_back(paramsTensor);
         MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());
-        Value paramsProcessed = rewriter.create<memref::AllocaOp>(loc, paramsProcessedType);
-        Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
-        rewriter.create<memref::StoreOp>(loc, cZero, paramsProcessed);
-        Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
+        Value paramsProcessed = getStaticMemrefAlloca(loc, rewriter, paramsProcessedType);
+        Value cZero = index::ConstantOp::create(rewriter, loc, 0);
+        memref::StoreOp::create(rewriter, loc, cZero, paramsProcessed);
+        Value cOne = index::ConstantOp::create(rewriter, loc, 1);
 
         splitFn.walk([&](Operation *op) {
             // Insert gate parameters into the params buffer.
@@ -164,12 +167,12 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
 
                 ValueRange diffParams = gate.getDiffParams();
                 if (!diffParams.empty()) {
-                    Value paramIdx = rewriter.create<memref::LoadOp>(loc, paramsProcessed);
+                    Value paramIdx = memref::LoadOp::create(rewriter, loc, paramsProcessed);
                     for (auto param : diffParams) {
-                        rewriter.create<memref::StoreOp>(loc, param, paramsBuffer, paramIdx);
-                        paramIdx = rewriter.create<index::AddOp>(loc, paramIdx, cOne);
+                        memref::StoreOp::create(rewriter, loc, param, paramsBuffer, paramIdx);
+                        paramIdx = index::AddOp::create(rewriter, loc, paramIdx, cOne);
                     }
-                    rewriter.create<memref::StoreOp>(loc, paramIdx, paramsProcessed);
+                    memref::StoreOp::create(rewriter, loc, paramIdx, paramsProcessed);
                 }
 
                 rewriter.replaceOp(op, gate.getQubitOperands());
@@ -197,7 +200,7 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
                 PatternRewriter::InsertionGuard insertionGuard(rewriter);
                 rewriter.setInsertionPoint(returnOp);
                 auto modifiedCall =
-                    rewriter.create<func::CallOp>(loc, qnodeQuantum, qnodeQuantumArgs);
+                    func::CallOp::create(rewriter, loc, qnodeQuantum, qnodeQuantumArgs);
 
                 returnOp.getOperandsMutable().assign(modifiedCall.getResults());
             }
@@ -208,98 +211,6 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
     }
 
     return splitFn;
-}
-
-/// Generate a new mlir function that maps qfunc arguments to gate parameters.
-///
-/// This enables to extract any classical preprocessing done inside the quantum function and compute
-/// its jacobian separately in order to combine it with quantum-only gradients such as the
-/// parameter-shift or adjoint method.
-///
-func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::FuncOp callee)
-{
-    // Define the properties of the classical preprocessing function.
-    std::string fnName = callee.getSymName().str() + ".argmap";
-    SmallVector<Type> fnArgTypes(callee.getArgumentTypes());
-    fnArgTypes.push_back(rewriter.getIndexType());
-    auto paramsVectorType = RankedTensorType::get({ShapedType::kDynamic}, rewriter.getF64Type());
-    FunctionType fnType = rewriter.getFunctionType(fnArgTypes, paramsVectorType);
-    StringAttr visibility = rewriter.getStringAttr("private");
-
-    func::FuncOp argMapFn =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callee, rewriter.getStringAttr(fnName));
-    if (!argMapFn) {
-        // First copy the original function as is, then we can replace all quantum ops by collecting
-        // their gate parameters in a memory buffer instead. The size of this vector is passed as an
-        // input to the new function.
-        argMapFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
-        rewriter.cloneRegionBefore(callee.getBody(), argMapFn.getBody(), argMapFn.end());
-        Block &argMapBlock = argMapFn.getFunctionBody().front();
-        // Allocate the memory for the gate parameters collected at runtime
-        Value numParams = argMapBlock.addArgument(rewriter.getIndexType(), loc);
-        auto paramsBufferType =
-            MemRefType::get(paramsVectorType.getShape(), paramsVectorType.getElementType());
-
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPointToStart(&argMapFn.getBody().front());
-
-        Value paramsBuffer = rewriter.create<memref::AllocOp>(loc, paramsBufferType, numParams);
-        MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());
-        Value paramsProcessed = rewriter.create<memref::AllocaOp>(loc, paramsProcessedType);
-        Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
-        rewriter.create<memref::StoreOp>(loc, cZero, paramsProcessed);
-        Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
-
-        argMapFn.walk([&](Operation *op) {
-            // Insert gate parameters into the params buffer.
-            if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
-                PatternRewriter::InsertionGuard insertGuard(rewriter);
-                rewriter.setInsertionPoint(gate);
-
-                ValueRange diffParams = gate.getDiffParams();
-                if (!diffParams.empty()) {
-                    Value paramIdx = rewriter.create<memref::LoadOp>(loc, paramsProcessed);
-                    for (auto param : diffParams) {
-                        rewriter.create<memref::StoreOp>(loc, param, paramsBuffer, paramIdx);
-                        paramIdx = rewriter.create<index::AddOp>(loc, paramIdx, cOne);
-                    }
-                    rewriter.create<memref::StoreOp>(loc, paramIdx, paramsProcessed);
-                }
-
-                rewriter.replaceOp(op, gate.getQubitOperands());
-            }
-            // Any other gates or quantum instructions also need to be stripped.
-            // Measurements are handled separately.
-            else if (isa<quantum::DeviceInitOp>(op)) {
-                rewriter.eraseOp(op);
-            }
-            else if (auto gate = dyn_cast<quantum::QuantumOperation>(op)) {
-                rewriter.replaceOp(op, gate.getQubitOperands());
-            }
-            else if (auto region = dyn_cast<quantum::QuantumRegion>(op)) {
-                rewriter.replaceOp(op, region.getRegisterOperand());
-            }
-            else if (isa<quantum::DeallocOp>(op)) {
-                rewriter.eraseOp(op);
-            }
-            else if (isa<quantum::DeviceReleaseOp>(op)) {
-                rewriter.eraseOp(op);
-            }
-
-            else if (auto returnOp = dyn_cast<func::ReturnOp>(op)) {
-                PatternRewriter::InsertionGuard insertionGuard(rewriter);
-                rewriter.setInsertionPoint(returnOp);
-                Value paramsVector =
-                    rewriter.create<bufferization::ToTensorOp>(loc, paramsVectorType, paramsBuffer);
-                returnOp.getOperandsMutable().assign(paramsVector);
-            }
-        });
-
-        quantum::removeQuantumMeasurements(argMapFn, rewriter);
-        argMapFn->setAttr("QuantumFree", rewriter.getUnitAttr());
-    }
-
-    return argMapFn;
 }
 
 } // namespace gradient

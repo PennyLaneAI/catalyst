@@ -19,7 +19,7 @@
 import jax.numpy as jnp
 import pennylane as qml
 from jax.core import ShapedArray
-from lit_util_printers import print_jaxpr, print_mlir
+from utils import print_jaxpr, print_mlir
 
 from catalyst import qjit
 
@@ -41,7 +41,7 @@ def test_qnode_dynamic_arg(a):
     """Test passing a dynamic argument to qnode"""
 
     # CHECK:       { lambda ; [[a:.]]:i64[] [[b:.]]:i64[[[a]]]. let
-    # CHECK:         [[c:.]]:i64[[[a]]] = func[
+    # CHECK:         [[c:.]]:i64[InDBIdx(val=0)] = quantum_kernel[
     # CHECK:                                  ] [[a]] [[b]]
     # CHECK:       in ([[c]],) }
     @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -60,7 +60,8 @@ def test_qjit_dynamic_result(a):
     """Test getting a dynamic result from qjit"""
     # CHECK:       { lambda ; [[a:.]]:i64[]. let
     # CHECK:         [[b:.]]:i64[] = add [[a]] 1
-    # CHECK:         [[c:.]]:f64[[[b]]] = {{[a-z_0-9.]+\[[^]]*\]}} 1.0 [[b]]
+    # CHECK:         [[c:.]]:f64[[[b]]] = {{[a-z_0-9.]+\[[^]]*}}
+    # CHECK:           ] 1.0:f64[] [[b]]
     # CHECK:       in ([[b]], [[c]]) }
     return jnp.ones((a + 1,), dtype=float)
 
@@ -74,9 +75,9 @@ def test_qnode_dynamic_result(a):
     """Test getting a dynamic result from qnode"""
 
     # CHECK:       { lambda ; [[a:.]]:i64[]. let
-    # CHECK:         [[b:.]]:i64[] [[c:.]]:f64[[[b]]] = func[
+    # CHECK:         {{.+}}:i64[] [[c:.]]:f64[OutDBIdx(val=0)] = quantum_kernel[
     # CHECK:                                                ] [[a]]
-    # CHECK:       in ([[b]], [[c]]) }
+    # CHECK:       in ([[c]],) }
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def _circuit(a):
         return jnp.ones((a + 1,), dtype=float)

@@ -2,9 +2,9 @@ Installation
 ============
 
 
-Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64, x86_64) 
-platforms, and pre-built binaries are being distributed via the Python Package Index (PyPI) for 
-Python versions 3.10 and higher. To install it, simply run the following ``pip`` command:
+Catalyst is officially supported on Linux (x86_64, aarch64) and macOS (arm64)
+platforms, and pre-built binaries are being distributed via the Python Package Index (PyPI) for
+Python versions 3.11 and higher. To install it, simply run the following ``pip`` command:
 
 .. code-block:: console
 
@@ -19,62 +19,36 @@ Python versions 3.10 and higher. To install it, simply run the following ``pip``
     The easiest method of installation is to run ``xcode-select --install`` from the Terminal
     app.
 
-Pre-built packages for Windows are not yet available, and compatibility with other platforms is
-untested and cannot be guaranteed. If you are using one of these platforms, please
-try out our Docker and Dev Container images described in the `next section <#dev-containers>`_.
-
-If you wish to contribute to Catalyst or develop against our runtime or compiler, instructions for
-building from source are also included `further down <#minimal-building-from-source-guide>`_.
-
-Dev Containers
---------------
-
-
-Try out Catalyst in self-contained, ready-to-go environments called
-`Dev Containers <https://code.visualstudio.com/docs/devcontainers/containers>`__:
-
-.. image:: https://img.shields.io/static/v1?label=Dev%20Container&message=Launch&color=blue&logo=visualstudiocode&style=flat-square
-  :alt: Try Catalyst in Dev Container
-  :target: https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/PennyLaneAI/catalyst
-  :align: center
-
-| You will need an existing installation of `Docker <https://www.docker.com/>`_,
-  `VS Code <https://code.visualstudio.com/>`_, and the VS Code
-  `Dev Containers <https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers>`__
-  extension.
-
-If desired, the Docker images can also be used in a standalone fashion:
-
-| `Docker: User Installation <https://github.com/PennyLaneAI/catalyst/blob/main/.devcontainer/Dockerfile>`_
-| `Docker: Developer Installation <https://github.com/PennyLaneAI/catalyst/blob/main/.devcontainer/dev/Dockerfile>`_
-
-The user image provides an officially supported environment and automatically installs the latest
-release of Catalyst. The developer image only provides the right environment to build Catalyst from
-source, and requires launching the post-install script at ``.devcontainer/dev/post-install.sh``
-from within the root of the running container.
-
 .. note::
 
-  Due to `a bug <https://github.com/microsoft/vscode-remote-release/issues/8412>`_ in the Dev
-  Containers extension, clicking on the "Launch" badge will not prompt for a choice between the User
-  and Dev containers. Instead, the User container is automatically chosen.
+  Catalyst no longer supports macOS with x86_64 architecture after 0.11.0. This includes Macs running on Intel processors.
 
-  As a workaround, you can clone the `Catalyst repository <https://github.com/PennyLaneAI/catalyst>`_
-  first, open it as a VS Code Workspace, and then reopen the Workspace in a Dev Container via the
-  ``Reopen in Container`` command.
+  If you would like to use Catalyst on these systems, please install Catalyst version 0.11.0, PennyLane version 0.41.0, PennyLane-Lightning
+  version 0.41.0, and Jax version 0.4.28:
 
+  .. code-block:: console
+
+    pip install pennylane-catalyst==0.11.0
+    pip install pennylane==0.41.0
+    pip install pennylane-lightning==0.41.0
+    pip install jax==0.4.28
+
+Pre-built packages for Windows are not yet available, and compatibility is untested and cannot
+be guaranteed. If you would like to use Catalyst on Windows, we recommend trying the
+`WSL <https://learn.microsoft.com/windows/wsl/>`_.
+
+If you wish to contribute to Catalyst or develop against our runtime or compiler, instructions for
+building from source are detailed `below <#minimal-building-from-source-guide>`_.
 
 
 Minimal Building From Source Guide
 ----------------------------------
 
 
-Most developers might want to build Catalyst from source instead of using a pre-shipped package. In this section we present a minimal building-from-source installation guide. 
-
-The next section provides a more detailed guide, which we **strongly** recommend the user to read through. Importantly, each component of Catalyst, namely the Python frontend, the MLIR compiler, and the runtime library, can be built and tested indenpendently, which this minimal installation guide does not go over. 
-
-
-The essential steps are:
+This is an abbreviated set of instructions that can be copy-pasted into the terminal of most
+common systems. For information on pre-requisites, how to build individual components, or if
+you are encoutering issues, please consult the detailed guide
+`in the next section <#detailed-building-from-source-guide>`_.
 
 
 .. tabs::
@@ -90,9 +64,9 @@ The essential steps are:
       .. code-block:: console
 
         # Install common requirements
-        sudo apt install clang lld ccache libomp-dev ninja-build make cmake 
+        sudo apt install clang lld ccache make
 
-        # Clone the Catalyst repository  
+        # Clone the Catalyst repository
         git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
 
         # Install specific requirements for Catalyst
@@ -103,7 +77,7 @@ The essential steps are:
         make all
 
         # Test that everything is built properly
-        make test
+        make pytest
 
    .. group-tab:: macOS
 
@@ -111,36 +85,29 @@ The essential steps are:
 
         # Install XCode Command Line Tools and common requirements
         xcode-select --install
-        pip install cmake ninja
 
         # If not present yet, install Homebrew (https://brew.sh/)
-        brew install libomp ccache
+        brew install ccache gfortran
 
         # Add ccache drop-in compiler replacements to the PATH
         export PATH=/usr/local/opt/ccache/libexec:$PATH
 
-        # Clone the Catalyst repository  
+        # Clone the Catalyst repository
         git clone --recurse-submodules --shallow-submodules https://github.com/PennyLaneAI/catalyst.git
 
         # Install specific requirements for Catalyst
         cd catalyst
-        pip install -r requirements.txt 
+        pip install -r requirements.txt
 
         # Build Catalyst
         make all
 
         # Test that everything is built properly
-        make test
-
-These steps should give you the full functionality of Catalyst. 
+        make pytest
 
 
 Detailed Building From Source Guide
 -----------------------------------
-
-
-.. note::
-  This section is a detailed building-from-source guide. Some commands in this section has already been included in the minimal guide. 
 
 
 To build Catalyst from source, developers should follow the instructions provided below for building
@@ -155,13 +122,14 @@ In order to build Catalyst from source, developers need to ensure the following 
 installed and available on the path (depending on the platform):
 
 - The `clang <https://clang.llvm.org/>`_ compiler, `LLD <https://lld.llvm.org/>`_ linker
-  (Linux only), `CCache <https://ccache.dev/>`_ compiler cache (optional, recommended), and
-  `OpenMP <https://www.openmp.org/>`_.
+  (Linux only), `CCache <https://ccache.dev/>`_ compiler cache (optional, recommended).
+  Additionally, the `GFortran <https://fortran-lang.org/en/learn/os_setup/install_gfortran/>`_
+  compiler is required on ARM macOS systems.
 
 - The `Ninja <https://ninja-build.org/>`_, `Make <https://www.gnu.org/software/make/>`_, and
-  `CMake <https://cmake.org/download/>`_ (v3.20 or greater) build tools.
+  `CMake <https://cmake.org/download/>`_ (v3.26 or greater, less than v4) build tools.
 
-- `Python <https://www.python.org/>`_ 3.10 or higher for the Python frontend.
+- `Python <https://www.python.org/>`_ 3.11 or higher for the Python frontend.
 
 - The Python package manager ``pip`` must be version 22.3 or higher.
 
@@ -174,12 +142,7 @@ They can be installed via:
 
       .. code-block:: console
 
-        sudo apt install clang lld ccache libomp-dev ninja-build make cmake
-
-      .. note::
-
-        If the CMake version available in your system is too old, you can also install up-to-date
-        versions of it via ``pip install cmake``.
+        sudo apt install clang lld ccache make
 
       .. tabs::
 
@@ -200,15 +163,14 @@ They can be installed via:
 
    .. group-tab:: macOS
 
-      On **macOS**, it is strongly recommended to install the official XCode Command Line Tools (for ``clang`` & ``make``).
-      The remaining packages can then be installed via ``pip`` and ``brew``.
-      If ``brew`` is not present yet, install it from https://brew.sh/:
+      On **macOS**, it is strongly recommended to install the official XCode Command Line Tools
+      (for ``clang`` & ``make``). The remaining packages can then be installed via ``pip`` and
+      ``brew``. If ``brew`` is not present yet, install it from https://brew.sh/:
 
       .. code-block:: console
 
         xcode-select --install
-        pip install cmake ninja
-        brew install libomp ccache
+        brew install ccache gfortran
         export PATH=/usr/local/opt/ccache/libexec:$PATH
 
 
@@ -330,12 +292,12 @@ To make Enzyme libraries discoverable to the compiler:
 
   export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"
 
-To make required tools in ``llvm-project/build``, ``mlir-hlo/mhlo-build``, and
+To make required tools in ``llvm-project/build``, ``stablehlo/build``, and
 ``mlir/build`` discoverable to the compiler:
 
 .. code-block:: console
 
-  export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/mlir-hlo/mhlo-build/bin:$PWD/mlir/build/bin:$PATH"
+  export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/stablehlo/build/bin:$PWD/mlir/build/bin:$PATH"
 
 Tests
 ^^^^^
@@ -346,9 +308,12 @@ The following target runs all available test suites with the default execution d
 
   make test
 
-You can also test each module separately by using running the ``test-frontend``,
-``test-dialects``, and ``test-runtime`` targets instead. Jupyter Notebook demos are also testable
-via ``test-demos``.
+You can also test each module separately by running the ``test-frontend``,
+``test-dialects``, and ``test-runtime`` targets instead.
+Alternately, the ``test-frontend`` target can be broken up into two subsets,
+``make pytest`` and ``make lit``, where the pytest suite
+can be considered the "core" (and most important) test set.
+Jupyter Notebook demos are also testable via ``test-demos``.
 
 Additional Device Backends
 """"""""""""""""""""""""""
@@ -395,7 +360,7 @@ To build and test documentation for Catalyst, you will need to install
 Additionally, `doxygen <https://www.doxygen.nl>`_ is required to build C++ documentation, and
 `pandoc <https://pandoc.org>`_ to render Jupyter Notebooks.
 
-They can be installed via 
+They can be installed via
 
 
 .. tabs::
@@ -430,16 +395,16 @@ Known Issues
 
    .. group-tab:: Linux Debian/Ubuntu
 
-      If you get this error: 
+      If you get this error:
 
       .. code-block:: console
-        
+
         cannot find -lstdc++: No such file or directory
 
-      you might need to install a recent version of ``libstdc``. E.g.: 
+      you might need to install a recent version of ``libstdc``. E.g.:
 
       .. code-block:: console
-        
+
         sudo apt install libstdc++-12-dev
 
       (See user's report `here <https://discourse.llvm.org/t/usr-bin-clang-is-not-able-to-compile-a-simple-test-program/72889/3>`_)
@@ -451,13 +416,13 @@ Known Issues
       Under Ubuntu 24.04, if you get this error:
 
       .. code-block:: console
-      
+
         fatal error: 'Python.h' file not found
-      
+
       you might need to install the Python Dev package:
 
       .. code-block:: console
-        
+
         sudo apt install python3-dev
 
       (See user's report `here <https://github.com/PennyLaneAI/catalyst/issues/1084>`_)
@@ -474,12 +439,36 @@ Known Issues
       If not, PyTest might try to use the default Python binary: ``/usr/bin/python3``.
       (See user's report `here <https://github.com/PennyLaneAI/catalyst/issues/377>`_)
 
+      .. raw:: html
+
+        <hr>
+
+      In some mac setups, it's possible that certain Catalyst libraries are compiled with a
+      different OSX deployment version than what Catalyst uses when compiling a user program.
+      In this case, you may see a *warning* like the following when using Catalyst:
+
+      .. code-block:: console
+
+        ld: warning: building for macOS-15.0, but linking with dylib '@rpath/libcustom_calls.so' which was built for newer version 15.7
+
+      While this warning does not prevent using Catalyst, if you would like to eliminate it, set the
+      following environment variable (adjust the value as needed given the warning you see):
+
+      .. code-block:: console
+
+        export MACOSX_DEPLOYMENT_TARGET=15.0
+
+      and then run ``make clean && make frontend``.
+
+      Note: Catalyst does not set any deployment targets, this issue likely arises due to differing
+      defaults in different build environments.
+
 Install a Frontend-Only Development Environment from TestPyPI Wheels
 --------------------------------------------------------------------
 
-It is possible to work on the source code repository and test the changes without 
-having to compile Catalyst. This is ideal for situations where the changes do not target the 
-runtime or the MLIR infrastructure, and only concern the frontend. It basically 
+It is possible to work on the source code repository and test the changes without
+having to compile Catalyst. This is ideal for situations where the changes do not target the
+runtime or the MLIR infrastructure, and only concern the frontend. It basically
 makes use of the shared libraries already shipped with the TestPyPI Catalyst wheels.
 
 Essential Steps
@@ -525,13 +514,19 @@ If you require the Catalyst repository with all its submodules, clone it this wa
 
   git clone --recurse-submodules --shallow-submodules git@github.com:PennyLaneAI/catalyst.git
 
+If you need to work on an existing branch, provide its name as a second argument:
+
+.. code-block:: console
+
+  bash ./setup_dev_from_wheel.sh /path/to/virtual/env branch-name
+
 How Does it Work?
 ^^^^^^^^^^^^^^^^^
 
 The provided script first creates and activates a Python virtual environment, so the system Python
 configurations do not get affected, nor other virtual environments.
 
-In a second step, it obtains the latest Catalyst wheel from the TestPyPI server and creates hard 
+In a second step, it obtains the latest Catalyst wheel from the TestPyPI server and creates hard
 links from the wheel code to the frontend code of the repository, in order to allow working
 directly with the frontend code of the repository and at the same time test the changes while
 using the installed Catalyst wheel libraries, hence avoiding compilation.
@@ -539,8 +534,7 @@ using the installed Catalyst wheel libraries, hence avoiding compilation.
 Further Steps
 ^^^^^^^^^^^^^
 
-If everything goes well, ``git status`` should not report any changed files. 
-
+``git status`` should not report any changed files when a branch name is not specified.
 Before making changes to the frontend, make sure you create a new branch:
 
 .. code-block:: console
@@ -549,8 +543,11 @@ Before making changes to the frontend, make sure you create a new branch:
 
 Once in the new branch, make the wanted changes. Use the IDE of your preference.
 
+When specifying a branch to switch to, ``git status`` might report changes in some files.
+This is normal. Proceed to make changes in the selected branch.
+
 You can test the changes by executing your sample code under the same virtual environment you used
-with the scripts. As files in the repository are hard-linked to the Wheel code, you are actually 
+with the scripts. As files in the repository are hard-linked to the Wheel code, you are actually
 changing the code stored at the Python ``site-packages`` folder as well, and you will be automatically
 using the shared libraries provided by the Python wheels. Again, there is no need to compile Catalyst
 from source.
@@ -559,7 +556,7 @@ You can commit your changes as usual. Once ready, push the new branch to the rem
 repository:
 
 .. code-block:: console
-  
+
   git push -u origin new-branch-name
 
 Now you can go to GitHub and issue a Pull Request based on the new branch.

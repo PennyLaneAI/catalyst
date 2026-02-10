@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "llvm/Support/FormatVariadic.h"
+
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/Support/FormatVariadic.h"
 
 #include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
@@ -136,9 +137,9 @@ void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewrit
         convertFunctionTypeCatalystWrapper(rewriter, functionType, hasReturns, hasInputs);
 
     Location loc = op.getLoc();
-    auto wrapperFuncOp = rewriter.create<LLVM::LLVMFuncOp>(
-        loc, llvm::formatv("_catalyst_pyface_{0}", nameWithoutPrefix).str(), wrapperFuncType,
-        LLVM::Linkage::External, /*dsoLocal*/ false,
+    auto wrapperFuncOp = LLVM::LLVMFuncOp::create(
+        rewriter, loc, llvm::formatv("_catalyst_pyface_{0}", nameWithoutPrefix).str(),
+        wrapperFuncType, LLVM::Linkage::External, /*dsoLocal*/ false,
         /*cconv*/ LLVM::CConv::C);
 
     OpBuilder::InsertionGuard guard(rewriter);
@@ -157,33 +158,32 @@ void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewrit
     if (hasInputs) {
         Value arg = wrapperFuncOp.getArgument(1);
         auto argType = inputType;
-        Value structOfMemrefs = rewriter.create<LLVM::LoadOp>(loc, argType, arg);
+        Value structOfMemrefs = LLVM::LoadOp::create(rewriter, loc, argType, arg);
 
         for (size_t idx = 0; idx < params.size(); idx++) {
-            Value pointer = rewriter.create<LLVM::ExtractValueOp>(loc, structOfMemrefs, idx);
+            Value pointer = LLVM::ExtractValueOp::create(rewriter, loc, structOfMemrefs, idx);
             args.push_back(pointer);
         }
     }
 
-    auto call = rewriter.create<LLVM::CallOp>(loc, op, args);
+    auto call = LLVM::CallOp::create(rewriter, loc, op, args);
 
-    rewriter.create<LLVM::ReturnOp>(loc, call.getResults());
+    LLVM::ReturnOp::create(rewriter, loc, call.getResults());
 }
 
 struct EmitCatalystPyInterfaceTransform : public OpRewritePattern<LLVM::LLVMFuncOp> {
     using OpRewritePattern<LLVM::LLVMFuncOp>::OpRewritePattern;
 
-    LogicalResult match(LLVM::LLVMFuncOp op) const override;
-    void rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const override;
+    LogicalResult matchAndRewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult EmitCatalystPyInterfaceTransform::match(LLVM::LLVMFuncOp op) const
+LogicalResult EmitCatalystPyInterfaceTransform::matchAndRewrite(LLVM::LLVMFuncOp op,
+                                                                PatternRewriter &rewriter) const
 {
-    return isFunctionMLIRCWrapper(op) ? success() : failure();
-}
+    if (!isFunctionMLIRCWrapper(op)) {
+        return failure();
+    }
 
-void EmitCatalystPyInterfaceTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const
-{
     // Find substr after _mlir_ciface_
     std::string _mlir_ciface = "_mlir_ciface_";
     size_t _mlir_ciface_len = _mlir_ciface.length();
@@ -194,11 +194,13 @@ void EmitCatalystPyInterfaceTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewri
 
     rewriter.modifyOpInPlace(op, [&] { op.setSymName(newName); });
     wrapResultsAndArgsInTwoStructs(op, rewriter, functionNameWithoutPrefix);
+    return success();
 }
 
 } // namespace
 
 namespace catalyst {
+namespace quantum {
 
 #define GEN_PASS_DEF_EMITCATALYSTPYINTERFACEPASS
 #include "Quantum/Transforms/Passes.h.inc"
@@ -212,24 +214,21 @@ struct EmitCatalystPyInterfacePass
         MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
         patterns.add<EmitCatalystPyInterfaceTransform>(context);
+
         GreedyRewriteConfig config;
-        config.strictMode = GreedyRewriteStrictness::ExistingOps;
-        config.enableRegionSimplification = false;
-        config.maxIterations = 1;
+        config.setStrictness(GreedyRewriteStrictness::ExistingOps);
+        config.setRegionSimplificationLevel(mlir::GreedySimplifyRegionLevel::Disabled);
+        config.setMaxIterations(1);
 
         auto op = getOperation();
         SmallVector<Operation *> targets;
         op->walk([&](LLVM::LLVMFuncOp func) { targets.push_back(func); });
 
-        if (failed(applyOpPatternsAndFold(targets, std::move(patterns), config))) {
+        if (failed(applyOpPatternsGreedily(targets, std::move(patterns), config))) {
             signalPassFailure();
         }
     }
 };
 
-std::unique_ptr<Pass> createEmitCatalystPyInterfacePass()
-{
-    return std::make_unique<EmitCatalystPyInterfacePass>();
-}
-
+} // namespace quantum
 } // namespace catalyst

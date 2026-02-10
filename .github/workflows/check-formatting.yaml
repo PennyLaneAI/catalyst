@@ -2,7 +2,6 @@ name: Check Code Formatting
 
 on:
   pull_request:
-    branches: [ main ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -11,11 +10,11 @@ concurrency:
 jobs:
   format-python:
     name: Python Formatting & Linting
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Install dependencies
-        run: pip install black isort pylint
+        run: pip install black==25.9.0 isort~=7.0.0 pylint~=4.0.0
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -31,16 +30,14 @@ jobs:
 
   format-cpp:
     name: C++ Formatting
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get -y install clang-format-14
-
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install dependencies
+        run: python3 -m pip install clang-format~=20.1
+
       - name: Run clang-format
-        run: python3 ./bin/format.py --check --verbose --cfversion 14 .
+        run: python3 ./bin/format.py --check --verbose .

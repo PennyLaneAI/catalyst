@@ -1,0 +1,178 @@
+// Copyright 2024 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#define DEBUG_TYPE "ions-decomposition"
+
+#include <variant>
+
+#include "mlir/Dialect/Arith/IR/Arith.h"
+
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Patterns.h"
+
+using namespace mlir;
+using namespace catalyst::quantum;
+
+constexpr double PI = llvm::numbers::pi;
+
+// This function creates the RX(phi) RY(theta) RX(lambda) decomposition
+// Note that for parametric operations theta is a Value, for non parametric
+// operation theta is an attribute, hence the use of std::variant.
+
+void oneQubitDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter, double phi,
+                    std::variant<mlir::Value, double> theta, double lambda)
+{
+    TypeRange outQubitsTypes = op.getOutQubits().getTypes();
+
+    ValueRange inQubits = op.getInQubits();
+
+    TypedAttr phiAttr = rewriter.getF64FloatAttr(phi);
+    mlir::Value phiValue = arith::ConstantOp::create(rewriter, op.getLoc(), phiAttr);
+
+    mlir::Value thetaValue;
+    if (std::holds_alternative<mlir::Value>(theta)) {
+        thetaValue = std::get<mlir::Value>(theta);
+    }
+    else if (std::holds_alternative<double>(theta)) {
+        TypedAttr thetaAttr = rewriter.getF64FloatAttr(std::get<double>(theta));
+        thetaValue = arith::ConstantOp::create(rewriter, op.getLoc(), thetaAttr);
+    }
+    TypedAttr lambdaAttr = rewriter.getF64FloatAttr(lambda);
+    mlir::Value lambdaValue = arith::ConstantOp::create(rewriter, op.getLoc(), lambdaAttr);
+
+    auto rxPhi = CustomOp::create(rewriter, op.getLoc(), outQubitsTypes, TypeRange{}, phiValue,
+                                  inQubits, "RX", false, ValueRange{}, ValueRange{});
+    auto ryTheta = CustomOp::create(rewriter, op.getLoc(), outQubitsTypes, TypeRange{}, thetaValue,
+                                    rxPhi.getOutQubits(), "RY", false, rxPhi.getInCtrlQubits(),
+                                    rxPhi.getInCtrlValues());
+    auto rxLambda =
+        CustomOp::create(rewriter, op.getLoc(), outQubitsTypes, TypeRange{}, lambdaValue,
+                         ryTheta.getOutQubits(), "RX", false, ValueRange{}, ValueRange{});
+    op.replaceAllUsesWith(rxLambda);
+}
+
+void tDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
+{
+    if (op.getAdjoint()) {
+        oneQubitDecomp(op, rewriter, -PI / 2, -PI / 4, PI / 2);
+    }
+    else {
+        oneQubitDecomp(op, rewriter, -PI / 2, PI / 4, PI / 2);
+    }
+}
+
+void sDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
+{
+    if (op.getAdjoint()) {
+        oneQubitDecomp(op, rewriter, -PI / 2, -PI / 2, PI / 2);
+    }
+    else {
+        oneQubitDecomp(op, rewriter, -PI / 2, PI / 2, PI / 2);
+    }
+}
+
+void zDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
+{
+    oneQubitDecomp(op, rewriter, -PI / 2, PI, PI / 2);
+}
+
+void hDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
+{
+    oneQubitDecomp(op, rewriter, 0.0, PI / 2, PI);
+}
+
+void psDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
+{
+    oneQubitDecomp(op, rewriter, -PI / 2, op.getParams().front(), PI / 2);
+}
+
+void rzDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
+{
+    oneQubitDecomp(op, rewriter, -PI / 2, op.getParams().front(), PI / 2);
+}
+
+void cnotDecomp(catalyst::quantum::CustomOp op, mlir::PatternRewriter &rewriter)
+{
+    TypeRange outQubitsTypes = op.getOutQubits().getTypes();
+
+    mlir::Value inQubit0 = op.getInQubits().front();
+    mlir::Value inQubit1 = op.getInQubits().back();
+
+    TypedAttr piOver2Attr = rewriter.getF64FloatAttr(PI / 2);
+    mlir::Value piOver2 = arith::ConstantOp::create(rewriter, op.getLoc(), piOver2Attr);
+    auto ryPiOver2 = CustomOp::create(rewriter, op.getLoc(), outQubitsTypes.front(), TypeRange{},
+                                      piOver2, inQubit0, "RY", false, ValueRange{}, ValueRange{});
+    SmallVector<mlir::Value> qubitsAfterRy;
+    qubitsAfterRy.push_back(ryPiOver2.getOutQubits().front());
+    qubitsAfterRy.push_back(inQubit1);
+    auto ms = CustomOp::create(rewriter, op.getLoc(), outQubitsTypes, TypeRange{}, piOver2,
+                               qubitsAfterRy, "MS", false, ValueRange{}, ValueRange{});
+    mlir::Value qubit0AfterMs = ms.getOutQubits().front();
+    mlir::Value qubit1AfterMs = ms.getOutQubits().back();
+
+    TypedAttr minusPiOver2Attr = rewriter.getF64FloatAttr(-PI / 2);
+    mlir::Value minusPiOver2 = arith::ConstantOp::create(rewriter, op.getLoc(), minusPiOver2Attr);
+    auto rxMinusPiOver2 =
+        CustomOp::create(rewriter, op.getLoc(), outQubitsTypes.front(), TypeRange{}, minusPiOver2,
+                         qubit0AfterMs, "RX", false, ValueRange{}, ValueRange{});
+    auto firstRyMinusPiOver2 =
+        CustomOp::create(rewriter, op.getLoc(), outQubitsTypes.front(), TypeRange{}, minusPiOver2,
+                         qubit1AfterMs, "RY", false, ValueRange{}, ValueRange{});
+
+    mlir::Value qubit0AfterRY = rxMinusPiOver2.getOutQubits().front();
+    auto secondRyMinusPiOver2 =
+        CustomOp::create(rewriter, op.getLoc(), outQubitsTypes.front(), TypeRange{}, minusPiOver2,
+                         qubit0AfterRY, "RY", false, ValueRange{}, ValueRange{});
+
+    SmallVector<mlir::Value> qubitsEnd;
+    qubitsEnd.push_back(firstRyMinusPiOver2.getOutQubits().front());
+    qubitsEnd.push_back(secondRyMinusPiOver2.getOutQubits().front());
+    op.replaceAllUsesWith(qubitsEnd);
+}
+
+std::map<std::string, std::function<void(catalyst::quantum::CustomOp, mlir::PatternRewriter &)>>
+    funcMap = {{"T", &tDecomp},        {"S", &sDecomp},   {"PauliZ", &zDecomp},
+               {"Hadamard", &hDecomp}, {"RZ", &rzDecomp}, {"PhaseShift", &psDecomp},
+               {"CNOT", &cnotDecomp}};
+
+namespace {
+
+struct IonsDecompositionRewritePattern : public mlir::OpRewritePattern<CustomOp> {
+    using mlir::OpRewritePattern<CustomOp>::OpRewritePattern;
+
+    mlir::LogicalResult matchAndRewrite(CustomOp op, mlir::PatternRewriter &rewriter) const override
+    {
+        auto it = funcMap.find(op.getGateName().str());
+        if (it != funcMap.end()) {
+            auto decompFunc = it->second;
+            decompFunc(op, rewriter);
+            return success();
+        }
+        else {
+            return failure();
+        }
+    }
+};
+} // namespace
+
+namespace catalyst {
+namespace quantum {
+
+void populateIonsDecompositionPatterns(RewritePatternSet &patterns)
+{
+    patterns.add<IonsDecompositionRewritePattern>(patterns.getContext(), 1);
+}
+
+} // namespace quantum
+} // namespace catalyst

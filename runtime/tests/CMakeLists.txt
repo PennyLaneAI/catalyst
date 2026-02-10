@@ -1,21 +1,24 @@
-cmake_minimum_required(VERSION 3.20)
-
-project(lightning_qir_runtime_tests)
-
-
-set(CMAKE_CXX_STANDARD 20)
-
 Include(FetchContent)
 
 FetchContent_Declare(
     Catch2
     GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    GIT_TAG        v2.13.9
+    GIT_TAG        v3.8.0
 )
+
+# Raised by Catch2 with GCC-13, so we disable it here before including their project.
+if(RUNTIME_ENABLE_WARNINGS AND (CMAKE_CXX_COMPILER_ID STREQUAL "GNU"))
+    add_compile_options("-Wno-maybe-uninitialized")
+endif()
 
 FetchContent_MakeAvailable(Catch2)
 
-fetch_pybind11()
+# Locate PyBind11
+execute_process(
+    COMMAND "${Python_EXECUTABLE}" -c "import pybind11; print(pybind11.get_cmake_dir())"
+    OUTPUT_VARIABLE pybind11_DIR OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+find_package(pybind11 CONFIG REQUIRED)
 
 # Required for catch_discover_tests().
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/contrib)
@@ -24,70 +27,128 @@ list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/contrib)
 include(CTest)
 include(Catch)
 
-if(ENABLE_LIGHTNING)
-    add_executable(runner_tests_lightning runner_main.cpp)
-    target_include_directories(runner_tests_lightning PRIVATE catalyst_python_interpreter)
+# Set up targets for testing.
+add_library(catalyst_runtime_testing INTERFACE)
 
-    # Skip dynamic device loading test when sanitizers are enabled or when building on mac,
-    # due to the fact that our current support is not fully compatible on macOS.
-    # RTLD_DEEPBIND incompatibility.
-    if (ENABLE_ADDRESS_SANITIZER OR APPLE)
-        set(dl_manager_tests "")
+target_include_directories(catalyst_runtime_testing INTERFACE
+    ${runtime_includes}
+    ${capi_utils_includes}
+    ${backend_utils_includes}
+)
+
+target_link_libraries(catalyst_runtime_testing INTERFACE
+    ${CMAKE_DL_LIBS}  # dlopen from ExecutionContext.h
+    ${devices_list}
+    rt_capi
+)
+
+if(ENABLE_CODE_COVERAGE)
+    if(APPLE)
+        target_compile_options(catalyst_runtime_testing INTERFACE -fprofile-instr-generate -fcoverage-mapping)
+        target_link_options(catalyst_runtime_testing INTERFACE -fprofile-instr-generate -fcoverage-mapping)
     else()
-        # Tests which use dlopen and RTLD_DEEPBIND are incompatible with sanitizers.
-        # All tests which go through dlopen need to be tested without sanitizers.
-        # They produce the following error message:
-        # You are trying to dlopen a this-file-does-not-exist.so shared
-        # library with RTLD_DEEPBIND flag which is incompatible with sanitizer
-        # runtime (see https://github.com/google/sanitizers/issues/611 for
-        # details). If you want to run this-file-does-not-exist.so library under
-        # sanitizers please remove RTLD_DEEPBIND from dlopen flags.
-        set(dl_manager_tests 
-            Test_DLManager.cpp
-            )
+        target_compile_options(catalyst_runtime_testing INTERFACE -fprofile-arcs -ftest-coverage)
+        target_link_libraries(catalyst_runtime_testing INTERFACE gcov)
     endif()
-
-    target_link_libraries(runner_tests_lightning PRIVATE
-        Catch2::Catch2
-        pybind11::embed
-        catalyst_qir_runtime
-        )
-
-    target_sources(runner_tests_lightning PRIVATE ${cov_helper_src}
-        ${dl_manager_tests}
-        Test_QubitManager.cpp
-        Test_CacheManager.cpp
-        Test_LightningDriver.cpp
-        Test_LightningGateSet.cpp
-        Test_LightningCoreQIS.cpp
-        Test_LightningMeasures.cpp
-        Test_LightningGradient.cpp
-        Test_SVDynamicCPU_Core.cpp
-        Test_SVDynamicCPU_Allocation.cpp
-        )
-
-    if(PLKOKKOS_ENABLE_NATIVE)
-        message(STATUS "ENABLE_NATIVE is ON. Use -march=native for cpptests.")
-        target_compile_options(runner_tests_lightning PRIVATE -march=native)
-    endif()
-
-    catch_discover_tests(runner_tests_lightning)
 endif()
 
+add_executable(runner_tests_qir_runtime)
+target_sources(runner_tests_qir_runtime PRIVATE
+    Test_DataView.cpp
+    Test_NullQubit.cpp
+    Test_ResourceTracker.cpp
+)
+
+# For tests we do require libpython in order to embed a Python interpreter.
+target_link_libraries(runner_tests_qir_runtime PRIVATE
+    Catch2WithMain
+    pybind11::embed
+    catalyst_runtime_testing
+    rtd_null_qubit
+)
+
+catch_discover_tests(runner_tests_qir_runtime)
+
 if(ENABLE_OPENQASM)
-    add_executable(runner_tests_openqasm runner_main.cpp)
-
-    # To avoid link to libpython, we use pybind11::module interface library.
-    target_link_libraries(runner_tests_openqasm PRIVATE
-        Catch2::Catch2
-        pybind11::embed
-        catalyst_qir_runtime
-        )
-
+    add_executable(runner_tests_openqasm)
     target_sources(runner_tests_openqasm PRIVATE
         Test_OpenQasmBuilder.cpp
         Test_OpenQasmDevice.cpp
-        )
+    )
+
+    if(NOT APPLE)
+        set_property(TARGET runner_tests_openqasm APPEND PROPERTY BUILD_RPATH $ORIGIN)
+        set_property(TARGET runner_tests_openqasm APPEND PROPERTY BUILD_RPATH $ORIGIN/../lib)
+    else()
+        set_property(TARGET runner_tests_openqasm APPEND PROPERTY BUILD_RPATH @loader_path)
+        set_property(TARGET runner_tests_openqasm APPEND PROPERTY BUILD_RPATH @loader_path/../lib)
+    endif()
+
+    target_link_libraries(runner_tests_openqasm PRIVATE
+        Catch2WithMain
+        pybind11::embed
+        catalyst_runtime_testing
+        rtd_openqasm
+    )
 
     catch_discover_tests(runner_tests_openqasm)
 endif()
+
+if(ENABLE_OQD)
+    add_executable(runner_tests_oqd)
+    target_sources(runner_tests_oqd PRIVATE
+        Test_OQDDevice.cpp
+    )
+
+    if(NOT APPLE)
+        set_property(TARGET runner_tests_oqd APPEND PROPERTY BUILD_RPATH $ORIGIN)
+        set_property(TARGET runner_tests_oqd APPEND PROPERTY BUILD_RPATH $ORIGIN/../lib)
+    else()
+        set_property(TARGET runner_tests_oqd APPEND PROPERTY BUILD_RPATH @loader_path)
+        set_property(TARGET runner_tests_oqd APPEND PROPERTY BUILD_RPATH @loader_path/../lib)
+    endif()
+
+    target_link_libraries(runner_tests_oqd PRIVATE
+        Catch2WithMain
+        catalyst_runtime_testing
+        rt_OQD_capi
+        rtd_oqd_device
+        nlohmann_json::nlohmann_json
+    )
+
+    catch_discover_tests(runner_tests_oqd)
+endif()
+
+
+# MBQC test suite
+add_executable(runner_tests_mbqc_runtime)
+target_sources(runner_tests_mbqc_runtime PRIVATE
+    Test_MBQC.cpp
+)
+
+target_link_libraries(runner_tests_mbqc_runtime PRIVATE
+    Catch2WithMain
+    catalyst_runtime_testing
+    rtd_null_qubit
+)
+
+catch_discover_tests(runner_tests_mbqc_runtime)
+
+# RS Decomposition test suite
+add_executable(runner_tests_rsdecomp_runtime)
+target_sources(runner_tests_rsdecomp_runtime PRIVATE
+    Test_RSDecompUtils.cpp
+    Test_RSDecompRings.cpp
+    Test_RSDecompEllipse.cpp
+    Test_RSDecompGridProblems.cpp
+    Test_RSDecompNormalForms.cpp
+    Test_RSDecompNormSolver.cpp
+    Test_RSDecomp.cpp
+)
+target_link_libraries(runner_tests_rsdecomp_runtime PRIVATE
+    Catch2WithMain
+    catalyst_runtime_testing
+    rt_rsdecomp
+)
+
+catch_discover_tests(runner_tests_rsdecomp_runtime)

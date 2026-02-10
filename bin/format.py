@@ -23,9 +23,9 @@ from utils import get_cpp_files
 
 CLANG_FMT_BIN = "clang-format"
 
-IGNORE_PATTERNS = ["external", "build", "llvm-project", "mlir-hlo", "Enzyme"]
+IGNORE_PATTERNS = ["external", "build", "llvm-project", "Enzyme", "stablehlo"]
 
-DEFAULT_CLANG_FORMAT_VERSION = 13
+DEFAULT_CLANG_FORMAT_VERSION = 20
 
 CLANG_FMT_CNFG_PATH = "../.clang-format"
 
@@ -33,7 +33,7 @@ BASE_ARGS = f"-assume-filename={CLANG_FMT_CNFG_PATH}"
 
 
 def parse_version(version_string):
-    version_rgx = "version (\d+)"
+    version_rgx = r"version (\d+)"
 
     m = re.search(version_rgx, version_string)
     return int(m.group(1))
@@ -51,9 +51,9 @@ def check_bin(command):
 
         if version < DEFAULT_CLANG_FORMAT_VERSION:
             print(
-                f"Using clang-format version {version}. \
-                    As this is lower than the version used for the CI, \
-                    the CI may fail even after formatting."
+                f"Warning: using clang-format version {version}, while the CI uses version "
+                f"{DEFAULT_CLANG_FORMAT_VERSION}. Since the local version is lower than the "
+                f"version used for the CI, the CI may fail even after formatting."
             )
     except FileNotFoundError as exc:
         raise FileNotFoundError(f"{command} is not installed or is not in PATH.") from exc
