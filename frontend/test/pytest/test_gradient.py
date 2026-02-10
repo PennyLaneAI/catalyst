@@ -1701,6 +1701,7 @@ def test_gradient_slice(backend):
     jax_res = jax.jacobian(my_model, argnums=1)(data, params["weights"], params["bias"])
     assert np.allclose(cat_res, jax_res)
 
+
 @pytest.mark.xfail(reason="Vmap yields wrong results when differentiated")
 def test_vmap_worflow_derivation(backend):
     """Check the gradient of a vmap workflow"""
@@ -1755,6 +1756,7 @@ def test_vmap_worflow_derivation(backend):
     assert pytree_enzyme == pytree_fd
     assert jnp.allclose(data_enzyme[0], data_jax[0])
     assert jnp.allclose(data_enzyme[1], data_jax[1])
+
 
 @pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", ["parameter-shift", "adjoint"])
