@@ -234,6 +234,13 @@ func.func @test_namedobs_op(%q0: !qref.bit) {
 
 // -----
 
+func.func @test_hermitian_op(%q0: !qref.bit, %matrix: tensor<2x2xcomplex<f64>>) {
+    %obs = qref.hermitian(%matrix : tensor<2x2xcomplex<f64>>) %q0 : !quantum.obs
+    func.return
+}
+
+// -----
+
 func.func @test_expval_circuit() -> f64 {
     %a = qref.alloc(2) : !qref.reg<2>
     %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit

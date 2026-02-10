@@ -404,7 +404,7 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSeg
 
         .. note::
             This operation is one of the few quantum operations that is not applied via
-            ``quantum.custom``. The reason for this is that its quantum dialect counterpart needs
+            ``qref.custom``. The reason for this is that its quantum dialect counterpart needs
             to be handled in a special way during the lowering due to its C function being variadic
             on the number of qubits.
 
@@ -545,6 +545,37 @@ def NamedObsOp : Observable_Op<"namedobs"> {
     let assemblyFormat = [{
         $wire `[` $type `]` attr-dict  `:` type(results)
     }];
+}
+
+def HermitianOp : Observable_Op<"hermitian"> {
+    let summary = "Define a Hermitian observable for use in measurements";
+    let description = [{
+        The `qref.hermitian` operation defines a quantum observable to be used by measurement
+        processes. The specific observable defined here represents the Hermitian observable on a
+        set of qubits. The arguments are a set of qubits to measure as well as a row-major flatten
+        matrix of complex numbers that represents a Hermitian matrix that must be of size
+        2^(number of qubits) * 2^(number of qubits).
+
+        .. note::
+            This op is not bufferizable at the moment, and must take in the Hermitian matrix as a
+            tensor instead of a memref. To execute reference semantics quantum dialect, please
+            convert to the value semantics quantum dialect, where ops are bufferizable and lowerable
+            to LLVM IR.
+    }];
+
+    let arguments = (ins
+        2DTensorOf<[Complex<F64>]>:$matrix,
+        Variadic<QRefQubitType>:$qubits
+    );
+
+    let results = (outs ObservableType:$obs);
+
+    let assemblyFormat = [{
+        `(` $matrix `:` type($matrix) `)` $qubits attr-dict `:` type(results)
+    }];
+
+    // TODO
+    // let hasVerifier = 1;
 }
 
 // -----
