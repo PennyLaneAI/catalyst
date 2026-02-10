@@ -293,7 +293,6 @@ def handle_qnode(
 
     if stopping_condition := self.decompose_tkwargs.get("stopping_condition"):
         # Case 1: User specified a stopping condition in decomposition
-        print("Using case 1: User specified a stopping condition in decomposition.")
         # Use the plxpr decompose transform and ignore graph
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
@@ -304,31 +303,17 @@ def handle_qnode(
         )
     elif use_device_specific_decomposition:
         # Case 2: User did not specify a decomposition. Using device-specific decomposition.
-        print(
-            "Using case 2: User did not specify a decomposition. Using device-specific decomposition."
-        )
+        # TODO: Figure out edges cases that this may raise as a result of non-parity between 
+        # catalyst_acceptance and the provided device gateset.
         device_capabilities = get_device_capabilities(device, execution_config, shots_len)
         device_specific_gate_set = device_capabilities.operations.keys()
-        gateset = {"gate_set": device_specific_gate_set}
+
+        gateset = {"gate_set": device_specific_gate_set.intersection(COMPILER_OPS_FOR_DECOMPOSITION.keys())}
         self.requires_decompose_lowering = True
         self.decompose_tkwargs = gateset
 
-        # Option 1: Using device-specific stopping condition in plxpr transform.
-        # device_diff_method = calculate_diff_method(qnode, qfunc_jaxpr)
-        # stopping_condition = lambda op: catalyst_acceptance(
-        #     op, device_capabilities, device_diff_method
-        # )
-        # closed_jaxpr = _apply_compiler_decompose_to_plxpr(
-        #     inner_jaxpr=closed_jaxpr,
-        #     consts=consts,
-        #     ncargs=non_const_args,
-        #     tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
-        #     stopping_condition=stopping_condition,
-        # )
-
-        # Option 2: Using graph decomposition on device-specific gate set. (Ignore device-specific
+        # Using graph decomposition on device-specific gate set. (Ignore device-specific
         # stopping condition.)
-
         # Injecting the decompose-lowering pass into the pipeline if it is not already present.
         # We need this for the graph-based decomposition to work in MLIR.
         if not any(p.pass_name == "decompose-lowering" for p in self._pass_pipeline):
@@ -343,7 +328,6 @@ def handle_qnode(
         )
     else:
         # Case 3: User defined decomposition with target gate set
-        print("Using case 3: User defined decomposition with target gate set.")
         # Try to use graph-based decomposition.
         closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
             inner_jaxpr=closed_jaxpr.jaxpr,
