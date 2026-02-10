@@ -291,7 +291,7 @@ func.func @test_expval_circuit() -> f64 {
 
 // -----
 
-func.func @test_circuit_with_loop(%nqubits: i64) -> f64 {
+func.func @test_circuit_with_loop(%nqubits: i64) -> tensor<?xf64> {
     %a = qref.alloc(%nqubits) : !qref.reg<?>
 
     %start = arith.constant 0 : index
@@ -305,9 +305,10 @@ func.func @test_circuit_with_loop(%nqubits: i64) -> f64 {
         scf.yield
     }
 
-    %q0 = qref.get %a[0] : !qref.reg<?> -> !qref.bit
-    %obs = qref.namedobs %q0 [ PauliX] : !quantum.obs
-    %expval = quantum.expval %obs : f64
+    %one = arith.constant 1 : i64
+    %shape = arith.shli %one, %nqubits : i64
+    %obs = qref.compbasis (qreg %a : !qref.reg<?>) : !quantum.obs
+    %probs = quantum.probs %obs shape %shape : tensor<?xf64>
     qref.dealloc %a : !qref.reg<?>
-    return %expval : f64
+    return %probs : tensor<?xf64>
 }

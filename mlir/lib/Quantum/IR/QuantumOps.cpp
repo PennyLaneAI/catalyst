@@ -22,6 +22,7 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/TypeSwitch.h"
 
+#include "QRef/IR/QRefOps.h"
 #include "Quantum/IR/QuantumAttrDefs.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -256,8 +257,14 @@ static LogicalResult verifyObservable(Value obs, std::optional<size_t> &numQubit
         numQubits = compOp.getQubits().size();
         return success();
     }
+    if (auto compOp = obs.getDefiningOp<catalyst::qref::ComputationalBasisOp>()) {
+        numQubits = compOp.getQubits().size();
+        return success();
+    }
     else if (obs.getDefiningOp<NamedObsOp>() || obs.getDefiningOp<HermitianOp>() ||
-             obs.getDefiningOp<TensorOp>() || obs.getDefiningOp<HamiltonianOp>()) {
+             obs.getDefiningOp<TensorOp>() || obs.getDefiningOp<HamiltonianOp>() ||
+             obs.getDefiningOp<catalyst::qref::NamedObsOp>() ||
+             obs.getDefiningOp<catalyst::qref::HermitianOp>()) {
         return success();
     }
 
