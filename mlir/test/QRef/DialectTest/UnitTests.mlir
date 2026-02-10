@@ -212,11 +212,25 @@ func.func @test_qubit_unitary(%q0: !qref.bit, %q1: !qref.bit,
 
 // -----
 
+func.func @test_adjoint_op(%r: !qref.reg<2>)
+{
+    qref.adjoint(%r) : !qref.reg<2> {
+    ^bb0(%arg0: !qref.reg<2>):
+        %q0 = qref.get %arg0[0] : !qref.reg<2> -> !qref.bit
+        %q1 = qref.get %arg0[1] : !qref.reg<2> -> !qref.bit
+        qref.custom "Hadamard"() %q0 : !qref.bit
+        qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+    }
+    return
+}
+
+// -----
+
 func.func @test_computational_basis_op(%q0: !qref.bit, %q1: !qref.bit, %r: !qref.reg<5>)
 {
     %obs_q = qref.compbasis qubits %q0, %q1 : !quantum.obs
     %obs_r = qref.compbasis (qreg %r : !qref.reg<5>) : !quantum.obs
-    func.return
+    return
 }
 
 // -----
@@ -236,14 +250,14 @@ func.func @test_namedobs_op(%q0: !qref.bit) {
 
 func.func @test_hermitian_op(%q0: !qref.bit, %matrix: tensor<2x2xcomplex<f64>>) {
     %obs = qref.hermitian(%matrix : tensor<2x2xcomplex<f64>>) %q0 : !quantum.obs
-    func.return
+    return
 }
 
 // -----
 
 func.func @test_measure_op(%q0: !qref.bit) {
     %mres = qref.measure %q0 : i1
-    func.return
+    return
 }
 
 // -----

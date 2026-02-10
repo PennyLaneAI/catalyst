@@ -17,6 +17,33 @@
 
 include "mlir/IR/OpBase.td"
 
+def QuantumRegion : OpInterface<"QuantumRegion"> {
+    let description = [{
+        This interface provides a generic way to interact with instructions that are
+        considered quantum regions. These are characterized by operating on a single
+        qubit register reference.
+    }];
+
+    let cppNamespace = "::catalyst::qref";
+
+    let methods = [
+        InterfaceMethod<
+            "Return the quantum register operand.",
+            "mlir::Value", "getRegisterOperand", (ins), /*methodBody=*/[{
+                return $_op->getOperand(0);
+            }]
+        >
+    ];
+
+    let verify = [{
+
+        if ($_op->getNumOperands() != 1)
+            return $_op->emitOpError("must have exactly one operand (quantum register)");
+
+        return mlir::success();
+    }];
+}
+
 def QuantumOperation : OpInterface<"QuantumOperation"> {
     let description = [{
         A base class for all quantum operations that can be considered actions on qubits.

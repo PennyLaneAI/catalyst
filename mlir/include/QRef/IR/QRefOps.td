@@ -17,11 +17,8 @@
 
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
-// TODO: I probably need bufferization. Remove if ended up not using it.
-// Or do I? If this dialect is only supposed to be at a high level,
-// i.e. connection to lower parts of the pipeline are done via
-//   ref dialect ---> value dialect ---> bufferization ---> ....
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 
 include "Quantum/IR/QuantumAttrDefs.td"
 include "Quantum/IR/QuantumDialect.td"
@@ -480,28 +477,25 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOpera
 
 // -----
 
-// class Region_Op<string mnemonic, list<Trait> traits = []> :
-//         QRef_Op<mnemonic, traits # [NoMemoryEffect]>;
+class Region_Op<string mnemonic, list<Trait> traits = []> :
+        QRef_Op<mnemonic, traits # [NoMemoryEffect]>;
 
-// def AdjointOp : Region_Op<"adjoint", [QuantumRegion, SingleBlockImplicitTerminator<"YieldOp">]> {
-//     let summary = "Calculate the adjoint of the enclosed operations";
+def AdjointOp : Region_Op<"adjoint", [QuantumRegion, NoTerminator]> {
+    let summary = "Calculate the adjoint of the enclosed operations";
 
-//     let regions = (region SizedRegion<1>:$region);
+    let regions = (region SizedRegion<1>:$region);
 
-//     let arguments = (ins
-//         QuregType:$qreg
-//     );
+    let arguments = (ins
+        QRefQuregType:$qreg
+    );
 
-//     let results = (outs
-//         QuregType:$out_qreg
-//     );
+    let assemblyFormat = [{
+        `(` $qreg `)` attr-dict `:` type(operands) $region
+    }];
 
-//     let assemblyFormat = [{
-//         `(` $qreg `)` attr-dict `:` type(operands) $region
-//     }];
-
-//     let hasVerifier = 1;
-// }
+    // TODO
+    // let hasVerifier = 1;
+}
 
 // -----
 
