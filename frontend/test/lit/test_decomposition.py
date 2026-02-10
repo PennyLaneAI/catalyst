@@ -1308,3 +1308,157 @@ def test_decompose_autograph_multi_blocks():
 
 
 test_decompose_autograph_multi_blocks()
+
+
+def test_decompose_work_wires_context_manager():
+    """
+    Test that decomposition with work wires is correctly applied when allocating with the context
+    manager.
+    """
+
+    qp.capture.enable()
+
+    @decomposition_rule(is_qreg=True, op_type="PauliZ")
+    def my_decomp(wires):
+        with qp.allocate(2, restored=False) as work_wires:
+            qp.X(wires[0])
+            qp.X(wires[1])
+            qp.H(work_wires[0])
+            qp.H(work_wires[1])
+
+    @qp.qjit
+    @qp.transform(pass_name="decompose-lowering")
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
+    def my_circuit():
+        my_decomp(jax.core.ShapedArray((2,), int))
+        qp.Z(0)
+        return qp.probs()
+
+    # check that decomp arrives properly
+    # CHECK: func.func public @my_decomp({{.*}}) -> !quantum.reg attributes {{{.*}} target_gate = "PauliZ"}
+    print(my_circuit.mlir)
+
+    # check that decomp is applied properly
+    # CHECK-NOT: PauliZ
+    # CHECK-NOT: my_decomp
+    # CHECK: alloc
+    # CHECK: PauliX
+    # CHECK: PauliX
+    # CHECK: Hadamard
+    # CHECK: Hadamard
+    # CHECK: release
+    print(my_circuit.mlir_opt)
+
+
+test_decompose_work_wires_context_manager()
+
+
+def test_decompose_work_wires_alloc_dealloc():
+    """
+    Test that decomposition with work wires is correctly applied when allocating/deallocating
+    explicitly.
+    """
+
+    qp.capture.enable()
+
+    @decomposition_rule(is_qreg=True, op_type="RY")
+    def my_decomp(angle, wires):
+        work_wires = qp.allocate(2)
+        qp.CNOT((work_wires[0], wires[0]))
+        qp.RX(-np.pi / 2, wires[0])
+        qp.RZ(angle, wires[0])
+        qp.RX(np.pi / 2, wires[0])
+        qp.CNOT((work_wires[1], wires[1]))
+        qp.deallocate(work_wires)
+
+    @qp.qjit
+    @qp.transform(pass_name="decompose-lowering")
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
+    def my_circuit(angle: float):
+        my_decomp(float, jax.core.ShapedArray((2,), int))
+        qp.RY(angle, 0)
+        return qp.probs()
+
+    # check that decomp arrives properly
+    # CHECK: func.func public @my_decomp({{.*}}) -> !quantum.reg attributes {{{.*}} target_gate = "RY"}
+    print(my_circuit.mlir)
+
+    # check that the decomposition applies properly
+    # CHECK-NOT: my_decomp
+    # CHECK-NOT: RY
+
+    # CHECK: alloc
+    # CHECK: CNOT
+    # CHECK: RX
+    # CHECK: RZ
+    # CHECK: RX
+    # CHECK: CNOT
+    # CHECK: release
+    print(my_circuit.mlir_opt)
+
+
+test_decompose_work_wires_alloc_dealloc()
+
+
+def test_decompose_work_wires_control_flow():
+    """Test that decomposition with work wires + control flow is correctly applied."""
+
+    qp.capture.enable()
+
+    @decomposition_rule(is_qreg=True, op_type="CRX")
+    def my_decomp(angle, wires, **_):
+        def true_func():
+            qp.CNOT(wires)
+
+            with qp.allocate(2, state="any", restored=True) as w:
+                for i in range(2):
+                    qp.H(w[0])
+                    qp.X(w[1])
+
+        def false_func():
+            with qp.allocate(1, state="any", restored=False) as w:
+                qp.H(w)
+
+                m = qp.measure(wires[0])
+
+                qp.cond(m, qp.CNOT)(wires)
+
+        qp.cond(angle > 1.2, true_func, false_func)()
+
+    @qp.qjit
+    @qp.transform(pass_name="decompose-lowering")
+    @qp.qnode(qp.device("lightning.qubit", wires=2))
+    def circuit():
+        my_decomp(float, jax.core.ShapedArray((2,), int))
+        qp.CRX(1.7, wires=[0, 1])
+        qp.CRX(-7.2, wires=[0, 1])
+        return qp.state()
+
+    # target_gate attribute is correctly applied
+    # CHECK: my_decomp([[args:.*]]) -> !quantum.reg attributes {[[other_attributes:.*]] target_gate = "CRX"}
+    print(circuit.mlir)
+
+    # test that the decomposition is applied correctly
+    # CHECK-NOT: CRX
+    # CHECK-NOT: my_decomp
+
+    # first CRX: true branch
+    # CHECK: CNOT
+    # CHECK: allocate
+    # CHECK: Hadamard
+    # CHECK: PauliX
+    # CHECK: Hadamard
+    # CHECK: PauliX
+    # CHECK: release
+
+    # second CRX: false branch
+    # CHECK: allocate
+    # CHECK: Hadamard
+    # CHECK: Measure
+    # CHECK: cond
+    # CHECK: CNOT
+    # check: release
+    print(circuit.mlir_opt)
+
+
+test_decompose_work_wires_control_flow()
