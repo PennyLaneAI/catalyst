@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --canonicalize --cse %s | FileCheck %s
+// RUN: quantum-opt --canonicalize --cse --split-input-file --verify-diagnostics %s | FileCheck %s
 
 // CHECK-LABEL: test_alloc_dce
 func.func @test_alloc_dce() {
