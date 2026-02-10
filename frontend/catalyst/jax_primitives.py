@@ -429,7 +429,63 @@ def subroutine(func):
 
 def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None, op_type=None):
     """
-    Denotes the creation of a quantum definition in the intermediate representation.
+        Denotes the creation of a quantum definition in the intermediate representation.
+
+        Args:
+            func (Callable): the subroutine to apply in place of the replaced gate.
+            is_qreg (bool): ???
+            num_params (int): ???
+            pauli_word (???): ???
+            op_type (str): the name attribute of the MLIR representation of the op type to be
+                           replaced.
+
+    .. note::
+
+        Must be used with capture.
+
+    **Example**
+
+    .. code-block:: python
+        from catalyst.jax_primitives import decomposition_rule
+        from numpy import pi
+
+        qp.capture.enable() # remember to enable capture
+
+
+        @decomposition_rule(is_qreg=True, op_type="RY") # specify the op type to decompose
+        def my_decomp(angle, wires):
+            qp.RX(-pi / 2, wires[0])
+            qp.RZ(angle, wires[0])
+            qp.RX(pi / 2, wires[0])
+
+
+        @qp.qjit
+        @qp.transform(pass_name="decompose-lowering") # apply decompose-lowering pass
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def my_circuit(angle: float):
+            my_decomp(float, jax.core.ShapedArray((2,), int)) # apply the decomposition
+            qp.RY(angle, 0)
+            return qp.probs()
+
+
+
+    >>> print(qp.specs(my_circuit)(pi))
+    Device: lightning.qubit
+    Device wires: 2
+    Shots: Shots(total=None)
+    Level: device
+
+    Resource specifications:
+      Total wire allocations: 2
+      Total gates: 3
+      Circuit depth: 3
+
+      Gate types:
+        RZ: 1
+        RX: 2
+
+      Measurements:
+        probs(all wires): 1
     """
 
     assert not is_qreg or (
