@@ -1411,7 +1411,7 @@ def test_decompose_work_wires_control_flow():
             qp.CNOT(wires)
 
             with qp.allocate(2, state="any", restored=True) as w:
-                for i in range(2):
+                for _ in range(2):
                     qp.H(w[0])
                     qp.X(w[1])
 
