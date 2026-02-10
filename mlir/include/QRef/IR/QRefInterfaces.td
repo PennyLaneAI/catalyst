@@ -19,7 +19,7 @@ include "mlir/IR/OpBase.td"
 
 def QuantumOperation : OpInterface<"QuantumOperation"> {
     let description = [{
-        A base class for all quantum operations that can be considered actions on wires.
+        A base class for all quantum operations that can be considered actions on qubits.
         The actions do not have to be unitary. For example, the SetState operations also falls
         under this class.
     }];
@@ -28,12 +28,12 @@ def QuantumOperation : OpInterface<"QuantumOperation"> {
 
     let methods = [
         InterfaceMethod<
-            "Return all operands which are considered input wires (including controls).",
-            "std::vector<mlir::Value>", "getWireOperands"
+            "Return all operands which are considered input qubits (including controls).",
+            "std::vector<mlir::Value>", "getQubitOperands"
         >,
         InterfaceMethod<
-            "Set all operands which are considered input wires (including controls).",
-            "void", "setWireOperands", (ins "mlir::ValueRange":$replacements)
+            "Set all operands which are considered input qubits (including controls).",
+            "void", "setQubitOperands", (ins "mlir::ValueRange":$replacements)
         >
     ];
 }
@@ -48,20 +48,20 @@ def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
 
     let methods = [
         InterfaceMethod<
-            "Return operands which are considered non-controlled input wire values.",
-            "mlir::ValueRange", "getNonCtrlWireOperands"
+            "Return operands which are considered non-controlled input qubit reference values.",
+            "mlir::ValueRange", "getNonCtrlQubitOperands"
         >,
         InterfaceMethod<
-            "Set all operands which are considered non-controlled input wire values.",
-            "void", "setNonCtrlWireOperands", (ins "mlir::ValueRange":$replacements)
+            "Set all operands which are considered non-controlled input qubit reference values.",
+            "void", "setNonCtrlQubitOperands", (ins "mlir::ValueRange":$replacements)
         >,
         InterfaceMethod<
-            "Return all operands which are considered controlling input wire values.",
-            "mlir::ValueRange", "getCtrlWireOperands"
+            "Return all operands which are considered controlling input qubit reference values.",
+            "mlir::ValueRange", "getCtrlQubitOperands"
         >,
         InterfaceMethod<
-            "Set all operands which are considered controlling input wire values.",
-            "void", "setCtrlWireOperands", (ins "mlir::ValueRange":$replacements)
+            "Set all operands which are considered controlling input qubit reference values.",
+            "void", "setCtrlQubitOperands", (ins "mlir::ValueRange":$replacements)
         >,
         InterfaceMethod<
             "Return all operands which are considered controlling input boolean values.",
@@ -84,10 +84,10 @@ def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
     let verify = [{
         auto gate = mlir::cast<ConcreteOp>($_op);
 
-        if (gate.getCtrlValueOperands().size() != gate.getCtrlWireOperands().size()) {
+        if (gate.getCtrlValueOperands().size() != gate.getCtrlQubitOperands().size()) {
             return $_op->emitError() <<
-                "number of controlling wires in input (" <<
-                gate.getCtrlWireOperands().size() << ") " <<
+                "number of controlling qubits in input (" <<
+                gate.getCtrlQubitOperands().size() << ") " <<
                 "and controlling values (" <<
                 gate.getCtrlValueOperands().size() <<
                 ") must be the same";
@@ -96,11 +96,11 @@ def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
         // STL methods to check duplicates will all complain about `mlir::Value` not having a
         // comparison method defined, since they all use map/set, which is hash-based
         // So we just do it manually
-        std::vector<mlir::Value> wireOperands = gate.getWireOperands();
-        for (size_t i=0; i < wireOperands.size(); i++) {
-            for (size_t j=i+1; j < wireOperands.size(); j++) {
-                if (wireOperands[i] == wireOperands[j]) {
-                    return $_op->emitError() << "all wires on a quantum gate must be " <<
+        std::vector<mlir::Value> qubitOperands = gate.getQubitOperands();
+        for (size_t i=0; i < qubitOperands.size(); i++) {
+            for (size_t j=i+1; j < qubitOperands.size(); j++) {
+                if (qubitOperands[i] == qubitOperands[j]) {
+                    return $_op->emitError() << "all qubits on a quantum gate must be " <<
                     "distinct (including controls)";
                 }
             }

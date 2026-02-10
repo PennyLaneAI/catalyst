@@ -51,10 +51,10 @@ static const mlir::StringSet<> validPauliWords = {"X", "Y", "Z", "I"};
 LogicalResult PauliRotOp::verify()
 {
     size_t pauliWordLength = getPauliProduct().size();
-    size_t numWires = getWires().size();
-    if (pauliWordLength != numWires) {
+    size_t numQubits = getQubits().size();
+    if (pauliWordLength != numQubits) {
         return emitOpError() << "length of Pauli word (" << pauliWordLength
-                             << ") and number of wires (" << numWires << ") must be the same";
+                             << ") and number of qubits (" << numQubits << ") must be the same";
     }
 
     if (!llvm::all_of(getPauliProduct(), [](mlir::Attribute attr) {
@@ -69,9 +69,9 @@ LogicalResult PauliRotOp::verify()
 
 LogicalResult QubitUnitaryOp::verify()
 {
-    size_t dim = 1 << getWires().size();
+    size_t dim = 1 << getQubits().size();
     if (failed(verifyTensorResult(cast<ShapedType>(getMatrix().getType()), dim, dim))) {
-        return emitOpError("The Unitary matrix must be of size 2^(num_wires) * 2^(num_wires)");
+        return emitOpError("The Unitary matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
     }
 
     return success();

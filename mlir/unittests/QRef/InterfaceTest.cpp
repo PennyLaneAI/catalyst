@@ -89,15 +89,15 @@ func.func @f(%q0: !qref.bit, %q1: !qref.bit, %param: f64, %bool: i1) {
     auto args = bb.getArguments();
 
     // Run checks
-    std::vector<Value> wireOperands = customOp.getWireOperands();
-    ASSERT_TRUE(wireOperands.size() == 2 && wireOperands[0] == args[0] &&
-                wireOperands[1] == args[1]);
+    std::vector<Value> qubitOperands = customOp.getQubitOperands();
+    ASSERT_TRUE(qubitOperands.size() == 2 && qubitOperands[0] == args[0] &&
+                qubitOperands[1] == args[1]);
 
-    ValueRange nonCtrlWireOperands = customOp.getNonCtrlWireOperands();
-    ASSERT_TRUE(nonCtrlWireOperands.size() == 1 && nonCtrlWireOperands[0] == args[0]);
+    ValueRange nonCtrlqubitOperands = customOp.getNonCtrlQubitOperands();
+    ASSERT_TRUE(nonCtrlqubitOperands.size() == 1 && nonCtrlqubitOperands[0] == args[0]);
 
-    ValueRange ctrlWireOperands = customOp.getCtrlWireOperands();
-    ASSERT_TRUE(ctrlWireOperands.size() == 1 && ctrlWireOperands[0] == args[1]);
+    ValueRange ctrlqubitOperands = customOp.getCtrlQubitOperands();
+    ASSERT_TRUE(ctrlqubitOperands.size() == 1 && ctrlqubitOperands[0] == args[1]);
 
     ValueRange ctrlValueOperands = customOp.getCtrlValueOperands();
     ASSERT_TRUE(ctrlValueOperands.size() == 1 && ctrlValueOperands[0] == args[3]);
@@ -111,7 +111,7 @@ func.func @f(%q0: !qref.bit, %q1: !qref.bit, %param: f64, %bool: i1) {
     ASSERT_TRUE(customOp.getParam(1) == args[2]);
 }
 
-TEST(InterfaceTests, setWireOperands)
+TEST(InterfaceTests, setQubitOperands)
 {
     std::string moduleStr = R"mlir(
 func.func @f(%q0: !qref.bit, %q1: !qref.bit, %bool: i1) {
@@ -135,13 +135,13 @@ func.func @f(%q0: !qref.bit, %q1: !qref.bit, %bool: i1) {
     auto args = bb.getArguments();
 
     // Run checks
-    customOp.setWireOperands({args[1], args[0]});
-    std::vector<Value> wireOperands = customOp.getWireOperands();
-    ASSERT_TRUE(wireOperands.size() == 2 && wireOperands[0] == args[1] &&
-                wireOperands[1] == args[0]);
+    customOp.setQubitOperands({args[1], args[0]});
+    std::vector<Value> qubitOperands = customOp.getQubitOperands();
+    ASSERT_TRUE(qubitOperands.size() == 2 && qubitOperands[0] == args[1] &&
+                qubitOperands[1] == args[0]);
 }
 
-TEST(InterfaceTests, setNonCtrlWireOperands)
+TEST(InterfaceTests, setNonCtrlQubitOperands)
 {
     std::string moduleStr = R"mlir(
 func.func @f(%q0: !qref.bit, %q1: !qref.bit, %q2: !qref.bit, %bool: i1) {
@@ -165,12 +165,12 @@ func.func @f(%q0: !qref.bit, %q1: !qref.bit, %q2: !qref.bit, %bool: i1) {
     auto args = bb.getArguments();
 
     // Run checks
-    customOp.setNonCtrlWireOperands({args[2]});
-    ValueRange nonCtrlWireOperands = customOp.getNonCtrlWireOperands();
-    ASSERT_TRUE(nonCtrlWireOperands.size() == 1 && nonCtrlWireOperands[0] == args[2]);
+    customOp.setNonCtrlQubitOperands({args[2]});
+    ValueRange nonCtrlqubitOperands = customOp.getNonCtrlQubitOperands();
+    ASSERT_TRUE(nonCtrlqubitOperands.size() == 1 && nonCtrlqubitOperands[0] == args[2]);
 }
 
-TEST(InterfaceTests, setCtrlWireOperands)
+TEST(InterfaceTests, setCtrlQubitOperands)
 {
     std::string moduleStr = R"mlir(
 func.func @f(%q0: !qref.bit, %q1: !qref.bit, %q2: !qref.bit, %bool: i1) {
@@ -194,9 +194,9 @@ func.func @f(%q0: !qref.bit, %q1: !qref.bit, %q2: !qref.bit, %bool: i1) {
     auto args = bb.getArguments();
 
     // Run checks
-    customOp.setCtrlWireOperands({args[2]});
-    ValueRange ctrlWireOperands = customOp.getCtrlWireOperands();
-    ASSERT_TRUE(ctrlWireOperands.size() == 1 && ctrlWireOperands[0] == args[2]);
+    customOp.setCtrlQubitOperands({args[2]});
+    ValueRange ctrlqubitOperands = customOp.getCtrlQubitOperands();
+    ASSERT_TRUE(ctrlqubitOperands.size() == 1 && ctrlqubitOperands[0] == args[2]);
 }
 
 TEST(InterfaceTests, setCtrlValueOperands)
@@ -285,8 +285,8 @@ func.func @f(%q0: !qref.bit, %cv: i1, %param: f64) {
 
     ASSERT_TRUE(gphaseOp.getAdjointFlag());
 
-    ValueRange ctrlWireOperands = gphaseOp.getCtrlWireOperands();
-    ASSERT_TRUE(ctrlWireOperands.size() == 1 && ctrlWireOperands[0] == args[0]);
+    ValueRange ctrlqubitOperands = gphaseOp.getCtrlQubitOperands();
+    ASSERT_TRUE(ctrlqubitOperands.size() == 1 && ctrlqubitOperands[0] == args[0]);
 
     ValueRange ctrlValueOperands = gphaseOp.getCtrlValueOperands();
     ASSERT_TRUE(ctrlValueOperands.size() == 1 && ctrlValueOperands[0] == args[1]);

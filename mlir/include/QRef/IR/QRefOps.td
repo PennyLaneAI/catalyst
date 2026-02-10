@@ -90,7 +90,7 @@ def GetOp : Memory_Op<"get", [NoMemoryEffect]> {
     );
 
     let results = (outs
-        QRefQubitType:$wire
+        QRefQubitType:$qubit
     );
 
     let assemblyFormat = [{
@@ -109,16 +109,16 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
         QRef_Op<mnemonic, traits # [QuantumOperation]> {
 
     code extraBaseClassDeclaration = [{
-        std::vector<mlir::Value> getWireOperands() {
+        std::vector<mlir::Value> getQubitOperands() {
             std::vector<mlir::Value> values;
-            values.insert(values.end(), getWires().begin(), getWires().end());
+            values.insert(values.end(), getQubits().begin(), getQubits().end());
             return values;
         }
 
-        void setWireOperands(mlir::ValueRange replacements) {
-            mlir::MutableOperandRange wires = getWiresMutable();
-            assert(wires.size() == replacements.size() && "must provide values for all wires");
-            wires.assign(replacements);
+        void setQubitOperands(mlir::ValueRange replacements) {
+            mlir::MutableOperandRange qubits = getQubitsMutable();
+            assert(qubits.size() == replacements.size() && "must provide values for all qubits");
+            qubits.assign(replacements);
         }
     }];
 
@@ -129,43 +129,43 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
         Gate_Op<mnemonic, traits # [QuantumGate, Unitary]> {
 
     code extraBaseClassDeclaration = [{
-        std::vector<mlir::Value> getWireOperands() {
+        std::vector<mlir::Value> getQubitOperands() {
             std::vector<mlir::Value> values;
-            values.insert(values.end(), getWires().begin(), getWires().end());
-            values.insert(values.end(), getCtrlWires().begin(), getCtrlWires().end());
+            values.insert(values.end(), getQubits().begin(), getQubits().end());
+            values.insert(values.end(), getCtrlQubits().begin(), getCtrlQubits().end());
             return values;
         }
 
-        void setWireOperands(mlir::ValueRange replacements) {
-            mlir::MutableOperandRange wires = getWiresMutable();
-            mlir::MutableOperandRange ctrls = getCtrlWiresMutable();
-            assert(wires.size() + ctrls.size() == replacements.size() &&
-                   "must provide values for all wires (including controls)");
+        void setQubitOperands(mlir::ValueRange replacements) {
+            mlir::MutableOperandRange qubits = getQubitsMutable();
+            mlir::MutableOperandRange ctrls = getCtrlQubitsMutable();
+            assert(qubits.size() + ctrls.size() == replacements.size() &&
+                   "must provide values for all qubits (including controls)");
 
-            wires.assign(replacements.take_front(wires.size()));
+            qubits.assign(replacements.take_front(qubits.size()));
             ctrls.assign(replacements.take_back(ctrls.size()));
         }
 
-        mlir::ValueRange getNonCtrlWireOperands() {
-            return getWires();
+        mlir::ValueRange getNonCtrlQubitOperands() {
+            return getQubits();
         }
 
-        void setNonCtrlWireOperands(mlir::ValueRange replacements) {
-            mlir::MutableOperandRange wires = getWiresMutable();
-            assert(wires.size() == replacements.size() &&
-                   "must provide values for all non-ctrl wire values");
-            wires.assign(replacements);
+        void setNonCtrlQubitOperands(mlir::ValueRange replacements) {
+            mlir::MutableOperandRange qubits = getQubitsMutable();
+            assert(qubits.size() == replacements.size() &&
+                   "must provide values for all non-ctrl qubit values");
+            qubits.assign(replacements);
         }
 
-        mlir::ValueRange getCtrlWireOperands() {
-            return getCtrlWires();
+        mlir::ValueRange getCtrlQubitOperands() {
+            return getCtrlQubits();
         }
 
-        void setCtrlWireOperands(mlir::ValueRange replacements) {
-            mlir::MutableOperandRange ctrlWires = getCtrlWiresMutable();
-            assert(ctrlWires.size() == replacements.size() &&
-                   "must provide values for all ctrl wire values");
-            ctrlWires.assign(replacements);
+        void setCtrlQubitOperands(mlir::ValueRange replacements) {
+            mlir::MutableOperandRange ctrlQubits = getCtrlQubitsMutable();
+            assert(ctrlQubits.size() == replacements.size() &&
+                   "must provide values for all ctrl qubit values");
+            ctrlQubits.assign(replacements);
         }
 
         mlir::ValueRange getCtrlValueOperands() {
@@ -211,11 +211,11 @@ def SetStateOp : Gate_Op<"set_state"> {
 
     let arguments = (ins
         1DTensorOf<[Complex<F64>]>:$in_state,
-        Variadic<QRefQubitType>:$wires
+        Variadic<QRefQubitType>:$qubits
     );
 
     let assemblyFormat = [{
-        `(` $in_state `)` $wires attr-dict `:` type(operands)
+        `(` $in_state `)` $qubits attr-dict `:` type(operands)
     }];
 
 }
@@ -239,11 +239,11 @@ def SetBasisStateOp : Gate_Op<"set_basis_state"> {
 
     let arguments = (ins
         1DTensorOf<[I1]>:$basis_state,
-        Variadic<QRefQubitType>:$wires
+        Variadic<QRefQubitType>:$qubits
     );
 
     let assemblyFormat = [{
-        `(` $basis_state`)` $wires attr-dict `:` type(operands)
+        `(` $basis_state`)` $qubits attr-dict `:` type(operands)
     }];
 }
 
@@ -255,20 +255,20 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
 
     let arguments = (ins
         Variadic<F64>:$params,
-        Variadic<QRefQubitType>:$wires,
+        Variadic<QRefQubitType>:$qubits,
         StrAttr:$gate_name,
         UnitAttr:$adjoint,
-        Variadic<QRefQubitType>:$ctrl_wires,
+        Variadic<QRefQubitType>:$ctrl_qubits,
         Variadic<I1>:$ctrl_values
     );
 
     // TODO: add convenience builders
 
     let assemblyFormat = [{
-        $gate_name `(` $params `)` $wires (`adj` $adjoint^)? attr-dict
-        ( `ctrls` `(` $ctrl_wires^ `)` )?
+        $gate_name `(` $params `)` $qubits (`adj` $adjoint^)? attr-dict
+        ( `ctrls` `(` $ctrl_qubits^ `)` )?
         ( `ctrlvals` `(` $ctrl_values^ `)` )?
-        `:` type($wires) (`ctrls` type($ctrl_wires)^ )?
+        `:` type($qubits) (`ctrls` type($ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -296,17 +296,17 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [ParametrizedGate, AttrSizedOperandS
     let arguments = (ins
         F64:$angle,
         PauliWord:$pauli_product,
-        Variadic<QRefQubitType>:$wires,
+        Variadic<QRefQubitType>:$qubits,
         UnitAttr:$adjoint,
-        Variadic<QRefQubitType>:$ctrl_wires,
+        Variadic<QRefQubitType>:$ctrl_qubits,
         Variadic<I1>:$ctrl_values
     );
 
     let assemblyFormat = [{
-        $pauli_product `(` $angle `)` $wires (`adj` $adjoint^)? attr-dict
-        ( `ctrls` `(` $ctrl_wires^ `)` )?
+        $pauli_product `(` $angle `)` $qubits (`adj` $adjoint^)? attr-dict
+        ( `ctrls` `(` $ctrl_qubits^ `)` )?
         ( `ctrlvals` `(` $ctrl_values^ `)` )?
-        `:` type($wires) (`ctrls` type($ctrl_wires)^ )?
+        `:` type($qubits) (`ctrls` type($ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -328,15 +328,15 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [ParametrizedGate, AttrSizedOperand
     let arguments = (ins
         F64:$params,
         UnitAttr:$adjoint,
-        Variadic<QRefQubitType>:$ctrl_wires,
+        Variadic<QRefQubitType>:$ctrl_qubits,
         Variadic<I1>:$ctrl_values
     );
 
     let assemblyFormat = [{
         `(` $params `)` (`adj` $adjoint^)? attr-dict
-        ( `ctrls` `(` $ctrl_wires^ `)` )?
+        ( `ctrls` `(` $ctrl_qubits^ `)` )?
         ( `ctrlvals` `(` $ctrl_values^ `)` )?
-        `:` type($params) (`ctrls` type($ctrl_wires)^ )?
+        `:` type($params) (`ctrls` type($ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -345,10 +345,10 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [ParametrizedGate, AttrSizedOperand
         }
 
         // Simulate missing operands and results for the default impl of the quantum gate interface.
-        mlir::OperandRange getWires() {
+        mlir::OperandRange getQubits() {
             return {getOperands().begin(), getOperands().begin()};
         }
-        mlir::MutableOperandRange getWiresMutable() {
+        mlir::MutableOperandRange getQubitsMutable() {
             return mlir::MutableOperandRange(getOperation(), 0, 0);
         }
     }];
@@ -358,7 +358,7 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [ParametrizedGate, AttrSizedOperandSeg
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `qref.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
-        The arguments are the rotation angle `theta` and a set of wires the operation acts on.
+        The arguments are the rotation angle `theta` and a set of qubits the operation acts on.
 
         .. note::
             This operation is one of the few quantum operations that is not applied via
@@ -369,17 +369,17 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [ParametrizedGate, AttrSizedOperandSeg
 
     let arguments = (ins
         F64:$theta,
-        Variadic<QRefQubitType>:$wires,
+        Variadic<QRefQubitType>:$qubits,
         UnitAttr:$adjoint,
-        Variadic<QRefQubitType>:$ctrl_wires,
+        Variadic<QRefQubitType>:$ctrl_qubits,
         Variadic<I1>:$ctrl_values
     );
 
     let assemblyFormat = [{
-        `(` $theta `)` $wires (`adj` $adjoint^)? attr-dict
-        ( `ctrls` `(` $ctrl_wires^ `)` )?
+        `(` $theta `)` $qubits (`adj` $adjoint^)? attr-dict
+        ( `ctrls` `(` $ctrl_qubits^ `)` )?
         ( `ctrlvals` `(` $ctrl_values^ `)` )?
-        `:` type($wires) (`ctrls` type($ctrl_wires)^ )?
+        `:` type($qubits) (`ctrls` type($ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -396,7 +396,7 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSeg
     let summary = "Apply a projector-controlled phase gate";
     let description = [{
         This gate is built from simpler gates like `PhaseShift` and `PauliX` and acts on a group
-        of wires and takes a rotation angle.
+        of qubits and takes a rotation angle.
         It also takes another number, an integer called `dim`, which defines a specific part
         of the quantum state. The gate then applies a positive phase shift to a portion of the
         state defined by `dim`. At the same time, it applies a negative phase shift to the rest
@@ -417,17 +417,17 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSeg
     let arguments = (ins
         F64:$theta,
         F64:$dim,
-        Variadic<QRefQubitType>:$wires,
+        Variadic<QRefQubitType>:$qubits,
         UnitAttr:$adjoint,
-        Variadic<QRefQubitType>:$ctrl_wires,
+        Variadic<QRefQubitType>:$ctrl_qubits,
         Variadic<I1>:$ctrl_values
     );
 
     let assemblyFormat = [{
-        `(` $theta `,` $dim `)` $wires (`adj` $adjoint^)? attr-dict
-        ( `ctrls` `(` $ctrl_wires^ `)` )?
+        `(` $theta `,` $dim `)` $qubits (`adj` $adjoint^)? attr-dict
+        ( `ctrls` `(` $ctrl_qubits^ `)` )?
         ( `ctrlvals` `(` $ctrl_values^ `)` )?
-        `:` type($wires) (`ctrls` type($ctrl_wires)^ )?
+        `:` type($qubits) (`ctrls` type($ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -456,17 +456,17 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOpera
 
     let arguments = (ins
         2DTensorOf<[Complex<F64>]>:$matrix,
-        Variadic<QRefQubitType>:$wires,
+        Variadic<QRefQubitType>:$qubits,
         UnitAttr:$adjoint,
-        Variadic<QRefQubitType>:$ctrl_wires,
+        Variadic<QRefQubitType>:$ctrl_qubits,
         Variadic<I1>:$ctrl_values
     );
 
     let assemblyFormat = [{
-        `(` $matrix `:` type($matrix) `)` $wires (`adj` $adjoint^)? attr-dict
-        ( `ctrls` `(` $ctrl_wires^ `)` )?
+        `(` $matrix `:` type($matrix) `)` $qubits (`adj` $adjoint^)? attr-dict
+        ( `ctrls` `(` $ctrl_qubits^ `)` )?
         ( `ctrlvals` `(` $ctrl_values^ `)` )?
-        `:` type($wires) (`ctrls` type($ctrl_wires)^ )?
+        `:` type($qubits) (`ctrls` type($ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
@@ -529,12 +529,12 @@ def NamedObsOp : Observable_Op<"namedobs"> {
     let description = [{
         The `qref.namedobs` operation defines a quantum observable to be used by measurement
         processes. The specific observable defined here represents one of 5 named observables
-        {Identity, PauliX, PauliY, PauliZ, Hadamard} on a qubit. The arguments are a wire to
+        {Identity, PauliX, PauliY, PauliZ, Hadamard} on a qubit. The arguments are a qubit to
         measure as well as an encoding operator for the qubit as an integer between 0-4.
     }];
 
     let arguments = (ins
-        QRefQubitType:$wire,
+        QRefQubitType:$qubit,
         NamedObservableAttr:$type
     );
 
@@ -543,7 +543,7 @@ def NamedObsOp : Observable_Op<"namedobs"> {
     );
 
     let assemblyFormat = [{
-        $wire `[` $type `]` attr-dict  `:` type(results)
+        $qubit `[` $type `]` attr-dict  `:` type(results)
     }];
 }
 
