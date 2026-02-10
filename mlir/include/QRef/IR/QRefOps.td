@@ -572,8 +572,7 @@ def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]
         (`qubits` $qubits^)? (`(` `qreg` $qreg `:` type($qreg)^ `)`)? attr-dict `:` type(results)
     }];
 
-    // TODO
-    // let hasVerifier = 1;
+    let hasVerifier = 1;
 }
 
 def NamedObsOp : Observable_Op<"namedobs"> {

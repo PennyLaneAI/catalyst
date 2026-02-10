@@ -213,4 +213,14 @@ LogicalResult AdjointOp::verify()
     return success();
 }
 
+LogicalResult ComputationalBasisOp::verify()
+{
+    if ((getQubits().size() != 0) && (getQreg() != nullptr)) {
+        return emitOpError()
+               << "computational basis op cannot simultaneously take in both qubits and quregs";
+    }
+
+    return success();
+}
+
 } // namespace catalyst::qref
