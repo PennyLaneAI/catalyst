@@ -117,7 +117,11 @@ def mlir_specs(
             raise ValueError(
                 f"Requested specs levels {', '.join(missing)} not found in MLIR pass list."
             )
+        # Resolve labels by using marker labels if assigned
+        # and defaulting to the MLIR level index.
         return {
+            # NOTE: Ensures that markers on the same level are joined 
+            # correctly as a string delimited by commas.
             (
                 ", ".join(m if not isinstance(m, str) else [m])
                 if (m := level_to_markers.get(lvl))
