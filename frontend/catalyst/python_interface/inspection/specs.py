@@ -120,7 +120,7 @@ def mlir_specs(
         # Resolve labels by using marker labels if assigned
         # and defaulting to the MLIR level index.
         return {
-            # NOTE: Ensures that markers on the same level are joined 
+            # NOTE: Ensures that markers on the same level are joined
             # correctly as a string delimited by commas.
             (
                 ", ".join(m if not isinstance(m, str) else [m])
