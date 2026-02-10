@@ -173,3 +173,19 @@ func.func @test_namedobs_op_bad_attribute(%q0: !qref.bit) {
     %0 = qref.namedobs %q0 [ bad] : !quantum.obs
     return
 }
+
+// -----
+
+func.func @test_alloc_bad_dynamic_size(%arg0 : i64) {
+    // expected-error@+1 {{expected result to have dynamic allocation size !qref.qreg<?>}}
+    %0 = qref.alloc(%arg0) : !qref.reg<20>
+    return
+}
+
+// -----
+
+func.func @test_alloc_bad_static_size() {
+    // expected-error@+1 {{expected result to have allocation size !qref.qreg<2>}}
+    %0 = qref.alloc(2) : !qref.reg<37>
+    return
+}

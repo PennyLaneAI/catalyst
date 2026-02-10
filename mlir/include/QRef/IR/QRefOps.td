@@ -47,15 +47,15 @@ def AllocOp : Memory_Op<"alloc"> {
     );
 
     let results = (outs
-        QRefQuregType:$allocation
+        QRefQuregType:$qreg
     );
 
     let assemblyFormat = [{
         `(` ($nqubits^):($nqubits_attr)? `)` attr-dict `:` type(results)
     }];
 
-    // TODO
-    // let hasCanonicalizeMethod = 1;
+    let hasCanonicalizeMethod = 1;
+    let hasVerifier = 1;
 }
 
 def AllocQubitOp : Memory_Op<"alloc_qb"> {

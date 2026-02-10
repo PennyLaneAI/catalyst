@@ -56,11 +56,11 @@ func.func @test_alloc(%arg0 : i64) {
         *(std::next(f.getOps<catalyst::qref::AllocOp>().begin(), 1));
 
     // Run checks
-    catalyst::qref::QuregType staticType = staticAllocOp.getAllocation().getType();
+    catalyst::qref::QuregType staticType = staticAllocOp.getQreg().getType();
     ASSERT_TRUE(staticType.isStatic());
     ASSERT_TRUE(staticType.getSize().getInt() == 2);
 
-    catalyst::qref::QuregType dynamicType = dynamicAllocOp.getAllocation().getType();
+    catalyst::qref::QuregType dynamicType = dynamicAllocOp.getQreg().getType();
     ASSERT_TRUE(!dynamicType.isStatic());
     ASSERT_TRUE(dynamicType.getSize().getInt() == mlir::ShapedType::kDynamic);
 }

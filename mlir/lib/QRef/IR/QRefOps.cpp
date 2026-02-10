@@ -43,10 +43,49 @@ static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length
 }
 
 //===----------------------------------------------------------------------===//
+// QRef op canonicalizers.
+//===----------------------------------------------------------------------===//
+
+LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewriter)
+{
+    if (alloc->use_empty()) {
+        rewriter.eraseOp(alloc);
+        return success();
+    }
+
+    return failure();
+}
+
+//===----------------------------------------------------------------------===//
 // QRef op verifiers.
 //===----------------------------------------------------------------------===//
 
 static const mlir::StringSet<> validPauliWords = {"X", "Y", "Z", "I"};
+
+LogicalResult AllocOp::verify()
+{
+    if (getNqubits() && getNqubitsAttr()) {
+        return emitOpError() << "must have a single allocation size";
+    }
+
+    QuregType type = getQreg().getType();
+    if (auto size = getNqubits()) {
+        // Dynamic
+        if (!type.isDynamic() || type.getSize().getInt() != mlir::ShapedType::kDynamic) {
+            return emitOpError() << "expected result to have dynamic allocation size !qref.qreg<?>";
+        }
+    }
+
+    else if (auto size = getNqubitsAttr()) {
+        // Static
+        if (!type.isStatic() || type.getSize().getInt() != size) {
+            return emitOpError() << "expected result to have allocation size !qref.qreg<" << *size
+                                 << ">";
+        }
+    }
+
+    return success();
+}
 
 LogicalResult PauliRotOp::verify()
 {
