@@ -420,8 +420,7 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [ParametrizedGate, AttrSizedOperandSeg
         }
     }];
 
-    // TODO
-    // let hasCanonicalizeMethod = 1;
+    let hasCanonicalizeMethod = 1;
 }
 
 def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSegments]> {
