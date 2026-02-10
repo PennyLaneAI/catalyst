@@ -28,6 +28,10 @@
   `shots` aren't set. Instead, an informative error message is raised.
   [(#2456)](https://github.com/PennyLaneAI/catalyst/pull/2456)
 
+* Added the `op_type` parameter to the `@decomposition_rule` decorator, allowing the `decompose-lowering` pass to
+  register and apply decomposition rules in MLIR.
+  [(#2470)](https://github.com/PennyLaneAI/catalyst/pull/2470)
+
 <h3>Breaking changes 💔</h3>
 
 * (Compiler integrators only) The versions of StableHLO/LLVM/Enzyme used by Catalyst have been updated.
