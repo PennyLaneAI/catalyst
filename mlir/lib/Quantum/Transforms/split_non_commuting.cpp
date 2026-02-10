@@ -40,12 +40,15 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/PassManager.h"
 
 #include "Quantum/IR/QuantumOps.h"
+#include "Quantum/IR/QuantumTypes.h"
 #include "Quantum/Transforms/Passes.h"
 
 using namespace mlir;
@@ -93,26 +96,25 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
 
         if (auto *defOp = returnValue.getDefiningOp()) {
             worklist.push_back(defOp);
-            visited.insert(defOp);
         }
 
         while (!worklist.empty()) {
             Operation *op = worklist.pop_back_val();
+            if (!op || !visited.insert(op).second) {
+                continue;
+            }
+
+            if (isSupportedMeasOp(op)) {
+                assert(op->hasAttrOfType<IntegerAttr>("group") &&
+                       "measurement op must have group attribute");
+                return static_cast<int>(op->getAttrOfType<IntegerAttr>("group").getInt());
+                continue;
+            }
 
             for (Value operand : op->getOperands()) {
-                auto *defOp = operand.getDefiningOp();
-                if (!defOp || !visited.insert(defOp).second) {
-                    continue;
+                if (auto *defOp = operand.getDefiningOp()) {
+                    worklist.push_back(defOp);
                 }
-
-                if (isSupportedMeasOp(defOp)) {
-                    assert(defOp->hasAttrOfType<IntegerAttr>("group") &&
-                           "measurement op must have group attribute");
-                    return static_cast<int>(defOp->getAttrOfType<IntegerAttr>("group").getInt());
-                    continue;
-                }
-
-                worklist.push_back(defOp);
             }
         }
 
@@ -320,6 +322,23 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
         func::ReturnOp::create(builder, loc, finalReturnValues);
     }
 
+    /// Simplify the identity-expval to a constant 1.0.
+    void simplifyIdentityExpval(func::FuncOp funcOp)
+    {
+        funcOp.walk([&](ExpvalOp expvalOp) {
+            auto namedObsOp = expvalOp.getObs().getDefiningOp<NamedObsOp>();
+            if (namedObsOp && namedObsOp.getType() == NamedObservable::Identity) {
+                // Identity expval is always 1.0
+                OpBuilder builder(expvalOp);
+                Value one = arith::ConstantOp::create(builder, expvalOp.getLoc(),
+                                                      builder.getF64FloatAttr(1.0));
+                expvalOp.replaceAllUsesWith(one);
+                expvalOp.erase();
+                namedObsOp.erase();
+            }
+        });
+    }
+
     void runOnOperation() override
     {
         ModuleOp moduleOp = cast<ModuleOp>(getOperation());
@@ -344,6 +363,9 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
         });
 
         for (func::FuncOp funcOp : funcsToProcess) {
+            // Simplify the identity-expval to a constant 1.0.
+            simplifyIdentityExpval(funcOp);
+
             // Calculate the number of groups (no grouping strategy for now)
             int numGroups = calculateNumGroups(funcOp);
 
@@ -367,6 +389,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
 
             // Replace original function body with calls to group functions
             replaceOriginalWithCalls(funcOp, groupFunctions, *groupReturnPositions);
+            funcOp->removeAttr("qnode");
         }
     }
 };
