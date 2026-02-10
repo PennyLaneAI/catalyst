@@ -1,9 +1,33 @@
+#########
+## fmt ##
+#########
+
+FetchContent_Declare(
+    fmt
+    GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+    GIT_TAG        12.1.0
+)
+set(FMT_TESTS OFF CACHE INTERNAL "Disable building fmt tests")
+FetchContent_MakeAvailable(fmt)
+
+#########################################
+## CatalystCompilerDriver MLIR library ##
+#########################################
+
 find_package(Enzyme REQUIRED CONFIG)
 message(STATUS "Using EnzymeConfig.cmake in: ${Enzyme_DIR}")
 
 # TODO: remove this once Enzyme exports the static library target
 find_library(ENZYME_LIB EnzymeStatic-${LLVM_VERSION_MAJOR} PATHS ${Enzyme_DIR}/Enzyme/)
-message(STATUS "Found Enzyme lib: ${ENZYME_LIB}")
+if(ENZYME_LIB)
+    add_library(EnzymeStatic STATIC IMPORTED)
+    set_target_properties(EnzymeStatic PROPERTIES
+        IMPORTED_LOCATION ${ENZYME_LIB}
+        INTERFACE_LINK_LIBRARIES ""
+    )
+    set(ENZYME_LIB EnzymeStatic)
+    message(STATUS "Found Enzyme lib: ${ENZYME_LIB}")
+endif()
 
 include_directories(SYSTEM ${ENZYME_SRC_DIR}/enzyme/Enzyme)
 
@@ -50,6 +74,7 @@ set(LIBS
     rtio-transforms
     MLIRCatalystTest
     ${ENZYME_LIB}
+    fmt::fmt
 )
 
 add_mlir_library(CatalystCompilerDriver
