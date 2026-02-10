@@ -404,7 +404,14 @@ def test_ppr_to_ppm():
         qml.PauliRot(np.pi / 4, "Y", wires=0)
         qml.pauli_measure("X", wires=0)
 
-    # CHECK: qec.select.ppm
+    # CHECK: qec.ppm ["X", "Y"]
+    # CHECK: qec.ppm ["Y", "Z"]
+    # CHECK: scf.if
+    # CHECK: qec.ppm ["Y"]
+    # CHECK: }
+    # CHECK: else
+    # CHECK: qec.ppm ["X"]
+    # CHECK: }
     # CHECK-NOT: qec.ppr ["Y"](8)
     # CHECK: qec.ppm ["X"]
     print(circuit.mlir_opt)
@@ -432,7 +439,12 @@ def test_ppm_compilation():
         qml.pauli_measure("X", wires=0)
 
     # CHECK: qec.ppm ["X", "Z"]
-    # CHECK: qec.select.ppm
+    # CHECK: scf.if
+    # CHECK: qec.ppm ["Y"]
+    # CHECK: }
+    # CHECK: else
+    # CHECK: qec.ppm ["X"]
+    # CHECK: }
     # CHECK: qec.ppr ["X"](2)
     # CHECK: qec.ppm ["Y", "Z"]
     # CHECK-NOT: qec.ppr ["Z"](8)

@@ -242,47 +242,70 @@ def test_ppr_to_ppm():
 # CHECK: qec.ppm ["Z", "Y"](-1) {{.+}}, {{.+}} : i1, !quantum.bit, !quantum.bit
 # CHECK: qec.ppm ["X"] {{.+}} : i1, !quantum.bit
 # CHECK: arith.xori
-# CHECK: qec.ppr ["Z"](2) {{.+}} cond({{.+}})
+# CHECK: scf.if
+# CHECK: qec.ppr ["Z"](2) {{.+}}
+# CHECK: }
+
 
 # CHECK-LABEL: public @cir_inject_magic_state_0
 
 # FOR T gate
-# CHECK: qec.fabricate  magic
+# CHECK: quantum.custom "Hadamard"
+# CHECK: quantum.custom "T"
+# CHECK: qec.ppm ["Z", "Z"] {{.+}}, {{.+}}
 # CHECK: qec.ppm ["Z", "Z"] {{.+}}, {{.+}} cond({{.+}})
 # CHECK: qec.ppm ["X"] {{.+}} cond({{.+}})
 
 # FOR CNOT gate
-# CHECK: qec.fabricate  plus_i
+# CHECK: quantum.custom "Hadamard"
+# CHECK: quantum.custom "S"
 # Avoid Y-measurement, so Z-measurement should be used
 # CHECK: ["Z", "X", "Z"] {{.+}}, {{.+}}, {{.+}}
 # CHECK: qec.ppm ["X"] {{.+}} : i1, !quantum.bit
 # CHECK: arith.xori
-# CHECK: qec.ppr ["Z", "X"](2) {{.+}},{{.+}} cond({{.+}})
+# CHECK: scf.if
+# CHECK: qec.ppr ["Z", "X"](2) {{.+}},{{.+}}
+# CHECK: }
 
 # CHECK-LABEL: public @cir_pauli_corrected_0
 
 # FOR T gate
-# CHECK: qec.fabricate  magic
+# CHECK: quantum.custom "Hadamard"
+# CHECK: quantum.custom "T"
 # CHECK: qec.ppm ["Z", "Z"] {{.+}}, {{.+}}
-# CHECK: qec.select.ppm({{.+}}, ["Y"], ["X"])
-# CHECK: qec.ppr ["Z"](2) {{.+}} cond({{.+}})
+# CHECK: scf.if
+# CHECK: qec.ppm ["Y"]
+# CHECK: }
+# CHECK: else
+# CHECK: qec.ppm ["X"]
+# CHECK: }
+
+# CHECK: scf.if
+# CHECK: qec.ppr ["Z"](2) {{.+}}
+# CHECK: }
 
 # FOR CNOT gate
 # CHECK: ["Z", "X", "Y"](-1) {{.+}}, {{.+}}, {{.+}}
 # CHECK: qec.ppm ["X"] {{.+}}
 # CHECK: arith.xori
-# CHECK: qec.ppr ["Z", "X"](2) {{.+}},{{.+}} cond({{.+}})
+# CHECK: scf.if
+# CHECK: qec.ppr ["Z", "X"](2) {{.+}},{{.+}}
+# CHECK: }
 
 # CHECK-LABEL: public @cir_pauli_corrected_avoid_y_0
 
 # FOR T gate
-# CHECK: qec.fabricate  magic
+# CHECK: quantum.custom "Hadamard"
+# CHECK: quantum.custom "T"
 # CHECK: qec.ppm ["Z", "Z"] {{.+}}, {{.+}}
 # CHECK: scf.if {{.+}}
-# CHECK: qec.fabricate  plus_i
-# CHECK: qec.ppm ["Z", "Z"]
+# CHECK: quantum.custom "Hadamard"
+# CHECK: quantum.custom "S"
+# # CHECK: qec.ppm ["Z", "Z"]
 # CHECK: qec.ppm ["X", "X"]
-# CHECK: qec.ppr ["Z"](2) {{.+}} cond({{.+}})
+# CHECK: scf.if
+# CHECK: qec.ppr ["Z"](2) {{.+}}
+# CHECK: }
 # CHECK: quantum.dealloc_qb {{.+}}
 # CHECK: quantum.dealloc_qb {{.+}}
 # CHECK: scf.yield {{.+}}
@@ -293,12 +316,15 @@ def test_ppr_to_ppm():
 # CHECK: scf.yield {{.+}}
 
 # FOR CNOT gate
-# CHECK: qec.fabricate  plus_i
-# Avoid Y-measurement, so Z-measurement should be used
+# CHECK: quantum.custom "Hadamard"
+# CHECK: quantum.custom "S"
+# # Avoid Y-measurement, so Z-measurement should be used
 # CHECK: ["Z", "X", "Z"] {{.+}}, {{.+}}, {{.+}}
 # CHECK: qec.ppm ["X"] {{.+}} : i1, !quantum.bit
 # CHECK: arith.xori
-# CHECK: qec.ppr ["Z", "X"](2) {{.+}},{{.+}} cond({{.+}})
+# CHECK: scf.if
+# CHECK: qec.ppr ["Z", "X"](2) {{.+}},{{.+}}
+# CHECK: }
 test_ppr_to_ppm()
 
 
@@ -344,11 +370,21 @@ def test_clifford_to_ppm():
 
 # CHECK-LABEL: public @cir_clifford_to_ppm
 # decompose Clifford to PPM
-# CHECK: qec.select.ppm({{.+}}, ["X"], ["Z"])
+# CHECK: scf.if
+# CHECK: qec.ppm ["X"]
+# CHECK: }
+# CHECK: else
+# CHECK: qec.ppm ["Z"]
+# CHECK: }
 # CHECK: qec.ppm ["X", "Z", "Z"]
 # CHECK: qec.ppm ["Z", "Y"](-1)
 # CHECK: qec.ppm ["X"]
-# CEHCK: qec.select.ppm({{.+}}, ["X"], ["Z"])
+# CHECK: scf.if
+# CHECK: qec.ppm ["X"]
+# CHECK: }
+# CHECK: else
+# CHECK: qec.ppm ["Z"]
+# CHECK: }
 
 # CHECK-LABEL: public @cir_clifford_to_ppm_with_params
 # decompose Clifford to PPM with params
@@ -454,7 +490,7 @@ def test_decompose_arbitrary_ppr():
 
 # CHECK: qec.ppr ["Y"](8)
 # CHECK-NOT: qec.ppr ["Z"](2)
-# CHECK: qec.prepare  plus
+# CHECK: quantum.custom "Hadamard"
 # CHECK: qec.ppm ["X", "Y", "Z", "Z"]
 # CHECK: qec.ppr ["X"](2)
 # CHECK: qec.ppr.arbitrary ["Z"]
