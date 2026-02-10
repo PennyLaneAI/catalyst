@@ -429,15 +429,15 @@ def subroutine(func):
 
 def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None, op_type=None):
     """
-        Denotes the creation of a quantum definition in the intermediate representation.
+    Denotes the creation of a quantum definition in the intermediate representation.
 
-        Args:
-            func (Callable): the subroutine to apply in place of the replaced gate.
-            is_qreg (bool): ???
-            num_params (int): ???
-            pauli_word (???): ???
-            op_type (str): the name attribute of the MLIR representation of the op type to be
-                           replaced.
+    Args:
+        func (Callable): the subroutine to apply in place of the replaced gate.
+        is_qreg (bool): ???
+        num_params (int): ???
+        pauli_word (???): ???
+        op_type (str): the name attribute of the MLIR representation of the op type to be
+                       replaced.
 
     .. note::
 
