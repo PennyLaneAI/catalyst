@@ -268,8 +268,6 @@ def handle_qnode(
     consts = args[shots_len : n_consts + shots_len]
     non_const_args = args[shots_len + n_consts :]
 
-    print("self.decompose_tkwargs", self.decompose_tkwargs)
-
     use_device_specific_decomposition = (not self.requires_decompose_lowering or self.decompose_tkwargs.get("gate_set", None) is not None)
     device_capabilities = get_device_capabilities(device, execution_config, shots_len)
     device_diff_method = calculate_diff_method(qnode, qfunc_jaxpr)
@@ -606,7 +604,6 @@ def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=Non
         else tkwargs
     )
 
-    # TODO [Jeffrey]: I assume this is calling decompose_plxpr_to_plxpr() in the DecomposeInterpreter class in pennylane.
     if stopping_condition:
         kwargs["stopping_condition"] = stopping_condition
 
