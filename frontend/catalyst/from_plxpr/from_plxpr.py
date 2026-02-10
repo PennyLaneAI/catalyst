@@ -14,6 +14,8 @@
 """
 This submodule defines a utility for converting plxpr into Catalyst jaxpr.
 """
+
+
 # pylint: disable=protected-access
 
 import warnings
@@ -39,11 +41,7 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
-from catalyst.from_plxpr.decompose_utils import (
-    calculate_diff_method,
-    catalyst_acceptance,
-    get_device_capabilities,
-)
+from catalyst.from_plxpr.decompose_utils import get_device_capabilities
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
 from catalyst.jax_extras.patches import patched_make_eqn
 from catalyst.jax_primitives import (
