@@ -241,6 +241,13 @@ func.func @test_hermitian_op(%q0: !qref.bit, %matrix: tensor<2x2xcomplex<f64>>) 
 
 // -----
 
+func.func @test_measure_op(%q0: !qref.bit) {
+    %mres, %out_qubit = qref.measure %q0 : i1, !qref.bit
+    func.return
+}
+
+// -----
+
 func.func @test_expval_circuit() -> f64 {
     %a = qref.alloc(2) : !qref.reg<2>
     %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit

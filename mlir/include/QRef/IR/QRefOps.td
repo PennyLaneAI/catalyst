@@ -580,7 +580,27 @@ def HermitianOp : Observable_Op<"hermitian"> {
 
 // -----
 
-// class Measurement_Op<string mnemonic, list<Trait> traits = []> :
-//         Quantum_Op<mnemonic, traits # [MeasurementProcess]>;
+class Measurement_Op<string mnemonic, list<Trait> traits = []> :
+        QRef_Op<mnemonic, traits>;
+
+def MeasureOp : QRef_Op<"measure", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "A single-qubit projective measurement in the computational basis.";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        QRefQubitType:$in_qubit,
+        OptionalAttr<ConfinedAttr<I32Attr, [IntMinValue<0>, IntMaxValue<1>]>>:$postselect
+    );
+
+    let results = (outs
+        I1:$mres,
+        QRefQubitType:$out_qubit
+    );
+
+    let assemblyFormat = [{
+        $in_qubit (`postselect` $postselect^)? attr-dict `:` type(results)
+    }];
+}
 
 #endif // QREF_OPS
