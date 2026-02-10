@@ -118,7 +118,11 @@ def mlir_specs(
                 f"Requested specs levels {', '.join(missing)} not found in MLIR pass list."
             )
         return {
-            ", ".join(level_to_markers.get(lvl, f"{cache[lvl][1]} (MLIR-{lvl})")): cache[lvl][0]
+            (
+                ", ".join(m if not isinstance(m, str) else [m])
+                if (m := level_to_markers.get(lvl))
+                else f"{cache[lvl][1]} (MLIR-{lvl})"
+            ): cache[lvl][0]
             for lvl in level
             if lvl in cache
         }
