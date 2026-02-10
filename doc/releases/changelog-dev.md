@@ -2,6 +2,65 @@
 
 <h3>New features since last release</h3>
 
+* Added `capture` keyword argument to the `@qjit` decorator for per-function control over
+  PennyLane's program capture frontend. This allows selective use of the new capture-based
+  compilation pathway without affecting the global `qml.capture.enabled()` state. The parameter
+  accepts `"global"` (default, defer to global state), `True` (force capture on), or `False`
+  (force capture off). This enables safe testing and gradual migration to the capture system.
+  [(#2457)](https://github.com/PennyLaneAI/catalyst/pull/2457)
+
+* OQD (Open Quantum Design) end-to-end pipeline is added to Catalyst.
+  The pipeline supports compilation to LLVM IR using the `QJIT` constructor with `link=False`, enabling integration with ARTIQ's cross-compilation toolchain. The generated LLVM IR can be used with the internal `compile_to_artiq()` function from the third-party OQD repository to produce ARTIQ binaries.
+  [(#2299)](https://github.com/PennyLaneAI/catalyst/pull/2299)
+
+  see `frontend/test/test_oqd/oqd/test_oqd_artiq_llvmir.py` for more details.
+  Note: This PR only covers LLVM IR generation; the `compile_to_artiq` function itself is not included.
+
+  For example:
+  ```python
+  import os
+  import numpy as np
+  import pennylane as qml
+
+  from catalyst import qjit
+  from catalyst.third_party.oqd import OQDDevice, OQDDevicePipeline
+
+  OQD_PIPELINES = OQDDevicePipeline(
+      os.path.join("calibration_data", "device.toml"),
+      os.path.join("calibration_data", "qubit.toml"),
+      os.path.join("calibration_data", "gate.toml"),
+      os.path.join("device_db", "device_db.json"),
+  )
+
+  oqd_dev = OQDDevice(
+      backend="default",
+      shots=4,
+      wires=1
+  )
+  qml.capture.enable()
+
+  # Compile to LLVM IR only
+  @qml.qnode(oqd_dev)
+  def circuit():
+      x = np.pi / 2
+      qml.RX(x, wires=0)
+      return qml.counts(wires=0)
+
+  compiled_circuit = QJIT(circuit, CompileOptions(link=False, pipelines=OQD_PIPELINES))
+
+  # Compile to ARTIQ ELF
+  artiq_config = {
+      "kernel_ld": "/path/to/kernel.ld",
+      "llc_path": "/path/to/llc",
+      "lld_path": "/path/to/ld.lld",
+  }
+
+  output_elf_path = compile_to_artiq(compiled_circuit, artiq_config)
+  # Output:
+  # LLVM IR file written to: /path/to/circuit.ll
+  # [ARTIQ] Generated ELF: /path/to/circuit.elf
+  ```
+
 <h3>Improvements 🛠</h3>
 
 * `null.qubit` resource tracking is now able to track measurements and observables. This output
@@ -21,14 +80,28 @@
   length and the number of qubit operands are the same, and that all of the Pauli words are legal.
   [(#2405)](https://github.com/PennyLaneAI/catalyst/pull/2405)
 
-* `qml.vjp` can now be used with Catalyst and program capture.
+* `qml.vjp`  and `qml.jvp` can now be used with Catalyst and program capture.
   [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
+  [(#2316)](https://github.com/PennyLaneAI/catalyst/pull/2316)
 
 * The `measurements_from_samples` pass no longer results in `nan`s and cryptic error messages when
   `shots` aren't set. Instead, an informative error message is raised.
   [(#2456)](https://github.com/PennyLaneAI/catalyst/pull/2456)
 
 <h3>Breaking changes 💔</h3>
+
+* (Compiler integrators only) The versions of StableHLO/LLVM/Enzyme used by Catalyst have been updated.
+  [(#2415)](https://github.com/PennyLaneAI/catalyst/pull/2415)
+  [(#2416)](https://github.com/PennyLaneAI/catalyst/pull/2416)
+  [(#2444)](https://github.com/PennyLaneAI/catalyst/pull/2444)
+  [(#2445)](https://github.com/PennyLaneAI/catalyst/pull/2445)
+
+  - The StableHLO version has been updated to
+  [v1.13.7](https://github.com/openxla/stablehlo/tree/v1.13.7).
+  - The LLVM version has been updated to
+  [commit 8f26458](https://github.com/llvm/llvm-project/tree/8f264586d7521b0e305ca7bb78825aa3382ffef7).
+  - The Enzyme version has been updated to
+  [v0.0.238](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.238).
 
 * When an integer argnums is provided to `catalyst.vjp`, a singleton dimension is now squeezed
   out. This brings the behaviour in line with that of `grad` and `jacobian`.
@@ -140,6 +213,70 @@
   QEC state preparation operations.
   [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
 
+* A new compiler pass `split-to-single-terms` has been added for QNode functions containing
+  Hamiltonian expectation values. It facilitates execution on devices that don't natively support expectation values of sums of observables by splitting them into individual leaf observable expvals.
+  [(#2441)](https://github.com/PennyLaneAI/catalyst/pull/2441)
+
+  Consider the following example:
+  ```python
+  import pennylane as qml
+  from catalyst import qjit
+  from catalyst.passes import apply_pass
+
+  @qjit
+  @apply_pass("split-to-single-terms")
+  @qml.qnode(qml.device("lightning.qubit", wires=3))
+  def circuit():
+      # Hamiltonian H = Z(0) @ X(1) + 2*Y(2)
+      return qml.expval(qml.Z(0) @ qml.X(1) + 2 * qml.Y(2))
+  ```
+
+  The pass transforms the function by splitting the Hamiltonian into individual observables:
+
+  **Before:**
+  ```mlir
+  func @circ1(%arg0) -> (tensor<f64>) {qnode} {
+      // ... quantum ops ...
+      // Z(0) @ X(1)
+      %obs0 = quantum.namedobs %qubit0[ PauliZ] : !quantum.obs
+      %obs1 = quantum.namedobs %qubit1[ PauliX] : !quantum.obs
+      %T0 = quantum.tensor %obs0, %obs1 : !quantum.obs
+
+      // Y(2)
+      %obs2 = quantum.namedobs %qubit2[ PauliY] : !quantum.obs
+      %H0 = quantum.hamiltonian(%8 : tensor<1xf64>) %obs2 : !quantum.obs
+
+      %H = quantum.hamiltonian(%coeffs_2xf64) %T0, %H0 : !quantum.obs
+      %result = quantum.expval %H : f64   // H = c_0 * (Z @ X) + c_1 * Y
+
+      // ... to tensor ...
+      %tensor_result = tensor.from_elements %result : tensor<f64>
+      return %tensor_result
+  }
+  ```
+
+  **After:**
+  ```mlir
+  func @circ1.quantum() -> (tensor<f64>, tensor<f64>) {qnode} {
+      // ... quantum ops ...
+      %expval0 = quantum.expval %T0 : f64
+      %expval1 = quantum.expval %obs2 : f64
+
+      // ... to tensor ...
+      %tensor0 = tensor.from_elements %expval0 : tensor<f64>
+      %tensor1 = tensor.from_elements %expval1 : tensor<f64>
+      return %tensor0, %tensor1
+  }
+  func @circ1(%arg0) -> (tensor<f64>, tensor<f64>) {
+      // ... setup ...
+      %call:2 = call @circ1.quantum()
+
+      // Extract coefficients and compute weighted sum
+      %result = c0 * %call#0 + c1 * %call#1
+      return %result
+  }
+  ```
+
 <h3>Documentation 📝</h3>
 
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
@@ -158,9 +295,11 @@ Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
 Jeffrey Kam,
+Mehrdad Malekmohammadi,
 River McCubbin,
 Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,
 Paul Haochen Wang,
-Jake Zaia.
+Jake Zaia,
+Hongsheng Zheng.

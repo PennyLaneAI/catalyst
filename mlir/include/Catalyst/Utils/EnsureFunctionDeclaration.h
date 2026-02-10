@@ -41,7 +41,7 @@ OpT ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op, StringRe
         rewriter.setInsertionPointToStart(mod.getBody());
 
         // Create the specific function operation (LLVMFuncOp or FuncOp)
-        auto newFunc = rewriter.create<OpT>(op->getLoc(), fnSymbol, fnType);
+        auto newFunc = OpT::create(rewriter, op->getLoc(), fnSymbol, fnType);
 
         // Handle visibility differences:
         // func::FuncOp usually requires explicit private visibility for runtime decls.
