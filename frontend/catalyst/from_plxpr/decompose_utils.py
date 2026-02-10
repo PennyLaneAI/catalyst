@@ -8,8 +8,14 @@ from catalyst.device.capabilities_utils import (
 )
 from catalyst.device.capabilities_utils import load_device_capabilities as _load_device_capabilities
 from catalyst.device.capabilities_utils import requires_shots as _requires_shots
+from catalyst.device.decomposition import catalyst_acceptance as _catalyst_acceptance
 from catalyst.jax_primitives_utils import _calculate_diff_method
 from catalyst.utils.exceptions import CompileError
+
+
+def catalyst_acceptance(op, capabilities, diff_method):
+    """Check if an operation is supported by the device."""
+    return _catalyst_acceptance(op, capabilities, diff_method)
 
 
 def calculate_diff_method(device, execution_config):

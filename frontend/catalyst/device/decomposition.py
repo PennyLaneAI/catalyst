@@ -208,11 +208,11 @@ def decompose_ops_to_unitary(tape, convert_to_matrix_ops):
 
 def catalyst_acceptance(
     op: qml.operation.Operator, capabilities: DeviceCapabilities, grad_method: Union[str, None]
-) -> Union[str, None]:
+) -> bool:
     """Check whether an Operator is supported and returns the name of the operation or None."""
 
     if not is_differentiable(op, capabilities, grad_method):
-        return None
+        return False
 
     if isinstance(op, qml.ops.Adjoint):
         match = catalyst_acceptance(op.base, capabilities, grad_method)
@@ -228,9 +228,9 @@ def catalyst_acceptance(
             return match
 
     elif is_supported(op, capabilities):
-        return op.name
+        return True
 
-    return None
+    return False
 
 
 @transform

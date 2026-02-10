@@ -272,69 +272,90 @@ def handle_qnode(
     consts = args[shots_len : n_consts + shots_len]
     non_const_args = args[shots_len + n_consts :]
 
-    use_device_specific_decomposition = (
-        not self.requires_decompose_lowering
-        or self.decompose_tkwargs.get("gate_set", None) is not None
-    )
-    device_capabilities = get_device_capabilities(device, execution_config, shots_len)
-    device_diff_method = calculate_diff_method(qnode, qfunc_jaxpr)
-    device_stopping_condition = lambda op: catalyst_acceptance(
-        op, device_capabilities, device_diff_method
-    )
+    closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
 
-    if use_device_specific_decomposition:
-        # Use the device-specific stopping condition.
-        stopping_condition = device_stopping_condition
-    else:
-        # Use the user-provided stopping condition.
-        stopping_condition = self.decompose_tkwargs.get("stopping_condition")
-
-    closed_jaxpr = _apply_compiler_decompose_to_plxpr(
-        inner_jaxpr=qfunc_jaxpr,
-        consts=consts,
-        ncargs=non_const_args,
-        tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
-        stopping_condition=stopping_condition,
+    # We use device-specific decomposition if the user has not provided a gate set or specified a stopping condition.
+    use_device_specific_decomposition = not (
+        self.requires_decompose_lowering and self.decompose_tkwargs.get("gate_set", None)
     )
-
     graph_succeeded = False
 
-    if use_device_specific_decomposition:
-        # Use graph-based decomposition on device-specific gate set.
-        device_specific_gate_set = device_capabilities.operations.keys()
-        gateset = {"gate_set": device_specific_gate_set}
-        closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
-            inner_jaxpr=closed_jaxpr.jaxpr,
-            consts=closed_jaxpr.consts,
-            tkwargs=gateset,
-            ncargs=non_const_args,
-        )
-    elif self.requires_decompose_lowering and not stopping_condition:
-        # Use the user-provided gate set.
-        closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
-            inner_jaxpr=closed_jaxpr.jaxpr,
-            consts=closed_jaxpr.consts,
-            tkwargs=self.decompose_tkwargs,
-            ncargs=non_const_args,
-        )
-    elif self.requires_decompose_lowering and stopping_condition:
-        print(
-            "Graph based decomposition is not supported when an arbitrary stopping condition is provided. Using fallback decomposition."
-        )
-
-    # Fallback to the legacy decomposition if the graph-based decomposition failed
-    if not graph_succeeded:
-        # Remove the decompose-lowering pass from the pipeline
-        self._pass_pipeline = [
-            p for p in self._pass_pipeline if p.pass_name != "decompose-lowering"
-        ]
+    if stopping_condition := self.decompose_tkwargs.get("stopping_condition"):
+        # Case 1: User specified a stopping condition in decomposition
+        print("Using case 1: User specified a stopping condition in decomposition.")
+        # Use the plxpr decompose transform and ignore graph
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
-            inner_jaxpr=closed_jaxpr.jaxpr,
-            consts=closed_jaxpr.consts,
+            inner_jaxpr=qfunc_jaxpr,
+            consts=consts,
             ncargs=non_const_args,
-            tkwargs=self.decompose_tkwargs,
+            tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
             stopping_condition=stopping_condition,
         )
+    elif use_device_specific_decomposition:
+        # Case 2: User did not specify a decomposition. Using device-specific decomposition.
+        print(
+            "Using case 2: User did not specify a decomposition. Using device-specific decomposition."
+        )
+        device_capabilities = get_device_capabilities(device, execution_config, shots_len)
+        device_specific_gate_set = device_capabilities.operations.keys()
+        gateset = {"gate_set": device_specific_gate_set}
+        self.requires_decompose_lowering = True
+        self.decompose_tkwargs = gateset
+
+        # Option 1: Using device-specific stopping condition in plxpr transform.
+        # device_diff_method = calculate_diff_method(qnode, qfunc_jaxpr)
+        # stopping_condition = lambda op: catalyst_acceptance(
+        #     op, device_capabilities, device_diff_method
+        # )
+        # closed_jaxpr = _apply_compiler_decompose_to_plxpr(
+        #     inner_jaxpr=closed_jaxpr,
+        #     consts=consts,
+        #     ncargs=non_const_args,
+        #     tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
+        #     stopping_condition=stopping_condition,
+        # )
+
+        # Option 2: Using graph decomposition on device-specific gate set. (Ignore device-specific
+        # stopping condition.)
+
+        # Injecting the decompose-lowering pass into the pipeline if it is not already present.
+        # We need this for the graph-based decomposition to work in MLIR.
+        if not any(p.pass_name == "decompose-lowering" for p in self._pass_pipeline):
+            lower_pass = qml.transform(pass_name="decompose-lowering")
+            self._pass_pipeline.insert(0, qml.transforms.core.TransformContainer(lower_pass))
+
+        closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
+            inner_jaxpr=closed_jaxpr.jaxpr,
+            consts=closed_jaxpr.consts,
+            tkwargs=self.decompose_tkwargs,
+            ncargs=non_const_args,
+        )
+    else:
+        # Case 3: User defined decomposition with target gate set
+        print("Using case 3: User defined decomposition with target gate set.")
+        # Try to use graph-based decomposition.
+        closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
+            inner_jaxpr=closed_jaxpr.jaxpr,
+            consts=closed_jaxpr.consts,
+            tkwargs=self.decompose_tkwargs,
+            ncargs=non_const_args,
+        )
+
+        # Fallback to the legacy decomposition if the graph-based decomposition failed
+        if not graph_succeeded:
+            # Remove the decompose-lowering pass from the pipeline
+            self._pass_pipeline = [
+                p for p in self._pass_pipeline if p.pass_name != "decompose-lowering"
+            ]
+            closed_jaxpr = _apply_compiler_decompose_to_plxpr(
+                inner_jaxpr=closed_jaxpr.jaxpr,
+                consts=closed_jaxpr.consts,
+                ncargs=non_const_args,
+                tkwargs=self.decompose_tkwargs,
+                stopping_condition=stopping_condition,
+            )
+
+    # print("Closed Jaxpr", closed_jaxpr)
 
     def calling_convention(*args):
         device_init_p.bind(
@@ -615,6 +636,9 @@ def _apply_compiler_decompose_to_plxpr(
         if tgateset
         else tkwargs
     )
+
+    if kwargs is None:
+        kwargs = {}
 
     if stopping_condition:
         kwargs["stopping_condition"] = stopping_condition
