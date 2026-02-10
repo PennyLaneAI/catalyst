@@ -51,9 +51,9 @@ LogicalResult convertArbitraryPPRToArbitraryZ(PPRotationArbitraryOp &op, Pattern
     auto loc = op.getLoc();
 
     /// |+⟩──
-    auto allocateQubit = rewriter.create<AllocQubitOp>(loc);
+    auto allocateQubit = AllocQubitOp::create(rewriter, loc);
     auto plus = LogicalInitKind::plus;
-    auto plusQubit = rewriter.create<PrepareStateOp>(loc, plus, allocateQubit.getOutQubit());
+    auto plusQubit = PrepareStateOp::create(rewriter, loc, plus, allocateQubit.getOutQubit());
 
     // ┌───┐──
     // | P |──
@@ -64,7 +64,7 @@ LogicalResult convertArbitraryPPRToArbitraryZ(PPRotationArbitraryOp &op, Pattern
     PZ.emplace_back("Z");
     SmallVector<Value> inQubits = op.getInQubits();
     inQubits.emplace_back(plusQubit.getOutQubits().front());
-    auto ppmPZ = rewriter.create<PPMeasurementOp>(loc, PZ, inQubits);
+    auto ppmPZ = PPMeasurementOp::create(rewriter, loc, PZ, inQubits);
 
     // ════╗
     // ┌───╩───┐
@@ -73,19 +73,19 @@ LogicalResult convertArbitraryPPRToArbitraryZ(PPRotationArbitraryOp &op, Pattern
     SmallVector<StringRef> X = {"X"};
     const uint16_t PI2 = 2; // For rotation of P(PI/2)
     auto inQubit = ppmPZ.getOutQubits().back();
-    auto pprX = rewriter.create<PPRotationOp>(loc, X, PI2, inQubit, ppmPZ.getMres());
+    auto pprX = PPRotationOp::create(rewriter, loc, X, PI2, inQubit, ppmPZ.getMres());
 
     // ┌───────┐
     // | Z(phi)|──
     // └───────┘
     SmallVector<StringRef> Z = {"Z"};
     auto phi = op.getArbitraryAngle();
-    auto pprZ = rewriter.create<PPRotationArbitraryOp>(loc, Z, phi, pprX.getOutQubits());
+    auto pprZ = PPRotationArbitraryOp::create(rewriter, loc, Z, phi, pprX.getOutQubits());
 
     // ┌─╩─┐
     // | X |──
     // └───┘
-    auto ppmX = rewriter.create<PPMeasurementOp>(loc, X, pprZ.getOutQubits());
+    auto ppmX = PPMeasurementOp::create(rewriter, loc, X, pprZ.getOutQubits());
 
     // ┌───────┐──
     // | P(π/2)|──
@@ -94,12 +94,12 @@ LogicalResult convertArbitraryPPRToArbitraryZ(PPRotationArbitraryOp &op, Pattern
     SmallVector<Value> outPZQubits = ppmPZ.getOutQubits();
     outPZQubits.pop_back();
     auto P = op.getPauliProduct();
-    auto pprP = rewriter.create<PPRotationOp>(loc, P, PI2, outPZQubits, ppmX.getMres());
+    auto pprP = PPRotationOp::create(rewriter, loc, P, PI2, outPZQubits, ppmX.getMres());
 
     rewriter.replaceOp(op, pprP.getOutQubits());
 
     // Deallocate the axillary qubits |+⟩
-    rewriter.create<DeallocQubitOp>(loc, ppmX.getOutQubits().back());
+    DeallocQubitOp::create(rewriter, loc, ppmX.getOutQubits().back());
     return success();
 }
 

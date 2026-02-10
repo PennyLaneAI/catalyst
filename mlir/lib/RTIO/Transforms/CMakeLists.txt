@@ -3,6 +3,7 @@ set(LIBRARY_NAME rtio-transforms)
 file(GLOB SRC
     RTIOEventToARTIQ.cpp
     RTIOEventToARTIQPatterns.cpp
+    RTIOEmitARTIQRuntime.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

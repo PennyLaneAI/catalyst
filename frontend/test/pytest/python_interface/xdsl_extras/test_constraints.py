@@ -526,3 +526,14 @@ class TestNestedTupleOfConstraint:
             VerifyException, match="tuple leaf 1 failed all allowed constraints: memref<2xi32>"
         ):
             self.constraint.verify(tup, ConstraintContext())
+
+    def test_nested_tuple_of_constraint_properties(self):
+        """Test that the properties of NestedTupleOfConstraint object are correct."""
+        assert self.constraint.mapping_type_vars({}) is self.constraint
+
+    def test_nested_tuple_of_constraint_invalid_attr(self):
+        """Test that NestedTupleOfConstraint raises an error if the attribute being
+        verified is not a TupleType."""
+        tensor = TensorType(i32, [2])
+        with pytest.raises(VerifyException, match="expected TupleType"):
+            self.constraint.verify(tensor, ConstraintContext())

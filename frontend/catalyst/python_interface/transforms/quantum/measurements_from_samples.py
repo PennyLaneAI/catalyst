@@ -90,6 +90,8 @@ class MeasurementsFromSamplesPattern(RewritePattern):
         assert isinstance(
             shots, int
         ), f"Expected `shots` to be an integer value but got {type(shots).__name__}"
+        if shots == 0:
+            raise ValueError("The measurements_from_samples pass requires non-zero shots")
         self._shots = shots
 
     @abstractmethod
