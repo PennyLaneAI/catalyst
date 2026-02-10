@@ -5,11 +5,11 @@ from pennylane.devices.capabilities import DeviceCapabilities
 
 from catalyst.device.capabilities_utils import (
     filter_device_capabilities_with_shots as _filter_device_capabilities_with_shots,
-    load_device_capabilities as _load_device_capabilities,
-    requires_shots as _requires_shots,
 )
-from catalyst.utils.exceptions import CompileError
+from catalyst.device.capabilities_utils import load_device_capabilities as _load_device_capabilities
+from catalyst.device.capabilities_utils import requires_shots as _requires_shots
 from catalyst.jax_primitives_utils import _calculate_diff_method
+from catalyst.utils.exceptions import CompileError
 
 
 def calculate_diff_method(device, execution_config):
@@ -31,9 +31,7 @@ def filter_device_capabilities_with_shots(
     capabilities, shots_present, unitary_support=None
 ) -> DeviceCapabilities:
     """Process device capabilities depending on shots and unitary support."""
-    return _filter_device_capabilities_with_shots(
-        capabilities, shots_present, unitary_support
-    )
+    return _filter_device_capabilities_with_shots(capabilities, shots_present, unitary_support)
 
 
 def get_device_capabilities(

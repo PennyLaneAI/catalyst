@@ -39,6 +39,11 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
+from catalyst.from_plxpr.decompose_utils import (
+    calculate_diff_method,
+    catalyst_acceptance,
+    get_device_capabilities,
+)
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
 from catalyst.jax_extras.patches import patched_make_eqn
 from catalyst.jax_primitives import (
@@ -56,7 +61,6 @@ from .qubit_handler import (
     QubitIndexRecorder,
 )
 
-from catalyst.from_plxpr.decompose_utils import get_device_capabilities, catalyst_acceptance, calculate_diff_method
 
 def _tuple_to_slice(t):
     """Convert a tuple representation of a slice back to a slice object.
@@ -258,7 +262,7 @@ def handle_vjp(self, *args, jaxpr, **kwargs):
 def handle_qnode(
     self, *args, qnode, device, shots_len, execution_config, qfunc_jaxpr, n_consts, batch_dims=None
 ):
-    """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""    
+    """Handle the conversion from plxpr to Catalyst jaxpr for the qnode primitive"""
     self.qubit_index_recorder = QubitIndexRecorder()
 
     if shots_len > 1:
@@ -268,10 +272,15 @@ def handle_qnode(
     consts = args[shots_len : n_consts + shots_len]
     non_const_args = args[shots_len + n_consts :]
 
-    use_device_specific_decomposition = (not self.requires_decompose_lowering or self.decompose_tkwargs.get("gate_set", None) is not None)
+    use_device_specific_decomposition = (
+        not self.requires_decompose_lowering
+        or self.decompose_tkwargs.get("gate_set", None) is not None
+    )
     device_capabilities = get_device_capabilities(device, execution_config, shots_len)
     device_diff_method = calculate_diff_method(qnode, qfunc_jaxpr)
-    device_stopping_condition = lambda op: catalyst_acceptance(op, device_capabilities, device_diff_method)
+    device_stopping_condition = lambda op: catalyst_acceptance(
+        op, device_capabilities, device_diff_method
+    )
 
     if use_device_specific_decomposition:
         # Use the device-specific stopping condition.
@@ -279,7 +288,6 @@ def handle_qnode(
     else:
         # Use the user-provided stopping condition.
         stopping_condition = self.decompose_tkwargs.get("stopping_condition")
-
 
     closed_jaxpr = _apply_compiler_decompose_to_plxpr(
         inner_jaxpr=qfunc_jaxpr,
@@ -310,7 +318,9 @@ def handle_qnode(
             ncargs=non_const_args,
         )
     elif self.requires_decompose_lowering and stopping_condition:
-        print("Graph based decomposition is not supported when an arbitrary stopping condition is provided. Using fallback decomposition.")
+        print(
+            "Graph based decomposition is not supported when an arbitrary stopping condition is provided. Using fallback decomposition."
+        )
 
     # Fallback to the legacy decomposition if the graph-based decomposition failed
     if not graph_succeeded:
@@ -562,7 +572,9 @@ def trace_from_pennylane(
     return jaxpr, out_type, out_treedef, sig
 
 
-def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=None, tkwargs=None, stopping_condition=None):
+def _apply_compiler_decompose_to_plxpr(
+    inner_jaxpr, consts, ncargs, tgateset=None, tkwargs=None, stopping_condition=None
+):
     """Apply the compiler-specific decomposition for a given JAXPR.
 
     This function first disables the graph-based decomposition optimization
