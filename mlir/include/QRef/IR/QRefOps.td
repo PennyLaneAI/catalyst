@@ -485,6 +485,45 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOpera
 class Observable_Op<string mnemonic, list<Trait> traits = []> :
         QRef_Op<mnemonic, traits # [Pure]>;
 
+def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]> {
+    let summary = "Define a pseudo-observable of the computational basis for use in measurements";
+    let description = [{
+        The `qref.compbasis` operation defines a quantum observable to be used by other
+        operations such as measurement processes. The specific observable defined here is a
+        "pseudo" observable to represent measurements in the computational basis.
+        The only arguments are either the list of qubit references to measure, or the quantum
+        register refrence to measure. When the argument is a register, the measurement occurs
+        on all qubits in the register.
+
+        Example:
+
+        ```mlir
+        func.func @foo(%q0: !qref.bit, %q1: !qref.bit, %r: !qref.reg<5>)
+        {
+            %obs_q = qref.compbasis qubits %q0, %q1 : !quantum.obs
+            %obs_r = qref.compbasis (qreg %r : !qref.reg<5>) : !quantum.obs
+            func.return
+        }
+        ```
+    }];
+
+    let arguments = (ins
+        Variadic<QRefQubitType>:$qubits,
+        Optional<QRefQuregType>:$qreg
+    );
+
+    let results = (outs
+        ObservableType:$obs
+    );
+
+    let assemblyFormat = [{
+        (`qubits` $qubits^)? (`(` `qreg` $qreg `:` type($qreg)^ `)`)? attr-dict `:` type(results)
+    }];
+
+    // TODO
+    // let hasVerifier = 1;
+}
+
 def NamedObsOp : Observable_Op<"namedobs"> {
     let summary = "Define a Named observable for use in measurements";
     let description = [{

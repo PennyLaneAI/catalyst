@@ -212,6 +212,15 @@ func.func @test_qubit_unitary(%q0: !qref.bit, %q1: !qref.bit,
 
 // -----
 
+func.func @test_computational_basis_op(%q0: !qref.bit, %q1: !qref.bit, %r: !qref.reg<5>)
+{
+    %obs_q = qref.compbasis qubits %q0, %q1 : !quantum.obs
+    %obs_r = qref.compbasis (qreg %r : !qref.reg<5>) : !quantum.obs
+    func.return
+}
+
+// -----
+
 func.func @test_namedobs_op(%q0: !qref.bit) {
 
     %ox = qref.namedobs %q0 [ PauliX] : !quantum.obs
