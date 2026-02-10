@@ -12,13 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test module for the convert to MBQC formalism transform"""
-import pytest
-
-# pylint: disable=wrong-import-position,line-too-long
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
+# pylint: disable=line-too-long
 
 import pennylane as qml
+import pytest
 from pennylane.ftqc import RotXZX
 
 from catalyst.ftqc import mbqc_pipeline
@@ -28,6 +25,8 @@ from catalyst.python_interface.transforms import (
     decompose_graph_state_pass,
     measurements_from_samples_pass,
 )
+
+pytestmark = pytest.mark.xdsl
 
 
 class TestConvertToMBQCFormalismPass:

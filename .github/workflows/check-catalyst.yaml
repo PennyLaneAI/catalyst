@@ -473,7 +473,14 @@ jobs:
         # macOS requirements.txt
         python3 -m pip install cuda-quantum==0.6.0
         python3 -m pip install oqc-qcaas-client
+        # Install graphviz for testing the mlir-op-graph integration
+        sudo apt-get install -y graphviz
         make frontend
+
+    - name: Verify Graphviz installation
+      run: |
+        dot -V 
+        dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -533,17 +540,6 @@ jobs:
         MDD_BENCHMARK_PRECISION=1 \
         python3 -m pytest demos -k "tutorial_qft_arithmetics.ipynb" --nbmake
 
-    - name: Install Unified Compiler Dependencies
-      run: |
-        python3 -m pip install xdsl~=0.55.0 xdsl-jax==0.1.1
-        # Install graphviz for testing the mlir-op-graph integration
-        sudo apt-get install -y graphviz
-        python3 -m pip install graphviz
-
-    - name: Run Unified Compiler Tests
-      run: |
-        python3 -m pytest frontend/test/pytest -n auto -m "xdsl"
-
   frontend-tests-lightning-kokkos:
     name: Frontend Tests (backend="lightning.kokkos")
     needs: [constants, llvm, runtime, quantum, determine_runner]
@@ -599,7 +595,8 @@ jobs:
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
-        make pytest TEST_BACKEND="lightning.kokkos"
+        # Don't run xDSL tests
+        make pytest TEST_BACKEND="lightning.kokkos" XDSL_TESTS=OFF
 
   frontend-tests-openqasm-device:
     name: Frontend Tests (backend="openqasm3")

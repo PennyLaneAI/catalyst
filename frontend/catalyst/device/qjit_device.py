@@ -28,6 +28,7 @@ from typing import Any, Dict, Optional
 
 import pennylane as qml
 from jax.interpreters.partial_eval import DynamicJaxprTracer
+from pennylane import CompilePipeline
 from pennylane.devices.capabilities import (
     DeviceCapabilities,
     ExecutionCondition,
@@ -38,7 +39,6 @@ from pennylane.transforms import (
     split_non_commuting,
     split_to_single_terms,
 )
-from pennylane.transforms.core import TransformProgram
 
 from catalyst.device.decomposition import (
     catalyst_decompose,
@@ -315,7 +315,7 @@ class QJITDevice(qml.devices.Device):
                 describing parameters of the execution.
 
         Returns:
-            TransformProgram: A transform program that when called returns QuantumTapes that can be
+            CompilePipeline: A compile pipeline that when called returns QuantumTapes that can be
                 compiled for the backend, and a postprocessing function to be called on the results
             ExecutionConfig: configuration with unset specifications filled in if relevant.
 
@@ -328,7 +328,7 @@ class QJITDevice(qml.devices.Device):
             execution_config = qml.devices.ExecutionConfig()
         _, config = self.original_device.preprocess(execution_config)
 
-        program = TransformProgram()
+        pipeline = CompilePipeline()
 
         # During preprocessing, we now have info on whether the user is requesting execution
         # with shots.
@@ -356,10 +356,10 @@ class QJITDevice(qml.devices.Device):
         # measurement transformations, so must occur before decomposition
         measurement_transforms = self._measurement_transform_program(capabilities)
         config = replace(config, device_options=deepcopy(config.device_options))
-        program = program + measurement_transforms
+        pipeline += measurement_transforms
 
         # decomposition to supported ops/measurements
-        program.add_transform(
+        pipeline.add_transform(
             catalyst_decompose,
             ctx=ctx,
             capabilities=capabilities,
@@ -367,10 +367,10 @@ class QJITDevice(qml.devices.Device):
         )
 
         # Catalyst program verification and validation
-        program.add_transform(
+        pipeline.add_transform(
             verify_operations, grad_method=config.gradient_method, qjit_device=self
         )
-        program.add_transform(
+        pipeline.add_transform(
             validate_measurements,
             capabilities,
             self.original_device.name,
@@ -378,57 +378,57 @@ class QJITDevice(qml.devices.Device):
         )
 
         if config.gradient_method is not None:
-            program.add_transform(verify_no_state_variance_returns)
+            pipeline.add_transform(verify_no_state_variance_returns)
         if config.gradient_method == "adjoint":
-            program.add_transform(validate_observables_adjoint_diff, qjit_device=self)
+            pipeline.add_transform(validate_observables_adjoint_diff, qjit_device=self)
         elif config.gradient_method == "parameter-shift":
-            program.add_transform(validate_observables_parameter_shift)
+            pipeline.add_transform(validate_observables_parameter_shift)
 
-        return program, config
+        return pipeline, config
 
     def _measurement_transform_program(self, capabilities):
-        measurement_program = TransformProgram()
+        measurement_pipeline = CompilePipeline()
         if isinstance(self.original_device, SoftwareQQPP):
-            return measurement_program
+            return measurement_pipeline
 
         supports_sum_observables = "Sum" in capabilities.observables
         if capabilities.non_commuting_observables is False:
-            measurement_program.add_transform(split_non_commuting)
+            measurement_pipeline.add_transform(split_non_commuting)
         elif not supports_sum_observables:
-            measurement_program.add_transform(split_to_single_terms)
+            measurement_pipeline.add_transform(split_to_single_terms)
 
         # if no observables are supported, we apply a transform to convert *everything* to the
         # readout basis, using either sample or counts based on device specification
         if not capabilities.observables:
-            if not split_non_commuting in measurement_program:
+            if not split_non_commuting in measurement_pipeline:
                 # this *should* be redundant, a TOML that doesn't have observables should have
                 # a False non_commuting_observables flag, but we aren't enforcing that
-                measurement_program.add_transform(split_non_commuting)
+                measurement_pipeline.add_transform(split_non_commuting)
             if "SampleMP" in capabilities.measurement_processes:
-                measurement_program.add_transform(measurements_from_samples, self.wires)
+                measurement_pipeline.add_transform(measurements_from_samples, self.wires)
             elif "CountsMP" in capabilities.measurement_processes:
-                measurement_program.add_transform(measurements_from_counts, self.wires)
+                measurement_pipeline.add_transform(measurements_from_counts, self.wires)
             else:
                 raise RuntimeError("The device does not support observables or sample/counts")
 
         elif not capabilities.measurement_processes.keys() - {"CountsMP", "SampleMP"}:
             # ToDo: this branch should become unnecessary when selective conversion of
             # unsupported MPs is finished, see ToDo below
-            if not split_non_commuting in measurement_program:  # pragma: no branch
-                measurement_program.add_transform(split_non_commuting)
+            if not split_non_commuting in measurement_pipeline:  # pragma: no branch
+                measurement_pipeline.add_transform(split_non_commuting)
             mp_transform = (
                 measurements_from_samples
                 if "SampleMP" in capabilities.measurement_processes
                 else measurements_from_counts
             )
-            measurement_program.add_transform(mp_transform, self.wires)
+            measurement_pipeline.add_transform(mp_transform, self.wires)
 
         # if only some observables are supported, we try to diagonalize those that aren't
         elif not {"PauliX", "PauliY", "PauliZ", "Hadamard"}.issubset(capabilities.observables):
-            if not split_non_commuting in measurement_program:
+            if not split_non_commuting in measurement_pipeline:
                 # the device might support non commuting measurements but not all the
                 # Pauli + Hadamard observables, so here it is needed
-                measurement_program.add_transform(split_non_commuting)
+                measurement_pipeline.add_transform(split_non_commuting)
             _obs_dict = {
                 "PauliX": qml.X,
                 "PauliY": qml.Y,
@@ -441,14 +441,14 @@ class QJITDevice(qml.devices.Device):
             )
             supported_observables = [_obs_dict[obs] for obs in supported_observables]
 
-            measurement_program.add_transform(
+            measurement_pipeline.add_transform(
                 diagonalize_measurements, supported_base_obs=supported_observables
             )
 
         # ToDo: if some measurement types are unsupported, convert the unsupported MPs to
         # samples or counts (without diagonalizing or modifying observables). See ToDo above.
 
-        return measurement_program
+        return measurement_pipeline
 
     def execute(self, circuits, execution_config):
         """

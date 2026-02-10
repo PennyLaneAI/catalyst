@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Unit and integration tests for the unified compiler `decompose-graph-state` transform.
 
 FileCheck notation hint:
@@ -20,18 +19,16 @@ FileCheck notation hint:
     number indicates the wire index of that qubit, and the second letter increments by one after
     each use.
 """
-
-# pylint: disable=wrong-import-position,line-too-long
+# pylint: disable=line-too-long
 
 import pytest
-
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
 
 from catalyst.python_interface.transforms import (
     DecomposeGraphStatePass,
     NullDecomposeGraphStatePass,
 )
+
+pytestmark = pytest.mark.xdsl
 
 
 class TestDecomposeGraphStatePass:

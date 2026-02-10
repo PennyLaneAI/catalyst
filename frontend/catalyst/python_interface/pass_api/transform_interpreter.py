@@ -27,13 +27,15 @@ See here (link valid with xDSL 0.46): https://github.com/xdslproject/xdsl/blob/3
 """
 
 import io
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from typing import Any
 
 from xdsl.context import Context
 from xdsl.dialects import builtin
 from xdsl.dialects.transform import ApplyRegisteredPassOp, NamedSequenceOp
 from xdsl.interpreter import Interpreter, PythonValues, impl, register_impls
 from xdsl.interpreters.transform import TransformFunctions
+from xdsl.ir import Attribute
 from xdsl.parser import Parser
 from xdsl.passes import ModulePass, PassPipeline
 from xdsl.printer import Printer
@@ -41,6 +43,7 @@ from xdsl.rewriter import Rewriter
 from xdsl.utils.exceptions import PassFailedException
 
 from catalyst.compiler import _quantum_opt
+from catalyst.python_interface.utils import get_pyval_from_xdsl_attr
 
 
 @register_impls
@@ -89,7 +92,8 @@ class TransformFunctionsExt(TransformFunctions):
         # ---- xDSL path ----
         if pass_name in self.passes:
             pass_class = self.passes[pass_name]()
-            pass_instance = pass_class(**op.options.data)
+            options = get_pyval_from_xdsl_attr(op.options)
+            pass_instance = pass_class(**options)
             pipeline = PassPipeline((pass_instance,))
             self._pre_pass_callback(pass_instance, module)
             pipeline.apply(self.ctx, module)
@@ -99,14 +103,12 @@ class TransformFunctionsExt(TransformFunctions):
         # ---- Catalyst path ----
         buffer = io.StringIO()
         Printer(stream=buffer, print_generic_format=True).print_op(module)
-
-        schedule = f"--{pass_name}"
+        schedule = _create_schedule([op])
         self._pre_pass_callback(pass_name, module)
-        modified = _quantum_opt(schedule, "-mlir-print-op-generic", stdin=buffer.getvalue())
+        modified = _quantum_opt(*schedule, "-mlir-print-op-generic", stdin=buffer.getvalue())
 
         data = Parser(self.ctx, modified).parse_module()
-        rewriter = Rewriter()
-        rewriter.replace_op(module, data)
+        Rewriter.replace_op(module, data)
         self._post_pass_callback(pass_name, data)
         return (data,)
 
@@ -143,3 +145,76 @@ class TransformInterpreterPass(ModulePass):
         if self.callback:
             self.callback(None, op, None, pass_level=0)
         interpreter.call_op(schedule, (op,))
+
+
+def _create_schedule(pass_ops: Sequence[ApplyRegisteredPassOp]) -> list[str]:
+    """Create a pass schedule for applying MLIR pass via CLI flags.
+
+    For a pass with options, the corresponding CLI flag will be the following:
+
+    .. code-block::
+
+        "--my-pass=arg1=val1 arg2=val2 ..."
+
+    Args:
+        pass_ops (Sequence[xdsl.dialects.transform.ApplyRegisteredPassOp]): The
+            passes to schedule
+
+    Returns:
+        list[str]: A list containing strings that correspond to the CLI flags
+        for the specified passes
+    """
+    schedule: list[str] = []
+
+    for op in pass_ops:
+        pass_name = op.pass_name.data
+        pass_options = op.options.data
+
+        if not pass_options:
+            schedule.append(f"--{pass_name}")
+            continue
+
+        cli_options = []
+        for opt, val in pass_options.items():
+            cli_options.append(f"{opt}={_get_cli_option_from_attr(val)}")
+        cli_options = " ".join(cli_options)
+
+        cli_pass = f"--{pass_name}={cli_options}"
+        schedule.append(cli_pass)
+
+    return schedule
+
+
+def _get_cli_option_from_attr(attr: Attribute) -> Any:
+    """Convert an xDSL attribute corresponding to a pass option value into a valid
+    CLI option value."""
+    cli_val = None
+
+    match attr:
+        case builtin.IntegerAttr():
+            # Booleans are represented as integer attributes with a bitwidth of 1
+            if isinstance(attr.type, builtin.IntegerType) and attr.type.width.data == 1:
+                # Python boolean's repr is capitalized so we use strings
+                cli_val = "true" if attr.value.data else "false"
+            else:
+                cli_val = attr.value.data
+
+        case builtin.FloatAttr():
+            cli_val = attr.value.data
+
+        case builtin.StringAttr():
+            cli_val = f"'{attr.data}'"
+
+        case builtin.ArrayAttr():
+            cli_val = ",".join([str(_get_cli_option_from_attr(attr)) for attr in attr.data])
+
+        case builtin.DictionaryAttr():
+            mapping = []
+            for k, v in attr.data.items():
+                mapping.append(f"{k}={_get_cli_option_from_attr(v)}")
+            cli_val = f"{{{' '.join(mapping)}}}"
+
+        case _:  # pragma: no cover
+            raise ValueError(f"Unsupported option type {attr}.")
+
+    return cli_val

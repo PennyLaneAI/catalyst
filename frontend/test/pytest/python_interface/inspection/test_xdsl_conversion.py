@@ -13,16 +13,13 @@
 # limitations under the License.
 """Unit test module for the utilities in xdsl_conversion.py"""
 
-import pytest
-
-pytestmark = pytest.mark.xdsl
-xdsl = pytest.importorskip("xdsl")
-
-# pylint: disable=wrong-import-position
 import pennylane as qml
+import pytest
 from jaxlib.mlir._mlir_libs._mlir.ir import Module
 
 from catalyst.python_interface.inspection.xdsl_conversion import get_mlir_module
+
+pytestmark = pytest.mark.xdsl
 
 
 class TestGetMLIRModule:

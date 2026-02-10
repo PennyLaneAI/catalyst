@@ -17,14 +17,16 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
-from ..compiler import Compiler
+from pennylane.workflow.qnode import QNode
+
+from catalyst.jit import QJIT
+from catalyst.passes.pass_api import PassPipelineWrapper
+from catalyst.python_interface.compiler import Compiler
+
 from .specs_collector import ResourcesResult, specs_collect
 from .xdsl_conversion import get_mlir_module
-
-if TYPE_CHECKING:
-    from catalyst.jit import QJIT
 
 
 class StopCompilation(Exception):
@@ -37,7 +39,7 @@ def mlir_specs(
     """Compute the specs used for a circuit at the level of an MLIR pass.
 
     Args:
-        qnode (QNode): The (QJIT'd) qnode to get the specs for
+        qnode (QJIT): The (QJIT'd) qnode to get the specs for
         level (int | tuple[int] | list[int] | "all"): The MLIR pass level to get the specs for
         *args: Positional arguments to pass to the QNode
         **kwargs: Keyword arguments to pass to the QNode
@@ -46,6 +48,18 @@ def mlir_specs(
         ResourcesResult | dict[str, ResourcesResult]: The resources for the circuit at the
           specified level
     """
+
+    if not isinstance(qnode, QJIT) or (
+        not isinstance(qnode.original_function, QNode)
+        and not (
+            isinstance(qnode.original_function, PassPipelineWrapper)
+            and isinstance(qnode.original_qnode, QNode)
+        )
+    ):
+        raise ValueError(
+            "The provided `qnode` argument does not appear to be a valid QJIT compiled QNode."
+        )
+
     cache: dict[int, tuple[ResourcesResult, str]] = {}
 
     if args or kwargs:

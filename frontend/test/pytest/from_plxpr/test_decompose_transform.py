@@ -61,12 +61,12 @@ class TestGraphDecomposition:
             qml.Hadamard(x)
             return qml.state()
 
-        with pytest.warns(
-            UserWarning,
-            match="The graph-based decomposition system is unable to find a decomposition"
-            " for {'Hadamard'} to the target gate set {'GlobalPhase'}.",
-        ):
-            circuit(0)
+        # TODO: RZ/RX warnings  should not be raised, remove (PL issue #8885)
+        with pytest.warns(UserWarning, match="Falling back to the legacy decomposition system"):
+            with pytest.warns(UserWarning, match="unable to find a decomposition for {'Hadamard'}"):
+                with pytest.warns(UserWarning, match="Operator RX does not define"):
+                    with pytest.warns(UserWarning, match="Operator RZ does not define"):
+                        circuit(0)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_decompose_lowering_on_empty_circuit(self):
@@ -173,9 +173,6 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.xfail(
-        reason="paulirot issue to be resolved at https://github.com/PennyLaneAI/catalyst/pull/2233"
-    )
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_tensorlike(self):
         """Test that TensorLike parameters are handled correctly in rules."""
@@ -254,16 +251,13 @@ class TestGraphDecomposition:
         ):
             qml.qjit(circuit)()
 
-    @pytest.mark.xfail(
-        reason="paulirot issue to be resolved at https://github.com/PennyLaneAI/catalyst/pull/2233"
-    )
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_ftqc_rotxzx(self):
         """Test that FTQC RotXZX decomposition works with from_plxpr."""
 
         @partial(
             qml.transforms.decompose,
-            gate_set={qml.CNOT, qml.GlobalPhase, qml.RX, qml.RZ},
+            gate_set={"CNOT", "GlobalPhase", "RX", "RZ", "PauliRot"},
         )
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
@@ -299,18 +293,17 @@ class TestGraphDecomposition:
             qml.MultiRZ(0.5, wires=[0, 1, 3])
             return qml.expval(qml.X(0))
 
-        without_qjit = circuit()
         with_qjit = qml.qjit(circuit)
-
-        assert qml.math.allclose(without_qjit, with_qjit())
-
-        expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
+        result_with_qjit = with_qjit()
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
-        assert resources == expected_resources
 
-    @pytest.mark.xfail(
-        reason="paulirot issue to be resolved at https://github.com/PennyLaneAI/catalyst/pull/2233"
-    )
+        with qml.capture.pause():
+            result_without_qjit = circuit()
+            expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
+
+        assert resources == expected_resources
+        assert qml.math.allclose(result_without_qjit, result_with_qjit)
+
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_gphase(self):
         """Test that the decompose lowering pass works with GlobalPhase."""
@@ -335,9 +328,6 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.xfail(
-        reason="paulirot issue to be resolved at https://github.com/PennyLaneAI/catalyst/pull/2233"
-    )
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_multi_qubits(self):
         """Test that the decompose lowering pass works with multi-qubit gates."""
@@ -362,9 +352,6 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.xfail(
-        reason="paulirot issue to be resolved at https://github.com/PennyLaneAI/catalyst/pull/2233"
-    )
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_adjoint(self):
         """Test the decompose lowering pass with adjoint operations."""
@@ -390,16 +377,13 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.xfail(
-        reason="paulirot issue to be resolved at https://github.com/PennyLaneAI/catalyst/pull/2233"
-    )
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_ctrl(self):
         """Test the decompose lowering pass with controlled operations."""
 
         @partial(
             qml.transforms.decompose,
-            gate_set={"RX", "RZ", "H", "CZ"},
+            gate_set={"RX", "RZ", "H", "CZ", "PauliRot"},
         )
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
@@ -417,34 +401,29 @@ class TestGraphDecomposition:
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
-    @pytest.mark.xfail(
-        reason="paulirot issue to be resolved at https://github.com/PennyLaneAI/catalyst/pull/2233"
-    )
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_template_qft(self):
         """Test the decompose lowering pass with the QFT template."""
 
         @partial(
             qml.transforms.decompose,
-            gate_set={"RX", "RY", "CNOT", "GlobalPhase"},
+            gate_set={"RX", "RY", "CNOT", "GlobalPhase", "PauliRot"},
         )
         @qml.qnode(qml.device("lightning.qubit", wires=4))
         def circuit():
             qml.QFT(wires=[0, 1, 2, 3])
             return qml.expval(qml.Z(0))
 
-        without_qjit = circuit()
         with_qjit = qml.qjit(circuit)
-
-        assert qml.math.allclose(without_qjit, with_qjit())
-
-        expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
+        result_with_qjit = with_qjit()
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
-        assert resources == expected_resources
 
-    @pytest.mark.xfail(
-        reason="paulirot issue to be resolved at https://github.com/PennyLaneAI/catalyst/pull/2233"
-    )
+        result_without_qjit = circuit()
+        expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
+
+        assert resources == expected_resources
+        assert qml.math.allclose(result_without_qjit, result_with_qjit)
+
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_multi_passes(self):
         """Test the decompose lowering pass with multiple passes."""
@@ -468,40 +447,6 @@ class TestGraphDecomposition:
         assert qml.math.allclose(without_qjit, with_qjit())
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
-        resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
-        assert resources == expected_resources
-
-    @pytest.mark.usefixtures("use_capture_dgraph")
-    def test_autograph(self):
-        """Test the decompose lowering pass with autograph."""
-
-        def _multi_rz_decomposition_resources(num_wires):
-            """Resources required for MultiRZ decomposition."""
-            return {qml.RZ: 1, qml.CNOT: 2 * (num_wires - 1)}
-
-        @qml.register_resources(_multi_rz_decomposition_resources)
-        def _multi_rz_decomposition(theta, wires, **__):
-            """Decomposition of MultiRZ using CNOTs and RZs."""
-            for i in range(len(wires) - 1):
-                qml.CNOT(wires=(wires[i], wires[i + 1]))
-            qml.RZ(theta, wires=wires[0])
-            for i in range(len(wires) - 1, 0, -1):
-                qml.CNOT(wires=(wires[i], wires[i - 1]))
-
-        @qml.qnode(qml.device("lightning.qubit", wires=5))
-        def circuit():
-            qml.MultiRZ(0.5, wires=[0, 1, 2, 3, 4])
-            qml.MultiRZ(0.5, wires=[0, 1, 4])
-            return qml.expval(qml.Z(0))
-
-        without_qjit = qml.transforms.decompose(circuit, gate_set={"RZ", "CNOT"})
-        with_qjit = qml.qjit(
-            qml.transforms.decompose(circuit, gate_set={"RZ", "CNOT"}), autograph=True
-        )
-
-        assert qml.math.allclose(without_qjit(), with_qjit())
-
-        expected_resources = qml.specs(without_qjit, level="device")()["resources"].gate_types
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 

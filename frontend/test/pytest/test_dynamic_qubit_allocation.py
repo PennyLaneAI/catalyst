@@ -248,6 +248,7 @@ def test_dynamic_wire_alloc_cond_outside(cond, expected, backend):
         with qml.allocate(1) as q1:
             with qml.allocate(1) as q2:
                 qml.X(q1[0])
+                qml.Identity(0)
                 if c:
                     qml.CNOT(wires=[q1[0], 1])  # |01>
                 else:
@@ -609,6 +610,40 @@ def test_unsupported_adjoint(backend):
             with qml.allocate(1) as q:
                 qml.adjoint(qml.X)(q[0])
             return qml.probs(wires=[0, 1])
+
+
+@pytest.mark.usefixtures("use_capture")
+@pytest.mark.parametrize(
+    "measurement_fn, shots",
+    [
+        (lambda: qml.expval(qml.Z(0)), None),
+        (lambda: qml.var(qml.Z(0)), None),
+        (lambda: qml.sample(wires=[0]), 10),
+    ],
+)
+def test_non_probs_measurement_with_dynamic_wires(backend, measurement_fn, shots):
+    """
+    Test that an error is raised when using non-probs measurements with dynamic wire allocations.
+    """
+
+    with pytest.raises(
+        CompileError,
+        match=textwrap.dedent(
+            """
+            Only probability measurements \\(qml.probs\\) are currently supported
+            when dynamic allocations are present in the program. Other measurement
+            types \\(qml.sample, qml.expval, qml.var, ...etc\\) will be supported
+            in a future release after the underlying bug is fixed.
+            """
+        ),
+    ):
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1), shots=shots)
+        def circuit():
+            with qml.allocate(1) as q:
+                qml.X(q[0])
+            return measurement_fn()
 
 
 if __name__ == "__main__":

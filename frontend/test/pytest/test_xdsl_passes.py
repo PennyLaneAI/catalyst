@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Unit tests for xDSL pass-related functionality in the Compiler class.
 """
+# pylint: disable=protected-access
 
 import os
 import pathlib
@@ -28,8 +28,6 @@ from catalyst import qjit
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.pipelines import KeepIntermediateLevel
 from catalyst.utils.filesystem import Directory
-
-# pylint: disable=protected-access
 
 
 @pytest.mark.xdsl
@@ -172,20 +170,23 @@ class TestXDSLPassesIntegration:
         from catalyst.python_interface.transforms import merge_rotations_pass
 
         @qjit(keep_intermediate="changed", verbose=True)
-        def workflow():
+        def workflow(x):
             @merge_rotations_pass
             @qml.transforms.cancel_inverses
             @qml.qnode(qml.device("lightning.qubit", wires=2))
-            def f(x):
-                qml.RX(x, 0)
+            def f(_x):
+                qml.RX(_x, 0)
                 qml.RX(1.6, 0)
                 qml.Hadamard(1)
                 qml.Hadamard(1)
                 return qml.expval(qml.Z(0))
 
-            return f(1.5)
+            return f(x)
 
-        workflow()
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        workflow.use_cwd_for_workspace = False
+
+        workflow.jit_compile((1.2,))
         workspace_path = str(workflow.workspace)
         assert os.path.exists(
             os.path.join(workspace_path, "0_QuantumCompilationStage", "1_cancel-inverses.mlir")

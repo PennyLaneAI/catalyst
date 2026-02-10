@@ -246,13 +246,17 @@ class TestPrintStage:
         """Test that the IR can be printed after the HLO lowering pipeline."""
 
         @qjit(keep_intermediate=True)
-        def func():
-            return 0
+        def func(x):
+            return x
+
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        func.use_cwd_for_workspace = False
+        func.jit_compile((0,))
 
         print(get_compilation_stage(func, "HLOLoweringStage"))
 
         out, _ = capsys.readouterr()
-        assert "@jit_func() -> tensor<i64>" in out
+        assert "@jit_func(%arg0: tensor<i64>) -> tensor<i64>" in out
         assert "stablehlo.constant" not in out
 
         func.workspace.cleanup()
@@ -339,12 +343,17 @@ class TestCProgramGeneration:
         with pytest.raises(TypeError, match="First argument needs to be a 'QJIT' object"):
             get_cmain(f, 0.5)
 
-    @pytest.mark.skip
     @pytest.mark.parametrize(
         ("pass_name", "target", "replacement"),
         [
             (
                 "mlir",
+                "%0 = stablehlo.multiply %arg0, %arg0 : tensor<f64>\n",
+                "%x = stablehlo.multiply %arg0, %arg0 : tensor<f64>\n"
+                + "    %0 = stablehlo.multiply %x, %arg0 : tensor<f64>\n",
+            ),
+            (
+                "QuantumCompilationStage",
                 "%0 = stablehlo.multiply %arg0, %arg0 : tensor<f64>\n",
                 "%x = stablehlo.multiply %arg0, %arg0 : tensor<f64>\n"
                 + "    %0 = stablehlo.multiply %x, %arg0 : tensor<f64>\n",
@@ -356,20 +365,14 @@ class TestCProgramGeneration:
                 + "    %0 = arith.mulf %t, %extracted : f64\n",
             ),
             (
-                "QuantumCompilationStage",
-                "%0 = arith.mulf %extracted, %extracted : f64\n",
-                "%t = arith.mulf %extracted, %extracted : f64\n"
-                + "    %0 = arith.mulf %t, %extracted : f64\n",
-            ),
-            (
                 "BufferizationStage",
-                "%2 = arith.mulf %1, %1 : f64",
+                "%2 = arith.mulf %1, %1 : f64\n",
                 "%t = arith.mulf %1, %1 : f64\n" + "    %2 = arith.mulf %t, %1 : f64\n",
             ),
             (
                 "MLIRToLLVMDialectConversion",
-                "%5 = llvm.fmul %4, %4  : f64\n",
-                "%t = llvm.fmul %4, %4  : f64\n" + "    %5 = llvm.fmul %t, %4  : f64\n",
+                "%7 = llvm.fmul %6, %6 : f64\n",
+                "%t = llvm.fmul %6, %6  : f64\n" + "    %7 = llvm.fmul %t, %6  : f64\n",
             ),
             (
                 "LLVMIRTranslation",
@@ -391,6 +394,9 @@ class TestCProgramGeneration:
             return x**2
 
         jit_f = qjit(f, keep_intermediate=True)
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        jit_f.use_cwd_for_workspace = False
+
         data = 2.0
         old_result = jit_f(data)
         old_ir = get_compilation_stage(jit_f, pass_name)
@@ -404,16 +410,30 @@ class TestCProgramGeneration:
         shutil.rmtree(str(jit_f.workspace), ignore_errors=True)
         assert old_result * data == new_result
 
-    @pytest.mark.parametrize("pass_name", ["HLOLoweringStage", "O2Opt", "Enzyme"])
+    @pytest.mark.parametrize(
+        "pass_name",
+        [
+            "QuantumCompilationStage",
+            "HLOLoweringStage",
+            "GradientLoweringStage",
+            "BufferizationStage",
+            "MLIRToLLVMDialectConversion",
+            "LLVMIRTranslation",
+            "O2Opt",
+            "Enzyme",
+        ],
+    )
     def test_modify_ir_file_generation(self, pass_name):
         """Test if recompilation rerun the same pass."""
 
-        def f(x: float):
+        def f(x):
             """Square function."""
             return x**2
 
-        jit_f = qjit(f)
-        jit_grad_f = qjit(value_and_grad(jit_f), keep_intermediate=True)
+        jit_grad_f = qjit(value_and_grad(f), keep_intermediate=True)
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        jit_grad_f.use_cwd_for_workspace = False
+
         jit_grad_f(3.0)
         ir = get_compilation_stage(jit_grad_f, pass_name)
         old_workspace = str(jit_grad_f.workspace)
@@ -421,7 +441,7 @@ class TestCProgramGeneration:
         replace_ir(jit_grad_f, pass_name, ir)
         jit_grad_f(3.0)
         file_list = os.listdir(str(jit_grad_f.workspace))
-        res = [i for i in file_list if pass_name in i]
+        res = [file_name for file_name in file_list if pass_name in file_name]
 
         shutil.rmtree(old_workspace, ignore_errors=True)
         shutil.rmtree(str(jit_grad_f.workspace), ignore_errors=True)

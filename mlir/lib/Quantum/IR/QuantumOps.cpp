@@ -19,8 +19,10 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/ADT/TypeSwitch.h"
 
+#include "Quantum/IR/QuantumAttrDefs.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 
@@ -55,7 +57,7 @@ LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewrite
             auto params = op.getParams();
             SmallVector<Value> paramsNeg;
             for (auto param : params) {
-                auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), param);
+                auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), param);
                 paramsNeg.push_back(paramNeg);
             }
 
@@ -73,7 +75,7 @@ LogicalResult CustomOp::canonicalize(CustomOp op, mlir::PatternRewriter &rewrite
 LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewriter)
 {
     if (op.getAdjoint()) {
-        auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), op.getTheta());
+        auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
 
         rewriter.replaceOpWithNewOp<MultiRZOp>(
             op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramNeg,
@@ -87,7 +89,7 @@ LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewri
 LogicalResult PCPhaseOp::canonicalize(PCPhaseOp op, mlir::PatternRewriter &rewriter)
 {
     if (op.getAdjoint()) {
-        auto paramNeg = rewriter.create<mlir::arith::NegFOp>(op.getLoc(), op.getTheta());
+        auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
 
         rewriter.replaceOpWithNewOp<PCPhaseOp>(
             op, op.getOutQubits().getTypes(), op.getOutCtrlQubits().getTypes(), paramNeg,
@@ -213,6 +215,19 @@ LogicalResult ExtractOp::verify()
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected op to have a non-null index";
     }
+
+    const auto qregLevel = getQreg().getType().getLevel();
+    const auto qbitLevel = getQubit().getType().getLevel();
+
+    if (qregLevel != qbitLevel) {
+        const auto qregLevelStr = stringifyQubitLevel(qregLevel);
+        const auto qbitLevelStr = stringifyQubitLevel(qbitLevel);
+        Twine aReg = (qregLevel == QubitLevel::Abstract) ? "an " : "a ";
+        Twine aBit = (qbitLevel == QubitLevel::Abstract) ? "an " : "a ";
+        return emitOpError() << "type mismatch: extracting from " << aReg << qregLevelStr
+                             << " register should produce " << aReg << qregLevelStr
+                             << " qubit but this op returns " << aBit << qbitLevelStr << " qubit";
+    }
     return success();
 }
 
@@ -220,6 +235,17 @@ LogicalResult InsertOp::verify()
 {
     if (!(getIdx() || getIdxAttr().has_value())) {
         return emitOpError() << "expected op to have a non-null index";
+    }
+
+    const auto inQregLevel = getInQreg().getType().getLevel();
+    const auto qbitLevel = getQubit().getType().getLevel();
+
+    if (inQregLevel != qbitLevel) {
+        const auto inQregLevelStr = stringifyQubitLevel(inQregLevel);
+        const auto qbitLevelStr = stringifyQubitLevel(qbitLevel);
+        Twine aBit = (qbitLevel == QubitLevel::Abstract) ? "an " : "a ";
+        return emitOpError() << "type mismatch: cannot insert " << aBit << qbitLevelStr
+                             << " qubit into a register requiring " << inQregLevelStr << " qubits";
     }
     return success();
 }
@@ -261,6 +287,27 @@ static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length
 }
 
 // ----- gates
+
+static const mlir::StringSet<> validPauliWords = {"X", "Y", "Z", "I"};
+
+LogicalResult PauliRotOp::verify()
+{
+    size_t pauliWordLength = getPauliProduct().size();
+    size_t numQubits = getInQubits().size();
+    if (pauliWordLength != numQubits) {
+        return emitOpError() << "length of Pauli word (" << pauliWordLength
+                             << ") and number of qubits (" << numQubits << ") must be the same";
+    }
+
+    if (!llvm::all_of(getPauliProduct(), [](mlir::Attribute attr) {
+            auto pauliStr = llvm::cast<mlir::StringAttr>(attr);
+            return validPauliWords.contains(pauliStr.getValue());
+        })) {
+        return emitOpError() << "Only \"X\", \"Y\", \"Z\", and \"I\" are valid Pauli words.";
+    }
+
+    return success();
+}
 
 LogicalResult QubitUnitaryOp::verify()
 {

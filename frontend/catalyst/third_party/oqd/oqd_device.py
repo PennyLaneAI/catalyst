@@ -22,14 +22,14 @@ trapped-ion quantum computer device.
 from typing import Optional
 import platform
 
+from pennylane import CompilePipeline
 from pennylane.devices import Device, ExecutionConfig
-from pennylane.transforms.core import TransformProgram
 from catalyst.compiler import get_lib_path
 
 BACKENDS = ["default"]
 
 
-def OQDDevicePipeline(device, qubit, gate):
+def OQDDevicePipeline(device, qubit, gate, device_db=None):
     """
     Generate the compilation pipeline for an OQD device.
 
@@ -37,12 +37,50 @@ def OQDDevicePipeline(device, qubit, gate):
         device (str): the path to the device toml file specifications.
         qubit (str): the path to the qubit toml file specifications.
         gate (str): the path to the gate toml file specifications.
+        device_db (str, optional): the path to the device_db.json file for ARTIQ.
+            If provided, generates ARTIQ-compatible output.
+            If None, uses convert-ion-to-llvm for legacy OQD pipeline.
 
     Returns:
         A list of tuples, with each tuple being a stage in the compilation pipeline.
         When using ``keep_intermediate=True`` from :func:`~.qjit`, the kept stages
         correspond to the tuples.
     """
+    # Common gates-to-pulses pass
+    gates_to_pulses_pass = (
+        "func.func(gates-to-pulses{"
+        + "device-toml-loc="
+        + device
+        + " qubit-toml-loc="
+        + qubit
+        + " gate-to-pulse-toml-loc="
+        + gate
+        + "})"
+    )
+
+    # Build OQD pipeline based on whether device_db is provided
+    if device_db is not None:
+        oqd_passes = [
+            "func.func(ions-decomposition)",
+            gates_to_pulses_pass,
+            "convert-ion-to-rtio{" + "device_db=" + device_db + "}",
+            "convert-rtio-event-to-artiq",
+        ]
+        llvm_lowering_passes = [
+            "llvm-dialect-lowering-stage",
+            "emit-artiq-runtime",
+        ]
+    else:
+        # Standard LLVM lowering route (legacy OQD pipeline)
+        oqd_passes = [
+            "func.func(ions-decomposition)",
+            gates_to_pulses_pass,
+            "convert-ion-to-llvm",
+        ]
+        llvm_lowering_passes = [
+            "llvm-dialect-lowering-stage",
+        ]
+
     return [
         (
             "device-agnostic-pipeline",
@@ -55,30 +93,23 @@ def OQDDevicePipeline(device, qubit, gate):
         ),
         (
             "oqd_pipeline",
-            [
-                "func.func(ions-decomposition)",
-                "func.func(gates-to-pulses{"
-                + "device-toml-loc="
-                + device
-                + " qubit-toml-loc="
-                + qubit
-                + " gate-to-pulse-toml-loc="
-                + gate
-                + "})",
-                "convert-ion-to-llvm",
-            ],
+            oqd_passes,
         ),
         (
             "llvm-dialect-lowering-stage",
-            [
-                "llvm-dialect-lowering-stage",
-            ],
+            llvm_lowering_passes,
         ),
     ]
 
 
 class OQDDevice(Device):
-    """The OQD device allows access to the hardware devices from OQD using Catalyst."""
+    """The OQD device allows access to the hardware devices from OQD using Catalyst.
+
+    Args:
+        wires: The number of wires/qubits.
+        backend: Backend name (default: "default").
+        openapl_file_name: Output file name for OpenAPL.
+    """
 
     config_filepath = get_lib_path("oqd_runtime", "OQD_LIB_DIR") + "/backend" + "/oqd.toml"
 
@@ -96,7 +127,11 @@ class OQDDevice(Device):
         return "oqd", lib_path
 
     def __init__(
-        self, wires, backend="default", openapl_file_name="__openapl__output.json", **kwargs
+        self,
+        wires,
+        backend="default",
+        openapl_file_name="__openapl__output.json",
+        **kwargs,
     ):
         self._backend = backend
         self._openapl_file_name = openapl_file_name
@@ -130,9 +165,7 @@ class OQDDevice(Device):
         if execution_config is None:
             execution_config = ExecutionConfig()
 
-        transform_program = TransformProgram()
-
-        return transform_program, execution_config
+        return CompilePipeline(), execution_config
 
     def execute(self, circuits, execution_config):
         """Python execution is not supported."""

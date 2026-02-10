@@ -67,11 +67,14 @@ class TestCompilerOptions:
 
         @qjit(verbose=verbose, logfile=logfile, keep_intermediate=keep_intermediate)
         @qml.qnode(qml.device(backend, wires=1))
-        def workflow():
-            qml.PauliX(wires=0)
+        def workflow(x):
+            qml.RX(x, wires=0)
             return qml.state()
 
-        workflow()
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        workflow.use_cwd_for_workspace = False
+        workflow.jit_compile((1.2,))
+
         capture_result = capsys.readouterr()
         capture = capture_result.out + capture_result.err
         assert ("[SYSTEM]" in capture) if verbose else ("[SYSTEM]" not in capture)
@@ -264,7 +267,7 @@ class TestCompilerState:
 
         assert f.jaxpr is None
         assert f.mlir is None
-        assert f.qir is None
+        assert f.llvmir is None
         assert f.compiled_function is None
 
     def test_callable_without_name(self):
@@ -291,9 +294,13 @@ class TestCompilerState:
             pipelines=[("EmptyPipeline1", [])] + pipelines + [("EmptyPipeline2", [])],
         )
         @qml.qnode(qml.device(backend, wires=1))
-        def workflow():
-            qml.PauliX(wires=0)
+        def workflow(x):
+            qml.RX(x, wires=0)
             return qml.state()
+
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        workflow.use_cwd_for_workspace = False
+        workflow.jit_compile((1.2,))
 
         compiler = workflow.compiler
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
@@ -313,9 +320,13 @@ class TestCompilerState:
 
         @qjit(keep_intermediate=True)
         @qml.qnode(qml.device(backend, wires=1))
-        def workflow():
-            qml.PauliX(wires=0)
+        def workflow(x):
+            qml.RX(x, wires=0)
             return qml.state()
+
+        # Create tmp workspaces for intermediates to avoid CI race conditions
+        workflow.use_cwd_for_workspace = False
+        workflow.jit_compile((1.2,))
 
         with pytest.raises(CompileError, match="Attempting to get output for pipeline"):
             workflow.compiler.get_output_of("None-existing-pipeline", workflow.workspace)

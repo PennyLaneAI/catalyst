@@ -89,7 +89,7 @@ with Patcher(
     )
     from mlir_quantum.dialects.mbqc import MeasureInBasisOp
     from mlir_quantum.dialects.mitigation import ZneOp
-    from mlir_quantum.dialects.qec import PPMeasurementOp, PPRotationArbitraryOp, PPRotationOp
+    from mlir_quantum.dialects.qec import PPMeasurementOp
     from mlir_quantum.dialects.quantum import (
         AdjointOp,
         AllocOp,
@@ -110,6 +110,7 @@ with Patcher(
         MultiRZOp,
         NamedObsOp,
         NumQubitsOp,
+        PauliRotOp,
         PCPhaseOp,
         ProbsOp,
         QubitUnitaryOp,
@@ -133,6 +134,8 @@ with Patcher(
     )
 
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
+from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
+from pennylane.capture.primitives import vjp_prim as pl_vjp_prim
 
 from catalyst.compiler import get_lib_path
 from catalyst.jax_extras import (
@@ -296,8 +299,6 @@ unitary_p = Primitive("unitary")
 unitary_p.multiple_results = True
 pauli_rot_p = Primitive("pauli_rot")
 pauli_rot_p.multiple_results = True
-pauli_rot_arbitrary_p = Primitive("pauli_rot_arbitrary")
-pauli_rot_arbitrary_p.multiple_results = True
 pauli_measure_p = Primitive("pauli_measure")
 pauli_measure_p.multiple_results = True
 measure_p = Primitive("measure")
@@ -427,7 +428,7 @@ def subroutine(func):
     return wrapper
 
 
-def decomposition_rule(func=None, *, is_qreg=True, num_params=0):
+def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None):
     """
     Denotes the creation of a quantum definition in the intermediate representation.
     """
@@ -439,9 +440,15 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0):
     if func is None:
         return functools.partial(decomposition_rule, is_qreg=is_qreg, num_params=num_params)
 
+    if pauli_word is not None:
+        func = functools.partial(func, pauli_word=pauli_word)
+
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
+        if pauli_word is not None:
+            jaxpr = jax.make_jaxpr(func)(theta=args[0], wires=args[1], **kwargs)
+        else:
+            jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
         decomprule_p.bind(pyfun=func, func_jaxpr=jaxpr, is_qreg=is_qreg, num_params=num_params)
 
     return wrapper
@@ -614,18 +621,18 @@ def _func_lowering(ctx, *args, call_jaxpr, fn):
 # Decomp rule
 #
 @decomprule_p.def_abstract_eval
-def _decomposition_rule_abstract(*, pyfun, func_jaxpr, is_qreg=False, num_params=None):
+def _decomposition_rule_abstract(*, pyfun, func_jaxpr, is_qreg=False, num_params=None, **params):
     return ()
 
 
-def _decomposition_rule_lowering(ctx, *, pyfun, func_jaxpr, **_):
+def _decomposition_rule_lowering(ctx, *, pyfun, func_jaxpr, **params):
     """Lower a quantum decomposition rule into MLIR in a single step process.
     The step is the compilation of the definition of the function fn.
     """
 
     # Set the visibility of the decomposition rule to public
     # to avoid the elimination by the compiler
-    lower_callable(ctx, pyfun, func_jaxpr, public=True)
+    lower_callable(ctx, pyfun, func_jaxpr, public=True, **params)
     return ()
 
 
@@ -876,6 +883,40 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     ).results
 
 
+def _capture_jvp_lowering(ctx, *args, jaxpr, fn, method, argnums, h):
+    """
+    Returns:
+        MLIR results
+    """
+    args = list(args)
+    mlir_ctx = ctx.module_context.context
+    n_params = len(jaxpr.invars)
+    array_argnums = np.array(argnums)
+
+    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
+    flat_output_types = util.flatten(output_types)
+
+    func_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
+    jvp_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
+
+    func_args = args[:n_params]
+    d_args = args[n_params:]
+
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums), fn=fn)
+
+    symbol_ref = get_symbolref(ctx, func_op)
+    return JVPOp(
+        func_result_types,
+        jvp_result_types,
+        ir.StringAttr.get(method),
+        symbol_ref,
+        mlir.flatten_ir_values(func_args),
+        mlir.flatten_ir_values(d_args),
+        diffArgIndices=ir.DenseIntElementsAttr.get(array_argnums),
+        finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
+    ).results
+
+
 @vjp_p.def_impl
 def _vjp_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
     raise NotImplementedError()
@@ -912,6 +953,38 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     vjp_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
 
     func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums))
+
+    symbol_ref = get_symbolref(ctx, func_op)
+    return VJPOp(
+        func_result_types,
+        vjp_result_types,
+        ir.StringAttr.get(method),
+        symbol_ref,
+        mlir.flatten_ir_values(func_args),
+        mlir.flatten_ir_values(cotang_args),
+        diffArgIndices=ir.DenseIntElementsAttr.get(new_argnums),
+        finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
+    ).results
+
+
+def _capture_vjp_lowering(ctx, *args, jaxpr, fn, method, argnums, h):
+    """
+    Returns:
+        MLIR results
+    """
+    args = list(args)
+    mlir_ctx = ctx.module_context.context
+    n_params = len(jaxpr.invars)
+    new_argnums = np.array(argnums)
+
+    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
+    flat_output_types = util.flatten(output_types)
+    func_args = args[:n_params]
+    cotang_args = args[n_params:]
+    func_result_types = flat_output_types[: len(flat_output_types) - len(argnums)]
+    vjp_result_types = flat_output_types[len(flat_output_types) - len(argnums) :]
+
+    func_op = lower_jaxpr(ctx, jaxpr, (method, h, *argnums), fn=fn)
 
     symbol_ref = get_symbolref(ctx, func_op)
     return VJPOp(
@@ -1435,11 +1508,26 @@ def _unitary_lowering(
 #
 # pauli rot operation
 #
+# pylint: disable=unused-variable
 @pauli_rot_p.def_abstract_eval
-def _pauli_rot_abstract_eval(*qubits, theta=None, pauli_word=None, qubits_len=0, adjoint=False):
-    qubits = qubits[:qubits_len]
-    assert all(isinstance(qubit, AbstractQbit) for qubit in qubits)
-    return (AbstractQbit(),) * (qubits_len)
+def _pauli_rot_abstract_eval(
+    *qubits_and_ctrl_qubits,
+    angle=None,
+    pauli_word=None,
+    qubits_len=0,
+    params_len=0,
+    ctrl_len=0,
+    adjoint=False,
+):
+    # The signature here is: (using * to denote zero or more)
+    # qubits*, params*, ctrl_qubits*, ctrl_values*
+    qubits = qubits_and_ctrl_qubits[:qubits_len]
+    params = qubits_and_ctrl_qubits[qubits_len : qubits_len + params_len]
+    ctrl_qubits = qubits_and_ctrl_qubits[-2 * ctrl_len : -ctrl_len]
+    ctrl_values = qubits_and_ctrl_qubits[-ctrl_len:]
+    all_qubits = qubits + ctrl_qubits
+    assert all(isinstance(qubit, AbstractQbit) for qubit in all_qubits)
+    return (AbstractQbit(),) * (qubits_len + ctrl_len)
 
 
 @pauli_rot_p.def_impl
@@ -1450,99 +1538,49 @@ def _pauli_rot_def_impl(*args, **kwargs):  # pragma: no cover
 # pylint: disable=unused-argument
 def _pauli_rot_lowering(
     jax_ctx: mlir.LoweringRuleContext,
-    *qubits: tuple,
-    theta=None,
-    pauli_word=None,
-    qubits_len=0,
-    adjoint=False,
-):
-    # Adjoint is currently not supported for PauliRot
-    ctx = jax_ctx.module_context.context
-    ctx.allow_unregistered_dialects = True
-
-    qubits = qubits[:qubits_len]
-
-    for q in qubits:
-        assert ir.OpaqueType.isinstance(q.type)
-        assert ir.OpaqueType(q.type).dialect_namespace == "quantum"
-        assert ir.OpaqueType(q.type).data == "bit"
-
-    assert theta is not None
-    assert pauli_word is not None
-
-    pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
-
-    i16_type = ir.IntegerType.get_signless(16, ctx)
-    allowed_angles = [np.pi / 4, np.pi / 2, np.pi, -np.pi / 4, -np.pi / 2, -np.pi]
-
-    if not any(np.isclose(theta, angle) for angle in allowed_angles):
-        raise ValueError("The theta supplied to PauliRot must be ±pi/4, ±pi/2, or ±pi.")
-
-    angle = int(np.round(2 * np.pi / theta))
-    if adjoint:
-        angle *= -1
-    rotation_kind = ir.IntegerAttr.get(i16_type, angle)
-
-    return PPRotationOp(
-        out_qubits=[q.type for q in qubits],
-        pauli_product=pauli_word,
-        rotation_kind=rotation_kind,
-        in_qubits=qubits,
-    ).results
-
-
-#
-# pauli rot arbitrary operation
-#
-@pauli_rot_arbitrary_p.def_abstract_eval
-def _pauli_rot_arbitrary_abstract_eval(
-    *qubits_or_params, pauli_word=None, qubits_len=0, params_len=0, adjoint=False
-):
-    qubits = qubits_or_params[:qubits_len]
-    assert all(isinstance(qubit, AbstractQbit) for qubit in qubits)
-    return (AbstractQbit(),) * (qubits_len)
-
-
-@pauli_rot_arbitrary_p.def_impl
-def _pauli_rot_arbitrary_def_impl(*args, **kwargs):  # pragma: no cover
-    raise NotImplementedError()
-
-
-# pylint: disable=unused-argument
-def _pauli_rot_arbitrary_lowering(
-    jax_ctx: mlir.LoweringRuleContext,
-    *qubits_or_params: tuple,
+    *qubits_and_params: tuple,
     pauli_word=None,
     qubits_len=0,
     params_len=0,
+    ctrl_len=0,
     adjoint=False,
 ):
-    # Adjoint is currently not supported for PauliRot
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    qubits = qubits_or_params[:qubits_len]
-    params = qubits_or_params[qubits_len : qubits_len + params_len]
+    qubits = qubits_and_params[:qubits_len]
+    params = qubits_and_params[qubits_len : qubits_len + params_len]
+    ctrl_qubits = qubits_and_params[qubits_len + params_len : qubits_len + params_len + ctrl_len]
+    ctrl_values = qubits_and_params[qubits_len + params_len + ctrl_len :]
 
     for q in qubits:
         assert ir.OpaqueType.isinstance(q.type)
         assert ir.OpaqueType(q.type).dialect_namespace == "quantum"
         assert ir.OpaqueType(q.type).data == "bit"
 
-    assert len(params) == 1  # PauliRot takes one parameter
-    theta = params[0]
-    theta = safe_cast_to_f64(theta, "PauliRot")
-    theta = extract_scalar(theta, "PauliRot")
-    assert ir.F64Type.isinstance(theta.type)
+    assert params_len == 1 and params[0] is not None
+    angle = params[0]
+    angle = safe_cast_to_f64(angle, "PauliRot")
+    angle = extract_scalar(angle, "PauliRot")
+    assert ir.F64Type.isinstance(angle.type)
     assert pauli_word is not None
 
     pauli_word = ir.ArrayAttr.get([ir.StringAttr.get(p) for p in pauli_word])
 
-    return PPRotationArbitraryOp(
-        out_qubits=[q.type for q in qubits],
+    ctrl_values_i1 = []
+    for v in ctrl_values:
+        p = TensorExtractOp(ir.IntegerType.get_signless(1), v, []).result
+        ctrl_values_i1.append(p)
+
+    return PauliRotOp(
+        out_qubits=[qubit.type for qubit in qubits],
+        out_ctrl_qubits=[qubit.type for qubit in ctrl_qubits],
+        angle=angle,
         pauli_product=pauli_word,
-        arbitrary_angle=theta,
+        adjoint=adjoint,
         in_qubits=qubits,
+        in_ctrl_qubits=ctrl_qubits,
+        in_ctrl_values=ctrl_values_i1,
     ).results
 
 
@@ -2854,7 +2892,6 @@ CUSTOM_LOWERING_RULES = (
     (gphase_p, _gphase_lowering),
     (unitary_p, _unitary_lowering),
     (pauli_rot_p, _pauli_rot_lowering),
-    (pauli_rot_arbitrary_p, _pauli_rot_arbitrary_lowering),
     (pauli_measure_p, _pauli_measure_lowering),
     (measure_p, _measure_lowering),
     (compbasis_p, _compbasis_lowering),
@@ -2874,6 +2911,8 @@ CUSTOM_LOWERING_RULES = (
     (for_p, _for_loop_lowering),
     (grad_p, _grad_lowering),
     (pl_jac_prim, _capture_grad_lowering),
+    (pl_vjp_prim, _capture_vjp_lowering),
+    (pl_jvp_prim, _capture_jvp_lowering),
     (func_p, _func_lowering),
     (jvp_p, _jvp_lowering),
     (vjp_p, _vjp_lowering),

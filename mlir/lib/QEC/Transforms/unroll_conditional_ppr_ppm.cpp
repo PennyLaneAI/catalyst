@@ -1,4 +1,4 @@
-// Copyright 2025 Xanadu Quantum Technologies Inc.
+// Copyright 2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,44 +12,49 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "to-ppr"
+#define DEBUG_TYPE "unroll-conditional-ppr-ppm"
 
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "QEC/IR/QECDialect.h"
+#include "QEC/IR/QECOps.h"
 #include "QEC/Transforms/Patterns.h"
-#include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
-using namespace catalyst::quantum;
 using namespace catalyst::qec;
 
 namespace catalyst {
 namespace qec {
 
-#define GEN_PASS_DEF_CLIFFORDTTOPPRPASS
+#define GEN_PASS_DECL_UNROLLCONDITIONALPPRPPMPASS
+#define GEN_PASS_DEF_UNROLLCONDITIONALPPRPPMPASS
 #include "QEC/Transforms/Passes.h.inc"
 
-struct CliffordTToPPRPass : impl::CliffordTToPPRPassBase<CliffordTToPPRPass> {
-    using CliffordTToPPRPassBase::CliffordTToPPRPassBase;
+struct UnrollConditionalPPRPPMPass
+    : impl::UnrollConditionalPPRPPMPassBase<UnrollConditionalPPRPPMPass> {
+    using UnrollConditionalPPRPPMPassBase::UnrollConditionalPPRPPMPassBase;
 
     void runOnOperation() final
     {
         auto ctx = &getContext();
+        auto module = getOperation();
+
         ConversionTarget target(*ctx);
 
-        // Convert MeasureOp and CustomOp
-        target.addIllegalOp<quantum::MeasureOp>();
-        target.addIllegalOp<quantum::CustomOp>();
+        // Convert SelectPPMeasurementOp
+        target.addIllegalOp<qec::SelectPPMeasurementOp>();
 
         // Conversion target is QECDialect
         target.addLegalDialect<qec::QECDialect>();
+        target.addLegalDialect<mlir::scf::SCFDialect>();
 
         RewritePatternSet patterns(ctx);
-        populateCliffordTToPPRPatterns(patterns);
+        populateUnrollConditionalPPRPPMPatterns(patterns);
 
-        if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(module, std::move(patterns)))) {
             return signalPassFailure();
         }
     }
