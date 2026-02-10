@@ -247,10 +247,41 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
         }
     }
 
+    /// Distribute device shots among group functions by dividing the original shots by the number
+    /// of groups.
+    static void distributeShots(func::FuncOp groupFunc, int numGroups)
+    {
+        // Find the DeviceInitOp in the group function
+        DeviceInitOp deviceOp = nullptr;
+        for (auto op : groupFunc.getOps<DeviceInitOp>()) {
+            deviceOp = op;
+            break;
+        }
+
+        if (!deviceOp) {
+            return;
+        }
+
+        Value shots = deviceOp.getShots();
+        if (!shots) {
+            return;
+        }
+
+        // Compute the divided shots and pass it to the device op
+        OpBuilder builder(deviceOp);
+        Location loc = deviceOp.getLoc();
+        Value numGroupsVal = arith::ConstantOp::create(
+            builder, loc, builder.getI64IntegerAttr(static_cast<int64_t>(numGroups)));
+        Value dividedShots = arith::DivSIOp::create(builder, loc, shots, numGroupsVal);
+
+        deviceOp.getShotsMutable().assign(dividedShots);
+    }
+
     /// Create a duplicate function for the given group index.
     /// Clones the original function, removes measurements from other groups,
     /// and inserts the new function into the module.
-    func::FuncOp createGroupFunction(func::FuncOp funcOp, int groupIdx, ModuleOp moduleOp)
+    func::FuncOp createGroupFunction(func::FuncOp funcOp, int groupIdx, int numGroups,
+                                     ModuleOp moduleOp)
     {
         // clone the entire function
         func::FuncOp groupFunc = funcOp.clone();
@@ -263,6 +294,9 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
 
         // Remove measurements from groups other than groupIdx
         removeGroup(groupFunc, groupIdx);
+
+        // Distribute shots among groups
+        distributeShots(groupFunc, numGroups);
 
         return groupFunc;
     }
@@ -384,7 +418,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
             // Create a duplicate function for each group
             SmallVector<func::FuncOp> groupFunctions;
             for (int i = 0; i < numGroups; ++i) {
-                groupFunctions.push_back(createGroupFunction(funcOp, i, moduleOp));
+                groupFunctions.push_back(createGroupFunction(funcOp, i, numGroups, moduleOp));
             }
 
             // Replace original function body with calls to group functions
