@@ -21,13 +21,12 @@ import pytest
 from catalyst import qjit
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_mlir_one_shot_pass_expval(backend):
     """
     Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with expval
     """
 
-    @qjit(seed=38)
+    @qjit(capture=True, seed=38)
     @qml.transform(pass_name="one-shot-mcm")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
@@ -40,14 +39,13 @@ def test_mlir_one_shot_pass_expval(backend):
     assert np.allclose(res, 1.0, atol=0.01, rtol=0.01)
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_mlir_one_shot_pass_expval_mcm(backend):
     """
     Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with expval
     on a mid circuit measurement
     """
 
-    @qjit(seed=38)
+    @qjit(capture=True, seed=38)
     @qml.transform(pass_name="one-shot-mcm")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
@@ -61,13 +59,12 @@ def test_mlir_one_shot_pass_expval_mcm(backend):
     assert np.allclose(res, 0.5, atol=0.01, rtol=0.01)
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_mlir_one_shot_pass_probs(backend):
     """
     Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with probs
     """
 
-    @qjit(seed=12345)
+    @qjit(capture=True, seed=12345)
     @qml.transform(pass_name="one-shot-mcm")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
@@ -80,14 +77,13 @@ def test_mlir_one_shot_pass_probs(backend):
     assert np.allclose(res, [0.5, 0, 0.5, 0], atol=0.01, rtol=0.01)
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_mlir_one_shot_pass_probs_mcm(backend):
     """
     Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with probs
     on a mid circuit measurement
     """
 
-    @qjit(seed=12345)
+    @qjit(capture=True, seed=12345)
     @qml.transform(pass_name="one-shot-mcm")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
@@ -102,14 +98,13 @@ def test_mlir_one_shot_pass_probs_mcm(backend):
     assert np.allclose(res, [0.5, 0, 0.5, 0], atol=0.01, rtol=0.01)
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_mlir_one_shot_pass_var_mcm(backend):
     """
     Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with variance
     on a mid circuit measurement
     """
 
-    @qjit(seed=38)
+    @qjit(capture=True, seed=38)
     @qml.transform(pass_name="one-shot-mcm")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
@@ -123,13 +118,12 @@ def test_mlir_one_shot_pass_var_mcm(backend):
     assert np.allclose(res[1], 0, atol=0.01, rtol=0.01)
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_mlir_one_shot_pass_sample(backend):
     """
     Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with sample
     """
 
-    @qjit(seed=12345)
+    @qjit(capture=True, seed=12345)
     @qml.transform(pass_name="one-shot-mcm")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
@@ -145,14 +139,13 @@ def test_mlir_one_shot_pass_sample(backend):
     assert np.allclose(wire0_sum / 1000, 0.5, atol=0.01, rtol=0.01)
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_mlir_one_shot_pass_sample_mcm(backend):
     """
     Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with sample
     on a mid circuit measurement
     """
 
-    @qjit(seed=12345)
+    @qjit(capture=True, seed=12345)
     @qml.transform(pass_name="one-shot-mcm")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
@@ -170,13 +163,12 @@ def test_mlir_one_shot_pass_sample_mcm(backend):
     assert np.allclose(wire0_sum / 1000, 0.5, atol=0.01, rtol=0.01)
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_mlir_one_shot_pass_counts(backend):
     """
     Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with counts
     """
 
-    @qjit(seed=12345)
+    @qjit(capture=True, seed=12345)
     @qml.transform(pass_name="one-shot-mcm")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
@@ -191,14 +183,13 @@ def test_mlir_one_shot_pass_counts(backend):
     assert np.allclose(counts, [500, 0, 500, 0], rtol=0.01)
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_mlir_one_shot_pass_counts_mcm(backend):
     """
     Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with counts
     on MCMs.
     """
 
-    @qjit(seed=12345)
+    @qjit(capture=True, seed=12345)
     @qml.transform(pass_name="one-shot-mcm")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
@@ -215,14 +206,13 @@ def test_mlir_one_shot_pass_counts_mcm(backend):
     assert np.allclose(counts, [500, 0, 500, 0], atol=10)
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_mlir_one_shot_pass_multiple_MPs(backend):
     """
     Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with
     multiple MPs
     """
 
-    @qjit(seed=123456)
+    @qjit(capture=True, seed=123456)
     @qml.transform(pass_name="one-shot-mcm")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
@@ -247,14 +237,13 @@ def test_mlir_one_shot_pass_multiple_MPs(backend):
     assert np.allclose(probs, [0.5, 0, 0.5, 0], atol=0.01, rtol=0.01)
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_mlir_one_shot_pass_multiple_MPs_mcms(backend):
     """
     Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with
     multiple MPs on MCMs
     """
 
-    @qjit(seed=12345)
+    @qjit(capture=True, seed=12345)
     @qml.transform(pass_name="one-shot-mcm")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
@@ -286,14 +275,13 @@ def test_mlir_one_shot_pass_multiple_MPs_mcms(backend):
     assert np.allclose(counts, [500, 500], atol=10)
 
 
-@pytest.mark.usefixtures("use_capture")
 def test_mlir_one_shot_pass_dynamic_shots(backend):
     """
     Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with a
     dynamic number of shots
     """
 
-    @qjit(seed=12345)
+    @qjit(capture=True, seed=12345)
     def workflow(shots):
         @qml.transform(pass_name="one-shot-mcm")
         @qml.qnode(qml.device(backend, wires=2), shots=shots)
