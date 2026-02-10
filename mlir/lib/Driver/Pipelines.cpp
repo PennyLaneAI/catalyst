@@ -95,9 +95,10 @@ void createGradientLoweringStage(OpPassManager &pm)
 }
 void createBufferizationStage(OpPassManager &pm)
 {
-    InlinerOptions options;
-    options.inliningThreshold = 25;
-    pm.addPass(mlir::createInlinerPass(options));
+    auto inlinerPass = mlir::createInlinerPass();
+    (void)inlinerPass->initializeOptions(
+        "inlining-threshold=25", [](const Twine &) { return failure(); });
+    pm.addPass(std::move(inlinerPass));
     pm.addPass(mlir::createConvertTensorToLinalgPass());
     pm.addPass(mlir::createConvertElementwiseToLinalgPass());
     pm.addPass(catalyst::gradient::createGradientPreprocessingPass());
