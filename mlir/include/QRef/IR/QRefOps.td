@@ -108,15 +108,14 @@ def DeallocOp : Memory_Op<"dealloc"> {
     }];
 
     let arguments = (ins
-        QRefQuregType:$allocation
+        QRefQuregType:$qreg
     );
 
     let assemblyFormat = [{
-        $allocation attr-dict `:` type(operands)
+        $qreg attr-dict `:` type(operands)
     }];
 
-    // TODO
-    // let hasCanonicalizeMethod = 1;
+    let hasCanonicalizeMethod = 1;
 }
 
 def GetOp : Memory_Op<"get", [NoMemoryEffect]> {

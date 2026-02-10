@@ -56,6 +56,19 @@ LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewrit
     return failure();
 }
 
+LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter)
+{
+    if (auto alloc = dyn_cast_if_present<AllocOp>(dealloc.getQreg().getDefiningOp())) {
+        if (dealloc.getQreg().hasOneUse()) {
+            rewriter.eraseOp(dealloc);
+            rewriter.eraseOp(alloc);
+            return success();
+        }
+    }
+
+    return failure();
+}
+
 //===----------------------------------------------------------------------===//
 // QRef op verifiers.
 //===----------------------------------------------------------------------===//

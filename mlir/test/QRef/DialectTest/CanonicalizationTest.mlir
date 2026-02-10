@@ -31,3 +31,26 @@ func.func @test_alloc_no_cse() -> (!qref.reg<4>, !qref.reg<4>){
     %r2 = qref.alloc(4) : !qref.reg<4>
     return %r1, %r2 : !qref.reg<4>, !qref.reg<4>
 }
+
+// -----
+
+// CHECK-LABEL: test_alloc_dealloc_fold
+func.func @test_alloc_dealloc_fold() {
+    // CHECK-NOT: qref.alloc
+    // CHECK-NOT: qref.dealloc
+    %r = qref.alloc(3) : !qref.reg<3>
+    qref.dealloc %r : !qref.reg<3>
+    return
+}
+
+// -----
+
+// CHECK-LABEL: test_alloc_dealloc_no_fold
+func.func @test_alloc_dealloc_no_fold() -> !qref.bit {
+    // CHECK: qref.alloc
+    // CHECK: qref.dealloc
+    %r = qref.alloc(3) : !qref.reg<3>
+    %q = qref.get %r[0] : !qref.reg<3> -> !qref.bit
+    qref.dealloc %r : !qref.reg<3>
+    return %q : !qref.bit<3>
+}
