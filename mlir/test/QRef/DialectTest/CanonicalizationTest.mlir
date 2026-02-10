@@ -58,43 +58,38 @@ func.func @test_alloc_dealloc_no_fold() -> !qref.bit {
 // -----
 
 // CHECK-LABEL: test_hermitian_adjoint_canonicalize
-func.func @test_hermitian_adjoint_canonicalize() {
-    %0 = qref.alloc( 1) : !qref.reg<1>
-    %1 = qref.get %0[ 0] : !qref.reg<1> -> !qref.bit
-    // CHECK: [[reg:%.+]] = qref.alloc( 1) : !qref.reg<1>
-    // CHECK: [[qubit:%.+]] = qref.get [[reg]][ 0] : !qref.reg<1> -> !qref.bit
-    qref.custom "Hadamard"() %1 adj: !qref.bit
-    // CHECK:  qref.custom "Hadamard"() [[qubit]] : !qref.bit
+func.func @test_hermitian_adjoint_canonicalize(%q0: !qref.bit) {
+    // CHECK:  qref.custom "Hadamard"() %arg0 : !qref.bit
+    qref.custom "Hadamard"() %q0 adj: !qref.bit
     return
 }
 
 // -----
 
 // CHECK-LABEL: test_rotation_adjoint_canonicalize
-func.func @test_rotation_adjoint_canonicalize(%arg0: f64) {
-    %0 = qref.alloc( 1) : !qref.reg<1>
-    %1 = qref.get %0[ 0] : !qref.reg<1> -> !qref.bit
-    // CHECK: [[reg:%.+]] = qref.alloc( 1) : !qref.reg<1>
-    // CHECK: [[qubit:%.+]] = qref.get [[reg]][ 0] : !qref.reg<1> -> !qref.bit
-    qref.custom "RX"(%arg0) %1 adj: !qref.bit
+func.func @test_rotation_adjoint_canonicalize(%arg0: f64, %q0: !qref.bit) {
     // CHECK: [[arg0neg:%.+]] = arith.negf %arg0 : f64
-    // CHECK:  qref.custom "RX"([[arg0neg]]) [[qubit]] : !qref.bit
+    // CHECK:  qref.custom "RX"([[arg0neg]]) %arg1 : !qref.bit
+    qref.custom "RX"(%arg0) %q0 adj: !qref.bit
     return
 }
 
 // -----
 
 // CHECK-LABEL: test_multirz_adjoint_canonicalize
-func.func @test_multirz_adjoint_canonicalize(%arg0: f64) {
-    // CHECK: [[reg:%.+]] = qref.alloc( 2) : !qref.reg<2>
-    // CHECK: [[qubit1:%.+]] = qref.get [[reg]][ 0] : !qref.reg<2> -> !qref.bit
-    // CHECK: [[qubit2:%.+]] = qref.get [[reg]][ 1] : !qref.reg<2> -> !qref.bit
-    %0 = qref.alloc( 2) : !qref.reg<2>
-    %1 = qref.get %0[ 0] : !qref.reg<2> -> !qref.bit
-    %2 = qref.get %0[ 1] : !qref.reg<2> -> !qref.bit
-
+func.func @test_multirz_adjoint_canonicalize(%arg0: f64, %q0: !qref.bit, %q1: !qref.bit) {
     // CHECK: [[arg0neg:%.+]] = arith.negf %arg0 : f64
-    // CHECK: qref.multirz([[arg0neg]]) [[qubit1]], [[qubit2]] : !qref.bit, !qref.bit
-    qref.multirz (%arg0) %1, %2 adj : !qref.bit, !qref.bit
+    // CHECK: qref.multirz([[arg0neg]]) %arg1, %arg2 : !qref.bit, !qref.bit
+    qref.multirz (%arg0) %q0, %q1 adj : !qref.bit, !qref.bit
+    return
+}
+
+// -----
+
+// CHECK-LABEL: test_pcphase_adjoint_canonicalize
+func.func @test_pcphase_adjoint_canonicalize(%arg0: f64, %dim: f64, %q0: !qref.bit, %q1: !qref.bit) {
+    // CHECK: [[arg0neg:%.+]] = arith.negf %arg0 : f64
+    // CHECK: qref.pcphase([[arg0neg]], %arg1) %arg2, %arg3 : !qref.bit, !qref.bit
+    qref.pcphase (%arg0, %dim) %q0, %q1 adj : !qref.bit, !qref.bit
     return
 }

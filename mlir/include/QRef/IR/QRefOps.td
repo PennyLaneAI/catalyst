@@ -467,8 +467,7 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSeg
         }
     }];
 
-    // TODO
-    // let hasCanonicalizeMethod = 1;
+    let hasCanonicalizeMethod = 1;
 }
 
 def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOperandSegments]> {

@@ -92,6 +92,19 @@ LogicalResult MultiRZOp::canonicalize(MultiRZOp op, mlir::PatternRewriter &rewri
     return failure();
 }
 
+LogicalResult PCPhaseOp::canonicalize(PCPhaseOp op, mlir::PatternRewriter &rewriter)
+{
+    if (op.getAdjoint()) {
+        auto paramNeg = mlir::arith::NegFOp::create(rewriter, op.getLoc(), op.getTheta());
+
+        rewriter.replaceOpWithNewOp<PCPhaseOp>(op, paramNeg, op.getDim(), op.getQubits(), nullptr,
+                                               op.getCtrlQubits(), op.getCtrlValues());
+
+        return success();
+    };
+    return failure();
+}
+
 LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewriter)
 {
     if (alloc->use_empty()) {
