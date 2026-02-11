@@ -1345,13 +1345,19 @@ def test_decompose_work_wires_context_manager():
     # check that decomp is applied properly
     # CHECK-NOT: PauliZ
     # CHECK-NOT: my_decomp
-    # CHECK: alloc
+
+    # two allocates, one for main register and one for decomp register
+    # CHECK: allocate
+    # CHECK: allocate
     # CHECK: PauliX
     # CHECK: PauliX
     # CHECK: Hadamard
     # CHECK: Hadamard
     # CHECK: release
+    # CHECK: release
     print(my_circuit.mlir_opt)
+
+    qml.capture.disable()
 
 
 test_decompose_work_wires_context_manager()
@@ -1391,14 +1397,19 @@ def test_decompose_work_wires_alloc_dealloc():
     # CHECK-NOT: my_decomp
     # CHECK-NOT: RY
 
-    # CHECK: alloc
+    # two allocates, one for main register and one for decomp register
+    # CHECK: allocate
+    # CHECK: allocate
     # CHECK: CNOT
     # CHECK: RX
     # CHECK: RZ
     # CHECK: RX
     # CHECK: CNOT
     # CHECK: release
+    # CHECK: release
     print(my_circuit.mlir_opt)
+
+    qml.capture.disable()
 
 
 test_decompose_work_wires_alloc_dealloc()
@@ -1446,6 +1457,9 @@ def test_decompose_work_wires_control_flow():
     # CHECK-NOT: CRX
     # CHECK-NOT: my_decomp
 
+    # allocate for main register, subsequent allocates+releases for decomp registers
+    # CHECK: allocate
+
     # first CRX: true branch
     # CHECK: CNOT
     # CHECK: allocate
@@ -1461,8 +1475,64 @@ def test_decompose_work_wires_control_flow():
     # CHECK: Measure
     # CHECK: cond
     # CHECK: CNOT
-    # check: release
+    # CHECK: release
+
+    # release main register
+    # CHECK: release
+
     print(circuit.mlir_opt)
+
+    qml.capture.disable()
 
 
 test_decompose_work_wires_control_flow()
+
+
+def test_decompose_work_wires_with_decompose_transform():
+    """Test that work wires are correctly lowered and decomposed by the decompose transform."""
+
+    qml.capture.enable()
+
+    qml.capture.enable()
+    qml.decomposition.enable_graph()
+
+    @qml.register_resources({qml.X: 1, qml.Z: 1})
+    def my_decomp(wire):
+        with qml.allocate(1) as work_wire:
+            qml.X(work_wire)
+            qml.Z(wire)
+            qml.X(work_wire)
+
+    @qjit
+    @partial(
+        qml.transforms.decompose,
+        gate_set={
+            "X",
+            "Z",
+        },
+        fixed_decomps={
+            qml.Y: my_decomp,
+        },
+    )
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def my_circuit():
+        qml.Y(0)
+        return qml.probs()
+
+    # CHECK-NOT: Y
+    # CHECK-NOT: my_decomp
+
+    # two allocates, one for main register and one for decomp register
+    # CHECK: allocate
+    # CHECK: allocate
+    # CHECK: X
+    # CHECK: Z
+    # CHECK: X
+    # CHECK: release
+    # CHECK: release
+    print(my_circuit.mlir_opt)
+
+    qml.capture.disable()
+
+
+test_decompose_work_wires_with_decompose_transform()
