@@ -122,12 +122,14 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     }
 
     /// Analyze which return-value positions belong to each group.
-    /// Returns a map: group_id -> list of positions in the return operand list.
+    /// Returns a pair of (groupPositions, returnValueGroupIds):
+    /// - groupPositions: group_id -> list of positions in the return operand list
+    /// - returnValueGroupIds: list of group_ids for each return value
     ///
     /// Return values that don't trace back to any measurement (e.g. constants produced by
     /// `split-to-single-terms` for Identity observables) are assigned to group 0 so that group 0's
     /// function computes and returns them.
-    static std::optional<llvm::DenseMap<int, SmallVector<int>>>
+    static std::optional<std::pair<llvm::DenseMap<int, SmallVector<int>>, SmallVector<int>>>
     analyzeGroupReturnPositions(func::FuncOp funcOp, int numGroups)
     {
         Operation *returnOp = funcOp.front().getTerminator();
@@ -136,6 +138,9 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
         for (int i = 0; i < numGroups; ++i) {
             groupPositions[i] = {};
         }
+
+        SmallVector<int> returnValueGroupIds;
+        returnValueGroupIds.reserve(returnOp->getNumOperands());
 
         for (auto [position, returnValue] : llvm::enumerate(returnOp->getOperands())) {
             int groupId = findGroupForReturnValue(returnValue);
@@ -147,9 +152,10 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
                 groupId = 0;
             }
             groupPositions[groupId].push_back(static_cast<int>(position));
+            returnValueGroupIds.push_back(groupId);
         }
 
-        return groupPositions;
+        return std::make_pair(groupPositions, returnValueGroupIds);
     }
 
     /// Update the return statement of a function to remove specified values,
@@ -193,15 +199,16 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
 
     /// Remove measurement operations (and their observable / intermediate chains) that do not
     /// belong to the target group.
-    static void removeGroup(func::FuncOp groupFunc, int targetGroup)
+    static void removeGroup(func::FuncOp groupFunc, int targetGroup,
+                            ArrayRef<int> returnValueGroupIds)
     {
         Operation *returnOp = groupFunc.front().getTerminator();
 
         // Identify return values that belong to other groups.
         llvm::DenseSet<Value> returnValuesToRemove;
-        for (Value operand : returnOp->getOperands()) {
-            int groupId = findGroupForReturnValue(operand);
-            bool keep = (groupId == targetGroup) || (groupId == -1 && targetGroup == 0);
+        for (auto [position, operand] : llvm::enumerate(returnOp->getOperands())) {
+            int groupId = returnValueGroupIds[position];
+            bool keep = (groupId == targetGroup);
             if (!keep) {
                 returnValuesToRemove.insert(operand);
             }
@@ -281,7 +288,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     /// Clones the original function, removes measurements from other groups,
     /// and inserts the new function into the module.
     func::FuncOp createGroupFunction(func::FuncOp funcOp, int groupIdx, int numGroups,
-                                     ModuleOp moduleOp)
+                                     ArrayRef<int> returnValueGroupIds, ModuleOp moduleOp)
     {
         // clone the entire function
         func::FuncOp groupFunc = funcOp.clone();
@@ -293,7 +300,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
         modSymTable.insert(groupFunc);
 
         // Remove measurements from groups other than groupIdx
-        removeGroup(groupFunc, groupIdx);
+        removeGroup(groupFunc, groupIdx, returnValueGroupIds);
 
         // Distribute shots among groups
         distributeShots(groupFunc, numGroups);
@@ -409,20 +416,22 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
             }
 
             // Analyze return value positions for each group
-            auto groupReturnPositions = analyzeGroupReturnPositions(funcOp, numGroups);
-            if (!groupReturnPositions) {
+            auto analysisResult = analyzeGroupReturnPositions(funcOp, numGroups);
+            if (!analysisResult) {
                 emitError(funcOp.getLoc()) << "failed to analyze group return positions";
                 return signalPassFailure();
             }
+            auto [groupReturnPositions, returnValueGroupIds] = *analysisResult;
 
             // Create a duplicate function for each group
             SmallVector<func::FuncOp> groupFunctions;
             for (int i = 0; i < numGroups; ++i) {
-                groupFunctions.push_back(createGroupFunction(funcOp, i, numGroups, moduleOp));
+                groupFunctions.push_back(
+                    createGroupFunction(funcOp, i, numGroups, returnValueGroupIds, moduleOp));
             }
 
             // Replace original function body with calls to group functions
-            replaceOriginalWithCalls(funcOp, groupFunctions, *groupReturnPositions);
+            replaceOriginalWithCalls(funcOp, groupFunctions, groupReturnPositions);
             funcOp->removeAttr("qnode");
         }
     }
