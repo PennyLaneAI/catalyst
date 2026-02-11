@@ -37,7 +37,7 @@ using namespace stablehlo;
 using namespace catalyst;
 
 namespace {
-void clearFuncExceptShots(func::FuncOp qnodeFunc, Value shots)
+void clearFuncExceptShots(IRRewriter &builder, func::FuncOp qnodeFunc, Value shots)
 {
     // Delete the body of a funcop, except the operations that produce the shots value
     // We need triple loop to explicitly iterate in reverse order, due to erasure.
@@ -63,7 +63,7 @@ void clearFuncExceptShots(func::FuncOp qnodeFunc, Value shots)
     }
 
     for (Operation *op : eraseWorklist) {
-        op->erase();
+        builder.eraseOp(op);
     }
 }
 
@@ -86,7 +86,7 @@ func::FuncOp createOneShotKernel(IRRewriter &builder, func::FuncOp qnodeFunc, Op
     Value originalKernelShots = kernelDeviceInitOp.getShots();
     kernelDeviceInitOp->setOperand(0, one);
     if (originalKernelShots.getNumUses() == 0) {
-        originalKernelShots.getDefiningOp()->erase();
+        builder.eraseOp(originalKernelShots.getDefiningOp());
     }
 
     return oneShotKernel;
@@ -110,7 +110,7 @@ scf::ForOp createForLoop(IRRewriter &builder, Value shots, ValueRange loopIterAr
     return forOp;
 }
 
-void eraseAllUsersExcept(Value v, Operation *exception)
+void eraseAllUsersExcept(IRRewriter &builder, Value v, Operation *exception)
 {
     // Erase all users of a Value, and all users of these users, etc., in its forward slice,
     // except the marked exception.
@@ -122,7 +122,7 @@ void eraseAllUsersExcept(Value v, Operation *exception)
     forwardSlice.remove(exception);
 
     for (auto op = forwardSlice.rbegin(); op != forwardSlice.rend(); ++op) {
-        (*op)->erase();
+        builder.eraseOp(*op);
     }
 }
 
@@ -213,7 +213,7 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
             // It needs to be used as the upper bound of the for loop.
             auto deviceInitOp = *qnodeFunc.getOps<quantum::DeviceInitOp>().begin();
             Value shots = deviceInitOp.getShots();
-            clearFuncExceptShots(qnodeFunc, shots);
+            clearFuncExceptShots(builder, qnodeFunc, shots);
 
             // Create the for loop
             // Depending on the MP, the for loop needs different iteration arguments
@@ -266,8 +266,8 @@ void OneShotMCMPass::editKernelMCMExpval(IRRewriter &builder, func::FuncOp oneSh
     retOp->setOperand(retIdx, fromElementsOp.getResult());
 
     // Erase all users of the mcm obs: the new return does not need them.
-    eraseAllUsersExcept(mcmobs.getObs(), retOp);
-    mcmobs->erase();
+    eraseAllUsersExcept(builder, mcmobs.getObs(), retOp);
+    builder.eraseOp(mcmobs);
 }
 
 void OneShotMCMPass::editKernelMCMProbs(IRRewriter &builder, func::FuncOp oneShotKernel,
@@ -345,8 +345,8 @@ void OneShotMCMPass::editKernelMCMProbs(IRRewriter &builder, func::FuncOp oneSho
     retOp->setOperand(retIdx, insertedTensor.getResult());
 
     // Erase all users of the mcm obs: they new return does not need them.
-    eraseAllUsersExcept(mcmobs.getObs(), retOp);
-    mcmobs->erase();
+    eraseAllUsersExcept(builder, mcmobs.getObs(), retOp);
+    builder.eraseOp(mcmobs);
 }
 
 void OneShotMCMPass::editKernelMCMSample(IRRewriter &builder, func::FuncOp oneShotKernel,
@@ -374,8 +374,8 @@ void OneShotMCMPass::editKernelMCMSample(IRRewriter &builder, func::FuncOp oneSh
     retOp->setOperand(retIdx, fromElementsOp.getResult());
 
     // Erase all users of the MCM obs: the new return does not need them.
-    eraseAllUsersExcept(mcmobs.getObs(), retOp);
-    mcmobs->erase();
+    eraseAllUsersExcept(builder, mcmobs.getObs(), retOp);
+    builder.eraseOp(mcmobs);
 }
 
 void OneShotMCMPass::editKernelSampleShapes(func::FuncOp oneShotKernel, ShapedType fullSampleType,
