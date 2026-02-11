@@ -292,12 +292,12 @@ To make Enzyme libraries discoverable to the compiler:
 
   export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"
 
-To make required tools in ``llvm-project/build``, ``mlir-hlo/mhlo-build``, and
+To make required tools in ``llvm-project/build``, ``stablehlo/build``, and
 ``mlir/build`` discoverable to the compiler:
 
 .. code-block:: console
 
-  export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/mlir-hlo/mhlo-build/bin:$PWD/mlir/build/bin:$PATH"
+  export PATH="$PWD/mlir/llvm-project/build/bin:$PWD/mlir/stablehlo/build/bin:$PWD/mlir/build/bin:$PATH"
 
 Tests
 ^^^^^

@@ -52,6 +52,7 @@ set(STABLEHLO_LIBS
     StablehloAssemblyFormat
     StablehloBase
     StablehloBroadcastUtils
+    StablehloBroadcastLowering
     StablehloCAPI
     StablehloLinalgTransforms
     StablehloOps

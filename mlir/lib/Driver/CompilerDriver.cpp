@@ -25,6 +25,7 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
@@ -38,6 +39,7 @@
 #include "llvm/Transforms/Coroutines/CoroSplit.h"
 #include "llvm/Transforms/IPO/GlobalDCE.h"
 
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllExtensions.h"
@@ -51,6 +53,7 @@
 
 #include "stablehlo/dialect/Register.h"
 #include "stablehlo/integrations/c/StablehloPasses.h"
+#include "stablehlo/transforms/Passes.h"
 #include "stablehlo/transforms/optimization/Passes.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
@@ -64,6 +67,7 @@
 #include "Driver/Timer.hpp"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientInterfaces.h"
+#include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/BufferizableOpInterfaceImpl.h"
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
@@ -129,15 +133,16 @@ OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, const llvm::SourceMgr &s
     return parseSourceFile<ModuleOp>(sourceMgr, parserConfig);
 }
 
-/// From the MLIR module it checks if gradients operations are in the program.
-bool containsGradients(mlir::ModuleOp moduleOp)
+/// Detect whether Enzyme differentiation is needed for the module.
+bool containsGradients(const llvm::Module &llvmModule)
 {
-    bool contain = false;
-    moduleOp.walk([&](catalyst::gradient::GradientOpInterface op) {
-        contain = true;
-        return WalkResult::interrupt();
-    });
-    return contain;
+    // This will match both declarations and definitions
+    for (const llvm::Function &func : llvmModule.functions()) {
+        if (func.getName().starts_with("__enzyme_autodiff")) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /// Parse an LLVM module given in textual representation. Any parse errors will be output to
@@ -339,6 +344,9 @@ llvm::LogicalResult catalyst::driver::runEnzymePasses(const CompilerOptions &opt
 std::string catalyst::driver::readInputFile(const std::string &filename)
 {
     if (filename == "-") {
+        if (llvm::errs().is_displayed()) {
+            llvm::errs() << "(processing input from stdin now, hit ctrl-c/ctrl-d to interrupt)\n";
+        }
         std::stringstream buffer;
         std::istreambuf_iterator<char> begin(std::cin), end;
         buffer << std::string(begin, end);

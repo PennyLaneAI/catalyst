@@ -151,4 +151,10 @@ def UnrollConditionalPPRPPMPass : Pass<"unroll-conditional-ppr-ppm"> {
     let dependentDialects = [ "catalyst::qec::QECDialect", "scf::SCFDialect" ];
 }
 
+def LowerQECInitOpsPass : Pass<"lower-qec-init-ops"> {
+    let summary = "Lower QEC initialization ops (prepare, fabricate) to quantum dialect op (set_basis_state).";
+    
+    let dependentDialects = [ "catalyst::qec::QECDialect"];
+}
+
 #endif // QEC_PASSES

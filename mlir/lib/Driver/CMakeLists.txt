@@ -59,6 +59,8 @@ add_mlir_library(CatalystCompilerDriver
     PassInstrumentation.cpp
     Pipelines.cpp
     LineUtils.cpp
+    HighResolutionOutputStrategy.cpp
     LINK_LIBS PRIVATE
     ${LIBS}
+    MLIRSupport
 )
