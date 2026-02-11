@@ -70,7 +70,7 @@ def test_different_wire_name():
     def f(register):
         @qml.for_loop(register.shape[0])
         def l(i):
-            qml.X(i)
+            qml.X(register[i])
 
         l()
 
