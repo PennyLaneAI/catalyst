@@ -1,4 +1,4 @@
-// Copyright 2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023-2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -236,6 +236,33 @@ def BufferDeallocationPass : Pass<"buffer-deallocation", "func::FuncOp"> {
     ```
 
   }];
+}
+
+def ResourceTrackerPass : Pass<"resource-tracker"> {
+    let summary = "Track and report quantum resource usage.";
+    let description = [{
+        This pass computes resource counts (gates, measurements, qubits, etc.)
+        for quantum, qec, and mbqc dialect operations. It queries the
+        ResourceAnalysis to obtain cached results and reports them via
+        MLIR's pass statistics mechanism.
+
+        Optionally, it can output the results as JSON to stdout for
+        consumption by the PennyLane frontend.
+
+        Usage:
+          quantum-opt input.mlir -resource-tracker -mlir-pass-statistics
+          quantum-opt input.mlir -resource-tracker -resource-tracker-output-json=true
+    }];
+
+    let options = [
+        Option<
+            /*C++ var name=*/"outputJson",
+            /*CLI arg name=*/"output-json",
+            /*type=*/"bool",
+            /*default=*/"false",
+            /*description=*/"Print resource counts as JSON to stdout"
+        >
+    ];
 }
 
 #endif // CATALYST_PASSES
