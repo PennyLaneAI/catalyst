@@ -155,6 +155,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update `mlir_specs` to account for new `marker` functionality in PennyLane.
+  [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
+
 * Updated the integration tests for `qp.specs` to get coverage for new features
   [(#2448)](https://github.com/PennyLaneAI/catalyst/pull/2448)
 
