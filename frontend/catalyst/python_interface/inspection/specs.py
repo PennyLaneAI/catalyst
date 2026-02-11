@@ -38,7 +38,7 @@ def mlir_specs(
     qnode: QJIT,
     level: int | tuple[int] | list[int] | Literal["all"],
     *args,
-    level_to_markers: dict[int, tuple(str)] | None = None,
+    level_to_markers: dict[int, tuple[str]] | None = None,
     **kwargs,
 ) -> ResourcesResult | dict[str, ResourcesResult]:
     """Compute the specs used for a circuit at the level of an MLIR pass.
