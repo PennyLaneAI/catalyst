@@ -107,6 +107,12 @@
 
 <h3>Improvements 🛠</h3>
 
+* The PPR/PPM lowering passes (`lower-qec-init-ops`, `unroll-conditional-ppr-ppm`) are now run
+  as part of the main quantum compilation pipeline. When using `to-ppr` and `ppr-to-ppm` transforms,
+  these passes are applied automatically during compilation; we no longer need to stack them
+  explicitly.
+  [(#2460)](https://github.com/PennyLaneAI/catalyst/pull/2460)
+
 * `null.qubit` resource tracking is now able to track measurements and observables. This output
   is also reflected in `qml.specs`.
   [(#2446)](https://github.com/PennyLaneAI/catalyst/pull/2446)
@@ -157,6 +163,11 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fix `CATALYST_XDSL_UNIVERSE` to correctly define the available dialects and transforms, allowing
+  tools like `xdsl-opt` to work with Catalyst's custom Python dialects.
+  [(#2471)](https://github.com/PennyLaneAI/catalyst/pull/2471)
+
 
 * Fix a bug with the xDSL `ParitySynth` pass that caused failure when the QNode being transformed
   contained operations with regions.

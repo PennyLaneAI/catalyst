@@ -26,6 +26,8 @@ file(GLOB SRC
     DecomposeArbitraryPPR.cpp
     lower_qec_init_ops.cpp
     LowerQECInitOps.cpp
+    ConversionPatterns.cpp
+    qec_to_llvm.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
