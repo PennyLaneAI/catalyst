@@ -77,6 +77,10 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
 
     mlir::DefaultTimingManager tm;
     applyDefaultTimingManagerCLOptions(tm);
+    if (tm.isEnabled()) {
+        auto strategy = std::make_unique<HighResolutionOutputStrategy>(llvm::errs());
+        tm.setOutput(std::move(strategy));
+    }
     mlir::TimingScope timing = tm.getRootScope();
 
     mlir::TimingScope parserTiming = timing.nest("Parser");
@@ -108,10 +112,6 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
     }
     parserTiming.stop();
 
-    // Enzyme always happens after O2Opt. If the checkpoint is O2Opt, enzymeRun must be set to
-    // true so that the enzyme pass can be executed.
-    bool enzymeRun = options.checkpointStage == "O2Opt";
-
     bool runAll = (options.loweringAction == Action::All);
     bool runOpt = (options.loweringAction == Action::OPT) || runAll;
     bool runTranslate = (options.loweringAction == Action::Translate) || runAll;
@@ -119,10 +119,6 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
 
     if (runOpt && (inType == InputType::MLIR)) {
         mlir::TimingScope optTiming = timing.nest("Optimization");
-        // TODO: The enzymeRun flag will not travel correctly in the case where different
-        // stages of compilation are executed independently via the Catalyst CLI.
-        // Ideally, It should be added to the IR via an attribute.
-        enzymeRun = containsGradients(*mlirModule);
         if (failed(runLowering(options, &ctx, *mlirModule, output, optTiming))) {
             CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return llvm::failure();
@@ -195,6 +191,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
             catalyst::utils::LinesCount::call(*llvmModule.get());
         }
 
+        bool enzymeRun = containsGradients(*llvmModule);
         if (enzymeRun) {
             mlir::TimingScope o2PassesTiming = llcTiming.nest("LLVM O2 passes");
             if (failed(timer::timer(runO2LLVMPasses, "runO2LLVMPasses", /* add_endl */ false,
@@ -342,17 +339,29 @@ int QuantumDriverMainFromCL(int argc, char **argv)
     llvm::InitLLVM y(argc, argv);
     MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
 
-    // Read the input IR file
-    std::string source = readInputFile(inputFilename);
-    if (source.empty()) {
-        llvm::errs() << "Error: Unable to read input file: " << inputFilename << "\n";
-        return llvm::to_underlying(ErrorCode::Failure);
+    if (config.shouldShowDialects()) {
+        llvm::outs() << "Available Dialects: ";
+        interleave(registry.getDialectNames(), llvm::outs(), ",");
+        llvm::outs() << "\n";
+        return 0;
+    }
+
+    if (config.shouldListPasses()) {
+        mlir::printRegisteredPasses();
+        return 0;
     }
 
     std::unique_ptr<CompilerOutput> output(new CompilerOutput());
     assert(output);
     output->outputFilename = outputFilename;
     llvm::raw_string_ostream errStream{output->diagnosticMessages};
+
+    // Read the input IR file
+    std::string source = readInputFile(inputFilename);
+    if (source.empty()) {
+        llvm::errs() << "Error: Unable to read input file: " << inputFilename << "\n";
+        return 1;
+    }
 
     CompilerOptions options{.source = source,
                             .workspace = WorkspaceDir,
