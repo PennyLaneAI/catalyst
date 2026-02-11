@@ -363,7 +363,6 @@ def handle_qnode(
                 stopping_condition=stopping_condition,
             )
 
-    # print("Closed Jaxpr", closed_jaxpr)
 
     def calling_convention(*args):
         device_init_p.bind(
