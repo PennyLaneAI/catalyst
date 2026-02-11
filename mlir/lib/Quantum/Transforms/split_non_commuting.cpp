@@ -45,6 +45,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/PassManager.h"
 
 #include "Quantum/IR/QuantumOps.h"
@@ -128,7 +129,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     /// Return values that don't trace back to any measurement (e.g. constants produced by
     /// `split-to-single-terms` for Identity observables) are assigned to group 0 so that group 0's
     /// function computes and returns them.
-    static std::optional<std::pair<llvm::DenseMap<int, SmallVector<int>>, SmallVector<int>>>
+    static std::pair<llvm::DenseMap<int, SmallVector<int>>, SmallVector<int>>
     analyzeGroupReturnPositions(func::FuncOp funcOp, int numGroups)
     {
         Operation *returnOp = funcOp.front().getTerminator();
@@ -287,7 +288,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     /// Clones the original function, removes measurements from other groups,
     /// and inserts the new function into the module.
     func::FuncOp createGroupFunction(func::FuncOp funcOp, int groupIdx, int numGroups,
-                                     ArrayRef<int> returnValueGroupIds, ModuleOp moduleOp)
+                                     ArrayRef<int> returnValueGroupIds, SymbolTable &modSymTable)
     {
         // clone the entire function
         func::FuncOp groupFunc = funcOp.clone();
@@ -295,7 +296,6 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
         groupFunc.setSymName(groupName);
         groupFunc.setPrivate();
 
-        SymbolTable modSymTable(moduleOp);
         modSymTable.insert(groupFunc);
 
         // Remove measurements from groups other than groupIdx
@@ -365,18 +365,24 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
     /// Simplify the identity-expval to a constant 1.0.
     void simplifyIdentityExpval(func::FuncOp funcOp)
     {
+        SmallVector<std::pair<ExpvalOp, NamedObsOp>> toSimplify;
         funcOp.walk([&](ExpvalOp expvalOp) {
             auto namedObsOp = expvalOp.getObs().getDefiningOp<NamedObsOp>();
             if (namedObsOp && namedObsOp.getType() == NamedObservable::Identity) {
-                // Identity expval is always 1.0
-                OpBuilder builder(expvalOp);
-                Value one = arith::ConstantOp::create(builder, expvalOp.getLoc(),
-                                                      builder.getF64FloatAttr(1.0));
-                expvalOp.replaceAllUsesWith(one);
-                expvalOp.erase();
-                namedObsOp.erase();
+
+                toSimplify.emplace_back(expvalOp, namedObsOp);
             }
         });
+
+        for (auto [expvalOp, namedObsOp] : toSimplify) {
+            // Identity expval is always 1.0
+            OpBuilder builder(expvalOp);
+            Value one =
+                arith::ConstantOp::create(builder, expvalOp.getLoc(), builder.getF64FloatAttr(1.0));
+            expvalOp.replaceAllUsesWith(one);
+            expvalOp.erase();
+            namedObsOp.erase();
+        }
     }
 
     void runOnOperation() override
@@ -415,18 +421,15 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
             }
 
             // Analyze return value positions for each group
-            auto analysisResult = analyzeGroupReturnPositions(funcOp, numGroups);
-            if (!analysisResult) {
-                emitError(funcOp.getLoc()) << "failed to analyze group return positions";
-                return signalPassFailure();
-            }
-            auto [groupReturnPositions, returnValueGroupIds] = *analysisResult;
+            auto [groupReturnPositions, returnValueGroupIds] =
+                analyzeGroupReturnPositions(funcOp, numGroups);
 
             // Create a duplicate function for each group
+            SymbolTable modSymTable(moduleOp);
             SmallVector<func::FuncOp> groupFunctions;
             for (int i = 0; i < numGroups; ++i) {
                 groupFunctions.push_back(
-                    createGroupFunction(funcOp, i, numGroups, returnValueGroupIds, moduleOp));
+                    createGroupFunction(funcOp, i, numGroups, returnValueGroupIds, modSymTable));
             }
 
             // Replace original function body with calls to group functions

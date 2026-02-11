@@ -67,7 +67,9 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
 }
 
 def SplitNonCommutingPass : Pass<"split-non-commuting"> {
-    let summary = "Split quantum functions non-commuting observables into multiple executions.";
+    let summary = "Split quantum functions non-commuting observables into multiple executions.";let dependentDialects = ["arith::ArithDialect"];
+
+    let dependentDialects = ["arith::ArithDialect"];
 }
 
 def SplitToSingleTermsPass : Pass<"split-to-single-terms"> {
