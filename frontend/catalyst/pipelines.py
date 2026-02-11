@@ -33,7 +33,7 @@ from functools import partial
 from io import TextIOWrapper
 from operator import is_not
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, Iterable, List, Literal, Optional, Set, Tuple, Union
 
 from catalyst.utils.exceptions import CompileError
 
@@ -116,11 +116,17 @@ class CompileOptions:
             Default is ``None``.
         pass_plugins (Optional[Iterable[Path]]): List of paths to pass plugins.
         dialect_plugins (Optional[Iterable[Path]]): List of paths to dialect plugins.
+        capture (Optional[Union[str, bool]]): Controls whether to use PennyLane program capture.
+
+            - ``"global"`` (default): Defer to ``qml.capture.enabled()``
+            - ``True``: Force program capture on, regardless of global setting
+            - ``False``: Force program capture off (use old frontend)
     """
 
     verbose: Optional[bool] = False
     logfile: Optional[TextIOWrapper] = sys.stderr
     target: Optional[str] = "binary"
+    link: Optional[bool] = True
     keep_intermediate: Optional[Union[str, int, bool, KeepIntermediateLevel]] = False
     use_nameloc: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
@@ -137,6 +143,7 @@ class CompileOptions:
     circuit_transform_pipeline: Optional[dict[str, dict[str, str]]] = None
     pass_plugins: Optional[Set[Path]] = None
     dialect_plugins: Optional[Set[Path]] = None
+    capture: bool | Literal["global"] = "global"
 
     def __post_init__(self):
         # Convert keep_intermediate to Enum
@@ -178,6 +185,14 @@ class CompileOptions:
             self.dialect_plugins = set()
         else:
             self.dialect_plugins = set(self.dialect_plugins)
+
+        # Validate capture parameter
+        valid_capture_values = ("global", True, False)
+        if self.capture not in valid_capture_values:
+            raise ValueError(
+                f"Invalid value for capture: {self.capture!r}. "
+                f"Valid values are: 'global', True, False."
+            )
 
     def __deepcopy__(self, memo):
         """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
@@ -229,6 +244,9 @@ def get_quantum_compilation_stage(_options: CompileOptions) -> List[str]:
         "inline-nested-module",
         "lower-mitigation",
         "adjoint-lowering",
+        # TODO: We can remove 2 passes below once PBC has its own pipeline.
+        "lower-qec-init-ops",
+        "unroll-conditional-ppr-ppm",
         "disable-assertion" if _options.disable_assertions else None,
     ]
     return list(filter(partial(is_not, None), user_transform_passes))
@@ -349,6 +367,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
         "finalize-memref-to-llvm{use-generic-functions}",
         "convert-index-to-llvm",
         "convert-catalyst-to-llvm",
+        "convert-qec-to-llvm",  # TODO: Remove this once PBC has its own pipeline
         "convert-quantum-to-llvm",
         # There should be no identical code folding
         # (`mergeIdenticalBlocks` in the MLIR source code)
