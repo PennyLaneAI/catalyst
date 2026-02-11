@@ -16,6 +16,8 @@
 
 #include <optional>
 
+#include "llvm/ADT/SmallSet.h"
+
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
@@ -26,7 +28,6 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "stablehlo/dialect/StablehloOps.h"
-#include "llvm/ADT/SmallSet.h"
 
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
