@@ -119,14 +119,12 @@ template <typename T> struct PPRotationBasedPattern : public OpConversionPattern
         args.push_back(LLVM::ZeroOp::create(rewriter, loc, ptrType));
         args.push_back(
             LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
-        args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        args.append(adaptor.getInQubits().begin(), adaptor.getInQubits().end());
 
         LLVM::CallOp::create(rewriter, loc, fnDecl, args);
 
         // Replace the op with the input qubits
-        SmallVector<Value> values;
-        values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
-        rewriter.replaceOp(op, values);
+        rewriter.replaceOp(op, adaptor.getInQubits());
 
         return success();
     }
@@ -163,7 +161,7 @@ struct PPMeasurementOpPattern : public OpConversionPattern<PPMeasurementOp> {
         args.push_back(pauliWordPtr);
         args.push_back(
             LLVM::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(numQubits)));
-        args.insert(args.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        args.append(adaptor.getInQubits().begin(), adaptor.getInQubits().end());
 
         // Call the function and get the result pointer
         Value resultPtr = LLVM::CallOp::create(rewriter, loc, fnDecl, args).getResult();
@@ -181,7 +179,7 @@ struct PPMeasurementOpPattern : public OpConversionPattern<PPMeasurementOp> {
         // Replace the op with the measurement result and the input qubits
         SmallVector<Value> values;
         values.push_back(mres);
-        values.insert(values.end(), adaptor.getInQubits().begin(), adaptor.getInQubits().end());
+        values.append(adaptor.getInQubits().begin(), adaptor.getInQubits().end());
         rewriter.replaceOp(op, values);
 
         return success();
