@@ -67,7 +67,6 @@ def get_device_capabilities(
 
     if execution_config is None:
         execution_config = qml.devices.ExecutionConfig()
-        execution_config = device.setup_execution_config
 
     if shots_len == 0 and requires_shots(capabilities):
         raise CompileError(
