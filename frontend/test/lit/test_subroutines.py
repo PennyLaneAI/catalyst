@@ -112,7 +112,7 @@ def test_different_shapes():
         def loop(i):
             qml.RX(data[i], wires[i])
 
-        loop() # pylint: disable=no-value-for-parameter
+        loop()  # pylint: disable=no-value-for-parameter
 
     @qml.qjit(capture=True, target="mlir")
     @qml.qnode(qml.device("null.qubit", wires=1))

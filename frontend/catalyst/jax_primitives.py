@@ -121,6 +121,7 @@ with Patcher(
         VarianceOp,
     )
     from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
+
     from catalyst.jax_primitives_utils import (
         ApplyRegisteredPassOp,
         cache,
