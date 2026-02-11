@@ -152,11 +152,11 @@ mlir::OwningOpRef<mlir::ModuleOp> parseMLIRSource(mlir::MLIRContext *ctx,
  * @brief Checks if the program contains gradient operations in the input MLIR module. Used to
  * identify validity of the program with given passes.
  *
- * @param moduleOp
+ * @param llvmModule
  * @return true Gradient operations are present in the program.
  * @return false Gradient operations are not present in the program.
  */
-bool containsGradients(mlir::ModuleOp moduleOp);
+bool containsGradients(const llvm::Module &llvmModule);
 
 /**
  * @brief Parse an LLVM module given in textual representation. Any parse errors will be output to

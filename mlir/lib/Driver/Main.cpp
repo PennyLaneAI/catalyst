@@ -33,6 +33,7 @@
 
 #include "Driver/CatalystLLVMTarget.h"
 #include "Driver/CompilerDriver.hpp"
+#include "Driver/HighResolutionOutputStrategy.h"
 #include "Driver/LineUtils.hpp"
 #include "Driver/Timer.hpp"
 #include "stablehlo/transforms/optimization/Passes.h"
@@ -191,7 +192,7 @@ llvm::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOu
             catalyst::utils::LinesCount::call(*llvmModule.get());
         }
 
-        bool enzymeRun = containsGradients(*llvmModule);
+        bool enzymeRun = catalyst::driver::containsGradients(*llvmModule);
         if (enzymeRun) {
             mlir::TimingScope o2PassesTiming = llcTiming.nest("LLVM O2 passes");
             if (failed(timer::timer(runO2LLVMPasses, "runO2LLVMPasses", /* add_endl */ false,
