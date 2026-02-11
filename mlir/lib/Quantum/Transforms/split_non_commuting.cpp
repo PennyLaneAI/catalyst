@@ -108,7 +108,6 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
                 assert(op->hasAttrOfType<IntegerAttr>("group") &&
                        "measurement op must have group attribute");
                 return static_cast<int>(op->getAttrOfType<IntegerAttr>("group").getInt());
-                continue;
             }
 
             for (Value operand : op->getOperands()) {
