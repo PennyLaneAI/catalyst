@@ -369,7 +369,6 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
         funcOp.walk([&](ExpvalOp expvalOp) {
             auto namedObsOp = expvalOp.getObs().getDefiningOp<NamedObsOp>();
             if (namedObsOp && namedObsOp.getType() == NamedObservable::Identity) {
-
                 toSimplify.emplace_back(expvalOp, namedObsOp);
             }
         });
