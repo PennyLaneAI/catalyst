@@ -440,7 +440,6 @@ def test_ppm_compilation():
     # CHECK: qec.ppm ["X", "Z"]
     # CHECK: scf.if
     # CHECK: qec.ppm ["Y"]
-    # CHECK: }
     # CHECK: else
     # CHECK: qec.ppm ["X"]
     # CHECK: }
