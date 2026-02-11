@@ -91,7 +91,12 @@ def mlir_specs(
         pass_instance = previous_pass if previous_pass else next_pass
         result = specs_collect(module)
 
-        pass_name = pass_instance.name if hasattr(pass_instance, "name") else pass_instance
+        pass_name = pass_instance
+        if m := level_to_markers.get(pass_level):
+            pass_name = ", ".join(m if not isinstance(m, str) else [m])
+        elif hasattr(pass_instance, "name"):
+            pass_name = pass_instance.name
+
         cache[pass_level] = (
             result,
             pass_name if pass_level else "Before MLIR Passes",
@@ -122,11 +127,7 @@ def mlir_specs(
         return {
             # NOTE: Ensures that markers on the same level are joined
             # correctly as a string delimited by commas.
-            (
-                ", ".join(m if not isinstance(m, str) else [m])
-                if (m := level_to_markers.get(lvl))
-                else f"{cache[lvl][1]} (MLIR-{lvl})"
-            ): cache[lvl][0]
+            f"{cache[lvl][1]} (MLIR-{lvl})": cache[lvl][0]
             for lvl in level
             if lvl in cache
         }
