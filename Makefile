@@ -221,7 +221,7 @@ wheel:
 	cp $(OQC_BUILD_DIR)/oqc_python_module.so $(MK_DIR)/frontend/catalyst/lib
 	cp $(OQC_BUILD_DIR)/backend/*.toml $(MK_DIR)/frontend/catalyst/lib/backend
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.* $(MK_DIR)/frontend/catalyst/lib
-	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_apfloat_wrappers.* $(MK_DIR)/frontend/catalyst/lib
+	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_apfloat_wrappers.* $(MK_DIR)/frontend/catalyst/lib || true # optional
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_async_runtime.* $(MK_DIR)/frontend/catalyst/lib
 
