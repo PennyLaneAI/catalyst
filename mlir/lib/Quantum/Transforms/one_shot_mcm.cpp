@@ -37,6 +37,11 @@ using namespace stablehlo;
 using namespace catalyst;
 
 namespace {
+
+//
+// Misc helper functions
+//
+
 void clearFuncExceptShots(IRRewriter &builder, func::FuncOp qnodeFunc, Value shots)
 {
     // Delete the body of a funcop, except the operations that produce the shots value
@@ -129,118 +134,43 @@ void eraseAllUsersExcept(IRRewriter &builder, Value v, Operation *exception)
     }
 }
 
-} // anonymous namespace
+std::optional<quantum::MeasurementProcess> getMPFromValue(Value v)
+{
+    // Get the MP operation that produces a Value v somewhere in the MP's forward slice.
+    // In other words, get the MP operations that a Value v comes from.
+    // Because an MP and the corresponding returned Value is usually not super far away, doing
+    // an entire backslice would not be ideal, since that could possibly backslice to the very
+    // beginning of a function.
+    // So we just depth-first search from the Value directly.
 
-namespace catalyst {
-namespace quantum {
+    Operation *defOp = v.getDefiningOp();
+    if (!defOp) {
+        // Reached a block argument
+        return std::nullopt;
+    }
 
-#define GEN_PASS_DEF_ONESHOTMCMPASS
-#include "Quantum/Transforms/Passes.h.inc"
+    if (auto mp = dyn_cast<quantum::MeasurementProcess>(defOp)) {
+        return mp;
+    }
 
-struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
-    using impl::OneShotMCMPassBase<OneShotMCMPass>::OneShotMCMPassBase;
-
-    // Misc helpers
-    std::optional<MeasurementProcess> getMPFromValue(Value);
-
-    // Methods to update the one shot kernel
-    // These edits are needed when the MPs are on MCMs, or to change the shapes of values of the
-    // one-shot samples.
-    void editKernelMCMExpval(IRRewriter &, func::FuncOp, quantum::MCMObsOp, size_t retIdx);
-    void editKernelMCMProbs(IRRewriter &, func::FuncOp, quantum::MCMObsOp, size_t retIdx);
-    void editKernelMCMSample(IRRewriter &, func::FuncOp, quantum::MCMObsOp, size_t retIdx);
-    void editKernelSampleShapes(func::FuncOp, ShapedType, quantum::SampleOp, size_t retIdx);
-    void editKernelMCMCounts(IRRewriter &, func::FuncOp, quantum::MCMObsOp, size_t retIdx);
-
-    // Methods to prepare the initial arguments to the for loop
-    void prepareForLoopInitArgs(IRRewriter &, func::FuncOp oneShotKernel, func::FuncOp qnodeFunc,
-                                SmallVector<Value> &loopIterArgs,
-                                SmallVector<std::string> &loopIterArgsMPKinds);
-
-    void prepareForLoopExpvalArgs(IRRewriter &, func::FuncOp oneShotKernel,
-                                  quantum::ExpvalOp expvalOp, size_t retIdx,
-                                  SmallVector<Value> &loopIterArgs,
-                                  SmallVector<std::string> &loopIterArgsMPKinds);
-
-    LogicalResult prepareForLoopVarianceArgs(IRRewriter &, func::FuncOp oneShotKernel,
-                                             quantum::VarianceOp varianceOp, size_t retIdx,
-                                             SmallVector<Value> &loopIterArgs,
-                                             SmallVector<std::string> &loopIterArgsMPKinds);
-
-    void prepareForLoopProbsArgs(IRRewriter &, func::FuncOp oneShotKernel, quantum::ProbsOp probsOp,
-                                 size_t retIdx, SmallVector<Value> &loopIterArgs,
-                                 SmallVector<std::string> &loopIterArgsMPKinds);
-
-    void prepareForLoopSampleArgs(IRRewriter &, func::FuncOp oneShotKernel,
-                                  quantum::SampleOp sampleOp, size_t retIdx,
-                                  SmallVector<Value> &loopIterArgs,
-                                  SmallVector<std::string> &loopIterArgsMPKinds);
-
-    void prepareForLoopCountsArgs(IRRewriter &, func::FuncOp oneShotKernel,
-                                  quantum::CountsOp countsOp, size_t retIdx,
-                                  SmallVector<Value> &loopIterArgs,
-                                  SmallVector<std::string> &loopIterArgsMPKinds);
-
-    // Methods to construct the loop body
-    void constructForLoopBody(IRRewriter &, scf::ForOp forOp, func::FuncOp oneShotKernel,
-                              const SmallVector<std::string> &loopIterArgsMPKinds);
-
-    // Methods to post process the loop results
-    void postProcessLoopResults(IRRewriter &, scf::ForOp forOp, func::FuncOp oneShotKernel,
-                                Value shots, SmallVector<Value> &retVals,
-                                const SmallVector<std::string> &loopIterArgsMPKinds);
-
-    void runOnOperation() override
-    {
-        Operation *mod = getOperation();
-        Location loc = mod->getLoc();
-        IRRewriter builder(mod->getContext());
-
-        // Collect all qnode functions.
-        // We find qnode functions by identifying the parent function ops of MPs
-        SetVector<func::FuncOp> qnodeFuncs;
-        mod->walk([&](MeasurementProcess _mp) {
-            qnodeFuncs.insert(_mp->getParentOfType<func::FuncOp>());
-        });
-
-        // For each qnode function, find the returned MPs
-        // Then handle the one shot logic for each MP type
-        for (auto qnodeFunc : qnodeFuncs) {
-            // Clone the qnode function and give it a new name.
-            // Because we need to make sure the current qnodeFunc name is reserved as entry point
-            // Set the number of shots in the new kernel to one.
-            func::FuncOp oneShotKernel = createOneShotKernel(builder, qnodeFunc, mod);
-
-            // Clear the original qnodeFunc. Its new contents will be the one-shot logic.
-            // Keep the SSA value for the shots.
-            // It needs to be used as the upper bound of the for loop.
-            auto deviceInitOp = *qnodeFunc.getOps<quantum::DeviceInitOp>().begin();
-            Value shots = deviceInitOp.getShots();
-            clearFuncExceptShots(builder, qnodeFunc, shots);
-
-            // Create the for loop
-            // Depending on the MP, the for loop needs different iteration arguments
-            SmallVector<Value> loopIterArgs;
-            SmallVector<std::string> loopIterArgsMPKinds;
-            prepareForLoopInitArgs(builder, oneShotKernel, qnodeFunc, loopIterArgs,
-                                   loopIterArgsMPKinds);
-            builder.setInsertionPointToEnd(&qnodeFunc.getBody().front());
-            scf::ForOp forOp = createForLoop(builder, shots, loopIterArgs);
-            constructForLoopBody(builder, forOp, oneShotKernel, loopIterArgsMPKinds);
-
-            // Perform each MP's necessary post processing after the loop body
-            builder.setInsertionPointToEnd(&qnodeFunc.getBody().front());
-            SmallVector<Value> retVals;
-            postProcessLoopResults(builder, forOp, oneShotKernel, shots, retVals,
-                                   loopIterArgsMPKinds);
-
-            func::ReturnOp::create(builder, loc, retVals);
+    for (Value operand : defOp->getOperands()) {
+        std::optional<quantum::MeasurementProcess> candidate = getMPFromValue(operand);
+        if (candidate.has_value()) {
+            return candidate;
         }
-    } // runOnOperation()
-}; // struct OneShotMCMPass
+    }
 
-void OneShotMCMPass::editKernelMCMExpval(IRRewriter &builder, func::FuncOp oneShotKernel,
-                                         quantum::MCMObsOp mcmobs, size_t retIdx)
+    return std::nullopt;
+}
+
+//
+// Methods to update the one shot kernel
+// These edits are needed when the MPs are on MCMs, or to change the shapes of values of the
+// one-shot samples.
+//
+
+void editKernelMCMExpval(IRRewriter &builder, func::FuncOp oneShotKernel, quantum::MCMObsOp mcmobs,
+                         size_t retIdx)
 {
     // If the kernel returns expval on a mcm,
     // the single-shot expval of a mcm is just the mcm boolean result itself
@@ -273,8 +203,8 @@ void OneShotMCMPass::editKernelMCMExpval(IRRewriter &builder, func::FuncOp oneSh
     builder.eraseOp(mcmobs);
 }
 
-void OneShotMCMPass::editKernelMCMProbs(IRRewriter &builder, func::FuncOp oneShotKernel,
-                                        quantum::MCMObsOp mcmobs, size_t retIdx)
+void editKernelMCMProbs(IRRewriter &builder, func::FuncOp oneShotKernel, quantum::MCMObsOp mcmobs,
+                        size_t retIdx)
 {
     // If the kernel returns probs on MCMs,
     // the single-shot probs of the MCM is a zero tensor, with a single one at
@@ -352,8 +282,8 @@ void OneShotMCMPass::editKernelMCMProbs(IRRewriter &builder, func::FuncOp oneSho
     builder.eraseOp(mcmobs);
 }
 
-void OneShotMCMPass::editKernelMCMSample(IRRewriter &builder, func::FuncOp oneShotKernel,
-                                         quantum::MCMObsOp mcmobs, size_t retIdx)
+void editKernelMCMSample(IRRewriter &builder, func::FuncOp oneShotKernel, quantum::MCMObsOp mcmobs,
+                         size_t retIdx)
 {
     // If the kernel returns sample on MCMs,
     // the single-shot sample of a MCM is just the MCM boolean result itself
@@ -381,8 +311,8 @@ void OneShotMCMPass::editKernelMCMSample(IRRewriter &builder, func::FuncOp oneSh
     builder.eraseOp(mcmobs);
 }
 
-void OneShotMCMPass::editKernelSampleShapes(func::FuncOp oneShotKernel, ShapedType fullSampleType,
-                                            quantum::SampleOp sampleOp, size_t retIdx)
+void editKernelSampleShapes(func::FuncOp oneShotKernel, ShapedType fullSampleType,
+                            quantum::SampleOp sampleOp, size_t retIdx)
 {
     // Change the one-shot kernel's sample op, and its users, to return one-shot shaped results
 
@@ -419,8 +349,8 @@ void OneShotMCMPass::editKernelSampleShapes(func::FuncOp oneShotKernel, ShapedTy
     }
 }
 
-void OneShotMCMPass::editKernelMCMCounts(IRRewriter &builder, func::FuncOp oneShotKernel,
-                                         quantum::MCMObsOp mcmobs, size_t retIdx)
+void editKernelMCMCounts(IRRewriter &builder, func::FuncOp oneShotKernel, quantum::MCMObsOp mcmobs,
+                         size_t retIdx)
 {
     // If the kernel returns counts on MCMs,
     // the single-shot counts of the MCM is a zero tensor, with a single one at
@@ -443,10 +373,14 @@ void OneShotMCMPass::editKernelMCMCounts(IRRewriter &builder, func::FuncOp oneSh
     editKernelMCMProbs(builder, oneShotKernel, mcmobs, retIdx + 1);
 }
 
-void OneShotMCMPass::prepareForLoopExpvalArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
-                                              quantum::ExpvalOp expvalOp, size_t retIdx,
-                                              SmallVector<Value> &loopIterArgs,
-                                              SmallVector<std::string> &loopIterArgsMPKinds)
+//
+// Methods to prepare the initial arguments to the for loop
+//
+
+void prepareForLoopExpvalArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
+                              quantum::ExpvalOp expvalOp, size_t retIdx,
+                              SmallVector<Value> &loopIterArgs,
+                              SmallVector<std::string> &loopIterArgsMPKinds)
 {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = oneShotKernel->getLoc();
@@ -467,9 +401,10 @@ void OneShotMCMPass::prepareForLoopExpvalArgs(IRRewriter &builder, func::FuncOp 
     loopIterArgsMPKinds.push_back("expval");
 }
 
-LogicalResult OneShotMCMPass::prepareForLoopVarianceArgs(
-    IRRewriter &builder, func::FuncOp oneShotKernel, quantum::VarianceOp varianceOp, size_t retIdx,
-    SmallVector<Value> &loopIterArgs, SmallVector<std::string> &loopIterArgsMPKinds)
+LogicalResult prepareForLoopVarianceArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
+                                         quantum::VarianceOp varianceOp, size_t retIdx,
+                                         SmallVector<Value> &loopIterArgs,
+                                         SmallVector<std::string> &loopIterArgsMPKinds)
 {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = oneShotKernel->getLoc();
@@ -513,10 +448,10 @@ LogicalResult OneShotMCMPass::prepareForLoopVarianceArgs(
     return success();
 }
 
-void OneShotMCMPass::prepareForLoopProbsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
-                                             quantum::ProbsOp probsOp, size_t retIdx,
-                                             SmallVector<Value> &loopIterArgs,
-                                             SmallVector<std::string> &loopIterArgsMPKinds)
+void prepareForLoopProbsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
+                             quantum::ProbsOp probsOp, size_t retIdx,
+                             SmallVector<Value> &loopIterArgs,
+                             SmallVector<std::string> &loopIterArgsMPKinds)
 {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = oneShotKernel->getLoc();
@@ -537,10 +472,10 @@ void OneShotMCMPass::prepareForLoopProbsArgs(IRRewriter &builder, func::FuncOp o
     loopIterArgsMPKinds.push_back("probs");
 }
 
-void OneShotMCMPass::prepareForLoopSampleArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
-                                              quantum::SampleOp sampleOp, size_t retIdx,
-                                              SmallVector<Value> &loopIterArgs,
-                                              SmallVector<std::string> &loopIterArgsMPKinds)
+void prepareForLoopSampleArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
+                              quantum::SampleOp sampleOp, size_t retIdx,
+                              SmallVector<Value> &loopIterArgs,
+                              SmallVector<std::string> &loopIterArgsMPKinds)
 {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = oneShotKernel->getLoc();
@@ -563,10 +498,10 @@ void OneShotMCMPass::prepareForLoopSampleArgs(IRRewriter &builder, func::FuncOp 
     loopIterArgsMPKinds.push_back("sample");
 }
 
-void OneShotMCMPass::prepareForLoopCountsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
-                                              quantum::CountsOp countsOp, size_t retIdx,
-                                              SmallVector<Value> &loopIterArgs,
-                                              SmallVector<std::string> &loopIterArgsMPKinds)
+void prepareForLoopCountsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
+                              quantum::CountsOp countsOp, size_t retIdx,
+                              SmallVector<Value> &loopIterArgs,
+                              SmallVector<std::string> &loopIterArgsMPKinds)
 {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = oneShotKernel->getLoc();
@@ -596,17 +531,16 @@ void OneShotMCMPass::prepareForLoopCountsArgs(IRRewriter &builder, func::FuncOp 
     loopIterArgsMPKinds.push_back("counts");
 }
 
-void OneShotMCMPass::prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
-                                            func::FuncOp qnodeFunc,
-                                            SmallVector<Value> &loopIterArgs,
-                                            SmallVector<std::string> &loopIterArgsMPKinds)
+LogicalResult prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
+                                     func::FuncOp qnodeFunc, SmallVector<Value> &loopIterArgs,
+                                     SmallVector<std::string> &loopIterArgsMPKinds)
 {
     OpBuilder::InsertionGuard guard(builder);
 
     Operation *retOp = oneShotKernel.getBody().back().getTerminator();
     assert(isa<func::ReturnOp>(retOp) && "Expected a qnode function to return values");
 
-    SmallVector<MeasurementProcess> qnodeMPs;
+    SmallVector<quantum::MeasurementProcess> qnodeMPs;
     for (Value returnValue : retOp->getOperands()) {
         qnodeMPs.push_back(*getMPFromValue(returnValue));
     }
@@ -616,18 +550,18 @@ void OneShotMCMPass::prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp on
 
     for (auto [i, _mp] : llvm::enumerate(qnodeMPs)) {
         // llvm::enumerate() marks the iterators with const
-        Operation *mp = const_cast<catalyst::quantum::MeasurementProcess &>(_mp);
+        Operation *mp = const_cast<quantum::MeasurementProcess &>(_mp);
 
         if (isa<quantum::StateOp>(mp)) {
             mp->emitOpError("StateOp is not compatible with shot-based execution, and has no "
                             "valid conversion to one-shot MCM.");
-            return signalPassFailure();
+            return failure();
         }
 
         else if (auto var = dyn_cast<quantum::VarianceOp>(mp)) {
             if (failed(prepareForLoopVarianceArgs(builder, oneShotKernel, var, i, loopIterArgs,
                                                   loopIterArgsMPKinds))) {
-                return signalPassFailure();
+                return failure();
             }
         }
 
@@ -659,11 +593,11 @@ void OneShotMCMPass::prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp on
             handledCountsOps.insert(counts);
         }
     }
+    return success();
 }
 
-void OneShotMCMPass::constructForLoopBody(IRRewriter &builder, scf::ForOp forOp,
-                                          func::FuncOp oneShotKernel,
-                                          const SmallVector<std::string> &loopIterArgsMPKinds)
+void constructForLoopBody(IRRewriter &builder, scf::ForOp forOp, func::FuncOp oneShotKernel,
+                          const SmallVector<std::string> &loopIterArgsMPKinds)
 {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = forOp->getLoc();
@@ -722,10 +656,9 @@ void OneShotMCMPass::constructForLoopBody(IRRewriter &builder, scf::ForOp forOp,
     scf::YieldOp::create(builder, loc, loopYields);
 }
 
-void OneShotMCMPass::postProcessLoopResults(IRRewriter &builder, scf::ForOp forOp,
-                                            func::FuncOp oneShotKernel, Value shots,
-                                            SmallVector<Value> &retVals,
-                                            const SmallVector<std::string> &loopIterArgsMPKinds)
+void postProcessLoopResults(IRRewriter &builder, scf::ForOp forOp, func::FuncOp oneShotKernel,
+                            Value shots, SmallVector<Value> &retVals,
+                            const SmallVector<std::string> &loopIterArgsMPKinds)
 {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = forOp->getLoc();
@@ -784,34 +717,67 @@ void OneShotMCMPass::postProcessLoopResults(IRRewriter &builder, scf::ForOp forO
     }
 }
 
-std::optional<MeasurementProcess> OneShotMCMPass::getMPFromValue(Value v)
-{
-    // Get the MP operation that produces a Value v somewhere in the MP's forward slice.
-    // In other words, get the MP operations that a Value v comes from.
-    // Because an MP and the corresponding returned Value is usually not super far away, doing
-    // an entire backslice would not be ideal, since that could possibly backslice to the very
-    // beginning of a function.
-    // So we just depth-first search from the Value directly.
+} // anonymous namespace
 
-    Operation *defOp = v.getDefiningOp();
-    if (!defOp) {
-        // Reached a block argument
-        return std::nullopt;
-    }
+namespace catalyst {
+namespace quantum {
 
-    if (isa<MeasurementProcess>(defOp)) {
-        return cast<MeasurementProcess>(defOp);
-    }
+#define GEN_PASS_DEF_ONESHOTMCMPASS
+#include "Quantum/Transforms/Passes.h.inc"
 
-    for (Value operand : defOp->getOperands()) {
-        std::optional<MeasurementProcess> candidate = getMPFromValue(operand);
-        if (candidate.has_value()) {
-            return candidate;
+struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
+    using impl::OneShotMCMPassBase<OneShotMCMPass>::OneShotMCMPassBase;
+
+    void runOnOperation() override
+    {
+        Operation *mod = getOperation();
+        Location loc = mod->getLoc();
+        IRRewriter builder(mod->getContext());
+
+        // Collect all qnode functions.
+        // We find qnode functions by identifying the parent function ops of MPs
+        SetVector<func::FuncOp> qnodeFuncs;
+        mod->walk([&](MeasurementProcess _mp) {
+            qnodeFuncs.insert(_mp->getParentOfType<func::FuncOp>());
+        });
+
+        // For each qnode function, find the returned MPs
+        // Then handle the one shot logic for each MP type
+        for (auto qnodeFunc : qnodeFuncs) {
+            // Clone the qnode function and give it a new name.
+            // Because we need to make sure the current qnodeFunc name is reserved as entry point
+            // Set the number of shots in the new kernel to one.
+            func::FuncOp oneShotKernel = createOneShotKernel(builder, qnodeFunc, mod);
+
+            // Clear the original qnodeFunc. Its new contents will be the one-shot logic.
+            // Keep the SSA value for the shots.
+            // It needs to be used as the upper bound of the for loop.
+            auto deviceInitOp = *qnodeFunc.getOps<quantum::DeviceInitOp>().begin();
+            Value shots = deviceInitOp.getShots();
+            clearFuncExceptShots(builder, qnodeFunc, shots);
+
+            // Create the for loop
+            // Depending on the MP, the for loop needs different iteration arguments
+            SmallVector<Value> loopIterArgs;
+            SmallVector<std::string> loopIterArgsMPKinds;
+            if (failed(prepareForLoopInitArgs(builder, oneShotKernel, qnodeFunc, loopIterArgs,
+                                              loopIterArgsMPKinds))) {
+                return signalPassFailure();
+            }
+            builder.setInsertionPointToEnd(&qnodeFunc.getBody().front());
+            scf::ForOp forOp = createForLoop(builder, shots, loopIterArgs);
+            constructForLoopBody(builder, forOp, oneShotKernel, loopIterArgsMPKinds);
+
+            // Perform each MP's necessary post processing after the loop body
+            builder.setInsertionPointToEnd(&qnodeFunc.getBody().front());
+            SmallVector<Value> retVals;
+            postProcessLoopResults(builder, forOp, oneShotKernel, shots, retVals,
+                                   loopIterArgsMPKinds);
+
+            func::ReturnOp::create(builder, loc, retVals);
         }
     }
-
-    return std::nullopt;
-}
+}; // struct OneShotMCMPass
 
 } // namespace quantum
 } // namespace catalyst
