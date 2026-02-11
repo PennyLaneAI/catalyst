@@ -95,7 +95,7 @@ def mlir_specs(
         if m := level_to_markers.get(pass_level):
             pass_name = ", ".join(m if not isinstance(m, str) else [m])
         elif hasattr(pass_instance, "name"):
-            pass_name = pass_instance.name
+            pass_name = pass_instance.name + "(MLIR-{lvl})"
 
         cache[pass_level] = (
             result,
@@ -122,15 +122,7 @@ def mlir_specs(
             raise ValueError(
                 f"Requested specs levels {', '.join(missing)} not found in MLIR pass list."
             )
-        # Resolve labels by using marker labels if assigned
-        # and defaulting to the MLIR level index.
-        return {
-            # NOTE: Ensures that markers on the same level are joined
-            # correctly as a string delimited by commas.
-            f"{cache[lvl][1]} (MLIR-{lvl})": cache[lvl][0]
-            for lvl in level
-            if lvl in cache
-        }
+        return {f"{cache[lvl][1]}": cache[lvl][0] for lvl in level if lvl in cache}
 
     # Just one level was specified
     if level not in cache:

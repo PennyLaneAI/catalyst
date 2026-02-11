@@ -283,10 +283,10 @@ class TestPassByPassSpecs:
     def test_redundant_marker(self, simple_circuit):
         """Test that two markers on the same level generate the same specs."""
 
-        simple_circuit = partial(qml.marker, level="m0")(simple_circuit)
+        simple_circuit = partial(qml.marker, label="m0")(simple_circuit)
         simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
-        simple_circuit = partial(qml.marker, level="m1")(simple_circuit)
-        simple_circuit = partial(qml.marker, level="m1-duplicate")(simple_circuit)
+        simple_circuit = partial(qml.marker, label="m1")(simple_circuit)
+        simple_circuit = partial(qml.marker, label="m1-duplicate")(simple_circuit)
 
         simple_circuit = qjit(simple_circuit)
 
@@ -318,11 +318,11 @@ class TestPassByPassSpecs:
     def test_marker(self, simple_circuit):
         """Test that qml.marker can be used appropriately."""
 
-        simple_circuit = partial(qml.marker, level="m0")(simple_circuit)
+        simple_circuit = partial(qml.marker, label="m0")(simple_circuit)
         simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
-        simple_circuit = partial(qml.marker, level="m1")(simple_circuit)
+        simple_circuit = partial(qml.marker, label="m1")(simple_circuit)
         simple_circuit = qml.transforms.merge_rotations(simple_circuit)
-        simple_circuit = partial(qml.marker, level="m2")(simple_circuit)
+        simple_circuit = partial(qml.marker, label="m2")(simple_circuit)
 
         simple_circuit = qjit(simple_circuit)
 
