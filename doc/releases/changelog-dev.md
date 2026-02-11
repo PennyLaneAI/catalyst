@@ -101,6 +101,7 @@
   [(#2416)](https://github.com/PennyLaneAI/catalyst/pull/2416)
   [(#2444)](https://github.com/PennyLaneAI/catalyst/pull/2444)
   [(#2445)](https://github.com/PennyLaneAI/catalyst/pull/2445)
+  [(#2478)](https://github.com/PennyLaneAI/catalyst/pull/2478)
 
   - The StableHLO version has been updated to
   [v1.13.7](https://github.com/openxla/stablehlo/tree/v1.13.7).
