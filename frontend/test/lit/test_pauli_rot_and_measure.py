@@ -408,7 +408,6 @@ def test_ppr_to_ppm():
     # CHECK: qec.ppm ["Y", "Z"]
     # CHECK: scf.if
     # CHECK: qec.ppm ["Y"]
-    # CHECK: }
     # CHECK: else
     # CHECK: qec.ppm ["X"]
     # CHECK: }
