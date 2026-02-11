@@ -40,7 +40,8 @@ namespace {
 void clearFuncExceptShots(IRRewriter &builder, func::FuncOp qnodeFunc, Value shots)
 {
     // Delete the body of a funcop, except the operations that produce the shots value
-    // We need triple loop to explicitly iterate in reverse order, due to erasure.
+    // Because the goal is to clear the body of the funcop, there is no need to recursively
+    // walk into the ops, since we can just erase the top level ops.
 
     SetVector<Operation *> backwardSlice;
     BackwardSliceOptions options;
@@ -54,7 +55,7 @@ void clearFuncExceptShots(IRRewriter &builder, func::FuncOp qnodeFunc, Value sho
     SmallVector<Operation *> eraseWorklist;
     for (auto &region : qnodeFunc->getRegions()) {
         for (auto &block : region.getBlocks()) {
-            for (auto op = block.rbegin(); op != block.rend(); ++op) {
+            for (auto op = block.begin(); op != block.end(); ++op) {
                 if (!backwardSlice.contains(&*op)) {
                     eraseWorklist.push_back(&*op);
                 }
@@ -62,7 +63,9 @@ void clearFuncExceptShots(IRRewriter &builder, func::FuncOp qnodeFunc, Value sho
         }
     }
 
-    for (Operation *op : eraseWorklist) {
+    // We need to iterate in reverse order, since later ops will use earlier ops and thus need
+    // to be erased first.
+    for (Operation *op : llvm::reverse(eraseWorklist)) {
         builder.eraseOp(op);
     }
 }
@@ -613,7 +616,7 @@ void OneShotMCMPass::prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp on
 
     for (auto [i, _mp] : llvm::enumerate(qnodeMPs)) {
         // llvm::enumerate() marks the iterators with const
-        auto mp = const_cast<catalyst::quantum::MeasurementProcess &>(_mp);
+        Operation *mp = const_cast<catalyst::quantum::MeasurementProcess &>(_mp);
 
         if (isa<quantum::StateOp>(mp)) {
             mp->emitOpError("StateOp is not compatible with shot-based execution, and has no "
@@ -621,37 +624,39 @@ void OneShotMCMPass::prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp on
             return signalPassFailure();
         }
 
-        else if (isa<quantum::VarianceOp>(mp)) {
-            if (failed(prepareForLoopVarianceArgs(builder, oneShotKernel,
-                                                  cast<quantum::VarianceOp>(mp), i, loopIterArgs,
+        else if (auto var = dyn_cast<quantum::VarianceOp>(mp)) {
+            if (failed(prepareForLoopVarianceArgs(builder, oneShotKernel, var, i, loopIterArgs,
                                                   loopIterArgsMPKinds))) {
                 return signalPassFailure();
             }
         }
 
-        else if (isa<quantum::ExpvalOp>(mp)) {
-            prepareForLoopExpvalArgs(builder, oneShotKernel, cast<quantum::ExpvalOp>(mp), i,
-                                     loopIterArgs, loopIterArgsMPKinds);
+        else if (auto expval = dyn_cast<quantum::ExpvalOp>(mp)) {
+            prepareForLoopExpvalArgs(builder, oneShotKernel, expval, i, loopIterArgs,
+                                     loopIterArgsMPKinds);
         }
 
-        else if (isa<quantum::ProbsOp>(mp)) {
-            prepareForLoopProbsArgs(builder, oneShotKernel, cast<quantum::ProbsOp>(mp), i,
-                                    loopIterArgs, loopIterArgsMPKinds);
+        else if (auto probs = dyn_cast<quantum::ProbsOp>(mp)) {
+            prepareForLoopProbsArgs(builder, oneShotKernel, probs, i, loopIterArgs,
+                                    loopIterArgsMPKinds);
         }
 
-        else if (isa<quantum::SampleOp>(mp)) {
-            prepareForLoopSampleArgs(builder, oneShotKernel, cast<quantum::SampleOp>(mp), i,
-                                     loopIterArgs, loopIterArgsMPKinds);
+        else if (auto sample = dyn_cast<quantum::SampleOp>(mp)) {
+            prepareForLoopSampleArgs(builder, oneShotKernel, sample, i, loopIterArgs,
+                                     loopIterArgsMPKinds);
         }
 
-        else if (isa<quantum::CountsOp>(mp)) {
-            quantum::CountsOp countsOp = cast<quantum::CountsOp>(mp);
-            if (handledCountsOps.contains(countsOp)) {
+        else if (auto counts = dyn_cast<quantum::CountsOp>(mp)) {
+            // CountsOp has two results, the eigens and the counts.
+            // Both would be returned from the quantum function, so the same counts op would be
+            // identified as the source MP op twice.
+            // The second time around, we shouldn't redo the processing.
+            if (handledCountsOps.contains(counts)) {
                 continue;
             }
-            prepareForLoopCountsArgs(builder, oneShotKernel, countsOp, i, loopIterArgs,
+            prepareForLoopCountsArgs(builder, oneShotKernel, counts, i, loopIterArgs,
                                      loopIterArgsMPKinds);
-            handledCountsOps.insert(countsOp);
+            handledCountsOps.insert(counts);
         }
     }
 }
@@ -675,15 +680,11 @@ void OneShotMCMPass::constructForLoopBody(IRRewriter &builder, scf::ForOp forOp,
     SmallVector<Value> loopYields;
 
     for (auto [i, mpKind] : llvm::enumerate(loopIterArgsMPKinds)) {
-        if (mpKind == "expval" || mpKind == "variance") {
-            // Add the expval from each iteration
-            auto addOp = stablehlo::AddOp::create(builder, loc, kernalCallOp.getResult(i),
-                                                  forOp.getRegionIterArg(i));
-            loopYields.push_back(addOp.getResult());
-        }
-
-        else if (mpKind == "probs") {
-            // Add the probs from each iteration
+        if (mpKind == "expval" || mpKind == "variance" || mpKind == "probs") {
+            // Add the expval or probs from each iteration.
+            // For variance, currently the only supported case is variance on MCMs.
+            // For a set of zeros and ones, the variance is expval - expval^2
+            // So we only need to compute the expval in the main loop body.
             auto addOp = stablehlo::AddOp::create(builder, loc, kernalCallOp.getResult(i),
                                                   forOp.getRegionIterArg(i));
             loopYields.push_back(addOp.getResult());
