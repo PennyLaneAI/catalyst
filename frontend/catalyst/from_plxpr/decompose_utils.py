@@ -35,9 +35,9 @@ def catalyst_acceptance(op, capabilities, diff_method):
     return _catalyst_acceptance(op, capabilities, diff_method)
 
 
-def calculate_diff_method(device, execution_config):
+def calculate_diff_method(device, closed_jaxpr):
     """Calculate the diff method for the device."""
-    return _calculate_diff_method(device, execution_config)
+    return _calculate_diff_method(device, closed_jaxpr)
 
 
 def load_device_capabilities(device) -> DeviceCapabilities:
