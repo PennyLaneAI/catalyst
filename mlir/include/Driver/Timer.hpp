@@ -52,7 +52,6 @@ concept IsRatio = requires {
  * @tparam duration std::ratio type to set output scale, matching std::chrono constants.
  */
 template <IsRatio Duration = std::milli> class CPUTimeInstance {
-
   public:
     CPUTimeInstance() : t{} {}
 
