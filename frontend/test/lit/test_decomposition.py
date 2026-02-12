@@ -1600,5 +1600,41 @@ def test_num_work_wires():
     # CHECK: release
     print(circuit.mlir_opt)
 
+    qml.capture.disable()
+
 
 test_num_work_wires()
+
+
+def test_default_decomps():
+    """Test that default decompositions are correctly applied with qjit."""
+    qml.capture.enable()
+    qml.decomposition.enable_graph()
+
+    # Toffoli's decomposition to this gateset includes a wire allocation
+    @qml.qjit(target="mlir")
+    @partial(
+        qml.transforms.decompose,
+        gate_set={qml.ops.ChangeOpBasis},
+        num_work_wires=1,
+    )
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def circuit():
+        qml.Toffoli(wires=[0, 1, 2])
+        return qml.state()
+
+    # CHECK-NOT: toffoli_elbow
+    # CHECK-NOT: Toffoli
+
+    # two allocates/releases, for default register + work wires
+    # CHECK: allocate
+    # CHECK: allocate
+    # CHECK: ChangeOpBasis
+    # CHECK: release
+    # CHECK: release
+    print(circuit.mlir_opt)
+
+    qml.capture.disable()
+
+
+test_default_decomps()
