@@ -16,6 +16,7 @@ file(GLOB SRC
     MergeRotationsPatterns.cpp
     decompose_lowering.cpp
     DecomposeLoweringPatterns.cpp
+    dynamic_one_shot.cpp
     gridsynth.cpp
     GridsynthPatterns.cpp
     DisentangleSWAP.cpp
@@ -24,7 +25,6 @@ file(GLOB SRC
     IonsDecompositionPatterns.cpp
     loop_boundary_optimization.cpp
     LoopBoundaryOptimizationPatterns.cpp
-    one_shot_mcm.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

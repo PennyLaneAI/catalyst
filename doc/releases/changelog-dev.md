@@ -2,9 +2,9 @@
 
 <h3>New features since last release</h3>
 
-* A new MLIR transformation pass `--one-shot-mcm` is available.
+* A new MLIR transformation pass `--dynamic-one-shot` is available.
   Devices that natively support mid-circuit measurements can evaluate dynamic circuits by executing
-  them one shot at a time, sampling a dynamic execution path for each shot. The `--one-shot-mcm`
+  them one shot at a time, sampling a dynamic execution path for each shot. The `--dynamic-one-shot`
   pass first transforms the circuit so that each circuit execution only contains a singular shot,
   then performs the appropriate classical statistical postprocessing across the execution results
   from all shots.
@@ -18,7 +18,7 @@
   dev = qml.device("lightning.qubit", wires=2)
 
   @qjit
-  @qml.transform(pass_name="one-shot-mcm")
+  @qml.transform(pass_name="dynamic-one-shot")
   @qml.qnode(dev, shots=10)
   def circuit():
       qml.Hadamard(wires=0)

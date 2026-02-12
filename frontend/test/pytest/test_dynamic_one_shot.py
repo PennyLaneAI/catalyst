@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""End-to-end tests for one-shot mcm transform in MLIR"""
+"""End-to-end tests for dynamic one-shot transform in MLIR"""
 
 import numpy as np
 import pennylane as qml
@@ -23,11 +23,11 @@ from catalyst import qjit
 
 def test_mlir_one_shot_pass_expval(backend):
     """
-    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with expval
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with expval
     """
 
     @qjit(capture=True, seed=38)
-    @qml.transform(pass_name="one-shot-mcm")
+    @qml.transform(pass_name="dynamic-one-shot")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
         qml.Hadamard(wires=0)
@@ -41,12 +41,12 @@ def test_mlir_one_shot_pass_expval(backend):
 
 def test_mlir_one_shot_pass_expval_mcm(backend):
     """
-    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with expval
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with expval
     on a mid circuit measurement
     """
 
     @qjit(capture=True, seed=38)
-    @qml.transform(pass_name="one-shot-mcm")
+    @qml.transform(pass_name="dynamic-one-shot")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
         qml.Hadamard(wires=0)
@@ -61,11 +61,11 @@ def test_mlir_one_shot_pass_expval_mcm(backend):
 
 def test_mlir_one_shot_pass_probs(backend):
     """
-    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with probs
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with probs
     """
 
     @qjit(capture=True, seed=12345)
-    @qml.transform(pass_name="one-shot-mcm")
+    @qml.transform(pass_name="dynamic-one-shot")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
         qml.Hadamard(wires=0)
@@ -79,12 +79,12 @@ def test_mlir_one_shot_pass_probs(backend):
 
 def test_mlir_one_shot_pass_probs_mcm(backend):
     """
-    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with probs
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with probs
     on a mid circuit measurement
     """
 
     @qjit(capture=True, seed=12345)
-    @qml.transform(pass_name="one-shot-mcm")
+    @qml.transform(pass_name="dynamic-one-shot")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
         qml.Hadamard(wires=0)
@@ -100,12 +100,12 @@ def test_mlir_one_shot_pass_probs_mcm(backend):
 
 def test_mlir_one_shot_pass_var_mcm(backend):
     """
-    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with variance
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with variance
     on a mid circuit measurement
     """
 
     @qjit(capture=True, seed=38)
-    @qml.transform(pass_name="one-shot-mcm")
+    @qml.transform(pass_name="dynamic-one-shot")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
         qml.Hadamard(wires=0)
@@ -120,11 +120,11 @@ def test_mlir_one_shot_pass_var_mcm(backend):
 
 def test_mlir_one_shot_pass_sample(backend):
     """
-    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with sample
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with sample
     """
 
     @qjit(capture=True, seed=12345)
-    @qml.transform(pass_name="one-shot-mcm")
+    @qml.transform(pass_name="dynamic-one-shot")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
         qml.Hadamard(wires=0)
@@ -141,12 +141,12 @@ def test_mlir_one_shot_pass_sample(backend):
 
 def test_mlir_one_shot_pass_sample_mcm(backend):
     """
-    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with sample
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with sample
     on a mid circuit measurement
     """
 
     @qjit(capture=True, seed=12345)
-    @qml.transform(pass_name="one-shot-mcm")
+    @qml.transform(pass_name="dynamic-one-shot")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
         qml.Hadamard(wires=0)
@@ -165,11 +165,11 @@ def test_mlir_one_shot_pass_sample_mcm(backend):
 
 def test_mlir_one_shot_pass_counts(backend):
     """
-    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with counts
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with counts
     """
 
     @qjit(capture=True, seed=12345)
-    @qml.transform(pass_name="one-shot-mcm")
+    @qml.transform(pass_name="dynamic-one-shot")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
         qml.Hadamard(wires=0)
@@ -185,12 +185,12 @@ def test_mlir_one_shot_pass_counts(backend):
 
 def test_mlir_one_shot_pass_counts_mcm(backend):
     """
-    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with counts
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with counts
     on MCMs.
     """
 
     @qjit(capture=True, seed=12345)
-    @qml.transform(pass_name="one-shot-mcm")
+    @qml.transform(pass_name="dynamic-one-shot")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
         qml.Hadamard(wires=0)
@@ -208,12 +208,12 @@ def test_mlir_one_shot_pass_counts_mcm(backend):
 
 def test_mlir_one_shot_pass_multiple_MPs(backend):
     """
-    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with
     multiple MPs
     """
 
     @qjit(capture=True, seed=123456)
-    @qml.transform(pass_name="one-shot-mcm")
+    @qml.transform(pass_name="dynamic-one-shot")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
         qml.Hadamard(wires=0)
@@ -239,12 +239,12 @@ def test_mlir_one_shot_pass_multiple_MPs(backend):
 
 def test_mlir_one_shot_pass_multiple_MPs_mcms(backend):
     """
-    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with
     multiple MPs on MCMs
     """
 
     @qjit(capture=True, seed=12345)
-    @qml.transform(pass_name="one-shot-mcm")
+    @qml.transform(pass_name="dynamic-one-shot")
     @qml.qnode(qml.device(backend, wires=2), shots=1000)
     def circuit():
         qml.Hadamard(wires=0)
@@ -277,13 +277,13 @@ def test_mlir_one_shot_pass_multiple_MPs_mcms(backend):
 
 def test_mlir_one_shot_pass_dynamic_shots(backend):
     """
-    Test that the mlir implementation of --one-shot-mcm pass can be used from frontend with a
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with a
     dynamic number of shots
     """
 
     @qjit(capture=True, seed=12345)
     def workflow(shots):
-        @qml.transform(pass_name="one-shot-mcm")
+        @qml.transform(pass_name="dynamic-one-shot")
         @qml.qnode(qml.device(backend, wires=2), shots=shots)
         def circuit():
             qml.Hadamard(wires=0)

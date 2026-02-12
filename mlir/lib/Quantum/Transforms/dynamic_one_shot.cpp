@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "one-shot-mcm"
+#define DEBUG_TYPE "dynamic-one-shot"
 
 #include <optional>
 
@@ -722,11 +722,11 @@ void postProcessLoopResults(IRRewriter &builder, scf::ForOp forOp, func::FuncOp 
 namespace catalyst {
 namespace quantum {
 
-#define GEN_PASS_DEF_ONESHOTMCMPASS
+#define GEN_PASS_DEF_DYNAMICONESHOTPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
-    using impl::OneShotMCMPassBase<OneShotMCMPass>::OneShotMCMPassBase;
+struct DynamicOneShotPass : public impl::DynamicOneShotPassBase<DynamicOneShotPass> {
+    using impl::DynamicOneShotPassBase<DynamicOneShotPass>::DynamicOneShotPassBase;
 
     void runOnOperation() override
     {
@@ -777,7 +777,7 @@ struct OneShotMCMPass : public impl::OneShotMCMPassBase<OneShotMCMPass> {
             func::ReturnOp::create(builder, loc, retVals);
         }
     }
-}; // struct OneShotMCMPass
+}; // struct DynamicOneShotPass
 
 } // namespace quantum
 } // namespace catalyst

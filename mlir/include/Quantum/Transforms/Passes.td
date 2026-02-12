@@ -138,8 +138,8 @@ def LoopBoundaryOptimizationPass : Pass<"loop-boundary"> {
     let summary = "Perform loop boundary optimization to eliminate the redundancy of operations on loop boundary.";
 }
 
-def OneShotMCMPass : Pass<"one-shot-mcm"> {
-    let summary = "Apply the one-shot mid-circuit measurement transform.";
+def DynamicOneShotPass : Pass<"dynamic-one-shot"> {
+    let summary = "Apply the dynamic one-shot transform.";
 
     let dependentDialects = [
         "index::IndexDialect",
