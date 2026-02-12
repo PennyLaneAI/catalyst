@@ -472,11 +472,17 @@ class TestGraphDecomposition:
         ],
     )
     def test_work_wires(self, num_work_wires, expectation):
-        """Test that graph decomposition fails with an insufficient number of work wires."""
+        """
+        Test that graph decomposition raises the correct exception when given an insufficient
+        number of work wires, and passes otherwise.
+        """
 
         @qml.register_resources(
             {qml.CNOT: 3, qml.H: 1, qml.X: 1, qml.ops.op_math.Conditional: 2},
-            work_wires={"borrowed": 2, "garbage": 1},
+            work_wires={
+                "borrowed": 2,
+                "garbage": 1,
+            },
         )
         def my_decomp(angle, wires, **_):
             def true_func():
