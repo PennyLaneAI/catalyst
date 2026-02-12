@@ -371,12 +371,12 @@ def handle_qnode(
             self._pass_pipeline = [
                 p for p in self._pass_pipeline if p.pass_name != "decompose-lowering"
             ]
+
             closed_jaxpr = _apply_compiler_decompose_to_plxpr(
                 inner_jaxpr=closed_jaxpr.jaxpr,
                 consts=closed_jaxpr.consts,
                 ncargs=non_const_args,
                 tkwargs=self.decompose_tkwargs,
-                stopping_condition=stopping_condition,
             )
 
 
