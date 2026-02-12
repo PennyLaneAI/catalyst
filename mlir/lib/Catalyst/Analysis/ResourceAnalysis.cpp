@@ -162,7 +162,8 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
         }
         funcResults[funcOp.getName()] = std::move(result);
 
-        if (funcOp->hasAttr("qnode")) {
+        // main/entry function is the first function marked with "qnode"
+        if (funcOp->hasAttr("qnode") && entryFunc.empty()) {
             entryFunc = funcOp.getName();
         }
     });

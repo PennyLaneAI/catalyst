@@ -292,3 +292,27 @@ func.func @stats_test() {
     quantum.dealloc %3 : !quantum.reg
     return
 }
+
+// -----
+
+// Multiple qnode functions: the first qnode is the entry function.
+
+// STATS: 4 total-gates
+// STATS: 4 total-function-calls
+func.func private @shared_helper(%arg0: !quantum.bit) -> !quantum.bit {
+    %out = quantum.custom "Hadamard"() %arg0 : !quantum.bit
+    return %out : !quantum.bit
+}
+
+func.func @first_qnode(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode} {
+    %r1 = func.call @shared_helper(%arg0) : (!quantum.bit) -> !quantum.bit
+    %r2 = func.call @shared_helper(%r1) : (!quantum.bit) -> !quantum.bit
+    %r3 = func.call @second_qnode(%r2) : (!quantum.bit) -> !quantum.bit
+    return %r3 : !quantum.bit
+}
+
+func.func @second_qnode(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode} {
+    %r1 = func.call @shared_helper(%arg0) : (!quantum.bit) -> !quantum.bit
+    %out = quantum.custom "PauliX"() %r1 : !quantum.bit
+    return %out : !quantum.bit
+}
