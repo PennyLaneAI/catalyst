@@ -91,11 +91,11 @@ def mlir_specs(
         pass_instance = previous_pass if previous_pass else next_pass
         result = specs_collect(module)
 
-        pass_name = pass_instance
+        pass_name = str(pass_instance) + f" (MLIR-{pass_level})"
         if m := level_to_markers.get(pass_level):
             pass_name = ", ".join(m if not isinstance(m, str) else [m])
         elif hasattr(pass_instance, "name"):
-            pass_name = pass_instance.name + f"(MLIR {pass_level})"
+            pass_name = pass_instance.name + f" (MLIR-{pass_level})"
 
         cache[pass_level] = (
             result,
@@ -114,7 +114,7 @@ def mlir_specs(
         pass
 
     if level == "all":
-        return {f"{cache[lvl][1]} (MLIR-{lvl})": cache[lvl][0] for lvl in sorted(cache.keys())}
+        return {f"{cache[lvl][1]}": cache[lvl][0] for lvl in sorted(cache.keys())}
 
     if isinstance(level, (tuple, list)):
         if any(lvl not in cache for lvl in level):
