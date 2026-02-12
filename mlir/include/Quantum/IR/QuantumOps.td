@@ -868,7 +868,7 @@ def NamedObsOp : Observable_Op<"namedobs"> {
 }
 
 def MCMObsOp : Observable_Op<"mcmobs"> {
-    let summary = "Define a pseudo-observable of mid-circuit measurements for use in terminal measurements";
+    let summary = "Define a pseudo-observable of mid-circuit measurements for use in measurement processes";
     let description = [{
         The `quantum.mcmobs` operation defines a quantum observable from mid-circuit measurements,
         to be used by other operations such as measurement processes.
