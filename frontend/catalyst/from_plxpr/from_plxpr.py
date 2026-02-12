@@ -42,7 +42,11 @@ from pennylane.transforms import unitary_to_rot as pl_unitary_to_rot
 
 from catalyst.device import extract_backend_info
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION, DecompRuleInterpreter
-from catalyst.from_plxpr.decompose_utils import get_device_capabilities, catalyst_acceptance, calculate_diff_method
+from catalyst.from_plxpr.decompose_utils import (
+    calculate_diff_method,
+    catalyst_acceptance,
+    get_device_capabilities,
+)
 from catalyst.jax_extras import make_jaxpr2, transient_jax_config
 from catalyst.jax_extras.patches import patched_make_eqn
 from catalyst.jax_primitives import (
@@ -287,15 +291,16 @@ def handle_qnode(
 
     # We use device-specific decomposition if the user has not provided a gate set or specified a stopping condition.
     use_device_specific_decomposition = not (
-        self.requires_decompose_lowering 
-        # and self.decompose_tkwargs.get("gate_set", None)
+        self.requires_decompose_lowering
+        and self.decompose_tkwargs.get("gate_set", None)
     )
     graph_succeeded = False
 
     # Decomposing templated operations is not supported in graph-based decomposition yet.
     if stopping_condition := self.decompose_tkwargs.get("stopping_condition"):
-        # print("Case 1: User specified a stopping condition in decomposition.")
         # Case 1: User specified a stopping condition in decomposition
+        print("Case 1: User specified a stopping condition in decomposition.")
+        
         # Use the plxpr decompose transform and ignore graph
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
@@ -305,14 +310,18 @@ def handle_qnode(
             stopping_condition=stopping_condition,
         )
     elif not qml.decomposition.enabled_graph():
-        # print("Case 2: User did not specify a decomposition. Using plxpr decomposition on device-specific gate set when graph is disabled.")
+        print("Case 2: User did not specify a decomposition. Using plxpr decomposition on device-specific gate set when graph is disabled.")
         stopping_condition = None
         if use_device_specific_decomposition:
             device_capabilities = get_device_capabilities(device, execution_config, shots_len)
-            device_specific_gate_set = device_capabilities.gate_set(differentiable=False) # TODO: Figure out when differentiable=False is not the case.
+            device_specific_gate_set = device_capabilities.gate_set(
+                differentiable=False
+            )  # TODO: Figure out when differentiable=False is not the case.
             self.decompose_tkwargs.update({"gate_set": device_specific_gate_set})
             device_diff_method = calculate_diff_method(qnode, closed_jaxpr)
-            stopping_condition = lambda op: catalyst_acceptance(op, device_capabilities, device_diff_method)
+            stopping_condition = lambda op: catalyst_acceptance(
+                op, device_capabilities, device_diff_method
+            )
 
         # Using plxpr decomposition on device-specific gate set when graph is disabled.
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
@@ -324,6 +333,8 @@ def handle_qnode(
         )
     elif qml.decomposition.enabled_graph():
         # Decomposing templated operations is not supported in graph-based decomposition yet.
+        # We are decomposing it at this layer lol
+        print("Case 3: Decomposing templated operations at this layer.")
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
             consts=consts,
@@ -333,9 +344,10 @@ def handle_qnode(
 
         if use_device_specific_decomposition:
             # Case 3: User did not specify a decomposition. Using graph-based decomposition on device-specific gate set.
-            # print("Case 3: User did not specify a decomposition. Using graph-based decomposition on device-specific gate set.")            
+            print("Case 3.1: User did not specify a decomposition. Using graph-based decomposition on device-specific gate set.")
             device_capabilities = get_device_capabilities(device, execution_config, shots_len)
-            device_specific_gate_set = device_capabilities.operations.keys()
+            # TODO: Differentiable is False by default. Only true when we use lightning device with adjoint differentiation.
+            device_specific_gate_set = device_capabilities.gate_set()
             gateset = {"gate_set": device_specific_gate_set}
             self.requires_decompose_lowering = True
             self.decompose_tkwargs = gateset
@@ -353,9 +365,10 @@ def handle_qnode(
                 tkwargs=self.decompose_tkwargs,
                 ncargs=non_const_args,
             )
+            print(f"Graph-based decomposition succeeded: {graph_succeeded}.")
         else:
             # Case 4: User defined decomposition with target gate set
-            # print("Case 4: User defined decomposition with target gate set. Trying to use graph-based decomposition.")
+            print("Case 3.2: User defined decomposition with target gate set. Trying to use graph-based decomposition.")
             # Try to use graph-based decomposition.
             closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
                 inner_jaxpr=closed_jaxpr.jaxpr,
@@ -366,7 +379,7 @@ def handle_qnode(
 
         # Fallback to the legacy decomposition if the graph-based decomposition failed
         if not graph_succeeded:
-            # print("Graph-based decomposition failed. Falling back to plxpr decomposition.")
+            print("Graph-based decomposition failed. Falling back to plxpr decomposition.")
             # Remove the decompose-lowering pass from the pipeline
             self._pass_pipeline = [
                 p for p in self._pass_pipeline if p.pass_name != "decompose-lowering"
@@ -378,7 +391,6 @@ def handle_qnode(
                 ncargs=non_const_args,
                 tkwargs=self.decompose_tkwargs,
             )
-
 
     def calling_convention(*args):
         device_init_p.bind(
@@ -659,7 +671,7 @@ def _apply_compiler_decompose_to_plxpr(
 
     kwargs = (
         {"gate_set": set(COMPILER_OPS_FOR_DECOMPOSITION.keys()).union(tgateset)}
-        if tgateset
+        if tkwargs is None
         else tkwargs
     )
 

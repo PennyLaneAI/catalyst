@@ -42,7 +42,7 @@ def test_pauli_rot_lowering():
 
 @pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_lowering_with_ctrl_qubits():
-    """Test that Pauli rotation with control qubits is converted to qec.ppr.
+    """Test that Pauli rotation with control qubits is converted to quantum.paulirot.
     Note that control PauliRot is currently not supported by the to_ppr pass.
     """
     pipe = [("pipe", ["quantum-compilation-stage"])]

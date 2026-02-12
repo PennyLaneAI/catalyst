@@ -78,6 +78,7 @@ COMPILER_OPS_FOR_DECOMPOSITION: dict[str, tuple[int, int]] = {
     "PauliY": (1, 0),
     "PauliZ": (1, 0),
     "PauliRot": (-1, 1),
+    "C(PauliRot)": (-1, 1),
     "PauliMeasure": (-1, 1),
     "PhaseShift": (1, 1),
     "PSWAP": (2, 1),
@@ -216,6 +217,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                 # in the circuit, but is used inside a decomposition rule.
                 # In this case, we fall back to using the COMPILER_OPS_FOR_DECOMPOSITION
                 # dictionary to get the number of wires.
+                print(f"Fallback to COMPILER_OPS_FOR_DECOMPOSITION for {op.op.name}")
                 num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
                 pauli_word = op.op.params.get("pauli_word", None)
                 requires_copy = num_wires == -1
