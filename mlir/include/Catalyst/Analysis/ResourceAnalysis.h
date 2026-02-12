@@ -14,12 +14,16 @@
 
 #pragma once
 
+#include "llvm/ADT/StringMap.h"
+
+#include "QEC/IR/QECOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Pass/AnalysisManager.h"
 
-#include "llvm/ADT/StringMap.h"
-
 #include "Catalyst/Analysis/ResourceResult.h"
+
+using namespace mlir;
 
 namespace catalyst {
 
@@ -56,10 +60,16 @@ class ResourceAnalysis {
     std::string entryFuncName;
 
     // analyze a region and accumulate results
-    void analyzeRegion(mlir::Region &region, ResourceResult &result, bool adjointMode);
+    void analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint);
+
+    void analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint);
+    void analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result, bool isAdjoint);
+    void analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint);
+    void analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, ResourceResult &result, bool isAdjoint);
+    void analyzePBCLayer(qec::LayerOp layerOp, ResourceResult &result, bool isAdjoint);
 
     // categorize and count a single operation
-    void collectOperation(mlir::Operation *op, ResourceResult &result, bool adjointMode);
+    void collectOperation(Operation *op, ResourceResult &result, bool isAdjoint);
 
     // resolve function calls: inline callee resources into caller
     void resolveFunctionCalls(llvm::StringRef funcName);

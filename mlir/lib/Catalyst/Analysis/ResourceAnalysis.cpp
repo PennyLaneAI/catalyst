@@ -14,10 +14,14 @@
 
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include <cstdint>
+#include <mlir/Dialect/SCF/IR/SCF.h>
+#include <mlir/IR/BuiltinAttributes.h>
+#include <mlir/IR/Operation.h>
 
+#include "Catalyst/Analysis/ResourceResult.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 
@@ -92,7 +96,7 @@ static int64_t countForLoopIterations(scf::ForOp forOp)
 //===----------------------------------------------------------------------===//
 
 /// Get the name to use for a quantum gate op.
-static std::string getGateOpName(Operation *op, bool adjointMode)
+static std::string getGateOpName(Operation *op, bool isAdjoint)
 {
     std::string name =
         llvm::TypeSwitch<Operation *, std::string>(op)
@@ -108,10 +112,10 @@ static std::string getGateOpName(Operation *op, bool adjointMode)
     // Combine region-level adjoint (from quantum.adjoint) with
     // op-level adjoint flag (from the adj attribute on the gate).
     if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
-        adjointMode ^= gate.getAdjointFlag();
+        isAdjoint ^= gate.getAdjointFlag();
     }
 
-    if (adjointMode) {
+    if (isAdjoint) {
         name = "Adjoint(" + name + ")";
     }
     return name;
@@ -188,7 +192,7 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
 
         ResourceResult result;
         for (auto &region : funcOp->getRegions()) {
-            analyzeRegion(region, result, /*adjointMode=*/false);
+            analyzeRegion(region, result, /*isAdjoint=*/false);
         }
         funcResults[funcOp.getName()] = std::move(result);
 
@@ -209,116 +213,125 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
     }
 }
 
-void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, bool adjointMode)
+void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint)
 {
-    // This implementation is based on the Python implementation in specs_collector.py
+    ResourceResult bodyResult;
+    analyzeRegion(forOp.getBodyRegion(), bodyResult, isAdjoint);
+
+    // estimated_iterations attribute
+    if (auto estAttr = forOp->getAttrOfType<IntegerAttr>("estimated_iterations")) {
+        int64_t iters = estAttr.getValue().getSExtValue();
+        bodyResult.multiplyByScalar(iters);
+    }
+    else {
+        int64_t iters = countForLoopIterations(forOp);
+        // iters <= 0 means the loop is dynamic
+        if (iters > 0) {
+            bodyResult.multiplyByScalar(iters);
+        }
+    }
+    result.mergeWith(bodyResult);
+}
+
+void ResourceAnalysis::analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result,
+                                        bool isAdjoint)
+{
+    ResourceResult bodyResult;
+    analyzeRegion(whileOp.getAfter(), bodyResult, isAdjoint);
+
+    if (auto estAttr = whileOp->getAttrOfType<IntegerAttr>("estimated_iterations")) {
+        int64_t iters = estAttr.getValue().getSExtValue();
+        bodyResult.multiplyByScalar(iters);
+    }
+
+    result.mergeWith(bodyResult);
+}
+
+void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint)
+{
+    ResourceResult thenResult;
+    analyzeRegion(ifOp.getThenRegion(), thenResult, isAdjoint);
+
+    if (!ifOp.getElseRegion().empty()) {
+        ResourceResult elseResult;
+        analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint);
+        thenResult.mergeWith(elseResult, MergeMethod::Max);
+    }
+    result.mergeWith(thenResult);
+}
+
+void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, ResourceResult &result,
+                                            bool isAdjoint)
+{
+    ResourceResult maxResult;
+    bool first = true;
+
+    for (auto &caseRegion : switchOp.getCaseRegions()) {
+        ResourceResult caseResult;
+        analyzeRegion(caseRegion, caseResult, isAdjoint);
+        if (first) {
+            maxResult = std::move(caseResult);
+            first = false;
+        }
+        else {
+            maxResult.mergeWith(caseResult, MergeMethod::Max);
+        }
+    }
+
+    // default region
+    ResourceResult defaultResult;
+    analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint);
+    maxResult.mergeWith(defaultResult, MergeMethod::Max);
+
+    result.mergeWith(maxResult);
+}
+
+void ResourceAnalysis::analyzePBCLayer(qec::LayerOp layerOp, ResourceResult &result, bool isAdjoint)
+{
+    for (auto &layerRegion : layerOp->getRegions()) {
+        analyzeRegion(layerRegion, result, isAdjoint);
+    }
+}
+
+// This implementation is based on the Python implementation in specs_collector.py
+void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, bool isAdjoint)
+{
     for (Block &block : region) {
         for (Operation &op : block) {
-            // quantum.adjoint regions
-            if (auto adjOp = dyn_cast<quantum::AdjointOp>(&op)) {
-                analyzeRegion(adjOp.getRegion(), result, !adjointMode);
-                continue;
-            }
+            llvm::TypeSwitch<Operation &, void>(op)
+                .Case([&](quantum::AdjointOp adjOp) {
+                    analyzeRegion(adjOp.getRegion(), result, !isAdjoint);
+                })
+                .Case([&](mlir::scf::ForOp forLoopOp) {
+                    analyzeForLoop(forLoopOp, result, isAdjoint);
+                })
+                .Case([&](mlir::scf::WhileOp whileOp) {
+                    analyzeWhileLoop(whileOp, result, isAdjoint);
+                })
+                .Case([&](mlir::scf::IfOp ifConditionalOp) {
+                    analyzeIfOp(ifConditionalOp, result, isAdjoint);
+                })
+                .Case([&](mlir::scf::IndexSwitchOp switchOp) {
+                    analyzeIndexSwitchOp(switchOp, result, isAdjoint);
+                })
+                .Case([&](qec::LayerOp regionLayerOp) {
+                    analyzePBCLayer(regionLayerOp, result, isAdjoint);
+                })
+                .Default([&](Operation &op) {
+                    // other operations - do nothing
+                });
 
-            // scf.for loops
-            if (auto forOp = dyn_cast<scf::ForOp>(&op)) {
-                ResourceResult bodyResult;
-                analyzeRegion(forOp.getBodyRegion(), bodyResult, adjointMode);
-
-                // estimated_iterations attribute
-                if (auto estAttr = forOp->getAttrOfType<IntegerAttr>("estimated_iterations")) {
-                    int64_t iters = estAttr.getValue().getSExtValue();
-                    bodyResult.multiplyByScalar(iters);
-                }
-                else {
-                    int64_t iters = countForLoopIterations(forOp);
-                    // iters <= 0 means the loop is dynamic
-                    if (iters > 0) {
-                        bodyResult.multiplyByScalar(iters);
-                    }
-                }
-                result.mergeWith(bodyResult);
-                continue;
-            }
-
-            // scf.while loops
-            if (auto whileOp = dyn_cast<scf::WhileOp>(&op)) {
-                ResourceResult bodyResult;
-                analyzeRegion(whileOp.getAfter(), bodyResult, adjointMode);
-
-                if (auto estAttr = whileOp->getAttrOfType<IntegerAttr>("estimated_iterations")) {
-                    int64_t iters = estAttr.getValue().getSExtValue();
-                    bodyResult.multiplyByScalar(iters);
-                }
-
-                result.mergeWith(bodyResult);
-                continue;
-            }
-
-            // scf.if: take max across branches
-            if (auto ifOp = dyn_cast<scf::IfOp>(&op)) {
-                ResourceResult thenResult;
-                analyzeRegion(ifOp.getThenRegion(), thenResult, adjointMode);
-
-                if (!ifOp.getElseRegion().empty()) {
-                    ResourceResult elseResult;
-                    analyzeRegion(ifOp.getElseRegion(), elseResult, adjointMode);
-                    thenResult.mergeWith(elseResult, MergeMethod::Max);
-                }
-                result.mergeWith(thenResult);
-                continue;
-            }
-
-            // scf.index_switch: take max across all cases
-            if (auto switchOp = dyn_cast<scf::IndexSwitchOp>(&op)) {
-                ResourceResult maxResult;
-                bool first = true;
-
-                for (auto &caseRegion : switchOp.getCaseRegions()) {
-                    ResourceResult caseResult;
-                    analyzeRegion(caseRegion, caseResult, adjointMode);
-                    if (first) {
-                        maxResult = std::move(caseResult);
-                        first = false;
-                    }
-                    else {
-                        maxResult.mergeWith(caseResult, MergeMethod::Max);
-                    }
-                }
-
-                // default region
-                ResourceResult defaultResult;
-                analyzeRegion(switchOp.getDefaultRegion(), defaultResult, adjointMode);
-                if (first) {
-                    maxResult = std::move(defaultResult);
-                }
-                else {
-                    maxResult.mergeWith(defaultResult, MergeMethod::Max);
-                }
-
-                result.mergeWith(maxResult);
-                continue;
-            }
-
-            // qec.layer regions
-            if (auto layerOp = dyn_cast<qec::LayerOp>(&op)) {
-                for (auto &layerRegion : layerOp->getRegions()) {
-                    analyzeRegion(layerRegion, result, adjointMode);
-                }
-                continue;
-            }
-
-            collectOperation(&op, result, adjointMode);
+            collectOperation(&op, result, isAdjoint);
         }
     }
 }
 
-void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool adjointMode)
+void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, bool isAdjoint)
 {
     // Quantum gates
     if (isa<quantum::CustomOp, quantum::PauliRotOp, quantum::GlobalPhaseOp, quantum::MultiRZOp,
             quantum::QubitUnitaryOp, quantum::SetStateOp, quantum::SetBasisStateOp>(op)) {
-        std::string name = getGateOpName(op, adjointMode);
+        std::string name = getGateOpName(op, isAdjoint);
         int nQubits = getGateQubitCount(op);
         result.operations[name][nQubits] += 1;
         return;
