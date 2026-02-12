@@ -1,4 +1,4 @@
-# Copyright 2024 Xanadu Quantum Technologies Inc.
+# Copyright 2024-2026 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -212,12 +212,12 @@ class TestCapture:
     @pytest.mark.parametrize(
         "n_wires, basis_state",
         [
-            # (1, jnp.array([0])),
+            (1, jnp.array([0])),
             (1, jnp.array([1])),
             (2, jnp.array([0, 0])),
-            # (2, jnp.array([0, 1])),
-            # (2, jnp.array([1, 0])),
-            # (2, jnp.array([1, 1])),
+            (2, jnp.array([0, 1])),
+            (2, jnp.array([1, 0])),
+            (2, jnp.array([1, 1])),
         ],
     )
     def test_basis_state(self, backend, n_wires, basis_state):
