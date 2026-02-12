@@ -1508,7 +1508,7 @@ def _trace_classical_phase(
         # with an extra computational cost
 
         if any(isinstance(wire, qml.wires.DynamicWire) for wire in quantum_tape.wires):
-            msg = "qml.allocate() is only supported with program capture enabled."
+            msg = "qml.allocate() with qjit is only supported with program capture enabled."
             raise CompileError(msg)
 
         # 1. Recompute the original return

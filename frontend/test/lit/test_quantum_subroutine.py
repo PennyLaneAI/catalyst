@@ -493,9 +493,8 @@ def test_different_shapes():
         return qml.probs()
 
     # CHECK: func.func private @my_subroutine(%arg0: !quantum.reg, %arg1: tensor<3xf64>, %arg2: tensor<3xi64>) -> !quantum.reg
-    # CHECK: arith.constant 3 : index
-    # CHECK: scf.for
-    # CHECK: [[QUBIT_1:%.+]] = quantum.custom "RX"
+    # CHECK:   [[ub:%.+]] = arith.constant 3 : index
+    # CHECK:   scf.for {{%.+}} = {{%.+}} to [[ub]] step {{%.+}}
 
     # CHECK: func.func private @my_subroutine_0(%arg0: !quantum.reg, %arg1: tensor<2xf64>, %arg2: tensor<3xi64>) -> !quantum.reg
     # CHECK: arith.constant 2 : index
