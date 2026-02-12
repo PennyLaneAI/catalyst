@@ -666,7 +666,9 @@ LogicalResult prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp oneShotKe
 
     SmallVector<quantum::MeasurementProcess> qnodeMPs;
     for (Value returnValue : retOp->getOperands()) {
-        qnodeMPs.push_back(*getMPFromValue(returnValue));
+        std::optional<quantum::MeasurementProcess> mp = getMPFromValue(returnValue);
+        assert(mp.has_value() && "Classical qnode return values not supported in dynamic one-shot");
+        qnodeMPs.push_back(*mp);
     }
     llvm::SmallSet<quantum::CountsOp, 8> handledCountsOps;
 
