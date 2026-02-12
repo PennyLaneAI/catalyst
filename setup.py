@@ -149,8 +149,14 @@ entry_points = {
         "cuda_quantum.ops = catalyst.api_extensions",
         "cuda_quantum.qjit = catalyst.third_party.cuda:cudaqjit",
     ],
-    "xdsl.universe": [
-        "catalyst-xdsl-universe = catalyst.python_interface.xdsl_universe:CATALYST_XDSL_UNIVERSE"
+    "catalyst.passes": [
+        "to_ppr = catalyst.passes:to_ppr",
+        "merge_ppr_ppm = catalyst.passes:merge_ppr_ppm",
+        "commute_ppr = catalyst.passes:to_ppr",
+        "ppm_compilation = catalyst.passes:ppm_compilation",
+        "ppr_to_ppm = catalyst.passes:ppr_to_ppm",
+        "reduce_t_depth = catalyst.passes:reduce_t_depth",
+        "decompose_arbitrary_ppr = catalyst.passes:decompose_arbitrary_ppr",
     ],
 }
 
