@@ -42,20 +42,42 @@ namespace {
 // Misc helper functions
 //
 
-void clearFuncExceptShots(IRRewriter &builder, func::FuncOp qnodeFunc, Value shots)
+void getNumQubitsValues(func::FuncOp qnodeFunc, llvm::SmallPtrSet<Value, 8> &vals)
 {
-    // Delete the body of a funcop, except the operations that produce the shots value
+    // Collect all SSA values in a FuncOp that represents the number of qubits
+    // These will show up as the dynamic shape dimensions of MPs
+
+    qnodeFunc->walk([&](quantum::SampleOp sampleOp) {
+        ArrayRef<int64_t> shape = cast<ShapedType>(sampleOp.getSamples().getType()).getShape();
+        if ((shape.size() == 2) && ShapedType::isDynamic(shape[1])) {
+            if (ShapedType::isDynamic(shape[0])) {
+                vals.insert(sampleOp.getDynamicShape()[1]);
+            }
+            else {
+                vals.insert(sampleOp.getDynamicShape()[0]);
+            }
+        }
+    });
+}
+
+void clearFuncExcept(IRRewriter &builder, func::FuncOp qnodeFunc,
+                     const llvm::SmallPtrSet<Value, 8> &exceptions, IRMapping &cloneMapper)
+{
+    // Delete the body of a funcop, except the operations that are excepted.
+    // In addition, remove all erased Values from the mapper.
+    //
     // Because the goal is to clear the body of the funcop, there is no need to recursively
     // walk into the ops, since we can just erase the top level ops.
 
     SetVector<Operation *> backwardSlice;
     BackwardSliceOptions options;
-    LogicalResult bsr = getBackwardSlice(shots, &backwardSlice, options);
-    assert(bsr.succeeded() && "expected a backward slice");
-
-    // For whatever reason, upstream mlir decided to not include the op itself into its backward
-    // slice
-    backwardSlice.insert(shots.getDefiningOp());
+    for (auto v : exceptions) {
+        LogicalResult bsr = getBackwardSlice(v, &backwardSlice, options);
+        assert(bsr.succeeded() && "expected a backward slice");
+        // For whatever reason, upstream mlir decided to not include the op itself into its backward
+        // slice
+        backwardSlice.insert(v.getDefiningOp());
+    }
 
     SmallVector<Operation *> eraseWorklist;
     for (auto &region : qnodeFunc->getRegions()) {
@@ -71,11 +93,17 @@ void clearFuncExceptShots(IRRewriter &builder, func::FuncOp qnodeFunc, Value sho
     // We need to iterate in reverse order, since later ops will use earlier ops and thus need
     // to be erased first.
     for (Operation *op : llvm::reverse(eraseWorklist)) {
+        for (Value v : op->getResults()) {
+            if (cloneMapper.contains(v)) {
+                cloneMapper.erase(v);
+            }
+        }
         builder.eraseOp(op);
     }
 }
 
-func::FuncOp createOneShotKernel(IRRewriter &builder, func::FuncOp qnodeFunc, Operation *mod)
+func::FuncOp createOneShotKernel(IRRewriter &builder, func::FuncOp qnodeFunc, Operation *mod,
+                                 IRMapping &mapper)
 {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = mod->getLoc();
@@ -83,7 +111,8 @@ func::FuncOp createOneShotKernel(IRRewriter &builder, func::FuncOp qnodeFunc, Op
     Type i64Type = builder.getI64Type();
 
     builder.setInsertionPointToStart(&qnodeFunc->getParentOfType<ModuleOp>()->getRegion(0).front());
-    auto oneShotKernel = cast<func::FuncOp>(qnodeFunc->clone());
+    auto oneShotKernel = cast<func::FuncOp>(qnodeFunc->clone(mapper));
+
     oneShotKernel.setSymNameAttr(StringAttr::get(ctx, qnodeFunc.getSymName() + ".one_shot_kernel"));
     builder.insert(oneShotKernel);
 
@@ -347,6 +376,12 @@ void editKernelSampleShapes(func::FuncOp oneShotKernel, ShapedType fullSampleTyp
             }
         }
     }
+
+    // On the sample op itself, drop the shots shape operand if it was dynamic.
+    // It is static (just 1) in the one-shot kernel
+    if (ShapedType::isDynamic(fullSampleType.getShape()[0])) {
+        sampleOp.getDynamicShapeMutable().erase(0);
+    }
 }
 
 void editKernelMCMCounts(IRRewriter &builder, func::FuncOp oneShotKernel, quantum::MCMObsOp mcmobs,
@@ -475,7 +510,8 @@ void prepareForLoopProbsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
 void prepareForLoopSampleArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
                               quantum::SampleOp sampleOp, size_t retIdx,
                               SmallVector<Value> &loopIterArgs,
-                              SmallVector<std::string> &loopIterArgsMPKinds)
+                              SmallVector<std::string> &loopIterArgsMPKinds,
+                              const IRMapping &cloneMapper)
 {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = oneShotKernel->getLoc();
@@ -484,6 +520,20 @@ void prepareForLoopSampleArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
     assert(fullSampleType.getShape().size() == 2 &&
            "Expected sample result type to be a tensor of size shot X num_qubits");
 
+    SmallVector<OpFoldResult> sizes;
+    int64_t sampleDynShapeOperandIdx = 0;
+    for (auto dim : fullSampleType.getShape()) {
+        if (ShapedType::isDynamic(dim)) {
+            auto indexCast = index::CastSOp::create(
+                builder, loc, builder.getIndexType(),
+                cloneMapper.lookup(sampleOp.getDynamicShape()[sampleDynShapeOperandIdx++]));
+            sizes.push_back(indexCast.getResult());
+        }
+        else {
+            sizes.push_back(builder.getIndexAttr(dim));
+        }
+    }
+
     editKernelSampleShapes(oneShotKernel, fullSampleType, sampleOp, retIdx);
 
     // If the sample MP is on a MCM, we need to massage the one-shot kernel a bit
@@ -491,8 +541,9 @@ void prepareForLoopSampleArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
     if (isa<quantum::MCMObsOp>(MPSourceOp)) {
         editKernelMCMSample(builder, oneShotKernel, cast<quantum::MCMObsOp>(MPSourceOp), retIdx);
     }
-    auto fullSampleResults = tensor::EmptyOp::create(builder, loc, fullSampleType.getShape(),
-                                                     fullSampleType.getElementType());
+
+    auto fullSampleResults =
+        tensor::EmptyOp::create(builder, loc, sizes, fullSampleType.getElementType());
 
     loopIterArgs.push_back(fullSampleResults);
     loopIterArgsMPKinds.push_back("sample");
@@ -533,7 +584,8 @@ void prepareForLoopCountsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
 
 LogicalResult prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
                                      func::FuncOp qnodeFunc, SmallVector<Value> &loopIterArgs,
-                                     SmallVector<std::string> &loopIterArgsMPKinds)
+                                     SmallVector<std::string> &loopIterArgsMPKinds,
+                                     const IRMapping &cloneMapper)
 {
     OpBuilder::InsertionGuard guard(builder);
 
@@ -577,7 +629,7 @@ LogicalResult prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp oneShotKe
 
         else if (auto sample = dyn_cast<quantum::SampleOp>(mp)) {
             prepareForLoopSampleArgs(builder, oneShotKernel, sample, i, loopIterArgs,
-                                     loopIterArgsMPKinds);
+                                     loopIterArgsMPKinds, cloneMapper);
         }
 
         else if (auto counts = dyn_cast<quantum::CountsOp>(mp)) {
@@ -597,7 +649,8 @@ LogicalResult prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp oneShotKe
 }
 
 void constructForLoopBody(IRRewriter &builder, scf::ForOp forOp, func::FuncOp oneShotKernel,
-                          const SmallVector<std::string> &loopIterArgsMPKinds)
+                          const SmallVector<std::string> &loopIterArgsMPKinds,
+                          const IRMapping &cloneMapper)
 {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = forOp->getLoc();
@@ -628,12 +681,28 @@ void constructForLoopBody(IRRewriter &builder, scf::ForOp forOp, func::FuncOp on
             // Insert the one shot kernel's sample into the full sample result tensor
             ArrayRef<int64_t> oneShotSampleShape =
                 cast<ShapedType>(oneShotKernel.getFunctionType().getResults()[i]).getShape();
+
             auto zero = builder.getIndexAttr(0);
             auto one = builder.getIndexAttr(1);
             SmallVector<OpFoldResult> offsets = {forOp.getInductionVar(), zero};
-            SmallVector<OpFoldResult> sizes = {builder.getIndexAttr(oneShotSampleShape[0]),
-                                               builder.getIndexAttr(oneShotSampleShape[1])};
             SmallVector<OpFoldResult> strides = {one, one};
+
+            OpFoldResult numQubits;
+            if (ShapedType::isDynamic(oneShotSampleShape[1])) {
+                Operation *kernelRetOp = oneShotKernel.getBody().back().getTerminator();
+                auto kernelSampleOp =
+                    dyn_cast<quantum::SampleOp>(*getMPFromValue(kernelRetOp->getOperand(i)));
+                assert(kernelSampleOp && kernelSampleOp.getDynamicShape().size() == 1 &&
+                       "One-shot kernal sample shape must have at most 1 dynamic dimension");
+                numQubits =
+                    index::CastSOp::create(builder, loc, builder.getIndexType(),
+                                           cloneMapper.lookup(kernelSampleOp.getDynamicShape()[0]))
+                        .getResult();
+            }
+            else {
+                numQubits = builder.getIndexAttr(oneShotSampleShape[1]);
+            }
+            SmallVector<OpFoldResult> sizes = {one, numQubits};
 
             auto insertSliceOp =
                 tensor::InsertSliceOp::create(builder, loc, kernalCallOp.getResult(i),
@@ -747,26 +816,45 @@ struct DynamicOneShotPass : public impl::DynamicOneShotPassBase<DynamicOneShotPa
             // Clone the qnode function and give it a new name.
             // Because we need to make sure the current qnodeFunc name is reserved as entry point
             // Set the number of shots in the new kernel to one.
-            func::FuncOp oneShotKernel = createOneShotKernel(builder, qnodeFunc, mod);
+            IRMapping cloneMapper;
+            func::FuncOp oneShotKernel = createOneShotKernel(builder, qnodeFunc, mod, cloneMapper);
 
             // Clear the original qnodeFunc. Its new contents will be the one-shot logic.
             // Keep the SSA value for the shots.
             // It needs to be used as the upper bound of the for loop.
             auto deviceInitOp = *qnodeFunc.getOps<quantum::DeviceInitOp>().begin();
             Value shots = deviceInitOp.getShots();
-            clearFuncExceptShots(builder, qnodeFunc, shots);
+            llvm::SmallPtrSet<Value, 8> erasureExceptions;
+            getNumQubitsValues(qnodeFunc, erasureExceptions);
+            erasureExceptions.insert(shots);
+            clearFuncExcept(builder, qnodeFunc, erasureExceptions, cloneMapper);
+
+            // Reverse the mapper. The map from the cloned one shot kernel to the original
+            // qnodeFunc will be more useful to us.
+            SmallVector<Value> eraseWorklist;
+            llvm::DenseMap<Value, Value> insertWorklist;
+            for (auto pair : cloneMapper.getValueMap()) {
+                insertWorklist.insert({pair.second, pair.first});
+                eraseWorklist.push_back(pair.first);
+            }
+            for (auto pair : insertWorklist) {
+                cloneMapper.map(pair.first, pair.second);
+            }
+            for (auto v : eraseWorklist) {
+                cloneMapper.erase(v);
+            }
 
             // Create the for loop
             // Depending on the MP, the for loop needs different iteration arguments
             SmallVector<Value> loopIterArgs;
             SmallVector<std::string> loopIterArgsMPKinds;
             if (failed(prepareForLoopInitArgs(builder, oneShotKernel, qnodeFunc, loopIterArgs,
-                                              loopIterArgsMPKinds))) {
+                                              loopIterArgsMPKinds, cloneMapper))) {
                 return signalPassFailure();
             }
             builder.setInsertionPointToEnd(&qnodeFunc.getBody().front());
             scf::ForOp forOp = createForLoop(builder, shots, loopIterArgs);
-            constructForLoopBody(builder, forOp, oneShotKernel, loopIterArgsMPKinds);
+            constructForLoopBody(builder, forOp, oneShotKernel, loopIterArgsMPKinds, cloneMapper);
 
             // Perform each MP's necessary post processing after the loop body
             builder.setInsertionPointToEnd(&qnodeFunc.getBody().front());

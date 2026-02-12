@@ -301,6 +301,46 @@ func.func public @test_sample_mcm(%arg0: f64) -> tensor<1000x1xi64> {
 // CHECK:      func.call @test_sample_mcm.one_shot_kernel(%arg0)
 // CHECK:      tensor.insert_slice
 
+// -----
+
+
+func.func public @test_sample_dynamic_shape(%arg0: f64, %shots: i64, %num_qubits: i64) -> tensor<?x?xi64> {
+  quantum.device shots(%shots) ["", "", ""]
+  %0 = quantum.alloc(%num_qubits) : !quantum.reg
+  %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+  %out_qubits = quantum.custom "RX"(%arg0) %1 : !quantum.bit
+  %mres, %out_qubit = quantum.measure %out_qubits : i1, !quantum.bit
+  %2 = quantum.insert %0[ 0], %out_qubit : !quantum.reg, !quantum.bit
+  %3 = quantum.compbasis qreg %2 : !quantum.obs
+  %4 = quantum.sample %3 shape %shots, %num_qubits : tensor<?x?xf64>
+  %5 = stablehlo.convert %4 : (tensor<?x?xf64>) -> tensor<?x?xi64>
+  quantum.dealloc %2 : !quantum.reg
+  quantum.device_release
+  return %5 : tensor<?x?xi64>
+}
+
+
+// CHECK: func.func public @test_sample_dynamic_shape.one_shot_kernel(%arg0: f64, [[shots:%.+]]: i64, [[num_qubits:%.+]]: i64) -> tensor<1x?xi64>
+// CHECK:   [[one:%.+]] = arith.constant 1 : i64
+// CHECK:   quantum.device shots([[one]]) ["", "", ""]
+// CHECK:   [[sample:%.+]] = quantum.sample {{%.+}} shape [[num_qubits]] : tensor<1x?xf64>
+// CHECK:   [[cast:%.+]] = stablehlo.convert [[sample]] : (tensor<1x?xf64>) -> tensor<1x?xi64>
+// CHECK:   return [[cast]] : tensor<1x?xi64>
+
+// CHECK: func.func public @test_sample_dynamic_shape(%arg0: f64, [[shots:%.+]]: i64, [[num_qubits:%.+]]: i64) -> tensor<?x?xi64>
+// CHECK:   [[shots_cast:%.+]] = index.casts [[shots]] : i64 to index
+// CHECK:   [[num_qubits_cast:%.+]] = index.casts [[num_qubits]] : i64 to index
+// CHECK:   [[empty:%.+]] = tensor.empty([[shots_cast]], [[num_qubits_cast]]) : tensor<?x?xi64>
+// CHECK:   [[lb:%.+]] = arith.constant 0 : index
+// CHECK:   [[step:%.+]] = arith.constant 1 : index
+// CHECK:   [[ub:%.+]] = index.casts [[shots]] : i64 to index
+// CHECK:   [[fullSamples:%.+]] = scf.for %arg3 = [[lb]] to [[ub]] step [[step]] iter_args(%arg4 = [[empty]]) -> (tensor<?x?xi64>) {
+// CHECK:      [[call:%.+]] = func.call @test_sample_dynamic_shape.one_shot_kernel(%arg0, %arg1, [[num_qubits]]) : (f64, i64, i64) -> tensor<1x?xi64>
+// CHECK:      [[num_qubits_cast:%.+]] = index.casts [[num_qubits]] : i64 to index
+// CHECK:      [[insert:%.+]] = tensor.insert_slice [[call]] into %arg4[%arg3, 0] [1, [[num_qubits_cast]]] [1, 1] : tensor<1x?xi64> into tensor<?x?xi64>
+// CHECK:      scf.yield [[insert]] : tensor<?x?xi64>
+// CHECK:    return [[fullSamples]] : tensor<?x?xi64>
+
 
 // -----
 
