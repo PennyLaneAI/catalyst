@@ -20,7 +20,6 @@
 #include <mlir/IR/Operation.h>
 
 #include "Catalyst/Analysis/ResourceResult.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
@@ -56,39 +55,6 @@ static bool isCustomDialectOp(Operation *op)
     if (!dialect)
         return false;
     return isa<quantum::QuantumDialect, qec::QECDialect, mbqc::MBQCDialect>(dialect);
-}
-
-//===----------------------------------------------------------------------===//
-// Static loop iteration counting (from SCFUtils)
-//===----------------------------------------------------------------------===//
-
-static int64_t getIntFromConstant(arith::ConstantOp op)
-{
-    assert(isa<IntegerAttr>(op.getValue()));
-    return cast<IntegerAttr>(op.getValue()).getValue().getSExtValue();
-}
-
-/// Count iterations of a scf.for loop. Returns -1 if dynamic bounds.
-static int64_t countForLoopIterations(scf::ForOp forOp)
-{
-    Operation *lbOp = forOp.getLowerBound().getDefiningOp();
-    if (!lbOp || !isa<arith::ConstantOp>(lbOp))
-        return -1;
-    int64_t lb = getIntFromConstant(cast<arith::ConstantOp>(lbOp));
-
-    Operation *ubOp = forOp.getUpperBound().getDefiningOp();
-    if (!ubOp || !isa<arith::ConstantOp>(ubOp))
-        return -1;
-    int64_t ub = getIntFromConstant(cast<arith::ConstantOp>(ubOp));
-
-    Operation *stepOp = forOp.getStep().getDefiningOp();
-    if (!stepOp || !isa<arith::ConstantOp>(stepOp))
-        return -1;
-    int64_t step = getIntFromConstant(cast<arith::ConstantOp>(stepOp));
-
-    if (step <= 0 || ub <= lb)
-        return 0;
-    return static_cast<int64_t>(std::ceil(static_cast<double>(ub - lb) / step));
 }
 
 //===----------------------------------------------------------------------===//
@@ -223,12 +189,8 @@ void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, 
         int64_t iters = estAttr.getValue().getSExtValue();
         bodyResult.multiplyByScalar(iters);
     }
-    else {
-        int64_t iters = countForLoopIterations(forOp);
-        // iters <= 0 means the loop is dynamic
-        if (iters > 0) {
-            bodyResult.multiplyByScalar(iters);
-        }
+    else if (auto tripCount = forOp.getStaticTripCount()) {
+        bodyResult.multiplyByScalar(tripCount->getSExtValue());
     }
     result.mergeWith(bodyResult);
 }
