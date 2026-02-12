@@ -230,6 +230,51 @@ func.func public @test_probs_mcm(%arg0: f64) -> tensor<4xf64> {
 // -----
 
 
+func.func public @test_probs_dynamic_shape(%arg0: f64, %num_qubits: i64) -> tensor<?xf64> {
+  %1000 = arith.constant 1000 : i64
+  quantum.device shots(%1000) ["", "", ""]
+  %0 = quantum.alloc(%num_qubits) : !quantum.reg
+  %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+  %out_qubits = quantum.custom "RX"(%arg0) %1 : !quantum.bit
+  %2 = quantum.insert %0[ 0], %out_qubits : !quantum.reg, !quantum.bit
+  %3 = quantum.compbasis qreg %2 : !quantum.obs
+  // COM: technically probs shape is 2^num_qubits, but I don't want to further blow up lit test size
+  %4 = quantum.probs %3 shape %num_qubits: tensor<?xf64>
+  quantum.dealloc %2 : !quantum.reg
+  quantum.device_release
+  return %4 : tensor<?xf64>
+}
+
+// CHECK: func.func public @test_probs_dynamic_shape.one_shot_kernel(%arg0: f64, [[num_qubits:%.+]]: i64) -> tensor<?xf64>
+// CHECK:   [[one:%.+]] = arith.constant 1 : i64
+// CHECK:   quantum.device shots([[one]]) ["", "", ""]
+// CHECK:   quantum.probs {{%.+}} shape [[num_qubits]] : tensor<?xf64>
+
+// CHECK: func.func public @test_probs_dynamic_shape(%arg0: f64, [[num_qubits:%.+]]: i64) -> tensor<?xf64>
+// CHECK:   [[shots:%.+]] = arith.constant 1000 : i64
+// CHECK:   [[zeroScalar:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
+// CHECK:   [[num_qubits_i32:%.+]] = arith.trunci [[num_qubits]] : i64 to i32
+// CHECK:   [[num_qubits_tensor:%.+]] = tensor.from_elements [[num_qubits_i32]] : tensor<1xi32>
+// CHECK:   [[loopIterSum:%.+]] = stablehlo.dynamic_broadcast_in_dim [[zeroScalar]], [[num_qubits_tensor]], dims = [] : (tensor<f64>, tensor<1xi32>) -> tensor<?xf64>
+// CHECK:   [[lb:%.+]] = arith.constant 0 : index
+// CHECK:   [[step:%.+]] = arith.constant 1 : index
+// CHECK:   [[ub:%.+]] = index.casts [[shots]] : i64 to index
+// CHECK:   [[totalSum:%.+]] = scf.for %arg2 = [[lb]] to [[ub]] step [[step]] iter_args(%arg3 = [[loopIterSum]]) -> (tensor<?xf64>) {
+// CHECK:     [[call:%.+]] = func.call @test_probs_dynamic_shape.one_shot_kernel(%arg0, [[num_qubits]]) : (f64, i64) -> tensor<?xf64>
+// CHECK:     [[add:%.+]] = stablehlo.add [[call]], %arg3 : tensor<?xf64>
+// CHECK:     scf.yield [[add]] : tensor<?xf64>
+// CHECK:   [[castShots:%.+]] = arith.sitofp [[shots]] : i64 to f64
+// CHECK:   [[shots_fromElem:%.+]] = tensor.from_elements [[castShots]] : tensor<f64>
+// CHECK:   [[num_qubits_i32:%.+]] = arith.trunci [[num_qubits]] : i64 to i32
+// CHECK:   [[num_qubits_tensor:%.+]] = tensor.from_elements [[num_qubits_i32]] : tensor<1xi32>
+// CHECK:   [[broadcastShots:%.+]] = stablehlo.dynamic_broadcast_in_dim [[shots_fromElem]], [[num_qubits_tensor]], dims = [] : (tensor<f64>, tensor<1xi32>) -> tensor<?xf64>
+// CHECK:   [[div:%.+]] = stablehlo.divide [[totalSum]], [[broadcastShots]] : tensor<?xf64>
+// CHECK:   return [[div]] : tensor<?xf64>
+
+
+// -----
+
+
 func.func public @test_sample(%arg0: f64) -> tensor<1000x2xi64> {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]

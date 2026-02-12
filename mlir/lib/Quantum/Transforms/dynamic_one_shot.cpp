@@ -42,10 +42,15 @@ namespace {
 // Misc helper functions
 //
 
-void getNumQubitsValues(func::FuncOp qnodeFunc, llvm::SmallPtrSet<Value, 8> &vals)
+void getMPDynamicNumQubitsSizeValues(func::FuncOp qnodeFunc, llvm::SmallPtrSet<Value, 8> &vals)
 {
-    // Collect all SSA values in a FuncOp that represents the number of qubits
-    // These will show up as the dynamic shape dimensions of MPs
+    // Collect all SSA values in a FuncOp that represents the dynamic shape dimensions of MPs
+
+    qnodeFunc->walk([&](quantum::ProbsOp probsOp) {
+        if (auto v = probsOp.getDynamicShape()) {
+            vals.insert(v);
+        }
+    });
 
     qnodeFunc->walk([&](quantum::SampleOp sampleOp) {
         ArrayRef<int64_t> shape = cast<ShapedType>(sampleOp.getSamples().getType()).getShape();
@@ -486,11 +491,15 @@ LogicalResult prepareForLoopVarianceArgs(IRRewriter &builder, func::FuncOp oneSh
 void prepareForLoopProbsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
                              quantum::ProbsOp probsOp, size_t retIdx,
                              SmallVector<Value> &loopIterArgs,
-                             SmallVector<std::string> &loopIterArgsMPKinds)
+                             SmallVector<std::string> &loopIterArgsMPKinds,
+                             const IRMapping &cloneMapper)
 {
+    // Create a zero tensor. Each shot's probs results are added together.
+
     OpBuilder::InsertionGuard guard(builder);
     Location loc = oneShotKernel->getLoc();
     Type f64Type = builder.getF64Type();
+    Type i32Type = builder.getI32Type();
 
     // The one shot kernel itself might need some massaging if the MP is on a MCM.
     Operation *MPSourceOp = probsOp.getObs().getDefiningOp();
@@ -500,10 +509,32 @@ void prepareForLoopProbsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
 
     // Each probs result is a tensor<blahxf64>
     auto probsType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[retIdx]);
-    auto probsSum = stablehlo::ConstantOp::create(
-        builder, loc, probsType,
-        DenseElementsAttr::get(probsType, builder.getFloatAttr(f64Type, 0)));
-    loopIterArgs.push_back(probsSum);
+
+    if (ShapedType::isDynamic(probsType.getShape()[0])) {
+        Value probsDynamicShape = cloneMapper.lookup(probsOp.getDynamicShape());
+
+        // Broadcast a zero scalar into a 1D tensor.
+        auto scalarTensorf64Type = RankedTensorType::get({}, f64Type);
+        auto zeroScalar = stablehlo::ConstantOp::create(
+            builder, loc, scalarTensorf64Type,
+            DenseElementsAttr::get(scalarTensorf64Type, builder.getFloatAttr(f64Type, 0)));
+
+        // Shape Value on ProbsOp is I64; need to convert to tensor<1xi32> for broadcasting
+        auto valI32 = arith::TruncIOp::create(builder, loc, i32Type, probsDynamicShape);
+        auto shapeTensor = tensor::FromElementsOp::create(
+            builder, loc, RankedTensorType::get({1}, i32Type), valI32.getOut());
+
+        auto probsSum = stablehlo::DynamicBroadcastInDimOp::create(
+            builder, loc, RankedTensorType::get({ShapedType::kDynamic}, f64Type),
+            zeroScalar.getResult(), shapeTensor.getResult(), builder.getDenseI64ArrayAttr({}));
+        loopIterArgs.push_back(probsSum);
+    }
+    else {
+        auto probsSum = stablehlo::ConstantOp::create(
+            builder, loc, probsType,
+            DenseElementsAttr::get(probsType, builder.getFloatAttr(f64Type, 0)));
+        loopIterArgs.push_back(probsSum);
+    }
     loopIterArgsMPKinds.push_back("probs");
 }
 
@@ -624,7 +655,7 @@ LogicalResult prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp oneShotKe
 
         else if (auto probs = dyn_cast<quantum::ProbsOp>(mp)) {
             prepareForLoopProbsArgs(builder, oneShotKernel, probs, i, loopIterArgs,
-                                    loopIterArgsMPKinds);
+                                    loopIterArgsMPKinds, cloneMapper);
         }
 
         else if (auto sample = dyn_cast<quantum::SampleOp>(mp)) {
@@ -648,6 +679,45 @@ LogicalResult prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp oneShotKe
     return success();
 }
 
+void constructForLoopSampleBody(IRRewriter &builder, scf::ForOp forOp, func::FuncOp oneShotKernel,
+                                func::CallOp kernalCallOp, size_t retIdx,
+                                SmallVector<Value> &loopYields, const IRMapping &cloneMapper)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    Location loc = forOp->getLoc();
+
+    // Insert the one shot kernel's sample into the full sample result tensor
+    ArrayRef<int64_t> oneShotSampleShape =
+        cast<ShapedType>(oneShotKernel.getFunctionType().getResults()[retIdx]).getShape();
+
+    auto zero = builder.getIndexAttr(0);
+    auto one = builder.getIndexAttr(1);
+    SmallVector<OpFoldResult> offsets = {forOp.getInductionVar(), zero};
+    SmallVector<OpFoldResult> strides = {one, one};
+
+    OpFoldResult numQubits;
+    if (ShapedType::isDynamic(oneShotSampleShape[1])) {
+        Operation *kernelRetOp = oneShotKernel.getBody().back().getTerminator();
+        auto kernelSampleOp =
+            dyn_cast<quantum::SampleOp>(*getMPFromValue(kernelRetOp->getOperand(retIdx)));
+        assert(kernelSampleOp && kernelSampleOp.getDynamicShape().size() == 1 &&
+               "One-shot kernal sample shape must have at most 1 dynamic dimension");
+        numQubits = index::CastSOp::create(builder, loc, builder.getIndexType(),
+                                           cloneMapper.lookup(kernelSampleOp.getDynamicShape()[0]))
+                        .getResult();
+    }
+    else {
+        numQubits = builder.getIndexAttr(oneShotSampleShape[1]);
+    }
+    SmallVector<OpFoldResult> sizes = {one, numQubits};
+
+    auto insertSliceOp =
+        tensor::InsertSliceOp::create(builder, loc, kernalCallOp.getResult(retIdx),
+                                      forOp.getRegionIterArg(retIdx), offsets, sizes, strides);
+
+    loopYields.push_back(insertSliceOp.getResult());
+}
+
 void constructForLoopBody(IRRewriter &builder, scf::ForOp forOp, func::FuncOp oneShotKernel,
                           const SmallVector<std::string> &loopIterArgsMPKinds,
                           const IRMapping &cloneMapper)
@@ -667,7 +737,7 @@ void constructForLoopBody(IRRewriter &builder, scf::ForOp forOp, func::FuncOp on
     SmallVector<Value> loopYields;
 
     for (auto [i, mpKind] : llvm::enumerate(loopIterArgsMPKinds)) {
-        if (mpKind == "expval" || mpKind == "variance" || mpKind == "probs") {
+        if (mpKind == "expval" || mpKind == "variance" || mpKind == "probs" || mpKind == "counts") {
             // Add the expval or probs from each iteration.
             // For variance, currently the only supported case is variance on MCMs.
             // For a set of zeros and ones, the variance is expval - expval^2
@@ -678,56 +748,68 @@ void constructForLoopBody(IRRewriter &builder, scf::ForOp forOp, func::FuncOp on
         }
 
         else if (mpKind == "sample") {
-            // Insert the one shot kernel's sample into the full sample result tensor
-            ArrayRef<int64_t> oneShotSampleShape =
-                cast<ShapedType>(oneShotKernel.getFunctionType().getResults()[i]).getShape();
-
-            auto zero = builder.getIndexAttr(0);
-            auto one = builder.getIndexAttr(1);
-            SmallVector<OpFoldResult> offsets = {forOp.getInductionVar(), zero};
-            SmallVector<OpFoldResult> strides = {one, one};
-
-            OpFoldResult numQubits;
-            if (ShapedType::isDynamic(oneShotSampleShape[1])) {
-                Operation *kernelRetOp = oneShotKernel.getBody().back().getTerminator();
-                auto kernelSampleOp =
-                    dyn_cast<quantum::SampleOp>(*getMPFromValue(kernelRetOp->getOperand(i)));
-                assert(kernelSampleOp && kernelSampleOp.getDynamicShape().size() == 1 &&
-                       "One-shot kernal sample shape must have at most 1 dynamic dimension");
-                numQubits =
-                    index::CastSOp::create(builder, loc, builder.getIndexType(),
-                                           cloneMapper.lookup(kernelSampleOp.getDynamicShape()[0]))
-                        .getResult();
-            }
-            else {
-                numQubits = builder.getIndexAttr(oneShotSampleShape[1]);
-            }
-            SmallVector<OpFoldResult> sizes = {one, numQubits};
-
-            auto insertSliceOp =
-                tensor::InsertSliceOp::create(builder, loc, kernalCallOp.getResult(i),
-                                              forOp.getRegionIterArg(i), offsets, sizes, strides);
-
-            loopYields.push_back(insertSliceOp.getResult());
+            constructForLoopSampleBody(builder, forOp, oneShotKernel, kernalCallOp, i, loopYields,
+                                       cloneMapper);
         }
 
         else if (mpKind == "eigens") {
             loopYields.push_back(kernalCallOp.getResult(i));
-        }
-
-        else if (mpKind == "counts") {
-            auto addOp = stablehlo::AddOp::create(builder, loc, kernalCallOp.getResult(i),
-                                                  forOp.getRegionIterArg(i));
-            loopYields.push_back(addOp.getResult());
         }
     }
 
     scf::YieldOp::create(builder, loc, loopYields);
 }
 
+void postProcessLoopProbsResults(IRRewriter &builder, scf::ForOp forOp, func::FuncOp oneShotKernel,
+                                 Value shots, SmallVector<Value> &retVals, size_t retIdx,
+                                 const IRMapping &cloneMapper)
+{
+    // Divide the sum by shots
+    // shots Value is I64, need to turn into tensor<f64> and then broadcast for
+    // division
+    OpBuilder::InsertionGuard guard(builder);
+    Location loc = forOp->getLoc();
+    Type i32Type = builder.getI32Type();
+    Type f64Type = builder.getF64Type();
+
+    auto int2floatCastOp = arith::SIToFPOp::create(builder, loc, f64Type, shots);
+    auto shotsFromElementsOp = tensor::FromElementsOp::create(
+        builder, loc, RankedTensorType::get({}, f64Type), int2floatCastOp.getResult());
+
+    auto probsType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[retIdx]);
+
+    Value broadcastedShots;
+    if (ShapedType::isDynamic(probsType.getShape()[0])) {
+        Operation *kernelRetOp = oneShotKernel.getBody().back().getTerminator();
+        auto kernelProbsOp =
+            dyn_cast<quantum::ProbsOp>(*getMPFromValue(kernelRetOp->getOperand(retIdx)));
+
+        Value probsDynamicShape = cloneMapper.lookup(kernelProbsOp.getDynamicShape());
+
+        // Shape Value on ProbsOp is I64; need to convert to tensor<1xi32> for broadcasting
+        auto valI32 = arith::TruncIOp::create(builder, loc, i32Type, probsDynamicShape);
+        auto shapeTensor = tensor::FromElementsOp::create(
+            builder, loc, RankedTensorType::get({1}, i32Type), valI32.getOut());
+
+        broadcastedShots = stablehlo::DynamicBroadcastInDimOp::create(
+            builder, loc, RankedTensorType::get({ShapedType::kDynamic}, f64Type),
+            shotsFromElementsOp.getResult(), shapeTensor.getResult(),
+            builder.getDenseI64ArrayAttr({}));
+    }
+    else {
+        broadcastedShots = stablehlo::BroadcastInDimOp::create(builder, loc, probsType,
+                                                               shotsFromElementsOp.getResult(),
+                                                               builder.getDenseI64ArrayAttr({}));
+    }
+
+    auto divOp = stablehlo::DivOp::create(builder, loc, forOp->getResult(retIdx), broadcastedShots);
+    retVals.push_back(divOp.getResult());
+}
+
 void postProcessLoopResults(IRRewriter &builder, scf::ForOp forOp, func::FuncOp oneShotKernel,
                             Value shots, SmallVector<Value> &retVals,
-                            const SmallVector<std::string> &loopIterArgsMPKinds)
+                            const SmallVector<std::string> &loopIterArgsMPKinds,
+                            const IRMapping &cloneMapper)
 {
     OpBuilder::InsertionGuard guard(builder);
     Location loc = forOp->getLoc();
@@ -757,21 +839,8 @@ void postProcessLoopResults(IRRewriter &builder, scf::ForOp forOp, func::FuncOp 
         }
 
         else if (mpKind == "probs") {
-            // Divide the sum by shots
-            // shots Value is I64, need to turn into tensor<f64> and then broadcast for
-            // division
-            auto int2floatCastOp = arith::SIToFPOp::create(builder, loc, f64Type, shots);
-            auto shotsFromElementsOp = tensor::FromElementsOp::create(
-                builder, loc, RankedTensorType::get({}, f64Type), int2floatCastOp.getResult());
-
-            auto probsType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[i]);
-            auto broadcastedShots = stablehlo::BroadcastInDimOp::create(
-                builder, loc, probsType, shotsFromElementsOp.getResult(),
-                builder.getDenseI64ArrayAttr({}));
-
-            auto divOp = stablehlo::DivOp::create(builder, loc, forOp->getResult(i),
-                                                  broadcastedShots.getResult());
-            retVals.push_back(divOp.getResult());
+            postProcessLoopProbsResults(builder, forOp, oneShotKernel, shots, retVals, i,
+                                        cloneMapper);
         }
 
         else if (mpKind == "sample") {
@@ -825,7 +894,7 @@ struct DynamicOneShotPass : public impl::DynamicOneShotPassBase<DynamicOneShotPa
             auto deviceInitOp = *qnodeFunc.getOps<quantum::DeviceInitOp>().begin();
             Value shots = deviceInitOp.getShots();
             llvm::SmallPtrSet<Value, 8> erasureExceptions;
-            getNumQubitsValues(qnodeFunc, erasureExceptions);
+            getMPDynamicNumQubitsSizeValues(qnodeFunc, erasureExceptions);
             erasureExceptions.insert(shots);
             clearFuncExcept(builder, qnodeFunc, erasureExceptions, cloneMapper);
 
@@ -860,7 +929,7 @@ struct DynamicOneShotPass : public impl::DynamicOneShotPassBase<DynamicOneShotPa
             builder.setInsertionPointToEnd(&qnodeFunc.getBody().front());
             SmallVector<Value> retVals;
             postProcessLoopResults(builder, forOp, oneShotKernel, shots, retVals,
-                                   loopIterArgsMPKinds);
+                                   loopIterArgsMPKinds, cloneMapper);
 
             func::ReturnOp::create(builder, loc, retVals);
         }
