@@ -1332,7 +1332,7 @@ def test_decompose_work_wires_context_manager():
 
     @qml.qjit
     @qml.transform(pass_name="decompose-lowering")
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
     def my_circuit():
         my_decomp(jax.core.ShapedArray((2,), int))
         qml.Z(0)
@@ -1383,7 +1383,7 @@ def test_decompose_work_wires_alloc_dealloc():
 
     @qml.qjit
     @qml.transform(pass_name="decompose-lowering")
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
     def my_circuit(angle: float):
         my_decomp(float, jax.core.ShapedArray((2,), int))
         qml.RY(angle, 0)
@@ -1442,7 +1442,7 @@ def test_decompose_work_wires_control_flow():
 
     @qml.qjit
     @qml.transform(pass_name="decompose-lowering")
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
     def circuit():
         my_decomp(float, jax.core.ShapedArray((2,), int))
         qml.CRX(1.7, wires=[0, 1])
@@ -1530,6 +1530,7 @@ def test_decompose_work_wires_with_decompose_transform():
     # CHECK: release
     print(my_circuit.mlir_opt)
 
+    qml.decomposition.disable_graph()
     qml.capture.disable()
 
 
@@ -1577,7 +1578,7 @@ def test_num_work_wires():
         fixed_decomps={qml.CRX: my_decomp},
         num_work_wires=3,
     )
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qml.qnode(qml.device("lightning.qubit", wires=5))
     def circuit():
         qml.CRX(1.7, wires=[0, 1])
         qml.CRX(-7.2, wires=[0, 1])
@@ -1600,6 +1601,7 @@ def test_num_work_wires():
     # CHECK: release
     print(circuit.mlir_opt)
 
+    qml.decomposition.disable_graph()
     qml.capture.disable()
 
 
@@ -1618,7 +1620,7 @@ def test_default_decomps():
         gate_set={qml.ops.ChangeOpBasis},
         num_work_wires=1,
     )
-    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
     def circuit():
         qml.Toffoli(wires=[0, 1, 2])
         return qml.state()
@@ -1634,6 +1636,7 @@ def test_default_decomps():
     # CHECK: release
     print(circuit.mlir_opt)
 
+    qml.decomposition.disable_graph()
     qml.capture.disable()
 
 
