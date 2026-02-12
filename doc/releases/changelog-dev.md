@@ -316,11 +316,14 @@
   ```
 
   The pass first runs `split-to-single-terms` to decompose the Hamiltonian, then splits
-  non-commuting observables into separate groups:
+  non-commuting observables into separate groups. Shots are distributed among groups using
+  integer division (rounded down); e.g., 100 shots with 3 groups yields 33 shots per group.
 
   **Before:**
   ```mlir
   func @circ1(%arg0) -> (tensor<f64>) {qnode} {
+      %shots = arith.constant 100
+      quantum.device shots(%shots)
       // ... quantum ops ...
       %H = quantum.hamiltonian(%coeffs) %T0, %obs2 : !quantum.obs
       %result = quantum.expval %H : f64
@@ -338,6 +341,11 @@
   }
   func @circ1.quantum.group.0() -> (tensor<f64>, tensor<f64>) {qnode} {
       // ... quantum ops ...
+      %shots = arith.constant 100
+      %num_group = arith.constant 3 : i64
+      // Shots are divided among groups via integer division (rounded down)
+      %new_shots = arith.divsi %shots, %num_group
+      quantum.device shots(%new_shots)
       %obs = quantum.namedobs %out_qubits[ PauliZ] : !quantum.obs
       %r0 = quantum.expval %obs
 
