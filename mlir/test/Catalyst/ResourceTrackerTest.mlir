@@ -280,9 +280,10 @@ func.func @mixed_ops() {
 // RUN: quantum-opt --pass-pipeline="builtin.module(resource-tracker)" -mlir-pass-statistics -mlir-pass-statistics-display=list --split-input-file %s 2>&1 | FileCheck %s --check-prefix=STATS
 
 // STATS: ResourceTrackerPass
-// STATS: total-gates
-// STATS: total-measurements
-// STATS: total-qubits
+// STATS: 1 total-classical-ops
+// STATS: 1 total-gates
+// STATS: 1 total-measurements
+// STATS: 2 total-qubits
 func.func @stats_test() {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -297,8 +298,9 @@ func.func @stats_test() {
 
 // Multiple qnode functions: the first qnode is the entry function.
 
-// STATS: 4 total-gates
+// STATS: ResourceTrackerPass
 // STATS: 4 total-function-calls
+// STATS: 4 total-gates
 func.func private @shared_helper(%arg0: !quantum.bit) -> !quantum.bit {
     %out = quantum.custom "Hadamard"() %arg0 : !quantum.bit
     return %out : !quantum.bit
