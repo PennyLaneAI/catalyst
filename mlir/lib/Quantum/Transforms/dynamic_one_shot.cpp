@@ -63,6 +63,12 @@ void getMPDynamicNumQubitsSizeValues(func::FuncOp qnodeFunc, llvm::SmallPtrSet<V
             }
         }
     });
+
+    qnodeFunc->walk([&](quantum::CountsOp countsOp) {
+        if (auto v = countsOp.getDynamicShape()) {
+            vals.insert(v);
+        }
+    });
 }
 
 void clearFuncExcept(IRRewriter &builder, func::FuncOp qnodeFunc,
@@ -583,13 +589,14 @@ void prepareForLoopSampleArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
 void prepareForLoopCountsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
                               quantum::CountsOp countsOp, size_t retIdx,
                               SmallVector<Value> &loopIterArgs,
-                              SmallVector<std::string> &loopIterArgsMPKinds)
+                              SmallVector<std::string> &loopIterArgsMPKinds,
+                              const IRMapping &cloneMapper)
 {
+    // Create a zero tensor. Each shot's counts results are added together.
     OpBuilder::InsertionGuard guard(builder);
     Location loc = oneShotKernel->getLoc();
-
-    auto eigensType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[retIdx]);
-    auto countsType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[retIdx + 1]);
+    Type i32Type = builder.getI32Type();
+    Type i64Type = builder.getI64Type();
 
     // The one shot kernel itself might need some massaging if the MP is on a MCM.
     Operation *MPSourceOp = countsOp.getObs().getDefiningOp();
@@ -597,15 +604,49 @@ void prepareForLoopCountsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
         editKernelMCMCounts(builder, oneShotKernel, cast<quantum::MCMObsOp>(MPSourceOp), retIdx);
     }
 
-    auto countsSum = stablehlo::ConstantOp::create(
-        builder, loc, countsType,
-        DenseElementsAttr::get(countsType, builder.getIntegerAttr(builder.getI64Type(), 0)));
+    auto eigensType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[retIdx]);
+    auto countsType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[retIdx + 1]);
+
+    Value countsSum;
+    if (ShapedType::isDynamic(countsType.getShape()[0])) {
+        Value countsDynamicShape = cloneMapper.lookup(countsOp.getDynamicShape());
+
+        // Broadcast a zero scalar into a 1D tensor.
+        auto scalarTensori64Type = RankedTensorType::get({}, i64Type);
+        auto zeroScalar = stablehlo::ConstantOp::create(
+            builder, loc, scalarTensori64Type,
+            DenseElementsAttr::get(scalarTensori64Type, builder.getIntegerAttr(i64Type, 0)));
+
+        // Shape Value on CountsOp is I64; need to convert to tensor<1xi32> for broadcasting
+        auto valI32 = arith::TruncIOp::create(builder, loc, i32Type, countsDynamicShape);
+        auto shapeTensor = tensor::FromElementsOp::create(
+            builder, loc, RankedTensorType::get({1}, i32Type), valI32.getOut());
+
+        countsSum = stablehlo::DynamicBroadcastInDimOp::create(
+            builder, loc, RankedTensorType::get({ShapedType::kDynamic}, i64Type),
+            zeroScalar.getResult(), shapeTensor.getResult(), builder.getDenseI64ArrayAttr({}));
+    }
+    else {
+        countsSum = stablehlo::ConstantOp::create(
+            builder, loc, countsType,
+            DenseElementsAttr::get(countsType, builder.getIntegerAttr(i64Type, 0)));
+    }
 
     // We also need to yield the eigens from the kernel call inside the loop body.
     // However, this requires the loop to have an iteration argument for the eigens tensor.
     // We just initialize an empty one.
+    SmallVector<OpFoldResult> sizes;
+    if (ShapedType::isDynamic(eigensType.getShape()[0])) {
+        auto indexCast = index::CastSOp::create(builder, loc, builder.getIndexType(),
+                                                cloneMapper.lookup(countsOp.getDynamicShape()));
+        sizes.push_back(indexCast.getResult());
+    }
+    else {
+        sizes.push_back(builder.getIndexAttr(eigensType.getShape()[0]));
+    }
+
     auto eigensPlaceholder =
-        tensor::EmptyOp::create(builder, loc, eigensType.getShape(), eigensType.getElementType());
+        tensor::EmptyOp::create(builder, loc, sizes, eigensType.getElementType());
 
     loopIterArgs.push_back(eigensPlaceholder);
     loopIterArgs.push_back(countsSum);
@@ -672,12 +713,16 @@ LogicalResult prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp oneShotKe
                 continue;
             }
             prepareForLoopCountsArgs(builder, oneShotKernel, counts, i, loopIterArgs,
-                                     loopIterArgsMPKinds);
+                                     loopIterArgsMPKinds, cloneMapper);
             handledCountsOps.insert(counts);
         }
     }
     return success();
 }
+
+//
+// Methods to construct the body of the for loop
+//
 
 void constructForLoopSampleBody(IRRewriter &builder, scf::ForOp forOp, func::FuncOp oneShotKernel,
                                 func::CallOp kernalCallOp, size_t retIdx,
@@ -759,6 +804,10 @@ void constructForLoopBody(IRRewriter &builder, scf::ForOp forOp, func::FuncOp on
 
     scf::YieldOp::create(builder, loc, loopYields);
 }
+
+//
+// Methods to postprocess the for loop results
+//
 
 void postProcessLoopProbsResults(IRRewriter &builder, scf::ForOp forOp, func::FuncOp oneShotKernel,
                                  Value shots, SmallVector<Value> &retVals, size_t retIdx,
