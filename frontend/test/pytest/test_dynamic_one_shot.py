@@ -23,7 +23,8 @@ from catalyst import qjit
 
 def test_mlir_one_shot_pass_expval(backend):
     """
-    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with expval
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend
+    with expval
     """
 
     @qjit(capture=True, seed=38)
@@ -41,8 +42,8 @@ def test_mlir_one_shot_pass_expval(backend):
 
 def test_mlir_one_shot_pass_expval_mcm(backend):
     """
-    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with expval
-    on a mid circuit measurement
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend
+    with expval on a mid circuit measurement
     """
 
     @qjit(capture=True, seed=38)
@@ -61,7 +62,8 @@ def test_mlir_one_shot_pass_expval_mcm(backend):
 
 def test_mlir_one_shot_pass_probs(backend):
     """
-    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with probs
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend
+    with probs
     """
 
     @qjit(capture=True, seed=12345)
@@ -79,8 +81,8 @@ def test_mlir_one_shot_pass_probs(backend):
 
 def test_mlir_one_shot_pass_probs_mcm(backend):
     """
-    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with probs
-    on a mid circuit measurement
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend
+    with probs on a mid circuit measurement
     """
 
     @qjit(capture=True, seed=12345)
@@ -100,8 +102,8 @@ def test_mlir_one_shot_pass_probs_mcm(backend):
 
 def test_mlir_one_shot_pass_var_mcm(backend):
     """
-    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with variance
-    on a mid circuit measurement
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend
+    with variance on a mid circuit measurement
     """
 
     @qjit(capture=True, seed=38)
@@ -120,7 +122,8 @@ def test_mlir_one_shot_pass_var_mcm(backend):
 
 def test_mlir_one_shot_pass_sample(backend):
     """
-    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with sample
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend
+    with sample
     """
 
     @qjit(capture=True, seed=12345)
@@ -141,8 +144,8 @@ def test_mlir_one_shot_pass_sample(backend):
 
 def test_mlir_one_shot_pass_sample_mcm(backend):
     """
-    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with sample
-    on a mid circuit measurement
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend
+    with sample on a mid circuit measurement
     """
 
     @qjit(capture=True, seed=12345)
@@ -165,7 +168,8 @@ def test_mlir_one_shot_pass_sample_mcm(backend):
 
 def test_mlir_one_shot_pass_counts(backend):
     """
-    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with counts
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend
+    with counts
     """
 
     @qjit(capture=True, seed=12345)
@@ -185,8 +189,8 @@ def test_mlir_one_shot_pass_counts(backend):
 
 def test_mlir_one_shot_pass_counts_mcm(backend):
     """
-    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with counts
-    on MCMs.
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend
+    with counts on MCMs.
     """
 
     @qjit(capture=True, seed=12345)
