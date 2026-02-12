@@ -24,9 +24,9 @@ import numpy as np
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
+from pennylane.capture import subroutine
 
 from catalyst import qjit
-from pennylane.capture import subroutine
 from catalyst.utils.exceptions import CompileError
 
 

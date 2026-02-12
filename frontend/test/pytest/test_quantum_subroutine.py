@@ -14,18 +14,18 @@
 
 """Integration tests for quantum subroutine"""
 from functools import partial
+
 import jax
 import numpy as np
 import pennylane as qml
 import pytest
-
 from pennylane.capture import subroutine
-
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
 
 class TestSubroutineHOP:
+    """Integration tests for qml.capture.subroutine"""
 
     def test_classical_subroutine(self):
         """Dummy test"""
@@ -43,7 +43,6 @@ class TestSubroutineHOP:
         assert subroutine_test() == 1
         qml.capture.disable()
 
-
     def test_quantum_subroutine(self):
         """Test quantum subroutine"""
 
@@ -59,9 +58,9 @@ class TestSubroutineHOP:
             Hadamard0(c)
             return qml.state()
 
-        assert np.allclose(subroutine_test(0), jax.numpy.array([0.70710678 + 0.0j, 0.70710678 + 0.0j]))
+        expected = jax.numpy.array([0.70710678 + 0.0j, 0.70710678 + 0.0j])
+        assert np.allclose(subroutine_test(0), expected)
         qml.capture.disable()
-
 
     def test_quantum_subroutine_self_inverses(self):
         """Test quantum subroutine multiple calls"""
@@ -85,7 +84,6 @@ class TestSubroutineHOP:
 
         qml.capture.disable()
 
-
     def test_quantum_subroutine_error_message(self):
         """Test error message for quantum operations outside of qnode."""
 
@@ -101,7 +99,6 @@ class TestSubroutineHOP:
             @qml.qjit(autograph=False)
             def subroutine_test():
                 Hadamard0()
-
 
     def test_quantum_subroutine_conditional(self):
         """Test quantum subroutine control flow"""
@@ -124,11 +121,14 @@ class TestSubroutineHOP:
             return qml.state()
 
         assert np.allclose(subroutine_test(0), jax.numpy.array([1.0, 0.0], dtype=complex))
-        assert np.allclose(subroutine_test(1), jax.numpy.array([0.70710678 + 0.0j, 0.70710678 + 0.0j]))
+        assert np.allclose(
+            subroutine_test(1), jax.numpy.array([0.70710678 + 0.0j, 0.70710678 + 0.0j])
+        )
         qml.capture.disable()
 
 
 class TestSubroutineClass:
+    """integration tests for qml.templates.Subroutine"""
 
     def test_basic_subroutine(self):
         """Test the execution of a simple subroutine."""
@@ -149,7 +149,6 @@ class TestSubroutineClass:
         assert qml.math.allclose(r1, np.cos(0.5))
         assert qml.math.allclose(r2, np.cos(1))
         assert qml.math.allclose(r3, np.cos(1.5))
-
 
     def test_subroutine_with_metadata(self):
         """Test that catalyst can handle a subroutine with metadata."""
@@ -173,7 +172,6 @@ class TestSubroutineClass:
         assert qml.math.allclose(r1, -1)
         assert qml.math.allclose(r2, -1)
         assert qml.math.allclose(r3, 1)
-
 
     def test_different_wire_name(self):
         """Test that the input for wires can be named something different."""
