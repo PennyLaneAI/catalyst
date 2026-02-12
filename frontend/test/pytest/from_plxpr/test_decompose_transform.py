@@ -519,7 +519,7 @@ class TestGraphDecomposition:
                 fixed_decomps={qml.CRX: my_decomp},
                 num_work_wires=num_work_wires,
             )
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            @qml.qnode(qml.device("lightning.qubit", wires=5))
             def circuit():
                 qml.CRX(1.7, wires=[0, 1])
                 qml.CRX(-7.2, wires=[0, 1])
