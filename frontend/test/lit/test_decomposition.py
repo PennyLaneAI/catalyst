@@ -1492,8 +1492,6 @@ def test_decompose_work_wires_with_decompose_transform():
     """Test that work wires are correctly lowered and decomposed by the decompose transform."""
 
     qml.capture.enable()
-
-    qml.capture.enable()
     qml.decomposition.enable_graph()
 
     @qml.register_resources({qml.X: 1, qml.Z: 1})
@@ -1536,3 +1534,71 @@ def test_decompose_work_wires_with_decompose_transform():
 
 
 test_decompose_work_wires_with_decompose_transform()
+
+
+def test_num_work_wires():
+    """Test that num_work_wires can be passed and is correctly used in solving the graph."""
+
+    qml.decomposition.enable_graph()
+    qml.capture.enable()
+
+    @qml.register_resources(
+        {qml.CNOT: 3, qml.H: 1, qml.X: 1, qml.ops.op_math.Conditional: 2},
+        work_wires={"borrowed": 2, "garbage": 1},
+    )
+    def my_decomp(angle, wires, **_):
+        def true_func():
+            qml.CNOT(wires)
+
+            with qml.allocate(2, state="any", restored=True) as w:
+                qml.H(w[0])
+                qml.H(w[0])
+                qml.X(w[1])
+                qml.X(w[1])
+
+            return
+
+        def false_func():
+            with qml.allocate(1, state="any", restored=False) as w:
+                qml.H(w)
+
+            m = qml.measure(wires[0])
+
+            qml.cond(m, qml.CNOT)(wires)
+
+            return
+
+        qml.cond(angle > 1.2, true_func, false_func)()
+
+    @qml.qjit
+    @partial(
+        qml.transforms.decompose,
+        gate_set={qml.CNOT, qml.H, qml.X, "Conditional", "MidMeasure"},
+        fixed_decomps={qml.CRX: my_decomp},
+        num_work_wires=3,
+    )
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def circuit():
+        qml.CRX(1.7, wires=[0, 1])
+        qml.CRX(-7.2, wires=[0, 1])
+        return qml.state()
+
+    # CHECK-NOT: CRX
+    # CHECK-NOT: my_decomp
+
+    # CHECK: allocate
+    # CHECK: allocate
+    # CHECK: CNOT
+    # CHECK: Hadamard
+    # CHECK: Hadamard
+    # CHECK: PauliX
+    # CHECK: PauliX
+    # CHECK: Hadamard
+    # CHECK: Measure
+    # CHECK: CNOT
+    # CHECK: release
+    # CHECK: release
+    print(circuit.mlir_opt)
+
+
+test_num_work_wires()
