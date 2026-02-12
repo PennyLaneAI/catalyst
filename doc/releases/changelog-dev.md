@@ -63,6 +63,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* Catalyst with program capture can now be used with the new `qml.templates.Subroutine` class and the associated
+  `qml.capture.subroutine` upstreamed from `catalyst.jax_primitives.subroutine`.
+  [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
+
 * The PPR/PPM lowering passes (`lower-qec-init-ops`, `unroll-conditional-ppr-ppm`) are now run
   as part of the main quantum compilation pipeline. When using `to-ppr` and `ppr-to-ppm` transforms,
   these passes are applied automatically during compilation; we no longer need to stack them
@@ -95,6 +99,9 @@
   [(#2456)](https://github.com/PennyLaneAI/catalyst/pull/2456)
 
 <h3>Breaking changes 💔</h3>
+
+* `catalyst.jax_primitives.subroutine` has been moved to `qml.capture.subroutine`.
+  [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
 
 * (Compiler integrators only) The versions of StableHLO/LLVM/Enzyme used by Catalyst have been updated.
   [(#2415)](https://github.com/PennyLaneAI/catalyst/pull/2415)
