@@ -63,6 +63,12 @@
 
 <h3>Improvements 🛠</h3>
 
+* The PPR/PPM lowering passes (`lower-qec-init-ops`, `unroll-conditional-ppr-ppm`) are now run
+  as part of the main quantum compilation pipeline. When using `to-ppr` and `ppr-to-ppm` transforms,
+  these passes are applied automatically during compilation; we no longer need to stack them
+  explicitly.
+  [(#2460)](https://github.com/PennyLaneAI/catalyst/pull/2460)
+
 * `null.qubit` resource tracking is now able to track measurements and observables. This output
   is also reflected in `qml.specs`.
   [(#2446)](https://github.com/PennyLaneAI/catalyst/pull/2446)
@@ -95,6 +101,7 @@
   [(#2416)](https://github.com/PennyLaneAI/catalyst/pull/2416)
   [(#2444)](https://github.com/PennyLaneAI/catalyst/pull/2444)
   [(#2445)](https://github.com/PennyLaneAI/catalyst/pull/2445)
+  [(#2478)](https://github.com/PennyLaneAI/catalyst/pull/2478)
 
   - The StableHLO version has been updated to
   [v1.13.7](https://github.com/openxla/stablehlo/tree/v1.13.7).
