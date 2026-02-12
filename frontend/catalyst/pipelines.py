@@ -299,11 +299,9 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
         bufferization_options += " copy-before-write"
 
     bufferization = [
-        # Setting the inlining threshold to 25% as inlining all function would blow up
-        # code size in certain cases. Note that the inlining pass here is added to assist the
-        # buffer-deallocation pass. We can consider removing this pass when the buffer-deallocation
-        # pass is properly migrated to the new bufferization pipeline.
-        "inline{inlining-threshold=25}",
+        # Removing the inlining pass for now as inlining all function would blow up
+        # code size in certain cases.
+        # "inline",
         "convert-tensor-to-linalg",  # tensor.pad
         "convert-elementwise-to-linalg",  # Must be run before --one-shot-bufferize
         "gradient-preprocess",

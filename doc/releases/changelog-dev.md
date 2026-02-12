@@ -117,7 +117,7 @@
 * Dropped support for NumPy 1.x following its end-of-life. NumPy 2.0 or higher is now required.
   [(#2407)](https://github.com/PennyLaneAI/catalyst/pull/2407)
 
-* The inlining threshold for the `inline` pass has been set to 25% by default.
+* The inlining pass has been removed from the default compilation pipeline.
   [(#2473)](https://github.com/PennyLaneAI/catalyst/pull/2473)
 
 <h3>Deprecations 👋</h3>
