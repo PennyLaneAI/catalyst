@@ -18,8 +18,8 @@
 
 import jax
 import pennylane as qml
+from pennylane.capture import subroutine
 
-from catalyst.jax_primitives import subroutine
 
 # pylint: disable=line-too-long
 

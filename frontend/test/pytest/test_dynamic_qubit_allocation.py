@@ -26,7 +26,7 @@ import pytest
 from jax import numpy as jnp
 
 from catalyst import qjit
-from catalyst.jax_primitives import subroutine
+from pennylane.capture import subroutine
 from catalyst.utils.exceptions import CompileError
 
 

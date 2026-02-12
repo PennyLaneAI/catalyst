@@ -94,6 +94,9 @@
 
 <h3>Breaking changes 💔</h3>
 
+* `catalyst.jax_primitives.subroutine` has been moved to `qml.capture.subroutine`.
+  [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
+
 * (Compiler integrators only) The versions of StableHLO/LLVM/Enzyme used by Catalyst have been updated.
   [(#2415)](https://github.com/PennyLaneAI/catalyst/pull/2415)
   [(#2416)](https://github.com/PennyLaneAI/catalyst/pull/2416)

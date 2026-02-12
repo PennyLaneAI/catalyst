@@ -133,8 +133,6 @@ with Patcher(
         lower_jaxpr,
     )
 
-# subroutine got upstreamed to pennylane
-from pennylane.capture import subroutine  # pylint: disable=unused-import
 from pennylane.capture.primitives import jacobian_prim as pl_jac_prim
 from pennylane.capture.primitives import jvp_prim as pl_jvp_prim
 from pennylane.capture.primitives import quantum_subroutine_prim

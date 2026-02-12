@@ -619,10 +619,8 @@ class TestMLIRSpecs:
 
     def test_subroutine(self):
         """Test that subroutines are handled correctly."""
-        if not qml.capture.enabled():
-            pytest.xfail("Subroutine requires plxpr to be enabled.")
 
-        @catalyst.jax_primitives.subroutine
+        @qml.capture.subroutine
         def extra_function():
             qml.Hadamard(wires=0)
 

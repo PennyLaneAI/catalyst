@@ -13,113 +13,187 @@
 # limitations under the License.
 
 """Integration tests for quantum subroutine"""
-
+from functools import partial
 import jax
 import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst.jax_primitives import subroutine
+from pennylane.capture import subroutine
+
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
 
-def test_classical_subroutine():
-    """Dummy test"""
+class TestSubroutineHOP:
 
-    @subroutine
-    def identity(x):
-        return x
+    def test_classical_subroutine(self):
+        """Dummy test"""
 
-    qml.capture.enable()
+        @subroutine
+        def identity(x):
+            return x
 
-    @qml.qjit
-    def subroutine_test():
-        return identity(1)
+        qml.capture.enable()
 
-    assert subroutine_test() == 1
-    qml.capture.disable()
-
-
-def test_quantum_subroutine():
-    """Test quantum subroutine"""
-
-    @subroutine
-    def Hadamard0(wire):
-        qml.Hadamard(wire)
-
-    qml.capture.enable()
-
-    @qml.qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
-    def subroutine_test(c: int):
-        Hadamard0(c)
-        return qml.state()
-
-    assert np.allclose(subroutine_test(0), jax.numpy.array([0.70710678 + 0.0j, 0.70710678 + 0.0j]))
-    qml.capture.disable()
-
-
-def test_quantum_subroutine_self_inverses():
-    """Test quantum subroutine multiple calls"""
-
-    @subroutine
-    def Hadamard0(wire):
-        qml.Hadamard(wire)
-
-    qml.capture.enable()
-
-    @qml.qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
-    def subroutine_test(c: int):
-        Hadamard0(c)
-        Hadamard0(c)
-        return qml.state()
-
-    assert np.allclose(
-        subroutine_test(0), jax.numpy.array([complex(1.0, 0), complex(0.0, 0.0)], dtype=complex)
-    )
-
-    qml.capture.disable()
-
-
-def test_quantum_subroutine_error_message():
-    """Test error message for quantum operations outside of qnode."""
-
-    @subroutine
-    def Hadamard0():
-        qml.Hadamard(wires=[0])
-
-    qml.capture.enable()
-
-    msg = "inside subroutine"
-    with pytest.raises(NotImplementedError, match=msg):
-
-        @qml.qjit(autograph=False)
+        @qml.qjit
         def subroutine_test():
-            Hadamard0()
+            return identity(1)
+
+        assert subroutine_test() == 1
+        qml.capture.disable()
 
 
-def test_quantum_subroutine_conditional():
-    """Test quantum subroutine control flow"""
+    def test_quantum_subroutine(self):
+        """Test quantum subroutine"""
 
-    @subroutine
-    def Hadamard0(wire):
-        def true_path():
+        @subroutine
+        def Hadamard0(wire):
+            qml.Hadamard(wire)
+
+        qml.capture.enable()
+
+        @qml.qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def subroutine_test(c: int):
+            Hadamard0(c)
+            return qml.state()
+
+        assert np.allclose(subroutine_test(0), jax.numpy.array([0.70710678 + 0.0j, 0.70710678 + 0.0j]))
+        qml.capture.disable()
+
+
+    def test_quantum_subroutine_self_inverses(self):
+        """Test quantum subroutine multiple calls"""
+
+        @subroutine
+        def Hadamard0(wire):
+            qml.Hadamard(wire)
+
+        qml.capture.enable()
+
+        @qml.qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def subroutine_test(c: int):
+            Hadamard0(c)
+            Hadamard0(c)
+            return qml.state()
+
+        assert np.allclose(
+            subroutine_test(0), jax.numpy.array([complex(1.0, 0), complex(0.0, 0.0)], dtype=complex)
+        )
+
+        qml.capture.disable()
+
+
+    def test_quantum_subroutine_error_message(self):
+        """Test error message for quantum operations outside of qnode."""
+
+        @subroutine
+        def Hadamard0():
             qml.Hadamard(wires=[0])
 
-        def false_path(): ...
+        qml.capture.enable()
 
-        qml.cond(wire != 0, true_path, false_path)()
+        msg = "inside subroutine"
+        with pytest.raises(NotImplementedError, match=msg):
 
-    qml.capture.enable()
+            @qml.qjit(autograph=False)
+            def subroutine_test():
+                Hadamard0()
 
-    @qml.qjit(autograph=False)
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
-    def subroutine_test(c: int):
-        Hadamard0(c)
-        return qml.state()
 
-    assert np.allclose(subroutine_test(0), jax.numpy.array([1.0, 0.0], dtype=complex))
-    assert np.allclose(subroutine_test(1), jax.numpy.array([0.70710678 + 0.0j, 0.70710678 + 0.0j]))
-    qml.capture.disable()
+    def test_quantum_subroutine_conditional(self):
+        """Test quantum subroutine control flow"""
+
+        @subroutine
+        def Hadamard0(wire):
+            def true_path():
+                qml.Hadamard(wires=[0])
+
+            def false_path(): ...
+
+            qml.cond(wire != 0, true_path, false_path)()
+
+        qml.capture.enable()
+
+        @qml.qjit(autograph=False)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def subroutine_test(c: int):
+            Hadamard0(c)
+            return qml.state()
+
+        assert np.allclose(subroutine_test(0), jax.numpy.array([1.0, 0.0], dtype=complex))
+        assert np.allclose(subroutine_test(1), jax.numpy.array([0.70710678 + 0.0j, 0.70710678 + 0.0j]))
+        qml.capture.disable()
+
+
+class TestSubroutineClass:
+
+    def test_basic_subroutine(self):
+        """Test the execution of a simple subroutine."""
+
+        @qml.templates.Subroutine
+        def f(x, wires):
+            qml.RX(x, wires)
+
+        @qml.qjit(capture=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def c(x):
+            f(x, 0)
+            f(2 * x, 1)
+            f(x + 1, 2)
+            return [qml.expval(qml.Z(i)) for i in range(3)]
+
+        r1, r2, r3 = c(0.5)
+        assert qml.math.allclose(r1, np.cos(0.5))
+        assert qml.math.allclose(r2, np.cos(1))
+        assert qml.math.allclose(r3, np.cos(1.5))
+
+
+    def test_subroutine_with_metadata(self):
+        """Test that catalyst can handle a subroutine with metadata."""
+
+        @partial(qml.templates.Subroutine, static_argnames="kind")
+        def f(wires, kind):
+            if kind == "X":
+                qml.X(wires)
+            else:
+                qml.Z(wires)
+
+        @qml.qjit(capture=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def c():
+            f(0, "X")
+            f(1, "X")
+            f(2, "Z")
+            return [qml.expval(qml.Z(i)) for i in range(3)]
+
+        r1, r2, r3 = c()
+        assert qml.math.allclose(r1, -1)
+        assert qml.math.allclose(r2, -1)
+        assert qml.math.allclose(r3, 1)
+
+
+    def test_different_wire_name(self):
+        """Test that the input for wires can be named something different."""
+
+        @partial(qml.templates.Subroutine, wire_argnames="register")
+        def f(register):
+            @qml.for_loop(register.shape[0])
+            def l(i):
+                qml.X(register[i])
+
+            l()
+
+        @qml.qjit(capture=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def c():
+            f(register=(0, 1, 3))
+            return [qml.expval(qml.Z(i)) for i in range(4)]
+
+        r0, r1, r2, r3 = c()
+        assert qml.math.allclose(r0, -1)
+        assert qml.math.allclose(r1, -1)
+        assert qml.math.allclose(r2, 1)
+        assert qml.math.allclose(r3, -1)
