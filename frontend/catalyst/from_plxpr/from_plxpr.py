@@ -294,7 +294,7 @@ def handle_qnode(
 
     # Decomposing templated operations is not supported in graph-based decomposition yet.
     if stopping_condition := self.decompose_tkwargs.get("stopping_condition"):
-        print("Case 1: User specified a stopping condition in decomposition.")
+        # print("Case 1: User specified a stopping condition in decomposition.")
         # Case 1: User specified a stopping condition in decomposition
         # Use the plxpr decompose transform and ignore graph
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
@@ -305,7 +305,7 @@ def handle_qnode(
             stopping_condition=stopping_condition,
         )
     elif not qml.decomposition.enabled_graph():
-        print("Case 2: User did not specify a decomposition. Using plxpr decomposition on device-specific gate set when graph is disabled.")
+        # print("Case 2: User did not specify a decomposition. Using plxpr decomposition on device-specific gate set when graph is disabled.")
         stopping_condition = None
         if use_device_specific_decomposition:
             device_capabilities = get_device_capabilities(device, execution_config, shots_len)
@@ -333,7 +333,7 @@ def handle_qnode(
 
         if use_device_specific_decomposition:
             # Case 3: User did not specify a decomposition. Using graph-based decomposition on device-specific gate set.
-            print("Case 3: User did not specify a decomposition. Using graph-based decomposition on device-specific gate set.")            
+            # print("Case 3: User did not specify a decomposition. Using graph-based decomposition on device-specific gate set.")            
             device_capabilities = get_device_capabilities(device, execution_config, shots_len)
             device_specific_gate_set = device_capabilities.operations.keys()
             gateset = {"gate_set": device_specific_gate_set}
@@ -355,7 +355,7 @@ def handle_qnode(
             )
         else:
             # Case 4: User defined decomposition with target gate set
-            print("Case 4: User defined decomposition with target gate set. Trying to use graph-based decomposition.")
+            # print("Case 4: User defined decomposition with target gate set. Trying to use graph-based decomposition.")
             # Try to use graph-based decomposition.
             closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
                 inner_jaxpr=closed_jaxpr.jaxpr,
@@ -366,7 +366,7 @@ def handle_qnode(
 
         # Fallback to the legacy decomposition if the graph-based decomposition failed
         if not graph_succeeded:
-            print("Graph-based decomposition failed. Falling back to plxpr decomposition.")
+            # print("Graph-based decomposition failed. Falling back to plxpr decomposition.")
             # Remove the decompose-lowering pass from the pipeline
             self._pass_pipeline = [
                 p for p in self._pass_pipeline if p.pass_name != "decompose-lowering"

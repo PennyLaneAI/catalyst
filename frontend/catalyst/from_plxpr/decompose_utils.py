@@ -20,11 +20,11 @@ import textwrap
 import pennylane as qml
 from pennylane.devices.capabilities import DeviceCapabilities
 
-from catalyst.device.capabilities_utils import (
+from catalyst.device.qjit_device import (
     filter_device_capabilities_with_shots as _filter_device_capabilities_with_shots,
+    _requires_shots,
+    _load_device_capabilities,
 )
-from catalyst.device.capabilities_utils import load_device_capabilities as _load_device_capabilities
-from catalyst.device.capabilities_utils import requires_shots as _requires_shots
 from catalyst.device.decomposition import catalyst_acceptance as _catalyst_acceptance
 from catalyst.jax_primitives_utils import _calculate_diff_method
 from catalyst.utils.exceptions import CompileError
