@@ -30,9 +30,9 @@ from xdsl.dialects.builtin import (
     StringAttr,
     i16,
 )
-from xdsl.dialects.utils import AbstractYieldOperation
-from xdsl.ir import Attribute, Dialect, EnumAttribute, SpacedOpaqueSyntaxAttribute
+from xdsl.ir import Dialect, EnumAttribute, SpacedOpaqueSyntaxAttribute
 from xdsl.irdl import (
+    AnyAttr,
     AttrSizedOperandSegments,
     IRDLOperation,
     irdl_attr_definition,
@@ -40,7 +40,6 @@ from xdsl.irdl import (
     lazy_traits_def,
     operand_def,
     opt_operand_def,
-    opt_prop_def,
     prop_def,
     region_def,
     result_def,
@@ -79,10 +78,12 @@ PauliWord = ArrayAttr[StringAttr]
 
 
 @irdl_op_definition
-class YieldOp(AbstractYieldOperation[Attribute]):
+class YieldOp(IRDLOperation):
     """Return results from a layer region"""
 
     name = "qec.yield"
+
+    results = var_operand_def(AnyAttr())
 
     traits = lazy_traits_def(lambda: (IsTerminator(), HasParent(LayerOp), Pure()))
 
@@ -136,7 +137,7 @@ class PPMeasurementOp(IRDLOperation):
 
     pauli_product = prop_def(PauliWord)
 
-    rotation_sign = opt_prop_def(IntegerAttr[I16], default_value=IntegerAttr(1, i16))
+    rotation_sign = prop_def(IntegerAttr[I16], default_value=IntegerAttr(1, i16))
 
     in_qubits = var_operand_def(QubitType)
 

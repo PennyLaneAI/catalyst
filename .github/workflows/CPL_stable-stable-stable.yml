@@ -8,7 +8,7 @@ on:
 jobs:
   build-config:
     name: CPL stable/stable/stable
-    uses: ./.github/workflows/check-pl-compat.yaml
+    uses: ./.github/workflows/check-pl-compat.yml
     with:
       catalyst: stable
       pennylane: stable
