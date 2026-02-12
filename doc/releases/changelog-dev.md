@@ -80,8 +80,8 @@
   `shots` aren't set. Instead, an informative error message is raised.
   [(#2456)](https://github.com/PennyLaneAI/catalyst/pull/2456)
 
-* Added the `op_type` parameter to the `@decomposition_rule` decorator, allowing the `decompose-lowering` pass to
-  register and apply decomposition rules in MLIR.
+* Graph decomposition with qjit now accepts `num_work_wires`, and lowers and decomposes correctly
+  with the `decompose-lowering` pass and with `qp.transforms.decompose`.
   [(#2470)](https://github.com/PennyLaneAI/catalyst/pull/2470)
 
 <h3>Breaking changes 💔</h3>
