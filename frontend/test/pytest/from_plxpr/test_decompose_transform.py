@@ -28,6 +28,10 @@ from pennylane.wires import WiresLike
 
 @contextmanager
 def does_not_raise():
+    """
+    define a context manager for tests that do not fail, for use with `parametrize`.
+    See https://github.com/pytest-dev/pytest/pull/4682/changes for details.
+    """
     yield
 
 
