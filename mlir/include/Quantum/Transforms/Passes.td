@@ -66,13 +66,13 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let summary = "Given a qnode containing multiple tapes, split each tape into its own function.";
 }
 
-def SplitNonCommutingPass : Pass<"split-non-commuting"> {
-    let summary = "Split quantum functions non-commuting observables into multiple executions.";let dependentDialects = ["arith::ArithDialect"];
+def SplitNonCommutingPass : Pass<"split-non-commuting", "mlir::ModuleOp"> {
+    let summary = "Split quantum functions non-commuting observables into multiple executions.";
 
     let dependentDialects = ["arith::ArithDialect"];
 }
 
-def SplitToSingleTermsPass : Pass<"split-to-single-terms"> {
+def SplitToSingleTermsPass : Pass<"split-to-single-terms", "mlir::ModuleOp"> {
     let summary = "Split quantum functions into single-term observables.";
 }
 

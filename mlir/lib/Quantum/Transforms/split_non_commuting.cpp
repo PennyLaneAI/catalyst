@@ -386,7 +386,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
 
     void runOnOperation() override
     {
-        ModuleOp moduleOp = cast<ModuleOp>(getOperation());
+        ModuleOp moduleOp = getOperation();
 
         // Run split-to-single-terms pass first to decompose Hamiltonian expvals
         {

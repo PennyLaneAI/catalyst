@@ -501,10 +501,10 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
 
     void runOnOperation() override
     {
-        Operation *moduleOp = getOperation();
+        ModuleOp moduleOp = getOperation();
 
         // Raise an error if any measurement processes aside from expval are found
-        auto result = moduleOp->walk([&](Operation *op) {
+        auto result = moduleOp.walk([&](Operation *op) {
             if (auto measOp = dyn_cast<MeasurementProcess>(op)) {
                 if (!isSupportedMeasOp(op)) {
                     op->emitError() << "unsupported measurement operation: " << op->getName()
@@ -522,7 +522,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
 
         // Find all qnode functions with Hamiltonian expvals
         SmallVector<func::FuncOp> funcsToProcess;
-        moduleOp->walk([&](func::FuncOp funcOp) {
+        moduleOp.walk([&](func::FuncOp funcOp) {
             if (!funcOp->hasAttr("qnode")) {
                 return;
             }
