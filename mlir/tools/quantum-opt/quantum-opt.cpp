@@ -46,6 +46,7 @@
 #include "Quantum/Transforms/BufferizableOpInterfaceImpl.h"
 #include "RTIO/IR/RTIODialect.h"
 #include "RegisterAllPasses.h"
+#include "OpenQASM/OpenQASM.h"
 
 namespace test {
 void registerTestDialect(mlir::DialectRegistry &);
@@ -74,6 +75,7 @@ int main(int argc, char **argv)
     registry.insert<catalyst::ion::IonDialect>();
     registry.insert<catalyst::rtio::RTIODialect>();
     registry.insert<mlir::stablehlo::StablehloDialect>();
+    registry.insert<catalyst::openqasm::OpenQASMDialect>(); 
 
     catalyst::registerBufferizableOpInterfaceExternalModels(registry);
     catalyst::gradient::registerBufferizableOpInterfaceExternalModels(registry);
