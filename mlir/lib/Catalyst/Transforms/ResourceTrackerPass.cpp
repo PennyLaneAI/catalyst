@@ -14,14 +14,12 @@
 
 #define DEBUG_TYPE "resource-tracker"
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/BuiltinOps.h"
+#include "llvm/Support/JSON.h"
+
 #include "mlir/Pass/Pass.h"
 
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 #include "Catalyst/Analysis/ResourceResult.h"
-
-#include "llvm/Support/JSON.h"
 
 using namespace mlir;
 using namespace llvm;
@@ -142,7 +140,7 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
 
         // TODO: write to file, when called from frontend. Then, frontend read and delete the file.
         llvm::json::Value jsonValue(std::move(root));
-        llvm::outs() << formatv("{0:2}", jsonValue) << "\n";
+        llvm::outs() << llvm::formatv("{0:2}", jsonValue) << "\n";
     }
 };
 
