@@ -515,7 +515,7 @@ def test_no_capture(backend):
     """
     with pytest.raises(
         CompileError,
-        match=re.escape("qml.allocate() is only supported with program capture enabled."),
+        match=re.escape("qml.allocate() with qjit is only supported with program capture enabled."),
     ):
 
         @qjit
