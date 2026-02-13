@@ -170,6 +170,25 @@
 
 * Fixed incorrect global phase when lowering CNOT gates into PPR/PPM operations.
   [(#2459)](https://github.com/PennyLaneAI/catalyst/pull/2459)
+  
+* Circuits with preprocessing functions outside qnodes can now be differentiated.
+  [(#332)](https://github.com/PennyLaneAI/catalyst/pull/332)
+
+  ```python
+  @qml.qnode(qml.device("lightning.qubit", wires=1))
+  def f(y):
+      qml.RX(y, wires=0)
+      return qml.expval(qml.PauliZ(0))
+
+  @catalyst.qjit
+  def g(x):
+      return catalyst.grad(lambda y: f(jnp.cos(y)) ** 2)(x)
+  ```
+
+  ```pycon
+  >>> g(0.4)
+  0.3751720385067584
+  ```
 
 <h3>Internal changes ⚙️</h3>
 

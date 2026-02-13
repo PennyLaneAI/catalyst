@@ -198,7 +198,8 @@ static FailureOr<func::FuncOp> cloneCallee(PatternRewriter &rewriter, Operation 
                 funcOp.walk([&](func::CallOp callOp) {
                     if (callOp.getCallee() == qnode.getName()) {
                         PatternRewriter::InsertionGuard insertionGuard(rewriter);
-                        rewriter.setInsertionPointToStart(&funcOp.getFunctionBody().front());
+                        // TODO: optimize the placement of the param count call (e.g. loop hoisting)
+                        rewriter.setInsertionPoint(callOp);
                         Value paramCount = func::CallOp::create(rewriter, loc, paramCountFn,
                                                                 callOp.getArgOperands())
                                                .getResult(0);

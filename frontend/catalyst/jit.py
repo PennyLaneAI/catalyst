@@ -467,17 +467,19 @@ def qjit(
         Out of all the :ref:`Catalyst-supported terminal measurements <measurements>`, there are
         four that have a return shape that depend on the number of qubits. Namely, the return shape
         of :func:`qml.probs() <pennylane.probs>` and :func:`qml.state() <pennylane.state>` is a 1D
-        array of size ``(2**num_qubits)``, the return shape of :func:`qml.sample() <pennylane.sample>`
-        is a 2D array of size ``(shots, num_qubits)``, and the return shape of
-        :func:`qml.counts() <pennylane.counts>` is two 1D arrays of size ``(2**num_qubits)``.
-        The general rule of recompilation mentioned above would imply that changing the number of qubits
-        in a workflow that returns any of these four measurements triggers recompilation.
+        array of size ``(2**num_qubits)``, the return shape of
+        :func:`qml.sample() <pennylane.sample>` is a 2D array of size ``(shots, num_qubits)``,
+        and the return shape of :func:`qml.counts() <pennylane.counts>` is two 1D arrays of size
+        ``(2**num_qubits)``. The general rule of recompilation mentioned above would imply that
+        changing the number of qubits in a workflow that returns any of these four measurements
+        triggers recompilation.
 
-        However, Catalyst offers a powerful exception to this rule with **qubit-invariant compilation**:
-        the same compiled QNode can be invoked with a different number of qubits! This is especially
-        helpful for workflows where you would like to, for example, iterate through the wires without
-        knowing how many of them there are in advance. For instance, many workflows (such as `Grover's
-        algorithm <https://pennylane.ai/qml/demos/tutorial_grovers_algorithm>`_) have
+        However, Catalyst offers a powerful exception to this rule with
+        **qubit-invariant compilation**: the same compiled QNode can be invoked with a different
+        number of qubits! This is especially helpful for workflows where you would like to, for
+        example, iterate through the wires without knowing how many of them there are in advance.
+        For instance, many workflows (such as
+        `Grover's algorithm <https://pennylane.ai/qml/demos/tutorial_grovers_algorithm>`_) have
         an entangling layer at the beginning, where a Hadamard gate is applied to every wire.
 
         To use this feature, the PennyLane device needs to be instantiated within the qjitted

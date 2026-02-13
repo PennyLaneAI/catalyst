@@ -1724,7 +1724,7 @@ def test_ellipsis_differentiation(backend, diff_method):
 
 def test_vmap_worflow_derivation(backend):
     """Check the gradient of a vmap workflow"""
-    pytest.xfail("Avoid segfault in CI: vmap differentiation not stable yet.")
+    pytest.xfail(reason="Vmap yields wrong results or segfaults when differentiated")
     n_wires = 5
     data = jnp.sin(jnp.mgrid[-2:2:0.2].reshape(n_wires, -1)) ** 3
 
@@ -1740,7 +1740,7 @@ def test_vmap_worflow_derivation(backend):
         def data_embedding(i):
             qml.RY(data[i], wires=i)
 
-        data_embedding()  # pylint: disable=no-value-for-parameter
+        data_embedding()
 
         @for_loop(0, n_wires, 1)
         def ansatz(i):
@@ -1749,7 +1749,7 @@ def test_vmap_worflow_derivation(backend):
             qml.RX(weights[i, 2], wires=i)
             qml.CNOT(wires=[i, (i + 1) % n_wires])
 
-        ansatz()  # pylint: disable=no-value-for-parameter
+        ansatz()
 
         return qml.expval(qml.sum(*[qml.PauliZ(i) for i in range(n_wires)]))
 
@@ -1767,15 +1767,15 @@ def test_vmap_worflow_derivation(backend):
     bias = jnp.array(0.0, dtype=jax.numpy.float64)
     params = {"weights": weights, "bias": bias}
 
-    results_cat = qjit(grad(loss_fn))(params, data, targets)
+    results_enzyme = qjit(grad(loss_fn))(params, data, targets)
     results_jax = jax.grad(loss_fn)(params, data, targets)
 
-    data_cat, pytree_enzyme = tree_flatten(results_cat)
+    data_enzyme, pytree_enzyme = tree_flatten(results_enzyme)
     data_jax, pytree_fd = tree_flatten(results_jax)
 
     assert pytree_enzyme == pytree_fd
-    assert jnp.allclose(data_cat[0], data_jax[0])
-    assert jnp.allclose(data_cat[1], data_jax[1])
+    assert jnp.allclose(data_enzyme[0], data_jax[0])
+    assert jnp.allclose(data_enzyme[1], data_jax[1])
 
 
 def test_forloop_vmap_worflow_derivation(backend):
