@@ -140,6 +140,10 @@
   `shots` aren't set. Instead, an informative error message is raised.
   [(#2456)](https://github.com/PennyLaneAI/catalyst/pull/2456)
 
+* Graph decomposition with qjit now accepts `num_work_wires`, and lowers and decomposes correctly
+  with the `decompose-lowering` pass and with `qp.transforms.decompose`.
+  [(#2470)](https://github.com/PennyLaneAI/catalyst/pull/2470)
+
 <h3>Breaking changes 💔</h3>
 
 * `catalyst.jax_primitives.subroutine` has been moved to `qml.capture.subroutine`.

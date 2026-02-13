@@ -355,9 +355,65 @@ decomprule_p = core.Primitive("decomposition_rule")
 decomprule_p.multiple_results = True
 
 
-def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None):
+def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None, op_type=None):
     """
     Denotes the creation of a quantum definition in the intermediate representation.
+
+    Args:
+        func (Callable): the subroutine to apply in place of the replaced gate.
+        is_qreg (bool): ???
+        num_params (int): ???
+        pauli_word (???): ???
+        op_type (str): the name attribute of the MLIR representation of the op type to be
+                       replaced.
+
+    .. note::
+
+        Must be used with capture.
+
+    **Example**
+
+    .. code-block:: python
+        from catalyst.jax_primitives import decomposition_rule
+        from numpy import pi
+
+        qp.capture.enable() # remember to enable capture
+
+
+        @decomposition_rule(is_qreg=True, op_type="RY") # specify the op type to decompose
+        def my_decomp(angle, wires):
+            qp.RX(-pi / 2, wires[0])
+            qp.RZ(angle, wires[0])
+            qp.RX(pi / 2, wires[0])
+
+
+        @qp.qjit
+        @qp.transform(pass_name="decompose-lowering") # apply decompose-lowering pass
+        @qp.qnode(qp.device("lightning.qubit", wires=2))
+        def my_circuit(angle: float):
+            my_decomp(float, jax.core.ShapedArray((2,), int)) # apply the decomposition
+            qp.RY(angle, 0)
+            return qp.probs()
+
+
+
+    >>> print(qp.specs(my_circuit)(pi))
+    Device: lightning.qubit
+    Device wires: 2
+    Shots: Shots(total=None)
+    Level: device
+
+    Resource specifications:
+      Total wire allocations: 2
+      Total gates: 3
+      Circuit depth: 3
+
+      Gate types:
+        RZ: 1
+        RX: 2
+
+      Measurements:
+        probs(all wires): 1
     """
 
     assert not is_qreg or (
@@ -365,13 +421,23 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None
     ), "Decomposition rules with `qreg` do not require `num_params`."
 
     if func is None:
-        return functools.partial(decomposition_rule, is_qreg=is_qreg, num_params=num_params)
+        return functools.partial(
+            decomposition_rule,
+            is_qreg=is_qreg,
+            num_params=num_params,
+            pauli_word=pauli_word,
+            op_type=op_type,
+        )
 
     if pauli_word is not None:
         func = functools.partial(func, pauli_word=pauli_word)
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        # TODO change this name to op_type
+        if getattr(func, "target_gate", None) is None:
+            setattr(func, "target_gate", op_type)
+
         if pauli_word is not None:
             jaxpr = jax.make_jaxpr(func)(theta=args[0], wires=args[1], **kwargs)
         else:
@@ -2215,7 +2281,7 @@ def _cond_lowering(
             if_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend("if"))
             with ir.InsertionPoint(if_block):
                 # recursively generate the mlir for the if block
-                (out, _) = mlir.jaxpr_subcomp(
+                out, _ = mlir.jaxpr_subcomp(
                     if_ctx.module_context,
                     true_jaxpr.jaxpr,
                     if_ctx.name_stack,
@@ -2236,7 +2302,7 @@ def _cond_lowering(
                 # Base case: reached the otherwise block
                 otherwise_jaxpr = branch_jaxprs[-1]
                 with ir.InsertionPoint(else_block):
-                    (out, _) = mlir.jaxpr_subcomp(
+                    out, _ = mlir.jaxpr_subcomp(
                         else_ctx.module_context,
                         otherwise_jaxpr.jaxpr,
                         else_ctx.name_stack,
@@ -2307,7 +2373,7 @@ def _switch_lowering(
         with ir.InsertionPoint(scf_switch_op.caseRegions[i].blocks.append()):
             branch_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend(f"branch {i}"))
             branch_jaxpr = branch_jaxprs[i]
-            (out, _) = mlir.jaxpr_subcomp(
+            out, _ = mlir.jaxpr_subcomp(
                 branch_ctx.module_context,
                 branch_jaxpr.jaxpr,
                 branch_ctx.name_stack,
@@ -2323,7 +2389,7 @@ def _switch_lowering(
     with ir.InsertionPoint(scf_switch_op.defaultRegion.blocks.append()):
         branch_ctx = jax_ctx.replace(name_stack=jax_ctx.name_stack.extend("default branch"))
         branch_jaxpr = branch_jaxprs[-1]
-        (out, _) = mlir.jaxpr_subcomp(
+        out, _ = mlir.jaxpr_subcomp(
             branch_ctx.module_context,
             branch_jaxpr.jaxpr,
             branch_ctx.name_stack,
@@ -2416,7 +2482,7 @@ def _while_loop_lowering(
         params = cond_consts + cond_args
 
         # recursively generate the mlir for the while cond
-        ((pred,), _) = mlir.jaxpr_subcomp(
+        (pred,), _ = mlir.jaxpr_subcomp(
             cond_ctx.module_context,
             cond_jaxpr.jaxpr,
             cond_ctx.name_stack,
