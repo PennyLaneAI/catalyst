@@ -19,7 +19,6 @@
 #include "QEC/IR/QECOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
-#include "mlir/Pass/AnalysisManager.h"
 
 #include "Catalyst/Analysis/ResourceResult.h"
 
@@ -46,12 +45,6 @@ class ResourceAnalysis {
     // get the entry function name (the function marked with "qnode")
     // returns empty string if no entry function was found
     llvm::StringRef getEntryFunc() const { return entryFuncName; }
-
-    // MLIR analysis invalidation hook.
-    bool isInvalidated(const mlir::AnalysisManager::PreservedAnalyses &pa)
-    {
-        return !pa.isPreserved<ResourceAnalysis>();
-    }
 
   private:
     // per-function resource counts
