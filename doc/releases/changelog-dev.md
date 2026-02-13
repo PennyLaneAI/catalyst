@@ -63,6 +63,16 @@
 
 <h3>Improvements 🛠</h3>
 
+* Catalyst with program capture can now be used with the new `qml.templates.Subroutine` class and the associated
+  `qml.capture.subroutine` upstreamed from `catalyst.jax_primitives.subroutine`.
+  [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
+
+* The PPR/PPM lowering passes (`lower-qec-init-ops`, `unroll-conditional-ppr-ppm`) are now run
+  as part of the main quantum compilation pipeline. When using `to-ppr` and `ppr-to-ppm` transforms,
+  these passes are applied automatically during compilation; we no longer need to stack them
+  explicitly.
+  [(#2460)](https://github.com/PennyLaneAI/catalyst/pull/2460)
+
 * `null.qubit` resource tracking is now able to track measurements and observables. This output
   is also reflected in `qml.specs`.
   [(#2446)](https://github.com/PennyLaneAI/catalyst/pull/2446)
@@ -88,13 +98,21 @@
   `shots` aren't set. Instead, an informative error message is raised.
   [(#2456)](https://github.com/PennyLaneAI/catalyst/pull/2456)
 
+* Graph decomposition with qjit now accepts `num_work_wires`, and lowers and decomposes correctly
+  with the `decompose-lowering` pass and with `qp.transforms.decompose`.
+  [(#2470)](https://github.com/PennyLaneAI/catalyst/pull/2470)
+
 <h3>Breaking changes 💔</h3>
+
+* `catalyst.jax_primitives.subroutine` has been moved to `qml.capture.subroutine`.
+  [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
 
 * (Compiler integrators only) The versions of StableHLO/LLVM/Enzyme used by Catalyst have been updated.
   [(#2415)](https://github.com/PennyLaneAI/catalyst/pull/2415)
   [(#2416)](https://github.com/PennyLaneAI/catalyst/pull/2416)
   [(#2444)](https://github.com/PennyLaneAI/catalyst/pull/2444)
   [(#2445)](https://github.com/PennyLaneAI/catalyst/pull/2445)
+  [(#2478)](https://github.com/PennyLaneAI/catalyst/pull/2478)
 
   - The StableHLO version has been updated to
   [v1.13.7](https://github.com/openxla/stablehlo/tree/v1.13.7).
@@ -113,6 +131,11 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fix `CATALYST_XDSL_UNIVERSE` to correctly define the available dialects and transforms, allowing
+  tools like `xdsl-opt` to work with Catalyst's custom Python dialects.
+  [(#2471)](https://github.com/PennyLaneAI/catalyst/pull/2471)
+
 
 * Fix a bug with the xDSL `ParitySynth` pass that caused failure when the QNode being transformed
   contained operations with regions.
