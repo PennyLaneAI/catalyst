@@ -949,6 +949,7 @@ struct DynamicOneShotPass : public impl::DynamicOneShotPassBase<DynamicOneShotPa
             getMPDynamicNumQubitsSizeValues(qnodeFunc, erasureExceptions);
             erasureExceptions.insert(shots);
             clearFuncExcept(builder, qnodeFunc, erasureExceptions, cloneMapper);
+            qnodeFunc->removeAttr("qnode");
 
             // Reverse the mapper. The map from the cloned one shot kernel to the original
             // qnodeFunc will be more useful to us.

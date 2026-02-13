@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --dynamic-one-shot --split-input-file -verify-diagnostics %s | FileCheck %s
+// RUN: quantum-opt --dynamic-one-shot --split-input-file --verify-diagnostics %s | FileCheck %s
 
 func.func public @test_expval(%arg0: f64) -> tensor<f64> {
   %1000 = arith.constant 1000 : i64
