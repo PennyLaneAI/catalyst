@@ -26,10 +26,8 @@
 
 // CHECK-LABEL: func.func private @circ.group.0
 // CHECK-SAME: () -> f64 attributes {qnode}
-// CHECK: %[[SHOTS:.*]] = arith.constant 100
-// CHECK: %[[NUM_GROUPS:.*]] = arith.constant 3 : i64
-// CHECK: %[[DIV_SHOTS:.*]] = arith.divsi %[[SHOTS]], %[[NUM_GROUPS:.*]]
-// CHECK: quantum.device shots(%[[DIV_SHOTS]])
+// CHECK: %[[SHOTS:.*]] = arith.constant 33
+// CHECK: quantum.device shots(%[[SHOTS]])
 // CHECK: quantum.alloc
 // CHECK: %[[OBS_Z0:.*]] = quantum.namedobs %[[Q0:.*]][ PauliZ]
 // CHECK: %[[EXPVAL_Z0:.*]] = quantum.expval %[[OBS_Z0]]
@@ -39,10 +37,8 @@
 
 // CHECK-LABEL: func.func private @circ.group.1
 // CHECK-SAME: () -> f64 attributes {qnode}
-// CHECK: %[[SHOTS:.*]] = arith.constant 100
-// CHECK: %[[NUM_GROUPS:.*]] = arith.constant 3 : i64
-// CHECK: %[[DIV_SHOTS:.*]] = arith.divsi %[[SHOTS]], %[[NUM_GROUPS:.*]]
-// CHECK: quantum.device shots(%[[DIV_SHOTS]])
+// CHECK: %[[SHOTS:.*]] = arith.constant 33
+// CHECK: quantum.device shots(%[[SHOTS]])
 // CHECK: quantum.alloc
 // CHECK: %[[OBS_X1:.*]] = quantum.namedobs %[[Q1:.*]][ PauliX]
 // CHECK: %[[EXPVAL_X1:.*]] = quantum.expval %[[OBS_X1]]
@@ -52,10 +48,8 @@
 
 // CHECK-LABEL: func.func private @circ.group.2
 // CHECK-SAME: () -> f64 attributes {qnode}
-// CHECK: %[[SHOTS:.*]] = arith.constant 100
-// CHECK: %[[NUM_GROUPS:.*]] = arith.constant 3 : i64
-// CHECK: %[[DIV_SHOTS:.*]] = arith.divsi %[[SHOTS]], %[[NUM_GROUPS:.*]]
-// CHECK: quantum.device shots(%[[DIV_SHOTS]])
+// CHECK: %[[SHOTS:.*]] = arith.constant 33
+// CHECK: quantum.device shots(%[[SHOTS]])
 // CHECK: quantum.alloc
 // CHECK: %[[OBS_Y2:.*]] = quantum.namedobs %[[Q2:.*]][ PauliY]
 // CHECK: %[[EXPVAL_Y2:.*]] = quantum.expval %[[OBS_Y2]]
@@ -94,10 +88,8 @@ module {
 
 // CHECK-LABEL: func.func private @circ.group.0
 // CHECK-SAME: () -> (f64, f64) attributes {qnode}
-// CHECK: %[[SHOTS:.*]] = arith.constant 100
-// CHECK: %[[NUM_GROUPS:.*]] = arith.constant 3 : i64
-// CHECK: %[[DIV_SHOTS:.*]] = arith.divsi %[[SHOTS]], %[[NUM_GROUPS:.*]]
-// CHECK: quantum.device shots(%[[DIV_SHOTS]])
+// CHECK: %[[SHOTS:.*]] = arith.constant 33
+// CHECK: quantum.device shots(%[[SHOTS]])
 // CHECK: quantum.alloc
 // CHECK: %[[OBS_Z0:.*]] = quantum.namedobs %[[Q0:.*]][ PauliZ]
 // CHECK: %[[EXPVAL_Z0:.*]] = quantum.expval %[[OBS_Z0]]
@@ -108,10 +100,8 @@ module {
 
 // CHECK-LABEL: func.func private @circ.group.1
 // CHECK-SAME: () -> f64 attributes {qnode}
-// CHECK: %[[SHOTS:.*]] = arith.constant 100
-// CHECK: %[[NUM_GROUPS:.*]] = arith.constant 3 : i64
-// CHECK: %[[DIV_SHOTS:.*]] = arith.divsi %[[SHOTS]], %[[NUM_GROUPS:.*]]
-// CHECK: quantum.device shots(%[[DIV_SHOTS]])
+// CHECK: %[[SHOTS:.*]] = arith.constant 33
+// CHECK: quantum.device shots(%[[SHOTS]])
 // CHECK: quantum.alloc
 // CHECK: %[[OBS_X1:.*]] = quantum.namedobs %[[Q1:.*]][ PauliX]
 // CHECK: %[[EXPVAL_X1:.*]] = quantum.expval %[[OBS_X1]]
@@ -121,10 +111,8 @@ module {
 
 // CHECK-LABEL: func.func private @circ.group.2
 // CHECK-SAME: () -> f64 attributes {qnode}
-// CHECK: %[[SHOTS:.*]] = arith.constant 100
-// CHECK: %[[NUM_GROUPS:.*]] = arith.constant 3 : i64
-// CHECK: %[[DIV_SHOTS:.*]] = arith.divsi %[[SHOTS]], %[[NUM_GROUPS:.*]]
-// CHECK: quantum.device shots(%[[DIV_SHOTS]])
+// CHECK: %[[SHOTS:.*]] = arith.constant 33
+// CHECK: quantum.device shots(%[[SHOTS]])
 // CHECK: quantum.alloc
 // CHECK: %[[OBS_Y2:.*]] = quantum.namedobs %[[Q2:.*]][ PauliY]
 // CHECK: %[[EXPVAL_Y2:.*]] = quantum.expval %[[OBS_Y2]]

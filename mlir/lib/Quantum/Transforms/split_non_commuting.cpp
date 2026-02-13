@@ -44,9 +44,11 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
@@ -274,12 +276,22 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
             return;
         }
 
-        // Compute the divided shots and pass it to the device op
         OpBuilder builder(deviceOp);
         Location loc = deviceOp.getLoc();
-        Value numGroupsVal = arith::ConstantOp::create(
-            builder, loc, builder.getI64IntegerAttr(static_cast<int64_t>(numGroups)));
-        Value dividedShots = arith::DivSIOp::create(builder, loc, shots, numGroupsVal);
+        Value dividedShots;
+
+        // Simplify the shots to a constant if possible
+        IntegerAttr intAttr;
+        if (matchPattern(shots, m_Constant(&intAttr))) {
+            int64_t dividedVal = intAttr.getValue().getSExtValue() / numGroups;
+            dividedShots =
+                arith::ConstantOp::create(builder, loc, builder.getI64IntegerAttr(dividedVal));
+        }
+        else {
+            Value numGroupsVal = arith::ConstantOp::create(
+                builder, loc, builder.getI64IntegerAttr(static_cast<int64_t>(numGroups)));
+            dividedShots = arith::DivSIOp::create(builder, loc, shots, numGroupsVal);
+        }
 
         deviceOp.getShotsMutable().assign(dividedShots);
     }
@@ -393,6 +405,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
             MLIRContext *ctx = &getContext();
             auto pm = PassManager::on<ModuleOp>(ctx);
             pm.addPass(createSplitToSingleTermsPass());
+            pm.addPass(createCanonicalizerPass());
             if (failed(pm.run(moduleOp))) {
                 emitError(moduleOp.getLoc()) << "split-to-single-terms pass failed";
                 return signalPassFailure();
