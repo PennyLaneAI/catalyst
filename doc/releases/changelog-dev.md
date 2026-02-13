@@ -13,11 +13,9 @@
   With this new MLIR pass, one shot execution mode is now available when capture is enabled.
 
   ```python
-  qml.capture.enable()
-
   dev = qml.device("lightning.qubit", wires=2)
 
-  @qjit
+  @qjit(capture=True)
   @qml.transform(pass_name="dynamic-one-shot")
   @qml.qnode(dev, shots=10)
   def circuit():
