@@ -670,7 +670,6 @@ LogicalResult prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp oneShotKe
         assert(mp.has_value() && "Classical qnode return values not supported in dynamic one-shot");
         qnodeMPs.push_back(*mp);
     }
-    llvm::SmallSet<quantum::CountsOp *, 8> handledCountsOps;
 
     builder.setInsertionPointToEnd(&qnodeFunc.getBody().front());
 
