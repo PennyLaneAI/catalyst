@@ -363,7 +363,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
         "convert-index-to-llvm",
         "convert-catalyst-to-llvm",
         "convert-qec-to-llvm",  # TODO: Remove this once PBC has its own pipeline
-        "convert-quantum-to-llvm{use-array-backed-registers=true}",
+        "convert-quantum-to-llvm",
         # There should be no identical code folding
         # (`mergeIdenticalBlocks` in the MLIR source code)
         # between convert-async-to-llvm and
