@@ -73,10 +73,10 @@
   these passes are applied automatically during compilation; we no longer need to stack them
   explicitly.
 * The PPR/PPM lowering passes (`lower-pbc-init-ops`, `unroll-conditional-ppr-ppm`) are now run
-as part of the main quantum compilation pipeline. When using `to-ppr` and `ppr-to-ppm` transforms,
-these passes are applied automatically during compilation; we no longer need to stack them
-explicitly.
-[(#2460)](https://github.com/PennyLaneAI/catalyst/pull/2460)
+  as part of the main quantum compilation pipeline. When using `to-ppr` and `ppr-to-ppm` transforms,
+  these passes are applied automatically during compilation; we no longer need to stack them
+  explicitly.
+  [(#2460)](https://github.com/PennyLaneAI/catalyst/pull/2460)
 
 * `null.qubit` resource tracking is now able to track measurements and observables. This output
   is also reflected in `qml.specs`.
