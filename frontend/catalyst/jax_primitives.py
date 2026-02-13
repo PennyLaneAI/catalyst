@@ -89,7 +89,7 @@ with Patcher(
     )
     from mlir_quantum.dialects.mbqc import MeasureInBasisOp
     from mlir_quantum.dialects.mitigation import ZneOp
-    from mlir_quantum.dialects.qec import PPMeasurementOp
+    from mlir_quantum.dialects.pbc import PPMeasurementOp
     from mlir_quantum.dialects.quantum import (
         AdjointOp,
         AllocOp,
@@ -2775,7 +2775,7 @@ def _adjoint_lowering(
     # TODO: remove this manual addition when PPR is end-to-end, or when PPR has its own
     # pipeline registered.
 
-    if any(_op.name == "qec.ppr" for _op in adjoint_block.operations):
+    if any(_op.name == "pbc.ppr" for _op in adjoint_block.operations):
 
         def adjoint_pass_injector(_op: ir.Operation) -> ir.WalkResult:
             if _op.name == "transform.named_sequence":

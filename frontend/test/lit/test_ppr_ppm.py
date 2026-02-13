@@ -55,15 +55,15 @@ def test_convert_clifford_to_ppr():
 
 
 # CHECK-NOT: transform.apply_registered_pass "to-ppr"
-# CHECK: qec.ppr
-# CHECK: qec.ppm
+# CHECK: pbc.ppr
+# CHECK: pbc.ppm
 test_convert_clifford_to_ppr()
 
 
 def test_commute_ppr():
     """
     Test the `commute_ppr` pass.
-    Ensure that the `qec.ppr` with pi/8 rotations are moved to the beginning of the circuit.
+    Ensure that the `pbc.ppr` with pi/8 rotations are moved to the beginning of the circuit.
     """
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
@@ -86,13 +86,13 @@ def test_commute_ppr():
 # CHECK-LABEL: public @cir_commute_ppr
 # CHECK: %0 = quantum.alloc( 2)
 # CHECK: %1 = quantum.extract %0[ 0]
-# CHECK: %2 = qec.ppr ["X"](8) %1
-# CHECK: %3 = qec.ppr ["Z"](4) %2
-# CHECK: %4 = qec.ppr ["X"](4) %3
-# CHECK: %5 = qec.ppr ["Z"](4) %4
+# CHECK: %2 = pbc.ppr ["X"](8) %1
+# CHECK: %3 = pbc.ppr ["Z"](4) %2
+# CHECK: %4 = pbc.ppr ["X"](4) %3
+# CHECK: %5 = pbc.ppr ["Z"](4) %4
 # CHECK: %6 = quantum.extract %0[ 1]
-# CHECK: %7 = qec.ppr ["Z"](8) %6
-# CHECK: %8 = qec.ppr ["Z"](4) %7
+# CHECK: %7 = pbc.ppr ["Z"](8) %6
+# CHECK: %8 = pbc.ppr ["Z"](4) %7
 test_commute_ppr()
 
 
@@ -122,15 +122,15 @@ def test_commute_ppr_max_pauli_size():
 
 
 # CHECK-LABEL: public @cir_commute_ppr_max_pauli_size
-# CHECK-NOT: qec.ppr ["Y", "X", "X"](-8)
-# CHECK: qec.ppr ["X", "X"](8)
+# CHECK-NOT: pbc.ppr ["Y", "X", "X"](-8)
+# CHECK: pbc.ppr ["X", "X"](8)
 test_commute_ppr_max_pauli_size()
 
 
 def test_merge_ppr_ppm():
     """
     Test the `merge_ppr_ppm` pass.
-    `qec.ppr` should be merged into `qec.ppm`, thus no `qec.ppr` should be left.
+    `pbc.ppr` should be merged into `pbc.ppm`, thus no `pbc.ppr` should be left.
     """
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
@@ -149,9 +149,9 @@ def test_merge_ppr_ppm():
 
 
 # CHECK-LABEL: public @cir_merge_ppr_ppm
-# CHECK-NOT: qec.ppr
-# CHECK: qec.ppm ["Z", "X"]
-# CHECK: qec.ppm ["X"]
+# CHECK-NOT: pbc.ppr
+# CHECK: pbc.ppm ["Z", "X"]
+# CHECK: pbc.ppm ["X"]
 test_merge_ppr_ppm()
 
 
@@ -178,15 +178,15 @@ def test_merge_ppr_ppm_max_pauli_size():
 
 
 # CHECK-LABEL: public @cir_merge_ppr_ppm_max_pauli_size
-# CHECK-NOT: qec.ppm ["Z", "Z"]
-# CHECK:  qec.ppm ["Y"](-1)
+# CHECK-NOT: pbc.ppm ["Z", "Z"]
+# CHECK:  pbc.ppm ["Y"](-1)
 test_merge_ppr_ppm_max_pauli_size()
 
 
 def test_ppr_to_ppm():
     """
     Test the pipeline `ppr_to_ppm` pass with decompose method ``"clifford-corrected"`` and `""pauli-corrected"``.
-    Check that the `qec.ppr` is correctly decomposed into `qec.ppm`.
+    Check that the `pbc.ppr` is correctly decomposed into `pbc.ppm`.
     """
 
     pipe = [("pipe", ["quantum-compilation-stage"])]
@@ -236,14 +236,14 @@ def test_ppr_to_ppm():
 # CHECK-LABEL: public @cir_default_0
 
 # PPR Z(pi/4) should be decomposed.
-# CHECK-NOT: qec.ppr ["Z"](4)
+# CHECK-NOT: pbc.ppr ["Z"](4)
 # CHECK: quantum.alloc( 2)
 # CHECK: quantum.alloc_qb
-# CHECK: qec.ppm ["Z", "Y"](-1) {{.+}}, {{.+}} : i1, !quantum.bit, !quantum.bit
-# CHECK: qec.ppm ["X"] {{.+}} : i1, !quantum.bit
+# CHECK: pbc.ppm ["Z", "Y"](-1) {{.+}}, {{.+}} : i1, !quantum.bit, !quantum.bit
+# CHECK: pbc.ppm ["X"] {{.+}} : i1, !quantum.bit
 # CHECK: arith.xori
 # CHECK: scf.if
-# CHECK: qec.ppr ["Z"](2) {{.+}}
+# CHECK: pbc.ppr ["Z"](2) {{.+}}
 # CHECK: }
 
 
@@ -252,19 +252,19 @@ def test_ppr_to_ppm():
 # FOR T gate
 # CHECK: quantum.custom "Hadamard"
 # CHECK: quantum.custom "T"
-# CHECK: qec.ppm ["Z", "Z"] {{.+}}, {{.+}}
-# CHECK: qec.ppm ["Z", "Z"] {{.+}}, {{.+}} cond({{.+}})
-# CHECK: qec.ppm ["X"] {{.+}} cond({{.+}})
+# CHECK: pbc.ppm ["Z", "Z"] {{.+}}, {{.+}}
+# CHECK: pbc.ppm ["Z", "Z"] {{.+}}, {{.+}} cond({{.+}})
+# CHECK: pbc.ppm ["X"] {{.+}} cond({{.+}})
 
 # FOR CNOT gate
 # CHECK: quantum.custom "Hadamard"
 # CHECK: quantum.custom "S"
 # Avoid Y-measurement, so Z-measurement should be used
 # CHECK: ["Z", "X", "Z"] {{.+}}, {{.+}}, {{.+}}
-# CHECK: qec.ppm ["X"] {{.+}} : i1, !quantum.bit
+# CHECK: pbc.ppm ["X"] {{.+}} : i1, !quantum.bit
 # CHECK: arith.xori
 # CHECK: scf.if
-# CHECK: qec.ppr ["Z", "X"](2) {{.+}},{{.+}}
+# CHECK: pbc.ppr ["Z", "X"](2) {{.+}},{{.+}}
 # CHECK: }
 
 # CHECK-LABEL: public @cir_pauli_corrected_0
@@ -272,24 +272,24 @@ def test_ppr_to_ppm():
 # FOR T gate
 # CHECK: quantum.custom "Hadamard"
 # CHECK: quantum.custom "T"
-# CHECK: qec.ppm ["Z", "Z"] {{.+}}, {{.+}}
+# CHECK: pbc.ppm ["Z", "Z"] {{.+}}, {{.+}}
 # CHECK: scf.if
-# CHECK: qec.ppm ["Y"]
+# CHECK: pbc.ppm ["Y"]
 # CHECK: }
 # CHECK: else
-# CHECK: qec.ppm ["X"]
+# CHECK: pbc.ppm ["X"]
 # CHECK: }
 
 # CHECK: scf.if
-# CHECK: qec.ppr ["Z"](2) {{.+}}
+# CHECK: pbc.ppr ["Z"](2) {{.+}}
 # CHECK: }
 
 # FOR CNOT gate
 # CHECK: ["Z", "X", "Y"](-1) {{.+}}, {{.+}}, {{.+}}
-# CHECK: qec.ppm ["X"] {{.+}}
+# CHECK: pbc.ppm ["X"] {{.+}}
 # CHECK: arith.xori
 # CHECK: scf.if
-# CHECK: qec.ppr ["Z", "X"](2) {{.+}},{{.+}}
+# CHECK: pbc.ppr ["Z", "X"](2) {{.+}},{{.+}}
 # CHECK: }
 
 # CHECK-LABEL: public @cir_pauli_corrected_avoid_y_0
@@ -297,21 +297,21 @@ def test_ppr_to_ppm():
 # FOR T gate
 # CHECK: quantum.custom "Hadamard"
 # CHECK: quantum.custom "T"
-# CHECK: qec.ppm ["Z", "Z"] {{.+}}, {{.+}}
+# CHECK: pbc.ppm ["Z", "Z"] {{.+}}, {{.+}}
 # CHECK: scf.if {{.+}}
 # CHECK: quantum.custom "Hadamard"
 # CHECK: quantum.custom "S"
-# # CHECK: qec.ppm ["Z", "Z"]
-# CHECK: qec.ppm ["X", "X"]
+# # CHECK: pbc.ppm ["Z", "Z"]
+# CHECK: pbc.ppm ["X", "X"]
 # CHECK: scf.if
-# CHECK: qec.ppr ["Z"](2) {{.+}}
+# CHECK: pbc.ppr ["Z"](2) {{.+}}
 # CHECK: }
 # CHECK: quantum.dealloc_qb {{.+}}
 # CHECK: quantum.dealloc_qb {{.+}}
 # CHECK: scf.yield {{.+}}
 # CHECK: else
-# CHECK: qec.ppm ["X"]
-# CHECK: qec.ppr ["Z"](2)
+# CHECK: pbc.ppm ["X"]
+# CHECK: pbc.ppr ["Z"](2)
 # CHECK: quantum.dealloc_qb {{.+}}
 # CHECK: scf.yield {{.+}}
 
@@ -320,10 +320,10 @@ def test_ppr_to_ppm():
 # CHECK: quantum.custom "S"
 # # Avoid Y-measurement, so Z-measurement should be used
 # CHECK: ["Z", "X", "Z"] {{.+}}, {{.+}}, {{.+}}
-# CHECK: qec.ppm ["X"] {{.+}} : i1, !quantum.bit
+# CHECK: pbc.ppm ["X"] {{.+}} : i1, !quantum.bit
 # CHECK: arith.xori
 # CHECK: scf.if
-# CHECK: qec.ppr ["Z", "X"](2) {{.+}},{{.+}}
+# CHECK: pbc.ppr ["Z", "X"](2) {{.+}},{{.+}}
 # CHECK: }
 test_ppr_to_ppm()
 
@@ -371,27 +371,27 @@ def test_clifford_to_ppm():
 # CHECK-LABEL: public @cir_clifford_to_ppm
 # decompose Clifford to PPM
 # CHECK: scf.if
-# CHECK: qec.ppm ["X"]
+# CHECK: pbc.ppm ["X"]
 # CHECK: }
 # CHECK: else
-# CHECK: qec.ppm ["Z"]
+# CHECK: pbc.ppm ["Z"]
 # CHECK: }
-# CHECK: qec.ppm ["X", "Z", "Z"]
-# CHECK: qec.ppm ["Z", "Y"](-1)
-# CHECK: qec.ppm ["X"]
+# CHECK: pbc.ppm ["X", "Z", "Z"]
+# CHECK: pbc.ppm ["Z", "Y"](-1)
+# CHECK: pbc.ppm ["X"]
 # CHECK: scf.if
-# CHECK: qec.ppm ["X"]
+# CHECK: pbc.ppm ["X"]
 # CHECK: }
 # CHECK: else
-# CHECK: qec.ppm ["Z"]
+# CHECK: pbc.ppm ["Z"]
 # CHECK: }
 
 # CHECK-LABEL: public @cir_clifford_to_ppm_with_params
 # decompose Clifford to PPM with params
-# CHECK-NOT: qec.ppm [{{.+}}, {{.+}}, {{.+}}, {{.+}}, {{.+}}, {{.+}}]
-# CHECK-NOT: qec.ppm [{{.+}}, {{.+}}, {{.+}}, {{.+}}]
+# CHECK-NOT: pbc.ppm [{{.+}}, {{.+}}, {{.+}}, {{.+}}, {{.+}}, {{.+}}]
+# CHECK-NOT: pbc.ppm [{{.+}}, {{.+}}, {{.+}}, {{.+}}]
 # It can be decomposed to three pauli strings in decomposing ppr to ppm
-# CHECK: qec.ppm [{{.+}}, {{.+}}, {{.+}}]
+# CHECK: pbc.ppm [{{.+}}, {{.+}}, {{.+}}]
 test_clifford_to_ppm()
 
 
@@ -423,12 +423,12 @@ def test_reduce_t_depth():
     print(test_reduce_t_depth_workflow.mlir_opt)
 
 
-# CHECK: qec.ppr ["X"](8)
-# CHECK: qec.ppr ["X"](8)
-# CHECK: qec.ppr ["Y", "X"](8)
-# CHECK: qec.ppr ["X", "Y", "X"](8)
-# CHECK: qec.ppr ["X"](8)
-# CHECK: qec.ppr ["X", "X", "Y"](8)
+# CHECK: pbc.ppr ["X"](8)
+# CHECK: pbc.ppr ["X"](8)
+# CHECK: pbc.ppr ["Y", "X"](8)
+# CHECK: pbc.ppr ["X", "Y", "X"](8)
+# CHECK: pbc.ppr ["X"](8)
+# CHECK: pbc.ppr ["X", "X", "Y"](8)
 test_reduce_t_depth()
 
 
@@ -461,8 +461,8 @@ def test_ppr_to_mbqc():
 # CHECK: quantum.custom "RZ"
 # CHECK: quantum.custom "CNOT"
 # CHECK: quantum.custom "Hadamard"
-# CHECK-NOT: qec.ppr
-# CHECK-NOT: qec.ppm
+# CHECK-NOT: pbc.ppr
+# CHECK-NOT: pbc.ppm
 # CHECK: quantum.measure
 test_ppr_to_mbqc()
 
@@ -488,13 +488,13 @@ def test_decompose_arbitrary_ppr():
     qml.capture.disable()
 
 
-# CHECK: qec.ppr ["Y"](8)
-# CHECK-NOT: qec.ppr ["Z"](2)
+# CHECK: pbc.ppr ["Y"](8)
+# CHECK-NOT: pbc.ppr ["Z"](2)
 # CHECK: quantum.custom "Hadamard"
-# CHECK: qec.ppm ["X", "Y", "Z", "Z"]
-# CHECK: qec.ppr ["X"](2)
-# CHECK: qec.ppr.arbitrary ["Z"]
-# CHECK: qec.ppm ["X"]
-# CHECK: qec.ppr ["X", "Y", "Z"](2)
+# CHECK: pbc.ppm ["X", "Y", "Z", "Z"]
+# CHECK: pbc.ppr ["X"](2)
+# CHECK: pbc.ppr.arbitrary ["Z"]
+# CHECK: pbc.ppm ["X"]
+# CHECK: pbc.ppr ["X", "Y", "Z"](2)
 # CHECK: quantum.dealloc_qb
 test_decompose_arbitrary_ppr()

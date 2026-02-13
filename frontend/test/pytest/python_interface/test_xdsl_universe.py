@@ -75,8 +75,8 @@ def test_xdsl_opt(_transform):
         // For checking that the MBQC dialect is loaded correctly
         %mcm, %q1 = mbqc.measure_in_basis[XY, %angle] %q0 : i1, !quantum.bit
 
-        // For checking that the QEC dialect is loaded correctly
-        %q2 = qec.fabricate zero : !quantum.bit
+        // For checking that the PBC dialect is loaded correctly
+        %q2 = pbc.fabricate zero : !quantum.bit
     """
 
     cmd = ["xdsl-opt", "-p", _transform.name]

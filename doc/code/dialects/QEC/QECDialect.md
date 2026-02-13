@@ -1,6 +1,6 @@
 <!-- Manually added, please edit -->
 
-# 'qec' Dialect
+# 'pbc' Dialect
 
 _A dialect for Pauli-based computation and error correction._
 

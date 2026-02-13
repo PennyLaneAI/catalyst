@@ -43,7 +43,7 @@
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Mitigation/Transforms/Passes.h"
-#include "QEC/Transforms/Passes.h"
+#include "PBC/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
 #include "hlo-extensions/Transforms/Passes.h"
@@ -61,8 +61,8 @@ void createQuantumCompilationStage(OpPassManager &pm)
     pm.addPass(catalyst::mitigation::createMitigationLoweringPass());
     pm.addPass(catalyst::quantum::createAdjointLoweringPass());
     // TODO: We can remove 2 passes below once PBC has its own pipeline.
-    pm.addPass(catalyst::qec::createLowerQECInitOpsPass());
-    pm.addPass(catalyst::qec::createUnrollConditionalPPRPPMPass());
+    pm.addPass(catalyst::pbc::createLowerPBCInitOpsPass());
+    pm.addPass(catalyst::pbc::createUnrollConditionalPPRPPMPass());
     pm.addPass(catalyst::createDisableAssertionPass());
 }
 void createHloLoweringStage(OpPassManager &pm)
@@ -145,7 +145,7 @@ void createLLVMDialectLoweringStage(OpPassManager &pm)
     options.useGenericFunctions = true;
     pm.addPass(mlir::createFinalizeMemRefToLLVMConversionPass(options));
     pm.addPass(mlir::createConvertIndexToLLVMPass());
-    pm.addPass(catalyst::qec::createQECConversionPass());
+    pm.addPass(catalyst::pbc::createPBCConversionPass());
     pm.addPass(catalyst::createCatalystConversionPass());
     pm.addPass(catalyst::quantum::createQuantumConversionPass());
     pm.addPass(catalyst::createAddExceptionHandlingPass());

@@ -299,8 +299,8 @@ dialects available in the xDSL layer of Catalyst:
   qubits, etc.
 - ``Catalyst``: this dialect contains operations and attributes for
   classical computing features unavailable out of the box with xDSL/MLIR
-- ``QEC``: This dialect contains operations and attributes useful for
-  QEC, such as PPRs/PPMs.
+- ``PBC``: This dialect contains operations and attributes useful for
+  PBC, such as PPRs/PPMs.
 - ``MBQC``: This dialect contains operations and attributes for
   representing MBQC formalism.
 
