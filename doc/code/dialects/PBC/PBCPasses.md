@@ -61,4 +61,4 @@ _Count specs in Pauli Product Measurement operations._
 
 ### `-to-ppr`
 
-_Convert quantum dialects to the QEC dialect._
+_Convert quantum dialects to the PBC dialect._

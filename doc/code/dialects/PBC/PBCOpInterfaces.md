@@ -2,10 +2,10 @@
 
 # OpInterface definitions
 
-## QECOpInterface (`QECOpInterface`)
+## PBCOpInterface (`PBCOpInterface`)
 
 This interface provides a generic way to interact with instructions that are
-considered QEC Operations. These are characterized by operating on zero
+considered PBC Operations. These are characterized by operating on zero
 or more qubit values, and returning the same amount of qubit values.
 
 ### Methods:
