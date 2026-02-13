@@ -114,7 +114,7 @@ def mlir_specs(
         pass
 
     if level == "all":
-        return {f"{cache[lvl][1]}": cache[lvl][0] for lvl in sorted(cache.keys())}
+        return {cache_item[1]: cache_item[0] for cache_item in cache.values()}
 
     if isinstance(level, (tuple, list)):
         if any(lvl not in cache for lvl in level):
