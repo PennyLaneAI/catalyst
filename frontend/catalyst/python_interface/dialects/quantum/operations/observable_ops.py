@@ -30,7 +30,13 @@ from xdsl.irdl import (
 
 from catalyst.python_interface.xdsl_extras import MemRefConstraint, TensorConstraint
 
-from ..attributes import NamedObservableAttr, ObservableType, QubitSSAValue, QubitType, QuregType
+from ..attributes import (
+    NamedObservableAttr,
+    ObservableType,
+    QubitSSAValue,
+    QubitTypeConstraint,
+    QuregTypeConstraint,
+)
 
 ##############################################
 ################ Base classes ################
@@ -60,9 +66,9 @@ class ComputationalBasisOp(ObservableOp):
 
     irdl_options = (AttrSizedOperandSegments(as_property=True),)
 
-    qubits = var_operand_def(QubitType)
+    qubits = var_operand_def(QubitTypeConstraint())
 
-    qreg = opt_operand_def(QuregType)
+    qreg = opt_operand_def(QuregTypeConstraint())
 
 
 @irdl_op_definition
@@ -98,7 +104,7 @@ class HermitianOp(ObservableOp):
         | MemRefConstraint(element_type=ComplexType(Float64Type()), rank=2)
     )
 
-    qubits = var_operand_def(QubitType)
+    qubits = var_operand_def(QubitTypeConstraint())
 
 
 @irdl_op_definition
@@ -111,7 +117,7 @@ class NamedObsOp(ObservableOp):
         $qubit `[` $type `]` attr-dict  `:` type(results)
     """
 
-    qubit = operand_def(QubitType)
+    qubit = operand_def(QubitTypeConstraint())
 
     type = prop_def(NamedObservableAttr)
 

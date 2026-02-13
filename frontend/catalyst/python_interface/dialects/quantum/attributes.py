@@ -14,7 +14,7 @@
 """Attributes for the xDSL Quantum dialect, which mirrors Catalyst's MLIR
 Quantum dialect."""
 
-from functools import partial
+from collections.abc import Sequence
 from typing import TypeAlias
 
 from xdsl.dialects.builtin import ArrayAttr, StringAttr
@@ -27,14 +27,32 @@ from xdsl.ir import (
     StrEnum,
     TypeAttribute,
 )
-from xdsl.irdl import irdl_attr_definition, param_def, ParamAttrConstraint
-from xdsl.parser import AttrParser, GenericParser
+from xdsl.irdl import AnyOf, AttrConstraint, irdl_attr_definition
+from xdsl.parser import AttrParser
 from xdsl.printer import Printer
 from xdsl.utils.exceptions import ParseError
 
 ################################################################
 ######################## ATTRIBUTES ############################
 ################################################################
+
+
+class QubitLevel(StrEnum):
+    """Qubit levels enum in the hierarchical qubit representation."""
+
+    Abstract = "abstract"
+    Logical = "logical"
+    QEC = "qec"
+    Physical = "physical"
+
+
+class QubitRole(StrEnum):
+    """Qubit roles enum for further specialization in the hierarchical qubit representation."""
+
+    Null = "null"
+    Data = "data"
+    XCheck = "xcheck"
+    ZCheck = "zcheck"
 
 
 class NamedObservable(StrEnum):
@@ -52,38 +70,6 @@ class NamedObservableAttr(EnumAttribute[NamedObservable], SpacedOpaqueSyntaxAttr
     """Known named observables"""
 
     name = "quantum.named_observable"
-
-
-class QubitLevel(StrEnum):
-    """Qubit levels enum in the hierarchical qubit representation."""
-
-    Abstract = "abstract"
-    Logical = "logical"
-    QEC = "qec"
-    Physical = "physical"
-
-
-@irdl_attr_definition
-class QubitLevelAttr(EnumAttribute[QubitLevel], SpacedOpaqueSyntaxAttribute):
-    """Qubit levels in the hierarchical qubit representation."""
-
-    name = "quantum.qubit_level"
-
-
-class QubitRole(StrEnum):
-    """Qubit roles enum for further specialization in the hierarchical qubit representation."""
-
-    Null = "null"
-    Data = "data"
-    XCheck = "xcheck"
-    ZCheck = "zcheck"
-
-
-@irdl_attr_definition
-class QubitRoleAttr(EnumAttribute[QubitRole], SpacedOpaqueSyntaxAttribute):
-    """Qubit roles for further specialization in the hierarchical qubit representation."""
-
-    name = "quantum.qubit_role"
 
 
 #############################################################
@@ -104,42 +90,78 @@ class QubitType(ParametrizedAttribute, TypeAttribute):
 
     name = "quantum.bit"
 
-    level: QubitLevelAttr
+    level: StringAttr
 
-    role: QubitRoleAttr
+    role: StringAttr
+
+    def __init__(
+        self,
+        level: str | StringAttr = QubitLevel.Abstract.value,
+        role: str | StringAttr = QubitRole.Null.value,
+    ):
+        level_str = level.data if isinstance(level, StringAttr) else level
+        role_str = role.data if isinstance(role, StringAttr) else role
+
+        if level_str not in QubitLevel.__members__.values():
+            raise ValueError(f"Invalid level for 'QubitType': {level}.")
+        if role_str not in QubitRole.__members__.values():
+            raise ValueError(f"Invalid role for 'QubitType': {role}.")
+
+        super().__init__(StringAttr(level_str), StringAttr(role_str))
+
+    def print_parameters(self, printer: Printer):
+        params_to_print = []
+        if self.level.data != QubitLevel.Abstract.value:
+            params_to_print.append(self.level.data)
+        if self.role.data != QubitRole.Null.value:
+            params_to_print.append(self.role.data)
+
+        if params_to_print:
+            with printer.in_angle_brackets():
+                printer.print_list(params_to_print, printer.print_string)
 
     @classmethod
     def parse_parameters(cls, parser: AttrParser) -> list[Attribute]:
 
-        def parse_fn():
-            try:
-                res = parser.parse_optional_str_enum(QubitLevel)
-            except ParseError:
-                try:
-                    res = parser.parse_optional_str_enum(QubitRole)
-                except ParseError:
-                    res = None
-
-            return res
-
         optional_params = parser.parse_optional_comma_separated_list(
-            delimiter=parser.Delimiter.ANGLE, parse=parse_fn
+            delimiter=parser.Delimiter.ANGLE, parse=parser.parse_str_literal
         )
+        optional_params = optional_params or []
 
         final_params = []
         match len(optional_params):
             case 0:
-                final_params = [QubitLevelAttr(QubitLevel.Abstract), QubitRoleAttr(QubitRole.Null)]
+                final_params = [
+                    StringAttr(QubitLevel.Abstract.value),
+                    StringAttr(QubitRole.Null.value),
+                ]
+
             case 1:
-                level = QubitLevelAttr(optional_params[0] if isinstance(optional_params[0], QubitLevel) else QubitLevel.Abstract)
-                role = QubitRoleAttr(optional_params[0] if isinstance(optional_params[0], QubitRole) else QubitRole.Null)
+                param = optional_params[0]
+                if param in QubitLevel.__members__.values():
+                    level = StringAttr(param)
+                    role = StringAttr(QubitRole.Null.value)
+                elif param in QubitRole.__members__.values():
+                    level = StringAttr(QubitLevel.Abstract.value)
+                    role = StringAttr(param)
+                else:
+                    raise ParseError(f"Invalid parameter for 'QubitType': {param}.")
                 final_params = [level, role]
+
             case 2:
+                if optional_params[0] not in QubitLevel.__members__.values():
+                    raise ParseError(f"Invalid value for 'QubitType.level': {optional_params[0]}.")
+                if optional_params[1] not in QubitRole.__members__.values():
+                    raise ParseError(f"Invalid value for 'QubitType.role': {optional_params[1]}.")
                 final_params = optional_params
+
             case _:
-                raise ParseError(f"Expected 2 or less parameters for QubitType, got {optional_params}.")
+                raise ParseError(
+                    f"Expected 2 or less parameters for 'QubitType', got {optional_params}."
+                )
 
         return final_params
+
 
 @irdl_attr_definition
 class QuregType(ParametrizedAttribute, TypeAttribute):
@@ -147,22 +169,40 @@ class QuregType(ParametrizedAttribute, TypeAttribute):
 
     name = "quantum.reg"
 
-    level: QubitLevelAttr
+    level: StringAttr
+
+    def __init__(self, level: str | StringAttr = QubitLevel.Abstract.value):
+        level_str = level.data if isinstance(level, StringAttr) else level
+        if level_str not in QubitLevel.__members__.values():
+            raise ValueError(f"Invalid level for 'QubitType': {level}.")
+
+        super().__init__(StringAttr(level_str))
+
+    def print_parameters(self, printer: Printer):
+        if self.level.data == QubitLevel.Abstract.value:
+            return
+
+        with printer.in_angle_brackets():
+            printer.print_string(self.level.data)
 
     @classmethod
     def parse_parameters(cls, parser: AttrParser) -> list[Attribute]:
-        parse_fn = partial(parser.parse_optional_str_enum, QubitLevel)
         optional_params = parser.parse_optional_comma_separated_list(
-            delimiter=parser.Delimiter.ANGLE, parse=parse_fn
+            delimiter=parser.Delimiter.ANGLE, parse=parser.parse_str_literal
         )
 
+        optional_params = optional_params or []
         if len(optional_params) > 1:
-            raise ParseError(f"Expected 1 or less parameters for QuregType, got {optional_params}.")
+            raise ParseError(
+                f"Expected 1 or less parameters for 'QuregType', got {optional_params}."
+            )
 
         if len(optional_params) == 1:
-            return [QubitLevelAttr(optional_params[0])]
+            if optional_params[0] not in QubitLevel.__members__.values():
+                raise ParseError(f"Invalid value for 'QuregType.level': {optional_params[0]}.")
+            return [StringAttr(optional_params[0])]
 
-        return [QubitLevelAttr(QubitLevel.Abstract)]
+        return [StringAttr(QubitLevel.Abstract.value)]
 
 
 @irdl_attr_definition
@@ -183,6 +223,121 @@ QuregSSAValue: TypeAlias = SSAValue[QuregType]
 ObservableSSAValue: TypeAlias = SSAValue[ObservableType]
 PauliWord: TypeAlias = ArrayAttr[StringAttr]
 
-# Constraints
-AnyQubitTypeConstr = ParamAttrConstraint(base_attr=QubitType, param_constrs=(None, None))
-AnyQuregTypeConstr = ParamAttrConstraint(base_attr=QuregType, param_constrs=(None,))
+
+###############################################################
+######################## Constraints ##########################
+###############################################################
+
+
+class QubitTypeConstraint(AttrConstraint):
+    """Constraint to make QubitType be inferrable during IRDL declaration."""
+
+    level_constr: AttrConstraint
+    """The qubit level constraint."""
+
+    role_constr: AttrConstraint
+    """The qubit role constraint."""
+
+    def __init__(
+        self,
+        *,
+        level_constr: Sequence[str | StringAttr] | None = None,
+        role_constr: Sequence[str | StringAttr] | None = None,
+    ):
+        if not level_constr:
+            self.level_constr = AnyOf([StringAttr(v) for v in QubitLevel.__members__.values()])
+        else:
+            attr_list = []
+            for s in level_constr:
+                if isinstance(s, str):
+                    assert s in QubitLevel.__members__.values()
+                    attr_list.append(StringAttr(s))
+                elif isinstance(s, StringAttr):
+                    assert s.value in QubitLevel.__members__.values()
+                    attr_list.append(s)
+                else:
+                    raise ValueError(f"Invalid value for 'QubitType.level' constraint: {s}.")
+            self.level_constr = AnyOf(attr_list)
+
+        if not role_constr:
+            self.role_constr = AnyOf([StringAttr(v) for v in QubitRole.__members__.values()])
+        else:
+            attr_list = []
+            for s in role_constr:
+                if isinstance(s, str):
+                    assert s in QubitRole.__members__.values()
+                    attr_list.append(StringAttr(s))
+                elif isinstance(s, StringAttr):
+                    assert s.value in QubitRole.__members__.values()
+                    attr_list.append(s)
+                else:
+                    raise ValueError(f"Invalid value for 'QubitType.role' constraint: {s}.")
+            self.role_constr = AnyOf(attr_list)
+
+    def can_infer(self, var_constraint_names) -> bool:
+        if len(self.level_constr.attr_constrs) not in (1, len(QubitLevel.__members__)):
+            return False
+        if len(self.role_constr.attr_constrs) not in (1, len(QubitRole.__members__)):
+            return False
+        return True
+
+    def infer(self, context):
+        if len(self.level_constr.attr_constrs) == 1:
+            level = self.level_constr.attr_constrs[0].attr
+        else:
+            level = StringAttr(QubitLevel.Abstract.value)
+        if len(self.role_constr.attr_constrs) == 1:
+            role = self.role_constr.attr_constrs[0].attr
+        else:
+            role = StringAttr(QubitRole.Null.value)
+
+        return QubitType(level, role)
+
+    def verify(self, attr, constraint_context):
+        self.level_constr.verify(attr.level, constraint_context)
+        self.role_constr.verify(attr.role, constraint_context)
+
+    def mapping_type_vars(self, type_var_mapping):
+        return self
+
+
+class QuregTypeConstraint(AttrConstraint):
+    """Constraint to make QuregType be inferrable during IRDL declaration."""
+
+    level_constr: AttrConstraint
+    """The qubit level constraint."""
+
+    def __init__(self, *, level_constr: Sequence[str | StringAttr] | None = None):
+        if not level_constr:
+            self.level_constr = AnyOf([StringAttr(v) for v in QubitLevel.__members__.values()])
+        else:
+            attr_list = []
+            for s in level_constr:
+                if isinstance(s, str):
+                    assert s in QubitLevel.__members__.values()
+                    attr_list.append(StringAttr(s))
+                elif isinstance(s, StringAttr):
+                    assert s.value in QubitLevel.__members__.values()
+                    attr_list.append(s)
+                else:
+                    raise ValueError(f"Invalid value for 'QubitType.level' constraint: {s}.")
+            self.level_constr = AnyOf(attr_list)
+
+    def can_infer(self, var_constraint_names) -> bool:
+        if len(self.level_constr.attr_constrs) not in (1, len(QubitLevel.__members__)):
+            return False
+        return True
+
+    def infer(self, context):
+        if len(self.level_constr.attr_constrs) == 1:
+            level = self.level_constr.attr_constrs[0].attr
+        else:
+            level = StringAttr(QubitLevel.Abstract.value)
+
+        return QuregType(level)
+
+    def verify(self, attr, constraint_context):
+        self.level_constr.verify(attr.level, constraint_context)
+
+    def mapping_type_vars(self, type_var_mapping):
+        return self

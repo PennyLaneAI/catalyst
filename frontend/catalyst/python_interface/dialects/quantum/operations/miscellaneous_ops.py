@@ -46,7 +46,9 @@ from xdsl.traits import (
     SingleBlockImplicitTerminator,
 )
 
-from ..attributes import QuregSSAValue, QuregType
+from catalyst.python_interface.xdsl_extras import AllTypesMatch
+
+from ..attributes import QuregSSAValue, QuregType, QuregTypeConstraint
 
 
 @irdl_op_definition
@@ -59,9 +61,16 @@ class AdjointOp(IRDLOperation):
         `(` $qreg `)` attr-dict `:` type(operands) $region
     """
 
-    qreg = operand_def(QuregType)
+    qreg = operand_def(QuregTypeConstraint())
 
-    out_qreg = result_def(QuregType)
+    out_qreg = result_def(QuregTypeConstraint())
+
+    traits = traits_def(
+        AllTypesMatch(
+            ("qreg", "out_qreg"),
+            "Qreg ins and outs must have the same size and types",
+        )
+    )
 
     region = region_def("single_block")
 
@@ -72,7 +81,7 @@ class AdjointOp(IRDLOperation):
         qreg: QuregSSAValue | Operation,
         region: Region | Sequence[Operation] | Sequence[Block],
     ):
-        super().__init__(operands=(qreg,), result_types=(QuregType(),), regions=(region,))
+        super().__init__(operands=(qreg,), result_types=(qreg.type,), regions=(region,))
 
 
 @irdl_op_definition
@@ -146,6 +155,6 @@ class YieldOp(IRDLOperation):
 
     assembly_format = "attr-dict ($retvals^ `:` type($retvals))?"
 
-    retvals = var_operand_def(QuregType)
+    retvals = var_operand_def(QuregTypeConstraint())
 
     traits = traits_def(HasParent(AdjointOp), IsTerminator(), Pure(), ReturnLike())

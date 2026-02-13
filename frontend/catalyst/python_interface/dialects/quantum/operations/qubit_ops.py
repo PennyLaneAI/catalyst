@@ -15,12 +15,7 @@
 This file contains the definition of operations that create/destroy qubits
 and quantum registers in the Quantum dialect.
 """
-from xdsl.dialects.builtin import (
-    I64,
-    IntegerAttr,
-    IntegerType,
-    i64,
-)
+from xdsl.dialects.builtin import I64, IntegerAttr, IntegerType, StringAttr, i64
 from xdsl.ir import Operation, SSAValue
 from xdsl.irdl import (
     AtLeast,
@@ -35,10 +30,14 @@ from xdsl.irdl import (
 from xdsl.traits import NoMemoryEffect
 
 from ..attributes import (
+    QubitLevel,
+    QubitRole,
     QubitSSAValue,
     QubitType,
+    QubitTypeConstraint,
     QuregSSAValue,
     QuregType,
+    QuregTypeConstraint,
 )
 
 
@@ -56,7 +55,7 @@ class AllocOp(IRDLOperation):
 
     nqubits_attr = opt_prop_def(IntegerAttr.constr(type=I64, value=AtLeast(0)))
 
-    qreg = result_def(QuregType)
+    qreg = result_def(QuregTypeConstraint())
 
     def __init__(self, nqubits):
         if isinstance(nqubits, int):
@@ -69,7 +68,11 @@ class AllocOp(IRDLOperation):
             operands = (nqubits,)
             properties = {}
 
-        super().__init__(operands=operands, properties=properties, result_types=(QuregType(),))
+        super().__init__(
+            operands=operands,
+            properties=properties,
+            result_types=(QuregType(level=StringAttr(QubitLevel.Abstract.value)),),
+        )
 
 
 @irdl_op_definition
@@ -80,11 +83,16 @@ class AllocQubitOp(IRDLOperation):
 
     assembly_format = "attr-dict `:` type(results)"
 
-    qubit = result_def(QubitType)
+    qubit = result_def(QubitTypeConstraint())
 
     def __init__(self):
         super().__init__(
-            result_types=(QubitType(),),
+            result_types=(
+                QubitType(
+                    level=StringAttr(QubitLevel.Abstract.value),
+                    role=StringAttr(QubitRole.Null.value),
+                ),
+            )
         )
 
 
@@ -96,7 +104,7 @@ class DeallocOp(IRDLOperation):
 
     assembly_format = "$qreg attr-dict `:` type(operands)"
 
-    qreg = operand_def(QuregType)
+    qreg = operand_def(QuregTypeConstraint())
 
     def __init__(self, qreg: QuregSSAValue | Operation):
         super().__init__(operands=(qreg,))
@@ -110,12 +118,10 @@ class DeallocQubitOp(IRDLOperation):
 
     assembly_format = "$qubit attr-dict `:` type(operands)"
 
-    qubit = operand_def(QubitType)
+    qubit = operand_def(QubitTypeConstraint())
 
     def __init__(self, qubit: QubitSSAValue | Operation):
-        super().__init__(
-            operands=(qubit,),
-        )
+        super().__init__(operands=(qubit,))
 
 
 @irdl_op_definition
@@ -128,13 +134,13 @@ class ExtractOp(IRDLOperation):
         $qreg `[` ($idx^):($idx_attr)? `]` attr-dict `:` type($qreg) `->` type(results)
     """
 
-    qreg = operand_def(QuregType)
+    qreg = operand_def(QuregTypeConstraint())
 
     idx = opt_operand_def(i64)
 
     idx_attr = opt_prop_def(IntegerAttr.constr(type=i64, value=AtLeast(0)))
 
-    qubit = result_def(QubitType)
+    qubit = result_def(QubitTypeConstraint())
 
     traits = traits_def(NoMemoryEffect())
 
@@ -155,7 +161,7 @@ class ExtractOp(IRDLOperation):
 
         super().__init__(
             operands=operands,
-            result_types=(QubitType(),),
+            result_types=(QubitType(level=qreg.type.level, role=StringAttr(QubitRole.Null.value)),),
             properties=properties,
         )
 
@@ -170,15 +176,15 @@ class InsertOp(IRDLOperation):
         $in_qreg `[` ($idx^):($idx_attr)? `]` `,` $qubit attr-dict `:` type($in_qreg) `,` type($qubit)
     """
 
-    in_qreg = operand_def(QuregType)
+    in_qreg = operand_def(QuregTypeConstraint())
 
     idx = opt_operand_def(i64)
 
     idx_attr = opt_prop_def(IntegerAttr.constr(type=i64, value=AtLeast(0)))
 
-    qubit = operand_def(QubitType)
+    qubit = operand_def(QubitTypeConstraint())
 
-    out_qreg = result_def(QuregType)
+    out_qreg = result_def(QuregTypeConstraint())
 
     traits = traits_def(NoMemoryEffect())
 
@@ -198,4 +204,4 @@ class InsertOp(IRDLOperation):
             operands = (in_qreg, idx, qubit)
             properties = {}
 
-        super().__init__(operands=operands, properties=properties, result_types=(QuregType(),))
+        super().__init__(operands=operands, properties=properties, result_types=(in_qreg.type,))

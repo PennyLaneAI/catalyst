@@ -50,7 +50,13 @@ from xdsl.utils.str_enum import StrEnum  # StrEnum is standard in Python>=3.11
 
 from catalyst.python_interface.xdsl_extras import MemRefConstraint, TensorConstraint
 
-from .quantum import QubitType, QuregType
+from .quantum import (
+    QubitLevel,
+    QubitType,
+    QubitTypeConstraint,
+    QuregType,
+    QuregTypeConstraint,
+)
 
 QubitSSAValue: TypeAlias = SSAValue[QubitType]
 
@@ -80,7 +86,7 @@ class MeasureInBasisOp(IRDLOperation):
             `[` $plane `,` $angle `]` $in_qubit (`postselect` $postselect^)? attr-dict `:` type(results)
         """
 
-    in_qubit = operand_def(QubitType)
+    in_qubit = operand_def(QubitTypeConstraint())
 
     plane = prop_def(MeasurementPlaneAttr)
 
@@ -92,7 +98,7 @@ class MeasureInBasisOp(IRDLOperation):
 
     mres = result_def(IntegerType(1))
 
-    out_qubit = result_def(QubitType)
+    out_qubit = result_def(QubitTypeConstraint())
 
     def __init__(
         self,
@@ -112,7 +118,7 @@ class MeasureInBasisOp(IRDLOperation):
         super().__init__(
             operands=(in_qubit, angle),
             properties=properties,
-            result_types=(IntegerType(1), QubitType()),
+            result_types=(IntegerType(1), in_qubit.type),
         )
 
 
@@ -134,7 +140,7 @@ class GraphStatePrepOp(IRDLOperation):
 
     entangle_op = prop_def(StringAttr)
 
-    qreg = result_def(QuregType)
+    qreg = result_def(QuregTypeConstraint())
 
     def __init__(
         self, adj_matrix: AnyAttr, init_op: str | StringAttr, entangle_op: str | StringAttr
@@ -147,13 +153,9 @@ class GraphStatePrepOp(IRDLOperation):
 
         properties = {"init_op": init_op, "entangle_op": entangle_op}
 
-        qreg = QuregType()
+        qreg = QuregType(level=StringAttr(QubitLevel.Abstract.value))
 
-        super().__init__(
-            operands=(adj_matrix,),
-            result_types=(qreg,),
-            properties=properties,
-        )
+        super().__init__(operands=(adj_matrix,), result_types=(qreg,), properties=properties)
 
 
 MBQC = Dialect(

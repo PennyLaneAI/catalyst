@@ -51,7 +51,7 @@ from xdsl.irdl import (
 from xdsl.traits import HasParent, IsTerminator, Pure, SingleBlockImplicitTerminator
 from xdsl.utils.str_enum import StrEnum
 
-from .quantum import QubitType
+from .quantum import QubitTypeConstraint
 
 
 class LogicalInitKind(StrEnum):
@@ -99,7 +99,7 @@ class FabricateOp(IRDLOperation):
 
     init_state = prop_def(LogicalInit)
 
-    out_qubits = var_result_def(QubitType)
+    out_qubits = var_result_def(QubitTypeConstraint())
 
 
 @irdl_op_definition
@@ -138,13 +138,13 @@ class PPMeasurementOp(IRDLOperation):
 
     rotation_sign = opt_prop_def(IntegerAttr[I16], default_value=IntegerAttr(1, i16))
 
-    in_qubits = var_operand_def(QubitType)
+    in_qubits = var_operand_def(QubitTypeConstraint())
 
     condition = opt_operand_def(IntegerType(1))
 
     mres = result_def(IntegerType(1))
 
-    out_qubits = var_result_def(QubitType)
+    out_qubits = var_result_def(QubitTypeConstraint())
 
 
 @irdl_op_definition
@@ -167,11 +167,11 @@ class PPRotationArbitraryOp(IRDLOperation):
 
     arbitrary_angle = operand_def(Float64Type())
 
-    in_qubits = var_operand_def(QubitType)
+    in_qubits = var_operand_def(QubitTypeConstraint())
 
     condition = opt_operand_def(IntegerType(1))
 
-    out_qubits = var_result_def(QubitType)
+    out_qubits = var_result_def(QubitTypeConstraint())
 
 
 @irdl_op_definition
@@ -194,11 +194,11 @@ class PPRotationOp(IRDLOperation):
 
     rotation_kind = prop_def(IntegerAttr[IntegerType(16)])
 
-    in_qubits = var_operand_def(QubitType)
+    in_qubits = var_operand_def(QubitTypeConstraint())
 
     condition = opt_operand_def(IntegerType(1))
 
-    out_qubits = var_result_def(QubitType)
+    out_qubits = var_result_def(QubitTypeConstraint())
 
 
 @irdl_op_definition
@@ -213,9 +213,9 @@ class PrepareStateOp(IRDLOperation):
 
     init_state = prop_def(LogicalInit)
 
-    in_qubits = var_operand_def(QubitType)
+    in_qubits = var_operand_def(QubitTypeConstraint())
 
-    out_qubits = var_result_def(QubitType)
+    out_qubits = var_result_def(QubitTypeConstraint())
 
 
 @irdl_op_definition
@@ -237,11 +237,11 @@ class SelectPPMeasurementOp(IRDLOperation):
 
     pauli_product_1 = prop_def(PauliWord)
 
-    in_qubits = var_operand_def(QubitType)
+    in_qubits = var_operand_def(QubitTypeConstraint())
 
     mres = result_def(IntegerType(1))
 
-    out_qubits = var_result_def(QubitType)
+    out_qubits = var_result_def(QubitTypeConstraint())
 
 
 QEC = Dialect(
