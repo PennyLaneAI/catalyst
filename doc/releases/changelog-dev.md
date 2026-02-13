@@ -68,10 +68,6 @@
   `qml.capture.subroutine` upstreamed from `catalyst.jax_primitives.subroutine`.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
 
-* The PPR/PPM lowering passes (`lower-qec-init-ops`, `unroll-conditional-ppr-ppm`) are now run
-  as part of the main quantum compilation pipeline. When using `to-ppr` and `ppr-to-ppm` transforms,
-  these passes are applied automatically during compilation; we no longer need to stack them
-  explicitly.
 * The PPR/PPM lowering passes (`lower-pbc-init-ops`, `unroll-conditional-ppr-ppm`) are now run
   as part of the main quantum compilation pipeline. When using `to-ppr` and `ppr-to-ppm` transforms,
   these passes are applied automatically during compilation; we no longer need to stack them
@@ -148,7 +144,7 @@
   adjoint-differentiation method.
   [(#2428)](https://github.com/PennyLaneAI/catalyst/pull/2428)
 
-* Fixed the angle conversion when lowering `qec.ppr` and `qec.ppr.arbitrary` operations to
+* Fixed the angle conversion when lowering `pbc.ppr` and `pbc.ppr.arbitrary` operations to
   `__catalyst__qis__PauliRot` runtime calls. The PPR rotation angle is now correctly multiplied
   by 2 to match the PauliRot convention (`PauliRot(φ) == PPR(φ/2)`).
   [(#2414)](https://github.com/PennyLaneAI/catalyst/pull/2414)
@@ -174,10 +170,10 @@
 <h3>Internal changes ⚙️</h3>
 
 * The QEC (Quantum Error Correction) dialect has been renamed to PBC (Pauli-Based Computation)
-  across the entire codebase. This includes the MLIR dialect (`qec.*` -> `pbc.*`), C++ namespaces
-  (`catalyst::qec` -> `catalyst::pbc`), Python bindings, compiler passes (e.g.,
-  `lower-qec-init-ops` -> `lower-pbc-init-ops`, `convert-qec-to-llvm` -> `convert-pbc-to-llvm`),
-  qubit type (`!quantum.bit<qec>` -> `!quantum.bit<pbc>`), and all associated file and directory
+  across the entire codebase. This includes the MLIR dialect (`pbc.*` -> `pbc.*`), C++ namespaces
+  (`catalyst::pbc` -> `catalyst::pbc`), Python bindings, compiler passes (e.g.,
+  `lower-pbc-init-ops` -> `lower-pbc-init-ops`, `convert-pbc-to-llvm` -> `convert-pbc-to-llvm`),
+  qubit type (`!quantum.bit<pbc>` -> `!quantum.bit<pbc>`), and all associated file and directory
   names. The rename better reflects the dialect's purpose as a representation for Pauli-Based
   Computation rather than general quantum error correction.
   [(#2482)](https://github.com/PennyLaneAI/catalyst/pull/2482)
@@ -205,14 +201,14 @@
   definitions in separate file scopes.
   [(#2329)](https://github.com/PennyLaneAI/catalyst/pull/2329)
 
-* Added lowering of `qec.ppm`, `qec.ppr`, and `quantum.paulirot` to the runtime CAPI and QuantumDevice C++ API.
+* Added lowering of `pbc.ppm`, `pbc.ppr`, and `quantum.paulirot` to the runtime CAPI and QuantumDevice C++ API.
   [(#2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
   [(#2413)](https://github.com/PennyLaneAI/catalyst/pull/2413)
 
-* Added LLVM conversion patterns to lower QEC dialect operations to their corresponding runtime
+* Added LLVM conversion patterns to lower PBC dialect operations to their corresponding runtime
   CAPI calls.
-  This includes `qec.ppr` and `qec.ppr.arbitrary` (lowered to `__catalyst__qis__PauliRot`),
-  `qec.ppm` (lowered to `__catalyst__qis__PauliMeasure`). This enables device execution of QEC
+  This includes `pbc.ppr` and `pbc.ppr.arbitrary` (lowered to `__catalyst__qis__PauliRot`),
+  `pbc.ppm` (lowered to `__catalyst__qis__PauliMeasure`). This enables device execution of PBC
   operations through the Catalyst runtime.
   [(#2389)](https://github.com/PennyLaneAI/catalyst/pull/2389)
 
@@ -229,7 +225,7 @@
   [(#2419)](https://github.com/PennyLaneAI/catalyst/pull/2419)
 
 * New qubit-type specializations have been added to Catalyst's MLIR type system. These new qubit
-  types include `!quantum.bit<logical>`, `!quantum.bit<qec>` and `!quantum.bit<physical>`. The
+  types include `!quantum.bit<logical>`, `!quantum.bit<pbc>` and `!quantum.bit<physical>`. The
   original `!quantum.bit` type continues to be supported and used as the default qubit type.
   [(#2369)](https://github.com/PennyLaneAI/catalyst/pull/2369)
 
@@ -239,10 +235,10 @@
 * The upstream MLIR `Test` dialect is now available via the `catalyst` command line tool.
   [(#2417)](https://github.com/PennyLaneAI/catalyst/pull/2417)
 
-* A new compiler pass `lower-qec-init-ops` has been added to lower QEC initialization operations
-  to Quantum dialect operations. This pass converts `qec.prepare` to `quantum.custom` and
-  `qec.fabricate` to `quantum.alloc_qb` + `quantum.custom`, enabling runtime execution of
-  QEC state preparation operations.
+* A new compiler pass `lower-pbc-init-ops` has been added to lower PBC initialization operations
+  to Quantum dialect operations. This pass converts `pbc.prepare` to `quantum.custom` and
+  `pbc.fabricate` to `quantum.alloc_qb` + `quantum.custom`, enabling runtime execution of
+  PBC state preparation operations.
   [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
 
 * A new compiler pass `split-to-single-terms` has been added for QNode functions containing
