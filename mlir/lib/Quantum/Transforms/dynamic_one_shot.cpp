@@ -15,6 +15,9 @@
 #define DEBUG_TYPE "dynamic-one-shot"
 
 #include <optional>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 #include "llvm/ADT/SmallSet.h"
 
@@ -237,6 +240,25 @@ std::optional<quantum::MeasurementProcess> getMPFromValue(Value v)
     return std::nullopt;
 }
 
+std::unordered_map<size_t, size_t>
+getDuplicateIndexPairs(SmallVector<quantum::MeasurementProcess> MPs)
+{
+    std::unordered_map<size_t, size_t> pairs;
+    std::unordered_map<Operation *, size_t> firstSeen; // Map of {MP -> first seen index}
+
+    for (size_t i = 0; i < MPs.size(); i++) {
+        Operation *current = MPs[i].getOperation();
+        if (firstSeen.find(current) != firstSeen.end()) {
+            pairs.insert({firstSeen[current], i});
+        }
+        else {
+            firstSeen[current] = i;
+        }
+    }
+
+    return pairs;
+}
+
 //
 // Methods to update the one shot kernel
 // These edits are needed when the MPs are on MCMs, or to change the shapes of values of the
@@ -430,7 +452,7 @@ void editKernelSampleShapes(func::FuncOp oneShotKernel, ShapedType fullSampleTyp
 }
 
 void editKernelMCMCounts(IRRewriter &builder, func::FuncOp oneShotKernel, quantum::MCMObsOp mcmobs,
-                         size_t retIdx)
+                         size_t eigensRetIdx, size_t countsRetIdx)
 {
     // If the kernel returns counts on MCMs,
     // the single-shot counts of the MCM is a zero tensor, with a single one at
@@ -447,10 +469,10 @@ void editKernelMCMCounts(IRRewriter &builder, func::FuncOp oneShotKernel, quantu
     builder.setInsertionPoint(retOp);
 
     auto eigensType =
-        dyn_cast<RankedTensorType>(oneShotKernel.getFunctionType().getResults()[retIdx]);
+        dyn_cast<RankedTensorType>(oneShotKernel.getFunctionType().getResults()[eigensRetIdx]);
     auto iotaOp = stablehlo::IotaOp::create(builder, loc, eigensType, 0);
-    retOp->setOperand(retIdx, iotaOp.getOutput());
-    editKernelMCMProbs(builder, oneShotKernel, mcmobs, retIdx + 1);
+    retOp->setOperand(eigensRetIdx, iotaOp.getOutput());
+    editKernelMCMProbs(builder, oneShotKernel, mcmobs, countsRetIdx);
 }
 
 //
@@ -621,7 +643,7 @@ void prepareForLoopSampleArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
 }
 
 void prepareForLoopCountsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
-                              quantum::CountsOp countsOp, size_t retIdx,
+                              quantum::CountsOp countsOp, size_t eigensRetIdx, size_t countsRetIdx,
                               SmallVector<Value> &loopIterArgs,
                               SmallVector<std::string> &loopIterArgsMPKinds,
                               const IRMapping &cloneMapper)
@@ -635,11 +657,12 @@ void prepareForLoopCountsArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
     // The one shot kernel itself might need some massaging if the MP is on a MCM.
     Operation *MPSourceOp = countsOp.getObs().getDefiningOp();
     if (isa<quantum::MCMObsOp>(MPSourceOp)) {
-        editKernelMCMCounts(builder, oneShotKernel, cast<quantum::MCMObsOp>(MPSourceOp), retIdx);
+        editKernelMCMCounts(builder, oneShotKernel, cast<quantum::MCMObsOp>(MPSourceOp),
+                            eigensRetIdx, countsRetIdx);
     }
 
-    auto eigensType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[retIdx]);
-    auto countsType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[retIdx + 1]);
+    auto eigensType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[eigensRetIdx]);
+    auto countsType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[countsRetIdx]);
 
     Value countsSum;
     if (ShapedType::isDynamic(countsType.getShape()[0])) {
@@ -711,14 +734,18 @@ LogicalResult prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp oneShotKe
     // Both would be returned from the quantum function, so the same counts op would be
     // identified as the source MP op twice.
     // The second time around, we shouldn't redo the processing.
-    size_t skip_counts_iterator = -1;
+    std::unordered_map<size_t, size_t> countsResultPairIndices = getDuplicateIndexPairs(qnodeMPs);
+    std::unordered_set<size_t> skipIndices;
+    for (auto const &[_, val] : countsResultPairIndices) {
+        skipIndices.insert(val);
+    }
+
     for (auto [i, _mp] : llvm::enumerate(qnodeMPs)) {
-        if (i == skip_counts_iterator) {
+        if (skipIndices.contains(i)) {
             continue;
         }
 
-        // llvm::enumerate() marks the iterators with const
-        Operation *mp = const_cast<quantum::MeasurementProcess &>(_mp);
+        Operation *mp = _mp.getOperation();
 
         if (isa<quantum::StateOp>(mp)) {
             mp->emitOpError("StateOp is not compatible with shot-based execution, and has no "
@@ -749,9 +776,8 @@ LogicalResult prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp oneShotKe
         }
 
         else if (auto counts = dyn_cast<quantum::CountsOp>(mp)) {
-            prepareForLoopCountsArgs(builder, oneShotKernel, counts, i, loopIterArgs,
-                                     loopIterArgsMPKinds, cloneMapper);
-            skip_counts_iterator = i + 1;
+            prepareForLoopCountsArgs(builder, oneShotKernel, counts, i, countsResultPairIndices[i],
+                                     loopIterArgs, loopIterArgsMPKinds, cloneMapper);
         }
     }
     return success();
