@@ -670,11 +670,20 @@ LogicalResult prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp oneShotKe
         assert(mp.has_value() && "Classical qnode return values not supported in dynamic one-shot");
         qnodeMPs.push_back(*mp);
     }
-    llvm::SmallSet<quantum::CountsOp, 8> handledCountsOps;
+    llvm::SmallSet<quantum::CountsOp *, 8> handledCountsOps;
 
     builder.setInsertionPointToEnd(&qnodeFunc.getBody().front());
 
+    // CountsOp has two results, the eigens and the counts.
+    // Both would be returned from the quantum function, so the same counts op would be
+    // identified as the source MP op twice.
+    // The second time around, we shouldn't redo the processing.
+    size_t skip_counts_iterator = -1;
     for (auto [i, _mp] : llvm::enumerate(qnodeMPs)) {
+        if (i == skip_counts_iterator) {
+            continue;
+        }
+
         // llvm::enumerate() marks the iterators with const
         Operation *mp = const_cast<quantum::MeasurementProcess &>(_mp);
 
@@ -707,16 +716,9 @@ LogicalResult prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp oneShotKe
         }
 
         else if (auto counts = dyn_cast<quantum::CountsOp>(mp)) {
-            // CountsOp has two results, the eigens and the counts.
-            // Both would be returned from the quantum function, so the same counts op would be
-            // identified as the source MP op twice.
-            // The second time around, we shouldn't redo the processing.
-            if (handledCountsOps.contains(counts)) {
-                continue;
-            }
             prepareForLoopCountsArgs(builder, oneShotKernel, counts, i, loopIterArgs,
                                      loopIterArgsMPKinds, cloneMapper);
-            handledCountsOps.insert(counts);
+            skip_counts_iterator = i + 1;
         }
     }
     return success();
