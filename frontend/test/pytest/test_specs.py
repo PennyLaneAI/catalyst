@@ -289,8 +289,10 @@ class TestPassByPassSpecs:
 
         simple_circuit = qml.marker(simple_circuit, "before-transforms")
         simple_circuit = dummy_transform(simple_circuit)
+        simple_circuit = dummy_transform(simple_circuit)
         simple_circuit = qml.marker(simple_circuit, "after-tape")
         # Completely relying on cancel inverses being used as an MLIR transform
+        simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
         simple_circuit = qml.transforms.cancel_inverses(simple_circuit)
         simple_circuit = qml.marker(simple_circuit, "after-mlir")
 

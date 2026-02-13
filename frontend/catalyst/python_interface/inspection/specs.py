@@ -92,6 +92,7 @@ def mlir_specs(
         result = specs_collect(module)
 
         pass_name = str(pass_instance) + f" (MLIR-{pass_level})"
+        # Always prioritize marker label is it exists
         if m := level_to_markers.get(pass_level):
             pass_name = ", ".join(m if not isinstance(m, str) else [m])
         elif hasattr(pass_instance, "name"):
