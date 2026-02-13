@@ -604,3 +604,35 @@ func.func public @test_many_MPs(%arg0: f64) -> (tensor<1000x2xi64>, tensor<4xi64
 // CHECK:    [[shotsBroadcast:%.+]] = stablehlo.broadcast_in_dim [[shotsTensor]], dims = [] : (tensor<f64>) -> tensor<4xf64>
 // CHECK:    [[probsDivide:%.+]] = stablehlo.divide [[forOut]]#4, [[shotsBroadcast]] : tensor<4xf64>
 // CHECK:    return [[forOut]]#0, [[forOut]]#1, [[forOut]]#2, [[expvalDivide]], %8 : tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>
+
+
+// -----
+
+
+func.func public @test_analytical() {
+  %0 = arith.constant 0 : i64
+  quantum.device shots(%0) ["", "", ""]
+  return
+}
+
+// CHECK: func.func public @test_analytical
+// CHECK:   [[_0:%.+]] = arith.constant 0 : i64
+// CHECK:   quantum.device shots([[_0]]) ["", "", ""]
+// CHECK:   return
+
+
+// -----
+
+
+func.func public @test_analytical() {
+  %0 = stablehlo.constant dense<0> : tensor<i64>
+  %1 = tensor.extract %0[] : tensor<i64>
+  quantum.device shots(%1) ["", "", ""]
+  return
+}
+
+// CHECK: func.func public @test_analytical()
+// CHECK:   [[_0:%.+]] = stablehlo.constant dense<0> : tensor<i64>
+// CHECK:   [[_1:%.+]] = tensor.extract [[_0]][] : tensor<i64>
+// CHECK:   quantum.device shots([[_1]]) ["", "", ""]
+// CHECK:   return

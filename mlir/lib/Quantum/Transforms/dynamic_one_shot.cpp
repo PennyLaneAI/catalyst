@@ -42,6 +42,40 @@ namespace {
 // Misc helper functions
 //
 
+bool isZeroShots(Value shots)
+{
+    Operation *shotsDefOp = shots.getDefiningOp();
+    if (shotsDefOp == nullptr) {
+        return false;
+    }
+
+    if (auto ac = dyn_cast<arith::ConstantOp>(shotsDefOp)) {
+        if (auto intAttr = dyn_cast<mlir::IntegerAttr>(ac.getValue())) {
+            return intAttr.getInt() == 0;
+        }
+    }
+
+    // stablehlo constant op returns tensor, so there would be a tensor.extract between it and the
+    // device init op's shots
+    auto sc = dyn_cast<stablehlo::ConstantOp>(shotsDefOp->getResult(0).getDefiningOp());
+    if (sc) {
+        auto denseAttr = dyn_cast<mlir::DenseElementsAttr>(sc.getValue());
+
+        if (denseAttr.getNumElements() != 1) {
+            return false;
+        }
+        Type elementType = denseAttr.getElementType();
+        if (!elementType.isInteger()) {
+            return false;
+        }
+
+        llvm::APInt value = denseAttr.getValues<llvm::APInt>()[0];
+
+        return value.isZero();
+    }
+    return false;
+}
+
 void getMPDynamicNumQubitsSizeValues(func::FuncOp qnodeFunc, llvm::SmallPtrSet<Value, 8> &vals)
 {
     // Collect all SSA values in a FuncOp that represents the dynamic shape dimensions of MPs
@@ -934,6 +968,14 @@ struct DynamicOneShotPass : public impl::DynamicOneShotPassBase<DynamicOneShotPa
         // For each qnode function, find the returned MPs
         // Then handle the one shot logic for each MP type
         for (auto qnodeFunc : qnodeFuncs) {
+            auto deviceInitOp = *qnodeFunc.getOps<quantum::DeviceInitOp>().begin();
+            Value shots = deviceInitOp.getShots();
+
+            // If we know it's zero shots, i.e. analytical mode, then no need to do anything.
+            if (isZeroShots(shots)) {
+                continue;
+            }
+
             // Clone the qnode function and give it a new name.
             // Because we need to make sure the current qnodeFunc name is reserved as entry point
             // Set the number of shots in the new kernel to one.
@@ -943,8 +985,6 @@ struct DynamicOneShotPass : public impl::DynamicOneShotPassBase<DynamicOneShotPa
             // Clear the original qnodeFunc. Its new contents will be the one-shot logic.
             // Keep the SSA value for the shots.
             // It needs to be used as the upper bound of the for loop.
-            auto deviceInitOp = *qnodeFunc.getOps<quantum::DeviceInitOp>().begin();
-            Value shots = deviceInitOp.getShots();
             llvm::SmallPtrSet<Value, 8> erasureExceptions;
             getMPDynamicNumQubitsSizeValues(qnodeFunc, erasureExceptions);
             erasureExceptions.insert(shots);
