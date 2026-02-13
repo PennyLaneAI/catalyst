@@ -299,9 +299,6 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
         bufferization_options += " copy-before-write"
 
     bufferization = [
-        # Removing the inlining pass for now as inlining all function would blow up
-        # code size in certain cases.
-        # "inline",
         "convert-tensor-to-linalg",  # tensor.pad
         "convert-elementwise-to-linalg",  # Must be run before --one-shot-bufferize
         "gradient-preprocess",
@@ -366,7 +363,7 @@ def get_convert_to_llvm_stage(options: CompileOptions) -> List[str]:
         "convert-index-to-llvm",
         "convert-catalyst-to-llvm",
         "convert-qec-to-llvm",  # TODO: Remove this once PBC has its own pipeline
-        "convert-quantum-to-llvm",
+        "convert-quantum-to-llvm{use-array-backed-registers=true}",
         # There should be no identical code folding
         # (`mergeIdenticalBlocks` in the MLIR source code)
         # between convert-async-to-llvm and
