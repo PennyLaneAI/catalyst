@@ -68,8 +68,9 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
             applyMerge(unresolvedFunctionCalls[entry.getKey()], entry.getValue(), method);
     }
 
-    if (deviceName.empty() && !other.deviceName.empty())
+    if (deviceName.empty() && !other.deviceName.empty()) {
         deviceName = other.deviceName;
+    }
     numQubits = applyMerge(numQubits, other.numQubits, method);
 }
 

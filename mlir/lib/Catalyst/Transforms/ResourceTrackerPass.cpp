@@ -56,12 +56,14 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
         // functions when no entry function is present.
         StringRef entry = analysis.getEntryFunc();
         if (!entry.empty()) {
-            if (const ResourceResult *r = analysis.getResult(entry))
+            if (const ResourceResult *r = analysis.getResult(entry)) {
                 accumulateStats(*r);
+            }
         }
         else {
-            for (const auto &funcEntry : results)
+            for (const auto &funcEntry : results) {
                 accumulateStats(funcEntry.getValue());
+            }
         }
 
         if (outputJson) {
@@ -74,20 +76,25 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
   private:
     void accumulateStats(const ResourceResult &result)
     {
-        for (const auto &opEntry : result.operations)
-            for (const auto &sizeEntry : opEntry.getValue())
+        for (const auto &opEntry : result.operations) {
+            for (const auto &sizeEntry : opEntry.getValue()) {
                 totalGates += sizeEntry.second;
+            }
+        }
 
-        for (const auto &measEntry : result.measurements)
+        for (const auto &measEntry : result.measurements) {
             totalMeasurements += measEntry.getValue();
+        }
 
         totalQubits += result.numQubits;
 
-        for (const auto &classEntry : result.classicalInstructions)
+        for (const auto &classEntry : result.classicalInstructions) {
             totalClassicalOps += classEntry.getValue();
+        }
 
-        for (const auto &fcEntry : result.functionCalls)
+        for (const auto &fcEntry : result.functionCalls) {
             totalFunctionCalls += fcEntry.getValue();
+        }
     }
 
     void printJsonOutput(const llvm::StringMap<ResourceResult> &results) const

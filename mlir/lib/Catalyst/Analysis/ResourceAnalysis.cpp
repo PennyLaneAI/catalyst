@@ -52,8 +52,9 @@ static bool isSkippedOp(Operation *op)
 static bool isCustomDialectOp(Operation *op)
 {
     mlir::Dialect *dialect = op->getDialect();
-    if (!dialect)
+    if (!dialect) {
         return false;
+    }
     return isa<quantum::QuantumDialect, qec::QECDialect, mbqc::MBQCDialect>(dialect);
 }
 
@@ -108,8 +109,9 @@ static std::string getQECOpName(Operation *op)
     return llvm::TypeSwitch<Operation *, std::string>(op)
         .Case<qec::PPRotationOp>([](auto pprOp) -> std::string {
             int16_t rk = pprOp.getRotationKindAttr().getValue().getSExtValue();
-            if (rk == 0)
+            if (rk == 0) {
                 return "PPR-identity";
+            }
             return "PPR-pi/" + std::to_string(std::abs(rk));
         })
         .Case<qec::PPRotationArbitraryOp>([](auto) -> std::string { return "PPR-Phi"; })
@@ -153,8 +155,9 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
 
     StringRef entryFunc;
     op->walk([&](func::FuncOp funcOp) {
-        if (funcOp.isDeclaration())
+        if (funcOp.isDeclaration()) {
             return;
+        }
 
         ResourceResult result;
         for (auto &region : funcOp->getRegions()) {
@@ -162,8 +165,8 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
         }
         funcResults[funcOp.getName()] = std::move(result);
 
-        // main/entry function is the first function marked with "qnode"
-        if (funcOp->hasAttr("qnode") && entryFunc.empty()) {
+        // main/entry function is the first function with no declaration
+        if (entryFunc.empty()) {
             entryFunc = funcOp.getName();
         }
     });
@@ -353,8 +356,9 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     }
 
     // Skipped ops
-    if (isSkippedOp(op))
+    if (isSkippedOp(op)) {
         return;
+    }
 
     // Other ops from custom dialects: emit a warning so users are aware
     if (isCustomDialectOp(op)) {
@@ -369,8 +373,9 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 void ResourceAnalysis::resolveFunctionCalls(StringRef funcName)
 {
     auto it = funcResults.find(funcName);
-    if (it == funcResults.end())
+    if (it == funcResults.end()) {
         return;
+    }
 
     ResourceResult &resources = it->second;
 
@@ -383,9 +388,9 @@ void ResourceAnalysis::resolveFunctionCalls(StringRef funcName)
         int64_t callCount = callEntry.getValue();
 
         auto calleeIt = funcResults.find(calledFunc);
-        if (calleeIt == funcResults.end())
+        if (calleeIt == funcResults.end()) {
             continue; // External function, cannot resolve
-
+        }
         resolveFunctionCalls(calledFunc);
 
         // Scale and merge callee resources
