@@ -302,6 +302,8 @@ def handle_qnode(
         print("Case 1: User specified a stopping condition in decomposition.")
         
         # Use the plxpr decompose transform and ignore graph
+        # TODO: Figure out if it is problematic to use tgateset here instead of tkwargs.
+        # Instead of union, this should be intersection with the compiler ops for decomposition?
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
             consts=consts,
@@ -314,9 +316,8 @@ def handle_qnode(
         stopping_condition = None
         if use_device_specific_decomposition:
             device_capabilities = get_device_capabilities(device, execution_config, shots_len)
-            device_specific_gate_set = device_capabilities.gate_set(
-                differentiable=False
-            )  # TODO: Figure out when differentiable=False is not the case.
+            # TODO: Differentiable is False by default. Only true when we use lightning device with adjoint differentiation.
+            device_specific_gate_set = device_capabilities.gate_set()
             self.decompose_tkwargs.update({"gate_set": device_specific_gate_set})
             device_diff_method = calculate_diff_method(qnode, closed_jaxpr)
             stopping_condition = lambda op: catalyst_acceptance(
@@ -324,11 +325,12 @@ def handle_qnode(
             )
 
         # Using plxpr decomposition on device-specific gate set when graph is disabled.
+        # TODO: Figure out if it is problematic to use tkwargs here instead of tgateset.
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=closed_jaxpr.jaxpr,
             consts=closed_jaxpr.consts,
             ncargs=non_const_args,
-            tkwargs=self.decompose_tkwargs,
+            tkwarge=self.decompose_tkwargs,
             stopping_condition=stopping_condition,
         )
     elif qml.decomposition.enabled_graph():
@@ -347,6 +349,7 @@ def handle_qnode(
             print("Case 3.1: User did not specify a decomposition. Using graph-based decomposition on device-specific gate set.")
             device_capabilities = get_device_capabilities(device, execution_config, shots_len)
             # TODO: Differentiable is False by default. Only true when we use lightning device with adjoint differentiation.
+            # device_specific_gate_set = set(device_capabilities.operators.keys())
             device_specific_gate_set = device_capabilities.gate_set()
             gateset = {"gate_set": device_specific_gate_set}
             self.requires_decompose_lowering = True
