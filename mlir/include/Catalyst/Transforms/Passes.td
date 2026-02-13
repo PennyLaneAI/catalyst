@@ -238,4 +238,9 @@ def BufferDeallocationPass : Pass<"buffer-deallocation", "func::FuncOp"> {
   }];
 }
 
+def MyHelloWorldPass : Pass<"my-hello-world"> {
+    let summary = "An empty pass boilerplate that prints out hello world.";
+}
+
+
 #endif // CATALYST_PASSES
