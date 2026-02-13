@@ -545,11 +545,12 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
             Location loc = origFunc.getLoc();
             OpBuilder moduleBuilder(origFunc);
 
-            // Clone origFunc -> origFunc.quantum (<circuit_name>.quantum)
-            // origFunc.quantum will contain the quantum operations and return individual expvals
-            // origFunc will be the entry point that calls quantumFunc and does post-processing
+            // Clone origFunc -> origFunc.single_terms (<circuit_name>.single_terms)
+            // origFunc.single_terms will contain the quantum operations and return individual
+            // expvals origFunc will be the entry point that calls quantumFunc and does
+            // post-processing
             IRMapping cloneMapping;
-            std::string quantumFuncName = origFunc.getName().str() + ".quantum";
+            std::string quantumFuncName = origFunc.getName().str() + ".single_terms";
             auto quantumFunc = cast<func::FuncOp>(moduleBuilder.clone(*origFunc, cloneMapping));
             quantumFunc.setName(quantumFuncName);
 
