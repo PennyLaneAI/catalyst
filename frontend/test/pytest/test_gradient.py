@@ -1778,6 +1778,7 @@ def test_vmap_worflow_derivation(backend):
     assert jnp.allclose(data_cat[0], data_jax[0])
     assert jnp.allclose(data_cat[1], data_jax[1])
 
+
 @pytest.mark.xfail(reason="First need #332, then Vmap yields wrong results when differentiated")
 def test_forloop_vmap_worflow_derivation(backend):
     """Test a forloop vmap."""
