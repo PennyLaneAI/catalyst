@@ -14,6 +14,7 @@
 
 // RUN: quantum-opt --dynamic-one-shot --split-input-file --verify-diagnostics %s | FileCheck %s
 
+
 func.func public @test_expval(%arg0: f64) -> tensor<f64> {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
@@ -30,24 +31,33 @@ func.func public @test_expval(%arg0: f64) -> tensor<f64> {
 }
 
 
-// CHECK: func.func public @test_expval.one_shot_kernel(%arg0: f64) -> tensor<f64>
+// CHECK: func.func public @test_expval.quantum.one_shot_kernel(%arg0: f64) -> f64
 // CHECK:  [[one:%.+]] = arith.constant 1 : i64
 // CHECK:  quantum.device shots([[one]]) ["", "", ""]
+// CHECK:  quantum.expval
 
-// CHECK: func.func public @test_expval(%arg0: f64) -> tensor<f64> {
+// CHECK: func.func public @test_expval.quantum(%arg0: f64) -> f64 {
 // CHECK:   [[shots:%.+]] = arith.constant 1000 : i64
-// CHECK:   [[loopIterSum:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
+// CHECK:   [[loopIterSum:%.+]] = arith.constant 0.000000e+00 : f64
 // CHECK:   [[lb:%.+]] = arith.constant 0 : index
 // CHECK:   [[step:%.+]] = arith.constant 1 : index
 // CHECK:   [[ub:%.+]] = index.casts [[shots]] : i64 to index
-// CHECK:   [[totalSum:%.+]] = scf.for %arg1 = [[lb]] to [[ub]] step [[step]] iter_args(%arg2 = [[loopIterSum]]) -> (tensor<f64>) {
-// CHECK:     [[call:%.+]] = func.call @test_expval.one_shot_kernel(%arg0) : (f64) -> tensor<f64>
-// CHECK:     [[add:%.+]] = stablehlo.add [[call]], %arg2 : tensor<f64>
-// CHECK:     scf.yield [[add]] : tensor<f64>
+// CHECK:   [[totalSum:%.+]] = scf.for %arg1 = [[lb]] to [[ub]] step [[step]] iter_args(%arg2 = [[loopIterSum]]) -> (f64) {
+// CHECK:     [[call:%.+]] = func.call @test_expval.quantum.one_shot_kernel(%arg0) : (f64) -> f64
+// CHECK:     [[add:%.+]] = arith.addf [[call]], %arg2 : f64
+// CHECK:     scf.yield [[add]] : f64
 // CHECK:   [[castShots:%.+]] = arith.sitofp [[shots]] : i64 to f64
-// CHECK:   [[fromElem:%.+]] = tensor.from_elements [[castShots]] : tensor<f64>
-// CHECK:   [[div:%.+]] = stablehlo.divide [[totalSum]], [[fromElem]] : tensor<f64>
-// CHECK:   return [[div]] : tensor<f64>
+// CHECK:   [[div:%.+]] = arith.divf [[totalSum]], [[castShots]] : f64
+// CHECK:   return [[div]] : f64
+
+// CHECK: func.func public @test_expval.postprocess(%arg0: f64, %arg1: f64) -> tensor<f64>
+// CHECK:   [[from_elements:%.+]] = tensor.from_elements %arg1 : tensor<f64>
+// CHECK:   return [[from_elements]] : tensor<f64>
+
+// CHECK: func.func public @test_expval(%arg0: f64) -> tensor<f64>
+// CHECK:   [[quantum_call:%.+]] = call @test_expval.quantum(%arg0) : (f64) -> f64
+// CHECK:   [[post_process_call:%.+]] = call @test_expval.postprocess(%arg0, [[quantum_call]]) : (f64, f64) -> tensor<f64>
+// CHECK:   return [[post_process_call]] : tensor<f64>
 
 
 // -----
@@ -70,7 +80,7 @@ func.func public @test_expval_mcm(%arg0: f64) -> tensor<f64> {
 }
 
 
-// CHECK:   func.func public @test_expval_mcm.one_shot_kernel(%arg0: f64) -> tensor<f64>
+// CHECK:   func.func public @test_expval_mcm.quantum.one_shot_kernel(%arg0: f64) -> f64
 // CHECK:     [[one:%.+]] = arith.constant 1 : i64
 // CHECK:     quantum.device shots([[one]]) ["", "", ""]
 // CHECK:     [[mres:%.+]], {{%.+}} = quantum.measure {{%.+}} : i1, !quantum.bit
@@ -80,14 +90,22 @@ func.func public @test_expval_mcm(%arg0: f64) -> tensor<f64> {
 // CHECK:     quantum.device_release
 // CHECK:     [[extend:%.+]] = arith.extui [[mres]] : i1 to i64
 // CHECK:     [[cast:%.+]] = arith.sitofp [[extend]] : i64 to f64
-// CHECK:     [[fromElements:%.+]] = tensor.from_elements [[cast]] : tensor<f64>
-// CHECK:     return [[fromElements]] : tensor<f64>
-//
-// CHECK:   func.func public @test_expval_mcm(%arg0: f64) -> tensor<f64>
+// CHECK:     return [[cast]] : f64
+
+// CHECK:   func.func public @test_expval_mcm.quantum(%arg0: f64) -> f64
 // CHECK:      scf.for
-// CHECK:      func.call @test_expval_mcm.one_shot_kernel(%arg0)
-// CHECK:      stablehlo.add
-// CHECK:      stablehlo.divide
+// CHECK:      func.call @test_expval_mcm.quantum.one_shot_kernel(%arg0)
+// CHECK:      arith.addf
+// CHECK:    arith.divf
+
+// CHECK:   func.func public @test_expval_mcm.postprocess(%arg0: f64, %arg1: f64) -> tensor<f64>
+// CHECK:     [[from_elements:%.+]] = tensor.from_elements %arg1 : tensor<f64>
+// CHECK:     return [[from_elements]] : tensor<f64>
+
+// CHECK:   func.func public @test_expval_mcm(%arg0: f64) -> tensor<f64>
+// CHECK:     [[quantum_call:%.+]] = call @test_expval_mcm.quantum(%arg0) : (f64) -> f64
+// CHECK:     [[post_process_call:%.+]] = call @test_expval_mcm.postprocess(%arg0, [[quantum_call]]) : (f64, f64) -> tensor<f64>
+// CHECK:     return [[post_process_call]] : tensor<f64>
 
 
 // -----
@@ -109,7 +127,7 @@ func.func public @test_var_mcm(%arg0: f64) -> tensor<f64> {
   return %from_elements : tensor<f64>
 }
 
-// CHECK:   func.func public @test_var_mcm.one_shot_kernel(%arg0: f64) -> tensor<f64>
+// CHECK:   func.func public @test_var_mcm.quantum.one_shot_kernel(%arg0: f64) -> f64
 // CHECK:     [[one:%.+]] = arith.constant 1 : i64
 // CHECK:     quantum.device shots([[one]]) ["", "", ""]
 // CHECK:     [[mres:%.+]], {{%.+}} = quantum.measure {{%.+}} : i1, !quantum.bit
@@ -119,17 +137,25 @@ func.func public @test_var_mcm(%arg0: f64) -> tensor<f64> {
 // CHECK:     quantum.device_release
 // CHECK:     [[extend:%.+]] = arith.extui [[mres]] : i1 to i64
 // CHECK:     [[cast:%.+]] = arith.sitofp [[extend]] : i64 to f64
-// CHECK:     [[fromElements:%.+]] = tensor.from_elements [[cast]] : tensor<f64>
-// CHECK:     return [[fromElements]] : tensor<f64>
-//
-// CHECK:   func.func public @test_var_mcm(%arg0: f64) -> tensor<f64>
+// CHECK:     return [[cast]] : f64
+
+// CHECK:   func.func public @test_var_mcm.quantum(%arg0: f64) -> f64
 // CHECK:      scf.for
-// CHECK:      func.call @test_var_mcm.one_shot_kernel(%arg0)
-// CHECK:      stablehlo.add
-// CHECK:      [[expval:%.+]] = stablehlo.divide
-// CHECK:      [[square:%.+]] = stablehlo.multiply [[expval]], [[expval]]
-// CHECK:      [[variance:%.+]] = stablehlo.subtract [[expval]], [[square]]
-// CHECK:      return [[variance]]
+// CHECK:      func.call @test_var_mcm.quantum.one_shot_kernel(%arg0)
+// CHECK:      arith.addf
+// CHECK:    [[expval:%.+]] = arith.divf
+// CHECK:    [[square:%.+]] = arith.mulf [[expval]], [[expval]]
+// CHECK:    [[variance:%.+]] = arith.subf [[expval]], [[square]]
+// CHECK:    return [[variance]] : f64
+
+// CHECK: func.func public @test_var_mcm.postprocess(%arg0: f64, %arg1: f64) -> tensor<f64>
+// CHECK:   [[from_elements:%.+]] = tensor.from_elements %arg1 : tensor<f64>
+// CHECK:   return [[from_elements]] : tensor<f64>
+
+// CHECK: func.func public @test_var_mcm(%arg0: f64) -> tensor<f64>
+// CHECK:   [[quantum_call:%.+]] = call @test_var_mcm.quantum(%arg0) : (f64) -> f64
+// CHECK:   [[post_process_call:%.+]] = call @test_var_mcm.postprocess(%arg0, [[quantum_call]]) : (f64, f64) -> tensor<f64>
+// CHECK:   return [[post_process_call]] : tensor<f64>
 
 
 // -----
@@ -150,18 +176,19 @@ func.func public @test_probs(%arg0: f64) -> tensor<4xf64> {
   return %4 : tensor<4xf64>
 }
 
-// CHECK: func.func public @test_probs.one_shot_kernel(%arg0: f64) -> tensor<4xf64>
+// CHECK: func.func public @test_probs.quantum.one_shot_kernel(%arg0: f64) -> tensor<4xf64>
 // CHECK:   [[one:%.+]] = arith.constant 1 : i64
 // CHECK:   quantum.device shots([[one]]) ["", "", ""]
+// CHECK:   quantum.probs
 
-// CHECK: func.func public @test_probs(%arg0: f64) -> tensor<4xf64> {
+// CHECK: func.func public @test_probs.quantum(%arg0: f64) -> tensor<4xf64> {
 // CHECK:   [[shots:%.+]] = arith.constant 1000 : i64
 // CHECK:   [[loopIterSum:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<4xf64>
 // CHECK:   [[lb:%.+]] = arith.constant 0 : index
 // CHECK:   [[step:%.+]] = arith.constant 1 : index
 // CHECK:   [[ub:%.+]] = index.casts [[shots]] : i64 to index
 // CHECK:   [[totalSum:%.+]] = scf.for %arg1 = [[lb]] to [[ub]] step [[step]] iter_args(%arg2 = [[loopIterSum]]) -> (tensor<4xf64>) {
-// CHECK:     [[call:%.+]] = func.call @test_probs.one_shot_kernel(%arg0) : (f64) -> tensor<4xf64>
+// CHECK:     [[call:%.+]] = func.call @test_probs.quantum.one_shot_kernel(%arg0) : (f64) -> tensor<4xf64>
 // CHECK:     [[add:%.+]] = stablehlo.add [[call]], %arg2 : tensor<4xf64>
 // CHECK:     scf.yield [[add]] : tensor<4xf64>
 // CHECK:   [[castShots:%.+]] = arith.sitofp [[shots]] : i64 to f64
@@ -169,6 +196,14 @@ func.func public @test_probs(%arg0: f64) -> tensor<4xf64> {
 // CHECK:   [[broadcastShots:%.+]] = stablehlo.broadcast_in_dim [[fromElem]], dims = [] : (tensor<f64>) -> tensor<4xf64>
 // CHECK:   [[div:%.+]] = stablehlo.divide [[totalSum]], [[broadcastShots]] : tensor<4xf64>
 // CHECK:   return [[div]] : tensor<4xf64>
+
+// CHECK: func.func public @test_probs.postprocess(%arg0: f64, %arg1: tensor<4xf64>) -> tensor<4xf64>
+// CHECK:   return %arg1 : tensor<4xf64>
+
+// CHECK: func.func public @test_probs(%arg0: f64) -> tensor<4xf64>
+// CHECK:   [[quantum_call:%.+]] = call @test_probs.quantum(%arg0) : (f64) -> tensor<4xf64>
+// CHECK:   [[post_process_call:%.+]] = call @test_probs.postprocess(%arg0, [[quantum_call]]) : (f64, tensor<4xf64>) -> tensor<4xf64>
+// CHECK:   return [[post_process_call]] : tensor<4xf64>
 
 
 // -----
@@ -193,7 +228,7 @@ func.func public @test_probs_mcm(%arg0: f64) -> tensor<4xf64> {
 }
 
 
-// CHECK:   func.func public @test_probs_mcm.one_shot_kernel(%arg0: f64) -> tensor<4xf64>
+// CHECK:   func.func public @test_probs_mcm.quantum.one_shot_kernel(%arg0: f64) -> tensor<4xf64>
 // CHECK:     [[one:%.+]] = arith.constant 1 : i64
 // CHECK:     quantum.device shots([[one]]) ["", "", ""]
 // CHECK:     [[mres0:%.+]], {{%.+}} = quantum.measure {{%.+}} : i1, !quantum.bit
@@ -219,12 +254,20 @@ func.func public @test_probs_mcm(%arg0: f64) -> tensor<4xf64> {
 // CHECK:     [[one:%.+]] = arith.constant 1.000000e+00 : f64
 // CHECK:     [[inserted:%.+]] = tensor.insert [[one]] into [[zeroTensor]][[[indexCast]]] : tensor<4xf64>
 // CHECK:     return [[inserted]] : tensor<4xf64>
-//
-// CHECK:   func.func public @test_probs_mcm(%arg0: f64) -> tensor<4xf64>
+
+// CHECK:   func.func public @test_probs_mcm.quantum(%arg0: f64) -> tensor<4xf64>
 // CHECK:      scf.for
-// CHECK:      func.call @test_probs_mcm.one_shot_kernel(%arg0)
-// CHECK:      stablehlo.add
+// CHECK:        func.call @test_probs_mcm.quantum.one_shot_kernel(%arg0)
+// CHECK:        stablehlo.add
 // CHECK:      stablehlo.divide
+
+// CHECK: func.func public @test_probs_mcm.postprocess(%arg0: f64, %arg1: tensor<4xf64>) -> tensor<4xf64>
+// CHECK:   return %arg1 : tensor<4xf64>
+
+// CHECK: func.func public @test_probs_mcm(%arg0: f64) -> tensor<4xf64>
+// CHECK:   [[quantum_call:%.+]] = call @test_probs_mcm.quantum(%arg0) : (f64) -> tensor<4xf64>
+// CHECK:   [[post_process_call:%.+]] = call @test_probs_mcm.postprocess(%arg0, [[quantum_call]]) : (f64, tensor<4xf64>) -> tensor<4xf64>
+// CHECK:   return [[post_process_call]] : tensor<4xf64>
 
 
 // -----
@@ -245,12 +288,12 @@ func.func public @test_probs_dynamic_shape(%arg0: f64, %num_qubits: i64) -> tens
   return %4 : tensor<?xf64>
 }
 
-// CHECK: func.func public @test_probs_dynamic_shape.one_shot_kernel(%arg0: f64, [[num_qubits:%.+]]: i64) -> tensor<?xf64>
+// CHECK: func.func public @test_probs_dynamic_shape.quantum.one_shot_kernel(%arg0: f64, [[num_qubits:%.+]]: i64) -> tensor<?xf64>
 // CHECK:   [[one:%.+]] = arith.constant 1 : i64
 // CHECK:   quantum.device shots([[one]]) ["", "", ""]
 // CHECK:   quantum.probs {{%.+}} shape [[num_qubits]] : tensor<?xf64>
 
-// CHECK: func.func public @test_probs_dynamic_shape(%arg0: f64, [[num_qubits:%.+]]: i64) -> tensor<?xf64>
+// CHECK: func.func public @test_probs_dynamic_shape.quantum(%arg0: f64, [[num_qubits:%.+]]: i64) -> tensor<?xf64>
 // CHECK:   [[shots:%.+]] = arith.constant 1000 : i64
 // CHECK:   [[zeroScalar:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
 // CHECK:   [[num_qubits_i32:%.+]] = arith.trunci [[num_qubits]] : i64 to i32
@@ -260,7 +303,7 @@ func.func public @test_probs_dynamic_shape(%arg0: f64, %num_qubits: i64) -> tens
 // CHECK:   [[step:%.+]] = arith.constant 1 : index
 // CHECK:   [[ub:%.+]] = index.casts [[shots]] : i64 to index
 // CHECK:   [[totalSum:%.+]] = scf.for %arg2 = [[lb]] to [[ub]] step [[step]] iter_args(%arg3 = [[loopIterSum]]) -> (tensor<?xf64>) {
-// CHECK:     [[call:%.+]] = func.call @test_probs_dynamic_shape.one_shot_kernel(%arg0, [[num_qubits]]) : (f64, i64) -> tensor<?xf64>
+// CHECK:     [[call:%.+]] = func.call @test_probs_dynamic_shape.quantum.one_shot_kernel(%arg0, [[num_qubits]]) : (f64, i64) -> tensor<?xf64>
 // CHECK:     [[add:%.+]] = stablehlo.add [[call]], %arg3 : tensor<?xf64>
 // CHECK:     scf.yield [[add]] : tensor<?xf64>
 // CHECK:   [[castShots:%.+]] = arith.sitofp [[shots]] : i64 to f64
@@ -270,6 +313,14 @@ func.func public @test_probs_dynamic_shape(%arg0: f64, %num_qubits: i64) -> tens
 // CHECK:   [[broadcastShots:%.+]] = stablehlo.dynamic_broadcast_in_dim [[shots_fromElem]], [[num_qubits_tensor]], dims = [] : (tensor<f64>, tensor<1xi32>) -> tensor<?xf64>
 // CHECK:   [[div:%.+]] = stablehlo.divide [[totalSum]], [[broadcastShots]] : tensor<?xf64>
 // CHECK:   return [[div]] : tensor<?xf64>
+
+// CHECK:  func.func public @test_probs_dynamic_shape.postprocess(%arg0: f64, %arg1: i64, %arg2: tensor<?xf64>) -> tensor<?xf64>
+// CHECK:    return %arg2 : tensor<?xf64>
+
+// CHECK:  func.func public @test_probs_dynamic_shape(%arg0: f64, %arg1: i64) -> tensor<?xf64>
+// CHECK:    [[quantum_call:%.+]] = call @test_probs_dynamic_shape.quantum(%arg0, %arg1) : (f64, i64) -> tensor<?xf64>
+// CHECK:    [[post_process_call]] = call @test_probs_dynamic_shape.postprocess(%arg0, %arg1, [[quantum_call]]) : (f64, i64, tensor<?xf64>) -> tensor<?xf64>
+// CHECK:    return [[post_process_call]] : tensor<?xf64>
 
 
 // -----
@@ -292,24 +343,32 @@ func.func public @test_sample(%arg0: f64) -> tensor<1000x2xi64> {
 }
 
 
-// CHECK: func.func public @test_sample.one_shot_kernel(%arg0: f64) -> tensor<1x2xi64>
+// CHECK: func.func public @test_sample.quantum.one_shot_kernel(%arg0: f64) -> tensor<1x2xf64>
 // CHECK:   [[one:%.+]] = arith.constant 1 : i64
 // CHECK:   quantum.device shots([[one]]) ["", "", ""]
 // CHECK:   [[sample:%.+]] = quantum.sample {{%.+}} : tensor<1x2xf64>
-// CHECK:   [[cast:%.+]] = stablehlo.convert [[sample]] : (tensor<1x2xf64>) -> tensor<1x2xi64>
-// CHECK:   return [[cast]] : tensor<1x2xi64>
+// CHECK:   return [[sample]] : tensor<1x2xf64>
 
-// CHECK: func.func public @test_sample(%arg0: f64) -> tensor<1000x2xi64> {
+// CHECK: func.func public @test_sample.quantum(%arg0: f64) -> tensor<1000x2xf64> {
 // CHECK:   [[shots:%.+]] = arith.constant 1000 : i64
-// CHECK:   [[empty:%.+]] = tensor.empty() : tensor<1000x2xi64>
+// CHECK:   [[empty:%.+]] = tensor.empty() : tensor<1000x2xf64>
 // CHECK:   [[lb:%.+]] = arith.constant 0 : index
 // CHECK:   [[step:%.+]] = arith.constant 1 : index
 // CHECK:   [[ub:%.+]] = index.casts [[shots]] : i64 to index
-// CHECK:   [[fullSamples:%.+]] = scf.for %arg1 = [[lb]] to [[ub]] step [[step]] iter_args(%arg2 = [[empty]]) -> (tensor<1000x2xi64>) {
-// CHECK:      [[call:%.+]] = func.call @test_sample.one_shot_kernel(%arg0) : (f64) -> tensor<1x2xi64>
-// CHECK:      [[insert:%.+]] = tensor.insert_slice [[call]] into %arg2[%arg1, 0] [1, 2] [1, 1] : tensor<1x2xi64> into tensor<1000x2xi64>
-// CHECK:      scf.yield [[insert]] : tensor<1000x2xi64>
-// CHECK:    return [[fullSamples]] : tensor<1000x2xi64>
+// CHECK:   [[fullSamples:%.+]] = scf.for %arg1 = [[lb]] to [[ub]] step [[step]] iter_args(%arg2 = [[empty]]) -> (tensor<1000x2xf64>) {
+// CHECK:      [[call:%.+]] = func.call @test_sample.quantum.one_shot_kernel(%arg0) : (f64) -> tensor<1x2xf64>
+// CHECK:      [[insert:%.+]] = tensor.insert_slice [[call]] into %arg2[%arg1, 0] [1, 2] [1, 1] : tensor<1x2xf64> into tensor<1000x2xf64>
+// CHECK:      scf.yield [[insert]] : tensor<1000x2xf64>
+// CHECK:    return [[fullSamples]] : tensor<1000x2xf64>
+
+// CHECK:  func.func public @test_sample.postprocess(%arg0: f64, %arg1: tensor<1000x2xf64>) -> tensor<1000x2xi64>
+// CHECK:    [[cast:%.+]] = stablehlo.convert %arg1 : (tensor<1000x2xf64>) -> tensor<1000x2xi64>
+// CHECK:    return [[cast]] : tensor<1000x2xi64>
+
+// CHECK:  func.func public @test_sample(%arg0: f64) -> tensor<1000x2xi64>
+// CHECK:    [[quantum_call:%.+]] = call @test_sample.quantum(%arg0) : (f64) -> tensor<1000x2xf64>
+// CHECK:    [[post_process_call:%.+]] = call @test_sample.postprocess(%arg0, [[quantum_call]]) : (f64, tensor<1000x2xf64>) -> tensor<1000x2xi64>
+// CHECK:    return [[post_process_call]] : tensor<1000x2xi64>
 
 
 // -----
@@ -331,20 +390,32 @@ func.func public @test_sample_mcm(%arg0: f64) -> tensor<1000x1xi64> {
   return %5 : tensor<1000x1xi64>
 }
 
-// CHECK:   func.func public @test_sample_mcm.one_shot_kernel(%arg0: f64) -> tensor<1x1xi64>
+// CHECK:   func.func public @test_sample_mcm.quantum.one_shot_kernel(%arg0: f64) -> tensor<1x1xf64>
 // CHECK:     [[one:%.+]] = arith.constant 1 : i64
 // CHECK:     quantum.device shots([[one]]) ["", "", ""]
 // CHECK:     [[mres:%.+]], {{%.+}} = quantum.measure {{%.+}} : i1, !quantum.bit
 // CHECK-NOT:    quantum.mcmobs
 // CHECK-NOT:    quantum.sample
 // CHECK:     [[extend:%.+]] = arith.extui [[mres]] : i1 to i64
-// CHECK:     [[fromElements:%.+]] = tensor.from_elements [[extend]] : tensor<1x1xi64>
-// CHECK:     return [[fromElements]] : tensor<1x1xi64>
-//
-// CHECK:   func.func public @test_sample_mcm(%arg0: f64) -> tensor<1000x1xi64>
+// CHECK:     [[cast:%.+]] = arith.sitofp [[extend]] : i64 to f64
+// CHECK:     [[fromElements:%.+]] = tensor.from_elements [[cast]] : tensor<1x1xf64>
+// CHECK:     return [[fromElements]] : tensor<1x1xf64>
+
+// CHECK:   func.func public @test_sample_mcm.quantum(%arg0: f64) -> tensor<1000x1xf64>
+// CHECK:      tensor.empty() : tensor<1000x1xf64>
 // CHECK:      scf.for
-// CHECK:      func.call @test_sample_mcm.one_shot_kernel(%arg0)
-// CHECK:      tensor.insert_slice
+// CHECK:        func.call @test_sample_mcm.quantum.one_shot_kernel(%arg0)
+// CHECK:        tensor.insert_slice
+
+// CHECK:  func.func public @test_sample_mcm.postprocess(%arg0: f64, %arg1: tensor<1000x1xf64>) -> tensor<1000x1xi64>
+// CHECK:    [[cast:%.+]] = stablehlo.convert %arg1 : (tensor<1000x1xf64>) -> tensor<1000x1xi64>
+// CHECK:    return [[cast]] : tensor<1000x1xi64>
+
+// CHECK:  func.func public @test_sample_mcm(%arg0: f64) -> tensor<1000x1xi64>
+// CHECK:    [[quantum_call:%.+]] = call @test_sample_mcm.quantum(%arg0) : (f64) -> tensor<1000x1xf64>
+// CHECK:    [[post_process_call:%.+]] = call @test_sample_mcm.postprocess(%arg0, [[quantum_call]]) : (f64, tensor<1000x1xf64>) -> tensor<1000x1xi64>
+// CHECK:    return [[post_process_call]] : tensor<1000x1xi64>
+
 
 // -----
 
@@ -365,26 +436,34 @@ func.func public @test_sample_dynamic_shape(%arg0: f64, %shots: i64, %num_qubits
 }
 
 
-// CHECK: func.func public @test_sample_dynamic_shape.one_shot_kernel(%arg0: f64, [[shots:%.+]]: i64, [[num_qubits:%.+]]: i64) -> tensor<1x?xi64>
+// CHECK: func.func public @test_sample_dynamic_shape.quantum.one_shot_kernel(%arg0: f64, [[shots:%.+]]: i64, [[num_qubits:%.+]]: i64) -> tensor<1x?xf64>
 // CHECK:   [[one:%.+]] = arith.constant 1 : i64
 // CHECK:   quantum.device shots([[one]]) ["", "", ""]
 // CHECK:   [[sample:%.+]] = quantum.sample {{%.+}} shape [[num_qubits]] : tensor<1x?xf64>
-// CHECK:   [[cast:%.+]] = stablehlo.convert [[sample]] : (tensor<1x?xf64>) -> tensor<1x?xi64>
-// CHECK:   return [[cast]] : tensor<1x?xi64>
+// CHECK:   return [[sample]] : tensor<1x?xf64>
 
-// CHECK: func.func public @test_sample_dynamic_shape(%arg0: f64, [[shots:%.+]]: i64, [[num_qubits:%.+]]: i64) -> tensor<?x?xi64>
+// CHECK: func.func public @test_sample_dynamic_shape.quantum(%arg0: f64, [[shots:%.+]]: i64, [[num_qubits:%.+]]: i64) -> tensor<?x?xf64>
 // CHECK:   [[shots_cast:%.+]] = index.casts [[shots]] : i64 to index
 // CHECK:   [[num_qubits_cast:%.+]] = index.casts [[num_qubits]] : i64 to index
-// CHECK:   [[empty:%.+]] = tensor.empty([[shots_cast]], [[num_qubits_cast]]) : tensor<?x?xi64>
+// CHECK:   [[empty:%.+]] = tensor.empty([[shots_cast]], [[num_qubits_cast]]) : tensor<?x?xf64>
 // CHECK:   [[lb:%.+]] = arith.constant 0 : index
 // CHECK:   [[step:%.+]] = arith.constant 1 : index
 // CHECK:   [[ub:%.+]] = index.casts [[shots]] : i64 to index
-// CHECK:   [[fullSamples:%.+]] = scf.for %arg3 = [[lb]] to [[ub]] step [[step]] iter_args(%arg4 = [[empty]]) -> (tensor<?x?xi64>) {
-// CHECK:      [[call:%.+]] = func.call @test_sample_dynamic_shape.one_shot_kernel(%arg0, %arg1, [[num_qubits]]) : (f64, i64, i64) -> tensor<1x?xi64>
+// CHECK:   [[fullSamples:%.+]] = scf.for %arg3 = [[lb]] to [[ub]] step [[step]] iter_args(%arg4 = [[empty]]) -> (tensor<?x?xf64>)
+// CHECK:      [[call:%.+]] = func.call @test_sample_dynamic_shape.quantum.one_shot_kernel(%arg0, %arg1, [[num_qubits]]) : (f64, i64, i64) -> tensor<1x?xf64>
 // CHECK:      [[num_qubits_cast:%.+]] = index.casts [[num_qubits]] : i64 to index
-// CHECK:      [[insert:%.+]] = tensor.insert_slice [[call]] into %arg4[%arg3, 0] [1, [[num_qubits_cast]]] [1, 1] : tensor<1x?xi64> into tensor<?x?xi64>
-// CHECK:      scf.yield [[insert]] : tensor<?x?xi64>
-// CHECK:    return [[fullSamples]] : tensor<?x?xi64>
+// CHECK:      [[insert:%.+]] = tensor.insert_slice [[call]] into %arg4[%arg3, 0] [1, [[num_qubits_cast]]] [1, 1] : tensor<1x?xf64> into tensor<?x?xf64>
+// CHECK:      scf.yield [[insert]] : tensor<?x?xf64>
+// CHECK:    return [[fullSamples]] : tensor<?x?xf64>
+
+// CHECK:  func.func public @test_sample_dynamic_shape.postprocess(%arg0: f64, %arg1: i64, %arg2: i64, %arg3: tensor<?x?xf64>) -> tensor<?x?xi64>
+// CHECK:    %0 = stablehlo.convert %arg3 : (tensor<?x?xf64>) -> tensor<?x?xi64>
+// CHECK:    return %0 : tensor<?x?xi64>
+
+// CHECK:  func.func public @test_sample_dynamic_shape(%arg0: f64, %arg1: i64, %arg2: i64) -> tensor<?x?xi64>
+// CHECK:    [[quantum_call:%.+]] = call @test_sample_dynamic_shape.quantum(%arg0, %arg1, %arg2) : (f64, i64, i64) -> tensor<?x?xf64>
+// CHECK:    [[post_process_call:%.+]] = call @test_sample_dynamic_shape.postprocess(%arg0, %arg1, %arg2, [[quantum_call]]) : (f64, i64, i64, tensor<?x?xf64>) -> tensor<?x?xi64>
+// CHECK:    return %1 : tensor<?x?xi64>
 
 
 // -----
@@ -407,23 +486,34 @@ func.func public @test_counts(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) {
 }
 
 
-// CHECK: func.func public @test_counts.one_shot_kernel(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>)
+// CHECK: func.func public @test_counts.quantum.one_shot_kernel(%arg0: f64) -> (tensor<4xf64>, tensor<4xi64>)
 // CHECK:   [[one:%.+]] = arith.constant 1 : i64
 // CHECK:   quantum.device shots([[one]]) ["", "", ""]
+// CHECK:   quantum.counts
 
-// CHECK: func.func public @test_counts(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) {
+// CHECK: func.func public @test_counts.quantum(%arg0: f64) -> (tensor<4xf64>, tensor<4xi64>)
 // CHECK:   [[shots:%.+]] = arith.constant 1000 : i64
 // CHECK:   [[countsSum:%.+]] = stablehlo.constant dense<0> : tensor<4xi64>
-// CHECK:   [[eigens:%.+]] = tensor.empty() : tensor<4xi64>
+// CHECK:   [[eigens:%.+]] = tensor.empty() : tensor<4xf64>
 // CHECK:   [[lb:%.+]] = arith.constant 0 : index
 // CHECK:   [[step:%.+]] = arith.constant 1 : index
 // CHECK:   [[ub:%.+]] = index.casts [[shots]] : i64 to index
 // CHECK:   [[forOut:%.+]]:2 = scf.for %arg1 = [[lb]] to [[ub]] step [[step]]
-// CHECK-SAME:   (%arg2 = [[eigens]], %arg3 = [[countsSum]]) -> (tensor<4xi64>, tensor<4xi64>)
-// CHECK:     [[call:%.+]]:2 = func.call @test_counts.one_shot_kernel(%arg0) : (f64) -> (tensor<4xi64>, tensor<4xi64>)
+// CHECK-SAME:   (%arg2 = [[eigens]], %arg3 = [[countsSum]]) -> (tensor<4xf64>, tensor<4xi64>)
+// CHECK:     [[call:%.+]]:2 = func.call @test_counts.quantum.one_shot_kernel(%arg0) : (f64) -> (tensor<4xf64>, tensor<4xi64>)
 // CHECK:     [[add:%.+]] = stablehlo.add [[call]]#1, %arg3 : tensor<4xi64>
-// CHECK:     scf.yield [[call]]#0, [[add]] : tensor<4xi64>, tensor<4xi64>
-// CHECK:   return [[forOut]]#0, [[forOut]]#1 : tensor<4xi64>, tensor<4xi64>
+// CHECK:     scf.yield [[call]]#0, [[add]] : tensor<4xf64>, tensor<4xi64>
+// CHECK:   return [[forOut]]#0, [[forOut]]#1 : tensor<4xf64>, tensor<4xi64>
+
+// CHECK:  func.func public @test_counts.postprocess(%arg0: f64, %arg1: tensor<4xf64>, %arg2: tensor<4xi64>) -> (tensor<4xi64>, tensor<4xi64>)
+// CHECK:    [[cast:%.+]] = stablehlo.convert %arg1 : (tensor<4xf64>) -> tensor<4xi64>
+// CHECK:    return [[cast]], %arg2 : tensor<4xi64>, tensor<4xi64>
+
+// CHECK:  func.func public @test_counts(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>)
+// CHECK:    [[quantum_call:%.+]]:2 = call @test_counts.quantum(%arg0) : (f64) -> (tensor<4xf64>, tensor<4xi64>)
+// CHECK:    [[post_process_call:%.+]]:2 = call @test_counts.postprocess(%arg0, [[quantum_call]]#0, [[quantum_call]]#1)
+// CHECK-SAME:     (f64, tensor<4xf64>, tensor<4xi64>) -> (tensor<4xi64>, tensor<4xi64>)
+// CHECK:    return [[post_process_call]]#0, [[post_process_call]]#1 : tensor<4xi64>, tensor<4xi64>
 
 
 // -----
@@ -449,7 +539,7 @@ func.func public @test_counts_mcm(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) 
 }
 
 
-// CHECK:   func.func public @test_counts_mcm.one_shot_kernel(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>)
+// CHECK:   func.func public @test_counts_mcm.quantum.one_shot_kernel(%arg0: f64) -> (tensor<4xf64>, tensor<4xi64>)
 // CHECK:     [[one:%.+]] = arith.constant 1 : i64
 // CHECK:     quantum.device shots([[one]]) ["", "", ""]
 // CHECK:     [[mres0:%.+]], {{%.+}} = quantum.measure {{%.+}} : i1, !quantum.bit
@@ -457,7 +547,7 @@ func.func public @test_counts_mcm(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) 
 // CHECK-NOT:    quantum.mcmobs
 // CHECK-NOT:    quantum.counts
 //
-// CHECK:     [[iota:%.+]] = stablehlo.iota dim = 0 : tensor<4xi64>
+// CHECK:     [[iota:%.+]] = stablehlo.iota dim = 0 : tensor<4xf64>
 // CHECK:     [[zero:%.+]] = arith.constant 0
 // CHECK:     [[zeroTensor:%.+]] = tensor.from_elements [[zero]], [[zero]], [[zero]], [[zero]] : tensor<4xi64>
 // CHECK:     [[totalIndexBase:%.+]] = arith.constant 0 : i64
@@ -475,13 +565,22 @@ func.func public @test_counts_mcm(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) 
 // CHECK:     [[indexCast:%.+]] = arith.index_cast [[mcm_bit1_ormask]] : i64 to index
 // CHECK:     [[one:%.+]] = arith.constant 1 : i64
 // CHECK:     [[inserted:%.+]] = tensor.insert [[one]] into [[zeroTensor]][[[indexCast]]] : tensor<4xi64>
-// CHECK:     return [[iota]], [[inserted]] : tensor<4xi64>, tensor<4xi64>
-//
-// CHECK:   func.func public @test_counts_mcm(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>)
-// CHECK:      scf.for
-// CHECK:      func.call @test_counts_mcm.one_shot_kernel(%arg0)
-// CHECK:      stablehlo.add
+// CHECK:     return [[iota]], [[inserted]] : tensor<4xf64>, tensor<4xi64>
 
+// CHECK:   func.func public @test_counts_mcm.quantum(%arg0: f64) -> (tensor<4xf64>, tensor<4xi64>)
+// CHECK:      scf.for
+// CHECK:        func.call @test_counts_mcm.quantum.one_shot_kernel(%arg0)
+// CHECK:        stablehlo.add
+
+// CHECK:  func.func public @test_counts_mcm.postprocess(%arg0: f64, %arg1: tensor<4xf64>, %arg2: tensor<4xi64>) -> (tensor<4xi64>, tensor<4xi64>)
+// CHECK:    [[cast:%.+]] = stablehlo.convert %arg1 : (tensor<4xf64>) -> tensor<4xi64>
+// CHECK:    return [[cast]], %arg2 : tensor<4xi64>, tensor<4xi64>
+
+// CHECK:  func.func public @test_counts_mcm(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>)
+// CHECK:    [[quantum_call:%.+]]:2 = call @test_counts_mcm.quantum(%arg0) : (f64) -> (tensor<4xf64>, tensor<4xi64>)
+// CHECK:    [[post_process_call:%.+]]:2 = call @test_counts_mcm.postprocess(%arg0, [[quantum_call]]#0, [[quantum_call]]#1)
+// CHECK-SAME:     (f64, tensor<4xf64>, tensor<4xi64>) -> (tensor<4xi64>, tensor<4xi64>)
+// CHECK:    return [[post_process_call]]#0, [[post_process_call]]#1 : tensor<4xi64>, tensor<4xi64>
 
 // -----
 
@@ -503,28 +602,38 @@ func.func public @test_counts_dynamic_shape(%arg0: f64, %num_qubits: i64) -> (te
 }
 
 
-// CHECK: func.func public @test_counts_dynamic_shape.one_shot_kernel(%arg0: f64, [[num_qubits:%.+]]: i64) -> (tensor<?xi64>, tensor<?xi64>)
+// CHECK: func.func public @test_counts_dynamic_shape.quantum.one_shot_kernel(%arg0: f64, [[num_qubits:%.+]]: i64) -> (tensor<?xf64>, tensor<?xi64>)
 // CHECK:   [[one:%.+]] = arith.constant 1 : i64
 // CHECK:   quantum.device shots([[one]]) ["", "", ""]
 // CHECK:   quantum.counts {{%.+}} shape [[num_qubits]] : tensor<?xf64>, tensor<?xi64>
 
-// CHECK: func.func public @test_counts_dynamic_shape(%arg0: f64, [[num_qubits:%.+]]: i64) -> (tensor<?xi64>, tensor<?xi64>)
+// CHECK: func.func public @test_counts_dynamic_shape.quantum(%arg0: f64, [[num_qubits:%.+]]: i64) -> (tensor<?xf64>, tensor<?xi64>)
 // CHECK:   [[shots:%.+]] = arith.constant 1000 : i64
 // CHECK:   [[zeroScalar:%.+]] = stablehlo.constant dense<0> : tensor<i64>
 // CHECK:   [[num_qubits_i32:%.+]] = arith.trunci [[num_qubits]] : i64 to i32
 // CHECK:   [[num_qubits_tensor:%.+]] = tensor.from_elements [[num_qubits_i32]] : tensor<1xi32>
 // CHECK:   [[countsSum:%.+]] = stablehlo.dynamic_broadcast_in_dim [[zeroScalar]], [[num_qubits_tensor]], dims = [] : (tensor<i64>, tensor<1xi32>) -> tensor<?xi64>
 // CHECK:   [[eigensShape:%.+]] = index.casts [[num_qubits]] : i64 to index
-// CHECK:   [[eigens:%.+]] = tensor.empty([[eigensShape]]) : tensor<?xi64>
+// CHECK:   [[eigens:%.+]] = tensor.empty([[eigensShape]]) : tensor<?xf64>
 // CHECK:   [[lb:%.+]] = arith.constant 0 : index
 // CHECK:   [[step:%.+]] = arith.constant 1 : index
 // CHECK:   [[ub:%.+]] = index.casts [[shots]] : i64 to index
 // CHECK:   [[forOut:%.+]]:2 = scf.for %arg2 = [[lb]] to [[ub]] step [[step]]
-// CHECK-SAME:   (%arg3 = [[eigens]], %arg4 = [[countsSum]]) -> (tensor<?xi64>, tensor<?xi64>)
-// CHECK:     [[call:%.+]]:2 = func.call @test_counts_dynamic_shape.one_shot_kernel(%arg0, [[num_qubits]]) : (f64, i64) -> (tensor<?xi64>, tensor<?xi64>)
+// CHECK-SAME:   (%arg3 = [[eigens]], %arg4 = [[countsSum]]) -> (tensor<?xf64>, tensor<?xi64>)
+// CHECK:     [[call:%.+]]:2 = func.call @test_counts_dynamic_shape.quantum.one_shot_kernel(%arg0, [[num_qubits]]) : (f64, i64) -> (tensor<?xf64>, tensor<?xi64>)
 // CHECK:     [[add:%.+]] = stablehlo.add [[call]]#1, %arg4 : tensor<?xi64>
-// CHECK:     scf.yield [[call]]#0, [[add]] : tensor<?xi64>, tensor<?xi64>
-// CHECK:   return [[forOut]]#0, [[forOut]]#1 : tensor<?xi64>, tensor<?xi64>
+// CHECK:     scf.yield [[call]]#0, [[add]] : tensor<?xf64>, tensor<?xi64>
+// CHECK:   return [[forOut]]#0, [[forOut]]#1 : tensor<?xf64>, tensor<?xi64>
+
+// CHECK:  func.func public @test_counts_dynamic_shape.postprocess(%arg0: f64, %arg1: i64, %arg2: tensor<?xf64>, %arg3: tensor<?xi64>) -> (tensor<?xi64>, tensor<?xi64>)
+// CHECK:    %0 = stablehlo.convert %arg2 : (tensor<?xf64>) -> tensor<?xi64>
+// CHECK:    return %0, %arg3 : tensor<?xi64>, tensor<?xi64>
+
+// CHECK:  func.func public @test_counts_dynamic_shape(%arg0: f64, %arg1: i64) -> (tensor<?xi64>, tensor<?xi64>)
+// CHECK:    [[quantum_call:%.+]]:2 = call @test_counts_dynamic_shape.quantum(%arg0, %arg1) : (f64, i64) -> (tensor<?xf64>, tensor<?xi64>)
+// CHECK:    [[post_process_call:%.+]]:2 = call @test_counts_dynamic_shape.postprocess(%arg0, %arg1, [[quantum_call]]#0, [[quantum_call]]#1)
+// CHECK-SAME:    (f64, i64, tensor<?xf64>, tensor<?xi64>) -> (tensor<?xi64>, tensor<?xi64>)
+// CHECK:    return [[post_process_call]]#0, [[post_process_call]]#1 : tensor<?xi64>, tensor<?xi64>
 
 
 // -----
@@ -568,16 +677,16 @@ func.func public @test_many_MPs(%arg0: f64) -> (tensor<1000x2xi64>, tensor<4xi64
 }
 
 
-// CHECK: func.func public @test_many_MPs.one_shot_kernel(%arg0: f64) -> (tensor<1x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>)
+// CHECK: func.func public @test_many_MPs.quantum.one_shot_kernel(%arg0: f64) -> (tensor<1x2xf64>, tensor<4xf64>, tensor<4xi64>, f64, tensor<4xf64>)
 // CHECK:   [[one:%.+]] = arith.constant 1 : i64
 // CHECK:   quantum.device shots([[one]]) ["", "", ""]
 
-// CHECK: func.func public @test_many_MPs(%arg0: f64) -> (tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>) {
+// CHECK: func.func public @test_many_MPs.quantum(%arg0: f64) -> (tensor<1000x2xf64>, tensor<4xf64>, tensor<4xi64>, f64, tensor<4xf64>) {
 // CHECK:   [[shots:%.+]] = arith.constant 1000 : i64
-// CHECK:   [[sampleFull:%.+]] = tensor.empty() : tensor<1000x2xi64>
+// CHECK:   [[sampleFull:%.+]] = tensor.empty() : tensor<1000x2xf64>
 // CHECK:   [[countsSum:%.+]] = stablehlo.constant dense<0> : tensor<4xi64>
-// CHECK:   [[eigens:%.+]] = tensor.empty() : tensor<4xi64>
-// CHECK:   [[expvalSum:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<f64>
+// CHECK:   [[eigens:%.+]] = tensor.empty() : tensor<4xf64>
+// CHECK:   [[expvalSum:%.+]] = arith.constant 0.000000e+00 : f64
 // CHECK:   [[probsSum:%.+]] = stablehlo.constant dense<0.000000e+00> : tensor<4xf64>
 //
 // CHECK:   [[lb:%.+]] = arith.constant 0 : index
@@ -586,24 +695,37 @@ func.func public @test_many_MPs(%arg0: f64) -> (tensor<1000x2xi64>, tensor<4xi64
 //
 // CHECK:   [[forOut:%.+]]:5 = scf.for %arg1 = [[lb]] to [[ub]] step [[step]] iter_args
 // CHECK-SAME:   (%arg2 = [[sampleFull]], %arg3 = [[eigens]], %arg4 = [[countsSum]], %arg5 = [[expvalSum]], %arg6 = [[probsSum]])
-// CHECK-SAME:   -> (tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>)
-// CHECK:     [[call:%.+]]:5 = func.call @test_many_MPs.one_shot_kernel(%arg0) :
-// CHECK-SAME:   (f64) -> (tensor<1x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>)
-// CHECK:     [[sample_insert_slice:%.+]] = tensor.insert_slice [[call]]#0 into %arg2[%arg1, 0] [1, 2] [1, 1] : tensor<1x2xi64> into tensor<1000x2xi64>
+// CHECK-SAME:   -> (tensor<1000x2xf64>, tensor<4xf64>, tensor<4xi64>, f64, tensor<4xf64>)
+// CHECK:     [[call:%.+]]:5 = func.call @test_many_MPs.quantum.one_shot_kernel(%arg0) :
+// CHECK-SAME:   (f64) -> (tensor<1x2xf64>, tensor<4xf64>, tensor<4xi64>, f64, tensor<4xf64>)
+// CHECK:     [[sample_insert_slice:%.+]] = tensor.insert_slice [[call]]#0 into %arg2[%arg1, 0] [1, 2] [1, 1] : tensor<1x2xf64> into tensor<1000x2xf64>
 // CHECK:     [[countsAdd:%.+]] = stablehlo.add [[call]]#2, %arg4 : tensor<4xi64>
-// CHECK:     [[expvalAdd:%.+]] = stablehlo.add [[call]]#3, %arg5 : tensor<f64>
+// CHECK:     [[expvalAdd:%.+]] = arith.addf [[call]]#3, %arg5 : f64
 // CHECK:     [[probsAdd:%.+]] = stablehlo.add [[call]]#4, %arg6 : tensor<4xf64>
 // CHECK:     scf.yield [[sample_insert_slice]], [[call]]#1, [[countsAdd]], [[expvalAdd]], [[probsAdd]]
-// CHECK-SAME:   tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>
+// CHECK-SAME:   tensor<1000x2xf64>, tensor<4xf64>, tensor<4xi64>, f64, tensor<4xf64>
 //
 // CHECK:    [[shotsCast:%.+]] = arith.sitofp [[shots]] : i64 to f64
-// CHECK:    [[shotsTensor:%.+]] = tensor.from_elements [[shotsCast]] : tensor<f64>
-// CHECK:    [[expvalDivide:%.+]] = stablehlo.divide [[forOut]]#3, [[shotsTensor]] : tensor<f64>
+// CHECK:    [[expvalDivide:%.+]] = arith.divf [[forOut]]#3, [[shotsCast]] : f64
 // CHECK:    [[shotsCast:%.+]] = arith.sitofp [[shots]] : i64 to f64
 // CHECK:    [[shotsTensor:%.+]] = tensor.from_elements [[shotsCast]] : tensor<f64>
 // CHECK:    [[shotsBroadcast:%.+]] = stablehlo.broadcast_in_dim [[shotsTensor]], dims = [] : (tensor<f64>) -> tensor<4xf64>
 // CHECK:    [[probsDivide:%.+]] = stablehlo.divide [[forOut]]#4, [[shotsBroadcast]] : tensor<4xf64>
-// CHECK:    return [[forOut]]#0, [[forOut]]#1, [[forOut]]#2, [[expvalDivide]], %8 : tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>
+// CHECK:    return [[forOut]]#0, [[forOut]]#1, [[forOut]]#2, [[expvalDivide]], %8 : tensor<1000x2xf64>, tensor<4xf64>, tensor<4xi64>, f64, tensor<4xf64>
+
+// CHECK:  func.func public @test_many_MPs.postprocess(%arg0: f64, %arg1: tensor<1000x2xf64>, %arg2: tensor<4xf64>, %arg3: tensor<4xi64>, %arg4: f64, %arg5: tensor<4xf64>)
+// CHECK-SAME:  -> (tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>)
+// CHECK:    [[sample:%.+]] = stablehlo.convert %arg1 : (tensor<1000x2xf64>) -> tensor<1000x2xi64>
+// CHECK:    [[eigens:%.+]] = stablehlo.convert %arg2 : (tensor<4xf64>) -> tensor<4xi64>
+// CHECK:    [[expval:%.+]] = tensor.from_elements %arg4 : tensor<f64>
+// CHECK:    return [[sample]], [[eigens]], %arg3, [[expval]], %arg5 : tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>
+
+// CHECK:  func.func public @test_many_MPs(%arg0: f64) -> (tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>)
+// CHECK:    [[quantum_call:%.+]]:5 = call @test_many_MPs.quantum(%arg0) : (f64) -> (tensor<1000x2xf64>, tensor<4xf64>, tensor<4xi64>, f64, tensor<4xf64>)
+// CHECK:    [[post_process_call:%.+]]:5 = call @test_many_MPs.postprocess(%arg0, [[quantum_call]]#0, [[quantum_call]]#1, [[quantum_call]]#2, [[quantum_call]]#3, [[quantum_call]]#4)
+// CHECK-SAME:    (f64, tensor<1000x2xf64>, tensor<4xf64>, tensor<4xi64>, f64, tensor<4xf64>) -> (tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>)
+// CHECK:    return [[post_process_call]]#0, [[post_process_call]]#1, [[post_process_call]]#2, [[post_process_call]]#3, [[post_process_call]]#4
+// CHECK-SAME:    tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>
 
 
 // -----

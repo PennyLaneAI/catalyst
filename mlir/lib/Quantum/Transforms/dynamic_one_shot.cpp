@@ -109,7 +109,8 @@ void getMPDynamicNumQubitsSizeValues(func::FuncOp qnodeFunc, llvm::SmallPtrSet<V
 }
 
 void clearFuncExcept(IRRewriter &builder, func::FuncOp qnodeFunc,
-                     const llvm::SmallPtrSet<Value, 8> &exceptions, IRMapping &cloneMapper)
+                     const llvm::SmallPtrSet<Value, 8> &exceptionValues,
+                     const llvm::SmallPtrSet<Operation *, 8> &exceptionOps, IRMapping &cloneMapper)
 {
     // Delete the body of a funcop, except the operations that are excepted.
     // In addition, remove all erased Values from the mapper.
@@ -119,7 +120,7 @@ void clearFuncExcept(IRRewriter &builder, func::FuncOp qnodeFunc,
 
     SetVector<Operation *> backwardSlice;
     BackwardSliceOptions options;
-    for (auto v : exceptions) {
+    for (auto v : exceptionValues) {
         LogicalResult bsr = getBackwardSlice(v, &backwardSlice, options);
         assert(bsr.succeeded() && "expected a backward slice");
         // For whatever reason, upstream mlir decided to not include the op itself into its backward
@@ -131,7 +132,7 @@ void clearFuncExcept(IRRewriter &builder, func::FuncOp qnodeFunc,
     for (auto &region : qnodeFunc->getRegions()) {
         for (auto &block : region.getBlocks()) {
             for (auto op = block.begin(); op != block.end(); ++op) {
-                if (!backwardSlice.contains(&*op)) {
+                if (!backwardSlice.contains(&*op) && !exceptionOps.contains(&*op)) {
                     eraseWorklist.push_back(&*op);
                 }
             }
@@ -150,6 +151,119 @@ void clearFuncExcept(IRRewriter &builder, func::FuncOp qnodeFunc,
     }
 }
 
+void eraseAllUsersExcept(IRRewriter &builder, Value v, Operation *exception)
+{
+    // Erase all users of a Value, and all users of these users, etc., in its forward slice,
+    // except the marked exception.
+
+    // We need to use a SetVector, since during the erasure we have to delete from bottom up
+    // So we need an ordered container
+    SetVector<Operation *> forwardSlice;
+    getForwardSlice(v, &forwardSlice);
+    if (exception != nullptr) {
+        forwardSlice.remove(exception);
+    }
+
+    for (auto op = forwardSlice.rbegin(); op != forwardSlice.rend(); ++op) {
+        builder.eraseOp(*op);
+    }
+}
+
+func::FuncOp splitQuantumAndPostProcessing(IRRewriter &builder, func::FuncOp qnodeFunc)
+{
+    OpBuilder::InsertionGuard guard(builder);
+    Location loc = qnodeFunc->getLoc();
+    MLIRContext *ctx = qnodeFunc->getContext();
+
+    // 1. Create the quantum kernel and the classical post processing function
+    builder.setInsertionPointToStart(&qnodeFunc->getParentOfType<ModuleOp>()->getRegion(0).front());
+    auto qKernel = cast<func::FuncOp>(qnodeFunc->clone());
+    qKernel.setSymNameAttr(StringAttr::get(ctx, qnodeFunc.getSymName() + ".quantum"));
+    builder.insert(qKernel);
+
+    IRMapping mapper;
+    auto postProcessingKernel = cast<func::FuncOp>(qKernel->clone(mapper));
+    postProcessingKernel.setSymNameAttr(
+        StringAttr::get(ctx, qnodeFunc.getSymName() + ".postprocess"));
+    builder.insert(postProcessingKernel);
+
+    // 2. The quantum kernel only returns MPs' direct results.
+    // 2.1. Create the return op
+    SmallVector<Value> MPResults;
+    qKernel->walk([&](quantum::MeasurementProcess mp) {
+        for (auto v : mp->getResults()) {
+            MPResults.push_back(v);
+        }
+    });
+
+    builder.setInsertionPoint(qKernel.getBody().back().getTerminator());
+    for (Value v : MPResults) {
+        eraseAllUsersExcept(builder, v, nullptr);
+    }
+    func::ReturnOp::create(builder, loc, MPResults);
+
+    // 2.2. Update function type
+    auto oldKernelType = qKernel.getFunctionType();
+    qKernel.setFunctionType(
+        FunctionType::get(ctx, oldKernelType.getInputs(), TypeRange(MPResults)));
+
+    // 3. Append arguments to the post processing function
+    // 3.1. Update the function type
+    auto oldType = postProcessingKernel.getFunctionType();
+    size_t startingIdx = oldType.getInputs().size();
+    SmallVector<Type> newInputs(oldType.getInputs().begin(), oldType.getInputs().end());
+
+    for (Value v : MPResults) {
+        newInputs.push_back(v.getType());
+    }
+    auto newType = FunctionType::get(ctx, newInputs, oldType.getResults());
+    postProcessingKernel.setFunctionType(newType);
+
+    // 3.2. Update the block arguments
+    Block &entryBlock = postProcessingKernel.front();
+    for (Value v : MPResults) {
+        entryBlock.addArgument(v.getType(), loc);
+    }
+
+    // 3.3. Replace uses
+    for (auto [i, v] : llvm::enumerate(MPResults)) {
+        mapper.lookup(v).replaceAllUsesWith(entryBlock.getArguments()[i + startingIdx]);
+    }
+
+    // 3.4. Clear all ops except the post processing using the new args
+    // No other ops will be using these new args, because we started using these args just now
+    llvm::SmallPtrSet<Operation *, 8> exceptions;
+    for (size_t i = startingIdx; i < entryBlock.getNumArguments(); i++) {
+        SetVector<Operation *> postProcessingOps;
+        getForwardSlice(entryBlock.getArguments()[i], &postProcessingOps);
+        for (Operation *op : postProcessingOps) {
+            exceptions.insert(op);
+        }
+    }
+    clearFuncExcept(builder, postProcessingKernel, {}, exceptions, mapper);
+
+    // 4. Replace the original qnode func with two calls
+    builder.setInsertionPointToStart(&qnodeFunc.getBody().front());
+    clearFuncExcept(builder, qnodeFunc, {}, {}, mapper);
+    MutableArrayRef<mlir::BlockArgument> originalArgs = qnodeFunc.getBody().front().getArguments();
+    auto kernalCallOp = func::CallOp::create(builder, loc, qKernel.getFunctionType().getResults(),
+                                             qKernel.getSymName(), originalArgs);
+
+    SmallVector<Value> postProssingCallArgs;
+    for (Value v : originalArgs) {
+        postProssingCallArgs.push_back(v);
+    }
+    for (auto v : kernalCallOp->getResults()) {
+        postProssingCallArgs.push_back(v);
+    }
+    auto postProcessingCallOp =
+        func::CallOp::create(builder, loc, postProcessingKernel.getFunctionType().getResults(),
+                             postProcessingKernel.getSymName(), postProssingCallArgs);
+    func::ReturnOp::create(builder, loc, postProcessingCallOp->getResults());
+
+    return qKernel;
+}
+
 func::FuncOp createOneShotKernel(IRRewriter &builder, func::FuncOp qnodeFunc, Operation *mod,
                                  IRMapping &mapper)
 {
@@ -160,7 +274,6 @@ func::FuncOp createOneShotKernel(IRRewriter &builder, func::FuncOp qnodeFunc, Op
 
     builder.setInsertionPointToStart(&qnodeFunc->getParentOfType<ModuleOp>()->getRegion(0).front());
     auto oneShotKernel = cast<func::FuncOp>(qnodeFunc->clone(mapper));
-
     oneShotKernel.setSymNameAttr(StringAttr::get(ctx, qnodeFunc.getSymName() + ".one_shot_kernel"));
     builder.insert(oneShotKernel);
 
@@ -193,22 +306,6 @@ scf::ForOp createForLoop(IRRewriter &builder, Value shots, ValueRange loopIterAr
     auto forOp = scf::ForOp::create(builder, loc, lb, ub, step, loopIterArgs);
 
     return forOp;
-}
-
-void eraseAllUsersExcept(IRRewriter &builder, Value v, Operation *exception)
-{
-    // Erase all users of a Value, and all users of these users, etc., in its forward slice,
-    // except the marked exception.
-
-    // We need to use a SetVector, since during the erasure we have to delete from bottom up
-    // So we need an ordered container
-    SetVector<Operation *> forwardSlice;
-    getForwardSlice(v, &forwardSlice);
-    forwardSlice.remove(exception);
-
-    for (auto op = forwardSlice.rbegin(); op != forwardSlice.rend(); ++op) {
-        builder.eraseOp(*op);
-    }
 }
 
 std::optional<quantum::MeasurementProcess> getMPFromValue(Value v)
@@ -277,8 +374,7 @@ void editKernelMCMExpval(IRRewriter &builder, func::FuncOp oneShotKernel, quantu
 
     // Cast the I1 mcm to the correct type and return it
     // MCM itself is I1
-    // Expval kernel returns tensor<f64>
-    // We need to cast as I1 -> I64 -> F64 -> tensor<f64>
+    // We need to cast as I1 -> I64 -> F64
     Operation *retOp = oneShotKernel.getBody().back().getTerminator();
     builder.setInsertionPoint(retOp);
 
@@ -288,11 +384,9 @@ void editKernelMCMExpval(IRRewriter &builder, func::FuncOp oneShotKernel, quantu
     auto extuiOp = arith::ExtUIOp::create(builder, loc, builder.getI64Type(), mcm);
     auto int2floatCastOp =
         arith::SIToFPOp::create(builder, loc, builder.getF64Type(), extuiOp.getOut());
-    auto fromElementsOp = tensor::FromElementsOp::create(
-        builder, loc, RankedTensorType::get({}, builder.getF64Type()), int2floatCastOp.getResult());
 
     // Return the new mcm expval
-    retOp->setOperand(retIdx, fromElementsOp.getResult());
+    retOp->setOperand(retIdx, int2floatCastOp.getResult());
 
     // Erase all users of the mcm obs: the new return does not need them.
     eraseAllUsersExcept(builder, mcmobs.getObs(), retOp);
@@ -389,13 +483,16 @@ void editKernelMCMSample(IRRewriter &builder, func::FuncOp oneShotKernel, quantu
     Location loc = oneShotKernel->getLoc();
 
     // Cast the I1 MCMs to the correct type and return it
+    // SampleOp returns a tensor of floats
     Operation *retOp = oneShotKernel.getBody().back().getTerminator();
     builder.setInsertionPoint(retOp);
 
     SmallVector<Value> castedMCMs;
     for (Value mcm : mcmobs.getMcms()) {
         auto extuiOp = arith::ExtUIOp::create(builder, loc, builder.getI64Type(), mcm);
-        castedMCMs.push_back(extuiOp.getResult());
+        auto int2floatCastOp =
+            arith::SIToFPOp::create(builder, loc, builder.getF64Type(), extuiOp.getOut());
+        castedMCMs.push_back(int2floatCastOp.getResult());
     }
 
     auto fromElementsOp = tensor::FromElementsOp::create(
@@ -494,11 +591,9 @@ void prepareForLoopExpvalArgs(IRRewriter &builder, func::FuncOp oneShotKernel,
         editKernelMCMExpval(builder, oneShotKernel, cast<quantum::MCMObsOp>(MPSourceOp), retIdx);
     }
 
-    // Each expval result is a tensor<f64>
-    auto expvalType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[retIdx]);
-    auto expvalSum = stablehlo::ConstantOp::create(
-        builder, loc, expvalType,
-        DenseElementsAttr::get(expvalType, builder.getFloatAttr(f64Type, 0)));
+    // Each expval result is a f64
+    auto expvalSum =
+        arith::ConstantOp::create(builder, loc, f64Type, builder.getFloatAttr(f64Type, 0));
     loopIterArgs.push_back(expvalSum);
     loopIterArgsMPKinds.push_back("expval");
 }
@@ -541,10 +636,8 @@ LogicalResult prepareForLoopVarianceArgs(IRRewriter &builder, func::FuncOp oneSh
     // in the post processing after the for loop over the shots, when the expval across all shots
     // have become available.
     editKernelMCMExpval(builder, oneShotKernel, cast<quantum::MCMObsOp>(MPSourceOp), retIdx);
-    auto expvalType = dyn_cast<ShapedType>(oneShotKernel.getResultTypes()[retIdx]);
-    auto expvalSum = stablehlo::ConstantOp::create(
-        builder, loc, expvalType,
-        DenseElementsAttr::get(expvalType, builder.getFloatAttr(f64Type, 0)));
+    auto expvalSum =
+        arith::ConstantOp::create(builder, loc, f64Type, builder.getFloatAttr(f64Type, 0));
     loopIterArgs.push_back(expvalSum);
     loopIterArgsMPKinds.push_back("variance");
     return success();
@@ -845,11 +938,16 @@ void constructForLoopBody(IRRewriter &builder, scf::ForOp forOp, func::FuncOp on
     SmallVector<Value> loopYields;
 
     for (auto [i, mpKind] : llvm::enumerate(loopIterArgsMPKinds)) {
-        if (mpKind == "expval" || mpKind == "variance" || mpKind == "probs" || mpKind == "counts") {
+        if (mpKind == "expval" || mpKind == "variance") {
             // Add the expval or probs from each iteration.
             // For variance, currently the only supported case is variance on MCMs.
             // For a set of zeros and ones, the variance is expval - expval^2
             // So we only need to compute the expval in the main loop body.
+            auto addOp = arith::AddFOp::create(builder, loc, kernalCallOp.getResult(i),
+                                               forOp.getRegionIterArg(i));
+            loopYields.push_back(addOp.getResult());
+        }
+        else if (mpKind == "probs" || mpKind == "counts") {
             auto addOp = stablehlo::AddOp::create(builder, loc, kernalCallOp.getResult(i),
                                                   forOp.getRegionIterArg(i));
             loopYields.push_back(addOp.getResult());
@@ -928,26 +1026,26 @@ void postProcessLoopResults(IRRewriter &builder, scf::ForOp forOp, func::FuncOp 
     Type f64Type = builder.getF64Type();
 
     for (auto [i, mpKind] : llvm::enumerate(loopIterArgsMPKinds)) {
-        if (mpKind == "expval" || mpKind == "variance") {
+        if (mpKind == "expval") {
+            auto int2floatCastOp = arith::SIToFPOp::create(builder, loc, f64Type, shots);
+            auto divOp = arith::DivFOp::create(builder, loc, forOp->getResult(i),
+                                               int2floatCastOp.getResult());
+            retVals.push_back(divOp.getResult());
+        }
+
+        else if (mpKind == "variance") {
             // Divide the sum by shots
             // shots Value is I64, need to turn into tensor<f64> for division
             auto int2floatCastOp = arith::SIToFPOp::create(builder, loc, f64Type, shots);
-            auto shotsFromElementsOp = tensor::FromElementsOp::create(
-                builder, loc, RankedTensorType::get({}, f64Type), int2floatCastOp.getResult());
+            auto divOp = arith::DivFOp::create(builder, loc, forOp->getResult(i),
+                                               int2floatCastOp.getResult());
 
-            auto divOp = stablehlo::DivOp::create(builder, loc, forOp->getResult(i),
-                                                  shotsFromElementsOp.getResult());
-            if (mpKind == "expval") {
-                retVals.push_back(divOp.getResult());
-            }
-            else if (mpKind == "variance") {
-                // Var(a set of MCMs) = Exp(a set of MCMs) - Exp(a set of MCMs)^2
-                auto multiplyOp =
-                    stablehlo::MulOp::create(builder, loc, divOp.getResult(), divOp.getResult());
-                auto subtractOp = stablehlo::SubtractOp::create(builder, loc, divOp.getResult(),
-                                                                multiplyOp.getResult());
-                retVals.push_back(subtractOp.getResult());
-            }
+            // Var(a set of MCMs) = Exp(a set of MCMs) - Exp(a set of MCMs)^2
+            auto multiplyOp =
+                arith::MulFOp::create(builder, loc, divOp.getResult(), divOp.getResult());
+            auto subtractOp =
+                arith::SubFOp::create(builder, loc, divOp.getResult(), multiplyOp.getResult());
+            retVals.push_back(subtractOp.getResult());
         }
 
         else if (mpKind == "probs") {
@@ -994,7 +1092,10 @@ struct DynamicOneShotPass : public impl::DynamicOneShotPassBase<DynamicOneShotPa
         // For each qnode function, find the returned MPs
         // Then handle the one shot logic for each MP type
         for (auto qnodeFunc : qnodeFuncs) {
-            auto deviceInitOp = *qnodeFunc.getOps<quantum::DeviceInitOp>().begin();
+            qnodeFunc->removeAttr("qnode");
+            func::FuncOp qKernel = splitQuantumAndPostProcessing(builder, qnodeFunc);
+
+            auto deviceInitOp = *qKernel.getOps<quantum::DeviceInitOp>().begin();
             Value shots = deviceInitOp.getShots();
 
             // If we know it's zero shots, i.e. analytical mode, then no need to do anything.
@@ -1003,22 +1104,21 @@ struct DynamicOneShotPass : public impl::DynamicOneShotPassBase<DynamicOneShotPa
             }
 
             // Clone the qnode function and give it a new name.
-            // Because we need to make sure the current qnodeFunc name is reserved as entry point
+            // Because we need to make sure the current qKernel name is reserved as entry point
             // Set the number of shots in the new kernel to one.
             IRMapping cloneMapper;
-            func::FuncOp oneShotKernel = createOneShotKernel(builder, qnodeFunc, mod, cloneMapper);
+            func::FuncOp oneShotKernel = createOneShotKernel(builder, qKernel, mod, cloneMapper);
 
-            // Clear the original qnodeFunc. Its new contents will be the one-shot logic.
+            // Clear the original qKernel. Its new contents will be the one-shot logic.
             // Keep the SSA value for the shots.
             // It needs to be used as the upper bound of the for loop.
             llvm::SmallPtrSet<Value, 8> erasureExceptions;
-            getMPDynamicNumQubitsSizeValues(qnodeFunc, erasureExceptions);
+            getMPDynamicNumQubitsSizeValues(qKernel, erasureExceptions);
             erasureExceptions.insert(shots);
-            clearFuncExcept(builder, qnodeFunc, erasureExceptions, cloneMapper);
-            qnodeFunc->removeAttr("qnode");
+            clearFuncExcept(builder, qKernel, erasureExceptions, {}, cloneMapper);
 
             // Reverse the mapper. The map from the cloned one shot kernel to the original
-            // qnodeFunc will be more useful to us.
+            // qKernel will be more useful to us.
             SmallVector<Value> eraseWorklist;
             llvm::DenseMap<Value, Value> insertWorklist;
             for (auto pair : cloneMapper.getValueMap()) {
@@ -1036,20 +1136,19 @@ struct DynamicOneShotPass : public impl::DynamicOneShotPassBase<DynamicOneShotPa
             // Depending on the MP, the for loop needs different iteration arguments
             SmallVector<Value> loopIterArgs;
             SmallVector<std::string> loopIterArgsMPKinds;
-            if (failed(prepareForLoopInitArgs(builder, oneShotKernel, qnodeFunc, loopIterArgs,
+            if (failed(prepareForLoopInitArgs(builder, oneShotKernel, qKernel, loopIterArgs,
                                               loopIterArgsMPKinds, cloneMapper))) {
                 return signalPassFailure();
             }
-            builder.setInsertionPointToEnd(&qnodeFunc.getBody().front());
+            builder.setInsertionPointToEnd(&qKernel.getBody().front());
             scf::ForOp forOp = createForLoop(builder, shots, loopIterArgs);
             constructForLoopBody(builder, forOp, oneShotKernel, loopIterArgsMPKinds, cloneMapper);
 
             // Perform each MP's necessary post processing after the loop body
-            builder.setInsertionPointToEnd(&qnodeFunc.getBody().front());
+            builder.setInsertionPointToEnd(&qKernel.getBody().front());
             SmallVector<Value> retVals;
             postProcessLoopResults(builder, forOp, oneShotKernel, shots, retVals,
                                    loopIterArgsMPKinds, cloneMapper);
-
             func::ReturnOp::create(builder, loc, retVals);
         }
     }
