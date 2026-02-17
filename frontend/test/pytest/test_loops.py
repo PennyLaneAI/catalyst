@@ -46,7 +46,8 @@ def while_loop(*args, **kwargs):
 
 def measure(*args, **kwargs):
     """Use catalyst.measure always - qml.measure not yet compatible with qjit(capture=True)."""
-    # TODO: Replace with qml.measure dispatch when PennyLane capture supports MCM
+    if qml.capture.enabled():
+        return qml.measure(*args, **kwargs)
     return catalyst_measure(*args, **kwargs)
 
 
@@ -118,7 +119,6 @@ class TestLoopToJaxpr:
 class TestWhileLoops:
     """Test the Catalyst while_loop operation."""
 
-    @pytest.mark.capture_todo
     def test_alternating_loop(self, backend, capture_mode):
         """Test simple while loop."""
 
@@ -131,14 +131,15 @@ class TestWhileLoops:
                 return v[0] + 1, v[1]
 
             loop((0, n))
-            return measure(wires=0)
+            return qml.expval(qml.PauliZ(0))
 
-        assert circuit(1)
-        assert not circuit(2)
-        assert circuit(3)
-        assert not circuit(4)
+        # PauliX applied n times: odd -> |1⟩ (Z=-1), even -> |0⟩ (Z=+1)
+        assert circuit(1) == -1.0  # 1 PauliX -> |1⟩
+        assert circuit(2) == 1.0  # 2 PauliX -> |0⟩
+        assert circuit(3) == -1.0  # 3 PauliX -> |1⟩
+        assert circuit(4) == 1.0  # 4 PauliX -> |0⟩
 
-    @pytest.mark.capture_todo
+    @pytest.mark.old_frontend  # Error message specific to catalyst.while_loop
     def test_non_bool_condition_error(self, backend, capture_mode):
         """Test error messages issues when the non-bool conditions are provided."""
 
@@ -152,7 +153,7 @@ class TestWhileLoops:
                     return i + 1
 
                 loop(0)
-                return measure(wires=0)
+                return qml.expval(qml.PauliZ(0))
 
             return circuit()
 
@@ -161,7 +162,6 @@ class TestWhileLoops:
         with pytest.raises(TypeError, match="boolean scalar was expected, got the value"):
             workflow(33)
 
-    @pytest.mark.capture_todo
     def test_closure_condition_fn(self, backend, capture_mode):
         """Test while loop with captured values (closures) in the condition function."""
 
@@ -174,14 +174,13 @@ class TestWhileLoops:
                 return i + 1
 
             loop(0)
-            return measure(wires=0)
+            return qml.expval(qml.PauliZ(0))
 
-        assert circuit(1)
-        assert not circuit(2)
-        assert circuit(3)
-        assert not circuit(4)
+        assert circuit(1) == -1.0
+        assert circuit(2) == 1.0
+        assert circuit(3) == -1.0
+        assert circuit(4) == 1.0
 
-    @pytest.mark.capture_todo
     def test_closure_body_fn(self, backend, capture_mode):
         """Test while loop with captured values (closures) in the body function."""
 
@@ -196,14 +195,13 @@ class TestWhileLoops:
                 return v[0] + my_const, v[1]
 
             loop((0, n))
-            return measure(wires=0)
+            return qml.expval(qml.PauliZ(0))
 
-        assert circuit(1)
-        assert not circuit(2)
-        assert circuit(3)
-        assert not circuit(4)
+        assert circuit(1) == -1.0
+        assert circuit(2) == 1.0
+        assert circuit(3) == -1.0
+        assert circuit(4) == 1.0
 
-    @pytest.mark.capture_todo
     def test_assert_joint_closure(self, backend, capture_mode):
         """Test while loop with captured values (closures) in both body and condition functions."""
 
@@ -218,14 +216,14 @@ class TestWhileLoops:
                 return i + my_const
 
             loop(0)
-            return measure(wires=0)
+            return qml.expval(qml.PauliZ(0))
 
-        assert circuit(1)
-        assert not circuit(2)
-        assert circuit(3)
-        assert not circuit(4)
+        assert circuit(1) == -1.0
+        assert circuit(2) == 1.0
+        assert circuit(3) == -1.0
+        assert circuit(4) == 1.0
 
-    @pytest.mark.capture_todo
+    @pytest.mark.old_frontend  # Tests MCM usage in loop body - MCM not supported with capture
     def test_assert_reference_outside_measure(self, backend, capture_mode):
         """Test while loop in conjunction with the measure op."""
 
@@ -247,7 +245,6 @@ class TestWhileLoops:
         assert circuit(3)
         assert not circuit(4)
 
-    @pytest.mark.capture_todo
     def test_multiple_loop_arguments(self, backend, capture_mode):
         """Test while loop with multiple (loop-carried) arguments."""
 
@@ -260,14 +257,14 @@ class TestWhileLoops:
                 return (v[0] + inc, v[1]), inc
 
             loop((0, n), 1)
-            return measure(wires=0)
+            return qml.expval(qml.PauliZ(0))
 
-        assert circuit(1)
-        assert not circuit(2)
-        assert circuit(3)
-        assert not circuit(4)
+        assert circuit(1) == -1.0
+        assert circuit(2) == 1.0
+        assert circuit(3) == -1.0
+        assert circuit(4) == 1.0
 
-    @pytest.mark.capture_todo
+    @pytest.mark.old_frontend  # Returns raw classical value from QNode - not valid with capture
     def test_nested_loops(self, backend, capture_mode):
         """Test nested while loops."""
 
@@ -336,7 +333,7 @@ class TestWhileLoops:
 class TestForLoops:
     """Test the Catalyst for_loop operation."""
 
-    @pytest.mark.capture_todo
+    @pytest.mark.old_frontend  # Error message specific to catalyst.for_loop
     def test_required_index(self, backend, capture_mode):
         """Check for loop error message when the iteration index is missing."""
 
@@ -353,7 +350,6 @@ class TestForLoops:
         with pytest.raises(TypeError, match="takes 0 positional arguments but 1 was given"):
             circuit(5)
 
-    @pytest.mark.capture_todo
     def test_basic_loop(self, backend, capture_mode):
         """Test simple for loop."""
 
@@ -365,10 +361,10 @@ class TestForLoops:
                 qml.PauliX(0)
 
             loop_fn()
-            return measure(0)
+            return qml.expval(qml.PauliZ(0))
 
-        assert circuit(1)
-        assert not circuit(2)
+        assert circuit(1) == -1.0  # 1 PauliX -> |1⟩
+        assert circuit(2) == 1.0  # 2 PauliX -> |0⟩
 
     def test_loop_carried_values(self, backend, capture_mode):
         """Test for loop with updating loop carried values."""
@@ -426,7 +422,6 @@ class TestForLoops:
 
         assert np.allclose(circuit(np.pi / 4), 0.0)
 
-    @pytest.mark.capture_todo
     def test_nested_loops(self, backend, capture_mode):
         """Test nested for loops."""
 
@@ -457,7 +452,6 @@ class TestForLoops:
 
         assert np.allclose(circuit(4), np.eye(2**4)[0])
 
-    @pytest.mark.capture_todo
     def test_negative_step(self, backend, capture_mode):
         """Test loops with a negative step size."""
 
@@ -469,10 +463,10 @@ class TestForLoops:
                 qml.PauliX(0)
 
             loop_fn()
-            return measure(0)
+            return qml.expval(qml.PauliZ(0))
 
-        assert circuit(1)
-        assert not circuit(0)
+        assert circuit(1) == -1.0  # 1 PauliX
+        assert circuit(0) == 1.0  # 0 PauliX
 
     @pytest.mark.usefixtures("disable_capture")
     def test_for_loop_raises_compatibility_error_with_capture(self):
