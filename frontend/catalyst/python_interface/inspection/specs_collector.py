@@ -30,7 +30,7 @@ from xdsl.ir import Region
 
 from catalyst.python_interface.dialects.catalyst import CallbackOp
 from catalyst.python_interface.dialects.mbqc import GraphStatePrepOp, MeasureInBasisOp
-from catalyst.python_interface.dialects.qec import (
+from catalyst.python_interface.dialects.pbc import (
     FabricateOp,
     PPMeasurementOp,
     PPRotationArbitraryOp,
@@ -69,7 +69,7 @@ from catalyst.python_interface.inspection.xdsl_conversion import (
 _CUSTOM_DIALECT_NAMES = frozenset(
     {
         "quantum",
-        "qec",
+        "pbc",
         "mbqc",
     }
 )
@@ -92,7 +92,7 @@ _SKIPPED_OPS = frozenset(
         "quantum.num_qubits",
         "quantum.tensor",
         "quantum.yield",
-        "qec.yield",
+        "pbc.yield",
     }
 )
 
@@ -103,7 +103,7 @@ class ResourceType(enum.Enum):
     # Circuit resources
     GATE = "gate"
     MEASUREMENT = "measurement"
-    QEC = "qec"
+    PBC = "pbc"
 
     # Extra circuit info
     METADATA = "meta"
@@ -246,7 +246,7 @@ def _(
 
 
 ############################################################
-### QEC Operations
+### PBC Operations
 ############################################################
 
 
@@ -254,7 +254,7 @@ def _(
 def _(
     xdsl_op: FabricateOp | GraphStatePrepOp | MeasureInBasisOp | PrepareStateOp,
 ) -> tuple[ResourceType, str]:
-    return ResourceType.QEC, xdsl_op.name
+    return ResourceType.PBC, xdsl_op.name
 
 
 @handle_resource.register
@@ -267,17 +267,17 @@ def _(xdsl_op: PPRotationOp) -> tuple[ResourceType, str]:
         s = "PPR-identity"
     else:
         s = f"PPR-pi/{abs(xdsl_op.rotation_kind.value.data)}"
-    return ResourceType.QEC, s
+    return ResourceType.PBC, s
 
 
 @handle_resource.register
 def _(xdsl_op: PPRotationArbitraryOp) -> tuple[ResourceType, str]:
-    return ResourceType.QEC, "PPR-Phi"
+    return ResourceType.PBC, "PPR-Phi"
 
 
 @handle_resource.register
 def _(_: PPMeasurementOp | SelectPPMeasurementOp) -> tuple[ResourceType, str]:
-    return ResourceType.QEC, "PPM"
+    return ResourceType.PBC, "PPM"
 
 
 ############################################################
@@ -382,7 +382,7 @@ def _collect_operation(
         case ResourceType.MEASUREMENT:
             resources.measurements[resource] += 1
 
-        case ResourceType.QEC:
+        case ResourceType.PBC:
             n_qubits = len(op.in_qubits) if hasattr(op, "in_qubits") else 0
             resources.operations[resource][n_qubits] += 1
 

@@ -15,8 +15,8 @@
 
 from .catalyst import Catalyst
 from .mbqc import MBQC
-from .qec import QEC
+from .pbc import PBC
 from .quantum import Quantum
 from .stablehlo import StableHLO
 
-__all__ = ["Catalyst", "MBQC", "Quantum", "QEC", "StableHLO"]
+__all__ = ["Catalyst", "MBQC", "Quantum", "PBC", "StableHLO"]
