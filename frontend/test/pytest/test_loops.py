@@ -19,16 +19,41 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import api_extensions, for_loop, measure, qjit, while_loop
+from catalyst import api_extensions
+from catalyst import for_loop as catalyst_for_loop
+from catalyst import measure as catalyst_measure
+from catalyst import qjit
+from catalyst import while_loop as catalyst_while_loop
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
 
 # pylint: disable=no-value-for-parameter,unused-argument
 
 
+# Helper functions that select the appropriate primitive based on capture state
+def for_loop(*args, **kwargs):
+    """Select qml.for_loop when capture is enabled, else catalyst.for_loop."""
+    if qml.capture.enabled():
+        return qml.for_loop(*args, **kwargs)
+    return catalyst_for_loop(*args, **kwargs)
+
+
+def while_loop(*args, **kwargs):
+    """Select qml.while_loop when capture is enabled, else catalyst.while_loop."""
+    if qml.capture.enabled():
+        return qml.while_loop(*args, **kwargs)
+    return catalyst_while_loop(*args, **kwargs)
+
+
+def measure(*args, **kwargs):
+    """Use catalyst.measure always - qml.measure not yet compatible with qjit(capture=True)."""
+    # TODO: Replace with qml.measure dispatch when PennyLane capture supports MCM
+    return catalyst_measure(*args, **kwargs)
+
+
 class TestLoopToJaxpr:
     """Collection of tests that examine the generated JAXPR of loops."""
 
-    def test_while_loop(self, capture_mode):
+    def test_while_loop(self):
         """Check the while loop JAXPR."""
 
         expected = dedent(
@@ -50,7 +75,7 @@ class TestLoopToJaxpr:
             """
         )
 
-        @qjit(capture=capture_mode)
+        @qjit
         def circuit(x: float):
             @while_loop(lambda v: v[0] < 10)
             def loop(v):
@@ -60,7 +85,7 @@ class TestLoopToJaxpr:
 
         assert expected.strip() == str(circuit.jaxpr).strip()
 
-    def test_for_loop(self, capture_mode):
+    def test_for_loop(self):
         """Check the for loop JAXPR."""
 
         expected = dedent(
@@ -79,7 +104,7 @@ class TestLoopToJaxpr:
         """
         )
 
-        @qjit(capture=capture_mode)
+        @qjit
         def circuit(x: float, n: int):
             @for_loop(0, n, 1)
             def loop(_, v):
@@ -93,6 +118,7 @@ class TestLoopToJaxpr:
 class TestWhileLoops:
     """Test the Catalyst while_loop operation."""
 
+    @pytest.mark.capture_todo
     def test_alternating_loop(self, backend, capture_mode):
         """Test simple while loop."""
 
@@ -112,6 +138,7 @@ class TestWhileLoops:
         assert circuit(3)
         assert not circuit(4)
 
+    @pytest.mark.capture_todo
     def test_non_bool_condition_error(self, backend, capture_mode):
         """Test error messages issues when the non-bool conditions are provided."""
 
@@ -134,6 +161,7 @@ class TestWhileLoops:
         with pytest.raises(TypeError, match="boolean scalar was expected, got the value"):
             workflow(33)
 
+    @pytest.mark.capture_todo
     def test_closure_condition_fn(self, backend, capture_mode):
         """Test while loop with captured values (closures) in the condition function."""
 
@@ -153,6 +181,7 @@ class TestWhileLoops:
         assert circuit(3)
         assert not circuit(4)
 
+    @pytest.mark.capture_todo
     def test_closure_body_fn(self, backend, capture_mode):
         """Test while loop with captured values (closures) in the body function."""
 
@@ -174,6 +203,7 @@ class TestWhileLoops:
         assert circuit(3)
         assert not circuit(4)
 
+    @pytest.mark.capture_todo
     def test_assert_joint_closure(self, backend, capture_mode):
         """Test while loop with captured values (closures) in both body and condition functions."""
 
@@ -195,6 +225,7 @@ class TestWhileLoops:
         assert circuit(3)
         assert not circuit(4)
 
+    @pytest.mark.capture_todo
     def test_assert_reference_outside_measure(self, backend, capture_mode):
         """Test while loop in conjunction with the measure op."""
 
@@ -216,6 +247,7 @@ class TestWhileLoops:
         assert circuit(3)
         assert not circuit(4)
 
+    @pytest.mark.capture_todo
     def test_multiple_loop_arguments(self, backend, capture_mode):
         """Test while loop with multiple (loop-carried) arguments."""
 
@@ -235,6 +267,7 @@ class TestWhileLoops:
         assert circuit(3)
         assert not circuit(4)
 
+    @pytest.mark.capture_todo
     def test_nested_loops(self, backend, capture_mode):
         """Test nested while loops."""
 
@@ -265,7 +298,7 @@ class TestWhileLoops:
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @while_loop(condition)
+            @catalyst_while_loop(condition)
             def loop_fn(x):
                 return x + 1
 
@@ -287,7 +320,7 @@ class TestWhileLoops:
                 def condition(x):
                     return x < n
 
-                @while_loop(condition)
+                @catalyst_while_loop(condition)
                 def loop(i):
                     qml.X(i)
 
@@ -303,6 +336,7 @@ class TestWhileLoops:
 class TestForLoops:
     """Test the Catalyst for_loop operation."""
 
+    @pytest.mark.capture_todo
     def test_required_index(self, backend, capture_mode):
         """Check for loop error message when the iteration index is missing."""
 
@@ -319,6 +353,7 @@ class TestForLoops:
         with pytest.raises(TypeError, match="takes 0 positional arguments but 1 was given"):
             circuit(5)
 
+    @pytest.mark.capture_todo
     def test_basic_loop(self, backend, capture_mode):
         """Test simple for loop."""
 
@@ -335,7 +370,7 @@ class TestForLoops:
         assert circuit(1)
         assert not circuit(2)
 
-    def test_loop_caried_values(self, backend, capture_mode):
+    def test_loop_carried_values(self, backend, capture_mode):
         """Test for loop with updating loop carried values."""
 
         @qjit(capture=capture_mode)
@@ -391,6 +426,7 @@ class TestForLoops:
 
         assert np.allclose(circuit(np.pi / 4), 0.0)
 
+    @pytest.mark.capture_todo
     def test_nested_loops(self, backend, capture_mode):
         """Test nested for loops."""
 
@@ -421,6 +457,7 @@ class TestForLoops:
 
         assert np.allclose(circuit(4), np.eye(2**4)[0])
 
+    @pytest.mark.capture_todo
     def test_negative_step(self, backend, capture_mode):
         """Test loops with a negative step size."""
 
@@ -446,7 +483,7 @@ class TestForLoops:
 
         with pytest.raises(PlxprCaptureCFCompatibilityError) as exc_info:
 
-            @for_loop(0, 3, 1)
+            @catalyst_for_loop(0, 3, 1)
             def loop_fn(i, acc):
                 return acc + i
 
@@ -466,7 +503,7 @@ class TestForLoops:
             @qml.qjit
             @qml.qnode(qml.device("lightning.qubit", wires=3))
             def test(n):
-                @for_loop(0, n, 1)
+                @catalyst_for_loop(0, n, 1)
                 def loop(i):
                     qml.X(i)
 
@@ -790,6 +827,7 @@ class TestResultStructureInterpreted:
         assert while_loop(lambda _, y: y[0] < 3)(loop)(x, y) == (x, (y[0] + 2,) + y[1:])
 
 
+@pytest.mark.old_frontend
 class TestForLoopOperatorAccess:
     """Test suite for accessing the ForLoop operation in quantum contexts in Catalyst."""
 
@@ -860,6 +898,7 @@ class TestForLoopOperatorAccess:
         assert func(0) == 1
 
 
+@pytest.mark.old_frontend
 class TestWhileLoopOperatorAccess:
     """Test suite for accessing the WhileLoop operation in quantum contexts in Catalyst."""
 
