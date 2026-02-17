@@ -31,7 +31,7 @@ from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
-from pennylane.capture.primitives import transform_prim
+from pennylane.capture.primitives import quantum_subroutine_prim, transform_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.measurements import CountsMP
 
@@ -57,7 +57,6 @@ from catalyst.jax_primitives import (
     qalloc_p,
     qdealloc_p,
     qinst_p,
-    quantum_subroutine_p,
     sample_p,
     set_basis_state_p,
     set_state_p,
@@ -501,7 +500,7 @@ def _subroutine_kernel(
     return converter.init_qreg.get(), *retvals
 
 
-@PLxPRToQuantumJaxprInterpreter.register_primitive(quantum_subroutine_p)
+@PLxPRToQuantumJaxprInterpreter.register_primitive(quantum_subroutine_prim)
 def handle_subroutine(self, *args, **kwargs):
     """
     Transform the subroutine from PLxPR into JAXPR with quantum primitives.
@@ -548,7 +547,7 @@ def handle_subroutine(self, *args, **kwargs):
 
     # quantum_subroutine_p.bind
     # is just pjit_p with a different name.
-    vals_out = quantum_subroutine_p.bind(
+    vals_out = quantum_subroutine_prim.bind(
         self.init_qreg.get(),
         *[dyn_qreg.get() for dyn_qreg in dynalloced_qregs],
         *new_args,

@@ -549,16 +549,15 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
     Args:
         qnode (QNode): the QNode to apply the gridsynth compiler pass to
         epsilon (float): The maximum permissible operator norm error per rotation gate. Defaults to ``1e-4``.
-        ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in QEC dialect. Defaults to ``False``
+        ppr_basis (bool): If true, decompose directly to Pauli Product Rotations (PPRs) in PBC dialect. Defaults to ``False``
 
     Returns:
         :class:`QNode <pennylane.QNode>`
 
     .. note::
 
-        The circuit generated from this pass with ``ppr_basis=True`` are currently not executable on any backend.
-        This is only for analysis with the ``null.qubit`` device and potential future execution
-        when a suitable backend is available.
+        The circuit generated from this pass with ``ppr_basis=True`` are currently only executable on the
+        ``lightning.qubit`` device with program capture enabled.
 
     **Example**
 
@@ -647,9 +646,8 @@ def to_ppr(qnode):
 
     .. note::
 
-        The circuits that generated from this pass are currently not executable on any backend.
-        This pass is only for analysis with the ``null.qubit`` device and potential future execution
-        when a suitable backend is available.
+        The circuits generated from this pass are currently only executable on the ``lightning.qubit``
+        device with program capture enabled.
 
     The full list of supported gates and operations are
     ``qml.H``,
@@ -692,25 +690,20 @@ def to_ppr(qnode):
 
         print(circuit.mlir_opt)
 
-    Because Catalyst does not currently support execution of Pauli-based computation operations, we
-    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-    passes will be applied to the initial MLIR, without attempting to further compile for execution.
-
     Example MLIR Representation:
 
     .. code-block:: mlir
 
         . . .
-        %2 = qec.ppr ["Z"](4) %1 : !quantum.bit
-        %3 = qec.ppr ["X"](4) %2 : !quantum.bit
-        %4 = qec.ppr ["Z"](4) %3 : !quantum.bit
+        %2 = pbc.ppr ["Z"](4) %1 : !quantum.bit
+        %3 = pbc.ppr ["X"](4) %2 : !quantum.bit
+        %4 = pbc.ppr ["Z"](4) %3 : !quantum.bit
         %5 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-        %6:2 = qec.ppr ["Z", "X"](4) %4, %5 : !quantum.bit, !quantum.bit
-        %7 = qec.ppr ["Z"](-4) %6#0 : !quantum.bit
-        %8 = qec.ppr ["X"](-4) %6#1 : !quantum.bit
-        %9 = qec.ppr ["Z"](8) %7 : !quantum.bit
+        %6:2 = pbc.ppr ["Z", "X"](4) %4, %5 : !quantum.bit, !quantum.bit
+        %7 = pbc.ppr ["Z"](-4) %6#0 : !quantum.bit
+        %8 = pbc.ppr ["X"](-4) %6#1 : !quantum.bit
+        %9 = pbc.ppr ["Z"](8) %7 : !quantum.bit
         . . .
-
     """
     return PassPipelineWrapper(qnode, "to-ppr")
 
@@ -765,19 +758,15 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
 
         print(circuit.mlir_opt)
 
-    Because Catalyst does not currently support execution of Pauli-based computation operations, we
-    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-    passes will be applied to the initial MLIR, without attempting to further compile for execution.
-
     Example MLIR Representation:
 
     .. code-block:: mlir
 
         . . .
-        %2 = qec.ppr ["X"](8) %1 : !quantum.bit
-        %3 = qec.ppr ["Z"](4) %2 : !quantum.bit
-        %4 = qec.ppr ["X"](4) %3 : !quantum.bit
-        %5 = qec.ppr ["Z"](4) %4 : !quantum.bit
+        %2 = pbc.ppr ["X"](8) %1 : !quantum.bit
+        %3 = pbc.ppr ["Z"](4) %2 : !quantum.bit
+        %4 = pbc.ppr ["X"](4) %3 : !quantum.bit
+        %5 = pbc.ppr ["Z"](4) %4 : !quantum.bit
         %6 = quantum.insert %0[ 0], %5 : !quantum.reg, !quantum.bit
         . . .
 
@@ -806,21 +795,21 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
     .. code-block:: mlir
 
         . . .
-        %4:2 = qec.ppr ["Z", "X"](4) %2, %3 : !quantum.bit, !quantum.bit
-        %5 = qec.ppr ["X"](8) %1 : !quantum.bit
-        %6:2 = qec.ppr ["X", "Y"](-8) %5, %4#1 : !quantum.bit, !quantum.bit
-        %7 = qec.ppr ["X"](-4) %6#1 : !quantum.bit
-        %8:2 = qec.ppr ["X", "Z"](8) %6#0, %4#0 : !quantum.bit, !quantum.bit
-        %9 = qec.ppr ["Z"](4) %8#0 : !quantum.bit
-        %10 = qec.ppr ["X"](4) %9 : !quantum.bit
-        %11 = qec.ppr ["Z"](4) %10 : !quantum.bit
-        %12 = qec.ppr ["Z"](-4) %8#1 : !quantum.bit
-        %13:2 = qec.ppr ["Z", "X"](4) %11, %12 : !quantum.bit, !quantum.bit
-        %14 = qec.ppr ["X"](-4) %13#1 : !quantum.bit
-        %15 = qec.ppr ["Z"](-4) %13#0 : !quantum.bit
-        %16:2 = qec.ppr ["Z", "X"](4) %15, %7 : !quantum.bit, !quantum.bit
-        %17 = qec.ppr ["Z"](-4) %16#0 : !quantum.bit
-        %18 = qec.ppr ["X"](-4) %16#1 : !quantum.bit
+        %4:2 = pbc.ppr ["Z", "X"](4) %2, %3 : !quantum.bit, !quantum.bit
+        %5 = pbc.ppr ["X"](8) %1 : !quantum.bit
+        %6:2 = pbc.ppr ["X", "Y"](-8) %5, %4#1 : !quantum.bit, !quantum.bit
+        %7 = pbc.ppr ["X"](-4) %6#1 : !quantum.bit
+        %8:2 = pbc.ppr ["X", "Z"](8) %6#0, %4#0 : !quantum.bit, !quantum.bit
+        %9 = pbc.ppr ["Z"](4) %8#0 : !quantum.bit
+        %10 = pbc.ppr ["X"](4) %9 : !quantum.bit
+        %11 = pbc.ppr ["Z"](4) %10 : !quantum.bit
+        %12 = pbc.ppr ["Z"](-4) %8#1 : !quantum.bit
+        %13:2 = pbc.ppr ["Z", "X"](4) %11, %12 : !quantum.bit, !quantum.bit
+        %14 = pbc.ppr ["X"](-4) %13#1 : !quantum.bit
+        %15 = pbc.ppr ["Z"](-4) %13#0 : !quantum.bit
+        %16:2 = pbc.ppr ["Z", "X"](4) %15, %7 : !quantum.bit, !quantum.bit
+        %17 = pbc.ppr ["Z"](-4) %16#0 : !quantum.bit
+        %18 = pbc.ppr ["X"](-4) %16#1 : !quantum.bit
         . . .
     """
 
@@ -876,20 +865,16 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
 
         print(circuit.mlir_opt)
 
-    Because Catalyst does not currently support execution of Pauli-based computation operations, we
-    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-    passes will be applied to the initial MLIR, without attempting to further compile for execution.
-
     Example MLIR Representation:
 
     .. code-block:: mlir
 
         . . .
-        %2 = qec.ppr ["X"](8) %1 : !quantum.bit
-        %mres, %out_qubits = qec.ppm ["X"] %2 : i1, !quantum.bit
+        %2 = pbc.ppr ["X"](8) %1 : !quantum.bit
+        %mres, %out_qubits = pbc.ppm ["X"] %2 : i1, !quantum.bit
         %from_elements = tensor.from_elements %mres : tensor<i1>
         %3 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-        %mres_0, %out_qubits_1 = qec.ppm ["Z"] %3 : i1, !quantum.bit
+        %mres_0, %out_qubits_1 = pbc.ppm ["Z"] %3 : i1, !quantum.bit
         . . .
 
     If a merging resulted in a PPM acting on more than
@@ -917,8 +902,8 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     .. code-block:: mlir
 
         . . .
-        %mres, %out_qubits:2 = qec.ppm ["Z", "Z"] %1, %3 : i1, !quantum.bit, !quantum.bit
-        %mres_0, %out_qubits_1 = qec.ppm ["Z"] %out_qubits#1 : i1, !quantum.bit
+        %mres, %out_qubits:2 = pbc.ppm ["Z", "Z"] %1, %3 : i1, !quantum.bit, !quantum.bit
+        %mres_0, %out_qubits_1 = pbc.ppm ["Z"] %out_qubits#1 : i1, !quantum.bit
         . . .
 
     """
@@ -987,22 +972,18 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
 
         print(circuit.mlir_opt)
 
-    Because Catalyst does not currently support execution of Pauli-based computation operations, we
-    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-    passes will be applied to the initial MLIR, without attempting to further compile for execution.
-
     Example MLIR Representation:
 
     .. code-block:: mlir
 
         . . .
-        %3 = qec.fabricate  magic : !quantum.bit
-        %mres, %out_qubits:2 = qec.ppm ["X", "Z"] %1, %3 : i1, !quantum.bit, !quantum.bit
-        %mres_0, %out_qubits_1:2 = qec.ppm ["Z", "Y"](-1) %out_qubits#1, %2 : i1, !quantum.bit, !quantum.bit
-        %mres_2, %out_qubits_3 = qec.ppm ["X"] %out_qubits_1#0 : i1, !quantum.bit
-        %mres_4, %out_qubits_5 = qec.select.ppm(%mres, ["X"], ["Z"]) %out_qubits_1#1 : i1, !quantum.bit
+        %3 = pbc.fabricate  magic : !quantum.bit
+        %mres, %out_qubits:2 = pbc.ppm ["X", "Z"] %1, %3 : i1, !quantum.bit, !quantum.bit
+        %mres_0, %out_qubits_1:2 = pbc.ppm ["Z", "Y"](-1) %out_qubits#1, %2 : i1, !quantum.bit, !quantum.bit
+        %mres_2, %out_qubits_3 = pbc.ppm ["X"] %out_qubits_1#0 : i1, !quantum.bit
+        %mres_4, %out_qubits_5 = pbc.select.ppm(%mres, ["X"], ["Z"]) %out_qubits_1#1 : i1, !quantum.bit
         %4 = arith.xori %mres_0, %mres_2 : i1
-        %5 = qec.ppr ["X"](2) %out_qubits#0 cond(%4) : !quantum.bit
+        %5 = pbc.ppr ["X"](2) %out_qubits#0 cond(%4) : !quantum.bit
         . . .
 
     """
@@ -1091,39 +1072,35 @@ def ppm_compilation(
 
         print(circuit.mlir_opt)
 
-    Because Catalyst does not currently support execution of Pauli-based computation operations, we
-    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-    passes will be applied to the initial MLIR, without attempting to further compile for execution.
-
     Example MLIR Representation:
 
     .. code-block:: mlir
 
         . . .
-        %3 = qec.fabricate  magic : !quantum.bit
-        %mres, %out_qubits:3 = qec.ppm ["Z", "Z", "Z"] %1, %2, %3 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+        %3 = pbc.fabricate  magic : !quantum.bit
+        %mres, %out_qubits:3 = pbc.ppm ["Z", "Z", "Z"] %1, %2, %3 : i1, !quantum.bit, !quantum.bit, !quantum.bit
         %4 = quantum.alloc_qb : !quantum.bit
-        %mres_0, %out_qubits_1:3 = qec.ppm ["Z", "Z", "Y"](-1) %out_qubits#0, %out_qubits#1, %4 cond(%mres) : i1, !quantum.bit, !quantum.bit, !quantum.bit
-        %mres_2, %out_qubits_3 = qec.ppm ["X"] %out_qubits_1#2 cond(%mres) : i1, !quantum.bit
+        %mres_0, %out_qubits_1:3 = pbc.ppm ["Z", "Z", "Y"](-1) %out_qubits#0, %out_qubits#1, %4 cond(%mres) : i1, !quantum.bit, !quantum.bit, !quantum.bit
+        %mres_2, %out_qubits_3 = pbc.ppm ["X"] %out_qubits_1#2 cond(%mres) : i1, !quantum.bit
         %5 = arith.xori %mres_0, %mres_2 : i1
-        %6:2 = qec.ppr ["Z", "Z"](2) %out_qubits_1#0, %out_qubits_1#1 cond(%5) : !quantum.bit, !quantum.bit
+        %6:2 = pbc.ppr ["Z", "Z"](2) %out_qubits_1#0, %out_qubits_1#1 cond(%5) : !quantum.bit, !quantum.bit
         quantum.dealloc_qb %out_qubits_3 : !quantum.bit
-        %mres_4, %out_qubits_5 = qec.ppm ["X"] %out_qubits#2 : i1, !quantum.bit
-        %7:2 = qec.ppr ["Z", "Z"](2) %6#0, %6#1 cond(%mres_4) : !quantum.bit, !quantum.bit
+        %mres_4, %out_qubits_5 = pbc.ppm ["X"] %out_qubits#2 : i1, !quantum.bit
+        %7:2 = pbc.ppr ["Z", "Z"](2) %6#0, %6#1 cond(%mres_4) : !quantum.bit, !quantum.bit
         quantum.dealloc_qb %out_qubits_5 : !quantum.bit
-        %8 = qec.fabricate  magic_conj : !quantum.bit
-        %mres_6, %out_qubits_7:2 = qec.ppm ["Z", "Z"] %7#1, %8 : i1, !quantum.bit, !quantum.bit
+        %8 = pbc.fabricate  magic_conj : !quantum.bit
+        %mres_6, %out_qubits_7:2 = pbc.ppm ["Z", "Z"] %7#1, %8 : i1, !quantum.bit, !quantum.bit
         %9 = quantum.alloc_qb : !quantum.bit
-        %mres_8, %out_qubits_9:2 = qec.ppm ["Z", "Y"](-1) %out_qubits_7#0, %9 cond(%mres_6) : i1, !quantum.bit, !quantum.bit
-        %mres_10, %out_qubits_11 = qec.ppm ["X"] %out_qubits_9#1 cond(%mres_6) : i1, !quantum.bit
+        %mres_8, %out_qubits_9:2 = pbc.ppm ["Z", "Y"](-1) %out_qubits_7#0, %9 cond(%mres_6) : i1, !quantum.bit, !quantum.bit
+        %mres_10, %out_qubits_11 = pbc.ppm ["X"] %out_qubits_9#1 cond(%mres_6) : i1, !quantum.bit
         %10 = arith.xori %mres_8, %mres_10 : i1
-        %11 = qec.ppr ["Z"](2) %out_qubits_9#0 cond(%10) : !quantum.bit
+        %11 = pbc.ppr ["Z"](2) %out_qubits_9#0 cond(%10) : !quantum.bit
         quantum.dealloc_qb %out_qubits_11 : !quantum.bit
-        %mres_12, %out_qubits_13 = qec.ppm ["X"] %out_qubits_7#1 : i1, !quantum.bit
-        %12 = qec.ppr ["Z"](2) %11 cond(%mres_12) : !quantum.bit
+        %mres_12, %out_qubits_13 = pbc.ppm ["X"] %out_qubits_7#1 : i1, !quantum.bit
+        %12 = pbc.ppr ["Z"](2) %11 cond(%mres_12) : !quantum.bit
         quantum.dealloc_qb %out_qubits_13 : !quantum.bit
-        %mres_14, %out_qubits_15:2 = qec.ppm ["Z", "Z"] %7#0, %12 : i1, !quantum.bit, !quantum.bit
-        %mres_16, %out_qubits_17 = qec.ppm ["Z"] %out_qubits_15#1 : i1, !quantum.bit
+        %mres_14, %out_qubits_15:2 = pbc.ppm ["Z", "Z"] %7#0, %12 : i1, !quantum.bit, !quantum.bit
+        %mres_16, %out_qubits_17 = pbc.ppm ["Z"] %out_qubits_15#1 : i1, !quantum.bit
         . . .
 
     """
@@ -1201,10 +1178,6 @@ def ppm_specs(fn):
         ppm_specs = catalyst.passes.ppm_specs(circuit)
         print(ppm_specs)
 
-    Because Catalyst does not currently support execution of Pauli-based computation operations, we
-    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-    passes will be applied to the initial MLIR, without attempting to further compile for execution.
-
     Example PPM Specs:
 
     .. code-block:: pycon
@@ -1263,9 +1236,8 @@ def reduce_t_depth(qnode):
 
     .. note::
 
-        The circuits that generated from this pass are currently not executable on any backend.
-        This pass is only for analysis with the ``null.qubit`` device and potential future execution
-        when a suitable backend is available.
+        The circuits generated from this pass are currently only executable on the ``lightning.qubit``
+        device with program capture enabled.
 
     Args:
         qnode (QNode): QNode to apply the pass to.
@@ -1308,31 +1280,27 @@ def reduce_t_depth(qnode):
 
             return catalyst.measure(0), catalyst.measure(1), catalyst.measure(2)
 
-    Because Catalyst does not currently support execution of Pauli-based computation operations, we
-    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-    passes will be applied to the initial MLIR, without attempting to further compile for execution.
-
     >>> print(circuit.mlir_opt)
 
     . . .
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
     // layer 1
-    %3 = qec.ppr ["X"](8) %1 : !quantum.bit
-    %4 = qec.ppr ["X"](8) %2 : !quantum.bit
+    %3 = pbc.ppr ["X"](8) %1 : !quantum.bit
+    %4 = pbc.ppr ["X"](8) %2 : !quantum.bit
 
     // layer 2
-    %5:2 = qec.ppr ["Y", "X"](8) %3, %4 : !quantum.bit, !quantum.bit
+    %5:2 = pbc.ppr ["Y", "X"](8) %3, %4 : !quantum.bit, !quantum.bit
     %6 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
-    %7:3 = qec.ppr ["X", "Y", "X"](8) %5#0, %5#1, %6 : !quantum.bit, !quantum.bit, !quantum.bit
-    %8 = qec.ppr ["X"](8) %7#2 : !quantum.bit
+    %7:3 = pbc.ppr ["X", "Y", "X"](8) %5#0, %5#1, %6 : !quantum.bit, !quantum.bit, !quantum.bit
+    %8 = pbc.ppr ["X"](8) %7#2 : !quantum.bit
 
     // layer 3
-    %9:3 = qec.ppr ["X", "X", "Y"](8) %7#0, %7#1, %8 : !quantum.bit, !quantum.bit, !quantum.bit
+    %9:3 = pbc.ppr ["X", "X", "Y"](8) %7#0, %7#1, %8 : !quantum.bit, !quantum.bit, !quantum.bit
 
-    %mres, %out_qubits:3 = qec.ppm ["X", "X", "Y"] %9#0, %9#1, %9#2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
-    %mres_0, %out_qubits_1:3 = qec.ppm ["Y", "X", "X"] %out_qubits#0, %out_qubits#1, %out_qubits#2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
-    %mres_2, %out_qubits_3:3 = qec.ppm ["X", "Y", "X"] %out_qubits_1#0, %out_qubits_1#1, %out_qubits_1#2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+    %mres, %out_qubits:3 = pbc.ppm ["X", "X", "Y"] %9#0, %9#1, %9#2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+    %mres_0, %out_qubits_1:3 = pbc.ppm ["Y", "X", "X"] %out_qubits#0, %out_qubits#1, %out_qubits#2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
+    %mres_2, %out_qubits_3:3 = pbc.ppm ["X", "Y", "X"] %out_qubits_1#0, %out_qubits_1#1, %out_qubits_1#2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
     . . .
     """
 
@@ -1345,7 +1313,7 @@ def ppr_to_mbqc(qnode):
     and Pauli Product Measurements (PPM) to a measurement-based quantum computing
     (MBQC) style circuit will be applied.
 
-    This pass replaces QEC operations (``qec.ppr`` and ``qec.ppm``) with a
+    This pass replaces PBC operations (``pbc.ppr`` and ``pbc.ppm``) with a
     gate-based sequence in the Quantum dialect using universal gates and
     measurements that supported as MBQC gate set.
     For details, see the Figure 2 of [Measurement-based Quantum Computation on cluster states](https://arxiv.org/abs/quant-ph/0301052).
@@ -1364,8 +1332,7 @@ def ppr_to_mbqc(qnode):
     .. note::
 
         This pass expects PPR/PPM operations to be present. In practice, use it
-        after :func:`~.passes.to_ppr` and/or :func:`~.passes.commute_ppr` and/or
-        :func:`~.passes.merge_ppr_ppm`.
+        after :func:`~.passes.to_ppr`.
 
     Args:
         fn (QNode): QNode to apply the pass to.
@@ -1396,10 +1363,6 @@ def ppr_to_mbqc(qnode):
             return
 
         print(circuit.mlir_opt)
-
-    Because Catalyst does not currently support execution of Pauli-based computation operations, we
-    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-    passes will be applied to the initial MLIR, without attempting to further compile for execution.
 
     Example MLIR excerpt (structure only):
 
@@ -1469,23 +1432,19 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
         @qml.qnode(qml.device("null.qubit", wires=3))
         def circuit():
             qml.PauliRot(0.123, pauli_word="XXY", wires=[0, 1, 2])
-            return catalyst.measure(0), catalyst.measure(1), catalyst.measure(2)
-
-    Because Catalyst does not currently support execution of Pauli-based computation operations, we
-    must halt the pipeline after ``quantum-compilation-stage``. This ensures that only the quantum
-    passes will be applied to the initial MLIR, without attempting to further compile for execution.
+            return qml.probs()
 
     >>> print(circuit.mlir_opt)
-    ...
-    %out_qubits = quantum.custom "Hadamard"() %1 : !quantum.bit
-    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-    %out_qubits_2 = quantum.custom "Hadamard"() %2 : !quantum.bit
-    %3 = quantum.extract %0[ 2] : !quantum.reg -> !quantum.bit
-    %out_qubits_3 = quantum.custom "RX"(%cst_1) %3 : !quantum.bit
-    %out_qubits_4:3 = quantum.multirz(%cst_0) %out_qubits, %out_qubits_2, %out_qubits_3 : !quantum.bit, !quantum.bit, !quantum.bit
-    %out_qubits_5 = quantum.custom "Hadamard"() %out_qubits_4#0 : !quantum.bit
-    %mres, %out_qubit = quantum.measure %out_qubits_5 : i1, !quantum.bit
-    %from_elements = tensor.from_elements %mres : tensor<i1>
-    %out_qubits_6 = quantum.custom "Hadamard"() %out_qubits_4#1 : !quantum.bit
+
+    Example MLIR excerpt (structure only):
+
+    .. code-block:: mlir
+        ...
+        %mres, %out_qubits:4 = qec.ppm ["X", "X", "Y", "Z"] %1, %2, %3, %5 : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+        %6 = qec.ppr ["X"](2) %out_qubits#3 cond(%mres) : !quantum.bit
+        %7 = qec.ppr.arbitrary ["Z"](%cst) %6 : !quantum.bit
+        %mres_0, %out_qubits_1 = qec.ppm ["X"] %7 : i1, !quantum.bit
+        %8:3 = qec.ppr ["X", "X", "Y"](2) %out_qubits#0, %out_qubits#1, %out_qubits#2 cond(%mres_0) : !quantum.bit, !quantum.bit, !quantum.bit
+        ...
     """
     return PassPipelineWrapper(qnode, "decompose-arbitrary-ppr")
