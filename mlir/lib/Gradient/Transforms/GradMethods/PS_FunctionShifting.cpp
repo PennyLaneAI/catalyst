@@ -31,25 +31,25 @@ static Value genSelectiveShift(PatternRewriter &rewriter, Location loc, Value pa
                                const std::vector<std::pair<Value, Value>> &selectors)
 {
     if (selectors.empty()) {
-        return rewriter.create<arith::AddFOp>(loc, shift, param);
+        return arith::AddFOp::create(rewriter, loc, shift, param);
     }
 
     // Make sure all active iteration variables match the selectors.
-    Value shiftCondition = rewriter.create<arith::ConstantIntOp>(loc, 1, true);
+    Value shiftCondition = arith::ConstantIntOp::create(rewriter, loc, 1, true);
     for (auto &[iteration, selector] : selectors) {
         Value iterationMatch =
-            rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq, iteration, selector);
-        shiftCondition = rewriter.create<arith::AndIOp>(loc, shiftCondition, iterationMatch);
+            arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::eq, iteration, selector);
+        shiftCondition = arith::AndIOp::create(rewriter, loc, shiftCondition, iterationMatch);
     }
 
-    scf::IfOp ifOp = rewriter.create<scf::IfOp>(
-        loc, shiftCondition,
+    scf::IfOp ifOp = scf::IfOp::create(
+        rewriter, loc, shiftCondition,
         [&](OpBuilder &builder, Location loc) { // then
-            Value shiftedParam = builder.create<arith::AddFOp>(loc, shift, param);
-            builder.create<scf::YieldOp>(loc, shiftedParam);
+            Value shiftedParam = arith::AddFOp::create(builder, loc, shift, param);
+            scf::YieldOp::create(builder, loc, shiftedParam);
         },
         [&](OpBuilder &builder, Location loc) { // else
-            builder.create<scf::YieldOp>(loc, param);
+            scf::YieldOp::create(builder, loc, param);
         });
 
     return ifOp.getResult(0);
@@ -79,7 +79,7 @@ func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter &rewriter,
         PatternRewriter::InsertionGuard insertGuard(rewriter);
 
         shiftedFn =
-            rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
+            func::FuncOp::create(rewriter, loc, fnName, fnType, visibility, nullptr, nullptr);
 
         // First copy the entire function as is, then we can add the shifts.
         // Make sure to add the shiftVector/selectorVector parameters to the new function.
@@ -98,9 +98,9 @@ func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter &rewriter,
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
                 rewriter.setInsertionPointToStart(forOp.getBody());
 
-                Value idx = rewriter.create<arith::ConstantOp>(
-                    loc, rewriter.getIndexAttr(selectors.size()));
-                Value selector = rewriter.create<tensor::ExtractOp>(loc, selectorVector, idx);
+                Value idx = arith::ConstantOp::create(rewriter, loc,
+                                                      rewriter.getIndexAttr(selectors.size()));
+                Value selector = tensor::ExtractOp::create(rewriter, loc, selectorVector, idx);
                 Value iteration = forOp.getInductionVar();
                 selectors.push_back({iteration, selector});
             }
@@ -117,8 +117,8 @@ func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter &rewriter,
                 shiftedParams.reserve(params.size());
 
                 for (size_t i = 0; i < params.size(); i++) {
-                    Value idx = rewriter.create<index::ConstantOp>(loc, shiftsProcessed++);
-                    Value shift = rewriter.create<tensor::ExtractOp>(loc, shiftVector, idx);
+                    Value idx = index::ConstantOp::create(rewriter, loc, shiftsProcessed++);
+                    Value shift = tensor::ExtractOp::create(rewriter, loc, shiftVector, idx);
                     Value shiftedParam =
                         genSelectiveShift(rewriter, loc, params[i], shift, selectors);
                     shiftedParams.push_back(shiftedParam);

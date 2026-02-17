@@ -534,6 +534,21 @@ def PPMeasurementOp : QEC_Op<"ppm", [QECOpInterface, AttrSizedOperandSegments]> 
             /*in_qubits=*/ in_qubits,
             /*condition=*/ condition);
         }]>,
+        // Convenience builder with ArrayRef<StringRef> and rotation sign
+        OpBuilder<
+        (ins
+            "::mlir::ArrayRef<mlir::StringRef>":$pauli_product,
+            "uint16_t":$rotation_sign,
+            "::mlir::ValueRange":$in_qubits
+        ),[{
+            PPMeasurementOp::build($_builder, $_state,
+            /*mres=*/ $_builder.getI1Type(),
+            /*out_qubits=*/ mlir::TypeRange(in_qubits),
+            /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product), 
+            /*rotation_sign=*/ rotation_sign,
+            /*in_qubits=*/ in_qubits,
+            /*condition=*/ nullptr);
+        }]>,
     ];
 
     let assemblyFormat = [{
@@ -656,8 +671,8 @@ def LayerOp : QEC_Op<"layer", [SingleBlockImplicitTerminator<"YieldOp">]> {
     let skipDefaultBuilders = 1;
     let builders = [
       OpBuilder<(ins
-        CArg<"mlir::ValueRange", "std::nullopt">:$initArgs,
-        CArg<"mlir::ValueRange", "std::nullopt">:$outArgs,
+        CArg<"mlir::ValueRange", "{}">:$initArgs,
+        CArg<"mlir::ValueRange", "{}">:$outArgs,
         CArg<"llvm::function_ref<void(mlir::OpBuilder &, mlir::Location, mlir::ValueRange, mlir::ValueRange)>",
             "nullptr">)>
     ];
