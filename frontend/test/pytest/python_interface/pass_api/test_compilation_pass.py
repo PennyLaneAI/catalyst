@@ -16,7 +16,7 @@ from functools import lru_cache, partial
 
 import pytest
 from xdsl.context import Context
-from xdsl.dialects import arith, builtin, test
+from xdsl.dialects import arith, test
 from xdsl.rewriter import InsertPoint
 
 from catalyst.python_interface import QuantumParser
@@ -32,10 +32,10 @@ parse_xdsl_str = partial(parse_generic_to_xdsl_module, extra_dialects=(test.Test
 @pytest.fixture(scope="function")
 def ctx():
     """Context to use for applying passes."""
-    ctx = Context()
+    _ctx = Context()
     # QuantumParser automatically populates ctx with the dialects we want
-    _ = QuantumParser(ctx, "", extra_dialects=(test.Test,))
-    return ctx
+    _ = QuantumParser(_ctx, "", extra_dialects=(test.Test,))
+    return _ctx
 
 
 @lru_cache
@@ -107,6 +107,8 @@ def create_test_pass(greedy: bool, recursive: bool) -> CompilationPass:
 
 class TestCompilationPass:
     """Unit tests for CompilationPass."""
+
+    # pylint: disable=too-many-arguments,too-many-positional-arguments,redefined-outer-name
 
     @pytest.mark.parametrize(
         "greedy,recursive,expected_op_types,expected_counts",
