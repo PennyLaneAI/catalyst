@@ -97,6 +97,14 @@ class TestMLIRSpecs:
 
         return circ
 
+    def test_float_in_level_sequence(self, simple_circuit):
+        """Test that requesting an invalid level type raises an error."""
+
+        simple_circuit = qml.qjit(simple_circuit)
+
+        with pytest.raises(ValueError, match="All elements in 'level' sequence must be integers."):
+            mlir_specs(simple_circuit, level=[0, 1.1, 2])
+
     @pytest.mark.parametrize("level", [3.14, "invalid"])
     def test_invalid_level_type(self, simple_circuit, level):
         """Test that requesting an invalid level type raises an error."""
@@ -104,7 +112,7 @@ class TestMLIRSpecs:
         simple_circuit = qml.qjit(simple_circuit)
 
         with pytest.raises(
-            ValueError, match="The `level` argument must be an int, a tuple/list of ints, or 'all'."
+            ValueError, match="The 'level' argument must be an int, a tuple/list of ints, or 'all'."
         ):
             mlir_specs(simple_circuit, level=level)
 

@@ -47,6 +47,7 @@ def mlir_specs(
         qnode (QJIT): The (QJIT'd) qnode to get the specs for
         level (int | tuple[int] | list[int] | "all"): The MLIR pass level to get the specs for
         *args: Positional arguments to pass to the QNode
+        level_to_markers (dict[str, tuple[str]]): A dictionary that maps integer levels to marker labels.
         **kwargs: Keyword arguments to pass to the QNode
 
     Returns:
@@ -54,8 +55,8 @@ def mlir_specs(
           specified level
     """
 
-    if level_to_markers is None:
-        level_to_markers = defaultdict(tuple)
+    cache: dict[int, tuple[ResourcesResult, str]] = {}
+    level_to_markers: dict[int, list[str]] = level_to_markers or {}
 
     if not isinstance(qnode, QJIT) or (
         not isinstance(qnode.original_function, QNode)
@@ -68,8 +69,6 @@ def mlir_specs(
             "The provided `qnode` argument does not appear to be a valid QJIT compiled QNode."
         )
 
-    cache: dict[int, tuple[ResourcesResult, str]] = {}
-
     if args or kwargs:
         warnings.warn(
             "The `specs` function does not yet support dynamic arguments, "
@@ -77,13 +76,7 @@ def mlir_specs(
             UserWarning,
         )
 
-    max_level = level
-    if max_level == "all":
-        max_level = None
-    elif isinstance(level, (tuple, list)):
-        max_level = max(level)
-    elif not isinstance(level, int):
-        raise ValueError("The `level` argument must be an int, a tuple/list of ints, or 'all'.")
+    max_level: int | None = _get_max_level(level)
 
     def _specs_callback(previous_pass, module, next_pass, pass_level=0):
         """Callback function for gathering circuit specs."""
@@ -112,7 +105,7 @@ def mlir_specs(
         # the desired level
         pass
 
-    if level == "all":
+    if max_level is None:
         return {cache_item[1]: cache_item[0] for cache_item in cache.values()}
 
     if isinstance(level, (tuple, list)):
@@ -123,7 +116,32 @@ def mlir_specs(
             )
         return {f"{cache[lvl][1]}": cache[lvl][0] for lvl in level if lvl in cache}
 
-    # Just one level was specified
     if level not in cache:
         raise ValueError(f"Requested specs level {level} not found in MLIR pass list.")
+
+    # Just one level was specified
     return cache[level][0]
+
+
+def _get_max_level(level: int | tuple[int] | list[int] | Literal["all"]) -> int | None:
+    """Retrieve the maximum level based on the user input.
+
+    Args:
+        level: User's level sequence.
+
+    Returns:
+        max_level (int | None): The maximum level.
+
+    """
+    if level == "all":
+        return None
+
+    if isinstance(level, int):
+        return level
+
+    if isinstance(level, (tuple, list)):
+        if not all(isinstance(lvl, int) for lvl in level):
+            raise ValueError("All elements in 'level' sequence must be integers.")
+        return max(level)
+
+    raise ValueError("The 'level' argument must be an int, a tuple/list of ints, or 'all'.")
