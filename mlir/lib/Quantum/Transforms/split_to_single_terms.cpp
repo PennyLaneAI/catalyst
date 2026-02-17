@@ -53,10 +53,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
     /// Check if an operation is a supported measurement operation.
     static bool isSupportedMeasOp(Operation *op)
     {
-        if (auto measOp = dyn_cast<MeasurementProcess>(op)) {
-            return isa<ExpvalOp>(op);
-        }
-        return false;
+        return isa<ExpvalOp>(op);
     }
 
     /// Check if an observable is Identity
