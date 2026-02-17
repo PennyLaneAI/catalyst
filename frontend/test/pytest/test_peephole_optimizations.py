@@ -537,7 +537,10 @@ def test_merge_rotation_arbitrary_angle_ppr():
     assert "arith.addf" in ir_opt
     assert ir_opt.count('pbc.ppr.arbitrary ["Z", "Y"]') == 1
 
-@pytest.mark.xfail(reason="PPM execution with ppr-to-ppm pass is not fully supported yet.")
+
+@pytest.mark.xfail(
+    reason="PPM execution with ppr-to-ppm pass is not fully supported yet. This can be removed once the pass is fully supported."
+)
 @pytest.mark.usefixtures("use_capture")
 def test_clifford_to_ppm():
 
