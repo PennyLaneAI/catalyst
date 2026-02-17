@@ -21,9 +21,7 @@
   ```python
   import pennylane as qml
 
-  @qml.qjit
-  @qml.transform(pass_name="unroll-conditional-ppr-ppm")
-  @qml.transform(pass_name="lower-qec-init-ops")
+  @qml.qjit(capture=True)
   @qml.transforms.decompose_arbitrary_ppr
   @qml.transforms.to_ppr
   @qml.qnode(qml.device("lightning.qubit", wires=3))
