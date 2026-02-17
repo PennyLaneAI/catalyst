@@ -2,10 +2,10 @@
 
 <h3>New features since last release</h3>
 
-* Users can now execute circuits that are compiled with :func:`pennylane.transforms.to_ppr`, 
+* Executing circuits that are compiled with :func:`pennylane.transforms.to_ppr`, 
   :func:`pennylane.transforms.commute_ppr`, :func:`pennylane.transforms.ppr_to_ppm`, 
   :func:`pennylane.transforms.merge_ppr_ppm`, :func:`pennylane.transforms.reduce_t_depth`,
-  and :func:`pennylane.transforms.decompose_arbitrary_ppr` using `lightning.qubit` device and
+  and :func:`pennylane.transforms.decompose_arbitrary_ppr` is now possible with the `lightning.qubit` device and
   with program capture enabled (:func:`pennylane.capture.enable`).
   [(#2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
   [(#2389)](https://github.com/PennyLaneAI/catalyst/pull/2389)
