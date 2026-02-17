@@ -943,7 +943,7 @@ class TestTransform:
     )
     @pytest.mark.parametrize("mcm_method", ("one-shot", "single-branch-statistics"))
     def test_measurements_transform(self, mcm_method, transform_measurement):
-        """Test raise an error when measurements_from_samples is used with one-shot."""
+        """Test the measurements_from_samples/counts transform."""
         device = qml.device("lightning.qubit", wires=2)
 
         @partial(transform_measurement, device_wires=device.wires)
@@ -954,11 +954,4 @@ class TestTransform:
             qml.X(1)
             return (qml.expval(qml.PauliX(wires=0) @ qml.PauliX(wires=1)),)
 
-        if mcm_method == "one-shot":
-            with pytest.raises(
-                CompileError,
-                match=f"'{transform_measurement.__name__}' transform is not supported",
-            ):
-                qjit(circuit)()
-        else:
-            qjit(circuit)()
+        qjit(circuit)()

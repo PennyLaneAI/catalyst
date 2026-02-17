@@ -272,8 +272,13 @@ def measurements_from_counts(tape, device_wires):
 
     def postprocessing_counts(results):
         """A processing function to get expectation values from counts."""
-        states = results[0][0]
-        counts_outcomes = results[0][1]
+        # In one-shot mode, results may be nested: (((states, counts),),).
+        # Unwrap tuple-of-tuples until we reach (states, counts).
+        inner = results[0]
+        while isinstance(inner, (tuple, list)) and isinstance(inner[0], (tuple, list)):
+            inner = inner[0]
+        states = inner[0]
+        counts_outcomes = inner[1]
         results_processed = []
         for m in tape.measurements:
             wires = m.wires if m.wires else device_wires
@@ -344,6 +349,16 @@ def measurements_from_samples(tape, device_wires):
     def postprocessing_samples(results):
         """A processing function to get expectation values from samples."""
         samples = results[0]
+        # In one-shot mode, results may be nested: ((samples_array, mcm1, mcm2),)
+        # Unwrap tuple-of-tuples until we reach a flat tuple of arrays
+        # which may be partitioned-shot results like (partition1, partition2)
+        while isinstance(samples, (tuple, list)) and isinstance(samples[0], (tuple, list)):
+            samples = samples[0]
+
+        # If still a tuple and not partitioned shots, e.g. (samples_arr, mcm1, ...)
+        # just take the `samples_arr`
+        if isinstance(samples, (tuple, list)) and not tape.shots.has_partitioned_shots:
+            samples = samples[0]
         results_processed = []
         for m in tape.measurements:
             if isinstance(m, (ExpectationMP, VarianceMP, ProbabilityMP, SampleMP)):
