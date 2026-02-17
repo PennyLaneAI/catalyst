@@ -106,7 +106,7 @@ def GridsynthPass : Pass<"gridsynth"> {
         let dependentDialects = [
         "memref::MemRefDialect",
         "scf::SCFDialect",
-        "catalyst::qec::QECDialect",
+        "catalyst::pbc::PBCDialect",
     ];
 }
 
