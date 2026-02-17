@@ -24,9 +24,9 @@ import numpy as np
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
+from pennylane.capture import subroutine
 
 from catalyst import qjit
-from catalyst.jax_primitives import subroutine
 from catalyst.utils.exceptions import CompileError
 
 
@@ -248,6 +248,7 @@ def test_dynamic_wire_alloc_cond_outside(cond, expected, backend):
         with qml.allocate(1) as q1:
             with qml.allocate(1) as q2:
                 qml.X(q1[0])
+                qml.Identity(0)
                 if c:
                     qml.CNOT(wires=[q1[0], 1])  # |01>
                 else:
@@ -514,7 +515,7 @@ def test_no_capture(backend):
     """
     with pytest.raises(
         CompileError,
-        match=re.escape("qml.allocate() is only supported with program capture enabled."),
+        match=re.escape("qml.allocate() with qjit is only supported with program capture enabled."),
     ):
 
         @qjit

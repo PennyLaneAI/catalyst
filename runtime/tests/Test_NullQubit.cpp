@@ -229,13 +229,14 @@ TEST_CASE("Test a NullQubit circuit with num_qubits=4 and observables", "[NullQu
     sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
 
     ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[0]});
-
     ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[1]});
     ObsIdType h = sim->Observable(ObsId::Hadamard, {}, {Qs[0]});
+    ObsIdType t = sim->TensorObservable({pz, px});
 
     sim->Var(h);
     sim->Var(px);
     sim->Expval(pz);
+    sim->Expval(t);
 
     auto &&[num_ops, num_obs, num_params, op_names, obs_keys] = sim->CacheManagerInfo();
     CHECK(num_ops == 0);
@@ -935,12 +936,17 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
     std::unique_ptr<NullQubit> sim =
         std::make_unique<NullQubit>("{'track_resources':True, 'resources_filename':'" +
                                     RESOURCES_FILENAME + "', 'compute_depth':True}");
+
+    constexpr size_t shots = 100;
+    constexpr size_t num_qubits = 4;
+    sim->SetDeviceShots(shots);
+
     CHECK(sim->IsTrackingResources() == true);
 
     // Ensure data will be written to the correct place
     CHECK(sim->GetResourcesFilename() == RESOURCES_FILENAME);
 
-    std::vector<QubitIdType> Qs = sim->AllocateQubits(4);
+    std::vector<QubitIdType> Qs = sim->AllocateQubits(num_qubits);
 
     // Apply set state operations
     {
@@ -969,6 +975,59 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
     sim->MatrixOperation({}, {Qs[0]}, false, {Qs[1]});
     sim->MatrixOperation({}, {Qs[0]}, true);
     sim->MatrixOperation({}, {Qs[0]}, true, {Qs[1], Qs[2]});
+
+    // Test adding all types of observables
+    auto obs1 = sim->Observable(ObsId::PauliZ, {}, {});
+    auto obs2 = sim->Observable(ObsId::PauliX, {}, {});
+    sim->Observable(ObsId::PauliY, {}, {});
+    sim->Observable(ObsId::Hadamard, {}, {});
+    sim->Observable(ObsId::Hermitian, {}, {});
+    sim->Observable(ObsId::Identity, {}, {});
+    auto obs3 = sim->TensorObservable({obs1, obs2});
+    auto obs4 = sim->HamiltonianObservable({}, {obs1, obs2});
+    CHECK(obs1 == 1);
+    CHECK(obs2 == 2);
+    CHECK(obs3 == 7);
+    CHECK(obs4 == 8);
+
+    // Test expectation value on each observable type
+    sim->Expval(obs1);
+    sim->Expval(obs3);
+    sim->Expval(obs4);
+
+    sim->Var(obs1);
+    sim->Measure(Qs[0], 0);
+
+    // Test analytical measurement types
+    {
+        std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+        DataView<std::complex<double>, 1> view(state);
+        sim->State(view);
+    }
+    {
+        std::vector<double> probs(1);
+        DataView<double, 1> probs_view(probs);
+        sim->Probs(probs_view);
+        sim->PartialProbs(probs_view, {Qs[0], Qs[2]});
+    }
+    {
+        std::vector<int64_t> counts(1);
+        DataView<int64_t, 1> counts_view(counts);
+        std::vector<double> eigvals(1);
+        DataView<double, 1> eigvals_view(eigvals);
+        sim->Counts(eigvals_view, counts_view);
+        sim->PartialCounts(eigvals_view, counts_view, {Qs[1], Qs[3]});
+    }
+    {
+        double *_data_aligned = nullptr;
+        size_t _offset = 0U;
+        size_t _sizes[2] = {shots, num_qubits};
+        size_t _strides[2] = {1, 1};
+
+        DataView<double, 2> sample_view(_data_aligned, _offset, _sizes, _strides);
+        sim->Sample(sample_view);
+        sim->PartialSample(sample_view, {Qs[0], Qs[2]});
+    }
 
     sim->ReleaseQubits(Qs);
 
@@ -1000,6 +1059,19 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
         "BasisState",
     };
 
+    std::vector<std::string> measurement_names = {"expval(PauliZ)",
+                                                  "expval(Prod(num_terms=2))",
+                                                  "expval(Hamiltonian(num_terms=2))",
+                                                  "var(PauliZ)",
+                                                  "MidMeasure",
+                                                  "state(all wires)",
+                                                  "probs(all wires)",
+                                                  "probs(2 wires)",
+                                                  "counts(all wires)",
+                                                  "counts(2 wires)",
+                                                  "sample(all wires)",
+                                                  "sample(2 wires)"};
+
     // Read full Json, check if num_wires and num_gates are correct
     std::string full_json;
     while (resource_file_r) {
@@ -1024,6 +1096,10 @@ TEST_CASE("Test NullQubit device resource tracking integration", "[NullQubit]")
     CHECK(full_json.find("depth") != std::string::npos);
     for (const auto &name : resource_names) {
         // Check that all operations applied are present in the data
+        CHECK(full_json.find(name) != std::string::npos);
+    }
+    for (const auto &name : measurement_names) {
+        // Check that all measurements applied are present in the data
         CHECK(full_json.find(name) != std::string::npos);
     }
 

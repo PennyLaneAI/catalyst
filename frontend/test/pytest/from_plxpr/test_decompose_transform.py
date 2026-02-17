@@ -15,13 +15,24 @@
 This module tests the decompose transformation.
 """
 
+from contextlib import contextmanager
 from functools import partial
 
 import numpy as np
 import pennylane as qml
 import pytest
+from pennylane.exceptions import DecompositionError, DecompositionWarning
 from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
+
+
+@contextmanager
+def does_not_raise():
+    """
+    define a context manager for tests that do not fail, for use with `parametrize`.
+    See https://github.com/pytest-dev/pytest/pull/4682/changes for details.
+    """
+    yield
 
 
 class TestGraphDecomposition:
@@ -63,7 +74,9 @@ class TestGraphDecomposition:
 
         # TODO: RZ/RX warnings  should not be raised, remove (PL issue #8885)
         with pytest.warns(UserWarning, match="Falling back to the legacy decomposition system"):
-            with pytest.warns(UserWarning, match="unable to find a decomposition for {'Hadamard'}"):
+            with pytest.warns(
+                DecompositionWarning, match="unable to find a decomposition for {'Hadamard'}"
+            ):
                 with pytest.warns(UserWarning, match="Operator RX does not define"):
                     with pytest.warns(UserWarning, match="Operator RZ does not define"):
                         circuit(0)
@@ -86,8 +99,7 @@ class TestGraphDecomposition:
         assert qml.math.allclose(without_qjit, with_qjit())
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
-        with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
-            resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
+        resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
     @pytest.mark.usefixtures("use_capture_dgraph")
@@ -117,8 +129,7 @@ class TestGraphDecomposition:
         assert qml.math.allclose(qjited_circuit(), expected)
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
-        with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
-            resources = qml.specs(qjited_circuit, level="device")()["resources"].gate_types
+        resources = qml.specs(qjited_circuit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
     @pytest.mark.usefixtures("use_capture_dgraph")
@@ -172,8 +183,7 @@ class TestGraphDecomposition:
         assert qml.math.allclose(without_qjit, with_qjit())
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
-        with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
-            resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
+        resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
     @pytest.mark.usefixtures("use_capture_dgraph")
@@ -206,8 +216,7 @@ class TestGraphDecomposition:
 
         assert qml.math.allclose(without_qjit, with_qjit(x, y))
         expected_resources = qml.specs(circuit, level="device")(x, y)["resources"].gate_types
-        with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
-            resources = qml.specs(with_qjit, level="device")(x, y)["resources"].gate_types
+        resources = qml.specs(with_qjit, level="device")(x, y)["resources"].gate_types
         assert resources == expected_resources
 
     @pytest.mark.usefixtures("use_capture_dgraph")
@@ -230,8 +239,7 @@ class TestGraphDecomposition:
         assert qml.math.allclose(without_qjit, with_qjit(x, y, z))
 
         expected_resources = qml.specs(circuit, level="device")(x, y, z)["resources"].gate_types
-        with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
-            resources = qml.specs(with_qjit, level="device")(x, y, z)["resources"].gate_types
+        resources = qml.specs(with_qjit, level="device")(x, y, z)["resources"].gate_types
         assert resources == expected_resources
 
     @pytest.mark.skip(
@@ -262,7 +270,7 @@ class TestGraphDecomposition:
 
         @partial(
             qml.transforms.decompose,
-            gate_set={qml.CNOT: 1, qml.GlobalPhase: 1, qml.RX: 1, qml.RZ: 1, "PauliRot": 100},
+            gate_set={"CNOT", "GlobalPhase", "RX", "RZ", "PauliRot"},
         )
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
@@ -276,8 +284,7 @@ class TestGraphDecomposition:
         assert qml.math.allclose(without_qjit, with_qjit())
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
-        with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
-            resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
+        resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
     @pytest.mark.xfail(reason="unstable global phase numbers", strict=False)
@@ -301,8 +308,7 @@ class TestGraphDecomposition:
 
         with_qjit = qml.qjit(circuit)
         result_with_qjit = with_qjit()
-        with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
-            resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
+        resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
 
         with qml.capture.pause():
             result_without_qjit = circuit()
@@ -332,8 +338,7 @@ class TestGraphDecomposition:
         assert qml.math.allclose(without_qjit, with_qjit())
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
-        with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
-            resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
+        resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
     @pytest.mark.usefixtures("use_capture_dgraph")
@@ -357,8 +362,7 @@ class TestGraphDecomposition:
         assert qml.math.allclose(without_qjit, with_qjit())
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
-        with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
-            resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
+        resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
     @pytest.mark.usefixtures("use_capture_dgraph")
@@ -383,8 +387,7 @@ class TestGraphDecomposition:
         assert qml.math.allclose(without_qjit, with_qjit())
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
-        with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
-            resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
+        resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
     @pytest.mark.usefixtures("use_capture_dgraph")
@@ -393,7 +396,7 @@ class TestGraphDecomposition:
 
         @partial(
             qml.transforms.decompose,
-            gate_set={"RX": 1, "RZ": 1, "H": 1, "CZ": 1, "PauliRot": 100},
+            gate_set={"RX", "RZ", "H", "CZ", "PauliRot"},
         )
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def circuit():
@@ -408,8 +411,7 @@ class TestGraphDecomposition:
         assert qml.math.allclose(without_qjit, with_qjit())
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
-        with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
-            resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
+        resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
 
     @pytest.mark.usefixtures("use_capture_dgraph")
@@ -418,7 +420,7 @@ class TestGraphDecomposition:
 
         @partial(
             qml.transforms.decompose,
-            gate_set={"RX": 1, "RY": 1, "CNOT": 1, "GlobalPhase": 1, "PauliRot": 100},
+            gate_set={"RX", "RY", "CNOT", "GlobalPhase", "PauliRot"},
         )
         @qml.qnode(qml.device("lightning.qubit", wires=4))
         def circuit():
@@ -427,12 +429,10 @@ class TestGraphDecomposition:
 
         with_qjit = qml.qjit(circuit)
         result_with_qjit = with_qjit()
-        with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
-            resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
+        resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
 
-        with qml.capture.pause():
-            result_without_qjit = circuit()
-            expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
+        result_without_qjit = circuit()
+        expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
 
         assert resources == expected_resources
         assert qml.math.allclose(result_without_qjit, result_with_qjit)
@@ -460,9 +460,70 @@ class TestGraphDecomposition:
         assert qml.math.allclose(without_qjit, with_qjit())
 
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
-        with pytest.warns(UserWarning, match="Measurement resource tracking is not yet supported"):
-            resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
+        resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
+
+    @pytest.mark.usefixtures("use_capture_dgraph")
+    @pytest.mark.parametrize(
+        "num_work_wires,expectation",
+        [
+            (0, pytest.raises(DecompositionError)),
+            (2, pytest.raises(DecompositionError)),
+            (3, does_not_raise()),
+            (7, does_not_raise()),
+        ],
+    )
+    def test_work_wires(self, num_work_wires, expectation):
+        """
+        Test that graph decomposition raises the correct exception when given an insufficient
+        number of work wires, and passes otherwise.
+        """
+
+        @qml.register_resources(
+            {qml.CNOT: 3, qml.H: 1, qml.X: 1, qml.ops.op_math.Conditional: 2},
+            work_wires={
+                "borrowed": 2,
+                "garbage": 1,
+            },
+        )
+        def my_decomp(angle, wires, **_):
+            def true_func():
+                qml.CNOT(wires)
+
+                with qml.allocate(2, state="any", restored=True) as w:
+                    qml.H(w[0])
+                    qml.H(w[0])
+                    qml.X(w[1])
+                    qml.X(w[1])
+
+                return
+
+            def false_func():
+                with qml.allocate(1, state="any", restored=False) as w:
+                    qml.H(w)
+
+                m = qml.measure(wires[0])
+
+                qml.cond(m, qml.CNOT)(wires)
+
+                return
+
+            qml.cond(angle > 1.2, true_func, false_func)()
+
+        with expectation:
+
+            @qml.qjit
+            @partial(
+                qml.transforms.decompose,
+                gate_set={qml.CNOT, qml.H, qml.X, "Conditional", "MidMeasure"},
+                fixed_decomps={qml.CRX: my_decomp},
+                num_work_wires=num_work_wires,
+            )
+            @qml.qnode(qml.device("lightning.qubit", wires=9))
+            def circuit():
+                qml.CRX(1.7, wires=[0, 1])
+                qml.CRX(-7.2, wires=[0, 1])
+                return qml.state()
 
 
 if __name__ == "__main__":

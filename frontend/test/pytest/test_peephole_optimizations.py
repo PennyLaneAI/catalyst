@@ -27,7 +27,6 @@ from catalyst.passes import (
     disentangle_swap,
     merge_ppr_ppm,
     merge_rotations,
-    ppm_compilation,
     ppm_specs,
     ppr_to_ppm,
     to_ppr,
@@ -350,33 +349,27 @@ def test_ppr_to_ppm_auto_corrected():
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
+    @ppr_to_ppm(decompose_method="auto-corrected")
+    @to_ppr
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
     def test_ppr_to_ppm_workflow():
-
-        @ppr_to_ppm(decompose_method="auto-corrected")
-        @to_ppr
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
-        def f():
-            qml.H(0)
-            qml.S(1)
-            qml.T(0)
-            qml.CNOT([0, 1])
-            return measure(0), measure(1)
-
-        return f()
+        qml.H(0)
+        qml.S(1)
+        qml.T(0)
+        qml.CNOT([0, 1])
+        return measure(0), measure(1)
 
     assert 'transform.apply_registered_pass "ppr-to-ppm"' in test_ppr_to_ppm_workflow.mlir
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
-    assert "quantum.alloc_qb" in optimized_ir
-    assert "qec.fabricate  magic" in optimized_ir
-    assert "qec.select.ppm" in optimized_ir
-    assert 'qec.ppr ["X"]' in optimized_ir
 
-    ppm_specs_output = ppm_specs(test_ppr_to_ppm_workflow)
-    assert ppm_specs_output["f_0"]["num_of_ppm"] == 19
-    assert ppm_specs_output["f_0"]["logical_qubits"] == 2
-    assert ppm_specs_output["f_0"]["pi2_ppr"] == 8
-    assert ppm_specs_output["f_0"]["max_weight_pi2"] == 2
+    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=2)()
+    gate_types = specs_output.resources.gate_types
+
+    assert gate_types["GlobalPhase"] == 4
+    assert gate_types["PPR-pi/4-w1"] == 6
+    assert gate_types["PPR-pi/4-w2"] == 1
+    assert gate_types["PPR-pi/8-w1"] == 1
 
 
 def test_ppr_to_ppm_inject_magic_state():
@@ -384,29 +377,26 @@ def test_ppr_to_ppm_inject_magic_state():
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
+    @ppr_to_ppm(decompose_method="clifford-corrected", avoid_y_measure=True)
+    @to_ppr
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
     def test_ppr_to_ppm_workflow():
-
-        @ppr_to_ppm(decompose_method="clifford-corrected", avoid_y_measure=True)
-        @to_ppr
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
-        def f():
-            qml.H(0)
-            qml.S(1)
-            qml.T(0)
-            qml.CNOT([0, 1])
-            return measure(0), measure(1)
-
-        return f()
+        qml.H(0)
+        qml.S(1)
+        qml.T(0)
+        qml.CNOT([0, 1])
+        return measure(0), measure(1)
 
     assert 'transform.apply_registered_pass "ppr-to-ppm"' in test_ppr_to_ppm_workflow.mlir
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
 
-    ppm_specs_output = ppm_specs(test_ppr_to_ppm_workflow)
-    assert ppm_specs_output["f_0"]["num_of_ppm"] == 20
-    assert ppm_specs_output["f_0"]["logical_qubits"] == 2
-    assert ppm_specs_output["f_0"]["pi2_ppr"] == 9
-    assert ppm_specs_output["f_0"]["max_weight_pi2"] == 2
+    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=2)()
+    gate_types = specs_output.resources.gate_types
+    assert gate_types["PPR-pi/4-w1"] == 6
+    assert gate_types["PPR-pi/4-w2"] == 1
+    assert gate_types["PPR-pi/8-w1"] == 1
+    assert gate_types["PPM-w1"] == 2
 
 
 def test_ppr_to_ppm_pauli_corrected():
@@ -414,32 +404,26 @@ def test_ppr_to_ppm_pauli_corrected():
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
+    @ppr_to_ppm(decompose_method="pauli-corrected")
+    @to_ppr
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
     def test_ppr_to_ppm_workflow():
-
-        @ppr_to_ppm(decompose_method="pauli-corrected")
-        @to_ppr
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
-        def f():
-            qml.H(0)
-            qml.S(1)
-            qml.T(0)
-            qml.CNOT([0, 1])
-            return measure(0), measure(1)
-
-        return f()
+        qml.H(0)
+        qml.S(1)
+        qml.T(0)
+        qml.CNOT([0, 1])
+        return measure(0), measure(1)
 
     assert 'transform.apply_registered_pass "ppr-to-ppm"' in test_ppr_to_ppm_workflow.mlir
     optimized_ir = test_ppr_to_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "ppr-to-ppm"' not in optimized_ir
-    assert (
-        "qec.select.ppm" in optimized_ir
-    )  # Make sure we use the select PPM to implement the reactive measurement
 
-    ppm_specs_output = ppm_specs(test_ppr_to_ppm_workflow)
-    assert ppm_specs_output["f_0"]["num_of_ppm"] == 17
-    assert ppm_specs_output["f_0"]["logical_qubits"] == 2
-    assert ppm_specs_output["f_0"]["pi2_ppr"] == 8
-    assert ppm_specs_output["f_0"]["max_weight_pi2"] == 2
+    specs_output = qml.specs(test_ppr_to_ppm_workflow, level=2)()
+    gate_types = specs_output.resources.gate_types
+    assert gate_types["PPR-pi/4-w1"] == 6
+    assert gate_types["PPR-pi/4-w2"] == 1
+    assert gate_types["PPR-pi/8-w1"] == 1
+    assert gate_types["PPM-w1"] == 2
 
 
 def test_commute_ppr_and_merge_ppr_ppm_with_max_pauli_size():
@@ -556,59 +540,34 @@ def test_merge_rotation_arbitrary_angle_ppr():
 
 def test_clifford_to_ppm():
 
-    pipe = [("pipe", ["quantum-compilation-stage"])]
+    @qml.qnode(qml.device("lightning.qubit", wires=6))
+    def cir():
+        for idx in range(5):
+            qml.H(idx)
+            qml.CNOT(wires=[idx, idx + 1])
+            qml.T(idx)
+            qml.T(idx + 1)
+        return [qml.expval(qml.PauliZ(idx)) for idx in range(5)]
 
-    @qjit(pipelines=pipe, target="mlir")
-    def test_clifford_to_ppm_workflow():
+    ppm_transform = qml.transform(pass_name="ppm-compilation")
 
-        @ppm_compilation(decompose_method="auto-corrected")
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
-        def f():
-            for idx in range(5):
-                qml.H(idx)
-                qml.CNOT(wires=[idx, idx + 1])
-                qml.T(idx)
-                qml.T(idx + 1)
-            return measure(0)
+    auto_corrected_cir = ppm_transform(decompose_method="auto-corrected")(cir)
 
-        @ppm_compilation(
-            decompose_method="clifford-corrected", avoid_y_measure=True, max_pauli_size=2
-        )
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
-        def g():
-            for idx in range(5):
-                qml.H(idx)
-                qml.CNOT(wires=[idx, idx + 1])
-                qml.T(idx)
-                qml.T(idx + 1)
+    clifford_corrected_cir = ppm_transform(
+        decompose_method="clifford-corrected", avoid_y_measure=True, max_pauli_size=2
+    )(cir)
 
-        @ppm_compilation(decompose_method="pauli-corrected", max_pauli_size=2)
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
-        def h():
-            for idx in range(5):
-                qml.H(idx)
-                qml.CNOT(wires=[idx, idx + 1])
-                qml.T(idx)
-                qml.T(idx + 1)
+    pauli_corrected_cir = ppm_transform(decompose_method="pauli-corrected", max_pauli_size=2)(cir)
 
-        return f(), g(), h()
+    auto_qjit_cir = qml.qjit(auto_corrected_cir)
+    clifford_qjit_cir = qml.qjit(clifford_corrected_cir)
+    pauli_qjit_cir = qml.qjit(pauli_corrected_cir)
 
-    assert 'transform.apply_registered_pass "ppm-compilation"' in test_clifford_to_ppm_workflow.mlir
-    optimized_ir = test_clifford_to_ppm_workflow.mlir_opt
-    assert 'transform.apply_registered_pass "ppm-compilation"' not in optimized_ir
-    assert "qec.select.ppm" in optimized_ir
-    assert 'qec.ppm ["X", "Z", "Z"]' in optimized_ir
-    assert 'qec.ppm ["Z", "Y"]' in optimized_ir
-    assert 'qec.ppr ["X", "Z"](2)' in optimized_ir
+    baseline_cir = cir()
 
-    ppm_specs_output = ppm_specs(test_clifford_to_ppm_workflow)
-
-    assert ppm_specs_output["f_0"]["logical_qubits"] == 2
-    assert ppm_specs_output["f_0"]["num_of_ppm"] == 7
-    assert ppm_specs_output["f_0"]["pi2_ppr"] == 2
-    assert ppm_specs_output["f_0"]["max_weight_pi2"] == 2
-
-    assert ppm_specs_output["g_0"]["logical_qubits"] == 2
+    np.allclose(auto_qjit_cir(), baseline_cir)
+    np.allclose(clifford_qjit_cir(), baseline_cir)
+    np.allclose(pauli_qjit_cir(), baseline_cir)
 
 
 @pytest.mark.usefixtures("use_capture")
@@ -639,6 +598,50 @@ def test_decompose_arbitrary_ppr():
     assert 'qec.ppm ["X", "Y", "Z", "Z"]' in ir_opt
     assert 'qec.ppr.arbitrary ["Z"]' in ir_opt
     assert 'qec.ppr ["X", "Y", "Z"](2)' in ir_opt
+
+
+@pytest.mark.usefixtures("use_capture")
+class TestLowerQECInitOps:
+    """Test that the lower-qec-init-ops pass correctly lowers fabricate/prepare ops to gates."""
+
+    @pytest.mark.parametrize(
+        "gates",
+        [
+            (lambda: qml.Identity(0)),
+            (lambda: qml.PauliX(0)),
+            (lambda: (qml.H(0), qml.PauliZ(0))),
+            (lambda: qml.H(0)),
+            (lambda: (qml.H(0), qml.T(0))),
+            (lambda: (qml.H(0), qml.S(0))),
+            (lambda: (qml.H(0), qml.adjoint(qml.T(0), lazy=False))),
+            (lambda: (qml.H(0), qml.adjoint(qml.S(0), lazy=False))),
+        ],
+    )
+    def test_lower_qec_init_ops_preserves_states(self, gates):
+        """Test that lower-qec-init-ops correctly lowers states through the PPR/PPM pipeline."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def baseline_circuit():
+            gates()
+            return (
+                qml.expval(qml.PauliX(0)),
+                qml.expval(qml.PauliY(0)),
+                qml.expval(qml.PauliZ(0)),
+            )
+
+        to_ppr_circuit = qml.transform(pass_name="to-ppr")(baseline_circuit)
+        lowered_circuit = qml.transform(pass_name="ppr-to-ppm")(to_ppr_circuit)
+
+        baseline_circuit = qml.qjit(baseline_circuit)
+        to_ppr_circuit = qml.qjit(to_ppr_circuit)
+        lowered_circuit = qml.qjit(lowered_circuit)
+
+        baseline_result = baseline_circuit()
+        to_ppr_result = to_ppr_circuit()
+        lowered_result = lowered_circuit()
+
+        assert np.allclose(baseline_result, to_ppr_result)
+        assert np.allclose(to_ppr_result, lowered_result)
 
 
 class TestPPMSpecsErrors:

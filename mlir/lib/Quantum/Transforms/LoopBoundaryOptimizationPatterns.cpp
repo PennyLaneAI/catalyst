@@ -191,7 +191,7 @@ quantum::ExtractOp createExtractOp(Value qreg, const QubitOrigin &qubit, Pattern
     auto loc = qubit.qubitOrRegister.getLoc();
     auto idxAttr = rewriter.getI64IntegerAttr(qubit.position);
     auto type = rewriter.getType<quantum::QubitType>();
-    return rewriter.create<quantum::ExtractOp>(loc, type, qreg, nullptr, idxAttr);
+    return quantum::ExtractOp::create(rewriter, loc, type, qreg, nullptr, idxAttr);
 }
 
 // Creates a quantum.insert operation.
@@ -201,7 +201,8 @@ quantum::InsertOp createInsertOp(Value qreg, const QubitOrigin &qubit, Value ele
     assert(element && "InsertOp requires an element value!");
     auto loc = qubit.qubitOrRegister.getLoc();
     auto idxAttr = rewriter.getI64IntegerAttr(qubit.position);
-    return rewriter.create<quantum::InsertOp>(loc, qreg.getType(), qreg, nullptr, idxAttr, element);
+    return quantum::InsertOp::create(rewriter, loc, qreg.getType(), qreg, nullptr, idxAttr,
+                                     element);
 }
 
 // Finds the initial value of a quantum register in the for loop.
@@ -585,7 +586,8 @@ void handleParams(QuantumOpInfo topEdgeOp, QuantumOpInfo bottomEdgeOp, scf::ForO
 
         // Update the param of topEdgeOp to negative value
         for (auto [idx, param] : llvm::enumerate(topEdgeParams)) {
-            Value negParam = rewriter.create<arith::NegFOp>(cloneTopOp.getLoc(), param).getResult();
+            Value negParam =
+                arith::NegFOp::create(rewriter, cloneTopOp.getLoc(), param).getResult();
             rewriter.moveOpBefore(negParam.getDefiningOp(), cloneTopOp);
             bottomEdgeOp.op.setOperand(idx, negParam);
         }

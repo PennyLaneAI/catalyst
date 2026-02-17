@@ -107,14 +107,20 @@ Will print out something close to the following:
 
 .. code-block:: bash
 
-        [RUNNING] mlir-hlo-opt --allow-unregistered-dialect --canonicalize --chlo-legalize-to-hlo --stablehlo-legalize-to-hlo --mhlo-legalize-control-flow --hlo-legalize-to-linalg --mhlo-legalize-to-std --convert-to-signless --canonicalize /tmp/tmpwsoh3acq/circuit.mlir -o /tmp/tmpwsoh3acq/circuit.nohlo.mlir
-        [RUNNING] quantum-opt --lower-gradients --convert-arraylist-to-memref /tmp/tmpwsoh3acq/circuit.nohlo.mlir -o /tmp/tmpwsoh3acq/circuit.nohlo.opt.mlir
-        [RUNNING] quantum-opt --inline --gradient-bufferize --scf-bufferize --convert-tensor-to-linalg --convert-elementwise-to-linalg --arith-bufferize --empty-tensor-to-alloc-tensor --bufferization-bufferize --tensor-bufferize --linalg-bufferize --tensor-bufferize --quantum-bufferize --func-bufferize --finalizing-bufferize --buffer-loop-hoisting --convert-bufferization-to-memref --canonicalize --cp-global-memref /tmp/tmpwsoh3acq/circuit.nohlo.opt.mlir -o /tmp/tmpwsoh3acq/circuit.nohlo.opt.buff.mlir
-        [RUNNING] quantum-opt --convert-linalg-to-loops --convert-scf-to-cf --expand-strided-metadata --lower-affine --arith-expand --convert-complex-to-standard --convert-complex-to-llvm --convert-math-to-llvm --convert-math-to-libm --convert-arith-to-llvm --finalize-memref-to-llvm=use-generic-functions --convert-index-to-llvm --convert-gradient-to-llvm --convert-quantum-to-llvm --emit-catalyst-py-interface --canonicalize --reconcile-unrealized-casts /tmp/tmpwsoh3acq/circuit.nohlo.opt.buff.mlir -o /tmp/tmpwsoh3acq/circuit.nohlo.opt.buff.llvm.mlir
-        [RUNNING] mlir-translate --mlir-to-llvmir /tmp/tmpwsoh3acq/circuit.nohlo.opt.buff.llvm.mlir -o /tmp/tmpwsoh3acq/circuit.nohlo.opt.buff.llvm.ll
-        [RUNNING] llc --filetype=obj --relocation-model=pic /tmp/tmpwsoh3acq/circuit.nohlo.opt.buff.llvm.ll -o /tmp/tmpwsoh3acq/circuit.nohlo.opt.buff.llvm.o
-        [RUNNING] clang -shared -rdynamic -Wl,-no-as-needed -Wl,-rpath,runtime/build/lib/capi:runtime/build/lib/backend:mlir/llvm-project/build/lib -Lmlir/llvm-project/build/lib -Lruntime/build/lib/capi -Lruntime/build/lib/backend -lrt_backend -lrt_capi -lpthread -lmlir_c_runner_utils /tmp/tmpwsoh3acq/circuit.nohlo.opt.buff.llvm.o -o /tmp/tmpwsoh3acq/circuit.nohlo.opt.buff.llvm.so
-
+        [SYSTEM] catalyst -o circuit.ll --module-name circuit --workspace ./ -verify-each=false \
+            --catalyst-pipeline \
+            QuantumCompilationStage(split-multiple-tapes;builtin.module(apply-transform-sequence);inline-nested-module;lower-mitigation;adjoint-lowering), \
+            HLOLoweringStage(canonicalize;func.func(chlo-legalize-to-stablehlo);func.func(stablehlo-legalize-control-flow);func.func(stablehlo-aggressive-simplification);stablehlo-legalize-to-linalg;func.func(stablehlo-legalize-to-std);func.func(stablehlo-legalize-sort);stablehlo-convert-to-signless;canonicalize;scatter-lowering;hlo-custom-call-lowering;cse;func.func(linalg-detensorize{aggressive-mode});detensorize-scf;detensorize-function-boundary;canonicalize;symbol-dce), \
+            GradientLoweringStage(annotate-invalid-gradient-functions;lower-gradients), \
+            BufferizationStage(inline;convert-tensor-to-linalg;convert-elementwise-to-linalg;gradient-preprocess;one-shot-bufferize{bufferize-function-boundaries allow-return-allocs-from-loops function-boundary-type-conversion=identity-layout-map unknown-type-conversion=identity-layout-map};canonicalize;gradient-postprocess;func.func(buffer-hoisting);func.func(buffer-loop-hoisting);func.func(buffer-deallocation);convert-arraylist-to-memref;convert-bufferization-to-memref;canonicalize;cp-global-memref), \
+            MLIRToLLVMDialectConversion(expand-realloc;convert-gradient-to-llvm;memrefcpy-to-linalgcpy;func.func(convert-linalg-to-loops);convert-scf-to-cf;expand-strided-metadata;lower-affine;arith-expand;convert-complex-to-standard;convert-complex-to-llvm;convert-math-to-llvm;convert-math-to-libm;convert-arith-to-llvm;memref-to-llvm-tbaa;finalize-memref-to-llvm{use-generic-functions};convert-index-to-llvm;convert-catalyst-to-llvm;convert-quantum-to-llvm;emit-catalyst-py-interface;canonicalize;reconcile-unrealized-casts;gep-inbounds;register-inactive-callback), \
+            --verbose out.mlir
+        [SYSTEM] clang -shared -rdynamic -Wl,-arch_errors_fatal \
+            -Wl,-rpath,mlir/llvm-project/build/lib -Lmlir/llvm-project/build/lib \
+            -Wl,-rpath,frontend/catalyst/utils/../../../runtime/build/lib -Lfrontend/catalyst/utils/../../../runtime/build/lib \
+            -Wl,-rpath,frontend/catalyst/utils -Lfrontend/catalyst/utils \
+            -lrt_capi -lpthread -lmlir_c_runner_utils -llapacke.3 -lcustom_calls -lmlir_async_runtime -lrt_rsdecomp -lrt_OQD_capi \
+            circuit.o -o circuit.so
 
 Pass Pipelines
 ==============
@@ -206,8 +212,8 @@ The compilation process of a QJITed quantum function moves through various stage
 - **Quantum Tape**: the quantum record of hybrid quantum programs in a single ``qml.QNode``
 - **JAXPR**: the graph data structure maintained by `JAX <https://github.com/google/jax>`_ for the classical & quantum parts of the compiled program
 - **MLIR**: a novel compiler framework and intermediate representation
-- **HLO (XLA) + Quantum Dialect**: Lowering to `HLO <https://github.com/tensorflow/mlir-hlo>`_ is the first stage inside MLIR after leaving JAXPR.
-- **Builtin + Quantum Dialects**: HLO is then converted to a variety of classical dialects in MLIR.
+- **StableHLO + Quantum Dialect**: Lowering to `StableHLO <https://github.com/openxla/stablehlo>`_ is the first stage inside MLIR after leaving JAXPR.
+- **Builtin + Quantum Dialects**: StableHLO is then converted to a variety of classical dialects in MLIR.
 - **Bufferized MLIR**: All tensors are `converted <https://mlir.llvm.org/docs/Bufferization>`_ to memory buffer allocations at this step.
 - **LLVM Dialect**: Lowering the code to the `LLVM Dialect <https://mlir.llvm.org/docs/Dialects/LLVM/>`_ in MLIR simplifies the translation to LLVMIR by providing a one-to-one mapping.
 - **QIR (LLVMIR)**: a `specification <https://learn.microsoft.com/en-us/azure/quantum/concepts-qir>`_ for quantum programs in LLVMIR
@@ -253,16 +259,16 @@ Out:
         ] a b
     in (c,) }
 
-The next stage is the JAXPR equivalent in MLIR, expressed using the MHLO dialect for classical
-computation and the Quantum dialect for quantum computation. Note that the MHLO dialect is a
-representation of HLO in MLIR, where HLO is the input IR to the accelerated linear algebra (XLA)
-compiler used by TensorFlow.
+The next stage is the JAXPR equivalent in MLIR, expressed using the StableHLO dialect for classical
+computation and the Quantum dialect for quantum computation. Note that the StableHLO dialect is the
+MLIR representation of HLO, the input IR to the accelerated linear algebra (XLA) compiler used by
+TensorFlow.
 
 .. code-block:: python
 
     print(circuit.mlir)
 
-Lowering out of the MHLO dialect leaves us with the classical computation represented by generic
+Lowering out of the StableHLO dialect leaves us with the classical computation represented by generic
 dialects such as ``arith``, ``math``, or ``linalg``. This allows us to later generate machine code
 via standard LLVM-MLIR tooling.
 

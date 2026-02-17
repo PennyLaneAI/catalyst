@@ -65,8 +65,8 @@ struct QubitUnitaryOpInterface
         Location loc = op->getLoc();
         auto tensorType = cast<RankedTensorType>(qubitUnitaryOp.getMatrix().getType());
         MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
-        auto toBufferOp =
-            rewriter.create<bufferization::ToBufferOp>(loc, memrefType, qubitUnitaryOp.getMatrix());
+        auto toBufferOp = bufferization::ToBufferOp::create(rewriter, loc, memrefType,
+                                                            qubitUnitaryOp.getMatrix());
         auto memref = toBufferOp.getResult();
         bufferization::replaceOpWithNewBufferizedOp<QubitUnitaryOp>(
             rewriter, op, qubitUnitaryOp.getOutQubits().getTypes(),
@@ -110,10 +110,10 @@ struct HermitianOpInterface
         auto tensorType = cast<RankedTensorType>(hermitianOp.getMatrix().getType());
         MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
         auto toBufferOp =
-            rewriter.create<bufferization::ToBufferOp>(loc, memrefType, hermitianOp.getMatrix());
+            bufferization::ToBufferOp::create(rewriter, loc, memrefType, hermitianOp.getMatrix());
         auto memref = toBufferOp.getResult();
-        auto newHermitianOp = rewriter.create<HermitianOp>(loc, hermitianOp.getType(), memref,
-                                                           hermitianOp.getQubits());
+        auto newHermitianOp = HermitianOp::create(rewriter, loc, hermitianOp.getType(), memref,
+                                                  hermitianOp.getQubits());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, newHermitianOp.getObs());
 
         return success();
@@ -153,10 +153,10 @@ struct HamiltonianOpInterface
         auto tensorType = cast<RankedTensorType>(hamiltonianOp.getCoeffs().getType());
         MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
         auto toBufferOp =
-            rewriter.create<bufferization::ToBufferOp>(loc, memrefType, hamiltonianOp.getCoeffs());
+            bufferization::ToBufferOp::create(rewriter, loc, memrefType, hamiltonianOp.getCoeffs());
         auto memref = toBufferOp.getResult();
-        auto newHamiltonianOp = rewriter.create<HamiltonianOp>(loc, hamiltonianOp.getType(), memref,
-                                                               hamiltonianOp.getTerms());
+        auto newHamiltonianOp = HamiltonianOp::create(rewriter, loc, hamiltonianOp.getType(),
+                                                      memref, hamiltonianOp.getTerms());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, newHamiltonianOp.getObs());
 
         return success();
@@ -201,13 +201,13 @@ struct SampleOpInterface
         SmallVector<Value> allocSizes;
         for (Value dynShapeDimension : sampleOp.getDynamicShape()) {
             auto indexCastOp =
-                rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(), dynShapeDimension);
+                index::CastSOp::create(rewriter, loc, rewriter.getIndexType(), dynShapeDimension);
             allocSizes.push_back(indexCastOp);
         }
 
-        Value allocVal = rewriter.create<memref::AllocOp>(loc, resultType, allocSizes);
-        auto allocedSampleOp = rewriter.create<SampleOp>(
-            loc, TypeRange{}, ValueRange{sampleOp.getObs(), allocVal}, op->getAttrs());
+        Value allocVal = memref::AllocOp::create(rewriter, loc, resultType, allocSizes);
+        auto allocedSampleOp = SampleOp::create(
+            rewriter, loc, TypeRange{}, ValueRange{sampleOp.getObs(), allocVal}, op->getAttrs());
         allocedSampleOp->setAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 1}));
         bufferization::replaceOpWithBufferizedValues(rewriter, op, allocVal);
         return success();
@@ -256,19 +256,19 @@ struct CountsOpInterface
 
             Value allocVal;
             if (shape[0] == ShapedType::kDynamic) {
-                auto indexCastOp = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
-                                                                   countsOp.getDynamicShape());
+                auto indexCastOp = index::CastSOp::create(rewriter, loc, rewriter.getIndexType(),
+                                                          countsOp.getDynamicShape());
                 allocVal =
-                    rewriter.create<memref::AllocOp>(loc, resultType, ValueRange{indexCastOp});
+                    memref::AllocOp::create(rewriter, loc, resultType, ValueRange{indexCastOp});
             }
             else {
-                allocVal = rewriter.create<memref::AllocOp>(loc, resultType);
+                allocVal = memref::AllocOp::create(rewriter, loc, resultType);
             }
             buffers.push_back(allocVal);
         }
 
-        rewriter.create<CountsOp>(loc, nullptr, nullptr, countsOp.getObs(), nullptr, buffers[0],
-                                  buffers[1]);
+        CountsOp::create(rewriter, loc, nullptr, nullptr, countsOp.getObs(), nullptr, buffers[0],
+                         buffers[1]);
         bufferization::replaceOpWithBufferizedValues(rewriter, op, buffers);
 
         return success();
@@ -313,16 +313,16 @@ struct ProbsOpInterface
         Value buffer;
         auto shape = cast<mlir::RankedTensorType>(tensorType).getShape();
         if (shape[0] == ShapedType::kDynamic) {
-            auto indexCastOp = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
-                                                               probsOp.getDynamicShape());
-            buffer = rewriter.create<memref::AllocOp>(loc, resultType, ValueRange{indexCastOp});
+            auto indexCastOp = index::CastSOp::create(rewriter, loc, rewriter.getIndexType(),
+                                                      probsOp.getDynamicShape());
+            buffer = memref::AllocOp::create(rewriter, loc, resultType, ValueRange{indexCastOp});
         }
         else {
-            buffer = rewriter.create<memref::AllocOp>(loc, resultType);
+            buffer = memref::AllocOp::create(rewriter, loc, resultType);
         }
 
         auto allocedProbsOp =
-            rewriter.create<ProbsOp>(loc, TypeRange{}, ValueRange{probsOp.getObs(), buffer});
+            ProbsOp::create(rewriter, loc, TypeRange{}, ValueRange{probsOp.getObs(), buffer});
         allocedProbsOp->setAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 1}));
         bufferization::replaceOpWithBufferizedValues(rewriter, op, buffer);
         return success();
@@ -367,16 +367,16 @@ struct StateOpInterface
         Value buffer;
         auto shape = cast<RankedTensorType>(tensorType).getShape();
         if (shape[0] == ShapedType::kDynamic) {
-            auto indexCastOp = rewriter.create<index::CastSOp>(loc, rewriter.getIndexType(),
-                                                               stateOp.getDynamicShape());
-            buffer = rewriter.create<memref::AllocOp>(loc, resultType, ValueRange{indexCastOp});
+            auto indexCastOp = index::CastSOp::create(rewriter, loc, rewriter.getIndexType(),
+                                                      stateOp.getDynamicShape());
+            buffer = memref::AllocOp::create(rewriter, loc, resultType, ValueRange{indexCastOp});
         }
         else {
-            buffer = rewriter.create<memref::AllocOp>(loc, resultType);
+            buffer = memref::AllocOp::create(rewriter, loc, resultType);
         }
 
         auto allocedStateOp =
-            rewriter.create<StateOp>(loc, TypeRange{}, ValueRange{stateOp.getObs(), buffer});
+            StateOp::create(rewriter, loc, TypeRange{}, ValueRange{stateOp.getObs(), buffer});
         allocedStateOp->setAttr("operandSegmentSizes", rewriter.getDenseI32ArrayAttr({1, 0, 1}));
         bufferization::replaceOpWithBufferizedValues(rewriter, op, buffer);
         return success();
@@ -417,10 +417,10 @@ struct SetStateOpInterface
         MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
 
         auto toBufferOp =
-            rewriter.create<bufferization::ToBufferOp>(loc, memrefType, setStateOp.getInState());
+            bufferization::ToBufferOp::create(rewriter, loc, memrefType, setStateOp.getInState());
         auto memref = toBufferOp.getResult();
-        auto newSetStateOp = rewriter.create<SetStateOp>(loc, setStateOp.getOutQubits().getTypes(),
-                                                         memref, setStateOp.getInQubits());
+        auto newSetStateOp = SetStateOp::create(rewriter, loc, setStateOp.getOutQubits().getTypes(),
+                                                memref, setStateOp.getInQubits());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, newSetStateOp.getOutQubits());
         return success();
     }
@@ -459,11 +459,12 @@ struct SetBasisStateOpInterface
         auto tensorType = cast<RankedTensorType>(setBasisStateOp.getBasisState().getType());
         MemRefType memrefType = MemRefType::get(tensorType.getShape(), tensorType.getElementType());
 
-        auto toBufferOp = rewriter.create<bufferization::ToBufferOp>(
-            loc, memrefType, setBasisStateOp.getBasisState());
+        auto toBufferOp = bufferization::ToBufferOp::create(rewriter, loc, memrefType,
+                                                            setBasisStateOp.getBasisState());
         auto memref = toBufferOp.getResult();
-        auto newSetStateOp = rewriter.create<SetBasisStateOp>(
-            loc, setBasisStateOp.getOutQubits().getTypes(), memref, setBasisStateOp.getInQubits());
+        auto newSetStateOp =
+            SetBasisStateOp::create(rewriter, loc, setBasisStateOp.getOutQubits().getTypes(),
+                                    memref, setBasisStateOp.getInQubits());
         bufferization::replaceOpWithBufferizedValues(rewriter, op, newSetStateOp.getOutQubits());
         return success();
     }
