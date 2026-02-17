@@ -14,14 +14,13 @@
 
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
-#include <cstdint>
-#include <mlir/Dialect/SCF/IR/SCF.h>
-#include <mlir/IR/BuiltinAttributes.h>
-#include <mlir/IR/Operation.h>
 
-#include "Catalyst/Analysis/ResourceResult.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
+#include "Catalyst/Analysis/ResourceResult.h"
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 
 #include "MBQC/IR/MBQCOps.h"
@@ -163,6 +162,18 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
         for (auto &region : funcOp->getRegions()) {
             analyzeRegion(region, result, /*isAdjoint=*/false);
         }
+
+        // count qubit arguments only for the entry function (first non-declaration).
+        // callee qubit args are not counted to avoid double-counting after
+        // function call resolution merges callee resources into the caller.
+        if (entryFunc.empty()) {
+            for (auto argType : funcOp.getArgumentTypes()) {
+                if (isa<quantum::QubitType>(argType)) {
+                    result.numArgQubits += 1;
+                }
+            }
+        }
+
         funcResults[funcOp.getName()] = std::move(result);
 
         // main/entry function is the first function with no declaration
@@ -337,13 +348,13 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     // Metadata: qubit allocations
     if (auto allocOp = dyn_cast<quantum::AllocOp>(op)) {
         uint64_t nqubits = allocOp.getNqubitsAttr().value_or(0);
-        result.numQubits += nqubits;
+        result.numAllocQubits += nqubits;
         return;
     }
 
     // Metadata: qubit allocation
     if (isa<quantum::AllocQubitOp>(op)) {
-        result.numQubits += 1;
+        result.numAllocQubits += 1;
         return;
     }
 

@@ -71,7 +71,8 @@ void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
     if (deviceName.empty() && !other.deviceName.empty()) {
         deviceName = other.deviceName;
     }
-    numQubits = applyMerge(numQubits, other.numQubits, method);
+    numAllocQubits = applyMerge(numAllocQubits, other.numAllocQubits, method);
+    numArgQubits = applyMerge(numArgQubits, other.numArgQubits, method);
 }
 
 void ResourceResult::multiplyByScalar(int64_t scalar)
@@ -98,7 +99,8 @@ void ResourceResult::multiplyByScalar(int64_t scalar)
         entry.getValue() *= scalar;
     }
 
-    numQubits *= scalar;
+    numAllocQubits *= scalar;
+    numArgQubits *= scalar;
 }
 
 std::string ResourceResult::toJson(int indent) const
@@ -140,7 +142,9 @@ std::string ResourceResult::toJson(int indent) const
     }
     root["function_calls"] = std::move(fcObj);
 
-    root["num_qubits"] = numQubits;
+    root["num_qubits"] = numQubits();
+    root["num_alloc_qubits"] = numAllocQubits;
+    root["num_arg_qubits"] = numArgQubits;
     root["device_name"] = deviceName;
 
     llvm::json::Value jsonValue(std::move(root));

@@ -37,8 +37,14 @@ struct ResourceResult {
     // unresolved function calls (to be inlined later)
     llvm::StringMap<int64_t> unresolvedFunctionCalls;
 
-    // qubits allocated in this function/region
-    int64_t numQubits = 0;
+    // qubits from quantum.alloc / quantum.alloc_qubit ops
+    int64_t numAllocQubits = 0;
+
+    // qubits from !quantum.bit function arguments (entry function only)
+    int64_t numArgQubits = 0;
+
+    // total qubits (allocated + argument)
+    int64_t numQubits() const { return numAllocQubits + numArgQubits; }
 
     // from quantum.device op
     std::string deviceName;

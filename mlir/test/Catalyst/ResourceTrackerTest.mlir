@@ -18,6 +18,8 @@
 // Basic gate counting
 
 // CHECK-LABEL: "basic_gates"
+// CHECK:   "num_alloc_qubits": 2
+// CHECK:   "num_arg_qubits": 0
 // CHECK:   "num_qubits": 2
 // CHECK:   "operations"
 // CHECK-DAG: "Hadamard(1)": 1
@@ -43,6 +45,8 @@ func.func @basic_gates() {
 // PBC operations (PPR and PPM)
 
 // CHECK-LABEL: "pbc_operations"
+// CHECK:   "num_alloc_qubits": 2
+// CHECK:   "num_arg_qubits": 0
 // CHECK:   "num_qubits": 2
 // CHECK:   "operations"
 // CHECK-DAG: "PPR-pi/4(1)": 3
@@ -181,6 +185,8 @@ func.func @nested_static_for(%arg0: !quantum.bit) -> !quantum.bit {
 // CHECK-LABEL: "measurement_ops"
 // CHECK: "measurements"
 // CHECK-DAG: "MidCircuitMeasure": 1
+// CHECK: "num_alloc_qubits": 1
+// CHECK: "num_arg_qubits": 0
 // CHECK: "num_qubits": 1
 func.func @measurement_ops() {
     %0 = quantum.alloc( 1) : !quantum.reg
@@ -256,6 +262,8 @@ func.func private @nested_helper_func(%arg0: !quantum.bit) -> !quantum.bit {
 // Mixed quantum and PBC ops
 
 // CHECK-LABEL: "mixed_ops"
+// CHECK: "num_alloc_qubits": 2
+// CHECK: "num_arg_qubits": 0
 // CHECK: "num_qubits": 2
 // CHECK: "operations"
 // CHECK-DAG: "Hadamard(1)": 1
@@ -274,6 +282,45 @@ func.func @mixed_ops() {
     return
 }
 
+
+// -----
+
+// Qubit arguments on the entry function are counted toward num_qubits.
+
+// CHECK-LABEL: "multi_qubit_args"
+// CHECK: "num_alloc_qubits": 0
+// CHECK: "num_arg_qubits": 2
+// CHECK: "num_qubits": 2
+// CHECK: "operations"
+// CHECK-DAG: "CNOT(2)": 1
+func.func @multi_qubit_args(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
+    %0:2 = quantum.custom "CNOT"() %q0, %q1 : !quantum.bit, !quantum.bit
+    return %0#0, %0#1 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// Mixed: both allocated qubits and argument qubits contribute to num_qubits.
+
+// CHECK-LABEL: "mixed_alloc_and_arg_qubits"
+// CHECK: "num_alloc_qubits": 2
+// CHECK: "num_arg_qubits": 1
+// CHECK: "num_qubits": 3
+// CHECK: "operations"
+// CHECK-DAG: "Hadamard(1)": 1
+// CHECK-DAG: "CNOT(2)": 1
+func.func @mixed_alloc_and_arg_qubits(%q0: !quantum.bit) -> !quantum.bit {
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+    %3 = quantum.custom "Hadamard"() %1 : !quantum.bit
+    %4:2 = quantum.custom "CNOT"() %q0, %3 : !quantum.bit, !quantum.bit
+    %5 = quantum.insert %0[ 0], %4#1 : !quantum.reg, !quantum.bit
+    %6 = quantum.insert %5[ 1], %2 : !quantum.reg, !quantum.bit
+    quantum.dealloc %6 : !quantum.reg
+    return %4#0 : !quantum.bit
+}
+
 // -----
 
 // Pass statistics output
@@ -281,6 +328,8 @@ func.func @mixed_ops() {
 // RUN: quantum-opt --pass-pipeline="builtin.module(resource-tracker)" -mlir-pass-statistics -mlir-pass-statistics-display=list --split-input-file %s 2>&1 | FileCheck %s --check-prefix=STATS
 
 // STATS: ResourceTrackerPass
+// STATS: 2 total-alloc-qubits
+// STATS: 0 total-arg-qubits
 // STATS: 1 total-classical-ops
 // STATS: 1 total-gates
 // STATS: 1 total-measurements
@@ -300,8 +349,11 @@ func.func @stats_test() {
 // Multiple qnode functions: the first qnode is the entry function.
 
 // STATS: ResourceTrackerPass
+// STATS: 0 total-alloc-qubits
+// STATS: 1 total-arg-qubits
 // STATS: 4 total-function-calls
 // STATS: 4 total-gates
+// STATS: 1 total-qubits
 func.func @first_qnode(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode} {
     %r1 = func.call @shared_helper(%arg0) : (!quantum.bit) -> !quantum.bit
     %r2 = func.call @shared_helper(%r1) : (!quantum.bit) -> !quantum.bit

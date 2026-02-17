@@ -41,7 +41,11 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
 
     Statistic totalGates{this, "total-gates", "Total number of gate operations"};
     Statistic totalMeasurements{this, "total-measurements", "Total number of measurements"};
-    Statistic totalQubits{this, "total-qubits", "Total number of qubits allocated"};
+    Statistic totalQubits{this, "total-qubits", "Total number of qubits"};
+    Statistic totalAllocQubits{this, "total-alloc-qubits",
+                               "Total number of qubits from allocation"};
+    Statistic totalArgQubits{this, "total-arg-qubits",
+                             "Total number of qubits from function arguments"};
     Statistic totalClassicalOps{this, "total-classical-ops",
                                 "Total number of classical instructions"};
     Statistic totalFunctionCalls{this, "total-function-calls", "Total number of function calls"};
@@ -86,7 +90,9 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
             totalMeasurements += measEntry.getValue();
         }
 
-        totalQubits += result.numQubits;
+        totalQubits += result.numQubits();
+        totalAllocQubits += result.numAllocQubits;
+        totalArgQubits += result.numArgQubits;
 
         for (const auto &classEntry : result.classicalInstructions) {
             totalClassicalOps += classEntry.getValue();
@@ -139,7 +145,9 @@ struct ResourceTrackerPass : public impl::ResourceTrackerPassBase<ResourceTracke
             }
             funcObj["function_calls"] = std::move(fcObj);
 
-            funcObj["num_qubits"] = static_cast<int64_t>(result.numQubits);
+            funcObj["num_qubits"] = static_cast<int64_t>(result.numQubits());
+            funcObj["num_alloc_qubits"] = static_cast<int64_t>(result.numAllocQubits);
+            funcObj["num_arg_qubits"] = static_cast<int64_t>(result.numArgQubits);
             funcObj["device_name"] = result.deviceName;
 
             root[funcEntry.getKey()] = std::move(funcObj);
