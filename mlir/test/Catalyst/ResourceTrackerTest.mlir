@@ -40,24 +40,24 @@ func.func @basic_gates() {
 
 // -----
 
-// QEC operations (PPR and PPM)
+// PBC operations (PPR and PPM)
 
-// CHECK-LABEL: "qec_operations"
+// CHECK-LABEL: "pbc_operations"
 // CHECK:   "num_qubits": 2
 // CHECK:   "operations"
 // CHECK-DAG: "PPR-pi/4(1)": 3
 // CHECK-DAG: "PPR-pi/8(1)": 1
 // CHECK-DAG: "PPM(1)": 2
-func.func @qec_operations() {
+func.func @pbc_operations() {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-    %3 = qec.ppr ["Z"](4) %1 : !quantum.bit
-    %4 = qec.ppr ["X"](4) %3 : !quantum.bit
-    %5 = qec.ppr ["Z"](4) %2 : !quantum.bit
-    %6 = qec.ppr ["Z"](8) %4 : !quantum.bit
-    %mres, %out = qec.ppm ["Z"] %5 : i1, !quantum.bit
-    %mres2, %out2 = qec.ppm ["X"] %6 : i1, !quantum.bit
+    %3 = pbc.ppr ["Z"](4) %1 : !quantum.bit
+    %4 = pbc.ppr ["X"](4) %3 : !quantum.bit
+    %5 = pbc.ppr ["Z"](4) %2 : !quantum.bit
+    %6 = pbc.ppr ["Z"](8) %4 : !quantum.bit
+    %mres, %out = pbc.ppm ["Z"] %5 : i1, !quantum.bit
+    %mres2, %out2 = pbc.ppm ["X"] %6 : i1, !quantum.bit
     %7 = quantum.insert %0[ 0], %out2 : !quantum.reg, !quantum.bit
     %8 = quantum.insert %7[ 1], %out : !quantum.reg, !quantum.bit
     quantum.dealloc %8 : !quantum.reg
@@ -253,7 +253,7 @@ func.func private @nested_helper_func(%arg0: !quantum.bit) -> !quantum.bit {
 
 // -----
 
-// Mixed quantum and QEC ops
+// Mixed quantum and PBC ops
 
 // CHECK-LABEL: "mixed_ops"
 // CHECK: "num_qubits": 2
@@ -266,8 +266,8 @@ func.func @mixed_ops() {
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
     %3 = quantum.custom "Hadamard"() %1 : !quantum.bit
-    %4 = qec.ppr ["Z"](4) %2 : !quantum.bit
-    %mres, %out = qec.ppm ["Z"] %4 : i1, !quantum.bit
+    %4 = pbc.ppr ["Z"](4) %2 : !quantum.bit
+    %mres, %out = pbc.ppm ["Z"] %4 : i1, !quantum.bit
     %5 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
     %6 = quantum.insert %5[ 1], %out : !quantum.reg, !quantum.bit
     quantum.dealloc %6 : !quantum.reg

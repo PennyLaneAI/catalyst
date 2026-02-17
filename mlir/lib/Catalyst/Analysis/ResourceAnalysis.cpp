@@ -25,7 +25,7 @@
 #include "Catalyst/Analysis/ResourceAnalysis.h"
 
 #include "MBQC/IR/MBQCOps.h"
-#include "QEC/IR/QECOps.h"
+#include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
 
 #define DEBUG_TYPE "resource-analysis"
@@ -45,7 +45,7 @@ static bool isSkippedOp(Operation *op)
                quantum::DeviceReleaseOp, quantum::ExtractOp, quantum::FinalizeOp,
                quantum::HamiltonianOp, quantum::HermitianOp, quantum::InitializeOp,
                quantum::InsertOp, quantum::NamedObsOp, quantum::NumQubitsOp, quantum::TensorOp,
-               quantum::YieldOp, qec::YieldOp>(op);
+               quantum::YieldOp, pbc::YieldOp>(op);
 }
 
 /// Check if the operation belongs to one of the tracked quantum dialects.
@@ -55,7 +55,7 @@ static bool isCustomDialectOp(Operation *op)
     if (!dialect) {
         return false;
     }
-    return isa<quantum::QuantumDialect, qec::QECDialect, mbqc::MBQCDialect>(dialect);
+    return isa<quantum::QuantumDialect, pbc::PBCDialect, mbqc::MBQCDialect>(dialect);
 }
 
 //===----------------------------------------------------------------------===//
@@ -103,30 +103,30 @@ static int getGateQubitCount(Operation *op)
         .Default(0);
 }
 
-/// Get the name for a QEC operation.
-static std::string getQECOpName(Operation *op)
+/// Get the name for a PBC operation.
+static std::string getPBCOpName(Operation *op)
 {
     return llvm::TypeSwitch<Operation *, std::string>(op)
-        .Case<qec::PPRotationOp>([](auto pprOp) -> std::string {
+        .Case<pbc::PPRotationOp>([](auto pprOp) -> std::string {
             int16_t rk = pprOp.getRotationKindAttr().getValue().getSExtValue();
             if (rk == 0) {
                 return "PPR-identity";
             }
             return "PPR-pi/" + std::to_string(std::abs(rk));
         })
-        .Case<qec::PPRotationArbitraryOp>([](auto) -> std::string { return "PPR-Phi"; })
-        .Case<qec::PPMeasurementOp, qec::SelectPPMeasurementOp>(
+        .Case<pbc::PPRotationArbitraryOp>([](auto) -> std::string { return "PPR-Phi"; })
+        .Case<pbc::PPMeasurementOp, pbc::SelectPPMeasurementOp>(
             [](auto) -> std::string { return "PPM"; })
         .Default([](Operation *o) { return o->getName().getStringRef().str(); });
 }
 
-/// Get the qubit count for a QEC operation.
-static int getQECQubitCount(Operation *op)
+/// Get the qubit count for a PBC operation.
+static int getPBCQubitCount(Operation *op)
 {
     // if the operation is one of these operations, it will return the number of qubits in the input
     return llvm::TypeSwitch<Operation *, int>(op)
-        .Case<qec::PPRotationOp, qec::PPRotationArbitraryOp, qec::PPMeasurementOp,
-              qec::SelectPPMeasurementOp, qec::PrepareStateOp>(
+        .Case<pbc::PPRotationOp, pbc::PPRotationArbitraryOp, pbc::PPMeasurementOp,
+              pbc::SelectPPMeasurementOp, pbc::PrepareStateOp>(
             [](auto typedOp) { return static_cast<int>(typedOp.getInQubits().size()); })
         .Default(0);
 }
@@ -252,7 +252,7 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
     result.mergeWith(maxResult);
 }
 
-void ResourceAnalysis::analyzePBCLayer(qec::LayerOp layerOp, ResourceResult &result, bool isAdjoint)
+void ResourceAnalysis::analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &result, bool isAdjoint)
 {
     for (auto &layerRegion : layerOp->getRegions()) {
         analyzeRegion(layerRegion, result, isAdjoint);
@@ -280,7 +280,7 @@ void ResourceAnalysis::analyzeRegion(Region &region, ResourceResult &result, boo
                 .Case([&](mlir::scf::IndexSwitchOp switchOp) {
                     analyzeIndexSwitchOp(switchOp, result, isAdjoint);
                 })
-                .Case([&](qec::LayerOp regionLayerOp) {
+                .Case([&](pbc::LayerOp regionLayerOp) {
                     analyzePBCLayer(regionLayerOp, result, isAdjoint);
                 })
                 .Default([&](Operation &op) {
@@ -312,10 +312,10 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
     }
 
     // PBC operations
-    if (isa<qec::PPRotationOp, qec::PPRotationArbitraryOp, qec::PPMeasurementOp,
-            qec::SelectPPMeasurementOp, qec::PrepareStateOp, qec::FabricateOp>(op)) {
-        std::string name = getQECOpName(op);
-        int nQubits = getQECQubitCount(op);
+    if (isa<pbc::PPRotationOp, pbc::PPRotationArbitraryOp, pbc::PPMeasurementOp,
+            pbc::SelectPPMeasurementOp, pbc::PrepareStateOp, pbc::FabricateOp>(op)) {
+        std::string name = getPBCOpName(op);
+        int nQubits = getPBCQubitCount(op);
         result.operations[name][nQubits] += 1;
         return;
     }

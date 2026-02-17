@@ -16,7 +16,7 @@
 
 #include "llvm/ADT/StringMap.h"
 
-#include "QEC/IR/QECOps.h"
+#include "PBC/IR/PBCOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
 
@@ -60,7 +60,7 @@ class ResourceAnalysis {
     void analyzeWhileLoop(scf::WhileOp whileOp, ResourceResult &result, bool isAdjoint);
     void analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool isAdjoint);
     void analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, ResourceResult &result, bool isAdjoint);
-    void analyzePBCLayer(qec::LayerOp layerOp, ResourceResult &result, bool isAdjoint);
+    void analyzePBCLayer(pbc::LayerOp layerOp, ResourceResult &result, bool isAdjoint);
 
     // categorize and count a single operation
     void collectOperation(Operation *op, ResourceResult &result, bool isAdjoint);

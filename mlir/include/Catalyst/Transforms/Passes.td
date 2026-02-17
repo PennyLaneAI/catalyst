@@ -242,7 +242,7 @@ def ResourceTrackerPass : Pass<"resource-tracker"> {
     let summary = "Track and report quantum resource usage.";
     let description = [{
         This pass computes resource counts (gates, measurements, qubits, etc.)
-        for quantum, qec, and mbqc dialect operations. It queries the
+        for quantum, pbc, and mbqc dialect operations. It queries the
         ResourceAnalysis to obtain cached results and reports them via
         MLIR's pass statistics mechanism.
 
