@@ -499,7 +499,7 @@ class TestPassByPassSpecs:
         """Test qml.specs when there is a Catalyst subroutine"""
         dev = qml.device("lightning.qubit", wires=3)
 
-        @catalyst.jax_primitives.subroutine
+        @qml.capture.subroutine
         def subroutine():
             qml.Hadamard(wires=0)
 
@@ -574,7 +574,7 @@ class TestPassByPassSpecs:
             level=3,
             resources=SpecsResources(
                 gate_types={
-                    "qec.prepare": 1,
+                    "pbc.prepare": 1,
                     "PPM-w3": 1,
                     "PPM-w1": 1,
                     "PPR-pi/2-w1": 1,

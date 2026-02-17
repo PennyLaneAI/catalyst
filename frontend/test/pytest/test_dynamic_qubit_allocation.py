@@ -24,9 +24,9 @@ import numpy as np
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
+from pennylane.capture import subroutine
 
 from catalyst import qjit
-from catalyst.jax_primitives import subroutine
 from catalyst.utils.exceptions import CompileError
 
 
@@ -515,7 +515,7 @@ def test_no_capture(backend):
     """
     with pytest.raises(
         CompileError,
-        match=re.escape("qml.allocate() is only supported with program capture enabled."),
+        match=re.escape("qml.allocate() with qjit is only supported with program capture enabled."),
     ):
 
         @qjit
