@@ -1440,11 +1440,11 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
 
     .. code-block:: mlir
         ...
-        %mres, %out_qubits:4 = qec.ppm ["X", "X", "Y", "Z"] %1, %2, %3, %5 : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
-        %6 = qec.ppr ["X"](2) %out_qubits#3 cond(%mres) : !quantum.bit
-        %7 = qec.ppr.arbitrary ["Z"](%cst) %6 : !quantum.bit
-        %mres_0, %out_qubits_1 = qec.ppm ["X"] %7 : i1, !quantum.bit
-        %8:3 = qec.ppr ["X", "X", "Y"](2) %out_qubits#0, %out_qubits#1, %out_qubits#2 cond(%mres_0) : !quantum.bit, !quantum.bit, !quantum.bit
+        %mres, %out_qubits:4 = pbc.ppm ["X", "X", "Y", "Z"] %1, %2, %3, %5 : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
+        %6 = pbc.ppr ["X"](2) %out_qubits#3 cond(%mres) : !quantum.bit
+        %7 = pbc.ppr.arbitrary ["Z"](%cst) %6 : !quantum.bit
+        %mres_0, %out_qubits_1 = pbc.ppm ["X"] %7 : i1, !quantum.bit
+        %8:3 = pbc.ppr ["X", "X", "Y"](2) %out_qubits#0, %out_qubits#1, %out_qubits#2 cond(%mres_0) : !quantum.bit, !quantum.bit, !quantum.bit
         ...
     """
     return PassPipelineWrapper(qnode, "decompose-arbitrary-ppr")
