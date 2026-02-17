@@ -273,6 +273,10 @@
 * The upstream MLIR `Test` dialect is now available via the `catalyst` command line tool.
   [(#2417)](https://github.com/PennyLaneAI/catalyst/pull/2417)
 
+* Removing some previously-added guardrails that were in place due to a bug in dynamic allocation 
+  that is now fixed.
+  [(#2427)](https://github.com/PennyLaneAI/catalyst/pull/2427)
+
 * A new compiler pass `lower-pbc-init-ops` has been added to lower PBC initialization operations
   to Quantum dialect operations. This pass converts `pbc.prepare` to `quantum.custom` and
   `pbc.fabricate` to `quantum.alloc_qb` + `quantum.custom`, enabling runtime execution of
