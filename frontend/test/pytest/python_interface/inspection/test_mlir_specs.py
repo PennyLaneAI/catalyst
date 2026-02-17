@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit test module for the mlir_specs function in the Python Compiler inspection module."""
+# pylint: disable=too-many-public-methods
 
 from functools import partial
 

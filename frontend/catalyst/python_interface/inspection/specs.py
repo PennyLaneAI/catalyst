@@ -17,7 +17,6 @@
 from __future__ import annotations
 
 import warnings
-from collections import defaultdict
 from typing import Literal
 
 from pennylane.workflow.qnode import QNode
@@ -47,7 +46,8 @@ def mlir_specs(
         qnode (QJIT): The (QJIT'd) qnode to get the specs for
         level (int | tuple[int] | list[int] | "all"): The MLIR pass level to get the specs for
         *args: Positional arguments to pass to the QNode
-        level_to_markers (dict[str, tuple[str]]): A dictionary that maps integer levels to marker labels.
+        level_to_markers (dict[str, tuple[str]]): A dictionary that maps integer levels to
+            marker labels.
         **kwargs: Keyword arguments to pass to the QNode
 
     Returns:
