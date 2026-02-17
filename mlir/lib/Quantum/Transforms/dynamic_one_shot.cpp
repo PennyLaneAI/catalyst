@@ -238,6 +238,22 @@ func::FuncOp splitQuantumAndPostProcessing(IRRewriter &builder, func::FuncOp qno
         getForwardSlice(entryBlock.getArguments()[i], &postProcessingOps);
         for (Operation *op : postProcessingOps) {
             exceptions.insert(op);
+            // These postprocessing ops might need operands other than the MPs
+            for (Value operand : op->getOperands()) {
+                if (!operand.getDefiningOp()) {
+                    continue;
+                }
+                if (isa<quantum::MeasurementProcess>(operand.getDefiningOp())) {
+                    continue;
+                }
+                SetVector<Operation *> backwardSlice;
+                BackwardSliceOptions options;
+                LogicalResult bsr = getBackwardSlice(operand, &backwardSlice, options);
+                assert(bsr.succeeded() && "expected a backward slice");
+                for (auto neededOp : backwardSlice) {
+                    exceptions.insert(neededOp);
+                }
+            }
         }
     }
     clearFuncExcept(builder, postProcessingKernel, {}, exceptions, mapper);

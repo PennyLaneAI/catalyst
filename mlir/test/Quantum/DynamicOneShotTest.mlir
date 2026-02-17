@@ -22,7 +22,9 @@ func.func public @test_expval(%arg0: f64) -> tensor<f64> {
   %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
   %out_qubit = quantum.custom "RX"(%arg0) %1 : !quantum.bit
   %2 = quantum.namedobs %out_qubit[ PauliZ] : !quantum.obs
-  %3 = quantum.expval %2 : f64
+  %expval = quantum.expval %2 : f64
+  %pp_arg = arith.constant 0.000000e+00 : f64
+  %3 = arith.addf %expval, %pp_arg : f64
   %from_elements = tensor.from_elements %3 : tensor<f64>
   %4 = quantum.insert %0[ 0], %out_qubit : !quantum.reg, !quantum.bit
   quantum.dealloc %4 : !quantum.reg
@@ -51,7 +53,9 @@ func.func public @test_expval(%arg0: f64) -> tensor<f64> {
 // CHECK:   return [[div]] : f64
 
 // CHECK: func.func public @test_expval.postprocess(%arg0: f64, %arg1: f64) -> tensor<f64>
-// CHECK:   [[from_elements:%.+]] = tensor.from_elements %arg1 : tensor<f64>
+// CHECK:   [[pp_arg:%.+]] = arith.constant 0.000000e+00 : f64
+// CHECK:   [[add:%.+]] = arith.addf %arg1, [[pp_arg]] : f64
+// CHECK:   [[from_elements:%.+]] = tensor.from_elements [[add]] : tensor<f64>
 // CHECK:   return [[from_elements]] : tensor<f64>
 
 // CHECK: func.func public @test_expval(%arg0: f64) -> tensor<f64>
