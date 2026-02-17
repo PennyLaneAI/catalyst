@@ -27,7 +27,7 @@ from catalyst import qjit
 from catalyst.passes import gridsynth
 
 # Pipeline to stop after quantum compilation (where gridsynth runs)
-# This prevents lowerings that might fail for qec.ppr.
+# This prevents lowerings that might fail for pbc.ppr.
 pipe = [("pipe", ["quantum-compilation-stage"])]
 
 # ==============================================================================
@@ -166,7 +166,7 @@ test_ppr_registration()
 
 
 def test_ppr_lowering():
-    """Test that PPR basis generates qec.ppr operations."""
+    """Test that PPR basis generates pbc.ppr operations."""
 
     @qjit(target="mlir", pipelines=pipe)
     @gridsynth(epsilon=0.01, ppr_basis=True)
@@ -182,7 +182,7 @@ def test_ppr_lowering():
     # CHECK-LABEL: func.func private @__catalyst_decompose_RZ_ppr_basis{{.*}}
     # CHECK:       scf.index_switch
     # CHECK:       case 1 {
-    # CHECK:         qec.ppr ["X"](2)
+    # CHECK:         pbc.ppr ["X"](2)
     # CHECK:       }
 
     # CHECK-LABEL: func.func public @circuit{{.*}}
@@ -252,7 +252,7 @@ def test_capture_workflow_ppr():
     # CHECK-LABEL: func.func private @__catalyst_decompose_RZ_ppr_basis{{.*}}
     # CHECK:       scf.index_switch
     # CHECK:       case 1 {
-    # CHECK:         qec.ppr ["X"](2)
+    # CHECK:         pbc.ppr ["X"](2)
     # CHECK:       }
 
     # CHECK-LABEL: func.func public @circuit{{.*}}

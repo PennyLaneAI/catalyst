@@ -574,7 +574,7 @@ class TestPassByPassSpecs:
             level=3,
             resources=SpecsResources(
                 gate_types={
-                    "qec.prepare": 1,
+                    "pbc.prepare": 1,
                     "PPM-w3": 1,
                     "PPM-w1": 1,
                     "PPR-pi/2-w1": 1,

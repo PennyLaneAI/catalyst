@@ -29,7 +29,7 @@ from pennylane.ops import GlobalPhase
 from xdsl.dialects import builtin, func, scf
 from xdsl.ir import Block, Operation, Region
 
-from catalyst.python_interface.dialects import qec, quantum
+from catalyst.python_interface.dialects import pbc, quantum
 from catalyst.python_interface.inspection.dag_builder import DAGBuilder
 from catalyst.python_interface.inspection.xdsl_conversion import (
     ssa_to_qml_wires,
@@ -61,12 +61,12 @@ _SKIPPED_QUANTUM_OPS = (
 )
 # Handlers for PPRs and PPMs are defined
 # but not sure how to visualize these yet
-_SKIPPED_QEC_OPS = (
-    qec.FabricateOp,
-    qec.LayerOp,
-    qec.PrepareStateOp,
-    qec.SelectPPMeasurementOp,
-    qec.YieldOp,
+_SKIPPED_PBC_OPS = (
+    pbc.FabricateOp,
+    pbc.LayerOp,
+    pbc.PrepareStateOp,
+    pbc.SelectPPMeasurementOp,
+    pbc.YieldOp,
 )
 # Any MBQC operation encountered will raise a
 # VisualizationError
@@ -164,9 +164,9 @@ class ConstructCircuitDAG:
     @singledispatchmethod
     def _visualize_operation(self, op: Operation) -> None:
         # NOTE: Currently only visualizing "quantum" operations
-        if op.dialect_name() not in {"quantum", "qec", "mbqc"}:
+        if op.dialect_name() not in {"quantum", "pbc", "mbqc"}:
             return
-        _SKIPPED_OPS = (*_SKIPPED_QUANTUM_OPS, *_SKIPPED_QEC_OPS, *_SKIPPED_MBQC_OPS)
+        _SKIPPED_OPS = (*_SKIPPED_QUANTUM_OPS, *_SKIPPED_PBC_OPS, *_SKIPPED_MBQC_OPS)
         if not isinstance(op, _SKIPPED_OPS):
             raise VisualizationError(
                 f"Visualization for operation '{op.name}' is currently not supported."
@@ -231,7 +231,7 @@ class ConstructCircuitDAG:
         self._connect(meas.wires, node_uid)
 
     @_visit_operation.register
-    def _ppr(self, op: qec.PPRotationOp | qec.PPRotationArbitraryOp) -> None:
+    def _ppr(self, op: pbc.PPRotationOp | pbc.PPRotationArbitraryOp) -> None:
         """Handler for the PPR operation."""
 
         # Create label
@@ -275,7 +275,7 @@ class ConstructCircuitDAG:
         self._connect(wires, node_uid)
 
     @_visit_operation.register
-    def _ppm(self, op: qec.PPMeasurementOp) -> None:
+    def _ppm(self, op: pbc.PPMeasurementOp) -> None:
         """Handler for the PPM operation."""
 
         wires = ssa_to_qml_wires(op)
