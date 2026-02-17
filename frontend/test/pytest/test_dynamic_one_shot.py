@@ -310,5 +310,26 @@ def test_mlir_one_shot_pass_dynamic_shots(backend):
     assert sum(counts) == 500
 
 
+def test_mlir_one_shot_pass_post_process(backend):
+    """
+    Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend
+    with some classical post processing
+    """
+
+    @qjit(capture=True, seed=38)
+    @qml.transform(pass_name="dynamic-one-shot")
+    @qml.qnode(qml.device(backend, wires=2), shots=1000)
+    def circuit():
+        qml.Hadamard(wires=0)
+        e = qml.expval(qml.X(0))
+        return e, e
+
+    results = circuit()
+    for res in results:
+        assert res.dtype == "float64"
+        assert res.shape == ()
+        assert np.allclose(res, 1.0, atol=0.01, rtol=0.01)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
