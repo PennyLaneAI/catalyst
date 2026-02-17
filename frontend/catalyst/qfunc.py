@@ -352,6 +352,9 @@ def _aggregate_preprocessed_results(results):
     if isinstance(results, tuple):
         return tuple(jnp.mean(r, axis=0) for r in results)
 
+    if hasattr(results, "ndim") and results.ndim >= 1:
+        return (jnp.mean(results, axis=0),)
+
     return (results,)
 
 
