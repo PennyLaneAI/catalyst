@@ -15,8 +15,6 @@
 // Split non-commuting pass: splits quantum functions that measure non-commuting
 // observables into multiple executions, with one group per observable.
 //
-// Precondition: split-to-single-terms pass has been run first to decompose Hamiltonian expvals.
-//
 // For a function like:
 //   func.func @circuit() -> (f64, f64, f64) {
 //     %ev0 = quantum.expval %obs_q0_X : f64   // group 0
