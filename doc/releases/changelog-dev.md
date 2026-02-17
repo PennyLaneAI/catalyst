@@ -2,6 +2,40 @@
 
 <h3>New features since last release</h3>
 
+* Executing circuits that are compiled with :func:`pennylane.transforms.to_ppr`, 
+  :func:`pennylane.transforms.commute_ppr`, :func:`pennylane.transforms.ppr_to_ppm`, 
+  :func:`pennylane.transforms.merge_ppr_ppm`, :func:`pennylane.transforms.reduce_t_depth`,
+  and :func:`pennylane.transforms.decompose_arbitrary_ppr` is now possible with the `lightning.qubit` device and
+  with program capture enabled (:func:`pennylane.capture.enable`).
+  [(#2348)](https://github.com/PennyLaneAI/catalyst/pull/2348)
+  [(#2389)](https://github.com/PennyLaneAI/catalyst/pull/2389)
+  [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
+  [(#2413)](https://github.com/PennyLaneAI/catalyst/pull/2413)
+  [(#2414)](https://github.com/PennyLaneAI/catalyst/pull/2414)
+  [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
+  [(#2443)](https://github.com/PennyLaneAI/catalyst/pull/2443)
+  
+  Previously, circuits compiled with these transforms were only inspectable via 
+  :func:`pennylane.specs` and :func:`catalyst.draw`. Now, such circuits can be executed:
+
+  ```python
+  import pennylane as qml
+
+  @qml.qjit(capture=True)
+  @qml.transforms.decompose_arbitrary_ppr
+  @qml.transforms.to_ppr
+  @qml.qnode(qml.device("lightning.qubit", wires=3))
+  def circuit():
+      qml.PauliRot(0.123, pauli_word="XXY", wires=[0, 1, 2])
+      qml.pauli_measure("XYZ", wires=[0, 1, 2])
+      return qml.probs([0, 1])
+  ```
+
+  ```
+  >>> print(circuit())
+  [0.5 0.  0.  0.5]
+  ```
+
 * Added `capture` keyword argument to the `@qjit` decorator for per-function control over
   PennyLane's program capture frontend. This allows selective use of the new capture-based
   compilation pathway without affecting the global `qml.capture.enabled()` state. The parameter
