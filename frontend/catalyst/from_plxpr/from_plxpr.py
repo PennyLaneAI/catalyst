@@ -330,7 +330,7 @@ def handle_qnode(
             inner_jaxpr=closed_jaxpr.jaxpr,
             consts=closed_jaxpr.consts,
             ncargs=non_const_args,
-            tkwarge=self.decompose_tkwargs,
+            tkwargs=self.decompose_tkwargs,
             stopping_condition=stopping_condition,
         )
     elif qml.decomposition.enabled_graph():
