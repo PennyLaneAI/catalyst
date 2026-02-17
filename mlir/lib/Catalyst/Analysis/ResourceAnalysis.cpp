@@ -12,22 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#define DEBUG_TYPE "resource-analysis"
+
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Operation.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
-#include "Catalyst/Analysis/ResourceResult.h"
 #include "Catalyst/Analysis/ResourceAnalysis.h"
+#include "Catalyst/Analysis/ResourceResult.h"
 
 #include "MBQC/IR/MBQCOps.h"
 #include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
-
-#define DEBUG_TYPE "resource-analysis"
 
 using namespace mlir;
 using namespace llvm;
