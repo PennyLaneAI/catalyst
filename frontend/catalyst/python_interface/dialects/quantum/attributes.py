@@ -157,7 +157,7 @@ class QubitType(ParametrizedAttribute, TypeAttribute):
 
             case _:
                 raise ParseError(
-                    f"Expected 2 or less parameters for 'QubitType', got {optional_params}."
+                    f"Expected 2 or fewer parameters for 'QubitType', got {optional_params}."
                 )
 
         return final_params
