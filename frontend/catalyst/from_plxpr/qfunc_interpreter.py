@@ -48,6 +48,7 @@ from catalyst.jax_primitives import (
     gphase_p,
     hamiltonian_p,
     hermitian_p,
+    mcmobs_p,
     measure_in_basis_p,
     measure_p,
     namedobs_p,
@@ -225,16 +226,8 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             self.init_qreg.insert_all_dangling_qubits()
             return compbasis_p.bind(self.init_qreg.get(), qreg_available=True)
 
-    # pylint: disable=too-many-branches
-    def interpret_measurement(self, measurement):
-        """Rebind a measurement as a catalyst instruction.
-
-        Args:
-            measurement (qml.measurements.MeasurementProcess): The measurement to interpret.
-
-        Returns:
-            AbstractQbit: The resulting measurement value.
-        """
+    def _check_measurement_with_dynamic_allocation(self, measurement):
+        """Check some constraints regarding dynamic allocation."""
         if self.has_dynamic_allocation:
             if len(measurement.wires) == 0 and not isinstance(
                 measurement, qml.measurements.StateMP
@@ -258,6 +251,18 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
                     )
                 )
 
+    # pylint: disable=too-many-branches
+    def interpret_measurement(self, measurement):
+        """Rebind a measurement as a catalyst instruction.
+
+        Args:
+            measurement (qml.measurements.MeasurementProcess): The measurement to interpret.
+
+        Returns:
+            AbstractQbit: The resulting measurement value.
+        """
+        self._check_measurement_with_dynamic_allocation(measurement)
+
         if type(measurement) not in measurement_map:
             raise NotImplementedError(
                 f"measurement {measurement} not yet supported for conversion."
@@ -267,28 +272,34 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             raise NotImplementedError(
                 "from_plxpr does not yet support measurements with manual eigvals."
             )
-        if (
-            measurement.mv is not None
-            or measurement.obs is not None
-            and not isinstance(measurement.obs, qml.operation.Operator)
-        ):
-            raise NotImplementedError("Measurements of mcms are not yet supported.")
-
-        if measurement.obs:
-            obs = self._obs(measurement.obs)
-        else:
-            obs = self._compbasis_obs(*measurement.wires)
-
-        shape, dtype = measurement._abstract_eval(
-            n_wires=len(measurement.wires),
-            shots=self.shots,
-            num_device_wires=len(self.device.wires),
-        )
 
         prim = measurement_map[type(measurement)]
+        mcm_mv = measurement.mv
+        mcm_obs = measurement.obs
+        mp_is_on_mcm = (mcm_mv is not None) or (
+            mcm_obs is not None and not isinstance(mcm_obs, qml.operation.Operator)
+        )
+
+        if mp_is_on_mcm:
+            mcm_list = mcm_mv if isinstance(mcm_mv, list) else [mcm_mv]
+            obs = mcmobs_p.bind(*mcm_list)
+            n_wires = len(mcm_list)
+            _abstract_eval_kwargs = {}
+        else:
+            obs = self._obs(mcm_obs) if mcm_obs else self._compbasis_obs(*measurement.wires)
+            n_wires = len(measurement.wires)
+            _abstract_eval_kwargs = {"num_device_wires": len(self.device.wires)}
+
+        shape, dtype = measurement._abstract_eval(
+            n_wires=n_wires, shots=self.shots, **_abstract_eval_kwargs
+        )
+
         if prim is sample_p:
-            num_qubits = len(measurement.wires) or len(self.device.wires)
-            sample_shape = (self.shots, num_qubits)
+            if mp_is_on_mcm:
+                sample_shape = (self.shots, n_wires)
+            else:
+                num_qubits = len(measurement.wires) or len(self.device.wires)
+                sample_shape = (self.shots, num_qubits)
             dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(sample_shape)
             mval = sample_p.bind(obs, *dyn_dims, static_shape=tuple(static_shape))
         elif prim in {expval_p, var_p}:
@@ -424,6 +435,16 @@ def interpret_counts(self, *wires, all_outcomes):
     obs = self._compbasis_obs(*wires)
     num_wires = len(wires) if wires else len(self.device.wires)
     keys, vals = counts_p.bind(obs, static_shape=(2**num_wires,))
+    keys = jax.lax.convert_element_type(keys, int)
+    return keys, vals
+
+
+# pylint: disable=unused-argument
+@PLxPRToQuantumJaxprInterpreter.register_primitive(CountsMP._mcm_primitive)
+def interpret_counts_mcm(self, *mcms, single_mcm, all_outcomes):
+    """Interpret a CountsMP MCM primitive as the catalyst version."""
+    obs = mcmobs_p.bind(*mcms)
+    keys, vals = counts_p.bind(obs, static_shape=(2 ** len(mcms),))
     keys = jax.lax.convert_element_type(keys, int)
     return keys, vals
 
