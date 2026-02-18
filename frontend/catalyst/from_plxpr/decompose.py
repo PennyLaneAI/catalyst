@@ -219,7 +219,6 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                 # in the circuit, but is used inside a decomposition rule.
                 # In this case, we fall back to using the COMPILER_OPS_FOR_DECOMPOSITION
                 # dictionary to get the number of wires.
-                print(f"Fallback to COMPILER_OPS_FOR_DECOMPOSITION for {op.op.name}")
                 num_wires, num_params = COMPILER_OPS_FOR_DECOMPOSITION[op.op.name]
                 pauli_word = op.op.params.get("pauli_word", None)
                 requires_copy = num_wires == -1

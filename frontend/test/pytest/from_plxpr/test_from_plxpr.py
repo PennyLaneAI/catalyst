@@ -670,39 +670,22 @@ class TestAdjointCtrl:
         catalyst_xpr = from_plxpr(plxpr)(0.5, 3)
 
         qfunc_xpr = catalyst_xpr.eqns[0].params["call_jaxpr"]
-        expected_adjoint = (inner_adjoint + outer_adjoint) % 2 == 1
-        # Find RX controlled-op equation(s); equation order may vary (e.g. extra qextract/convert)
-        candidates = [
-            (i, e)
-            for i, e in enumerate(qfunc_xpr.eqns)
-            if e.primitive == qinst_p
-            and e.params.get("op") == "RX"
-            and e.params.get("ctrl_len") == 3
-        ]
-        # Prefer the one with matching adjoint when multiple exist
-        matching = [(i, e) for i, e in candidates if e.params.get("adjoint") == expected_adjoint]
-        idx, _ = matching[0] if matching else candidates[0]
-        eqn = qfunc_xpr.eqns[idx]
-
+        eqn = qfunc_xpr.eqns[6]  # dev, qreg, four allocations
         assert eqn.primitive == qinst_p
-        # Assert structure; adjoint follows conversion (may differ from inner^outer when plxpr flattens)
         assert eqn.params == {
-            "adjoint": eqn.params["adjoint"],
+            "adjoint": (inner_adjoint + outer_adjoint) % 2 == 1,
             "ctrl_len": 3,
             "op": "RX",
             "qubits_len": 1,
             "params_len": 1,
         }
-        # When we found a matching-adjoint candidate, layout matches original test assumptions
-        if matching:
-            assert idx >= 4
-            assert eqn.invars[0] is qfunc_xpr.eqns[idx - 4].outvars[0]
-            assert eqn.invars[1] is qfunc_xpr.invars[0]
-            for i in range(3):
-                assert eqn.invars[2 + i] is qfunc_xpr.eqns[idx - 3 + i].outvars[0]
-            assert eqn.invars[5].val == False
-            assert eqn.invars[6].val == True
-            assert eqn.invars[7].val == False
+        assert eqn.invars[0] is qfunc_xpr.eqns[2].outvars[0]
+        assert eqn.invars[1] is qfunc_xpr.invars[0]
+        for i in range(3):
+            assert eqn.invars[2 + i] is qfunc_xpr.eqns[3 + i].outvars[0]
+        assert eqn.invars[5].val == False
+        assert eqn.invars[6].val == True
+        assert eqn.invars[7].val == False
 
     @pytest.mark.parametrize("as_qfunc", (True, False))
     def test_doubly_ctrl(self, as_qfunc):
