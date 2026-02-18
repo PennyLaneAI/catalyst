@@ -263,6 +263,7 @@
   names. The rename better reflects the dialect's purpose as a representation for Pauli-Based
   Computation rather than general quantum error correction.
   [(#2482)](https://github.com/PennyLaneAI/catalyst/pull/2482)
+  [(#2485)](https://github.com/PennyLaneAI/catalyst/pull/2485)
 
 * Updated the integration tests for `qp.specs` to get coverage for new features
   [(#2448)](https://github.com/PennyLaneAI/catalyst/pull/2448)
