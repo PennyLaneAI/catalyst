@@ -268,8 +268,8 @@ class TestWhileLoops:
         assert circuit(3) == -1.0
         assert circuit(4) == 1.0
 
-    def test_nested_loops(self, capture_mode):
-        """Test nested while loops."""
+    def test_nested_loops_classical(self, capture_mode):
+        """Test nested while loops without qnode."""
 
         @qjit(capture=capture_mode)
         def circuit(n, m):
@@ -285,6 +285,35 @@ class TestWhileLoops:
 
         assert circuit(5, 6) == 30  # 5 * 6
         assert circuit(4, 7) == 28  # 4 * 7
+
+    def test_nested_loops_quantum(self, backend, capture_mode):
+        """Test nested while loops with quantum operations."""
+
+        @qjit(capture=capture_mode)
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(n: int, m: int):
+            @while_loop(lambda i: i < n)
+            def outer(i):
+                @while_loop(lambda j: j < m)
+                def inner(j):
+                    qml.RX(0.1, wires=0)
+                    return j + 1
+
+                inner(0)
+                return i + 1
+
+            outer(0)
+            return qml.expval(qml.PauliZ(0))
+
+        # Total rotation angle = n * m * 0.1
+        # Expectation value of Z for state RX(theta)|0> is cos(theta)
+        # Note: RX(theta) = exp(-i*theta/2*X).
+        # State = (cos(theta/2)I - i*sin(theta/2)X)|0> = cos(theta/2)|0> - i*sin(theta/2)|1>
+        # <Z> = |cos(theta/2)|^2 - |-i*sin(theta/2)|^2 = cos^2(theta/2) - sin^2(theta/2) = cos(theta)
+
+        n, m = 4, 3
+        expected = np.cos(n * m * 0.1)
+        assert np.isclose(circuit(n, m), expected)
 
     @pytest.mark.usefixtures("disable_capture")
     def test_while_loop_raises_compatibility_error_with_capture(self):
