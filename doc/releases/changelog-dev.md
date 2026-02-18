@@ -2,8 +2,8 @@
 
 <h3>New features since last release</h3>
 
-* Executing circuits that are compiled with :func:`pennylane.transforms.to_ppr`, 
-  :func:`pennylane.transforms.commute_ppr`, :func:`pennylane.transforms.ppr_to_ppm`, 
+* Executing circuits that are compiled with :func:`pennylane.transforms.to_ppr`,
+  :func:`pennylane.transforms.commute_ppr`, :func:`pennylane.transforms.ppr_to_ppm`,
   :func:`pennylane.transforms.merge_ppr_ppm`, :func:`pennylane.transforms.reduce_t_depth`,
   and :func:`pennylane.transforms.decompose_arbitrary_ppr` is now possible with the `lightning.qubit` device and
   with program capture enabled (:func:`pennylane.capture.enable`).
@@ -14,8 +14,8 @@
   [(#2414)](https://github.com/PennyLaneAI/catalyst/pull/2414)
   [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
   [(#2443)](https://github.com/PennyLaneAI/catalyst/pull/2443)
-  
-  Previously, circuits compiled with these transforms were only inspectable via 
+
+  Previously, circuits compiled with these transforms were only inspectable via
   :func:`pennylane.specs` and :func:`catalyst.draw`. Now, such circuits can be executed:
 
   ```python
@@ -212,7 +212,7 @@
 
 * Update `mlir_specs` to account for new `marker` functionality in PennyLane.
   [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
-  
+
 * The QEC (Quantum Error Correction) dialect has been renamed to PBC (Pauli-Based Computation)
   across the entire codebase. This includes the MLIR dialect (`pbc.*` -> `pbc.*`), C++ namespaces
   (`catalyst::pbc` -> `catalyst::pbc`), Python bindings, compiler passes (e.g.,
@@ -268,10 +268,11 @@
   global phase correctness.
   [(#2419)](https://github.com/PennyLaneAI/catalyst/pull/2419)
 
-* New qubit-type specializations have been added to Catalyst's MLIR type system. These new qubit
+* New qubit-type specializations have been added to Catalyst's MLIR and xDSL type system. These new qubit
   types include `!quantum.bit<logical>`, `!quantum.bit<pbc>` and `!quantum.bit<physical>`. The
   original `!quantum.bit` type continues to be supported and used as the default qubit type.
   [(#2369)](https://github.com/PennyLaneAI/catalyst/pull/2369)
+  [(#2455)](https://github.com/PennyLaneAI/catalyst/pull/2455)
 
   The corresponding register-type specializations have also been added.
   [(#2431)](https://github.com/PennyLaneAI/catalyst/pull/2431)
@@ -279,7 +280,7 @@
 * The upstream MLIR `Test` dialect is now available via the `catalyst` command line tool.
   [(#2417)](https://github.com/PennyLaneAI/catalyst/pull/2417)
 
-* Removing some previously-added guardrails that were in place due to a bug in dynamic allocation 
+* Removing some previously-added guardrails that were in place due to a bug in dynamic allocation
   that is now fixed.
   [(#2427)](https://github.com/PennyLaneAI/catalyst/pull/2427)
 
