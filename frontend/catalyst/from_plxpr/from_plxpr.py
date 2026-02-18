@@ -286,6 +286,7 @@ def handle_qnode(
 
     # Plxpr decomposition for templates
     if self.requires_decompose_lowering:
+        print("Performing template decomposition.")
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
             consts=consts,
@@ -295,6 +296,7 @@ def handle_qnode(
 
     if stopping_condition := self.decompose_tkwargs.get("stopping_condition"):        
         # Use the plxpr decompose transform and ignore graph decomposition
+        print("Plxpr decomposition for stopping condition.")
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
             consts=consts,
@@ -303,6 +305,7 @@ def handle_qnode(
             stopping_condition=stopping_condition,
         )
     elif self.requires_decompose_lowering:
+        print("Performing graph decomposition.")
         closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
             inner_jaxpr=closed_jaxpr.jaxpr,
             consts=closed_jaxpr.consts,
@@ -313,6 +316,7 @@ def handle_qnode(
         # Fallback to the legacy decomposition if the graph-based decomposition failed
         if not graph_succeeded:
             # Remove the decompose-lowering pass from the pipeline
+            print("Graph decomposition failed. Falling back to legacy decomposition.")
             self._pass_pipeline = [
                 p for p in self._pass_pipeline if p.pass_name != "decompose-lowering"
             ]
@@ -377,18 +381,16 @@ def register_transform(pl_transform, pass_name, decomposition):
     transforms_to_passes[pl_transform] = (pass_name, decomposition)
 
 
-def _set_decompose_lowering_state(self, tkwargs):
+def _set_decompose_lowering_state(self):
     """Set requires_decompose_lowering and decompose_tkwargs; raise if already set."""
-    print("setting decompose_lowering state")
     if not self.requires_decompose_lowering:
         self.requires_decompose_lowering = True
     else:
         raise NotImplementedError("Multiple decomposition transforms are not yet supported.")
-    self.decompose_tkwargs = tkwargs
 
 
 def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs):
-    _set_decompose_lowering_state(self, tkwargs)
+    _set_decompose_lowering_state(self)
 
     next_eval = copy(self)
     # Update the decompose_gateset to be used by the quantum kernel primitive
@@ -452,8 +454,10 @@ def handle_transform(
         and qml.decomposition.enabled_graph()
     ):
         return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs)
-    # elif hasattr(transform._plxpr_transform, "__name__") and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr":
-    #     return _set_decompose_lowering_state(self, tkwargs)
+    elif hasattr(transform._plxpr_transform, "__name__") and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr":
+        _set_decompose_lowering_state(self)
+        # TODO: Might need to add self.decompose_tkwargs = tkwargs here.
+
     
     catalyst_pass_name = transform.pass_name
     if catalyst_pass_name is None:
