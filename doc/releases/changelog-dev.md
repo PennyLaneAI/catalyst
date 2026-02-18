@@ -2,8 +2,50 @@
 
 <h3>New features since last release</h3>
 
-* Executing circuits that are compiled with :func:`pennylane.transforms.to_ppr`, 
-  :func:`pennylane.transforms.commute_ppr`, :func:`pennylane.transforms.ppr_to_ppm`, 
+* A new MLIR transformation pass `--dynamic-one-shot` is available.
+  Devices that natively support mid-circuit measurements can evaluate dynamic circuits by executing
+  them one shot at a time, sampling a dynamic execution path for each shot. The `--dynamic-one-shot`
+  pass first transforms the circuit so that each circuit execution only contains a singular shot,
+  then performs the appropriate classical statistical postprocessing across the execution results
+  from all shots.
+  [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
+
+  With this new MLIR pass, one shot execution mode is now available when capture is enabled.
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=2)
+
+  @qjit(capture=True)
+  @qml.transform(pass_name="dynamic-one-shot")
+  @qml.qnode(dev, shots=10)
+  def circuit():
+      qml.Hadamard(wires=0)
+      m_0 = qml.measure(0)
+      m_1 = qml.measure(1)
+      return qml.sample([m_0, m_1]), qml.expval(m_0), qml.probs(op=[m_0,m_1]), qml.counts(wires=0)
+  ```
+
+  ```pycon
+  >>> circuit()
+  (Array([[1, 0],
+         [0, 0],
+         [1, 0],
+         [1, 0],
+         [0, 0],
+         [0, 0],
+         [1, 0],
+         [1, 0],
+         [1, 0],
+         [0, 0]], dtype=int64), Array(0.6, dtype=float64), Array([0.4, 0. , 0.6, 0. ], dtype=float64),
+         (Array([0, 1], dtype=int64), Array([4, 6], dtype=int64)))
+  ```
+
+  Note that although the one-shot transform is motivated from the context of mid-circuit measurements,
+  this pass also supports terminal measurement processes that are performed on wires, instead of
+  mid-circuit measurement results.
+
+* Executing circuits that are compiled with :func:`pennylane.transforms.to_ppr`,
+  :func:`pennylane.transforms.commute_ppr`, :func:`pennylane.transforms.ppr_to_ppm`,
   :func:`pennylane.transforms.merge_ppr_ppm`, :func:`pennylane.transforms.reduce_t_depth`,
   and :func:`pennylane.transforms.decompose_arbitrary_ppr` is now possible with the `lightning.qubit` device and
   with program capture enabled (:func:`pennylane.capture.enable`).
@@ -14,8 +56,8 @@
   [(#2414)](https://github.com/PennyLaneAI/catalyst/pull/2414)
   [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
   [(#2443)](https://github.com/PennyLaneAI/catalyst/pull/2443)
-  
-  Previously, circuits compiled with these transforms were only inspectable via 
+
+  Previously, circuits compiled with these transforms were only inspectable via
   :func:`pennylane.specs` and :func:`catalyst.draw`. Now, such circuits can be executed:
 
   ```python
