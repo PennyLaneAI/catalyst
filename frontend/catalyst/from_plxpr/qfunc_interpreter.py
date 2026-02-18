@@ -452,12 +452,13 @@ def interpret_counts_mcm(self, *mcms, single_mcm, all_outcomes):
 def _subroutine_kernel(
     interpreter,
     jaxpr,
-    *qregs_plus_args,
+    *args_plus_qregs,
     outer_dynqreg_handlers=(),
     wire_label_arg_to_tracer_arg_index=(),
     wire_to_owner_qreg=(),
 ):
-    global_qreg, *dynqregs_plus_args = qregs_plus_args
+
+    *dynqregs_plus_args, global_qreg = args_plus_qregs
     num_dynamic_alloced_qregs = len(outer_dynqreg_handlers)
     dynalloced_qregs, args = (
         dynqregs_plus_args[:num_dynamic_alloced_qregs],
@@ -558,9 +559,9 @@ def handle_subroutine(self, *args, **kwargs):
     # quantum_subroutine_p.bind
     # is just pjit_p with a different name.
     vals_out = quantum_subroutine_prim.bind(
+        *new_args,
         self.init_qreg.get(),
         *[dyn_qreg.get() for dyn_qreg in dynalloced_qregs],
-        *new_args,
         jaxpr=converted_closed_jaxpr_branch,
         in_shardings=(*(UNSPECIFIED,) * (len(dynalloced_qregs) + 1), *kwargs["in_shardings"]),
         out_shardings=(*(UNSPECIFIED,) * (len(dynalloced_qregs) + 1), *kwargs["out_shardings"]),
