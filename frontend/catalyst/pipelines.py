@@ -299,7 +299,6 @@ def get_bufferization_stage(options: CompileOptions) -> List[str]:
         bufferization_options += " copy-before-write"
 
     bufferization = [
-        "inline",
         "convert-tensor-to-linalg",  # tensor.pad
         "convert-elementwise-to-linalg",  # Must be run before --one-shot-bufferize
         "gradient-preprocess",
