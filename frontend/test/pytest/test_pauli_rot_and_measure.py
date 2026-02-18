@@ -97,7 +97,6 @@ def test_pauli_rot_with_arbitrary_angle_to_ppr():
         return f()
 
     optimized_ir = test_pauli_rot_with_arbitrary_angle_to_ppr_workflow.mlir_opt
-    print(optimized_ir)
     assert "pbc.ppr.arbitrary" in optimized_ir
 
 

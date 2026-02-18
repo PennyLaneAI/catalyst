@@ -15,6 +15,7 @@
 
 from textwrap import dedent
 
+import re
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -71,11 +72,12 @@ class TestCondToJaxpr:
 
             out = cond_fn()
             return out
-
+        
         def asline(text):
-            return " ".join(map(lambda x: x.strip(), str(text).split("\n"))).strip()
+            return " ".join(map(lambda x: re.sub(r"\033\[[0-9;]*m", "", x).strip(), str(text).split("\n"))).strip()
 
-        assert asline(expected) == asline(circuit.jaxpr)
+        result = circuit.jaxpr
+        assert asline(expected) == asline(result)
 
 
 # pylint: disable=too-many-public-methods,too-many-lines

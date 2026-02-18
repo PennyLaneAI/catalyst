@@ -284,8 +284,17 @@ def handle_qnode(
     closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
     graph_succeeded = False
 
+    # Plxpr decomposition for templates
+    if self.requires_decompose_lowering:
+        closed_jaxpr = _apply_compiler_decompose_to_plxpr(
+            inner_jaxpr=qfunc_jaxpr,
+            consts=consts,
+            ncargs=non_const_args,
+            tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
+        )
+
     if stopping_condition := self.decompose_tkwargs.get("stopping_condition"):        
-        # Use the plxpr decompose transform and ignore graph 
+        # Use the plxpr decompose transform and ignore graph decomposition
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
             consts=consts,
@@ -294,33 +303,25 @@ def handle_qnode(
             stopping_condition=stopping_condition,
         )
     elif self.requires_decompose_lowering:
-        closed_jaxpr = _apply_compiler_decompose_to_plxpr(
-            inner_jaxpr=qfunc_jaxpr,
-            consts=consts,
+        closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
+            inner_jaxpr=closed_jaxpr.jaxpr,
+            consts=closed_jaxpr.consts,
+            tkwargs=self.decompose_tkwargs,
             ncargs=non_const_args,
-            tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
         )
 
-        if self.requires_decompose_lowering:
-            closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
+        # Fallback to the legacy decomposition if the graph-based decomposition failed
+        if not graph_succeeded:
+            # Remove the decompose-lowering pass from the pipeline
+            self._pass_pipeline = [
+                p for p in self._pass_pipeline if p.pass_name != "decompose-lowering"
+            ]
+            closed_jaxpr = _apply_compiler_decompose_to_plxpr(
                 inner_jaxpr=closed_jaxpr.jaxpr,
                 consts=closed_jaxpr.consts,
-                tkwargs=self.decompose_tkwargs,
                 ncargs=non_const_args,
+                tkwargs=self.decompose_tkwargs,
             )
-
-            # Fallback to the legacy decomposition if the graph-based decomposition failed
-            if not graph_succeeded:
-                # Remove the decompose-lowering pass from the pipeline
-                self._pass_pipeline = [
-                    p for p in self._pass_pipeline if p.pass_name != "decompose-lowering"
-                ]
-                closed_jaxpr = _apply_compiler_decompose_to_plxpr(
-                    inner_jaxpr=closed_jaxpr.jaxpr,
-                    consts=closed_jaxpr.consts,
-                    ncargs=non_const_args,
-                    tkwargs=self.decompose_tkwargs,
-                )
 
     def calling_convention(*args):
         device_init_p.bind(
@@ -378,6 +379,7 @@ def register_transform(pl_transform, pass_name, decomposition):
 
 def _set_decompose_lowering_state(self, tkwargs):
     """Set requires_decompose_lowering and decompose_tkwargs; raise if already set."""
+    print("setting decompose_lowering state")
     if not self.requires_decompose_lowering:
         self.requires_decompose_lowering = True
     else:
@@ -450,8 +452,8 @@ def handle_transform(
         and qml.decomposition.enabled_graph()
     ):
         return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs)
-    elif hasattr(transform._plxpr_transform, "__name__") and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr":
-        return _set_decompose_lowering_state(self, tkwargs)
+    # elif hasattr(transform._plxpr_transform, "__name__") and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr":
+    #     return _set_decompose_lowering_state(self, tkwargs)
     
     catalyst_pass_name = transform.pass_name
     if catalyst_pass_name is None:
@@ -604,12 +606,19 @@ def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=Non
 
     if graph_enabled:
         qml.decomposition.enable_graph()
-    
+
     kwargs = (
         {"gate_set": set(COMPILER_OPS_FOR_DECOMPOSITION.keys()).union(tgateset)}
         if tgateset
         else tkwargs
     )
+
+    if kwargs is None:
+        kwargs = {}
+
+    if stopping_condition:
+        kwargs["stopping_condition"] = stopping_condition
+
     final_jaxpr = qml.transforms.decompose.plxpr_transform(inner_jaxpr, consts, (), kwargs, *ncargs)
 
     if stopping_condition:
