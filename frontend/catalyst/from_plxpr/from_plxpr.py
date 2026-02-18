@@ -304,7 +304,15 @@ def handle_qnode(
             tkwargs={"gate_set": self.decompose_tkwargs.get("gate_set", [])},
             stopping_condition=stopping_condition,
         )
-    elif self.requires_decompose_lowering:
+    elif not qml.decomposition.enabled_graph() and self.requires_decompose_lowering:
+        print("Performing plxpr decomposition.")
+        closed_jaxpr = _apply_compiler_decompose_to_plxpr(
+            inner_jaxpr=qfunc_jaxpr,
+            consts=consts,
+            ncargs=non_const_args,
+            tkwargs={"gate_set": self.decompose_tkwargs.get("gate_set", [])},
+        )
+    elif qml.decomposition.enabled_graph() and self.requires_decompose_lowering:
         print("Performing graph decomposition.")
         closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
             inner_jaxpr=closed_jaxpr.jaxpr,
@@ -609,7 +617,7 @@ def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=Non
     graph_enabled = qml.decomposition.enabled_graph()
 
     if graph_enabled:
-        qml.decomposition.enable_graph()
+        qml.decomposition.disable_graph()
 
     kwargs = (
         {"gate_set": set(COMPILER_OPS_FOR_DECOMPOSITION.keys()).union(tgateset)}
@@ -625,7 +633,7 @@ def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=Non
 
     final_jaxpr = qml.transforms.decompose.plxpr_transform(inner_jaxpr, consts, (), kwargs, *ncargs)
 
-    if stopping_condition:
+    if graph_enabled:
         qml.decomposition.enable_graph()
     
     return final_jaxpr
