@@ -511,7 +511,7 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOpera
 // -----
 
 class Region_Op<string mnemonic, list<Trait> traits = []> :
-        QRef_Op<mnemonic, traits # [NoMemoryEffect]>;
+        QRef_Op<mnemonic, traits # []>;
 
 def AdjointOp : Region_Op<"adjoint", [QuantumRegion, NoTerminator]> {
     let summary = "Calculate the adjoint of the enclosed operations";
