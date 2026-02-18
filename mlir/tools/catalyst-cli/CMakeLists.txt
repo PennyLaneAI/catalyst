@@ -32,8 +32,8 @@ set(LIBS
     quantum-transforms
     MLIRQRef
     ref-quantum-transforms
-    MLIRQEC
-    qec-transforms
+    MLIRPBC
+    pbc-transforms
     MLIRGradient
     gradient-transforms
     MLIRMBQC

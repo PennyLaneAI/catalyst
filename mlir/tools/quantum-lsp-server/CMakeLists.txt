@@ -9,7 +9,7 @@ set(LIBS
     MLIRCatalyst
     MLIRQuantum
     MLIRQRef
-    MLIRQEC
+    MLIRPBC
     MLIRGradient
     MLIRMBQC
     MLIRMitigation

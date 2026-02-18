@@ -28,7 +28,7 @@ set(TEST_SUITES
     MBQC
     PauliFrame
     cli
-    QEC
+    PBC
     RTIO
     )
 
