@@ -177,8 +177,6 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
         }
     });
 
-    entryFuncName = entryFunc.str();
-
     if (!entryFunc.empty()) {
         resolveFunctionCalls(entryFunc);
     }
@@ -187,6 +185,8 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
             resolveFunctionCalls(entry.getKey());
         }
     }
+
+    entryFuncName = entryFunc.str();
 }
 
 void ResourceAnalysis::analyzeForLoop(scf::ForOp forOp, ResourceResult &result, bool isAdjoint)
