@@ -35,6 +35,7 @@ from xdsl.utils.exceptions import ParseError, VerifyException
 ################################################################
 ######################## ATTRIBUTES ############################
 ################################################################
+# pylint: disable=no-member
 
 
 class QubitLevel(StrEnum):
