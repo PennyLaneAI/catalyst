@@ -177,14 +177,8 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
         }
     });
 
-    if (!entryFunc.empty()) {
-        resolveFunctionCalls(entryFunc);
-    }
-    else {
-        for (auto &entry : funcResults) {
-            resolveFunctionCalls(entry.getKey());
-        }
-    }
+    assert(!entryFunc.empty() && "expected at least one non-declaration function");
+    resolveFunctionCalls(entryFunc);
 
     entryFuncName = entryFunc.str();
 }
