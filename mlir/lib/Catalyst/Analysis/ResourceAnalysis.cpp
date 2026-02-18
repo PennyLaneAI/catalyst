@@ -148,7 +148,7 @@ ResourceAnalysis::ResourceAnalysis(Operation *op)
     LLVM_DEBUG(dbgs() << "ResourceAnalysis: analyzing operation " << op->getName() << "\n");
 
     StringRef entryFunc;
-    op->walk([&](func::FuncOp funcOp) {
+    op->walk<WalkOrder::PreOrder>([&](func::FuncOp funcOp) {
         if (funcOp.isDeclaration()) {
             return;
         }
