@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit tests for the xDSL Quantum dialect."""
+from io import StringIO
 
 import pytest
+from xdsl.context import Context
 from xdsl.dialects.builtin import (
     ArrayAttr,
     ComplexType,
@@ -25,16 +27,24 @@ from xdsl.dialects.builtin import (
     i1,
     i64,
 )
-from xdsl.dialects.test import TestOp
+from xdsl.dialects.test import Test, TestOp
 from xdsl.ir import AttributeCovT, Block, Operation, OpResult, Region
+from xdsl.irdl import ConstraintContext
+from xdsl.parser import Parser
+from xdsl.printer import Printer
+from xdsl.utils.exceptions import ParseError, VerifyException
 
 from catalyst.python_interface.dialects import Quantum, quantum
 from catalyst.python_interface.dialects.quantum import (
     CustomOp,
     NamedObservableAttr,
     ObservableType,
+    QubitLevel,
+    QubitRole,
     QubitType,
+    QubitTypeConstraint,
     QuregType,
+    QuregTypeConstraint,
 )
 
 pytestmark = pytest.mark.xdsl
@@ -295,6 +305,91 @@ class TestDialectBasics:
         """Test that the expected attributes above only contain existing attributes."""
         existing_attrs_names = {attr.__name__ for attr in all_attrs}
         assert existing_attrs_names == set(expected_attrs_names)
+
+
+class TestQubitType:
+    """Unit tests for QubitType and its associated QubitTypeConstraint."""
+
+    @pytest.mark.parametrize(
+        "level,expected_level",
+        [
+            (None, StringAttr("abstract")),
+            ("abstract", StringAttr("abstract")),
+            ("pbc", StringAttr("pbc")),
+            ("physical", StringAttr("physical")),
+            ("logical", StringAttr("logical")),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "role, expected_role",
+        [
+            (None, StringAttr("null")),
+            ("null", StringAttr("null")),
+            ("data", StringAttr("data")),
+            ("xcheck", StringAttr("xcheck")),
+            ("zcheck", StringAttr("zcheck")),
+        ],
+    )
+    def test_constructor(self, args, level, expected_level, role, expected_role):
+        """Test that the parameters of QubitType are correct with defaults."""
+        args = {}
+        if level is not None:
+            args["level"] = level
+        if role is not None:
+            args["role"] = role
+
+        ty = QubitType(**args)
+        assert ty.level == expected_level
+        assert ty.role == expected_role
+
+    @pytest.mark.parametrize("ty,error", [])
+    def test_verify(self, ty, error):
+        """Test that QubitType verifies correctly."""
+        if error:
+            with pytest.raises(VerifyException, match=error):
+                ty.verify()
+        else:
+            ty.verify()
+
+    @pytest.mark.parametrize("ty,expected", [])
+    @pytest.mark.parametrize("generic", [True, False])
+    def test_printing(self, ty, expected, generic):
+        """Test that QubitType is printed correctly."""
+        buf = StringIO()
+        printer = Printer(stream=buf, print_generic_format=generic)
+        printer.print_attribute(ty)
+        assert buf.getvalue() == expected
+
+    @pytest.mark.parametrize("attr_str,expected_type", [])
+    def test_parsing(self, input_str, expected_type):
+        """Test that QubitType is parsed correctly."""
+        ctx = Context()
+        ctx.load_dialect(Quantum)
+        ctx.load_dialect(Test)
+        op = Parser(ctx, input=input_str).parse_op()
+
+        ty = op.results[0]
+        assert ty == expected_type
+
+    @pytest.mark.parametrize("constr,can_infer", [])
+    def test_constraint_can_infer(self, constr, can_infer):
+        """Test that QubitTypeConstraint can infer the type correctly if possible."""
+        assert constr.can_infer({}) == can_infer
+
+    @pytest.mark.parametrize("constr,expected_type", [])
+    def test_constraint_infer(self, constr, expected_type):
+        """Test that QubitTypeConstraint infers the correct type based on its constraints."""
+        ty = constr.infer(ConstraintContext())
+        assert ty == expected_type
+
+    @pytest.mark.parametrize("constr, ty,error", [])
+    def test_constraint_verify(self, constr, ty, error):
+        """Test that QubitTypeConstraint verifies correctly."""
+        if error:
+            with pytest.raises(VerifyException, match=error):
+                constr.verify(ty, ConstraintContext())
+        else:
+            constr.verify(ty, ConstraintContext())
 
 
 class TestCustomVerifiers:
