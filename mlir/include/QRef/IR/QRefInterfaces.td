@@ -154,7 +154,11 @@ def ParametrizedGate : OpInterface<"ParametrizedGate", [QuantumGate]> {
         InterfaceMethod<
             "Return the param operand at the requested index.",
             "mlir::Value", "getParam", (ins "size_t":$idx), /*methodBody=*/[{}],
-            /*defaultImplementation=*/[{ return mlir::cast<ConcreteOp>($_op).getAllParams()[idx]; }]
+            /*defaultImplementation=*/[{
+                mlir::ValueRange allParams = mlir::cast<ConcreteOp>($_op).getAllParams();
+                assert(idx < allParams.size() && "parameter index out of range");
+                return allParams[idx];
+            }]
         >,
     ];
 }

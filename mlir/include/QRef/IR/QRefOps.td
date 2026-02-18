@@ -224,7 +224,7 @@ class UnitaryGate_Op<string mnemonic, list<Trait> traits = []> :
             } else {
                (*this)->removeAttr("adjoint");
             }
-        };
+        }
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration;
@@ -321,7 +321,7 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [ParametrizedGate, AttrSizedOperandS
         operator to the state-vector.
         The arguments are the rotation angle `angle`, a string representing the
         Pauli product operator, and a set of qubits the operation acts on.
-        Note that this operation is currently not excutable. There isn't a valid
+        Note that this operation is currently not executable. There isn't a valid
         lowering path to the LLVM IR.
     }];
 
@@ -544,7 +544,7 @@ def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]
         operations such as measurement processes. The specific observable defined here is a
         "pseudo" observable to represent measurements in the computational basis.
         The only arguments are either the list of qubit references to measure, or the quantum
-        register refrence to measure. When the argument is a register, the measurement occurs
+        register reference to measure. When the argument is a register, the measurement occurs
         on all qubits in the register.
 
         Example:
