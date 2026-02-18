@@ -2,8 +2,12 @@
 
 <h3>New features since last release</h3>
 
-* Executing circuits that are compiled with :func:`pennylane.transforms.to_ppr`, 
-  :func:`pennylane.transforms.commute_ppr`, :func:`pennylane.transforms.ppr_to_ppm`, 
+* Added a new `CompilationPass` class to `catalyst.python_interface.pass_api` that creates abstractions to allow
+  simpler implementations for xDSL compilation passes.
+  [(#2211)](https://github.com/PennyLaneAI/catalyst/pull/2211)
+
+* Executing circuits that are compiled with :func:`pennylane.transforms.to_ppr`,
+  :func:`pennylane.transforms.commute_ppr`, :func:`pennylane.transforms.ppr_to_ppm`,
   :func:`pennylane.transforms.merge_ppr_ppm`, :func:`pennylane.transforms.reduce_t_depth`,
   and :func:`pennylane.transforms.decompose_arbitrary_ppr` is now possible with the `lightning.qubit` device and
   with program capture enabled (:func:`pennylane.capture.enable`).
@@ -14,8 +18,8 @@
   [(#2414)](https://github.com/PennyLaneAI/catalyst/pull/2414)
   [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
   [(#2443)](https://github.com/PennyLaneAI/catalyst/pull/2443)
-  
-  Previously, circuits compiled with these transforms were only inspectable via 
+
+  Previously, circuits compiled with these transforms were only inspectable via
   :func:`pennylane.specs` and :func:`catalyst.draw`. Now, such circuits can be executed:
 
   ```python
