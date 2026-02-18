@@ -97,10 +97,7 @@ def test_one_shot_with_passes():
 print(test_one_shot_with_passes.mlir)
 
 
-qml.capture.enable()
-
-
-@qjit(target="mlir")
+@qjit(capture=True, target="mlir")
 def test_mcm_obs():
     """
     Test generation of mcm observale operation.
@@ -137,5 +134,3 @@ def test_mcm_obs():
 
 
 print(test_mcm_obs.mlir)
-
-qml.capture.disable()
