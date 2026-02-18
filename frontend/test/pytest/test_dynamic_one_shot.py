@@ -14,11 +14,15 @@
 
 """End-to-end tests for dynamic one-shot transform in MLIR"""
 
+from functools import partial
+
 import numpy as np
 import pennylane as qml
 import pytest
 
 from catalyst import qjit
+from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
+from catalyst.passes import apply_pass
 
 
 def test_mlir_one_shot_pass_expval(backend):
@@ -329,6 +333,34 @@ def test_mlir_one_shot_pass_post_process(backend):
         assert res.dtype == "float64"
         assert res.shape == ()
         assert np.allclose(res, 1.0, atol=0.01, rtol=0.01)
+
+
+@pytest.mark.parametrize("tape_transform", [measurements_from_samples, measurements_from_counts])
+def test_with_measurements_from_samples_and_counts(backend, tape_transform):
+    """
+    Test that the mlir implementation of --dynamic-one-shot pass can be used together with the
+    tape-based measurements-from-samples/counts transforms.
+
+    Note that the tape-based transform is only available without capture.
+    """
+
+    dev = qml.device(backend, wires=3)
+
+    @qjit(capture=False)
+    @apply_pass("dynamic-one-shot")
+    @partial(tape_transform, device_wires=dev.wires)
+    @qml.qnode(dev, shots=1000)
+    def circuit():
+        return (
+            qml.expval(qml.PauliZ(wires=0) @ qml.PauliZ(wires=1)),
+            qml.var(qml.PauliZ(wires=2)),
+            qml.probs(wires=[0]),
+        )
+
+    e, v, p = circuit()
+    assert np.allclose(e, 1.0)
+    assert np.allclose(v, 0.0)
+    assert np.allclose(p, [1, 0])
 
 
 if __name__ == "__main__":
