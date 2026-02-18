@@ -7,8 +7,8 @@ add_mlir_public_c_api_library(QuantumCAPI
     catalyst-stablehlo-transforms
     MLIRQuantum
     quantum-transforms
-    MLIRQEC
-    qec-transforms
+    MLIRPBC
+    pbc-transforms
     MLIRGradient
     gradient-transforms
     MLIRMBQC

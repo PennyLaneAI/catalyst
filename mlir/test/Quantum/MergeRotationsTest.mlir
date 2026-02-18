@@ -652,10 +652,10 @@ func.func @test_merge_rotations(%arg0: f64, %arg1: f64) -> (!quantum.bit, !quant
 
 // CHECK-LABEL: merge_Y_pi_4
 func.func public @merge_Y_pi_4(%q1: !quantum.bit) {
-    // CHECK-NOT: qec.ppr ["Y"](4)
-    // CHECK: qec.ppr ["Y"](2)
-    %0 = qec.ppr ["Y"](4) %q1: !quantum.bit
-    %1 = qec.ppr ["Y"](4) %0: !quantum.bit
+    // CHECK-NOT: pbc.ppr ["Y"](4)
+    // CHECK: pbc.ppr ["Y"](2)
+    %0 = pbc.ppr ["Y"](4) %q1: !quantum.bit
+    %1 = pbc.ppr ["Y"](4) %0: !quantum.bit
     func.return
 }
 
@@ -664,9 +664,9 @@ func.func public @merge_Y_pi_4(%q1: !quantum.bit) {
 // merging to identity
 
 func.func public @test_merge_rotations(%q1: !quantum.bit) {
-    // CHECK-NOT: qec.ppr
-    %0 = qec.ppr ["X"](2) %q1: !quantum.bit
-    %1 = qec.ppr ["X"](2) %0: !quantum.bit
+    // CHECK-NOT: pbc.ppr
+    %0 = pbc.ppr ["X"](2) %q1: !quantum.bit
+    %1 = pbc.ppr ["X"](2) %0: !quantum.bit
     func.return
 }
 
@@ -676,13 +676,13 @@ func.func public @test_merge_rotations(%q1: !quantum.bit) {
 
 // CHECK-LABEL: merge_multi_Y
 func.func public @merge_multi_Y(%q1: !quantum.bit) {
-    // CHECK-NOT: qec.ppr
-    %0 = qec.ppr ["Y"](4) %q1: !quantum.bit
-    %1 = qec.ppr ["Y"](4) %0: !quantum.bit
-    %2 = qec.ppr ["Y"](8) %1: !quantum.bit
-    %3 = qec.ppr ["Y"](8) %2: !quantum.bit
-    %4 = qec.ppr ["Y"](8) %3: !quantum.bit
-    %5 = qec.ppr ["Y"](8) %4: !quantum.bit
+    // CHECK-NOT: pbc.ppr
+    %0 = pbc.ppr ["Y"](4) %q1: !quantum.bit
+    %1 = pbc.ppr ["Y"](4) %0: !quantum.bit
+    %2 = pbc.ppr ["Y"](8) %1: !quantum.bit
+    %3 = pbc.ppr ["Y"](8) %2: !quantum.bit
+    %4 = pbc.ppr ["Y"](8) %3: !quantum.bit
+    %5 = pbc.ppr ["Y"](8) %4: !quantum.bit
     func.return
 }
 
@@ -692,18 +692,18 @@ func.func public @merge_multi_Y(%q1: !quantum.bit) {
 
 // CHECK-LABEL: dont_merge
 func.func public @dont_merge(%q1: !quantum.bit) {
-    // CHECK: qec.ppr ["Y"](4)
-    // CHECK: qec.ppr ["X"](4)
-    // CHECK: qec.ppr ["Z"](8)
-    // CHECK: qec.ppr ["X"](8)
-    // CHECK: qec.ppr ["Y"](2)
-    // CHECK: qec.ppr ["Z"](2)
-    %0 = qec.ppr ["Y"](4) %q1: !quantum.bit
-    %1 = qec.ppr ["X"](4) %0: !quantum.bit
-    %2 = qec.ppr ["Z"](8) %1: !quantum.bit
-    %3 = qec.ppr ["X"](8) %2: !quantum.bit
-    %4 = qec.ppr ["Y"](2) %3: !quantum.bit
-    %5 = qec.ppr ["Z"](2) %4: !quantum.bit
+    // CHECK: pbc.ppr ["Y"](4)
+    // CHECK: pbc.ppr ["X"](4)
+    // CHECK: pbc.ppr ["Z"](8)
+    // CHECK: pbc.ppr ["X"](8)
+    // CHECK: pbc.ppr ["Y"](2)
+    // CHECK: pbc.ppr ["Z"](2)
+    %0 = pbc.ppr ["Y"](4) %q1: !quantum.bit
+    %1 = pbc.ppr ["X"](4) %0: !quantum.bit
+    %2 = pbc.ppr ["Z"](8) %1: !quantum.bit
+    %3 = pbc.ppr ["X"](8) %2: !quantum.bit
+    %4 = pbc.ppr ["Y"](2) %3: !quantum.bit
+    %5 = pbc.ppr ["Z"](2) %4: !quantum.bit
     func.return
 }
 
@@ -713,13 +713,13 @@ func.func public @dont_merge(%q1: !quantum.bit) {
 
 // CHECK-LABEL: merge_correct_references
 func.func public @merge_correct_references(%q1: !quantum.bit) {
-    // CHECK: [[in:%.+]] = qec.ppr ["Y"](4)
-    // CHECK: [[merge_out:%.+]] = qec.ppr ["X"](2) [[in]]
-    // CHECK: qec.ppr ["Z"](4) [[merge_out]]
-    %0 = qec.ppr ["Y"](4) %q1: !quantum.bit
-    %1 = qec.ppr ["X"](4) %0: !quantum.bit
-    %2 = qec.ppr ["X"](4) %1: !quantum.bit
-    %3 = qec.ppr ["Z"](4) %2: !quantum.bit
+    // CHECK: [[in:%.+]] = pbc.ppr ["Y"](4)
+    // CHECK: [[merge_out:%.+]] = pbc.ppr ["X"](2) [[in]]
+    // CHECK: pbc.ppr ["Z"](4) [[merge_out]]
+    %0 = pbc.ppr ["Y"](4) %q1: !quantum.bit
+    %1 = pbc.ppr ["X"](4) %0: !quantum.bit
+    %2 = pbc.ppr ["X"](4) %1: !quantum.bit
+    %3 = pbc.ppr ["Z"](4) %2: !quantum.bit
     func.return
 }
 
@@ -729,14 +729,14 @@ func.func public @merge_correct_references(%q1: !quantum.bit) {
 
 // CHECK-LABEL: merge_multi_XYZ
 func.func public @merge_multi_XYZ(%q1: !quantum.bit, %q2: !quantum.bit, %q3: !quantum.bit) {
-    // CHECK: qec.ppr ["X", "Y", "Z"](4)
-    // CHECK-NOT: qec.ppr ["X", "Y", "Z"](2)
-    // CHECK-NOT: qec.ppr ["X", "Y", "Z"](8)
-    %0:3 = qec.ppr ["X", "Y", "Z"](4) %q1, %q2, %q3: !quantum.bit, !quantum.bit, !quantum.bit
-    %1:3 = qec.ppr ["X", "Y", "Z"](4) %0#0, %0#1, %0#2: !quantum.bit, !quantum.bit, !quantum.bit
-    %2:3 = qec.ppr ["X", "Y", "Z"](8) %1#0, %1#1, %1#2: !quantum.bit, !quantum.bit, !quantum.bit
-    %3:3 = qec.ppr ["X", "Y", "Z"](8) %2#0, %2#1, %2#2: !quantum.bit, !quantum.bit, !quantum.bit
-    %4:3 = qec.ppr ["X", "Y", "Z"](2) %3#0, %3#1, %3#2: !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK: pbc.ppr ["X", "Y", "Z"](4)
+    // CHECK-NOT: pbc.ppr ["X", "Y", "Z"](2)
+    // CHECK-NOT: pbc.ppr ["X", "Y", "Z"](8)
+    %0:3 = pbc.ppr ["X", "Y", "Z"](4) %q1, %q2, %q3: !quantum.bit, !quantum.bit, !quantum.bit
+    %1:3 = pbc.ppr ["X", "Y", "Z"](4) %0#0, %0#1, %0#2: !quantum.bit, !quantum.bit, !quantum.bit
+    %2:3 = pbc.ppr ["X", "Y", "Z"](8) %1#0, %1#1, %1#2: !quantum.bit, !quantum.bit, !quantum.bit
+    %3:3 = pbc.ppr ["X", "Y", "Z"](8) %2#0, %2#1, %2#2: !quantum.bit, !quantum.bit, !quantum.bit
+    %4:3 = pbc.ppr ["X", "Y", "Z"](2) %3#0, %3#1, %3#2: !quantum.bit, !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -746,9 +746,9 @@ func.func public @merge_multi_XYZ(%q1: !quantum.bit, %q2: !quantum.bit, %q3: !qu
 
 // CHECK-LABEL: cancel_Z_pi_2
 func.func public @cancel_Z_pi_2(%q1: !quantum.bit) {
-    // CHECK-NOT: qec.ppr
-    %0 = qec.ppr ["Z"](2) %q1: !quantum.bit
-    %1 = qec.ppr ["Z"](-2) %0: !quantum.bit
+    // CHECK-NOT: pbc.ppr
+    %0 = pbc.ppr ["Z"](2) %q1: !quantum.bit
+    %1 = pbc.ppr ["Z"](-2) %0: !quantum.bit
     func.return
 }
 
@@ -758,11 +758,11 @@ func.func public @cancel_Z_pi_2(%q1: !quantum.bit) {
 
 // CHECK-LABEL: cancel_multi_Z
 func.func public @cancel_multi_Z(%q1: !quantum.bit) {
-    // CHECK-NOT: qec.ppr
-    %0 = qec.ppr ["Z"](8) %q1: !quantum.bit
-    %1 = qec.ppr ["X"](-4) %0: !quantum.bit
-    %2 = qec.ppr ["X"](4) %1: !quantum.bit
-    %3 = qec.ppr ["Z"](-8) %2: !quantum.bit
+    // CHECK-NOT: pbc.ppr
+    %0 = pbc.ppr ["Z"](8) %q1: !quantum.bit
+    %1 = pbc.ppr ["X"](-4) %0: !quantum.bit
+    %2 = pbc.ppr ["X"](4) %1: !quantum.bit
+    %3 = pbc.ppr ["Z"](-8) %2: !quantum.bit
     func.return
 }
 
@@ -772,14 +772,14 @@ func.func public @cancel_multi_Z(%q1: !quantum.bit) {
 
 // CHECK-LABEL: dont_cancel
 func.func public @dont_cancel(%q1: !quantum.bit) {
-    // CHECK: qec.ppr ["Z"](8)
-    // CHECK: qec.ppr ["X"](-4)
-    // CHECK: qec.ppr ["Z"](-8)
-    // CHECK: qec.ppr ["X"](4)
-    %0 = qec.ppr ["Z"](8) %q1: !quantum.bit
-    %1 = qec.ppr ["X"](-4) %0: !quantum.bit
-    %2 = qec.ppr ["Z"](-8) %1: !quantum.bit
-    %3 = qec.ppr ["X"](4) %2: !quantum.bit
+    // CHECK: pbc.ppr ["Z"](8)
+    // CHECK: pbc.ppr ["X"](-4)
+    // CHECK: pbc.ppr ["Z"](-8)
+    // CHECK: pbc.ppr ["X"](4)
+    %0 = pbc.ppr ["Z"](8) %q1: !quantum.bit
+    %1 = pbc.ppr ["X"](-4) %0: !quantum.bit
+    %2 = pbc.ppr ["Z"](-8) %1: !quantum.bit
+    %3 = pbc.ppr ["X"](4) %2: !quantum.bit
     func.return
 }
 
@@ -789,12 +789,12 @@ func.func public @dont_cancel(%q1: !quantum.bit) {
 
 // CHECK-LABEL: merge_through
 func.func public @merge_through(%q1: !quantum.bit, %q2: !quantum.bit) -> !quantum.bit {
-    // CHECK-NOT: qec.ppr ["X"](4)
+    // CHECK-NOT: pbc.ppr ["X"](4)
     // CHECK-DAG: quantum.custom
-    // CHECK-DAG: qec.ppr ["X"](2)
-    %0 = qec.ppr ["X"](4) %q1: !quantum.bit
+    // CHECK-DAG: pbc.ppr ["X"](2)
+    %0 = pbc.ppr ["X"](4) %q1: !quantum.bit
     %1 = quantum.custom "Hadamard"() %q2: !quantum.bit
-    %2 = qec.ppr ["X"](4) %0: !quantum.bit
+    %2 = pbc.ppr ["X"](4) %0: !quantum.bit
     func.return %1: !quantum.bit
 }
 
@@ -804,12 +804,12 @@ func.func public @merge_through(%q1: !quantum.bit, %q2: !quantum.bit) -> !quantu
 
 // CHECK-LABEL: cancel_correct_references
 func.func public @cancel_correct_references(%q1: !quantum.bit) {
-    // CHECK: [[in:%.+]] = qec.ppr ["Y"](2)
-    // CHECK: qec.ppr ["Z"](4) [[in]]
-    %0 = qec.ppr ["Y"](2) %q1: !quantum.bit
-    %1 = qec.ppr ["X"](8) %0: !quantum.bit
-    %2 = qec.ppr ["X"](-8) %1: !quantum.bit
-    %3 = qec.ppr ["Z"](4) %2: !quantum.bit
+    // CHECK: [[in:%.+]] = pbc.ppr ["Y"](2)
+    // CHECK: pbc.ppr ["Z"](4) [[in]]
+    %0 = pbc.ppr ["Y"](2) %q1: !quantum.bit
+    %1 = pbc.ppr ["X"](8) %0: !quantum.bit
+    %2 = pbc.ppr ["X"](-8) %1: !quantum.bit
+    %3 = pbc.ppr ["Z"](4) %2: !quantum.bit
     func.return
 }
 
@@ -819,11 +819,11 @@ func.func public @cancel_correct_references(%q1: !quantum.bit) {
 
 // CHECK-LABEL: cancel_multi_XY
 func.func public @cancel_multi_XY(%q1: !quantum.bit, %q2: !quantum.bit) {
-    // CHECK-NOT: qec.ppr
-    %0:2 = qec.ppr ["X", "Y"](2) %q1, %q2: !quantum.bit, !quantum.bit
-    %1:2 = qec.ppr ["X", "Y"](-2) %0#0, %0#1: !quantum.bit, !quantum.bit
-    %2:2 = qec.ppr ["X", "Y"](4) %1#0, %1#1: !quantum.bit, !quantum.bit
-    %3:2 = qec.ppr ["X", "Y"](-4) %2#0, %2#1: !quantum.bit, !quantum.bit
+    // CHECK-NOT: pbc.ppr
+    %0:2 = pbc.ppr ["X", "Y"](2) %q1, %q2: !quantum.bit, !quantum.bit
+    %1:2 = pbc.ppr ["X", "Y"](-2) %0#0, %0#1: !quantum.bit, !quantum.bit
+    %2:2 = pbc.ppr ["X", "Y"](4) %1#0, %1#1: !quantum.bit, !quantum.bit
+    %3:2 = pbc.ppr ["X", "Y"](-4) %2#0, %2#1: !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -833,14 +833,14 @@ func.func public @cancel_multi_XY(%q1: !quantum.bit, %q2: !quantum.bit) {
 
 // CHECK-LABEL: dont_cancel_multi
 func.func public @dont_cancel_multi(%q1: !quantum.bit, %q2: !quantum.bit) {
-    // CHECK: qec.ppr ["X", "Y"](2)
-    // CHECK: qec.ppr ["Y", "X"](-2)
-    // CHECK: qec.ppr ["Z", "Y"](4)
-    // CHECK: qec.ppr ["Y", "Z"](-4)
-    %0:2 = qec.ppr ["X", "Y"](2) %q1, %q2: !quantum.bit, !quantum.bit
-    %1:2 = qec.ppr ["Y", "X"](-2) %0#0, %0#1: !quantum.bit, !quantum.bit
-    %2:2 = qec.ppr ["Z", "Y"](4) %1#0, %1#1: !quantum.bit, !quantum.bit
-    %3:2 = qec.ppr ["Y", "Z"](-4) %2#0, %2#1: !quantum.bit, !quantum.bit
+    // CHECK: pbc.ppr ["X", "Y"](2)
+    // CHECK: pbc.ppr ["Y", "X"](-2)
+    // CHECK: pbc.ppr ["Z", "Y"](4)
+    // CHECK: pbc.ppr ["Y", "Z"](-4)
+    %0:2 = pbc.ppr ["X", "Y"](2) %q1, %q2: !quantum.bit, !quantum.bit
+    %1:2 = pbc.ppr ["Y", "X"](-2) %0#0, %0#1: !quantum.bit, !quantum.bit
+    %2:2 = pbc.ppr ["Z", "Y"](4) %1#0, %1#1: !quantum.bit, !quantum.bit
+    %3:2 = pbc.ppr ["Y", "Z"](-4) %2#0, %2#1: !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -850,12 +850,12 @@ func.func public @dont_cancel_multi(%q1: !quantum.bit, %q2: !quantum.bit) {
 
 // CHECK-LABEL: multi_cancel_and_merge
 func.func public @multi_cancel_and_merge(%q1: !quantum.bit, %q2: !quantum.bit) {
-    // CHECK-NOT: qec.ppr ["X", "Y"]
-    // CHECK: qec.ppr ["Y", "Z"](4)
-    %0:2 = qec.ppr ["Y", "Z"](8) %q1, %q2: !quantum.bit, !quantum.bit
-    %1:2 = qec.ppr ["X", "Y"](-4) %0#0, %0#1: !quantum.bit, !quantum.bit
-    %2:2 = qec.ppr ["X", "Y"](4) %1#0, %1#1: !quantum.bit, !quantum.bit
-    %3:2 = qec.ppr ["Y", "Z"](8) %2#0, %2#1: !quantum.bit, !quantum.bit
+    // CHECK-NOT: pbc.ppr ["X", "Y"]
+    // CHECK: pbc.ppr ["Y", "Z"](4)
+    %0:2 = pbc.ppr ["Y", "Z"](8) %q1, %q2: !quantum.bit, !quantum.bit
+    %1:2 = pbc.ppr ["X", "Y"](-4) %0#0, %0#1: !quantum.bit, !quantum.bit
+    %2:2 = pbc.ppr ["X", "Y"](4) %1#0, %1#1: !quantum.bit, !quantum.bit
+    %3:2 = pbc.ppr ["Y", "Z"](8) %2#0, %2#1: !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -865,10 +865,10 @@ func.func public @multi_cancel_and_merge(%q1: !quantum.bit, %q2: !quantum.bit) {
 
 // CHECK-LABEL: multi_merge_and_cancel
 func.func public @multi_merge_and_cancel(%q1: !quantum.bit, %q2: !quantum.bit) {
-    // CHECK-NOT: qec.ppr
-    %0:2 = qec.ppr ["Z", "X"](4) %q1, %q2: !quantum.bit, !quantum.bit
-    %1:2 = qec.ppr ["Z", "X"](-8) %0#0, %0#1: !quantum.bit, !quantum.bit
-    %2:2 = qec.ppr ["Z", "X"](-8) %1#0, %1#1: !quantum.bit, !quantum.bit
+    // CHECK-NOT: pbc.ppr
+    %0:2 = pbc.ppr ["Z", "X"](4) %q1, %q2: !quantum.bit, !quantum.bit
+    %1:2 = pbc.ppr ["Z", "X"](-8) %0#0, %0#1: !quantum.bit, !quantum.bit
+    %2:2 = pbc.ppr ["Z", "X"](-8) %1#0, %1#1: !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -878,12 +878,12 @@ func.func public @multi_merge_and_cancel(%q1: !quantum.bit, %q2: !quantum.bit) {
 
 // CHECK-LABEL: mixed_operations
 func.func public @mixed_operations(%q1: !quantum.bit) {
-    // CHECK: qec.ppr ["Z"](4)
+    // CHECK: pbc.ppr ["Z"](4)
     // CHECK: quantum.custom "Hadamard"()
-    // CHECK: qec.ppr ["Z"](4)
-    %0 = qec.ppr ["Z"](4) %q1: !quantum.bit
+    // CHECK: pbc.ppr ["Z"](4)
+    %0 = pbc.ppr ["Z"](4) %q1: !quantum.bit
     %1 = quantum.custom "Hadamard"() %0: !quantum.bit
-    %2 = qec.ppr ["Z"](4) %1: !quantum.bit
+    %2 = pbc.ppr ["Z"](4) %1: !quantum.bit
     func.return
 }
 
@@ -893,10 +893,10 @@ func.func public @mixed_operations(%q1: !quantum.bit) {
 
 // CHECK-LABEL: half_compatible_qubits
 func.func public @half_compatible_qubits(%q1: !quantum.bit, %q2: !quantum.bit, %q3: !quantum.bit) {
-    // CHECK: qec.ppr ["X", "X"](4)
-    // CHECK: qec.ppr ["X", "X"](4)
-    %0, %1 = qec.ppr ["X", "X"](4) %q1, %q2: !quantum.bit, !quantum.bit
-    %2:2 = qec.ppr ["X", "X"](4) %0, %q3: !quantum.bit, !quantum.bit
+    // CHECK: pbc.ppr ["X", "X"](4)
+    // CHECK: pbc.ppr ["X", "X"](4)
+    %0, %1 = pbc.ppr ["X", "X"](4) %q1, %q2: !quantum.bit, !quantum.bit
+    %2:2 = pbc.ppr ["X", "X"](4) %0, %q3: !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -906,10 +906,10 @@ func.func public @half_compatible_qubits(%q1: !quantum.bit, %q2: !quantum.bit, %
 
 // CHECK-LABEL: merge_conditionals
 func.func public @merge_conditionals(%q1: !quantum.bit, %q2: !quantum.bit, %arg0: i1) {
-    // CHECK: qec.ppr ["X", "Z"](4) {{%.+}}, {{%.+}} cond({{%.+}})
-    // CHECK-NOT: qec.ppr ["X", "Z"](8)
-    %0, %1 = qec.ppr ["X", "Z"](8) %q1, %q2 cond(%arg0): !quantum.bit, !quantum.bit
-    %2, %3 = qec.ppr ["X", "Z"](8) %0, %1 cond(%arg0): !quantum.bit, !quantum.bit
+    // CHECK: pbc.ppr ["X", "Z"](4) {{%.+}}, {{%.+}} cond({{%.+}})
+    // CHECK-NOT: pbc.ppr ["X", "Z"](8)
+    %0, %1 = pbc.ppr ["X", "Z"](8) %q1, %q2 cond(%arg0): !quantum.bit, !quantum.bit
+    %2, %3 = pbc.ppr ["X", "Z"](8) %0, %1 cond(%arg0): !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -919,11 +919,11 @@ func.func public @merge_conditionals(%q1: !quantum.bit, %q2: !quantum.bit, %arg0
 
 // CHECK-LABEL: dont_merge_incompatible_conditionals
 func.func public @dont_merge_incompatible_conditionals(%q1: !quantum.bit, %q2: !quantum.bit, %arg0: i1, %arg1: i1) {
-    // CHECK-NOT: qec.ppr ["X", "Z"](4)
-    // CHECK: [[in:%.+]]:2 = qec.ppr ["X", "Z"](8) 
-    // CHECK: qec.ppr ["X", "Z"](8) [[in]]#0, [[in]]#1
-    %0:2 = qec.ppr ["X", "Z"](8) %q1, %q2 cond(%arg0): !quantum.bit, !quantum.bit
-    %1:2 = qec.ppr ["X", "Z"](8) %0#0, %0#1 cond(%arg1): !quantum.bit, !quantum.bit
+    // CHECK-NOT: pbc.ppr ["X", "Z"](4)
+    // CHECK: [[in:%.+]]:2 = pbc.ppr ["X", "Z"](8) 
+    // CHECK: pbc.ppr ["X", "Z"](8) [[in]]#0, [[in]]#1
+    %0:2 = pbc.ppr ["X", "Z"](8) %q1, %q2 cond(%arg0): !quantum.bit, !quantum.bit
+    %1:2 = pbc.ppr ["X", "Z"](8) %0#0, %0#1 cond(%arg1): !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -933,11 +933,11 @@ func.func public @dont_merge_incompatible_conditionals(%q1: !quantum.bit, %q2: !
 
 // CHECK-LABEL: dont_merge_conditionals
 func.func public @dont_merge_conditionals(%q1: !quantum.bit, %q2: !quantum.bit, %arg0: i1) {
-    // CHECK-NOT: qec.ppr ["X", "Z"](4)
-    // CHECK: [[in:%.+]]:2 = qec.ppr ["X", "Z"](8)
-    // CHECK: qec.ppr ["X", "Z"](8) [[in]]#0, [[in]]#1
-    %0:2 = qec.ppr ["X", "Z"](8) %q1, %q2: !quantum.bit, !quantum.bit
-    %1:2 = qec.ppr ["X", "Z"](8) %0#0, %0#1 cond(%arg0): !quantum.bit, !quantum.bit
+    // CHECK-NOT: pbc.ppr ["X", "Z"](4)
+    // CHECK: [[in:%.+]]:2 = pbc.ppr ["X", "Z"](8)
+    // CHECK: pbc.ppr ["X", "Z"](8) [[in]]#0, [[in]]#1
+    %0:2 = pbc.ppr ["X", "Z"](8) %q1, %q2: !quantum.bit, !quantum.bit
+    %1:2 = pbc.ppr ["X", "Z"](8) %0#0, %0#1 cond(%arg0): !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -948,11 +948,11 @@ func.func public @dont_merge_conditionals(%q1: !quantum.bit, %q2: !quantum.bit, 
 // CHECK-LABEL: merge_permutations
 func.func public @merge_permutations(%z0: !quantum.bit, %y0: !quantum.bit) {
     // CHECK: ([[zIn:%.+]]: !quantum.bit, [[yIn:%.+]]: !quantum.bit)
-    // CHECK-NOT: qec.ppr ["Z", "Y"]
-    // CHECK-NOT: qec.ppr ["Y", "Z"](4)
-    // CHECK: qec.ppr ["Y", "Z"](2) [[yIn]], [[zIn]]
-    %z1, %y1 = qec.ppr ["Z", "Y"](4) %z0, %y0: !quantum.bit, !quantum.bit
-    %y2, %z2 = qec.ppr ["Y", "Z"](4) %y1, %z1: !quantum.bit, !quantum.bit
+    // CHECK-NOT: pbc.ppr ["Z", "Y"]
+    // CHECK-NOT: pbc.ppr ["Y", "Z"](4)
+    // CHECK: pbc.ppr ["Y", "Z"](2) [[yIn]], [[zIn]]
+    %z1, %y1 = pbc.ppr ["Z", "Y"](4) %z0, %y0: !quantum.bit, !quantum.bit
+    %y2, %z2 = pbc.ppr ["Y", "Z"](4) %y1, %z1: !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -963,11 +963,11 @@ func.func public @merge_permutations(%z0: !quantum.bit, %y0: !quantum.bit) {
 // CHECK-LABEL: merge_permutations_with_duplicates
 func.func public @merge_permutations_with_duplicates(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) {
     // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit)
-    // CHECK-NOT: qec.ppr ["X", "Y", "X"]
-    // CHECK-NOT: qec.ppr ["Y", "X", "X"](8)
-    // CHECK: qec.ppr ["Y", "X", "X"](4) [[q1]], [[q2]], [[q0]]
-    %3:3 = qec.ppr ["X", "Y", "X"](8) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
-    %4:3 = qec.ppr ["Y", "X", "X"](8) %3#1, %3#2, %3#0: !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK-NOT: pbc.ppr ["X", "Y", "X"]
+    // CHECK-NOT: pbc.ppr ["Y", "X", "X"](8)
+    // CHECK: pbc.ppr ["Y", "X", "X"](4) [[q1]], [[q2]], [[q0]]
+    %3:3 = pbc.ppr ["X", "Y", "X"](8) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %4:3 = pbc.ppr ["Y", "X", "X"](8) %3#1, %3#2, %3#0: !quantum.bit, !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -977,10 +977,10 @@ func.func public @merge_permutations_with_duplicates(%q0: !quantum.bit, %q1: !qu
 
 // CHECK-LABEL: dont_merge_permutations_qubits
 func.func public @dont_merge_permutations_qubits(%q0: !quantum.bit, %q1: !quantum.bit) {
-    // CHECK: qec.ppr ["Y", "X"](8)
-    // CHECK: qec.ppr ["Y", "X"](8)
-    %2:2 = qec.ppr ["Y", "X"](8) %q0, %q1: !quantum.bit, !quantum.bit
-    %3:2 = qec.ppr ["Y", "X"](8) %2#1, %2#0: !quantum.bit, !quantum.bit
+    // CHECK: pbc.ppr ["Y", "X"](8)
+    // CHECK: pbc.ppr ["Y", "X"](8)
+    %2:2 = pbc.ppr ["Y", "X"](8) %q0, %q1: !quantum.bit, !quantum.bit
+    %3:2 = pbc.ppr ["Y", "X"](8) %2#1, %2#0: !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -990,10 +990,10 @@ func.func public @dont_merge_permutations_qubits(%q0: !quantum.bit, %q1: !quantu
 
 // CHECK-LABEL: dont_merge_permutations_pauli
 func.func public @dont_merge_permutations_pauli(%q0: !quantum.bit, %q1: !quantum.bit) {
-    // CHECK: qec.ppr ["Z", "Y"](2)
-    // CHECK: qec.ppr ["Y", "Z"](2)
-    %2:2 = qec.ppr ["Z", "Y"](2) %q0, %q1: !quantum.bit, !quantum.bit
-    %3:2 = qec.ppr ["Y", "Z"](2) %2#0, %2#1: !quantum.bit, !quantum.bit
+    // CHECK: pbc.ppr ["Z", "Y"](2)
+    // CHECK: pbc.ppr ["Y", "Z"](2)
+    %2:2 = pbc.ppr ["Z", "Y"](2) %q0, %q1: !quantum.bit, !quantum.bit
+    %3:2 = pbc.ppr ["Y", "Z"](2) %2#0, %2#1: !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -1003,10 +1003,10 @@ func.func public @dont_merge_permutations_pauli(%q0: !quantum.bit, %q1: !quantum
 
 // CHECK-LABEL: permutation_results
 func.func public @permutation_results(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
-    // CHECK: [[result:%.+]]:3 = qec.ppr ["Z", "X", "Y"](2)
+    // CHECK: [[result:%.+]]:3 = pbc.ppr ["Z", "X", "Y"](2)
     // CHECK: return [[result]]#1, [[result]]#0, [[result]]#2
-    %0:3 = qec.ppr ["X", "Z", "Y"](4) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
-    %1:3 = qec.ppr ["Z", "X", "Y"](4) %0#1, %0#0, %0#2: !quantum.bit, !quantum.bit, !quantum.bit
+    %0:3 = pbc.ppr ["X", "Z", "Y"](4) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %1:3 = pbc.ppr ["Z", "X", "Y"](4) %0#1, %0#0, %0#2: !quantum.bit, !quantum.bit, !quantum.bit
     func.return %1#1, %1#0, %1#2: !quantum.bit, !quantum.bit, !quantum.bit
 }
 
@@ -1017,9 +1017,9 @@ func.func public @permutation_results(%q0: !quantum.bit, %q1: !quantum.bit, %q2:
 // CHECK-LABEL: permute_ignore_identity_parent_op
 func.func public @permute_ignore_identity_parent_op(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit, %q3: !quantum.bit) {
     // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit, [[q3:%.+]])
-    // CHECK: qec.ppr ["Z", "X"](2) [[q2]], [[q0]]
-    %0:3 = qec.ppr ["X", "I", "Z"](4) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
-    %1:3 = qec.ppr ["I", "Z", "X"](4) %q3, %0#2, %0#0: !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK: pbc.ppr ["Z", "X"](2) [[q2]], [[q0]]
+    %0:3 = pbc.ppr ["X", "I", "Z"](4) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %1:3 = pbc.ppr ["I", "Z", "X"](4) %q3, %0#2, %0#0: !quantum.bit, !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -1031,8 +1031,8 @@ func.func public @permute_ignore_identity_parent_op(%q0: !quantum.bit, %q1: !qua
 func.func public @pass_identity_qubits(%q0: !quantum.bit, %q1: !quantum.bit) -> !quantum.bit {
     // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit)
     // CHECK: return [[q0]]
-    %0:2 = qec.ppr ["I", "X"](4) %q0, %q1: !quantum.bit, !quantum.bit
-    %1:2 = qec.ppr ["X", "I"](4) %0#1, %0#0: !quantum.bit, !quantum.bit
+    %0:2 = pbc.ppr ["I", "X"](4) %q0, %q1: !quantum.bit, !quantum.bit
+    %1:2 = pbc.ppr ["X", "I"](4) %0#1, %0#0: !quantum.bit, !quantum.bit
     func.return %1#1: !quantum.bit
 }
 
@@ -1043,17 +1043,17 @@ func.func public @pass_identity_qubits(%q0: !quantum.bit, %q1: !quantum.bit) -> 
 // CHECK-LABEL: identity_agnostic_sizing
 func.func public @identity_agnostic_sizing(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) {
     // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit)
-    // CHECK: qec.ppr ["Y", "Z"](4) [[q2]], [[q0]]
-    %0:3 = qec.ppr ["Z", "I", "Y"](8) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
-    %1:2 = qec.ppr ["Y", "Z"](8) %0#2, %0#0: !quantum.bit, !quantum.bit
+    // CHECK: pbc.ppr ["Y", "Z"](4) [[q2]], [[q0]]
+    %0:3 = pbc.ppr ["Z", "I", "Y"](8) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %1:2 = pbc.ppr ["Y", "Z"](8) %0#2, %0#0: !quantum.bit, !quantum.bit
     func.return
 }
 
 func.func public @dont_merge_superset(%q0: !quantum.bit, %q1: !quantum.bit) {
-    // CHECK: qec.ppr ["X", "Y"](4)
-    // CHECK: qec.ppr ["X"](4)
-    %0:2 = qec.ppr ["X", "Y"](4) %q0, %q1 : !quantum.bit, !quantum.bit
-    %1 = qec.ppr ["X"](4) %0#0 : !quantum.bit
+    // CHECK: pbc.ppr ["X", "Y"](4)
+    // CHECK: pbc.ppr ["X"](4)
+    %0:2 = pbc.ppr ["X", "Y"](4) %q0, %q1 : !quantum.bit, !quantum.bit
+    %1 = pbc.ppr ["X"](4) %0#0 : !quantum.bit
 
     func.return
 }
@@ -1066,9 +1066,9 @@ func.func public @dont_merge_superset(%q0: !quantum.bit, %q1: !quantum.bit) {
 // CHECK-LABEL: merge_Y
 func.func public @merge_Y(%q0: !quantum.bit, %0: f64, %1: f64) {
     // CHECK: [[angle:%.+]] = arith.addf
-    // CHECK: qec.ppr.arbitrary ["Y"]([[angle]])
-    %2 = qec.ppr.arbitrary ["Y"](%0) %q0: !quantum.bit
-    %3 = qec.ppr.arbitrary ["Y"](%1) %2: !quantum.bit
+    // CHECK: pbc.ppr.arbitrary ["Y"]([[angle]])
+    %2 = pbc.ppr.arbitrary ["Y"](%0) %q0: !quantum.bit
+    %3 = pbc.ppr.arbitrary ["Y"](%1) %2: !quantum.bit
     func.return
 }
 
@@ -1080,11 +1080,11 @@ func.func public @merge_Y(%q0: !quantum.bit, %0: f64, %1: f64) {
 func.func public @merge_multi_Z(%q0: !quantum.bit, %0: f64, %1: f64, %2: f64) {
     // CHECK: [[angle:%.+]] = arith.addf
     // CHECK: [[angle2:%.+]] = arith.addf
-    // CHECK: qec.ppr.arbitrary ["Z"]([[angle2]])
-    // CHECK-NOT: qec.ppr.arbitrary
-    %3 = qec.ppr.arbitrary ["Z"](%0) %q0: !quantum.bit
-    %4 = qec.ppr.arbitrary ["Z"](%1) %3: !quantum.bit
-    %5 = qec.ppr.arbitrary ["Z"](%2) %4: !quantum.bit
+    // CHECK: pbc.ppr.arbitrary ["Z"]([[angle2]])
+    // CHECK-NOT: pbc.ppr.arbitrary
+    %3 = pbc.ppr.arbitrary ["Z"](%0) %q0: !quantum.bit
+    %4 = pbc.ppr.arbitrary ["Z"](%1) %3: !quantum.bit
+    %5 = pbc.ppr.arbitrary ["Z"](%2) %4: !quantum.bit
     func.return
 }
 
@@ -1095,18 +1095,18 @@ func.func public @merge_multi_Z(%q0: !quantum.bit, %0: f64, %1: f64, %2: f64) {
 // CHECK-LABEL: dont_merge
 func.func public @dont_merge(%q0: !quantum.bit, %q1: !quantum.bit, %0: f64, %1: f64, %2: f64, %3: f64, %4: f64, %5: f64) {
     // CHECK-NOT: arith.addf
-    // CHECK: qec.ppr.arbitrary ["Z", "X"]
-    // CHECK: qec.ppr.arbitrary ["Y", "X"]
-    // CHECK: qec.ppr.arbitrary ["Y", "Z"]
-    // CHECK: qec.ppr.arbitrary ["X", "Z"]
-    // CHECK: qec.ppr.arbitrary ["X", "Y"]
-    // CHECK: qec.ppr.arbitrary ["Z", "Y"]
-    %6:2 = qec.ppr.arbitrary ["Z", "X"](%0) %q0, %q1: !quantum.bit, !quantum.bit
-    %7:2 = qec.ppr.arbitrary ["Y", "X"](%1) %6#0, %6#1: !quantum.bit, !quantum.bit
-    %8:2 = qec.ppr.arbitrary ["Y", "Z"](%2) %7#0, %7#1: !quantum.bit, !quantum.bit
-    %9:2 = qec.ppr.arbitrary ["X", "Z"](%3) %8#0, %8#1: !quantum.bit, !quantum.bit
-    %10:2 = qec.ppr.arbitrary ["X", "Y"](%4) %9#0, %9#1: !quantum.bit, !quantum.bit
-    %11:2 = qec.ppr.arbitrary ["Z", "Y"](%5) %10#0, %10#1: !quantum.bit, !quantum.bit
+    // CHECK: pbc.ppr.arbitrary ["Z", "X"]
+    // CHECK: pbc.ppr.arbitrary ["Y", "X"]
+    // CHECK: pbc.ppr.arbitrary ["Y", "Z"]
+    // CHECK: pbc.ppr.arbitrary ["X", "Z"]
+    // CHECK: pbc.ppr.arbitrary ["X", "Y"]
+    // CHECK: pbc.ppr.arbitrary ["Z", "Y"]
+    %6:2 = pbc.ppr.arbitrary ["Z", "X"](%0) %q0, %q1: !quantum.bit, !quantum.bit
+    %7:2 = pbc.ppr.arbitrary ["Y", "X"](%1) %6#0, %6#1: !quantum.bit, !quantum.bit
+    %8:2 = pbc.ppr.arbitrary ["Y", "Z"](%2) %7#0, %7#1: !quantum.bit, !quantum.bit
+    %9:2 = pbc.ppr.arbitrary ["X", "Z"](%3) %8#0, %8#1: !quantum.bit, !quantum.bit
+    %10:2 = pbc.ppr.arbitrary ["X", "Y"](%4) %9#0, %9#1: !quantum.bit, !quantum.bit
+    %11:2 = pbc.ppr.arbitrary ["Z", "Y"](%5) %10#0, %10#1: !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -1117,13 +1117,13 @@ func.func public @dont_merge(%q0: !quantum.bit, %q1: !quantum.bit, %0: f64, %1: 
 // CHECK-LABEL: merge_correct_references
 func.func public @merge_correct_references(%q0: !quantum.bit, %0: f64, %1: f64, %2: f64, %3: f64) {
     // CHECK-DAG: [[angle:%.+]] = arith.addf
-    // CHECK-DAG: [[in:%.+]] = qec.ppr.arbitrary ["X"]
-    // CHECK: [[out:%.+]] = qec.ppr.arbitrary ["Z"]([[angle]]) [[in]]
-    // CHECK: qec.ppr.arbitrary ["Y"]({{%.+}}) [[out]]
-    %4 = qec.ppr.arbitrary ["X"](%0) %q0: !quantum.bit
-    %5 = qec.ppr.arbitrary ["Z"](%1) %4: !quantum.bit
-    %6 = qec.ppr.arbitrary ["Z"](%2) %5: !quantum.bit
-    %7 = qec.ppr.arbitrary ["Y"](%3) %6: !quantum.bit
+    // CHECK-DAG: [[in:%.+]] = pbc.ppr.arbitrary ["X"]
+    // CHECK: [[out:%.+]] = pbc.ppr.arbitrary ["Z"]([[angle]]) [[in]]
+    // CHECK: pbc.ppr.arbitrary ["Y"]({{%.+}}) [[out]]
+    %4 = pbc.ppr.arbitrary ["X"](%0) %q0: !quantum.bit
+    %5 = pbc.ppr.arbitrary ["Z"](%1) %4: !quantum.bit
+    %6 = pbc.ppr.arbitrary ["Z"](%2) %5: !quantum.bit
+    %7 = pbc.ppr.arbitrary ["Y"](%3) %6: !quantum.bit
     func.return
 }
 
@@ -1135,10 +1135,10 @@ func.func public @merge_correct_references(%q0: !quantum.bit, %0: f64, %1: f64, 
 func.func public @merge_multi_XZY(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit, %0: f64, %1: f64, %2: f64) {
     // CHECK: [[angle1:%.+]] = arith.addf
     // CHECK: [[angle2:%.+]] = arith.addf
-    // CHECK: qec.ppr.arbitrary ["X", "Z", "Y"]([[angle2]])
-    %3:3 = qec.ppr.arbitrary ["X", "Z", "Y"](%0) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
-    %4:3 = qec.ppr.arbitrary ["X", "Z", "Y"](%1) %3#0, %3#1, %3#2: !quantum.bit, !quantum.bit, !quantum.bit
-    %5:3 = qec.ppr.arbitrary ["X", "Z", "Y"](%2) %4#0, %4#1, %4#2: !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK: pbc.ppr.arbitrary ["X", "Z", "Y"]([[angle2]])
+    %3:3 = pbc.ppr.arbitrary ["X", "Z", "Y"](%0) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %4:3 = pbc.ppr.arbitrary ["X", "Z", "Y"](%1) %3#0, %3#1, %3#2: !quantum.bit, !quantum.bit, !quantum.bit
+    %5:3 = pbc.ppr.arbitrary ["X", "Z", "Y"](%2) %4#0, %4#1, %4#2: !quantum.bit, !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -1150,10 +1150,10 @@ func.func public @merge_multi_XZY(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !qu
 func.func public @merge_through(%q0: !quantum.bit, %q1: !quantum.bit, %0: f64, %1: f64) -> !quantum.bit {
     // CHECK-DAG: [[angle:%.+]] = arith.addf
     // CHECK-DAG: quantum.custom
-    // CHECK-DAG: qec.ppr.arbitrary ["X"]([[angle]])
-    %2 = qec.ppr.arbitrary ["X"](%0) %q0: !quantum.bit
+    // CHECK-DAG: pbc.ppr.arbitrary ["X"]([[angle]])
+    %2 = pbc.ppr.arbitrary ["X"](%0) %q0: !quantum.bit
     %3 = quantum.custom "Hadamard"() %q1: !quantum.bit
-    %4 = qec.ppr.arbitrary ["X"](%1) %2: !quantum.bit
+    %4 = pbc.ppr.arbitrary ["X"](%1) %2: !quantum.bit
     func.return %3: !quantum.bit
 }
 
@@ -1164,12 +1164,12 @@ func.func public @merge_through(%q0: !quantum.bit, %q1: !quantum.bit, %0: f64, %
 // CHECK-LABEL: mixed_operations
 func.func public @mixed_operations(%q0: !quantum.bit, %q1: !quantum.bit, %0: f64, %1: f64) {
     // CHECK-NOT: arith.addf
-    // CHECK: qec.ppr.arbitrary ["Z", "X"]
+    // CHECK: pbc.ppr.arbitrary ["Z", "X"]
     // CHECK: quantum.custom
-    // CHECK: qec.ppr.arbitrary ["Z", "X"]
-    %2:2 = qec.ppr.arbitrary ["Z", "X"](%0) %q0, %q1: !quantum.bit, !quantum.bit
+    // CHECK: pbc.ppr.arbitrary ["Z", "X"]
+    %2:2 = pbc.ppr.arbitrary ["Z", "X"](%0) %q0, %q1: !quantum.bit, !quantum.bit
     %3 = quantum.custom "Hadamard"() %2#1: !quantum.bit
-    %5:2 = qec.ppr.arbitrary ["Z", "X"](%1) %2#0, %3: !quantum.bit, !quantum.bit
+    %5:2 = pbc.ppr.arbitrary ["Z", "X"](%1) %2#0, %3: !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -1179,9 +1179,9 @@ func.func public @mixed_operations(%q0: !quantum.bit, %q1: !quantum.bit, %0: f64
 
 // CHECK-LABEL: half_compatible_qubits
 func.func public @half_compatible_qubits(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit, %0: f64, %1: f64) {
-    // CHECK: qec.ppr.arbitrary ["X", "Z"]
-    %2:2 = qec.ppr.arbitrary ["X", "Z"](%0) %q0, %q1: !quantum.bit, !quantum.bit
-    %3:2 = qec.ppr.arbitrary ["X", "Z"](%1) %q2, %2#1 : !quantum.bit, !quantum.bit
+    // CHECK: pbc.ppr.arbitrary ["X", "Z"]
+    %2:2 = pbc.ppr.arbitrary ["X", "Z"](%0) %q0, %q1: !quantum.bit, !quantum.bit
+    %3:2 = pbc.ppr.arbitrary ["X", "Z"](%1) %q2, %2#1 : !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -1192,9 +1192,9 @@ func.func public @half_compatible_qubits(%q0: !quantum.bit, %q1: !quantum.bit, %
 // CHECK-LABEL: merge_permutations
 func.func public @merge_permutations(%z0: !quantum.bit, %y0: !quantum.bit, %0: f64, %1: f64) {
     // CHECK-DAG: [[angle:%.+]] = arith.addf
-    // CHECK: qec.ppr.arbitrary ["Y", "Z"]([[angle]]) %arg1, %arg0
-    %z1, %y1 = qec.ppr.arbitrary ["Z", "Y"](%0) %z0, %y0: !quantum.bit, !quantum.bit
-    %y2, %z2 = qec.ppr.arbitrary ["Y", "Z"](%1) %y1, %z1: !quantum.bit, !quantum.bit
+    // CHECK: pbc.ppr.arbitrary ["Y", "Z"]([[angle]]) %arg1, %arg0
+    %z1, %y1 = pbc.ppr.arbitrary ["Z", "Y"](%0) %z0, %y0: !quantum.bit, !quantum.bit
+    %y2, %z2 = pbc.ppr.arbitrary ["Y", "Z"](%1) %y1, %z1: !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -1205,9 +1205,9 @@ func.func public @merge_permutations(%z0: !quantum.bit, %y0: !quantum.bit, %0: f
 // CHECK-LABEL: merge_permutations_with_duplicates
 func.func public @merge_permutations_with_duplicates(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit, %0: f64, %1: f64) {
     // CHECK: [[angle:%.+]] = arith.addf
-    // CHECK: qec.ppr.arbitrary ["Y", "X", "X"]([[angle]]) %arg1, %arg2, %arg0
-    %3:3 = qec.ppr.arbitrary ["X", "Y", "X"](%0) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
-    %4:3 = qec.ppr.arbitrary ["Y", "X", "X"](%1) %3#1, %3#2, %3#0: !quantum.bit, !quantum.bit, !quantum.bit
+    // CHECK: pbc.ppr.arbitrary ["Y", "X", "X"]([[angle]]) %arg1, %arg2, %arg0
+    %3:3 = pbc.ppr.arbitrary ["X", "Y", "X"](%0) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %4:3 = pbc.ppr.arbitrary ["Y", "X", "X"](%1) %3#1, %3#2, %3#0: !quantum.bit, !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -1217,10 +1217,10 @@ func.func public @merge_permutations_with_duplicates(%q0: !quantum.bit, %q1: !qu
 
 // CHECK-LABEL: dont_merge_permutations_qubits
 func.func public @dont_merge_permutations_qubits(%q0: !quantum.bit, %q1: !quantum.bit, %0: f64, %1: f64) {
-    // CHECK: qec.ppr.arbitrary ["Y", "X"]
-    // CHECK: qec.ppr.arbitrary ["Y", "X"]
-    %2:2 = qec.ppr.arbitrary ["Y", "X"](%0) %q0, %q1: !quantum.bit, !quantum.bit
-    %3:2 = qec.ppr.arbitrary ["Y", "X"](%1) %2#1, %2#0: !quantum.bit, !quantum.bit
+    // CHECK: pbc.ppr.arbitrary ["Y", "X"]
+    // CHECK: pbc.ppr.arbitrary ["Y", "X"]
+    %2:2 = pbc.ppr.arbitrary ["Y", "X"](%0) %q0, %q1: !quantum.bit, !quantum.bit
+    %3:2 = pbc.ppr.arbitrary ["Y", "X"](%1) %2#1, %2#0: !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -1230,10 +1230,10 @@ func.func public @dont_merge_permutations_qubits(%q0: !quantum.bit, %q1: !quantu
 
 // CHECK-LABEL: dont_merge_permutations_pauli
 func.func public @dont_merge_permutations_pauli(%q0: !quantum.bit, %q1: !quantum.bit, %0: f64, %1: f64) {
-    // CHECK: qec.ppr.arbitrary ["Z", "Y"]
-    // CHECK: qec.ppr.arbitrary ["Y", "Z"]
-    %2:2 = qec.ppr.arbitrary ["Z", "Y"](%0) %q0, %q1: !quantum.bit, !quantum.bit
-    %3:2 = qec.ppr.arbitrary ["Y", "Z"](%1) %2#0, %2#1: !quantum.bit, !quantum.bit
+    // CHECK: pbc.ppr.arbitrary ["Z", "Y"]
+    // CHECK: pbc.ppr.arbitrary ["Y", "Z"]
+    %2:2 = pbc.ppr.arbitrary ["Z", "Y"](%0) %q0, %q1: !quantum.bit, !quantum.bit
+    %3:2 = pbc.ppr.arbitrary ["Y", "Z"](%1) %2#0, %2#1: !quantum.bit, !quantum.bit
     return
 }
 
@@ -1245,11 +1245,11 @@ func.func public @dont_merge_permutations_pauli(%q0: !quantum.bit, %q1: !quantum
 func.func public @permute_ignore_identity(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) {
     // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit)
     // CHECK: [[angle:%.+]] = arith.constant 5.0
-    // CHECK: qec.ppr.arbitrary ["Z", "X"]([[angle]]) [[q2]], [[q0]]
+    // CHECK: pbc.ppr.arbitrary ["Z", "X"]([[angle]]) [[q2]], [[q0]]
     %0 = arith.constant 0.8 : f64
     %1 = arith.constant 4.2 : f64
-    %2:3 = qec.ppr.arbitrary ["X", "I", "Z"](%0) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
-    %3:3 = qec.ppr.arbitrary ["I", "Z", "X"](%1) %2#1, %2#2, %2#0: !quantum.bit, !quantum.bit, !quantum.bit
+    %2:3 = pbc.ppr.arbitrary ["X", "I", "Z"](%0) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %3:3 = pbc.ppr.arbitrary ["I", "Z", "X"](%1) %2#1, %2#2, %2#0: !quantum.bit, !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -1261,11 +1261,11 @@ func.func public @permute_ignore_identity(%q0: !quantum.bit, %q1: !quantum.bit, 
 func.func public @identity_agnostic_sizing(%q0: !quantum.bit, %q1: !quantum.bit, %q2: !quantum.bit) {
     // CHECK: ([[q0:%.+]]: !quantum.bit, [[q1:%.+]]: !quantum.bit, [[q2:%.+]]: !quantum.bit)
     // CHECK: [[angle:%.+]] = arith.constant
-    // CHECK: qec.ppr.arbitrary ["Y", "Z"]([[angle]]) [[q2]], [[q0]]
+    // CHECK: pbc.ppr.arbitrary ["Y", "Z"]([[angle]]) [[q2]], [[q0]]
     %0 = arith.constant 0.2 : f64    
     %1 = arith.constant 0.7 : f64
-    %2:3 = qec.ppr.arbitrary ["Z", "I", "Y"](%0) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
-    %3:2 = qec.ppr.arbitrary ["Y", "Z"](%1) %2#2, %2#0: !quantum.bit, !quantum.bit
+    %2:3 = pbc.ppr.arbitrary ["Z", "I", "Y"](%0) %q0, %q1, %q2: !quantum.bit, !quantum.bit, !quantum.bit
+    %3:2 = pbc.ppr.arbitrary ["Y", "Z"](%1) %2#2, %2#0: !quantum.bit, !quantum.bit
     func.return
 }
 
@@ -1276,9 +1276,9 @@ func.func public @identity_agnostic_sizing(%q0: !quantum.bit, %q1: !quantum.bit,
 // CHECK-LABEL: merge_condition
 func.func public @merge_condition(%q0: !quantum.bit, %0: f64, %1: f64, %b0: i1) {
     // CHECK: [[angle:%.+]] = arith.addf
-    // CHECK: qec.ppr.arbitrary ["X"]([[angle]]) {{%.+}} cond({{%.+}})
-    %2 = qec.ppr.arbitrary ["X"](%0) %q0 cond(%b0): !quantum.bit
-    %3 = qec.ppr.arbitrary ["X"](%1) %2 cond(%b0): !quantum.bit
+    // CHECK: pbc.ppr.arbitrary ["X"]([[angle]]) {{%.+}} cond({{%.+}})
+    %2 = pbc.ppr.arbitrary ["X"](%0) %q0 cond(%b0): !quantum.bit
+    %3 = pbc.ppr.arbitrary ["X"](%1) %2 cond(%b0): !quantum.bit
     func.return
 }
 
@@ -1288,10 +1288,10 @@ func.func public @merge_condition(%q0: !quantum.bit, %0: f64, %1: f64, %b0: i1) 
 
 // CHECK-LABEL: dont_merge_condition
 func.func public @dont_merge_condition(%q0: !quantum.bit, %0: f64, %1: f64, %b0: i1, %b1: i1) {
-    // CHECK: [[in:%.+]] = qec.ppr.arbitrary ["X"]({{%.+}}) {{%.+}} cond({{%.+}})
-    // CHECK: qec.ppr.arbitrary ["X"]({{%.+}}) [[in]] cond({{%.+}})
-    %2 = qec.ppr.arbitrary ["X"](%0) %q0 cond(%b0): !quantum.bit
-    %3 = qec.ppr.arbitrary ["X"](%1) %2 cond(%b1): !quantum.bit
+    // CHECK: [[in:%.+]] = pbc.ppr.arbitrary ["X"]({{%.+}}) {{%.+}} cond({{%.+}})
+    // CHECK: pbc.ppr.arbitrary ["X"]({{%.+}}) [[in]] cond({{%.+}})
+    %2 = pbc.ppr.arbitrary ["X"](%0) %q0 cond(%b0): !quantum.bit
+    %3 = pbc.ppr.arbitrary ["X"](%1) %2 cond(%b1): !quantum.bit
     func.return
 }
 
@@ -1301,10 +1301,10 @@ func.func public @dont_merge_condition(%q0: !quantum.bit, %0: f64, %1: f64, %b0:
 
 // CHECK-LABEL: dont_merge_mixed
 func.func public @dont_merge_mixed(%q0: !quantum.bit, %0: f64, %1: f64, %b0: i1) {
-    // CHECK: [[in:%.+]] = qec.ppr.arbitrary ["X"]({{%.+}}) {{%.+}} cond({{%.+}})
-    // CHECK: qec.ppr.arbitrary ["X"]({{%.+}}) [[in]]
-    %2 = qec.ppr.arbitrary ["X"](%0) %q0 cond(%b0): !quantum.bit
-    %3 = qec.ppr.arbitrary ["X"](%1) %2: !quantum.bit
+    // CHECK: [[in:%.+]] = pbc.ppr.arbitrary ["X"]({{%.+}}) {{%.+}} cond({{%.+}})
+    // CHECK: pbc.ppr.arbitrary ["X"]({{%.+}}) [[in]]
+    %2 = pbc.ppr.arbitrary ["X"](%0) %q0 cond(%b0): !quantum.bit
+    %3 = pbc.ppr.arbitrary ["X"](%1) %2: !quantum.bit
     func.return
 }
 
@@ -1315,11 +1315,11 @@ func.func public @dont_merge_mixed(%q0: !quantum.bit, %0: f64, %1: f64, %b0: i1)
 // CHECK-LABEL: merge_const_angles
 func.func public @merge_const_angles(%q0: !quantum.bit) {
     // CHECK: [[newAngle:%.+]] = arith.constant 2.000000e+00 : f64
-    // CHECK: qec.ppr.arbitrary ["Y"]([[newAngle]])
+    // CHECK: pbc.ppr.arbitrary ["Y"]([[newAngle]])
     %0 = arith.constant 0.420000e+00 : f64
     %1 = arith.constant 1.580000e+00 : f64
-    %2 = qec.ppr.arbitrary ["Y"](%0) %q0: !quantum.bit
-    %3 = qec.ppr.arbitrary ["Y"](%1) %2: !quantum.bit
+    %2 = pbc.ppr.arbitrary ["Y"](%0) %q0: !quantum.bit
+    %3 = pbc.ppr.arbitrary ["Y"](%1) %2: !quantum.bit
     func.return
 }
 
@@ -1330,10 +1330,10 @@ func.func public @merge_const_angles(%q0: !quantum.bit) {
 // CHECK-LABEL: merge_const_var
 func.func public @merge_const_var(%q0: !quantum.bit, %0: f64) {
     // CHECK: [[newAngle:%.+]] = arith.addf
-    // CHECK: qec.ppr.arbitrary ["Z"]([[newAngle]])
+    // CHECK: pbc.ppr.arbitrary ["Z"]([[newAngle]])
     %1 = arith.constant 0.000420e+00 : f64
-    %2 = qec.ppr.arbitrary ["Z"](%0) %q0: !quantum.bit
-    %3 = qec.ppr.arbitrary ["Z"](%1) %2: !quantum.bit
+    %2 = pbc.ppr.arbitrary ["Z"](%0) %q0: !quantum.bit
+    %3 = pbc.ppr.arbitrary ["Z"](%1) %2: !quantum.bit
     func.return
 }
 

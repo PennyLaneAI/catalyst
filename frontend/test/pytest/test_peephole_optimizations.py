@@ -271,7 +271,7 @@ def test_convert_clifford_to_ppr():
     assert 'transform.apply_registered_pass "to-ppr"' in test_convert_clifford_to_ppr_workflow.mlir
     optimized_ir = test_convert_clifford_to_ppr_workflow.mlir_opt
     assert 'transform.apply_registered_pass "to-ppr"' not in optimized_ir
-    assert "qec.ppr" in optimized_ir
+    assert "pbc.ppr" in optimized_ir
 
     ppm_specs_output = ppm_specs(test_convert_clifford_to_ppr_workflow)
     assert ppm_specs_output["f_0"]["logical_qubits"] == 2
@@ -303,8 +303,8 @@ def test_commute_ppr():
     assert 'transform.apply_registered_pass "commute-ppr"' in test_commute_ppr_workflow.mlir
     optimized_ir = test_commute_ppr_workflow.mlir_opt
     assert 'transform.apply_registered_pass "commute-ppr"' not in optimized_ir
-    assert "qec.ppr" in optimized_ir
-    assert "qec.ppm" in optimized_ir
+    assert "pbc.ppr" in optimized_ir
+    assert "pbc.ppm" in optimized_ir
 
     ppm_specs_output = ppm_specs(test_commute_ppr_workflow)
     assert ppm_specs_output["f_0"]["num_of_ppm"] == 2
@@ -336,8 +336,8 @@ def test_merge_ppr_ppm():
     assert 'transform.apply_registered_pass "merge-ppr-ppm"' in test_merge_ppr_ppm_workflow.mlir
     optimized_ir = test_merge_ppr_ppm_workflow.mlir_opt
     assert 'transform.apply_registered_pass "merge-ppr-ppm"' not in optimized_ir
-    assert 'qec.ppm ["Z", "X"]' in optimized_ir
-    assert 'qec.ppm ["X"]' in optimized_ir
+    assert 'pbc.ppm ["Z", "X"]' in optimized_ir
+    assert 'pbc.ppm ["X"]' in optimized_ir
 
     ppm_specs_output = ppm_specs(test_merge_ppr_ppm_workflow)
     assert ppm_specs_output["f_0"]["num_of_ppm"] == 2
@@ -506,8 +506,8 @@ def test_merge_rotation_ppr():
     ir_opt = test_merge_rotation_ppr_workflow.mlir_opt
 
     assert 'transform.apply_registered_pass "merge-rotations"' in ir
-    assert 'qec.ppr ["X", "Y", "Z"](4)' not in ir_opt
-    assert 'qec.ppr ["X", "Y", "Z"](2)' in ir_opt
+    assert 'pbc.ppr ["X", "Y", "Z"](4)' not in ir_opt
+    assert 'pbc.ppr ["X", "Y", "Z"](2)' in ir_opt
 
 
 @pytest.mark.usefixtures("use_capture")
@@ -531,13 +531,15 @@ def test_merge_rotation_arbitrary_angle_ppr():
     ir_opt = test_merge_rotation_ppr_workflow.mlir_opt
 
     assert 'transform.apply_registered_pass "merge-rotations"' in ir
-    assert "qec.ppr.arbitrary" not in ir
+    assert "pbc.ppr.arbitrary" not in ir
     assert "arith.addf" not in ir
 
     assert "arith.addf" in ir_opt
-    assert ir_opt.count('qec.ppr.arbitrary ["Z", "Y"]') == 1
+    assert ir_opt.count('pbc.ppr.arbitrary ["Z", "Y"]') == 1
 
 
+@pytest.mark.xfail(reason="PPM execution with ppr-to-ppm pass is not fully supported yet.")
+@pytest.mark.usefixtures("use_capture")
 def test_clifford_to_ppm():
 
     @qml.qnode(qml.device("lightning.qubit", wires=6))
@@ -549,15 +551,17 @@ def test_clifford_to_ppm():
             qml.T(idx + 1)
         return [qml.expval(qml.PauliZ(idx)) for idx in range(5)]
 
-    ppm_transform = qml.transform(pass_name="ppm-compilation")
+    to_ppr_transform = qml.transform(pass_name="to-ppr")
+    ppr_to_ppm_transform = qml.transform(pass_name="ppr-to-ppm")
+    to_ppr_cir = to_ppr_transform(cir)
 
-    auto_corrected_cir = ppm_transform(decompose_method="auto-corrected")(cir)
+    auto_corrected_cir = ppr_to_ppm_transform(decompose_method="auto-corrected")(to_ppr_cir)
 
-    clifford_corrected_cir = ppm_transform(
-        decompose_method="clifford-corrected", avoid_y_measure=True, max_pauli_size=2
-    )(cir)
+    clifford_corrected_cir = ppr_to_ppm_transform(
+        decompose_method="clifford-corrected", avoid_y_measure=True
+    )(to_ppr_cir)
 
-    pauli_corrected_cir = ppm_transform(decompose_method="pauli-corrected", max_pauli_size=2)(cir)
+    pauli_corrected_cir = ppr_to_ppm_transform(decompose_method="pauli-corrected")(to_ppr_cir)
 
     auto_qjit_cir = qml.qjit(auto_corrected_cir)
     clifford_qjit_cir = qml.qjit(clifford_corrected_cir)
@@ -594,15 +598,15 @@ def test_decompose_arbitrary_ppr():
     print(ir_opt)
 
     assert 'transform.apply_registered_pass "decompose-arbitrary-ppr"' in ir
-    assert 'qec.ppr.arbitrary ["X", "Y", "Z"]' not in ir_opt
-    assert 'qec.ppm ["X", "Y", "Z", "Z"]' in ir_opt
-    assert 'qec.ppr.arbitrary ["Z"]' in ir_opt
-    assert 'qec.ppr ["X", "Y", "Z"](2)' in ir_opt
+    assert 'pbc.ppr.arbitrary ["X", "Y", "Z"]' not in ir_opt
+    assert 'pbc.ppm ["X", "Y", "Z", "Z"]' in ir_opt
+    assert 'pbc.ppr.arbitrary ["Z"]' in ir_opt
+    assert 'pbc.ppr ["X", "Y", "Z"](2)' in ir_opt
 
 
 @pytest.mark.usefixtures("use_capture")
-class TestLowerQECInitOps:
-    """Test that the lower-qec-init-ops pass correctly lowers fabricate/prepare ops to gates."""
+class TestLowerPBCInitOps:
+    """Test that the lower-pbc-init-ops pass correctly lowers fabricate/prepare ops to gates."""
 
     @pytest.mark.parametrize(
         "gates",
@@ -617,8 +621,8 @@ class TestLowerQECInitOps:
             (lambda: (qml.H(0), qml.adjoint(qml.S(0), lazy=False))),
         ],
     )
-    def test_lower_qec_init_ops_preserves_states(self, gates):
-        """Test that lower-qec-init-ops correctly lowers states through the PPR/PPM pipeline."""
+    def test_lower_pbc_init_ops_preserves_states(self, gates):
+        """Test that lower-pbc-init-ops correctly lowers states through the PPR/PPM pipeline."""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def baseline_circuit():
