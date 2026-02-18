@@ -42,12 +42,15 @@ private:
     // In a real compiler, we might interpret AllocOp to know the array name.
     // For this task, we assume simple mapping or pass-through.
     DenseMap<Value, std::string> qubitMap;
+    // Map SSA values to OpenQASM classical bits (e.g. "c[0]")
+    DenseMap<Value, std::string> bitMap;
 
     LogicalResult emitOperation(Operation *op) {
         return TypeSwitch<Operation *, LogicalResult>(op)
             .Case<ModuleOp>([&](ModuleOp op) { return emitModule(op); })
             .Case<func::FuncOp>([&](func::FuncOp op) { return emitFunction(op); })
             .Case<scf::ForOp>([&](scf::ForOp op) { return emitForLoop(op); })
+            .Case<scf::IfOp>([&](scf::IfOp op) { return emitIf(op); })
             .Case<CustomOp>([&](CustomOp op) { return emitCustomGate(op); })
             // Add other quantum ops like Alloc, Measure here
             .Case<AllocOp>([&](AllocOp op) { return emitAlloc(op); })
@@ -134,6 +137,34 @@ private:
         return success();
     }
 
+    LogicalResult emitIf(scf::IfOp op) {
+        Value cond = op.getCondition();
+        std::string condName = "unknown_cond";
+        if (bitMap.count(cond)) {
+            condName = bitMap[cond];
+        }
+
+        os << "if (" << condName << " == 1) {\n";
+        
+        for (Operation &innerOp : op.getThenRegion().front()) {
+            if (failed(emitOperation(&innerOp))) return failure();
+        }
+        os << "}";
+        
+        if (!op.getElseRegion().empty()) {
+            // Check if else block is effectively empty (just yield)
+            // But we can just print it.
+            os << " else {\n";
+            for (Operation &innerOp : op.getElseRegion().front()) {
+                if (failed(emitOperation(&innerOp))) return failure();
+            }
+            os << "}";
+        }
+        os << "\n";
+        
+        return success();
+    }
+
     LogicalResult emitAlloc(AllocOp op) {
         // quantum.alloc(n) -> qreg q[n];
         // We need to name it.
@@ -180,7 +211,33 @@ private:
 
     LogicalResult emitCustomGate(CustomOp op) {
         // quantum.custom "name" (q1, q2)
-        os << op.getGateName() << " ";
+        // or quantum.custom "name"(p1) (q1)
+        os << op.getGateName();
+        
+        auto params = op.getParams();
+        if (!params.empty()) {
+            os << "(";
+            for (size_t i = 0; i < params.size(); ++i) {
+                 Value p = params[i];
+                 // Try to resolve constant
+                 if (auto cOp = p.getDefiningOp<arith::ConstantOp>()) {
+                     if (auto floatAttr = dyn_cast<FloatAttr>(cOp.getValue())) {
+                         os << floatAttr.getValueAsDouble();
+                     } else if (auto intAttr = dyn_cast<IntegerAttr>(cOp.getValue())) {
+                         os << intAttr.getInt();
+                     } else {
+                         os << "unknown_param";
+                     }
+                 } else {
+                     os << "unknown_param";
+                 }
+                 
+                 if (i < params.size() - 1) os << ", ";
+            }
+            os << ")";
+        }
+        
+        os << " ";
         
         auto operands = op.getInQubits();
         for (size_t i = 0; i < operands.size(); ++i) {
@@ -231,8 +288,8 @@ private:
         // In Catalyst, measure returns the qubit state as well.
         qubitMap[op.getOutQubit()] = qName;
         
-        // We might want to map the result bit too?
-        // But for QASM generation, we just need to emit the statement.
+        // Map the result bit
+        bitMap[op.getResult(0)] = cName;
         
         return success();
     }

@@ -6,7 +6,7 @@ import qiskit
 try:
     # Use standard MLIR package
     from mlir.dialects import scf, func, arith
-    from mlir.ir import Context, Module, Location, InsertionPoint, StringAttr, SymbolTable, Type, IntegerType, IndexType, IntegerAttr, Operation, DenseI32ArrayAttr
+    from mlir.ir import Context, Module, Location, InsertionPoint, StringAttr, SymbolTable, Type, IntegerType, IndexType, IntegerAttr, FloatAttr, Operation, DenseI32ArrayAttr
 except ImportError:
     # Error out if mlir not found
     raise ImportError("Could not import mlir package. Ensure PYTHONPATH includes mlir_core.")
@@ -29,6 +29,7 @@ class QiskitToCatalystImporter:
         
         self.module = Module.create(Location.unknown(self.ctx))
         self.qubit_map = {} # Maps qiskit.Qubit -> ir.Value
+        self.clbit_map = {} # Maps qiskit.Clbit -> ir.Value (i1)
         self.global_qubit_reg = None
 
     def _emit_quantum_op(self, name, operands, result_types, loc, attrs=None):
@@ -83,18 +84,22 @@ class QiskitToCatalystImporter:
             elif op.name == "for_loop":
                 self._emit_for_loop(op, qubits, loc)
             elif op.name == "measure":
-                self._emit_measure(qubits, loc)
+                self._emit_measure(qubits, instruction.clbits, loc)
+            elif op.name == "if_else":
+                self._emit_if_else(op, qubits, instruction.clbits, loc)
             else:
                  self._emit_gate(op.name, qubits, op.params, loc)
 
-    def _emit_measure(self, qubits, loc):
-        for q in qubits:
+    def _emit_measure(self, qubits, clbits, loc):
+        for i, q in enumerate(qubits):
             val_in = self.qubit_map[q]
             bit_type = Type.parse("!quantum.bit", context=self.ctx)
             i1_type = IntegerType.get_signless(1, self.ctx)
             
             op = self._emit_quantum_op("quantum.measure", [val_in], [i1_type, bit_type], loc)
             self.qubit_map[q] = op.results[1]
+            if i < len(clbits):
+                self.clbit_map[clbits[i]] = op.results[0]
 
     def _emit_gate(self, gate_name, qubits, params, loc):
         in_qubits = [self.qubit_map[q] for q in qubits]
@@ -115,6 +120,21 @@ class QiskitToCatalystImporter:
         # Params are currently ignored/empty in this simplified imported
         # If we had params, they should be F64 values.
         op_params = [] 
+        f64_type = Type.parse("f64", context=self.ctx)
+        
+        with loc:
+            for p in params:
+                 # Assume p is a number (float/int)
+                 try:
+                     val = float(p)
+                 except (ValueError, TypeError):
+                     # Skip complex params or expressions for now
+                     continue
+                     
+                 val_attr = FloatAttr.get(f64_type, val)
+                 val_op = arith.ConstantOp(f64_type, val_attr, loc=loc)
+                 op_params.append(val_op.result)
+             
         op_ctrls = []
         op_ctrlvals = []
         
@@ -169,5 +189,51 @@ class QiskitToCatalystImporter:
             self.qubit_map = old_map
             
         results = for_op.results
+        for i, q in enumerate(qubits):
+            self.qubit_map[q] = results[i]
+
+    def _emit_if_else(self, op, qubits, clbits, loc):
+        # op.params = [true_body, false_body]
+        true_body = op.params[0]
+        false_body = op.params[1]
+        
+        if not clbits:
+            raise CompileError("if_else instruction requires classical bits for condition")
+            
+        cond_bit = clbits[0]
+        if cond_bit not in self.clbit_map:
+             raise CompileError(f"Classical bit {cond_bit} used in if_else but not measured previously")
+             
+        cond_val = self.clbit_map[cond_bit] # i1
+        
+        # Determine qubits involved in the if_else block
+        # The 'qubits' argument to this function *should* contain all qubits touched by the body.
+        
+        # Ensure hasElse=True because we must yield results (qubits) from both branches
+        if_op = scf.IfOp(cond_val, [self.qubit_map[q].type for q in qubits], hasElse=True, loc=loc)
+        
+        # True Body
+        with InsertionPoint(if_op.then_block):
+            old_map = self.qubit_map.copy()
+            self._process_instructions(true_body.data, loc)
+            yield_results = [self.qubit_map[q] for q in qubits]
+            scf.YieldOp(yield_results, loc=loc)
+            self.qubit_map = old_map 
+
+        # False Body
+        with InsertionPoint(if_op.else_block):
+            if false_body is not None:
+                old_map = self.qubit_map.copy()
+                self._process_instructions(false_body.data, loc)
+                yield_results = [self.qubit_map[q] for q in qubits]
+                scf.YieldOp(yield_results, loc=loc)
+                self.qubit_map = old_map
+            else:
+                 # Default pass-through
+                 yield_results = [self.qubit_map[q] for q in qubits]
+                 scf.YieldOp(yield_results, loc=loc)
+        
+        # Update mappings with if_op results
+        results = if_op.results
         for i, q in enumerate(qubits):
             self.qubit_map[q] = results[i]
