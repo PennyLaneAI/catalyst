@@ -294,6 +294,9 @@ def handle_qnode(
         self.requires_decompose_lowering
         and self.decompose_tkwargs.get("gate_set", None)
     )
+    print("use_device_specific_decomposition: ", use_device_specific_decomposition)
+    print("requires_decompose_lowering: ", self.requires_decompose_lowering)
+    print("decompose_tkwargs gate_set: ", self.decompose_tkwargs.get("gate_set", None))
     graph_succeeded = False
 
     # Decomposing templated operations is not supported in graph-based decomposition yet.
@@ -302,23 +305,23 @@ def handle_qnode(
         print("Case 1: User specified a stopping condition in decomposition.")
         
         # Use the plxpr decompose transform and ignore graph
-        # TODO: Figure out if it is problematic to use tgateset here instead of tkwargs.
-        # Instead of union, this should be intersection with the compiler ops for decomposition?
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
             consts=consts,
             ncargs=non_const_args,
-            tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
+            tkwargs={"gate_set": self.decompose_tkwargs.get("gate_set", [])},
             stopping_condition=stopping_condition,
         )
     elif not qml.decomposition.enabled_graph():
-        print("Case 2: User did not specify a decomposition. Using plxpr decomposition on device-specific gate set when graph is disabled.")
+        print("Case 2: Graph is disabled.")
         stopping_condition = None
         if use_device_specific_decomposition:
+            print("Case 2.1: Using device-specific gate set when graph is disabled.")
             device_capabilities = get_device_capabilities(device, execution_config, shots_len)
             # TODO: Differentiable is False by default. Only true when we use lightning device with adjoint differentiation.
             device_specific_gate_set = device_capabilities.gate_set()
             self.decompose_tkwargs.update({"gate_set": device_specific_gate_set})
+            # print(f"Device-specific gate set: {device_specific_gate_set}")
             device_diff_method = calculate_diff_method(qnode, closed_jaxpr)
             stopping_condition = lambda op: catalyst_acceptance(
                 op, device_capabilities, device_diff_method
@@ -336,14 +339,6 @@ def handle_qnode(
     elif qml.decomposition.enabled_graph():
         # Decomposing templated operations is not supported in graph-based decomposition yet.
         # We are decomposing it at this layer lol
-        print("Case 3: Decomposing templated operations at this layer.")
-        closed_jaxpr = _apply_compiler_decompose_to_plxpr(
-            inner_jaxpr=qfunc_jaxpr,
-            consts=consts,
-            ncargs=non_const_args,
-            tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
-        )
-
         if use_device_specific_decomposition:
             # Case 3: User did not specify a decomposition. Using graph-based decomposition on device-specific gate set.
             print("Case 3.1: User did not specify a decomposition. Using graph-based decomposition on device-specific gate set.")
@@ -449,11 +444,17 @@ def register_transform(pl_transform, pass_name, decomposition):
     transforms_to_passes[pl_transform] = (pass_name, decomposition)
 
 
-def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs):
+def _set_decompose_lowering_state(self, tkwargs):
+    """Set requires_decompose_lowering and decompose_tkwargs; raise if already set."""
     if not self.requires_decompose_lowering:
         self.requires_decompose_lowering = True
     else:
         raise NotImplementedError("Multiple decomposition transforms are not yet supported.")
+    self.decompose_tkwargs = tkwargs
+
+
+def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs):
+    _set_decompose_lowering_state(self, tkwargs)
 
     next_eval = copy(self)
     # Update the decompose_gateset to be used by the quantum kernel primitive
@@ -517,6 +518,8 @@ def handle_transform(
         and qml.decomposition.enabled_graph()
     ):
         return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs)
+    elif hasattr(transform._plxpr_transform, "__name__") and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr":
+        _set_decompose_lowering_state(self, tkwargs)
 
     catalyst_pass_name = transform.pass_name
     if catalyst_pass_name is None:
@@ -673,7 +676,7 @@ def _apply_compiler_decompose_to_plxpr(
         qml.decomposition.disable_graph()
 
     kwargs = (
-        {"gate_set": set(COMPILER_OPS_FOR_DECOMPOSITION.keys()).union(tgateset)}
+        {"gate_set": set(COMPILER_OPS_FOR_DECOMPOSITION.keys()).union(tgateset if tgateset else [])}
         if tkwargs is None
         else tkwargs
     )
