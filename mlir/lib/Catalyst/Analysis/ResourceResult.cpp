@@ -23,6 +23,8 @@ using namespace llvm;
 
 namespace catalyst {
 
+using MergeMethod = ResourceResult::MergeMethod;
+
 /// Helper: select merge function based on method enum.
 static int64_t applyMerge(int64_t a, int64_t b, MergeMethod method)
 {

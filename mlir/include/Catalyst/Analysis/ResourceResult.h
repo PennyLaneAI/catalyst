@@ -19,12 +19,13 @@
 
 namespace catalyst {
 
-// method for merging two ResourceResult values
-enum class MergeMethod { Sum, Max, Min };
-
 // ResourceResult holds the resource counts for a single function.
 // It mirrors the Python-side ResourcesResult from specs_collector.py.
 struct ResourceResult {
+
+    // method for merging two ResourceResult values
+    enum class MergeMethod { Sum, Max, Min };
+
     // quantum, pbc, mbqc operations
     llvm::StringMap<llvm::DenseMap<int, int64_t>> operations;
 

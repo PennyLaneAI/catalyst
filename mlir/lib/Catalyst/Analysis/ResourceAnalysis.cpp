@@ -232,7 +232,7 @@ void ResourceAnalysis::analyzeIfOp(scf::IfOp ifOp, ResourceResult &result, bool 
     if (!ifOp.getElseRegion().empty()) {
         ResourceResult elseResult;
         analyzeRegion(ifOp.getElseRegion(), elseResult, isAdjoint);
-        thenResult.mergeWith(elseResult, MergeMethod::Max);
+        thenResult.mergeWith(elseResult, ResourceResult::MergeMethod::Max);
     }
     result.mergeWith(thenResult);
 }
@@ -251,14 +251,14 @@ void ResourceAnalysis::analyzeIndexSwitchOp(scf::IndexSwitchOp switchOp, Resourc
             first = false;
         }
         else {
-            maxResult.mergeWith(caseResult, MergeMethod::Max);
+            maxResult.mergeWith(caseResult, ResourceResult::MergeMethod::Max);
         }
     }
 
     // default region
     ResourceResult defaultResult;
     analyzeRegion(switchOp.getDefaultRegion(), defaultResult, isAdjoint);
-    maxResult.mergeWith(defaultResult, MergeMethod::Max);
+    maxResult.mergeWith(defaultResult, ResourceResult::MergeMethod::Max);
 
     result.mergeWith(maxResult);
 }
