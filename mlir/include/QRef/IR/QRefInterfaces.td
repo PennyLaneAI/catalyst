@@ -120,16 +120,11 @@ def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
                 ") must be the same";
         }
 
-        // STL methods to check duplicates will all complain about `mlir::Value` not having a
-        // comparison method defined, since they all use map/set, which is hash-based
-        // So we just do it manually
-        std::vector<mlir::Value> qubitOperands = gate.getQubitOperands();
-        for (size_t i=0; i < qubitOperands.size(); i++) {
-            for (size_t j=i+1; j < qubitOperands.size(); j++) {
-                if (qubitOperands[i] == qubitOperands[j]) {
-                    return $_op->emitError() << "all qubits on a quantum gate must be " <<
-                    "distinct (including controls)";
-                }
+        llvm::SmallPtrSet<mlir::Value, 4> seenQubits;
+        for (mlir::Value qubit : gate.getQubitOperands()) {
+            if (!seenQubits.insert(qubit).second) {
+                return $_op->emitError() << "all qubits on a quantum gate must be " <<
+                "distinct (including controls)";
             }
         }
 
