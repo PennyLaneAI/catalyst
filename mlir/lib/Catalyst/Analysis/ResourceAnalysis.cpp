@@ -91,29 +91,10 @@ static std::string getGateOpName(Operation *op, bool isAdjoint)
 /// Get the number of qubits for a gate operation.
 static int getGateQubitCount(Operation *op)
 {
-    return llvm::TypeSwitch<Operation *, int>(op)
-        .Case<quantum::CustomOp>([](auto customOp) {
-            return static_cast<int>(customOp.getInQubits().size() +
-                                    customOp.getInCtrlQubits().size());
-        })
-        .Case<quantum::PauliRotOp>(
-            [](auto pauliRotOp) { return static_cast<int>(pauliRotOp.getInQubits().size()); })
-        .Case<quantum::MultiRZOp>(
-            [](auto multiRZOp) { return static_cast<int>(multiRZOp.getInQubits().size()); })
-        .Case<quantum::PCPhaseOp>([](auto pcPhaseOp) {
-            return static_cast<int>(pcPhaseOp.getInQubits().size() +
-                                    pcPhaseOp.getInCtrlQubits().size());
-        })
-        .Case<quantum::QubitUnitaryOp>([](auto qubitUnitaryOp) {
-            return static_cast<int>(qubitUnitaryOp.getInQubits().size() +
-                                    qubitUnitaryOp.getInCtrlQubits().size());
-        })
-        .Case<quantum::SetStateOp>(
-            [](auto setStateOp) { return static_cast<int>(setStateOp.getInQubits().size()); })
-        .Case<quantum::SetBasisStateOp>([](auto setBasisStateOp) {
-            return static_cast<int>(setBasisStateOp.getInQubits().size());
-        })
-        .Default(0);
+    if (auto qOp = dyn_cast<quantum::QuantumOperation>(op)) {
+        return static_cast<int>(qOp.getQubitOperands().size());
+    }
+    return 0;
 }
 
 /// Get the name for a PBC operation.
