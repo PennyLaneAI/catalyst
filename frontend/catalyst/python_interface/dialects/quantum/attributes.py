@@ -42,7 +42,7 @@ class QubitLevel(StrEnum):
 
     Abstract = "abstract"
     Logical = "logical"
-    QEC = "qec"
+    PBC = "pbc"
     Physical = "physical"
 
 
