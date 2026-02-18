@@ -13,7 +13,9 @@
 # limitations under the License.
 """Tests for CompilationPass."""
 from functools import lru_cache, partial
+from typing import Union
 
+import pennylane as qml
 import pytest
 from xdsl.context import Context
 from xdsl.dialects import arith, test
@@ -25,7 +27,7 @@ from catalyst.python_interface.dialects import quantum
 from catalyst.python_interface.pass_api import CompilationPass
 
 pytestmark = pytest.mark.xdsl
-# This parsing function doesn't load the test dialect by default
+# parse_generic_to_xdsl_module doesn't load the test dialect by default
 parse_xdsl_str = partial(parse_generic_to_xdsl_module, extra_dialects=(test.Test,))
 
 
@@ -52,7 +54,14 @@ def create_test_pass(greedy: bool, recursive: bool) -> CompilationPass:
         def __init__(self):
             # Keys should be "default", "gate1", "gate2", "mcm", "ins_ex",
             # corresponding to the different actions.
-            self.counts = {"default": 0, "gate1": 0, "gate2": 0, "mcm": 0, "ins_ex": 0}
+            self.counts = {
+                "default": 0,
+                "gate1": 0,
+                "gate2": 0,
+                "mcm": 0,
+                "ins_ex": 0,
+                "alloc_dealloc": 0,
+            }
 
         def action(self, op: quantum.CustomOp, rewriter):
             """Default action. Do nothing."""
@@ -94,11 +103,21 @@ def create_test_pass(greedy: bool, recursive: bool) -> CompilationPass:
         if self.counts["mcm"] > 1:
             rewriter.erase_op(op)
 
+    # Union type hints, both using 'Union' and '|'
+
     @MyPass.add_action
     def insert_extract_action(self, op: quantum.InsertOp | quantum.ExtractOp, rewriter):
         """Action on qubit inserts and extracts. Erase the op."""
         assert isinstance(op, (quantum.InsertOp, quantum.ExtractOp))
         self.counts["ins_ex"] += 1
+
+        rewriter.erase_op(op)
+
+    @MyPass.add_action
+    def alloc_dealloc_action(self, op: Union[quantum.AllocOp, quantum.DeallocOp], rewriter):
+        """Action on quantum register allocation/deallocation ops. Erase the op"""
+        assert isinstance(op, (quantum.AllocOp, quantum.DeallocOp))
+        self.counts["alloc_dealloc"] += 1
 
         rewriter.erase_op(op)
 
@@ -130,7 +149,7 @@ class TestCompilationPass:
                     quantum.CustomOp,
                     quantum.MeasureOp,
                 ),
-                {"default": 2, "gate1": 2, "gate2": 2, "mcm": 1, "ins_ex": 0},
+                {"default": 2, "gate1": 2, "gate2": 2, "mcm": 1, "ins_ex": 0, "alloc_dealloc": 0},
             ),
             (
                 # Non-greedy, recursive
@@ -153,7 +172,7 @@ class TestCompilationPass:
                     quantum.CustomOp,
                     quantum.CustomOp,
                 ),
-                {"default": 2, "gate1": 5, "gate2": 2, "mcm": 2, "ins_ex": 0},
+                {"default": 2, "gate1": 5, "gate2": 2, "mcm": 2, "ins_ex": 0, "alloc_dealloc": 0},
             ),
             (
                 # Greedy, non-recursive
@@ -175,7 +194,7 @@ class TestCompilationPass:
                     quantum.CustomOp,
                     quantum.MeasureOp,
                 ),
-                {"default": 2, "gate1": 2, "gate2": 1, "mcm": 1, "ins_ex": 0},
+                {"default": 2, "gate1": 2, "gate2": 1, "mcm": 1, "ins_ex": 0, "alloc_dealloc": 0},
             ),
             (
                 # Greedy, recursive
@@ -205,7 +224,7 @@ class TestCompilationPass:
                     arith.ConstantOp,
                     arith.ConstantOp,
                 ),
-                {"default": 7, "gate1": 7, "gate2": 4, "mcm": 2, "ins_ex": 0},
+                {"default": 7, "gate1": 7, "gate2": 4, "mcm": 2, "ins_ex": 0, "alloc_dealloc": 0},
             ),
         ],
     )
@@ -240,18 +259,75 @@ class TestCompilationPass:
             %r1 = "test.op"() : () -> !quantum.reg
             %r2 = quantum.insert %r1[0], %q0 : !quantum.reg, !quantum.bit
             %q1 = quantum.extract %r1[0] : !quantum.reg -> !quantum.bit
+            %r3 = quantum.alloc(4) : !quantum.reg
+            quantum.dealloc %r1 : !quantum.reg
         """
         mod = parse_xdsl_str(mod_str)
 
         pass_ = create_test_pass(greedy=greedy, recursive=recursive)()
         pass_.apply(ctx, mod)
 
-        # The action on inserts and extracts is to erase them, so there shouldn't be any in the
-        # modified program.
-        assert not any(isinstance(op, (quantum.InsertOp, quantum.ExtractOp)) for op in mod.ops)
+        # The action on inserts, extracts, allocs, and deallocs is to erase them, so there
+        # shouldn't be any in the modified program.
+        assert not any(
+            isinstance(
+                op, (quantum.InsertOp, quantum.ExtractOp, quantum.AllocOp, quantum.DeallocOp)
+            )
+            for op in mod.ops
+        )
         # insert_extract_action should be invoked for both the quantum.insert and
         # quantum.extract operations
-        assert pass_.counts == {"default": 0, "gate1": 0, "gate2": 0, "mcm": 0, "ins_ex": 2}
+        assert pass_.counts == {
+            "default": 0,
+            "gate1": 0,
+            "gate2": 0,
+            "mcm": 0,
+            "ins_ex": 2,
+            "alloc_dealloc": 2,
+        }
+
+    def test_add_action_invalid_args(self):
+        """Test that adding actions with invalid arguments raises an error."""
+        pass_cls = create_test_pass(greedy=False, recursive=False)
+
+        with pytest.raises(
+            ValueError, match="The action must have 3 arguments, with the first one being 'self'"
+        ):
+
+            @pass_cls.add_action
+            def new_action1(pass_, op, rewriter):
+                return
+
+        with pytest.raises(
+            ValueError, match="The action must have 3 arguments, with the first one being 'self'"
+        ):
+
+            @pass_cls.add_action
+            def new_action2(self, op1, op2, rewriter):
+                return
+
+    def test_add_action_invalid_type_hint(self):
+        """Test that using type hints that are not xDSL operations or unions of xDSL operations
+        raises an error."""
+        pass_cls = create_test_pass(greedy=False, recursive=False)
+
+        with pytest.raises(TypeError, match="Only Operation types or unions of Operation types"):
+
+            @pass_cls.add_action
+            def new_action1(self, op: qml.PauliX, rewriter):
+                return
+
+        with pytest.raises(TypeError, match="Only Operation types or unions of Operation types"):
+
+            @pass_cls.add_action
+            def new_action1(self, op: qml.PauliX | qml.PauliY, rewriter):
+                return
+
+        with pytest.raises(TypeError, match="Only Operation types or unions of Operation types"):
+
+            @pass_cls.add_action
+            def new_action1(self, op: Union[qml.PauliX, qml.PauliY], rewriter):
+                return
 
 
 if __name__ == "__main__":
