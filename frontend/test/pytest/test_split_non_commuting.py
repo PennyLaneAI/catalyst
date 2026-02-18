@@ -21,7 +21,6 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.passes import apply_pass
 
 
 @pytest.mark.parametrize(
@@ -46,7 +45,7 @@ def test_split_non_commuting_integration(hamiltonian):
     # Circuit with Hamiltonian observable
     # Expected: split into individual terms with coefficients
     @qjit
-    @apply_pass("split-non-commuting")
+    @qml.transform(pass_name="split-non-commuting")
     @qml.qnode(dev)
     def circ1():
         qml.Rot(0.3, 0.5, 0.7, wires=0)
@@ -113,7 +112,7 @@ def test_split_non_commuting_with_tensor_product():
     dev = qml.device("lightning.qubit", wires=3)
 
     @qjit
-    @apply_pass("split-non-commuting")
+    @qml.transform(pass_name="split-non-commuting")
     @qml.qnode(dev)
     def circ1():
         qml.Rot(0.4, 0.3, 0.2, wires=0)
@@ -172,7 +171,7 @@ def test_split_non_commuting_with_Identity():
     dev = qml.device("lightning.qubit", wires=3)
 
     @qjit
-    @apply_pass("split-non-commuting")
+    @qml.transform(pass_name="split-non-commuting")
     @qml.qnode(dev)
     def circ1():
         qml.Rot(0.5, 0.3, 0.2, wires=0)
@@ -230,7 +229,7 @@ def test_lightning_execution_with_structure():
         return i
 
     @qjit
-    @apply_pass("split-non-commuting")
+    @qml.transform(pass_name="split-non-commuting")
     @qml.qnode(dev)
     def circuit():
         for_fn()  # pylint: disable=no-value-for-parameter
