@@ -69,10 +69,9 @@ def compiler_transform(module_pass: ModulePass) -> CompilerTransform:
     .. code-block:: python
 
         import pennylane as qp
-        from catalyst.python_interface.dialects import quantum
 
         class ReplaceWithRX(qp.CompilationPass):
-            name = "replace-with-rot"
+            name = "replace-with-rx"
 
             def __init__(self, theta, mult_by_two=True):
                 self.theta = theta
@@ -268,7 +267,7 @@ class CompilationPass(ModulePass):
             from catalyst.python_interface.dialects import quantum
 
             class ReplaceOps(qp.CompilationPass):
-                name = "replace-with-rot"
+                name = "replace-ops"
 
                 def action(self, op: quantum.MultiRZOp, rewriter):
                     T_gates = []

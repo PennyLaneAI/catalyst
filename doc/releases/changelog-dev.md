@@ -2,8 +2,9 @@
 
 <h3>New features since last release</h3>
 
-* Added a new `CompilationPass` class to `catalyst.python_interface.pass_api` that creates abstractions to allow
-  simpler implementations for xDSL compilation passes.
+* A new `~.CompilationPass` class has been added that abstracts away compiler-level details for 
+  seamless compilation pass creation. Used in tandem with :func:`~.compiler_transform`, compilation 
+  passes can be created entirely in Python and used on QNodes within a :func:`~.qjit`'d workflow.
   [(#2211)](https://github.com/PennyLaneAI/catalyst/pull/2211)
 
 * Executing circuits that are compiled with :func:`pennylane.transforms.to_ppr`,
