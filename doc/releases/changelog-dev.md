@@ -210,6 +210,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update `mlir_specs` to account for new `marker` functionality in PennyLane.
+  [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
+  
 * The QEC (Quantum Error Correction) dialect has been renamed to PBC (Pauli-Based Computation)
   across the entire codebase. This includes the MLIR dialect (`pbc.*` -> `pbc.*`), C++ namespaces
   (`catalyst::pbc` -> `catalyst::pbc`), Python bindings, compiler passes (e.g.,
