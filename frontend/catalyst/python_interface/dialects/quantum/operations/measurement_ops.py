@@ -34,13 +34,7 @@ from xdsl.irdl import (
 
 from catalyst.python_interface.xdsl_extras import AllTypesMatch, MemRefConstraint, TensorConstraint
 
-from ..attributes import (
-    ObservableSSAValue,
-    ObservableType,
-    QubitSSAValue,
-    QubitType,
-    QubitTypeConstraint,
-)
+from ..attributes import ObservableSSAValue, ObservableType, QubitSSAValue, QubitTypeConstraint
 
 ##############################################
 ################ Base classes ################

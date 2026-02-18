@@ -207,7 +207,7 @@ class QuregType(ParametrizedAttribute, TypeAttribute):
         optional_params = optional_params or []
 
         final_params = []
-        match len(optional_params)
+        match len(optional_params):
             case 0:
                 final_params = [StringAttr(QubitLevel.Abstract.value)]
             case 1:

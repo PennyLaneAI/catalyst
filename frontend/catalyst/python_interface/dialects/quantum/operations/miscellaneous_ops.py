@@ -48,7 +48,7 @@ from xdsl.traits import (
 
 from catalyst.python_interface.xdsl_extras import AllTypesMatch
 
-from ..attributes import QuregSSAValue, QuregType, QuregTypeConstraint
+from ..attributes import QuregSSAValue, QuregTypeConstraint
 
 
 @irdl_op_definition

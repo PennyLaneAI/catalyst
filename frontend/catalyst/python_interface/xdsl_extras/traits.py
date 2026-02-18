@@ -241,7 +241,9 @@ class AllTypesMatch(OpTrait):
     attr_names: tuple[str, ...]
     summary: str
 
-    def same_ssa_types_operator(self, val_or_vals: SSAValue | SSAValues):
+    @staticmethod
+    def same_ssa_types_operator(val_or_vals: SSAValue | SSAValues):
+        """Operator to get the types of SSAValues being compared."""
         vals = [val_or_vals] if isinstance(val_or_vals, SSAValue) else val_or_vals
         return [v.type for v in vals]
 
