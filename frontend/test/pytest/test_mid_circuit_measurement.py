@@ -26,10 +26,18 @@ from pennylane import exceptions, measure
 from pennylane.transforms.dynamic_one_shot import fill_in_value
 
 import catalyst
-from catalyst import CompileError, cond, grad
+from catalyst import CompileError, cond as catalyst_cond, grad
 from catalyst import jvp as C_jvp
 from catalyst import qjit, value_and_grad
 from catalyst import vjp as C_vjp
+
+
+def cond(pred):
+    """Wrapper for cond that switches between PennyLane and Catalyst implementations."""
+    if qml.capture.enabled():
+        return qml.cond(pred)
+    return catalyst_cond(pred)
+
 
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
 
@@ -39,6 +47,7 @@ from catalyst import vjp as C_vjp
 class TestMidCircuitMeasurement:
     """Tests for mid-circuit behaviour."""
 
+    @pytest.mark.old_frontend
     def test_measure_outside_qjit(self):
         """Test measure outside qjit."""
 

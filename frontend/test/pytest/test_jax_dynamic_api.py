@@ -24,10 +24,32 @@ from jax._src.source_info_util import current as current_source_info
 from numpy import array_equal
 from numpy.testing import assert_allclose
 
-from catalyst import cond, for_loop, qjit, while_loop
+from catalyst import cond as catalyst_cond, for_loop as catalyst_for_loop, qjit, while_loop as catalyst_while_loop
 from catalyst.jax_extras import DShapedArray, ShapedArray
 from catalyst.jax_extras.tracing import trace_to_jaxpr
 from catalyst.tracing.contexts import EvaluationContext
+
+
+def for_loop(start, stop, step):
+    """Wrapper for for_loop that switches between PennyLane and Catalyst implementations."""
+    if qml.capture.enabled():
+        return qml.for_loop(start, stop, step)
+    return catalyst_for_loop(start, stop, step)
+
+
+def while_loop(cond_fn):
+    """Wrapper for while_loop that switches between PennyLane and Catalyst implementations."""
+    if qml.capture.enabled():
+        return qml.while_loop(cond_fn)
+    return catalyst_while_loop(cond_fn)
+
+
+def cond(pred):
+    """Wrapper for cond that switches between PennyLane and Catalyst implementations."""
+    if qml.capture.enabled():
+        return qml.cond(pred)
+    return catalyst_cond(pred)
+
 
 DTYPES = [float, int, jnp.float32, jnp.float64, jnp.int8, jnp.int16, "float32", np.float64]
 SHAPES = [3, (2, 3, 1), (), jnp.array([2, 1, 3], dtype=int)]

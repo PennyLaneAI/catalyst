@@ -18,8 +18,12 @@ This file contains a couple of tests for the capture of measurement primitives i
 # pylint: disable=line-too-long
 
 import jax
+import pytest
 
 from catalyst.jax_primitives import compbasis_p, expval_p, probs_p, state_p, var_p
+
+# These tests check internal Catalyst JAX primitives - old frontend-specific
+pytestmark = pytest.mark.old_frontend
 
 
 def test_expval():
