@@ -203,6 +203,9 @@ def apply_pass(pass_name: str, *flags, **valued_options):
                 return qnode()
     """
 
+    if qml.capture.enabled():
+        raise RuntimeError(f"The apply_pass decorator is not compatible with program capture. Please use qml.transform(pass_name='{pass_name}') instead.")
+
     def decorator(qnode):
         return PassPipelineWrapper(qnode, pass_name, *flags, **valued_options)
 
