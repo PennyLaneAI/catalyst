@@ -2,10 +2,47 @@
 
 <h3>New features since last release</h3>
 
-* A new `~.CompilationPass` class has been added that abstracts away compiler-level details for 
-  seamless compilation pass creation. Used in tandem with :func:`~.compiler_transform`, compilation 
-  passes can be created entirely in Python and used on QNodes within a :func:`~.qjit`'d workflow.
-  [(#2211)](https://github.com/PennyLaneAI/catalyst/pull/2211)
+* A new MLIR transformation pass `--dynamic-one-shot` is available.
+  Devices that natively support mid-circuit measurements can evaluate dynamic circuits by executing
+  them one shot at a time, sampling a dynamic execution path for each shot. The `--dynamic-one-shot`
+  pass first transforms the circuit so that each circuit execution only contains a singular shot,
+  then performs the appropriate classical statistical postprocessing across the execution results
+  from all shots.
+  [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
+
+  With this new MLIR pass, one shot execution mode is now available when capture is enabled.
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=2)
+
+  @qjit(capture=True)
+  @qml.transform(pass_name="dynamic-one-shot")
+  @qml.qnode(dev, shots=10)
+  def circuit():
+      qml.Hadamard(wires=0)
+      m_0 = qml.measure(0)
+      m_1 = qml.measure(1)
+      return qml.sample([m_0, m_1]), qml.expval(m_0), qml.probs(op=[m_0,m_1]), qml.counts(wires=0)
+  ```
+
+  ```pycon
+  >>> circuit()
+  (Array([[1, 0],
+         [0, 0],
+         [1, 0],
+         [1, 0],
+         [0, 0],
+         [0, 0],
+         [1, 0],
+         [1, 0],
+         [1, 0],
+         [0, 0]], dtype=int64), Array(0.6, dtype=float64), Array([0.4, 0. , 0.6, 0. ], dtype=float64),
+         (Array([0, 1], dtype=int64), Array([4, 6], dtype=int64)))
+  ```
+
+  Note that although the one-shot transform is motivated from the context of mid-circuit measurements,
+  this pass also supports terminal measurement processes that are performed on wires, instead of
+  mid-circuit measurement results.
 
 * Executing circuits that are compiled with :func:`pennylane.transforms.to_ppr`,
   :func:`pennylane.transforms.commute_ppr`, :func:`pennylane.transforms.ppr_to_ppm`,
@@ -226,6 +263,7 @@
   names. The rename better reflects the dialect's purpose as a representation for Pauli-Based
   Computation rather than general quantum error correction.
   [(#2482)](https://github.com/PennyLaneAI/catalyst/pull/2482)
+  [(#2485)](https://github.com/PennyLaneAI/catalyst/pull/2485)
 
 * Updated the integration tests for `qp.specs` to get coverage for new features
   [(#2448)](https://github.com/PennyLaneAI/catalyst/pull/2448)
