@@ -252,7 +252,6 @@ def SetStateOp : Gate_Op<"set_state"> {
     let assemblyFormat = [{
         `(` $in_state `)` $qubits attr-dict `:` type(operands)
     }];
-
 }
 
 
@@ -629,9 +628,6 @@ def HermitianOp : Observable_Op<"hermitian"> {
 }
 
 // -----
-
-class Measurement_Op<string mnemonic, list<Trait> traits = []> :
-        QRef_Op<mnemonic, traits>;
 
 def MeasureOp : QRef_Op<"measure"> {
     let summary = "A single-qubit projective measurement in the computational basis.";
