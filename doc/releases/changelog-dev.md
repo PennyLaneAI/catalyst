@@ -167,6 +167,9 @@
 * Dropped support for NumPy 1.x following its end-of-life. NumPy 2.0 or higher is now required.
   [(#2407)](https://github.com/PennyLaneAI/catalyst/pull/2407)
 
+* The inlining pass has been removed from the default compilation pipeline.
+  [(#2473)](https://github.com/PennyLaneAI/catalyst/pull/2473)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
@@ -211,6 +214,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update `mlir_specs` to account for new `marker` functionality in PennyLane.
+  [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
+  
 * The QEC (Quantum Error Correction) dialect has been renamed to PBC (Pauli-Based Computation)
   across the entire codebase. This includes the MLIR dialect (`pbc.*` -> `pbc.*`), C++ namespaces
   (`catalyst::pbc` -> `catalyst::pbc`), Python bindings, compiler passes (e.g.,
