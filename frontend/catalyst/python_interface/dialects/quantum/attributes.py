@@ -121,6 +121,7 @@ class QubitType(ParametrizedAttribute, TypeAttribute):
             )
 
     def print_parameters(self, printer: Printer):
+        """Print type parameters."""
         params_to_print = []
         if self.level.data != QubitLevel.Abstract.value:
             params_to_print.append(self.level.data)
@@ -133,7 +134,7 @@ class QubitType(ParametrizedAttribute, TypeAttribute):
 
     @classmethod
     def parse_parameters(cls, parser: AttrParser) -> list[Attribute]:
-
+        """Parse type parameters."""
         optional_params = parser.parse_optional_comma_separated_list(
             delimiter=parser.Delimiter.ANGLE, parse=parser.parse_str_literal
         )
@@ -193,6 +194,7 @@ class QuregType(ParametrizedAttribute, TypeAttribute):
             )
 
     def print_parameters(self, printer: Printer):
+        """Print type parameters."""
         if self.level.data == QubitLevel.Abstract.value:
             return
 
@@ -201,6 +203,7 @@ class QuregType(ParametrizedAttribute, TypeAttribute):
 
     @classmethod
     def parse_parameters(cls, parser: AttrParser) -> list[Attribute]:
+        """Parse type parameters."""
         optional_params = parser.parse_optional_comma_separated_list(
             delimiter=parser.Delimiter.ANGLE, parse=parser.parse_str_literal
         )
@@ -242,6 +245,7 @@ PauliWord: TypeAlias = ArrayAttr[StringAttr]
 ###############################################################
 ######################## Constraints ##########################
 ###############################################################
+# pylint: disable=unused-argument
 
 
 class QubitTypeConstraint(AttrConstraint):
@@ -290,6 +294,9 @@ class QubitTypeConstraint(AttrConstraint):
             self.role_constr = AnyOf(attr_list)
 
     def can_infer(self, var_constraint_names) -> bool:
+        """Check if there is enough information to infer the attribute given the
+        constraint variables that are already set.
+        """
         if len(self.level_constr.attr_constrs) not in (1, len(QubitLevel.__members__)):
             return False
         if len(self.role_constr.attr_constrs) not in (1, len(QubitRole.__members__)):
@@ -297,6 +304,7 @@ class QubitTypeConstraint(AttrConstraint):
         return True
 
     def infer(self, context):
+        """Infer the attribute given the the values for all variables."""
         if len(self.level_constr.attr_constrs) == 1:
             level = self.level_constr.attr_constrs[0].attr
         else:
@@ -309,10 +317,14 @@ class QubitTypeConstraint(AttrConstraint):
         return QubitType(level, role)
 
     def verify(self, attr, constraint_context):
+        """Verify the constraint."""
         self.level_constr.verify(attr.level, constraint_context)
         self.role_constr.verify(attr.role, constraint_context)
 
     def mapping_type_vars(self, type_var_mapping):
+        """A helper function to make type vars used in attribute definitions concrete when
+        creating constraints for new attributes or operations.
+        """
         return self
 
 
@@ -339,11 +351,15 @@ class QuregTypeConstraint(AttrConstraint):
             self.level_constr = AnyOf(attr_list)
 
     def can_infer(self, var_constraint_names) -> bool:
+        """Check if there is enough information to infer the attribute given the
+        constraint variables that are already set.
+        """
         if len(self.level_constr.attr_constrs) not in (1, len(QubitLevel.__members__)):
             return False
         return True
 
     def infer(self, context):
+        """Infer the attribute given the the values for all variables."""
         if len(self.level_constr.attr_constrs) == 1:
             level = self.level_constr.attr_constrs[0].attr
         else:
@@ -352,7 +368,11 @@ class QuregTypeConstraint(AttrConstraint):
         return QuregType(level)
 
     def verify(self, attr, constraint_context):
+        """Verify the constraint."""
         self.level_constr.verify(attr.level, constraint_context)
 
     def mapping_type_vars(self, type_var_mapping):
+        """A helper function to make type vars used in attribute definitions concrete when
+        creating constraints for new attributes or operations.
+        """
         return self
