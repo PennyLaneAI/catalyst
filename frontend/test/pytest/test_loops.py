@@ -223,11 +223,12 @@ class TestWhileLoops:
         assert circuit(3) == -1.0
         assert circuit(4) == 1.0
 
-    @pytest.mark.old_frontend  # Tests MCM usage in loop body - MCM not supported with capture
+    @pytest.mark.old_frontend  # MCM used in arithmetic inside loop - bool type issues with capture
     def test_assert_reference_outside_measure(self, backend, capture_mode):
         """Test while loop in conjunction with the measure op."""
 
         @qjit(capture=capture_mode)
+        @qml.set_shots(1)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             m = measure(wires=0)
@@ -238,12 +239,15 @@ class TestWhileLoops:
                 return i + 1 + m
 
             loop(0)
-            return measure(wires=0)
+            return qml.sample(measure(wires=0))
 
-        assert circuit(1)
-        assert not circuit(2)
-        assert circuit(3)
-        assert not circuit(4)
+        # Initial state |0⟩: m=0, loop runs n times applying PauliX
+        # n=1: 1 PauliX -> |1⟩ -> sample=1
+        # n=2: 2 PauliX -> |0⟩ -> sample=0
+        assert circuit(1)[0] == 1
+        assert circuit(2)[0] == 0
+        assert circuit(3)[0] == 1
+        assert circuit(4)[0] == 0
 
     def test_multiple_loop_arguments(self, backend, capture_mode):
         """Test while loop with multiple (loop-carried) arguments."""
@@ -264,12 +268,10 @@ class TestWhileLoops:
         assert circuit(3) == -1.0
         assert circuit(4) == 1.0
 
-    @pytest.mark.old_frontend  # Returns raw classical value from QNode - not valid with capture
-    def test_nested_loops(self, backend, capture_mode):
+    def test_nested_loops(self, capture_mode):
         """Test nested while loops."""
 
         @qjit(capture=capture_mode)
-        @qml.qnode(qml.device(backend, wires=1))
         def circuit(n, m):
             @while_loop(lambda i, _: i < n)
             def outer(i, accum):
