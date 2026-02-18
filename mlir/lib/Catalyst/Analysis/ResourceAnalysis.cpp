@@ -70,6 +70,7 @@ static std::string getGateOpName(Operation *op, bool isAdjoint)
             .Case<quantum::PauliRotOp>([](auto) { return "PauliRot"; })
             .Case<quantum::GlobalPhaseOp>([](auto) { return "GlobalPhase"; })
             .Case<quantum::MultiRZOp>([](auto) { return "MultiRZ"; })
+            .Case<quantum::PCPhaseOp>([](auto) { return "PCPhase"; })
             .Case<quantum::QubitUnitaryOp>([](auto) { return "QubitUnitary"; })
             .Case<quantum::SetStateOp>([](auto) { return "SetState"; })
             .Case<quantum::SetBasisStateOp>([](auto) { return "SetBasisState"; })
@@ -99,6 +100,19 @@ static int getGateQubitCount(Operation *op)
             [](auto pauliRotOp) { return static_cast<int>(pauliRotOp.getInQubits().size()); })
         .Case<quantum::MultiRZOp>(
             [](auto multiRZOp) { return static_cast<int>(multiRZOp.getInQubits().size()); })
+        .Case<quantum::PCPhaseOp>([](auto pcPhaseOp) {
+            return static_cast<int>(pcPhaseOp.getInQubits().size() +
+                                    pcPhaseOp.getInCtrlQubits().size());
+        })
+        .Case<quantum::QubitUnitaryOp>([](auto qubitUnitaryOp) {
+            return static_cast<int>(qubitUnitaryOp.getInQubits().size() +
+                                    qubitUnitaryOp.getInCtrlQubits().size());
+        })
+        .Case<quantum::SetStateOp>(
+            [](auto setStateOp) { return static_cast<int>(setStateOp.getInQubits().size()); })
+        .Case<quantum::SetBasisStateOp>([](auto setBasisStateOp) {
+            return static_cast<int>(setBasisStateOp.getInQubits().size());
+        })
         .Default(0);
 }
 
@@ -307,7 +321,8 @@ void ResourceAnalysis::collectOperation(Operation *op, ResourceResult &result, b
 {
     // Quantum gates
     if (isa<quantum::CustomOp, quantum::PauliRotOp, quantum::GlobalPhaseOp, quantum::MultiRZOp,
-            quantum::QubitUnitaryOp, quantum::SetStateOp, quantum::SetBasisStateOp>(op)) {
+            quantum::PCPhaseOp, quantum::QubitUnitaryOp, quantum::SetStateOp,
+            quantum::SetBasisStateOp>(op)) {
         std::string name = getGateOpName(op, isAdjoint);
         int nQubits = getGateQubitCount(op);
         result.operations[name][nQubits] += 1;
