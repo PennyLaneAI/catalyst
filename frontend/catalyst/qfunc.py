@@ -133,31 +133,6 @@ def configure_mcm_and_try_one_shot(qnode, args, kwargs, pass_pipeline=None):
     if mcm_config.mcm_method != "one-shot":
         return None
 
-    # Special case for measurements_from_{samples/counts} transforms. If the default is determined
-    # to be one-shot, but no mcms are being used, we don't want to raise an error outright. Since
-    # the mcm determination happens later, we currently always fallback to single-branch if the
-    # user hasn't specified one-shot explicitly. TODO: remove need for special case
-    no_user_mcm_method = qnode.execute_kwargs["mcm_method"] is None
-    uses_measurements_from_samples = uses_transform(qnode, "measurements_from_samples")
-    uses_measurements_from_counts = uses_transform(qnode, "measurements_from_counts")
-    if no_user_mcm_method and (uses_measurements_from_samples or uses_measurements_from_counts):
-        return None
-
-    # These transforms are currently not compatible with one-shot when used manually,
-    # although they can be used from within a device transform program.
-    if uses_measurements_from_samples:
-        raise CompileError(
-            "The 'measurements_from_samples' transform is not supported with the chosen or default "
-            "mcm_method 'one-shot'. Please consider using 'single-branch-statistics' if you need "
-            "to use this transform explicitly."
-        )
-    if uses_measurements_from_counts:
-        raise CompileError(
-            "The 'measurements_from_counts' transform is not supported with the chosen or default "
-            "mcm_method 'one-shot'. Please consider using 'single-branch-statistics' if you need "
-            "to use this transform explicitly."
-        )
-
     try:
         return Function(
             dynamic_one_shot(qnode, mcm_config=mcm_config, pass_pipeline=pass_pipeline)
@@ -178,7 +153,7 @@ def _reconstruct_output_with_classical_values(
     Returns:
         results: Reconstructed output with classical values inserted
     """
-    if not classical_values:
+    if len(classical_values) == 0:
         return measurement_results
 
     total_expected = len(classical_values) + len(measurement_results)
@@ -370,6 +345,27 @@ def _reshape_for_shot_vector(mcm_method, result, shot_vector):
         start_idx += shot * copies
     result = tuple(result_list)
     return result
+
+
+def _aggregate_preprocessed_results(results):
+    """Aggregate per-shot results that were already postprocessed by a transform."""
+    if isinstance(results, tuple):
+        return tuple(jnp.mean(r, axis=0) for r in results)
+
+    if hasattr(results, "ndim") and results.ndim >= 1:
+        return (jnp.mean(results, axis=0),)
+
+    return (results,)
+
+
+def _parse_mcm_results(cpy_tape, results):
+    """Process results containing terminal measurements and MCM tracking values."""
+    results_list = list(results)
+    out = parse_native_mid_circuit_measurements(
+        cpy_tape, results=tuple(results_list), postselect_mode="pad-invalid-samples"
+    )
+
+    return [out] if len(cpy_tape.measurements) == 1 else list(out)
 
 
 def _process_terminal_measurements(mcm_method, cpy_tape, out, snapshots, shot_vector):
@@ -607,16 +603,21 @@ def dynamic_one_shot(qnode, **kwargs):
         shot_vector = _get_shot_vector(qnode)
         snapshots, out = _get_snapshot_results(mcm_config.mcm_method, cpy_tape, out)
 
-        if has_mcm and len(cpy_tape.measurements) > 0:
-            out = parse_native_mid_circuit_measurements(
-                cpy_tape, results=results, postselect_mode="pad-invalid-samples"
-            )
-            if len(cpy_tape.measurements) == 1:
-                out = (out,)
-        elif len(cpy_tape.measurements) > 0:
-            out = _process_terminal_measurements(
-                mcm_config.mcm_method, cpy_tape, out, snapshots, shot_vector
-            )
+        # Check if the measurements have been preprocessed by a transform
+        results_preprocessed = (
+            uses_transform(qnode, "measurements_from_samples")
+            or uses_transform(qnode, "measurements_from_counts")
+        )
+
+        if len(cpy_tape.measurements) > 0:
+            if results_preprocessed:
+                out = _aggregate_preprocessed_results(results)
+            elif has_mcm:
+                out = _parse_mcm_results(cpy_tape, results)
+            else:
+                out = _process_terminal_measurements(
+                    mcm_config.mcm_method, cpy_tape, out, snapshots, shot_vector
+                )
 
         ctx = OutputContext(
             cpy_tape=cpy_tape,
