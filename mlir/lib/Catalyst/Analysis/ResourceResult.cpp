@@ -36,7 +36,7 @@ static int64_t applyMerge(int64_t a, int64_t b, MergeMethod method)
     case MergeMethod::Sum:
         return a + b;
     }
-    return a + b; // unreachable, silences warning
+    return -1; // unreachable, silences warning
 }
 
 void ResourceResult::mergeWith(const ResourceResult &other, MergeMethod method)
