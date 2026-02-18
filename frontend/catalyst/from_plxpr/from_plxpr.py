@@ -311,7 +311,6 @@ def handle_qnode(
             tkwargs={"gate_set": self.decompose_tkwargs.get("gate_set", [])},
         )
     elif qml.decomposition.enabled_graph() and self.requires_decompose_lowering:
-        # Use the graph-based decomposition when graph is enabled
         closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
             inner_jaxpr=closed_jaxpr.jaxpr,
             consts=closed_jaxpr.consts,
@@ -464,7 +463,6 @@ def handle_transform(
         and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
     ):
         _set_decompose_lowering_state(self)
-        # TODO: Might need to add self.decompose_tkwargs = tkwargs here.
 
     catalyst_pass_name = transform.pass_name
     if catalyst_pass_name is None:
