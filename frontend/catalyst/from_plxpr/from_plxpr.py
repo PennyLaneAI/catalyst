@@ -293,7 +293,7 @@ def handle_qnode(
             tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
         )
 
-    if stopping_condition := self.decompose_tkwargs.get("stopping_condition"):        
+    if stopping_condition := self.decompose_tkwargs.get("stopping_condition"):
         # Use the plxpr decompose transform and ignore graph decomposition
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
@@ -459,11 +459,13 @@ def handle_transform(
         and qml.decomposition.enabled_graph()
     ):
         return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs)
-    elif hasattr(transform._plxpr_transform, "__name__") and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr":
+    elif (
+        hasattr(transform._plxpr_transform, "__name__")
+        and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
+    ):
         _set_decompose_lowering_state(self)
         # TODO: Might need to add self.decompose_tkwargs = tkwargs here.
 
-    
     catalyst_pass_name = transform.pass_name
     if catalyst_pass_name is None:
         catalyst_pass_name = transforms_to_passes.get(transform, (None,))[0]
@@ -577,7 +579,9 @@ def trace_from_pennylane(
     return jaxpr, out_type, out_treedef, sig
 
 
-def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=None, tkwargs=None, stopping_condition=None):
+def _apply_compiler_decompose_to_plxpr(
+    inner_jaxpr, consts, ncargs, tgateset=None, tkwargs=None, stopping_condition=None
+):
     """Apply the compiler-specific decomposition for a given JAXPR.
 
     This function first disables the graph-based decomposition optimization
@@ -632,7 +636,7 @@ def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=Non
 
     if graph_enabled:
         qml.decomposition.enable_graph()
-    
+
     return final_jaxpr
 
 
