@@ -274,7 +274,6 @@ class TestGraphDecomposition:
         assert "MultiRZ" in expected_resources
         assert resources == expected_resources
 
-
     @pytest.mark.skip(
         reason="inconsistent type and error msg across gcc/clang on arm/x86 for undefined symbols"
     )
