@@ -1384,7 +1384,7 @@ def reduce_t_depth(qnode):
 
     >>> fig1.savefig('path_to_file1.png', dpi=300, bbox_inches="tight") # doctest: +SKIP
 
-    .. figure:: ../../../../doc/_static/reduce-t-depth-example1.png
+    .. figure:: ../../../doc/_static/reduce-t-depth-example1.png
         :width: 35%
         :alt: Graphical representation of circuit without ``reduce_t_depth``
         :align: left
@@ -1393,7 +1393,7 @@ def reduce_t_depth(qnode):
 
     >>> fig2.savefig('path_to_file2.png', dpi=300, bbox_inches="tight") # doctest: +SKIP
 
-    .. figure:: ../../../../doc/_static/reduce-t-depth-example2.png
+    .. figure:: ../../../doc/_static/reduce-t-depth-example2.png
         :width: 35%
         :alt: Graphical representation of circuit with ``reduce_t_depth``
         :align: left
