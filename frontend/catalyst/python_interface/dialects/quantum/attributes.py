@@ -30,7 +30,7 @@ from xdsl.ir import (
 from xdsl.irdl import AnyOf, AttrConstraint, irdl_attr_definition
 from xdsl.parser import AttrParser
 from xdsl.printer import Printer
-from xdsl.utils.exceptions import ParseError
+from xdsl.utils.exceptions import ParseError, VerifyException
 
 ################################################################
 ######################## ATTRIBUTES ############################
@@ -99,15 +99,26 @@ class QubitType(ParametrizedAttribute, TypeAttribute):
         level: str | StringAttr = QubitLevel.Abstract.value,
         role: str | StringAttr = QubitRole.Null.value,
     ):
-        level_str = level.data if isinstance(level, StringAttr) else level
-        role_str = role.data if isinstance(role, StringAttr) else role
+        level = level if isinstance(level, StringAttr) else StringAttr(level)
+        role = role if isinstance(role, StringAttr) else StringAttr(role)
+        super().__init__(level, role)
 
-        if level_str not in QubitLevel.__members__.values():
-            raise ValueError(f"Invalid level for 'QubitType': {level}.")
-        if role_str not in QubitRole.__members__.values():
-            raise ValueError(f"Invalid role for 'QubitType': {role}.")
+    def verify(self) -> None:
+        """Verify that the attribute is defined correctly."""
+        level = self.level.data
+        role = self.role.data
+        allowed_levels = list(QubitLevel.__members__.values())
+        allowed_roles = list(QubitRole.__members__.values())
 
-        super().__init__(StringAttr(level_str), StringAttr(role_str))
+        if level not in allowed_levels:
+            raise VerifyException(
+                f"Invalid value {level} for 'QubitType.level'. Allowed values are {allowed_levels}."
+            )
+
+        if role not in allowed_roles:
+            raise VerifyException(
+                f"Invalid value {role} for 'QubitType.role'. Allowed values are {allowed_roles}."
+            )
 
     def print_parameters(self, printer: Printer):
         params_to_print = []
@@ -149,10 +160,6 @@ class QubitType(ParametrizedAttribute, TypeAttribute):
                 final_params = [level, role]
 
             case 2:
-                if optional_params[0] not in QubitLevel.__members__.values():
-                    raise ParseError(f"Invalid value for 'QubitType.level': {optional_params[0]}.")
-                if optional_params[1] not in QubitRole.__members__.values():
-                    raise ParseError(f"Invalid value for 'QubitType.role': {optional_params[1]}.")
                 final_params = optional_params
 
             case _:
@@ -172,11 +179,18 @@ class QuregType(ParametrizedAttribute, TypeAttribute):
     level: StringAttr
 
     def __init__(self, level: str | StringAttr = QubitLevel.Abstract.value):
-        level_str = level.data if isinstance(level, StringAttr) else level
-        if level_str not in QubitLevel.__members__.values():
-            raise ValueError(f"Invalid level for 'QubitType': {level}.")
+        level = level if isinstance(level, StringAttr) else StringAttr(level)
+        super().__init__(level)
 
-        super().__init__(StringAttr(level_str))
+    def verify(self) -> None:
+        """Verify that the attribute is defined correctly."""
+        level = self.level.data
+        allowed_levels = list(QubitLevel.__members__.values())
+
+        if level not in allowed_levels:
+            raise VerifyException(
+                f"Invalid value {level} for 'QuregType.level'. Allowed values are {allowed_levels}."
+            )
 
     def print_parameters(self, printer: Printer):
         if self.level.data == QubitLevel.Abstract.value:
@@ -190,19 +204,20 @@ class QuregType(ParametrizedAttribute, TypeAttribute):
         optional_params = parser.parse_optional_comma_separated_list(
             delimiter=parser.Delimiter.ANGLE, parse=parser.parse_str_literal
         )
-
         optional_params = optional_params or []
-        if len(optional_params) > 1:
-            raise ParseError(
-                f"Expected 1 or less parameters for 'QuregType', got {optional_params}."
-            )
 
-        if len(optional_params) == 1:
-            if optional_params[0] not in QubitLevel.__members__.values():
-                raise ParseError(f"Invalid value for 'QuregType.level': {optional_params[0]}.")
-            return [StringAttr(optional_params[0])]
+        final_params = []
+        match len(optional_params)
+            case 0:
+                final_params = [StringAttr(QubitLevel.Abstract.value)]
+            case 1:
+                final_params = [StringAttr(optional_params[0])]
+            case _:
+                raise ParseError(
+                    f"Expected 1 or fewer parameters for 'QuregType', got {optional_params}."
+                )
 
-        return [StringAttr(QubitLevel.Abstract.value)]
+        return final_params
 
 
 @irdl_attr_definition
