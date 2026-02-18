@@ -14,12 +14,8 @@
 
 #define DEBUG_TYPE "dynamic-one-shot"
 
-#include <optional>
 #include <unordered_map>
 #include <unordered_set>
-#include <vector>
-
-#include "llvm/ADT/SmallSet.h"
 
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -33,6 +29,7 @@
 #include "stablehlo/dialect/StablehloOps.h"
 
 #include "Quantum/IR/QuantumDialect.h"
+#include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
@@ -322,35 +319,6 @@ scf::ForOp createForLoop(IRRewriter &builder, Value shots, ValueRange loopIterAr
     auto forOp = scf::ForOp::create(builder, loc, lb, ub, step, loopIterArgs);
 
     return forOp;
-}
-
-std::optional<quantum::MeasurementProcess> getMPFromValue(Value v)
-{
-    // Get the MP operation that produces a Value v somewhere in the MP's forward slice.
-    // In other words, get the MP operations that a Value v comes from.
-    // Because an MP and the corresponding returned Value is usually not super far away, doing
-    // an entire backslice would not be ideal, since that could possibly backslice to the very
-    // beginning of a function.
-    // So we just depth-first search from the Value directly.
-
-    Operation *defOp = v.getDefiningOp();
-    if (!defOp) {
-        // Reached a block argument
-        return std::nullopt;
-    }
-
-    if (auto mp = dyn_cast<quantum::MeasurementProcess>(defOp)) {
-        return mp;
-    }
-
-    for (Value operand : defOp->getOperands()) {
-        std::optional<quantum::MeasurementProcess> candidate = getMPFromValue(operand);
-        if (candidate.has_value()) {
-            return candidate;
-        }
-    }
-
-    return std::nullopt;
 }
 
 std::unordered_map<size_t, size_t>
@@ -832,9 +800,9 @@ LogicalResult prepareForLoopInitArgs(IRRewriter &builder, func::FuncOp oneShotKe
 
     SmallVector<quantum::MeasurementProcess> qnodeMPs;
     for (Value returnValue : retOp->getOperands()) {
-        std::optional<quantum::MeasurementProcess> mp = getMPFromValue(returnValue);
-        assert(mp.has_value() && "Classical qnode return values not supported in dynamic one-shot");
-        qnodeMPs.push_back(*mp);
+        auto mp = dyn_cast<quantum::MeasurementProcess>(returnValue.getDefiningOp());
+        assert(mp && "Classical qnode return values not supported in dynamic one-shot");
+        qnodeMPs.push_back(mp);
     }
 
     builder.setInsertionPointToEnd(&qnodeFunc.getBody().front());
@@ -916,7 +884,7 @@ void constructForLoopSampleBody(IRRewriter &builder, scf::ForOp forOp, func::Fun
     if (ShapedType::isDynamic(oneShotSampleShape[1])) {
         Operation *kernelRetOp = oneShotKernel.getBody().back().getTerminator();
         auto kernelSampleOp =
-            dyn_cast<quantum::SampleOp>(*getMPFromValue(kernelRetOp->getOperand(retIdx)));
+            dyn_cast<quantum::SampleOp>(kernelRetOp->getOperand(retIdx).getDefiningOp());
         assert(kernelSampleOp && kernelSampleOp.getDynamicShape().size() == 1 &&
                "One-shot kernal sample shape must have at most 1 dynamic dimension");
         numQubits = index::CastSOp::create(builder, loc, builder.getIndexType(),
@@ -1008,7 +976,7 @@ void postProcessLoopProbsResults(IRRewriter &builder, scf::ForOp forOp, func::Fu
     if (ShapedType::isDynamic(probsType.getShape()[0])) {
         Operation *kernelRetOp = oneShotKernel.getBody().back().getTerminator();
         auto kernelProbsOp =
-            dyn_cast<quantum::ProbsOp>(*getMPFromValue(kernelRetOp->getOperand(retIdx)));
+            dyn_cast<quantum::ProbsOp>(kernelRetOp->getOperand(retIdx).getDefiningOp());
 
         Value probsDynamicShape = cloneMapper.lookup(kernelProbsOp.getDynamicShape());
 
