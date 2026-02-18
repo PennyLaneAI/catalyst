@@ -252,6 +252,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* A new AI policy document is now applied across the PennyLaneAI organization for all AI contributions.
+  [(#2488)](https://github.com/PennyLaneAI/catalyst/pull/2488)
+
 * Update `mlir_specs` to account for new `marker` functionality in PennyLane.
   [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
   
