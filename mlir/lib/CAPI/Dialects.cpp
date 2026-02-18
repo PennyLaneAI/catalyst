@@ -21,7 +21,7 @@
 #include "Ion/IR/IonDialect.h"
 #include "MBQC/IR/MBQCDialect.h"
 #include "Mitigation/IR/MitigationDialect.h"
-#include "QEC/IR/QECDialect.h"
+#include "PBC/IR/PBCDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 
 MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(Quantum, quantum, catalyst::quantum::QuantumDialect)
@@ -31,4 +31,4 @@ MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(Mitigation, mitigation,
                                       catalyst::mitigation::MitigationDialect)
 MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(Ion, ion, catalyst::ion::IonDialect)
 MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(MBQC, mbqc, catalyst::mbqc::MBQCDialect)
-MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(QEC, qec, catalyst::qec::QECDialect)
+MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(PBC, pbc, catalyst::pbc::PBCDialect)

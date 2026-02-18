@@ -22,7 +22,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "QEC/IR/QECDialect.h"
+#include "PBC/IR/PBCDialect.h"
 #include "Quantum/Transforms/Patterns.h"
 
 using namespace llvm;

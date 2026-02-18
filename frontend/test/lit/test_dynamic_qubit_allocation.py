@@ -21,7 +21,7 @@ Unit tests for the dynamic qubit allocation.
 import pennylane as qml
 
 from catalyst import qjit
-from catalyst.jax_primitives import qalloc_p, qdealloc_qb_p, qextract_p, subroutine
+from catalyst.jax_primitives import qalloc_p, qdealloc_qb_p, qextract_p
 
 
 @qjit(target="mlir")
@@ -251,7 +251,7 @@ def test_quantum_subroutine():
     Test passing dynamically allocated wires into a quantum subroutine.
     """
 
-    @subroutine
+    @qml.capture.subroutine
     def flip(w1, w2, w3, theta):
         qml.X(w1)
         qml.Y(w2)
