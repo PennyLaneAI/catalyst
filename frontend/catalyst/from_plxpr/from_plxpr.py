@@ -286,7 +286,6 @@ def handle_qnode(
 
     # Plxpr decomposition for templates
     if self.requires_decompose_lowering:
-        print("Performing template decomposition.")
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
             consts=consts,
@@ -296,7 +295,6 @@ def handle_qnode(
 
     if stopping_condition := self.decompose_tkwargs.get("stopping_condition"):        
         # Use the plxpr decompose transform and ignore graph decomposition
-        print("Plxpr decomposition for stopping condition.")
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
             consts=consts,
@@ -305,7 +303,7 @@ def handle_qnode(
             stopping_condition=stopping_condition,
         )
     elif not qml.decomposition.enabled_graph() and self.requires_decompose_lowering:
-        print("Performing plxpr decomposition.")
+        # Use the plxpr decompose transform when graph is disabled
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
             consts=consts,
@@ -313,7 +311,7 @@ def handle_qnode(
             tkwargs={"gate_set": self.decompose_tkwargs.get("gate_set", [])},
         )
     elif qml.decomposition.enabled_graph() and self.requires_decompose_lowering:
-        print("Performing graph decomposition.")
+        # Use the graph-based decomposition when graph is enabled
         closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
             inner_jaxpr=closed_jaxpr.jaxpr,
             consts=closed_jaxpr.consts,
@@ -324,7 +322,6 @@ def handle_qnode(
         # Fallback to the legacy decomposition if the graph-based decomposition failed
         if not graph_succeeded:
             # Remove the decompose-lowering pass from the pipeline
-            print("Graph decomposition failed. Falling back to legacy decomposition.")
             self._pass_pipeline = [
                 p for p in self._pass_pipeline if p.pass_name != "decompose-lowering"
             ]
