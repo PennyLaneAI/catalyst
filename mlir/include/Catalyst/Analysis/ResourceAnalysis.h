@@ -16,11 +16,11 @@
 
 #include "llvm/ADT/StringMap.h"
 
-#include "PBC/IR/PBCOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
 
 #include "Catalyst/Analysis/ResourceResult.h"
+#include "PBC/IR/PBCOps.h"
 
 using namespace mlir;
 
