@@ -1258,8 +1258,8 @@ class TestDynamicOneShotMLIRPass:
 
     def test_mlir_one_shot_pass_dynamic_shots(self, backend):
         """
-        Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with a
-        dynamic number of shots
+        Test that the mlir implementation of --dynamic-one-shot pass can be used from frontend with
+        a dynamic number of shots.
         """
 
         @qjit(capture=True, seed=12345)
