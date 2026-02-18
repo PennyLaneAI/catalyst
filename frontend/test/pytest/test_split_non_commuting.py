@@ -17,7 +17,7 @@ Integration test for the split non-commuting pass.
 """
 
 import numpy as np
-import pennylane as qml
+import pennylane as qp
 import pytest
 
 from catalyst import qjit
@@ -26,9 +26,9 @@ from catalyst import qjit
 @pytest.mark.parametrize(
     "hamiltonian",
     [
-        [qml.Z(0) + qml.X(1) + 2 * qml.Y(2), lambda term1, term2, term3: term1 + term2 + 2 * term3],
+        [qp.Z(0) + qp.X(1) + 2 * qp.Y(2), lambda term1, term2, term3: term1 + term2 + 2 * term3],
         [
-            3 * qml.Z(0) + qml.X(1) + 2 * qml.Y(2),
+            3 * qp.Z(0) + qp.X(1) + 2 * qp.Y(2),
             lambda term1, term2, term3: 3 * term1 + term2 + 2 * term3,
         ],
     ],
@@ -39,52 +39,52 @@ def test_split_non_commuting_integration(hamiltonian):
     Test that split non-commuting pass produces the same results as
 
     """
-    dev = qml.device("lightning.qubit", wires=3)
+    dev = qp.device("lightning.qubit", wires=3)
     hamiltonian_obs, post_process_fn = hamiltonian
 
     # Circuit with Hamiltonian observable
     # Expected: split into individual terms with coefficients
     @qjit
-    @qml.transform(pass_name="split-non-commuting")
-    @qml.qnode(dev)
+    @qp.transform(pass_name="split-non-commuting")
+    @qp.qnode(dev)
     def circ1():
-        qml.Rot(0.3, 0.5, 0.7, wires=0)
-        qml.Rot(0.2, 0.4, 0.6, wires=1)
-        qml.Rot(0.1, 0.8, 0.9, wires=2)
-        return qml.expval(hamiltonian_obs), qml.expval(qml.Z(1))
+        qp.Rot(0.3, 0.5, 0.7, wires=0)
+        qp.Rot(0.2, 0.4, 0.6, wires=1)
+        qp.Rot(0.1, 0.8, 0.9, wires=2)
+        return qp.expval(hamiltonian_obs), qp.expval(qp.Z(1))
 
     # Manual implementation: split into individual execution and compute weighted sum
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def group0():
-        qml.Rot(0.3, 0.5, 0.7, wires=0)
-        qml.Rot(0.2, 0.4, 0.6, wires=1)
-        qml.Rot(0.1, 0.8, 0.9, wires=2)
-        return qml.expval(qml.Z(0))
+        qp.Rot(0.3, 0.5, 0.7, wires=0)
+        qp.Rot(0.2, 0.4, 0.6, wires=1)
+        qp.Rot(0.1, 0.8, 0.9, wires=2)
+        return qp.expval(qp.Z(0))
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def group1():
-        qml.Rot(0.3, 0.5, 0.7, wires=0)
-        qml.Rot(0.2, 0.4, 0.6, wires=1)
-        qml.Rot(0.1, 0.8, 0.9, wires=2)
-        return qml.expval(qml.X(1))
+        qp.Rot(0.3, 0.5, 0.7, wires=0)
+        qp.Rot(0.2, 0.4, 0.6, wires=1)
+        qp.Rot(0.1, 0.8, 0.9, wires=2)
+        return qp.expval(qp.X(1))
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def group2():
-        qml.Rot(0.3, 0.5, 0.7, wires=0)
-        qml.Rot(0.2, 0.4, 0.6, wires=1)
-        qml.Rot(0.1, 0.8, 0.9, wires=2)
-        return qml.expval(qml.Y(2))
+        qp.Rot(0.3, 0.5, 0.7, wires=0)
+        qp.Rot(0.2, 0.4, 0.6, wires=1)
+        qp.Rot(0.1, 0.8, 0.9, wires=2)
+        return qp.expval(qp.Y(2))
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def group3():
-        qml.Rot(0.3, 0.5, 0.7, wires=0)
-        qml.Rot(0.2, 0.4, 0.6, wires=1)
-        qml.Rot(0.1, 0.8, 0.9, wires=2)
-        return qml.expval(qml.Z(1))
+        qp.Rot(0.3, 0.5, 0.7, wires=0)
+        qp.Rot(0.2, 0.4, 0.6, wires=1)
+        qp.Rot(0.1, 0.8, 0.9, wires=2)
+        return qp.expval(qp.Z(1))
 
     def circ2():
         return group0(), group1(), group2(), group3()
@@ -109,40 +109,40 @@ def test_split_non_commuting_with_tensor_product():
     """
     Test split-to-single-terms with tensor product observables.
     """
-    dev = qml.device("lightning.qubit", wires=3)
+    dev = qp.device("lightning.qubit", wires=3)
 
     @qjit
-    @qml.transform(pass_name="split-non-commuting")
-    @qml.qnode(dev)
+    @qp.transform(pass_name="split-non-commuting")
+    @qp.qnode(dev)
     def circ1():
-        qml.Rot(0.4, 0.3, 0.2, wires=0)
-        qml.Rot(0.6, 0.5, 0.4, wires=1)
-        qml.Rot(0.8, 0.7, 0.6, wires=2)
-        return qml.expval(2 * (qml.Z(0) @ qml.X(1)) + 3 * qml.Y(2)), qml.expval(qml.Z(1))
+        qp.Rot(0.4, 0.3, 0.2, wires=0)
+        qp.Rot(0.6, 0.5, 0.4, wires=1)
+        qp.Rot(0.8, 0.7, 0.6, wires=2)
+        return qp.expval(2 * (qp.Z(0) @ qp.X(1)) + 3 * qp.Y(2)), qp.expval(qp.Z(1))
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def group0():
-        qml.Rot(0.4, 0.3, 0.2, wires=0)
-        qml.Rot(0.6, 0.5, 0.4, wires=1)
-        qml.Rot(0.8, 0.7, 0.6, wires=2)
-        return qml.expval(qml.Z(0) @ qml.X(1))
+        qp.Rot(0.4, 0.3, 0.2, wires=0)
+        qp.Rot(0.6, 0.5, 0.4, wires=1)
+        qp.Rot(0.8, 0.7, 0.6, wires=2)
+        return qp.expval(qp.Z(0) @ qp.X(1))
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def group1():
-        qml.Rot(0.4, 0.3, 0.2, wires=0)
-        qml.Rot(0.6, 0.5, 0.4, wires=1)
-        qml.Rot(0.8, 0.7, 0.6, wires=2)
-        return qml.expval(qml.Y(2))
+        qp.Rot(0.4, 0.3, 0.2, wires=0)
+        qp.Rot(0.6, 0.5, 0.4, wires=1)
+        qp.Rot(0.8, 0.7, 0.6, wires=2)
+        return qp.expval(qp.Y(2))
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def group2():
-        qml.Rot(0.4, 0.3, 0.2, wires=0)
-        qml.Rot(0.6, 0.5, 0.4, wires=1)
-        qml.Rot(0.8, 0.7, 0.6, wires=2)
-        return qml.expval(qml.Z(1))
+        qp.Rot(0.4, 0.3, 0.2, wires=0)
+        qp.Rot(0.6, 0.5, 0.4, wires=1)
+        qp.Rot(0.8, 0.7, 0.6, wires=2)
+        return qp.expval(qp.Z(1))
 
     def circ2():
         return group0(), group1(), group2()
@@ -168,29 +168,29 @@ def test_split_non_commuting_with_Identity():
     Identity observables are removed from the quantum circuit since their
     expectation value is always 1, and their coefficient is added in post-processing.
     """
-    dev = qml.device("lightning.qubit", wires=3)
+    dev = qp.device("lightning.qubit", wires=3)
 
     @qjit
-    @qml.transform(pass_name="split-non-commuting")
-    @qml.qnode(dev)
+    @qp.transform(pass_name="split-non-commuting")
+    @qp.qnode(dev)
     def circ1():
-        qml.Rot(0.5, 0.3, 0.2, wires=0)
-        qml.Rot(0.4, 0.6, 0.1, wires=1)
-        return qml.expval(qml.Z(0) + 2 * qml.X(1) + 0.7 * qml.Identity(2))
+        qp.Rot(0.5, 0.3, 0.2, wires=0)
+        qp.Rot(0.4, 0.6, 0.1, wires=1)
+        return qp.expval(qp.Z(0) + 2 * qp.X(1) + 0.7 * qp.Identity(2))
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def group0():
-        qml.Rot(0.5, 0.3, 0.2, wires=0)
-        qml.Rot(0.4, 0.6, 0.1, wires=1)
-        return qml.expval(qml.Z(0))
+        qp.Rot(0.5, 0.3, 0.2, wires=0)
+        qp.Rot(0.4, 0.6, 0.1, wires=1)
+        return qp.expval(qp.Z(0))
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def group1():
-        qml.Rot(0.5, 0.3, 0.2, wires=0)
-        qml.Rot(0.4, 0.6, 0.1, wires=1)
-        return qml.expval(qml.X(1))
+        qp.Rot(0.5, 0.3, 0.2, wires=0)
+        qp.Rot(0.4, 0.6, 0.1, wires=1)
+        return qp.expval(qp.X(1))
 
     def circ2():
         return group0(), group1()
@@ -212,47 +212,47 @@ def test_split_non_commuting_with_Identity():
 def test_lightning_execution_with_structure():
     """Test that the split non-commuting pass on lightning.qubit for a circuit with program
     structure is executable and returns results as expected."""
-    dev = qml.device("lightning.qubit", wires=10)
+    dev = qp.device("lightning.qubit", wires=10)
 
-    @qml.for_loop(0, 10, 1)
+    @qp.for_loop(0, 10, 1)
     def for_fn(i):
-        qml.H(i)
-        qml.S(i)
-        qml.RZ(phi=0.1, wires=[i])
+        qp.H(i)
+        qp.S(i)
+        qp.RZ(phi=0.1, wires=[i])
 
-    @qml.while_loop(lambda i: i < 10)
+    @qp.while_loop(lambda i: i < 10)
     def while_fn(i):
-        qml.H(i)
-        qml.S(i)
-        qml.RZ(phi=0.1, wires=[i])
+        qp.H(i)
+        qp.S(i)
+        qp.RZ(phi=0.1, wires=[i])
         i = i + 1
         return i
 
     @qjit
-    @qml.transform(pass_name="split-non-commuting")
-    @qml.qnode(dev)
+    @qp.transform(pass_name="split-non-commuting")
+    @qp.qnode(dev)
     def circuit():
         for_fn()  # pylint: disable=no-value-for-parameter
         while_fn(0)
-        qml.CNOT(wires=[0, 1])
+        qp.CNOT(wires=[0, 1])
         return (
-            qml.expval(qml.Z(wires=0)),
-            qml.expval(qml.Y(wires=1)),
-            qml.expval(qml.X(wires=0)),
+            qp.expval(qp.Z(wires=0)),
+            qp.expval(qp.Y(wires=1)),
+            qp.expval(qp.X(wires=0)),
         )
 
     res = circuit()
 
     @qjit
-    @qml.qnode(dev)
+    @qp.qnode(dev)
     def circuit_ref():
         for_fn()  # pylint: disable=no-value-for-parameter
         while_fn(0)
-        qml.CNOT(wires=[0, 1])
+        qp.CNOT(wires=[0, 1])
         return (
-            qml.expval(qml.Z(wires=0)),
-            qml.expval(qml.Y(wires=1)),
-            qml.expval(qml.X(wires=0)),
+            qp.expval(qp.Z(wires=0)),
+            qp.expval(qp.Y(wires=1)),
+            qp.expval(qp.X(wires=0)),
         )
 
     res_ref = circuit_ref()
