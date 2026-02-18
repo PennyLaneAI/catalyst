@@ -63,7 +63,7 @@ def test_pauli_rot_lowering_with_ctrl_qubits():
 
 @pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_to_ppr():
-    """Test that Pauli rotation is converted to qec.ppr."""
+    """Test that Pauli rotation is converted to pbc.ppr."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
@@ -78,7 +78,7 @@ def test_pauli_rot_to_ppr():
 
     optimized_ir = test_pauli_rot_to_ppr_workflow.mlir_opt
     print(optimized_ir)
-    assert "qec.ppr" in optimized_ir
+    assert "pbc.ppr" in optimized_ir
 
 
 @pytest.mark.usefixtures("use_capture")
@@ -97,7 +97,8 @@ def test_pauli_rot_with_arbitrary_angle_to_ppr():
         return f()
 
     optimized_ir = test_pauli_rot_with_arbitrary_angle_to_ppr_workflow.mlir_opt
-    assert "qec.ppr.arbitrary" in optimized_ir
+    print(optimized_ir)
+    assert "pbc.ppr.arbitrary" in optimized_ir
 
 
 @pytest.mark.usefixtures("use_capture")
@@ -116,12 +117,12 @@ def test_pauli_rot_with_dynamic_angle_to_ppr():
         return f(0.42)
 
     optimized_ir = test_pauli_rot_with_dynamic_angle_to_ppr_workflow.mlir_opt
-    assert "qec.ppr.arbitrary" in optimized_ir
+    assert "pbc.ppr.arbitrary" in optimized_ir
 
 
 @pytest.mark.usefixtures("use_capture")
 def test_pauli_measure_to_ppm():
-    """Test that Pauli measurement is converted to qec.ppm."""
+    """Test that Pauli measurement is converted to pbc.ppm."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
@@ -135,7 +136,7 @@ def test_pauli_measure_to_ppm():
         return f()
 
     optimized_ir = test_pauli_measure_to_ppr_workflow.mlir_opt
-    assert "qec.ppm" in optimized_ir
+    assert "pbc.ppm" in optimized_ir
 
 
 @pytest.mark.usefixtures("use_capture")
