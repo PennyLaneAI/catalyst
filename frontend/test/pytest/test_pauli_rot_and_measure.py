@@ -1,4 +1,4 @@
-# Copyright 2025 Xanadu Quantum Technologies Inc.
+# Copyright 2025-2026 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ def test_pauli_rot_lowering():
     @qjit(pipelines=pipe, target="mlir")
     def test_pauli_rot_lowering_workflow():
 
-        @qml.qnode(qml.device("null.qubit", wires=1))
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f():
             qml.PauliRot(np.pi / 4, "X", wires=0)
 
@@ -42,7 +42,7 @@ def test_pauli_rot_lowering():
 
 @pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_lowering_with_ctrl_qubits():
-    """Test that Pauli rotation with control qubits is converted to pbc.ppr.
+    """Test that Pauli rotation with control qubits is converted to quantum.paulirot.
     Note that control PauliRot is currently not supported by the to_ppr pass.
     """
     pipe = [("pipe", ["quantum-compilation-stage"])]
@@ -50,7 +50,7 @@ def test_pauli_rot_lowering_with_ctrl_qubits():
     @qjit(pipelines=pipe, target="mlir")
     def test_pauli_rot_lowering_with_ctrl_qubits_workflow():
 
-        @qml.qnode(qml.device("null.qubit", wires=2))
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f():
             qml.ctrl(qml.PauliRot(np.pi / 4, "X", wires=0), control=1)
 
@@ -63,21 +63,22 @@ def test_pauli_rot_lowering_with_ctrl_qubits():
 
 @pytest.mark.usefixtures("use_capture")
 def test_pauli_rot_to_ppr():
-    """Test that Pauli rotation is converted to pbc.ppr."""
+    """Test that Pauli rotation is converted to qec.ppr."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     @to_ppr
     def test_pauli_rot_to_ppr_workflow():
 
-        @qml.qnode(qml.device("null.qubit", wires=1))
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f():
             qml.PauliRot(np.pi / 4, "X", wires=0)
 
         return f()
 
     optimized_ir = test_pauli_rot_to_ppr_workflow.mlir_opt
-    assert "pbc.ppr" in optimized_ir
+    print(optimized_ir)
+    assert "qec.ppr" in optimized_ir
 
 
 @pytest.mark.usefixtures("use_capture")
@@ -89,14 +90,14 @@ def test_pauli_rot_with_arbitrary_angle_to_ppr():
     @to_ppr
     def test_pauli_rot_with_arbitrary_angle_to_ppr_workflow():
 
-        @qml.qnode(qml.device("null.qubit", wires=1))
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f():
             qml.PauliRot(0.42, "X", wires=0)
 
         return f()
 
     optimized_ir = test_pauli_rot_with_arbitrary_angle_to_ppr_workflow.mlir_opt
-    assert "pbc.ppr.arbitrary" in optimized_ir
+    assert "qec.ppr.arbitrary" in optimized_ir
 
 
 @pytest.mark.usefixtures("use_capture")
@@ -108,33 +109,33 @@ def test_pauli_rot_with_dynamic_angle_to_ppr():
     @to_ppr
     def test_pauli_rot_with_dynamic_angle_to_ppr_workflow():
 
-        @qml.qnode(qml.device("null.qubit", wires=1))
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(x: float):
             qml.PauliRot(x, "X", wires=0)
 
         return f(0.42)
 
     optimized_ir = test_pauli_rot_with_dynamic_angle_to_ppr_workflow.mlir_opt
-    assert "pbc.ppr.arbitrary" in optimized_ir
+    assert "qec.ppr.arbitrary" in optimized_ir
 
 
 @pytest.mark.usefixtures("use_capture")
 def test_pauli_measure_to_ppm():
-    """Test that Pauli measurement is converted to pbc.ppm."""
+    """Test that Pauli measurement is converted to qec.ppm."""
     pipe = [("pipe", ["quantum-compilation-stage"])]
 
     @qjit(pipelines=pipe, target="mlir")
     @to_ppr
     def test_pauli_measure_to_ppr_workflow():
 
-        @qml.qnode(qml.device("null.qubit", wires=1))
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f():
             qml.pauli_measure("X", wires=0)
 
         return f()
 
     optimized_ir = test_pauli_measure_to_ppr_workflow.mlir_opt
-    assert "pbc.ppm" in optimized_ir
+    assert "qec.ppm" in optimized_ir
 
 
 @pytest.mark.usefixtures("use_capture")
@@ -151,7 +152,7 @@ def test_pauli_rot_to_ppr_pauli_word_error():
         @qjit(pipelines=pipe, target="mlir")
         def test_pauli_rot_to_ppr_pauli_word_error_workflow():
 
-            @qml.qnode(qml.device("null.qubit", wires=1))
+            @qml.qnode(qml.device("lightning.qubit", wires=1))
             def f():
                 qml.PauliRot(np.pi / 4, "A", wires=0)
 
@@ -171,7 +172,7 @@ def test_pauli_measure_to_ppr_pauli_word_error():
         @qjit(pipelines=pipe, target="mlir")
         def test_pauli_measure_to_ppr_pauli_word_error_workflow():
 
-            @qml.qnode(qml.device("null.qubit", wires=1))
+            @qml.qnode(qml.device("lightning.qubit", wires=1))
             def f():
                 qml.pauli_measure("A", wires=0)
 
