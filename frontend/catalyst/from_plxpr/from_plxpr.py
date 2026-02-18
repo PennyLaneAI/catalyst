@@ -294,12 +294,8 @@ def handle_qnode(
         self.requires_decompose_lowering
         and self.decompose_tkwargs.get("gate_set", None)
     )
-    print("use_device_specific_decomposition: ", use_device_specific_decomposition)
-    print("requires_decompose_lowering: ", self.requires_decompose_lowering)
-    print("decompose_tkwargs gate_set: ", self.decompose_tkwargs.get("gate_set", None))
     graph_succeeded = False
 
-    # Decomposing templated operations is not supported in graph-based decomposition yet.
     if stopping_condition := self.decompose_tkwargs.get("stopping_condition"):
         # Case 1: User specified a stopping condition in decomposition
         print("Case 1: User specified a stopping condition in decomposition.")
@@ -338,7 +334,13 @@ def handle_qnode(
         )
     elif qml.decomposition.enabled_graph():
         # Decomposing templated operations is not supported in graph-based decomposition yet.
-        # We are decomposing it at this layer lol
+        closed_jaxpr = _apply_compiler_decompose_to_plxpr(
+            inner_jaxpr=qfunc_jaxpr,
+            consts=consts,
+            ncargs=non_const_args,
+            tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
+        )
+
         if use_device_specific_decomposition:
             # Case 3: User did not specify a decomposition. Using graph-based decomposition on device-specific gate set.
             print("Case 3.1: User did not specify a decomposition. Using graph-based decomposition on device-specific gate set.")
