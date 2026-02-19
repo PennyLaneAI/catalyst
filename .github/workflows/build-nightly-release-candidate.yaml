@@ -87,9 +87,9 @@ jobs:
         rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/pennylane_catalyst-*
         rename "s/macosx_14/macosx_13/" dist/pennylane_catalyst-*
 
-    - name: Upload wheels
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        repository-url: https://test.pypi.org/legacy/
-        packages-dir: dist
-        verbose: true
+    # - name: Upload wheels
+    #   uses: pypa/gh-action-pypi-publish@release/v1
+    #   with:
+    #     repository-url: https://test.pypi.org/legacy/
+    #     packages-dir: dist
+    #     verbose: true
