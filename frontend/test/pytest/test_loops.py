@@ -309,7 +309,7 @@ class TestWhileLoops:
         # Expectation value of Z for state RX(theta)|0> is cos(theta)
         # Note: RX(theta) = exp(-i*theta/2*X).
         # State = (cos(theta/2)I - i*sin(theta/2)X)|0> = cos(theta/2)|0> - i*sin(theta/2)|1>
-        # <Z> = |cos(theta/2)|^2 - |-i*sin(theta/2)|^2 = cos^2(theta/2) - sin^2(theta/2) = cos(theta)
+        # <Z> = |cos(theta/2)|^2 - |-i*sin(theta/2)|^2 = cos(theta)
 
         n, m = 4, 3
         expected = np.cos(n * m * 0.1)
