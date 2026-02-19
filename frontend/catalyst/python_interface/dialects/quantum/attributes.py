@@ -168,6 +168,7 @@ class QubitType(ParametrizedAttribute, TypeAttribute):
                 final_params = [StringAttr(p) if isinstance(p, str) else p for p in optional_params]
 
             case _:
+                # pylint: disable=protected-access
                 raise ParseError(
                     parser._current_token.span,
                     f"Expected 2 or fewer parameters for 'QubitType', got {optional_params}.",
@@ -223,6 +224,7 @@ class QuregType(ParametrizedAttribute, TypeAttribute):
             case 1:
                 final_params = [StringAttr(optional_params[0])]
             case _:
+                # pylint: disable=protected-access
                 raise ParseError(
                     parser._current_token.span,
                     f"Expected 1 or fewer parameters for 'QuregType', got {optional_params}.",
