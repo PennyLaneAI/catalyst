@@ -790,23 +790,24 @@ def test_decomposition_inside_subroutine():
 
     @qml.qjit(capture=True, target="mlir")
     @qml.decompose(gate_set=qml.gate_sets.ROTATIONS_PLUS_CNOT)
-    @qml.qnode(qml.device('lightning.qubit', wires=5))
+    @qml.qnode(qml.device("lightning.qubit", wires=5))
     # CHECK-DAG: %0 = transform.apply_registered_pass "decompose-lowering"
     def subroutine_circuit():
         # CHECK: [[QREG:%.+]] = quantum.alloc
         # CHECK: [[QREG_1:%.+]] = call @f([[QREG]], %cst_1, %3) : (!quantum.reg, tensor<f64>, tensor<2xi64>) -> !quantum.reg
         # CHECK: [[QREG_2:%.+]] = call @f([[QREG_1]], %cst, %7) : (!quantum.reg, tensor<f64>, tensor<2xi64>) -> !quantum.reg
 
-        f(0.5, (0,1))
-        f(1.2, (2,3))
+        f(0.5, (0, 1))
+        f(1.2, (2, 3))
         return qml.probs(wires=0)
-
 
     # CHECK-DAG: func.func public @_isingxx_to_cnot_rx_cnot(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>)
     print(subroutine_circuit.mlir)
     qml.decomposition.disable_graph()
 
+
 test_decomposition_inside_subroutine()
+
 
 def test_decomposition_rule_name_update_multi_qubits():
     """Test the name of the decomposition rule with multi-qubit gates."""

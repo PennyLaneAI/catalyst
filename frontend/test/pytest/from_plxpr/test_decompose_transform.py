@@ -536,10 +536,10 @@ class TestGraphDecomposition:
 
         @qml.qjit(capture=True)
         @qml.decompose(gate_set=qml.gate_sets.ROTATIONS_PLUS_CNOT)
-        @qml.qnode(qml.device('lightning.qubit', wires=5))
+        @qml.qnode(qml.device("lightning.qubit", wires=5))
         def c():
-            f(0.5, (0,1))
-            f(1.2, (2,3))
+            f(0.5, (0, 1))
+            f(1.2, (2, 3))
             return qml.expval(qml.Z(0)), qml.expval(qml.Z(2))
 
         resources = qml.specs(c, level="device")().resources.gate_types
@@ -550,6 +550,7 @@ class TestGraphDecomposition:
         assert qml.math.allclose(r2, np.cos(1.2))
 
         qml.decomposition.disable_graph()
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
