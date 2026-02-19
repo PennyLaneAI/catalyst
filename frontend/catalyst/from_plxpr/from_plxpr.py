@@ -472,7 +472,7 @@ def _set_decompose_lowering_state(self):
         raise NotImplementedError("Multiple decomposition transforms are not yet supported.")
 
 
-def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs):
+def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs, use_graph=False):
     _set_decompose_lowering_state(self)
 
     next_eval = copy(self)
