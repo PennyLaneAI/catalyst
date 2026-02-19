@@ -209,7 +209,7 @@ def apply_pass(pass_name: str, *flags, **valued_options):
     def decorator(qnode):
         return PassPipelineWrapper(qnode, pass_name, *flags, **valued_options)
 
-    return decorator
+    return qml.transform(pass_name=pass_name, *flags, **valued_options)
 
 
 def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valued_options):
