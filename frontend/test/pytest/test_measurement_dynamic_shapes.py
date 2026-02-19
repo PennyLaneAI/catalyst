@@ -26,11 +26,10 @@ import pytest
 import catalyst
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_dynamic_sample(capfd):
+def test_dynamic_sample(capfd, capture_mode):
     """Test that a `sample` program with dynamic shots can be executed correctly and doesn't recompile."""
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=capture_mode)
     def workflow_dyn_sample(shots):
         print("compiling...")
         device = qml.device("lightning.qubit", wires=1)
@@ -56,11 +55,10 @@ def test_dynamic_sample(capfd):
     assert out.count("compiling...") == 1
 
 
-@pytest.mark.usefixtures("use_both_frontend")
-def test_dynamic_counts(capfd):
+def test_dynamic_counts(capfd, capture_mode):
     """Test that a `counts` program with dynamic shots can be executed correctly and doesn't recompile."""
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=capture_mode)
     def workflow_dyn_counts(shots):
         print("compiling...")
         device = qml.device("lightning.qubit", wires=1)
@@ -89,7 +87,7 @@ def test_dynamic_counts(capfd):
 
 
 @pytest.mark.parametrize("readout", [qml.expval, qml.var])
-def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
+def test_dynamic_wires_scalar_readouts(readout, backend, capfd, capture_mode):
     """
     Test that a circuit with dynamic number of wires can be executed correctly.
 
@@ -113,7 +111,7 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
 
         return circ()
 
-    cat = catalyst.qjit(ref)
+    cat = catalyst.qjit(ref, capture=capture_mode)
 
     assert np.allclose(ref(10), cat(10))
     assert np.allclose(ref(4), cat(4))
@@ -122,7 +120,7 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd):
 
 
 @pytest.mark.parametrize("readout", [qml.probs])
-def test_dynamic_wires_statebased_with_wires(readout, backend, capfd):
+def test_dynamic_wires_statebased_with_wires(readout, backend, capfd, capture_mode):
     """
     Test that a circuit with dynamic number of wires can be executed correctly
     with state based measurements with wires specified.
@@ -148,7 +146,7 @@ def test_dynamic_wires_statebased_with_wires(readout, backend, capfd):
 
         return circ()
 
-    cat = catalyst.qjit(ref)
+    cat = catalyst.qjit(ref, capture=capture_mode)
 
     assert np.allclose(ref(10), cat(10))
     assert np.allclose(ref(4), cat(4))
@@ -157,7 +155,7 @@ def test_dynamic_wires_statebased_with_wires(readout, backend, capfd):
 
 
 @pytest.mark.parametrize("readout", [qml.probs, qml.state])
-def test_dynamic_wires_statebased_without_wires(readout, backend, capfd):
+def test_dynamic_wires_statebased_without_wires(readout, backend, capfd, capture_mode):
     """
     Test that a circuit with dynamic number of wires can be executed correctly
     with state based measurements without wires specified.
@@ -179,7 +177,7 @@ def test_dynamic_wires_statebased_without_wires(readout, backend, capfd):
 
         return circ(42)
 
-    cat = catalyst.qjit(ref)
+    cat = catalyst.qjit(ref, capture=capture_mode)
 
     assert np.allclose(ref(10), cat(10))
     assert np.allclose(ref(4), cat(4))
@@ -188,7 +186,7 @@ def test_dynamic_wires_statebased_without_wires(readout, backend, capfd):
 
 
 @pytest.mark.parametrize("shots", [3, (3, 4, 5)])
-def test_dynamic_wires_sample_with_wires(shots, backend, capfd):
+def test_dynamic_wires_sample_with_wires(shots, backend, capfd, capture_mode):
     """
     Test that a circuit with dynamic number of wires can be executed correctly
     with sample measurements with wires specified.
@@ -211,7 +209,7 @@ def test_dynamic_wires_sample_with_wires(shots, backend, capfd):
 
         return circ()
 
-    cat = catalyst.qjit(ref)
+    cat = catalyst.qjit(ref, capture=capture_mode)
     num_shots = 1 if isinstance(shots, int) else len(shots)
     for test_nqubits in (10, 4):
         expected = ref(test_nqubits)
@@ -223,7 +221,7 @@ def test_dynamic_wires_sample_with_wires(shots, backend, capfd):
 
 
 @pytest.mark.parametrize("shots", [3, (3, 4, 5), (7,) * 3])
-def test_dynamic_wires_sample_without_wires(shots, backend, capfd):
+def test_dynamic_wires_sample_without_wires(shots, backend, capfd, capture_mode):
     """
     Test that a circuit with dynamic number of wires can be executed correctly
     with sample measurements without wires specified.
@@ -246,7 +244,7 @@ def test_dynamic_wires_sample_without_wires(shots, backend, capfd):
 
         return circ()
 
-    cat = catalyst.qjit(ref)
+    cat = catalyst.qjit(ref, capture=capture_mode)
     num_shots = 1 if isinstance(shots, int) else len(shots)
     for test_nqubits in (10, 4):
         expected = ref(test_nqubits)
@@ -257,7 +255,7 @@ def test_dynamic_wires_sample_without_wires(shots, backend, capfd):
     assert out.count("compiling...") == 3
 
 
-def test_dynamic_wires_counts_with_wires(backend, capfd):
+def test_dynamic_wires_counts_with_wires(backend, capfd, capture_mode):
     """
     Test that a circuit with dynamic number of wires can be executed correctly
     with counts measurements with wires specified.
@@ -265,7 +263,7 @@ def test_dynamic_wires_counts_with_wires(backend, capfd):
     Note that Catalyst does not support shot vectors with counts.
     """
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=capture_mode)
     def func(num_qubits):
         print("compiling...")
         dev = qml.device(backend, wires=num_qubits)
@@ -287,7 +285,7 @@ def test_dynamic_wires_counts_with_wires(backend, capfd):
     assert out.count("compiling...") == 1
 
 
-def test_dynamic_wires_counts_without_wires(backend, capfd):
+def test_dynamic_wires_counts_without_wires(backend, capfd, capture_mode):
     """
     Test that a circuit with dynamic number of wires can be executed correctly
     with counts measurements without wires specified.
@@ -295,7 +293,7 @@ def test_dynamic_wires_counts_without_wires(backend, capfd):
     Note that Catalyst does not support shot vectors with counts.
     """
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=capture_mode)
     def func(num_qubits):
         print("compiling...")
         dev = qml.device(backend, wires=num_qubits)
@@ -321,13 +319,13 @@ def test_dynamic_wires_counts_without_wires(backend, capfd):
 
 
 @pytest.mark.parametrize("wires", [1.1, (1.1)])
-def test_wrong_wires_argument(backend, wires):
+def test_wrong_wires_argument(backend, wires, capture_mode):
     """
     Test that a circuit with a wrongly typed and shaped dynamic wire argument
     is correctly caught.
     """
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=capture_mode)
     def func(num_qubits):
         dev = qml.device(backend, wires=num_qubits)
 
@@ -343,10 +341,10 @@ def test_wrong_wires_argument(backend, wires):
         func(wires)
 
 
-def test_dynamic_shots_and_wires(capfd):
+def test_dynamic_shots_and_wires(capfd, capture_mode):
     """Test that a circuit with both dynamic shots and dynamic wires works correctly with qml.sample."""
 
-    @catalyst.qjit
+    @catalyst.qjit(capture=capture_mode)
     def workflow_dynamic_shots_and_wires(num_shots, num_wires):
         print("compiling...")
         device = qml.device("lightning.qubit", wires=num_wires)

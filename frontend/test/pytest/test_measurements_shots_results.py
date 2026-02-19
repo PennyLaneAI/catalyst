@@ -20,14 +20,11 @@ import pytest
 
 from catalyst import CompileError, qjit
 
-pytestmark = pytest.mark.usefixtures("use_both_frontend")
-
 
 class TestExpval:
     "Test expval with shots > 0"
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_identity(self, backend, tol_stochastic):
+    def test_identity(self, backend, tol_stochastic, capture_mode):
         """Test that identity expectation value (i.e. the trace) is 1."""
         n_wires = 2
         n_shots = 10000
@@ -44,14 +41,13 @@ class TestExpval:
             qml.CNOT(wires=[0, 1])
             return qml.expval(qml.Identity(wires=0)), qml.expval(qml.Identity(wires=1))
 
-        result = qjit(circuit, seed=37)()
+        result = qjit(circuit, seed=37, capture=capture_mode)()
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit()
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_pauliz(self, backend, tol_stochastic):
+    def test_pauliz(self, backend, tol_stochastic, capture_mode):
         """Test that PauliZ expectation value is correct"""
         n_wires = 2
         n_shots = 10000
@@ -68,13 +64,12 @@ class TestExpval:
             qml.CNOT(wires=[0, 1])
             return qml.expval(qml.PauliZ(wires=0)), qml.expval(qml.PauliZ(wires=1))
 
-        result = qjit(circuit, seed=37)()
+        result = qjit(circuit, seed=37, capture=capture_mode)()
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_paulix(self, backend, tol_stochastic):
+    def test_paulix(self, backend, tol_stochastic, capture_mode):
         """Test that PauliX expectation value is correct"""
         n_wires = 2
         n_shots = 10000
@@ -91,13 +86,12 @@ class TestExpval:
             qml.CNOT(wires=[0, 1])
             return qml.expval(qml.PauliX(wires=0)), qml.expval(qml.PauliX(wires=1))
 
-        result = qjit(circuit, seed=37)()
+        result = qjit(circuit, seed=37, capture=capture_mode)()
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_pauliy(self, backend, tol_stochastic):
+    def test_pauliy(self, backend, tol_stochastic, capture_mode):
         """Test that PauliY expectation value is correct"""
         n_wires = 2
         n_shots = 10000
@@ -114,13 +108,12 @@ class TestExpval:
             qml.CNOT(wires=[0, 1])
             return qml.expval(qml.PauliY(wires=0)), qml.expval(qml.PauliY(wires=1))
 
-        result = qjit(circuit, seed=37)()
+        result = qjit(circuit, seed=37, capture=capture_mode)()
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_hadamard(self, backend, tol_stochastic):
+    def test_hadamard(self, backend, tol_stochastic, capture_mode):
         """Test that Hadamard expectation value is correct"""
         n_wires = 2
         n_shots = 10000
@@ -137,14 +130,13 @@ class TestExpval:
             qml.CNOT(wires=[0, 1])
             return qml.expval(qml.Hadamard(wires=0)), qml.expval(qml.Hadamard(wires=1))
 
-        result = qjit(circuit, seed=37)()
+        result = qjit(circuit, seed=37, capture=capture_mode)()
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit()
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_hermitian(self, backend, tol_stochastic):
+    def test_hermitian(self, backend, tol_stochastic, capture_mode):
         """Test expval Hermitian observables with shots."""
         n_wires = 3
         n_shots = 10000
@@ -161,13 +153,13 @@ class TestExpval:
             )
             return qml.expval(qml.Hermitian(A, wires=2))
 
-        result = qjit(circuit, seed=37)(np.pi / 4, np.pi / 4)
+        result = qjit(circuit, seed=37, capture=capture_mode)(np.pi / 4, np.pi / 4)
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit(np.pi / 4, np.pi / 4)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    def test_paulix_pauliy(self, backend, tol_stochastic):
+    def test_paulix_pauliy(self, backend, tol_stochastic, capture_mode):
         """Test that a tensor product involving PauliX and PauliY works correctly"""
         n_wires = 3
         n_shots = 100000
@@ -187,12 +179,12 @@ class TestExpval:
             qml.CNOT(wires=[1, 2])
             return qml.expval(qml.PauliX(wires=0) @ qml.PauliY(wires=2))
 
-        result = qjit(circuit, seed=37)()
+        result = qjit(circuit, seed=37, capture=capture_mode)()
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    def test_pauliz_pauliy_prod(self, backend, tol_stochastic):
+    def test_pauliz_pauliy_prod(self, backend, tol_stochastic, capture_mode):
         """Test that a tensor product involving PauliZ and PauliY works correctly"""
         n_wires = 3
         n_shots = 10000
@@ -208,13 +200,13 @@ class TestExpval:
             qml.CNOT(wires=[1, 2])
             return qml.expval(qml.PauliX(2) @ qml.PauliY(1) @ qml.PauliZ(0))
 
-        result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
+        result = qjit(circuit, seed=37, capture=capture_mode)(0.432, 0.123, -0.543)
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit(0.432, 0.123, -0.543)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    def test_pauliz_hamiltonian(self, backend, tol_stochastic):
+    def test_pauliz_hamiltonian(self, backend, tol_stochastic, capture_mode):
         """Test that a hamiltonian involving PauliZ and PauliY and hadamard works correctly"""
         n_wires = 3
         n_shots = 10000
@@ -232,13 +224,13 @@ class TestExpval:
                 0.2 * qml.PauliZ(wires=0) + 0.5 * qml.Hadamard(wires=1) + qml.PauliY(wires=2)
             )
 
-        result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
+        result = qjit(circuit, seed=37, capture=capture_mode)(0.432, 0.123, -0.543)
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit(0.432, 0.123, -0.543)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    def test_prod_hamiltonian(self, backend, tol_stochastic):
+    def test_prod_hamiltonian(self, backend, tol_stochastic, capture_mode):
         """Test that a hamiltonian involving PauliZ and Hadamard @ PauliX works correctly"""
         n_wires = 3
         n_shots = 10000
@@ -256,7 +248,7 @@ class TestExpval:
                 0.2 * qml.PauliZ(wires=0) + 0.5 * qml.Hadamard(wires=1) @ qml.PauliX(2)
             )
 
-        result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
+        result = qjit(circuit, seed=37, capture=capture_mode)(0.432, 0.123, -0.543)
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit(0.432, 0.123, -0.543)
 
@@ -266,8 +258,7 @@ class TestExpval:
 class TestVar:
     "Test var with shots > 0"
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_identity(self, backend, tol_stochastic):
+    def test_identity(self, backend, tol_stochastic, capture_mode):
         """Test that identity variance value (i.e. the trace) is 1."""
         n_wires = 2
         n_shots = 10000
@@ -284,13 +275,12 @@ class TestVar:
             qml.CNOT(wires=[0, 1])
             return qml.var(qml.Identity(wires=0)), qml.var(qml.Identity(wires=1))
 
-        result = qjit(circuit, seed=37)()
+        result = qjit(circuit, seed=37, capture=capture_mode)()
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_pauliz(self, backend, tol_stochastic):
+    def test_pauliz(self, backend, tol_stochastic, capture_mode):
         """Test that PauliZ variance value is correct"""
         n_wires = 2
         n_shots = 10000
@@ -307,14 +297,13 @@ class TestVar:
             qml.CNOT(wires=[0, 1])
             return qml.var(qml.PauliZ(wires=0)), qml.var(qml.PauliZ(wires=1))
 
-        result = qjit(circuit, seed=37)()
+        result = qjit(circuit, seed=37, capture=capture_mode)()
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit()
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_paulix(self, backend, tol_stochastic):
+    def test_paulix(self, backend, tol_stochastic, capture_mode):
         """Test that PauliX variance value is correct"""
         n_wires = 2
         n_shots = 10000
@@ -331,13 +320,12 @@ class TestVar:
             qml.CNOT(wires=[0, 1])
             return qml.var(qml.PauliX(wires=0)), qml.var(qml.PauliX(wires=1))
 
-        result = qjit(circuit, seed=37)()
+        result = qjit(circuit, seed=37, capture=capture_mode)()
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_pauliy(self, backend, tol_stochastic):
+    def test_pauliy(self, backend, tol_stochastic, capture_mode):
         """Test that PauliY variance value is correct"""
         n_wires = 2
         n_shots = 10000
@@ -354,14 +342,13 @@ class TestVar:
             qml.CNOT(wires=[0, 1])
             return qml.var(qml.PauliY(wires=0)), qml.var(qml.PauliY(wires=1))
 
-        result = qjit(circuit, seed=37)()
+        result = qjit(circuit, seed=37, capture=capture_mode)()
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit()
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_hadamard(self, backend, tol_stochastic):
+    def test_hadamard(self, backend, tol_stochastic, capture_mode):
         """Test that Hadamard variance value is correct"""
         n_wires = 2
         n_shots = 10000
@@ -378,13 +365,12 @@ class TestVar:
             qml.CNOT(wires=[0, 1])
             return qml.var(qml.Hadamard(wires=0)), qml.var(qml.Hadamard(wires=1))
 
-        result = qjit(circuit, seed=37)()
+        result = qjit(circuit, seed=37, capture=capture_mode)()
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit()
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    @pytest.mark.usefixtures("use_both_frontend")
-    def test_hermitian_shots(self, backend, tol_stochastic):
+    def test_hermitian_shots(self, backend, tol_stochastic, capture_mode):
         """Test var Hermitian observables with shots."""
 
         n_wires = 3
@@ -402,13 +388,13 @@ class TestVar:
             )
             return qml.var(qml.Hermitian(A, wires=2))
 
-        result = qjit(circuit, seed=37)(np.pi / 4, np.pi / 4)
+        result = qjit(circuit, seed=37, capture=capture_mode)(np.pi / 4, np.pi / 4)
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit(np.pi / 4, np.pi / 4)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    def test_paulix_pauliy(self, backend, tol_stochastic):
+    def test_paulix_pauliy(self, backend, tol_stochastic, capture_mode):
         """Test that a tensor product involving PauliX and PauliY works correctly"""
         n_wires = 3
         n_shots = 10000
@@ -428,13 +414,13 @@ class TestVar:
             qml.CNOT(wires=[1, 2])
             return qml.var(qml.PauliX(wires=0) @ qml.PauliY(wires=2))
 
-        result = qjit(circuit, seed=37)()
+        result = qjit(circuit, seed=37, capture=capture_mode)()
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit()
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    def test_hadamard_pauliy_prod(self, backend, tol_stochastic):
+    def test_hadamard_pauliy_prod(self, backend, tol_stochastic, capture_mode):
         """Test that a tensor product involving Hadamard and PauliY works correctly"""
         n_wires = 3
         n_shots = 10000
@@ -450,13 +436,13 @@ class TestVar:
             qml.CNOT(wires=[1, 2])
             return qml.var(qml.Hadamard(wires=1) @ qml.PauliY(wires=2))
 
-        result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
+        result = qjit(circuit, seed=37, capture=capture_mode)(0.432, 0.123, -0.543)
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit(0.432, 0.123, -0.543)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    def test_pauliz_pauliy_prod(self, backend, tol_stochastic):
+    def test_pauliz_pauliy_prod(self, backend, tol_stochastic, capture_mode):
         """Test that a tensor product involving PauliZ and PauliY works correctly"""
         n_wires = 3
         n_shots = 10000
@@ -472,12 +458,13 @@ class TestVar:
             qml.CNOT(wires=[1, 2])
             return qml.var(qml.PauliX(2) @ qml.PauliY(1) @ qml.PauliZ(0))
 
-        result = qjit(circuit, seed=37)(0.432, 0.123, -0.543)
+        result = qjit(circuit, seed=37, capture=capture_mode)(0.432, 0.123, -0.543)
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit(0.432, 0.123, -0.543)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
+    @pytest.mark.old_frontend  # uses @qml.qjit, Catalyst-specific test
     @pytest.mark.xfail(
         reason="error disappeared when I added qjit. Should be investigated. sc-95950"
     )
@@ -517,7 +504,7 @@ class TestVar:
 class TestProbs:
     "Test var with shots > 0"
 
-    def test_probs(self, backend, tol_stochastic):
+    def test_probs(self, backend, tol_stochastic, capture_mode):
         """Test probs on all wires"""
 
         n_wires = 2
@@ -531,13 +518,13 @@ class TestProbs:
             qml.Hadamard(wires=[1])
             return qml.probs()
 
-        result = qjit(circuit, seed=37)(0.432)
+        result = qjit(circuit, seed=37, capture=capture_mode)(0.432)
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit(0.432)
 
         assert np.allclose(result, expected, atol=tol_stochastic, rtol=tol_stochastic)
 
-    def test_probs_wire(self, backend, tol_stochastic):
+    def test_probs_wire(self, backend, tol_stochastic, capture_mode):
         """Test probs on subset of wires"""
 
         n_wires = 2
@@ -551,7 +538,7 @@ class TestProbs:
             qml.Hadamard(wires=[1])
             return qml.probs(wires=[0])
 
-        result = qjit(circuit, seed=37)(0.432)
+        result = qjit(circuit, seed=37, capture=capture_mode)(0.432)
         qml.capture.disable()  # capture execution unmaintained
         expected = circuit(0.432)
 
@@ -562,12 +549,12 @@ class TestShadow:
     """Test shadow."""
 
     @pytest.mark.xfail(reason="Not supported on lightning.")
-    def test_shadow(self):
+    def test_shadow(self, capture_mode):
         """Test that Shadow can be used with Catalyst."""
 
         dev = qml.device("lightning.qubit", wires=range(2))
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.set_shots(10000)
         @qml.qnode(dev)
         def classical_shadow_circuit():
@@ -586,12 +573,12 @@ class TestShadowExpval:
     """Test shadowexpval."""
 
     @pytest.mark.xfail(reason="TypeError in Catalyst")
-    def test_shadow_expval(self):
+    def test_shadow_expval(self, capture_mode):
         """Test that ShadowExpVal can be used with Catalyst."""
 
         dev = qml.device("lightning.qubit", wires=range(2))
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.set_shots(10000)
         @qml.qnode(dev)
         def shadow_expval_circuit(x, obs):
@@ -609,7 +596,7 @@ class TestOtherMeasurements:
     """Test other measurement processes."""
 
     @pytest.mark.parametrize("meas_fun", (qml.sample, qml.counts))
-    def test_missing_shots_value(self, backend, meas_fun):
+    def test_missing_shots_value(self, backend, meas_fun, capture_mode):
         """Test error for missing shots value."""
 
         dev = qml.device(backend, wires=1)
@@ -620,16 +607,16 @@ class TestOtherMeasurements:
 
         if qml.capture.enabled():
             with pytest.raises(ValueError, match="finite shots are required"):
-                qjit(circuit)
+                qjit(circuit, capture=capture_mode)
         else:
 
             with pytest.raises(CompileError, match="cannot work with shots=None"):
-                qjit(circuit)
+                qjit(circuit, capture=capture_mode)
 
-    def test_multiple_return_values(self, backend, tol_stochastic):
+    def test_multiple_return_values(self, backend, tol_stochastic, capture_mode):
         """Test multiple return values."""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.set_shots(shots=10000)
         @qml.qnode(qml.device(backend, wires=2))
         def all_measurements(x):
