@@ -332,6 +332,9 @@ class TestQubitType:
     )
     def test_constructor(self, level, expected_level, role, expected_role):
         """Test that the parameters of QubitType are correct with defaults."""
+        if level not in (QubitLevel.PBC, QubitLevel.Physical) and role != QubitRole.Null:
+            pytest.skip("Unsupported combination of level and role.")
+
         args = {}
         if level is not None:
             args["level"] = level
@@ -349,6 +352,7 @@ class TestQubitType:
             ({"level": "physical", "role": "xcheck"}, None),
             ({"level": "foo"}, "Invalid value foo for 'QubitType.level'"),
             ({"role": "bar"}, "Invalid value bar for 'QubitType.role'"),
+            ({"level": "logical", "role": "xcheck"}, "Qubit role xcheck is only permitted"),
         ],
     )
     def test_verify(self, args, error):
@@ -364,9 +368,8 @@ class TestQubitType:
         [
             (QubitType(), "!quantum.bit"),
             (QubitType(level="abstract", role="null"), "!quantum.bit"),
-            (QubitType(role="xcheck"), "!quantum.bit<xcheck>"),
             (QubitType(level="physical"), "!quantum.bit<physical>"),
-            (QubitType(level="logical", role="data"), "!quantum.bit<logical, data>"),
+            (QubitType(level="pbc", role="data"), "!quantum.bit<pbc, data>"),
         ],
     )
     @pytest.mark.parametrize("generic", [True, False])
@@ -382,10 +385,8 @@ class TestQubitType:
         [
             ('%0 = "test.op"() : () -> !quantum.bit', "abstract", "null"),
             ('%0 = "test.op"() : () -> !quantum.bit<abstract>', "abstract", "null"),
-            ('%0 = "test.op"() : () -> !quantum.bit<null>', "abstract", "null"),
             ('%0 = "test.op"() : () -> !quantum.bit<abstract, null>', "abstract", "null"),
             ('%0 = "test.op"() : () -> !quantum.bit<logical>', "logical", "null"),
-            ('%0 = "test.op"() : () -> !quantum.bit<data>', "abstract", "data"),
             ('%0 = "test.op"() : () -> !quantum.bit<physical, xcheck>', "physical", "xcheck"),
         ],
     )
@@ -416,16 +417,9 @@ class TestQubitType:
         [
             (QubitTypeConstraint(), True),
             (QubitTypeConstraint(level_constr=["logical"]), True),
-            (QubitTypeConstraint(role_constr=["data"]), True),
             (QubitTypeConstraint(level_constr=["physical"], role_constr=["xcheck"]), True),
             (QubitTypeConstraint(level_constr=["abstract", "logical"]), False),
-            (QubitTypeConstraint(role_constr=["null", "data"]), False),
-            (
-                QubitTypeConstraint(
-                    level_constr=["abstract", "logical"], role_constr=["null", "data"]
-                ),
-                False,
-            ),
+            (QubitTypeConstraint(level_constr=["physical"], role_constr=["xcheck", "data"]), False),
         ],
     )
     def test_constraint_can_infer(self, constr, can_infer):
@@ -437,7 +431,6 @@ class TestQubitType:
         [
             (QubitTypeConstraint(), QubitType()),
             (QubitTypeConstraint(level_constr=["logical"]), QubitType(level="logical")),
-            (QubitTypeConstraint(role_constr=["data"]), QubitType(role="data")),
             (
                 QubitTypeConstraint(level_constr=["physical"], role_constr=["xcheck"]),
                 QubitType(level="physical", role="xcheck"),
@@ -453,17 +446,17 @@ class TestQubitType:
         "constr,ty,error",
         [
             (QubitTypeConstraint(), QubitType(), None),
-            (QubitTypeConstraint(), QubitType(level="logical", role="xcheck"), None),
+            (QubitTypeConstraint(), QubitType(level="physical", role="xcheck"), None),
             (QubitTypeConstraint(level_constr=["logical"]), QubitType(level="logical"), None),
             (
                 QubitTypeConstraint(level_constr=["logical"]),
                 QubitType(level="physical"),
                 'Unexpected attribute "physical"',
             ),
-            (QubitTypeConstraint(role_constr=["data"]), QubitType(role="data"), None),
+            (QubitTypeConstraint(role_constr=["data"]), QubitType(level="pbc", role="data"), None),
             (
                 QubitTypeConstraint(role_constr=["data"]),
-                QubitType(role="xcheck"),
+                QubitType(level="pbc", role="xcheck"),
                 'Unexpected attribute "xcheck"',
             ),
             (
@@ -478,8 +471,8 @@ class TestQubitType:
             ),
             (
                 QubitTypeConstraint(level_constr=["physical"], role_constr=["xcheck"]),
-                QubitType(level="logical", role="xcheck"),
-                'Unexpected attribute "logical"',
+                QubitType(level="pbc", role="xcheck"),
+                'Unexpected attribute "pbc"',
             ),
             (
                 QubitTypeConstraint(level_constr=["abstract", "logical"]),
@@ -491,32 +484,36 @@ class TestQubitType:
                 QubitType(level="physical"),
                 'Unexpected attribute "physical"',
             ),
-            (QubitTypeConstraint(role_constr=["null", "data"]), QubitType(role="null"), None),
             (
                 QubitTypeConstraint(role_constr=["null", "data"]),
-                QubitType(role="xcheck"),
+                QubitType(level="pbc", role="null"),
+                None,
+            ),
+            (
+                QubitTypeConstraint(role_constr=["null", "data"]),
+                QubitType(level="pbc", role="xcheck"),
                 'Unexpected attribute "xcheck"',
             ),
             (
                 QubitTypeConstraint(
-                    level_constr=["abstract", "logical"], role_constr=["null", "data"]
+                    level_constr=["abstract", "physical"], role_constr=["null", "data"]
                 ),
-                QubitType(level="logical", role="data"),
+                QubitType(level="physical", role="data"),
                 None,
             ),
             (
                 QubitTypeConstraint(
-                    level_constr=["abstract", "logical"], role_constr=["null", "data"]
+                    level_constr=["abstract", "physical"], role_constr=["null", "data"]
                 ),
-                QubitType(level="physical", role="data"),
-                'Unexpected attribute "physical"',
+                QubitType(level="physical", role="xcheck"),
+                'Unexpected attribute "xcheck"',
             ),
             (
                 QubitTypeConstraint(
-                    level_constr=["abstract", "logical"], role_constr=["null", "data"]
+                    level_constr=["abstract", "physical"], role_constr=["null", "data"]
                 ),
-                QubitType(level="logical", role="xcheck"),
-                'Unexpected attribute "xcheck"',
+                QubitType(level="pbc", role="xcheck"),
+                'Unexpected attribute "pbc"',
             ),
         ],
     )
@@ -723,12 +720,9 @@ class TestAssemblyFormat:
         // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit
         %qb_abstract_null1 = "test.op"() : () -> !quantum.bit<abstract>
         // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit
-        %qb_abstract_null2 = "test.op"() : () -> !quantum.bit<null>
-        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit
         %qb_abstract_null3 = "test.op"() : () -> !quantum.bit<abstract, null>
 
         //// Single arg ////
-        // Levels
         // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<logical>
         %qb_level0 = "test.op"() : () -> !quantum.bit<logical>
         // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<physical>
@@ -736,17 +730,9 @@ class TestAssemblyFormat:
         // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<pbc>
         %qb_level2 = "test.op"() : () -> !quantum.bit<pbc>
 
-        // Roles
-        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<data>
-        %qb_role0 = "test.op"() : () -> !quantum.bit<data>
-        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<xcheck>
-        %qb_role1 = "test.op"() : () -> !quantum.bit<xcheck>
-        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<zcheck>
-        %qb_role2 = "test.op"() : () -> !quantum.bit<zcheck>
-
         //// Multiple args ////
-        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<logical, data>
-        %qb_mul0 = "test.op"() : () -> !quantum.bit<logical, data>
+        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<pbc, data>
+        %qb_mul0 = "test.op"() : () -> !quantum.bit<pbc, data>
         // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<physical, xcheck>
         %qb_mul1 = "test.op"() : () -> !quantum.bit<physical, xcheck>
         """

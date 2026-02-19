@@ -15,6 +15,7 @@
 Quantum dialect."""
 
 from collections.abc import Sequence
+from enum import StrEnum
 from typing import TypeAlias
 
 from xdsl.dialects.builtin import ArrayAttr, StringAttr
@@ -24,7 +25,6 @@ from xdsl.ir import (
     ParametrizedAttribute,
     SpacedOpaqueSyntaxAttribute,
     SSAValue,
-    StrEnum,
     TypeAttribute,
 )
 from xdsl.irdl import AnyOf, AttrConstraint, irdl_attr_definition
@@ -105,29 +105,37 @@ class QubitType(ParametrizedAttribute, TypeAttribute):
         super().__init__(level, role)
 
     def verify(self) -> None:
-        """Verify that the attribute is defined correctly."""
+        """Verify that the attribute is defined correctly. The verifier is called automatically
+        when a QubitType is being initialized."""
         level = self.level.data
         role = self.role.data
-        allowed_levels = list(QubitLevel.__members__.values())
-        allowed_roles = list(QubitRole.__members__.values())
 
-        if level not in allowed_levels:
+        if level not in QubitLevel:
             raise VerifyException(
-                f"Invalid value {level} for 'QubitType.level'. Allowed values are {allowed_levels}."
+                f"Invalid value {level} for 'QubitType.level'. Allowed values "
+                f"are {list(QubitLevel.__members__.values())}."
             )
 
-        if role not in allowed_roles:
+        if role not in QubitRole:
             raise VerifyException(
-                f"Invalid value {role} for 'QubitType.role'. Allowed values are {allowed_roles}."
+                f"Invalid value {role} for 'QubitType.role'. Allowed values "
+                f"are {list(QubitRole.__members__.values())}."
+            )
+
+        if role != QubitRole.Null and level not in (QubitLevel.PBC, QubitLevel.Physical):
+            raise VerifyException(
+                f"Qubit role {role} is only permitted for pbc and physical qubits. "
+                f"Found level {level}."
             )
 
     def print_parameters(self, printer: Printer):
         """Print type parameters."""
-        params_to_print = []
-        if self.level.data != QubitLevel.Abstract.value:
-            params_to_print.append(self.level.data)
         if self.role.data != QubitRole.Null.value:
-            params_to_print.append(self.role.data)
+            params_to_print = [self.level.data, self.role.data]
+        elif self.level.data != QubitLevel.Abstract.value:
+            params_to_print = [self.level.data]
+        else:
+            params_to_print = []
 
         if params_to_print:
             with printer.in_angle_brackets():
@@ -135,7 +143,8 @@ class QubitType(ParametrizedAttribute, TypeAttribute):
 
     @classmethod
     def parse_parameters(cls, parser: AttrParser) -> list[Attribute]:
-        """Parse type parameters."""
+        """Parse type parameters. This method does not do any verification. That is handled
+        automatically when a QubitType is initialized by the parser."""
         optional_params = parser.parse_optional_comma_separated_list(
             delimiter=parser.Delimiter.ANGLE, parse=parser.parse_identifier_or_str_literal
         )
@@ -151,14 +160,8 @@ class QubitType(ParametrizedAttribute, TypeAttribute):
 
             case 1:
                 param = optional_params[0]
-                if param in QubitLevel.__members__.values():
-                    level = StringAttr(param) if isinstance(param, str) else param
-                    role = StringAttr(QubitRole.Null.value)
-                elif param in QubitRole.__members__.values():
-                    level = StringAttr(QubitLevel.Abstract.value)
-                    role = StringAttr(param) if isinstance(param, str) else param
-                else:
-                    raise ParseError(f"Invalid parameter for 'QubitType': {param}.")
+                level = StringAttr(param) if isinstance(param, str) else param
+                role = StringAttr(QubitRole.Null.value)
                 final_params = [level, role]
 
             case 2:
@@ -186,7 +189,8 @@ class QuregType(ParametrizedAttribute, TypeAttribute):
         super().__init__(level)
 
     def verify(self) -> None:
-        """Verify that the attribute is defined correctly."""
+        """Verify that the attribute is defined correctly. The verifier is called automatically
+        when a QuregType is being initialized."""
         level = self.level.data
         allowed_levels = list(QubitLevel.__members__.values())
 
@@ -205,7 +209,8 @@ class QuregType(ParametrizedAttribute, TypeAttribute):
 
     @classmethod
     def parse_parameters(cls, parser: AttrParser) -> list[Attribute]:
-        """Parse type parameters."""
+        """Parse type parameters. This method does not do any verification. That is handled
+        automatically when a QuregType is initialized by the parser."""
         optional_params = parser.parse_optional_comma_separated_list(
             delimiter=parser.Delimiter.ANGLE, parse=parser.parse_identifier_or_str_literal
         )
