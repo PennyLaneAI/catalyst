@@ -16,7 +16,6 @@ set(LIBS
     MLIRQuantum
     quantum-transforms
     MLIRQRef
-    ref-quantum-transforms
     MLIRPBC
     pbc-transforms
     MLIRGradient
