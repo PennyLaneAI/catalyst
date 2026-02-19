@@ -156,8 +156,8 @@ LogicalResult AllocOp::verify()
     else if (auto size = getNqubitsAttr()) {
         // Static
         if (!type.isStatic() || type.getSize().getInt() != size) {
-            return emitOpError() << "expected result to have allocation size !qref.qreg<" << *size
-                                 << ">";
+            return emitOpError() << "expected result to have static allocation size !qref.qreg<"
+                                 << *size << ">";
         }
     }
 

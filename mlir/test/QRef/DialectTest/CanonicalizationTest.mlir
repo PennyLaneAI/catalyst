@@ -57,6 +57,15 @@ func.func @test_alloc_dealloc_no_fold() -> !qref.bit {
 
 // -----
 
+// CHECK-LABEL: test_get_no_user_fold
+func.func @test_get_no_user_fold(%r: !qref.reg<3>) {
+    // CHECK-NOT: qref.get
+    %q = qref.get %r[0] : !qref.reg<3> -> !qref.bit
+    return
+}
+
+// -----
+
 // CHECK-LABEL: test_hermitian_adjoint_canonicalize
 func.func @test_hermitian_adjoint_canonicalize(%q0: !qref.bit) {
     // CHECK:  qref.custom "Hadamard"() %arg0 : !qref.bit
@@ -91,5 +100,51 @@ func.func @test_pcphase_adjoint_canonicalize(%arg0: f64, %dim: f64, %q0: !qref.b
     // CHECK: [[arg0neg:%.+]] = arith.negf %arg0 : f64
     // CHECK: qref.pcphase([[arg0neg]], %arg1) %arg2, %arg3 : !qref.bit, !qref.bit
     qref.pcphase (%arg0, %dim) %q0, %q1 adj : !qref.bit, !qref.bit
+    return
+}
+
+// -----
+
+// Unlike the value semantics quantum dialect, in reference semantics, gates do not produce output
+// qubit values, and will consequently have no users.
+// We must make sure that they are not removed by DCE.
+
+// CHECK-LABEL: test_canonicalize_no_dce
+func.func @test_canonicalize_no_dce(%arg0: tensor<2xcomplex<f64>>, %arg1 : tensor<1xi1>, %arg2: f64,
+     %arg3 : tensor<2x2xcomplex<f64>>, %q0: !qref.bit, %q1: !qref.bit, %r: !qref.reg<2>) {
+
+    // CHECK: qref.set_state
+    qref.set_state(%arg0) %q0 : tensor<2xcomplex<f64>>, !qref.bit
+
+    // CHECK: qref.set_basis_state
+    qref.set_basis_state(%arg1) %q0 : tensor<1xi1>, !qref.bit
+
+    // CHECK: qref.custom "Hadamard"
+    qref.custom "Hadamard"() %q0 : !qref.bit
+
+    // CHECK: qref.paulirot
+    qref.paulirot ["Z"](%arg2) %q0 : !qref.bit
+
+    // CHECK: qref.gphase
+    qref.gphase(%arg2) : f64
+
+    // CHECK: qref.multirz
+    qref.multirz (%arg2) %q0, %q1 : !qref.bit, !qref.bit
+
+    // CHECK: qref.pcphase
+    qref.pcphase (%arg2, %arg2) %q0 : !qref.bit
+
+    // CHECK: qref.unitary
+    qref.unitary (%arg3 : tensor<2x2xcomplex<f64>>) %q0 : !qref.bit
+
+    // CHECK: qref.adjoint
+    // CHECK:   qref.get
+    // CHECK:   qref.custom "Hadamard"
+    qref.adjoint(%r) : !qref.reg<2> {
+    ^bb0(%r0: !qref.reg<2>):
+        %q = qref.get %r0[0] : !qref.reg<2> -> !qref.bit
+        qref.custom "Hadamard"() %q : !qref.bit
+    }
+
     return
 }

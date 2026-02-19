@@ -183,7 +183,7 @@ func.func @test_alloc_bad_dynamic_size(%arg0 : i64) {
 // -----
 
 func.func @test_alloc_bad_static_size() {
-    // expected-error@+1 {{expected result to have allocation size !qref.qreg<2>}}
+    // expected-error@+1 {{expected result to have static allocation size !qref.qreg<2>}}
     %0 = qref.alloc(2) : !qref.reg<37>
     return
 }
