@@ -525,6 +525,31 @@ class TestGraphDecomposition:
                 qml.CRX(-7.2, wires=[0, 1])
                 return qml.state()
 
+    def test_decomp_inside_subroutine(self):
+        """Test that decompositions can happen inside subroutines."""
+
+        qml.decomposition.enable_graph()
+
+        @qml.templates.Subroutine
+        def f(x, wires):
+            qml.IsingXX(x, wires)
+
+        @qml.qjit(capture=True)
+        @qml.decompose(gate_set=qml.gate_sets.ROTATIONS_PLUS_CNOT)
+        @qml.qnode(qml.device('lightning.qubit', wires=5))
+        def c():
+            f(0.5, (0,1))
+            f(1.2, (2,3))
+            return qml.expval(qml.Z(0)), qml.expval(qml.Z(2))
+
+        resources = qml.specs(c, level="device")().resources.gate_types
+        assert resources == {"RX": 2, "CNOT": 4}
+
+        r1, r2 = c()
+        assert qml.math.allclose(r1, np.cos(0.5))
+        assert qml.math.allclose(r2, np.cos(1.2))
+
+        qml.decomposition.disable_graph()
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

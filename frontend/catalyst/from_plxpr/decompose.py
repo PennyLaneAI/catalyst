@@ -148,6 +148,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
         self._captured = False
         self._operations = set()
         self._decomp_graph_solution = {}
+        self.subroutine_cache = {}
 
     def interpret_operation(self, op: "qml.operation.Operator"):
         """Interpret a PennyLane operation instance.
@@ -227,7 +228,6 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                     num_wires = len(pauli_word)
                 elif num_wires == -1 and op_num_wires is not None:
                     num_wires = op_num_wires
-
                 _create_decomposition_rule(
                     rule,
                     op_name=op.op.name,
