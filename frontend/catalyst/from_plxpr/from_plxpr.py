@@ -393,6 +393,7 @@ def _set_decompose_lowering_state(self):
     else:
         raise NotImplementedError("Multiple decomposition transforms are not yet supported.")
 
+
 # pylint: disable=too-many-positional-arguments
 def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs, use_graph=True):
     _set_decompose_lowering_state(self)

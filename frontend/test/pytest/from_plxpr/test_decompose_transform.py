@@ -24,7 +24,9 @@ import pytest
 from pennylane.exceptions import DecompositionError, DecompositionWarning
 from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
-from pennylane_lightning.lightning_qubit.lightning_qubit import stopping_condition
+from pennylane_lightning.lightning_qubit.lightning_qubit import (
+    stopping_condition as lightning_stopping_condition,
+)
 
 
 @contextmanager
@@ -286,7 +288,7 @@ class TestGraphDecomposition:
         @partial(
             qml.transforms.decompose,
             gate_set=[qml.CNOT, qml.PauliZ],
-            stopping_condition=stopping_condition,
+            stopping_condition=lightning_stopping_condition,
         )
         @qml.qnode(device)
         def circuit(x):
