@@ -28,7 +28,7 @@
 //   - circ: calls circ.quantum, computes weighted sum, returns [<H>, <Z>]
 
 // CHECK-LABEL: func.func public @circ.quantum
-// CHECK-SAME: () -> (tensor<f64>, tensor<f64>, tensor<f64>) attributes {qnode}
+// CHECK-SAME: () -> (tensor<f64>, tensor<f64>, tensor<f64>) attributes {quantum.node}
 // CHECK: quantum.device
 // CHECK: quantum.alloc
 // CHECK: quantum.custom "RY"
@@ -43,7 +43,7 @@
 
 // CHECK-LABEL: func.func public @circ
 // CHECK-SAME: (%arg0: tensor<1xf64>, %arg1: tensor<1xf64>) -> (tensor<f64>, tensor<f64>)
-// CHECK-NOT: attributes {qnode}
+// CHECK-NOT: attributes {quantum.node}
 // CHECK-NOT: quantum.hamiltonian
 // CHECK-NOT: quantum.custom "RY"
 // CHECK-NOT: quantum.custom "RX"
@@ -58,7 +58,7 @@
 // CHECK: return %[[RESULT]], %[[CALL]]#2
 
 module {
-  func.func public @circ(%arg0: tensor<1xf64>, %arg1: tensor<1xf64>) -> (tensor<f64>, tensor<f64>) attributes {qnode} {
+  func.func public @circ(%arg0: tensor<1xf64>, %arg1: tensor<1xf64>) -> (tensor<f64>, tensor<f64>) attributes {quantum.node} {
     %shots = arith.constant 0 : i64
     quantum.device shots(%shots) ["/path/to/lightning.dylib", "LightningSimulator", "{}"]
     %reg = quantum.alloc(3) : !quantum.reg
@@ -103,7 +103,7 @@ module {
 //   - circ: calls circ.quantum, computes weighted sum, returns <H>
 
 // CHECK-LABEL: func.func public @circ.quantum
-// CHECK-SAME: () -> (tensor<f64>, tensor<f64>, tensor<f64>) attributes {qnode}
+// CHECK-SAME: () -> (tensor<f64>, tensor<f64>, tensor<f64>) attributes {quantum.node}
 // CHECK: quantum.device
 // CHECK: quantum.alloc
 // CHECK: quantum.custom "RY"
@@ -120,7 +120,7 @@ module {
 
 // CHECK-LABEL: func.func public @circ
 // CHECK-SAME: (%arg0: tensor<1xf64>, %arg1: tensor<1xf64>) -> tensor<f64>
-// CHECK-NOT: attributes {qnode}
+// CHECK-NOT: attributes {quantum.node}
 // CHECK-NOT: quantum.hamiltonian
 // CHECK-NOT: quantum.custom "RY"
 // CHECK-NOT: quantum.custom "RX"
@@ -135,7 +135,7 @@ module {
 // CHECK: %[[RESULT:.*]] = stablehlo.reduce(%[[CONCAT]] init: %[[ZERO]]) applies stablehlo.add
 // CHECK: return %[[RESULT]]
 module {
-  func.func public @circ(%arg0: tensor<1xf64>, %arg1: tensor<1xf64>) -> tensor<f64> attributes {qnode} {
+  func.func public @circ(%arg0: tensor<1xf64>, %arg1: tensor<1xf64>) -> tensor<f64> attributes {quantum.node} {
     %shots = arith.constant 0 : i64
     quantum.device shots(%shots) ["/path/to/lightning.dylib", "LightningSimulator", "{}"]
     %reg = quantum.alloc(3) : !quantum.reg
@@ -160,5 +160,3 @@ module {
     return %result : tensor<f64>
   }
 }
-
-

@@ -1160,6 +1160,8 @@ def ExpvalOp : Measurement_Op<"expval"> {
     let assemblyFormat = [{
         $obs attr-dict `:` type(results)
     }];
+
+    let hasVerifier = 1;
 }
 
 def VarianceOp : Measurement_Op<"var"> {
@@ -1196,6 +1198,8 @@ def VarianceOp : Measurement_Op<"var"> {
     let assemblyFormat = [{
         $obs attr-dict `:` type(results)
     }];
+
+    let hasVerifier = 1;
 }
 
 def ProbsOp : Measurement_Op<"probs", [AttrSizedOperandSegments]> {

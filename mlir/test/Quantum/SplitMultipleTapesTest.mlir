@@ -22,17 +22,29 @@
 // Each tape take in different number elements in different order
 
 module @circuit_twotapes_module {
-  func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+  func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node} {
     %cst = stablehlo.constant dense<4.000000e-01> : tensor<f64>
     %cst_0 = stablehlo.constant dense<8.000000e-01> : tensor<f64>
     quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %tape0_out = stablehlo.add %arg1, %cst_0 : tensor<f64>
+    %qreg_t0 = quantum.alloc( 1) : !quantum.reg
+    %obs_t0 = quantum.compbasis qreg %qreg_t0 : !quantum.obs
+    %sample_t0 = quantum.sample %obs_t0 : tensor<1x1xf64>
+    quantum.dealloc %qreg_t0 : !quantum.reg
     quantum.device_release
     quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %extracted = tensor.extract %arg1[] : tensor<f64>
     %tape1_out = stablehlo.multiply %arg0, %cst : tensor<f64>
+    %qreg = quantum.alloc( 1) : !quantum.reg
+    %obs = quantum.compbasis qreg %qreg : !quantum.obs
+    %sample = quantum.sample %obs : tensor<1x1xf64>
+    quantum.dealloc %qreg : !quantum.reg
     quantum.device_release
     %result = stablehlo.subtract %tape0_out, %tape1_out : tensor<f64>
+    %qreg_out = quantum.alloc( 1) : !quantum.reg
+    %obs_out = quantum.compbasis qreg %qreg_out : !quantum.obs
+    %sample_out = quantum.sample %obs_out : tensor<1x1xf64>
+    quantum.dealloc %qreg_out : !quantum.reg
     return %result : tensor<f64>
   }
 }
@@ -43,14 +55,14 @@ module @circuit_twotapes_module {
 // CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, %cst)
 // CHECK: {{%.+}} = stablehlo.subtract {{%.+}}, {{%.+}} : tensor<f64>
 
-// CHECK: func.func private @circuit_twotapes_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK: func.func private @circuit_twotapes_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node}
 // CHECK: quantum.device
 // CHECK: {{%.+}} = stablehlo.add %arg0, %arg1 : tensor<f64>
 // CHECK: quantum.device_release
 // CHECK: return {{%.+}} : tensor<f64>
 // CHECK-NEXT: }
 
-// CHECK: func.func private @circuit_twotapes_tape_1(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK: func.func private @circuit_twotapes_tape_1(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node}
 // CHECK: quantum.device
 // CHECK: tensor.extract %arg0[]
 // CHECK: {{%.+}} = stablehlo.multiply %arg1, %arg2 : tensor<f64>
@@ -68,30 +80,54 @@ module @circuit_twotapes_module {
 // Both of them needs to be split
 
 module @circuit_twotapes_module {
-  func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+  func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node} {
     %cst = stablehlo.constant dense<4.000000e-01> : tensor<f64>
     %cst_0 = stablehlo.constant dense<8.000000e-01> : tensor<f64>
     quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %tape0_out = stablehlo.add %arg1, %cst_0 : tensor<f64>
+    %qreg_t0 = quantum.alloc( 1) : !quantum.reg
+    %obs_t0 = quantum.compbasis qreg %qreg_t0 : !quantum.obs
+    %sample_t0 = quantum.sample %obs_t0 : tensor<1x1xf64>
+    quantum.dealloc %qreg_t0 : !quantum.reg
     quantum.device_release
     quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %extracted = tensor.extract %arg1[] : tensor<f64>
     %tape1_out = stablehlo.multiply %arg0, %cst : tensor<f64>
+    %qreg = quantum.alloc( 1) : !quantum.reg
+    %obs = quantum.compbasis qreg %qreg : !quantum.obs
+    %sample = quantum.sample %obs : tensor<1x1xf64>
+    quantum.dealloc %qreg : !quantum.reg
     quantum.device_release
     %result = stablehlo.subtract %tape0_out, %tape1_out : tensor<f64>
+    %qreg_out = quantum.alloc( 1) : !quantum.reg
+    %obs_out = quantum.compbasis qreg %qreg_out : !quantum.obs
+    %sample_out = quantum.sample %obs_out : tensor<1x1xf64>
+    quantum.dealloc %qreg_out : !quantum.reg
     return %result : tensor<f64>
   }
-  func.func private @circuit_twotapes_doppleganger(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+  func.func private @circuit_twotapes_doppleganger(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node} {
     %cst = stablehlo.constant dense<4.000000e-01> : tensor<f64>
     %cst_0 = stablehlo.constant dense<8.000000e-01> : tensor<f64>
     quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %tape0_out = stablehlo.add %arg1, %cst_0 : tensor<f64>
+    %qreg_t0 = quantum.alloc( 1) : !quantum.reg
+    %obs_t0 = quantum.compbasis qreg %qreg_t0 : !quantum.obs
+    %sample_t0 = quantum.sample %obs_t0 : tensor<1x1xf64>
+    quantum.dealloc %qreg_t0 : !quantum.reg
     quantum.device_release
     quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %extracted = tensor.extract %arg1[] : tensor<f64>
     %tape1_out = stablehlo.multiply %arg0, %cst : tensor<f64>
+    %qreg = quantum.alloc( 1) : !quantum.reg
+    %obs = quantum.compbasis qreg %qreg : !quantum.obs
+    %sample = quantum.sample %obs : tensor<1x1xf64>
+    quantum.dealloc %qreg : !quantum.reg
     quantum.device_release
     %result = stablehlo.subtract %tape0_out, %tape1_out : tensor<f64>
+    %qreg_out = quantum.alloc( 1) : !quantum.reg
+    %obs_out = quantum.compbasis qreg %qreg_out : !quantum.obs
+    %sample_out = quantum.sample %obs_out : tensor<1x1xf64>
+    quantum.dealloc %qreg_out : !quantum.reg
     return %result : tensor<f64>
   }
 }
@@ -102,14 +138,14 @@ module @circuit_twotapes_module {
 // CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, %cst)
 // CHECK: {{%.+}} = stablehlo.subtract {{%.+}}, {{%.+}} : tensor<f64>
 
-// CHECK-DAG: func.func private @circuit_twotapes_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK-DAG: func.func private @circuit_twotapes_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node}
 // CHECK-DAG: quantum.device
 // CHECK-DAG: [[retAdd:%.+]] = stablehlo.add %arg0, %arg1 : tensor<f64>
 // CHECK-DAG: quantum.device_release
 // CHECK-DAG: return [[retAdd]] : tensor<f64>
 // CHECK-DAG: }
 
-// CHECK-DAG: func.func private @circuit_twotapes_tape_1(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK-DAG: func.func private @circuit_twotapes_tape_1(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node}
 // CHECK-DAG: quantum.device
 // CHECK-DAG: tensor.extract %arg0[]
 // CHECK-DAG: [[retMult:%.+]] = stablehlo.multiply %arg1, %arg2 : tensor<f64>
@@ -122,14 +158,14 @@ module @circuit_twotapes_module {
 // CHECK: func.call @circuit_twotapes_doppleganger_tape_1(%arg1, %arg0, %cst)
 // CHECK: {{%.+}} = stablehlo.subtract {{%.+}}, {{%.+}} : tensor<f64>
 
-// CHECK-DAG: func.func private @circuit_twotapes_doppleganger_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK-DAG: func.func private @circuit_twotapes_doppleganger_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node}
 // CHECK-DAG: quantum.device
 // CHECK-DAG: [[retAddDop:%.+]] = stablehlo.add %arg0, %arg1 : tensor<f64>
 // CHECK-DAG: quantum.device_release
 // CHECK-DAG: return [[retAddDop]] : tensor<f64>
 // CHECK-DAG: }
 
-// CHECK-DAG: func.func private @circuit_twotapes_doppleganger_tape_1(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK-DAG: func.func private @circuit_twotapes_doppleganger_tape_1(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node}
 // CHECK-DAG: quantum.device
 // CHECK-DAG: tensor.extract %arg0[]
 // CHECK-DAG: [[retMultDop:%.+]] = stablehlo.multiply %arg1, %arg2 : tensor<f64>
@@ -146,17 +182,29 @@ module @circuit_twotapes_module {
 // Test when the outlined name collides with an already existing name
 
 module @circuit_twotapes_module {
-  func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+  func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node} {
     %cst = stablehlo.constant dense<4.000000e-01> : tensor<f64>
     %cst_0 = stablehlo.constant dense<8.000000e-01> : tensor<f64>
     quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %tape0_out = stablehlo.add %arg1, %cst_0 : tensor<f64>
+    %qreg_t0 = quantum.alloc( 1) : !quantum.reg
+    %obs_t0 = quantum.compbasis qreg %qreg_t0 : !quantum.obs
+    %sample_t0 = quantum.sample %obs_t0 : tensor<1x1xf64>
+    quantum.dealloc %qreg_t0 : !quantum.reg
     quantum.device_release
     quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %extracted = tensor.extract %arg1[] : tensor<f64>
     %tape1_out = stablehlo.multiply %arg0, %cst : tensor<f64>
+    %qreg = quantum.alloc( 1) : !quantum.reg
+    %obs = quantum.compbasis qreg %qreg : !quantum.obs
+    %sample = quantum.sample %obs : tensor<1x1xf64>
+    quantum.dealloc %qreg : !quantum.reg
     quantum.device_release
     %result = stablehlo.subtract %tape0_out, %tape1_out : tensor<f64>
+    %qreg_out = quantum.alloc( 1) : !quantum.reg
+    %obs_out = quantum.compbasis qreg %qreg_out : !quantum.obs
+    %sample_out = quantum.sample %obs_out : tensor<1x1xf64>
+    quantum.dealloc %qreg_out : !quantum.reg
     return %result : tensor<f64>
   }
 
@@ -172,14 +220,14 @@ module @circuit_twotapes_module {
 // CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, %cst)
 // CHECK: {{%.+}} = stablehlo.subtract {{%.+}}, {{%.+}} : tensor<f64>
 
-// CHECK: func.func private @circuit_twotapes_tape_0_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK: func.func private @circuit_twotapes_tape_0_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node}
 // CHECK: quantum.device
 // CHECK: {{%.+}} = stablehlo.add %arg0, %arg1 : tensor<f64>
 // CHECK: quantum.device_release
 // CHECK: return {{%.+}} : tensor<f64>
 // CHECK-NEXT: }
 
-// CHECK: func.func private @circuit_twotapes_tape_1(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK: func.func private @circuit_twotapes_tape_1(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node}
 // CHECK: quantum.device
 // CHECK: tensor.extract %arg0[]
 // CHECK: {{%.+}} = stablehlo.multiply %arg1, %arg2 : tensor<f64>
@@ -201,21 +249,33 @@ module @circuit_twotapes_module {
 // Test when a post processing op is nested and the necessary values are not exposed at the upmost layer
 
 module @circuit_twotapes_module {
-  func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+  func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node} {
     %cst = stablehlo.constant dense<4.000000e-01> : tensor<f64>
     %cst_0 = stablehlo.constant dense<8.000000e-01> : tensor<f64>
     quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %tape0_out = stablehlo.add %arg1, %cst_0 : tensor<f64>
+    %qreg_t0 = quantum.alloc( 1) : !quantum.reg
+    %obs_t0 = quantum.compbasis qreg %qreg_t0 : !quantum.obs
+    %sample_t0 = quantum.sample %obs_t0 : tensor<1x1xf64>
+    quantum.dealloc %qreg_t0 : !quantum.reg
     quantum.device_release
     quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %extracted = tensor.extract %arg1[] : tensor<f64>
     %tape1_out = stablehlo.multiply %arg0, %cst : tensor<f64>
+    %qreg = quantum.alloc( 1) : !quantum.reg
+    %obs = quantum.compbasis qreg %qreg : !quantum.obs
+    %sample = quantum.sample %obs : tensor<1x1xf64>
+    quantum.dealloc %qreg : !quantum.reg
     quantum.device_release
     %result = scf.execute_region -> (tensor<f64>) {
       %result_in_scf = stablehlo.subtract %tape0_out, %tape1_out : tensor<f64>
       scf.yield %result_in_scf : tensor<f64>
     }
     %result_1 = func.call @adder(%result, %cst) : (tensor<f64>, tensor<f64>) -> tensor<f64>
+    %qreg_out = quantum.alloc( 1) : !quantum.reg
+    %obs_out = quantum.compbasis qreg %qreg_out : !quantum.obs
+    %sample_out = quantum.sample %obs_out : tensor<1x1xf64>
+    quantum.dealloc %qreg_out : !quantum.reg
     return %result_1 : tensor<f64>
   }
 
@@ -234,14 +294,14 @@ module @circuit_twotapes_module {
 // CHECK: scf.yield
 // CHECK: {{%.+}} = call @adder({{%.+}}, {{%.+}})
 
-// CHECK: func.func private @circuit_twotapes_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK: func.func private @circuit_twotapes_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node}
 // CHECK: quantum.device
 // CHECK: {{%.+}} = stablehlo.add %arg0, %arg1 : tensor<f64>
 // CHECK: quantum.device_release
 // CHECK: return {{%.+}} : tensor<f64>
 // CHECK-NEXT: }
 
-// CHECK: func.func private @circuit_twotapes_tape_1(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK: func.func private @circuit_twotapes_tape_1(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node}
 // CHECK: quantum.device
 // CHECK: tensor.extract %arg0[]
 // CHECK: {{%.+}} = stablehlo.multiply %arg1, %arg2 : tensor<f64>
@@ -258,18 +318,30 @@ module @circuit_twotapes_module {
 // Test when a later tape uses values from an earlier tape
 
 module @circuit_twotapes_module {
-  func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+  func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node} {
     %cst = stablehlo.constant dense<4.000000e-01> : tensor<f64>
     %cst_0 = stablehlo.constant dense<8.000000e-01> : tensor<f64>
     quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %tape0_out = stablehlo.add %arg1, %cst_0 : tensor<f64>
+    %qreg_t0 = quantum.alloc( 1) : !quantum.reg
+    %obs_t0 = quantum.compbasis qreg %qreg_t0 : !quantum.obs
+    %sample_t0 = quantum.sample %obs_t0 : tensor<1x1xf64>
+    quantum.dealloc %qreg_t0 : !quantum.reg
     quantum.device_release
     quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %extracted = tensor.extract %arg1[] : tensor<f64>
     %2 = stablehlo.multiply %arg0, %cst : tensor<f64>
     %tape1_out = stablehlo.multiply %2, %tape0_out : tensor<f64>
+    %qreg = quantum.alloc( 1) : !quantum.reg
+    %obs = quantum.compbasis qreg %qreg : !quantum.obs
+    %sample = quantum.sample %obs : tensor<1x1xf64>
+    quantum.dealloc %qreg : !quantum.reg
     quantum.device_release
     %result = stablehlo.subtract %tape0_out, %tape1_out : tensor<f64>
+    %qreg_out = quantum.alloc( 1) : !quantum.reg
+    %obs_out = quantum.compbasis qreg %qreg_out : !quantum.obs
+    %sample_out = quantum.sample %obs_out : tensor<1x1xf64>
+    quantum.dealloc %qreg_out : !quantum.reg
     return %result : tensor<f64>
   }
 }
@@ -280,14 +352,14 @@ module @circuit_twotapes_module {
 // CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, %cst, {{%.+}})
 // CHECK: {{%.+}} = stablehlo.subtract {{%.+}}, {{%.+}} : tensor<f64>
 
-// CHECK: func.func private @circuit_twotapes_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK: func.func private @circuit_twotapes_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node}
 // CHECK: quantum.device
 // CHECK: {{%.+}} = stablehlo.add %arg0, %arg1 : tensor<f64>
 // CHECK: quantum.device_release
 // CHECK: return {{%.+}} : tensor<f64>
 // CHECK-NEXT: }
 
-// CHECK: func.func private @circuit_twotapes_tape_1(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK: func.func private @circuit_twotapes_tape_1(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>, %arg3: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node}
 // CHECK: quantum.device
 // CHECK: tensor.extract %arg0[]
 // CHECK: {{%.+}} = stablehlo.multiply %arg1, %arg2 : tensor<f64>
@@ -308,17 +380,29 @@ module @circuit_twotapes_module {
 // Technically, an "in-between" operation will be distributed to the tape immediately above it during parsing in SplitMultipleTapes.cpp/collectOperationsForEachTape().
 
 module @circuit_twotapes_module {
-  func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+  func.func private @circuit_twotapes(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node} {
     %cst = stablehlo.constant dense<8.000000e-01> : tensor<f64>
     quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %tape0_out = stablehlo.add %arg1, %cst : tensor<f64>
+    %qreg_t0 = quantum.alloc( 1) : !quantum.reg
+    %obs_t0 = quantum.compbasis qreg %qreg_t0 : !quantum.obs
+    %sample_t0 = quantum.sample %obs_t0 : tensor<1x1xf64>
+    quantum.dealloc %qreg_t0 : !quantum.reg
     quantum.device_release
     %cst_0 = stablehlo.constant dense<4.000000e-01> : tensor<f64>
     quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %extracted = tensor.extract %arg1[] : tensor<f64>
     %tape1_out = stablehlo.multiply %arg0, %cst_0 : tensor<f64>
+    %qreg = quantum.alloc( 1) : !quantum.reg
+    %obs = quantum.compbasis qreg %qreg : !quantum.obs
+    %sample = quantum.sample %obs : tensor<1x1xf64>
+    quantum.dealloc %qreg : !quantum.reg
     quantum.device_release
     %result = stablehlo.subtract %tape0_out, %tape1_out : tensor<f64>
+    %qreg_out = quantum.alloc( 1) : !quantum.reg
+    %obs_out = quantum.compbasis qreg %qreg_out : !quantum.obs
+    %sample_out = quantum.sample %obs_out : tensor<1x1xf64>
+    quantum.dealloc %qreg_out : !quantum.reg
     return %result : tensor<f64>
   }
 }
@@ -329,7 +413,7 @@ module @circuit_twotapes_module {
 // CHECK: func.call @circuit_twotapes_tape_1(%arg1, %arg0, {{%.+}}#1)
 // CHECK: {{%.+}} = stablehlo.subtract {{%.+}}#0, {{%.+}} : tensor<f64>
 
-// CHECK: func.func private @circuit_twotapes_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> (tensor<f64>, tensor<f64>) attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK: func.func private @circuit_twotapes_tape_0(%arg0: tensor<f64>, %arg1: tensor<f64>) -> (tensor<f64>, tensor<f64>) attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node}
 // CHECK: quantum.device
 // CHECK: {{%.+}} = stablehlo.add %arg0, %arg1 : tensor<f64>
 // CHECK: quantum.device_release
@@ -337,7 +421,7 @@ module @circuit_twotapes_module {
 // CHECK: return {{%.+}}, {{%.+}} : tensor<f64>, tensor<f64>
 // CHECK-NEXT: }
 
-// CHECK: func.func private @circuit_twotapes_tape_1(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode}
+// CHECK: func.func private @circuit_twotapes_tape_1(%arg0: tensor<f64>, %arg1: tensor<f64>, %arg2: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node}
 // CHECK: quantum.device
 // CHECK: tensor.extract %arg0[]
 // CHECK: {{%.+}} = stablehlo.multiply %arg1, %arg2 : tensor<f64>
@@ -379,7 +463,7 @@ module @classical_workflow {
 
 // Should do nothing when there's only one tape
 module @circuit_one_tape {
-  func.func private @circuit(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+  func.func private @circuit(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node} {
     quantum.device["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -396,7 +480,7 @@ module @circuit_one_tape {
 }
 
 // CHECK: module @circuit_one_tape {
-// CHECK-NEXT:  func.func private @circuit(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {
+// CHECK-NEXT:  func.func private @circuit(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node} {
 // CHECK-NEXT:    quantum.device ["librtd_lightning.so", "LightningSimulator", "{'shots': 0, 'mcmc': False, 'num_burnin': 0, 'kernel_name': None}"]
 // CHECK-NEXT:    %0 = quantum.alloc( 1) : !quantum.reg
 // CHECK-NEXT:    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -411,4 +495,3 @@ module @circuit_one_tape {
 // CHECK-NEXT:    return %from_elements : tensor<f64>
 // CHECK-NEXT:  }
 // CHECK-NEXT:}
-
