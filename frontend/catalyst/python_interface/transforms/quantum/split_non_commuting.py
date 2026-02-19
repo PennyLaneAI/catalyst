@@ -111,10 +111,13 @@ class SplitNonCommutingPass(passes.ModulePass):
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the split non-commuting pass to all QNode functions in the module."""
+        qnodes = []
         for op_ in op.ops:
             if isinstance(op_, func.FuncOp) and "quantum.node" in op_.attributes:
-                rewriter = pattern_rewriter.PatternRewriter(op_)
-                SplitNonCommutingPattern().match_and_rewrite(op_, rewriter)
+                qnodes.append(op_)
+        for op_ in qnodes:
+            rewriter = pattern_rewriter.PatternRewriter(op_)
+            SplitNonCommutingPattern().match_and_rewrite(op_, rewriter)
 
 
 split_non_commuting_pass = compiler_transform(SplitNonCommutingPass)
@@ -157,6 +160,7 @@ class SplitNonCommutingPattern(pattern_rewriter.RewritePattern):
         fun_type = builtin.FunctionType.from_lists(input_types, output_types)
 
         dup_func = func.FuncOp(func_op.sym_name.data + ".dup." + str(i), fun_type)
+        dup_func.attributes["quantum.node"] = builtin.UnitAttr()
         rewriter.insert_op(dup_func, InsertPoint.at_end(self.module.body.block))
 
         # Map original function arguments to dup function arguments
@@ -489,6 +493,7 @@ class SplitNonCommutingPattern(pattern_rewriter.RewritePattern):
         """
         self.module = self.get_parent_of_type(func_op, builtin.ModuleOp)
         assert self.module is not None, "got orphaned qnode function"
+        assert "quantum.node" in func_op.attributes
 
         # Calculate the number of groups using wires-based grouping strategy
         num_groups = self.calculate_num_groups(func_op)
