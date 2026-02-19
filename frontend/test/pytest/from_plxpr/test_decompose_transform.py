@@ -76,7 +76,9 @@ class TestGraphDecomposition:
             with pytest.warns(
                 DecompositionWarning, match="unable to find a decomposition for {'Hadamard'}"
             ):
-                circuit(0)
+                with pytest.warns(UserWarning, match="Operator RX does not define"):
+                    with pytest.warns(UserWarning, match="Operator RZ does not define"):
+                        circuit(0)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_decompose_lowering_on_empty_circuit(self):
