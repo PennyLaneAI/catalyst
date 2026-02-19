@@ -240,6 +240,16 @@ def MeasurementProcess : OpInterface<"MeasurementProcess"> {
     }];
 
     let cppNamespace = "::catalyst::quantum";
+
+    let methods = [
+        InterfaceMethod<
+            "Return the observable",
+            "mlir::Value", "getObs", (ins), /*methodBody=*/[{}],
+            /*defaultImplementation=*/[{
+                return $_op.getObs();
+            }]
+        >,
+    ];
 }
 
 #endif // QUANTUM_INTERFACES
