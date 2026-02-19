@@ -13,9 +13,9 @@
 # limitations under the License.
 # pylint: disable=too-many-lines
 
+import re
 from textwrap import dedent
 
-import re
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -74,7 +74,9 @@ class TestCondToJaxpr:
             return out
 
         def asline(text):
-            return " ".join(map(lambda x: re.sub(r"\033\[[0-9;]*m", "", x).strip(), str(text).split("\n"))).strip()
+            return " ".join(
+                map(lambda x: re.sub(r"\033\[[0-9;]*m", "", x).strip(), str(text).split("\n"))
+            ).strip()
 
         result = circuit.jaxpr
         assert asline(expected) == asline(result)

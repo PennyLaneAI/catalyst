@@ -346,7 +346,7 @@ class TestPassByPassSpecs:
     @pytest.mark.usefixtures("use_both_frontend")
     def test_reprs_match(self):
         """Test that when no transforms are applied to a typical circuit and the gates are
-        supported by the device and compiler level, then the "Before Transform" and "Before 
+        supported by the device and compiler level, then the "Before Transform" and "Before
         MLIR Passes" representations should match."""
 
         dev = qml.device("lightning.qubit", wires=4)
