@@ -99,7 +99,6 @@ void createGradientLoweringStage(OpPassManager &pm)
 }
 void createBufferizationStage(OpPassManager &pm)
 {
-    pm.addPass(mlir::createInlinerPass());
     pm.addPass(mlir::createConvertTensorToLinalgPass());
     pm.addPass(mlir::createConvertElementwiseToLinalgPass());
     pm.addPass(catalyst::gradient::createGradientPreprocessingPass());

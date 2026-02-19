@@ -17,6 +17,7 @@ file(GLOB SRC
     MergeRotationsPatterns.cpp
     decompose_lowering.cpp
     DecomposeLoweringPatterns.cpp
+    dynamic_one_shot.cpp
     gridsynth.cpp
     GridsynthPatterns.cpp
     DisentangleSWAP.cpp
