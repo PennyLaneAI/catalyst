@@ -97,6 +97,7 @@ COMPILER_OPS_FOR_DECOMPOSITION: dict[str, tuple[int, int]] = {
 }
 
 
+# pylint: disable=too-many-instance-attributes
 class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
     """Interpreter for getting the decomposition graph solution
     from a jaxpr when program capture is enabled.
