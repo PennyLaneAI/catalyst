@@ -72,14 +72,12 @@ class TestGraphDecomposition:
             qml.Hadamard(x)
             return qml.state()
 
-        # TODO: RZ/RX warnings  should not be raised, remove (PL issue #8885)
+        # TODO: RZ/RX warnings should not be raised, remove (PL issue #8885)
         with pytest.warns(UserWarning, match="Falling back to the legacy decomposition system"):
             with pytest.warns(
                 DecompositionWarning, match="unable to find a decomposition for {'Hadamard'}"
             ):
-                with pytest.warns(UserWarning, match="Operator RX does not define"):
-                    with pytest.warns(UserWarning, match="Operator RZ does not define"):
-                        circuit(0)
+                circuit(0)
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_decompose_lowering_on_empty_circuit(self):
@@ -240,6 +238,40 @@ class TestGraphDecomposition:
 
         expected_resources = qml.specs(circuit, level="device")(x, y, z)["resources"].gate_types
         resources = qml.specs(with_qjit, level="device")(x, y, z)["resources"].gate_types
+        assert resources == expected_resources
+
+    @pytest.mark.usefixtures("use_capture_dgraph")
+    def test_decompose_with_stopping_condition(self):
+        """Test that decompose with stopping_condition uses plxpr decomposition correctly.
+
+        When stopping_condition is passed to qml.transforms.decompose, from_plxpr uses
+        the plxpr decompose path (no graph), passing stopping_condition to the transform.
+        This test ensures that path compiles and produces correct results.
+        """
+
+        def stopping_condition(op):
+            return op.name == "MultiRZ"
+
+        @partial(
+            qml.transforms.decompose,
+            gate_set=[qml.RX, qml.RY, qml.RZ],
+            stopping_condition=stopping_condition,
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x, y, z):
+            qml.Rot(x, y, z, wires=0)
+            qml.MultiRZ(0.5, wires=[0, 1])
+            return qml.expval(qml.PauliZ(0))
+
+        x, y, z = 0.5, 0.3, 0.2
+        without_qjit = circuit(x, y, z)
+        with_qjit = qml.qjit(circuit)
+        assert qml.math.allclose(without_qjit, with_qjit(x, y, z))
+
+        expected_resources = qml.specs(circuit, level="device")(x, y, z)["resources"].gate_types
+        resources = qml.specs(with_qjit, level="device")(x, y, z)["resources"].gate_types
+        assert "MultiRZ" in resources
+        assert "MultiRZ" in expected_resources
         assert resources == expected_resources
 
     @pytest.mark.skip(

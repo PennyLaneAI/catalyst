@@ -77,6 +77,7 @@ def test_pauli_rot_to_ppr():
         return f()
 
     optimized_ir = test_pauli_rot_to_ppr_workflow.mlir_opt
+    print(optimized_ir)
     assert "pbc.ppr" in optimized_ir
 
 

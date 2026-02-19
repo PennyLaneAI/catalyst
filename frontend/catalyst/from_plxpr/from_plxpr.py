@@ -464,7 +464,7 @@ def register_transform(pl_transform, pass_name, decomposition):
     transforms_to_passes[pl_transform] = (pass_name, decomposition)
 
 
-def _set_decompose_lowering_state(self, tkwargs):
+def _set_decompose_lowering_state(self):
     """Set requires_decompose_lowering and decompose_tkwargs; raise if already set."""
     if not self.requires_decompose_lowering:
         self.requires_decompose_lowering = True
@@ -472,8 +472,8 @@ def _set_decompose_lowering_state(self, tkwargs):
         raise NotImplementedError("Multiple decomposition transforms are not yet supported.")
 
 
-def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs, use_graph=True):
-    _set_decompose_lowering_state(self, tkwargs)
+def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs):
+    _set_decompose_lowering_state(self)
 
     next_eval = copy(self)
     # Update the decompose_gateset to be used by the quantum kernel primitive
