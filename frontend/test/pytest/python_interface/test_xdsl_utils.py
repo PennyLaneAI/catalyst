@@ -367,8 +367,8 @@ class TestConversionUtils:
                 funcs.append(op)
 
         assert len(funcs) == 1
-        # All qnodes have a UnitAttr attribute called qnode
-        assert funcs[0].attributes.get("qnode", None) is not None
+        # All qnodes have a UnitAttr attribute called quantum.node
+        assert funcs[0].attributes.get("quantum.node", None) is not None
 
 
 class TestInliningUtils:

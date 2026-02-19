@@ -112,7 +112,7 @@ class SplitNonCommutingPass(passes.ModulePass):
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the split non-commuting pass to all QNode functions in the module."""
         for op_ in op.ops:
-            if isinstance(op_, func.FuncOp) and "qnode" in op_.attributes:
+            if isinstance(op_, func.FuncOp) and "quantum.node" in op_.attributes:
                 rewriter = pattern_rewriter.PatternRewriter(op_)
                 SplitNonCommutingPattern().match_and_rewrite(op_, rewriter)
 
