@@ -28,7 +28,7 @@ class QRef_Type<string name, string typeMnemonic, list<Trait> traits = []>
     let mnemonic = typeMnemonic;
 }
 
-def QRefQuregType : QRef_Type<"Qureg", "reg"> {
+def QuregRefType : QRef_Type<"Qureg", "reg"> {
     let summary = "A container value for qubit references.";
 
     let parameters = (ins OptionalParameter<"mlir::IntegerAttr">:$size);
@@ -52,7 +52,7 @@ def QRefQuregType : QRef_Type<"Qureg", "reg"> {
     }];
 }
 
-def QRefQubitType : QRef_Type<"Qubit", "bit"> {
+def QubitRefType : QRef_Type<"Qubit", "bit"> {
     let summary = "A reference to a qubit.";
 }
 

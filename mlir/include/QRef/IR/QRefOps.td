@@ -47,7 +47,7 @@ def AllocOp : Memory_Op<"alloc"> {
     );
 
     let results = (outs
-        QRefQuregType:$qreg
+        QuregRefType:$qreg
     );
 
     let assemblyFormat = [{
@@ -65,7 +65,7 @@ def AllocQubitOp : Memory_Op<"alloc_qb"> {
     }];
 
     let results = (outs
-        QRefQubitType:$qubit
+        QubitRefType:$qubit
     );
 
     let assemblyFormat = [{
@@ -96,7 +96,7 @@ def DeallocQubitOp : Memory_Op<"dealloc_qb"> {
     }];
 
     let arguments = (ins
-        QRefQubitType:$qubit
+        QubitRefType:$qubit
     );
 
     let assemblyFormat = [{
@@ -111,7 +111,7 @@ def DeallocOp : Memory_Op<"dealloc"> {
     }];
 
     let arguments = (ins
-        QRefQuregType:$qreg
+        QuregRefType:$qreg
     );
 
     let assemblyFormat = [{
@@ -137,13 +137,13 @@ def GetOp : Memory_Op<"get", [NoMemoryEffect]> {
     }];
 
     let arguments = (ins
-        QRefQuregType:$qreg,
+        QuregRefType:$qreg,
         Optional<I64>:$idx,
         OptionalAttr<ConfinedAttr<I64Attr, [IntNonNegative]>>:$idx_attr
     );
 
     let results = (outs
-        QRefQubitType:$qubit
+        QubitRefType:$qubit
     );
 
     let assemblyFormat = [{
@@ -259,7 +259,7 @@ def SetStateOp : Gate_Op<"set_state"> {
 
     let arguments = (ins
         1DTensorOf<[Complex<F64>]>:$in_state,
-        Variadic<QRefQubitType>:$qubits
+        Variadic<QubitRefType>:$qubits
     );
 
     let assemblyFormat = [{
@@ -286,7 +286,7 @@ def SetBasisStateOp : Gate_Op<"set_basis_state"> {
 
     let arguments = (ins
         1DTensorOf<[I1]>:$basis_state,
-        Variadic<QRefQubitType>:$qubits
+        Variadic<QubitRefType>:$qubits
     );
 
     let assemblyFormat = [{
@@ -304,10 +304,10 @@ def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegme
 
     let arguments = (ins
         Variadic<F64>:$params,
-        Variadic<QRefQubitType>:$qubits,
+        Variadic<QubitRefType>:$qubits,
         StrAttr:$gate_name,
         UnitAttr:$adjoint,
-        Variadic<QRefQubitType>:$ctrl_qubits,
+        Variadic<QubitRefType>:$ctrl_qubits,
         Variadic<I1>:$ctrl_values
     );
 
@@ -340,9 +340,9 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [ParametrizedGate, AttrSizedOperandS
     let arguments = (ins
         F64:$angle,
         PauliWord:$pauli_product,
-        Variadic<QRefQubitType>:$qubits,
+        Variadic<QubitRefType>:$qubits,
         UnitAttr:$adjoint,
-        Variadic<QRefQubitType>:$ctrl_qubits,
+        Variadic<QubitRefType>:$ctrl_qubits,
         Variadic<I1>:$ctrl_values
     );
 
@@ -372,7 +372,7 @@ def GlobalPhaseOp : UnitaryGate_Op<"gphase", [ParametrizedGate, AttrSizedOperand
     let arguments = (ins
         F64:$params,
         UnitAttr:$adjoint,
-        Variadic<QRefQubitType>:$ctrl_qubits,
+        Variadic<QubitRefType>:$ctrl_qubits,
         Variadic<I1>:$ctrl_values
     );
 
@@ -413,9 +413,9 @@ def MultiRZOp : UnitaryGate_Op<"multirz", [ParametrizedGate, AttrSizedOperandSeg
 
     let arguments = (ins
         F64:$theta,
-        Variadic<QRefQubitType>:$qubits,
+        Variadic<QubitRefType>:$qubits,
         UnitAttr:$adjoint,
-        Variadic<QRefQubitType>:$ctrl_qubits,
+        Variadic<QubitRefType>:$ctrl_qubits,
         Variadic<I1>:$ctrl_values
     );
 
@@ -460,9 +460,9 @@ def PCPhaseOp : UnitaryGate_Op<"pcphase", [ParametrizedGate, AttrSizedOperandSeg
     let arguments = (ins
         F64:$theta,
         F64:$dim,
-        Variadic<QRefQubitType>:$qubits,
+        Variadic<QubitRefType>:$qubits,
         UnitAttr:$adjoint,
-        Variadic<QRefQubitType>:$ctrl_qubits,
+        Variadic<QubitRefType>:$ctrl_qubits,
         Variadic<I1>:$ctrl_values
     );
 
@@ -498,9 +498,9 @@ def QubitUnitaryOp : UnitaryGate_Op<"unitary", [ParametrizedGate, AttrSizedOpera
 
     let arguments = (ins
         2DTensorOf<[Complex<F64>]>:$matrix,
-        Variadic<QRefQubitType>:$qubits,
+        Variadic<QubitRefType>:$qubits,
         UnitAttr:$adjoint,
-        Variadic<QRefQubitType>:$ctrl_qubits,
+        Variadic<QubitRefType>:$ctrl_qubits,
         Variadic<I1>:$ctrl_values
     );
 
@@ -531,7 +531,7 @@ def AdjointOp : Region_Op<"adjoint", [QuantumRegion, NoTerminator]> {
     let regions = (region SizedRegion<1>:$region);
 
     let arguments = (ins
-        QRefQuregType:$qreg
+        QuregRefType:$qreg
     );
 
     let assemblyFormat = [{
@@ -572,8 +572,8 @@ def ComputationalBasisOp : Observable_Op<"compbasis", [AttrSizedOperandSegments]
     }];
 
     let arguments = (ins
-        Variadic<QRefQubitType>:$qubits,
-        Optional<QRefQuregType>:$qreg
+        Variadic<QubitRefType>:$qubits,
+        Optional<QuregRefType>:$qreg
     );
 
     let results = (outs
@@ -597,7 +597,7 @@ def NamedObsOp : Observable_Op<"namedobs"> {
     }];
 
     let arguments = (ins
-        QRefQubitType:$qubit,
+        QubitRefType:$qubit,
         NamedObservableAttr:$type
     );
 
@@ -628,7 +628,7 @@ def HermitianOp : Observable_Op<"hermitian"> {
 
     let arguments = (ins
         2DTensorOf<[Complex<F64>]>:$matrix,
-        Variadic<QRefQubitType>:$qubits
+        Variadic<QubitRefType>:$qubits
     );
 
     let results = (outs ObservableType:$obs);
@@ -651,7 +651,7 @@ def MeasureOp : QRef_Op<"measure"> {
     }];
 
     let arguments = (ins
-        QRefQubitType:$in_qubit,
+        QubitRefType:$in_qubit,
         OptionalAttr<ConfinedAttr<I32Attr, [IntMinValue<0>, IntMaxValue<1>]>>:$postselect
     );
 
