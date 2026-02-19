@@ -721,6 +721,11 @@ class TestAssemblyFormat:
         // CHECK: [[QREG_STATIC:%.+]] = quantum.alloc(10) : !quantum.reg
         %qreg_static = quantum.alloc(10) : !quantum.reg
 
+        {{%.+}} = quantum.alloc(10) : !quantum.reg<logical>
+        %qreg_logical = quantum.alloc(10) : !quantum.reg<logical>
+        {{%.+}} = quantum.alloc(10) : !quantum.reg
+        %qreg_logical = quantum.alloc(10) : !quantum.reg<abstract>
+
         ////////////////// **Deallocation of static register** //////////////////
         // CHECK: quantum.dealloc [[QREG_STATIC]] : !quantum.reg
         quantum.dealloc %qreg_static : !quantum.reg
@@ -756,6 +761,52 @@ class TestAssemblyFormat:
         ////////////////// **Dynamic qubit insertion** //////////////////
         // CHECK: quantum.insert [[QREG1]][[[DYN_INDEX]]], [[DYN_QUBIT1]] : !quantum.reg, !quantum.bit
         %qreg2 = quantum.insert %qreg1[%dyn_index], %dyn_qubit1 : !quantum.reg, !quantum.bit
+
+        //////////////////////////////////////////////////////////////////
+        //////////////Hierarchical qubits/quregs testing//////////////////
+        //////////////////////////////////////////////////////////////////
+
+        /////////////////////// **QuregType** ///////////////////////
+        {{%.+}} = "test.op"() : () -> !quantum.reg
+        %qreg_abstract0 = "test.op"() : () -> !quantum.reg
+        {{%.+}} = "test.op"() : () -> !quantum.reg
+        %qreg_abstract1 = "test.op"() : () -> !quantum.reg<abstract>
+        {{%.+}} = "test.op"() : () -> !quantum.reg<logical>
+        %qreg_logical = "test.op"() : () -> !quantum.reg<logical>
+
+        /////////////////////// **QubitType** ///////////////////////
+        // Defaults
+        {{%.+}} = "test.op"() : () -> !quantum.bit
+        %qb_abstract_null0 = "test.op"() : () -> !quantum.bit
+        {{%.+}} = "test.op"() : () -> !quantum.bit
+        %qb_abstract_null1 = "test.op"() : () -> !quantum.bit<abstract>
+        {{%.+}} = "test.op"() : () -> !quantum.bit
+        %qb_abstract_null2 = "test.op"() : () -> !quantum.bit<null>
+        {{%.+}} = "test.op"() : () -> !quantum.bit
+        %qb_abstract_null3 = "test.op"() : () -> !quantum.bit<abstract, null>
+
+        //// Single arg ////
+        // Levels
+        {{%.+}} = "test.op"() : () -> !quantum.bit<logical>
+        %qb_level0 = "test.op"() : () -> !quantum.bit<logical>
+        {{%.+}} = "test.op"() : () -> !quantum.bit<physical>
+        %qb_level1 = "test.op"() : () -> !quantum.bit<physical>
+        {{%.+}} = "test.op"() : () -> !quantum.bit<pbc>
+        %qb_level2 = "test.op"() : () -> !quantum.bit<pbc>
+
+        // Roles
+        {{%.+}} = "test.op"() : () -> !quantum.bit<data>
+        %qb_role0 = "test.op"() : () -> !quantum.bit<data>
+        {{%.+}} = "test.op"() : () -> !quantum.bit<xcheck>
+        %qb_role1 = "test.op"() : () -> !quantum.bit<xcheck>
+        {{%.+}} = "test.op"() : () -> !quantum.bit<zcheck>
+        %qb_role2 = "test.op"() : () -> !quantum.bit<zcheck>
+
+        // Multiple args
+        {{%.+}} = "test.op"() : () -> !quantum.bit<logical, data>
+        %qb_mul0 = "test.op"() : () -> !quantum.bit<logical, data>
+        {{%.+}} = "test.op"() : () -> !quantum.bit<physical, xcheck>
+        %qb_mul0 = "test.op"() : () -> !quantum.bit<physical, xcheck>
         """
 
         run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
