@@ -4,7 +4,7 @@
 
 _A dialect for Pauli-based computation and error correction._
 
-This QEC dialect focuses on Pauli-based computation for the purposes of Surface code and related
+This PBC dialect focuses on Pauli-based computation for the purposes of Surface code and related
 Quantum Error Correction techniques. Pauli-product rotations (PPRs) and Pauli-product measurements
 (PPMs) are represented, as well transformations on them. Error correction primitives like
 magic state fabrication are also represented.

@@ -138,6 +138,16 @@
   # [ARTIQ] Generated ELF: /path/to/circuit.elf
   ```
 
+* Added a scalable MLIR resource tracker analysis pass (`resource-tracker`) that counts quantum
+  operations across the `quantum`, `qec`, and `mbqc` dialects. The analysis is implemented as a
+  cacheable MLIR analysis class (`ResourceAnalysis`) that other transformation passes can query
+  via `getAnalysis<ResourceAnalysis>()`, avoiding redundant recomputation.
+
+  ```bash
+  quantum-opt --resource-tracker='output-json=true' input.mlir
+  quantum-opt --resource-tracker -mlir-pass-statistics input.mlir
+  ```
+
 <h3>Improvements 🛠</h3>
 
 * Catalyst with program capture can now be used with the new `qml.templates.Subroutine` class and the associated
@@ -266,6 +276,7 @@
   names. The rename better reflects the dialect's purpose as a representation for Pauli-Based
   Computation rather than general quantum error correction.
   [(#2482)](https://github.com/PennyLaneAI/catalyst/pull/2482)
+  [(#2485)](https://github.com/PennyLaneAI/catalyst/pull/2485)
 
 * Updated the integration tests for `qp.specs` to get coverage for new features
   [(#2448)](https://github.com/PennyLaneAI/catalyst/pull/2448)
