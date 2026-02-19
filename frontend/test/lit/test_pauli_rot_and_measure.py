@@ -67,9 +67,9 @@ def test_single_qubit_pauli_rotations():
         qml.PauliRot(np.pi / 2, "Y", wires=0)
         qml.PauliRot(np.pi, "Z", wires=0)
 
-    # CHECK: [[q0:%.+]] = qec.ppr ["X"](8)
-    # CHECK: [[q1:%.+]] = qec.ppr ["Y"](4) [[q0]]
-    # CHECK: [[q2:%.+]] = qec.ppr ["Z"](2) [[q1]]
+    # CHECK: [[q0:%.+]] = pbc.ppr ["X"](8)
+    # CHECK: [[q1:%.+]] = pbc.ppr ["Y"](4) [[q0]]
+    # CHECK: [[q2:%.+]] = pbc.ppr ["Z"](2) [[q1]]
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -91,7 +91,7 @@ def test_arbitrary_angle_pauli_rotations():
         qml.PauliRot(0.42, "X", wires=0)
 
     # CHECK: [[cst:%.+]] = arith.constant 2.100000e-01 : f64
-    # CHECK: [[q0:%.+]] = qec.ppr.arbitrary ["X"]([[cst]])
+    # CHECK: [[q0:%.+]] = pbc.ppr.arbitrary ["X"]([[cst]])
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -113,7 +113,7 @@ def test_arbitrary_negative_angle_pauli_rotations():
         qml.PauliRot(-0.42, "X", wires=0)
 
     # CHECK: [[cst:%.+]] = arith.constant -2.100000e-01 : f64
-    # CHECK: [[q0:%.+]] = qec.ppr.arbitrary ["X"]([[cst]])
+    # CHECK: [[q0:%.+]] = pbc.ppr.arbitrary ["X"]([[cst]])
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -137,7 +137,7 @@ def test_dynamic_angle_pauli_rotations():
     # CHECK: [[cst:%.+]] = arith.constant 2.000000e+00 : f64
     # CHECK: [[extracted:%.+]] = tensor.extract
     # CHECK: [[div:%.+]] = arith.divf [[extracted]], [[cst]] : f64
-    # CHECK: [[q0:%.+]] = qec.ppr.arbitrary ["X"]([[div]])
+    # CHECK: [[q0:%.+]] = pbc.ppr.arbitrary ["X"]([[div]])
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -161,10 +161,10 @@ def test_multi_qubit_pauli_rotations():
         qml.PauliRot(np.pi, "ZX", wires=[0, 2])
         qml.PauliRot(np.pi / 4, "XYZ", wires=[0, 1, 2])
 
-    # CHECK: [[q0:%.+]]:3 = qec.ppr ["X", "Y", "Z"](8)
-    # CHECK: [[q1:%.+]]:2 = qec.ppr ["Y", "Z"](4) [[q0]]#1, [[q0]]#2
-    # CHECK: [[q2:%.+]]:2 = qec.ppr ["Z", "X"](2) [[q0]]#0, [[q1]]#1
-    # CHECK: [[q3:%.+]]:3 = qec.ppr ["X", "Y", "Z"](8) [[q2]]#0, [[q1]]#0, [[q2]]#1
+    # CHECK: [[q0:%.+]]:3 = pbc.ppr ["X", "Y", "Z"](8)
+    # CHECK: [[q1:%.+]]:2 = pbc.ppr ["Y", "Z"](4) [[q0]]#1, [[q0]]#2
+    # CHECK: [[q2:%.+]]:2 = pbc.ppr ["Z", "X"](2) [[q0]]#0, [[q1]]#1
+    # CHECK: [[q3:%.+]]:3 = pbc.ppr ["X", "Y", "Z"](8) [[q2]]#0, [[q1]]#0, [[q2]]#1
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -188,8 +188,8 @@ def test_arbitrary_angle_multi_qubit_pauli_rotations():
 
     # CHECK: [[cst:%.+]] = arith.constant 4.200000e-01 : f64
     # CHECK: [[cst_1:%.+]] = arith.constant 2.100000e-01 : f64
-    # CHECK: [[q0:%.+]]:2 = qec.ppr.arbitrary ["X", "Z"]([[cst_1]])
-    # CHECK: [[q1:%.+]]:2 = qec.ppr.arbitrary ["Y", "X"]([[cst]]) [[q0]]#0, [[q0]]#1
+    # CHECK: [[q0:%.+]]:2 = pbc.ppr.arbitrary ["X", "Z"]([[cst_1]])
+    # CHECK: [[q1:%.+]]:2 = pbc.ppr.arbitrary ["Y", "X"]([[cst]]) [[q0]]#0, [[q0]]#1
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -214,10 +214,10 @@ def test_dynamic_angle_multi_qubit_pauli_rotations():
     # CHECK: [[cst:%.+]] = arith.constant 2.000000e+00 : f64
     # CHECK: [[extracted:%.+]] = tensor.extract
     # CHECK: [[div:%.+]] = arith.divf [[extracted]], [[cst]] : f64
-    # CHECK: [[q0:%.+]]:2 = qec.ppr.arbitrary ["X", "Z"]([[div]])
+    # CHECK: [[q0:%.+]]:2 = pbc.ppr.arbitrary ["X", "Z"]([[div]])
     # CHECK: [[extracted_1:%.+]] = tensor.extract
     # CHECK: [[div_1:%.+]] = arith.divf [[extracted_1]], [[cst]] : f64
-    # CHECK: [[q1:%.+]]:2 = qec.ppr.arbitrary ["Y", "X"]([[div_1]]) [[q0]]#0, [[q0]]#1
+    # CHECK: [[q1:%.+]]:2 = pbc.ppr.arbitrary ["Y", "X"]([[div_1]]) [[q0]]#0, [[q0]]#1
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -240,9 +240,9 @@ def test_single_qubit_pauli_measurements():
         qml.pauli_measure("Y", wires=0)
         qml.pauli_measure("Z", wires=0)
 
-    # CHECK: [[m0:%.+]], [[q0:%.+]] = qec.ppm ["X"]
-    # CHECK: [[m1:%.+]], [[q1:%.+]] = qec.ppm ["Y"] [[q0]]
-    # CHECK: [[m2:%.+]], [[q2:%.+]] = qec.ppm ["Z"] [[q1]]
+    # CHECK: [[m0:%.+]], [[q0:%.+]] = pbc.ppm ["X"]
+    # CHECK: [[m1:%.+]], [[q1:%.+]] = pbc.ppm ["Y"] [[q0]]
+    # CHECK: [[m2:%.+]], [[q2:%.+]] = pbc.ppm ["Z"] [[q1]]
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -265,9 +265,9 @@ def test_multi_qubit_pauli_measurements():
         qml.pauli_measure("ZX", wires=[1, 2])
         qml.pauli_measure("XYZ", wires=[0, 1, 2])
 
-    # CHECK: [[m0:%.+]], [[q0:%.+]]:3 = qec.ppm ["X", "Y", "Z"]
-    # CHECK: [[m1:%.+]], [[q1:%.+]]:2 = qec.ppm ["Z", "X"] [[q0]]#1, [[q0]]#2
-    # CHECK: [[m2:%.+]], [[q2:%.+]]:3 = qec.ppm ["X", "Y", "Z"] [[q0]]#0, [[q1]]#0, [[q1]]#1
+    # CHECK: [[m0:%.+]], [[q0:%.+]]:3 = pbc.ppm ["X", "Y", "Z"]
+    # CHECK: [[m1:%.+]], [[q1:%.+]]:2 = pbc.ppm ["Z", "X"] [[q0]]#1, [[q0]]#2
+    # CHECK: [[m2:%.+]], [[q2:%.+]]:3 = pbc.ppm ["X", "Y", "Z"] [[q0]]#0, [[q1]]#0, [[q1]]#1
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -293,12 +293,12 @@ def test_pauli_rot_and_measure_combined():
         qml.pauli_measure("Y", wires=1)
         qml.pauli_measure("XY", wires=[0, 1])
 
-    # CHECK: qec.ppr ["X"](8)
-    # CHECK: qec.ppr ["Y"](4)
-    # CHECK: qec.ppr ["X", "Y"](8)
-    # CHECK: qec.ppm ["X"]
-    # CHECK: qec.ppm ["Y"]
-    # CHECK: qec.ppm ["X", "Y"]
+    # CHECK: pbc.ppr ["X"](8)
+    # CHECK: pbc.ppr ["Y"](4)
+    # CHECK: pbc.ppr ["X", "Y"](8)
+    # CHECK: pbc.ppm ["X"]
+    # CHECK: pbc.ppm ["Y"]
+    # CHECK: pbc.ppm ["X", "Y"]
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -323,13 +323,13 @@ def test_clifford_t_ppr_ppm_combined():
         qml.PauliRot(np.pi / 2, "YZ", wires=[1, 2])
         qml.pauli_measure("YZ", wires=[1, 2])
 
-    # CHECK: qec.ppr ["Z"](4)
-    # CHECK: qec.ppr ["Z"](4)
-    # CHECK: qec.ppr ["X"](4)
-    # CHECK: qec.ppr ["Z"](4)
-    # CHECK: qec.ppr ["Z"](8)
-    # CHECK: qec.ppr ["Y", "Z"](4)
-    # CHECK: qec.ppm ["Y", "Z"]
+    # CHECK: pbc.ppr ["Z"](4)
+    # CHECK: pbc.ppr ["Z"](4)
+    # CHECK: pbc.ppr ["X"](4)
+    # CHECK: pbc.ppr ["Z"](4)
+    # CHECK: pbc.ppr ["Z"](8)
+    # CHECK: pbc.ppr ["Y", "Z"](4)
+    # CHECK: pbc.ppm ["Y", "Z"]
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -354,9 +354,9 @@ def test_commute_ppr():
         qml.S(wires=0)  # Clifford gate
         qml.T(wires=0)  # Non-Clifford gate
 
-    # CHECK: qec.ppr ["Z"](8)
-    # CHECK: qec.ppr ["Z"](4)
-    # CHECK: qec.ppr ["Z"](4)
+    # CHECK: pbc.ppr ["Z"](8)
+    # CHECK: pbc.ppr ["Z"](4)
+    # CHECK: pbc.ppr ["Z"](4)
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -379,7 +379,7 @@ def test_merge_ppr_ppm():
         qml.PauliRot(np.pi / 2, "Z", wires=0)
         qml.pauli_measure("X", wires=0)
 
-    # CHECK: qec.ppm ["Y"](-1)
+    # CHECK: pbc.ppm ["Y"](-1)
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -404,9 +404,15 @@ def test_ppr_to_ppm():
         qml.PauliRot(np.pi / 4, "Y", wires=0)
         qml.pauli_measure("X", wires=0)
 
-    # CHECK: qec.select.ppm
-    # CHECK-NOT: qec.ppr ["Y"](8)
-    # CHECK: qec.ppm ["X"]
+    # CHECK: pbc.ppm ["X", "Y"]
+    # CHECK: pbc.ppm ["Y", "Z"]
+    # CHECK: scf.if
+    # CHECK: pbc.ppm ["Y"]
+    # CHECK: else
+    # CHECK: pbc.ppm ["X"]
+    # CHECK: }
+    # CHECK-NOT: pbc.ppr ["Y"](8)
+    # CHECK: pbc.ppm ["X"]
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -431,11 +437,15 @@ def test_ppm_compilation():
         qml.T(wires=0)
         qml.pauli_measure("X", wires=0)
 
-    # CHECK: qec.ppm ["X", "Z"]
-    # CHECK: qec.select.ppm
-    # CHECK: qec.ppr ["X"](2)
-    # CHECK: qec.ppm ["Y", "Z"]
-    # CHECK-NOT: qec.ppr ["Z"](8)
+    # CHECK: pbc.ppm ["X", "Z"]
+    # CHECK: scf.if
+    # CHECK: pbc.ppm ["Y"]
+    # CHECK: else
+    # CHECK: pbc.ppm ["X"]
+    # CHECK: }
+    # CHECK: pbc.ppr ["X"](2)
+    # CHECK: pbc.ppm ["Y", "Z"]
+    # CHECK-NOT: pbc.ppr ["Z"](8)
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -458,10 +468,10 @@ def test_pauli_rot_and_measure_with_cond():
         m = qml.pauli_measure("Z", wires=0)
         qml.cond(m, partial(qml.PauliRot, pauli_word="Z"))(theta=np.pi / 2, wires=0)
 
-    # CHECK: [[q0:%.+]] = qec.ppr ["Z"](4)
-    # CHECK: qec.ppm ["Z"]
+    # CHECK: [[q0:%.+]] = pbc.ppr ["Z"](4)
+    # CHECK: pbc.ppm ["Z"]
     # CHECK: scf.if
-    # CHECK: qec.ppr ["Z"](4)
+    # CHECK: pbc.ppr ["Z"](4)
     # CHECK: scf.yield
     # CHECK: else
     # CHECK: scf.yield
@@ -489,8 +499,8 @@ def test_pauli_rot_with_adjoint_region():
         qml.PauliRot(np.pi / 2, "YX", wires=[0, 1])
         qml.adjoint(f)()
 
-    # CHECK: qec.ppr ["Y", "X"](4)
-    # CHECK: qec.ppr ["X", "Z"](-8)
+    # CHECK: pbc.ppr ["Y", "X"](4)
+    # CHECK: pbc.ppr ["X", "Z"](-8)
     print(circuit.mlir_opt)
     qml.capture.disable()
 
@@ -511,7 +521,7 @@ def test_pauli_rot_with_adjoint_single_gate():
     def circuit():
         qml.adjoint(qml.PauliRot(np.pi / 2, "XZ", wires=[0, 1]))
 
-    # CHECK: qec.ppr ["X", "Z"](-4)
+    # CHECK: pbc.ppr ["X", "Z"](-4)
     print(circuit.mlir_opt)
     qml.capture.disable()
 

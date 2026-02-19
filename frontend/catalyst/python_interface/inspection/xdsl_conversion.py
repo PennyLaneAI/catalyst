@@ -35,7 +35,7 @@ from xdsl.dialects.tensor import ExtractOp as TensorExtractOp
 from xdsl.ir import Block, SSAValue
 
 from catalyst.jit import QJIT, qjit
-from catalyst.python_interface.dialects.qec import (
+from catalyst.python_interface.dialects.pbc import (
     PPMeasurementOp,
     PPRotationArbitraryOp,
     PPRotationOp,
@@ -353,7 +353,7 @@ def resolve_constant_wire(ssa: SSAValue) -> float | int | str:
         case PPMeasurementOp():
             # NOTE: This branch is needed to cover two PPMs in a row
             # subtract one as the first ssa index is the result,
-            # %res, %q0, ... = qec.ppm [PAULI_WORD] %q0, ...
+            # %res, %q0, ... = pbc.ppm [PAULI_WORD] %q0, ...
             return resolve_constant_wire(op.operands[ssa.index - 1])
         case _:
             raise NotImplementedError(f"Cannot resolve wire for op: {op}")

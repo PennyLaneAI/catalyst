@@ -26,12 +26,13 @@ set(LIBS
     ExternalStablehloLib
     MLIROptLib
     MLIRCatalyst
+    catalyst-analysis
     catalyst-transforms
     catalyst-stablehlo-transforms
     MLIRQuantum
     quantum-transforms
-    MLIRQEC
-    qec-transforms
+    MLIRPBC
+    pbc-transforms
     MLIRGradient
     gradient-transforms
     MLIRMBQC

@@ -15,13 +15,24 @@
 This module tests the decompose transformation.
 """
 
+from contextlib import contextmanager
 from functools import partial
 
 import numpy as np
 import pennylane as qml
 import pytest
+from pennylane.exceptions import DecompositionError, DecompositionWarning
 from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
+
+
+@contextmanager
+def does_not_raise():
+    """
+    define a context manager for tests that do not fail, for use with `parametrize`.
+    See https://github.com/pytest-dev/pytest/pull/4682/changes for details.
+    """
+    yield
 
 
 class TestGraphDecomposition:
@@ -63,7 +74,9 @@ class TestGraphDecomposition:
 
         # TODO: RZ/RX warnings  should not be raised, remove (PL issue #8885)
         with pytest.warns(UserWarning, match="Falling back to the legacy decomposition system"):
-            with pytest.warns(UserWarning, match="unable to find a decomposition for {'Hadamard'}"):
+            with pytest.warns(
+                DecompositionWarning, match="unable to find a decomposition for {'Hadamard'}"
+            ):
                 with pytest.warns(UserWarning, match="Operator RX does not define"):
                     with pytest.warns(UserWarning, match="Operator RZ does not define"):
                         circuit(0)
@@ -449,6 +462,68 @@ class TestGraphDecomposition:
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
+
+    @pytest.mark.usefixtures("use_capture_dgraph")
+    @pytest.mark.parametrize(
+        "num_work_wires,expectation",
+        [
+            (0, pytest.raises(DecompositionError)),
+            (2, pytest.raises(DecompositionError)),
+            (3, does_not_raise()),
+            (7, does_not_raise()),
+        ],
+    )
+    def test_work_wires(self, num_work_wires, expectation):
+        """
+        Test that graph decomposition raises the correct exception when given an insufficient
+        number of work wires, and passes otherwise.
+        """
+
+        @qml.register_resources(
+            {qml.CNOT: 3, qml.H: 1, qml.X: 1, qml.ops.op_math.Conditional: 2},
+            work_wires={
+                "borrowed": 2,
+                "garbage": 1,
+            },
+        )
+        def my_decomp(angle, wires, **_):
+            def true_func():
+                qml.CNOT(wires)
+
+                with qml.allocate(2, state="any", restored=True) as w:
+                    qml.H(w[0])
+                    qml.H(w[0])
+                    qml.X(w[1])
+                    qml.X(w[1])
+
+                return
+
+            def false_func():
+                with qml.allocate(1, state="any", restored=False) as w:
+                    qml.H(w)
+
+                m = qml.measure(wires[0])
+
+                qml.cond(m, qml.CNOT)(wires)
+
+                return
+
+            qml.cond(angle > 1.2, true_func, false_func)()
+
+        with expectation:
+
+            @qml.qjit
+            @partial(
+                qml.transforms.decompose,
+                gate_set={qml.CNOT, qml.H, qml.X, "Conditional", "MidMeasure"},
+                fixed_decomps={qml.CRX: my_decomp},
+                num_work_wires=num_work_wires,
+            )
+            @qml.qnode(qml.device("lightning.qubit", wires=9))
+            def circuit():
+                qml.CRX(1.7, wires=[0, 1])
+                qml.CRX(-7.2, wires=[0, 1])
+                return qml.state()
 
 
 if __name__ == "__main__":
