@@ -25,6 +25,7 @@ from jaxlib.mlir.dialects.builtin import ModuleOp
 from jaxlib.mlir.dialects.func import CallOp
 from mlir_quantum.dialects._transform_ops_gen import ApplyRegisteredPassOp, NamedSequenceOp, YieldOp
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
+from pennylane.transforms.core import BoundTransform, Transform
 
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 
@@ -49,7 +50,7 @@ def _calculate_diff_method(qn: qml.QNode, call_jaxpr: core.ClosedJaxpr):
 
 
 def get_call_jaxpr(jaxpr):
-    """Extracts the `call_jaxpr` from a JAXPR if it exists.""" ""
+    """Extracts the `call_jaxpr` from a JAXPR if it exists."""
     for eqn in jaxpr.eqns:
         if eqn.params.get("call_jaxpr"):
             return eqn.params["call_jaxpr"]
@@ -62,6 +63,73 @@ def get_call_equation(jaxpr):
         if eqn.params.get("call_jaxpr"):
             return eqn
     raise AssertionError("No call_jaxpr found in the JAXPR.")
+
+
+def _get_device_pipeline(ctx, qnode: qml.QNode) -> list[BoundTransform]:
+    """Get a CompilePipeline corresponding to device preprocessing."""
+    # Importing here to avoid circular imports
+    # pylint: disable=import-outside-toplevel
+    from catalyst.device import QJITDevice
+    from catalyst.device.decomposition import catalyst_decompose
+
+    device = qnode.device if isinstance(qnode.device, QJITDevice) else QJITDevice(qnode.device)
+    shots = qnode.shots
+
+    final_pipeline = []
+    pipeline, _ = device.preprocess(ctx, execution_config=None, shots=shots)
+    for t in pipeline:
+        if t.tape_transform == catalyst_decompose.tape_transform:
+            # This is fine as decomposition rules for unsupported gates
+            # will be added to the program at the plxpr layer.
+            final_pipeline.append(BoundTransform(Transform(pass_name="decompose-lowering")))
+        else:
+            final_pipeline.append(t)
+
+    return final_pipeline
+
+
+def _get_serialized_pipeline(pipeline: tuple[BoundTransform, ...]):
+    """Create a serialized pipeline from a sequence of bound transforms.
+
+    Args:
+        pipeline (tuple[pennylane.transforms.core.BoundTransform, ...]): A sequence
+            of transforms that we want to lower.
+
+    Returns:
+        list[tuple[str, str, dict[str, Any], bool], ...]: A list containing serialized
+            passes. Each entry in the tuple contains the transform's mnemonic name, the
+            name of the PennyLane transform, a dictionary of pass options, and a boolean
+            to indicate whether the pass is an xDSL pass.
+    """
+    # Importing here to avoid circular imports
+    # pylint: disable=import-outside-toplevel
+    from catalyst.python_interface.pass_api import is_xdsl_pass
+
+    serialized = []
+    for t in pipeline:
+        xdsl_pass = False
+
+        if isinstance(t, BoundTransform):
+            if t.pass_name:
+                name = t.pass_name
+                pl_name = ""
+                options = _lowered_options(t.args, t.kwargs)
+                xdsl_pass = is_xdsl_pass(name)
+            else:
+                name = "test"
+                pl_name = t.tape_transform.__name__
+                options = {}
+                xdsl_pass = False
+
+        else:  # t is a catalyst.passes.Pass
+            name = t.name
+            pl_name = ""
+            options = t.get_options()
+            xdsl_pass = is_xdsl_pass(name)
+
+        serialized.append((name, pl_name, options, xdsl_pass))
+
+    return serialized
 
 
 def lower_jaxpr(ctx, jaxpr, metadata=None, fn=None):
@@ -244,10 +312,14 @@ def lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipeline):
     """
     assert isinstance(callable_, qml.QNode), "This function expects qnodes"
 
+    # We add the device preprocessing transforms to the pipeline after checking the
+    # cache because using the QNode as part of the key should be good enough
+    lowering_pipeline = pipeline + _get_device_pipeline(ctx, callable_)
+
     name = "module_" + callable_.__name__
     # pylint: disable-next=no-member
     with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
-        transform_named_sequence_lowering(ctx, pipeline)
+        transform_named_sequence_lowering(ctx, lowering_pipeline)
         ctx.module_context.ip = ip
         func_op = get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline)
         func_op.sym_visibility = ir.StringAttr.get("public")
@@ -357,6 +429,7 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
 
     # Track if we created any xDSL passes
     uses_xdsl_passes = False
+    serialized_pipeline = _get_serialized_pipeline(pipeline)
 
     with ir.InsertionPoint(bb_transformer):
         named_sequence_op = NamedSequenceOp(
@@ -374,13 +447,7 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
         # The transform.named_sequence needs a terminator called "transform.yield"
         with ir.InsertionPoint(bb_named_sequence):
             target = bb_named_sequence.arguments[0]
-            for _pass in pipeline:
-                if isinstance(_pass, qml.transforms.core.TransformContainer):
-                    options = _lowered_options(_pass.args, _pass.kwargs)
-                    name = _pass.pass_name
-                else:
-                    options = _pass.get_options()
-                    name = _pass.name
+            for name, pl_name, options, xdsl_pass in serialized_pipeline:
                 apply_registered_pass_op = ApplyRegisteredPassOp(
                     result=transform_mod_type,
                     target=target,
@@ -390,23 +457,16 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
                 )
                 target = apply_registered_pass_op.result
 
-                try:
-                    # pylint: disable=import-outside-toplevel
-                    from catalyst.python_interface.pass_api import is_xdsl_pass
+                if pl_name:
+                    apply_registered_pass_op.operation.attributes["catalyst.actual_name"] = (
+                        ir.StringAttr.get(pl_name)
+                    )
 
-                    # catalyst.python_interface.xdsl_universe collects all transforms in
-                    # catalyst.python_interface.transforms, so importing from that file
-                    # updates the global xDSL transforms registry.
-                    from catalyst.python_interface.xdsl_universe import CATALYST_XDSL_UNIVERSE as _
-
-                    if is_xdsl_pass(name):
-                        uses_xdsl_passes = True
-                        apply_registered_pass_op.operation.attributes["catalyst.xdsl_pass"] = (
-                            ir.UnitAttr.get()
-                        )
-                except ModuleNotFoundError:
-                    # If xDSL pass API is not available, do not set the attribute
-                    pass
+                if xdsl_pass:
+                    uses_xdsl_passes = True
+                    apply_registered_pass_op.operation.attributes["catalyst.xdsl_pass"] = (
+                        ir.UnitAttr.get()
+                    )
 
             transform_yield_op = YieldOp(operands_=[])  # pylint: disable=unused-variable
 
