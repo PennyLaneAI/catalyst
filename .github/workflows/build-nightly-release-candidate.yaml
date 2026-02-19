@@ -38,7 +38,7 @@ jobs:
         git config --global user.name "ringo-but-quantum"
         git add $GITHUB_WORKSPACE/frontend/catalyst/_version.py
         git commit -m "[no ci] bump nightly rc version"
-        git push
+        # git push
 
   # Only build the most popular configurations on a nightly schedule to save PyPI storage.
 
