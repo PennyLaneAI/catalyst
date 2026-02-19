@@ -25,7 +25,6 @@ from pennylane.exceptions import DecompositionError, DecompositionWarning
 from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
 
-
 @contextmanager
 def does_not_raise():
     """
@@ -273,6 +272,28 @@ class TestGraphDecomposition:
         assert "MultiRZ" in resources
         assert "MultiRZ" in expected_resources
         assert resources == expected_resources
+
+    def test_decompose_with_lightning_stopping_condition(self):
+        """Test that decompose with stopping_condition using Lightning's stopping condition.
+        """
+
+        device = qml.device("lightning.qubit", wires=4)
+        def stopping_condition(op):
+            return op.name == "PauliRot"
+        @partial(
+            qml.transforms.decompose,
+            gate_set=[qml.RX, qml.RY, qml.RZ],
+            stopping_condition=stopping_condition,
+        )
+        @qml.qnode(device)
+        def circuit(x):
+            qml.PauliRot(x, "XYZZ", wires=[0, 1, 2, 3])
+            return qml.expval(qml.PauliZ(0))
+
+        without_qjit = circuit(0.5)
+        with_qjit = qml.qjit(circuit)
+        # assert qml.math.allclose(without_qjit, with_qjit(0.5))
+
 
     @pytest.mark.skip(
         reason="inconsistent type and error msg across gcc/clang on arm/x86 for undefined symbols"

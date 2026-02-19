@@ -281,20 +281,21 @@ def handle_qnode(
     consts = args[shots_len : n_consts + shots_len]
     non_const_args = args[shots_len + n_consts :]
 
-    closed_jaxpr = ClosedJaxpr(qfunc_jaxpr, consts)
-    graph_succeeded = False
-
-    # Plxpr decomposition for templates
-    if self.requires_decompose_lowering:
-        closed_jaxpr = _apply_compiler_decompose_to_plxpr(
+    closed_jaxpr = (
+        ClosedJaxpr(qfunc_jaxpr, consts)
+        if not self.requires_decompose_lowering
+        else _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
             consts=consts,
             ncargs=non_const_args,
             tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
         )
+    )
 
+    graph_succeeded = False
     if stopping_condition := self.decompose_tkwargs.get("stopping_condition"):
         # Use the plxpr decompose transform and ignore graph decomposition
+        # See https://github.com/PennyLaneAI/catalyst/pull/2472.
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
             consts=consts,
@@ -452,16 +453,10 @@ def handle_transform(
 
     # If the transform is a decomposition transform
     # and the graph-based decomposition is enabled
-    if (
-        hasattr(transform._plxpr_transform, "__name__")
-        and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
-        and qml.decomposition.enabled_graph()
-    ):
-        return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs)
-    elif (
-        hasattr(transform._plxpr_transform, "__name__")
-        and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
-    ):
+    transform_name = getattr(transform._plxpr_transform, "__name__", None)
+    if transform_name == "decompose_plxpr_to_plxpr":
+        if qml.decomposition.enabled_graph():
+            return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs)
         _set_decompose_lowering_state(self)
 
     catalyst_pass_name = transform.pass_name
