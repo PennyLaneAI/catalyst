@@ -122,6 +122,7 @@ class TestCapture:
             qml.RZ(x, wires=0)
             qml.CNOT(wires=[1, 0])
             qml.Hadamard(wires=1)
+            qml.PCPhase(x, 2, wires=[0])
             return qml.expval(qml.PauliY(wires=0))
 
         captured_result = circuit_aot_builder(dev)(theta)
@@ -302,6 +303,7 @@ class TestCapture:
         def captured_circuit(theta, val):
             qml.adjoint(qml.RY)(jnp.pi, val)
             qml.adjoint(qml.RZ)(theta, wires=val)
+            qml.adjoint(qml.PCPhase)(theta, 2, wires=[0])
             return qml.state()
 
         capture_result = captured_circuit(theta, val)
@@ -332,6 +334,7 @@ class TestCapture:
         def captured_circuit(theta):
             qml.ctrl(qml.RX(theta, wires=0), control=[1], control_values=[False])
             qml.ctrl(qml.RX, control=[1], control_values=[False])(theta, wires=[0])
+            qml.ctrl(qml.PCPhase, control=[1], control_values=[False])(theta, 2, wires=[0])
             return qml.state()
 
         capture_result = captured_circuit(theta)
@@ -344,6 +347,7 @@ class TestCapture:
         def circuit(theta):
             qml.ctrl(qml.RX(theta, wires=0), control=[1], control_values=[False])
             qml.ctrl(qml.RX, control=[1], control_values=[False])(theta, wires=[0])
+            qml.ctrl(qml.PCPhase, control=[1], control_values=[False])(theta, 2, wires=[0])
             return qml.state()
 
         assert jnp.allclose(capture_result, circuit(theta))
