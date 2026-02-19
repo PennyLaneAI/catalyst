@@ -155,6 +155,11 @@ def ParametrizedGate : OpInterface<"ParametrizedGate", [QuantumGate]> {
                 return allParams[idx];
             }]
         >,
+        InterfaceMethod<
+            "Return the starting index at which to find gate parameter operands.",
+            "size_t", "getParamOperandIdx", (ins), /*methodBody=*/[{}],
+            /*defaultImplementation=*/[{ return 0; }]
+        >,
     ];
 }
 
