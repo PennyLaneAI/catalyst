@@ -321,7 +321,7 @@ class TestQubitType:
         ],
     )
     @pytest.mark.parametrize(
-        "role, expected_role",
+        "role,expected_role",
         [
             (None, StringAttr("null")),
             ("null", StringAttr("null")),
@@ -330,7 +330,7 @@ class TestQubitType:
             ("zcheck", StringAttr("zcheck")),
         ],
     )
-    def test_constructor(self, args, level, expected_level, role, expected_role):
+    def test_constructor(self, level, expected_level, role, expected_role):
         """Test that the parameters of QubitType are correct with defaults."""
         args = {}
         if level is not None:
@@ -342,16 +342,33 @@ class TestQubitType:
         assert ty.level == expected_level
         assert ty.role == expected_role
 
-    @pytest.mark.parametrize("ty,error", [])
-    def test_verify(self, ty, error):
+    @pytest.mark.parametrize(
+        "args,error",
+        [
+            ({}, None),
+            ({"level": "physical", "role": "xcheck"}, None),
+            ({"level": "foo"}, "Invalid value foo for 'QubitType.level'"),
+            ({"role": "bar"}, "Invalid value bar for 'QubitType.role'"),
+        ],
+    )
+    def test_verify(self, args, error):
         """Test that QubitType verifies correctly."""
         if error:
             with pytest.raises(VerifyException, match=error):
-                ty.verify()
+                QubitType(**args)
         else:
-            ty.verify()
+            QubitType(**args)
 
-    @pytest.mark.parametrize("ty,expected", [])
+    @pytest.mark.parametrize(
+        "ty,expected",
+        [
+            (QubitType(), "!quantum.bit"),
+            (QubitType(level="abstract", role="null"), "!quantum.bit"),
+            (QubitType(role="xcheck"), "!quantum.bit<xcheck>"),
+            (QubitType(level="physical"), "!quantum.bit<physical>"),
+            (QubitType(level="logical", role="data"), "!quantum.bit<logical, data>"),
+        ],
+    )
     @pytest.mark.parametrize("generic", [True, False])
     def test_printing(self, ty, expected, generic):
         """Test that QubitType is printed correctly."""
@@ -360,31 +377,294 @@ class TestQubitType:
         printer.print_attribute(ty)
         assert buf.getvalue() == expected
 
-    @pytest.mark.parametrize("attr_str,expected_type", [])
-    def test_parsing(self, input_str, expected_type):
+    @pytest.mark.parametrize(
+        "input_str,expected_level,expected_role",
+        [
+            ('%0 = "test.op"() : () -> !quantum.bit', "abstract", "null"),
+            ('%0 = "test.op"() : () -> !quantum.bit<abstract>', "abstract", "null"),
+            ('%0 = "test.op"() : () -> !quantum.bit<null>', "abstract", "null"),
+            ('%0 = "test.op"() : () -> !quantum.bit<abstract, null>', "abstract", "null"),
+            ('%0 = "test.op"() : () -> !quantum.bit<logical>', "logical", "null"),
+            ('%0 = "test.op"() : () -> !quantum.bit<data>', "abstract", "data"),
+            ('%0 = "test.op"() : () -> !quantum.bit<physical, xcheck>', "physical", "xcheck"),
+        ],
+    )
+    def test_parsing(self, input_str, expected_level, expected_role):
         """Test that QubitType is parsed correctly."""
         ctx = Context()
         ctx.load_dialect(Quantum)
         ctx.load_dialect(Test)
         op = Parser(ctx, input=input_str).parse_op()
 
-        ty = op.results[0]
-        assert ty == expected_type
+        ty = op.results[0].type
+        assert ty.level.data == expected_level
+        assert ty.role.data == expected_role
 
-    @pytest.mark.parametrize("constr,can_infer", [])
+    def test_parsing_error(self):
+        """Test that an error is raised if a qubit being parsed has an invalid
+        number of parameters"""
+        input_str = '%0 = "test.op"() : () -> !quantum.bit<abstract, data, foo>'
+        ctx = Context()
+        ctx.load_dialect(Quantum)
+        ctx.load_dialect(Test)
+
+        with pytest.raises(ParseError, match="Expected 2 or fewer parameters"):
+            _ = Parser(ctx, input=input_str).parse_op()
+
+    @pytest.mark.parametrize(
+        "constr,can_infer",
+        [
+            (QubitTypeConstraint(), True),
+            (QubitTypeConstraint(level_constr=["logical"]), True),
+            (QubitTypeConstraint(role_constr=["data"]), True),
+            (QubitTypeConstraint(level_constr=["physical"], role_constr=["xcheck"]), True),
+            (QubitTypeConstraint(level_constr=["abstract", "logical"]), False),
+            (QubitTypeConstraint(role_constr=["null", "data"]), False),
+            (
+                QubitTypeConstraint(
+                    level_constr=["abstract", "logical"], role_constr=["null", "data"]
+                ),
+                False,
+            ),
+        ],
+    )
     def test_constraint_can_infer(self, constr, can_infer):
         """Test that QubitTypeConstraint can infer the type correctly if possible."""
         assert constr.can_infer({}) == can_infer
 
-    @pytest.mark.parametrize("constr,expected_type", [])
+    @pytest.mark.parametrize(
+        "constr,expected_type",
+        [
+            (QubitTypeConstraint(), QubitType()),
+            (QubitTypeConstraint(level_constr=["logical"]), QubitType(level="logical")),
+            (QubitTypeConstraint(role_constr=["data"]), QubitType(role="data")),
+            (
+                QubitTypeConstraint(level_constr=["physical"], role_constr=["xcheck"]),
+                QubitType(level="physical", role="xcheck"),
+            ),
+        ],
+    )
     def test_constraint_infer(self, constr, expected_type):
         """Test that QubitTypeConstraint infers the correct type based on its constraints."""
         ty = constr.infer(ConstraintContext())
         assert ty == expected_type
 
-    @pytest.mark.parametrize("constr, ty,error", [])
+    @pytest.mark.parametrize(
+        "constr,ty,error",
+        [
+            (QubitTypeConstraint(), QubitType(), None),
+            (QubitTypeConstraint(), QubitType(level="logical", role="xcheck"), None),
+            (QubitTypeConstraint(level_constr=["logical"]), QubitType(level="logical"), None),
+            (
+                QubitTypeConstraint(level_constr=["logical"]),
+                QubitType(level="physical"),
+                'Unexpected attribute "physical"',
+            ),
+            (QubitTypeConstraint(role_constr=["data"]), QubitType(role="data"), None),
+            (
+                QubitTypeConstraint(role_constr=["data"]),
+                QubitType(role="xcheck"),
+                'Unexpected attribute "xcheck"',
+            ),
+            (
+                QubitTypeConstraint(level_constr=["physical"], role_constr=["xcheck"]),
+                QubitType(level="physical", role="xcheck"),
+                None,
+            ),
+            (
+                QubitTypeConstraint(level_constr=["physical"], role_constr=["xcheck"]),
+                QubitType(level="physical", role="null"),
+                'Unexpected attribute "null"',
+            ),
+            (
+                QubitTypeConstraint(level_constr=["physical"], role_constr=["xcheck"]),
+                QubitType(level="logical", role="xcheck"),
+                'Unexpected attribute "logical"',
+            ),
+            (
+                QubitTypeConstraint(level_constr=["abstract", "logical"]),
+                QubitType(level="logical"),
+                None,
+            ),
+            (
+                QubitTypeConstraint(level_constr=["abstract", "logical"]),
+                QubitType(level="physical"),
+                'Unexpected attribute "physical"',
+            ),
+            (QubitTypeConstraint(role_constr=["null", "data"]), QubitType(role="null"), None),
+            (
+                QubitTypeConstraint(role_constr=["null", "data"]),
+                QubitType(role="xcheck"),
+                'Unexpected attribute "xcheck"',
+            ),
+            (
+                QubitTypeConstraint(
+                    level_constr=["abstract", "logical"], role_constr=["null", "data"]
+                ),
+                QubitType(level="logical", role="data"),
+                None,
+            ),
+            (
+                QubitTypeConstraint(
+                    level_constr=["abstract", "logical"], role_constr=["null", "data"]
+                ),
+                QubitType(level="physical", role="data"),
+                'Unexpected attribute "physical"',
+            ),
+            (
+                QubitTypeConstraint(
+                    level_constr=["abstract", "logical"], role_constr=["null", "data"]
+                ),
+                QubitType(level="logical", role="xcheck"),
+                'Unexpected attribute "xcheck"',
+            ),
+        ],
+    )
     def test_constraint_verify(self, constr, ty, error):
         """Test that QubitTypeConstraint verifies correctly."""
+        if error:
+            with pytest.raises(VerifyException, match=error):
+                constr.verify(ty, ConstraintContext())
+        else:
+            constr.verify(ty, ConstraintContext())
+
+
+class TestQuregType:
+    """Unit tests for QuregType and its associated QuregTypeConstraint."""
+
+    @pytest.mark.parametrize(
+        "level,expected_level",
+        [
+            (None, StringAttr("abstract")),
+            ("abstract", StringAttr("abstract")),
+            ("pbc", StringAttr("pbc")),
+            ("physical", StringAttr("physical")),
+            ("logical", StringAttr("logical")),
+        ],
+    )
+    def test_constructor(self, level, expected_level):
+        """Test that the parameters of QuregType are correct with defaults."""
+        args = {"level": level} if level is not None else {}
+
+        ty = QuregType(**args)
+        assert ty.level == expected_level
+
+    @pytest.mark.parametrize(
+        "level,error",
+        [
+            (None, None),
+            ("physical", None),
+            ("foo", "Invalid value foo for 'QuregType.level'"),
+        ],
+    )
+    def test_verify(self, level, error):
+        """Test that QuregType verifies correctly."""
+        args = {"level": level} if level is not None else {}
+        if error:
+            with pytest.raises(VerifyException, match=error):
+                QuregType(**args)
+        else:
+            QuregType(**args)
+
+    @pytest.mark.parametrize(
+        "ty,expected",
+        [
+            (QuregType(), "!quantum.reg"),
+            (QuregType(level="abstract"), "!quantum.reg"),
+            (QuregType(level="physical"), "!quantum.reg<physical>"),
+        ],
+    )
+    @pytest.mark.parametrize("generic", [True, False])
+    def test_printing(self, ty, expected, generic):
+        """Test that QuregType is printed correctly."""
+        buf = StringIO()
+        printer = Printer(stream=buf, print_generic_format=generic)
+        printer.print_attribute(ty)
+        assert buf.getvalue() == expected
+
+    @pytest.mark.parametrize(
+        "input_str,expected_level",
+        [
+            ('%0 = "test.op"() : () -> !quantum.reg', "abstract"),
+            ('%0 = "test.op"() : () -> !quantum.reg<abstract>', "abstract"),
+            ('%0 = "test.op"() : () -> !quantum.reg<logical>', "logical"),
+        ],
+    )
+    def test_parsing(self, input_str, expected_level):
+        """Test that QuregType is parsed correctly."""
+        ctx = Context()
+        ctx.load_dialect(Quantum)
+        ctx.load_dialect(Test)
+        op = Parser(ctx, input=input_str).parse_op()
+
+        ty = op.results[0].type
+        assert ty.level.data == expected_level
+
+    def test_parsing_error(self):
+        """Test that an error is raised if a register being parsed has an invalid
+        number of parameters"""
+        input_str = '%0 = "test.op"() : () -> !quantum.reg<abstract, foo>'
+        ctx = Context()
+        ctx.load_dialect(Quantum)
+        ctx.load_dialect(Test)
+
+        with pytest.raises(ParseError, match="Expected 1 or fewer parameters"):
+            _ = Parser(ctx, input=input_str).parse_op()
+
+    @pytest.mark.parametrize(
+        "constr,can_infer",
+        [
+            (QuregTypeConstraint(), True),
+            (QuregTypeConstraint(level_constr=["logical"]), True),
+            (QuregTypeConstraint(level_constr=["abstract", "logical"]), False),
+            (QuregTypeConstraint(level_constr=["abstract", "logical", "physical", "pbc"]), True),
+        ],
+    )
+    def test_constraint_can_infer(self, constr, can_infer):
+        """Test that QuregTypeConstraint can infer the type correctly if possible."""
+        assert constr.can_infer({}) == can_infer
+
+    @pytest.mark.parametrize(
+        "constr,expected_type",
+        [
+            (QuregTypeConstraint(), QuregType()),
+            (QuregTypeConstraint(level_constr=["logical"]), QuregType(level="logical")),
+            (
+                QuregTypeConstraint(level_constr=["abstract", "logical", "pbc", "physical"]),
+                QuregType(level="abstract"),
+            ),
+        ],
+    )
+    def test_constraint_infer(self, constr, expected_type):
+        """Test that QuregTypeConstraint infers the correct type based on its constraints."""
+        ty = constr.infer(ConstraintContext())
+        assert ty == expected_type
+
+    @pytest.mark.parametrize(
+        "constr,ty,error",
+        [
+            (QuregTypeConstraint(), QuregType(), None),
+            (QuregTypeConstraint(), QuregType(level="logical"), None),
+            (QuregTypeConstraint(level_constr=["logical"]), QuregType(level="logical"), None),
+            (
+                QuregTypeConstraint(level_constr=["logical"]),
+                QuregType(level="physical"),
+                'Unexpected attribute "physical"',
+            ),
+            (
+                QuregTypeConstraint(level_constr=["abstract", "logical"]),
+                QuregType(level="logical"),
+                None,
+            ),
+            (
+                QuregTypeConstraint(level_constr=["abstract", "logical"]),
+                QuregType(level="physical"),
+                'Unexpected attribute "physical"',
+            ),
+        ],
+    )
+    def test_constraint_verify(self, constr, ty, error):
+        """Test that QuregTypeConstraint verifies correctly."""
         if error:
             with pytest.raises(VerifyException, match=error):
                 constr.verify(ty, ConstraintContext())

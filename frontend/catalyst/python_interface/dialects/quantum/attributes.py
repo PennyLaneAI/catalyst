@@ -137,7 +137,7 @@ class QubitType(ParametrizedAttribute, TypeAttribute):
     def parse_parameters(cls, parser: AttrParser) -> list[Attribute]:
         """Parse type parameters."""
         optional_params = parser.parse_optional_comma_separated_list(
-            delimiter=parser.Delimiter.ANGLE, parse=parser.parse_str_literal
+            delimiter=parser.Delimiter.ANGLE, parse=parser.parse_identifier_or_str_literal
         )
         optional_params = optional_params or []
 
@@ -152,21 +152,22 @@ class QubitType(ParametrizedAttribute, TypeAttribute):
             case 1:
                 param = optional_params[0]
                 if param in QubitLevel.__members__.values():
-                    level = StringAttr(param)
+                    level = StringAttr(param) if isinstance(param, str) else param
                     role = StringAttr(QubitRole.Null.value)
                 elif param in QubitRole.__members__.values():
                     level = StringAttr(QubitLevel.Abstract.value)
-                    role = StringAttr(param)
+                    role = StringAttr(param) if isinstance(param, str) else param
                 else:
                     raise ParseError(f"Invalid parameter for 'QubitType': {param}.")
                 final_params = [level, role]
 
             case 2:
-                final_params = optional_params
+                final_params = [StringAttr(p) if isinstance(p, str) else p for p in optional_params]
 
             case _:
                 raise ParseError(
-                    f"Expected 2 or fewer parameters for 'QubitType', got {optional_params}."
+                    parser._current_token.span,
+                    f"Expected 2 or fewer parameters for 'QubitType', got {optional_params}.",
                 )
 
         return final_params
@@ -206,7 +207,7 @@ class QuregType(ParametrizedAttribute, TypeAttribute):
     def parse_parameters(cls, parser: AttrParser) -> list[Attribute]:
         """Parse type parameters."""
         optional_params = parser.parse_optional_comma_separated_list(
-            delimiter=parser.Delimiter.ANGLE, parse=parser.parse_str_literal
+            delimiter=parser.Delimiter.ANGLE, parse=parser.parse_identifier_or_str_literal
         )
         optional_params = optional_params or []
 
@@ -218,7 +219,8 @@ class QuregType(ParametrizedAttribute, TypeAttribute):
                 final_params = [StringAttr(optional_params[0])]
             case _:
                 raise ParseError(
-                    f"Expected 1 or fewer parameters for 'QuregType', got {optional_params}."
+                    parser._current_token.span,
+                    f"Expected 1 or fewer parameters for 'QuregType', got {optional_params}.",
                 )
 
         return final_params
