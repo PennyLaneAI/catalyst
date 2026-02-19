@@ -24,6 +24,8 @@ import pytest
 from pennylane.exceptions import DecompositionError, DecompositionWarning
 from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
+from pennylane_lightning.lightning_qubit.lightning_qubit import stopping_condition
+
 
 @contextmanager
 def does_not_raise():
@@ -277,9 +279,7 @@ class TestGraphDecomposition:
 
     @pytest.mark.usefixtures("use_capture_dgraph")
     def test_decompose_with_lightning_stopping_condition(self):
-        """Test that decompose with stopping_condition using Lightning's stopping condition.
-        """
-        from pennylane_lightning.lightning_qubit.lightning_qubit import stopping_condition
+        """Test that decompose with stopping_condition using Lightning's stopping condition."""
 
         device = qml.device("lightning.qubit", wires=4)
 

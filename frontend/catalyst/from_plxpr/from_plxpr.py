@@ -393,7 +393,7 @@ def _set_decompose_lowering_state(self):
     else:
         raise NotImplementedError("Multiple decomposition transforms are not yet supported.")
 
-
+# pylint: disable=too-many-positional-arguments
 def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs, use_graph=True):
     _set_decompose_lowering_state(self)
 
@@ -457,7 +457,9 @@ def handle_transform(
     transform_name = getattr(transform._plxpr_transform, "__name__", None)
     if transform_name == "decompose_plxpr_to_plxpr":
         use_graph = qml.decomposition.enabled_graph()
-        return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs, use_graph)
+        return _handle_decompose_transform(
+            self, inner_jaxpr, consts, non_const_args, tkwargs, use_graph
+        )
 
     catalyst_pass_name = transform.pass_name
     if catalyst_pass_name is None:
