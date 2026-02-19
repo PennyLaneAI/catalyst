@@ -622,9 +622,6 @@ def _apply_compiler_decompose_to_plxpr(
         else tkwargs
     )
 
-    if kwargs is None:
-        kwargs = {}
-
     if stopping_condition:
         kwargs["stopping_condition"] = stopping_condition
 
