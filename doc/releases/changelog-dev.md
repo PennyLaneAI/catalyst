@@ -153,6 +153,7 @@
 * Catalyst with program capture can now be used with the new `qml.templates.Subroutine` class and the associated
   `qml.capture.subroutine` upstreamed from `catalyst.jax_primitives.subroutine`.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
+  [(#2493)](https://github.com/PennyLaneAI/catalyst/pull/2493)
 
 * The PPR/PPM lowering passes (`lower-pbc-init-ops`, `unroll-conditional-ppr-ppm`) are now run
   as part of the main quantum compilation pipeline. When using `to-ppr` and `ppr-to-ppm` transforms,
