@@ -150,6 +150,7 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
         self._operations = set()
         self._decomp_graph_solution = {}
         self.subroutine_cache = {}
+        # This will be consumed by _quantum_subroutine inherited from PlxprInterpreter
 
     def interpret_operation(self, op: "qml.operation.Operator"):
         """Interpret a PennyLane operation instance.
