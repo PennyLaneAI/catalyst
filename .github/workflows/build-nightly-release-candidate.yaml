@@ -38,7 +38,7 @@ jobs:
         git config --global user.name "ringo-but-quantum"
         git add $GITHUB_WORKSPACE/frontend/catalyst/_version.py
         git commit -m "[no ci] bump nightly rc version"
-        git push
+        # git push
 
   # Only build the most popular configurations on a nightly schedule to save PyPI storage.
 
@@ -87,9 +87,9 @@ jobs:
         rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/pennylane_catalyst-*
         rename "s/macosx_14/macosx_13/" dist/pennylane_catalyst-*
 
-    - name: Upload wheels
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        repository-url: https://test.pypi.org/legacy/
-        packages-dir: dist
-        verbose: true
+    # - name: Upload wheels
+    #   uses: pypa/gh-action-pypi-publish@release/v1
+    #   with:
+    #     repository-url: https://test.pypi.org/legacy/
+    #     packages-dir: dist
+    #     verbose: true
