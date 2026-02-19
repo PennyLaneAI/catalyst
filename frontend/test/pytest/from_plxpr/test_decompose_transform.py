@@ -273,27 +273,37 @@ class TestGraphDecomposition:
         assert "MultiRZ" in expected_resources
         assert resources == expected_resources
 
+    @pytest.mark.usefixtures("use_capture_dgraph")
     def test_decompose_with_lightning_stopping_condition(self):
         """Test that decompose with stopping_condition using Lightning's stopping condition.
         """
+        from pennylane_lightning.lightning_qubit.lightning_qubit import stopping_condition
 
         device = qml.device("lightning.qubit", wires=4)
-        def stopping_condition(op):
-            return op.name == "PauliRot"
+
         @partial(
             qml.transforms.decompose,
-            gate_set=[qml.RX, qml.RY, qml.RZ],
+            gate_set=[qml.CNOT, qml.PauliZ],
             stopping_condition=stopping_condition,
         )
         @qml.qnode(device)
         def circuit(x):
             qml.PauliRot(x, "XYZZ", wires=[0, 1, 2, 3])
+            qml.StatePrep(np.array([1, 0, 0, 0]), wires=range(2))
             return qml.expval(qml.PauliZ(0))
 
-        without_qjit = circuit(0.5)
+        x = 0.5
+        without_qjit = circuit(x)
         with_qjit = qml.qjit(circuit)
-        # assert qml.math.allclose(without_qjit, with_qjit(0.5))
+        assert qml.math.allclose(without_qjit, with_qjit(x))
 
+        expected_resources = qml.specs(circuit, level="device")(x)["resources"].gate_types
+        resources = qml.specs(with_qjit, level="device")(x)["resources"].gate_types
+        assert "PauliRot" in expected_resources
+        assert "PauliRot" in resources
+        assert "StatePrep" not in expected_resources
+        assert "StatePrep" not in resources
+        assert resources == expected_resources
 
     @pytest.mark.skip(
         reason="inconsistent type and error msg across gcc/clang on arm/x86 for undefined symbols"

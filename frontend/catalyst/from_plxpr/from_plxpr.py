@@ -394,7 +394,7 @@ def _set_decompose_lowering_state(self):
         raise NotImplementedError("Multiple decomposition transforms are not yet supported.")
 
 
-def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs):
+def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs, use_graph=True):
     _set_decompose_lowering_state(self)
 
     next_eval = copy(self)
@@ -414,9 +414,10 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     # in the qnode handler.
 
     # Add the decompose-lowering pass to the start of the pipeline
-    t = qml.transform(pass_name="decompose-lowering")
-    pass_container = qml.transforms.core.TransformContainer(t)
-    next_eval._pass_pipeline.insert(0, pass_container)
+    if use_graph:
+        t = qml.transform(pass_name="decompose-lowering")
+        pass_container = qml.transforms.core.TransformContainer(t)
+        next_eval._pass_pipeline.insert(0, pass_container)
 
     # We still need to construct and solve the graph based on
     # the current jaxpr based on the current gateset
@@ -455,9 +456,8 @@ def handle_transform(
     # and the graph-based decomposition is enabled
     transform_name = getattr(transform._plxpr_transform, "__name__", None)
     if transform_name == "decompose_plxpr_to_plxpr":
-        if qml.decomposition.enabled_graph():
-            return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs)
-        _set_decompose_lowering_state(self)
+        use_graph = qml.decomposition.enabled_graph()
+        return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs, use_graph)
 
     catalyst_pass_name = transform.pass_name
     if catalyst_pass_name is None:
