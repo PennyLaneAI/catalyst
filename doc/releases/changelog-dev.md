@@ -312,6 +312,7 @@
 * A new compiler pass `unroll-conditional-ppr-ppm` for lowering conditional PPR and PPMs
   into normal PPR and PPMs with SCF dialect to support runtime execution.
   [(#2390)](https://github.com/PennyLaneAI/catalyst/pull/2390)
+  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
 
 * Increased format size for the `--mlir-timing` flag, displaying more decimals for better timing precision.
   [(#2423)](https://github.com/PennyLaneAI/catalyst/pull/2423)

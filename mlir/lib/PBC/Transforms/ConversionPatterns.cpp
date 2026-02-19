@@ -136,6 +136,10 @@ struct PPMeasurementOpPattern : public OpConversionPattern<PPMeasurementOp> {
     LogicalResult matchAndRewrite(PPMeasurementOp op, PPMeasurementOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
+        if (op.getCondition()) {
+            return op.emitOpError("PPMeasurementOp with condition is not supported.");
+        }
+
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         const TypeConverter *conv = getTypeConverter();

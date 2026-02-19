@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 
 #include "PBC/IR/PBCOps.h"
@@ -134,6 +135,68 @@ struct LowerCondPPR : public OpRewritePattern<PPRotationOp> {
     }
 };
 
+// Lower pbc.ppm cond(...) to scf.if with ppm operation
+//
+// For example:
+// %mres, %out = pbc.ppm ["X"] %qubits cond(%cond) : i1, !quantum.bit
+//
+// becomes:
+// %mres, %out = scf.if %cond -> (i1, !quantum.bit) {
+//   %m0, %out0 = pbc.ppm ["X"] %qubits : i1, !quantum.bit
+//   scf.yield %m0, %out0 : i1, !quantum.bit
+// } else {
+//   %false = arith.constant false
+//   scf.yield %false, %qubits : i1, !quantum.bit
+// }
+struct LowerCondPPM : public OpRewritePattern<PPMeasurementOp> {
+    using OpRewritePattern::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(PPMeasurementOp op, PatternRewriter &rewriter) const override
+    {
+        if (!op.getCondition()) {
+            return failure();
+        }
+
+        Location loc = op.getLoc();
+        mlir::Value condition = op.getCondition();
+        ArrayAttr pauliProduct = op.getPauliProduct();
+        IntegerAttr rotationSign = op.getRotationSignAttr();
+        ValueRange inQubits = op.getInQubits();
+
+        SmallVector<mlir::Type> resultTypes;
+        resultTypes.push_back(rewriter.getI1Type());
+        for (auto qubit : inQubits) {
+            resultTypes.push_back(qubit.getType());
+        }
+
+        auto ifOp = scf::IfOp::create(rewriter, loc, resultTypes, condition, true);
+        {
+            OpBuilder::InsertionGuard guard(rewriter);
+            rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
+            auto ppm =
+                PPMeasurementOp::create(rewriter, loc, rewriter.getI1Type(), TypeRange(inQubits),
+                                        pauliProduct, rotationSign, inQubits);
+            SmallVector<mlir::Value> yieldValues;
+            yieldValues.push_back(ppm.getMres());
+            yieldValues.append(ppm.getOutQubits().begin(), ppm.getOutQubits().end());
+            scf::YieldOp::create(rewriter, loc, yieldValues);
+        }
+
+        {
+            OpBuilder::InsertionGuard guard(rewriter);
+            rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
+            auto falseCst = arith::ConstantOp::create(rewriter, loc, rewriter.getBoolAttr(false));
+            SmallVector<mlir::Value> yieldValues;
+            yieldValues.push_back(falseCst.getResult());
+            yieldValues.append(inQubits.begin(), inQubits.end());
+            scf::YieldOp::create(rewriter, loc, yieldValues);
+        }
+
+        rewriter.replaceOp(op, ifOp.getResults());
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -143,6 +206,7 @@ void populateUnrollConditionalPPRPPMPatterns(RewritePatternSet &patterns)
 {
     patterns.add<LowerSelectPPM>(patterns.getContext());
     patterns.add<LowerCondPPR>(patterns.getContext());
+    patterns.add<LowerCondPPM>(patterns.getContext());
 }
 
 } // namespace pbc

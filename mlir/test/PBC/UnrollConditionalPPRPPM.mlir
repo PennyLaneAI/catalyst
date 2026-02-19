@@ -42,6 +42,35 @@ func.func @test_ppr_cond(%q : !quantum.bit, %cond : i1) -> !quantum.bit {
 
 // -----
 
+func.func @test_ppm_cond(%q : !quantum.bit, %cond : i1) -> (i1, !quantum.bit) {
+    // CHECK-LABEL: func.func @test_ppm_cond
+    // CHECK: [[false:%.+]] = arith.constant false
+    // CHECK: scf.if {{.*}} -> (i1, !quantum.bit)
+    // CHECK: [[m1:%.+]], [[q1:%.+]] = pbc.ppm ["X"]
+    // CHECK: scf.yield [[m1]], [[q1]] : i1, !quantum.bit
+    // CHECK: else
+    // CHECK: scf.yield [[false]], {{.*}} : i1, !quantum.bit
+    // CHECK-NOT: pbc.ppm ["X"] {{.*}} cond({{.*}})
+    %m, %out = pbc.ppm ["X"] %q cond(%cond) : i1, !quantum.bit
+    func.return %m, %out : i1, !quantum.bit
+}
+
+// -----
+
+func.func @test_ppm_cond_multi_qubit(%q0 : !quantum.bit, %q1 : !quantum.bit, %cond : i1) -> (i1, !quantum.bit, !quantum.bit) {
+    // CHECK-LABEL: func.func @test_ppm_cond_multi_qubit
+    // CHECK: [[false:%.+]] = arith.constant false
+    // CHECK: scf.if {{.*}} -> (i1, !quantum.bit, !quantum.bit)
+    // CHECK: [[m1:%.+]], [[q1:%.+]]:2 = pbc.ppm ["X", "Z"]
+    // CHECK: scf.yield [[m1]], [[q1]]#0, [[q1]]#1 : i1, !quantum.bit, !quantum.bit
+    // CHECK: else
+    // CHECK: scf.yield [[false]], {{.*}}, {{.*}} : i1, !quantum.bit, !quantum.bit
+    %m, %out:2 = pbc.ppm ["X", "Z"] %q0, %q1 cond(%cond) : i1, !quantum.bit, !quantum.bit
+    func.return %m, %out#0, %out#1 : i1, !quantum.bit, !quantum.bit
+}
+
+// -----
+
 func.func @test_no_cond(%q : !quantum.bit) -> (i1, !quantum.bit) {
     // CHECK: [[q1:%.+]] = pbc.ppr ["X"](4)
     // CHECK: [[q2:%.+]] = pbc.ppm ["Y"] [[q1]]
