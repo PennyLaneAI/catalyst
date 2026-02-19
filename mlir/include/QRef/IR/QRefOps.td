@@ -38,7 +38,7 @@ class Memory_Op<string mnemonic, list<Trait> traits = []> : QRef_Op<mnemonic, tr
 def AllocOp : Memory_Op<"alloc"> {
     let summary = "Allocate n qubits.";
     let description = [{
-        This operation represents the allocation of some number of qubits.
+        This operation represents the allocations of some number of qubits.
     }];
 
     let arguments = (ins
@@ -61,7 +61,6 @@ def AllocOp : Memory_Op<"alloc"> {
 def AllocQubitOp : Memory_Op<"alloc_qb"> {
     let summary = "Allocate a single qubit.";
     let description = [{
-        This operation represents the allocation of a single qubit.
     }];
 
     let results = (outs
@@ -92,7 +91,6 @@ def AllocQubitOp : Memory_Op<"alloc_qb"> {
 def DeallocQubitOp : Memory_Op<"dealloc_qb"> {
     let summary = "Deallocate a single qubit.";
     let description = [{
-        This operation represents the deallocation of a single qubit.
     }];
 
     let arguments = (ins
@@ -105,9 +103,8 @@ def DeallocQubitOp : Memory_Op<"dealloc_qb"> {
 }
 
 def DeallocOp : Memory_Op<"dealloc"> {
-    let summary = "Deallocate a batch of qubits.";
+    let summary = "Deallocate an allocation.";
     let description = [{
-        This operation represents the allocation of some number of qubits.
     }];
 
     let arguments = (ins
@@ -124,16 +121,6 @@ def DeallocOp : Memory_Op<"dealloc"> {
 def GetOp : Memory_Op<"get", [NoMemoryEffect]> {
     let summary = "Produce a qubit reference SSA value from an allocation and an index.";
     let description = [{
-        This operation produces a qubit reference SSA value from an allocation and an index.
-
-        It is analogous to the quantum.extract operation in the value semantics quantum dialect, but
-        with two crucial differences:
-        1. In the value semantics dialect, an extracted qubit value represents an abstract data edge
-        not a real value in memory; however here in the reference semantics dialect, a qubit value
-        represents a concrete, classical qubit ID.
-        2. Unlike the quantum.extract operation, the qubit values do not have to be inserted back
-        into the register they come from, since the circuit topology is not represented via SSA
-        dataflow.
     }];
 
     let arguments = (ins
@@ -298,8 +285,6 @@ def SetBasisStateOp : Gate_Op<"set_basis_state"> {
 def CustomOp : UnitaryGate_Op<"custom", [ParametrizedGate, AttrSizedOperandSegments]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
-        This operation represents a generic quantum gate on an arbitrary number of qubits, with
-        an arbitrary number of floating point parameters.
     }];
 
     let arguments = (ins
@@ -335,6 +320,8 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [ParametrizedGate, AttrSizedOperandS
         operator to the state-vector.
         The arguments are the rotation angle `angle`, a string representing the
         Pauli product operator, and a set of qubits the operation acts on.
+        Note that this operation is currently not executable. There isn't a valid
+        lowering path to the LLVM IR.
     }];
 
     let arguments = (ins
@@ -645,9 +632,6 @@ def HermitianOp : Observable_Op<"hermitian"> {
 def MeasureOp : QRef_Op<"measure"> {
     let summary = "A single-qubit projective measurement in the computational basis.";
     let description = [{
-        This operation represents a single-qubit computational basis measurement.
-        Note that in PennyLane, measurements are performed in the 0/1 convention, instead of the
-        1/-1 convention.
     }];
 
     let arguments = (ins
