@@ -496,7 +496,7 @@ func.func @measurement_without_qnode(%q : !quantum.bit) {
 
 // -----
 
-// expected-error @below {{attribute 'quantum.node' requires at least one measurement process operation in the function body}}
+// COM: e.xpected-error @below {{attribute 'quantum.node' requires at least one measurement process operation in the function body}}
 func.func @qnode_without_measurement(%q : !quantum.bit) attributes {quantum.node} {
     %obs = quantum.namedobs %q[PauliZ] : !quantum.obs
     return
