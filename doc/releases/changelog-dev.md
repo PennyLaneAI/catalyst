@@ -107,7 +107,7 @@
 <h3>Bug fixes 🐛</h3>
 
 * Fix a bug in the bind call function for `PCPhase` where the signature did not match what was 
-  expected in `jax_primitives`.
+  expected in `jax_primitives`. `ctrl_qubits` was missing from positional arguments in previous signature.
   [(#2467)](https://github.com/PennyLaneAI/catalyst/pull/2467)
 
 * Fix a bug with the xDSL `ParitySynth` pass that caused failure when the QNode being transformed
