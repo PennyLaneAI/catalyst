@@ -522,6 +522,10 @@ class TestMLIRSpecs:
         """Test that StatePrep operations are handled correctly."""
 
         @qml.qjit
+        @partial(
+            qml.transforms.decompose,
+            gate_set={"StatePrep", "Hadamard"},
+        )
         @qml.qnode(qml.device("lightning.qubit", wires=3), shots=10)
         def circ():
             qml.StatePrep(jnp.array([1, 0, 0, 0]), wires=[0, 1])
@@ -602,7 +606,7 @@ class TestMLIRSpecs:
         if not qml.capture.enabled():
             pytest.xfail("to_ppr requires plxpr to be enabled to lower PauliRot")
 
-        pipeline = [("pipe", ["enforce-runtime-invariants-pipeline"])]
+        pipeline = [("pipe", ["quantum-compilation-stage"])]
 
         @qml.qjit(pipelines=pipeline, target="mlir")
         @qml.transform(pass_name="to-ppr")

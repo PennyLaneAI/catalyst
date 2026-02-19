@@ -345,28 +345,19 @@ class TestPassByPassSpecs:
 
     @pytest.mark.usefixtures("use_both_frontend")
     def test_reprs_match(self):
-        """Test that when no transforms are applied to a typical circuit, the "Before Transform"
-        and "Before MLIR Passes" representations match."""
+        """Test that when no transforms are applied to a typical circuit and the gates are
+        supported by the device and compiler level, then the "Before Transform" and "Before
+        MLIR Passes" representations should match."""
 
-        dev = qml.device("lightning.qubit", wires=7)
+        dev = qml.device("lightning.qubit", wires=4)
 
         @qml.qnode(dev)
         def circuit():
-            qml.StatePrep(jnp.array([0, 1]), wires=0)
-
             qml.Hadamard(wires=0)
             qml.CNOT(wires=[0, 1])
 
             qml.GlobalPhase(jnp.pi / 4)
             qml.MultiRZ(jnp.pi / 2, wires=[1, 2, 3])
-            qml.ctrl(qml.T, control=0)(wires=3)
-            qml.ctrl(
-                op=qml.IsingXX(0.5, wires=[5, 6]),
-                control=range(5),
-                control_values=[1] * 5,
-            )
-
-            qml.QubitUnitary(jnp.array([[1, 0], [0, 1j]]), wires=2)
 
             return (
                 qml.expval(qml.PauliZ(0)),
@@ -521,7 +512,7 @@ class TestPassByPassSpecs:
     def test_arbitrary_ppr(self):
         """Test that PPRs are handled correctly."""
 
-        @qml.qjit(target="mlir")
+        @qml.qjit(target="mlir", pipelines=[("pipe", ["quantum-compilation-stage"])])
         @qml.transforms.decompose_arbitrary_ppr
         @qml.transforms.to_ppr
         @qml.qnode(qml.device("null.qubit", wires=3))
