@@ -360,20 +360,18 @@ class TestCapture:
 
         # Capture enabled
 
-        @qjit
-        @qml.qnode(device)
-        def captured_circuit(theta):
-            qml.ctrl(qml.PCPhase, control=[1], control_values=[False])(theta, 2, wires=[0])
-            return qml.state()
-
-        capture_result = captured_circuit(theta)
-
-        qml.capture.disable()
+        qml.capture.enable()
 
         @qml.qnode(device)
         def circuit(theta):
             qml.ctrl(qml.PCPhase, control=[1], control_values=[False])(theta, 2, wires=[0])
             return qml.state()
+
+        capture_result = qjit(circuit)(theta)
+
+        # Capture disabled
+
+        qml.capture.disable()
 
         assert jnp.allclose(capture_result, circuit(theta))
 
