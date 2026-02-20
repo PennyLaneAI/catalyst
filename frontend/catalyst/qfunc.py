@@ -649,4 +649,8 @@ def _extract_passes(transform_program):
             raise ValueError(
                 f"{t} without a tape definition occurs before tape transform {tape_transforms[-1]}."
             )
+
+    # Add boundary marker between tapes and MLIR to compile pipeline
+    transform_program.add_marker("mlir_boundary", i)
+
     return qml.CompilePipeline(tape_transforms), tuple(pass_pipeline)
