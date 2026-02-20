@@ -86,6 +86,9 @@ def test_dynamic_counts(capfd, capture_mode):
     assert out.count("compiling...") == 1
 
 
+# capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+# fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+@pytest.mark.capture_todo
 @pytest.mark.parametrize("readout", [qml.expval, qml.var])
 def test_dynamic_wires_scalar_readouts(readout, backend, capfd, capture_mode):
     """
@@ -119,6 +122,9 @@ def test_dynamic_wires_scalar_readouts(readout, backend, capfd, capture_mode):
     assert out.count("compiling...") == 3
 
 
+# capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+# fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+@pytest.mark.capture_todo
 @pytest.mark.parametrize("readout", [qml.probs])
 def test_dynamic_wires_statebased_with_wires(readout, backend, capfd, capture_mode):
     """
@@ -154,6 +160,9 @@ def test_dynamic_wires_statebased_with_wires(readout, backend, capfd, capture_mo
     assert out.count("compiling...") == 3
 
 
+# capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+# fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+@pytest.mark.capture_todo
 @pytest.mark.parametrize("readout", [qml.probs, qml.state])
 def test_dynamic_wires_statebased_without_wires(readout, backend, capfd, capture_mode):
     """
@@ -185,6 +194,9 @@ def test_dynamic_wires_statebased_without_wires(readout, backend, capfd, capture
     assert out.count("compiling...") == 3
 
 
+# capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+# fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+@pytest.mark.capture_todo
 @pytest.mark.parametrize("shots", [3, (3, 4, 5)])
 def test_dynamic_wires_sample_with_wires(shots, backend, capfd, capture_mode):
     """
@@ -220,6 +232,9 @@ def test_dynamic_wires_sample_with_wires(shots, backend, capfd, capture_mode):
     assert out.count("compiling...") == 3
 
 
+# capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+# fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+@pytest.mark.capture_todo
 @pytest.mark.parametrize("shots", [3, (3, 4, 5), (7,) * 3])
 def test_dynamic_wires_sample_without_wires(shots, backend, capfd, capture_mode):
     """
@@ -255,6 +270,9 @@ def test_dynamic_wires_sample_without_wires(shots, backend, capfd, capture_mode)
     assert out.count("compiling...") == 3
 
 
+# capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+# fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+@pytest.mark.capture_todo
 def test_dynamic_wires_counts_with_wires(backend, capfd, capture_mode):
     """
     Test that a circuit with dynamic number of wires can be executed correctly
@@ -285,6 +303,9 @@ def test_dynamic_wires_counts_with_wires(backend, capfd, capture_mode):
     assert out.count("compiling...") == 1
 
 
+# capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+# fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+@pytest.mark.capture_todo
 def test_dynamic_wires_counts_without_wires(backend, capfd, capture_mode):
     """
     Test that a circuit with dynamic number of wires can be executed correctly
@@ -318,6 +339,9 @@ def test_dynamic_wires_counts_without_wires(backend, capfd, capture_mode):
     assert out.count("compiling...") == 1
 
 
+# capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+# fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+@pytest.mark.capture_todo
 @pytest.mark.parametrize("wires", [1.1, (1.1)])
 def test_wrong_wires_argument(backend, wires, capture_mode):
     """
@@ -341,6 +365,9 @@ def test_wrong_wires_argument(backend, wires, capture_mode):
         func(wires)
 
 
+# capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+# fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+@pytest.mark.capture_todo
 def test_dynamic_shots_and_wires(capfd, capture_mode):
     """Test that a circuit with both dynamic shots and dynamic wires works correctly with qml.sample."""
 

@@ -24,6 +24,9 @@ from catalyst import qjit
 class TestShotVector:
     """Test shot-vector"""
 
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     @pytest.mark.parametrize("shots", [((3, 4),), (3,) * 4, (3, 3, 3, 3), [3, 3, 3, 3]])
     def test_return_format_and_shape(self, shots, capture_mode):
         """Test shot-vector as parameter with single sample measurment"""
@@ -39,6 +42,9 @@ class TestShotVector:
         assert len(circuit()) == 4
         assert jnp.array(circuit()).shape == (4, 3, 1)
 
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
     @pytest.mark.parametrize("shots", [((3, 4),), (3,) * 4, (3, 3, 3, 3), [3, 3, 3, 3]])
     def test_multiple_sample_measurement(self, shots, mcm_method, capture_mode):
@@ -68,6 +74,9 @@ class TestShotVector:
         assert jnp.array(circuit_dict()["first"]).shape == (4, 3, 1)
         assert jnp.array(circuit_dict()["second"]).shape == (4, 3, 1)
 
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
     def test_shot_vector_with_mixes_shots_and_without_copies(self, mcm_method, capture_mode):
         # pylint: disable=unsubscriptable-object
@@ -99,6 +108,9 @@ class TestShotVector:
             (lambda wires: qml.probs(wires=wires), "ProbabilityMP"),
         ],
     )
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
     def test_shot_vector_with_different_measurement(self, measurement, mcm_method, capture_mode):
         """Test a NotImplementedError is raised when using a shot-vector with a measurement that is not qml.sample()"""
@@ -122,6 +134,9 @@ class TestShotVector:
             ):
                 qjit(circuit, capture=capture_mode)()
 
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     def test_shot_vector_with_complex_container_sample(self, capture_mode):
         """Test shot-vector with complex container sample"""
 

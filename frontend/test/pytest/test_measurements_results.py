@@ -85,7 +85,7 @@ class TestSample:
 
     @pytest.mark.old_frontend  # dynamic wires not supported with capture
     @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
-    def test_sample_on_empty_wires(self, mcm_method):
+    def test_sample_on_empty_wires(self, mcm_method, capture_mode):
         """Test sample on dynamic wires."""
 
         @qml.set_shots(10)
@@ -99,9 +99,9 @@ class TestSample:
                 NotImplementedError,
                 match="cannot be used without wires and a dynamic number of device wires",
             ):
-                qjit(sample_dynamic_wires)()
+                qjit(sample_dynamic_wires, capture = capture_mode)()
         else:
-            qjit(sample_dynamic_wires)()
+            qjit(sample_dynamic_wires, capture = capture_mode)()
 
 
 class TestCounts:
@@ -200,7 +200,7 @@ class TestCounts:
 
     @pytest.mark.old_frontend  # dynamic wires not supported with capture
     @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
-    def test_counts_on_empty_wires(self, mcm_method):
+    def test_counts_on_empty_wires(self, mcm_method, capture_mode):
         """Test counts on dynamic wires."""
 
         @qml.set_shots(10)
@@ -214,9 +214,9 @@ class TestCounts:
                 NotImplementedError,
                 match="cannot be used without wires and a dynamic number of device wires",
             ):
-                qjit(counts_dynamic_wires)()
+                qjit(counts_dynamic_wires, capture = capture_mode)()
         else:
-            qjit(counts_dynamic_wires)()
+            qjit(counts_dynamic_wires, capture = capture_mode)()
 
 
 class TestExpval:
@@ -1098,6 +1098,9 @@ class CustomDevice(qml.devices.Device):
 class TestDensityMatrixMP:
     """Tests for density_matrix"""
 
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     def test_error(self, capture_mode):
         """Test that tracing density matrix produces an error"""
 

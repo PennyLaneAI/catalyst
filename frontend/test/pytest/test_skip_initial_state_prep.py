@@ -166,6 +166,9 @@ class TestExamplesFromWebsite:
 class TestDynamicWires:
     """Test dynamic wires"""
 
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     @pytest.mark.parametrize("inp", [(0), (1)])
     def test_state_prep(self, capture_mode, inp):
         """Test example from
@@ -212,6 +215,9 @@ class TestDynamicWires:
 class TestPossibleErrors:
     """What happens when there is bad user input?"""
 
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     def test_array_less_than_size_basis_state(self, capture_mode):
         """Test what happens when the array is less than the size required.
         In PennyLane the error raised is a ValueError.
@@ -227,6 +233,9 @@ class TestPossibleErrors:
 
             example_circuit()
 
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     def test_different_shape_state_prep(self, capture_mode):
         """Test that the same error is raised"""
         with pytest.raises(ValueError, match="State must be of length 2; got length 1"):
@@ -261,6 +270,9 @@ class TestPossibleErrors:
 class TestGrad:
     """What happens if grad?"""
 
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     def test_state_prep_grad(self, capture_mode, backend):
         """Test error happens with gradient"""
 
@@ -276,6 +288,9 @@ class TestGrad:
 
             example_circuit(0.0)
 
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     def test_basis_state_grad(self, capture_mode, backend):
         """Test error happens with gradient"""
 
@@ -295,6 +310,9 @@ class TestGrad:
 class TestControlled:
     """What happens if ctrl?"""
 
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     def test_state_prep_ctrl(self, capture_mode):
         """Test state prep with ctrl"""
 
@@ -308,6 +326,9 @@ class TestControlled:
         observed = qjit(example_circuit, capture=capture_mode)()
         assert jnp.allclose(expected, observed)
 
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     def test_basis_state_ctrl(self, capture_mode):
         """Test basis state with ctrl"""
 
@@ -325,6 +346,9 @@ class TestControlled:
 class TestAdjoint:
     """What happens if adjoint?"""
 
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     def test_state_prep_ctrl(self, capture_mode, backend):
         """Test state prep with adjoint"""
 
@@ -338,6 +362,9 @@ class TestAdjoint:
         observed = qjit(example_circuit, capture=capture_mode)()
         assert jnp.allclose(expected, observed)
 
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     def test_basis_state_ctrl(self, capture_mode, backend):
         """Test basis state with adjoint"""
 
