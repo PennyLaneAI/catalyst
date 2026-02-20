@@ -364,7 +364,7 @@ class TestCapture:
         def circuit(theta):
             qml.ctrl(qml.PCPhase, control=[1], control_values=[False])(theta, 2, wires=[0])
             return qml.state()
-         
+
         capture_result = qjit(capture=True)(theta)
 
         assert jnp.allclose(capture_result, circuit(theta))
