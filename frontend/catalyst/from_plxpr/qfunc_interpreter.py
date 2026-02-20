@@ -454,18 +454,17 @@ def interpret_counts_mcm(self, *mcms, single_mcm, all_outcomes):
 def _subroutine_kernel(
     interpreter,
     jaxpr,
-    *qregs_plus_args,
+    *args_plus_qregs,
     outer_dynqreg_handlers=(),
     wire_label_arg_to_tracer_arg_index=(),
     wire_to_owner_qreg=(),
 ):
-    global_qreg, *dynqregs_plus_args = qregs_plus_args
+    *dynqregs_plus_args, global_qreg = args_plus_qregs
     num_dynamic_alloced_qregs = len(outer_dynqreg_handlers)
     dynalloced_qregs, args = (
         dynqregs_plus_args[:num_dynamic_alloced_qregs],
         dynqregs_plus_args[num_dynamic_alloced_qregs:],
     )
-
     # Launch a new interpreter for the body region
     # A new interpreter's root qreg value needs a new recorder
     converter = copy(interpreter)
@@ -501,7 +500,6 @@ def _subroutine_kernel(
             converter.qubit_index_recorder[arg] = arg_to_qreg[arg]
 
     retvals = converter(jaxpr, *args)
-
     init_qreg.insert_all_dangling_qubits()
 
     # Return all registers
@@ -551,7 +549,7 @@ def handle_subroutine(self, *args, **kwargs):
             wire_to_owner_qreg=wire_to_owner_qreg,
         )
         converted_closed_jaxpr_branch = jax.make_jaxpr(f)(
-            self.init_qreg.get(), *[dyn_qreg.get() for dyn_qreg in dynalloced_qregs], *args
+            *args, *[dyn_qreg.get() for dyn_qreg in dynalloced_qregs], self.init_qreg.get()
         )
         self.subroutine_cache[plxpr] = converted_closed_jaxpr_branch
     else:
@@ -560,9 +558,9 @@ def handle_subroutine(self, *args, **kwargs):
     # quantum_subroutine_p.bind
     # is just pjit_p with a different name.
     vals_out = quantum_subroutine_prim.bind(
+        *new_args,
         self.init_qreg.get(),
         *[dyn_qreg.get() for dyn_qreg in dynalloced_qregs],
-        *new_args,
         jaxpr=converted_closed_jaxpr_branch,
         in_shardings=(*(UNSPECIFIED,) * (len(dynalloced_qregs) + 1), *kwargs["in_shardings"]),
         out_shardings=(*(UNSPECIFIED,) * (len(dynalloced_qregs) + 1), *kwargs["out_shardings"]),
@@ -796,7 +794,6 @@ def handle_adjoint_transform(
         return *retvals, converter.init_qreg.get()
 
     converted_jaxpr_branch = jax.make_jaxpr(calling_convention)(*args, qreg)
-
     converted_closed_jaxpr_branch = ClosedJaxpr(
         convert_constvars_jaxpr(converted_jaxpr_branch.jaxpr), ()
     )
