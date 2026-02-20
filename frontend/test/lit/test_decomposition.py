@@ -793,8 +793,8 @@ def test_decomposition_inside_subroutine():
     @qml.qnode(qml.device("lightning.qubit", wires=5))
     # CHECK-DAG: %0 = transform.apply_registered_pass "decompose-lowering"
     def subroutine_circuit():
-        # CHECK-DAG [[FIRST_CONST:%.+]] = stablehlo.constant dense<5.000000e-01> : tensor<f64>
-        # CHECK-DAG [[SECOND_CONST:%.+]] = stablehlo.constant dense<1.200000e+00> : tensor<f64>
+        # CHECK-DAG: [[FIRST_CONST:%.+]] = stablehlo.constant dense<5.000000e-01> : tensor<f64>
+        # CHECK-DAG: [[SECOND_CONST:%.+]] = stablehlo.constant dense<1.200000e+00> : tensor<f64>
 
         # CHECK: [[QREG:%.+]] = quantum.alloc
         # CHECK: [[QREG_1:%.+]] = call @f([[QREG]], [[FIRST_CONST]], {{%.+}}) : (!quantum.reg, tensor<f64>, tensor<2xi64>) -> !quantum.reg
