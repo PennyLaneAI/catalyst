@@ -12,12 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-// #include <cstdint>
-// #include <llvm/ADT/SmallPtrSet.h>
-// #include <mlir/IR/Builders.h>
-// #include <mlir/IR/BuiltinAttributes.h>
-// #include <mlir/IR/OpDefinition.h>
 #define DEBUG_TYPE "value-semantics-conversion"
 
 #include <variant>
@@ -29,7 +23,6 @@
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Operation.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
 
@@ -40,7 +33,6 @@
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumTypes.h"
 
-
 using namespace mlir;
 using namespace catalyst;
 
@@ -49,29 +41,30 @@ using namespace catalyst;
 
 namespace {
 
-
-void dumpMap(const llvm::DenseMap<Value, Value> &map){
-    for ([[maybe_unused]] auto _ : map){
-        //llvm::errs() << "(" << _.first << ", " << _.second << ") \n";
+void dumpMap(const llvm::DenseMap<Value, Value> &map)
+{
+    for ([[maybe_unused]] auto _ : map) {
+        // llvm::errs() << "(" << _.first << ", " << _.second << ") \n";
     }
 }
-
 
 //
 // Misc helpers
 //
 
-DenseI32ArrayAttr getResultSegmentSizes(IRRewriter &builder, qref::QuantumOperation rGateOp){
+DenseI32ArrayAttr getResultSegmentSizes(IRRewriter &builder, qref::QuantumOperation rGateOp)
+{
     // The reference semantics gates do not produce results.
     // Therefore, we need to manually set the result segment sizes for the corresponding
     // value semantics gate.
 
     int32_t ctrl_len, non_ctrl_len = -1;
-    if (auto rCtrlGate = dyn_cast<qref::QuantumGate>(rGateOp.getOperation())){
+    if (auto rCtrlGate = dyn_cast<qref::QuantumGate>(rGateOp.getOperation())) {
         // Has controls
         ctrl_len = rCtrlGate.getCtrlQubitOperands().size();
         non_ctrl_len = rCtrlGate.getNonCtrlQubitOperands().size();
-    } else {
+    }
+    else {
         // No controls
         ctrl_len = 0;
         non_ctrl_len = rGateOp.getQubitOperands().size();
@@ -80,8 +73,10 @@ DenseI32ArrayAttr getResultSegmentSizes(IRRewriter &builder, qref::QuantumOperat
     return builder.getDenseI32ArrayAttr({non_ctrl_len, ctrl_len});
 }
 
-
-Value insertQubits(IRRewriter &builder, Value qreg, const SmallVector<std::pair<Value, std::variant<Value, IntegerAttr>>> &qubitIdxPairs){
+Value insertQubits(
+    IRRewriter &builder, Value qreg,
+    const SmallVector<std::pair<Value, std::variant<Value, IntegerAttr>>> &qubitIdxPairs)
+{
     // Create a chain of insert ops, inserting all qubits into the qreg.
     assert(isa<quantum::QuregType>(qreg.getType()) && "Expected a value semantics qreg SSA value");
 
@@ -96,7 +91,9 @@ Value insertQubits(IRRewriter &builder, Value qreg, const SmallVector<std::pair<
         Operation *latestOp = latest.getDefiningOp();
         Operation *currentOp = qubitIdxPairs[i].first.getDefiningOp();
 
-        assert(latestOp->getBlock() == currentOp->getBlock() && "Qubit values cannot cross scopes, please insert into registers at scope boundaries.");
+        assert(
+            latestOp->getBlock() == currentOp->getBlock() &&
+            "Qubit values cannot cross scopes, please insert into registers at scope boundaries.");
         if (latestOp->isBeforeInBlock(currentOp)) {
             latest = qubitIdxPairs[i].first;
         }
@@ -105,31 +102,32 @@ Value insertQubits(IRRewriter &builder, Value qreg, const SmallVector<std::pair<
 
     // Perform the inserts
     Value current = qreg;
-    for (auto pair : qubitIdxPairs){
+    for (auto pair : qubitIdxPairs) {
         Value qubit = pair.first;
-        assert(isa<quantum::QubitType>(qubit.getType()) && "Expected a value semantics qubit SSA value");
+        assert(isa<quantum::QubitType>(qubit.getType()) &&
+               "Expected a value semantics qubit SSA value");
 
         std::variant<Value, IntegerAttr> idx = pair.second;
-        if (std::holds_alternative<Value>(idx)){
-            current = quantum::InsertOp::create(builder, loc, quantum::QuregType::get(ctx),
-                current, std::get<Value>(idx), nullptr, qubit);
+        if (std::holds_alternative<Value>(idx)) {
+            current = quantum::InsertOp::create(builder, loc, quantum::QuregType::get(ctx), current,
+                                                std::get<Value>(idx), nullptr, qubit);
         }
-        else if (std::holds_alternative<IntegerAttr>(idx)){
-            current = quantum::InsertOp::create(builder, loc, quantum::QuregType::get(ctx),
-                current, {}, std::get<IntegerAttr>(idx), qubit);
+        else if (std::holds_alternative<IntegerAttr>(idx)) {
+            current = quantum::InsertOp::create(builder, loc, quantum::QuregType::get(ctx), current,
+                                                {}, std::get<IntegerAttr>(idx), qubit);
         }
     }
 
     return current;
 }
 
-
 //
 // Handlers for each op
 //
 
-
-void handleAlloc(IRRewriter &builder, qref::AllocOp rAllocOp, llvm::DenseMap<Value, Value> &currentQuregs){
+void handleAlloc(IRRewriter &builder, qref::AllocOp rAllocOp,
+                 llvm::DenseMap<Value, Value> &currentQuregs)
+{
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPointAfter(rAllocOp);
 
@@ -140,8 +138,9 @@ void handleAlloc(IRRewriter &builder, qref::AllocOp rAllocOp, llvm::DenseMap<Val
 
     quantum::AllocOp vAllocOp;
     std::optional<uint64_t> nqubitsAttr = rAllocOp.getNqubitsAttr();
-    if (nqubitsAttr.has_value()){
-        vAllocOp = quantum::AllocOp::create(builder, loc, qregType, {}, IntegerAttr::get(i64Type, *nqubitsAttr));
+    if (nqubitsAttr.has_value()) {
+        vAllocOp = quantum::AllocOp::create(builder, loc, qregType, {},
+                                            IntegerAttr::get(i64Type, *nqubitsAttr));
     }
     else {
         vAllocOp = quantum::AllocOp::create(builder, loc, qregType, rAllocOp.getNqubits(), nullptr);
@@ -149,9 +148,9 @@ void handleAlloc(IRRewriter &builder, qref::AllocOp rAllocOp, llvm::DenseMap<Val
     currentQuregs.insert({rAllocOp.getQreg(), vAllocOp.getQreg()});
 }
 
-
 void handleGet(IRRewriter &builder, qref::GetOp getOp, llvm::DenseMap<Value, Value> &currentQubits,
-        llvm::DenseMap<Value, Value> &currentQuregs){
+               llvm::DenseMap<Value, Value> &currentQuregs)
+{
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPointAfter(getOp);
 
@@ -165,16 +164,20 @@ void handleGet(IRRewriter &builder, qref::GetOp getOp, llvm::DenseMap<Value, Val
 
     quantum::ExtractOp extractOp;
     std::optional<uint64_t> idxAttr = getOp.getIdxAttr();
-    if (idxAttr.has_value()){
-        extractOp = quantum::ExtractOp::create(builder, loc, qubitType, vQreg, {}, IntegerAttr::get(i64Type, *idxAttr));
+    if (idxAttr.has_value()) {
+        extractOp = quantum::ExtractOp::create(builder, loc, qubitType, vQreg, {},
+                                               IntegerAttr::get(i64Type, *idxAttr));
     }
     else {
-        extractOp = quantum::ExtractOp::create(builder, loc, qubitType, vQreg, getOp.getIdx(), nullptr);
+        extractOp =
+            quantum::ExtractOp::create(builder, loc, qubitType, vQreg, getOp.getIdx(), nullptr);
     }
     currentQubits.insert({getOp.getQubit(), extractOp.getQubit()});
 }
 
-void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp, llvm::DenseMap<Value, Value> &currentQubits){
+void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp,
+                llvm::DenseMap<Value, Value> &currentQubits)
+{
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPointAfter(rGateOp);
 
@@ -182,8 +185,8 @@ void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp, llvm::Dense
     MLIRContext *ctx = rGateOp.getContext();
 
     SmallVector<Value> vQubitOperands;
-    for (Value v : rGateOp->getOperands()){
-        if (isa<qref::QubitType>(v.getType())){
+    for (Value v : rGateOp->getOperands()) {
+        if (isa<qref::QubitType>(v.getType())) {
             assert(currentQubits.contains(v) && "The qubit reference is missing a qubit SSA value");
             vQubitOperands.push_back(currentQubits.lookup(v));
         }
@@ -193,7 +196,7 @@ void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp, llvm::Dense
     }
 
     SmallVector<Type> qubitResultsType;
-    for (size_t i = 0; i < rGateOp.getQubitOperands().size(); i++){
+    for (size_t i = 0; i < rGateOp.getQubitOperands().size(); i++) {
         qubitResultsType.push_back(quantum::QubitType::get(ctx));
     }
 
@@ -209,15 +212,17 @@ void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp, llvm::Dense
             // other operations - do nothing
         });
 
-    for (auto [i, qubitReference] : llvm::enumerate(rGateOp.getQubitOperands())){
+    for (auto [i, qubitReference] : llvm::enumerate(rGateOp.getQubitOperands())) {
         currentQubits[qubitReference] = vGateOp.getQubitResults()[i];
     }
 
     builder.eraseOp(rGateOp);
 }
 
-void handleDealloc(IRRewriter &builder, qref::DeallocOp rDeallocOp, llvm::DenseMap<Value, Value> &currentQubits,
-        llvm::DenseMap<Value, Value> &currentQuregs){
+void handleDealloc(IRRewriter &builder, qref::DeallocOp rDeallocOp,
+                   llvm::DenseMap<Value, Value> &currentQubits,
+                   llvm::DenseMap<Value, Value> &currentQuregs)
+{
     OpBuilder::InsertionGuard guard(builder);
     builder.setInsertionPointAfter(rDeallocOp);
 
@@ -232,17 +237,18 @@ void handleDealloc(IRRewriter &builder, qref::DeallocOp rDeallocOp, llvm::DenseM
     // A register is either used by a qref.get, or a region op (adjoint, control flow, ...)
     // Only getOps produce qubits
     SmallVector<std::pair<Value, std::variant<Value, IntegerAttr>>> qubitIdxPairs;
-    for (Operation *user : rSourceQreg.getUsers()){
-        if (auto getOp = dyn_cast<qref::GetOp>(user)){
+    for (Operation *user : rSourceQreg.getUsers()) {
+        if (auto getOp = dyn_cast<qref::GetOp>(user)) {
             Value currentVQubit = currentQubits.lookup(getOp.getQubit());
             std::optional<uint64_t> idxAttr = getOp.getIdxAttr();
-            if (idxAttr.has_value()){
+            if (idxAttr.has_value()) {
                 qubitIdxPairs.push_back({currentVQubit, IntegerAttr::get(i64Type, *idxAttr)});
             }
             else {
                 qubitIdxPairs.push_back({currentVQubit, getOp.getIdx()});
             }
-        } else {
+        }
+        else {
             continue;
         }
     }
@@ -254,8 +260,6 @@ void handleDealloc(IRRewriter &builder, qref::DeallocOp rDeallocOp, llvm::DenseM
 }
 } // anonymous namespace
 
-
-
 namespace catalyst {
 namespace qref {
 
@@ -263,13 +267,14 @@ namespace qref {
 #define GEN_PASS_DEF_VALUESEMANTICSCONVERSIONPASS
 #include "QRef/Transforms/Passes.h.inc"
 
-struct ValueSemanticsConversionPass : impl::ValueSemanticsConversionPassBase<ValueSemanticsConversionPass> {
+struct ValueSemanticsConversionPass
+    : impl::ValueSemanticsConversionPassBase<ValueSemanticsConversionPass> {
     using ValueSemanticsConversionPassBase::ValueSemanticsConversionPassBase;
 
     void runOnOperation() final
     {
         Operation *mod = getOperation();
-        //Location loc = mod->getLoc();
+        // Location loc = mod->getLoc();
         IRRewriter builder(mod->getContext());
 
         // This map tracks: qref.bit Value -> current quantum.bit Value
@@ -279,7 +284,6 @@ struct ValueSemanticsConversionPass : impl::ValueSemanticsConversionPassBase<Val
         llvm::DenseMap<Value, Value> currentQuregs;
 
         mod->walk<WalkOrder::PreOrder>([&](Operation *op) {
-
             if (auto rAllocOp = dyn_cast<qref::AllocOp>(op)) {
                 handleAlloc(builder, rAllocOp, currentQuregs);
                 dumpMap(currentQuregs);
@@ -299,10 +303,10 @@ struct ValueSemanticsConversionPass : impl::ValueSemanticsConversionPassBase<Val
             }
         });
 
-        for (auto pair : currentQubits){
+        for (auto pair : currentQubits) {
             builder.eraseOp(pair.first.getDefiningOp());
         }
-        for (auto pair : currentQuregs){
+        for (auto pair : currentQuregs) {
             builder.eraseOp(pair.first.getDefiningOp());
         }
 
