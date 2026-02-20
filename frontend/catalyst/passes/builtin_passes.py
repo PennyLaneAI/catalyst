@@ -626,7 +626,9 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
     if qnode is None:
         return functools.partial(gridsynth, epsilon=epsilon, ppr_basis=ppr_basis)
 
-    setup_inputs = {"epsilon": epsilon, "ppr_basis": ppr_basis}
+    def setup_inputs(epsilon=epsilon, ppr_basis=ppr_basis):
+        return (), {"epsilon": epsilon, "ppr_basis": ppr_basis}
+    
     return qml.transform(pass_name="gridsynth", setup_inputs=setup_inputs)(qnode)
 
 
@@ -817,7 +819,8 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
     if qnode is None:
         return functools.partial(commute_ppr, max_pauli_size=max_pauli_size)
 
-    setup_inputs = {"max-pauli-size": max_pauli_size}
+    def setup_inputs(max_pauli_size=max_pauli_size):
+        return (), {"max_pauli_size": max_pauli_size}
     return qml.transform(pass_name="commute_ppr", setup_inputs=setup_inputs)(qnode)
 
 
@@ -911,7 +914,8 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     if qnode is None:
         return functools.partial(merge_ppr_ppm, max_pauli_size=max_pauli_size)
 
-    setup_inputs = {"max-pauli-size": max_pauli_size}
+    def setup_inputs(max_pauli_size=max_pauli_size):
+        return (), {"max_pauli_size": max_pauli_size}
     return qml.transform(pass_name="merge_ppr_ppm", setup_inputs=setup_inputs)(qnode)
 
 
@@ -993,7 +997,8 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
             ppr_to_ppm, decompose_method=decompose_method, avoid_y_measure=avoid_y_measure
         )
 
-    setup_inputs = {"decompose-method": decompose_method, "avoid-y-measure": avoid_y_measure}
+    def setup_inputs(decompose_method=decompose_method, avoid_y_measure=avoid_y_measure):
+        return (), {"decompose_method": decompose_method, "avoid_y_measure": avoid_y_measure}
     return qml.transform(pass_name="ppr_to_ppm", setup_inputs=setup_inputs)(qnode)
 
 
@@ -1107,11 +1112,8 @@ def ppm_compilation(
             max_pauli_size=max_pauli_size,
         )
 
-    setup_inputs = {
-        "decompose-method": decompose_method,
-        "avoid-y-measure": avoid_y_measure,
-        "max-pauli-size": max_pauli_size,
-    }
+    def setup_inputs(decompose_method=decompose_method, avoid_y_measure=avoid_y_measure, max_pauli_size=max_pauli_size):
+        return (), {"decompose_method": decompose_method, "avoid_y_measure": avoid_y_measure, "max_pauli_size": max_pauli_size}
     return qml.transform(pass_name="ppm-compilation", setup_inputs=setup_inputs)(qnode)
 
 
