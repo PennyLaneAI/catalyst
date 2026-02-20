@@ -37,13 +37,16 @@ func.func @test_expval_circuit(%arg0: f64, %arg1: f64, %arg2: i1) -> f64 {
     // CHECK: [[ROT:%.+]], [[ROTctrl:%.+]] = quantum.custom "Rot"(%arg0, %arg1) [[RX]] adj ctrls([[CNOT]]#1) ctrlvals(%arg2) : !quantum.bit ctrls !quantum.bit
     qref.custom "Rot"(%arg0, %arg1) %q0 adj ctrls (%q1) ctrlvals (%arg2) : !qref.bit ctrls !qref.bit
 
-    // CHECK: [[namedobs:%.+]] = quantum.namedobs [[ROTctrl]][ PauliX] : !quantum.obs
+    // CHECK: [[PPR:%.+]], [[PPRctrl:%.+]] = quantum.paulirot ["Y"](%arg0) [[ROT]] ctrls([[ROTctrl]]) ctrlvals(%arg2) : !quantum.bit ctrls !quantum.bit
+    qref.paulirot ["Y"](%arg0) %q0 ctrls (%q1) ctrlvals (%arg2) : !qref.bit ctrls !qref.bit
+
+    // CHECK: [[namedobs:%.+]] = quantum.namedobs [[PPRctrl]][ PauliX] : !quantum.obs
     // CHECK: quantum.expval [[namedobs]]
     %obs = qref.namedobs %q1 [ PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
 
-    // CHECK: [[insert1:%.+]] = quantum.insert [[qreg]][ 1], [[ROTctrl]] : !quantum.reg, !quantum.bit
-    // CHECK: [[insert0:%.+]] = quantum.insert [[insert1]][ 0], [[ROT]] : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[qreg]][ 1], [[PPRctrl]] : !quantum.reg, !quantum.bit
+    // CHECK: [[insert0:%.+]] = quantum.insert [[insert1]][ 0], [[PPR]] : !quantum.reg, !quantum.bit
     // CHECK: quantum.dealloc [[insert0]] : !quantum.reg
     qref.dealloc %a : !qref.reg<2>
     return %expval : f64

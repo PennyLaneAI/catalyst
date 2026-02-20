@@ -220,7 +220,8 @@ void handleDealloc(IRRewriter &builder, qref::DeallocOp rDeallocOp,
             Value currentVQubit = currentQubits.lookup(getOp.getQubit());
             std::optional<uint64_t> idxAttr = getOp.getIdxAttr();
             if (idxAttr.has_value()) {
-                qubitIdxPairs.push_back({currentVQubit, IntegerAttr::get(i64Type, *idxAttr)});
+                qubitIdxPairs.push_back(
+                    {currentVQubit, IntegerAttr::get(i64Type, idxAttr.value())});
             }
             else {
                 qubitIdxPairs.push_back({currentVQubit, getOp.getIdx()});
@@ -251,16 +252,16 @@ void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp,
     }
 
     quantum::QuantumOperation vGateOp;
-
-    llvm::TypeSwitch<qref::QuantumOperation, void>(rGateOp)
-        .Case([&](qref::CustomOp rCustomOp) {
-            vGateOp = migrateOpToValueSemantics<quantum::CustomOp>(builder, rGateOp, currentQubits,
-                                                                   qubitResultsType);
-            vGateOp->setAttr("resultSegmentSizes", getResultSegmentSizes(builder, rCustomOp));
-        })
-        .Default([&](Operation *op) {
-            // other operations - do nothing
-        });
+    if (isa<qref::CustomOp>(rGateOp)) {
+        vGateOp = migrateOpToValueSemantics<quantum::CustomOp>(builder, rGateOp, currentQubits,
+                                                               qubitResultsType);
+        vGateOp->setAttr("resultSegmentSizes", getResultSegmentSizes(builder, rGateOp));
+    }
+    else if (isa<qref::PauliRotOp>(rGateOp)) {
+        vGateOp = migrateOpToValueSemantics<quantum::PauliRotOp>(builder, rGateOp, currentQubits,
+                                                                 qubitResultsType);
+        vGateOp->setAttr("resultSegmentSizes", getResultSegmentSizes(builder, rGateOp));
+    }
 
     for (auto [i, qubitReference] : llvm::enumerate(rGateOp.getQubitOperands())) {
         currentQubits[qubitReference] = vGateOp.getQubitResults()[i];
