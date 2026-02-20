@@ -275,7 +275,7 @@ clean:
 	find frontend/catalyst -name "*.so" -not -path "*/third_party/*" -exec rm -v {} +
 	git restore frontend/catalyst/_configuration.py
 	rm -rf $(MK_DIR)/frontend/catalyst/_revision.py
-	rm -rf $(MK_DIR)/frontend/mlir_quantum $(MK_DIR)/frontend/catalyst/lib $(MK_DIR)/frontend/catalyst/bin
+	rm -rf $(MK_DIR)/frontend/mlir_quantum $(MK_DIR)/frontend/catalyst/include $(MK_DIR)/frontend/catalyst/lib $(MK_DIR)/frontend/bin
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 	rm -rf .benchmarks
