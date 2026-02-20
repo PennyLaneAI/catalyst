@@ -18,15 +18,15 @@
 
 
 // CHECK-LABEL: test_expval_circuit
-func.func @test_expval_circuit(%arg0: f64, %arg1: f64, %arg2: i1) -> f64 {
+func.func @test_expval_circuit(%arg0: f64, %arg1: f64, %arg2: i1, %arg3: i64) -> f64 {
 
     // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
     %a = qref.alloc(2) : !qref.reg<2>
 
     // CHECK: [[bit0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[bit1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
+    // CHECK: [[bit1:%.+]] = quantum.extract [[qreg]][%arg3] : !quantum.reg -> !quantum.bit
     %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit
-    %q1 = qref.get %a[1] : !qref.reg<2> -> !qref.bit
+    %q1 = qref.get %a[%arg3] : !qref.reg<2>, i64 -> !qref.bit
 
     // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() [[bit0]], [[bit1]] : !quantum.bit, !quantum.bit
     qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
@@ -45,7 +45,7 @@ func.func @test_expval_circuit(%arg0: f64, %arg1: f64, %arg2: i1) -> f64 {
     %obs = qref.namedobs %q1 [ PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
 
-    // CHECK: [[insert1:%.+]] = quantum.insert [[qreg]][ 1], [[PPRctrl]] : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[qreg]][%arg3], [[PPRctrl]] : !quantum.reg, !quantum.bit
     // CHECK: [[insert0:%.+]] = quantum.insert [[insert1]][ 0], [[PPR]] : !quantum.reg, !quantum.bit
     // CHECK: quantum.dealloc [[insert0]] : !quantum.reg
     qref.dealloc %a : !qref.reg<2>
