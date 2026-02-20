@@ -2,8 +2,7 @@ set(LIBRARY_NAME qref-transforms)
 
 
 file(GLOB SRC
-    HelloWorldPatterns.cpp
-    hello_world.cpp
+    value_semantics_conversion.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

@@ -17,13 +17,12 @@
 
 include "mlir/Pass/PassBase.td"
 
-def RQHelloWorldPass : Pass<"rq-hw"> {
-    let summary = "QRef Hello world!";
+def ValueSemanticsConversionPass : Pass<"convert-to-value-semantics"> {
+    let summary = "Convert to value semantics quantum dialect";
 
-    // let dependentDialects = [
-    //    "scf::SCFDialect",
-    //    "catalyst::quantum::QuantumDialect"
-    // ];
+    let dependentDialects = [
+       "catalyst::quantum::QuantumDialect"
+    ];
 }
 
 #endif // QREF_PASSES
