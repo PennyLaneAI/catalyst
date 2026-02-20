@@ -161,6 +161,9 @@ entry_points = {
         "reduce_t_depth = catalyst.passes:reduce_t_depth",
         "decompose_arbitrary_ppr = catalyst.passes:decompose_arbitrary_ppr",
     ],
+    "catalyst.graph_drawer": [
+        "draw_graph = catalyst:draw_graph",
+    ],
 }
 
 classifiers = [
