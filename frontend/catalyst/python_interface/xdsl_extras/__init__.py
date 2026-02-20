@@ -17,6 +17,7 @@
 from .constraints import MemRefConstraint, NestedTupleOfConstraint, TensorConstraint
 from .traits import (
     AllMatchSameOperatorTrait,
+    AllTypesMatch,
     Elementwise,
     SameOperandsAndResultElementType,
     SameOperandsAndResultShape,
@@ -30,6 +31,7 @@ __all__ = [
     "TensorConstraint",
     # Traits
     "AllMatchSameOperatorTrait",
+    "AllTypesMatch",
     "Elementwise",
     "SameOperandsAndResultElementType",
     "SameOperandsAndResultShape",

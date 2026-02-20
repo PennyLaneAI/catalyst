@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from xdsl.dialects.builtin import TensorType, VectorType
-from xdsl.ir import Attribute, Operation
+from xdsl.ir import Attribute, Operation, SSAValue, SSAValues
 from xdsl.traits import OpTrait
 from xdsl.utils.exceptions import VerifyException
 from xdsl.utils.type import get_element_type_or_self, have_compatible_shape
@@ -232,3 +232,28 @@ class AllMatchSameOperatorTrait(OpTrait):
                 f"all of {{{names_str}}} must have the same {self.summary}: got "
                 f"{self.summary}s {results_str}"
             )
+
+
+@dataclass(frozen=True)
+class AllTypesMatch(OpTrait):
+    """Verify sequences of SSAValues all have the same type"""
+
+    attr_names: tuple[str, ...]
+    summary: str
+
+    @staticmethod
+    def same_ssa_types_operator(val_or_vals: SSAValue | SSAValues):
+        """Operator to get the types of SSAValues being compared."""
+        vals = [val_or_vals] if isinstance(val_or_vals, SSAValue) else val_or_vals
+        return [v.type for v in vals]
+
+    def verify(self, op: Operation) -> None:
+        """Verify that the operation attributes all share the same types."""
+        for attr in self.attr_names:
+            value = getattr(op, attr, None)
+            if not isinstance(value, (SSAValue, SSAValues)):
+                return
+
+        AllMatchSameOperatorTrait(
+            attr_names=self.attr_names, operator=self.same_ssa_types_operator, summary=self.summary
+        ).verify(op)

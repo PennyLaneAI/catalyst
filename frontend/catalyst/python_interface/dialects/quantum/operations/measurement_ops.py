@@ -28,12 +28,13 @@ from xdsl.irdl import (
     opt_prop_def,
     opt_result_def,
     result_def,
+    traits_def,
     var_operand_def,
 )
 
-from catalyst.python_interface.xdsl_extras import MemRefConstraint, TensorConstraint
+from catalyst.python_interface.xdsl_extras import AllTypesMatch, MemRefConstraint, TensorConstraint
 
-from ..attributes import ObservableSSAValue, ObservableType, QubitSSAValue, QubitType
+from ..attributes import ObservableSSAValue, ObservableType, QubitSSAValue, QubitTypeConstraint
 
 ##############################################
 ################ Base classes ################
@@ -59,7 +60,7 @@ class MeasureOp(IRDLOperation):
         $in_qubit (`postselect` $postselect^)? attr-dict `:` type(results)
     """
 
-    in_qubit = operand_def(QubitType)
+    in_qubit = operand_def(QubitTypeConstraint())
 
     postselect = opt_prop_def(
         IntegerAttr.constr(type=I32, value=IntSetConstraint(frozenset((0, 1))))
@@ -67,7 +68,14 @@ class MeasureOp(IRDLOperation):
 
     mres = result_def(i1)
 
-    out_qubit = result_def(QubitType)
+    out_qubit = result_def(QubitTypeConstraint())
+
+    traits = traits_def(
+        AllTypesMatch(
+            ("in_qubit", "out_qubit"),
+            "Qubit ins and outs must have the same size and types",
+        )
+    )
 
     def __init__(
         self, in_qubit: QubitSSAValue | Operation, postselect: int | IntegerAttr | None = None
@@ -81,7 +89,7 @@ class MeasureOp(IRDLOperation):
             properties = {"postselect": postselect}
 
         super().__init__(
-            operands=(in_qubit,), properties=properties, result_types=(i1, QubitType())
+            operands=(in_qubit,), properties=properties, result_types=(i1, in_qubit.type)
         )
 
 
