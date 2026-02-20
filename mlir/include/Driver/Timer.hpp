@@ -1,4 +1,4 @@
-// Copyright 2024 Xanadu Quantum Technologies Inc.
+// Copyright 2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,40 +13,79 @@
 // limitations under the License.
 #pragma once
 
+#include <bits/types/struct_timeval.h>
 #include <cassert>
-#include <cstdlib>
-
 #include <chrono>
+#include <concepts>
+#include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <ios>
 #include <iostream>
+#include <ratio>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <utility> // std::forward
-
-#include <ctime>
-
-// Note that this method returns CPU time on Linux/Unix-like systems,
-// and returns wall-clock time on Windows.
-static inline double getClock()
-{
-    // Convert results in ms
-    return static_cast<double>(1000.0 * std::clock() / CLOCKS_PER_SEC) * 0.001;
-}
 
 namespace catalyst::utils {
 
 /**
- * Timer: A utility class to measure the wall-time and CPU-time of code blocks.
+ * @brief std::ratio concept. Ensure the given types have `num` and `den` data for use with time
+ * scaling.
+ *
+ * @tparam T
+ */
+template <typename T>
+concept IsRatio = requires {
+    T::num;
+    T::den;
+    requires std::convertible_to<decltype(T::num), std::intmax_t>;
+    requires std::convertible_to<decltype(T::den), std::intmax_t>;
+};
+
+/**
+ * @brief Utility data-class for POSIX time abstractions with compile-time chosen output. Uses
+ * nanosecond-compatible POSIX clocks.
+ *
+ * @tparam duration std::ratio type to set output scale, matching std::chrono constants.
+ */
+template <IsRatio Duration = std::milli> class CPUTimeInstance {
+  public:
+    CPUTimeInstance() : t{} {}
+
+    /**
+     * @brief Return an fixed integer type casting of time values at the chosen precision.
+     *
+     * @return int64_t
+     */
+    int64_t getTime()
+    {
+        if (clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t) == 0) {
+            return static_cast<double>(t.tv_sec * Duration::den + t.tv_nsec);
+        }
+        return 0;
+    }
+
+  private:
+    timespec t;
+};
+
+template <IsRatio Duration = std::milli> static inline double getClock()
+{
+    CPUTimeInstance<std::nano> t;
+    return static_cast<double>(t.getTime()) * (Duration::den / std::nano::den);
+}
+
+/**
+ * Timer: A template-header utility class to measure the wall-time and CPU-time of code blocks.
  *
  * To display results, run the driver with the `ENABLE_DIAGNOSTICS=ON` variable.
  * To store results in YAML format, use `DIAGNOSTICS_RESULTS_PATH=/path/to/file.yml`
  * along with `ENABLE_DIAGNOSTICS=ON`.
  */
-class Timer {
+template <IsRatio Duration = std::milli> class Timer {
   private:
     // Toggle the support w.r.t. the value of `ENABLE_DIAGNOSTICS`
     bool debug_timer;
@@ -54,9 +93,9 @@ class Timer {
     // Manage the call order of `start` and `stop` methods
     bool running;
 
-    // Start and stop time points using steady_clock
-    std::chrono::time_point<std::chrono::steady_clock> start_wall_time_;
-    std::chrono::time_point<std::chrono::steady_clock> stop_wall_time_;
+    // Start and stop time points using high_resolution_clock
+    std::chrono::time_point<std::chrono::high_resolution_clock> start_wall_time_;
+    std::chrono::time_point<std::chrono::high_resolution_clock> stop_wall_time_;
 
     // Start and stop CPU Time using the system clock
     double start_cpu_time_;
@@ -76,8 +115,8 @@ class Timer {
     void start() noexcept
     {
         if (debug_timer) {
-            start_wall_time_ = std::chrono::steady_clock::now();
-            start_cpu_time_ = getClock();
+            start_wall_time_ = std::chrono::high_resolution_clock::now();
+            start_cpu_time_ = getClock<Duration>();
             running = true;
         }
     }
@@ -85,8 +124,8 @@ class Timer {
     void stop() noexcept
     {
         if (debug_timer && running) {
-            stop_cpu_time_ = getClock();
-            stop_wall_time_ = std::chrono::steady_clock::now();
+            stop_cpu_time_ = getClock<Duration>();
+            stop_wall_time_ = std::chrono::high_resolution_clock::now();
             running = false;
         }
     }
@@ -109,7 +148,8 @@ class Timer {
     {
         // Convert nanoseconds (long) to milliseconds (double)
         const auto wall_elapsed = static_cast<double>(elapsed().count()) / 1e6;
-        const auto cpu_elapsed = (stop_cpu_time_ - start_cpu_time_) * 1e+3;
+        const auto cpu_elapsed =
+            (stop_cpu_time_ - start_cpu_time_) * (Duration::den / std::nano::den);
 
         std::cerr << "[DIAGNOSTICS] Running " << std::setw(23) << std::left << name;
         std::cerr << "\t" << std::fixed << "walltime: " << std::setprecision(3) << wall_elapsed
@@ -125,7 +165,8 @@ class Timer {
     {
         // Convert nanoseconds (long) to milliseconds (double)
         const auto wall_elapsed = static_cast<double>(elapsed().count()) / 1e6;
-        const auto cpu_elapsed = (stop_cpu_time_ - start_cpu_time_) * 1e+3;
+        const auto cpu_elapsed =
+            (stop_cpu_time_ - start_cpu_time_) * (Duration::den / std::nano::den);
 
         const std::string_view key_padding = "          ";
         const std::string_view val_padding = "              ";
@@ -139,7 +180,6 @@ class Timer {
             ofile.close();
             return;
         }
-        // else
 
         // Second, update the file
         std::ofstream ofile(file_path, std::ios::app);
@@ -166,13 +206,14 @@ class Timer {
     }
 
     template <typename Function, typename... Args>
+        requires std::is_invocable_v<Function, Args...>
     static auto timer(Function func, const std::string &name, bool add_endl, Args &&...args)
     {
         if (!enable_debug_timer()) {
             return func(std::forward<Args>(args)...);
         }
 
-        Timer timer{};
+        Timer<Duration> timer{};
 
         timer.start();
         auto result = func(std::forward<Args>(args)...);

@@ -1,0 +1,43 @@
+CompileFlags:
+  Add: [-std=c++20]
+
+---
+
+If:
+  PathMatch: mlir/llvm-project/build/*
+
+CompileFlags:
+  CompilationDatabase: mlir/llvm-project/build
+
+---
+
+If:
+  PathMatch: mlir/build/*
+
+CompileFlags:
+  CompilationDatabase: mlir/build
+
+---
+
+If:
+  PathMatch: mlir/stablehlo/build/*
+
+CompileFlags:
+  CompilationDatabase: mlir/stablehlo/build
+
+---
+
+If:
+  PathMatch: mlir/Enzyme/build/*
+
+CompileFlags:
+  CompilationDatabase: mlir/Enzyme/build
+
+---
+
+If:
+  PathMatch: runtime/build/*
+
+CompileFlags:
+  CompilationDatabase: runtime/build
+

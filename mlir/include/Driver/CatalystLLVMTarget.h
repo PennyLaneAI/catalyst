@@ -20,7 +20,7 @@
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Support/LogicalResult.h"
 
-#include "CompilerDriver.h"
+#include "CompilerDriver.hpp"
 
 namespace catalyst {
 namespace driver {

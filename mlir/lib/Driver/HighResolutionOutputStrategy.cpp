@@ -15,11 +15,9 @@
 #include "Driver/HighResolutionOutputStrategy.h"
 #include "llvm/Support/Format.h"
 
-using namespace mlir;
-
 constexpr llvm::StringLiteral kTimingDescription = "... Execution time report ...";
 
-void HighResolutionOutputStrategy::printHeader(const TimeRecord &total)
+void HighResolutionOutputStrategy::printHeader(const mlir::TimeRecord &total)
 {
     // Figure out how many spaces to description name.
     unsigned padding = (80 - kTimingDescription.size()) / 2;
@@ -36,22 +34,25 @@ void HighResolutionOutputStrategy::printHeader(const TimeRecord &total)
 
 void HighResolutionOutputStrategy::printFooter() { os.flush(); }
 
-void HighResolutionOutputStrategy::printTime(const TimeRecord &time, const TimeRecord &total)
+void HighResolutionOutputStrategy::printTime(const mlir::TimeRecord &time,
+                                             const mlir::TimeRecord &total)
 {
     if (total.user != total.wall) {
         os << llvm::format("  %10.9f (%5.1f%%)", time.user, 100.0 * time.user / total.user);
     }
     os << llvm::format("  %10.9f (%5.1f%%)  ", time.wall, 100.0 * time.wall / total.wall);
 }
-void HighResolutionOutputStrategy::printListEntry(llvm::StringRef name, const TimeRecord &time,
-                                                  const TimeRecord &total, bool lastEntry)
+void HighResolutionOutputStrategy::printListEntry(llvm::StringRef name,
+                                                  const mlir::TimeRecord &time,
+                                                  const mlir::TimeRecord &total, bool lastEntry)
 {
     printTime(time, total);
     os << name << "\n";
 }
 
 void HighResolutionOutputStrategy::printTreeEntry(unsigned indent, llvm::StringRef name,
-                                                  const TimeRecord &time, const TimeRecord &total)
+                                                  const mlir::TimeRecord &time,
+                                                  const mlir::TimeRecord &total)
 {
     printTime(time, total);
     os.indent(indent) << name << "\n";
