@@ -275,7 +275,6 @@
   Computation rather than general quantum error correction.
   [(#2482)](https://github.com/PennyLaneAI/catalyst/pull/2482)
   [(#2485)](https://github.com/PennyLaneAI/catalyst/pull/2485)
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
 
 * Updated the integration tests for `qp.specs` to get coverage for new features
   [(#2448)](https://github.com/PennyLaneAI/catalyst/pull/2448)
