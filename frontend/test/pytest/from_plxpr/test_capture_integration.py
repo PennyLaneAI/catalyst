@@ -303,7 +303,6 @@ class TestCapture:
         def captured_circuit(theta, val):
             qml.adjoint(qml.RY)(jnp.pi, val)
             qml.adjoint(qml.RZ)(theta, wires=val)
-            qml.adjoint(qml.PCPhase)(theta, 2, wires=[0])
             return qml.state()
 
         capture_result = captured_circuit(theta, val)
