@@ -354,7 +354,7 @@ class TestCapture:
     def test_ctrl_pcphase(self, backend, theta):
         """Test the integration for a PCPhase circuit with control."""
         if backend == "lightning.kokkos":
-            pytest.xfail(reason="PCPhase not yet implemented on Kokkos.")
+            pytest.xfail(reason="Controlled PCPhase not yet implemented on Kokkos.")
 
         device = qml.device(backend, wires=3)
 
