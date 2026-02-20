@@ -223,6 +223,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fix a bug in the bind call function for `PCPhase` where the signature did not match what was 
+  expected in `jax_primitives`. `ctrl_qubits` was missing from positional arguments in previous signature.
+  [(#2467)](https://github.com/PennyLaneAI/catalyst/pull/2467)
+
 * Fix `CATALYST_XDSL_UNIVERSE` to correctly define the available dialects and transforms, allowing
   tools like `xdsl-opt` to work with Catalyst's custom Python dialects.
   [(#2471)](https://github.com/PennyLaneAI/catalyst/pull/2471)
@@ -424,6 +428,7 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
 Yushao Chen,
+Marcus Edwards,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
