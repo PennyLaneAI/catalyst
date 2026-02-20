@@ -628,7 +628,7 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
 
     def setup_inputs(epsilon=epsilon, ppr_basis=ppr_basis):
         return (), {"epsilon": epsilon, "ppr_basis": ppr_basis}
-    
+
     return qml.transform(pass_name="gridsynth", setup_inputs=setup_inputs)(qnode)
 
 
@@ -821,6 +821,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
 
     def setup_inputs(max_pauli_size=max_pauli_size):
         return (), {"max_pauli_size": max_pauli_size}
+
     return qml.transform(pass_name="commute-ppr", setup_inputs=setup_inputs)(qnode)
 
 
@@ -916,6 +917,7 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
 
     def setup_inputs(max_pauli_size=max_pauli_size):
         return (), {"max_pauli_size": max_pauli_size}
+
     return qml.transform(pass_name="merge-ppr-ppm", setup_inputs=setup_inputs)(qnode)
 
 
@@ -999,6 +1001,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
 
     def setup_inputs(decompose_method=decompose_method, avoid_y_measure=avoid_y_measure):
         return (), {"decompose_method": decompose_method, "avoid_y_measure": avoid_y_measure}
+
     return qml.transform(pass_name="ppr-to-ppm", setup_inputs=setup_inputs)(qnode)
 
 
@@ -1112,8 +1115,17 @@ def ppm_compilation(
             max_pauli_size=max_pauli_size,
         )
 
-    def setup_inputs(decompose_method=decompose_method, avoid_y_measure=avoid_y_measure, max_pauli_size=max_pauli_size):
-        return (), {"decompose_method": decompose_method, "avoid_y_measure": avoid_y_measure, "max_pauli_size": max_pauli_size}
+    def setup_inputs(
+        decompose_method=decompose_method,
+        avoid_y_measure=avoid_y_measure,
+        max_pauli_size=max_pauli_size,
+    ):
+        return (), {
+            "decompose_method": decompose_method,
+            "avoid_y_measure": avoid_y_measure,
+            "max_pauli_size": max_pauli_size,
+        }
+
     return qml.transform(pass_name="ppm-compilation", setup_inputs=setup_inputs)(qnode)
 
 
