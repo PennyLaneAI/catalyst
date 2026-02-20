@@ -31,7 +31,7 @@ class TestSplitNonCommutingPass:
         """Test split non-commuting pass would be applied to a func with a qnode attribute."""
         program = """
             module @module_circuit {
-                func.func public @circuit() -> tensor<f64> attributes {qnode} {
+                func.func public @circuit() -> tensor<f64> attributes {quantum.node} {
                     // CHECK-NOT: arith.constant
                     // CHECK: [[value:%.+]] = func.call [[dup_func:@[a-zA-Z0-9_.]+]]
                     // CHECK: func.return [[value]]
@@ -59,7 +59,7 @@ class TestSplitNonCommutingPass:
         """Test split non-commuting pass would be applied to a func with a qnode attribute."""
         program = """
             module @module_circuit {
-                func.func public @circuit1() -> tensor<f64> attributes {qnode} {
+                func.func public @circuit1() -> tensor<f64> attributes {quantum.node} {
                     // CHECK-NOT: arith.constant
                     // CHECK: [[value:%.+]] = func.call [[dup_func1:@[a-zA-Z0-9_.]+]]
                     // CHECK: func.return [[value]]
@@ -76,7 +76,7 @@ class TestSplitNonCommutingPass:
                     quantum.device_release
                     return %from_elements : tensor<f64>
                 }
-                func.func public @circuit2() -> tensor<f64> attributes {qnode} {
+                func.func public @circuit2() -> tensor<f64> attributes {quantum.node} {
                     // CHECK-NOT: arith.constant
                     // CHECK: [[value:%.+]] = func.call [[dup_func2:@[a-zA-Z0-9_.]+]]
                     // CHECK: func.return [[value]]
@@ -105,7 +105,7 @@ class TestSplitNonCommutingPass:
         """Test split non-commuting pass would be applied to a func with commuting ops."""
         program = """
             module @module_circuit {
-                func.func public @circuit() -> (tensor<f64>, tensor<f64>) attributes {qnode} {
+                func.func public @circuit() -> (tensor<f64>, tensor<f64>) attributes {quantum.node} {
                     // CHECK-NOT: arith.constant
                     // CHECK: [[v0:%.+]], [[v1:%.+]] = func.call [[dup_func:@[a-zA-Z0-9_.]+]]
                     // CHECK: func.return [[v0]], [[v1]]
@@ -139,7 +139,7 @@ class TestSplitNonCommutingPass:
         """Test split non-commuting pass would be applied to a func with non-commuting ops."""
         program = """
             module @module_circuit {
-                func.func public @circuit() -> (tensor<f64>, tensor<f64>) attributes {qnode} {
+                func.func public @circuit() -> (tensor<f64>, tensor<f64>) attributes {quantum.node} {
                     // CHECK-NOT: arith.constant
                     // CHECK: [[v0:%.+]] = func.call [[dup_func0:@[a-zA-Z0-9_.]+]]
                     // CHECK: [[v1:%.+]] = func.call [[dup_func1:@[a-zA-Z0-9_.]+]]
@@ -177,7 +177,7 @@ class TestSplitNonCommutingPass:
         """Test split non-commuting pass would be applied to a func with mixed ops."""
         program = """
             module @module_circuit {
-                func.func public @circuit() -> (tensor<f64>, tensor<f64>) attributes {qnode} {
+                func.func public @circuit() -> (tensor<f64>, tensor<f64>) attributes {quantum.node} {
                     // CHECK-NOT: arith.constant
                     // CHECK: [[v0:%.+]], [[v1:%.+]] = func.call [[dup_func0:@[a-zA-Z0-9_.]+]]
                     // CHECK: [[v2:%.+]] = func.call [[dup_func1:@[a-zA-Z0-9_.]+]]

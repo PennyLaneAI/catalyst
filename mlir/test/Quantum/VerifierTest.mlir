@@ -473,3 +473,36 @@ func.func @state_good(%q0 : !quantum.bit, %q1 : !quantum.bit, %c : i64, %in_stat
     quantum.state %obs shape %c : tensor<?xcomplex<f64>>
     return
 }
+
+// -----
+
+func.func @expval_and_var_good(%q : !quantum.bit) attributes {quantum.node} {
+    %obs = quantum.namedobs %q[PauliX] : !quantum.obs
+    %exp = quantum.expval %obs : f64
+    %var = quantum.var %obs : f64
+    return
+}
+
+// -----
+
+module {
+func.func @measurement_without_qnode(%q : !quantum.bit) {
+    %obs = quantum.namedobs %q[PauliZ] : !quantum.obs
+    // expected-error@+1 {{requires parent function to carry 'quantum.node' attribute}}
+    %exp = quantum.expval %obs : f64
+    return
+}
+}
+
+// -----
+
+// COM: e.xpected-error @below {{attribute 'quantum.node' requires at least one measurement process operation in the function body}}
+func.func @qnode_without_measurement(%q : !quantum.bit) attributes {quantum.node} {
+    %obs = quantum.namedobs %q[PauliZ] : !quantum.obs
+    return
+}
+
+// -----
+
+// expected-error @below {{attribute 'quantum.node' is only valid on 'func.func'}}
+%c0 = "arith.constant"() {value = 0 : i64, quantum.node} : () -> i64
