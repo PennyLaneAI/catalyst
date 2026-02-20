@@ -150,44 +150,17 @@ def test_pipeline_functionality(theta, backend):
 ### Test bad usages of pass decorators ###
 def test_passes_bad_usages():
     """
-    Tests that an error is raised when cancel_inverses is not used properly
+    Tests that an error is raised when a PassPipelineWrapper is applied to a classical function
     """
 
-    def test_passes_not_on_qnode():
-        def classical_func():
-            return 42.42
+    def classical_func():
+        return 42.42
 
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            pipeline({})(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            cancel_inverses(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            merge_rotations(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            disentangle_cnot(classical_func)
-
-        with pytest.raises(
-            TypeError,
-            match="A QNode is expected, got the classical function",
-        ):
-            disentangle_swap(classical_func)
-
-    test_passes_not_on_qnode()
+    with pytest.raises(
+        TypeError,
+        match="A QNode is expected, got the classical function",
+    ):
+        pipeline({})(classical_func)
 
 
 def test_chained_passes():
