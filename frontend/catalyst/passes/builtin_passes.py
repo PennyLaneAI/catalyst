@@ -821,7 +821,7 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
 
     def setup_inputs(max_pauli_size=max_pauli_size):
         return (), {"max_pauli_size": max_pauli_size}
-    return qml.transform(pass_name="commute_ppr", setup_inputs=setup_inputs)(qnode)
+    return qml.transform(pass_name="commute-ppr", setup_inputs=setup_inputs)(qnode)
 
 
 def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
@@ -916,7 +916,7 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
 
     def setup_inputs(max_pauli_size=max_pauli_size):
         return (), {"max_pauli_size": max_pauli_size}
-    return qml.transform(pass_name="merge_ppr_ppm", setup_inputs=setup_inputs)(qnode)
+    return qml.transform(pass_name="merge-ppr-ppm", setup_inputs=setup_inputs)(qnode)
 
 
 def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measure=False):
@@ -999,7 +999,7 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
 
     def setup_inputs(decompose_method=decompose_method, avoid_y_measure=avoid_y_measure):
         return (), {"decompose_method": decompose_method, "avoid_y_measure": avoid_y_measure}
-    return qml.transform(pass_name="ppr_to_ppm", setup_inputs=setup_inputs)(qnode)
+    return qml.transform(pass_name="ppr-to-ppm", setup_inputs=setup_inputs)(qnode)
 
 
 def ppm_compilation(
