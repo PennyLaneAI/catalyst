@@ -31,7 +31,7 @@ from pennylane.capture.primitives import adjoint_transform_prim as plxpr_adjoint
 from pennylane.capture.primitives import ctrl_transform_prim as plxpr_ctrl_transform_prim
 from pennylane.capture.primitives import measure_prim as plxpr_measure_prim
 from pennylane.capture.primitives import pauli_measure_prim as plxpr_pauli_measure_prim
-from pennylane.capture.primitives import transform_prim
+from pennylane.capture.primitives import quantum_subroutine_prim, transform_prim
 from pennylane.ftqc.primitives import measure_in_basis_prim as plxpr_measure_in_basis_prim
 from pennylane.measurements import CountsMP
 
@@ -48,6 +48,7 @@ from catalyst.jax_primitives import (
     gphase_p,
     hamiltonian_p,
     hermitian_p,
+    mcmobs_p,
     measure_in_basis_p,
     measure_p,
     namedobs_p,
@@ -57,7 +58,6 @@ from catalyst.jax_primitives import (
     qalloc_p,
     qdealloc_p,
     qinst_p,
-    quantum_subroutine_p,
     sample_p,
     set_basis_state_p,
     set_state_p,
@@ -226,6 +226,31 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             self.init_qreg.insert_all_dangling_qubits()
             return compbasis_p.bind(self.init_qreg.get(), qreg_available=True)
 
+    def _check_measurement_with_dynamic_allocation(self, measurement):
+        """Check some constraints regarding dynamic allocation."""
+        if self.has_dynamic_allocation:
+            if len(measurement.wires) == 0 and not isinstance(
+                measurement, qml.measurements.StateMP
+            ):
+                raise CompileError(
+                    textwrap.dedent(
+                        """
+                        Terminal measurements must take in an explicit list of wires when
+                        dynamically allocated wires are present in the program.
+                        """
+                    )
+                )
+
+            if any(is_dynamically_allocated_wire(w) for w in measurement.wires):
+                raise CompileError(
+                    textwrap.dedent(
+                        """
+                        Terminal measurements cannot take in dynamically allocated wires
+                        since they must be temporary.
+                        """
+                    )
+                )
+
     # pylint: disable=too-many-branches
     def interpret_measurement(self, measurement):
         """Rebind a measurement as a catalyst instruction.
@@ -236,39 +261,7 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
         Returns:
             AbstractQbit: The resulting measurement value.
         """
-        if self.has_dynamic_allocation:
-            if len(measurement.wires) == 0:
-                raise CompileError(
-                    textwrap.dedent(
-                        """
-                        Terminal measurements must take in an explicit list of wires when
-                        dynamically allocated wires are present in the program.
-                        """
-                    )
-                )
-            if any(is_dynamically_allocated_wire(w) for w in measurement.wires):
-                raise CompileError(
-                    textwrap.dedent(
-                        """
-                        Terminal measurements cannot take in dynamically allocated wires
-                        since they must be temporary.
-                        """
-                    )
-                )
-            # Only probs measurements are currently supported with dynamic allocation
-            # due to a bug in Lightning's PartialSample implementation
-            # TODO: Remove this once the bug is fixed
-            if not isinstance(measurement, qml.measurements.ProbabilityMP):
-                raise CompileError(
-                    textwrap.dedent(
-                        """
-                        Only probability measurements (qml.probs) are currently supported
-                        when dynamic allocations are present in the program. Other measurement
-                        types (qml.sample, qml.expval, qml.var, ...etc) will be supported
-                        in a future release after the underlying bug is fixed.
-                        """
-                    )
-                )
+        self._check_measurement_with_dynamic_allocation(measurement)
 
         if type(measurement) not in measurement_map:
             raise NotImplementedError(
@@ -279,28 +272,34 @@ class PLxPRToQuantumJaxprInterpreter(PlxprInterpreter):
             raise NotImplementedError(
                 "from_plxpr does not yet support measurements with manual eigvals."
             )
-        if (
-            measurement.mv is not None
-            or measurement.obs is not None
-            and not isinstance(measurement.obs, qml.operation.Operator)
-        ):
-            raise NotImplementedError("Measurements of mcms are not yet supported.")
-
-        if measurement.obs:
-            obs = self._obs(measurement.obs)
-        else:
-            obs = self._compbasis_obs(*measurement.wires)
-
-        shape, dtype = measurement._abstract_eval(
-            n_wires=len(measurement.wires),
-            shots=self.shots,
-            num_device_wires=len(self.device.wires),
-        )
 
         prim = measurement_map[type(measurement)]
+        mcm_mv = measurement.mv
+        mcm_obs = measurement.obs
+        mp_is_on_mcm = (mcm_mv is not None) or (
+            mcm_obs is not None and not isinstance(mcm_obs, qml.operation.Operator)
+        )
+
+        if mp_is_on_mcm:
+            mcm_list = mcm_mv if isinstance(mcm_mv, list) else [mcm_mv]
+            obs = mcmobs_p.bind(*mcm_list)
+            n_wires = len(mcm_list)
+            _abstract_eval_kwargs = {}
+        else:
+            obs = self._obs(mcm_obs) if mcm_obs else self._compbasis_obs(*measurement.wires)
+            n_wires = len(measurement.wires)
+            _abstract_eval_kwargs = {"num_device_wires": len(self.device.wires)}
+
+        shape, dtype = measurement._abstract_eval(
+            n_wires=n_wires, shots=self.shots, **_abstract_eval_kwargs
+        )
+
         if prim is sample_p:
-            num_qubits = len(measurement.wires) or len(self.device.wires)
-            sample_shape = (self.shots, num_qubits)
+            if mp_is_on_mcm:
+                sample_shape = (self.shots, n_wires)
+            else:
+                num_qubits = len(measurement.wires) or len(self.device.wires)
+                sample_shape = (self.shots, num_qubits)
             dyn_dims, static_shape = jax._src.lax.lax._extract_tracers_dyn_shape(sample_shape)
             mval = sample_p.bind(obs, *dyn_dims, static_shape=tuple(static_shape))
         elif prim in {expval_p, var_p}:
@@ -442,6 +441,16 @@ def interpret_counts(self, *wires, all_outcomes):
     return keys, vals
 
 
+# pylint: disable=unused-argument
+@PLxPRToQuantumJaxprInterpreter.register_primitive(CountsMP._mcm_primitive)
+def interpret_counts_mcm(self, *mcms, single_mcm, all_outcomes):
+    """Interpret a CountsMP MCM primitive as the catalyst version."""
+    obs = mcmobs_p.bind(*mcms)
+    keys, vals = counts_p.bind(obs, static_shape=(2 ** len(mcms),))
+    keys = jax.lax.convert_element_type(keys, int)
+    return keys, vals
+
+
 def _subroutine_kernel(
     interpreter,
     jaxpr,
@@ -503,7 +512,7 @@ def _subroutine_kernel(
     return converter.init_qreg.get(), *retvals
 
 
-@PLxPRToQuantumJaxprInterpreter.register_primitive(quantum_subroutine_p)
+@PLxPRToQuantumJaxprInterpreter.register_primitive(quantum_subroutine_prim)
 def handle_subroutine(self, *args, **kwargs):
     """
     Transform the subroutine from PLxPR into JAXPR with quantum primitives.
@@ -550,7 +559,7 @@ def handle_subroutine(self, *args, **kwargs):
 
     # quantum_subroutine_p.bind
     # is just pjit_p with a different name.
-    vals_out = quantum_subroutine_p.bind(
+    vals_out = quantum_subroutine_prim.bind(
         self.init_qreg.get(),
         *[dyn_qreg.get() for dyn_qreg in dynalloced_qregs],
         *new_args,

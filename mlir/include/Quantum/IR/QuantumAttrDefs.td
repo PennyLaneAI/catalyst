@@ -43,7 +43,7 @@ def QubitLevel : I32EnumAttr<"QubitLevel",
     [
         I32EnumAttrCase<"Abstract", 0, "abstract">,
         I32EnumAttrCase<"Logical",  1, "logical">,
-        I32EnumAttrCase<"QEC",      2, "qec">,
+        I32EnumAttrCase<"PBC",      2, "pbc">,
         I32EnumAttrCase<"Physical", 3, "physical">,
     ]> {
     let cppNamespace = "catalyst::quantum";
