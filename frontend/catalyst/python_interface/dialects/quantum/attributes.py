@@ -43,7 +43,7 @@ class QubitLevel(StrEnum):
 
     Abstract = "abstract"
     Logical = "logical"
-    PBC = "pbc"
+    QEC = "qec"
     Physical = "physical"
 
 
@@ -122,9 +122,9 @@ class QubitType(ParametrizedAttribute, TypeAttribute):
                 f"are {list(QubitRole.__members__.values())}."
             )
 
-        if role != QubitRole.Null and level not in (QubitLevel.PBC, QubitLevel.Physical):
+        if role != QubitRole.Null and level not in (QubitLevel.QEC, QubitLevel.Physical):
             raise VerifyException(
-                f"Qubit role {role} is only permitted for pbc and physical qubits. "
+                f"Qubit role {role} is only permitted for QEC and physical qubits. "
                 f"Found level {level}."
             )
 

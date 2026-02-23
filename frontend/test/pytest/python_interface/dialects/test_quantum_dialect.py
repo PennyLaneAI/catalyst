@@ -317,7 +317,7 @@ class TestQubitType:
         [
             (None, StringAttr("abstract")),
             ("abstract", StringAttr("abstract")),
-            ("pbc", StringAttr("pbc")),
+            ("qec", StringAttr("qec")),
             ("physical", StringAttr("physical")),
             ("logical", StringAttr("logical")),
         ],
@@ -334,7 +334,7 @@ class TestQubitType:
     )
     def test_constructor(self, level, expected_level, role, expected_role):
         """Test that the parameters of QubitType are correct with defaults."""
-        if level not in (QubitLevel.PBC, QubitLevel.Physical) and role != QubitRole.Null:
+        if level not in (QubitLevel.QEC, QubitLevel.Physical) and role != QubitRole.Null:
             pytest.skip("Unsupported combination of level and role.")
 
         args = {}
@@ -371,7 +371,7 @@ class TestQubitType:
             (QubitType(), "!quantum.bit"),
             (QubitType(level="abstract", role="null"), "!quantum.bit"),
             (QubitType(level="physical"), "!quantum.bit<physical>"),
-            (QubitType(level="pbc", role="data"), "!quantum.bit<pbc, data>"),
+            (QubitType(level="qec", role="data"), "!quantum.bit<qec, data>"),
         ],
     )
     @pytest.mark.parametrize("generic", [True, False])
@@ -455,10 +455,10 @@ class TestQubitType:
                 QubitType(level="physical"),
                 'Unexpected attribute "physical"',
             ),
-            (QubitTypeConstraint(role_constr=["data"]), QubitType(level="pbc", role="data"), None),
+            (QubitTypeConstraint(role_constr=["data"]), QubitType(level="qec", role="data"), None),
             (
                 QubitTypeConstraint(role_constr=["data"]),
-                QubitType(level="pbc", role="xcheck"),
+                QubitType(level="qec", role="xcheck"),
                 'Unexpected attribute "xcheck"',
             ),
             (
@@ -473,8 +473,8 @@ class TestQubitType:
             ),
             (
                 QubitTypeConstraint(level_constr=["physical"], role_constr=["xcheck"]),
-                QubitType(level="pbc", role="xcheck"),
-                'Unexpected attribute "pbc"',
+                QubitType(level="qec", role="xcheck"),
+                'Unexpected attribute "qec"',
             ),
             (
                 QubitTypeConstraint(level_constr=["abstract", "logical"]),
@@ -488,12 +488,12 @@ class TestQubitType:
             ),
             (
                 QubitTypeConstraint(role_constr=["null", "data"]),
-                QubitType(level="pbc", role="null"),
+                QubitType(level="qec", role="null"),
                 None,
             ),
             (
                 QubitTypeConstraint(role_constr=["null", "data"]),
-                QubitType(level="pbc", role="xcheck"),
+                QubitType(level="qec", role="xcheck"),
                 'Unexpected attribute "xcheck"',
             ),
             (
@@ -514,8 +514,8 @@ class TestQubitType:
                 QubitTypeConstraint(
                     level_constr=["abstract", "physical"], role_constr=["null", "data"]
                 ),
-                QubitType(level="pbc", role="xcheck"),
-                'Unexpected attribute "pbc"',
+                QubitType(level="qec", role="xcheck"),
+                'Unexpected attribute "qec"',
             ),
         ],
     )
@@ -536,7 +536,7 @@ class TestQuregType:
         [
             (None, StringAttr("abstract")),
             ("abstract", StringAttr("abstract")),
-            ("pbc", StringAttr("pbc")),
+            ("qec", StringAttr("qec")),
             ("physical", StringAttr("physical")),
             ("logical", StringAttr("logical")),
         ],
@@ -616,7 +616,7 @@ class TestQuregType:
             (QuregTypeConstraint(), True),
             (QuregTypeConstraint(level_constr=["logical"]), True),
             (QuregTypeConstraint(level_constr=["abstract", "logical"]), False),
-            (QuregTypeConstraint(level_constr=["abstract", "logical", "physical", "pbc"]), True),
+            (QuregTypeConstraint(level_constr=["abstract", "logical", "physical", "qec"]), True),
         ],
     )
     def test_constraint_can_infer(self, constr, can_infer):
@@ -629,7 +629,7 @@ class TestQuregType:
             (QuregTypeConstraint(), QuregType()),
             (QuregTypeConstraint(level_constr=["logical"]), QuregType(level="logical")),
             (
-                QuregTypeConstraint(level_constr=["abstract", "logical", "pbc", "physical"]),
+                QuregTypeConstraint(level_constr=["abstract", "logical", "qec", "physical"]),
                 QuregType(level="abstract"),
             ),
         ],
@@ -729,12 +729,12 @@ class TestAssemblyFormat:
         %qb_level0 = "test.op"() : () -> !quantum.bit<logical>
         // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<physical>
         %qb_level1 = "test.op"() : () -> !quantum.bit<physical>
-        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<pbc>
-        %qb_level2 = "test.op"() : () -> !quantum.bit<pbc>
+        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<qec>
+        %qb_level2 = "test.op"() : () -> !quantum.bit<qec>
 
         //// Multiple args ////
-        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<pbc, data>
-        %qb_mul0 = "test.op"() : () -> !quantum.bit<pbc, data>
+        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<qec, data>
+        %qb_mul0 = "test.op"() : () -> !quantum.bit<qec, data>
         // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<physical, xcheck>
         %qb_mul1 = "test.op"() : () -> !quantum.bit<physical, xcheck>
         """
