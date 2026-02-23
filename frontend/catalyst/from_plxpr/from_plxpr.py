@@ -293,8 +293,25 @@ def handle_qnode(
     )
 
     graph_succeeded = False
-    if self.requires_decompose_lowering:
-
+    if stopping_condition := self.decompose_tkwargs.get("stopping_condition"):
+        # Use the plxpr decompose transform and ignore graph decomposition
+        # See https://github.com/PennyLaneAI/catalyst/pull/2472.
+        closed_jaxpr = _apply_compiler_decompose_to_plxpr(
+            inner_jaxpr=qfunc_jaxpr,
+            consts=consts,
+            ncargs=non_const_args,
+            tkwargs={"gate_set": self.decompose_tkwargs.get("gate_set", [])},
+            stopping_condition=stopping_condition,
+        )
+    elif not qml.decomposition.enabled_graph() and self.requires_decompose_lowering:
+        # Use the plxpr decompose transform when graph is disabled
+        closed_jaxpr = _apply_compiler_decompose_to_plxpr(
+            inner_jaxpr=qfunc_jaxpr,
+            consts=consts,
+            ncargs=non_const_args,
+            tkwargs={"gate_set": self.decompose_tkwargs.get("gate_set", [])},
+        )
+    elif qml.decomposition.enabled_graph() and self.requires_decompose_lowering:
         closed_jaxpr, graph_succeeded = _collect_and_compile_graph_solutions(
             inner_jaxpr=closed_jaxpr.jaxpr,
             consts=closed_jaxpr.consts,
@@ -370,6 +387,11 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     else:
         raise NotImplementedError("Multiple decomposition transforms are not yet supported.")
 
+
+# pylint: disable=too-many-positional-arguments
+def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs, use_graph=True):
+    _set_decompose_lowering_state(self)
+
     next_eval = copy(self)
     # Update the decompose_gateset to be used by the quantum kernel primitive
     # TODO: we originally wanted to treat decompose_gateset as a queue of
@@ -387,9 +409,10 @@ def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwar
     # in the qnode handler.
 
     # Add the decompose-lowering pass to the start of the pipeline
-    t = qml.transform(pass_name="decompose-lowering")
-    pass_container = qml.transforms.core.TransformContainer(t)
-    next_eval._pass_pipeline.insert(0, pass_container)
+    if use_graph:
+        t = qml.transform(pass_name="decompose-lowering")
+        pass_container = qml.transforms.core.TransformContainer(t)
+        next_eval._pass_pipeline.insert(0, pass_container)
 
     # We still need to construct and solve the graph based on
     # the current jaxpr based on the current gateset
@@ -426,12 +449,12 @@ def handle_transform(
 
     # If the transform is a decomposition transform
     # and the graph-based decomposition is enabled
-    if (
-        hasattr(transform._plxpr_transform, "__name__")
-        and transform._plxpr_transform.__name__ == "decompose_plxpr_to_plxpr"
-        and qml.decomposition.enabled_graph()
-    ):
-        return _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs)
+    transform_name = getattr(transform._plxpr_transform, "__name__", None)
+    if transform_name == "decompose_plxpr_to_plxpr":
+        use_graph = qml.decomposition.enabled_graph()
+        return _handle_decompose_transform(
+            self, inner_jaxpr, consts, non_const_args, tkwargs, use_graph
+        )
 
     catalyst_pass_name = transform.pass_name
     if catalyst_pass_name is None:
@@ -546,7 +569,9 @@ def trace_from_pennylane(
     return jaxpr, out_type, out_treedef, sig
 
 
-def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=None, tkwargs=None):
+def _apply_compiler_decompose_to_plxpr(
+    inner_jaxpr, consts, ncargs, tgateset=None, tkwargs=None, stopping_condition=None
+):
     """Apply the compiler-specific decomposition for a given JAXPR.
 
     This function first disables the graph-based decomposition optimization
@@ -580,16 +605,24 @@ def _apply_compiler_decompose_to_plxpr(inner_jaxpr, consts, ncargs, tgateset=Non
     # Besides, the graph-based decomposition is not supported
     # yet in from_plxpr for most gates and templates.
     # TODO: Enable the graph-based decomposition
-    qml.decomposition.disable_graph()
+    graph_enabled = qml.decomposition.enabled_graph()
+
+    if graph_enabled:
+        qml.decomposition.disable_graph()
 
     kwargs = (
         {"gate_set": set(COMPILER_OPS_FOR_DECOMPOSITION.keys()).union(tgateset)}
         if tgateset
         else tkwargs
     )
+
+    if stopping_condition:
+        kwargs["stopping_condition"] = stopping_condition
+
     final_jaxpr = qml.transforms.decompose.plxpr_transform(inner_jaxpr, consts, (), kwargs, *ncargs)
 
-    qml.decomposition.enable_graph()
+    if graph_enabled:
+        qml.decomposition.enable_graph()
 
     return final_jaxpr
 
