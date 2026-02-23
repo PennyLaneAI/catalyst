@@ -262,6 +262,10 @@ void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp,
                                                                  qubitResultsType);
         vGateOp->setAttr("resultSegmentSizes", getResultSegmentSizes(builder, rGateOp));
     }
+    else if (isa<qref::GlobalPhaseOp>(rGateOp)) {
+        vGateOp = migrateOpToValueSemantics<quantum::GlobalPhaseOp>(builder, rGateOp, currentQubits,
+                                                                    qubitResultsType);
+    }
 
     for (auto [i, qubitReference] : llvm::enumerate(rGateOp.getQubitOperands())) {
         currentQubits[qubitReference] = vGateOp.getQubitResults()[i];
@@ -301,35 +305,44 @@ struct ValueSemanticsConversionPass
         // Location loc = mod->getLoc();
         IRRewriter builder(mod->getContext());
 
-        // This map tracks: qref.bit Value -> current quantum.bit Value
-        llvm::DenseMap<Value, Value> currentQubits;
-
-        // This map tracks: qref.reg Value -> current quantum.reg Value
-        llvm::DenseMap<Value, Value> currentQuregs;
-
-        mod->walk<WalkOrder::PreOrder>([&](Operation *op) {
-            if (auto rAllocOp = dyn_cast<qref::AllocOp>(op)) {
-                handleAlloc(builder, rAllocOp, currentQuregs);
-            }
-            else if (auto getOp = dyn_cast<qref::GetOp>(op)) {
-                handleGet(builder, getOp, currentQubits, currentQuregs);
-            }
-            else if (auto rGateOp = dyn_cast<qref::QuantumOperation>(op)) {
-                handleGate(builder, rGateOp, currentQubits);
-            }
-            else if (auto rNamedObsOp = dyn_cast<qref::NamedObsOp>(op)) {
-                handleNamedObs(builder, rNamedObsOp, currentQubits);
-            }
-            else if (auto rDeallocOp = dyn_cast<qref::DeallocOp>(op)) {
-                handleDealloc(builder, rDeallocOp, currentQubits, currentQuregs);
-            }
+        // Collect all qnode functions.
+        // We find qnode functions by identifying the parent function ops of MPs
+        SetVector<func::FuncOp> qnodeFuncs;
+        mod->walk([&](quantum::MeasurementProcess _mp) {
+            qnodeFuncs.insert(_mp->getParentOfType<func::FuncOp>());
         });
 
-        for (auto pair : currentQubits) {
-            builder.eraseOp(pair.first.getDefiningOp());
-        }
-        for (auto pair : currentQuregs) {
-            builder.eraseOp(pair.first.getDefiningOp());
+        for (auto qnodeFunc : qnodeFuncs) {
+            // This map tracks: qref.bit Value -> current quantum.bit Value
+            llvm::DenseMap<Value, Value> currentQubits;
+
+            // This map tracks: qref.reg Value -> current quantum.reg Value
+            llvm::DenseMap<Value, Value> currentQuregs;
+
+            qnodeFunc->walk<WalkOrder::PreOrder>([&](Operation *op) {
+                if (auto rAllocOp = dyn_cast<qref::AllocOp>(op)) {
+                    handleAlloc(builder, rAllocOp, currentQuregs);
+                }
+                else if (auto getOp = dyn_cast<qref::GetOp>(op)) {
+                    handleGet(builder, getOp, currentQubits, currentQuregs);
+                }
+                else if (auto rGateOp = dyn_cast<qref::QuantumOperation>(op)) {
+                    handleGate(builder, rGateOp, currentQubits);
+                }
+                else if (auto rNamedObsOp = dyn_cast<qref::NamedObsOp>(op)) {
+                    handleNamedObs(builder, rNamedObsOp, currentQubits);
+                }
+                else if (auto rDeallocOp = dyn_cast<qref::DeallocOp>(op)) {
+                    handleDealloc(builder, rDeallocOp, currentQubits, currentQuregs);
+                }
+            });
+
+            for (auto pair : currentQubits) {
+                builder.eraseOp(pair.first.getDefiningOp());
+            }
+            for (auto pair : currentQuregs) {
+                builder.eraseOp(pair.first.getDefiningOp());
+            }
         }
     }
 };
