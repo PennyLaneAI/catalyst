@@ -97,6 +97,7 @@ COMPILER_OPS_FOR_DECOMPOSITION: dict[str, tuple[int, int]] = {
 }
 
 
+# pylint: disable=too-many-instance-attributes
 class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
     """Interpreter for getting the decomposition graph solution
     from a jaxpr when program capture is enabled.
@@ -148,6 +149,8 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
         self._captured = False
         self._operations = set()
         self._decomp_graph_solution = {}
+        self.subroutine_cache = {}
+        # This will be consumed by _quantum_subroutine inherited from PlxprInterpreter
 
     def interpret_operation(self, op: "qml.operation.Operator"):
         """Interpret a PennyLane operation instance.
@@ -227,7 +230,6 @@ class DecompRuleInterpreter(qml.capture.PlxprInterpreter):
                     num_wires = len(pauli_word)
                 elif num_wires == -1 and op_num_wires is not None:
                     num_wires = op_num_wires
-
                 _create_decomposition_rule(
                     rule,
                     op_name=op.op.name,
