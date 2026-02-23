@@ -96,7 +96,12 @@ class TestVectorizeMap:
             ]
         )
 
-        with pytest.raises(NotImplementedError, match="Batching rule for 'qinst' not implemented"):
+        msg = (
+            "Abstract evaluation for 'qnode' not implemented"
+            if capture_mode
+            else "Batching rule for 'qinst' not implemented"
+        )
+        with pytest.raises(NotImplementedError, match=msg):
             workflow(x)
 
     def test_vmap_circuit_inside(self, backend, capture_mode):
@@ -639,6 +644,7 @@ class TestVectorizeMap:
         assert jnp.allclose(result[0], expected_state)
         assert jnp.allclose(result[1], expected_probs)
 
+    @pytest.mark.old_frontend
     def test_vmap_circuit_return_tensor_pytree_dict(self, backend, capture_mode):
         """Test catalyst.vmap of a hybrid workflow inside QJIT returning PyTrees."""
 

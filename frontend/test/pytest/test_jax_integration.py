@@ -28,6 +28,7 @@ from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.jit import JAX_QJIT
 from catalyst.utils.exceptions import CompileError
 
+
 class TestJAXJIT:
     """Test QJIT compatibility with JAX compilation."""
 

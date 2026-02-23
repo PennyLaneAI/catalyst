@@ -29,7 +29,6 @@ from catalyst.jax_extras import DShapedArray, ShapedArray
 from catalyst.jax_extras.tracing import trace_to_jaxpr
 from catalyst.tracing.contexts import EvaluationContext
 
-
 DTYPES = [float, int, jnp.float32, jnp.float64, jnp.int8, jnp.int16, "float32", np.float64]
 SHAPES = [3, (2, 3, 1), (), jnp.array([2, 1, 3], dtype=int)]
 
@@ -135,10 +134,12 @@ def test_classical_tracing_init(shape, dtype, capture_mode):
         qjit(lambda: jnp.ones(shape, dtype), capture=capture_mode)(), jnp.ones(shape, dtype=dtype)
     )
     assert_array_and_dtype_equal(
-        qjit(lambda s: jnp.ones(s, dtype), capture=capture_mode)(shape), jnp.ones(shape, dtype=dtype)
+        qjit(lambda s: jnp.ones(s, dtype), capture=capture_mode)(shape),
+        jnp.ones(shape, dtype=dtype),
     )
     assert_array_and_dtype_equal(
-        qjit(lambda s: jnp.zeros(s, dtype), capture=capture_mode)(shape), jnp.zeros(shape, dtype=dtype)
+        qjit(lambda s: jnp.zeros(s, dtype), capture=capture_mode)(shape),
+        jnp.zeros(shape, dtype=dtype),
     )
 
     @qjit(capture=capture_mode)
@@ -289,7 +290,6 @@ def test_quantum_tracing_1(capture_mode):
 
     while_loop_prim = qml.while_loop if capture_mode else while_loop
 
-
     @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(shape):
@@ -318,7 +318,6 @@ def test_quantum_tracing_2(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
 
     while_loop_prim = qml.while_loop if capture_mode else while_loop
-
 
     @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
@@ -435,7 +434,6 @@ def test_qjit_forloop_identity(capture_mode):
 
     for_loop_prim = qml.for_loop if capture_mode else for_loop
 
-
     @qjit(capture=capture_mode)
     def f(sz):
         a = jnp.ones([sz], dtype=float)
@@ -456,7 +454,6 @@ def test_qjit_forloop_capture(capture_mode):
     """Test simple for-loop primitive vs dynamic dimensions"""
 
     for_loop_prim = qml.for_loop if capture_mode else for_loop
-
 
     @qjit(capture=capture_mode)
     def f(sz):
@@ -481,7 +478,6 @@ def test_qjit_forloop_shared_indbidx(capture_mode):
     """Test for-loops with shared dynamic input dimensions in classical tracing mode"""
 
     for_loop_prim = qml.for_loop if capture_mode else for_loop
-
 
     @qjit(capture=capture_mode)
     def f(sz):
@@ -534,7 +530,6 @@ def test_qjit_forloop_index_indbidx(capture_mode):
 
     for_loop_prim = qml.for_loop if capture_mode else for_loop
 
-
     @qjit(capture=capture_mode)
     def f(sz):
         a0 = jnp.ones([sz], dtype=float)
@@ -559,7 +554,6 @@ def test_qjit_forloop_indbidx_const(capture_mode):
 
     for_loop_prim = qml.for_loop if capture_mode else for_loop
 
-
     @qjit(capture=capture_mode)
     def f(sz):
         a0 = jnp.ones([sz], dtype=float)
@@ -583,7 +577,6 @@ def test_qjit_forloop_shared_dimensions(capture_mode):
     """Test catalyst for-loop primitive's experimental_preserve_dimensions option"""
 
     for_loop_prim = qml.for_loop if capture_mode else for_loop
-
 
     @qjit(capture=capture_mode)
     def f(sz: int):
@@ -612,7 +605,6 @@ def test_qnode_forloop_identity(capture_mode):
 
     for_loop_prim = qml.for_loop if capture_mode else for_loop
 
-
     @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
@@ -637,7 +629,6 @@ def test_qnode_forloop_capture(capture_mode):
     """Test simple for-loops with dynamic dimensions while doing quantum tracing."""
 
     for_loop_prim = qml.for_loop if capture_mode else for_loop
-
 
     @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
@@ -664,7 +655,6 @@ def test_qnode_forloop_shared_indbidx(capture_mode):
 
     for_loop_prim = qml.for_loop if capture_mode else for_loop
 
-
     @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
@@ -690,7 +680,6 @@ def test_qnode_forloop_indbidx_outdbidx(capture_mode):
     """Test for-loops with mixed input and output dimension variables during the quantum tracing."""
 
     for_loop_prim = qml.for_loop if capture_mode else for_loop
-
 
     @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
@@ -720,7 +709,6 @@ def test_qnode_forloop_abstracted_axes(capture_mode):
 
     for_loop_prim = qml.for_loop if capture_mode else for_loop
 
-
     @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(a, b):
@@ -747,7 +735,6 @@ def test_qnode_forloop_index_indbidx(capture_mode):
 
     for_loop_prim = qml.for_loop if capture_mode else for_loop
 
-
     @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
@@ -772,7 +759,6 @@ def test_qnode_whileloop_1(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
     while_loop_prim = qml.while_loop if capture_mode else while_loop
-
 
     @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
@@ -799,7 +785,6 @@ def test_qnode_whileloop_2(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
     while_loop_prim = qml.while_loop if capture_mode else while_loop
-
 
     @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
@@ -828,7 +813,6 @@ def test_qnode_whileloop_capture(capture_mode):
 
     while_loop_prim = qml.while_loop if capture_mode else while_loop
 
-
     @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
@@ -854,7 +838,6 @@ def test_qnode_whileloop_abstracted_axes(capture_mode):
     the source of dynamism."""
 
     while_loop_prim = qml.while_loop if capture_mode else while_loop
-
 
     @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
@@ -882,7 +865,6 @@ def test_qnode_whileloop_shared_indbidx(capture_mode):
 
     while_loop_prim = qml.while_loop if capture_mode else while_loop
 
-
     @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
@@ -909,7 +891,6 @@ def test_qnode_whileloop_indbidx_outdbidx(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
     while_loop_prim = qml.while_loop if capture_mode else while_loop
-
 
     @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
@@ -939,7 +920,6 @@ def test_qnode_whileloop_outer(capture_mode):
 
     while_loop_prim = qml.while_loop if capture_mode else while_loop
 
-
     @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
@@ -964,7 +944,6 @@ def test_qjit_whileloop_1(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
     while_loop_prim = qml.while_loop if capture_mode else while_loop
-
 
     @qjit(capture=capture_mode)
     def f(sz):
@@ -991,7 +970,6 @@ def test_qjit_whileloop_2(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
     while_loop_prim = qml.while_loop if capture_mode else while_loop
-
 
     @qjit(capture=capture_mode)
     def f(sz):
@@ -1045,7 +1023,6 @@ def test_qjit_whileloop_shared_indbidx(capture_mode):
 
     while_loop_prim = qml.while_loop if capture_mode else while_loop
 
-
     @qjit(capture=capture_mode)
     def f(sz):
         a = jnp.ones([sz], dtype=float)
@@ -1098,7 +1075,6 @@ def test_qjit_whileloop_outer(capture_mode):
 
     while_loop_prim = qml.while_loop if capture_mode else while_loop
 
-
     @qjit(capture=capture_mode)
     def f(sz):
         a0 = jnp.ones([sz], dtype=float)
@@ -1124,7 +1100,6 @@ def test_qjit_whileloop_capture(capture_mode):
 
     while_loop_prim = qml.while_loop if capture_mode else while_loop
 
-
     @qjit(capture=capture_mode)
     def f(sz):
         x = jnp.ones([sz], dtype=float)
@@ -1148,7 +1123,6 @@ def test_qnode_cond_identity(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
     cond_prim = qml.cond if capture_mode else cond
-
 
     @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
@@ -1215,7 +1189,6 @@ def test_qnode_cond_capture(capture_mode):
 
     cond_prim = qml.cond if capture_mode else cond
 
-
     @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(flag, sz):
@@ -1245,7 +1218,6 @@ def test_qjit_cond_identity(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
     cond_prim = qml.cond if capture_mode else cond
-
 
     @qjit(capture=capture_mode)
     def f(flag, sz):
@@ -1277,7 +1249,6 @@ def test_qjit_cond_outdbidx(capture_mode):
 
     cond_prim = qml.cond if capture_mode else cond
 
-
     @qjit(capture=capture_mode)
     def f(flag, sz):
         @cond_prim(flag)
@@ -1301,7 +1272,6 @@ def test_qjit_cond_capture(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
     cond_prim = qml.cond if capture_mode else cond
-
 
     @qjit(capture=capture_mode)
     def f(flag, sz):
