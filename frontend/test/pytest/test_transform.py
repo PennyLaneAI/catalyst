@@ -51,7 +51,9 @@ from catalyst.utils.exceptions import CompileError
 # pylint: disable=too-many-lines,line-too-long
 
 
-def test_add_noise(backend):
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
+def test_add_noise(capture_mode, backend):
     """Test the add_noise transform on a simple circuit"""
 
     def qnode_builder(device_name):
@@ -83,7 +85,7 @@ def test_add_noise(backend):
     qnode_backend = qnode_builder(backend)
 
     expected = jax.jit(qnode_control)(0.9, 0.4, 0.5, 0.6)
-    observed = qjit(qnode_backend)(0.9, 0.4, 0.5, 0.6)
+    observed = qjit(qnode_backend, capture=capture_mode)(0.9, 0.4, 0.5, 0.6)
     assert np.allclose(expected, observed)
 
     _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -91,8 +93,10 @@ def test_add_noise(backend):
     assert expected_shape == observed_shape
 
 
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
 @pytest.mark.skip(reason="Uses part of old API")
-def test_batch_input(backend):
+def test_batch_input(capture_mode, backend):
     """Test that batching works for a simple circuit"""
 
     def qnode_builder(device_name):
@@ -117,14 +121,16 @@ def test_batch_input(backend):
     weights = pnp.random.uniform(-pnp.pi, pnp.pi, (2,))
 
     expected = jax.jit(qnode_control)(inputs, weights)
-    observed = qjit(qnode_backend)(inputs, weights)
+    observed = qjit(qnode_backend, capture=capture_mode)(inputs, weights)
     _, expected_shape = jax.tree_util.tree_flatten(expected)
     _, observed_shape = jax.tree_util.tree_flatten(observed)
     assert np.allclose(expected, observed)
     assert expected_shape == observed_shape
 
 
-def test_batch_params(backend):
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
+def test_batch_params(capture_mode, backend):
     """Test batch param"""
 
     def qnode_builder(device_name):
@@ -153,7 +159,7 @@ def test_batch_params(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
     expected = jax_jit(data, x, weights)
     observed = compiled(data, x, weights)
     assert np.allclose(expected, observed)
@@ -163,7 +169,9 @@ def test_batch_params(backend):
     assert expected_shape == observed_shape
 
 
-def test_batch_partial(backend):
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
+def test_batch_partial(capture_mode, backend):
     """Test batch_partial"""
 
     def qnode_builder(device_name):
@@ -185,7 +193,7 @@ def test_batch_partial(backend):
     qnode_backend = qml.batch_partial(qnode_builder(backend), all_operations=True, y=y)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
     expected = jax_jit(x)
     observed = compiled(x)
     assert np.allclose(expected, observed)
@@ -195,7 +203,9 @@ def test_batch_partial(backend):
     assert expected_shape == observed_shape
 
 
-def test_cancel_inverses(backend):
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
+def test_cancel_inverses(capture_mode, backend):
     """Test cancel_inverses"""
 
     def qnode_builder(device_name):
@@ -222,7 +232,7 @@ def test_cancel_inverses(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     x, y, z = 0.1, 0.2, 0.3
     expected = jax_jit(x, y, z)
@@ -234,7 +244,9 @@ def test_cancel_inverses(backend):
     assert expected_shape == observed_shape
 
 
-def test_commute_controlled(backend):
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
+def test_commute_controlled(capture_mode, backend):
     """Test commute_controlled"""
 
     def qnode_builder(device_name):
@@ -261,7 +273,7 @@ def test_commute_controlled(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     expected = jax_jit(0.5)
     observed = compiled(0.5)
@@ -272,7 +284,9 @@ def test_commute_controlled(backend):
     assert expected_shape == observed_shape
 
 
-def test_convert_to_numpy_parameters(backend):
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
+def test_convert_to_numpy_parameters(capture_mode, backend):
     """Test convert_to_numpy_parameters"""
 
     def qnode_builder(device_name):
@@ -291,7 +305,7 @@ def test_convert_to_numpy_parameters(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     expected = jax_jit()
     observed = compiled()
@@ -302,7 +316,9 @@ def test_convert_to_numpy_parameters(backend):
     assert expected_shape == observed_shape
 
 
-def test_decompose(backend):
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
+def test_decompose(capture_mode, backend):
     """Test decompose"""
 
     def qnode_builder(device_name):
@@ -321,7 +337,7 @@ def test_decompose(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     expected = jax_jit()
     observed = compiled()
@@ -332,7 +348,9 @@ def test_decompose(backend):
     assert expected_shape == observed_shape
 
 
-def test_diagonalize_measurements(backend):
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
+def test_diagonalize_measurements(capture_mode, backend):
     """Test diagonalize_measurements"""
 
     def qnode_builder(device_name):
@@ -351,7 +369,7 @@ def test_diagonalize_measurements(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     x = [np.pi / 4, np.pi / 4]
     expected = jax_jit(x)
@@ -363,7 +381,9 @@ def test_diagonalize_measurements(backend):
     assert expected_shape == observed_shape
 
 
-def test_insert(backend):
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
+def test_insert(capture_mode, backend):
     """Test insert"""
 
     def qnode_builder(device_name):
@@ -385,7 +405,7 @@ def test_insert(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     expected = jax_jit(0.9, 0.4, 0.5, 0.6)
     observed = compiled(0.9, 0.4, 0.5, 0.6)
@@ -396,7 +416,9 @@ def test_insert(backend):
     assert expected_shape == observed_shape
 
 
-def test_merge_amplitude_embedding(backend):
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
+def test_merge_amplitude_embedding(capture_mode, backend):
     """Test merge_amplitude_embedding"""
 
     def qnode_builder(device_name):
@@ -416,7 +438,7 @@ def test_merge_amplitude_embedding(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     expected = jax_jit()
     observed = compiled()
@@ -427,7 +449,9 @@ def test_merge_amplitude_embedding(backend):
     assert expected_shape == observed_shape
 
 
-def test_remove_barrier(backend):
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
+def test_remove_barrier(capture_mode, backend):
     """Test remove_barrier"""
 
     def qnode_builder(device_name):
@@ -448,7 +472,7 @@ def test_remove_barrier(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     expected = jax_jit()
     observed = compiled()
@@ -459,7 +483,9 @@ def test_remove_barrier(backend):
     assert expected_shape == observed_shape
 
 
-def test_single_qubit_fusion(backend):
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
+def test_single_qubit_fusion(capture_mode, backend):
     """Test single_qubit_fusion"""
 
     def qnode_builder(device_name):
@@ -484,7 +510,7 @@ def test_single_qubit_fusion(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     expected = jax_jit(r1, r2)
     observed = compiled(r1, r2)
@@ -495,7 +521,9 @@ def test_single_qubit_fusion(backend):
     assert expected_shape == observed_shape
 
 
-def test_split_non_commuting(backend):
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
+def test_split_non_commuting(capture_mode, backend):
     """Test split non commuting"""
 
     def qnode_builder(device_name):
@@ -525,7 +553,7 @@ def test_split_non_commuting(backend):
     qnode_control = qnode_builder("default.qubit")
     qnode_backend = qnode_builder(backend)
     expected = jax.jit(qnode_control)()
-    observed = qjit(qnode_backend)()
+    observed = qjit(qnode_backend, capture=capture_mode)()
     assert np.allclose(expected, observed)
 
     _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -533,7 +561,9 @@ def test_split_non_commuting(backend):
     assert expected_shape == observed_shape
 
 
-def test_transpile(backend):
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
+def test_transpile(capture_mode, backend):
     """Test transpile"""
 
     def qnode_builder(device_name):
@@ -556,7 +586,7 @@ def test_transpile(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     expected = jax_jit()
     observed = compiled()
@@ -567,7 +597,9 @@ def test_transpile(backend):
     assert expected_shape == observed_shape
 
 
-def test_undo_swaps(backend):
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
+def test_undo_swaps(capture_mode, backend):
     """Test undo_swaps"""
 
     def qnode_builder(device_name):
@@ -589,7 +621,7 @@ def test_undo_swaps(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     expected = jax_jit()
     observed = compiled()
@@ -603,7 +635,9 @@ def test_undo_swaps(backend):
 class TestMitigate:
     """Test error mitigation transforms"""
 
-    def test_fold_global(self, backend):
+    # Capture gap: mitigation transforms not yet supported
+    @pytest.mark.capture_todo
+    def test_fold_global(self, capture_mode, backend):
         """Test fold_global"""
 
         def qnode_builder(device_name):
@@ -628,7 +662,7 @@ class TestMitigate:
         qnode_backend = qnode_builder(backend)
         x = np.arange(6)
 
-        compiled = qjit(qnode_backend)
+        compiled = qjit(qnode_backend, capture=capture_mode)
         observed = compiled(x)
         expected = qnode_control(x)
         assert np.allclose(expected, observed)
@@ -641,7 +675,9 @@ class TestMitigate:
         _, observed_shape = jax.tree_util.tree_flatten(observed)
         assert expected_shape == observed_shape
 
-    def test_mitigate_with_zne(self, backend):
+    # Capture gap: mitigation transforms not yet supported
+    @pytest.mark.capture_todo
+    def test_mitigate_with_zne(self, capture_mode, backend):
         """Test mitigate_with_zne"""
 
         def qnode_builder(device_name):
@@ -670,7 +706,7 @@ class TestMitigate:
         qnode_control = qnode_builder("default.qubit")
         qnode_backend = qnode_builder(backend)
 
-        compiled = qjit(qnode_backend)
+        compiled = qjit(qnode_backend, capture=capture_mode)
         observed = compiled(w1, w2)
         expected = qnode_control(w1, w2)
         assert np.allclose(expected, observed)
@@ -687,7 +723,9 @@ class TestMitigate:
 class TestQuantumMonteCarlo:
     """Test quantum Monte Carlo transforms"""
 
-    def test_apply_controlled_Q(self, backend):
+    # Capture gap: transforms not yet supported
+    @pytest.mark.capture_todo
+    def test_apply_controlled_Q(self, capture_mode, backend):
         """Test apply_controlled_Q"""
 
         def qnode_builder(device_name):
@@ -717,7 +755,7 @@ class TestQuantumMonteCarlo:
         qnode_backend = qnode_builder(backend)
 
         jax_jit = jax.jit(qnode_control)
-        compiled = qjit(qnode_backend)
+        compiled = qjit(qnode_backend, capture=capture_mode)
 
         expected = jax_jit()
         observed = compiled()
@@ -727,7 +765,9 @@ class TestQuantumMonteCarlo:
         _, observed_shape = jax.tree_util.tree_flatten(observed)
         assert expected_shape == observed_shape
 
-    def test_quantum_monte_carlo(self, backend):
+    # Capture gap: transforms not yet supported
+    @pytest.mark.capture_todo
+    def test_quantum_monte_carlo(self, capture_mode, backend):
         """Test quantum_monte_carlo"""
 
         def qnode_builder(device_name):
@@ -756,7 +796,7 @@ class TestQuantumMonteCarlo:
         qnode_backend = qnode_builder(backend)
 
         jax_jit = jax.jit(qnode_control)
-        compiled = qjit(qnode_backend)
+        compiled = qjit(qnode_backend, capture=capture_mode)
 
         expected = jax_jit()
         observed = compiled()
@@ -805,10 +845,12 @@ observables = [
 class TestBroadcastExpand:
     """Test Broadcast Expand"""
 
+    # Capture gap: transforms not yet supported
+    @pytest.mark.capture_todo
     @pytest.mark.skip(reason="https://github.com/PennyLaneAI/pennylane/issues/2762")
     @pytest.mark.parametrize("params", parameters)
     @pytest.mark.parametrize("obs", observables)
-    def test_expansion_qnode(self, backend, params, obs):
+    def test_expansion_qnode(self, capture_mode, backend, params, obs):
         """Test broadcast expand"""
 
         if obs[0] == H0:
@@ -838,16 +880,18 @@ class TestBroadcastExpand:
         qnode_backend = qnode_builder(backend)
 
         expected = jax.jit(qnode_control)(*params, obs)
-        observed = qjit(qnode_backend)(*params, obs)
+        observed = qjit(qnode_backend, capture=capture_mode)(*params, obs)
 
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
         _, observed_shape = jax.tree_util.tree_flatten(observed)
         assert expected_shape == observed_shape
 
+    # Capture gap: transforms not yet supported
+    @pytest.mark.capture_todo
     @pytest.mark.parametrize("params", parameters)
     @pytest.mark.parametrize("obs", observables)
-    def test_expansion_qnode_no_cache(self, backend, params, obs):
+    def test_expansion_qnode_no_cache(self, capture_mode, backend, params, obs):
         """Test broadcast expand.
 
         This test is used as an alternative to test_expansion_qnode which cannot succeed due to bug.
@@ -883,7 +927,7 @@ class TestBroadcastExpand:
         qnode_backend = qnode_builder(backend)
 
         expected = jax.jit(qnode_control)(*params, obs)
-        observed = qjit(qnode_backend)(*params, obs)
+        observed = qjit(qnode_backend, capture=capture_mode)(*params, obs)
 
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -896,7 +940,9 @@ class TestBroadcastExpand:
 class TestCutCircuitMCTransform:
     """Test Cut Circuit MC Transform"""
 
-    def test_cut_circuit_mc_sample(self, backend):
+    # Capture gap: transforms not yet supported
+    @pytest.mark.capture_todo
+    def test_cut_circuit_mc_sample(self, capture_mode, backend):
         """
         Tests that a circuit containing sampling measurements can be cut and
         postprocessed to return bitstrings of the original circuit size.
@@ -923,7 +969,7 @@ class TestCutCircuitMCTransform:
 
         x = jnp.array(0.531)
         cut_circuit_jit = jax.jit(qcut.cut_circuit(qnode_default, use_opt_einsum=False))
-        cut_circuit_qjit = qjit(qcut.cut_circuit(qnode_backend, use_opt_einsum=False))
+        cut_circuit_qjit = qjit(qcut.cut_circuit(qnode_backend, use_opt_einsum=False), capture=capture_mode)
 
         expected = cut_circuit_jit(x)
         observed = cut_circuit_qjit(x)
@@ -937,7 +983,9 @@ class TestCutCircuitMCTransform:
 class TestSplitNonCommuting:
     """Test split_non_commuting"""
 
-    def test_split_non_commuting_single_observable(self, backend):
+    # Capture gap: transforms not yet supported
+    @pytest.mark.capture_todo
+    def test_split_non_commuting_single_observable(self, capture_mode, backend):
         """Test split_non_commuting on a single, multi-term observable containing
         non-commuting terms."""
 
@@ -968,14 +1016,16 @@ class TestSplitNonCommuting:
         qnode_backend = qnode_builder(backend)
         qnode_control = qnode_builder("default.qubit")
         expected = jax.jit(qnode_control)()
-        observed = qjit(qnode_backend)()
+        observed = qjit(qnode_backend, capture=capture_mode)()
 
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
         _, observed_shape = jax.tree_util.tree_flatten(observed)
         assert expected_shape == observed_shape
 
-    def test_split_non_commuting_mulitiple_observables(self, backend):
+    # Capture gap: transforms not yet supported
+    @pytest.mark.capture_todo
+    def test_split_non_commuting_mulitiple_observables(self, capture_mode, backend):
         """Test split_non_commuting on two separate measurements with non-commuting
         observables"""
 
@@ -995,7 +1045,7 @@ class TestSplitNonCommuting:
         qnode_backend = qnode_builder(backend)
         qnode_control = qnode_builder("default.qubit")
         expected = jax.jit(qnode_control)()
-        observed = qjit(qnode_backend)()
+        observed = qjit(qnode_backend, capture=capture_mode)()
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
         _, observed_shape = jax.tree_util.tree_flatten(observed)
@@ -1007,8 +1057,10 @@ class TestSplitNonCommuting:
 class TestQFuncTransforms:
     """Test QFunc Transforms"""
 
+    # Capture gap: transforms not yet supported
+    @pytest.mark.capture_todo
     @pytest.mark.parametrize(("theta_1", "theta_2"), [(0.3, -0.2)])
-    def test_merge_rotations(self, backend, theta_1, theta_2):
+    def test_merge_rotations(self, capture_mode, backend, theta_1, theta_2):
         """Merge rotations"""
 
         def qnode_builder(device_name):
@@ -1026,7 +1078,7 @@ class TestQFuncTransforms:
         qnode_backend = qnode_builder(backend)
         qnode_control = qnode_builder("default.qubit")
         expected = jax.jit(qnode_control)(theta_1, theta_2)
-        compiled_function = qjit(qnode_backend)
+        compiled_function = qjit(qnode_backend, capture=capture_mode)
         observed = compiled_function(theta_1, theta_2)
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -1036,8 +1088,10 @@ class TestQFuncTransforms:
         # Here we are asserting that there is only one RZ operation
         assert 1 == compiled_function.mlir.count('quantum.custom "RZ"')
 
+    # Capture gap: transforms not yet supported
+    @pytest.mark.capture_todo
     @pytest.mark.xfail(reason="qml.ctrl to HybridCtrl dispatch breaks the method of this transform")
-    def test_unroll_ccrz(self, backend):
+    def test_unroll_ccrz(self, capture_mode, backend):
         """Test unroll_ccrz transform."""
         # TODO: Test by inspecting the circuit actually produced, testing the
         #       results does not verify the transform was applied correctly.
@@ -1078,7 +1132,7 @@ class TestQFuncTransforms:
         qnode_backend = qnode_builder(backend)
         qnode_control = qnode_builder("default.qubit")
         expected = jax.jit(qnode_control)()
-        compiled = qjit(qnode_backend)
+        compiled = qjit(qnode_backend, capture=capture_mode)
         observed = compiled()
         assert np.allclose(expected, observed)
         _, expected_shape = jax.tree_util.tree_flatten(expected)
@@ -1089,8 +1143,10 @@ class TestQFuncTransforms:
 class TestTransformValidity:
     """Test validity of transforms."""
 
+    # Capture gap: transforms not yet supported
+    @pytest.mark.capture_todo
     @pytest.mark.parametrize("transform", (measurements_from_counts, measurements_from_samples))
-    def test_invalid_modify_measurements_classical_return(self, backend, transform, monkeypatch):
+    def test_invalid_modify_measurements_classical_return(self, capture_mode, backend, transform, monkeypatch):
         """Test verification for transforms that are non-batching but modify tape measurements
         while returning classical values."""
 
@@ -1120,10 +1176,12 @@ class TestTransformValidity:
             CompileError,
             match="Transforming MeasurementProcesses is unsupported with non-MeasurementProcess",
         ):
-            qjit(qfunc)
+            qjit(qfunc, capture=capture_mode)
 
+    # Capture gap: transforms not yet supported
+    @pytest.mark.capture_todo
     @pytest.mark.parametrize("transform", (measurements_from_counts, measurements_from_samples))
-    def test_valid_modify_measurements_no_measurements(self, backend, transform, monkeypatch):
+    def test_valid_modify_measurements_no_measurements(self, capture_mode, backend, transform, monkeypatch):
         """Test verification for transforms that are non-batching and in-principle can modify tape
         measurements but don't, while returning classical values."""
 
@@ -1141,7 +1199,7 @@ class TestTransformValidity:
 
         dev = qml.device(backend, wires=2)
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(dev)
         def qfunc():
             qml.X(0)
@@ -1151,7 +1209,9 @@ class TestTransformValidity:
         m1, m2 = qfunc()
         assert m1 == True and m2 == False
 
-    def test_invalid_batch_return_classical_value(self, backend):
+    # Capture gap: transforms not yet supported
+    @pytest.mark.capture_todo
+    def test_invalid_batch_return_classical_value(self, capture_mode, backend):
         """Test that there's an error raised if the users uses a transform and returns
         a classical value."""
 
@@ -1178,9 +1238,11 @@ class TestTransformValidity:
             CompileError,
             match="Batch transforms are unsupported with MCMs or non-MeasurementProcess",
         ):
-            qjit(qfunc)
+            qjit(qfunc, capture=capture_mode)
 
-    def test_invalid_batch_transform_due_to_measure(self, backend):
+    # Capture gap: transforms not yet supported
+    @pytest.mark.capture_todo
+    def test_invalid_batch_transform_due_to_measure(self, capture_mode, backend):
         """Test split non commuting"""
 
         def qnode_builder(device_name):
@@ -1213,10 +1275,12 @@ class TestTransformValidity:
             CompileError,
             match="Batch transforms are unsupported with MCMs or non-MeasurementProcess",
         ):
-            qjit(qnode_builder(backend))
+            qjit(qnode_builder(backend), capture=capture_mode)
 
+    # Capture gap: transforms not yet supported
+    @pytest.mark.capture_todo
     @pytest.mark.parametrize(("theta_1", "theta_2"), [(0.3, -0.2)])
-    def test_valid_due_to_non_batch(self, backend, theta_1, theta_2):
+    def test_valid_due_to_non_batch(self, capture_mode, backend, theta_1, theta_2):
         """This program is valid even in the presence of a mid circuit measurement.
         This is because it will not create multiple tapes, and therefore not
         non-deterministic behaviour across the execution of multiple tapes.
@@ -1236,13 +1300,15 @@ class TestTransformValidity:
             return qfunc
 
         qnode_backend = qnode_builder(backend)
-        compiled_function = qjit(qnode_backend)
+        compiled_function = qjit(qnode_backend, capture=capture_mode)
         compiled_function(theta_1, theta_2)
 
         # Here we are asserting that there is only one RZ operation
         assert 1 == compiled_function.mlir.count('quantum.custom "RZ"')
 
-    def test_informative_transform(self, backend):
+    # Capture gap: transforms not yet supported
+    @pytest.mark.capture_todo
+    def test_informative_transform(self, capture_mode, backend):
         """Informative transforms are not supported!"""
 
         # Just fake that it is informative
@@ -1256,11 +1322,13 @@ class TestTransformValidity:
             return qml.state()
 
         with pytest.raises(CompileError, match="Catalyst does not support informative transforms."):
-            qjit(f)
+            qjit(f, capture=capture_mode)
 
 
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
 @pytest.mark.xfail(reason="Fails due to use of numpy arrays in transform")
-def test_clifford_t_decomposition(backend):
+def test_clifford_t_decomposition(capture_mode, backend):
     """Test clifford_t_decomposition"""
 
     def qnode_builder(device_name):
@@ -1282,7 +1350,7 @@ def test_clifford_t_decomposition(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     expected = jax_jit(x, y)
     observed = compiled(x, y)
@@ -1293,8 +1361,10 @@ def test_clifford_t_decomposition(backend):
     assert expected_shape == observed_shape
 
 
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
 @pytest.mark.xfail(reason="Catalyst does not support informative transforms.")
-def test_commutation_dag(backend):
+def test_commutation_dag(capture_mode, backend):
     """Test commutation DAG"""
 
     def qnode_builder(device_name):
@@ -1318,7 +1388,7 @@ def test_commutation_dag(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     expected = jax_jit(np.pi / 4, np.pi / 3, np.pi / 2)
     observed = compiled(np.pi / 4, np.pi / 3, np.pi / 2)
@@ -1326,8 +1396,10 @@ def test_commutation_dag(backend):
     assert expected.get_nodes() == observed.get_nodes()
 
 
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
 @pytest.mark.xfail(reason="catalyst.cond cannot accept MeasurementValue as a conditional")
-def test_defer_measurements(backend):
+def test_defer_measurements(capture_mode, backend):
     """Test defer_measurements"""
     # The defer_measurements transform looks for MidMeasureMP.
     # Catalyst's `measure` is not a MidMeasureMP.
@@ -1352,7 +1424,7 @@ def test_defer_measurements(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     expected = jax_jit()
     observed = compiled()
@@ -1363,8 +1435,10 @@ def test_defer_measurements(backend):
     assert expected_shape == observed_shape
 
 
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
 @pytest.mark.xfail(reason="catalyst.cond cannot accept MeasurementValue as a conditional")
-def test_dynamic_one_shot(backend):
+def test_dynamic_one_shot(capture_mode, backend):
     """Test dynamic_one_shot"""
     # Catalyst has its own dynamic_one_shot transform
     # Applying PennyLane's transform will result in errors.
@@ -1386,7 +1460,7 @@ def test_dynamic_one_shot(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     x = np.pi / 4
     y = np.pi / 4
@@ -1399,10 +1473,12 @@ def test_dynamic_one_shot(backend):
     assert expected_shape == observed_shape
 
 
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
 @pytest.mark.xfail(
     reason="QJIT fails with ValueError: Eagerly computing the adjoint (lazy=False) is only supported on single operators."
 )
-def test_pattern_matching_optimization(backend):
+def test_pattern_matching_optimization(capture_mode, backend):
     """Test pattern_matching_optimization"""
 
     def qnode_builder(device_name):
@@ -1430,7 +1506,7 @@ def test_pattern_matching_optimization(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     expected = jax_jit()
     observed = compiled()
@@ -1441,10 +1517,12 @@ def test_pattern_matching_optimization(backend):
     assert expected_shape == observed_shape
 
 
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
 @pytest.mark.xfail(
     reason="QJIT error ValueError: Passed tape must end in `qml.expval(H)` or qml.var(H)`, where H is of type `qml.Hamiltonian`"
 )
-def test_sign_expand(backend):
+def test_sign_expand(capture_mode, backend):
     """Test sign_expand"""
 
     def qnode_builder(device_name):
@@ -1466,7 +1544,7 @@ def test_sign_expand(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     expected = jax_jit()
     observed = compiled()
@@ -1477,8 +1555,10 @@ def test_sign_expand(backend):
     assert expected_shape == observed_shape
 
 
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
 @pytest.mark.xfail(reason="JIT and QJIT return different shapes")
-def test_split_to_single_terms(backend):
+def test_split_to_single_terms(capture_mode, backend):
     """Test split_to_single_terms"""
 
     def qnode_builder(device_name):
@@ -1500,7 +1580,7 @@ def test_split_to_single_terms(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     x = [np.pi / 4, np.pi / 4]
     expected = jax_jit(x)
@@ -1512,8 +1592,10 @@ def test_split_to_single_terms(backend):
     assert expected_shape == observed_shape
 
 
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
 @pytest.mark.xfail(reason="Both JAX JIT and QJIT fail due to this transform's dependency on PyZX")
-def test_to_zx(backend):
+def test_to_zx(capture_mode, backend):
     """Test to_zx"""
 
     def qnode_builder(device_name):
@@ -1538,7 +1620,7 @@ def test_to_zx(backend):
     qnode_backend = qnode_builder(backend)
 
     jax_jit = jax.jit(qnode_control)
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
 
     params = [5 / 4 * np.pi, 3 / 4 * np.pi, 0.1, 0.3]
     expected = jax_jit(params)
@@ -1550,8 +1632,10 @@ def test_to_zx(backend):
     assert expected_shape == observed_shape
 
 
+# Capture gap: transforms not yet supported
+@pytest.mark.capture_todo
 @pytest.mark.xfail(reason="QJIT result differs from PennyLane")
-def test_unitary_to_rot(backend):
+def test_unitary_to_rot(capture_mode, backend):
     """Test unitary_to_rot"""
 
     def qnode_builder(device_name):
@@ -1574,7 +1658,7 @@ def test_unitary_to_rot(backend):
 
     params = [0.2, 0.3]
 
-    compiled = qjit(qnode_backend)
+    compiled = qjit(qnode_backend, capture=capture_mode)
     observed = compiled(params)
     expected = qnode_control(params)
     assert np.allclose(expected, observed)
