@@ -37,7 +37,6 @@ from catalyst.api_extensions.quantum_operators import HybridAdjoint, adjoint
 from catalyst.compiler import get_lib_path
 from catalyst.device.decomposition import catalyst_decompose, decompose_ops_to_unitary
 from catalyst.jax_tracer import HybridOpRegion
-from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 
 # pylint: disable=unused-argument
 
@@ -226,6 +225,7 @@ class TestPreprocessHybridOp:
     def test_hybrid_op_decomposition(self, op, op_class, num_regions, request, gate_set_src):
         """Tests that for a tape containing a HybridOp that contains unsupported
         Operators, the unsupported Operators are decomposed"""
+        # pylint: disable=too-many-positional-arguments, too-many-arguments
 
         # hack for unit test (since it doesn't create a full context)
         for region in op.regions:

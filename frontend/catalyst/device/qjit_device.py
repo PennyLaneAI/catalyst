@@ -368,6 +368,7 @@ class QJITDevice(qml.devices.Device):
         which are created based on what is both compatible with Catalyst and what is supported the
         backend according to the backend TOML file).
         """
+        # pylint: disable=unused-argument
 
         if execution_config is None:
             execution_config = qml.devices.ExecutionConfig()
