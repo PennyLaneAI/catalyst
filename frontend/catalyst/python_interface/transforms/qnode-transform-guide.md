@@ -122,6 +122,12 @@ and smooth integration into the compilation infrastracture.
     into `sample` MPs within a qnode function needs to insert classical processing that
     computes the average of the samples produced by the new qnode function.
 
+Concrete examples for the recommended scheme can be found in the following MLIR passes:
+- [Split-to-single-terms](https://github.com/PennyLaneAI/catalyst/pull/2441)
+  (additional post-processing)
+- [Split-non-commuting](https://github.com/PennyLaneAI/catalyst/pull/2437)
+  (multiple executions)
+
 Future consideration:
 - We may want to consider allowing QNode passes to be scheduled on `FuncOp`s directly, for
   passes that only modify the internals of a QNode (think gate cancellation).
