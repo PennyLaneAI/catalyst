@@ -91,7 +91,10 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
 @transform
 @debug_logger
 def catalyst_decompose(
-    tape: qml.tape.QuantumTape, capabilities: DeviceCapabilities, grad_method: str = None, target_gates=None,
+    tape: qml.tape.QuantumTape,
+    capabilities: DeviceCapabilities,
+    grad_method: str = None,
+    target_gates=None,
 ):
     """Decompose operations until the stopping condition is met.
 
@@ -118,12 +121,16 @@ def catalyst_decompose(
 
     if capabilities is None:
         if grad_method is not None:
-            raise NotImplementedError("grad_method is not taken into account in catalyst_decompose if target_gates are provided instead of device capabilities.")
+            raise NotImplementedError(
+                "grad_method is not taken into account in catalyst_decompose if target_gates are provided instead of device capabilities."
+            )
         target_gates, stopping_condition = _resolve_gate_set(target_gates, None)
         decomposer = None
     else:
         if target_gates is not None:
-            raise ValueError("target_gates are not taken into account in catalyst_decompose if device capabilities are provided.")
+            raise ValueError(
+                "target_gates are not taken into account in catalyst_decompose if device capabilities are provided."
+            )
 
         stopping_condition = lambda op: catalyst_acceptance(op, capabilities, grad_method)
         decomposer = partial(catalyst_decomposer, capabilities=capabilities)
@@ -167,7 +174,9 @@ def _decompose_nested_tapes(op, capabilities: DeviceCapabilities, target_gates):
         else:
             with EvaluationContext.frame_tracing_context(region.trace):
                 tapes, _ = catalyst_decompose(
-                    region.quantum_tape, capabilities=capabilities, target_gates=target_gates,
+                    region.quantum_tape,
+                    capabilities=capabilities,
+                    target_gates=target_gates,
                 )
                 new_tape = tapes[0]
         new_regions.append(

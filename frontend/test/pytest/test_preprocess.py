@@ -201,7 +201,19 @@ Cond = { }
 QubitUnitary = { }
 """
 
-TARGET_GATES_FROM_CONFIG = {"PauliX": 1, "PauliZ": 1, "RX": 100, "RY": 100, "RZ": 100, "CNOT": 10, "HybridAdjoint": 1, "ForLoop": 1, "WhileLoop": 1, "Cond": 1, "QubitUnitary": 1000}
+TARGET_GATES_FROM_CONFIG = {
+    "PauliX": 1,
+    "PauliZ": 1,
+    "RX": 100,
+    "RY": 100,
+    "RZ": 100,
+    "CNOT": 10,
+    "HybridAdjoint": 1,
+    "ForLoop": 1,
+    "WhileLoop": 1,
+    "Cond": 1,
+    "QubitUnitary": 1000,
+}
 
 
 class TestPreprocessHybridOp:
@@ -419,7 +431,6 @@ class TestPreprocessHybridOp:
             kwargs = {"target_gates": TARGET_GATES_FROM_CONFIG, "capabilities": None}
             expected_ops = set(TARGET_GATES_FROM_CONFIG)
 
-
         # do the decomposition and get the new tape
         (new_tape,), _ = catalyst_decompose(tape, **kwargs)
 
@@ -589,7 +600,6 @@ class TestPreprocessHybridOp:
         else:
             kwargs = {"target_gates": {"QubitUnitary"}, "capabilities": None}
 
-
         with pytest.raises(
             CompileError,
             match="not supported with catalyst on this device and does not provide a decomposition",
@@ -620,6 +630,7 @@ class TestPreprocessHybridOp:
             match="grad_method is not taken into account .* if target_gates are provided",
         ):
             _ = catalyst_decompose(tape, None, grad_method="fd", target_gates={"X"})
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
