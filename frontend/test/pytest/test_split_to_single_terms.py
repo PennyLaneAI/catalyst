@@ -21,7 +21,6 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.passes import apply_pass
 
 
 @pytest.mark.parametrize(
