@@ -15,13 +15,18 @@
 This module tests the decompose transformation.
 """
 
+from contextlib import nullcontext as does_not_raise
 from functools import partial
 
 import numpy as np
 import pennylane as qml
 import pytest
+from pennylane.exceptions import DecompositionError, DecompositionWarning
 from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
+from pennylane_lightning.lightning_qubit.lightning_qubit import (
+    stopping_condition as lightning_stopping_condition,
+)
 
 
 class TestGraphDecomposition:
@@ -61,9 +66,11 @@ class TestGraphDecomposition:
             qml.Hadamard(x)
             return qml.state()
 
-        # TODO: RZ/RX warnings  should not be raised, remove (PL issue #8885)
+        # TODO: RZ/RX warnings should not be raised, remove (PL issue #8885)
         with pytest.warns(UserWarning, match="Falling back to the legacy decomposition system"):
-            with pytest.warns(UserWarning, match="unable to find a decomposition for {'Hadamard'}"):
+            with pytest.warns(
+                DecompositionWarning, match="unable to find a decomposition for {'Hadamard'}"
+            ):
                 with pytest.warns(UserWarning, match="Operator RX does not define"):
                     with pytest.warns(UserWarning, match="Operator RZ does not define"):
                         circuit(0)
@@ -227,6 +234,70 @@ class TestGraphDecomposition:
 
         expected_resources = qml.specs(circuit, level="device")(x, y, z)["resources"].gate_types
         resources = qml.specs(with_qjit, level="device")(x, y, z)["resources"].gate_types
+        assert resources == expected_resources
+
+    @pytest.mark.usefixtures("use_capture_dgraph")
+    def test_decompose_with_stopping_condition(self):
+        """Test that decompose with stopping_condition uses plxpr decomposition correctly.
+
+        When stopping_condition is passed to qml.transforms.decompose, from_plxpr uses
+        the plxpr decompose path (no graph), passing stopping_condition to the transform.
+        This test ensures that path compiles and produces correct results.
+        """
+
+        def stopping_condition(op):
+            return op.name == "MultiRZ"
+
+        @partial(
+            qml.transforms.decompose,
+            gate_set=[qml.RX, qml.RY, qml.RZ],
+            stopping_condition=stopping_condition,
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x, y, z):
+            qml.Rot(x, y, z, wires=0)
+            qml.MultiRZ(0.5, wires=[0, 1])
+            return qml.expval(qml.PauliZ(0))
+
+        x, y, z = 0.5, 0.3, 0.2
+        without_qjit = circuit(x, y, z)
+        with_qjit = qml.qjit(circuit)
+        assert qml.math.allclose(without_qjit, with_qjit(x, y, z))
+
+        expected_resources = qml.specs(circuit, level="device")(x, y, z)["resources"].gate_types
+        resources = qml.specs(with_qjit, level="device")(x, y, z)["resources"].gate_types
+        assert "MultiRZ" in resources
+        assert "MultiRZ" in expected_resources
+        assert resources == expected_resources
+
+    @pytest.mark.usefixtures("use_capture_dgraph")
+    def test_decompose_with_lightning_stopping_condition(self):
+        """Test that decompose with stopping_condition using Lightning's stopping condition."""
+
+        device = qml.device("lightning.qubit", wires=4)
+
+        @partial(
+            qml.transforms.decompose,
+            gate_set=[qml.CNOT, qml.PauliZ],
+            stopping_condition=lightning_stopping_condition,
+        )
+        @qml.qnode(device)
+        def circuit(x):
+            qml.PauliRot(x, "XYZZ", wires=[0, 1, 2, 3])
+            qml.StatePrep(np.array([1, 0, 0, 0]), wires=range(2))
+            return qml.expval(qml.PauliZ(0))
+
+        x = 0.5
+        without_qjit = circuit(x)
+        with_qjit = qml.qjit(circuit)
+        assert qml.math.allclose(without_qjit, with_qjit(x))
+
+        expected_resources = qml.specs(circuit, level="device")(x)["resources"].gate_types
+        resources = qml.specs(with_qjit, level="device")(x)["resources"].gate_types
+        assert "PauliRot" in expected_resources
+        assert "PauliRot" in resources
+        assert "StatePrep" not in expected_resources
+        assert "StatePrep" not in resources
         assert resources == expected_resources
 
     @pytest.mark.skip(
@@ -449,6 +520,94 @@ class TestGraphDecomposition:
         expected_resources = qml.specs(circuit, level="device")()["resources"].gate_types
         resources = qml.specs(with_qjit, level="device")()["resources"].gate_types
         assert resources == expected_resources
+
+    @pytest.mark.usefixtures("use_capture_dgraph")
+    @pytest.mark.parametrize(
+        "num_work_wires,expectation",
+        [
+            (0, pytest.raises(DecompositionError)),
+            (2, pytest.raises(DecompositionError)),
+            (3, does_not_raise()),
+            (7, does_not_raise()),
+        ],
+    )
+    def test_work_wires(self, num_work_wires, expectation):
+        """
+        Test that graph decomposition raises the correct exception when given an insufficient
+        number of work wires, and passes otherwise.
+        """
+
+        @qml.register_resources(
+            {qml.CNOT: 3, qml.H: 1, qml.X: 1, qml.ops.op_math.Conditional: 2},
+            work_wires={
+                "borrowed": 2,
+                "garbage": 1,
+            },
+        )
+        def my_decomp(angle, wires, **_):
+            def true_func():
+                qml.CNOT(wires)
+
+                with qml.allocate(2, state="any", restored=True) as w:
+                    qml.H(w[0])
+                    qml.H(w[0])
+                    qml.X(w[1])
+                    qml.X(w[1])
+
+                return
+
+            def false_func():
+                with qml.allocate(1, state="any", restored=False) as w:
+                    qml.H(w)
+
+                m = qml.measure(wires[0])
+
+                qml.cond(m, qml.CNOT)(wires)
+
+                return
+
+            qml.cond(angle > 1.2, true_func, false_func)()
+
+        with expectation:
+
+            @qml.qjit
+            @partial(
+                qml.transforms.decompose,
+                gate_set={qml.CNOT, qml.H, qml.X, "Conditional", "MidMeasure"},
+                fixed_decomps={qml.CRX: my_decomp},
+                num_work_wires=num_work_wires,
+            )
+            @qml.qnode(qml.device("lightning.qubit", wires=9))
+            def circuit():
+                qml.CRX(1.7, wires=[0, 1])
+                qml.CRX(-7.2, wires=[0, 1])
+                return qml.state()
+
+    def test_decomp_inside_subroutine(self):
+        """Test that decompositions can happen inside subroutines."""
+
+        qml.decomposition.enable_graph()
+
+        @qml.templates.Subroutine
+        def f(x, wires):
+            qml.IsingXX(x, wires)
+
+        @qml.qjit(capture=True)
+        @qml.decompose(gate_set=qml.gate_sets.ROTATIONS_PLUS_CNOT)
+        @qml.qnode(qml.device("lightning.qubit", wires=5))
+        def c():
+            f(0.5, (0, 1))
+            f(1.2, (2, 3))
+            return qml.expval(qml.Z(0)), qml.expval(qml.Z(2))
+
+        resources = qml.specs(c, level="device")().resources.gate_types
+        assert resources == {"RX": 2, "CNOT": 4}
+
+        r1, r2 = c()
+        assert qml.math.allclose(r1, np.cos(0.5))
+        assert qml.math.allclose(r2, np.cos(1.2))
+
+        qml.decomposition.disable_graph()
 
 
 if __name__ == "__main__":

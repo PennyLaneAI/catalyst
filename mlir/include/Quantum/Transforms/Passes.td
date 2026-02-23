@@ -66,6 +66,10 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let summary = "Given a qnode containing multiple tapes, split each tape into its own function.";
 }
 
+def SplitToSingleTermsPass : Pass<"split-to-single-terms"> {
+    let summary = "Split quantum functions into single-term observables.";
+}
+
 // ----- Quantum circuit transformation passes begin ----- //
 // For example, automatic compiler peephole opts, etc.
 
@@ -85,7 +89,7 @@ def GridsynthPass : Pass<"gridsynth"> {
         /*CLI name=*/"epsilon",
         /*Type=*/"double",
        /*Default=*/"1e-4",
-       /*Description=*/"Maximum error tolerance for per-gate discretization.">, 
+       /*Description=*/"Maximum error tolerance for per-gate discretization.">,
         Option<
         /*C++ var name=*/"pprBasis",
         /*CLI name=*/"ppr-basis",
@@ -96,7 +100,7 @@ def GridsynthPass : Pass<"gridsynth"> {
         let dependentDialects = [
         "memref::MemRefDialect",
         "scf::SCFDialect",
-        "catalyst::qec::QECDialect",
+        "catalyst::pbc::PBCDialect",
     ];
 }
 
@@ -133,6 +137,18 @@ def DisentangleSWAPPass : Pass<"disentangle-SWAP"> {
 def LoopBoundaryOptimizationPass : Pass<"loop-boundary"> {
     let summary = "Perform loop boundary optimization to eliminate the redundancy of operations on loop boundary.";
 }
+
+def DynamicOneShotPass : Pass<"dynamic-one-shot"> {
+    let summary = "Apply the dynamic one-shot transform.";
+
+    let dependentDialects = [
+        "index::IndexDialect",
+        "tensor::TensorDialect",
+        "scf::SCFDialect",
+        "stablehlo::StablehloDialect"
+    ];
+}
+
 // ----- Quantum circuit transformation passes end ----- //
 
 #endif // QUANTUM_PASSES

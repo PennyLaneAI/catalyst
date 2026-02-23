@@ -23,7 +23,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
-#include "QEC/IR/QECOps.h"
+#include "PBC/IR/PBCOps.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 #include "VerifyParentGateAnalysis.hpp"
@@ -31,7 +31,7 @@
 using llvm::dbgs;
 using namespace mlir;
 using namespace catalyst::quantum;
-using namespace catalyst::qec;
+using namespace catalyst::pbc;
 
 static const StringSet<> fixedRotationsAndPhaseShiftsSet = {
     "RX", "RY", "RZ", "PhaseShift", "CRX", "CRY", "CRZ", "ControlledPhaseShift"};
