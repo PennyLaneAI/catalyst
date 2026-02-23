@@ -26,6 +26,7 @@ set(LIBS
     ExternalStablehloLib
     MLIROptLib
     MLIRCatalyst
+    catalyst-analysis
     catalyst-transforms
     catalyst-stablehlo-transforms
     MLIRQuantum
