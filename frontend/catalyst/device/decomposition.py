@@ -91,7 +91,7 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
 @transform
 @debug_logger
 def catalyst_decompose(
-    tape: qml.tape.QuantumTape, ctx, capabilities: DeviceCapabilities, grad_method: str = None, target_gates=None,
+    tape: qml.tape.QuantumTape, capabilities: DeviceCapabilities, grad_method: str = None, target_gates=None,
 ):
     """Decompose operations until the stopping condition is met.
 
@@ -117,9 +117,14 @@ def catalyst_decompose(
             skip_initial_state_prep = capabilities.initial_state_prep
 
     if capabilities is None:
+        if grad_method is not None:
+            raise NotImplementedError("grad_method is not taken into account in catalyst_decompose if target_gates are provided instead of device capabilities.")
         target_gates, stopping_condition = _resolve_gate_set(target_gates, None)
         decomposer = None
     else:
+        if target_gates is not None:
+            raise ValueError("target_gates are not taken into account in catalyst_decompose if device capabilities are provided.")
+
         stopping_condition = lambda op: catalyst_acceptance(op, capabilities, grad_method)
         decomposer = partial(catalyst_decomposer, capabilities=capabilities)
 
@@ -136,7 +141,7 @@ def catalyst_decompose(
     new_ops = []
     for op in toplevel_tape.operations:
         if has_nested_tapes(op):
-            op = _decompose_nested_tapes(op, ctx, capabilities, target_gates)
+            op = _decompose_nested_tapes(op, capabilities, target_gates)
         new_ops.append(op)
     tape = qml.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
 
@@ -154,7 +159,7 @@ def _decompose_to_matrix(op):
     return [op]
 
 
-def _decompose_nested_tapes(op, ctx, capabilities: DeviceCapabilities, target_gates):
+def _decompose_nested_tapes(op, capabilities: DeviceCapabilities, target_gates):
     new_regions = []
     for region in op.regions:
         if region.quantum_tape is None:
@@ -162,7 +167,7 @@ def _decompose_nested_tapes(op, ctx, capabilities: DeviceCapabilities, target_ga
         else:
             with EvaluationContext.frame_tracing_context(region.trace):
                 tapes, _ = catalyst_decompose(
-                    region.quantum_tape, ctx=ctx, capabilities=capabilities, target_gates=target_gates,
+                    region.quantum_tape, capabilities=capabilities, target_gates=target_gates,
                 )
                 new_tape = tapes[0]
         new_regions.append(

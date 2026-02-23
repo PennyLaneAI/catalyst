@@ -406,7 +406,6 @@ class QJITDevice(qml.devices.Device):
         # decomposition to supported ops/measurements
         pipeline.add_transform(
             catalyst_decompose,
-            ctx=ctx,
             capabilities=capabilities,
             grad_method=config.gradient_method,
         )
