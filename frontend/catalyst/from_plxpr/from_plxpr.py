@@ -364,10 +364,6 @@ transforms_to_passes = {
 }
 
 
-def register_transform(pl_transform, pass_name, decomposition):
-    """Register pennylane transforms and their conversion to Catalyst transforms"""
-    transforms_to_passes[pl_transform] = (pass_name, decomposition)
-
 
 def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs):
     if not self.requires_decompose_lowering:

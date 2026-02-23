@@ -23,7 +23,6 @@ from jax.core import ShapedArray
 
 import catalyst
 from catalyst import qjit
-from catalyst.from_plxpr import register_transform
 
 pytestmark = pytest.mark.usefixtures("disable_capture")
 
@@ -1078,12 +1077,10 @@ class TestCapture:
     def test_pass_with_options_patch(self, backend):
         """Test the integration for a circuit with a pass that takes in options."""
 
-        @qml.transform
-        def my_pass(_tape, my_option=None, my_other_option=None):  # pylint: disable=unused-argument
-            """A dummy qml.transform."""
-            return
+        def my_pass_setup_inputs(my_option=None, my_other_option=None):  # pylint: disable=unused-argument
+            return (), {"my_option": my_option, "my_other_option": my_other_option}
 
-        register_transform(my_pass, "my-pass", False)
+        my_pass = qml.transform(pass_name="my-pass", setup_inputs=my_pass_setup_inputs)
 
         @qjit(target="mlir")
         @partial(my_pass, my_option="my_option_value", my_other_option=False)
