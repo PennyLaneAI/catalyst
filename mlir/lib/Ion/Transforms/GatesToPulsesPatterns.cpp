@@ -683,8 +683,8 @@ struct MeasureOpToMeasurePulsePattern : public mlir::OpRewritePattern<MeasureOp>
         // Single detection beam: use for all qubits. Multiple: use one per qubit.
         size_t beamIdx = (detectionBeams.size() == 1) ? 0 : idx;
         if (beamIdx >= detectionBeams.size()) {
-            op.emitError() << "No detection beam for qubit " << idx
-                           << "; detection_beam has only " << detectionBeams.size() << " entries.";
+            op.emitError() << "No detection beam for qubit " << idx << "; detection_beam has only "
+                           << detectionBeams.size() << " entries.";
             return failure();
         }
 
@@ -692,15 +692,15 @@ struct MeasureOpToMeasurePulsePattern : public mlir::OpRewritePattern<MeasureOp>
         auto loc = op.getLoc();
         MLIRContext *ctx = op.getContext();
 
-        auto beamAttr = BeamAttr::get(
-            ctx, rewriter.getI64IntegerAttr(beam.transition_index),
-            rewriter.getF64FloatAttr(beam.rabi), rewriter.getF64FloatAttr(beam.detuning),
-            rewriter.getDenseI64ArrayAttr(beam.polarization),
-            rewriter.getDenseI64ArrayAttr(beam.wavevector));
+        auto beamAttr = BeamAttr::get(ctx, rewriter.getI64IntegerAttr(beam.transition_index),
+                                      rewriter.getF64FloatAttr(beam.rabi),
+                                      rewriter.getF64FloatAttr(beam.detuning),
+                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(beam.wavevector));
 
         // duration is a compile-time constant emitted as an arith.constant Value
-        mlir::Value durationValue = arith::ConstantOp::create(
-            rewriter, loc, rewriter.getF64FloatAttr(measurementDuration));
+        mlir::Value durationValue =
+            arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(measurementDuration));
         auto phaseAttr = rewriter.getF64FloatAttr(0.0);
 
         auto ionQubits = convertQuantumBitsToIonQubits(rewriter, loc, op.getInQubit());
