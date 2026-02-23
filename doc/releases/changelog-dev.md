@@ -153,6 +153,7 @@
 * Catalyst with program capture can now be used with the new `qml.templates.Subroutine` class and the associated
   `qml.capture.subroutine` upstreamed from `catalyst.jax_primitives.subroutine`.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
+  [(#2493)](https://github.com/PennyLaneAI/catalyst/pull/2493)
 
 * The PPR/PPM lowering passes (`lower-pbc-init-ops`, `unroll-conditional-ppr-ppm`) are now run
   as part of the main quantum compilation pipeline. When using `to-ppr` and `ppr-to-ppm` transforms,
@@ -221,6 +222,10 @@
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fix a bug in the bind call function for `PCPhase` where the signature did not match what was 
+  expected in `jax_primitives`. `ctrl_qubits` was missing from positional arguments in previous signature.
+  [(#2467)](https://github.com/PennyLaneAI/catalyst/pull/2467)
 
 * Fix `CATALYST_XDSL_UNIVERSE` to correctly define the available dialects and transforms, allowing
   tools like `xdsl-opt` to work with Catalyst's custom Python dialects.
@@ -493,6 +498,7 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
 Yushao Chen,
+Marcus Edwards,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
