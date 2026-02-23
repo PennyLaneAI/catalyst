@@ -2,8 +2,50 @@
 
 <h3>New features since last release</h3>
 
-* Executing circuits that are compiled with :func:`pennylane.transforms.to_ppr`, 
-  :func:`pennylane.transforms.commute_ppr`, :func:`pennylane.transforms.ppr_to_ppm`, 
+* A new MLIR transformation pass `--dynamic-one-shot` is available.
+  Devices that natively support mid-circuit measurements can evaluate dynamic circuits by executing
+  them one shot at a time, sampling a dynamic execution path for each shot. The `--dynamic-one-shot`
+  pass first transforms the circuit so that each circuit execution only contains a singular shot,
+  then performs the appropriate classical statistical postprocessing across the execution results
+  from all shots.
+  [(#2458)](https://github.com/PennyLaneAI/catalyst/pull/2458)
+
+  With this new MLIR pass, one shot execution mode is now available when capture is enabled.
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=2)
+
+  @qjit(capture=True)
+  @qml.transform(pass_name="dynamic-one-shot")
+  @qml.qnode(dev, shots=10)
+  def circuit():
+      qml.Hadamard(wires=0)
+      m_0 = qml.measure(0)
+      m_1 = qml.measure(1)
+      return qml.sample([m_0, m_1]), qml.expval(m_0), qml.probs(op=[m_0,m_1]), qml.counts(wires=0)
+  ```
+
+  ```pycon
+  >>> circuit()
+  (Array([[1, 0],
+         [0, 0],
+         [1, 0],
+         [1, 0],
+         [0, 0],
+         [0, 0],
+         [1, 0],
+         [1, 0],
+         [1, 0],
+         [0, 0]], dtype=int64), Array(0.6, dtype=float64), Array([0.4, 0. , 0.6, 0. ], dtype=float64),
+         (Array([0, 1], dtype=int64), Array([4, 6], dtype=int64)))
+  ```
+
+  Note that although the one-shot transform is motivated from the context of mid-circuit measurements,
+  this pass also supports terminal measurement processes that are performed on wires, instead of
+  mid-circuit measurement results.
+
+* Executing circuits that are compiled with :func:`pennylane.transforms.to_ppr`,
+  :func:`pennylane.transforms.commute_ppr`, :func:`pennylane.transforms.ppr_to_ppm`,
   :func:`pennylane.transforms.merge_ppr_ppm`, :func:`pennylane.transforms.reduce_t_depth`,
   and :func:`pennylane.transforms.decompose_arbitrary_ppr` is now possible with the `lightning.qubit` device and
   with program capture enabled (:func:`pennylane.capture.enable`).
@@ -14,8 +56,8 @@
   [(#2414)](https://github.com/PennyLaneAI/catalyst/pull/2414)
   [(#2424)](https://github.com/PennyLaneAI/catalyst/pull/2424)
   [(#2443)](https://github.com/PennyLaneAI/catalyst/pull/2443)
-  
-  Previously, circuits compiled with these transforms were only inspectable via 
+
+  Previously, circuits compiled with these transforms were only inspectable via
   :func:`pennylane.specs` and :func:`catalyst.draw`. Now, such circuits can be executed:
 
   ```python
@@ -96,11 +138,22 @@
   # [ARTIQ] Generated ELF: /path/to/circuit.elf
   ```
 
+* Added a scalable MLIR resource tracker analysis pass (`resource-tracker`) that counts quantum
+  operations across the `quantum`, `qec`, and `mbqc` dialects. The analysis is implemented as a
+  cacheable MLIR analysis class (`ResourceAnalysis`) that other transformation passes can query
+  via `getAnalysis<ResourceAnalysis>()`, avoiding redundant recomputation.
+
+  ```bash
+  quantum-opt --resource-tracker='output-json=true' input.mlir
+  quantum-opt --resource-tracker -mlir-pass-statistics input.mlir
+  ```
+
 <h3>Improvements 🛠</h3>
 
 * Catalyst with program capture can now be used with the new `qml.templates.Subroutine` class and the associated
   `qml.capture.subroutine` upstreamed from `catalyst.jax_primitives.subroutine`.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
+  [(#2493)](https://github.com/PennyLaneAI/catalyst/pull/2493)
 
 * The PPR/PPM lowering passes (`lower-pbc-init-ops`, `unroll-conditional-ppr-ppm`) are now run
   as part of the main quantum compilation pipeline. When using `to-ppr` and `ppr-to-ppm` transforms,
@@ -163,9 +216,16 @@
 * Dropped support for NumPy 1.x following its end-of-life. NumPy 2.0 or higher is now required.
   [(#2407)](https://github.com/PennyLaneAI/catalyst/pull/2407)
 
+* The inlining pass has been removed from the default compilation pipeline.
+  [(#2473)](https://github.com/PennyLaneAI/catalyst/pull/2473)
+
 <h3>Deprecations 👋</h3>
 
 <h3>Bug fixes 🐛</h3>
+
+* Fix a bug in the bind call function for `PCPhase` where the signature did not match what was 
+  expected in `jax_primitives`. `ctrl_qubits` was missing from positional arguments in previous signature.
+  [(#2467)](https://github.com/PennyLaneAI/catalyst/pull/2467)
 
 * Fix `CATALYST_XDSL_UNIVERSE` to correctly define the available dialects and transforms, allowing
   tools like `xdsl-opt` to work with Catalyst's custom Python dialects.
@@ -207,6 +267,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update `mlir_specs` to account for new `marker` functionality in PennyLane.
+  [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
+  
 * The QEC (Quantum Error Correction) dialect has been renamed to PBC (Pauli-Based Computation)
   across the entire codebase. This includes the MLIR dialect (`pbc.*` -> `pbc.*`), C++ namespaces
   (`catalyst::pbc` -> `catalyst::pbc`), Python bindings, compiler passes (e.g.,
@@ -215,6 +278,7 @@
   names. The rename better reflects the dialect's purpose as a representation for Pauli-Based
   Computation rather than general quantum error correction.
   [(#2482)](https://github.com/PennyLaneAI/catalyst/pull/2482)
+  [(#2485)](https://github.com/PennyLaneAI/catalyst/pull/2485)
 
 * Updated the integration tests for `qp.specs` to get coverage for new features
   [(#2448)](https://github.com/PennyLaneAI/catalyst/pull/2448)
@@ -272,6 +336,10 @@
 
 * The upstream MLIR `Test` dialect is now available via the `catalyst` command line tool.
   [(#2417)](https://github.com/PennyLaneAI/catalyst/pull/2417)
+
+* Removing some previously-added guardrails that were in place due to a bug in dynamic allocation 
+  that is now fixed.
+  [(#2427)](https://github.com/PennyLaneAI/catalyst/pull/2427)
 
 * A new compiler pass `lower-pbc-init-ops` has been added to lower PBC initialization operations
   to Quantum dialect operations. This pass converts `pbc.prepare` to `quantum.custom` and
@@ -360,6 +428,7 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Joey Carter,
 Yushao Chen,
+Marcus Edwards,
 Lillian Frederiksen,
 Sengthai Heng,
 David Ittah,
