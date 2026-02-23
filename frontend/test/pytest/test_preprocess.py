@@ -611,13 +611,13 @@ class TestPreprocessHybridOp:
         ):
             _ = catalyst_decompose(tape, capabilities, target_gates={"X"})
 
-    def test_grad_method_with_target_gates_provided_error(self, request):
+    def test_grad_method_with_target_gates_provided_error(self):
         """Test that an error is raised if `grad_method` and a target gate set are provided."""
 
         tape = qml.tape.QuantumScript()
         with pytest.raises(
-            ValueError,
-            match="target_gates are not taken into account .* device capabilities are provided",
+            NotImplementedError,
+            match="grad_method is not taken into account .* if target_gates are provided",
         ):
             _ = catalyst_decompose(tape, None, grad_method="fd", target_gates={"X"})
 
