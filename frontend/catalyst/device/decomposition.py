@@ -134,6 +134,7 @@ def catalyst_decompose(
 
         def stopping_condition(op):
             return catalyst_acceptance(op, capabilities, grad_method)
+
         decomposer = partial(catalyst_decomposer, capabilities=capabilities)
 
     (toplevel_tape,), _ = decompose(
