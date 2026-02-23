@@ -45,16 +45,16 @@ class CompilerTransform(Transform):
 
 
 def compiler_transform(module_pass: ModulePass) -> CompilerTransform:
-    """Function to register compilation passes to use within :func:`~.qjit`'d workflows as 
+    """Function to register compilation passes to use within :func:`~.qjit`'d workflows as
     decorators on top of QNodes.
-    
+
     Args:
-        module_pass (xdsl.passes.ModulePass): The module pass to be registered. Note that a 
-            :class:`~.CompilationPass` is a ``ModulePass`` subclass, which is intended to be the 
+        module_pass (xdsl.passes.ModulePass): The module pass to be registered. Note that a
+            :class:`~.CompilationPass` is a ``ModulePass`` subclass, which is intended to be the
             most common type to be used in conjuction with ``compiler_transform``.
 
     Returns:
-        (Callable): The function that can be used as a traditional PennyLane transform (within 
+        (Callable): The function that can be used as a traditional PennyLane transform (within
         :func:`~.qjit`'d workflows only).
 
     .. see-also::
@@ -63,7 +63,7 @@ def compiler_transform(module_pass: ModulePass) -> CompilerTransform:
 
     **Example**
 
-    Here is a toy example that arbitrarily replaces a Hadamard gate with an ``RX`` gate, where the 
+    Here is a toy example that arbitrarily replaces a Hadamard gate with an ``RX`` gate, where the
     angle of rotation is specified with positional and keyword arguments.
 
     .. code-block:: python
@@ -76,7 +76,7 @@ def compiler_transform(module_pass: ModulePass) -> CompilerTransform:
             def __init__(self, theta, mult_by_two=True):
                 self.theta = theta
                 self.mult_by_two = mult_by_two
-            
+
             def action(self, op, rewriter):
                 if qp.compiler.op_eq(op, qp.H):
                     angle = self.theta * 2 if self.mult_by_two else self.theta
@@ -85,7 +85,7 @@ def compiler_transform(module_pass: ModulePass) -> CompilerTransform:
 
         replace_with_rx = qp.compiler_transform(ReplaceWithRX)
 
-    The ``replace_with_rx`` pass can now be applied to a QNode within a :func:`~.qjit` workflow, 
+    The ``replace_with_rx`` pass can now be applied to a QNode within a :func:`~.qjit` workflow,
     where the arguments ``theta`` and ``mult_by_two`` can be passed as arguments to it.
 
     .. code-block:: python
@@ -97,7 +97,7 @@ def compiler_transform(module_pass: ModulePass) -> CompilerTransform:
             qp.H(0)
             return qp.state()
 
-    >>> circuit() 
+    >>> circuit()
     Array([0.99810947+0.j        , 0.        -0.06146124j], dtype=complex128)
     """
     transform = CompilerTransform(module_pass)
@@ -111,8 +111,8 @@ def compiler_transform(module_pass: ModulePass) -> CompilerTransform:
 
 
 class CompilationPass(ModulePass):
-    """A base class for defining Catalyst-compatible compilation passes using 
-    `xDSL <https://xdsl.dev/>`_. ``CompilationPass`` is a subclass of xDSL's ``ModulePass`` to 
+    """A base class for defining Catalyst-compatible compilation passes using
+    `xDSL <https://xdsl.dev/>`_. ``CompilationPass`` is a subclass of xDSL's ``ModulePass`` to
     abstract away compiler-level details that would otherwise need to be provided manually.
 
     ``CompilationPass`` subclass objects have three attributes:
@@ -121,32 +121,32 @@ class CompilationPass(ModulePass):
     * :attr:`~.CompilationPass.recursive` (default: ``True``):  Whether or not the actions of the pass should be applied recursively. If ``True``, the actions will be applied repeatedly until a steady-state is reached.
     * :attr:`~.CompilationPass.greedy` (default: ``True``):  Whether or not the actions of the pass should be applied greedily. Only relevant if the compilation pass defines multiple actions. If ``True``, each iteration of the actions' application (if ``recursive == True``) will only apply the first action that modifies the input module.
 
-    .. see-also:: 
+    .. see-also::
 
-        `~.compiler_transform` for registering ``CompilationPass`` subclasses to use with 
+        `~.compiler_transform` for registering ``CompilationPass`` subclasses to use with
         :func:`pennylane.qjit` workflows.
 
         TODO: add see-also's for utility functions like ``op_eq``.
 
-    A ``CompilationPass`` must specify an :meth:`action <~.CompilationPass.action>` that describes 
-    how it will transform operations. Please consult the documentation for the 
-    :meth:`action <~.CompilationPass.action>` method below. 
+    A ``CompilationPass`` must specify an :meth:`action <~.CompilationPass.action>` that describes
+    how it will transform operations. Please consult the documentation for the
+    :meth:`action <~.CompilationPass.action>` method below.
     """
 
     name: ClassVar[str]
-    """str: Specifies a compilation pass' name. Kebab casing is suggested for naming (e.g., 
+    """str: Specifies a compilation pass' name. Kebab casing is suggested for naming (e.g.,
     ``"my-pass-name"``).
     """
 
     recursive: ClassVar[bool] = True
-    """bool: Whether or not the actions should be applied recursively. If ``True``, the actions will 
+    """bool: Whether or not the actions should be applied recursively. If ``True``, the actions will
     be applied repeatedly until a steady-state is reached. ``True`` by default.
     """
 
     greedy: ClassVar[bool] = True
-    """bool: Whether or not the actions should be applied greedily. Only relevant if the compilation 
-    pass defines multiple actions. If ``True``, each iteration of the actions' application (if 
-    ``recursive == True``) will only apply the first action that modifies the input module. ``True`` 
+    """bool: Whether or not the actions should be applied greedily. Only relevant if the compilation
+    pass defines multiple actions. If ``True``, each iteration of the actions' application (if
+    ``recursive == True``) will only apply the first action that modifies the input module. ``True``
     by default.
     """
 
@@ -169,18 +169,18 @@ class CompilationPass(ModulePass):
                 a type hint for the operation is provided, this method will _only_
                 be invoked if the input operation matches the type hint.
             rewriter (xdsl.pattern_rewriter.PatternRewriter): a ``PatternRewriter``
-                that provides methods for transforming operations. 
+                that provides methods for transforming operations.
 
-        .. see-also:: 
+        .. see-also::
 
-            :meth:`~.CompilationPass.add_action` for specifying additional actions. ``add_action`` 
-            should be used alongside ``action`` when a different behaviour is desired for certain 
+            :meth:`~.CompilationPass.add_action` for specifying additional actions. ``add_action``
+            should be used alongside ``action`` when a different behaviour is desired for certain
             operation types.
 
         **Example**
 
-        A ``CompilationPass`` subclass' functionality is predominantly defined by its ``action``. 
-        A simple example of an action is provided below, where the pass aims to arbitrarily replace 
+        A ``CompilationPass`` subclass' functionality is predominantly defined by its ``action``.
+        A simple example of an action is provided below, where the pass aims to arbitrarily replace
         a ``Hadamard`` gate a ``Rot`` gate.
 
         .. code-block:: python
@@ -207,7 +207,7 @@ class CompilationPass(ModulePass):
         >>> circuit()
         Array([0.97517033-0.19767681j, 0.09933467+0.00996671j], dtype=complex128)
 
-        As expected, the circuit's state is not a uniform superposition as if a Hadamard was 
+        As expected, the circuit's state is not a uniform superposition as if a Hadamard was
         applied, as it was replaced with a ``Rot`` gate.
         """
 
@@ -217,7 +217,7 @@ class CompilationPass(ModulePass):
     ) -> None:
         """Register an additional action that performs a transformation on an input operation.
 
-        The action _must_ type hint which operation is being rewritten. It must have the 
+        The action _must_ type hint which operation is being rewritten. It must have the
         following signature,
 
         .. code-block:: python
@@ -228,7 +228,7 @@ class CompilationPass(ModulePass):
             def rewrite_myop(self, op: MyOperationType, rewriter: PatternRewriter) -> None:
                 ...
 
-        In the above example, the type hint for the ``op`` argument is used to determine which xDSL 
+        In the above example, the type hint for the ``op`` argument is used to determine which xDSL
         operation is being matched. If not provided, _all_ xDSL operations will be matched.
 
         Additionally, the type hint can also contain a union of multiple operation types:
@@ -241,24 +241,24 @@ class CompilationPass(ModulePass):
             ) -> None:
                 ...
 
-        A full list of quantum operations that can be used for type-hinting can be found in the 
+        A full list of quantum operations that can be used for type-hinting can be found in the
         ``catalyst.python_interface.dialects.quantum`` dialect.
 
         .. note::
 
-            If an action for the provided operation already exists, the existing action will get 
-            priority over the new one. To see all registered actions, use the 
+            If an action for the provided operation already exists, the existing action will get
+            priority over the new one. To see all registered actions, use the
             :meth:`~.CompilationPass.actions` property.
 
         Args:
-            action (Callable): A callable meeting the above constraints that transforms a given 
+            action (Callable): A callable meeting the above constraints that transforms a given
                 operation
 
         **Example**
 
-        A simple example of an action and an added action is provided below, where the pass aims to 
-        arbitrarily replace a ``MultiRZ`` gate with a series of ``T`` gates via ``action``, and the 
-        added action (``new_action``) will only replace ``PCPhase`` operations with a series of 
+        A simple example of an action and an added action is provided below, where the pass aims to
+        arbitrarily replace a ``MultiRZ`` gate with a series of ``T`` gates via ``action``, and the
+        added action (``new_action``) will only replace ``PCPhase`` operations with a series of
         Hadamard gates.
 
         .. code-block:: python
@@ -305,6 +305,12 @@ class CompilationPass(ModulePass):
                 0.        +0.35355339j, -0.25      +0.25j      ,
                 0.        +0.j        ,  0.        +0.j        ],      dtype=complex128)
         """
+        if cls is CompilationPass:
+            raise TypeError(
+                "Cannot use 'CompilationPass.add_action'. New actions can only be registered "
+                "for subclasses of 'CompilationPass'."
+            )
+
         # xdsl.pattern_rewriter.op_type_rewrite_pattern was used as a reference to
         # implement the type hint collection. Source:
         # https://github.com/xdslproject/xdsl/blob/main/xdsl/pattern_rewriter.py
@@ -360,7 +366,6 @@ class CompilationPass(ModulePass):
 
 
 def _update_op_type_hint(hint: type[Operation]) -> Callable:
-
     """Update the signature of a ``match_and_rewrite`` method to use the provided type hint
     for the ``op`` argument."""
 

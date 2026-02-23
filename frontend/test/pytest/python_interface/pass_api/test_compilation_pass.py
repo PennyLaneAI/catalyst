@@ -18,13 +18,13 @@ from typing import Union
 import pennylane as qml
 import pytest
 from xdsl.context import Context
-from xdsl.dialects import arith, test
+from xdsl.dialects import arith, builtin, test
 from xdsl.rewriter import InsertPoint
 
 from catalyst.python_interface import QuantumParser
 from catalyst.python_interface.conversion import parse_generic_to_xdsl_module
 from catalyst.python_interface.dialects import quantum
-from catalyst.python_interface.pass_api import CompilationPass
+from catalyst.python_interface.pass_api import CompilationPass, compiler_transform
 
 pytestmark = pytest.mark.xdsl
 # parse_generic_to_xdsl_module doesn't load the test dialect by default
@@ -328,6 +328,74 @@ class TestCompilationPass:
             @pass_cls.add_action
             def new_action1(self, op: Union[qml.PauliX, qml.PauliY], rewriter):
                 return
+
+    def test_base_class_add_action_error(self):
+        """Test that an error is raised with trying to add an action to the CompilationPass
+        base class."""
+
+        def null_action(self, op, rewriter):
+            return
+
+        with pytest.raises(TypeError, match="Cannot use 'CompilationPass.add_action'"):
+            CompilationPass.add_action(null_action)
+
+
+class IntegrationTestPass(CompilationPass):
+    """Compilation pass for integration testing."""
+
+    name = "integration-pass"
+
+    def action(self, op: quantum.CustomOp, rewriter):
+        """Replace H with Y, remove X."""
+        if op.gate_name.data == "Hadamard":
+            new_op = quantum.CustomOp(
+                gate_name="PauliY", in_qubits=op.in_qubits, in_ctrl_qubits=op.in_ctrl_qubits
+            )
+            rewriter.replace_op(op, new_op)
+        elif op.gate_name.data == "PauliX":
+            rewriter.replace_op(op, (), op.in_qubits + op.in_ctrl_qubits)
+
+
+@IntegrationTestPass.add_action
+def _(self, op: quantum.MeasureOp, rewriter):
+    """Extend the classical MCM value if the MCM occurred right after a PauliY, and erase
+    the PauliY."""
+    if (
+        isinstance(owner := op.in_qubit.owner, quantum.CustomOp)
+        and op.in_qubit.owner.gate_name.data == "PauliY"
+    ):
+        rewriter.replace_op(owner, (), owner.in_qubits + owner.in_ctrl_qubits)
+        ext_op = arith.ExtUIOp(op.mres, target_type=builtin.i64)
+        rewriter.insert_op(ext_op, InsertPoint.after(op))
+
+
+integration_pass = compiler_transform(IntegrationTestPass)
+
+
+@pytest.mark.parametrize("capture", [True, False])
+class TestCompilationPassIntegration:
+    """Integration tests for CompilationPass."""
+
+    def test_qjit_integration(self, run_filecheck_qjit, capture):
+        """Test that passes created using CompilationPass can be used
+        with qjit."""
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qml.qjit(capture=capture)
+        @integration_pass
+        @qml.qnode(dev)
+        def circuit():
+            # CHECK-NOT: quantum.custom
+            qml.Hadamard(0)
+            qml.PauliX(0)
+            # CHECK: [[MRES:%.+]], {{%.+}} = quantum.measure
+            # CHECK: arith.extui [[MRES]] : i1 to i64
+            _ = qml.measure(0)
+            return qml.state()
+
+        run_filecheck_qjit(circuit)
+        assert qml.math.allclose(circuit(), [1, 0])
 
 
 if __name__ == "__main__":
