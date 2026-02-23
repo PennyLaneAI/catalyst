@@ -97,7 +97,7 @@ def test_split_non_commuting_integration(hamiltonian):
 
     # Validate that the pass was applied
     assert "hamiltonian" in circ1.mlir
-    assert "hamiltonian" not in circ1.mlir_opt
+    assert "Hamiltonian" not in circ1.mlir_opt
 
     # # Compare results
     result1 = circ1()
@@ -153,7 +153,7 @@ def test_split_non_commuting_with_tensor_product():
         return 2 * term1 + 3 * term2, term3
 
     assert "hamiltonian" in circ1.mlir
-    assert "hamiltonian" not in circ1.mlir_opt
+    assert "Hamiltonian" not in circ1.mlir_opt
 
     result1 = circ1()
     result2 = post_processing()
@@ -201,7 +201,7 @@ def test_split_non_commuting_with_Identity():
         return term1 + 2 * term2 + 0.7
 
     assert "hamiltonian" in circ1.mlir
-    assert "hamiltonian" not in circ1.mlir_opt
+    assert "Hamiltonian" not in circ1.mlir_opt
 
     result1 = circ1()
     result2 = post_processing()
