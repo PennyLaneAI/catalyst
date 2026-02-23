@@ -29,6 +29,8 @@ import numpy as np
 from jax._src.tree_util import tree_flatten, tree_leaves, tree_structure, tree_unflatten
 from jax.api_util import debug_info
 from jax.core import Tracer
+from pennylane import for_loop as qml_for_loop
+from pennylane.capture import enabled as capture_enabled
 
 from catalyst.api_extensions.control_flow import for_loop
 from catalyst.jax_extras import make_jaxpr2
@@ -197,7 +199,9 @@ class VmapCallable(CatalystCallable):
         """Vectorization around the hybrid program using catalyst.for_loop"""
 
         # Dispatch to jax.vmap when it is called outside qjit.
-        if not EvaluationContext.is_tracing():
+        # Check both capture_enabled() (new capture pathway) and EvaluationContext.is_tracing()
+        # (old frontend pathway) to properly detect tracing context.
+        if not capture_enabled() and not EvaluationContext.is_tracing():
             return jax.vmap(self.fn, self.in_axes, self.out_axes)(*args, **kwargs)
 
         args_flat, args_tree = tree_flatten(args)
@@ -265,7 +269,10 @@ class VmapCallable(CatalystCallable):
             batched_result_list.append(jnp.zeros(shape=out_shape, dtype=init_result_flat[j].dtype))
 
         # Apply mapping batched_args[1:] ---> fn(args)
-        @for_loop(0, batch_size, 1)
+        # Use qml.for_loop when capture is enabled, otherwise use catalyst.for_loop
+        loop_decorator = qml_for_loop if capture_enabled() else for_loop
+
+        @loop_decorator(0, batch_size, 1)
         def loop_fn(i, batched_result_list):
             fn_args_flat = args_flat
             for loc in batch_loc:
