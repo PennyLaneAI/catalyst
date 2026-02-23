@@ -137,7 +137,7 @@ struct PPMeasurementOpPattern : public OpConversionPattern<PPMeasurementOp> {
                                   ConversionPatternRewriter &rewriter) const override
     {
         if (op.getCondition()) {
-            return op.emitOpError("PPMeasurementOp with condition is not supported.");
+            return op.emitOpError("Conversion of PPMeasurementOp with condition to LLVM is not supported. Expected op to be unrolled with --unroll-conditional-ppr-ppm.");
         }
 
         Location loc = op.getLoc();

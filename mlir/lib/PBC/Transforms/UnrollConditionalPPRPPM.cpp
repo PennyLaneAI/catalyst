@@ -163,23 +163,12 @@ struct LowerCondPPM : public OpRewritePattern<PPMeasurementOp> {
         IntegerAttr rotationSign = op.getRotationSignAttr();
         ValueRange inQubits = op.getInQubits();
 
-        SmallVector<mlir::Type> resultTypes;
-        resultTypes.push_back(rewriter.getI1Type());
-        for (auto qubit : inQubits) {
-            resultTypes.push_back(qubit.getType());
-        }
-
-        auto ifOp = scf::IfOp::create(rewriter, loc, resultTypes, condition, true);
+        auto ifOp = scf::IfOp::create(rewriter, loc, op->getResultTypes(), condition, true);
         {
             OpBuilder::InsertionGuard guard(rewriter);
             rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
-            auto ppm =
-                PPMeasurementOp::create(rewriter, loc, rewriter.getI1Type(), TypeRange(inQubits),
-                                        pauliProduct, rotationSign, inQubits);
-            SmallVector<mlir::Value> yieldValues;
-            yieldValues.push_back(ppm.getMres());
-            yieldValues.append(ppm.getOutQubits().begin(), ppm.getOutQubits().end());
-            scf::YieldOp::create(rewriter, loc, yieldValues);
+            auto ppm = rewriter.clone(op);
+            scf::YieldOp::create(rewriter, loc, ppm->getResults());
         }
 
         {
