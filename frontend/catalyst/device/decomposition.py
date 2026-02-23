@@ -132,7 +132,8 @@ def catalyst_decompose(
                 "target_gates are not taken into account in catalyst_decompose if device capabilities are provided."
             )
 
-        stopping_condition = lambda op: catalyst_acceptance(op, capabilities, grad_method)
+        def stopping_condition(op):
+            return catalyst_acceptance(op, capabilities, grad_method)
         decomposer = partial(catalyst_decomposer, capabilities=capabilities)
 
     (toplevel_tape,), _ = decompose(
