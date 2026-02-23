@@ -26,6 +26,7 @@ using json = nlohmann::json;
 
 static std::unique_ptr<json> JSON = nullptr;
 static std::unique_ptr<std::vector<Pulse *>> PulseGarbageCan = nullptr;
+static std::unique_ptr<std::unordered_map<Pulse *, bool>> PulseIsMeasurePulse = nullptr;
 
 template <typename T> json &numerical_json_factory(T value)
 {
@@ -35,7 +36,7 @@ template <typename T> json &numerical_json_factory(T value)
     return j;
 }
 
-void to_json(json &j, const Pulse &p)
+void to_json(json &j, const Pulse &p, bool is_measure_pulse = false)
 {
     RT_FAIL_IF(p.target >= (*JSON)["system"]["ions"].size(), "ion index out of range");
 
@@ -44,7 +45,7 @@ void to_json(json &j, const Pulse &p)
                    static_cast<size_t>(p.beam->transition_index) >= transitions.size(),
                "transition index out of range");
 
-    j = json{{"class_", "Pulse"}, {"duration", p.duration}};
+    j = json{{"class_", is_measure_pulse ? "MeasurePulse" : "Pulse"}, {"duration", p.duration}};
 
     json j_beam;
     j_beam["class_"] = "Beam";
@@ -64,6 +65,7 @@ extern "C" {
 void __catalyst__oqd__rt__initialize()
 {
     PulseGarbageCan = std::make_unique<std::vector<Pulse *>>();
+    PulseIsMeasurePulse = std::make_unique<std::unordered_map<Pulse *, bool>>();
 
     JSON = std::make_unique<json>();
     (*JSON)["class_"] = "AtomicCircuit";
@@ -89,6 +91,7 @@ void __catalyst__oqd__rt__finalize(const std::string &openapl_file_name)
     for (auto pulse : *PulseGarbageCan) {
         delete pulse;
     }
+    PulseIsMeasurePulse->clear();
 
     std::ofstream out_json(openapl_file_name);
     out_json << JSON->dump(2);
@@ -115,6 +118,17 @@ Pulse *__catalyst__oqd__pulse(QUBIT *qubit, double duration, double phase, Beam 
     // This means we have to new and delete manually.
     Pulse *pulse = new Pulse({beam, wire, duration, phase});
     PulseGarbageCan->push_back(pulse);
+    (*PulseIsMeasurePulse)[pulse] = false;
+    return pulse;
+}
+
+Pulse *__catalyst__oqd__measure_pulse(QUBIT *qubit, double duration, double phase, Beam *beam)
+{
+    size_t wire = reinterpret_cast<QubitIdType>(qubit);
+
+    Pulse *pulse = new Pulse({beam, wire, duration, phase});
+    PulseGarbageCan->push_back(pulse);
+    (*PulseIsMeasurePulse)[pulse] = true;
     return pulse;
 }
 
@@ -123,9 +137,13 @@ void __catalyst__oqd__ParallelProtocol(Pulse **pulses, size_t num_of_pulses)
     json j;
     j["class_"] = "ParallelProtocol";
 
-    std::vector<std::reference_wrapper<Pulse>> pulses_json;
+    std::vector<json> pulses_json;
     for (std::size_t i = 0; i < num_of_pulses; i++) {
-        pulses_json.push_back(std::ref(*(pulses[i])));
+        Pulse *p = pulses[i];
+        bool is_measure = PulseIsMeasurePulse->count(p) ? (*PulseIsMeasurePulse)[p] : false;
+        json pj;
+        to_json(pj, *p, is_measure);
+        pulses_json.push_back(pj);
     }
     j["sequence"] = pulses_json;
 

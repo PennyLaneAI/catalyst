@@ -41,6 +41,8 @@ class OQDDatabaseManager {
 
         loadBeams1Params();
         loadBeams2Params();
+        loadDetectionBeamParams();
+        loadMeasurementDuration();
 
         loadPhononParams(n_qubits);
 
@@ -49,10 +51,13 @@ class OQDDatabaseManager {
 
     const std::vector<Beam> &getBeams1Params() const { return beams1; }
     const std::vector<Beam> &getBeams2Params() const { return beams2; }
+    const std::vector<DetectionBeam> &getDetectionBeamParams() const { return detectionBeams; }
 
     const std::vector<Phonon> &getPhononParams() const { return phonons; }
 
     const std::map<std::string, Ion> &getIonParams() const { return ions; }
+
+    double getMeasurementDuration() const { return measurementDuration; }
 
   private:
     toml::parse_result sourceTomlDevice;
@@ -61,15 +66,72 @@ class OQDDatabaseManager {
 
     std::vector<Beam> beams1;
     std::vector<Beam> beams2;
+    std::vector<DetectionBeam> detectionBeams;
 
     std::vector<Phonon> phonons;
 
+    double measurementDuration = 1e-4;
+
     std::map<std::string, Ion> ions;
 
-    void loadBeams1Params() { loadBeamsParamsImpl("beams1"); }
-    void loadBeams2Params() { loadBeamsParamsImpl("beams2"); }
+    void loadBeams1Params() { loadBeamsParamsImpl("beams1", beams1); }
+    void loadBeams2Params() { loadBeamsParamsImpl("beams2", beams2); }
 
-    void loadBeamsParamsImpl(const std::string &mode)
+    void loadMeasurementDuration()
+    {
+        toml::node_view<toml::node> val = sourceTomlGateDecomposition["measurement_duration"];
+        if (val && val.is_floating_point()) {
+            measurementDuration = val.as_floating_point()->get();
+        }
+    }
+
+    static int parseTransitionIndex(const std::string &transition)
+    {
+        if (transition == "downstate_estate")
+            return 0;
+        if (transition == "downstate_estate2")
+            return 1;
+        if (transition == "upstate_estate")
+            return 2;
+        if (transition == "upstate_estate2")
+            return 3;
+        return -1;
+    }
+
+    static double getTomlDouble(toml::node_view<toml::node> node)
+    {
+        if (auto fp = node.as_floating_point())
+            return fp->get();
+        if (auto i = node.as_integer())
+            return static_cast<double>(i->get());
+        return 0.0;
+    }
+
+    void loadDetectionBeamParams()
+    {
+        toml::node_view<toml::node> beamsToml = sourceTomlGateDecomposition["detection_beam"];
+        if (!beamsToml || !beamsToml.is_array()) {
+            return;
+        }
+        size_t numBeams = beamsToml.as_array()->size();
+        for (size_t i = 0; i < numBeams; i++) {
+            auto beam = beamsToml[i];
+            double rabi = getTomlDouble(beam["rabi"]);
+            double detuning = getTomlDouble(beam["detuning"]);
+            std::vector<int64_t> polarization =
+                tomlArray2StdVector<int64_t>(*(beam["polarization"].as_array()));
+            std::vector<int64_t> wavevector =
+                tomlArray2StdVector<int64_t>(*(beam["wavevector"].as_array()));
+            std::string transition = beam["transition"].as_string()->get();
+            int transitionIndex = parseTransitionIndex(transition);
+            if (transitionIndex < 0) {
+                assert(false && "detection_beam: invalid transition string");
+            }
+            detectionBeams.emplace_back(rabi, detuning, polarization, wavevector, transitionIndex);
+        }
+    }
+
+    void loadBeamsParamsImpl(const std::string &mode, std::vector<Beam> &collector)
     {
         // Read in the gate decomposition beam parameters from toml file.
         // The toml contains a list of beams, where each beam has the following fields:
@@ -79,19 +141,10 @@ class OQDDatabaseManager {
         //   wavevector = [8,9]
 
         toml::node_view<toml::node> beamsToml = sourceTomlGateDecomposition[mode];
+        if (!beamsToml || !beamsToml.is_array()) {
+            return;
+        }
         size_t numBeams = beamsToml.as_array()->size();
-
-        std::vector<Beam> *collector;
-        if (mode == "beams1") {
-            collector = &beams1;
-        }
-        else if (mode == "beams2") {
-            collector = &beams2;
-        }
-        else {
-            assert(false && "Invalid beam mode. Only single-qubit gates and 2-qubit gates are "
-                            "supported for decomposition onto beams.");
-        }
 
         for (size_t i = 0; i < numBeams; i++) {
             auto beam = beamsToml[i];
@@ -102,7 +155,7 @@ class OQDDatabaseManager {
             std::vector<int64_t> wavevector =
                 tomlArray2StdVector<int64_t>(*(beam["wavevector"].as_array()));
 
-            collector->push_back(Beam(rabi, detuning, polarization, wavevector));
+            collector.push_back(Beam(rabi, detuning, polarization, wavevector));
         }
     }
 

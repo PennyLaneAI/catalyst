@@ -610,10 +610,134 @@ struct GatesToPulsesRewritePattern : public mlir::OpConversionPattern<CustomOp> 
     }
 };
 
+// Helper to walk back a qubit SSA value (single-value version) to find its original wire index.
+static std::optional<int64_t> walkBackSingleQubitSSA(Value qubit)
+{
+    auto definingOp = qubit.getDefiningOp();
+    if (!definingOp) {
+        return std::nullopt;
+    }
+    if (auto extractOp = dyn_cast<quantum::ExtractOp>(definingOp)) {
+        if (extractOp.getIdxAttr().has_value()) {
+            return extractOp.getIdxAttr().value();
+        }
+        return std::nullopt;
+    }
+    if (auto customOp = dyn_cast<CustomOp>(definingOp)) {
+        auto outQubits = customOp.getOutQubits();
+        for (size_t i = 0; i < outQubits.size(); i++) {
+            if (qubit == outQubits[i]) {
+                return walkBackSingleQubitSSA(customOp.getInQubits()[i]);
+            }
+        }
+        return std::nullopt;
+    }
+    if (auto ppOp = dyn_cast<ion::ParallelProtocolOp>(definingOp)) {
+        // If this PP already contains a measure_pulse the quantum.measure was already
+        // converted; returning nullopt prevents the pattern from matching again.
+        bool hasMeasurePulse = false;
+        ppOp.getBody()->walk([&](ion::MeasurePulseOp) { hasMeasurePulse = true; });
+        if (hasMeasurePulse) {
+            return std::nullopt;
+        }
+        auto results = ppOp.getResults();
+        for (size_t i = 0; i < results.size(); i++) {
+            if (qubit == results[i]) {
+                return walkBackSingleQubitSSA(ppOp.getInQubits()[i]);
+            }
+        }
+        return std::nullopt;
+    }
+    if (auto castOp = dyn_cast<mlir::UnrealizedConversionCastOp>(definingOp)) {
+        if (castOp.getInputs().size() == 1) {
+            return walkBackSingleQubitSSA(castOp.getInputs()[0]);
+        }
+        return std::nullopt;
+    }
+    return std::nullopt;
+}
+
+struct MeasureOpToMeasurePulsePattern : public mlir::OpRewritePattern<MeasureOp> {
+    std::vector<DetectionBeam> detectionBeams;
+    double measurementDuration;
+
+    MeasureOpToMeasurePulsePattern(mlir::MLIRContext *ctx, const OQDDatabaseManager &dataManager)
+        : mlir::OpRewritePattern<MeasureOp>(ctx)
+    {
+        detectionBeams = dataManager.getDetectionBeamParams();
+        measurementDuration = dataManager.getMeasurementDuration();
+    }
+
+    LogicalResult matchAndRewrite(MeasureOp op, PatternRewriter &rewriter) const override
+    {
+        if (detectionBeams.empty()) {
+            return failure();
+        }
+
+        auto qubitIndex = walkBackSingleQubitSSA(op.getInQubit());
+        if (!qubitIndex.has_value()) {
+            return failure();
+        }
+
+        size_t idx = static_cast<size_t>(qubitIndex.value());
+        // Single detection beam: use for all qubits. Multiple: use one per qubit.
+        size_t beamIdx = (detectionBeams.size() == 1) ? 0 : idx;
+        if (beamIdx >= detectionBeams.size()) {
+            op.emitError() << "No detection beam for qubit " << idx
+                           << "; detection_beam has only " << detectionBeams.size() << " entries.";
+            return failure();
+        }
+
+        const DetectionBeam &beam = detectionBeams[beamIdx];
+        auto loc = op.getLoc();
+        MLIRContext *ctx = op.getContext();
+
+        auto beamAttr = BeamAttr::get(
+            ctx, rewriter.getI64IntegerAttr(beam.transition_index),
+            rewriter.getF64FloatAttr(beam.rabi), rewriter.getF64FloatAttr(beam.detuning),
+            rewriter.getDenseI64ArrayAttr(beam.polarization),
+            rewriter.getDenseI64ArrayAttr(beam.wavevector));
+
+        // duration is a compile-time constant emitted as an arith.constant Value
+        mlir::Value durationValue = arith::ConstantOp::create(
+            rewriter, loc, rewriter.getF64FloatAttr(measurementDuration));
+        auto phaseAttr = rewriter.getF64FloatAttr(0.0);
+
+        auto ionQubits = convertQuantumBitsToIonQubits(rewriter, loc, op.getInQubit());
+        if (!ionQubits.has_value()) {
+            return failure();
+        }
+
+        auto ppOp = ion::ParallelProtocolOp::create(
+            rewriter, loc, ionQubits.value(),
+            [&](OpBuilder &builder, Location loc, ValueRange qubits) {
+                ion::MeasurePulseOp::create(builder, loc, PulseType::get(ctx), durationValue,
+                                            qubits.front(), beamAttr, phaseAttr);
+            });
+
+        auto qubitResults = convertIonQubitsToQuantumBits(rewriter, loc, ppOp.getResults());
+        if (!qubitResults.has_value()) {
+            return failure();
+        }
+
+        auto newMeasure = MeasureOp::create(rewriter, op.getLoc(), rewriter.getI1Type(),
+                                            qubitResults.value()[0].getType(),
+                                            qubitResults.value()[0], op.getPostselectAttr());
+        rewriter.replaceOp(op, {newMeasure.getMres(), newMeasure.getOutQubit()});
+        return success();
+    }
+};
+
 void populateGatesToPulsesPatterns(RewritePatternSet &patterns,
                                    const OQDDatabaseManager &dataManager)
 {
     patterns.add<GatesToPulsesRewritePattern>(patterns.getContext(), dataManager);
+}
+
+void populateMeasureToPulsesPatterns(RewritePatternSet &patterns,
+                                     const OQDDatabaseManager &dataManager)
+{
+    patterns.add<MeasureOpToMeasurePulsePattern>(patterns.getContext(), dataManager);
 }
 
 } // namespace ion

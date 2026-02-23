@@ -233,6 +233,11 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
                 // keep track of parallel Pulses for the runtime call
                 parallelPulses.push_back(clonedPulseOp->getResult(0));
             }
+            else if (auto measurePulseOp = dyn_cast<catalyst::ion::MeasurePulseOp>(&regionOp)) {
+                auto *clonedMeasurePulseOp = rewriter.clone(regionOp, irMapping);
+                irMapping.map(regionOp.getResults(), clonedMeasurePulseOp->getResults());
+                parallelPulses.push_back(clonedMeasurePulseOp->getResult(0));
+            }
             else if (!isa<catalyst::ion::YieldOp>(&regionOp)) {
                 // Clone other operations (e.g., llvm.fdiv) that aren't YieldOp
                 auto *clonedRegionOp = rewriter.clone(regionOp, irMapping);
@@ -281,41 +286,50 @@ struct ParallelProtocolOpPattern : public OpConversionPattern<catalyst::ion::Par
     }
 };
 
+LogicalResult buildPulseCall(Operation *op, Value inQubit, Value time, FloatAttr phaseAttr,
+                             BeamAttr beamAttr, StringRef qirName, const TypeConverter *conv,
+                             ConversionPatternRewriter &rewriter)
+{
+    Location loc = op->getLoc();
+    MLIRContext *ctx = op->getContext();
+
+    Value phase = LLVM::ConstantOp::create(rewriter, loc, phaseAttr);
+    Type qubitTy = conv->convertType(catalyst::ion::QubitType::get(ctx));
+    Value beamStructPtr = createBeamStruct(loc, rewriter, ctx, beamAttr);
+
+    SmallVector<Value> operands = {inQubit, time, phase, beamStructPtr};
+
+    Type qirSignature =
+        LLVM::LLVMFunctionType::get(conv->convertType(PulseType::get(ctx)),
+                                    {conv->convertType(qubitTy), time.getType(),
+                                     Float64Type::get(ctx), LLVM::LLVMPointerType::get(ctx)});
+    LLVM::LLVMFuncOp fnDecl =
+        catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(rewriter, op, qirName, qirSignature);
+    rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, operands);
+
+    return success();
+}
+
 struct PulseOpPattern : public OpConversionPattern<catalyst::ion::PulseOp> {
     using OpConversionPattern<catalyst::ion::PulseOp>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(catalyst::ion::PulseOp op, catalyst::ion::PulseOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        Location loc = op.getLoc();
-        MLIRContext *ctx = this->getContext();
-        const TypeConverter *conv = getTypeConverter();
+        return buildPulseCall(op, adaptor.getInQubit(), op.getTime(), op.getPhase(), op.getBeam(),
+                              "__catalyst__oqd__pulse", getTypeConverter(), rewriter);
+    }
+};
 
-        auto time = op.getTime();
-        auto phase = LLVM::ConstantOp::create(rewriter, loc, op.getPhase());
-        Type qubitTy = conv->convertType(catalyst::ion::QubitType::get(ctx));
-        auto inQubit = adaptor.getInQubit();
-        auto beamAttr = op.getBeam();
+struct MeasurePulseOpPattern : public OpConversionPattern<catalyst::ion::MeasurePulseOp> {
+    using OpConversionPattern<catalyst::ion::MeasurePulseOp>::OpConversionPattern;
 
-        Value beamStructPtr = createBeamStruct(loc, rewriter, ctx, beamAttr);
-
-        SmallVector<Value> operands;
-        operands.push_back(inQubit);
-        operands.push_back(time);
-        operands.push_back(phase);
-        operands.push_back(beamStructPtr);
-
-        // Create the Ion stub function
-        Type qirSignature = LLVM::LLVMFunctionType::get(
-            conv->convertType(PulseType::get(ctx)),
-            {conv->convertType(qubitTy), time.getType(), Float64Type::get(ctx),
-             LLVM::LLVMPointerType::get(rewriter.getContext())});
-        std::string qirName = "__catalyst__oqd__pulse";
-        LLVM::LLVMFuncOp fnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
-            rewriter, op, qirName, qirSignature);
-        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, operands);
-
-        return success();
+    LogicalResult matchAndRewrite(catalyst::ion::MeasurePulseOp op,
+                                  catalyst::ion::MeasurePulseOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        return buildPulseCall(op, adaptor.getInQubit(), op.getTime(), op.getPhase(), op.getBeam(),
+                              "__catalyst__oqd__measure_pulse", getTypeConverter(), rewriter);
     }
 };
 
@@ -329,6 +343,7 @@ void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePattern
     patterns.add<IonOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ModesOpPattern>(typeConverter, patterns.getContext());
     patterns.add<PulseOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<MeasurePulseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ParallelProtocolOpPattern>(typeConverter, patterns.getContext());
 }
 
