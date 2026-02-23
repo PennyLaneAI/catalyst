@@ -17,8 +17,8 @@
 // RUN: quantum-opt --convert-to-value-semantics --split-input-file --verify-diagnostics %s | FileCheck %s
 
 
-// CHECK-LABEL: test_expval_circuit
-func.func @test_expval_circuit(%arg0: f64, %arg1: f64, %arg2: i1, %arg3: i64) -> f64 {
+// CHECK-LABEL: test_flat_circuit
+func.func @test_flat_circuit(%arg0: f64, %arg1: f64, %arg2: i1, %arg3: i64) -> f64 {
 
     // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
     %a = qref.alloc(2) : !qref.reg<2>
@@ -46,13 +46,16 @@ func.func @test_expval_circuit(%arg0: f64, %arg1: f64, %arg2: i1, %arg3: i64) ->
     // CHECK: [[GPHASEctrl:%.+]] = quantum.gphase(%arg0) ctrls([[PPR]]) ctrlvals(%arg2) : ctrls !quantum.bit
     qref.gphase(%arg0) ctrls (%q0) ctrlvals (%arg2) : f64 ctrls !qref.bit
 
-    // CHECK: [[namedobs:%.+]] = quantum.namedobs [[PPRctrl]][ PauliX] : !quantum.obs
+    // CHECK: [[MULTIRZ:%.+]]:2 = quantum.multirz(%arg0) [[GPHASEctrl]], [[PPRctrl]] : !quantum.bit, !quantum.bit
+    qref.multirz (%arg0) %q0, %q1 : !qref.bit, !qref.bit
+
+    // CHECK: [[namedobs:%.+]] = quantum.namedobs [[MULTIRZ]]#1[ PauliX] : !quantum.obs
     // CHECK: quantum.expval [[namedobs]]
     %obs = qref.namedobs %q1 [ PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
 
-    // CHECK: [[insert1:%.+]] = quantum.insert [[qreg]][%arg3], [[PPRctrl]] : !quantum.reg, !quantum.bit
-    // CHECK: [[insert0:%.+]] = quantum.insert [[insert1]][ 0], [[GPHASEctrl]] : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[qreg]][%arg3], [[MULTIRZ]]#1 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert0:%.+]] = quantum.insert [[insert1]][ 0], [[MULTIRZ]]#0 : !quantum.reg, !quantum.bit
     // CHECK: quantum.dealloc [[insert0]] : !quantum.reg
     qref.dealloc %a : !qref.reg<2>
     return %expval : f64

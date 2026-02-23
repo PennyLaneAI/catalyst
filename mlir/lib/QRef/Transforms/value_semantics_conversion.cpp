@@ -266,6 +266,11 @@ void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp,
         vGateOp = migrateOpToValueSemantics<quantum::GlobalPhaseOp>(builder, rGateOp, currentQubits,
                                                                     qubitResultsType);
     }
+    else if (isa<qref::MultiRZOp>(rGateOp)) {
+        vGateOp = migrateOpToValueSemantics<quantum::MultiRZOp>(builder, rGateOp, currentQubits,
+                                                                qubitResultsType);
+        vGateOp->setAttr("resultSegmentSizes", getResultSegmentSizes(builder, rGateOp));
+    }
 
     for (auto [i, qubitReference] : llvm::enumerate(rGateOp.getQubitOperands())) {
         currentQubits[qubitReference] = vGateOp.getQubitResults()[i];
