@@ -431,8 +431,8 @@
   @qml.transform(pass_name="split-non-commuting")
   @qml.qnode(qml.device("lightning.qubit", wires=3))
   def circuit():
-      # Hamiltonian H = Z(0) + 2 * X(1) + 3 * Identity
-      return qml.expval(qml.Z(0) + 2 * qml.X(1) + 3 * qml.Identity(2))
+      # Hamiltonian H = Z(0) + 2 * X(0) + 3 * Identity
+      return qml.expval(qml.Z(0) + 2 * qml.X(0) + 3 * qml.Identity(2))
   ```
 
   The pass first runs `split-to-single-terms` to decompose the Hamiltonian, then splits
