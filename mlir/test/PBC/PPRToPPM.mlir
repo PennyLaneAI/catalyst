@@ -93,9 +93,14 @@ func.func @test_ppr_to_ppm_with_condition(%q0 : !quantum.bit, %q1 : !quantum.bit
     return
 
     // CHECK: [[m0:%.+]], {{.*}} = pbc.ppm ["Z"]
-    // CHECK: quantum.alloc_qb : !quantum.bit
-    // CHECK: [[m1:%.+]], [[q1:%.+]]:4 = pbc.ppm ["X", "Y", "Z", "Y"](-1) {{.*}} cond([[m0]]) : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
-    // CHECK: [[m2:%.+]], {{.*}} = pbc.ppm ["X"] [[q1]]#3 cond([[m0]]) : i1, !quantum.bit
-    // CHECK: [[q_1:%.+]] = arith.xori [[m1]], [[m2]] : i1
-    // CHECK: {{.*}} = pbc.ppr ["X", "Y", "Z"](2) {{.*}} cond([[q_1]]) : !quantum.bit
+    // CHECK: [[if:%.+]]:3 = scf.if [[m0]]
+    // CHECK:   [[q_0:%.+]] = quantum.alloc_qb : !quantum.bit
+    // CHECK:   [[m1:%.+]], [[o1:%.+]]:4 = pbc.ppm ["X", "Y", "Z", "Y"](-1)
+    // CHECK:   [[m2:%.+]], {{.*}} = pbc.ppm ["X"] [[o1]]#3
+    // CHECK:   [[q_1:%.+]] = arith.xori [[m1]], [[m2]] : i1
+    // CHECK:   {{.*}} = pbc.ppr ["X", "Y", "Z"](2) {{.*}} cond([[q_1]])
+    // CHECK:   scf.yield
+    // CHECK: } else {
+    // CHECK:   scf.yield
+    // CHECK: }
 }
