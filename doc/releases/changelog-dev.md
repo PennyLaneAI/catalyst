@@ -190,6 +190,9 @@
   with the `decompose-lowering` pass and with `qp.transforms.decompose`.
   [(#2470)](https://github.com/PennyLaneAI/catalyst/pull/2470)
 
+* Added support for `stopping_condition` in user-defined `qp.decompose` when capture is enabled with both graph enabled and disabled.
+  [(#2486)](https://github.com/PennyLaneAI/catalyst/pull/2486)
+
 <h3>Breaking changes 💔</h3>
 
 * `catalyst.jax_primitives.subroutine` has been moved to `qml.capture.subroutine`.
