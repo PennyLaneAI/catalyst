@@ -51,7 +51,7 @@ def compiler_transform(module_pass: ModulePass) -> CompilerTransform:
     Args:
         module_pass (xdsl.passes.ModulePass): The module pass to be registered. Note that a
             :class:`~.CompilationPass` is a ``ModulePass`` subclass, which is intended to be the
-            most common type to be used in conjuction with ``compiler_transform``.
+            most common type to be used in conjunction with ``compiler_transform``.
 
     Returns:
         (Callable): The function that can be used as a traditional PennyLane transform (within

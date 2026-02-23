@@ -243,9 +243,6 @@ class TestCompilationPass:
         pass_ = create_test_pass(greedy=greedy, recursive=recursive)()
         pass_.apply(ctx, mod)
 
-        print(f"{greedy=}, {recursive=}")
-        print(mod)
-        print(pass_.counts)
         assert tuple(type(op) for op in mod.ops) == expected_op_types
         assert pass_.counts == expected_counts
 
