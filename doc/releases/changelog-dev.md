@@ -426,10 +426,9 @@
   ```python
   import pennylane as qml
   from catalyst import qjit
-  from catalyst.passes import apply_pass
 
   @qjit
-  @apply_pass("split-non-commuting")
+  @qml.transform(pass_name="split-non-commuting")
   @qml.qnode(qml.device("lightning.qubit", wires=3))
   def circuit():
       # Hamiltonian H = Z(0) + 2 * X(1) + 3 * Identity
