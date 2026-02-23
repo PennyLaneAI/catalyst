@@ -49,13 +49,16 @@ func.func @test_flat_circuit(%arg0: f64, %arg1: f64, %arg2: i1, %arg3: i64) -> f
     // CHECK: [[MULTIRZ:%.+]]:2 = quantum.multirz(%arg0) [[GPHASEctrl]], [[PPRctrl]] : !quantum.bit, !quantum.bit
     qref.multirz (%arg0) %q0, %q1 : !qref.bit, !qref.bit
 
-    // CHECK: [[namedobs:%.+]] = quantum.namedobs [[MULTIRZ]]#1[ PauliX] : !quantum.obs
+    // CHECK: [[PCPHASE:%.+]]:2 = quantum.pcphase(%arg0, %arg0) [[MULTIRZ]]#0, [[MULTIRZ]]#1 : !quantum.bit, !quantum.bit
+    qref.pcphase (%arg0, %arg0) %q0, %q1 : !qref.bit, !qref.bit
+
+    // CHECK: [[namedobs:%.+]] = quantum.namedobs [[PCPHASE]]#1[ PauliX] : !quantum.obs
     // CHECK: quantum.expval [[namedobs]]
     %obs = qref.namedobs %q1 [ PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
 
-    // CHECK: [[insert1:%.+]] = quantum.insert [[qreg]][%arg3], [[MULTIRZ]]#1 : !quantum.reg, !quantum.bit
-    // CHECK: [[insert0:%.+]] = quantum.insert [[insert1]][ 0], [[MULTIRZ]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[qreg]][%arg3], [[PCPHASE]]#1 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert0:%.+]] = quantum.insert [[insert1]][ 0], [[PCPHASE]]#0 : !quantum.reg, !quantum.bit
     // CHECK: quantum.dealloc [[insert0]] : !quantum.reg
     qref.dealloc %a : !qref.reg<2>
     return %expval : f64
