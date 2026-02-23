@@ -46,6 +46,7 @@ class TestPyTreesReturnValues:
         result = jitted_fn(params)
         assert jnp.allclose(result, expected)
 
+    @pytest.mark.old_frontend
     def test_return_value_mcm(self, backend, capture_mode):
         """Test that a qnode can return a scalar mcm."""
 
@@ -58,6 +59,7 @@ class TestPyTreesReturnValues:
         result = jitted_fn()
         assert not result
 
+    @pytest.mark.old_frontend
     def test_return_value_arrays(self, backend, capture_mode):
         """Test arrays."""
 
@@ -88,6 +90,7 @@ class TestPyTreesReturnValues:
         assert jnp.allclose(result[0], jnp.pi)
         assert jnp.allclose(result[1], ip_result)
 
+    @pytest.mark.old_frontend
     def test_return_value_tuples(self, backend, tol_stochastic, capture_mode):
         """Test tuples."""
 
@@ -189,6 +192,7 @@ class TestPyTreesReturnValues:
         assert jnp.allclose(result[0], result[2])
         assert jnp.allclose(result[1][0] + result[1][1], 1.0)
 
+    @pytest.mark.old_frontend
     def test_return_value_cond(self, backend, capture_mode):
         """Test conditionals."""
 
@@ -239,6 +243,7 @@ class TestPyTreesReturnValues:
         assert res5["cond"][1] == (125, 625)
         assert res5["const"] == 5
 
+    @pytest.mark.old_frontend
     @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
     def test_return_value_dict(self, backend, tol_stochastic, mcm_method, capture_mode):
         """Test dictionaries."""
@@ -356,6 +361,7 @@ class TestPyTreesReturnValues:
 class TestPyTreesFuncArgs:
     """Test QJIT workflows with PyTrees as function arguments."""
 
+    @pytest.mark.old_frontend
     def test_args_dict(self, backend, capture_mode):
         """Test arguments dict."""
 
@@ -404,6 +410,7 @@ class TestPyTreesFuncArgs:
             qml.RX(params1["b"][0] * params2[1], wires=1)
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
 
+    @pytest.mark.old_frontend
     def test_promotion_unneeded(self, backend, capture_mode):
         """Test arguments list of lists."""
 
@@ -423,6 +430,7 @@ class TestPyTreesFuncArgs:
         jitted_fn(params)
         jitted_fn(params)
 
+    @pytest.mark.old_frontend
     def test_promotion_needed(self, backend, capture_mode):
         """Test arguments list of lists."""
 
@@ -551,6 +559,7 @@ class TestPyTreesFuncArgs:
 
         circuit1(1, inp)
 
+    @pytest.mark.old_frontend
     def test_args_used_in_measure(self, backend, capture_mode):
         """Argument is used directly in measurement"""
 
@@ -566,6 +575,7 @@ class TestPyTreesFuncArgs:
         result = circuit({"wire": 1})
         assert jnp.allclose(result, False)
 
+    @pytest.mark.old_frontend
     def test_args_used_indirectly_in_measure(self, backend, capture_mode):
         """Argument is used indirectly in measurement"""
 
