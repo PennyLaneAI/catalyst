@@ -260,6 +260,10 @@ static LogicalResult verifyObservable(Value obs, std::optional<size_t> &numQubit
              obs.getDefiningOp<TensorOp>() || obs.getDefiningOp<HamiltonianOp>()) {
         return success();
     }
+    else if (auto mcmObsOp = obs.getDefiningOp<MCMObsOp>()) {
+        numQubits = mcmObsOp.getMcms().size();
+        return success();
+    }
 
     return failure();
 }
@@ -431,6 +435,10 @@ LogicalResult CountsOp::verify()
     }
     else if (getObs().getDefiningOp<ComputationalBasisOp>()) {
         // In the computational basis, the "eigenvalues" are all possible bistrings one can measure.
+        numEigvals = std::pow(2, numQubits.value());
+    }
+    else if (getObs().getDefiningOp<MCMObsOp>()) {
+        // When counting MCMs, the "eigenvalues" are all possible bistrings one can measure.
         numEigvals = std::pow(2, numQubits.value());
     }
     else {
