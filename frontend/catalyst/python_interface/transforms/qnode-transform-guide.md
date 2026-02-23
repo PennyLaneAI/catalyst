@@ -122,6 +122,119 @@ and smooth integration into the compilation infrastracture.
     into `sample` MPs within a qnode function needs to insert classical processing that
     computes the average of the samples produced by the new qnode function.
 
+The composition of two transforms with this scheme is illustrated via pseudo-IR below. The starting
+point is a quantum kernel with two transforms in its schedule, as well as a qnode function with
+measurement processes.
+
+```mlir
+module @module_circuit {
+    transform.named_sequence {
+        transform1
+        transform2
+    }
+
+    func @circuit() attributes {qnode} {
+        gates
+        call @subroutine
+        a, b = MeasurementProcessA, MeasurementProcessB
+        return a+b
+    }
+
+    func @subroutine {
+        gates
+    }
+}
+```
+
+Applying the first transform from the schedule yields the following program, where measurement
+processes are split into separate qnode functions:
+
+```mlir
+module @module_circuit {
+    transform.named_sequence {
+        transform2
+    }
+
+    // new qnode function
+    func @circuit_a() attributes {qnode} {
+        gates
+        call @subroutine
+        a = MeasurementProcessA
+        return a
+    }
+
+
+    // new qnode function
+    func @circuit_b() attributes {qnode} {
+        gates
+        call @subroutine
+        b = MeasurementProcessB
+        return b
+    }
+
+    // original function is now classical
+    func @circuit() {
+        a = call @circuit_a()
+        b = call @circuit_b()
+        return a+b
+    }
+
+    func @subroutine {
+        gates
+    }
+}
+```
+
+Finally, we apply the second transform from the schedule which applies to all qnode functions in
+the kernel, swapping the measurement process for another with additional post-processing:
+
+```mlir
+module @module_circuit {
+    transform.named_sequence {
+    }
+
+    // new qnode function
+    func @circuit_a_2() attributes {qnode} {
+        gates
+        call @subroutine
+        a = MeasurementProcessA_2
+        return a
+    }
+
+    // additional post-processing in classical function
+    func @circuit_a() {
+        r = call @circuit_a_2()
+        a = post_process(r)
+        return a
+    }
+
+    // new qnode function
+    func @circuit_b_2() attributes {qnode} {
+        gates
+        call @subroutine
+        b = MeasurementProcessB_2
+        return b
+    }
+
+    // additional post-processing in classical function
+    func @circuit_b() {
+        r = call @circuit_b_2()
+        b = post_process(r)
+        return b
+    }
+
+    func @circuit() {
+        a = call @circuit_a()
+        b = call @circuit_b()
+        return a+b
+    }
+
+    func @subroutine {
+        gates
+    }
+}
+```
+
 Concrete examples for the recommended scheme can be found in the following MLIR passes:
 - [Split-to-single-terms](https://github.com/PennyLaneAI/catalyst/pull/2441)
   (additional post-processing)
