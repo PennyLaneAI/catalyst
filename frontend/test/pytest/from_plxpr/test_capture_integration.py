@@ -1077,7 +1077,7 @@ class TestCapture:
     def test_pass_with_options_patch(self, backend):
         """Test the integration for a circuit with a pass that takes in options."""
 
-        def my_pass_setup_inputs(my_option=None, my_other_option=None):  # pylint: disable=unused-argument
+        def my_pass_setup_inputs(my_option=None, my_other_option=None):
             return (), {"my_option": my_option, "my_other_option": my_other_option}
 
         my_pass = qml.transform(pass_name="my-pass", setup_inputs=my_pass_setup_inputs)
