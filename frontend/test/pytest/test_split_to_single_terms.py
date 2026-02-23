@@ -46,7 +46,7 @@ def test_split_to_single_terms_integration(hamiltonian):
     # Circuit with Hamiltonian observable
     # Expected: split into individual terms with coefficients
     @qjit
-    @apply_pass("split-to-single-terms")
+    @qml.transform(pass_name="split-to-single-terms")
     @qml.qnode(dev)
     def circ1():
         qml.Rot(0.3, 0.5, 0.7, wires=0)
@@ -91,7 +91,7 @@ def test_split_to_single_terms_with_tensor_product():
     dev = qml.device("lightning.qubit", wires=3)
 
     @qjit
-    @apply_pass("split-to-single-terms")
+    @qml.transform(pass_name="split-to-single-terms")
     @qml.qnode(dev)
     def circ1():
         qml.Rot(0.4, 0.3, 0.2, wires=0)
@@ -131,7 +131,7 @@ def test_split_to_single_terms_with_Identity():
     dev = qml.device("lightning.qubit", wires=3)
 
     @qjit
-    @apply_pass("split-to-single-terms")
+    @qml.transform(pass_name="split-to-single-terms")
     @qml.qnode(dev)
     def circ1():
         qml.Rot(0.5, 0.3, 0.2, wires=0)
