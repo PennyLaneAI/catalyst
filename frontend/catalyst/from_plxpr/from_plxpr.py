@@ -294,17 +294,14 @@ def handle_qnode(
     )
     graph_succeeded = False
 
-    if (
-        stopping_condition := self.decompose_tkwargs.get("stopping_condition")
-        and self.requires_decompose_lowering
-    ):
+    stopping_condition = self.decompose_tkwargs.get("stopping_condition")
+    if stopping_condition is not None and self.requires_decompose_lowering:
         # print("Case 1: Using plxpr decompose for templates.")
         closed_jaxpr = _apply_compiler_decompose_to_plxpr(
             inner_jaxpr=qfunc_jaxpr,
             consts=consts,
             ncargs=non_const_args,
             tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
-            stopping_condition=stopping_condition,
         )
 
         # Use the plxpr decompose transform and ignore graph decomposition
@@ -324,7 +321,6 @@ def handle_qnode(
             consts=consts,
             ncargs=non_const_args,
             tgateset=list(self.decompose_tkwargs.get("gate_set", [])),
-            stopping_condition=stopping_condition,
         )
 
         stopping_condition = None
@@ -705,7 +701,7 @@ def _apply_compiler_decompose_to_plxpr(
     if kwargs is None:
         kwargs = {}
 
-    if stopping_condition:
+    if stopping_condition is not None:
         kwargs["stopping_condition"] = stopping_condition
 
     final_jaxpr = qml.transforms.decompose.plxpr_transform(inner_jaxpr, consts, (), kwargs, *ncargs)
