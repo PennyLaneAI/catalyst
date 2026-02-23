@@ -15,7 +15,7 @@
 This module tests the decompose transformation.
 """
 
-from contextlib import contextmanager
+from contextlib import nullcontext as does_not_raise
 from functools import partial
 
 import numpy as np
@@ -24,15 +24,9 @@ import pytest
 from pennylane.exceptions import DecompositionError, DecompositionWarning
 from pennylane.typing import TensorLike
 from pennylane.wires import WiresLike
-
-
-@contextmanager
-def does_not_raise():
-    """
-    define a context manager for tests that do not fail, for use with `parametrize`.
-    See https://github.com/pytest-dev/pytest/pull/4682/changes for details.
-    """
-    yield
+from pennylane_lightning.lightning_qubit.lightning_qubit import (
+    stopping_condition as lightning_stopping_condition,
+)
 
 
 class TestGraphDecomposition:
@@ -72,7 +66,7 @@ class TestGraphDecomposition:
             qml.Hadamard(x)
             return qml.state()
 
-        # TODO: RZ/RX warnings  should not be raised, remove (PL issue #8885)
+        # TODO: RZ/RX warnings should not be raised, remove (PL issue #8885)
         with pytest.warns(UserWarning, match="Falling back to the legacy decomposition system"):
             with pytest.warns(
                 DecompositionWarning, match="unable to find a decomposition for {'Hadamard'}"
@@ -240,6 +234,70 @@ class TestGraphDecomposition:
 
         expected_resources = qml.specs(circuit, level="device")(x, y, z)["resources"].gate_types
         resources = qml.specs(with_qjit, level="device")(x, y, z)["resources"].gate_types
+        assert resources == expected_resources
+
+    @pytest.mark.usefixtures("use_capture_dgraph")
+    def test_decompose_with_stopping_condition(self):
+        """Test that decompose with stopping_condition uses plxpr decomposition correctly.
+
+        When stopping_condition is passed to qml.transforms.decompose, from_plxpr uses
+        the plxpr decompose path (no graph), passing stopping_condition to the transform.
+        This test ensures that path compiles and produces correct results.
+        """
+
+        def stopping_condition(op):
+            return op.name == "MultiRZ"
+
+        @partial(
+            qml.transforms.decompose,
+            gate_set=[qml.RX, qml.RY, qml.RZ],
+            stopping_condition=stopping_condition,
+        )
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x, y, z):
+            qml.Rot(x, y, z, wires=0)
+            qml.MultiRZ(0.5, wires=[0, 1])
+            return qml.expval(qml.PauliZ(0))
+
+        x, y, z = 0.5, 0.3, 0.2
+        without_qjit = circuit(x, y, z)
+        with_qjit = qml.qjit(circuit)
+        assert qml.math.allclose(without_qjit, with_qjit(x, y, z))
+
+        expected_resources = qml.specs(circuit, level="device")(x, y, z)["resources"].gate_types
+        resources = qml.specs(with_qjit, level="device")(x, y, z)["resources"].gate_types
+        assert "MultiRZ" in resources
+        assert "MultiRZ" in expected_resources
+        assert resources == expected_resources
+
+    @pytest.mark.usefixtures("use_capture_dgraph")
+    def test_decompose_with_lightning_stopping_condition(self):
+        """Test that decompose with stopping_condition using Lightning's stopping condition."""
+
+        device = qml.device("lightning.qubit", wires=4)
+
+        @partial(
+            qml.transforms.decompose,
+            gate_set=[qml.CNOT, qml.PauliZ],
+            stopping_condition=lightning_stopping_condition,
+        )
+        @qml.qnode(device)
+        def circuit(x):
+            qml.PauliRot(x, "XYZZ", wires=[0, 1, 2, 3])
+            qml.StatePrep(np.array([1, 0, 0, 0]), wires=range(2))
+            return qml.expval(qml.PauliZ(0))
+
+        x = 0.5
+        without_qjit = circuit(x)
+        with_qjit = qml.qjit(circuit)
+        assert qml.math.allclose(without_qjit, with_qjit(x))
+
+        expected_resources = qml.specs(circuit, level="device")(x)["resources"].gate_types
+        resources = qml.specs(with_qjit, level="device")(x)["resources"].gate_types
+        assert "PauliRot" in expected_resources
+        assert "PauliRot" in resources
+        assert "StatePrep" not in expected_resources
+        assert "StatePrep" not in resources
         assert resources == expected_resources
 
     @pytest.mark.skip(
