@@ -1074,7 +1074,7 @@ class TestCapture:
         assert jnp.allclose(circuit(0.1), capture_result)
 
     @pytest.mark.usefixtures("use_capture")
-    def test_pass_with_options_patch(self, backend):
+    def test_pass_with_setup_input_options(self, backend):
         """Test the integration for a circuit with a pass that takes in options."""
 
         def my_pass_setup_inputs(my_option=None, my_other_option=None):
