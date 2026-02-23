@@ -15,7 +15,7 @@
 This module tests the decompose transformation.
 """
 
-from contextlib import contextmanager
+from contextlib import nullcontext as does_not_raise
 from functools import partial
 
 import numpy as np
@@ -27,15 +27,6 @@ from pennylane.wires import WiresLike
 from pennylane_lightning.lightning_qubit.lightning_qubit import (
     stopping_condition as lightning_stopping_condition,
 )
-
-
-@contextmanager
-def does_not_raise():
-    """
-    define a context manager for tests that do not fail, for use with `parametrize`.
-    See https://github.com/pytest-dev/pytest/pull/4682/changes for details.
-    """
-    yield
 
 
 class TestGraphDecomposition:
