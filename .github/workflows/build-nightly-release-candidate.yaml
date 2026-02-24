@@ -62,7 +62,7 @@ jobs:
 
   linux-x86:
     name: Build on Linux x86-64
-    if: ${{ steps.check_rc.outputs.branch_exists == 'true' }}
+    if: ${{ needs.setup.check_rc.outputs.branch_exists == 'true' }}
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
     with:
@@ -70,7 +70,7 @@ jobs:
 
   linux-aarch:
     name: Build on Linux aarch64
-    if: ${{ steps.check_rc.outputs.branch_exists == 'true' }}
+    if: ${{ needs.setup.check_rc.outputs.branch_exists == 'true' }}
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-arm64.yaml
     with:
@@ -78,7 +78,7 @@ jobs:
 
   macos-arm:
     name: Build on macOS arm64
-    if: ${{ steps.check_rc.outputs.branch_exists == 'true' }}
+    if: ${{ needs.setup.check_rc.outputs.branch_exists == 'true' }}
     needs: [setup]
     uses: ./.github/workflows/build-wheel-macos-arm64.yaml
     with:
@@ -86,7 +86,7 @@ jobs:
 
   upload:
     name: Prepare & Upload wheels to TestPyPI
-    if: ${{ steps.check_rc.outputs.branch_exists == 'true' }}
+    if: ${{ needs.setup.check_rc.outputs.branch_exists == 'true' }}
     needs: [linux-x86, macos-arm, linux-aarch]
     runs-on: ubuntu-24.04
     permissions:
