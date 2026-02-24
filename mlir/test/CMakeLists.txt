@@ -29,6 +29,7 @@ set(TEST_SUITES
     cli
     PBC
     RTIO
+    QecLogical
     )
 
 
