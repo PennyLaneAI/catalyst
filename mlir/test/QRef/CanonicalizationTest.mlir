@@ -66,6 +66,31 @@ func.func @test_get_no_user_fold(%r: !qref.reg<3>) {
 
 // -----
 
+// CHECK-LABEL: test_get_cse
+func.func @test_get_cse(%r: !qref.reg<3>, %i: i64) {
+    // CHECK: [[q0:%.+]] = qref.get %arg0[ 0] : !qref.reg<3> -> !qref.bit
+    // CHECK-NOT: qref.get
+    // qref.custom "Hadamard"() [[q0]] : !qref.bit
+    // qref.custom "Hadamard"() [[q0]] : !qref.bit
+    %q0 = qref.get %r[0] : !qref.reg<3> -> !qref.bit
+    %q0_dup = qref.get %r[0] : !qref.reg<3> -> !qref.bit
+    qref.custom "Hadamard"() %q0 : !qref.bit
+    qref.custom "Hadamard"() %q0_dup : !qref.bit
+
+    // CHECK: [[q1:%.+]] = qref.get %arg0[%arg1] : !qref.reg<3>, i64 -> !qref.bit
+    // CHECK-NOT: qref.get
+    // qref.custom "Hadamard"() [[q1]] : !qref.bit
+    // qref.custom "Hadamard"() [[q1]] : !qref.bit
+    %q1 = qref.get %r[%i] : !qref.reg<3>, i64 -> !qref.bit
+    %q1_dup = qref.get %r[%i] : !qref.reg<3>, i64 -> !qref.bit
+    qref.custom "Hadamard"() %q1 : !qref.bit
+    qref.custom "Hadamard"() %q1_dup : !qref.bit
+
+    return
+}
+
+// -----
+
 // CHECK-LABEL: test_hermitian_adjoint_canonicalize
 func.func @test_hermitian_adjoint_canonicalize(%q0: !qref.bit) {
     // CHECK:  qref.custom "Hadamard"() %arg0 : !qref.bit
