@@ -186,8 +186,10 @@ class TestJAXJIT:
 class TestJAXAD:
     """Test QJIT compatibility with JAX differentiation."""
 
-    # capture=True fails with RecursionError("maximum recursion depth exceeded") from jax.pure_callback.
-    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during AD lowering.
+    # capture=True fails with RecursionError("maximum recursion depth exceeded") from
+    # jax.pure_callback.
+    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
+    # AD lowering.
     @pytest.mark.capture_todo
     def test_simple_circuit(self, backend, capture_mode):
         """Test a basic use case of jax.grad on top of qjit."""
@@ -211,8 +213,10 @@ class TestJAXAD:
 
         assert jnp.allclose(result, reference)
 
-    # capture=True fails with RecursionError("maximum recursion depth exceeded") from jax.pure_callback.
-    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during AD lowering.
+    # capture=True fails with RecursionError("maximum recursion depth exceeded") from
+    # jax.pure_callback.
+    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
+    # AD lowering.
     @pytest.mark.capture_todo
     @pytest.mark.parametrize("argnums", (0, 1, [0, 1]))
     def test_multiple_arguments(self, backend, argnums, capture_mode):
@@ -241,8 +245,10 @@ class TestJAXAD:
         if isinstance(argnums, list):
             assert jnp.allclose(result[1], reference[1])
 
-    # capture=True fails with RecursionError("maximum recursion depth exceeded") from jax.pure_callback.
-    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during AD lowering.
+    # capture=True fails with RecursionError("maximum recursion depth exceeded") from
+    # jax.pure_callback.
+    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
+    # AD lowering.
     @pytest.mark.capture_todo
     def test_multiple_results(self, backend, capture_mode):
         """Test a circuit with multiple results using jax.grad on top of qjit."""
@@ -270,8 +276,10 @@ class TestJAXAD:
         assert jnp.allclose(result[0], reference[0])
         assert jnp.allclose(result[1], reference[1])
 
-    # capture=True fails with RecursionError("maximum recursion depth exceeded") from jax.pure_callback.
-    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during AD lowering.
+    # capture=True fails with RecursionError("maximum recursion depth exceeded") from
+    # jax.pure_callback.
+    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
+    # AD lowering.
     @pytest.mark.capture_todo
     def test_jacobian(self, backend, capture_mode):
         """Test a circuit with vector return type using jax.jacobian on top of qjit."""
@@ -299,8 +307,10 @@ class TestJAXAD:
         assert jnp.allclose(result[0], reference[0])
         assert jnp.allclose(result[1], reference[1])
 
-    # capture=True fails with RecursionError("maximum recursion depth exceeded") from jax.pure_callback.
-    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during AD lowering.
+    # capture=True fails with RecursionError("maximum recursion depth exceeded") from
+    # jax.pure_callback.
+    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
+    # AD lowering.
     @pytest.mark.capture_todo
     def test_without_precompilation(self, backend, capture_mode):
         """Test a function without type hints (pre-compilation) using jax.grad on top of qjit."""
@@ -326,8 +336,10 @@ class TestJAXAD:
         assert jnp.allclose(result[0], reference[0])
         assert jnp.allclose(result[1], reference[1])
 
-    # capture=True fails with RecursionError("maximum recursion depth exceeded") from jax.pure_callback.
-    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during AD lowering.
+    # capture=True fails with RecursionError("maximum recursion depth exceeded") from
+    # jax.pure_callback.
+    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
+    # AD lowering.
     @pytest.mark.capture_todo
     def test_non_differentiable_arguments(self, backend, capture_mode):
         """Test a circuit with non-differentiable arguments using jax.grad on top of qjit."""
@@ -351,8 +363,10 @@ class TestJAXAD:
 
         assert jnp.allclose(result, reference)
 
-    # capture=True fails with RecursionError("maximum recursion depth exceeded") from jax.pure_callback.
-    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during AD lowering.
+    # capture=True fails with RecursionError("maximum recursion depth exceeded") from
+    # jax.pure_callback.
+    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
+    # AD lowering.
     @pytest.mark.capture_todo
     def test_multiple_calls(self, backend, capture_mode):
         """Test a jax.grad function which repeatedly calls a qjit function."""
@@ -374,8 +388,10 @@ class TestJAXAD:
         assert jnp.allclose(result1, 0.0)
         assert jnp.allclose(result2, 0.0)
 
-    # capture=True fails with RecursionError("maximum recursion depth exceeded") from jax.pure_callback.
-    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during AD lowering.
+    # capture=True fails with RecursionError("maximum recursion depth exceeded") from
+    # jax.pure_callback.
+    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
+    # AD lowering.
     @pytest.mark.capture_todo
     @pytest.mark.parametrize("shape", ([2, 3], [3, 2], [1, 6]))
     def test_multiD_calls(self, shape, capture_mode):
@@ -401,8 +417,10 @@ class TestJAXAD:
             assert a.shape == b.shape
             assert jnp.allclose(a, b, rtol=1e-6, atol=1e-6)
 
-    # capture=True fails with RecursionError("maximum recursion depth exceeded") from jax.pure_callback.
-    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during AD lowering.
+    # capture=True fails with RecursionError("maximum recursion depth exceeded") from
+    # jax.pure_callback.
+    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
+    # AD lowering.
     @pytest.mark.capture_todo
     def test_efficient_Jacobian(self, backend, capture_mode):
         """Test a jax.grad function does not compute Jacobians for arguments not in argnums."""
@@ -424,8 +442,10 @@ class TestJAXAD:
         assert "0" in circuit.jaxed_function.derivative_functions
         assert len(circuit.jaxed_function.derivative_functions["0"].jaxpr.out_avals) == 1
 
-    # capture=True fails with RecursionError("maximum recursion depth exceeded") from jax.pure_callback.
-    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during AD lowering.
+    # capture=True fails with RecursionError("maximum recursion depth exceeded") from
+    # jax.pure_callback.
+    # Classification: Catalyst-JAX integration gap; fix by avoiding recursive qjit callback during
+    # AD lowering.
     @pytest.mark.capture_todo
     def test_jit_and_grad(self, backend, capture_mode):
         """Test that argnums determination works correctly when combining jax.jit with jax.grad.
@@ -448,8 +468,10 @@ class TestJAXAD:
 
         assert jnp.allclose(result, reference)
 
-    # capture=True fails with RecursionError("maximum recursion depth exceeded") while JAX inspects qjit callback.
-    # Classification: Catalyst-JAX integration gap; fix by preventing recursive derivative callback compilation.
+    # capture=True fails with RecursionError("maximum recursion depth exceeded") while JAX inspects
+    # qjit callback.
+    # Classification: Catalyst-JAX integration gap; fix by preventing recursive derivative callback
+    # compilation.
     @pytest.mark.capture_todo
     def test_argnums_passed(self, backend, monkeypatch, capture_mode):
         """Test that when combining jax.jit and jax.grad, the internal argnums are correctly
@@ -488,8 +510,10 @@ class TestJAXRecompilation:
     JAX is asked the gradient of a function, but the function itself might need recompilation.
     """
 
-    # capture=True fails with RecursionError("maximum recursion depth exceeded") from jax.pure_callback.
-    # Classification: Catalyst-JAX integration gap; fix by making AD recompilation path capture-safe.
+    # capture=True fails with RecursionError("maximum recursion depth exceeded") from
+    # jax.pure_callback.
+    # Classification: Catalyst-JAX integration gap; fix by making AD recompilation path
+    # capture-safe.
     @pytest.mark.capture_todo
     def test_jax_function_has_not_been_jit_compiled(self, backend, capture_mode):
         """Test if function can be used by jax.grad even if it has not been JIT compiled"""
@@ -512,8 +536,10 @@ class TestJAXRecompilation:
         params = jnp.array([0.54, 0.3154, 0.654, 0.123])
         jax.grad(circuit, argnums=0)(params, 2)
 
-    # capture=True fails with RecursionError("maximum recursion depth exceeded") from jax.pure_callback.
-    # Classification: Catalyst-JAX integration gap; fix by making AD recompilation path capture-safe.
+    # capture=True fails with RecursionError("maximum recursion depth exceeded") from
+    # jax.pure_callback.
+    # Classification: Catalyst-JAX integration gap; fix by making AD recompilation path
+    # capture-safe.
     @pytest.mark.capture_todo
     def test_jax_function_needs_recompilation(self, backend, capture_mode):
         """Test if function can be used by jax.grad but it needs recompilation"""
