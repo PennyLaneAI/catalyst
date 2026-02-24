@@ -779,6 +779,39 @@ def test_decomposition_rule_name_update():
 test_decomposition_rule_name_update()
 
 
+def test_decomposition_inside_subroutine():
+    """Test that operators inside subroutines can be decomposed."""
+
+    qml.decomposition.enable_graph()
+
+    @qml.templates.Subroutine
+    def f(x, wires):
+        qml.IsingXX(x, wires)
+
+    @qml.qjit(capture=True, target="mlir")
+    @qml.decompose(gate_set=qml.gate_sets.ROTATIONS_PLUS_CNOT)
+    @qml.qnode(qml.device("lightning.qubit", wires=5))
+    # CHECK-DAG: %0 = transform.apply_registered_pass "decompose-lowering"
+    def subroutine_circuit():
+        # CHECK-DAG: [[FIRST_CONST:%.+]] = stablehlo.constant dense<5.000000e-01> : tensor<f64>
+        # CHECK-DAG: [[SECOND_CONST:%.+]] = stablehlo.constant dense<1.200000e+00> : tensor<f64>
+
+        # CHECK: [[QREG:%.+]] = quantum.alloc
+        # CHECK: [[QREG_1:%.+]] = call @f([[QREG]], [[FIRST_CONST]], {{%.+}}) : (!quantum.reg, tensor<f64>, tensor<2xi64>) -> !quantum.reg
+        # CHECK: [[QREG_2:%.+]] = call @f([[QREG_1]], [[SECOND_CONST]], {{%.+}}) : (!quantum.reg, tensor<f64>, tensor<2xi64>) -> !quantum.reg
+
+        f(0.5, (0, 1))
+        f(1.2, (2, 3))
+        return qml.probs(wires=0)
+
+    # CHECK-DAG: func.func public @_isingxx_to_cnot_rx_cnot(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>)
+    print(subroutine_circuit.mlir)
+    qml.decomposition.disable_graph()
+
+
+test_decomposition_inside_subroutine()
+
+
 def test_decomposition_rule_name_update_multi_qubits():
     """Test the name of the decomposition rule with multi-qubit gates."""
 

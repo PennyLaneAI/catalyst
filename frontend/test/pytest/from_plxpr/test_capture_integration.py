@@ -122,6 +122,7 @@ class TestCapture:
             qml.RZ(x, wires=0)
             qml.CNOT(wires=[1, 0])
             qml.Hadamard(wires=1)
+            qml.PCPhase(x, 2, wires=[0])
             return qml.expval(qml.PauliY(wires=0))
 
         captured_result = circuit_aot_builder(dev)(theta)
@@ -321,6 +322,7 @@ class TestCapture:
     @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
     def test_ctrl(self, backend, theta):
         """Test the integration for a circuit with control."""
+
         device = qml.device(backend, wires=3)
 
         # Capture enabled
@@ -345,6 +347,31 @@ class TestCapture:
             qml.ctrl(qml.RX(theta, wires=0), control=[1], control_values=[False])
             qml.ctrl(qml.RX, control=[1], control_values=[False])(theta, wires=[0])
             return qml.state()
+
+        assert jnp.allclose(capture_result, circuit(theta))
+
+    @pytest.mark.parametrize("theta", (jnp.pi, 0.1, 0.0))
+    def test_ctrl_pcphase(self, backend, theta):
+        """Test the integration for a PCPhase circuit with control."""
+        if backend == "lightning.kokkos":
+            pytest.xfail(reason="Controlled PCPhase not yet implemented on Kokkos.")
+
+        device = qml.device(backend, wires=3)
+
+        # Capture enabled
+
+        qml.capture.enable()
+
+        @qml.qnode(device)
+        def circuit(theta):
+            qml.ctrl(qml.PCPhase, control=[1], control_values=[False])(theta, 2, wires=[0])
+            return qml.state()
+
+        capture_result = qjit(circuit)(theta)
+
+        # Capture disabled
+
+        qml.capture.disable()
 
         assert jnp.allclose(capture_result, circuit(theta))
 
