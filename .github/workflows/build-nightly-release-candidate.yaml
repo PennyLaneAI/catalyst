@@ -18,7 +18,7 @@ jobs:
     outputs:
       rc_branch: ${{ steps.check_rc.outputs.rc_branch }}
     steps:
-    - name: Checkout PennyLane repo
+    - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
     - name: Set branch
@@ -33,7 +33,7 @@ jobs:
         RC_BRANCH="v${MAJ}.$((MIN-1)).${PAT}-rc0"
         if git ls-remote --exit-code origin "refs/heads/$RC_BRANCH"; then
           echo "branch_exists=true" >> $GITHUB_OUTPUT
-          echo "rc_branch=$RC_BRANCH" >> $GITHUB_OUTPUT
+          echo "rc_branch=sc-111637-sync-rc" >> $GITHUB_OUTPUT  # TODO: Change back to RC_BRANCH
           echo "Found rc branch: $RC_BRANCH"
         else
           echo "branch_exists=false" >> $GITHUB_OUTPUT
@@ -42,7 +42,7 @@ jobs:
     - name: Checkout Catalyst repo release branch
       uses: actions/checkout@v4
       with:
-        ref: ${{ steps.set_branch.outputs.branch }}
+        ref: ${{ steps.check_rc.outputs.rc_branch }}
         ssh-key: ${{ secrets.NIGHTLY_VERSION_UPDATE_DEPLOY_KEY }}
 
     - name: Bump RC version
@@ -64,7 +64,7 @@ jobs:
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
     with:
-      branch: ${{ needs.setup.outputs.branch }}
+      branch: ${{ needs.setup.outputs.rc_branch }}
 
   linux-aarch:
     name: Build on Linux aarch64
