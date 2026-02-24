@@ -417,6 +417,76 @@
   }
   ```
 
+* A new compiler pass `split-non-commuting` has been added for QNode functions that measure
+  non-commuting observables. It facilitates execution on devices that don't natively support
+  measuring multiple non-commuting observables simultaneously by splitting them into separate
+  circuit executions, one group per observable for now.
+  [(#2437)](https://github.com/PennyLaneAI/catalyst/pull/2437)
+
+  **Relationship to `split-to-single-terms`:** The `split-non-commuting` pass internally runs
+  `split-to-single-terms` first when processing Hamiltonian expectation values. The
+  `split-to-single-terms` pass decomposes a Hamiltonian (sum of observables) into individual
+  leaf observables and computes the weighted sum in post-processing by running the circuit
+  once. By contrast, `split-non-commuting` goes further: it splits non-commuting observables
+  into multiple groups and runs the circuit once per group
+
+  Consider the following example:
+  ```python
+  import pennylane as qml
+  from catalyst import qjit
+
+  @qjit
+  @qml.transform(pass_name="split-non-commuting")
+  @qml.qnode(qml.device("lightning.qubit", wires=3))
+  def circuit():
+      # Hamiltonian H = Z(0) + 2 * X(0) + 3 * Identity
+      return qml.expval(qml.Z(0) + 2 * qml.X(0) + 3 * qml.Identity(2))
+  ```
+
+  The pass first runs `split-to-single-terms` to decompose the Hamiltonian, then splits
+  non-commuting observables into separate groups. Shots are distributed among groups using
+  integer division (rounded down); e.g., 100 shots with 3 groups yields 33 shots per group.
+
+  **Before:**
+  ```mlir
+  func @circ1(%arg0) -> (tensor<f64>) {qnode} {
+      %shots = arith.constant 100
+      quantum.device shots(%shots)
+      // ... quantum ops ...
+      %H = quantum.hamiltonian(%coeffs) %T0, %obs2 : !quantum.obs
+      %result = quantum.expval %H : f64
+      return %tensor_result
+  }
+  ```
+
+  **After:**
+  ```mlir
+  func @circ1() -> (tensor<f64>) {
+      %r0, %r1 = call @circ1.quantum.group.0()  // expval(Z), 1.0
+      %r2 = call @circ1.quantum.group.1()  // expval(X)
+      // Weighted sum: 1 * r0 + 3 * r1 + 2 * r2
+      return %result
+  }
+  func @circ1.quantum.group.0() -> (tensor<f64>, tensor<f64>) {qnode} {
+      // ... quantum ops ...
+      %shots = arith.constant 100
+      %num_group = arith.constant 3 : i64
+      // Shots are divided among groups via integer division (rounded down)
+      %new_shots = arith.divsi %shots, %num_group
+      quantum.device shots(%new_shots)
+      %obs = quantum.namedobs %out_qubits[ PauliZ] : !quantum.obs
+      %r0 = quantum.expval %obs
+
+      // expval(Identity) be simplified to one
+      %one = arith.constant dense<1.000000e+00>
+      return %r0, %one
+  }
+  func @circ1.quantum.group.1() -> tensor<f64> {qnode} {
+      // ... quantum ops, single expval ...
+  }
+  ```
+
+
 <h3>Documentation 📝</h3>
 
 * Updated the Unified Compiler Cookbook to be compatible with the latest versions of PennyLane and Catalyst.
