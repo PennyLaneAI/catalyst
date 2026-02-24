@@ -60,45 +60,6 @@ def compiler_transform(module_pass: ModulePass) -> CompilerTransform:
     .. see-also::
 
         :class:`~.CompilationPass` for creating custom compilation pass scaffolding.
-
-    **Example**
-
-    Here is a toy example that arbitrarily replaces a Hadamard gate with an ``RX`` gate, where the
-    angle of rotation is specified with positional and keyword arguments.
-
-    .. code-block:: python
-
-        import pennylane as qp
-
-        class ReplaceWithRX(qp.CompilationPass):
-            name = "replace-with-rx"
-
-            def __init__(self, theta, mult_by_two=True):
-                self.theta = theta
-                self.mult_by_two = mult_by_two
-
-            def action(self, op, rewriter):
-                if qp.compiler.op_eq(op, qp.H):
-                    angle = self.theta * 2 if self.mult_by_two else self.theta
-                    new_op = qp.RX(angle, wires=op.in_qubits)
-                    rewriter.replace_op(op, new_op)
-
-        replace_with_rx = qp.compiler_transform(ReplaceWithRX)
-
-    The ``replace_with_rx`` pass can now be applied to a QNode within a :func:`~.qjit` workflow,
-    where the arguments ``theta`` and ``mult_by_two`` can be passed as arguments to it.
-
-    .. code-block:: python
-
-        @qp.qjit
-        @replace_with_rx(0.123, mult_by_two=False)
-        @qp.qnode(qp.device("lightning.qubit", wires=1))
-        def circuit():
-            qp.H(0)
-            return qp.state()
-
-    >>> circuit()
-    Array([0.99810947+0.j        , 0.        -0.06146124j], dtype=complex128)
     """
     transform = CompilerTransform(module_pass)
 
@@ -131,8 +92,6 @@ class CompilationPass(ModulePass):
 
         `~.compiler_transform` for registering ``CompilationPass`` subclasses to use with
         :func:`pennylane.qjit` workflows.
-
-        TODO: add see-also's for utility functions like ``op_eq``.
 
     A ``CompilationPass`` must specify an :meth:`action <~.CompilationPass.action>` that describes
     how it will transform operations. Please consult the documentation for the
@@ -176,45 +135,6 @@ class CompilationPass(ModulePass):
                 be invoked if the input operation matches the type hint.
             rewriter (xdsl.pattern_rewriter.PatternRewriter): a ``PatternRewriter``
                 that provides methods for transforming operations.
-
-        .. see-also::
-
-            :meth:`~.CompilationPass.add_action` for specifying additional actions. ``add_action``
-            should be used alongside ``action`` when a different behaviour is desired for certain
-            operation types.
-
-        **Example**
-
-        A ``CompilationPass`` subclass' functionality is predominantly defined by its ``action``.
-        A simple example of an action is provided below, where the pass aims to arbitrarily replace
-        a ``Hadamard`` gate a ``Rot`` gate.
-
-        .. code-block:: python
-
-            import pennylane as qp
-
-            class ReplaceWithRot(qp.CompilationPass):
-                name = "replace-with-rot"
-
-                def action(self, op, rewriter):
-                    if qp.compiler.op_eq(op, qp.H):
-                        new_op = qp.Rot(0.1, 0.2, 0.3, wires=op.in_qubits)
-                        rewriter.replace_op(op, new_op)
-
-            replace_with_rot = qp.compiler_transform(ReplaceWithRot)
-
-            @qp.qjit
-            @replace_with_rot
-            @qp.qnode(qp.device("lightning.qubit", wires=1))
-            def circuit():
-                qp.H(0)
-                return qp.state()
-
-        >>> circuit()
-        Array([0.97517033-0.19767681j, 0.09933467+0.00996671j], dtype=complex128)
-
-        As expected, the circuit's state is not a uniform superposition as if a Hadamard was
-        applied, as it was replaced with a ``Rot`` gate.
         """
 
     @classmethod
@@ -259,57 +179,6 @@ class CompilationPass(ModulePass):
         Args:
             action (Callable): A callable meeting the above constraints that transforms a given
                 operation
-
-        **Example**
-
-        A simple example of an action and an added action is provided below, where the pass aims to
-        arbitrarily replace a ``MultiRZ`` gate with a series of ``T`` gates via ``action``, and the
-        added action (``new_action``) will only replace ``PCPhase`` operations with a series of
-        Hadamard gates.
-
-        .. code-block:: python
-
-            import pennylane as qp
-            from catalyst.python_interface.dialects import quantum
-
-            class ReplaceOps(qp.CompilationPass):
-                name = "replace-ops"
-
-                def action(self, op: quantum.MultiRZOp, rewriter):
-                    T_gates = []
-                    for qubit in op.in_qubits:
-                        T_gates.append(qp.T(qubit))
-
-                    rewriter.replace_op(op, new_ops)
-
-                @qp.CompilationPass.add_action
-                def new_action(self, op: quantum.PCPhaseOp, rewriter):
-                    H_gates = []
-                    for qubit in op.in_qubits:
-                        H_gates.append(qp.H(qubit))
-
-                    rewriter.replace_op(op, new_ops)
-
-            replace_ops = qp.compiler_transform(ReplaceOps)
-
-            @qp.qjit
-            @replace_ops
-            @qp.qnode(qp.device("lightning.qubit", wires=4))
-            def circuit():
-                qp.PCPhase(1.23, dim=7, wires=[1, 0, 3])
-                qp.MultiRZ(0.1, wires=[0, 1, 2, 3])
-                qp.adjoint(qp.CNOT)
-                return qp.state()
-
-        >>> circuit()
-        Array([ 0.35355339+0.j        ,  0.25      +0.25j      ,
-                0.        +0.j        ,  0.        +0.j        ,
-                0.25      +0.25j      ,  0.        +0.35355339j,
-                0.        +0.j        ,  0.        +0.j        ,
-                0.25      +0.25j      ,  0.        +0.35355339j,
-                0.        +0.j        ,  0.        +0.j        ,
-                0.        +0.35355339j, -0.25      +0.25j      ,
-                0.        +0.j        ,  0.        +0.j        ],      dtype=complex128)
         """
         if cls is CompilationPass:
             raise TypeError(
