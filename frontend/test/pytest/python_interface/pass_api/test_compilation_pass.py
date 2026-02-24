@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for CompilationPass."""
+# pylint: disable=unused-argument
+
 from functools import lru_cache, partial
 from typing import Union
 
@@ -62,6 +64,7 @@ def create_test_pass(greedy: bool, recursive: bool) -> CompilationPass:
                 "ins_ex": 0,
                 "alloc_dealloc": 0,
             }
+            super().__init__()
 
         def action(self, op: quantum.CustomOp, rewriter):
             """Default action. Do nothing."""
@@ -311,19 +314,19 @@ class TestCompilationPass:
         with pytest.raises(TypeError, match="Only Operation types or unions of Operation types"):
 
             @pass_cls.add_action
-            def new_action1(self, op: qml.PauliX, rewriter):
+            def _(self, op: qml.PauliX, rewriter):
                 return
 
         with pytest.raises(TypeError, match="Only Operation types or unions of Operation types"):
 
             @pass_cls.add_action
-            def new_action1(self, op: qml.PauliX | qml.PauliY, rewriter):
+            def _(self, op: qml.PauliX | qml.PauliY, rewriter):
                 return
 
         with pytest.raises(TypeError, match="Only Operation types or unions of Operation types"):
 
             @pass_cls.add_action
-            def new_action1(self, op: Union[qml.PauliX, qml.PauliY], rewriter):
+            def _(self, op: Union[qml.PauliX, qml.PauliY], rewriter):
                 return
 
     def test_base_class_add_action_error(self):

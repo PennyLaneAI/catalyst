@@ -117,9 +117,15 @@ class CompilationPass(ModulePass):
 
     ``CompilationPass`` subclass objects have three attributes:
 
-    * :attr:`~.CompilationPass.name` (required): Specifies a compilation pass' name. Kebab casing is suggested for naming (e.g., ``"my-pass-name"``).
-    * :attr:`~.CompilationPass.recursive` (default: ``True``):  Whether or not the actions of the pass should be applied recursively. If ``True``, the actions will be applied repeatedly until a steady-state is reached.
-    * :attr:`~.CompilationPass.greedy` (default: ``True``):  Whether or not the actions of the pass should be applied greedily. Only relevant if the compilation pass defines multiple actions. If ``True``, each iteration of the actions' application (if ``recursive == True``) will only apply the first action that modifies the input module.
+    * :attr:`~.CompilationPass.name` (required): Specifies a compilation pass' name. Kebab casing
+      is suggested for naming (e.g., ``"my-pass-name"``).
+    * :attr:`~.CompilationPass.recursive` (default: ``True``):  Whether or not the actions of the
+      pass should be applied recursively. If ``True``, the actions will be applied repeatedly until
+      a steady-state is reached.
+    * :attr:`~.CompilationPass.greedy` (default: ``True``):  Whether or not the actions of the pass
+      should be applied greedily. Only relevant if the compilation pass defines multiple actions.
+      If ``True``, each iteration of the actions' application (if ``recursive == True``) will only
+      apply the first action that modifies the input module.
 
     .. see-also::
 
