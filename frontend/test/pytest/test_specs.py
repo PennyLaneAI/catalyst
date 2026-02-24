@@ -236,9 +236,7 @@ class TestPassByPassSpecs:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level={
-                i: pass_name
-                for i, pass_name in enumerate(
+            level=dict(enumerate(
                     (
                         "Before transforms",
                         "Before MLIR Passes (MLIR-0)",
@@ -246,7 +244,7 @@ class TestPassByPassSpecs:
                         "merge-rotations (MLIR-2)",
                     )
                 )
-            },
+            ),
             resources={
                 "Before transforms": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
@@ -305,9 +303,7 @@ class TestPassByPassSpecs:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level={
-                i: pass_name
-                for i, pass_name in enumerate(
+            level=dict(enumerate(
                     (
                         "Before transforms",
                         "cancel_inverses",
@@ -316,7 +312,7 @@ class TestPassByPassSpecs:
                         "merge-rotations (MLIR-1)",
                     )
                 )
-            },
+            ),
             resources={
                 "Before transforms": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
@@ -658,9 +654,7 @@ class TestMarkerIntegration:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level={
-                i: pass_name
-                for i, pass_name in enumerate(
+            level=dict(enumerate(
                     (
                         "before-transforms",
                         "dummy_transform",
@@ -670,7 +664,7 @@ class TestMarkerIntegration:
                         "after-mlir",
                     )
                 )
-            },
+            ),
             resources={
                 "before-transforms": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
