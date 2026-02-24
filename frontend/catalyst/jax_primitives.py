@@ -438,6 +438,9 @@ def decomposition_rule(func=None, *, is_qreg=True, num_params=0, pauli_word=None
         if getattr(func, "target_gate", None) is None:
             setattr(func, "target_gate", op_type)
 
+        if getattr(func, "decomposition_rule", None) is None:
+            setattr(func, "decomposition_rule", True)
+
         if pauli_word is not None:
             jaxpr = jax.make_jaxpr(func)(theta=args[0], wires=args[1], **kwargs)
         else:

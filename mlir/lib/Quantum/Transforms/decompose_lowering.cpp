@@ -48,6 +48,7 @@ namespace quantum {
 
 namespace DecompUtils {
 
+static constexpr StringRef decomposition_rule_attr_name = "decomposition_rule";
 static constexpr StringRef target_gate_attr_name = "target_gate";
 static constexpr StringRef decomp_gateset_attr_name = "decomp_gateset";
 
@@ -56,7 +57,10 @@ static constexpr StringRef decomp_gateset_attr_name = "decomp_gateset";
 // `catalyst.decomposition.target_op` And this attribute is set by the `markDecompositionAttributes`
 // functionq The decomposition attribute are used to determine if a function is a decomposition
 // function, and target_op is that the decomposition function want to replace
-bool isDecompositionFunction(func::FuncOp func) { return func->hasAttr(target_gate_attr_name); }
+bool isDecompositionFunction(func::FuncOp func)
+{
+    return func->hasAttr(decomposition_rule_attr_name);
+}
 
 StringRef getTargetGateName(func::FuncOp func)
 {

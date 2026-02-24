@@ -196,8 +196,10 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=False):
         if gateset := getattr(callable_, "decompose_gatesets", []):
             func_op.attributes["decompose_gatesets"] = get_mlir_attribute_from_pyval(gateset)
 
-    # Extract the target gate and number of wires from decomposition rules
+    # Extract the decomposition_rule, target gate and number of wires from decomposition rules
     # and set them as attributes on the FuncOp for use in the MLIR decomposition pass
+    if decomposition_rule := getattr(callable_, "decomposition_rule", None):
+        func_op.attributes["decomposition_rule"] = get_mlir_attribute_from_pyval(decomposition_rule)
     if target_gate := getattr(callable_, "target_gate", None):
         func_op.attributes["target_gate"] = get_mlir_attribute_from_pyval(target_gate)
     if num_wires := getattr(callable_, "num_wires", None):
