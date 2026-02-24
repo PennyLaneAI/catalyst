@@ -16,11 +16,28 @@ jobs:
     name: Setup the release
     runs-on: ubuntu-24.04-arm
     outputs:
-      branch: ${{ steps.set_branch.outputs.branch }}
+      rc_branch: ${{ steps.check_rc.outputs.rc_branch }}
     steps:
+    - name: Checkout PennyLane repo
+      uses: actions/checkout@v4
+
     - name: Set branch
       id: set_branch
       run: echo "branch=${{ github.event.inputs.branch || 'v0.14.0-rc' }}" >> $GITHUB_OUTPUT
+
+    - name: Check for RC branch
+      id: check_rc
+      run: |
+        VERSION=$(python setup.py --version)
+        IFS=. read MAJ MIN PAT <<< "${VERSION%.dev[0-9]*}"
+        RC_BRANCH="v${MAJ}.$((MIN-1)).${PAT}-rc0"
+        if git ls-remote --exit-code origin "refs/heads/$RC_BRANCH"; then
+          echo "branch_exists=true" >> $GITHUB_OUTPUT
+          echo "rc_branch=$RC_BRANCH" >> $GITHUB_OUTPUT
+          echo "Found rc branch: $RC_BRANCH"
+        else
+          echo "branch_exists=false" >> $GITHUB_OUTPUT
+        fi
 
     - name: Checkout Catalyst repo release branch
       uses: actions/checkout@v4
@@ -93,3 +110,17 @@ jobs:
     #     repository-url: https://test.pypi.org/legacy/
     #     packages-dir: dist
     #     verbose: true
+
+  trigger-pennylane-rc-release:
+    name: Trigger PennyLane RC release workflow
+    needs: [upload, setup]
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Trigger PennyLane release workflow
+      env:
+        GITHUB_TOKEN: "${{ secrets.PENNYLANE_TRIGGER_RC_WORKFLOW }}"    
+      run: |
+        gh workflow run upload-nightly-rc-release.yml \
+          --repo pennylane/pennylane \
+          --ref sc-111648-sync-rc-release
