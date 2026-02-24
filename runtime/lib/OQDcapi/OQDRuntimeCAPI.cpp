@@ -150,4 +150,11 @@ void __catalyst__oqd__ParallelProtocol(Pulse **pulses, size_t num_of_pulses)
     (*JSON)["protocol"]["sequence"].push_back(j);
 }
 
+bool __catalyst__oqd__readout_bit(QUBIT *qubit)
+{
+    // The actual classical bit value is determined at runtime by the hardware.
+    // Return a placeholder here.
+    return false;
+}
+
 } // extern "C"

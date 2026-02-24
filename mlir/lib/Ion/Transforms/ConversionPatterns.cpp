@@ -333,6 +333,31 @@ struct MeasurePulseOpPattern : public OpConversionPattern<catalyst::ion::Measure
     }
 };
 
+struct ReadoutBitOpPattern : public OpConversionPattern<catalyst::ion::ReadoutBitOp> {
+    using OpConversionPattern<catalyst::ion::ReadoutBitOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(catalyst::ion::ReadoutBitOp op,
+                                  catalyst::ion::ReadoutBitOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = this->getContext();
+        Type ptrType = LLVM::LLVMPointerType::get(ctx);
+
+        Type readoutFuncType = LLVM::LLVMFunctionType::get(IntegerType::get(ctx, 1), {ptrType});
+        LLVM::LLVMFuncOp readoutFnDecl = catalyst::ensureFunctionDeclaration<LLVM::LLVMFuncOp>(
+            rewriter, op, "__catalyst__oqd__readout_bit", readoutFuncType);
+
+        Value mres =
+            LLVM::CallOp::create(rewriter, loc, readoutFnDecl, ValueRange{adaptor.getInQubit()})
+                .getResult();
+
+        // Thread the qubit through unchanged; the physical qubit pointer is the same.
+        rewriter.replaceOp(op, {mres, adaptor.getInQubit()});
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -344,6 +369,7 @@ void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePattern
     patterns.add<ModesOpPattern>(typeConverter, patterns.getContext());
     patterns.add<PulseOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MeasurePulseOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<ReadoutBitOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ParallelProtocolOpPattern>(typeConverter, patterns.getContext());
 }
 

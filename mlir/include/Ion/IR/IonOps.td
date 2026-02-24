@@ -225,6 +225,28 @@ def MeasurePulseOp : Ion_Op<"measure_pulse"> {
     }];
 }
 
+def ReadoutBitOp : Ion_Op<"readout_bit", [AllTypesMatch<["in_qubit", "out_qubit"]>]> {
+    let summary = "Read out the classical measurement result from a qubit after a measure pulse.";
+
+    let description = [{
+        This op reads out the classical measurement result from a ParallelProtocolOp containing a
+        MeasurePulseOp, and threads the qubit wire through.
+    }];
+
+    let arguments = (ins
+        QubitType: $in_qubit
+    );
+
+    let results = (outs
+        I1: $mres,
+        QubitType: $out_qubit
+    );
+
+    let assemblyFormat = [{
+        $in_qubit attr-dict `:` type(results)
+    }];
+}
+
 def ParallelProtocolOp : Ion_Op<"parallelprotocol", [SingleBlockImplicitTerminator<"YieldOp">]> {
     let summary = "Represent a parallel protocol of pulses.";
 

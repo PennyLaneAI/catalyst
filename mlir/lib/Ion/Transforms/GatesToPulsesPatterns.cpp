@@ -103,6 +103,8 @@ std::optional<SmallVector<Value>> convertIonQubitsToQuantumBits(mlir::PatternRew
     return qubits;
 }
 
+static std::optional<int64_t> walkBackSingleQubitSSA(mlir::Value qubit);
+
 /**
  * @brief Walk back the qubit SSA until we reach an ExtractOp that has an idxAttr set, or until we
  *        reach the root of the SSA.
@@ -117,34 +119,9 @@ std::optional<SmallVector<Value>> convertIonQubitsToQuantumBits(mlir::PatternRew
 std::optional<int64_t> walkBackQubitSSA(quantum::CustomOp gate, int64_t position)
 {
     // TODO (backlog): make that function able to cross control flow op (for, while, ...)
-    auto qubit = gate.getInQubits()[position];
-    auto definingOp = qubit.getDefiningOp();
-
-    if (auto extractOp = dyn_cast<quantum::ExtractOp>(definingOp)) {
-        if (extractOp.getIdxAttr().has_value()) {
-            return extractOp.getIdxAttr().value();
-        }
-        return std::nullopt;
-    }
-    else {
-        // TODO (backlog): if a pass on one operation fails, there may be a mixture of quantum ops
-        // and parallel protocol ops in the IR. Since MLIR will continue processing other ops after
-        // a failure, we may end up in a situation in which we attempt to cast a parallel protocol
-        // op to a quantum op, which will raise an incompatible-type assertion error. It would be
-        // best if we can immediately and gracefully exit after an emitError() call before this
-        // happens, or modify this function to handle this case.
-        auto customOp = cast<quantum::CustomOp>(definingOp);
-        auto outQubits = customOp.getOutQubits();
-        int64_t index = 0;
-        for (const auto &outQubit : outQubits) {
-            if (qubit == outQubit) {
-                position = index;
-                break;
-            }
-            ++index;
-        }
-        return walkBackQubitSSA(customOp, position);
-    }
+    // Delegate to the general single-qubit SSA walk, which handles all op types including
+    // ion.parallelprotocol, ion.readout_bit, unrealized_cast, quantum.measure, and quantum.custom.
+    return walkBackSingleQubitSSA(gate.getInQubits()[position]);
 }
 
 /**
@@ -633,13 +610,6 @@ static std::optional<int64_t> walkBackSingleQubitSSA(Value qubit)
         return std::nullopt;
     }
     if (auto ppOp = dyn_cast<ion::ParallelProtocolOp>(definingOp)) {
-        // If this PP already contains a measure_pulse the quantum.measure was already
-        // converted; returning nullopt prevents the pattern from matching again.
-        bool hasMeasurePulse = false;
-        ppOp.getBody()->walk([&](ion::MeasurePulseOp) { hasMeasurePulse = true; });
-        if (hasMeasurePulse) {
-            return std::nullopt;
-        }
         auto results = ppOp.getResults();
         for (size_t i = 0; i < results.size(); i++) {
             if (qubit == results[i]) {
@@ -647,6 +617,12 @@ static std::optional<int64_t> walkBackSingleQubitSSA(Value qubit)
             }
         }
         return std::nullopt;
+    }
+    if (auto measureOp = dyn_cast<quantum::MeasureOp>(definingOp)) {
+        return walkBackSingleQubitSSA(measureOp.getInQubit());
+    }
+    if (auto readoutOp = dyn_cast<ion::ReadoutBitOp>(definingOp)) {
+        return walkBackSingleQubitSSA(readoutOp.getInQubit());
     }
     if (auto castOp = dyn_cast<mlir::UnrealizedConversionCastOp>(definingOp)) {
         if (castOp.getInputs().size() == 1) {
@@ -715,15 +691,17 @@ struct MeasureOpToMeasurePulsePattern : public mlir::OpRewritePattern<MeasureOp>
                                             qubits.front(), beamAttr, phaseAttr);
             });
 
-        auto qubitResults = convertIonQubitsToQuantumBits(rewriter, loc, ppOp.getResults());
+        // Create a readout bit op to read out the classical measurement result
+        // and thread the qubit wire through.
+        auto readoutOp = ion::ReadoutBitOp::create(rewriter, loc, rewriter.getI1Type(),
+                                                   ion::QubitType::get(ctx), ppOp.getResults()[0]);
+
+        auto qubitResults = convertIonQubitsToQuantumBits(rewriter, loc, readoutOp.getOutQubit());
         if (!qubitResults.has_value()) {
             return failure();
         }
 
-        auto newMeasure = MeasureOp::create(rewriter, op.getLoc(), rewriter.getI1Type(),
-                                            qubitResults.value()[0].getType(),
-                                            qubitResults.value()[0], op.getPostselectAttr());
-        rewriter.replaceOp(op, {newMeasure.getMres(), newMeasure.getOutQubit()});
+        rewriter.replaceOp(op, {readoutOp.getMres(), qubitResults.value()[0]});
         return success();
     }
 };
