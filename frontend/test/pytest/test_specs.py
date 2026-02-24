@@ -236,7 +236,8 @@ class TestPassByPassSpecs:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level=dict(enumerate(
+            level=dict(
+                enumerate(
                     (
                         "Before transforms",
                         "Before MLIR Passes (MLIR-0)",
@@ -303,7 +304,8 @@ class TestPassByPassSpecs:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level=dict(enumerate(
+            level=dict(
+                enumerate(
                     (
                         "Before transforms",
                         "cancel_inverses",
@@ -654,7 +656,8 @@ class TestMarkerIntegration:
             device_name="lightning.qubit",
             num_device_wires=2,
             shots=Shots(None),
-            level=dict(enumerate(
+            level=dict(
+                enumerate(
                     (
                         "before-transforms",
                         "dummy_transform",
