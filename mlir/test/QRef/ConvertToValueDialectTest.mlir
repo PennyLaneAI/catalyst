@@ -18,15 +18,15 @@
 
 
 // CHECK-LABEL: test_flat_circuit
-func.func @test_flat_circuit(%arg0: f64, %arg1: f64, %arg2: i1, %arg3: i64) -> f64 {
+func.func @test_flat_circuit(%arg0: f64, %arg1: f64, %arg2: i1) -> f64 {
 
     // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
     %a = qref.alloc(2) : !qref.reg<2>
 
     // CHECK: [[bit0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[bit1:%.+]] = quantum.extract [[qreg]][%arg3] : !quantum.reg -> !quantum.bit
+    // CHECK: [[bit1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
     %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit
-    %q1 = qref.get %a[%arg3] : !qref.reg<2>, i64 -> !qref.bit
+    %q1 = qref.get %a[1] : !qref.reg<2> -> !qref.bit
 
     // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() [[bit0]], [[bit1]] : !quantum.bit, !quantum.bit
     qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
@@ -61,57 +61,103 @@ func.func @test_flat_circuit(%arg0: f64, %arg1: f64, %arg2: i1, %arg3: i64) -> f
     %obs = qref.namedobs %q1 [ PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
 
-    // CHECK: [[insert1:%.+]] = quantum.insert [[qreg]][%arg3], [[UNITARY]]#1 : !quantum.reg, !quantum.bit
-    // CHECK: [[insert0:%.+]] = quantum.insert [[insert1]][ 0], [[UNITARY]]#0 : !quantum.reg, !quantum.bit
-    // CHECK: quantum.dealloc [[insert0]] : !quantum.reg
+    // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[UNITARY]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[UNITARY]]#1 : !quantum.reg, !quantum.bit
+    // CHECK: quantum.dealloc [[insert1]] : !quantum.reg
     qref.dealloc %a : !qref.reg<2>
     return %expval : f64
 }
 
+
 // -----
 
-// CHECK-LABEL: test_for_loop
-func.func @test_for_loop(%nqubits: i64) -> f64 {
-    // CHECK: [[qreg:%.+]] = quantum.alloc(%arg0) : !quantum.reg
-    %a = qref.alloc(%nqubits) : !qref.reg<?>
 
-    // CHECK: [[q0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[X:%.+]] = quantum.custom "PauliX"() [[q0]] : !quantum.bit
-    %q0 = qref.get %a[0] : !qref.reg<?> -> !qref.bit
+// CHECK-LABEL: test_dynamic_wire_index
+func.func @test_dynamic_wire_index(%arg0: i64) -> f64 {
+
+    // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    %a = qref.alloc(2) : !qref.reg<2>
+
+    // CHECK: [[bit0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[bit_dynamic:%.+]] = quantum.extract [[qreg]][%arg0] : !quantum.reg -> !quantum.bit
+    %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit
+    %q1 = qref.get %a[%arg0] : !qref.reg<2>, i64 -> !qref.bit
+
+    // CHECK: [[X:%.+]] = quantum.custom "PauliX"() [[bit0]] : !quantum.bit
     qref.custom "PauliX"() %q0 : !qref.bit
 
-    %start = arith.constant 0 : index
-    %step = arith.constant 1 : index
-    %stop = index.casts %nqubits : i64 to index
+    // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[X]] : !quantum.reg, !quantum.bit
+    // CHECK: [[qreg:%.+]] = quantum.insert [[insert0]][%arg0], [[bit_dynamic]] : !quantum.reg, !quantum.bit
+    // CHECK: [[bit0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[bit_dynamic:%.+]] = quantum.extract [[qreg]][%arg0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() [[bit0]], [[bit_dynamic]] : !quantum.bit, !quantum.bit
+    // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[CNOT]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[qreg:%.+]] = quantum.insert [[insert0]][%arg0], [[CNOT]]#1 : !quantum.reg, !quantum.bit
+    qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
 
-    // CHECK: [[preLoopInsert:%.+]] = quantum.insert [[qreg]][ 0], [[X]] : !quantum.reg, !quantum.bit
-    // CHECK: [[loopOutReg:%.+]] = scf.for %arg1 = {{%.+}} to {{%.+}} step {{%.+}} iter_args(%arg2 = [[preLoopInsert]]) -> (!quantum.reg) {
-    scf.for %i = %start to %stop step %step {
-        // CHECK: [[indexCast:%.+]] = index.casts %arg1 : index to i64
-        %int = index.casts %i : index to i64
+    // CHECK: [[bit0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[Y:%.+]] = quantum.custom "PauliY"() [[bit0]] : !quantum.bit
+    qref.custom "PauliY"() %q0 : !qref.bit
 
-        // CHECK: [[dynamicQ:%.+]] = quantum.extract %arg2[[[indexCast]]] : !quantum.reg -> !quantum.bit
-        // CHECK: [[Hadamard:%.+]] = quantum.custom "Hadamard"() [[dynamicQ]] : !quantum.bit
-        // CHECK: [[dynamicQInsert:%.+]] = quantum.insert %arg2[[[indexCast]]], [[Hadamard]] : !quantum.reg, !quantum.bit
-        %this_q = qref.get %a[%int] : !qref.reg<?>, i64 -> !qref.bit
-        qref.custom "Hadamard"() %this_q : !qref.bit
-
-        // CHECK: [[staticQ:%.+]] = quantum.extract [[dynamicQInsert]][ 0] : !quantum.reg -> !quantum.bit
-        // CHECK: [[Z:%.+]] = quantum.custom "PauliZ"() [[staticQ]] : !quantum.bit
-        qref.custom "PauliZ"() %q0 : !qref.bit
-
-        // CHECK: [[staticQInsert:%.+]] = quantum.insert [[dynamicQInsert]][ 0], [[Z]] : !quantum.reg, !quantum.bit
-        // CHECK: scf.yield [[staticQInsert]] : !quantum.reg
-        scf.yield
-    }
-
-    // CHECK: [[extract:%.+]] = quantum.extract [[loopOutReg]][ 0] : !quantum.reg -> !quantum.bit
-    // CHECK: [[obs:%.+]] = quantum.namedobs [[extract]][ PauliX] : !quantum.obs
-    %obs = qref.namedobs %q0 [ PauliX] : !quantum.obs
+    // CHECK: [[bit_dynamic:%.+]] = quantum.extract [[qreg]][%arg0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[namedobs:%.+]] = quantum.namedobs [[bit_dynamic]][ PauliX] : !quantum.obs
+    // CHECK: quantum.expval [[namedobs]]
+    %obs = qref.namedobs %q1 [ PauliX] : !quantum.obs
     %expval = quantum.expval %obs : f64
 
-    // CHECK: [[insert:%.+]] = quantum.insert [[loopOutReg]][ 0], [[extract]] : !quantum.reg, !quantum.bit
-    // CHECK: quantum.dealloc [[insert]] : !quantum.reg
-    qref.dealloc %a : !qref.reg<?>
+    // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[Y]] : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][%arg0], [[bit_dynamic]] : !quantum.reg, !quantum.bit
+    // CHECK: quantum.dealloc [[insert1]] : !quantum.reg
+    qref.dealloc %a : !qref.reg<2>
     return %expval : f64
 }
+
+
+// -----
+
+
+// COM:// CHECK-LABEL: test_for_loop
+// COM:func.func @test_for_loop(%nqubits: i64) -> f64 {
+// COM:    // CHECK: [[qreg:%.+]] = quantum.alloc(%arg0) : !quantum.reg
+// COM:    %a = qref.alloc(%nqubits) : !qref.reg<?>
+// COM:
+// COM:    // CHECK: [[q0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
+// COM:    // CHECK: [[X:%.+]] = quantum.custom "PauliX"() [[q0]] : !quantum.bit
+// COM:    %q0 = qref.get %a[0] : !qref.reg<?> -> !qref.bit
+// COM:    qref.custom "PauliX"() %q0 : !qref.bit
+// COM:
+// COM:    %start = arith.constant 0 : index
+// COM:    %step = arith.constant 1 : index
+// COM:    %stop = index.casts %nqubits : i64 to index
+// COM:
+// COM:    // CHECK: [[preLoopInsert:%.+]] = quantum.insert [[qreg]][ 0], [[X]] : !quantum.reg, !quantum.bit
+// COM:    // CHECK: [[loopOutReg:%.+]] = scf.for %arg1 = {{%.+}} to {{%.+}} step {{%.+}} iter_args(%arg2 = [[preLoopInsert]]) -> (!quantum.reg) {
+// COM:    scf.for %i = %start to %stop step %step {
+// COM:        // CHECK: [[indexCast:%.+]] = index.casts %arg1 : index to i64
+// COM:        %int = index.casts %i : index to i64
+// COM:
+// COM:        // CHECK: [[dynamicQ:%.+]] = quantum.extract %arg2[[[indexCast]]] : !quantum.reg -> !quantum.bit
+// COM:        // CHECK: [[Hadamard:%.+]] = quantum.custom "Hadamard"() [[dynamicQ]] : !quantum.bit
+// COM:        // CHECK: [[dynamicQInsert:%.+]] = quantum.insert %arg2[[[indexCast]]], [[Hadamard]] : !quantum.reg, !quantum.bit
+// COM:        %this_q = qref.get %a[%int] : !qref.reg<?>, i64 -> !qref.bit
+// COM:        qref.custom "Hadamard"() %this_q : !qref.bit
+// COM:
+// COM:        // CHECK: [[staticQ:%.+]] = quantum.extract [[dynamicQInsert]][ 0] : !quantum.reg -> !quantum.bit
+// COM:        // CHECK: [[Z:%.+]] = quantum.custom "PauliZ"() [[staticQ]] : !quantum.bit
+// COM:        qref.custom "PauliZ"() %q0 : !qref.bit
+// COM:
+// COM:        // CHECK: [[staticQInsert:%.+]] = quantum.insert [[dynamicQInsert]][ 0], [[Z]] : !quantum.reg, !quantum.bit
+// COM:        // CHECK: scf.yield [[staticQInsert]] : !quantum.reg
+// COM:        scf.yield
+// COM:    }
+// COM:
+// COM:    // CHECK: [[extract:%.+]] = quantum.extract [[loopOutReg]][ 0] : !quantum.reg -> !quantum.bit
+// COM:    // CHECK: [[obs:%.+]] = quantum.namedobs [[extract]][ PauliX] : !quantum.obs
+// COM:    %obs = qref.namedobs %q0 [ PauliX] : !quantum.obs
+// COM:    %expval = quantum.expval %obs : f64
+// COM:
+// COM:    // CHECK: [[insert:%.+]] = quantum.insert [[loopOutReg]][ 0], [[extract]] : !quantum.reg, !quantum.bit
+// COM:    // CHECK: quantum.dealloc [[insert]] : !quantum.reg
+// COM:    qref.dealloc %a : !qref.reg<?>
+// COM:    return %expval : f64
+// COM:}
