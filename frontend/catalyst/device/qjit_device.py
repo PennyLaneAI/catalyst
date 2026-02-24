@@ -563,14 +563,10 @@ def filter_device_capabilities_with_shots(
 
     device_capabilities = capabilities.filter(finite_shots=shots_present)
 
-    # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
-    #       when customizable multi-pathway decomposition is implemented. (Epic 74474)
-    # If the device does not support QubitUnitary, we remove the to_matrix_ops attribute
-    # from the device capabilities, to avoid Catalyst attempting to decompose operations
-    # into unitaries.
-    # Why? Because the current to_matrix_ops decomposition pathway is not customizable per device,
-    # and may lead to unintentional decompositions.
-    if unitary_support is not None and device_capabilities.supports_operation("QubitUnitary"):
+    # This is a temporary solution for the legacy decomposition system in Catalyst,
+    # which currently does not have support for graph-based decomposition.
+    # TODO: Fix this when integrating graph-based decomposition with QJITDevice
+    if unitary_support is not None:
         _to_matrix_ops = unitary_support
         setattr(device_capabilities, "to_matrix_ops", _to_matrix_ops)
 
@@ -594,7 +590,9 @@ def get_device_capabilities(device, shots=False) -> DeviceCapabilities:
 
     assert not isinstance(device, QJITDevice)
 
-    return filter_device_capabilities_with_shots(_load_device_capabilities(device), bool(shots))
+    return filter_device_capabilities_with_shots(
+        _load_device_capabilities(device), bool(shots), getattr(device, "_to_matrix_ops", None)
+    )
 
 
 def is_dynamic_wires(wires: qml.wires.Wires):
