@@ -266,7 +266,7 @@
   Conditional PPR decompositions in the `decompose-clifford-ppr` pass now emit the
   measurement logic inside an `scf.if` region rather than propagating the condition
   to inner PPM ops.
-  [(#XXXX)](https://github.com/PennyLaneAI/catalyst/pull/XXXX)
+  [(#2511)](https://github.com/PennyLaneAI/catalyst/pull/2511)
 
 * Update `mlir_specs` to account for new `marker` functionality in PennyLane.
   [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
