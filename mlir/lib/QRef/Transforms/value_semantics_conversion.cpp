@@ -30,6 +30,8 @@
 #include "mlir/IR/TypeRange.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"  // for PassManager
+#include "mlir/Transforms/Passes.h" // for createCSEPass
 
 #include "QRef/IR/QRefInterfaces.h"
 #include "QRef/IR/QRefOps.h"
@@ -480,9 +482,14 @@ struct ValueSemanticsConversionPass
     void runOnOperation() final
     {
         Operation *mod = getOperation();
-        auto *qrefDialect = mod->getContext()->getLoadedDialect<qref::QRefDialect>();
+        MLIRContext *ctx = mod->getContext();
+        auto *qrefDialect = ctx->getLoadedDialect<qref::QRefDialect>();
         // Location loc = mod->getLoc();
-        IRRewriter builder(mod->getContext());
+        IRRewriter builder(ctx);
+
+        // CSE potential duplicated getOps
+        PassManager pm(ctx);
+        pm.addPass(createCSEPass());
 
         // Collect all qnode functions.
         // We find qnode functions by identifying the parent function ops of MPs
