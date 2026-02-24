@@ -34,8 +34,8 @@ set(LIBS
     catalyst-transforms
     MLIRQuantum
     quantum-transforms
-    MLIRQEC
-    qec-transforms
+    MLIRPBC
+    pbc-transforms
     MLIRGradient
     gradient-transforms
     MLIRMBQC
@@ -56,7 +56,9 @@ add_mlir_library(CatalystCompilerDriver
     CompilerDriver.cpp
     CatalystLLVMTarget.cpp
     Pipelines.cpp
+    HighResolutionOutputStrategy.cpp
 
     LINK_LIBS PRIVATE
     ${LIBS}
+    MLIRSupport
 )

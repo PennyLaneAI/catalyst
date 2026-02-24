@@ -779,6 +779,39 @@ def test_decomposition_rule_name_update():
 test_decomposition_rule_name_update()
 
 
+def test_decomposition_inside_subroutine():
+    """Test that operators inside subroutines can be decomposed."""
+
+    qml.decomposition.enable_graph()
+
+    @qml.templates.Subroutine
+    def f(x, wires):
+        qml.IsingXX(x, wires)
+
+    @qml.qjit(capture=True, target="mlir")
+    @qml.decompose(gate_set=qml.gate_sets.ROTATIONS_PLUS_CNOT)
+    @qml.qnode(qml.device("lightning.qubit", wires=5))
+    # CHECK-DAG: %0 = transform.apply_registered_pass "decompose-lowering"
+    def subroutine_circuit():
+        # CHECK-DAG: [[FIRST_CONST:%.+]] = stablehlo.constant dense<5.000000e-01> : tensor<f64>
+        # CHECK-DAG: [[SECOND_CONST:%.+]] = stablehlo.constant dense<1.200000e+00> : tensor<f64>
+
+        # CHECK: [[QREG:%.+]] = quantum.alloc
+        # CHECK: [[QREG_1:%.+]] = call @f([[QREG]], [[FIRST_CONST]], {{%.+}}) : (!quantum.reg, tensor<f64>, tensor<2xi64>) -> !quantum.reg
+        # CHECK: [[QREG_2:%.+]] = call @f([[QREG_1]], [[SECOND_CONST]], {{%.+}}) : (!quantum.reg, tensor<f64>, tensor<2xi64>) -> !quantum.reg
+
+        f(0.5, (0, 1))
+        f(1.2, (2, 3))
+        return qml.probs(wires=0)
+
+    # CHECK-DAG: func.func public @_isingxx_to_cnot_rx_cnot(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<2xi64>)
+    print(subroutine_circuit.mlir)
+    qml.decomposition.disable_graph()
+
+
+test_decomposition_inside_subroutine()
+
+
 def test_decomposition_rule_name_update_multi_qubits():
     """Test the name of the decomposition rule with multi-qubit gates."""
 
@@ -1177,7 +1210,7 @@ def test_decompose_lowering_fallback():
     @qml.qjit(target="mlir")
     @partial(qml.transforms.decompose, gate_set={qml.RX, qml.RZ})
     @qml.qnode(qml.device("lightning.qubit", wires=2))
-    # CHECK: func.func public @circuit_25() -> tensor<4xcomplex<f64>> attributes {diff_method = "adjoint", llvm.linkage = #llvm.linkage<internal>, qnode}
+    # CHECK-LABEL: func.func public @circuit_25()
     def circuit_25():
         # CHECK: [[OUT_QUBIT:%.+]] = quantum.custom "RZ"(%cst) {{%.+}} : !quantum.bit
         # CHECK-NEXT: [[OUT_QUBIT_0:%.+]] = quantum.custom "RX"(%cst) [[OUT_QUBIT]] : !quantum.bit
@@ -1264,38 +1297,6 @@ def test_decomposition_rule_with_allocation():
 test_decomposition_rule_with_allocation()
 
 
-def test_decompose_autograph_inner_block():
-    """Test the decompose lowering pass with autograph."""
-
-    qml.capture.enable()
-    qml.decomposition.enable_graph()
-
-    @qml.qjit(target="mlir", autograph=True)
-    @partial(qml.transforms.decompose, gate_set={"Rot"})
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
-    def circuit_28(n: int):
-
-        # CHECK: [[QREG:%.+]] = scf.for %arg1 = {{%.+}} to %1 step {{%.+}} iter_args(%arg2 = %0) -> (!quantum.reg) {
-        # CHECK-NEXT:     [[BIT:%.+]] = quantum.extract %arg2[ 0] : !quantum.reg -> !quantum.bit
-        # CHECK-NEXT:     [[OUT_QUBITS:%.+]] = quantum.custom "RX"(%cst) [[BIT]] : !quantum.bit
-        # CHECK-NEXT:     [[INSERT:%.+]] = quantum.insert %arg2[ 0], [[OUT_QUBITS]] : !quantum.reg, !quantum.bit
-        # CHECK-NEXT:     scf.yield [[INSERT]] : !quantum.reg
-        # CHECK-NEXT:   }
-        for _ in range(n):
-            qml.RX(0.2, wires=0)
-
-        return qml.expval(qml.Z(0))
-
-    # CHECK: func.func public @ag___ry_to_rot(%arg0: !quantum.reg, %arg1: tensor<f64>, %arg2: tensor<1xi64>) -> !quantum.reg
-    print(circuit_28.mlir)
-
-    qml.decomposition.disable_graph()
-    qml.capture.disable()
-
-
-test_decompose_autograph_inner_block()
-
-
 def test_decompose_autograph_multi_blocks():
     """Test the decompose lowering pass with autograph in the program and rule."""
 
@@ -1307,6 +1308,7 @@ def test_decompose_autograph_multi_blocks():
         return {qml.RZ: 1, qml.CNOT: 2 * (num_wires - 1)}
 
     @qml.register_resources(_multi_rz_decomposition_resources)
+    @qml.capture.run_autograph
     def _multi_rz_decomposition(theta: TensorLike, wires: WiresLike, **__):
         """Decomposition of MultiRZ using CNOTs and RZs."""
         for i in range(len(wires) - 1):
@@ -1315,7 +1317,7 @@ def test_decompose_autograph_multi_blocks():
         for i in range(len(wires) - 1, 0, -1):
             qml.CNOT(wires=(wires[i], wires[i - 1]))
 
-    @qml.qjit(target="mlir", autograph=True)
+    @qml.qjit(target="mlir")
     @partial(
         qml.transforms.decompose,
         gate_set={"RZ", "CNOT"},
@@ -1325,12 +1327,15 @@ def test_decompose_autograph_multi_blocks():
     def circuit_29(n: int):
 
         # CHECK: {{%.+}} = scf.for %arg1 = {{%.+}} to %1 step {{%.+}} iter_args(%arg2 = %0) -> (!quantum.reg) {
-        for _ in range(n):
+        @qml.for_loop(n)
+        def f(i):  # pylint: disable=unused-argument
             qml.MultiRZ(0.5, wires=[0, 1, 2, 3, 4])
+
+        f()  # pylint: disable=no-value-for-parameter
 
         return qml.expval(qml.Z(0))
 
-    # CHECK: func.func public @ag___multi_rz_decomposition(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<5xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 5 : i64, target_gate = "MultiRZ"}
+    # CHECK: func.func public @ag___multi_rz_decomposition_wires_5(%arg0: !quantum.reg, %arg1: tensor<1xf64>, %arg2: tensor<5xi64>) -> !quantum.reg attributes {llvm.linkage = #llvm.linkage<internal>, num_wires = 5 : i64, target_gate = "MultiRZ"}
     # CHECK: {{%.+}} = scf.for %arg3 = %c0 to %c4 step %c1 iter_args(%arg4 = %arg0) -> (!quantum.reg)
     # CHECK: {{%.+}} = scf.for %arg3 = %c0 to %c4 step %c1 iter_args(%arg4 = %4) -> (!quantum.reg)
     print(circuit_29.mlir)
@@ -1340,3 +1345,332 @@ def test_decompose_autograph_multi_blocks():
 
 
 test_decompose_autograph_multi_blocks()
+
+
+def test_decompose_work_wires_context_manager():
+    """
+    Test that decomposition with work wires is correctly applied when allocating with the context
+    manager.
+    """
+
+    qml.capture.enable()
+
+    @decomposition_rule(is_qreg=True, op_type="PauliZ")
+    def my_decomp(wires):
+        with qml.allocate(2, restored=False) as work_wires:
+            qml.X(wires[0])
+            qml.X(wires[1])
+            qml.H(work_wires[0])
+            qml.H(work_wires[1])
+
+    @qml.qjit
+    @qml.transform(pass_name="decompose-lowering")
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def my_circuit():
+        my_decomp(jax.core.ShapedArray((2,), int))
+        qml.Z(0)
+        return qml.probs()
+
+    # check that decomp arrives properly
+    # CHECK: func.func public @my_decomp({{.*}}) -> !quantum.reg attributes {{{.*}} target_gate = "PauliZ"}
+    print(my_circuit.mlir)
+
+    # check that decomp is applied properly
+    # CHECK-NOT: PauliZ
+    # CHECK-NOT: my_decomp
+
+    # two allocates, one for main register and one for decomp register
+    # CHECK: allocate
+    # CHECK: allocate
+    # CHECK: PauliX
+    # CHECK: PauliX
+    # CHECK: Hadamard
+    # CHECK: Hadamard
+    # CHECK: release
+    # CHECK: release
+    print(my_circuit.mlir_opt)
+
+    qml.capture.disable()
+
+
+test_decompose_work_wires_context_manager()
+
+
+def test_decompose_work_wires_alloc_dealloc():
+    """
+    Test that decomposition with work wires is correctly applied when allocating/deallocating
+    explicitly.
+    """
+
+    qml.capture.enable()
+
+    @decomposition_rule(is_qreg=True, op_type="RY")
+    def my_decomp(angle, wires):
+        work_wires = qml.allocate(2)
+        qml.CNOT((work_wires[0], wires[0]))
+        qml.RX(-np.pi / 2, wires[0])
+        qml.RZ(angle, wires[0])
+        qml.RX(np.pi / 2, wires[0])
+        qml.CNOT((work_wires[1], wires[1]))
+        qml.deallocate(work_wires)
+
+    @qml.qjit
+    @qml.transform(pass_name="decompose-lowering")
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def my_circuit(angle: float):
+        my_decomp(float, jax.core.ShapedArray((2,), int))
+        qml.RY(angle, 0)
+        return qml.probs()
+
+    # check that decomp arrives properly
+    # CHECK: func.func public @my_decomp({{.*}}) -> !quantum.reg attributes {{{.*}} target_gate = "RY"}
+    print(my_circuit.mlir)
+
+    # check that the decomposition applies properly
+    # CHECK-NOT: my_decomp
+    # CHECK-NOT: RY
+
+    # two allocates, one for main register and one for decomp register
+    # CHECK: allocate
+    # CHECK: allocate
+    # CHECK: CNOT
+    # CHECK: RX
+    # CHECK: RZ
+    # CHECK: RX
+    # CHECK: CNOT
+    # CHECK: release
+    # CHECK: release
+    print(my_circuit.mlir_opt)
+
+    qml.capture.disable()
+
+
+test_decompose_work_wires_alloc_dealloc()
+
+
+def test_decompose_work_wires_control_flow():
+    """Test that decomposition with work wires + control flow is correctly applied."""
+
+    qml.capture.enable()
+
+    @decomposition_rule(is_qreg=True, op_type="CRX")
+    def my_decomp(angle, wires, **_):
+        def true_func():
+            qml.CNOT(wires)
+
+            with qml.allocate(2, state="any", restored=True) as w:
+                for _ in range(2):
+                    qml.H(w[0])
+                    qml.X(w[1])
+
+        def false_func():
+            with qml.allocate(1, state="any", restored=False) as w:
+                qml.H(w)
+
+                m = qml.measure(wires[0])
+
+                qml.cond(m, qml.CNOT)(wires)
+
+        qml.cond(angle > 1.2, true_func, false_func)()
+
+    @qml.qjit
+    @qml.transform(pass_name="decompose-lowering")
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
+    def circuit():
+        my_decomp(float, jax.core.ShapedArray((2,), int))
+        qml.CRX(1.7, wires=[0, 1])
+        qml.CRX(-7.2, wires=[0, 1])
+        return qml.state()
+
+    # target_gate attribute is correctly applied
+    # CHECK: my_decomp([[args:.*]]) -> !quantum.reg attributes {[[other_attributes:.*]] target_gate = "CRX"}
+    print(circuit.mlir)
+
+    # test that the decomposition is applied correctly
+    # CHECK-NOT: CRX
+    # CHECK-NOT: my_decomp
+
+    # allocate for main register, subsequent allocates+releases for decomp registers
+    # CHECK: allocate
+
+    # first CRX: true branch
+    # CHECK: CNOT
+    # CHECK: allocate
+    # CHECK: Hadamard
+    # CHECK: PauliX
+    # CHECK: Hadamard
+    # CHECK: PauliX
+    # CHECK: release
+
+    # second CRX: false branch
+    # CHECK: allocate
+    # CHECK: Hadamard
+    # CHECK: Measure
+    # CHECK: cond
+    # CHECK: CNOT
+    # CHECK: release
+
+    # release main register
+    # CHECK: release
+
+    print(circuit.mlir_opt)
+
+    qml.capture.disable()
+
+
+test_decompose_work_wires_control_flow()
+
+
+def test_decompose_work_wires_with_decompose_transform():
+    """Test that work wires are correctly lowered and decomposed by the decompose transform."""
+
+    qml.capture.enable()
+    qml.decomposition.enable_graph()
+
+    @qml.register_resources({qml.X: 1, qml.Z: 1})
+    def my_decomp(wire):
+        with qml.allocate(1) as work_wire:
+            qml.X(work_wire)
+            qml.Z(wire)
+            qml.X(work_wire)
+
+    @qjit
+    @partial(
+        qml.transforms.decompose,
+        gate_set={
+            "X",
+            "Z",
+        },
+        fixed_decomps={
+            qml.Y: my_decomp,
+        },
+    )
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def my_circuit():
+        qml.Y(0)
+        return qml.probs()
+
+    # CHECK-NOT: Y
+    # CHECK-NOT: my_decomp
+
+    # two allocates, one for main register and one for decomp register
+    # CHECK: allocate
+    # CHECK: allocate
+    # CHECK: X
+    # CHECK: Z
+    # CHECK: X
+    # CHECK: release
+    # CHECK: release
+    print(my_circuit.mlir_opt)
+
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
+
+
+test_decompose_work_wires_with_decompose_transform()
+
+
+def test_num_work_wires():
+    """Test that num_work_wires can be passed and is correctly used in solving the graph."""
+
+    qml.decomposition.enable_graph()
+    qml.capture.enable()
+
+    @qml.register_resources(
+        {qml.CNOT: 3, qml.H: 1, qml.X: 1, qml.ops.op_math.Conditional: 2},
+        work_wires={"borrowed": 2, "garbage": 1},
+    )
+    def my_decomp(angle, wires, **_):
+        def true_func():
+            qml.CNOT(wires)
+
+            with qml.allocate(2, state="any", restored=True) as w:
+                qml.H(w[0])
+                qml.H(w[0])
+                qml.X(w[1])
+                qml.X(w[1])
+
+            return
+
+        def false_func():
+            with qml.allocate(1, state="any", restored=False) as w:
+                qml.H(w)
+
+            m = qml.measure(wires[0])
+
+            qml.cond(m, qml.CNOT)(wires)
+
+            return
+
+        qml.cond(angle > 1.2, true_func, false_func)()
+
+    @qml.qjit
+    @partial(
+        qml.transforms.decompose,
+        gate_set={qml.CNOT, qml.H, qml.X, "Conditional", "MidMeasure"},
+        fixed_decomps={qml.CRX: my_decomp},
+        num_work_wires=3,
+    )
+    @qml.qnode(qml.device("lightning.qubit", wires=5))
+    def circuit():
+        qml.CRX(1.7, wires=[0, 1])
+        qml.CRX(-7.2, wires=[0, 1])
+        return qml.state()
+
+    # CHECK-NOT: CRX
+    # CHECK-NOT: my_decomp
+
+    # CHECK: allocate
+    # CHECK: allocate
+    # CHECK: CNOT
+    # CHECK: Hadamard
+    # CHECK: Hadamard
+    # CHECK: PauliX
+    # CHECK: PauliX
+    # CHECK: Hadamard
+    # CHECK: Measure
+    # CHECK: CNOT
+    # CHECK: release
+    # CHECK: release
+    print(circuit.mlir_opt)
+
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
+
+
+test_num_work_wires()
+
+
+def test_default_decomps():
+    """Test that default decompositions are correctly applied with qjit."""
+    qml.capture.enable()
+    qml.decomposition.enable_graph()
+
+    # Toffoli's decomposition to this gateset includes a wire allocation
+    @qml.qjit(target="mlir")
+    @partial(
+        qml.transforms.decompose,
+        gate_set={qml.ops.ChangeOpBasis},
+        num_work_wires=1,
+    )
+    @qml.qnode(qml.device("lightning.qubit", wires=4))
+    def circuit():
+        qml.Toffoli(wires=[0, 1, 2])
+        return qml.state()
+
+    # CHECK-NOT: toffoli_elbow
+    # CHECK-NOT: Toffoli
+
+    # two allocates/releases, for default register + work wires
+    # CHECK: allocate
+    # CHECK: allocate
+    # CHECK: ChangeOpBasis
+    # CHECK: release
+    # CHECK: release
+    print(circuit.mlir_opt)
+
+    qml.decomposition.disable_graph()
+    qml.capture.disable()
+
+
+test_default_decomps()

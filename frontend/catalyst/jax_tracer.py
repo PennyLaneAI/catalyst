@@ -1312,7 +1312,8 @@ def apply_transforms(
         tracing_mode = TracingMode.TRANSFORM
     elif len(qnode_program) or have_measurements_changed(tape, tapes[0]):
         with_measurement_from_counts_or_samples = any(
-            "measurements_from_counts" in (transform_str := str(getattr(qnode, "transform", "")))
+            "measurements_from_counts"
+            in (transform_str := str(getattr(qnode, "tape_transform", "")))
             or "measurements_from_samples" in transform_str
             for qnode in qnode_program
         )
@@ -1507,7 +1508,7 @@ def _trace_classical_phase(
         # with an extra computational cost
 
         if any(isinstance(wire, qml.wires.DynamicWire) for wire in quantum_tape.wires):
-            msg = "qml.allocate() is only supported with program capture enabled."
+            msg = "qml.allocate() with qjit is only supported with program capture enabled."
             raise CompileError(msg)
 
         # 1. Recompute the original return

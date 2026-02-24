@@ -216,7 +216,7 @@ def ExtractOp : Memory_Op<"extract", [NoMemoryEffect]> {
     let hasFolder = 1;
 }
 
-def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
+def InsertOp : Memory_Op<"insert", [NoMemoryEffect, AllTypesMatch<["in_qreg", "out_qreg"]>]> {
     let summary = "Update the qubit value of a register.";
     let description = [{
     }];
@@ -864,6 +864,38 @@ def NamedObsOp : Observable_Op<"namedobs"> {
 
     let assemblyFormat = [{
         $qubit `[` $type `]` attr-dict  `:` type(results)
+    }];
+}
+
+def MCMObsOp : Observable_Op<"mcmobs"> {
+    let summary = "Define a pseudo-observable of mid-circuit measurements for use in measurement processes";
+    let description = [{
+        The `quantum.mcmobs` operation defines a quantum observable from mid-circuit measurements,
+        to be used by other operations such as measurement processes.
+
+        The only argument is a sequence of boolean result values of mid-circuit measurements.
+
+        Example:
+
+        ```mlir
+        func.func @foo(%mcm: i1)
+        {
+            %obs = quantum.mcmobs %mcm : !quantum.obs
+            func.return
+        }
+        ```
+    }];
+
+    let arguments = (ins
+        Variadic<I1>:$mcms
+    );
+
+    let results = (outs
+        ObservableType:$obs
+    );
+
+    let assemblyFormat = [{
+        $mcms attr-dict `:` type(results)
     }];
 }
 

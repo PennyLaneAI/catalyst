@@ -11,13 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """This submodule contains xDSL dialects for the unified compiler."""
 
 from .catalyst import Catalyst
 from .mbqc import MBQC
-from .qec import QEC
+from .pbc import PBC
 from .quantum import Quantum
 from .stablehlo import StableHLO
 
-__all__ = ["Catalyst", "MBQC", "Quantum", "QEC", "StableHLO"]
+__all__ = ["Catalyst", "MBQC", "Quantum", "PBC", "StableHLO"]
