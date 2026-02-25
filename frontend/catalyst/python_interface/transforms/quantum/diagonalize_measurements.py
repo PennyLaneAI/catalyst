@@ -22,12 +22,15 @@ Known Limitations
     Quantum dialect as NamedObservable).
   * Unlike the current tape-based implementation of the transform, it doesn't allow for
     diagonalization of a subset of observables.
+    - We need to allow users to pass the customized obs supported by the device.
   * Unlike the current tape-based implementation of the transform, conversion to measurements
     based on eigvals and wires (rather than the PauliZ observable) is not currently supported.
+    - We need to allow user to choose if we can return eigenvals
   * Unlike the tape-based implementation, this pass will NOT raise an error if given a circuit
     that is invalid because it contains non-commuting measurements. It should be assumed that
     this transform results in incorrect outputs unless split_non_commuting is applied to break
     non-commuting measurements into separate tapes.
+    - We need to check if a circuit contains non-commuting measurements or not
 """
 
 from dataclasses import dataclass
