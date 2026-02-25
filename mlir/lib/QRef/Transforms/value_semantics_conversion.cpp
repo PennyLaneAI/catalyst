@@ -553,7 +553,6 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp,
 void handleRegion(IRRewriter &builder, Region &r,
                   llvm::DenseMap<Value, std::unique_ptr<QubitValueTracker>> &qubitValueTrackers)
 {
-
     r.walk<WalkOrder::PreOrder>([&](Operation *op) {
         if (auto rAllocOp = dyn_cast<qref::AllocOp>(op)) {
             handleAlloc(builder, rAllocOp, qubitValueTrackers);
