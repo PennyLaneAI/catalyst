@@ -37,8 +37,9 @@ def QuantumRegion : OpInterface<"QuantumRegion"> {
 
     let verify = [{
 
-        if ($_op->getNumOperands() != 1)
-            return $_op->emitOpError("must have exactly one operand (quantum register)");
+        if ($_op->getNumOperands() != 1) {
+            return $_op->emitOpError("must have exactly one operand (a quantum register)");
+        }
 
         return mlir::success();
     }];
