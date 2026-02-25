@@ -98,7 +98,7 @@ def catalyst_decompose(
     num_work_wires=0,
     fixed_decomps=None,
     alt_decomps=None,
-):
+): # pylint: disable=too-many-arguments, too-many-positional-arguments
     """Decompose operations until the stopping condition is met.
 
     In a single call of the catalyst_decompose function, the PennyLane operations are decomposed
@@ -125,14 +125,16 @@ def catalyst_decompose(
     if capabilities is None:
         if grad_method is not None:
             raise NotImplementedError(
-                "grad_method is not taken into account in catalyst_decompose if target_gates are provided instead of device capabilities."
+                "grad_method is not taken into account in catalyst_decompose if target_gates are "
+                "provided instead of device capabilities."
             )
         target_gates, stopping_condition = _resolve_gate_set(target_gates, None)
         decomposer = None
     else:
         if target_gates is not None:
             raise ValueError(
-                "target_gates are not taken into account in catalyst_decompose if device capabilities are provided."
+                "target_gates are not taken into account in catalyst_decompose if device "
+                "capabilities are provided."
             )
 
         def stopping_condition(op):
@@ -140,12 +142,12 @@ def catalyst_decompose(
 
         decomposer = partial(catalyst_decomposer, capabilities=capabilities)
 
-    decompose_kwargs = dict(
-        num_work_wires=num_work_wires,
-        target_gates=target_gates,
-        fixed_decomps=fixed_decomps,
-        alt_decomps=alt_decomps,
-    )
+    decompose_kwargs = {
+        "num_work_wires": num_work_wires,
+        "target_gates": target_gates,
+        "fixed_decomps": fixed_decomps,
+        "alt_decomps": alt_decomps,
+    }
 
     (toplevel_tape,), _ = decompose(
         tape,
