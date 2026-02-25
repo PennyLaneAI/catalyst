@@ -16,10 +16,10 @@
 from functools import partial
 from typing import Type
 
-from catalyst.compiler import CompileError
-
 import pennylane as qml
 import pytest
+
+from catalyst.compiler import CompileError
 
 
 @pytest.mark.parametrize(
@@ -54,9 +54,7 @@ def test_pass_with_options(options, expected_strings, backend):
     capture_mlir = captured_circuit.mlir
     assert 'transform.apply_registered_pass "my-pass"' in capture_mlir
     for expected_str in expected_strings:
-        assert expected_str in str(capture_mlir), (
-            f"Expected {expected_str} in MLIR: {capture_mlir}"
-        )
+        assert expected_str in str(capture_mlir), f"Expected {expected_str} in MLIR: {capture_mlir}"
 
 
 @pytest.mark.parametrize(
@@ -104,9 +102,7 @@ def test_pass_before_tape_transform(backend):
     def f(x):  # pylint: disable=unused-argument
         return qml.state()
 
-    with pytest.raises(
-        ValueError, match="without a tape definition occurs before tape transform"
-    ):
+    with pytest.raises(ValueError, match="without a tape definition occurs before tape transform"):
         f(0.5)
 
 
@@ -168,13 +164,9 @@ def test_xdsl_pass_with_qml_transform():
     assert op_has_attr(named_sequence_mod, "catalyst.uses_xdsl_passes")
     assert op_has_attr(named_sequence_mod, "transform.with_named_sequence")
 
-    named_sequence_op = next(
-        iter(named_sequence_mod.regions[0].blocks[0].operations), None
-    )
+    named_sequence_op = next(iter(named_sequence_mod.regions[0].blocks[0].operations), None)
     assert named_sequence_op is not None
-    first_transform_op = next(
-        iter(named_sequence_op.regions[0].blocks[0].operations), None
-    )
+    first_transform_op = next(iter(named_sequence_op.regions[0].blocks[0].operations), None)
     assert first_transform_op is not None
 
     assert op_has_attr(first_transform_op, "catalyst.xdsl_pass")
