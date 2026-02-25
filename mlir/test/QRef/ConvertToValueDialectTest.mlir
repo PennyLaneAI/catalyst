@@ -114,7 +114,7 @@ func.func @test_set_basis_state(%arg0: tensor<2xi1>) attributes {quantum.node} {
     // CHECK: [[SET_BASIS_STATE:%.+]]:2 = quantum.set_basis_state(%arg0) [[bit0]], [[bit1]] : (tensor<2xi1>, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
     qref.set_basis_state(%arg0) %q0, %q1 : tensor<2xi1>, !qref.bit, !qref.bit
 
-    // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() [[SET_STATE]]#0, [[SET_STATE]]#1 : !quantum.bit, !quantum.bit
+    // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() [[SET_BASIS_STATE]]#0, [[SET_BASIS_STATE]]#1 : !quantum.bit, !quantum.bit
     qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
 
     // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[CNOT]]#0 : !quantum.reg, !quantum.bit
