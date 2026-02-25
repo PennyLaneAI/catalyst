@@ -306,6 +306,7 @@ DenseI32ArrayAttr getResultSegmentSizes(IRRewriter &builder, qref::QuantumGate r
 
 /**
 Collect the rQreg Values that are captured into a region from above via closure.
+This includes any rQregs that produce rQubits that the region captures from above via closure.
 
 Reference semantics dialect operations do not take in or produce qreg Values, which means all
 qreg Values are taken in via closure from above.
@@ -313,17 +314,25 @@ qreg Values are taken in via closure from above.
 When converting to value semantics, the vQregs need to be taken in by the region-ed operations
 explicitly.
  */
-void getNecessaryRegionRegisters(Operation *regionedOp, SetVector<Value> &necessaryRegionRegisters)
+void getNecessaryRegionRegisters(Region &r, SetVector<Value> &necessaryRegionRegisters)
 {
-    auto *qrefDialect = regionedOp->getContext()->getLoadedDialect<qref::QRefDialect>();
+    auto *qrefDialect = r.getContext()->getLoadedDialect<qref::QRefDialect>();
 
-    regionedOp->walk([&](Operation *op) {
+    r.walk([&](Operation *op) {
         if (op->getDialect() != qrefDialect) {
             return;
         }
         for (Value v : op->getOperands()) {
             if (isa<qref::QuregType>(v.getType())) {
-                necessaryRegionRegisters.insert(v);
+                if (v.getParentRegion()->isProperAncestor(&r)) {
+                    necessaryRegionRegisters.insert(v);
+                }
+            }
+            else if (isa<qref::QubitType>(v.getType())) {
+                Value rQreg = getRSourceRegisterValue(v);
+                if (rQreg.getParentRegion()->isProperAncestor(&r)) {
+                    necessaryRegionRegisters.insert(rQreg);
+                }
             }
         }
     });
@@ -487,7 +496,7 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp,
     MLIRContext *ctx = forOp.getContext();
 
     SetVector<Value> rQregsUsedByRegion;
-    getNecessaryRegionRegisters(forOp, rQregsUsedByRegion);
+    getNecessaryRegionRegisters(forOp->getRegion(0), rQregsUsedByRegion);
 
     // 1. Insert all extracted qubits before the loop, and append the vQregs to the for loop args
     SmallVector<Value> newInitArgs(forOp.getInitArgs());
