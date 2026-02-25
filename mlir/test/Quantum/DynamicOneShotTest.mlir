@@ -15,7 +15,7 @@
 // RUN: quantum-opt --dynamic-one-shot --split-input-file --verify-diagnostics %s | FileCheck %s
 
 
-func.func public @test_expval(%arg0: f64) -> tensor<f64> {
+func.func public @test_expval(%arg0: f64) -> tensor<f64> attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -67,7 +67,7 @@ func.func public @test_expval(%arg0: f64) -> tensor<f64> {
 // -----
 
 
-func.func public @test_expval_mcm(%arg0: f64) -> tensor<f64> {
+func.func public @test_expval_mcm(%arg0: f64) -> tensor<f64> attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -115,7 +115,7 @@ func.func public @test_expval_mcm(%arg0: f64) -> tensor<f64> {
 // -----
 
 
-func.func public @test_var_mcm(%arg0: f64) -> tensor<f64> {
+func.func public @test_var_mcm(%arg0: f64) -> tensor<f64> attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -165,7 +165,7 @@ func.func public @test_var_mcm(%arg0: f64) -> tensor<f64> {
 // -----
 
 
-func.func public @test_probs(%arg0: f64) -> tensor<4xf64> {
+func.func public @test_probs(%arg0: f64) -> tensor<4xf64> attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -213,7 +213,7 @@ func.func public @test_probs(%arg0: f64) -> tensor<4xf64> {
 // -----
 
 
-func.func public @test_probs_mcm(%arg0: f64) -> tensor<4xf64> {
+func.func public @test_probs_mcm(%arg0: f64) -> tensor<4xf64> attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -277,7 +277,7 @@ func.func public @test_probs_mcm(%arg0: f64) -> tensor<4xf64> {
 // -----
 
 
-func.func public @test_probs_dynamic_shape(%arg0: f64, %num_qubits: i64) -> tensor<?xf64> {
+func.func public @test_probs_dynamic_shape(%arg0: f64, %num_qubits: i64) -> tensor<?xf64> attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc(%num_qubits) : !quantum.reg
@@ -330,7 +330,7 @@ func.func public @test_probs_dynamic_shape(%arg0: f64, %num_qubits: i64) -> tens
 // -----
 
 
-func.func public @test_sample(%arg0: f64) -> tensor<1000x2xi64> {
+func.func public @test_sample(%arg0: f64) -> tensor<1000x2xi64> attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -378,7 +378,7 @@ func.func public @test_sample(%arg0: f64) -> tensor<1000x2xi64> {
 // -----
 
 
-func.func public @test_sample_mcm(%arg0: f64) -> tensor<1000x1xi64> {
+func.func public @test_sample_mcm(%arg0: f64) -> tensor<1000x1xi64> attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -424,7 +424,7 @@ func.func public @test_sample_mcm(%arg0: f64) -> tensor<1000x1xi64> {
 // -----
 
 
-func.func public @test_sample_dynamic_shape(%arg0: f64, %shots: i64, %num_qubits: i64) -> tensor<?x?xi64> {
+func.func public @test_sample_dynamic_shape(%arg0: f64, %shots: i64, %num_qubits: i64) -> tensor<?x?xi64> attributes {quantum.node} {
   quantum.device shots(%shots) ["", "", ""]
   %0 = quantum.alloc(%num_qubits) : !quantum.reg
   %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
@@ -473,7 +473,7 @@ func.func public @test_sample_dynamic_shape(%arg0: f64, %shots: i64, %num_qubits
 // -----
 
 
-func.func public @test_counts(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) {
+func.func public @test_counts(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -523,7 +523,7 @@ func.func public @test_counts(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) {
 // -----
 
 
-func.func public @test_counts_mcm(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) {
+func.func public @test_counts_mcm(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc( 2) : !quantum.reg
@@ -589,7 +589,7 @@ func.func public @test_counts_mcm(%arg0: f64) -> (tensor<4xi64>, tensor<4xi64>) 
 // -----
 
 
-func.func public @test_counts_dynamic_shape(%arg0: f64, %num_qubits: i64) -> (tensor<?xi64>, tensor<?xi64>) {
+func.func public @test_counts_dynamic_shape(%arg0: f64, %num_qubits: i64) -> (tensor<?xi64>, tensor<?xi64>) attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
   %0 = quantum.alloc(%num_qubits) : !quantum.reg
@@ -643,7 +643,7 @@ func.func public @test_counts_dynamic_shape(%arg0: f64, %num_qubits: i64) -> (te
 // -----
 
 
-func.func public @test_many_MPs(%arg0: f64) -> (tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>) {
+func.func public @test_many_MPs(%arg0: f64) -> (tensor<1000x2xi64>, tensor<4xi64>, tensor<4xi64>, tensor<f64>, tensor<4xf64>) attributes {quantum.node} {
   %1000 = arith.constant 1000 : i64
   quantum.device shots(%1000) ["", "", ""]
 

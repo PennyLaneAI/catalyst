@@ -1063,16 +1063,18 @@ struct DynamicOneShotPass : public impl::DynamicOneShotPassBase<DynamicOneShotPa
 
     void runOnOperation() override
     {
-        Operation *mod = getOperation();
+        ModuleOp mod = getOperation();
         Location loc = mod->getLoc();
         IRRewriter builder(mod->getContext());
 
         // Collect all qnode functions.
         // We find qnode functions by identifying the parent function ops of MPs
-        SetVector<func::FuncOp> qnodeFuncs;
-        mod->walk([&](MeasurementProcess _mp) {
-            qnodeFuncs.insert(_mp->getParentOfType<func::FuncOp>());
-        });
+        SmallVector<func::FuncOp> qnodeFuncs;
+        for (auto func : mod.getOps<func::FuncOp>()) {
+            if (func->hasAttrOfType<UnitAttr>("quantum.node")) {
+                qnodeFuncs.push_back(func);
+            }
+        }
 
         // For each qnode function, find the returned MPs
         // Then handle the one shot logic for each MP type
