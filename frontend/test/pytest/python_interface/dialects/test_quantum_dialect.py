@@ -12,8 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Unit tests for the xDSL Quantum dialect."""
+# pylint: disable=too-many-lines
+
+from io import StringIO
 
 import pytest
+from xdsl.context import Context
 from xdsl.dialects.builtin import (
     ArrayAttr,
     ComplexType,
@@ -25,16 +29,24 @@ from xdsl.dialects.builtin import (
     i1,
     i64,
 )
-from xdsl.dialects.test import TestOp
+from xdsl.dialects.test import Test, TestOp
 from xdsl.ir import AttributeCovT, Block, Operation, OpResult, Region
+from xdsl.irdl import ConstraintContext
+from xdsl.parser import Parser
+from xdsl.printer import Printer
+from xdsl.utils.exceptions import ParseError, VerifyException
 
 from catalyst.python_interface.dialects import Quantum, quantum
 from catalyst.python_interface.dialects.quantum import (
     CustomOp,
     NamedObservableAttr,
     ObservableType,
+    QubitLevel,
+    QubitRole,
     QubitType,
+    QubitTypeConstraint,
     QuregType,
+    QuregTypeConstraint,
 )
 
 pytestmark = pytest.mark.xdsl
@@ -297,6 +309,368 @@ class TestDialectBasics:
         assert existing_attrs_names == set(expected_attrs_names)
 
 
+class TestQubitType:
+    """Unit tests for QubitType and its associated QubitTypeConstraint."""
+
+    @pytest.mark.parametrize(
+        "level,expected_level",
+        [
+            (None, StringAttr("abstract")),
+            ("abstract", StringAttr("abstract")),
+            ("qec", StringAttr("qec")),
+            ("physical", StringAttr("physical")),
+            ("logical", StringAttr("logical")),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "role,expected_role",
+        [
+            (None, StringAttr("null")),
+            ("null", StringAttr("null")),
+            ("data", StringAttr("data")),
+            ("xcheck", StringAttr("xcheck")),
+            ("zcheck", StringAttr("zcheck")),
+        ],
+    )
+    def test_constructor(self, level, expected_level, role, expected_role):
+        """Test that the parameters of QubitType are correct with defaults."""
+        if level not in (QubitLevel.QEC, QubitLevel.Physical) and role != QubitRole.Null:
+            pytest.skip("Unsupported combination of level and role.")
+
+        args = {}
+        if level is not None:
+            args["level"] = level
+        if role is not None:
+            args["role"] = role
+
+        ty = QubitType(**args)
+        assert ty.level == expected_level
+        assert ty.role == expected_role
+
+    @pytest.mark.parametrize(
+        "args,error",
+        [
+            ({}, None),
+            ({"level": "physical", "role": "xcheck"}, None),
+            ({"level": "foo"}, "Invalid value foo for 'QubitType.level'"),
+            ({"role": "bar"}, "Invalid value bar for 'QubitType.role'"),
+            ({"level": "logical", "role": "xcheck"}, "Qubit role xcheck is only permitted"),
+        ],
+    )
+    def test_verify(self, args, error):
+        """Test that QubitType verifies correctly."""
+        if error:
+            with pytest.raises(VerifyException, match=error):
+                QubitType(**args)
+        else:
+            QubitType(**args)
+
+    @pytest.mark.parametrize(
+        "ty,expected",
+        [
+            (QubitType(), "!quantum.bit"),
+            (QubitType(level="abstract", role="null"), "!quantum.bit"),
+            (QubitType(level="physical"), "!quantum.bit<physical>"),
+            (QubitType(level="qec", role="data"), "!quantum.bit<qec, data>"),
+        ],
+    )
+    @pytest.mark.parametrize("generic", [True, False])
+    def test_printing(self, ty, expected, generic):
+        """Test that QubitType is printed correctly."""
+        buf = StringIO()
+        printer = Printer(stream=buf, print_generic_format=generic)
+        printer.print_attribute(ty)
+        assert buf.getvalue() == expected
+
+    @pytest.mark.parametrize(
+        "input_str,expected_level,expected_role",
+        [
+            ('%0 = "test.op"() : () -> !quantum.bit', "abstract", "null"),
+            ('%0 = "test.op"() : () -> !quantum.bit<abstract>', "abstract", "null"),
+            ('%0 = "test.op"() : () -> !quantum.bit<abstract, null>', "abstract", "null"),
+            ('%0 = "test.op"() : () -> !quantum.bit<logical>', "logical", "null"),
+            ('%0 = "test.op"() : () -> !quantum.bit<physical, xcheck>', "physical", "xcheck"),
+        ],
+    )
+    def test_parsing(self, input_str, expected_level, expected_role):
+        """Test that QubitType is parsed correctly."""
+        ctx = Context()
+        ctx.load_dialect(Quantum)
+        ctx.load_dialect(Test)
+        op = Parser(ctx, input=input_str).parse_op()
+
+        ty = op.results[0].type
+        assert ty.level.data == expected_level
+        assert ty.role.data == expected_role
+
+    def test_parsing_error(self):
+        """Test that an error is raised if a qubit being parsed has an invalid
+        number of parameters"""
+        input_str = '%0 = "test.op"() : () -> !quantum.bit<abstract, data, foo>'
+        ctx = Context()
+        ctx.load_dialect(Quantum)
+        ctx.load_dialect(Test)
+
+        with pytest.raises(ParseError, match="Expected 2 or fewer parameters"):
+            _ = Parser(ctx, input=input_str).parse_op()
+
+    @pytest.mark.parametrize(
+        "constr,can_infer",
+        [
+            (QubitTypeConstraint(), True),
+            (QubitTypeConstraint(level_constr=["logical"]), True),
+            (QubitTypeConstraint(level_constr=["physical"], role_constr=["xcheck"]), True),
+            (QubitTypeConstraint(level_constr=["abstract", "logical"]), False),
+            (QubitTypeConstraint(level_constr=["physical"], role_constr=["xcheck", "data"]), False),
+        ],
+    )
+    def test_constraint_can_infer(self, constr, can_infer):
+        """Test that QubitTypeConstraint can infer the type correctly if possible."""
+        assert constr.can_infer({}) == can_infer
+
+    @pytest.mark.parametrize(
+        "constr,expected_type",
+        [
+            (QubitTypeConstraint(), QubitType()),
+            (QubitTypeConstraint(level_constr=["logical"]), QubitType(level="logical")),
+            (
+                QubitTypeConstraint(level_constr=["physical"], role_constr=["xcheck"]),
+                QubitType(level="physical", role="xcheck"),
+            ),
+        ],
+    )
+    def test_constraint_infer(self, constr, expected_type):
+        """Test that QubitTypeConstraint infers the correct type based on its constraints."""
+        ty = constr.infer(ConstraintContext())
+        assert ty == expected_type
+
+    @pytest.mark.parametrize(
+        "constr,ty,error",
+        [
+            (QubitTypeConstraint(), QubitType(), None),
+            (QubitTypeConstraint(), QubitType(level="physical", role="xcheck"), None),
+            (QubitTypeConstraint(level_constr=["logical"]), QubitType(level="logical"), None),
+            (
+                QubitTypeConstraint(level_constr=["logical"]),
+                QubitType(level="physical"),
+                'Unexpected attribute "physical"',
+            ),
+            (QubitTypeConstraint(role_constr=["data"]), QubitType(level="qec", role="data"), None),
+            (
+                QubitTypeConstraint(role_constr=["data"]),
+                QubitType(level="qec", role="xcheck"),
+                'Unexpected attribute "xcheck"',
+            ),
+            (
+                QubitTypeConstraint(level_constr=["physical"], role_constr=["xcheck"]),
+                QubitType(level="physical", role="xcheck"),
+                None,
+            ),
+            (
+                QubitTypeConstraint(level_constr=["physical"], role_constr=["xcheck"]),
+                QubitType(level="physical", role="null"),
+                'Unexpected attribute "null"',
+            ),
+            (
+                QubitTypeConstraint(level_constr=["physical"], role_constr=["xcheck"]),
+                QubitType(level="qec", role="xcheck"),
+                'Unexpected attribute "qec"',
+            ),
+            (
+                QubitTypeConstraint(level_constr=["abstract", "logical"]),
+                QubitType(level="logical"),
+                None,
+            ),
+            (
+                QubitTypeConstraint(level_constr=["abstract", "logical"]),
+                QubitType(level="physical"),
+                'Unexpected attribute "physical"',
+            ),
+            (
+                QubitTypeConstraint(role_constr=["null", "data"]),
+                QubitType(level="qec", role="null"),
+                None,
+            ),
+            (
+                QubitTypeConstraint(role_constr=["null", "data"]),
+                QubitType(level="qec", role="xcheck"),
+                'Unexpected attribute "xcheck"',
+            ),
+            (
+                QubitTypeConstraint(
+                    level_constr=["abstract", "physical"], role_constr=["null", "data"]
+                ),
+                QubitType(level="physical", role="data"),
+                None,
+            ),
+            (
+                QubitTypeConstraint(
+                    level_constr=["abstract", "physical"], role_constr=["null", "data"]
+                ),
+                QubitType(level="physical", role="xcheck"),
+                'Unexpected attribute "xcheck"',
+            ),
+            (
+                QubitTypeConstraint(
+                    level_constr=["abstract", "physical"], role_constr=["null", "data"]
+                ),
+                QubitType(level="qec", role="xcheck"),
+                'Unexpected attribute "qec"',
+            ),
+        ],
+    )
+    def test_constraint_verify(self, constr, ty, error):
+        """Test that QubitTypeConstraint verifies correctly."""
+        if error:
+            with pytest.raises(VerifyException, match=error):
+                constr.verify(ty, ConstraintContext())
+        else:
+            constr.verify(ty, ConstraintContext())
+
+
+class TestQuregType:
+    """Unit tests for QuregType and its associated QuregTypeConstraint."""
+
+    @pytest.mark.parametrize(
+        "level,expected_level",
+        [
+            (None, StringAttr("abstract")),
+            ("abstract", StringAttr("abstract")),
+            ("qec", StringAttr("qec")),
+            ("physical", StringAttr("physical")),
+            ("logical", StringAttr("logical")),
+        ],
+    )
+    def test_constructor(self, level, expected_level):
+        """Test that the parameters of QuregType are correct with defaults."""
+        args = {"level": level} if level is not None else {}
+
+        ty = QuregType(**args)
+        assert ty.level == expected_level
+
+    @pytest.mark.parametrize(
+        "level,error",
+        [
+            (None, None),
+            ("physical", None),
+            ("foo", "Invalid value foo for 'QuregType.level'"),
+        ],
+    )
+    def test_verify(self, level, error):
+        """Test that QuregType verifies correctly."""
+        args = {"level": level} if level is not None else {}
+        if error:
+            with pytest.raises(VerifyException, match=error):
+                QuregType(**args)
+        else:
+            QuregType(**args)
+
+    @pytest.mark.parametrize(
+        "ty,expected",
+        [
+            (QuregType(), "!quantum.reg"),
+            (QuregType(level="abstract"), "!quantum.reg"),
+            (QuregType(level="physical"), "!quantum.reg<physical>"),
+        ],
+    )
+    @pytest.mark.parametrize("generic", [True, False])
+    def test_printing(self, ty, expected, generic):
+        """Test that QuregType is printed correctly."""
+        buf = StringIO()
+        printer = Printer(stream=buf, print_generic_format=generic)
+        printer.print_attribute(ty)
+        assert buf.getvalue() == expected
+
+    @pytest.mark.parametrize(
+        "input_str,expected_level",
+        [
+            ('%0 = "test.op"() : () -> !quantum.reg', "abstract"),
+            ('%0 = "test.op"() : () -> !quantum.reg<abstract>', "abstract"),
+            ('%0 = "test.op"() : () -> !quantum.reg<logical>', "logical"),
+        ],
+    )
+    def test_parsing(self, input_str, expected_level):
+        """Test that QuregType is parsed correctly."""
+        ctx = Context()
+        ctx.load_dialect(Quantum)
+        ctx.load_dialect(Test)
+        op = Parser(ctx, input=input_str).parse_op()
+
+        ty = op.results[0].type
+        assert ty.level.data == expected_level
+
+    def test_parsing_error(self):
+        """Test that an error is raised if a register being parsed has an invalid
+        number of parameters"""
+        input_str = '%0 = "test.op"() : () -> !quantum.reg<abstract, foo>'
+        ctx = Context()
+        ctx.load_dialect(Quantum)
+        ctx.load_dialect(Test)
+
+        with pytest.raises(ParseError, match="Expected 1 or fewer parameters"):
+            _ = Parser(ctx, input=input_str).parse_op()
+
+    @pytest.mark.parametrize(
+        "constr,can_infer",
+        [
+            (QuregTypeConstraint(), True),
+            (QuregTypeConstraint(level_constr=["logical"]), True),
+            (QuregTypeConstraint(level_constr=["abstract", "logical"]), False),
+            (QuregTypeConstraint(level_constr=["abstract", "logical", "physical", "qec"]), True),
+        ],
+    )
+    def test_constraint_can_infer(self, constr, can_infer):
+        """Test that QuregTypeConstraint can infer the type correctly if possible."""
+        assert constr.can_infer({}) == can_infer
+
+    @pytest.mark.parametrize(
+        "constr,expected_type",
+        [
+            (QuregTypeConstraint(), QuregType()),
+            (QuregTypeConstraint(level_constr=["logical"]), QuregType(level="logical")),
+            (
+                QuregTypeConstraint(level_constr=["abstract", "logical", "qec", "physical"]),
+                QuregType(level="abstract"),
+            ),
+        ],
+    )
+    def test_constraint_infer(self, constr, expected_type):
+        """Test that QuregTypeConstraint infers the correct type based on its constraints."""
+        ty = constr.infer(ConstraintContext())
+        assert ty == expected_type
+
+    @pytest.mark.parametrize(
+        "constr,ty,error",
+        [
+            (QuregTypeConstraint(), QuregType(), None),
+            (QuregTypeConstraint(), QuregType(level="logical"), None),
+            (QuregTypeConstraint(level_constr=["logical"]), QuregType(level="logical"), None),
+            (
+                QuregTypeConstraint(level_constr=["logical"]),
+                QuregType(level="physical"),
+                'Unexpected attribute "physical"',
+            ),
+            (
+                QuregTypeConstraint(level_constr=["abstract", "logical"]),
+                QuregType(level="logical"),
+                None,
+            ),
+            (
+                QuregTypeConstraint(level_constr=["abstract", "logical"]),
+                QuregType(level="physical"),
+                'Unexpected attribute "physical"',
+            ),
+        ],
+    )
+    def test_constraint_verify(self, constr, ty, error):
+        """Test that QuregTypeConstraint verifies correctly."""
+        if error:
+            with pytest.raises(VerifyException, match=error):
+                constr.verify(ty, ConstraintContext())
+        else:
+            constr.verify(ty, ConstraintContext())
+
+
 class TestCustomVerifiers:
     """Unit tests for operations and attributes that have custom verification."""
 
@@ -324,6 +698,48 @@ class TestCustomVerifiers:
 class TestAssemblyFormat:
     """Lit tests for assembly format of operations/attributes in the Quantum
     dialect."""
+
+    def test_hierarchical_qubits_qregs(self, run_filecheck, pretty_print):
+        """Test that the assembly format for hierarchical qubits and qregs can be parsed
+        correctly."""
+        program = """
+        //////////////////////////////////////////////////////////////////
+        //////////////Hierarchical qubits/quregs testing//////////////////
+        //////////////////////////////////////////////////////////////////
+
+        /////////////////////// **QuregType** ///////////////////////
+        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.reg
+        %qreg_abstract0 = "test.op"() : () -> !quantum.reg
+        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.reg
+        %qreg_abstract1 = "test.op"() : () -> !quantum.reg<abstract>
+        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.reg<logical>
+        %qreg_logical = "test.op"() : () -> !quantum.reg<logical>
+
+        /////////////////////// **QubitType** ///////////////////////
+        // Defaults
+        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit
+        %qb_abstract_null0 = "test.op"() : () -> !quantum.bit
+        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit
+        %qb_abstract_null1 = "test.op"() : () -> !quantum.bit<abstract>
+        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit
+        %qb_abstract_null3 = "test.op"() : () -> !quantum.bit<abstract, null>
+
+        //// Single arg ////
+        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<logical>
+        %qb_level0 = "test.op"() : () -> !quantum.bit<logical>
+        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<physical>
+        %qb_level1 = "test.op"() : () -> !quantum.bit<physical>
+        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<qec>
+        %qb_level2 = "test.op"() : () -> !quantum.bit<qec>
+
+        //// Multiple args ////
+        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<qec, data>
+        %qb_mul0 = "test.op"() : () -> !quantum.bit<qec, data>
+        // CHECK: {{%.+}} = "test.op"() : () -> !quantum.bit<physical, xcheck>
+        %qb_mul1 = "test.op"() : () -> !quantum.bit<physical, xcheck>
+        """
+
+        run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
 
     def test_qubit_qreg_operations(self, run_filecheck, pretty_print):
         """Test that the assembly format for operations for allocation/deallocation of

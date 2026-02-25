@@ -154,13 +154,7 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
         constant_one_op = arith.ConstantOp.from_int_and_width(1, builtin.i1)
         cond = arith.CmpiOp(meas_parity, constant_one_op, "eq")
         branch = scf.IfOp(
-            cond,
-            (
-                builtin.IntegerType(1),
-                QubitType(),
-            ),
-            Region(Block()),
-            Region(Block()),
+            cond, (builtin.IntegerType(1), QubitType()), Region(Block()), Region(Block())
         )
 
         plane_op = MeasurementPlaneAttr(MeasurementPlaneEnum(plane))
@@ -611,14 +605,8 @@ class ConvertToMBQCFormalismPass(passes.ModulePass):
     def _create_cnot_gate_subroutine(self):
         """Create a subroutine for a CNOT gate."""
         gate_name = "CNOT"
-        input_types = (
-            QubitType(),
-            QubitType(),
-        )
-        output_types = (
-            QubitType(),
-            QubitType(),
-        )
+        input_types = (QubitType(), QubitType())
+        output_types = (QubitType(), QubitType())
         block = Block(arg_types=input_types)
 
         with builder.ImplicitBuilder(block):

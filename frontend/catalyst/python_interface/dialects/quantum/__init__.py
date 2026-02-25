@@ -21,10 +21,14 @@ from .attributes import (
     ObservableSSAValue,
     ObservableType,
     PauliWord,
+    QubitLevel,
+    QubitRole,
     QubitSSAValue,
     QubitType,
+    QubitTypeConstraint,
     QuregSSAValue,
     QuregType,
+    QuregTypeConstraint,
     ResultType,
 )
 from .operations import (
@@ -165,4 +169,9 @@ __all__ = [
     "InitializeOp",
     "NumQubitsOp",
     "YieldOp",
+    # Qubit/Qureg parameters
+    "QubitLevel",
+    "QubitRole",
+    "QubitTypeConstraint",
+    "QuregTypeConstraint",
 ]

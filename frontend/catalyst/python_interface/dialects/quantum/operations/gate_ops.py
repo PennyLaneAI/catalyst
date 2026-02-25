@@ -46,9 +46,9 @@ from xdsl.irdl import (
 from xdsl.traits import NoMemoryEffect
 from xdsl.utils.hints import isa
 
-from catalyst.python_interface.xdsl_extras import MemRefConstraint, TensorConstraint
+from catalyst.python_interface.xdsl_extras import AllTypesMatch, MemRefConstraint, TensorConstraint
 
-from ..attributes import PauliWord, QubitSSAValue, QubitType
+from ..attributes import PauliWord, QubitSSAValue, QubitTypeConstraint
 
 ##############################################
 ################ Base classes ################
@@ -90,21 +90,31 @@ class CustomOp(UnitaryGateOp):
 
     params = var_operand_def(Float64Type())
 
-    in_qubits = var_operand_def(QubitType)
+    in_qubits = var_operand_def(QubitTypeConstraint())
 
     gate_name = prop_def(StringAttr)
 
     adjoint = opt_prop_def(UnitAttr)
 
-    in_ctrl_qubits = var_operand_def(QubitType)
+    in_ctrl_qubits = var_operand_def(QubitTypeConstraint())
 
     in_ctrl_values = var_operand_def(i1)
 
-    out_qubits = var_result_def(QubitType)
+    out_qubits = var_result_def(QubitTypeConstraint())
 
-    out_ctrl_qubits = var_result_def(QubitType)
+    out_ctrl_qubits = var_result_def(QubitTypeConstraint())
 
-    traits = traits_def(NoMemoryEffect())
+    traits = traits_def(
+        NoMemoryEffect(),
+        AllTypesMatch(
+            ("in_qubits", "out_qubits"),
+            "Qubit ins and outs must have the same size and types",
+        ),
+        AllTypesMatch(
+            ("in_ctrl_qubits", "out_ctrl_qubits"),
+            "Control qubit ins and outs must have the same size and types",
+        ),
+    )
 
     # pylint: disable=too-many-arguments
     def __init__(
@@ -141,8 +151,8 @@ class CustomOp(UnitaryGateOp):
         if isinstance(gate_name, str):
             gate_name = StringAttr(data=gate_name)
 
-        out_qubits = tuple(QubitType() for _ in in_qubits)
-        out_ctrl_qubits = tuple(QubitType() for _ in in_ctrl_qubits)
+        out_qubits = tuple(q.type for q in in_qubits)
+        out_ctrl_qubits = tuple(q.type for q in in_ctrl_qubits)
         properties = {"gate_name": gate_name}
         if adjoint:
             properties["adjoint"] = UnitAttr()
@@ -174,11 +184,18 @@ class GlobalPhaseOp(UnitaryGateOp):
 
     adjoint = opt_prop_def(UnitAttr)
 
-    in_ctrl_qubits = var_operand_def(QubitType)
+    in_ctrl_qubits = var_operand_def(QubitTypeConstraint())
 
     in_ctrl_values = var_operand_def(i1)
 
-    out_ctrl_qubits = var_result_def(QubitType)
+    out_ctrl_qubits = var_result_def(QubitTypeConstraint())
+
+    traits = traits_def(
+        AllTypesMatch(
+            ("in_ctrl_qubits", "out_ctrl_qubits"),
+            "Control qubit ins and outs must have the same size and types",
+        )
+    )
 
     def __init__(
         self,
@@ -203,7 +220,7 @@ class GlobalPhaseOp(UnitaryGateOp):
         if not isinstance(in_ctrl_values, Sequence):
             in_ctrl_values = (in_ctrl_values,)
 
-        out_ctrl_qubits = tuple(QubitType() for _ in in_ctrl_qubits)
+        out_ctrl_qubits = tuple(q.type for q in in_ctrl_qubits)
 
         super().__init__(
             operands=(params, in_ctrl_qubits, in_ctrl_values),
@@ -233,19 +250,29 @@ class MultiRZOp(UnitaryGateOp):
 
     theta = operand_def(Float64Type())
 
-    in_qubits = var_operand_def(QubitType)
+    in_qubits = var_operand_def(QubitTypeConstraint())
 
     adjoint = opt_prop_def(UnitAttr)
 
-    in_ctrl_qubits = var_operand_def(QubitType)
+    in_ctrl_qubits = var_operand_def(QubitTypeConstraint())
 
     in_ctrl_values = var_operand_def(i1)
 
-    out_qubits = var_result_def(QubitType)
+    out_qubits = var_result_def(QubitTypeConstraint())
 
-    out_ctrl_qubits = var_result_def(QubitType)
+    out_ctrl_qubits = var_result_def(QubitTypeConstraint())
 
-    traits = traits_def(NoMemoryEffect())
+    traits = traits_def(
+        NoMemoryEffect(),
+        AllTypesMatch(
+            ("in_qubits", "out_qubits"),
+            "Qubit ins and outs must have the same size and types",
+        ),
+        AllTypesMatch(
+            ("in_ctrl_qubits", "out_ctrl_qubits"),
+            "Control qubit ins and outs must have the same size and types",
+        ),
+    )
 
     # pylint: disable=too-many-arguments
     def __init__(
@@ -275,8 +302,8 @@ class MultiRZOp(UnitaryGateOp):
         if not isinstance(in_ctrl_values, Sequence):
             in_ctrl_values = (in_ctrl_values,)
 
-        out_qubits = tuple(QubitType() for _ in in_qubits)
-        out_ctrl_qubits = tuple(QubitType() for _ in in_ctrl_qubits)
+        out_qubits = tuple(q.type for q in in_qubits)
+        out_ctrl_qubits = tuple(q.type for q in in_ctrl_qubits)
         properties = {"adjoint": UnitAttr()} if adjoint else {}
 
         super().__init__(
@@ -312,19 +339,29 @@ class PauliRotOp(UnitaryGateOp):
 
     pauli_product = prop_def(PauliWord)
 
-    in_qubits = var_operand_def(QubitType)
+    in_qubits = var_operand_def(QubitTypeConstraint())
 
     adjoint = opt_prop_def(UnitAttr)
 
-    in_ctrl_qubits = var_operand_def(QubitType)
+    in_ctrl_qubits = var_operand_def(QubitTypeConstraint())
 
     in_ctrl_values = var_operand_def(i1)
 
-    out_qubits = var_result_def(QubitType)
+    out_qubits = var_result_def(QubitTypeConstraint())
 
-    out_ctrl_qubits = var_result_def(QubitType)
+    out_ctrl_qubits = var_result_def(QubitTypeConstraint())
 
-    traits = traits_def(NoMemoryEffect())
+    traits = traits_def(
+        NoMemoryEffect(),
+        AllTypesMatch(
+            ("in_qubits", "out_qubits"),
+            "Qubit ins and outs must have the same size and types",
+        ),
+        AllTypesMatch(
+            ("in_ctrl_qubits", "out_ctrl_qubits"),
+            "Control qubit ins and outs must have the same size and types",
+        ),
+    )
 
     # pylint: disable=too-many-arguments
     def __init__(
@@ -355,8 +392,8 @@ class PauliRotOp(UnitaryGateOp):
         if not isinstance(in_ctrl_values, Sequence):
             in_ctrl_values = (in_ctrl_values,)
 
-        out_qubits = tuple(QubitType() for _ in in_qubits)
-        out_ctrl_qubits = tuple(QubitType() for _ in in_ctrl_qubits)
+        out_qubits = tuple(q.type for q in in_qubits)
+        out_ctrl_qubits = tuple(q.type for q in in_ctrl_qubits)
 
         if not isa(pauli_product, PauliWord):
             pauli_product = ArrayAttr([StringAttr(c) for c in pauli_product])
@@ -404,19 +441,29 @@ class PCPhaseOp(UnitaryGateOp):
 
     dim = operand_def(Float64Type())
 
-    in_qubits = var_operand_def(QubitType)
+    in_qubits = var_operand_def(QubitTypeConstraint())
 
     adjoint = opt_prop_def(UnitAttr)
 
-    in_ctrl_qubits = var_operand_def(QubitType)
+    in_ctrl_qubits = var_operand_def(QubitTypeConstraint())
 
     in_ctrl_values = var_operand_def(i1)
 
-    out_qubits = var_result_def(QubitType)
+    out_qubits = var_result_def(QubitTypeConstraint())
 
-    out_ctrl_qubits = var_result_def(QubitType)
+    out_ctrl_qubits = var_result_def(QubitTypeConstraint())
 
-    traits = traits_def(NoMemoryEffect())
+    traits = traits_def(
+        NoMemoryEffect(),
+        AllTypesMatch(
+            ("in_qubits", "out_qubits"),
+            "Qubit ins and outs must have the same size and types",
+        ),
+        AllTypesMatch(
+            ("in_ctrl_qubits", "out_ctrl_qubits"),
+            "Control qubit ins and outs must have the same size and types",
+        ),
+    )
 
     # pylint: disable=too-many-arguments
     def __init__(
@@ -447,8 +494,8 @@ class PCPhaseOp(UnitaryGateOp):
         if not isinstance(in_ctrl_values, Sequence):
             in_ctrl_values = (in_ctrl_values,)
 
-        out_qubits = tuple(QubitType() for _ in in_qubits)
-        out_ctrl_qubits = tuple(QubitType() for _ in in_ctrl_qubits)
+        out_qubits = tuple(q.type for q in in_qubits)
+        out_ctrl_qubits = tuple(q.type for q in in_ctrl_qubits)
         properties = {"adjoint": UnitAttr()} if adjoint else {}
 
         super().__init__(
@@ -483,19 +530,29 @@ class QubitUnitaryOp(UnitaryGateOp):
         | (MemRefConstraint(element_type=ComplexType(Float64Type()), rank=2))
     )
 
-    in_qubits = var_operand_def(QubitType)
+    in_qubits = var_operand_def(QubitTypeConstraint())
 
     adjoint = opt_prop_def(UnitAttr)
 
-    in_ctrl_qubits = var_operand_def(QubitType)
+    in_ctrl_qubits = var_operand_def(QubitTypeConstraint())
 
     in_ctrl_values = var_operand_def(i1)
 
-    out_qubits = var_result_def(QubitType)
+    out_qubits = var_result_def(QubitTypeConstraint())
 
-    out_ctrl_qubits = var_result_def(QubitType)
+    out_ctrl_qubits = var_result_def(QubitTypeConstraint())
 
-    traits = traits_def(NoMemoryEffect())
+    traits = traits_def(
+        NoMemoryEffect(),
+        AllTypesMatch(
+            ("in_qubits", "out_qubits"),
+            "Qubit ins and outs must have the same size and types",
+        ),
+        AllTypesMatch(
+            ("in_ctrl_qubits", "out_ctrl_qubits"),
+            "Control qubit ins and outs must have the same size and types",
+        ),
+    )
 
     # pylint: disable=too-many-arguments
     def __init__(
@@ -525,8 +582,8 @@ class QubitUnitaryOp(UnitaryGateOp):
         if not isinstance(in_ctrl_values, Sequence):
             in_ctrl_values = (in_ctrl_values,)
 
-        out_qubits = tuple(QubitType() for _ in in_qubits)
-        out_ctrl_qubits = tuple(QubitType() for _ in in_ctrl_qubits)
+        out_qubits = tuple(q.type for q in in_qubits)
+        out_ctrl_qubits = tuple(q.type for q in in_ctrl_qubits)
         properties = {}
         if adjoint:
             properties["adjoint"] = UnitAttr()
@@ -557,9 +614,16 @@ class SetBasisStateOp(GateOp):
         (TensorConstraint(element_type=i1, rank=1)) | (MemRefConstraint(element_type=i1, rank=1))
     )
 
-    in_qubits = var_operand_def(QubitType)
+    in_qubits = var_operand_def(QubitTypeConstraint())
 
-    out_qubits = var_result_def(QubitType)
+    out_qubits = var_result_def(QubitTypeConstraint())
+
+    traits = traits_def(
+        AllTypesMatch(
+            ("in_qubits", "out_qubits"),
+            "Qubit ins and outs must have the same size and types",
+        )
+    )
 
 
 @irdl_op_definition
@@ -577,6 +641,13 @@ class SetStateOp(GateOp):
         | (MemRefConstraint(element_type=ComplexType(Float64Type()), rank=1))
     )
 
-    in_qubits = var_operand_def(QubitType)
+    in_qubits = var_operand_def(QubitTypeConstraint())
 
-    out_qubits = var_result_def(QubitType)
+    out_qubits = var_result_def(QubitTypeConstraint())
+
+    traits = traits_def(
+        AllTypesMatch(
+            ("in_qubits", "out_qubits"),
+            "Qubit ins and outs must have the same size and types",
+        )
+    )
