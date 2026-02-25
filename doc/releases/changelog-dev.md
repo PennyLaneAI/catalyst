@@ -150,6 +150,12 @@
 
 <h3>Improvements 🛠</h3>
 
+* The tape transform :func:`~.device.decomposition.catalyst_decompose` now accepts the optional
+  keyword arguments ``target_gates``, ``num_work_wires``, ``fixed_decomps``, and ``alt_decomps``,
+  which all are passed to the used PennyLane decomposition function 
+  ``qml.devices.preprocess.decompose`` and used if the graph-based decomposition system is enabled.
+  [(#2501)](https://github.com/PennyLaneAI/catalyst/pull/2501)
+
 * Catalyst with program capture can now be used with the new `qml.templates.Subroutine` class and the associated
   `qml.capture.subroutine` upstreamed from `catalyst.jax_primitives.subroutine`.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
@@ -518,5 +524,6 @@ Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,
 Paul Haochen Wang,
+David Wierichs,
 Jake Zaia,
 Hongsheng Zheng.
