@@ -39,7 +39,12 @@ template <typename T> std::vector<T> tomlArray2StdVector(const toml::array &arr)
     }
     else if constexpr (std::is_same_v<T, double>) {
         for (const auto &elem : arr) {
-            vec.push_back(elem.as_floating_point()->get());
+            if (auto fp = elem.as_floating_point()) {
+                vec.push_back(fp->get());
+            }
+            else if (auto i = elem.as_integer()) {
+                vec.push_back(static_cast<double>(i->get()));
+            }
         }
     }
 
