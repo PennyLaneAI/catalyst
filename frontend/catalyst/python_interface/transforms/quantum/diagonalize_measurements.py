@@ -17,20 +17,25 @@ written using xDSL.
 
 Known Limitations
 -----------------
-  * Only observables PauliX, PauliY, PauliZ, Hadamard and Identity are currently supported when
+  * 1. Only observables PauliX, PauliY, PauliZ, Hadamard and Identity are currently supported when
     using this transform (but these are also the only observables currently supported in the
     Quantum dialect as NamedObservable).
-  * Unlike the current tape-based implementation of the transform, it doesn't allow for
+  * 2. Unlike the current tape-based implementation of the transform, it doesn't allow for
     diagonalization of a subset of observables.
-    - We need to allow users to pass the customized obs supported by the device.
-  * Unlike the current tape-based implementation of the transform, conversion to measurements
+  * 3. Unlike the current tape-based implementation of the transform, conversion to measurements
     based on eigvals and wires (rather than the PauliZ observable) is not currently supported.
-    - We need to allow user to choose if we can return eigenvals
-  * Unlike the tape-based implementation, this pass will NOT raise an error if given a circuit
+  * 4. Unlike the tape-based implementation, this pass will NOT raise an error if given a circuit
     that is invalid because it contains non-commuting measurements. It should be assumed that
     this transform results in incorrect outputs unless split_non_commuting is applied to break
     non-commuting measurements into separate tapes.
     - We need to check if a circuit contains non-commuting measurements or not
+
+Tasks
+----------------
+  * Limitations 2 & 3 requires the feature allowing us to pass options to the xdsl pass.
+  Example [here](https://github.com/PennyLaneAI/catalyst/blob/195d8fa2f307dae8362dad123d56a83c4ade9779/frontend/test/pytest/python_interface/pass_api/test_transform_interpreter.py#L168)_
+  * Limitations 4 requires a step to detect if the all measurements in the circuit commute with each other or not.
+
 """
 
 from dataclasses import dataclass
