@@ -374,7 +374,7 @@
 * The upstream MLIR `Test` dialect is now available via the `catalyst` command line tool.
   [(#2417)](https://github.com/PennyLaneAI/catalyst/pull/2417)
 
-* Removing some previously-added guardrails that were in place due to a bug in dynamic allocation
+* Removing some previously added guardrails that were in place due to a bug in dynamic allocation
   that is now fixed.
   [(#2427)](https://github.com/PennyLaneAI/catalyst/pull/2427)
 
