@@ -274,8 +274,9 @@ def test_to_matrix_ops():
     ):
         circuit(0.3, 0.4, 0.5)
 
-    # Test that if we pass `None`` for `to_matrix_ops`, and exclude `QubitUnitary` from the capabilities,
-    # the device can successfully compile the circuit by decomposing to the target gateset.
+    # Test that if we pass `None`` for `to_matrix_ops`, and exclude `QubitUnitary` from the
+    # capabilities, the device can successfully compile the circuit by decomposing to the
+    # target gateset.
     # Related to https://github.com/PennyLaneAI/pennylane-lightning/pull/1348
     dev = get_custom_qjit_device(
         num_wires=1, discards=("QubitUnitary", "Rot"), additions=set(), to_matrix_ops=None

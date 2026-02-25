@@ -28,7 +28,7 @@ TEST_PATH = os.path.dirname(__file__)
 CONFIG_CUSTOM_DEVICE = pathlib.Path(f"{TEST_PATH}/../custom_device/custom_device.toml")
 
 
-def get_custom_qjit_device(num_wires, discards, additions, to_matrix_ops={}):
+def get_custom_qjit_device(num_wires, discards, additions, to_matrix_ops):
     """Generate a custom device without gates in discards.
 
     Args:
