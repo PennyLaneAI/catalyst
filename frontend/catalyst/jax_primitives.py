@@ -105,6 +105,7 @@ with Patcher(
         HamiltonianOp,
         HermitianOp,
         InsertOp,
+        MCMObsOp,
         MeasureOp,
         MultiRZOp,
         NamedObsOp,
@@ -305,6 +306,7 @@ measure_p = Primitive("measure")
 measure_p.multiple_results = True
 compbasis_p = Primitive("compbasis")
 namedobs_p = Primitive("namedobs")
+mcmobs_p = Primitive("mcmobs")
 hermitian_p = Primitive("hermitian")
 tensorobs_p = Primitive("tensorobs")
 hamiltonian_p = Primitive("hamiltonian")
@@ -1824,6 +1826,21 @@ def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, kind
 
 
 #
+# mcm observable
+#
+@mcmobs_p.def_abstract_eval
+def _mcmobs_abstract_eval(*mcms):
+    return AbstractObs(len(mcms), mcmobs_p)
+
+
+def _mcm_obs_lowering(jax_ctx: mlir.LoweringRuleContext, *mcms: list[ir.Value]):
+    ctx = jax_ctx.module_context.context
+    result_type = ir.OpaqueType.get("quantum", "obs", ctx)
+    extracted = [extract_scalar(mcm, "mcmobs") for mcm in mcms]
+    return MCMObsOp(result_type, extracted).results
+
+
+#
 # hermitian observable
 #
 @hermitian_p.def_abstract_eval
@@ -2009,7 +2026,7 @@ def counts_staging_rule(jaxpr_trace, _src, obs, *dynamic_shape, static_shape):
     """
 
     shape = _merge_dyn_shape(static_shape, dynamic_shape)
-    if obs.primitive is compbasis_p:
+    if obs.primitive in (compbasis_p, mcmobs_p):
         if obs.num_qubits:
             if isinstance(shape[0], int):
                 assert shape == (2**obs.num_qubits,)
@@ -2887,6 +2904,7 @@ CUSTOM_LOWERING_RULES = (
     (measure_p, _measure_lowering),
     (compbasis_p, _compbasis_lowering),
     (namedobs_p, _named_obs_lowering),
+    (mcmobs_p, _mcm_obs_lowering),
     (hermitian_p, _hermitian_lowering),
     (tensorobs_p, _tensor__obs_lowering),
     (hamiltonian_p, _hamiltonian_lowering),

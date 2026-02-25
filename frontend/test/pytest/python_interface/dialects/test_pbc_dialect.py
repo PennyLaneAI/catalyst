@@ -91,9 +91,6 @@ def test_assembly_format(run_filecheck, pretty_print):
     // CHECK: {{%.+}}, {{%.+}}, {{%.+}} = pbc.ppm ["X", "Z"] [[Q0]], [[Q1]] : i1, !quantum.bit,
     %measured, %m0, %m1 = pbc.ppm ["X", "Z"] %q0, %q1 : i1, !quantum.bit, !quantum.bit
 
-    // CHECK: {{%.+}}, {{%.+}}, {{%.+}} = pbc.ppm ["I", "Z"] [[Q0]], [[Q1]] cond([[COND]]) : i1, !quantum.bit,
-    %measured_cond, %c0, %c1 = pbc.ppm ["I", "Z"] %q0, %q1 cond(%cond) : i1, !quantum.bit, !quantum.bit
-
     // CHECK: {{%.+}}, {{%.+}} = pbc.select.ppm([[COND]], ["X"], ["Z"]) [[Q0]] : i1, !quantum.bit
     %select_measured, %select_out = pbc.select.ppm (%cond, ["X"], ["Z"]) %q0 : i1, !quantum.bit
 

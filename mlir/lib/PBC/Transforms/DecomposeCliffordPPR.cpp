@@ -15,6 +15,7 @@
 #define DEBUG_TYPE "decompose-clifford-ppr"
 
 #include <mlir/Dialect/Arith/IR/Arith.h> // for arith::XOrIOp and arith::ConstantOp
+#include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/Value.h>
 
@@ -48,8 +49,7 @@ namespace {
 ///      └───┘     └───┘
 /// If we prepare |Y⟩ as axillary qubit, then we can use P⊗Z as the measurement operator
 /// on first operation instead of -P⊗Y.
-PPRotationOp decompose_pi_over_four_flattening(bool avoidPauliYMeasure, PPRotationOp op,
-                                               TypedValue<IntegerType> measResult,
+SmallVector<Value> emitPiOverFourDecomposition(bool avoidPauliYMeasure, PPRotationOp op,
                                                PatternRewriter &rewriter)
 {
     auto loc = op.getLoc();
@@ -74,12 +74,10 @@ PPRotationOp decompose_pi_over_four_flattening(bool avoidPauliYMeasure, PPRotati
         rotationSign = -rotationSign;
     }
 
-    auto ppmPZ =
-        PPMeasurementOp::create(rewriter, loc, pauliP, rotationSign, m1InQubits, measResult);
+    auto ppmPZ = PPMeasurementOp::create(rewriter, loc, pauliP, rotationSign, m1InQubits);
 
     SmallVector<StringRef> pauliX = {"X"};
-    auto ppmX =
-        PPMeasurementOp::create(rewriter, loc, pauliX, ppmPZ.getOutQubits().back(), measResult);
+    auto ppmX = PPMeasurementOp::create(rewriter, loc, pauliX, ppmPZ.getOutQubits().back());
 
     // FIXME: Check global phase on this decomposition
 
@@ -96,8 +94,43 @@ PPRotationOp decompose_pi_over_four_flattening(bool avoidPauliYMeasure, PPRotati
     // Deallocate the axillary qubit
     DeallocQubitOp::create(rewriter, loc, ppmX.getOutQubits().back());
 
-    rewriter.replaceOp(op, pprPI2.getOutQubits());
-    return pprPI2;
+    return SmallVector<Value>(pprPI2.getOutQubits());
+}
+
+void decompose_pi_over_four_flattening(bool avoidPauliYMeasure, PPRotationOp op,
+                                       PatternRewriter &rewriter)
+{
+    auto loc = op.getLoc();
+    ValueRange inQubits = op.getInQubits();
+
+    if (!op.getCondition()) {
+        auto outQubits = emitPiOverFourDecomposition(avoidPauliYMeasure, op, rewriter);
+        rewriter.replaceOp(op, outQubits);
+        return;
+    }
+
+    SmallVector<Type> resultTypes;
+    for (auto qubit : inQubits) {
+        resultTypes.push_back(qubit.getType());
+    }
+
+    auto ifOp = scf::IfOp::create(rewriter, loc, resultTypes, op.getCondition(), true);
+    {
+        OpBuilder::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
+
+        auto outQubits = emitPiOverFourDecomposition(avoidPauliYMeasure, op, rewriter);
+
+        scf::YieldOp::create(rewriter, loc, outQubits);
+    }
+
+    {
+        OpBuilder::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
+        scf::YieldOp::create(rewriter, loc, inQubits);
+    }
+
+    rewriter.replaceOp(op, ifOp.getResults());
 }
 
 struct DecomposeCliffordPPR : public OpRewritePattern<PPRotationOp> {
@@ -113,7 +146,7 @@ struct DecomposeCliffordPPR : public OpRewritePattern<PPRotationOp> {
     LogicalResult matchAndRewrite(PPRotationOp op, PatternRewriter &rewriter) const override
     {
         if (op.hasPiOverFourRotation()) {
-            decompose_pi_over_four_flattening(avoidPauliYMeasure, op, op.getCondition(), rewriter);
+            decompose_pi_over_four_flattening(avoidPauliYMeasure, op, rewriter);
             return success();
         }
         return failure();

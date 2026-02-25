@@ -24,11 +24,11 @@ using namespace catalyst::quantum;
 LogicalResult QubitType::verify(function_ref<InFlightDiagnostic()> emitError, QubitLevel level,
                                 QubitRole role)
 {
-    // If qubit level is not PBC or Physical, role must be Null
+    // If qubit level is not QEC or Physical, role must be Null
     // In other words, abstract and logical qubits cannot specify a role
-    if ((level != QubitLevel::PBC && level != QubitLevel::Physical) && role != QubitRole::Null) {
+    if ((level != QubitLevel::QEC && level != QubitLevel::Physical) && role != QubitRole::Null) {
         return emitError() << "qubit role '" << stringifyQubitRole(role)
-                           << "' is only permitted for pbc and physical qubits; "
+                           << "' is only permitted for qec and physical qubits; "
                            << "found level '" << stringifyQubitLevel(level) << "'";
     }
     return success();

@@ -50,6 +50,9 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
         tensor::FromElementsOp fromElementsWrapper;
     };
 
+    /// Check if an operation is a supported measurement operation.
+    static bool isSupportedMeasOp(Operation *op) { return isa<ExpvalOp>(op); }
+
     /// Check if an observable is Identity
     bool isIdentityObservable(Value obs)
     {
@@ -492,11 +495,28 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
 
     void runOnOperation() override
     {
-        Operation *moduleOp = getOperation();
+        ModuleOp moduleOp = getOperation();
+
+        // Raise an error if any measurement processes aside from expval are found
+        auto result = moduleOp.walk([&](Operation *op) {
+            if (auto measOp = dyn_cast<MeasurementProcess>(op)) {
+                if (!isSupportedMeasOp(op)) {
+                    op->emitError() << "unsupported measurement operation: " << op->getName()
+                                    << " (only quantum.expval is supported)";
+                    return WalkResult::interrupt();
+                }
+            }
+            return WalkResult::advance();
+        });
+
+        if (result.wasInterrupted()) {
+            signalPassFailure();
+            return;
+        }
 
         // Find all qnode functions with Hamiltonian expvals
         SmallVector<func::FuncOp> funcsToProcess;
-        moduleOp->walk([&](func::FuncOp funcOp) {
+        moduleOp.walk([&](func::FuncOp funcOp) {
             if (!funcOp->hasAttrOfType<UnitAttr>("quantum.node")) {
                 return;
             }
@@ -519,11 +539,12 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
             Location loc = origFunc.getLoc();
             OpBuilder moduleBuilder(origFunc);
 
-            // Clone origFunc -> origFunc.quantum (<circuit_name>.quantum)
-            // origFunc.quantum will contain the quantum operations and return individual expvals
-            // origFunc will be the entry point that calls quantumFunc and does post-processing
+            // Clone origFunc -> origFunc.single_terms (<circuit_name>.single_terms)
+            // origFunc.single_terms will contain the quantum operations and return individual
+            // expvals origFunc will be the entry point that calls quantumFunc and does
+            // post-processing
             IRMapping cloneMapping;
-            std::string quantumFuncName = origFunc.getName().str() + ".quantum";
+            std::string quantumFuncName = origFunc.getName().str() + ".single_terms";
             auto quantumFunc = cast<func::FuncOp>(moduleBuilder.clone(*origFunc, cloneMapping));
             quantumFunc.setName(quantumFuncName);
 

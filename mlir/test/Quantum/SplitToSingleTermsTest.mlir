@@ -24,10 +24,10 @@
 //   - expval(Z) on qubit 1 (non-Hamiltonian)
 //
 // After transformation:
-//   - circ.quantum: returns individual expvals [<Z x X>, <Y>, <Z>]
-//   - circ: calls circ.quantum, computes weighted sum, returns [<H>, <Z>]
+//   - circ.single_terms: returns individual expvals [<Z x X>, <Y>, <Z>]
+//   - circ: calls circ.single_terms, computes weighted sum, returns [<H>, <Z>]
 
-// CHECK-LABEL: func.func public @circ.quantum
+// CHECK-LABEL: func.func public @circ.single_terms
 // CHECK-SAME: () -> (tensor<f64>, tensor<f64>, tensor<f64>) attributes {quantum.node}
 // CHECK: quantum.device
 // CHECK: quantum.alloc
@@ -51,7 +51,7 @@
 // CHECK-NOT: quantum.expval
 // CHECK-NOT: quantum.namedobs
 // CHECK-NOT: quantum.tensor
-// CHECK: %[[CALL:.*]]:3 = call @circ.quantum
+// CHECK: %[[CALL:.*]]:3 = call @circ.single_terms
 // CHECK: %[[CONCAT:.*]] = stablehlo.concatenate
 // CHECK: %[[ZERO:.*]] = stablehlo.constant dense<0.000000e+00>
 // CHECK: %[[RESULT:.*]] = stablehlo.reduce(%[[CONCAT]] init: %[[ZERO]]) applies stablehlo.add
@@ -99,10 +99,10 @@ module {
 //   - Hamiltonian H = 1.0 * Z(0) + 2.0 * X(1) + 0.7 * Identity(2)
 //
 // After transformation:
-//   - circ.quantum: returns individual expvals [<Z(0)>, <X(1)>, 1.0]
-//   - circ: calls circ.quantum, computes weighted sum, returns <H>
+//   - circ.single_terms: returns individual expvals [<Z(0)>, <X(1)>, 1.0]
+//   - circ: calls circ.single_terms, computes weighted sum, returns <H>
 
-// CHECK-LABEL: func.func public @circ.quantum
+// CHECK-LABEL: func.func public @circ.single_terms
 // CHECK-SAME: () -> (tensor<f64>, tensor<f64>, tensor<f64>) attributes {quantum.node}
 // CHECK: quantum.device
 // CHECK: quantum.alloc
@@ -126,7 +126,7 @@ module {
 // CHECK-NOT: quantum.custom "RX"
 // CHECK-NOT: quantum.expval
 // CHECK-NOT: quantum.namedobs
-// CHECK: %[[CALL:.*]]:3 = call @circ.quantum()
+// CHECK: %[[CALL:.*]]:3 = call @circ.single_terms()
 // CHECK: %[[W0:.*]] = stablehlo.multiply %[[COEFF0:.*]], %[[CALL]]#0
 // CHECK: %[[W1:.*]] = stablehlo.multiply %[[COEFF1:.*]], %[[CALL]]#1
 // CHECK: %[[W2:.*]] = stablehlo.multiply %[[COEFF2:.*]], %[[CALL]]#2

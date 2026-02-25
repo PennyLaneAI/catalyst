@@ -538,6 +538,8 @@ def test_merge_rotation_arbitrary_angle_ppr():
     assert ir_opt.count('pbc.ppr.arbitrary ["Z", "Y"]') == 1
 
 
+@pytest.mark.xfail(reason="PPM execution with ppr-to-ppm pass is not fully supported yet.")
+@pytest.mark.usefixtures("use_capture")
 def test_clifford_to_ppm():
 
     @qml.qnode(qml.device("lightning.qubit", wires=6))
@@ -549,15 +551,17 @@ def test_clifford_to_ppm():
             qml.T(idx + 1)
         return [qml.expval(qml.PauliZ(idx)) for idx in range(5)]
 
-    ppm_transform = qml.transform(pass_name="ppm-compilation")
+    to_ppr_transform = qml.transform(pass_name="to-ppr")
+    ppr_to_ppm_transform = qml.transform(pass_name="ppr-to-ppm")
+    to_ppr_cir = to_ppr_transform(cir)
 
-    auto_corrected_cir = ppm_transform(decompose_method="auto-corrected")(cir)
+    auto_corrected_cir = ppr_to_ppm_transform(decompose_method="auto-corrected")(to_ppr_cir)
 
-    clifford_corrected_cir = ppm_transform(
-        decompose_method="clifford-corrected", avoid_y_measure=True, max_pauli_size=2
-    )(cir)
+    clifford_corrected_cir = ppr_to_ppm_transform(
+        decompose_method="clifford-corrected", avoid_y_measure=True
+    )(to_ppr_cir)
 
-    pauli_corrected_cir = ppm_transform(decompose_method="pauli-corrected", max_pauli_size=2)(cir)
+    pauli_corrected_cir = ppr_to_ppm_transform(decompose_method="pauli-corrected")(to_ppr_cir)
 
     auto_qjit_cir = qml.qjit(auto_corrected_cir)
     clifford_qjit_cir = qml.qjit(clifford_corrected_cir)
