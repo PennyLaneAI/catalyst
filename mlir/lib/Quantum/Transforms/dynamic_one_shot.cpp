@@ -288,6 +288,7 @@ func::FuncOp createOneShotKernel(IRRewriter &builder, func::FuncOp qnodeFunc, Op
     builder.setInsertionPointToStart(&qnodeFunc->getParentOfType<ModuleOp>()->getRegion(0).front());
     auto oneShotKernel = cast<func::FuncOp>(qnodeFunc->clone(mapper));
     oneShotKernel.setSymNameAttr(StringAttr::get(ctx, qnodeFunc.getSymName() + ".one_shot_kernel"));
+    oneShotKernel->setAttr("quantum.node", builder.getUnitAttr());
     builder.insert(oneShotKernel);
 
     // Set the number of shots in the new kernel to one.
