@@ -98,7 +98,7 @@ def catalyst_decompose(
     num_work_wires=0,
     fixed_decomps=None,
     alt_decomps=None,
-): # pylint: disable=too-many-arguments, too-many-positional-arguments
+):  # pylint: disable=too-many-arguments, too-many-positional-arguments
     """Decompose operations until the stopping condition is met.
 
     In a single call of the catalyst_decompose function, the PennyLane operations are decomposed
