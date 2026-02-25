@@ -57,6 +57,8 @@ from catalyst.python_interface.dialects.quantum import (
 from catalyst.python_interface.pass_api import compiler_transform
 
 
+_default_supported_obs = {"PauliZ", "Identity"}
+
 def _generate_mapping():
     _gate_map = {}
     _params_map = {}
@@ -88,6 +90,10 @@ class DiagonalizeFinalMeasurementsPattern(
     pattern_rewriter.RewritePattern
 ):  # pylint: disable=too-few-public-methods
     """RewritePattern for diagonalizing final measurements."""
+
+    def __init__(self, supported_base_obs, to_eigvals):
+        self.supported_base_obs = supported_base_obs
+        self.to_eigvals = to_eigvals
 
     @pattern_rewriter.op_type_rewrite_pattern
     def match_and_rewrite(
@@ -154,17 +160,26 @@ class DiagonalizeFinalMeasurementsPattern(
             rewriter.replace_op(observable, diag_obs)
 
 
-@dataclass(frozen=True)
 class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
     """Pass for diagonalizing final measurements."""
 
     name = "diagonalize-final-measurements"
 
+    def __init__(self, **options):
+        self.supported_base_obs = (
+            options["supported_base_obs"]
+            if "supported_base_obs" in options and options["supported_base_obs"] is not None
+            else _default_supported_obs
+        )
+        if "to_eigvals" in options and options["to_eigvals"] is True:
+            raise ValueError("to_eigvals = True is not supported")
+        self.to_eigvals = False
+
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the diagonalize final measurements pass."""
-        pattern_rewriter.PatternRewriteWalker(DiagonalizeFinalMeasurementsPattern()).rewrite_module(
-            op
-        )
+        pattern_rewriter.PatternRewriteWalker(
+            DiagonalizeFinalMeasurementsPattern(self.supported_base_obs, self.to_eigvals)
+        ).rewrite_module(op)
 
 
 diagonalize_final_measurements_pass = compiler_transform(DiagonalizeFinalMeasurementsPass)
