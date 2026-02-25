@@ -76,7 +76,8 @@ class TestLoopToJaxpr:
 
             return loop((0, x))
 
-        assert expected.strip() == str(circuit.jaxpr).strip()
+        result = circuit.jaxpr.pretty_print(use_color=False).strip()
+        assert expected.strip() == result
 
     def test_for_loop(self):
         """Check the for loop JAXPR."""
@@ -105,7 +106,8 @@ class TestLoopToJaxpr:
 
             return loop((0, x))
 
-        assert expected.strip() == str(circuit.jaxpr).strip()
+        result = circuit.jaxpr.pretty_print(use_color=False).strip()
+        assert expected.strip() == result
 
 
 class TestWhileLoops:
