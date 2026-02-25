@@ -95,10 +95,6 @@ module @circuit_twotapes_module {
     quantum.dealloc %qreg : !quantum.reg
     quantum.device_release
     %result = stablehlo.subtract %tape0_out, %tape1_out : tensor<f64>
-    %qreg_out = quantum.alloc( 1) : !quantum.reg
-    %obs_out = quantum.compbasis qreg %qreg_out : !quantum.obs
-    %sample_out = quantum.sample %obs_out : tensor<1x1xf64>
-    quantum.dealloc %qreg_out : !quantum.reg
     return %result : tensor<f64>
   }
   func.func private @circuit_twotapes_doppleganger(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node} {
@@ -120,10 +116,6 @@ module @circuit_twotapes_module {
     quantum.dealloc %qreg : !quantum.reg
     quantum.device_release
     %result = stablehlo.subtract %tape0_out, %tape1_out : tensor<f64>
-    %qreg_out = quantum.alloc( 1) : !quantum.reg
-    %obs_out = quantum.compbasis qreg %qreg_out : !quantum.obs
-    %sample_out = quantum.sample %obs_out : tensor<1x1xf64>
-    quantum.dealloc %qreg_out : !quantum.reg
     return %result : tensor<f64>
   }
 }
@@ -197,10 +189,6 @@ module @circuit_twotapes_module {
     quantum.dealloc %qreg : !quantum.reg
     quantum.device_release
     %result = stablehlo.subtract %tape0_out, %tape1_out : tensor<f64>
-    %qreg_out = quantum.alloc( 1) : !quantum.reg
-    %obs_out = quantum.compbasis qreg %qreg_out : !quantum.obs
-    %sample_out = quantum.sample %obs_out : tensor<1x1xf64>
-    quantum.dealloc %qreg_out : !quantum.reg
     return %result : tensor<f64>
   }
 
@@ -268,10 +256,6 @@ module @circuit_twotapes_module {
       scf.yield %result_in_scf : tensor<f64>
     }
     %result_1 = func.call @adder(%result, %cst) : (tensor<f64>, tensor<f64>) -> tensor<f64>
-    %qreg_out = quantum.alloc( 1) : !quantum.reg
-    %obs_out = quantum.compbasis qreg %qreg_out : !quantum.obs
-    %sample_out = quantum.sample %obs_out : tensor<1x1xf64>
-    quantum.dealloc %qreg_out : !quantum.reg
     return %result_1 : tensor<f64>
   }
 
@@ -334,10 +318,6 @@ module @circuit_twotapes_module {
     quantum.dealloc %qreg : !quantum.reg
     quantum.device_release
     %result = stablehlo.subtract %tape0_out, %tape1_out : tensor<f64>
-    %qreg_out = quantum.alloc( 1) : !quantum.reg
-    %obs_out = quantum.compbasis qreg %qreg_out : !quantum.obs
-    %sample_out = quantum.sample %obs_out : tensor<1x1xf64>
-    quantum.dealloc %qreg_out : !quantum.reg
     return %result : tensor<f64>
   }
 }
@@ -395,10 +375,6 @@ module @circuit_twotapes_module {
     quantum.dealloc %qreg : !quantum.reg
     quantum.device_release
     %result = stablehlo.subtract %tape0_out, %tape1_out : tensor<f64>
-    %qreg_out = quantum.alloc( 1) : !quantum.reg
-    %obs_out = quantum.compbasis qreg %qreg_out : !quantum.obs
-    %sample_out = quantum.sample %obs_out : tensor<1x1xf64>
-    quantum.dealloc %qreg_out : !quantum.reg
     return %result : tensor<f64>
   }
 }
