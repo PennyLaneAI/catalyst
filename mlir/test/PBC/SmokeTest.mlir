@@ -80,13 +80,13 @@ func.func @layer(%arg0 : !quantum.bit, %arg1 : !quantum.bit) -> i1{
     // CHECK:  [[M:%.+]], [[O:%.+]]:2 = pbc.ppm ["X", "Z"] [[arg_0]], [[arg_1]] : i1, !quantum.bit, !quantum.bit
     // CHECK:  pbc.yield [[M]], [[O]]#0, [[O]]#1 : i1, !quantum.bit, !quantum.bit
 
-    %res_1, %3:2 = pbc.layer(%q0 = %2#0, %q1 = %2#1, %m = %res): !quantum.bit, !quantum.bit, i1 {
-        %q_res, %q_1:2 = pbc.ppm ["X", "Z"] %q0, %q1 cond(%m): i1, !quantum.bit, !quantum.bit
+    %res_1, %3:2 = pbc.layer(%q0 = %2#0, %q1 = %2#1): !quantum.bit, !quantum.bit {
+        %q_res, %q_1:2 = pbc.ppm ["X", "Z"] %q0, %q1 : i1, !quantum.bit, !quantum.bit
         pbc.yield %q_res, %q_1#0, %q_1#1 : i1, !quantum.bit, !quantum.bit
     }
 
-    // CHECK:  [[q3:%.+]]:3 = pbc.layer([[A0:%.+]] = [[q2]]#1, [[A1:%.+]] = [[q2]]#2, [[A2:%.+]] = [[q2]]#0) : !quantum.bit, !quantum.bit, i1 {
-    // CHECK:  [[M:%.+]], [[O:%.+]]:2 = pbc.ppm ["X", "Z"] [[A0]], [[A1]] cond([[A2]]) : i1, !quantum.bit, !quantum.bit
+    // CHECK:  [[q3:%.+]]:3 = pbc.layer([[A0:%.+]] = [[q2]]#1, [[A1:%.+]] = [[q2]]#2) : !quantum.bit, !quantum.bit {
+    // CHECK:  [[M:%.+]], [[O:%.+]]:2 = pbc.ppm ["X", "Z"] [[A0]], [[A1]] : i1, !quantum.bit, !quantum.bit
     // CHECK:  pbc.yield [[M]], [[O]]#0, [[O]]#1 : i1, !quantum.bit, !quantum.bit
 
     func.return %res_1 : i1

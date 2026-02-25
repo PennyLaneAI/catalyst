@@ -226,7 +226,7 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* Fix a bug in the bind call function for `PCPhase` where the signature did not match what was 
+* Fix a bug in the bind call function for `PCPhase` where the signature did not match what was
   expected in `jax_primitives`. `ctrl_qubits` was missing from positional arguments in previous signature.
   [(#2467)](https://github.com/PennyLaneAI/catalyst/pull/2467)
 
@@ -270,9 +270,43 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* A new dialect `QRef` was created. This dialect is very similar to the existing `Quantum` dialect,
+  but it is in reference semantics, whereas the existing `Quantum` dialect is in value semantics.
+  [(#2320)](https://github.com/PennyLaneAI/catalyst/pull/2320)
+
+  Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
+  in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
+  will be these qubit (or qreg) reference values.
+
+  For example, in the following circuit, gates and observable ops take in the qubit reference
+  they're acting on, and do not produce new qubit values.
+
+  ```mlir
+  func.func @expval_circuit() -> f64 {
+      %a = qref.alloc(2) : !qref.reg<2>
+      %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit
+      %q1 = qref.get %a[1] : !qref.reg<2> -> !qref.bit
+      qref.custom "Hadamard"() %q0 : !qref.bit
+      qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+      qref.custom "Hadamard"() %q0 : !qref.bit
+      %obs = qref.namedobs %q1 [ PauliX] : !quantum.obs
+      %expval = quantum.expval %obs : f64
+      qref.dealloc %a : !qref.reg<2>
+      return %expval : f64
+  }
+  ```
+
+  Notice that qubit reference values are reusable.
+
+* Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
+  Conditional PPR decompositions in the `decompose-clifford-ppr` pass now emit the
+  measurement logic inside an `scf.if` region rather than propagating the condition
+  to inner PPM ops.
+  [(#2511)](https://github.com/PennyLaneAI/catalyst/pull/2511)
+
 * Update `mlir_specs` to account for new `marker` functionality in PennyLane.
   [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
-  
+
 * The QEC (Quantum Error Correction) dialect has been renamed to PBC (Pauli-Based Computation)
   across the entire codebase. This includes the MLIR dialect (`pbc.*` -> `pbc.*`), C++ namespaces
   (`catalyst::pbc` -> `catalyst::pbc`), Python bindings, compiler passes (e.g.,
@@ -340,7 +374,7 @@
 * The upstream MLIR `Test` dialect is now available via the `catalyst` command line tool.
   [(#2417)](https://github.com/PennyLaneAI/catalyst/pull/2417)
 
-* Removing some previously-added guardrails that were in place due to a bug in dynamic allocation 
+* Removing some previously added guardrails that were in place due to a bug in dynamic allocation
   that is now fixed.
   [(#2427)](https://github.com/PennyLaneAI/catalyst/pull/2427)
 

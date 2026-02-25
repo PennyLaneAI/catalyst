@@ -1,4 +1,4 @@
-// Copyright 2025 Xanadu Quantum Technologies Inc.
+// Copyright 2026 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,8 +37,9 @@ def QuantumRegion : OpInterface<"QuantumRegion"> {
 
     let verify = [{
 
-        if ($_op->getNumOperands() != 1)
-            return $_op->emitOpError("must have exactly one operand (quantum register)");
+        if ($_op->getNumOperands() != 1) {
+            return $_op->emitOpError("must have exactly one operand (a quantum register)");
+        }
 
         return mlir::success();
     }];
@@ -123,8 +124,8 @@ def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
         llvm::SmallPtrSet<mlir::Value, 4> seenQubits;
         for (mlir::Value qubit : gate.getQubitOperands()) {
             if (!seenQubits.insert(qubit).second) {
-                return $_op->emitError() << "all qubits on a quantum gate must be " <<
-                "distinct (including controls)";
+                return $_op->emitError() <<
+                    "all qubits on a quantum gate must be distinct (including controls)";
             }
         }
 
