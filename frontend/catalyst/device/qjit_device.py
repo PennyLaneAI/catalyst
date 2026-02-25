@@ -563,9 +563,8 @@ def filter_device_capabilities_with_shots(
 
     device_capabilities = capabilities.filter(finite_shots=shots_present)
 
-    # This is a temporary solution for the legacy decomposition system in Catalyst,
-    # which currently does not have support for graph-based decomposition.
-    # TODO: Fix this when integrating graph-based decomposition with QJITDevice
+    # TODO: This is a temporary measure to ensure consistency of behaviour. Remove this
+    #       when customizable multi-pathway decomposition is implemented. (Epic 74474)
     if unitary_support is not None:
         _to_matrix_ops = unitary_support
         setattr(device_capabilities, "to_matrix_ops", _to_matrix_ops)

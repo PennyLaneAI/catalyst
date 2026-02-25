@@ -16,10 +16,13 @@ import numpy as np
 import pennylane as qml
 import pytest
 from pennylane.tape import QuantumTape
+from pennylane_lightning.lightning_qubit.lightning_qubit import OperatorProperties
+from utils import get_custom_qjit_device
 
 from catalyst import cond, for_loop, qjit, while_loop
 from catalyst.api_extensions.control_flow import Cond, ForLoop, WhileLoop
 from catalyst.jax_tracer import HybridOp, has_nested_tapes
+from catalyst.utils.exceptions import CompileError
 
 
 def test_no_parameters(backend):
@@ -249,6 +252,37 @@ def test_multicontrolledx_via_paulix():
     assert "PauliX" in str(circuit.jaxpr)
 
     assert np.allclose(circuit(), circuit.original_function())
+
+
+def test_to_matrix_ops():
+    """Test that devices with ``to_matrix_ops`` should have support for ``QubitUnitary``."""
+    dev = get_custom_qjit_device(
+        num_wires=1,
+        discards=("QubitUnitary",),
+        additions={"Rot": OperatorProperties(True, True, False)},
+        to_matrix_ops={"Rot"},
+    )
+
+    def qfunc(x, y, z):
+        qml.Rot(x, y, z, wires=[0])
+        return qml.state()
+
+    circuit = qjit(qml.qnode(dev)(qfunc))
+
+    with pytest.raises(
+        CompileError, match="The device that specifies to_matrix_ops must support QubitUnitary"
+    ):
+        circuit(0.3, 0.4, 0.5)
+
+    # Test that if we pass `None`` for `to_matrix_ops`, and exclude `QubitUnitary` from the capabilities,
+    # the device can successfully compile the circuit by decomposing to the target gateset.
+    # Related to https://github.com/PennyLaneAI/pennylane-lightning/pull/1348
+    dev = get_custom_qjit_device(
+        num_wires=1, discards=("QubitUnitary", "Rot"), additions=set(), to_matrix_ops=None
+    )
+
+    circuit = qjit(qml.qnode(dev)(qfunc))
+    circuit(0.3, 0.4, 0.5)  # should compile successfully
 
 
 if __name__ == "__main__":
