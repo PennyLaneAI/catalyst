@@ -14,7 +14,6 @@
 """Testing use of transforms with pass name integrating with qnodes."""
 
 from functools import partial
-from typing import Type
 
 import pennylane as qml
 import pytest
