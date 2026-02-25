@@ -72,6 +72,62 @@ func.func @test_flat_circuit(%arg0: f64, %arg1: f64, %arg2: i1) -> f64 attribute
 // -----
 
 
+// CHECK-LABEL: test_set_state
+func.func @test_set_state(%arg0: tensor<4xcomplex<f64>>) attributes {quantum.node} {
+
+    // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    %a = qref.alloc(2) : !qref.reg<2>
+
+    // CHECK: [[bit0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[bit1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
+    %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit
+    %q1 = qref.get %a[1] : !qref.reg<2> -> !qref.bit
+
+    // CHECK: [[SET_STATE:%.+]]:2 = quantum.set_state(%arg0) [[bit0]], [[bit1]] : (tensor<4xcomplex<f64>>, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+    qref.set_state(%arg0) %q0, %q1 : tensor<4xcomplex<f64>>, !qref.bit, !qref.bit
+
+    // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() [[SET_STATE]]#0, [[SET_STATE]]#1 : !quantum.bit, !quantum.bit
+    qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+
+    // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[CNOT]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[CNOT]]#1 : !quantum.reg, !quantum.bit
+    // CHECK: quantum.dealloc [[insert1]] : !quantum.reg
+    qref.dealloc %a : !qref.reg<2>
+    return
+}
+
+
+// -----
+
+
+// CHECK-LABEL: test_set_basis_state
+func.func @test_set_basis_state(%arg0: tensor<2xi1>) attributes {quantum.node} {
+
+    // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    %a = qref.alloc(2) : !qref.reg<2>
+
+    // CHECK: [[bit0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[bit1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
+    %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit
+    %q1 = qref.get %a[1] : !qref.reg<2> -> !qref.bit
+
+    // CHECK: [[SET_BASIS_STATE:%.+]]:2 = quantum.set_basis_state(%arg0) [[bit0]], [[bit1]] : (tensor<2xi1>, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+    qref.set_basis_state(%arg0) %q0, %q1 : tensor<2xi1>, !qref.bit, !qref.bit
+
+    // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() [[SET_STATE]]#0, [[SET_STATE]]#1 : !quantum.bit, !quantum.bit
+    qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+
+    // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[CNOT]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[CNOT]]#1 : !quantum.reg, !quantum.bit
+    // CHECK: quantum.dealloc [[insert1]] : !quantum.reg
+    qref.dealloc %a : !qref.reg<2>
+    return
+}
+
+
+// -----
+
+
 // CHECK-LABEL: test_dynamic_wire_index
 func.func @test_dynamic_wire_index(%arg0: i64) -> f64 attributes {quantum.node} {
 

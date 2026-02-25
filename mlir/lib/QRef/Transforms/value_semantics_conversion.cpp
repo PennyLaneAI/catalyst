@@ -438,7 +438,14 @@ void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp,
             builder, qQubitUnitaryOp, qubitValueTrackers, qubitResultsType);
         vGateOp->setAttr("resultSegmentSizes", getResultSegmentSizes(builder, qQubitUnitaryOp));
     }
-    // TODO: set state, set basis state
+    else if (auto rSetStateOp = dyn_cast<qref::SetStateOp>(_rGateOp)) {
+        vGateOp = migrateOpToValueSemantics<quantum::SetStateOp>(
+            builder, rSetStateOp, qubitValueTrackers, qubitResultsType);
+    }
+    else if (auto rSetBasisStateOp = dyn_cast<qref::SetBasisStateOp>(_rGateOp)) {
+        vGateOp = migrateOpToValueSemantics<quantum::SetBasisStateOp>(
+            builder, rSetBasisStateOp, qubitValueTrackers, qubitResultsType);
+    }
 
     for (auto [i, rQubit] : llvm::enumerate(rGateOp.getQubitOperands())) {
         qubitValueTrackers.at(getRSourceRegisterValue(rQubit))
