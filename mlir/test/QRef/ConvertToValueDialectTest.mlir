@@ -18,7 +18,7 @@
 
 
 // CHECK-LABEL: test_flat_circuit
-func.func @test_flat_circuit(%arg0: f64, %arg1: f64, %arg2: i1) -> f64 {
+func.func @test_flat_circuit(%arg0: f64, %arg1: f64, %arg2: i1) -> f64 attributes {quantum.node} {
 
     // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
     %a = qref.alloc(2) : !qref.reg<2>
@@ -73,7 +73,7 @@ func.func @test_flat_circuit(%arg0: f64, %arg1: f64, %arg2: i1) -> f64 {
 
 
 // CHECK-LABEL: test_dynamic_wire_index
-func.func @test_dynamic_wire_index(%arg0: i64) -> f64 {
+func.func @test_dynamic_wire_index(%arg0: i64) -> f64 attributes {quantum.node} {
 
     // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
     %a = qref.alloc(2) : !qref.reg<2>
@@ -116,8 +116,46 @@ func.func @test_dynamic_wire_index(%arg0: i64) -> f64 {
 // -----
 
 
+// CHECK-LABEL: test_multiple_allocs
+func.func @test_multiple_allocs() attributes {quantum.node} {
+
+    // CHECK: [[r2:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[r1:%.+]] = quantum.alloc( 1) : !quantum.reg
+    %r2 = qref.alloc(2) : !qref.reg<2>
+    %r1 = qref.alloc(1) : !qref.reg<1>
+
+    // CHECK: [[q20:%.+]] = quantum.extract [[r2]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[q21:%.+]] = quantum.extract [[r2]][ 1] : !quantum.reg -> !quantum.bit
+    // CHECK: [[q10:%.+]] = quantum.extract [[r1]][ 0] : !quantum.reg -> !quantum.bit
+    %q20 = qref.get %r2[0] : !qref.reg<2> -> !qref.bit
+    %q21 = qref.get %r2[1] : !qref.reg<2> -> !qref.bit
+    %q10 = qref.get %r1[0] : !qref.reg<1> -> !qref.bit
+
+    // CHECK: [[CNOT0:%.+]]:2 = quantum.custom "CNOT"() [[q10]], [[q20]] : !quantum.bit, !quantum.bit
+    // CHECK: [[CNOT1:%.+]]:2 = quantum.custom "CNOT"() [[CNOT0]]#0, [[q21]] : !quantum.bit, !quantum.bit
+    // CHECK: [[CNOT2:%.+]]:2 = quantum.custom "CNOT"() [[CNOT0]]#1, [[CNOT1]]#1 : !quantum.bit, !quantum.bit
+    qref.custom "CNOT"() %q10, %q20 : !qref.bit, !qref.bit
+    qref.custom "CNOT"() %q10, %q21: !qref.bit, !qref.bit
+    qref.custom "CNOT"() %q20, %q21 : !qref.bit, !qref.bit
+
+    // CHECK: [[insert20:%.+]] = quantum.insert [[r2]][ 0], [[CNOT2]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert21:%.+]] = quantum.insert [[insert20]][ 1], [[CNOT2]]#1 : !quantum.reg, !quantum.bit
+    // CHECK: quantum.dealloc [[insert21]] : !quantum.reg
+    qref.dealloc %r2 : !qref.reg<2>
+
+    // CHECK: [[insert10:%.+]] = quantum.insert [[r1]][ 0], [[CNOT1]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: quantum.dealloc [[insert10]] : !quantum.reg
+    qref.dealloc %r1 : !qref.reg<1>
+
+    return
+}
+
+
+// -----
+
+
 // CHECK-LABEL: test_for_loop
-func.func @test_for_loop(%nqubits: i64) -> f64 {
+func.func @test_for_loop(%nqubits: i64) -> f64 attributes {quantum.node} {
     // CHECK: [[qreg:%.+]] = quantum.alloc(%arg0) : !quantum.reg
     %a = qref.alloc(%nqubits) : !qref.reg<?>
 

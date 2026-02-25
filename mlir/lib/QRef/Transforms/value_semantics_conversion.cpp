@@ -585,10 +585,11 @@ struct ValueSemanticsConversionPass
         pm.addPass(createCSEPass());
 
         // Collect all qnode functions.
-        // We find qnode functions by identifying the parent function ops of MPs
         SetVector<func::FuncOp> qnodeFuncs;
-        mod->walk([&](quantum::MeasurementProcess _mp) {
-            qnodeFuncs.insert(_mp->getParentOfType<func::FuncOp>());
+        mod->walk([&](func::FuncOp f) {
+            if (f->hasAttrOfType<UnitAttr>("quantum.node")) {
+                qnodeFuncs.insert(f);
+            }
         });
 
         for (auto qnodeFunc : qnodeFuncs) {
