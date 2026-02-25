@@ -41,11 +41,13 @@ class LogicalCodeblockType(ParametrizedAttribute, TypeAttribute):
         super().__init__(k_attr)
 
     def print_parameters(self, printer: Printer) -> None:
+        """Print the attribute parameters."""
         with printer.in_angle_brackets():
             printer.print_int(self.k.value.data)
 
     @classmethod
     def parse_parameters(cls, parser: Parser) -> list[IntegerAttr]:
+        """Parse the attribute parameters."""
         with parser.in_angle_brackets():
             k = parser.parse_integer()
 
@@ -67,6 +69,7 @@ class LogicalHyperRegisterType(ParametrizedAttribute, TypeAttribute):
         super().__init__(a_attr, k_attr)
 
     def print_parameters(self, printer: Printer) -> None:
+        """Print the attribute parameters."""
         with printer.in_angle_brackets():
             printer.print_int(self.a.value.data)
             # TODO: We need to print with whitespace around 'x' for compatibility with MLIR parser
@@ -75,6 +78,7 @@ class LogicalHyperRegisterType(ParametrizedAttribute, TypeAttribute):
 
     @classmethod
     def parse_parameters(cls, parser: Parser) -> list[IntegerAttr]:
+        """Parse the attribute parameters."""
         with parser.in_angle_brackets():
             a = parser.parse_integer()
             parser.parse_characters("x")
