@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "decompose-clifford-ppr"
 
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
