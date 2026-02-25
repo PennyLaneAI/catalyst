@@ -25,6 +25,7 @@ from jaxlib.mlir.dialects.builtin import ModuleOp
 from jaxlib.mlir.dialects.func import CallOp
 from mlir_quantum.dialects._transform_ops_gen import ApplyRegisteredPassOp, NamedSequenceOp, YieldOp
 from mlir_quantum.dialects.catalyst import LaunchKernelOp
+from pennylane.devices.execution_config import MCM_METHOD, MCMConfig
 from pennylane.transforms.core import BoundTransform, Transform
 
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
@@ -74,9 +75,17 @@ def _get_device_pipeline(ctx, qnode: qml.QNode) -> list[BoundTransform]:
 
     device = qnode.device if isinstance(qnode.device, QJITDevice) else QJITDevice(qnode.device)
     shots = qnode.shots
+    mcm_method = qnode.execute_kwargs["mcm_method"]
+    postselect_mode = qnode.execute_kwargs["postselect_mode"]
+    mcm_config = MCMConfig(
+        mcm_method=None if mcm_method == MCM_METHOD.SINGLE_BRANCH_STATISTICS else mcm_method,
+        postselect_mode=postselect_mode,
+    )
+
+    config = qml.devices.ExecutionConfig(mcm_config=mcm_config)
 
     final_pipeline = []
-    pipeline, _ = device.preprocess(ctx, execution_config=None, shots=shots)
+    pipeline, _ = device.preprocess(ctx, execution_config=config, shots=shots)
     for t in pipeline:
         if t.tape_transform == catalyst_decompose.tape_transform:
             # This is fine as decomposition rules for unsupported gates
