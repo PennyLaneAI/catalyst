@@ -167,11 +167,11 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
 
     def __init__(self, **options):
         self.supported_base_obs = (
-            options["supported_base_obs"]
-            if "supported_base_obs" in options and options["supported_base_obs"] is not None
+            options["supported-base-obs"]
+            if "supported-base-obs" in options and options["supported-base-obs"] is not None
             else _default_supported_obs
         )
-        if "to_eigvals" in options and options["to_eigvals"] is True:
+        if "to-eigvals" in options and options["to-eigvals"] is True:
             raise ValueError("to_eigvals = True is not supported")
         self.to_eigvals = False
 
