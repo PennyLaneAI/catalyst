@@ -270,6 +270,12 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
+  Conditional PPR decompositions in the `decompose-clifford-ppr` pass now emit the
+  measurement logic inside an `scf.if` region rather than propagating the condition
+  to inner PPM ops.
+  [(#2511)](https://github.com/PennyLaneAI/catalyst/pull/2511)
+
 * Update `mlir_specs` to account for new `marker` functionality in PennyLane.
   [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
   
