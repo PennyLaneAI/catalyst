@@ -21,7 +21,6 @@ import pytest
 
 from catalyst import api_extensions
 from catalyst import for_loop as catalyst_for_loop
-from catalyst import measure as catalyst_measure
 from catalyst import qjit
 from catalyst import while_loop as catalyst_while_loop
 from catalyst.utils.exceptions import PlxprCaptureCFCompatibilityError
@@ -42,13 +41,6 @@ def while_loop(*args, **kwargs):
     if qml.capture.enabled():
         return qml.while_loop(*args, **kwargs)
     return catalyst_while_loop(*args, **kwargs)
-
-
-def measure(*args, **kwargs):
-    """Use catalyst.measure always - qml.measure not yet compatible with qjit(capture=True)."""
-    if qml.capture.enabled():
-        return qml.measure(*args, **kwargs)
-    return catalyst_measure(*args, **kwargs)
 
 
 class TestLoopToJaxpr:
@@ -231,7 +223,7 @@ class TestWhileLoops:
         @qml.set_shots(1)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
-            m = measure(wires=0)
+            m = qml.measure(wires=0)
 
             @while_loop(lambda i: i < n)
             def loop(i):
@@ -239,7 +231,7 @@ class TestWhileLoops:
                 return i + 1 + m
 
             loop(0)
-            return qml.sample(measure(wires=0))
+            return qml.sample(qml.measure(wires=0))
 
         # Initial state |0⟩: m=0, loop runs n times applying PauliX
         # n=1: 1 PauliX -> |1⟩ -> sample=1
