@@ -124,8 +124,8 @@ def QuantumGate : OpInterface<"QuantumGate", [QuantumOperation]> {
         llvm::SmallPtrSet<mlir::Value, 4> seenQubits;
         for (mlir::Value qubit : gate.getQubitOperands()) {
             if (!seenQubits.insert(qubit).second) {
-                return $_op->emitError() << "all qubits on a quantum gate must be " <<
-                "distinct (including controls)";
+                return $_op->emitError() <<
+                    "all qubits on a quantum gate must be distinct (including controls)";
             }
         }
 
