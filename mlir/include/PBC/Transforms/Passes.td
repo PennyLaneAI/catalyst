@@ -103,8 +103,8 @@ def DecomposeNonCliffordPPRPass : Pass<"decompose-non-clifford-ppr"> {
 
 def DecomposeCliffordPPRPass : Pass<"decompose-clifford-ppr"> {
     let summary = "Decompose Clifford PPRotation operations to set of Pauli Product Measurement operations.";
-    
-    let dependentDialects = [ "catalyst::pbc::PBCDialect" ];
+
+    let dependentDialects = [ "catalyst::pbc::PBCDialect", "scf::SCFDialect" ];
 
     let options = [AvoidYMeasureOption];
 }
@@ -112,15 +112,15 @@ def DecomposeCliffordPPRPass : Pass<"decompose-clifford-ppr"> {
 def PPRToPPMPass : Pass<"ppr-to-ppm"> {
     let summary = "Convert PPRotation operations to Pauli Product Measurement operations.";
 
-    let dependentDialects = [ "catalyst::pbc::PBCDialect" ];
+    let dependentDialects = [ "catalyst::pbc::PBCDialect", "scf::SCFDialect" ];
 
     let options = [DecomposeMethodOption, AvoidYMeasureOption];
 }
 
 def PPMCompilationPass : Pass<"ppm-compilation"> {
     let summary = "Convert CliffordT operations to Pauli Product Measurement operations.";
-    
-    let dependentDialects = [ "catalyst::pbc::PBCDialect" ];
+
+    let dependentDialects = [ "catalyst::pbc::PBCDialect", "scf::SCFDialect" ];
 
     let options = [MaxPauliSizeOption, DecomposeMethodOption, AvoidYMeasureOption];
 }
