@@ -363,6 +363,7 @@ def dict_to_compile_pipeline(
         filtered_pass_pipeline = {k.replace("_", "-"): v for k, v in pass_pipeline.items()}
         for name, pass_options in filtered_pass_pipeline.items():
             t = transform(pass_name=name)
+            pass_options = {k.replace("-", "_"): v for k, v in pass_options.items()}
             bound_t = BoundTransform(t, **pass_options)
             passes.append(bound_t)
         return CompilePipeline(passes)
@@ -370,23 +371,3 @@ def dict_to_compile_pipeline(
     return pass_pipeline
 
 
-def _API_name_to_pass_name():
-    return {
-        "gridsynth": "gridsynth",
-        "cancel_inverses": "cancel-inverses",
-        "decompose_lowering": "decompose-lowering",
-        "disentangle_cnot": "disentangle-CNOT",
-        "disentangle_swap": "disentangle-SWAP",
-        "merge_rotations": "merge-rotations",
-        "ions_decomposition": "ions-decomposition",
-        "to_ppr": "to-ppr",
-        "commute_ppr": "commute-ppr",
-        "merge_ppr_ppm": "merge-ppr-ppm",
-        "decompose_non_clifford_ppr": "decompose-non-clifford-ppr",
-        "decompose_clifford_ppr": "decompose-clifford-ppr",
-        "ppm_compilation": "ppm-compilation",
-        "ppr_to_ppm": "ppr-to-ppm",
-        "reduce_t_depth": "reduce-t-depth",
-        "ppr_to_mbqc": "ppr-to-mbqc",
-        "decompose_arbitrary_ppr": "decompose-arbitrary-ppr",
-    }
