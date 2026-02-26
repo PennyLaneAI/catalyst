@@ -37,7 +37,7 @@ def test_qjit_device():
     assert device_qjit.wires == qml.wires.Wires(range(0, 10))
 
     # Check the preprocess of the new device
-    with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+    with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
         config = qml.devices.ExecutionConfig()
         compile_pipeline, _ = device_qjit.preprocess(config)
     assert compile_pipeline

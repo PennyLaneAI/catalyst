@@ -221,7 +221,7 @@ class TestPreprocessHybridOp:
 
         # create and decompose the tape
         tape = QuantumScript([op, qml.X(0), qml.Hadamard(3)])
-        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
             (new_tape,), _ = catalyst_decompose(tape, capabilities)
 
         old_op = tape[0]
@@ -406,7 +406,7 @@ class TestPreprocessHybridOp:
         setattr(capabilities, "to_matrix_ops", {"S": OperatorProperties()})
 
         # do the decomposition and get the new tape
-        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
             (new_tape,), _ = catalyst_decompose(tape, capabilities)
 
         # unsupported ops on the top-level tape have been decomposed (no more Hadamard)
@@ -449,7 +449,7 @@ class TestPreprocessHybridOp:
         capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
         setattr(capabilities, "to_matrix_ops", {"S": OperatorProperties()})
 
-        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
             (new_tape,), _ = catalyst_decompose(tape, capabilities)
 
         assert len(new_tape.operations) == 2
@@ -465,7 +465,7 @@ class TestPreprocessHybridOp:
 
         capabilities = DeviceCapabilities.from_toml_file(request.node.toml_file)
 
-        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
             (new_tape,), _ = catalyst_decompose(tape, capabilities)
 
         assert len(new_tape.operations) == 6
@@ -490,7 +490,7 @@ class TestPreprocessHybridOp:
         with pytest.raises(
             CompileError, match="Must use 'measure' from Catalyst instead of PennyLane."
         ):
-            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
                 _ = catalyst_decompose(tape, capabilities)
 
     @pytest.mark.usefixtures("create_temporary_toml_file")
@@ -518,7 +518,7 @@ class TestPreprocessHybridOp:
         with pytest.raises(
             CompileError, match="Must use 'measure' from Catalyst instead of PennyLane."
         ):
-            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
                 _ = catalyst_decompose(tape, capabilities)
 
     @pytest.mark.usefixtures("create_temporary_toml_file")
@@ -536,7 +536,7 @@ class TestPreprocessHybridOp:
             CompileError,
             match="not supported with catalyst on this device and does not provide a decomposition",
         ):
-            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
                 _ = catalyst_decompose(tape, replace(capabilities, operations={}))
 
     @pytest.mark.usefixtures("create_temporary_toml_file")
@@ -560,7 +560,7 @@ class TestPreprocessHybridOp:
             CompileError,
             match="not supported with catalyst on this device and does not provide a decomposition",
         ):
-            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+            with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
                 _ = catalyst_decompose(
                     tape,
                     replace(capabilities, operations={"QubitUnitary": OperatorProperties()}),
