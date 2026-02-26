@@ -477,6 +477,10 @@ jobs:
         sudo apt-get install -y graphviz
         make frontend
 
+    - name: Install PennyLane branch
+      run: |
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@redundant-ftqc-transforms
+
     - name: Verify Graphviz installation
       run: |
         dot -V 
@@ -565,6 +569,10 @@ jobs:
         python3 -m pip install -r requirements.txt
         make frontend
 
+    - name: Install PennyLane branch
+      run: |
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@redundant-ftqc-transforms
+
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v4
@@ -627,6 +635,10 @@ jobs:
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
+
+    - name: Install PennyLane branch
+      run: |
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@redundant-ftqc-transforms
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
