@@ -20,12 +20,10 @@ from catalyst.device.qjit_device import (
     BackendInfo,
     QJITDevice,
     extract_backend_info,
-    get_device_capabilities,
 )
 
 __all__ = (
     "QJITDevice",
     "BackendInfo",
     "extract_backend_info",
-    "get_device_capabilities",
 )

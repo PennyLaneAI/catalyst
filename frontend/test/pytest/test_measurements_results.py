@@ -22,8 +22,9 @@ from jax import numpy as jnp
 from utils import CONFIG_CUSTOM_DEVICE
 
 from catalyst import CompileError, qjit
-from catalyst.device import get_device_capabilities
 from catalyst.utils.runtime_environment import get_lib_path
+
+from ..test_utils import get_device_capabilities
 
 # pylint: disable=too-many-lines
 
