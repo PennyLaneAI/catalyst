@@ -126,4 +126,4 @@ jobs:
       run: |
         gh workflow run upload-nightly-rc-release.yml \
           --repo PennyLaneAI/pennylane \
-          --ref sc-111648-sync-rc-release
+          --ref sc-111648-sync-rc-release #TODO remove

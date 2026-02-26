@@ -252,6 +252,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update nightly RC builds to be triggered by Lightning. 
+  [(#2491)](https://github.com/PennyLaneAI/catalyst/pull/2491)
+  
 * Update `mlir_specs` to account for new `marker` functionality in PennyLane.
   [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
   
