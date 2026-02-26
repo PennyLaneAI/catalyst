@@ -19,10 +19,6 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v4
 
-    - name: Set branch
-      id: set_branch
-      run: echo "branch=${{ github.event.inputs.branch || 'v0.14.0-rc' }}" >> $GITHUB_OUTPUT
-
     - name: Check for RC branch
       id: check_rc
       run: |
