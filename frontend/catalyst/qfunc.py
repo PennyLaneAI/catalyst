@@ -44,7 +44,7 @@ from catalyst.jax_extras.tracing import uses_transform
 from catalyst.jax_primitives import quantum_kernel_p
 from catalyst.jax_tracer import Function, trace_quantum_function
 from catalyst.logging import debug_logger
-from catalyst.passes.pass_api import dictionary_to_list_of_passes
+from catalyst.passes.pass_api import dict_to_compile_pipeline 
 from catalyst.tracing.contexts import EvaluationContext
 from catalyst.tracing.type_signatures import filter_static_args
 from catalyst.utils.exceptions import CompileError
@@ -254,7 +254,7 @@ class QFunc:
         new_compile_pipeline, new_pipeline = _extract_passes(self.compile_pipeline)
         # Update the qnode with peephole pipeline
         old_pipeline = kwargs.pop("pass_pipeline", None)
-        processed_old_pipeline = tuple(dictionary_to_list_of_passes(old_pipeline))
+        processed_old_pipeline = tuple(dict_to_compile_pipeline(old_pipeline))
         pass_pipeline = processed_old_pipeline + new_pipeline
         new_qnode = copy(self)
         # pylint: disable=attribute-defined-outside-init, protected-access

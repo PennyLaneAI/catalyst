@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import TypeAlias
 
 import pennylane as qml
+from pennylane.transforms.core import CompilePipeline, transform, BoundTransform
 
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.tracing.contexts import EvaluationContext
@@ -72,9 +73,9 @@ class PassPipelineWrapper(QNodeWrapper):
 
     def __call__(self, *args, **kwargs):
         if EvaluationContext.is_tracing():
-            pass_pipeline = kwargs.pop("pass_pipeline", [])
+            pass_pipeline = CompilePipeline(kwargs.pop("pass_pipeline", []))
             pass_pipeline = (
-                dictionary_to_list_of_passes(
+                dict_to_compile_pipeline(
                     self.pass_name_or_pipeline, *self.flags, **self.valued_options
                 )
                 + pass_pipeline
@@ -202,7 +203,7 @@ def apply_pass(pass_name: str, *flags, **valued_options):
             def module():
                 return qnode()
     """
-    return lambda obj: qml.transform(pass_name=pass_name)(obj, *flags, **valued_options)
+    return lambda obj: transform(pass_name=pass_name)(obj, *flags, **valued_options)
 
 
 def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valued_options):
@@ -239,10 +240,7 @@ def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valu
     if not path_to_plugin.exists():
         raise FileNotFoundError(f"File '{path_to_plugin}' does not exist.")
 
-    def decorator(qnode):
-        return PassPipelineWrapper(qnode, pass_name, *flags, **valued_options)
-
-    return decorator
+    return lambda obj: transform(pass_name=pass_name)(obj, *flags, **valued_options)
 
 
 class Pass:
@@ -342,7 +340,7 @@ class PassPlugin(Pass):
 
 
 ## PRIVATE ##
-def dictionary_to_list_of_passes(pass_pipeline: PipelineDict | str, *flags, **valued_options):
+def dict_to_compile_pipeline(pass_pipeline: PipelineDict | str | CompilePipeline | None, *flags, **valued_options) -> CompilePipeline:
     """Convert dictionary of passes or single pass name into list of passes.
 
     Args:
@@ -351,18 +349,21 @@ def dictionary_to_list_of_passes(pass_pipeline: PipelineDict | str, *flags, **va
         **valued_options: Optional valued options for single pass
     """
     if pass_pipeline is None:
-        return []
+        return CompilePipeline()
 
-    if isinstance(pass_pipeline, str):
-        return [Pass(pass_pipeline, *flags, **valued_options)]
+    elif isinstance(pass_pipeline, str):
+        t = transform(pass_name=pass_pipeline)
+        bound_t = BoundTransform(t, *flags, **valued_options)
+        return CompilePipeline(bound_t)
 
-    if isinstance(pass_pipeline, dict):
+    elif isinstance(pass_pipeline, dict):
         passes = []
-        pass_names = _API_name_to_pass_name()
-        for API_name, pass_options in pass_pipeline.items():
-            name = pass_names.get(API_name, API_name)
-            passes.append(Pass(name, **pass_options))
-        return passes
+        filtered_pass_pipeline = {k.replace("_", "-"): v for k, v in pass_pipeline.items()}
+        for name, pass_options in filtered_pass_pipeline.items():
+            t = transform(pass_name=name)
+            bound_t = BoundTransform(t, **pass_options)
+            passes.append(bound_t)
+        return CompilePipeline(passes)
 
     return pass_pipeline
 
