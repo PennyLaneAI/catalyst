@@ -34,6 +34,6 @@ def QecPhysicalQubitRole : I32EnumAttr<"QecPhysicalQubitRole",
 }
 
 def QecPhysicalQubitRoleAttr : EnumAttr<
-    QecPhysical_Dialect, QecPhysicalQubitRole, "qec_physical_qubit_role">;
+    QecPhysical_Dialect, QecPhysicalQubitRole, "qubit_role">;
 
 #endif // QEC_PHYSICAL_ATTR_DEFS
