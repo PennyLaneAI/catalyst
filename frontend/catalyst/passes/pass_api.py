@@ -353,12 +353,12 @@ def dict_to_compile_pipeline(
     if pass_pipeline is None:
         return CompilePipeline()
 
-    elif isinstance(pass_pipeline, str):
+    if isinstance(pass_pipeline, str):
         t = transform(pass_name=pass_pipeline)
         bound_t = BoundTransform(t, *flags, **valued_options)
         return CompilePipeline(bound_t)
 
-    elif isinstance(pass_pipeline, dict):
+    if isinstance(pass_pipeline, dict):
         passes = []
         filtered_pass_pipeline = {k.replace("_", "-"): v for k, v in pass_pipeline.items()}
         for name, pass_options in filtered_pass_pipeline.items():
