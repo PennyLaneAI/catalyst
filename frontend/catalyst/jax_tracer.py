@@ -1472,7 +1472,6 @@ def _trace_classical_phase(
     *,
     static_argnums,
     debug_info,
-    ctx,
 ) -> ClassicalTraceResult:
     """Perform classical tracing phase of quantum function compilation.
 
@@ -1484,7 +1483,6 @@ def _trace_classical_phase(
         qnode: Quantum node containing transforms
         static_argnums: Static argument numbers
         debug_info: Debug information
-        ctx: Evaluation context
 
     Returns:
         ClassicalTraceResult: Results for quantum tracing phase
@@ -1744,7 +1742,6 @@ def trace_quantum_function(
             qnode,
             static_argnums=static_argnums,
             debug_info=debug_info,
-            ctx=ctx,
         )
 
         # (2) - Quantum tracing
