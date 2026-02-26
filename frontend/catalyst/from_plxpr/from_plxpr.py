@@ -381,7 +381,8 @@ transforms_to_passes = {
 }
 
 
-def _handle_decompose_transform(self, inner_jaxpr, consts, non_const_args, tkwargs):
+def _set_decompose_lowering_state(self):
+    """Set requires_decompose_lowering and decompose_tkwargs; raise if already set."""
     if not self.requires_decompose_lowering:
         self.requires_decompose_lowering = True
     else:
