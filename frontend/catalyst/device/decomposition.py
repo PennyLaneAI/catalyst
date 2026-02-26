@@ -90,7 +90,7 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
 @transform
 @debug_logger
 def catalyst_decompose(
-    tape: qml.tape.QuantumTape, ctx, capabilities: DeviceCapabilities, grad_method: str = None
+    tape: qml.tape.QuantumTape, capabilities: DeviceCapabilities, grad_method: str = None
 ):
     """Decompose operations until the stopping condition is met.
 
@@ -127,7 +127,7 @@ def catalyst_decompose(
     new_ops = []
     for op in toplevel_tape.operations:
         if has_nested_tapes(op):
-            op = _decompose_nested_tapes(op, ctx, capabilities)
+            op = _decompose_nested_tapes(op, capabilities)
         new_ops.append(op)
     tape = qml.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
 
@@ -145,16 +145,14 @@ def _decompose_to_matrix(op):
     return [op]
 
 
-def _decompose_nested_tapes(op, ctx, capabilities: DeviceCapabilities):
+def _decompose_nested_tapes(op, capabilities: DeviceCapabilities):
     new_regions = []
     for region in op.regions:
         if region.quantum_tape is None:
             new_tape = None
         else:
             with EvaluationContext.frame_tracing_context(region.trace):
-                tapes, _ = catalyst_decompose(
-                    region.quantum_tape, ctx=ctx, capabilities=capabilities
-                )
+                tapes, _ = catalyst_decompose(region.quantum_tape, capabilities=capabilities)
                 new_tape = tapes[0]
         new_regions.append(
             HybridOpRegion(

@@ -353,9 +353,9 @@ class QJITDevice(qml.devices.Device):
 
         The final transforms verify that the resulting tape is supported.
 
-        Catalyst-specific parameters (``ctx`` and ``shots``) are passed via
-        ``execution_config.device_options`` using the keys ``"catalyst_ctx"``
-        and ``"catalyst_shots"`` respectively, so that the method signature
+        Catalyst-specific parameters (``shots``) are passed via
+        ``execution_config.device_options`` using the key ``"catalyst_shots"``
+        , so that the method signature
         stays compatible with the standard PennyLane ``Device.preprocess()``
         interface.
 
@@ -379,7 +379,6 @@ class QJITDevice(qml.devices.Device):
             execution_config = qml.devices.ExecutionConfig()
 
         # Extract catalyst-specific options from device_options
-        ctx = execution_config.device_options.get("catalyst_ctx")
         shots = execution_config.device_options.get("catalyst_shots")
 
         # Strip catalyst-specific keys before forwarding to the original device,
@@ -426,7 +425,6 @@ class QJITDevice(qml.devices.Device):
         # decomposition to supported ops/measurements
         pipeline.add_transform(
             catalyst_decompose,
-            ctx=ctx,
             capabilities=capabilities,
             grad_method=config.gradient_method,
         )

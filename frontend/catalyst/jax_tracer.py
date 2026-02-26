@@ -1527,7 +1527,6 @@ def _trace_classical_phase(
             # Pass catalyst-specific params via device_options so that
             # QJITDevice.preprocess() has a standard PennyLane signature.
             device_options = dict(config.device_options)
-            device_options["catalyst_ctx"] = ctx
             device_options["catalyst_shots"] = shots
             config = replace(config, device_options=device_options)
             device_program, config = device.preprocess(config)
