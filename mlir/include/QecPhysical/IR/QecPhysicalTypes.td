@@ -29,6 +29,16 @@ class QecPhysical_Type<string name, string typeMnemonic, list<Trait> traits = []
 }
 
 
+def QecPhysicalQubitType : QecPhysical_Type<"QecPhysicalQubit", "qubit"> {
+    let summary = "A value-semantic QEC physical qubit.";
+
+    let parameters = (ins
+        TypeParameter<"QecPhysicalQubitRole", "Qubit role">:$role
+    );
+
+    let assemblyFormat = "`<` $role `>`";
+}
+
 def PhysicalCodeblockType : QecPhysical_Type<"Codeblock", "codeblock"> {
     let summary = "A value-semantic physical codeblock.";
 

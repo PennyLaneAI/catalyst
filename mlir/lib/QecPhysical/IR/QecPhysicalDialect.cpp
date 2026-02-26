@@ -35,6 +35,11 @@ void QecPhysicalDialect::initialize()
 #include "QecPhysical/IR/QecPhysicalOpsTypes.cpp.inc"
         >();
 
+    addAttributes<
+#define GET_ATTRDEF_LIST
+#include "QecPhysical/IR/QecPhysicalAttributes.cpp.inc"
+        >();
+
     addOperations<
 #define GET_OP_LIST
 #include "QecPhysical/IR/QecPhysicalOps.cpp.inc"
@@ -45,5 +50,10 @@ void QecPhysicalDialect::initialize()
 // QecPhysical type definitions.
 //===----------------------------------------------------------------------===//
 
+#include "QecPhysical/IR/QecPhysicalEnums.cpp.inc"
+
 #define GET_TYPEDEF_CLASSES
 #include "QecPhysical/IR/QecPhysicalOpsTypes.cpp.inc"
+
+#define GET_ATTRDEF_CLASSES
+#include "QecPhysical/IR/QecPhysicalAttributes.cpp.inc"

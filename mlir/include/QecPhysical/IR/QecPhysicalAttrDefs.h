@@ -12,5 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "QecPhysical/IR/QecPhysicalTypes.h"
-#include "QecPhysical/IR/QecPhysicalAttrDefs.h"
+#pragma once
+
+#include "mlir/IR/Attributes.h"
+
+#include "QecPhysical/IR/QecPhysicalEnums.h.inc"
+#define GET_ATTRDEF_CLASSES
+#include "QecPhysical/IR/QecPhysicalAttributes.h.inc"

@@ -14,6 +14,18 @@
 
 // RUN: quantum-opt --split-input-file --verify-diagnostics %s
 
+func.func @test_qubit_data(%arg0 : !qecp.qubit<data>) {
+    func.return
+}
+
+// -----
+
+func.func @test_qubit_aux(%arg0 : !qecp.qubit<aux>) {
+    func.return
+}
+
+// -----
+
 func.func @test_codeblock(%arg0 : !qecp.codeblock<1 x 7>) {
     func.return
 }

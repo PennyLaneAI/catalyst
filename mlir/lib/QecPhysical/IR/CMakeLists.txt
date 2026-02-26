@@ -7,5 +7,6 @@ add_mlir_library(MLIRQecPhysical
     ${PROJECT_SOURCE_DIR}/include/QecPhysical
 
     DEPENDS
+    MLIRQecPhysicalAttrDefsIncGen
     MLIRQecPhysicalOpsIncGen
 )
