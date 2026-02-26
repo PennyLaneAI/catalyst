@@ -36,9 +36,10 @@ from catalyst import (
 )
 from catalyst.api_extensions import HybridAdjoint, HybridCtrl
 from catalyst.compiler import get_lib_path
-from catalyst.device import get_device_capabilities
 from catalyst.device.qjit_device import RUNTIME_OPERATIONS, get_qjit_device_capabilities
 from catalyst.device.verification import validate_measurements
+
+from ..test_utils import get_device_capabilities
 
 # pylint: disable = unused-argument, unnecessary-lambda-assignment, unnecessary-lambda
 

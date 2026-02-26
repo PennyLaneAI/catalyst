@@ -14,8 +14,9 @@ from pennylane.wires import WiresLike
 
 from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
-from catalyst.device import get_device_capabilities
 from catalyst.jax_primitives import decomposition_rule
+
+from ..test_utils import get_device_capabilities
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

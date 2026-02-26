@@ -574,28 +574,6 @@ def filter_device_capabilities_with_shots(
     return device_capabilities
 
 
-def get_device_capabilities(device, shots=False) -> DeviceCapabilities:
-    """
-    Get the capabilities from the device.
-
-    TODO: this function is not actually used in the codebase, but is just used by the
-    tests that want custom device capabilities.
-
-    These tests piggy-back off the lightning device (which has "full capabilities") by
-    calling this get_device_capabilities() on lightning, and manually delete some capabilities.
-
-    We leave this function in for now, just for the tests.
-    However, these tests should construct their capabilities properly, instead of piggy-back off
-    lightning.
-    """
-
-    assert not isinstance(device, QJITDevice)
-
-    return filter_device_capabilities_with_shots(
-        _load_device_capabilities(device), bool(shots), getattr(device, "_to_matrix_ops", None)
-    )
-
-
 def is_dynamic_wires(wires: qml.wires.Wires):
     """
     Checks if a pennylane Wires object corresponds to a concrete number

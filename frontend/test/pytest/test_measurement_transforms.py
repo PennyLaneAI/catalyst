@@ -31,10 +31,12 @@ from utils import CONFIG_CUSTOM_DEVICE
 
 from catalyst import qjit
 from catalyst.compiler import get_lib_path
-from catalyst.device import QJITDevice, get_device_capabilities
+from catalyst.device import QJITDevice
 from catalyst.device.decomposition import measurements_from_counts, measurements_from_samples
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
+
+from ..test_utils import get_device_capabilities
 
 # pylint: disable=attribute-defined-outside-init
 

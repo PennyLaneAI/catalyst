@@ -18,8 +18,10 @@ from pennylane.devices import NullQubit
 from pennylane.devices.capabilities import DeviceCapabilities, ExecutionCondition
 
 from catalyst import qjit
-from catalyst.device import QJITDevice, get_device_capabilities, qjit_device
+from catalyst.device import QJITDevice, qjit_device
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
+
+from ..test_utils import get_device_capabilities
 
 # pylint:disable = protected-access,attribute-defined-outside-init
 
