@@ -116,7 +116,7 @@ jobs:
   trigger-pennylane-rc-release:
     name: Trigger PennyLane RC release workflow
     # if: ${{ steps.check_rc.outputs.branch_exists == 'true' }}
-    # needs: [upload]
+    needs: [upload]
     runs-on: ubuntu-24.04
 
     steps:
