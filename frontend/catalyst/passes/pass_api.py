@@ -369,5 +369,3 @@ def dict_to_compile_pipeline(
         return CompilePipeline(passes)
 
     return pass_pipeline
-
-
