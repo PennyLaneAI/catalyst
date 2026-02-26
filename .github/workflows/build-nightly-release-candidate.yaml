@@ -1,7 +1,6 @@
 name: Build Release Branch Nightly for TestPyPI
 
 on:
-  push:
   workflow_dispatch:
     inputs:
       branch:
@@ -116,8 +115,8 @@ jobs:
 
   trigger-pennylane-rc-release:
     name: Trigger PennyLane RC release workflow
-    # if: ${{ steps.check_rc.outputs.branch_exists == 'true' }}
-    # needs: [upload]
+    if: ${{ steps.check_rc.outputs.branch_exists == 'true' }}
+    needs: [upload]
     runs-on: ubuntu-24.04
 
     steps:
@@ -126,5 +125,4 @@ jobs:
         GITHUB_TOKEN: "${{ secrets.PENNYLANE_TRIGGER_RC_WORKFLOW }}"    
       run: |
         gh workflow run upload-nightly-rc-release.yml \
-          --repo PennyLaneAI/pennylane \
-          --ref sc-111648-sync-rc-release #TODO remove
+          --repo PennyLaneAI/pennylane 
