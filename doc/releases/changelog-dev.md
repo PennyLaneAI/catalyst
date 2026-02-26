@@ -270,6 +270,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Update nightly RC builds to be triggered by Lightning. 
+  [(#2491)](https://github.com/PennyLaneAI/catalyst/pull/2491)
+  
 * A new AI policy document is now applied across the PennyLaneAI organization for all AI contributions.
   [(#2488)](https://github.com/PennyLaneAI/catalyst/pull/2488)
 

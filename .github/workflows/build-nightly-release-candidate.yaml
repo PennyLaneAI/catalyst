@@ -1,9 +1,6 @@
 name: Build Release Branch Nightly for TestPyPI
 
 on:
-  schedule:
-    # Run from Jan 6th to Jan 11th at 02:00 UTC (10:00 PM EDT)
-    - cron: "0 2 6-11 1 *"
   workflow_dispatch:
     inputs:
       branch:
@@ -16,16 +13,30 @@ jobs:
     name: Setup the release
     runs-on: ubuntu-24.04-arm
     outputs:
-      branch: ${{ steps.set_branch.outputs.branch }}
+      rc_branch: ${{ steps.check_rc.outputs.rc_branch }}
+      branch_exists: ${{ steps.check_rc.outputs.branch_exists }}
     steps:
-    - name: Set branch
-      id: set_branch
-      run: echo "branch=${{ github.event.inputs.branch || 'v0.14.0-rc' }}" >> $GITHUB_OUTPUT
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v4
+
+    - name: Check for RC branch
+      id: check_rc
+      run: |
+        VERSION=$(python setup.py --version)
+        IFS=. read MAJ MIN PAT <<< "${VERSION%.dev[0-9]*}"
+        RC_BRANCH="v${MAJ}.$((MIN-1)).${PAT}-rc0"
+        if git ls-remote --exit-code origin "refs/heads/$RC_BRANCH"; then
+          echo "branch_exists=true" >> $GITHUB_OUTPUT
+          echo "rc_branch=$RC_BRANCH" >> $GITHUB_OUTPUT 
+          echo "Found rc branch: $RC_BRANCH"
+        else
+          echo "branch_exists=false" >> $GITHUB_OUTPUT
+        fi
 
     - name: Checkout Catalyst repo release branch
       uses: actions/checkout@v4
       with:
-        ref: ${{ steps.set_branch.outputs.branch }}
+        ref: ${{ steps.check_rc.outputs.rc_branch }}
         ssh-key: ${{ secrets.NIGHTLY_VERSION_UPDATE_DEPLOY_KEY }}
 
     - name: Bump RC version
@@ -44,13 +55,15 @@ jobs:
 
   linux-x86:
     name: Build on Linux x86-64
+    if: ${{ needs.setup.check_rc.outputs.branch_exists == 'true' }}
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-x86_64.yaml
     with:
-      branch: ${{ needs.setup.outputs.branch }}
+      branch: ${{ needs.setup.outputs.rc_branch }}
 
   linux-aarch:
     name: Build on Linux aarch64
+    if: ${{ needs.setup.check_rc.outputs.branch_exists == 'true' }}
     needs: [setup]
     uses: ./.github/workflows/build-wheel-linux-arm64.yaml
     with:
@@ -58,6 +71,7 @@ jobs:
 
   macos-arm:
     name: Build on macOS arm64
+    if: ${{ needs.setup.check_rc.outputs.branch_exists == 'true' }}
     needs: [setup]
     uses: ./.github/workflows/build-wheel-macos-arm64.yaml
     with:
@@ -65,6 +79,7 @@ jobs:
 
   upload:
     name: Prepare & Upload wheels to TestPyPI
+    if: ${{ needs.setup.check_rc.outputs.branch_exists == 'true' }}
     needs: [linux-x86, macos-arm, linux-aarch]
     runs-on: ubuntu-24.04
     permissions:
@@ -93,3 +108,17 @@ jobs:
         repository-url: https://test.pypi.org/legacy/
         packages-dir: dist
         verbose: true
+
+  trigger-pennylane-rc-release:
+    name: Trigger PennyLane RC release workflow
+    if: ${{ steps.check_rc.outputs.branch_exists == 'true' }}
+    needs: [upload]
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Trigger PennyLane release workflow
+      env:
+        GITHUB_TOKEN: "${{ secrets.PENNYLANE_TRIGGER_RC_WORKFLOW }}"    
+      run: |
+        gh workflow run upload-nightly-rc-release.yml \
+          --repo PennyLaneAI/pennylane 
