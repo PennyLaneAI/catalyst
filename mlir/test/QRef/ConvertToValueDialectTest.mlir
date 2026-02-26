@@ -319,3 +319,77 @@ func.func @test_for_loop_multiple_allocs() -> f64 attributes {quantum.node} {
     qref.dealloc %r1 : !qref.reg<1>
     return %expval : f64
 }
+
+
+// -----
+
+
+// CHECK-LABEL: test_for_loop_nested
+func.func @test_for_loop_nested() -> f64 attributes {quantum.node} {
+    // CHECK: [[r1:%.+]] = quantum.alloc( 1) : !quantum.reg
+    %r1 = qref.alloc(1) : !qref.reg<1>
+
+    // CHECK: [[q10:%.+]] = quantum.extract [[r1]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[X:%.+]] = quantum.custom "PauliX"() [[q10]] : !quantum.bit
+    %q10 = qref.get %r1[0] : !qref.reg<1> -> !qref.bit
+    qref.custom "PauliX"() %q10 : !qref.bit
+
+    %start = arith.constant 0 : index
+    %step = arith.constant 1 : index
+    %stop = arith.constant 37 : index
+
+    // CHECK: [[r1Insert:%.+]] = quantum.insert [[r1]][ 0], [[X]] : !quantum.reg, !quantum.bit
+    // CHECK: [[r1LoopOut:%.+]] = scf.for %arg0 = {{%.+}} to {{%.+}} step {{%.+}} iter_args(%arg1 = [[r1Insert]]) -> (!quantum.reg) {
+    scf.for %i = %start to %stop step %step {
+        // CHECK: [[r2:%.+]] = quantum.alloc( 2) : !quantum.reg
+        // CHECK: [[q20:%.+]] = quantum.extract [[r2]][ 0] : !quantum.reg -> !quantum.bit
+        %r2 = qref.alloc(2) : !qref.reg<2>
+        %q20 = qref.get %r2[0] : !qref.reg<2> -> !qref.bit
+
+        // CHECK: [[q10:%.+]] = quantum.extract %arg1[ 0] : !quantum.reg -> !quantum.bit
+        // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() [[q10]], [[q20]] : !quantum.bit, !quantum.bit
+        qref.custom "CNOT"() %q10, %q20 : !qref.bit, !qref.bit
+
+        // CHECK: [[r1InsertInner:%.+]] = quantum.insert %arg1[ 0], [[CNOT]]#0 : !quantum.reg, !quantum.bit
+        // CHECK: [[r2Insert:%.+]] = quantum.insert [[r2]][ 0], [[CNOT]]#1 : !quantum.reg, !quantum.bit
+        // CHECK: [[innerLoopOuts:%.+]]:2 = scf.for %arg2 = {{%.+}} to {{%.+}} step {{%.+}} iter_args(%arg3 = [[r1InsertInner]], %arg4 = [[r2Insert]])
+        // CHECK-SAME:   -> (!quantum.reg, !quantum.reg) {
+        scf.for %j = %start to %stop step %step {
+            // CHECK: [[r3:%.+]] = quantum.alloc( 3) : !quantum.reg
+            // CHECK: [[q30:%.+]] = quantum.extract [[r3]][ 0] : !quantum.reg -> !quantum.bit
+            %r3 = qref.alloc(3) : !qref.reg<3>
+            %q30 = qref.get %r3[0] : !qref.reg<3> -> !qref.bit
+
+            // CHECK: [[q10:%.+]] = quantum.extract %arg3[ 0] : !quantum.reg -> !quantum.bit
+            // CHECK: [[q20:%.+]] = quantum.extract %arg4[ 0] : !quantum.reg -> !quantum.bit
+            // CHECK: [[Toffoli:%.+]]:3 = quantum.custom "Toffoli"() [[q10]], [[q20]], [[q30]] : !quantum.bit, !quantum.bit, !quantum.bit
+            qref.custom "Toffoli"() %q10, %q20, %q30 : !qref.bit, !qref.bit, !qref.bit
+
+            // CHECK: [[insert3:%.+]] = quantum.insert [[r3]][ 0], [[Toffoli]]#2 : !quantum.reg, !quantum.bit
+            // CHECK: quantum.dealloc [[insert3]] : !quantum.reg
+            qref.dealloc %r3 : !qref.reg<3>
+
+            // CHECK: [[insert1:%.+]] = quantum.insert %arg3[ 0], [[Toffoli]]#0 : !quantum.reg, !quantum.bit
+            // CHECK: [[insert2:%.+]] = quantum.insert %arg4[ 0], [[Toffoli]]#1 : !quantum.reg, !quantum.bit
+            // CHECK: scf.yield [[insert1]], [[insert2]] : !quantum.reg, !quantum.reg
+            scf.yield
+        }
+
+        // CHECK: quantum.dealloc [[innerLoopOuts]]#1 : !quantum.reg
+        qref.dealloc %r2 : !qref.reg<2>
+
+        // CHECK: scf.yield [[innerLoopOuts]]#0 : !quantum.reg
+        scf.yield
+    }
+
+    // CHECK: [[extract:%.+]] = quantum.extract [[r1LoopOut]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[obs:%.+]] = quantum.namedobs [[extract]][ PauliX] : !quantum.obs
+    // CHECK: quantum.expval [[obs]]
+    %obs = qref.namedobs %q10 [ PauliX] : !quantum.obs
+    %expval = quantum.expval %obs : f64
+
+    // CHECK: [[insert:%.+]] = quantum.insert [[r1LoopOut]][ 0], [[extract]] : !quantum.reg, !quantum.bit
+    // CHECK: quantum.dealloc [[insert]] : !quantum.reg
+    qref.dealloc %r1 : !qref.reg<1>
+    return %expval : f64
+}
