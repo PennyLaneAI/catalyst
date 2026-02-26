@@ -376,6 +376,7 @@ def _API_name_to_pass_name():
         "gridsynth": "gridsynth",
         "cancel_inverses": "cancel-inverses",
         "decompose_lowering": "decompose-lowering",
+        "diagonalize_measurements": "diagonalize_measurements",
         "disentangle_cnot": "disentangle-CNOT",
         "disentangle_swap": "disentangle-SWAP",
         "merge_rotations": "merge-rotations",

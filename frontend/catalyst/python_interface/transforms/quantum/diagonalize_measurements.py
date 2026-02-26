@@ -56,8 +56,8 @@ from catalyst.python_interface.dialects.quantum import (
 )
 from catalyst.python_interface.pass_api import compiler_transform
 
-
 _default_supported_obs = {"PauliZ", "Identity"}
+
 
 def _generate_mapping():
     _gate_map = {}
