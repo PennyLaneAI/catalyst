@@ -12,5 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "QecPhysical/IR/QecPhysicalAttrDefs.h"
-#include "QecPhysical/IR/QecPhysicalTypes.h"
+#pragma once
+
+//===----------------------------------------------------------------------===//
+// QRef type declarations.
+//===----------------------------------------------------------------------===//
+
+#include "mlir/IR/Types.h"
+
+#define GET_TYPEDEF_CLASSES
+#include "QRef/IR/QRefOpsTypes.h.inc"

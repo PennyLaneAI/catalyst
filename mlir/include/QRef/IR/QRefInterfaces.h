@@ -12,5 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "QecPhysical/IR/QecPhysicalAttrDefs.h"
-#include "QecPhysical/IR/QecPhysicalTypes.h"
+#pragma once
+
+#include <vector>
+
+#include "mlir/IR/OpDefinition.h"
+
+//===----------------------------------------------------------------------===//
+// QRef interface declarations.
+//===----------------------------------------------------------------------===//
+
+#include "QRef/IR/QRefInterfaces.h.inc"

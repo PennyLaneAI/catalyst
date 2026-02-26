@@ -12,5 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "QecPhysical/IR/QecPhysicalAttrDefs.h"
-#include "QecPhysical/IR/QecPhysicalTypes.h"
+#include "QRef/IR/QRefInterfaces.h"
+
+using namespace mlir;
+using namespace catalyst::qref;
+
+//===----------------------------------------------------------------------===//
+// QRef interface definitions.
+//===----------------------------------------------------------------------===//
+
+#include "QRef/IR/QRefInterfaces.cpp.inc"
