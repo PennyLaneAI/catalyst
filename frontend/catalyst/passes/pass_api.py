@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import TypeAlias
 
 import pennylane as qml
-from pennylane.transforms.core import CompilePipeline, transform, BoundTransform
+from pennylane.transforms.core import BoundTransform, CompilePipeline, transform
 
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.tracing.contexts import EvaluationContext
@@ -340,7 +340,9 @@ class PassPlugin(Pass):
 
 
 ## PRIVATE ##
-def dict_to_compile_pipeline(pass_pipeline: PipelineDict | str | CompilePipeline | None, *flags, **valued_options) -> CompilePipeline:
+def dict_to_compile_pipeline(
+    pass_pipeline: PipelineDict | str | CompilePipeline | None, *flags, **valued_options
+) -> CompilePipeline:
     """Convert dictionary of passes or single pass name into list of passes.
 
     Args:
