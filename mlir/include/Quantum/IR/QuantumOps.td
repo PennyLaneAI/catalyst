@@ -546,8 +546,6 @@ def PauliRotOp : UnitaryGate_Op<"paulirot", [DifferentiableGate, NoMemoryEffect,
         operator to the state-vector.
         The arguments are the rotation angle `angle`, a string representing the
         Pauli product operator, and a set of qubits the operation acts on.
-        Note that this operation is currently not excutable. There isn't a valid
-        lowering path to the LLVM IR.
     }];
 
     let arguments = (ins
