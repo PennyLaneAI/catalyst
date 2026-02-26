@@ -383,12 +383,7 @@ class QJITDevice(qml.devices.Device):
 
         # Strip catalyst-specific keys before forwarding to the original device,
         # which may validate device_options and reject unknown keys.
-        clean_options = {
-            k: v
-            for k, v in execution_config.device_options.items()
-            if not k.startswith("catalyst_")
-        }
-        clean_config = replace(execution_config, device_options=clean_options)
+        clean_config = _strip_catalyst_options(execution_config)
 
         _, config = self.original_device.preprocess(clean_config)
 
@@ -663,3 +658,8 @@ def _requires_shots(capabilities):
         ExecutionCondition.FINITE_SHOTS_ONLY in MP_conditions
         for _, MP_conditions in capabilities.measurement_processes.items()
     )
+
+
+def _strip_catalyst_options(config):
+    clean = {k: v for k, v in config.device_options.items() if not k.startswith("catalyst_")}
+    return replace(config, device_options=clean)
