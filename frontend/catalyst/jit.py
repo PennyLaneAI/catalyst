@@ -82,7 +82,7 @@ def qjit(
     async_qnodes=False,
     target="binary",
     keep_intermediate=False,
-    use_nameloc=False,
+    embed_var_names=False,
     verbose=False,
     logfile=None,
     pipelines=None,
@@ -129,7 +129,7 @@ def qjit(
             - :attr:`~.QJIT.mlir`: MLIR representation after canonicalization
             - :attr:`~.QJIT.mlir_opt`: MLIR representation after optimization
             - :attr:`~.QJIT.llvmir`: LLVM IR representation
-        use_nameloc (bool): If ``True``, function parameter names are added to the IR as name
+        embed_var_names (bool): If ``True``, function parameter names are added to the IR as name
             locations.
         verbose (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
             printed out.
@@ -612,7 +612,7 @@ class QJIT(CatalystCallable):
             return None
 
         stdin = self.mlir_module.operation.get_asm(
-            enable_debug_info=self.compile_options.use_nameloc
+            enable_debug_info=self.compile_options.embed_var_names
         )
         return canonicalize(stdin=stdin, options=self.compile_options)
 
@@ -624,7 +624,7 @@ class QJIT(CatalystCallable):
         using_python_compiler = self.compiler.is_using_python_compiler(self.mlir_module)
         stdin = self.mlir_module.operation.get_asm(
             print_generic_op_form=using_python_compiler,
-            enable_debug_info=self.compile_options.use_nameloc,
+            enable_debug_info=self.compile_options.embed_var_names,
         )
         return to_mlir_opt(
             stdin=stdin, options=self.compile_options, using_python_compiler=using_python_compiler

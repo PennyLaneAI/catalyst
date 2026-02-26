@@ -346,7 +346,7 @@
   now counted as a single pass instead of potentially many passes.
   [(#1978)](https://github.com/PennyLaneAI/catalyst/pull/1978)
 
-* A new option called ``use_nameloc`` has been added to :func:`~.qjit` that embeds variable names
+* A new option called ``embed_var_names`` has been added to :func:`~.qjit` that embeds variable names
   from Python into the compiler IR, which can make it easier to read when debugging programs.
   [(#2054)](https://github.com/PennyLaneAI/catalyst/pull/2054)
 

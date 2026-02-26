@@ -319,7 +319,7 @@ def canonicalize(*args, stdin=None, options: Optional[CompileOptions] = None):
     Returns stdout string
     """
     opts = ["--pass-pipeline", "builtin.module(canonicalize)"]
-    if options and options.use_nameloc:
+    if options and options.embed_var_names:
         opts.append("--use-nameloc-as-prefix")
 
     return _quantum_opt(*opts, *args, stdin=stdin)
@@ -359,7 +359,7 @@ def _options_to_cli_flags(options):
         case _:
             pass
 
-    if options.use_nameloc:
+    if options.embed_var_names:
         extra_args += ["--use-nameloc-as-prefix"]
 
     if options.verbose:

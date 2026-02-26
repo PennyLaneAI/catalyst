@@ -574,10 +574,10 @@ class TestOptionsToCliFlags:
         assert ("--load-dialect-plugin", path) in flags
         assert isinstance(options.dialect_plugins, set)
 
-    def test_option_use_nameloc(self):
-        """Test use name location option"""
+    def test_option_embed_var_names(self):
+        """Test embed variable names option"""
 
-        options = CompileOptions(use_nameloc=True)
+        options = CompileOptions(embed_var_names=True)
         flags = _options_to_cli_flags(options)
         assert "--use-nameloc-as-prefix" in flags
 

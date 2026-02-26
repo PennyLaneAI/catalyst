@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for use name location option."""
+"""Unit tests for embed variable names option."""
 
 # RUN: %PYTHON %s | FileCheck %s
 
@@ -22,7 +22,7 @@ from catalyst import qjit
 
 
 # CHECK-LABEL: @jit_f
-@qjit(use_nameloc=True)
+@qjit(embed_var_names=True)
 def f(x: float, y: float):
     """Check that MLIR module contains name location information, and MLIR code uses that name
     location information.
@@ -38,7 +38,7 @@ print_mlir(f, 0.3, 0.4)
 
 
 # CHECK-LABEL: @jit_f_opt
-@qjit(use_nameloc=True)
+@qjit(embed_var_names=True)
 def f_opt(x: float, y: float):
     """Check that MLIR module contains name location information, and MLIR code uses that name
     location information.
