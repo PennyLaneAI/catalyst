@@ -31,7 +31,7 @@ jobs:
         RC_BRANCH="v${MAJ}.$((MIN-1)).${PAT}-rc0"
         if git ls-remote --exit-code origin "refs/heads/$RC_BRANCH"; then
           echo "branch_exists=true" >> $GITHUB_OUTPUT
-          echo "rc_branch=sc-111637-sync-rc" >> $GITHUB_OUTPUT  # TODO: Change back to RC_BRANCH
+          echo "rc_branch=$RC_BRANCH" >> $GITHUB_OUTPUT 
           echo "Found rc branch: $RC_BRANCH"
         else
           echo "branch_exists=false" >> $GITHUB_OUTPUT
