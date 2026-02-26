@@ -270,6 +270,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* A new AI policy document is now applied across the PennyLaneAI organization for all AI contributions.
+  [(#2488)](https://github.com/PennyLaneAI/catalyst/pull/2488)
+
 * A new dialect `QRef` was created. This dialect is very similar to the existing `Quantum` dialect,
   but it is in reference semantics, whereas the existing `Quantum` dialect is in value semantics.
   [(#2320)](https://github.com/PennyLaneAI/catalyst/pull/2320)
