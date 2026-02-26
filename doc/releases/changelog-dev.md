@@ -226,7 +226,7 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* Fix a bug in the bind call function for `PCPhase` where the signature did not match what was 
+* Fix a bug in the bind call function for `PCPhase` where the signature did not match what was
   expected in `jax_primitives`. `ctrl_qubits` was missing from positional arguments in previous signature.
   [(#2467)](https://github.com/PennyLaneAI/catalyst/pull/2467)
 
@@ -270,6 +270,11 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `prepare` operation from the PBC dialect in MLIR now implicitly allocates new qubits
+  rather than requiring existing ones. This better suits our purposes for further lowering
+  the PBC dialect.
+  [(#2520)](https://github.com/PennyLaneAI/catalyst/pull/2520)
+
 * Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
   Conditional PPR decompositions in the `decompose-clifford-ppr` pass now emit the
   measurement logic inside an `scf.if` region rather than propagating the condition
@@ -278,7 +283,7 @@
 
 * Update `mlir_specs` to account for new `marker` functionality in PennyLane.
   [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
-  
+
 * The QEC (Quantum Error Correction) dialect has been renamed to PBC (Pauli-Based Computation)
   across the entire codebase. This includes the MLIR dialect (`pbc.*` -> `pbc.*`), C++ namespaces
   (`catalyst::pbc` -> `catalyst::pbc`), Python bindings, compiler passes (e.g.,
@@ -346,7 +351,7 @@
 * The upstream MLIR `Test` dialect is now available via the `catalyst` command line tool.
   [(#2417)](https://github.com/PennyLaneAI/catalyst/pull/2417)
 
-* Removing some previously-added guardrails that were in place due to a bug in dynamic allocation 
+* Removing some previously-added guardrails that were in place due to a bug in dynamic allocation
   that is now fixed.
   [(#2427)](https://github.com/PennyLaneAI/catalyst/pull/2427)
 
