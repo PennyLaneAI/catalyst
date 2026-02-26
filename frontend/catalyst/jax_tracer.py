@@ -1524,7 +1524,13 @@ def _trace_classical_phase(
         )
         if isinstance(device, qml.devices.Device):
             config = _make_execution_config(qnode)
-            device_program, config = device.preprocess(ctx, execution_config=config, shots=shots)
+            # Pass catalyst-specific params via device_options so that
+            # QJITDevice.preprocess() has a standard PennyLane signature.
+            device_options = dict(config.device_options)
+            device_options["catalyst_ctx"] = ctx
+            device_options["catalyst_shots"] = shots
+            config = replace(config, device_options=device_options)
+            device_program, config = device.preprocess(config)
         else:
             device_program = qml.CompilePipeline()
 

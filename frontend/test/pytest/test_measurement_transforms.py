@@ -36,6 +36,13 @@ from catalyst.device.decomposition import measurements_from_counts, measurements
 from catalyst.tracing.contexts import EvaluationContext, EvaluationMode
 from catalyst.utils.exceptions import CompileError
 
+
+def _catalyst_config(ctx=None, shots=None):
+    """Build an ExecutionConfig with catalyst-specific device_options."""
+    return qml.devices.ExecutionConfig(
+        device_options={"catalyst_ctx": ctx, "catalyst_shots": shots}
+    )
+
 # pylint: disable=attribute-defined-outside-init
 
 
@@ -262,7 +269,7 @@ class TestMeasurementTransforms:
             qjit_dev = QJITDevice(dev)
 
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                transform_program, _ = qjit_dev.preprocess(ctx)
+                transform_program, _ = qjit_dev.preprocess(_catalyst_config(ctx=ctx))
 
             assert split_non_commuting in transform_program
             assert measurement_transform in transform_program
@@ -315,7 +322,7 @@ class TestMeasurementTransforms:
             qjit_dev = QJITDevice(dev)
 
             with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-                transform_program, _ = qjit_dev.preprocess(ctx, shots=1000)
+                transform_program, _ = qjit_dev.preprocess(_catalyst_config(ctx=ctx, shots=1000))
 
             assert split_non_commuting in transform_program
             assert measurement_transform in transform_program
@@ -724,7 +731,7 @@ class TestMeasurementTransforms:
 
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            transform_program, _ = qjit_dev.preprocess(ctx)
+            transform_program, _ = qjit_dev.preprocess(_catalyst_config(ctx=ctx))
 
         assert split_non_commuting in transform_program
 
@@ -751,7 +758,7 @@ class TestMeasurementTransforms:
 
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            transform_program, _ = qjit_dev.preprocess(ctx, shots=1000)
+            transform_program, _ = qjit_dev.preprocess(_catalyst_config(ctx=ctx, shots=1000))
 
         assert split_non_commuting in transform_program
 
@@ -782,10 +789,11 @@ class TestMeasurementTransforms:
 
         # Check the preprocess
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            transform_program1, _ = qjit_dev1.preprocess(ctx)  # no splitting
-            transform_program2, _ = qjit_dev2.preprocess(ctx)  # split_to_single_terms
-            transform_program3, _ = qjit_dev3.preprocess(ctx)  # split_non_commuting
-            transform_program4, _ = qjit_dev4.preprocess(ctx)  # split_non_commuting
+            cfg = _catalyst_config(ctx=ctx)
+            transform_program1, _ = qjit_dev1.preprocess(cfg)  # no splitting
+            transform_program2, _ = qjit_dev2.preprocess(cfg)  # split_to_single_terms
+            transform_program3, _ = qjit_dev3.preprocess(cfg)  # split_non_commuting
+            transform_program4, _ = qjit_dev4.preprocess(cfg)  # split_non_commuting
 
         assert split_to_single_terms not in transform_program1
         assert split_non_commuting not in transform_program1

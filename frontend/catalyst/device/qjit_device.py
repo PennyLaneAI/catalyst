@@ -344,9 +344,7 @@ class QJITDevice(qml.devices.Device):
     @debug_logger
     def preprocess(
         self,
-        ctx,
         execution_config: Optional[qml.devices.ExecutionConfig] = None,
-        shots=None,
     ):
         """This function defines the device transform program to be applied and an updated device
         configuration. The transform program will be created and applied to the tape before
@@ -355,9 +353,17 @@ class QJITDevice(qml.devices.Device):
 
         The final transforms verify that the resulting tape is supported.
 
+        Catalyst-specific parameters (``ctx`` and ``shots``) are passed via
+        ``execution_config.device_options`` using the keys ``"catalyst_ctx"``
+        and ``"catalyst_shots"`` respectively, so that the method signature
+        stays compatible with the standard PennyLane ``Device.preprocess()``
+        interface.
+
         Args:
-            execution_config (Union[ExecutionConfig, Sequence[ExecutionConfig]]): A data structure
-                describing parameters of the execution.
+            execution_config (ExecutionConfig): A data structure describing
+                parameters of the execution.  Catalyst-specific data is
+                communicated via ``device_options`` keys prefixed with
+                ``catalyst_``.
 
         Returns:
             CompilePipeline: A compile pipeline that when called returns QuantumTapes that can be
@@ -371,7 +377,21 @@ class QJITDevice(qml.devices.Device):
 
         if execution_config is None:
             execution_config = qml.devices.ExecutionConfig()
-        _, config = self.original_device.preprocess(execution_config)
+
+        # Extract catalyst-specific options from device_options
+        ctx = execution_config.device_options.get("catalyst_ctx")
+        shots = execution_config.device_options.get("catalyst_shots")
+
+        # Strip catalyst-specific keys before forwarding to the original device,
+        # which may validate device_options and reject unknown keys.
+        clean_options = {
+            k: v
+            for k, v in execution_config.device_options.items()
+            if not k.startswith("catalyst_")
+        }
+        clean_config = replace(execution_config, device_options=clean_options)
+
+        _, config = self.original_device.preprocess(clean_config)
 
         pipeline = CompilePipeline()
 
