@@ -84,7 +84,7 @@ class PassPipelineWrapper(QNodeWrapper):
         return super().__call__(*args, **kwargs)
 
 
-def pipeline(pass_pipeline: PipelineDict):
+def pipeline(pass_pipeline: PipelineDict) -> CompilePipeline:
     """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode
     within a qjit-compiled program.
 
@@ -99,7 +99,7 @@ def pipeline(pass_pipeline: PipelineDict):
             If not specified, the default pass pipeline will be applied.
 
     Returns:
-        callable : A decorator that can be applied to a qnode.
+        CompilePipeline: A compilation pipeline that can be applied to a qnode.
 
     For a list of available passes, please see the :doc:`catalyst.passes module <code/passes>`.
 
@@ -172,10 +172,7 @@ def pipeline(pass_pipeline: PipelineDict):
     will always take precedence over global pass pipelines.
     """
 
-    def _decorator(qnode):
-        return PassPipelineWrapper(qnode, pass_pipeline)
-
-    return _decorator
+    return dict_to_compile_pipeline(pass_pipeline)
 
 
 def apply_pass(pass_name: str, *flags, **valued_options):

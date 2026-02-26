@@ -22,11 +22,11 @@ from functools import wraps
 from shutil import which
 
 from pennylane.tape import QuantumScript
+from pennylane.transforms.core import CompilePipeline
 from pennylane.workflow.qnode import QNode
 from xdsl.dialects.builtin import ModuleOp
 
 from catalyst.jit import QJIT
-from catalyst.passes.pass_api import PassPipelineWrapper
 from catalyst.python_interface.compiler import Compiler
 
 from .collector import QMLCollector
@@ -333,7 +333,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     if not isinstance(qnode, QJIT) or (
         not isinstance(qnode.original_function, QNode)
         and not (
-            isinstance(qnode.original_function, PassPipelineWrapper)
+            isinstance(qnode.original_function, CompilePipeline)
             and isinstance(qnode.original_qnode, QNode)
         )
     ):

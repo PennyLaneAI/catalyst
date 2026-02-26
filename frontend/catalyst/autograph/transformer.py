@@ -28,10 +28,11 @@ from contextlib import ContextDecorator
 import pennylane as qml
 from malt.core import ag_ctx, config, converter
 from malt.impl.api import PyToPy
+from pennylane.transforms.core import CompilePipeline
 
 import catalyst
 from catalyst.autograph import ag_primitives, operator_update
-from catalyst.passes.pass_api import PassPipelineWrapper, QNodeWrapper
+from catalyst.passes.pass_api import QNodeWrapper
 from catalyst.utils.exceptions import AutoGraphError
 from catalyst.utils.patching import Patcher
 
@@ -77,12 +78,12 @@ class CatalystTransformer(PyToPy):
         if isinstance(obj, qml.QNode):
             new_obj = copy.copy(obj)
             new_obj.func = new_fn
-        elif isinstance(obj, PassPipelineWrapper):
+        elif isinstance(obj, CompilePipeline):
             new_qnode = copy.copy(obj.original_qnode)
             new_qnode.func = new_fn
             data.reverse()
             for _pass, flags, kwopts in data:
-                new_qnode = PassPipelineWrapper(new_qnode, _pass, *flags, **kwopts)
+                new_qnode = qml.transform(pass_name=_pass)(new_qnode, *flags, **kwopts)
             new_obj = new_qnode
 
         return new_obj, module, source_map

@@ -150,7 +150,7 @@ def test_pipeline_functionality(theta, backend):
 ### Test bad usages of pass decorators ###
 def test_passes_bad_usages():
     """
-    Tests that an error is raised when a PassPipelineWrapper is applied to a classical function
+    Tests that an error is raised when a CompilePipeline is applied to a classical function
     """
 
     def classical_func():
