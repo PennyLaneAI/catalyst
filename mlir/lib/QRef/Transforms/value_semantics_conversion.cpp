@@ -247,7 +247,8 @@ Value getRSourceRegisterValue(Value rQubit)
 Given a reference semantics operation instance, migrate it to value semantics.
 
 We create the corresponding value semantics operation, with exactly the same operands and
-attributes, except we replace the rQubit Values with the corresponding vQubit Values.
+attributes, except we replace the rQubit (and rQreg) Values with the corresponding current
+vQubit (and vQreg) Values.
 
 If the vQubit Values do not exist in the IR yet, a quantum.extract op from the corresponding
 quantum.reg is created, and the newly extracted quantum.bit Value is used.
@@ -277,6 +278,9 @@ OpTy migrateOpToValueSemantics(
         if (isa<qref::QubitType>(v.getType())) {
             vOperands.push_back(
                 qubitValueTrackers.at(getRSourceRegisterValue(v))->getCurrentVQubit(v));
+        }
+        else if (isa<qref::QuregType>(v.getType())) {
+            vOperands.push_back(qubitValueTrackers.at(v)->getCurrentVQreg());
         }
         else {
             vOperands.push_back(v);
@@ -479,6 +483,16 @@ void handleGate(IRRewriter &builder, qref::QuantumOperation rGateOp,
 
 // Observable Ops
 
+void handleCompbasis(IRRewriter &builder, qref::ComputationalBasisOp rCompbasisOp,
+                     llvm::DenseMap<Value, std::unique_ptr<QubitValueTracker>> &qubitValueTrackers)
+{
+    OpBuilder::InsertionGuard guard(builder);
+
+    auto vCompbasisOp = migrateOpToValueSemantics<quantum::ComputationalBasisOp>(
+        builder, rCompbasisOp, qubitValueTrackers);
+    builder.replaceOp(rCompbasisOp, vCompbasisOp);
+}
+
 void handleNamedObs(IRRewriter &builder, qref::NamedObsOp rNamedObsOp,
                     llvm::DenseMap<Value, std::unique_ptr<QubitValueTracker>> &qubitValueTrackers)
 {
@@ -574,6 +588,9 @@ void handleRegion(IRRewriter &builder, Region &r,
         }
         else if (auto rGateOp = dyn_cast<qref::QuantumOperation>(op)) {
             handleGate(builder, rGateOp, qubitValueTrackers);
+        }
+        else if (auto rCompbasisOp = dyn_cast<qref::ComputationalBasisOp>(op)) {
+            handleCompbasis(builder, rCompbasisOp, qubitValueTrackers);
         }
         else if (auto rNamedObsOp = dyn_cast<qref::NamedObsOp>(op)) {
             handleNamedObs(builder, rNamedObsOp, qubitValueTrackers);

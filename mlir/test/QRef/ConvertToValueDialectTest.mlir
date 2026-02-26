@@ -128,6 +128,44 @@ func.func @test_set_basis_state(%arg0: tensor<2xi1>) attributes {quantum.node} {
 // -----
 
 
+// CHECK-LABEL: test_compbasis_op
+func.func @test_compbasis_op() -> (!quantum.obs, !quantum.obs) attributes {quantum.node} {
+
+    // CHECK: [[r2:%.+]] = quantum.alloc( 2) : !quantum.reg
+    // CHECK: [[r3:%.+]] = quantum.alloc( 3) : !quantum.reg
+    %r2 = qref.alloc(2) : !qref.reg<2>
+    %r3 = qref.alloc(3) : !qref.reg<3>
+
+    // CHECK: [[q20:%.+]] = quantum.extract [[r2]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[q21:%.+]] = quantum.extract [[r2]][ 1] : !quantum.reg -> !quantum.bit
+    %q20 = qref.get %r2[0] : !qref.reg<2> -> !qref.bit
+    %q21 = qref.get %r2[1] : !qref.reg<2> -> !qref.bit
+
+    // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() [[q20]], [[q21]] : !quantum.bit, !quantum.bit
+    qref.custom "CNOT"() %q20, %q21 : !qref.bit, !qref.bit
+
+    // CHECK: [[obs_q:%.+]] = quantum.compbasis qubits [[CNOT]]#0, [[CNOT]]#1 : !quantum.obs
+    %obs_q = qref.compbasis qubits %q20, %q21 : !quantum.obs
+
+    // CHECK: [[insert0:%.+]] = quantum.insert [[r2]][ 0], [[CNOT]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[CNOT]]#1 : !quantum.reg, !quantum.bit
+    // CHECK: quantum.dealloc [[insert1]] : !quantum.reg
+    qref.dealloc %r2 : !qref.reg<2>
+
+    // CHECK: [[obs_r:%.+]] = quantum.compbasis qreg [[r3]] : !quantum.obs
+    %obs_r = qref.compbasis (qreg %r3 : !qref.reg<3>) : !quantum.obs
+
+    // CHECK: quantum.dealloc [[r3]] : !quantum.reg
+    qref.dealloc %r3 : !qref.reg<3>
+
+    // CHECK: return [[obs_q]], [[obs_r]] : !quantum.obs, !quantum.obs
+    return %obs_q, %obs_r : !quantum.obs, !quantum.obs
+}
+
+
+// -----
+
+
 // CHECK-LABEL: test_hermitian_op
 func.func @test_hermitian_op(%matrix: tensor<4x4xcomplex<f64>>) -> !quantum.obs attributes {quantum.node} {
 
