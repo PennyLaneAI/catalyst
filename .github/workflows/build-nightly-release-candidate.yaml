@@ -1,6 +1,7 @@
 name: Build Release Branch Nightly for TestPyPI
 
 on:
+  push:
   workflow_dispatch:
     inputs:
       branch:
@@ -106,17 +107,17 @@ jobs:
         rename "s/macosx_14_0_universal2/macosx_13_0_arm64/" dist/pennylane_catalyst-*
         rename "s/macosx_14/macosx_13/" dist/pennylane_catalyst-*
 
-    # - name: Upload wheels
-    #   uses: pypa/gh-action-pypi-publish@release/v1
-    #   with:
-    #     repository-url: https://test.pypi.org/legacy/
-    #     packages-dir: dist
-    #     verbose: true
+    - name: Upload wheels
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
+        packages-dir: dist
+        verbose: true
 
   trigger-pennylane-rc-release:
     name: Trigger PennyLane RC release workflow
     # if: ${{ steps.check_rc.outputs.branch_exists == 'true' }}
-    needs: [upload]
+    # needs: [upload]
     runs-on: ubuntu-24.04
 
     steps:
