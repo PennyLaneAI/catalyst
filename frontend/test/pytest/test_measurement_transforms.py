@@ -43,6 +43,7 @@ def _catalyst_config(ctx=None, shots=None):
         device_options={"catalyst_ctx": ctx, "catalyst_shots": shots}
     )
 
+
 # pylint: disable=attribute-defined-outside-init
 
 

@@ -38,9 +38,7 @@ def test_qjit_device():
 
     # Check the preprocess of the new device
     with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-        config = qml.devices.ExecutionConfig(
-            device_options={"catalyst_ctx": ctx}
-        )
+        config = qml.devices.ExecutionConfig(device_options={"catalyst_ctx": ctx})
         compile_pipeline, _ = device_qjit.preprocess(config)
     assert compile_pipeline
     assert len(compile_pipeline) == 3
