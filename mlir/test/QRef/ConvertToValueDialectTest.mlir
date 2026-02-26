@@ -128,6 +128,36 @@ func.func @test_set_basis_state(%arg0: tensor<2xi1>) attributes {quantum.node} {
 // -----
 
 
+// CHECK-LABEL: test_hermitian_op
+func.func @test_hermitian_op(%matrix: tensor<4x4xcomplex<f64>>) -> !quantum.obs attributes {quantum.node} {
+
+    // CHECK: [[qreg:%.+]] = quantum.alloc( 2) : !quantum.reg
+    %a = qref.alloc(2) : !qref.reg<2>
+
+    // CHECK: [[q0:%.+]] = quantum.extract [[qreg]][ 0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[q1:%.+]] = quantum.extract [[qreg]][ 1] : !quantum.reg -> !quantum.bit
+    %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit
+    %q1 = qref.get %a[1] : !qref.reg<2> -> !qref.bit
+
+    // CHECK: [[CNOT:%.+]]:2 = quantum.custom "CNOT"() [[q0]], [[q1]] : !quantum.bit, !quantum.bit
+    qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+
+    // CHECK: [[obs:%.+]] = quantum.hermitian(%arg0 : tensor<4x4xcomplex<f64>>) [[CNOT]]#0, [[CNOT]]#1 : !quantum.obs
+    %obs = qref.hermitian(%matrix : tensor<4x4xcomplex<f64>>) %q0, %q1 : !quantum.obs
+
+    // CHECK: [[insert0:%.+]] = quantum.insert [[qreg]][ 0], [[CNOT]]#0 : !quantum.reg, !quantum.bit
+    // CHECK: [[insert1:%.+]] = quantum.insert [[insert0]][ 1], [[CNOT]]#1 : !quantum.reg, !quantum.bit
+    // CHECK: quantum.dealloc [[insert1]] : !quantum.reg
+    qref.dealloc %a : !qref.reg<2>
+
+    // CHECK: return [[obs]]
+    return %obs : !quantum.obs
+}
+
+
+// -----
+
+
 // CHECK-LABEL: test_dynamic_wire_index
 func.func @test_dynamic_wire_index(%arg0: i64) -> f64 attributes {quantum.node} {
 

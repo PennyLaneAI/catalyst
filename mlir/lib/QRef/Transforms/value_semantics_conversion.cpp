@@ -489,6 +489,16 @@ void handleNamedObs(IRRewriter &builder, qref::NamedObsOp rNamedObsOp,
     builder.replaceOp(rNamedObsOp, vNamedObsOp);
 }
 
+void handleHermitian(IRRewriter &builder, qref::HermitianOp rHermitianOp,
+                     llvm::DenseMap<Value, std::unique_ptr<QubitValueTracker>> &qubitValueTrackers)
+{
+    OpBuilder::InsertionGuard guard(builder);
+
+    auto vHermitianOp =
+        migrateOpToValueSemantics<quantum::HermitianOp>(builder, rHermitianOp, qubitValueTrackers);
+    builder.replaceOp(rHermitianOp, vHermitianOp);
+}
+
 // Control flow
 
 void handleFor(IRRewriter &builder, scf::ForOp forOp,
@@ -567,6 +577,9 @@ void handleRegion(IRRewriter &builder, Region &r,
         }
         else if (auto rNamedObsOp = dyn_cast<qref::NamedObsOp>(op)) {
             handleNamedObs(builder, rNamedObsOp, qubitValueTrackers);
+        }
+        else if (auto rHermitianOp = dyn_cast<qref::HermitianOp>(op)) {
+            handleHermitian(builder, rHermitianOp, qubitValueTrackers);
         }
         else if (auto rDeallocOp = dyn_cast<qref::DeallocOp>(op)) {
             handleDealloc(builder, rDeallocOp, qubitValueTrackers);
