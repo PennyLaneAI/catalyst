@@ -20,5 +20,7 @@
 
 #include "mlir/IR/Types.h"
 
+#include "QecPhysical/IR/QecPhysicalAttrDefs.h"
+
 #define GET_TYPEDEF_CLASSES
 #include "QecPhysical/IR/QecPhysicalOpsTypes.h.inc"

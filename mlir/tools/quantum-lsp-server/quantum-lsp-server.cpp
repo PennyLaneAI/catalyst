@@ -23,8 +23,8 @@
 #include "Mitigation/IR/MitigationDialect.h"
 #include "PBC/IR/PBCDialect.h"
 #include "PauliFrame/IR/PauliFrameDialect.h"
-#include "QecPhysical/IR/QecPhysicalDialect.h"
 #include "QRef/IR/QRefDialect.h"
+#include "QecPhysical/IR/QecPhysicalDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "RTIO/IR/RTIODialect.h"
 
