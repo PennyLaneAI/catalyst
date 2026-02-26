@@ -79,8 +79,8 @@ def test_assembly_format(run_filecheck, pretty_print):
     // CHECK: {{%.+}} = pbc.fabricate magic : !quantum.bit
     %fabricated = pbc.fabricate magic : !quantum.bit
 
-    // CHECK: {{%.+}} = pbc.prepare zero [[Q0]] : !quantum.bit
-    %prepared = pbc.prepare zero %q0 : !quantum.bit
+    // CHECK: {{%.+}} = pbc.prepare zero : !quantum.bit
+    %prepared = pbc.prepare zero : !quantum.bit
 
     // CHECK: {{%.+}}, {{%.+}} = pbc.ppr.arbitrary ["X", "Y"]([[PARAM]]) [[Q0]], [[Q1]] : !quantum.bit,
     %arb0, %arb1 = pbc.ppr.arbitrary ["X", "Y"](%param) %q0, %q1 : !quantum.bit, !quantum.bit
