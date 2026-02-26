@@ -229,7 +229,7 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* Fix a bug in the bind call function for `PCPhase` where the signature did not match what was 
+* Fix a bug in the bind call function for `PCPhase` where the signature did not match what was
   expected in `jax_primitives`. `ctrl_qubits` was missing from positional arguments in previous signature.
   [(#2467)](https://github.com/PennyLaneAI/catalyst/pull/2467)
 
@@ -273,9 +273,46 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* A new AI policy document is now applied across the PennyLaneAI organization for all AI contributions.
+  [(#2488)](https://github.com/PennyLaneAI/catalyst/pull/2488)
+
+* A new dialect `QRef` was created. This dialect is very similar to the existing `Quantum` dialect,
+  but it is in reference semantics, whereas the existing `Quantum` dialect is in value semantics.
+  [(#2320)](https://github.com/PennyLaneAI/catalyst/pull/2320)
+
+  Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
+  in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
+  will be these qubit (or qreg) reference values.
+
+  For example, in the following circuit, gates and observable ops take in the qubit reference
+  they're acting on, and do not produce new qubit values.
+
+  ```mlir
+  func.func @expval_circuit() -> f64 {
+      %a = qref.alloc(2) : !qref.reg<2>
+      %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit
+      %q1 = qref.get %a[1] : !qref.reg<2> -> !qref.bit
+      qref.custom "Hadamard"() %q0 : !qref.bit
+      qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+      qref.custom "Hadamard"() %q0 : !qref.bit
+      %obs = qref.namedobs %q1 [ PauliX] : !quantum.obs
+      %expval = quantum.expval %obs : f64
+      qref.dealloc %a : !qref.reg<2>
+      return %expval : f64
+  }
+  ```
+
+  Notice that qubit reference values are reusable.
+
+* Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
+  Conditional PPR decompositions in the `decompose-clifford-ppr` pass now emit the
+  measurement logic inside an `scf.if` region rather than propagating the condition
+  to inner PPM ops.
+  [(#2511)](https://github.com/PennyLaneAI/catalyst/pull/2511)
+
 * Update `mlir_specs` to account for new `marker` functionality in PennyLane.
   [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
-  
+
 * The QEC (Quantum Error Correction) dialect has been renamed to PBC (Pauli-Based Computation)
   across the entire codebase. This includes the MLIR dialect (`pbc.*` -> `pbc.*`), C++ namespaces
   (`catalyst::pbc` -> `catalyst::pbc`), Python bindings, compiler passes (e.g.,
@@ -343,7 +380,7 @@
 * The upstream MLIR `Test` dialect is now available via the `catalyst` command line tool.
   [(#2417)](https://github.com/PennyLaneAI/catalyst/pull/2417)
 
-* Removing some previously-added guardrails that were in place due to a bug in dynamic allocation 
+* Removing some previously added guardrails that were in place due to a bug in dynamic allocation
   that is now fixed.
   [(#2427)](https://github.com/PennyLaneAI/catalyst/pull/2427)
 
@@ -419,6 +456,76 @@
       return %result
   }
   ```
+
+* A new compiler pass `split-non-commuting` has been added for QNode functions that measure
+  non-commuting observables. It facilitates execution on devices that don't natively support
+  measuring multiple non-commuting observables simultaneously by splitting them into separate
+  circuit executions, one group per observable for now.
+  [(#2437)](https://github.com/PennyLaneAI/catalyst/pull/2437)
+
+  **Relationship to `split-to-single-terms`:** The `split-non-commuting` pass internally runs
+  `split-to-single-terms` first when processing Hamiltonian expectation values. The
+  `split-to-single-terms` pass decomposes a Hamiltonian (sum of observables) into individual
+  leaf observables and computes the weighted sum in post-processing by running the circuit
+  once. By contrast, `split-non-commuting` goes further: it splits non-commuting observables
+  into multiple groups and runs the circuit once per group
+
+  Consider the following example:
+  ```python
+  import pennylane as qml
+  from catalyst import qjit
+
+  @qjit
+  @qml.transform(pass_name="split-non-commuting")
+  @qml.qnode(qml.device("lightning.qubit", wires=3))
+  def circuit():
+      # Hamiltonian H = Z(0) + 2 * X(0) + 3 * Identity
+      return qml.expval(qml.Z(0) + 2 * qml.X(0) + 3 * qml.Identity(2))
+  ```
+
+  The pass first runs `split-to-single-terms` to decompose the Hamiltonian, then splits
+  non-commuting observables into separate groups. Shots are distributed among groups using
+  integer division (rounded down); e.g., 100 shots with 3 groups yields 33 shots per group.
+
+  **Before:**
+  ```mlir
+  func @circ1(%arg0) -> (tensor<f64>) {qnode} {
+      %shots = arith.constant 100
+      quantum.device shots(%shots)
+      // ... quantum ops ...
+      %H = quantum.hamiltonian(%coeffs) %T0, %obs2 : !quantum.obs
+      %result = quantum.expval %H : f64
+      return %tensor_result
+  }
+  ```
+
+  **After:**
+  ```mlir
+  func @circ1() -> (tensor<f64>) {
+      %r0, %r1 = call @circ1.quantum.group.0()  // expval(Z), 1.0
+      %r2 = call @circ1.quantum.group.1()  // expval(X)
+      // Weighted sum: 1 * r0 + 3 * r1 + 2 * r2
+      return %result
+  }
+  func @circ1.quantum.group.0() -> (tensor<f64>, tensor<f64>) {qnode} {
+      // ... quantum ops ...
+      %shots = arith.constant 100
+      %num_group = arith.constant 3 : i64
+      // Shots are divided among groups via integer division (rounded down)
+      %new_shots = arith.divsi %shots, %num_group
+      quantum.device shots(%new_shots)
+      %obs = quantum.namedobs %out_qubits[ PauliZ] : !quantum.obs
+      %r0 = quantum.expval %obs
+
+      // expval(Identity) be simplified to one
+      %one = arith.constant dense<1.000000e+00>
+      return %r0, %one
+  }
+  func @circ1.quantum.group.1() -> tensor<f64> {qnode} {
+      // ... quantum ops, single expval ...
+  }
+  ```
+
 
 <h3>Documentation 📝</h3>
 
