@@ -34,7 +34,6 @@ from pennylane.devices.capabilities import (
     ExecutionCondition,
     OperatorProperties,
 )
-from pennylane.devices.execution_config import MCM_METHOD, POSTSELECT_MODE
 from pennylane.transforms import (
     diagonalize_measurements,
     split_non_commuting,
@@ -397,29 +396,6 @@ class QJITDevice(qml.devices.Device):
             shots_present=bool(shots),
             unitary_support=getattr(self.original_device, "_to_matrix_ops", None),
         )
-
-        # MCM preprocessing. We use the **original** execution_config rather than the
-        # config returned by original_device.preprocess, so that the MCMConfig doesn't
-        # get resolved by the original device.
-        mcm_config = execution_config.mcm_config
-        if mcm_config.mcm_method is not None:
-            if mcm_config.mcm_method == MCM_METHOD.ONE_SHOT:
-                if mcm_config.postselect_mode in (POSTSELECT_MODE.FILL_SHOTS, None):
-                    pipeline += qml.transform(pass_name="dynamic-one-shot")
-                else:
-                    raise CompileError(
-                        f"postselect_mode='{mcm_config.postselect_mode.value}' is not supported "
-                        f"with the '{self.original_device.name}' device when using 'qml.qjit'."
-                    )
-            elif mcm_config.mcm_method not in (
-                MCM_METHOD.SINGLE_BRANCH_STATISTICS,
-                *capabilities.supported_mcm_methods,
-                None,
-            ):
-                raise CompileError(
-                    f"mcm_method='{mcm_config.mcm_method.value}' is not supported with the "
-                    f"'{self.original_device.name}' device when using 'qml.qjit'."
-                )
 
         # measurement transforms may change operations on the tape to accommodate
         # measurement transformations, so must occur before decomposition
