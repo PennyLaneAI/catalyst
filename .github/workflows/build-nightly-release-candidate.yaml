@@ -1,9 +1,6 @@
 name: Build Release Branch Nightly for TestPyPI
 
 on:
-  schedule:
-    # Run from Jan 6th to Jan 11th at 02:00 UTC (10:00 PM EDT)
-    - cron: "0 2 6-11 1 *"
   workflow_dispatch:
     inputs:
       branch:
@@ -119,7 +116,7 @@ jobs:
   trigger-pennylane-rc-release:
     name: Trigger PennyLane RC release workflow
     # if: ${{ steps.check_rc.outputs.branch_exists == 'true' }}
-    # needs: [upload, setup]
+    # needs: [upload]
     runs-on: ubuntu-24.04
 
     steps:
