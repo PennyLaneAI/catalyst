@@ -230,7 +230,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     >>> fig, ax = catalyst.draw_graph(circuit, level=0)()
     >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
-    .. figure:: ../../../doc/_static/catalyst-draw-graph-level0-example.png
+    .. figure:: /_static/catalyst-draw-graph-level0-example.png
         :width: 35%
         :alt: Graphical representation of circuit with level=0
         :align: left
@@ -247,7 +247,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     >>> fig, ax = catalyst.draw_graph(circuit, level=2)()
     >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
-    .. figure:: ../../../doc/_static/catalyst-draw-graph-level2-example.png
+    .. figure:: /_static/catalyst-draw-graph-level2-example.png
         :width: 35%
         :alt: Graphical representation of circuit with level=2
         :align: left
@@ -278,7 +278,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         >>> fig, ax = catalyst.draw_graph(circuit)()
         >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
-        .. figure:: ../../../doc/_static/catalyst-draw-graph-control-flow-example.png
+        .. figure:: /_static/catalyst-draw-graph-control-flow-example.png
             :width: 35%
             :alt: Graphical representation of circuit with control flow
             :align: left
@@ -313,7 +313,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
         >>> fig, ax = catalyst.draw_graph(circuit)(x, y)
         >>> fig.savefig('path_to_file.png', dpi=300, bbox_inches="tight")
 
-        .. figure:: ../../../doc/_static/catalyst-draw-graph-dynamic-wire-example.png
+        .. figure:: /_static/catalyst-draw-graph-dynamic-wire-example.png
             :width: 35%
             :alt: Graphical representation of circuit with control flow
             :align: left
