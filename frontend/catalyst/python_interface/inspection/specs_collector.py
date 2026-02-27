@@ -547,11 +547,11 @@ def _collect_region(
     return resources
 
 
-def specs_collect(module: ModuleOp) -> ResourcesResult:
+def specs_collect(module: ModuleOp) -> ResourcesResult | list[ResourcesResult]:
     """Collect PennyLane resources from the module."""
 
     func_to_resources = {}
-    entry_func = None
+    entry_funcs = []
 
     func_decl_warning = False
 
@@ -578,9 +578,18 @@ def specs_collect(module: ModuleOp) -> ResourcesResult:
 
         if "qnode" in func_op.attributes:
             # The main entrypoint for a qnode is always marked by the `qnode` attribute
-            entry_func = func_op.sym_name.data
+            entry_funcs.append(func_op.sym_name.data)
 
-    if entry_func not in func_to_resources:
+    if not entry_funcs:
         raise ValueError("Entry function not found in module.")
 
-    return _resolve_function_calls(entry_func, func_to_resources)
+    if (
+        len(
+            res := [
+                _resolve_function_calls(entry_func, func_to_resources) for entry_func in entry_funcs
+            ]
+        )
+        == 1
+    ):
+        return res[0]
+    return res

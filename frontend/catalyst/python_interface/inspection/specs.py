@@ -39,7 +39,7 @@ def mlir_specs(
     *args,
     level_to_markers: dict[int, tuple[str]] | None = None,
     **kwargs,
-) -> ResourcesResult | dict[str, ResourcesResult]:
+) -> ResourcesResult | list[ResourcesResult] | dict[str, ResourcesResult | list[ResourcesResult]]:
     """Compute the specs used for a circuit at the level of an MLIR pass.
 
     Args:
@@ -51,8 +51,8 @@ def mlir_specs(
         **kwargs: Keyword arguments to pass to the QNode
 
     Returns:
-        ResourcesResult | dict[str, ResourcesResult]: The resources for the circuit at the
-          specified level
+        ResourcesResult | list[ResourcesResult] | dict[str, ResourcesResult | list[ResourcesResult]]:
+            The resources for the circuit at the specified levels
     """
 
     cache: dict[int, tuple[ResourcesResult, str]] = {}
@@ -78,13 +78,13 @@ def mlir_specs(
 
     max_level: int | None = _get_max_level(level)
 
-    def _specs_callback(previous_pass, module, next_pass, pass_level=0):
+    def _specs_callback(
+        previous_pass, module, next_pass, pass_level=0
+    ):  # pylint: disable=unused-argument
         """Callback function for gathering circuit specs."""
-
-        pass_instance = previous_pass if previous_pass else next_pass
         result = specs_collect(module)
 
-        pass_name = str(pass_instance) + f" (MLIR-{pass_level})"
+        pass_name = str(previous_pass) + f" (MLIR-{pass_level})"
         # Always prioritize marker label if it exists
         if m := level_to_markers.get(pass_level):
             pass_name = ", ".join(m if not isinstance(m, str) else [m])
