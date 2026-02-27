@@ -152,7 +152,7 @@ entry_points = {
     "xdsl.universe": [
         "catalyst-xdsl-universe = catalyst.python_interface.xdsl_universe:CATALYST_XDSL_UNIVERSE"
     ],
-    "catalyst.passes": [
+    "catalyst.compilation_passes": [
         "to_ppr = catalyst.passes:to_ppr",
         "merge_ppr_ppm = catalyst.passes:merge_ppr_ppm",
         "commute_ppr = catalyst.passes:commute_ppr",
@@ -161,7 +161,7 @@ entry_points = {
         "reduce_t_depth = catalyst.passes:reduce_t_depth",
         "decompose_arbitrary_ppr = catalyst.passes:decompose_arbitrary_ppr",
     ],
-    "catalyst.graph_drawer": [
+    "pennylane.drawer": [
         "draw_graph = catalyst:draw_graph",
     ],
 }
