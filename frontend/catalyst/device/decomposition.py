@@ -35,6 +35,7 @@ from pennylane.measurements import (
     SampleMP,
     VarianceMP,
 )
+from pennylane.transforms.decompose import _resolve_gate_set
 
 from catalyst.api_extensions import HybridCtrl
 from catalyst.device.op_support import (
@@ -90,8 +91,14 @@ def catalyst_decomposer(op, capabilities: DeviceCapabilities):
 @transform
 @debug_logger
 def catalyst_decompose(
-    tape: qml.tape.QuantumTape, capabilities: DeviceCapabilities, grad_method: str = None
-):
+    tape: qml.tape.QuantumTape,
+    capabilities: DeviceCapabilities,
+    grad_method: str = None,
+    target_gates=None,
+    num_work_wires=0,
+    fixed_decomps=None,
+    alt_decomps=None,
+):  # pylint: disable=too-many-arguments, too-many-positional-arguments
     """Decompose operations until the stopping condition is met.
 
     In a single call of the catalyst_decompose function, the PennyLane operations are decomposed
@@ -115,19 +122,47 @@ def catalyst_decompose(
         if grad_method is None or not is_active(tape[0]):
             skip_initial_state_prep = capabilities.initial_state_prep
 
+    if capabilities is None:
+        if grad_method is not None:
+            raise NotImplementedError(
+                "grad_method is not taken into account in catalyst_decompose if target_gates are "
+                "provided instead of device capabilities."
+            )
+        target_gates, stopping_condition = _resolve_gate_set(target_gates, None)
+        decomposer = None
+    else:
+        if target_gates is not None:
+            raise ValueError(
+                "target_gates are not taken into account in catalyst_decompose if device "
+                "capabilities are provided."
+            )
+
+        def stopping_condition(op):
+            return catalyst_acceptance(op, capabilities, grad_method)
+
+        decomposer = partial(catalyst_decomposer, capabilities=capabilities)
+
+    decompose_kwargs = {
+        "num_work_wires": num_work_wires,
+        "target_gates": target_gates,
+        "fixed_decomps": fixed_decomps,
+        "alt_decomps": alt_decomps,
+    }
+
     (toplevel_tape,), _ = decompose(
         tape,
-        stopping_condition=lambda op: catalyst_acceptance(op, capabilities, grad_method),
+        stopping_condition=stopping_condition,
         skip_initial_state_prep=skip_initial_state_prep,
-        decomposer=partial(catalyst_decomposer, capabilities=capabilities),
+        decomposer=decomposer,
         name="catalyst on this device",
         error=CompileError,
+        **decompose_kwargs,
     )
 
     new_ops = []
     for op in toplevel_tape.operations:
         if has_nested_tapes(op):
-            op = _decompose_nested_tapes(op, capabilities)
+            op = _decompose_nested_tapes(op, capabilities, **decompose_kwargs)
         new_ops.append(op)
     tape = qml.tape.QuantumScript(new_ops, tape.measurements, shots=tape.shots)
 
@@ -145,14 +180,18 @@ def _decompose_to_matrix(op):
     return [op]
 
 
-def _decompose_nested_tapes(op, capabilities: DeviceCapabilities):
+def _decompose_nested_tapes(op, capabilities: DeviceCapabilities, **decompose_kwargs):
     new_regions = []
     for region in op.regions:
         if region.quantum_tape is None:
             new_tape = None
         else:
             with EvaluationContext.frame_tracing_context(region.trace):
-                tapes, _ = catalyst_decompose(region.quantum_tape, capabilities=capabilities)
+                tapes, _ = catalyst_decompose(
+                    region.quantum_tape,
+                    capabilities=capabilities,
+                    **decompose_kwargs,
+                )
                 new_tape = tapes[0]
         new_regions.append(
             HybridOpRegion(
