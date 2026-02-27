@@ -17,17 +17,25 @@ written using xDSL.
 
 Known Limitations
 -----------------
-  * Only observables PauliX, PauliY, PauliZ, Hadamard and Identity are currently supported when
+  * 1. Only observables PauliX, PauliY, PauliZ, Hadamard and Identity are currently supported when
     using this transform (but these are also the only observables currently supported in the
     Quantum dialect as NamedObservable).
-  * Unlike the current tape-based implementation of the transform, it doesn't allow for
+  * 2. Unlike the current tape-based implementation of the transform, it doesn't allow for
     diagonalization of a subset of observables.
-  * Unlike the current tape-based implementation of the transform, conversion to measurements
+  * 3. Unlike the current tape-based implementation of the transform, conversion to measurements
     based on eigvals and wires (rather than the PauliZ observable) is not currently supported.
-  * Unlike the tape-based implementation, this pass will NOT raise an error if given a circuit
+  * 4. Unlike the tape-based implementation, this pass will NOT raise an error if given a circuit
     that is invalid because it contains non-commuting measurements. It should be assumed that
     this transform results in incorrect outputs unless split_non_commuting is applied to break
     non-commuting measurements into separate tapes.
+    - We need to check if a circuit contains non-commuting measurements or not
+
+Tasks
+----------------
+  * Limitations 2 & 3 requires the feature allowing us to pass options to the xdsl pass.
+  Example [here](https://github.com/PennyLaneAI/catalyst/blob/195d8fa2f307dae8362dad123d56a83c4ade9779/frontend/test/pytest/python_interface/pass_api/test_transform_interpreter.py#L168)_
+  * Limitations 4 requires a step to detect if the all measurements in the circuit commute with each other or not.
+
 """
 
 from dataclasses import dataclass
@@ -48,6 +56,9 @@ from catalyst.python_interface.dialects.quantum import (
 )
 from catalyst.python_interface.pass_api import compiler_transform
 
+_default_supported_obs = ("PauliZ", "Identity")
+_obs_allowed_diagonalization = {"PauliX", "PauliY", "PauliZ", "Hadamard", "Identity"}
+
 
 def _generate_mapping():
     _gate_map = {}
@@ -65,9 +76,9 @@ def _generate_mapping():
 _gate_map, _params_map = _generate_mapping()
 
 
-def _diagonalize(obs: NamedObsOp) -> bool:
+def _diagonalize(obs: NamedObsOp, supported_base_obs) -> bool:
     """Whether to diagonalize a given observable."""
-    if obs.type.data in {"PauliZ", "Identity"}:
+    if obs.type.data in supported_base_obs:
         return False
     if obs.type.data in _gate_map:
         return True
@@ -81,13 +92,17 @@ class DiagonalizeFinalMeasurementsPattern(
 ):  # pylint: disable=too-few-public-methods
     """RewritePattern for diagonalizing final measurements."""
 
+    def __init__(self, supported_base_obs, to_eigvals):
+        self.supported_base_obs = supported_base_obs
+        self.to_eigvals = to_eigvals
+
     @pattern_rewriter.op_type_rewrite_pattern
     def match_and_rewrite(
         self, observable: NamedObsOp, rewriter: pattern_rewriter.PatternRewriter, /
     ):
         """Replace non-diagonalized observables with their diagonalizing gates and PauliZ."""
 
-        if _diagonalize(observable):
+        if _diagonalize(observable, self.supported_base_obs):
 
             diagonalizing_gates = _gate_map[observable.type.data]
             params = _params_map[observable.type.data]
@@ -146,17 +161,43 @@ class DiagonalizeFinalMeasurementsPattern(
             rewriter.replace_op(observable, diag_obs)
 
 
-@dataclass(frozen=True)
 class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
     """Pass for diagonalizing final measurements."""
 
     name = "diagonalize-final-measurements"
 
+    def __init__(self, **options):
+
+        self.supported_base_obs = options.get("supported-base-obs")
+
+        if self.supported_base_obs is None:
+            self.supported_base_obs = _default_supported_obs
+        if (
+            isinstance(self.supported_base_obs, str)
+            and self.supported_base_obs in _obs_allowed_diagonalization
+        ):
+            self.supported_base_obs = set(_default_supported_obs + (self.supported_base_obs,))
+        elif isinstance(self.supported_base_obs, tuple) and all(
+            x in _obs_allowed_diagonalization for x in self.supported_base_obs
+        ):
+            self.supported_base_obs = set(_default_supported_obs + self.supported_base_obs)
+        else:
+            raise ValueError(
+                f"{self.supported_base_obs} is not supported. Please ensure all the supported_base_obs is a subset of PauliX, PauliY, PauliZ, Hadamard and Identity"
+            )
+
+        print(self.supported_base_obs)
+
+        if options.get("to-eigvals", False) is not False:
+            raise ValueError("Only to_eigvals = False is supported.")
+
+        self.to_eigvals = options.get("to-eigvals", False)
+
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the diagonalize final measurements pass."""
-        pattern_rewriter.PatternRewriteWalker(DiagonalizeFinalMeasurementsPattern()).rewrite_module(
-            op
-        )
+        pattern_rewriter.PatternRewriteWalker(
+            DiagonalizeFinalMeasurementsPattern(self.supported_base_obs, self.to_eigvals)
+        ).rewrite_module(op)
 
 
 diagonalize_final_measurements_pass = compiler_transform(DiagonalizeFinalMeasurementsPass)
