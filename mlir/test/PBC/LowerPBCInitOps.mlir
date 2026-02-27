@@ -15,48 +15,51 @@
 // RUN: quantum-opt --lower-pbc-init-ops --split-input-file --verify-diagnostics %s | FileCheck %s
 
 // Test lowering pbc.prepare zero (no gates needed)
-func.func @test_prepare_zero(%q : !quantum.bit) -> !quantum.bit {
-    %0 = pbc.prepare zero %q : !quantum.bit
+func.func @test_prepare_zero() -> !quantum.bit {
+    %0 = pbc.prepare zero : !quantum.bit
     return %0 : !quantum.bit
 
     // CHECK-LABEL: func.func @test_prepare_zero
-    // CHECK-SAME: (%[[Q:.*]]: !quantum.bit)
-    // CHECK: return %[[Q]]
+    // CHECK: [[Q:%.*]] = quantum.alloc_qb
+    // CHECK-NEXT: return [[Q]]
 }
 
 // -----
 
 // Test lowering pbc.prepare one to PauliX gate
-func.func @test_prepare_one(%q : !quantum.bit) -> !quantum.bit {
-    %0 = pbc.prepare one %q : !quantum.bit
+func.func @test_prepare_one() -> !quantum.bit {
+    %0 = pbc.prepare one : !quantum.bit
     return %0 : !quantum.bit
 
     // CHECK-LABEL: func.func @test_prepare_one
-    // CHECK: [[OUT:%.+]] = quantum.custom "PauliX"() {{.*}} : !quantum.bit
+    // CHECK: [[Q:%.*]] = quantum.alloc_qb
+    // CHECK: [[OUT:%.+]] = quantum.custom "PauliX"() [[Q]] : !quantum.bit
     // CHECK: return [[OUT]]
 }
 
 // -----
 
 // Test lowering pbc.prepare plus to Hadamard gate
-func.func @test_prepare_plus(%q : !quantum.bit) -> !quantum.bit {
-    %0 = pbc.prepare plus %q : !quantum.bit
+func.func @test_prepare_plus() -> !quantum.bit {
+    %0 = pbc.prepare plus : !quantum.bit
     return %0 : !quantum.bit
 
     // CHECK-LABEL: func.func @test_prepare_plus
-    // CHECK: [[OUT:%.+]] = quantum.custom "Hadamard"() {{.*}} : !quantum.bit
+    // CHECK: [[Q:%.*]] = quantum.alloc_qb
+    // CHECK: [[OUT:%.+]] = quantum.custom "Hadamard"() [[Q]] : !quantum.bit
     // CHECK: return [[OUT]]
 }
 
 // -----
 
 // Test lowering pbc.prepare minus to Hadamard + PauliZ gates
-func.func @test_prepare_minus(%q : !quantum.bit) -> !quantum.bit {
-    %0 = pbc.prepare minus %q : !quantum.bit
+func.func @test_prepare_minus() -> !quantum.bit {
+    %0 = pbc.prepare minus : !quantum.bit
     return %0 : !quantum.bit
 
     // CHECK-LABEL: func.func @test_prepare_minus
-    // CHECK: [[H:%.+]] = quantum.custom "Hadamard"() {{.*}} : !quantum.bit
+    // CHECK: [[Q:%.*]] = quantum.alloc_qb
+    // CHECK: [[H:%.+]] = quantum.custom "Hadamard"() [[Q]] : !quantum.bit
     // CHECK: [[OUT:%.+]] = quantum.custom "PauliZ"() [[H]] : !quantum.bit
     // CHECK: return [[OUT]]
 }
@@ -64,12 +67,13 @@ func.func @test_prepare_minus(%q : !quantum.bit) -> !quantum.bit {
 // -----
 
 // Test lowering pbc.prepare plus_i to Hadamard + S gates
-func.func @test_prepare_plus_i(%q : !quantum.bit) -> !quantum.bit {
-    %0 = pbc.prepare plus_i %q : !quantum.bit
+func.func @test_prepare_plus_i() -> !quantum.bit {
+    %0 = pbc.prepare plus_i : !quantum.bit
     return %0 : !quantum.bit
 
     // CHECK-LABEL: func.func @test_prepare_plus_i
-    // CHECK: [[H:%.+]] = quantum.custom "Hadamard"() {{.*}} : !quantum.bit
+    // CHECK: [[Q:%.*]] = quantum.alloc_qb
+    // CHECK: [[H:%.+]] = quantum.custom "Hadamard"() [[Q]] : !quantum.bit
     // CHECK: [[OUT:%.+]] = quantum.custom "S"() [[H]] : !quantum.bit
     // CHECK: return [[OUT]]
 }
@@ -77,12 +81,13 @@ func.func @test_prepare_plus_i(%q : !quantum.bit) -> !quantum.bit {
 // -----
 
 // Test lowering pbc.prepare minus_i to Hadamard + S† gates
-func.func @test_prepare_minus_i(%q : !quantum.bit) -> !quantum.bit {
-    %0 = pbc.prepare minus_i %q : !quantum.bit
+func.func @test_prepare_minus_i() -> !quantum.bit {
+    %0 = pbc.prepare minus_i : !quantum.bit
     return %0 : !quantum.bit
 
     // CHECK-LABEL: func.func @test_prepare_minus_i
-    // CHECK: [[H:%.+]] = quantum.custom "Hadamard"() {{.*}} : !quantum.bit
+    // CHECK: [[Q:%.*]] = quantum.alloc_qb
+    // CHECK: [[H:%.+]] = quantum.custom "Hadamard"() [[Q]] : !quantum.bit
     // CHECK: [[OUT:%.+]] = quantum.custom "S"() [[H]] adj : !quantum.bit
     // CHECK: return [[OUT]]
 }
@@ -132,14 +137,15 @@ func.func @test_fabricate_plus_i() -> !quantum.bit {
 // -----
 
 // Test lowering pbc.prepare with multiple qubits
-func.func @test_prepare_multiple_qubits(%q1 : !quantum.bit, %q2 : !quantum.bit) -> (!quantum.bit, !quantum.bit) {
-    %0, %1 = pbc.prepare plus %q1, %q2 : !quantum.bit, !quantum.bit
+func.func @test_prepare_multiple_qubits() -> (!quantum.bit, !quantum.bit) {
+    %0, %1 = pbc.prepare plus : !quantum.bit, !quantum.bit
     return %0, %1 : !quantum.bit, !quantum.bit
 
     // CHECK-LABEL: func.func @test_prepare_multiple_qubits
-    // CHECK-SAME: (%[[Q1:.*]]: !quantum.bit, %[[Q2:.*]]: !quantum.bit)
-    // CHECK: [[OUT1:%.+]] = quantum.custom "Hadamard"() %[[Q1]] : !quantum.bit
-    // CHECK: [[OUT2:%.+]] = quantum.custom "Hadamard"() %[[Q2]] : !quantum.bit
+    // CHECK-DAG: [[Q1:%.+]] = quantum.alloc_qb
+    // CHECK-DAG: [[Q2:%.+]] = quantum.alloc_qb
+    // CHECK-DAG: [[OUT1:%.+]] = quantum.custom "Hadamard"() [[Q1]] : !quantum.bit
+    // CHECK-DAG: [[OUT2:%.+]] = quantum.custom "Hadamard"() [[Q2]] : !quantum.bit
     // CHECK: return [[OUT1]], [[OUT2]]
 }
 

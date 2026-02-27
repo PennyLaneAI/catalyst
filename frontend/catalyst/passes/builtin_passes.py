@@ -1567,23 +1567,10 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
     Measurements:
         expval(PauliZ): 1
 
-<<<<<<< HEAD
     In the above output, ``PPR-theta-w<int>`` denotes the type of PPR present in the circuit, where
     ``theta`` is the PPR angle (:math:`\theta`) and ``w<int>`` denotes the PPR weight (the number of
     qubits it acts on, or the length of the Pauli word). ``PPM-w<int>`` follows the same convention.
     ``PPR-Phi-w<int>`` corresponds to a PPR whose angle of rotation is not :math:`\tfrac{\pi}{2}`,
     :math:`\tfrac{\pi}{4}`, or :math:`\tfrac{\pi}{8}`.
-=======
-    Example MLIR excerpt (structure only):
-
-    .. code-block:: mlir
-        ...
-        %mres, %out_qubits:4 = pbc.ppm ["X", "X", "Y", "Z"] %1, %2, %3, %5 : i1, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
-        %6 = pbc.ppr ["X"](2) %out_qubits#3 cond(%mres) : !quantum.bit
-        %7 = pbc.ppr.arbitrary ["Z"](%cst) %6 : !quantum.bit
-        %mres_0, %out_qubits_1 = pbc.ppm ["X"] %7 : i1, !quantum.bit
-        %8:3 = pbc.ppr ["X", "X", "Y"](2) %out_qubits#0, %out_qubits#1, %out_qubits#2 cond(%mres_0) : !quantum.bit, !quantum.bit, !quantum.bit
-        ...
->>>>>>> entry-points
     """
     return PassPipelineWrapper(qnode, "decompose-arbitrary-ppr")

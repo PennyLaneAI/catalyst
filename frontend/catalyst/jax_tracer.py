@@ -1472,7 +1472,6 @@ def _trace_classical_phase(
     *,
     static_argnums,
     debug_info,
-    ctx,
 ) -> ClassicalTraceResult:
     """Perform classical tracing phase of quantum function compilation.
 
@@ -1484,7 +1483,6 @@ def _trace_classical_phase(
         qnode: Quantum node containing transforms
         static_argnums: Static argument numbers
         debug_info: Debug information
-        ctx: Evaluation context
 
     Returns:
         ClassicalTraceResult: Results for quantum tracing phase
@@ -1524,7 +1522,12 @@ def _trace_classical_phase(
         )
         if isinstance(device, qml.devices.Device):
             config = _make_execution_config(qnode)
-            device_program, config = device.preprocess(ctx, execution_config=config, shots=shots)
+            # Pass catalyst-specific params via device_options so that
+            # QJITDevice.preprocess() has a standard PennyLane signature.
+            device_options = dict(config.device_options)
+            device_options["catalyst_shots"] = shots
+            config = replace(config, device_options=device_options)
+            device_program, config = device.preprocess(config)
         else:
             device_program = qml.CompilePipeline()
 
@@ -1739,7 +1742,6 @@ def trace_quantum_function(
             qnode,
             static_argnums=static_argnums,
             debug_info=debug_info,
-            ctx=ctx,
         )
 
         # (2) - Quantum tracing
