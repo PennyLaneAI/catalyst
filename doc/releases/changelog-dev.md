@@ -276,6 +276,11 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* Standardized the `QJITDevice.preprocess` signature to align with the base PennyLane Device API.
+  * Removed the redundant `ctx` (EvaluationContext) argument from the preprocessing and decomposition pipelines. The parameter was unused and its removal simplifies the tracing data flow.
+  * Decoupled `shots` from the `QJITDevice.preprocess` signature. Catalyst-specific shot configurations are now handled via `execution_config.device_options` to maintain API compatibility.
+  [(#2524)](https://github.com/PennyLaneAI/catalyst/pull/2524)
+
 * A new AI policy document is now applied across the PennyLaneAI organization for all AI contributions.
   [(#2488)](https://github.com/PennyLaneAI/catalyst/pull/2488)
 
