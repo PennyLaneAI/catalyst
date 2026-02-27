@@ -30,7 +30,7 @@ class QecPhysical_Type<string name, string typeMnemonic, list<Trait> traits = []
 
 
 def QecPhysicalQubitType : QecPhysical_Type<"QecPhysicalQubit", "qubit"> {
-    let summary = "A value-semantic QEC physical qubit.";
+    let summary = "A value-semantic QEC physical qubit";
 
     let parameters = (ins
         TypeParameter<"QecPhysicalQubitRole", "Qubit role">:$role
@@ -40,7 +40,7 @@ def QecPhysicalQubitType : QecPhysical_Type<"QecPhysicalQubit", "qubit"> {
 }
 
 def PhysicalCodeblockType : QecPhysical_Type<"Codeblock", "codeblock"> {
-    let summary = "A value-semantic physical codeblock.";
+    let summary = "A value-semantic physical codeblock";
 
     let description = [{
         A physical codeblock type is an abstraction around a collection of QEC physical qubits that
@@ -73,7 +73,7 @@ def PhysicalCodeblockType : QecPhysical_Type<"Codeblock", "codeblock"> {
 }
 
 def PhysicalHyperRegisterType : QecPhysical_Type<"HyperRegister", "hyperreg"> {
-    let summary = "A value-semantic physical hyper-register.";
+    let summary = "A value-semantic physical hyper-register";
 
     let description = [{
         A physical hyper-register type is an abstraction that represents a sequence of physical
