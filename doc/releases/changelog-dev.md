@@ -547,6 +547,21 @@
 * Updated the changelog and builtin_passes.py to link to <https://pennylane.ai/compilation/pauli-based-computation> instead.
   [(#2409)](https://github.com/PennyLaneAI/catalyst/pull/2409)
 
+* Infrastructure has been put in place for features that are accessible from both PennyLane and 
+  Catalyst to have a single source of truth for documentation, which will provide a better overall
+  experience when consulting our documentation.
+  [(#2481)](https://github.com/PennyLaneAI/catalyst/pull/2481)
+
+  Several entry-points were added to ``setup.py`` for the Pauli-based computation compilation passes
+  and the :func:`~.draw_graph` function. This allows for the ability to use Catalyst features from 
+  PennyLane directly (related: [(#9020)](https://github.com/PennyLaneAI/pennylane/pull/9020)) and 
+  for the documentation of those features to be accessible to both Catalyst and PennyLane, creating
+  a single source of truth for such features.
+
+  In addition, the documentation for all Pauli-based computation transforms has been updated to be 
+  more user-focused by showing examples with :func:`~.specs` and by calling the transforms from the 
+  PennyLane frontend.
+
 <h3>Contributors ✍️</h3>
 
 This release contains contributions from (in alphabetical order):
