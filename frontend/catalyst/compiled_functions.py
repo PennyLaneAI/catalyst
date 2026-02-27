@@ -88,36 +88,45 @@ class SharedObjectManager:
             CFuncPtr: handle to the teardown function, which tears down the device
             CFuncPtr: handle to the memory transfer function for program results
         """
+        try:
 
-        setup = self.shared_object.setup
-        setup.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_char_p)]
-        setup.restypes = ctypes.c_int
+            setup = self.shared_object.setup
+            setup.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_char_p)]
+            setup.restypes = ctypes.c_int
 
-        teardown = self.shared_object.teardown
-        teardown.argtypes = None
-        teardown.restypes = None
+            teardown = self.shared_object.teardown
+            teardown.argtypes = None
+            teardown.restypes = None
 
-        # We are calling the c-interface
-        function = self.shared_object["_catalyst_pyface_" + self.func_name]
-        # Guaranteed from _mlir_ciface specification
-        function.restypes = None
-        # Not needed, computed from the arguments.
-        # function.argyptes
+        except:
+            setup = None
+            teardown = None
+        finally:
 
-        mem_transfer = self.shared_object["_mlir_memory_transfer"]
+            # We are calling the c-interface
+            function = self.shared_object["_catalyst_pyface_" + self.func_name]
+            # Guaranteed from _mlir_ciface specification
+            function.restypes = None
+            # Not needed, computed from the arguments.
+            # function.argyptes
 
-        return function, setup, teardown, mem_transfer
+            mem_transfer = self.shared_object["_mlir_memory_transfer"]
+
+            return function, setup, teardown, mem_transfer
 
     def __enter__(self):
-        params_to_setup = [b"jitted-function"]
-        argc = len(params_to_setup)
-        array_of_char_ptrs = (ctypes.c_char_p * len(params_to_setup))()
-        array_of_char_ptrs[:] = params_to_setup
-        self.setup(ctypes.c_int(argc), array_of_char_ptrs)
+        if self.setup:
+            params_to_setup = [b"jitted-function"]
+            argc = len(params_to_setup)
+            array_of_char_ptrs = (ctypes.c_char_p * len(params_to_setup))()
+            array_of_char_ptrs[:] = params_to_setup
+            self.setup(ctypes.c_int(argc), array_of_char_ptrs)
+            return self
         return self
 
     def __exit__(self, _type, _value, _traceback):
-        self.teardown()
+        if self.teardown:
+            self.teardown()
 
 
 class CompiledFunction:
@@ -325,10 +334,10 @@ class CompiledFunction:
         return get_template(self.func_name, self.restype, *buffer)
 
     def __call__(self, *args, **kwargs):
-        static_argnums = self.compile_options.static_argnums
+        static_argnums = self.compile_options.static_argnums if self.compile_options else None
         dynamic_args = filter_static_args(args, static_argnums)
 
-        if self.compile_options.abstracted_axes is not None:
+        if self.compile_options and self.compile_options.abstracted_axes is not None:
             abstracted_axes = self.compile_options.abstracted_axes
             dynamic_args = get_implicit_and_explicit_flat_args(
                 abstracted_axes, *dynamic_args, **kwargs
