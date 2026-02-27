@@ -41,7 +41,6 @@ from catalyst.passes import apply_pass
 class TestMidCircuitMeasurement:
     """Tests for mid-circuit behaviour."""
 
-    @pytest.mark.old_frontend
     def test_measure_outside_qjit(self):
         """Test measure outside qjit."""
 
