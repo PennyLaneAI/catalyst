@@ -629,23 +629,6 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
     return PassPipelineWrapper(qnode, gridsynth_pass)
 
 
-def diagonalize_measurements(
-    qnode=None, *, supported_base_obs={"PauliZ", "Identity"}, to_eigvals=False
-):
-
-    if qnode is None:
-        return functools.partial(
-            diagonalize_measurements, supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
-        )
-
-    diagonalize_measurements_pass = {
-        "diagonalize_measurements": {
-            "supported_base_obs": supported_base_obs,
-            "to_eigvals": to_eigvals,
-        }
-    }
-    return PassPipelineWrapper(qnode, diagonalize_measurements_pass)
-
 
 def to_ppr(qnode):
     R"""A quantum compilation pass that converts Clifford+T gates into Pauli Product Rotation (PPR)
