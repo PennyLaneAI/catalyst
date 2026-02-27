@@ -73,16 +73,16 @@ def create_device_preprocessing_pipeline(
 
     pipeline = []
     unsupported_transforms = []
-    __mcm_preprocessing(
+    _mcm_preprocessing(
         pipeline, unsupported_transforms, device, execution_config, shots, capabilities
     )
-    __measurements_preprocessing(
+    _measurements_preprocessing(
         pipeline, unsupported_transforms, device, execution_config, shots, capabilities
     )
-    __operations_preprocessing(
+    _operations_preprocessing(
         pipeline, unsupported_transforms, device, execution_config, shots, capabilities
     )
-    __gradient_preprocessing(
+    _gradient_preprocessing(
         pipeline, unsupported_transforms, device, execution_config, shots, capabilities
     )
 
@@ -98,7 +98,7 @@ def create_device_preprocessing_pipeline(
     return pipeline
 
 
-def __mcm_preprocessing(
+def _mcm_preprocessing(
     pipeline: list[BoundTransform],
     unsupported_transforms: list[str],
     device: qml.devices.Device,
@@ -134,7 +134,7 @@ def __mcm_preprocessing(
         )
 
 
-def __measurements_preprocessing(
+def _measurements_preprocessing(
     pipeline: list[BoundTransform],
     unsupported_transforms: list[str],
     device: qml.devices.Device,
@@ -192,7 +192,7 @@ def __measurements_preprocessing(
             )
 
 
-def __operations_preprocessing(
+def _operations_preprocessing(
     pipeline: list[BoundTransform],
     unsupported_transforms: list[str],
     device: qml.devices.Device,
@@ -223,7 +223,7 @@ def __operations_preprocessing(
     )
 
 
-def __gradient_preprocessing(
+def _gradient_preprocessing(
     pipeline: list[BoundTransform],
     unsupported_transforms: list[str],
     device: qml.devices.Device,
