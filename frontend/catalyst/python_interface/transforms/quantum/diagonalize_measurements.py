@@ -75,9 +75,9 @@ def _generate_mapping():
 _gate_map, _params_map = _generate_mapping()
 
 
-def _diagonalize(obs: NamedObsOp) -> bool:
+def _diagonalize(obs: NamedObsOp, supported_base_obs) -> bool:
     """Whether to diagonalize a given observable."""
-    if obs.type.data in {"PauliZ", "Identity"}:
+    if obs.type.data in supported_base_obs:
         return False
     if obs.type.data in _gate_map:
         return True
@@ -101,7 +101,7 @@ class DiagonalizeFinalMeasurementsPattern(
     ):
         """Replace non-diagonalized observables with their diagonalizing gates and PauliZ."""
 
-        if _diagonalize(observable):
+        if _diagonalize(observable, self.supported_base_obs):
 
             diagonalizing_gates = _gate_map[observable.type.data]
             params = _params_map[observable.type.data]

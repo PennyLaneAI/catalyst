@@ -16,7 +16,7 @@ from .cancel_inverses import IterativeCancelInversesPass, iterative_cancel_inver
 from .combine_global_phases import CombineGlobalPhasesPass, combine_global_phases_pass
 from .diagonalize_measurements import (
     DiagonalizeFinalMeasurementsPass,
-    diagonalize_measurements_pass,
+    diagonalize_final_measurements_pass,
 )
 from .measurements_from_samples import (
     MeasurementsFromSamplesPass,
@@ -28,7 +28,7 @@ from .parity_synth import ParitySynthPass, parity_synth_pass
 __all__ = [
     "combine_global_phases_pass",
     "CombineGlobalPhasesPass",
-    "diagonalize_measurements_pass",
+    "diagonalize_final_measurements_pass",
     "DiagonalizeFinalMeasurementsPass",
     "iterative_cancel_inverses_pass",
     "IterativeCancelInversesPass",
