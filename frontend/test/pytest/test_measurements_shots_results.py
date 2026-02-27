@@ -475,7 +475,7 @@ class TestVar:
         n_shots = 10000
         dev = qml.device(backend, wires=n_wires)
 
-        @qml.qjit(capture = capture_mode)
+        @qml.qjit(capture=capture_mode)
         @qml.set_shots(n_shots)
         @qml.qnode(dev)
         def circuit(theta, phi, varphi):

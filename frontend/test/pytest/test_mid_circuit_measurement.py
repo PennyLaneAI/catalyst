@@ -31,7 +31,6 @@ from catalyst import jvp as C_jvp
 from catalyst import qjit, value_and_grad
 from catalyst import vjp as C_vjp
 
-
 # TODO: add tests with other measurement processes (e.g. qml.sample, qml.probs, ...)
 
 # pylint: disable=too-many-lines,too-many-public-methods
@@ -393,7 +392,9 @@ class TestMidCircuitMeasurement:
 
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
     @pytest.mark.parametrize("mcm_method", ["one-shot"])
-    def test_mcm_method_with_count_mesurement(self, backend, postselect_mode, mcm_method, capture_mode):
+    def test_mcm_method_with_count_mesurement(
+        self, backend, postselect_mode, mcm_method, capture_mode
+    ):
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
         dev = qml.device(backend, wires=1)
 
@@ -421,8 +422,8 @@ class TestMidCircuitMeasurement:
     @pytest.mark.parametrize("postselect_mode", [None, "fill-shots", "hw-like"])
     @pytest.mark.parametrize("mcm_method", [None, "one-shot"])
     def test_mcm_method_with_dict_output_used_measurements(
-        self, backend, postselect_mode, mcm_method
-    , capture_mode):
+        self, backend, postselect_mode, mcm_method, capture_mode
+    ):
         """Test that the correct default mcm_method is chosen based on postselect_mode"""
         dev = qml.device(backend, wires=1)
 
@@ -477,7 +478,9 @@ class TestMidCircuitMeasurement:
     # Classification: missing PL feature/integration gap. Fix: add capture-time lowering/execution for MCM-derived measurements.
     @pytest.mark.capture_todo
     @pytest.mark.parametrize("measurement_process", [qml.counts, qml.var, qml.expval, qml.probs])
-    def test_single_branch_statistics_not_implemented_error(self, backend, measurement_process, capture_mode):
+    def test_single_branch_statistics_not_implemented_error(
+        self, backend, measurement_process, capture_mode
+    ):
         """
         Test that NotImplementedError is raised when using mid-circuit
         measurements inside measurement processes with single-branch-statistics.
@@ -546,8 +549,8 @@ class TestDynamicOneShotIntegration:
     )
     @pytest.mark.parametrize("postselect_mode", ["hw-like", "fill-shots"])
     def test_mcm_method_one_shot_with_single_shot(
-        self, backend, postselect, reset, expected, postselect_mode
-    , capture_mode):
+        self, backend, postselect, reset, expected, postselect_mode, capture_mode
+    ):
         """Test that the result is correct when using mcm_method="one-shot" with a single shot"""
         if postselect == 0 and postselect_mode == "fill-shots":
             pytest.xfail(
@@ -695,8 +698,8 @@ class TestDynamicOneShotIntegration:
     @pytest.mark.parametrize("postselect_mode", ["fill-shots", "hw-like"])
     # pylint: disable=too-many-arguments
     def test_dynamic_one_shot_several_mcms(
-        self, backend, shots, postselect, measure_f, meas_obj, postselect_mode
-    , capture_mode):
+        self, backend, shots, postselect, measure_f, meas_obj, postselect_mode, capture_mode
+    ):
         """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
         circuit with a mid-circuit measurement."""
         if measure_f in (qml.counts, qml.probs, qml.sample) and (
@@ -786,8 +789,8 @@ class TestDynamicOneShotIntegration:
     @pytest.mark.parametrize("reset", [False, True])
     @pytest.mark.parametrize("postselect_mode", ["fill-shots", "hw-like"])
     def test_dynamic_one_shot_multiple_measurements(
-        self, backend, shots, postselect, reset, postselect_mode
-    , capture_mode):
+        self, backend, shots, postselect, reset, postselect_mode, capture_mode
+    ):
         """Tests that Catalyst yields the same results as PennyLane's DefaultQubit for a simple
         circuit with a mid-circuit measurement and several terminal measurements."""
         if backend in ("lightning.kokkos", "lightning.gpu"):

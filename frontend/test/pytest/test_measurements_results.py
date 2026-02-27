@@ -99,9 +99,9 @@ class TestSample:
                 NotImplementedError,
                 match="cannot be used without wires and a dynamic number of device wires",
             ):
-                qjit(sample_dynamic_wires, capture = capture_mode)()
+                qjit(sample_dynamic_wires, capture=capture_mode)()
         else:
-            qjit(sample_dynamic_wires, capture = capture_mode)()
+            qjit(sample_dynamic_wires, capture=capture_mode)()
 
 
 class TestCounts:
@@ -214,9 +214,9 @@ class TestCounts:
                 NotImplementedError,
                 match="cannot be used without wires and a dynamic number of device wires",
             ):
-                qjit(counts_dynamic_wires, capture = capture_mode)()
+                qjit(counts_dynamic_wires, capture=capture_mode)()
         else:
-            qjit(counts_dynamic_wires, capture = capture_mode)()
+            qjit(counts_dynamic_wires, capture=capture_mode)()
 
 
 class TestExpval:
