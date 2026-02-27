@@ -79,30 +79,29 @@ def PhysicalHyperRegisterType : QecPhysical_Type<"HyperRegister", "hyperreg"> {
         A physical hyper-register type is an abstraction that represents a sequence of physical
         codeblocks.
 
-        The "dimensions" of a physical hyper-register are specified by the value *a*, the
-        hyper-register size (the number of physical codeblocks in the hyper-register), the
-        value *k*, the number of logical qubits encoded in each codeblock, and the value *n*, the
-        physical codeblock size (the number of physical qubits ini the codeblock that encode the *k*
-        logical qubits).
+        The "dimensions" of a physical hyper-register are specified by its *width* (the number of
+        physical codeblocks in the hyper-register), the value *k* (the number of logical qubits
+        encoded in each codeblock), and the value *n*, the physical codeblock size (the number of
+        physical qubits in the codeblock that encode the *k* logical qubits).
 
         #### Example:
 
         ```mlir
         // A physical hyper-register containing three size-7 physical codeblock, where each
-        // codeblock encode one logical qubit (a = 3, k = 1, n = 7)
+        // codeblock encode one logical qubit (width = 3, k = 1, n = 7)
         !qecp.hyperreg<3 x 1 x 7>
         ```
     }];
 
     let parameters = (ins
-        TypeParameter<"int64_t", "Physical hyper-register size">:$a,
+        TypeParameter<"int64_t", "Physical hyper-register width">:$width,
         TypeParameter<"int64_t", "Number of logical qubits encoded">:$k,
         TypeParameter<"int64_t", "Physical codeblock size">:$n
     );
 
-    // TODO: By default, this assembly format expects whitespace before and after the 'x'.
+    // TODO: By default, this assembly format expects whitespace before and after the 'x's.
     //       We could write custom printers/parsers as a workaround.
-    let assemblyFormat = "`<` $a `x` $k `x` $n `>`";
+    let assemblyFormat = "`<` $width `x` $k `x` $n `>`";
 
     // let genVerifyDecl = 1;
 }
