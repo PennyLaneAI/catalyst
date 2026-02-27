@@ -166,14 +166,14 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
     name = "diagonalize-final-measurements"
 
     def __init__(self, **options):
-        self.supported_base_obs = (
-            options["supported-base-obs"]
-            if "supported-base-obs" in options and options["supported-base-obs"] is not None
-            else _default_supported_obs
+        self.supported_base_obs = tuple(
+            set(options.get("supported-base-obs", _default_supported_obs) + _default_supported_obs)
         )
-        if "to-eigvals" in options and options["to-eigvals"] is True:
-            raise ValueError("to_eigvals = True is not supported")
-        self.to_eigvals = False
+
+        if options.get("to-eigvals", False) is not False:
+            raise ValueError("Only to_eigvals = False is supported.")
+
+        self.to_eigvals = options.get("to-eigvals", False)
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the diagonalize final measurements pass."""

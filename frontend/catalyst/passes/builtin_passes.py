@@ -629,7 +629,6 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
     return PassPipelineWrapper(qnode, gridsynth_pass)
 
 
-
 def to_ppr(qnode):
     R"""A quantum compilation pass that converts Clifford+T gates into Pauli Product Rotation (PPR)
     gates.
