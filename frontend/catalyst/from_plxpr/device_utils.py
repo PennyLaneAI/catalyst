@@ -55,7 +55,7 @@ _named_obs_dict = {
 
 def create_device_preprocessing_pipeline(
     device: qml.devices.Device, execution_config: ExecutionConfig, shots: int, warn: bool = True
-) -> list[BoundTransform]:
+) -> tuple[BoundTransform, ...]:
     """Create a pipeline of device preprocessing transforms for lowering QNodes."""
     capabilities: DeviceCapabilities = get_qjit_device_capabilities(
         get_device_capabilities(device, shots=shots)
@@ -76,15 +76,15 @@ def create_device_preprocessing_pipeline(
     _mcm_preprocessing(
         pipeline, unsupported_transforms, device, execution_config, shots, capabilities
     )
-    _measurements_preprocessing(
-        pipeline, unsupported_transforms, device, execution_config, shots, capabilities
-    )
-    _operations_preprocessing(
-        pipeline, unsupported_transforms, device, execution_config, shots, capabilities
-    )
-    _gradient_preprocessing(
-        pipeline, unsupported_transforms, device, execution_config, shots, capabilities
-    )
+    # _measurements_preprocessing(
+    #     pipeline, unsupported_transforms, device, execution_config, shots, capabilities
+    # )
+    # _operations_preprocessing(
+    #     pipeline, unsupported_transforms, device, execution_config, shots, capabilities
+    # )
+    # _gradient_preprocessing(
+    #     pipeline, unsupported_transforms, device, execution_config, shots, capabilities
+    # )
 
     if unsupported_transforms and warn:
         warnings.warn(
@@ -95,7 +95,7 @@ def create_device_preprocessing_pipeline(
             UserWarning,
         )
 
-    return pipeline
+    return tuple(pipeline)
 
 
 def _mcm_preprocessing(

@@ -43,6 +43,12 @@ def is_xdsl_pass(pass_name: str) -> bool:
     Returns:
         bool: True if this is an xDSL compiler pass
     """
+    # catalyst.python_interface.xdsl_universe collects all transforms in
+    # catalyst.python_interface.transforms, so importing from that file
+    # updates the global xDSL transforms registry.
+    # pylint: disable=import-outside-toplevel
+    from catalyst.python_interface.xdsl_universe import CATALYST_XDSL_UNIVERSE as _
+
     return pass_name in available_passes
 
 

@@ -367,16 +367,17 @@ def handle_qnode(
         gateset = [_get_operator_name(op) for op in self.decompose_tkwargs.get("gate_set", [])]
         setattr(qnode, "decompose_gatesets", [gateset])
 
-    device_pipeline = (
-        []
-        if self._skip_preprocess
-        else create_device_preprocessing_pipeline(qnode.device, execution_config, shots, warn=True)
-    )
+    pipelines = [("main", tuple(self._pass_pipeline))]
+    if not self._skip_preprocess:
+        pipelines.append(
+            ("device", create_device_preprocessing_pipeline(qnode.device, execution_config, shots))
+        )
+
     return quantum_kernel_p.bind(
         wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
         *non_const_args,
         qnode=qnode,
-        pipeline=tuple(self._pass_pipeline + device_pipeline),
+        pipelines=tuple(pipelines),
     )
 
 

@@ -81,19 +81,28 @@ def lower_jaxpr(ctx, jaxpr, metadata=None, fn=None):
         equation = get_call_equation(jaxpr)
         call_jaxpr = equation.params["call_jaxpr"]
         pipeline = equation.params.get("pipeline")
+        device_pipeline = equation.params.get("device_pipeline", ())
         callable_ = equation.params.get("fn")
         if callable_ is None:
             callable_ = equation.params.get("qnode", None)
     else:
         call_jaxpr = jaxpr
         pipeline = ()
+        device_pipeline = None
         callable_ = fn
 
-    return lower_callable(ctx, callable_, call_jaxpr, pipeline=pipeline, metadata=metadata)
+    return lower_callable(
+        ctx,
+        callable_,
+        call_jaxpr,
+        pipeline=pipeline,
+        device_pipeline=device_pipeline,
+        metadata=metadata,
+    )
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
-def lower_callable(ctx, callable_, call_jaxpr, pipeline=(), metadata=None, public=False):
+def lower_callable(ctx, callable_, call_jaxpr, pipelines=(), metadata=None, public=False):
     """Lowers _callable to MLIR.
 
     If callable_ is a qnode, then we will first create a module, then
@@ -110,18 +119,18 @@ def lower_callable(ctx, callable_, call_jaxpr, pipeline=(), metadata=None, publi
     Returns:
       FuncOp
     """
-    if pipeline is None:
-        pipeline = tuple()
+    if pipelines is None:
+        pipelines = tuple()
 
     if isinstance(callable_, qml.QNode):
-        return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline, metadata=metadata)
+        return get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipelines, metadata=metadata)
     return get_or_create_funcop(
-        ctx, callable_, call_jaxpr, pipeline, metadata=metadata, public=public
+        ctx, callable_, call_jaxpr, pipelines, metadata=metadata, public=public
     )
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
-def get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline, metadata=None, public=False):
+def get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines, metadata=None, public=False):
     """Get funcOp from cache, or create it from scratch
 
     Args:
@@ -136,7 +145,7 @@ def get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline, metadata=None, pu
     """
     if metadata is None:
         metadata = tuple()
-    key = (callable_, *metadata, *pipeline)
+    key = (callable_, *metadata, *pipelines)
     if callable_ is not None:
         if func_op := get_cached(ctx, key):
             return func_op
@@ -206,7 +215,7 @@ def lower_callable_to_funcop(ctx, callable_, call_jaxpr, public=False):
     return func_op
 
 
-def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline, metadata):
+def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipelines, metadata):
     """A wrapper around lower_qnode_to_funcop that will cache the FuncOp.
 
     Args:
@@ -219,16 +228,16 @@ def get_or_create_qnode_funcop(ctx, callable_, call_jaxpr, pipeline, metadata):
     if metadata is None:
         metadata = tuple()
     if callable_.static_argnums:
-        return lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipeline)
-    key = (callable_, *metadata, *pipeline)
+        return lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines)
+    key = (callable_, *metadata, *pipelines)
     if func_op := get_cached(ctx, key):
         return func_op
-    func_op = lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipeline)
+    func_op = lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines)
     cache(ctx, key, func_op)
     return func_op
 
 
-def lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipeline):
+def lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipelines):
     """Lowers callable_ to MLIR.
 
     Will create ModuleOp and then lower the callable_ to a
@@ -247,9 +256,9 @@ def lower_qnode_to_funcop(ctx, callable_, call_jaxpr, pipeline):
     name = "module_" + callable_.__name__
     # pylint: disable-next=no-member
     with NestedModule(ctx, name) as module, ir.InsertionPoint(module.regions[0].blocks[0]) as ip:
-        transform_named_sequence_lowering(ctx, pipeline)
+        transform_module_lowering(ctx, pipelines)
         ctx.module_context.ip = ip
-        func_op = get_or_create_funcop(ctx, callable_, call_jaxpr, pipeline)
+        func_op = get_or_create_funcop(ctx, callable_, call_jaxpr, pipelines)
         func_op.sym_visibility = ir.StringAttr.get("public")
 
     return func_op
@@ -329,11 +338,9 @@ def _lowered_options(args, kwargs):
     return lowered_options
 
 
-def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipeline):
+def transform_module_lowering(jax_ctx: mlir.LoweringRuleContext, pipelines) -> bool:
     """Generate a transform module embedded in the current module and schedule
     the transformations in pipeline"""
-
-    transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
     module = jax_ctx.module_context.module
 
     # We wish to generate the transformer module, and place it in the top-level module
@@ -349,9 +356,6 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
         )
         bb_transformer = transformer_module.body
 
-    functype = ir.FunctionType.get(inputs=[transform_mod_type], results=[])
-    functype_attr = ir.TypeAttr.get(functype)
-
     # Insert the transform.named_sequence op into the transformer module
     # Note that InsertionPoint(Block) inserts after the last operation but still inside the block.
 
@@ -359,59 +363,66 @@ def transform_named_sequence_lowering(jax_ctx: mlir.LoweringRuleContext, pipelin
     uses_xdsl_passes = False
 
     with ir.InsertionPoint(bb_transformer):
-        named_sequence_op = NamedSequenceOp(
-            sym_name="__transform_main",
-            function_type=functype_attr,
-        )
-
-        # transform.named_sequence op is the "main function" of the transform dialect
-        # and thus needs an entry block (which also should be its only block)
-        # The argument of the block is the payload module
-        bb_named_sequence = ir.Block.create_at_start(
-            named_sequence_op.body, arg_types=[transform_mod_type]
-        )
-
-        # The transform.named_sequence needs a terminator called "transform.yield"
-        with ir.InsertionPoint(bb_named_sequence):
-            target = bb_named_sequence.arguments[0]
-            for _pass in pipeline:
-                if isinstance(_pass, qml.transforms.core.TransformContainer):
-                    options = _lowered_options(_pass.args, _pass.kwargs)
-                    name = _pass.pass_name
-                else:
-                    options = _pass.get_options()
-                    name = _pass.name
-                apply_registered_pass_op = ApplyRegisteredPassOp(
-                    result=transform_mod_type,
-                    target=target,
-                    pass_name=name,
-                    options=options,
-                    dynamic_options={},
-                )
-                target = apply_registered_pass_op.result
-
-                try:
-                    # pylint: disable=import-outside-toplevel
-                    from catalyst.python_interface.pass_api import is_xdsl_pass
-
-                    # catalyst.python_interface.xdsl_universe collects all transforms in
-                    # catalyst.python_interface.transforms, so importing from that file
-                    # updates the global xDSL transforms registry.
-                    from catalyst.python_interface.xdsl_universe import CATALYST_XDSL_UNIVERSE as _
-
-                    if is_xdsl_pass(name):
-                        uses_xdsl_passes = True
-                        apply_registered_pass_op.operation.attributes["catalyst.xdsl_pass"] = (
-                            ir.UnitAttr.get()
-                        )
-                except ModuleNotFoundError:
-                    # If xDSL pass API is not available, do not set the attribute
-                    pass
-
-            transform_yield_op = YieldOp(operands_=[])  # pylint: disable=unused-variable
+        for stage_name, pipeline in pipelines:
+            uses_xdsl_passes |= transform_named_sequence_lowering(
+                pipeline, f"__transform_{stage_name}"
+            )
 
     # Set an attribute on the transformer module if we created any xDSL pass operations
     if uses_xdsl_passes:
         transformer_module.operation.attributes["catalyst.uses_xdsl_passes"] = ir.UnitAttr.get()
 
-    return named_sequence_op.results
+
+def transform_named_sequence_lowering(pipeline, sym_name):
+    """Generate a transform.named_sequence embedded in the current module and schedule
+    the transformations in pipeline."""
+
+    transform_mod_type = ir.OpaqueType.get("transform", 'op<"builtin.module">')
+    functype = ir.FunctionType.get(inputs=[transform_mod_type], results=[])
+    functype_attr = ir.TypeAttr.get(functype)
+
+    named_sequence_op = NamedSequenceOp(sym_name=sym_name, function_type=functype_attr)
+
+    # transform.named_sequence op is the "main function" of the transform dialect
+    # and thus needs an entry block (which also should be its only block)
+    # The argument of the block is the payload module
+    bb_named_sequence = ir.Block.create_at_start(
+        named_sequence_op.body, arg_types=[transform_mod_type]
+    )
+    uses_xdsl_passes = False
+
+    # The transform.named_sequence needs a terminator called "transform.yield"
+    with ir.InsertionPoint(bb_named_sequence):
+        target = bb_named_sequence.arguments[0]
+        for _pass in pipeline:
+            if isinstance(_pass, qml.transforms.core.BoundTransform):
+                options = _lowered_options(_pass.args, _pass.kwargs)
+                name = _pass.pass_name
+            else:
+                options = _pass.get_options()
+                name = _pass.name
+            apply_registered_pass_op = ApplyRegisteredPassOp(
+                result=transform_mod_type,
+                target=target,
+                pass_name=name,
+                options=options,
+                dynamic_options={},
+            )
+            target = apply_registered_pass_op.result
+
+            # pylint: disable=import-outside-toplevel
+            from catalyst.python_interface.pass_api import is_xdsl_pass
+
+            if is_xdsl_pass(name):
+                uses_xdsl_passes = True
+                apply_registered_pass_op.operation.attributes["catalyst.xdsl_pass"] = (
+                    ir.UnitAttr.get()
+                )
+
+        _ = YieldOp(operands_=[])
+
+    # Set an attribute on the transformer module if we created any xDSL pass operations
+    if uses_xdsl_passes:
+        named_sequence_op.operation.attributes["catalyst.uses_xdsl_passes"] = ir.UnitAttr.get()
+
+    return uses_xdsl_passes
