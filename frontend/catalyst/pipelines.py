@@ -89,7 +89,7 @@ class CompileOptions:
             - ``True`` or ``1`` or ``"pipeline"``: Intermediate files are saved after each pipeline.
             - ``2`` or ``"changed"``: Intermediate files are saved after each pass only if changed.
             - ``3`` or ``"pass"``: Intermediate files are saved after each pass, even if unchanged.
-        use_nameloc (Optional[bool]): If ``True``, add function parameter names to the IR as name
+        embed_var_names (Optional[bool]): If ``True``, add function parameter names to the IR as name
             locations.
         pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples. The first entry of the
             tuple corresponds to the name of a pipeline. The second entry of the tuple corresponds
@@ -128,7 +128,7 @@ class CompileOptions:
     target: Optional[str] = "binary"
     link: Optional[bool] = True
     keep_intermediate: Optional[Union[str, int, bool, KeepIntermediateLevel]] = False
-    use_nameloc: Optional[bool] = False
+    embed_var_names: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
     autograph_include: Optional[Iterable[str]] = ()
