@@ -72,27 +72,26 @@ def LogicalHyperRegisterType : QecLogical_Type<"HyperRegister", "hyperreg"> {
         A logical hyper-register type is an abstraction that represents a sequence of logical
         codeblocks.
 
-        The "dimensions" of a logical hyper-register are specified by the value *a*, the
-        hyper-register size (the number of logical codeblocks in the hyper-register), and the
-        value *k*, the logical codeblock size (the number of logical qubits encoded in each
-        codeblock).
+        The "dimensions" of a logical hyper-register are specified by its *width* (the number of
+        logical codeblocks in the hyper-register), and the value *k*, the logical codeblock size
+        (the number of logical qubits encoded in each codeblock).
 
         #### Example:
 
         ```mlir
-        // A logical hyper-register containing three size-1 logical codeblocks (a = 3, k = 1)
+        // A logical hyper-register containing three size-1 logical codeblocks (width = 3, k = 1)
         !qecl.hyperreg<3 x 1>
         ```
     }];
 
     let parameters = (ins
-        TypeParameter<"int64_t", "Logical hyper-register size">:$a,
+        TypeParameter<"int64_t", "Logical hyper-register width">:$width,
         TypeParameter<"int64_t", "Logical codeblock size">:$k
     );
 
     // TODO: By default, this assembly format expects whitespace before and after the 'x'.
     //       We could write custom printers/parsers as a workaround.
-    let assemblyFormat = "`<` $a `x` $k `>`";
+    let assemblyFormat = "`<` $width `x` $k `>`";
 
     // let genVerifyDecl = 1;
 }
