@@ -42,6 +42,7 @@ void populateDecomposeLoweringPatterns(mlir::RewritePatternSet &,
                                        const llvm::StringMap<mlir::func::FuncOp> &,
                                        const llvm::StringSet<llvm::MallocAllocator> &);
 void populateLoopBoundaryPatterns(mlir::RewritePatternSet &, unsigned int mode);
+void populateInsertDecompRulesPatters(mlir::RewritePatternSet &);
 
 } // namespace quantum
 } // namespace catalyst
