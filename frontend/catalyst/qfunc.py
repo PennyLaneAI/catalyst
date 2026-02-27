@@ -255,8 +255,10 @@ class QFunc:
         # Update the qnode with peephole pipeline
         old_pass_pipeline = kwargs.pop("pass_pipeline", None)
         processed_old_pass_pipeline = tuple(dict_to_compile_pipeline(old_pass_pipeline))
-        # Local pass pipelines
+        # Local pass pipelines override global
         pass_pipeline = new_pass_pipeline if new_pass_pipeline else processed_old_pass_pipeline
+
+        # Update the QNode's original compile_pipeline
         new_qnode = copy(self)
         # pylint: disable=attribute-defined-outside-init, protected-access
         new_qnode._compile_pipeline = new_compile_pipeline
