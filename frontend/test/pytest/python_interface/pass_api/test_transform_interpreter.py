@@ -325,6 +325,47 @@ class TestTransformInterpreterPass:
         # We check that there is a space after the pass name to check that no options were specified
         assert "--mlir-pass2 " in captured_cmds[1]
 
+    def test_callback_count(self):
+        """Test that the apply function calls the callback the correct number of times."""
+
+        num_calls = 0
+
+        def callback(
+            previous_pass, module, next_pass, pass_level=None
+        ):  # pylint: disable=unused-argument
+            """Mock implementation of the callback function"""
+            nonlocal num_calls
+            num_calls += 1
+
+        pass_names = ["options-pass"]
+        mod_non_blank = create_test_module(pass_names, [{}])
+
+        _pass = TransformInterpreterPass(
+            passes={"options-pass": lambda: OptionsPass}, callback=callback
+        )
+        ctx = Context()
+        ctx.load_dialect(builtin.Builtin)
+        ctx.load_dialect(transform.Transform)
+        _pass.apply(ctx, mod_non_blank)
+
+        # Should be 2 calls, 1 for init pass, 1 for "options-pass"
+        assert num_calls == 2
+
+        num_calls = 0  # Reset
+
+        mod_blank = create_test_module([], [])
+
+        _pass = TransformInterpreterPass(
+            passes={"options-pass": lambda: OptionsPass}, callback=callback
+        )
+        ctx = Context()
+        ctx.load_dialect(builtin.Builtin)
+        ctx.load_dialect(transform.Transform)
+        _pass.apply(ctx, mod_blank)
+
+        # Should be 1 call, for the init pass, since there are no passes to apply
+        assert num_calls == 1
+
     @pytest.mark.usefixtures("use_both_frontend")
     def test_qjit_with_passes_interpreted_correctly(self):
         """Test that applying the TransformInterpreter to a qjitted qnode's

@@ -232,6 +232,9 @@
 
 <h3>Bug fixes 🐛</h3>
 
+* Fixed a bug where the unified compiler would trigger a passed callback function 1 extra time for the initial pass level.
+  [(#2528)](https://github.com/PennyLaneAI/catalyst/pull/2528)
+
 * Fix a bug in the bind call function for `PCPhase` where the signature did not match what was
   expected in `jax_primitives`. `ctrl_qubits` was missing from positional arguments in previous signature.
   [(#2467)](https://github.com/PennyLaneAI/catalyst/pull/2467)
