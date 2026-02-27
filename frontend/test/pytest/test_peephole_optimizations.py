@@ -147,22 +147,6 @@ def test_pipeline_functionality(theta, backend):
     assert np.allclose(res[0], res[1])
 
 
-### Test bad usages of pass decorators ###
-def test_passes_bad_usages():
-    """
-    Tests that an error is raised when a PassPipelineWrapper is applied to a classical function
-    """
-
-    def classical_func():
-        return 42.42
-
-    with pytest.raises(
-        TypeError,
-        match="A QNode is expected, got the classical function",
-    ):
-        pipeline({})(classical_func)
-
-
 def test_chained_passes():
     """
     Test that chained passes are present in the transform passes.

@@ -19,10 +19,10 @@ from __future__ import annotations
 import warnings
 from typing import Literal
 
+from pennylane.transforms.core import CompilePipeline
 from pennylane.workflow.qnode import QNode
 
 from catalyst.jit import QJIT
-from catalyst.passes.pass_api import PassPipelineWrapper
 from catalyst.python_interface.compiler import Compiler
 
 from .specs_collector import ResourcesResult, specs_collect
@@ -61,7 +61,7 @@ def mlir_specs(
     if not isinstance(qnode, QJIT) or (
         not isinstance(qnode.original_function, QNode)
         and not (
-            isinstance(qnode.original_function, PassPipelineWrapper)
+            isinstance(qnode.original_function, CompilePipeline)
             and isinstance(qnode.original_qnode, QNode)
         )
     ):

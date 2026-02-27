@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import TypeAlias
 
 import pennylane as qml
+from pennylane.transforms.core import BoundTransform, CompilePipeline, transform
 
 from catalyst.jax_extras.lowering import get_mlir_attribute_from_pyval
 from catalyst.tracing.contexts import EvaluationContext
@@ -72,9 +73,9 @@ class PassPipelineWrapper(QNodeWrapper):
 
     def __call__(self, *args, **kwargs):
         if EvaluationContext.is_tracing():
-            pass_pipeline = kwargs.pop("pass_pipeline", [])
+            pass_pipeline = CompilePipeline(kwargs.pop("pass_pipeline", []))
             pass_pipeline = (
-                dictionary_to_list_of_passes(
+                dict_to_compile_pipeline(
                     self.pass_name_or_pipeline, *self.flags, **self.valued_options
                 )
                 + pass_pipeline
@@ -83,7 +84,7 @@ class PassPipelineWrapper(QNodeWrapper):
         return super().__call__(*args, **kwargs)
 
 
-def pipeline(pass_pipeline: PipelineDict):
+def pipeline(pass_pipeline: PipelineDict) -> CompilePipeline:
     """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode
     within a qjit-compiled program.
 
@@ -98,7 +99,7 @@ def pipeline(pass_pipeline: PipelineDict):
             If not specified, the default pass pipeline will be applied.
 
     Returns:
-        callable : A decorator that can be applied to a qnode.
+        CompilePipeline: A compilation pipeline that can be applied to a qnode.
 
     For a list of available passes, please see the :doc:`catalyst.passes module <code/passes>`.
 
@@ -171,10 +172,7 @@ def pipeline(pass_pipeline: PipelineDict):
     will always take precedence over global pass pipelines.
     """
 
-    def _decorator(qnode):
-        return PassPipelineWrapper(qnode, pass_pipeline)
-
-    return _decorator
+    return dict_to_compile_pipeline(pass_pipeline)
 
 
 def apply_pass(pass_name: str, *flags, **valued_options):
@@ -202,7 +200,7 @@ def apply_pass(pass_name: str, *flags, **valued_options):
             def module():
                 return qnode()
     """
-    return lambda obj: qml.transform(pass_name=pass_name)(obj, *flags, **valued_options)
+    return lambda obj: transform(pass_name=pass_name)(obj, *flags, **valued_options)
 
 
 def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valued_options):
@@ -239,10 +237,7 @@ def apply_pass_plugin(path_to_plugin: str | Path, pass_name: str, *flags, **valu
     if not path_to_plugin.exists():
         raise FileNotFoundError(f"File '{path_to_plugin}' does not exist.")
 
-    def decorator(qnode):
-        return PassPipelineWrapper(qnode, pass_name, *flags, **valued_options)
-
-    return decorator
+    return lambda obj: transform(pass_name=pass_name)(obj, *flags, **valued_options)
 
 
 class Pass:
@@ -342,7 +337,9 @@ class PassPlugin(Pass):
 
 
 ## PRIVATE ##
-def dictionary_to_list_of_passes(pass_pipeline: PipelineDict | str, *flags, **valued_options):
+def dict_to_compile_pipeline(
+    pass_pipeline: PipelineDict | str | CompilePipeline | None, *flags, **valued_options
+) -> CompilePipeline:
     """Convert dictionary of passes or single pass name into list of passes.
 
     Args:
@@ -351,39 +348,21 @@ def dictionary_to_list_of_passes(pass_pipeline: PipelineDict | str, *flags, **va
         **valued_options: Optional valued options for single pass
     """
     if pass_pipeline is None:
-        return []
+        return CompilePipeline()
 
     if isinstance(pass_pipeline, str):
-        return [Pass(pass_pipeline, *flags, **valued_options)]
+        t = transform(pass_name=pass_pipeline)
+        bound_t = BoundTransform(t, *flags, **valued_options)
+        return CompilePipeline(bound_t)
 
     if isinstance(pass_pipeline, dict):
         passes = []
-        pass_names = _API_name_to_pass_name()
-        for API_name, pass_options in pass_pipeline.items():
-            name = pass_names.get(API_name, API_name)
-            passes.append(Pass(name, **pass_options))
-        return passes
+        filtered_pass_pipeline = {k.replace("_", "-"): v for k, v in pass_pipeline.items()}
+        for name, pass_options in filtered_pass_pipeline.items():
+            t = transform(pass_name=name)
+            pass_options = {k.replace("-", "_"): v for k, v in pass_options.items()}
+            bound_t = BoundTransform(t, **pass_options)
+            passes.append(bound_t)
+        return CompilePipeline(passes)
 
     return pass_pipeline
-
-
-def _API_name_to_pass_name():
-    return {
-        "gridsynth": "gridsynth",
-        "cancel_inverses": "cancel-inverses",
-        "decompose_lowering": "decompose-lowering",
-        "disentangle_cnot": "disentangle-CNOT",
-        "disentangle_swap": "disentangle-SWAP",
-        "merge_rotations": "merge-rotations",
-        "ions_decomposition": "ions-decomposition",
-        "to_ppr": "to-ppr",
-        "commute_ppr": "commute-ppr",
-        "merge_ppr_ppm": "merge-ppr-ppm",
-        "decompose_non_clifford_ppr": "decompose-non-clifford-ppr",
-        "decompose_clifford_ppr": "decompose-clifford-ppr",
-        "ppm_compilation": "ppm-compilation",
-        "ppr_to_ppm": "ppr-to-ppm",
-        "reduce_t_depth": "reduce-t-depth",
-        "ppr_to_mbqc": "ppr-to-mbqc",
-        "decompose_arbitrary_ppr": "decompose-arbitrary-ppr",
-    }

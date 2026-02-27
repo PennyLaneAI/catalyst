@@ -66,7 +66,7 @@ def test_pipeline_lowering():
         qml.Hadamard(wires=[1])
         return qml.expval(qml.PauliY(wires=0))
 
-    # CHECK: pipeline=(cancel-inverses, merge-rotations)
+    # CHECK: pipeline=(<cancel-inverses()>, <merge-rotations()>)
     print_jaxpr(test_pipeline_lowering_workflow, 1.2)
 
     # CHECK: transform.named_sequence @__transform_main
@@ -151,7 +151,7 @@ def test_pipeline_lowering_keep_original():
     # COM: this if for f_pipeline(x)
     # COM: Unfortunately, we don't have a nice repr for qnode
     # CHECK: quantum_kernel
-    # CHECK: pipeline=(cancel-inverses, merge-rotations)
+    # CHECK: pipeline=(<cancel-inverses()>, <merge-rotations()>)
     print_jaxpr(test_pipeline_lowering_keep_original_workflow, 1.2)
 
     # COM: This is the one that is unchanged
@@ -210,9 +210,9 @@ def test_pipeline_lowering_global():
         return g(1.2), h(1.2)
 
     # CHECK: quantum_kernel
-    # CHECK: pipeline=(cancel-inverses, merge-rotations)
+    # CHECK: pipeline=(<cancel-inverses()>, <merge-rotations()>)
     # CHECK: quantum_kernel
-    # CHECK: pipeline=(cancel-inverses, merge-rotations)
+    # CHECK: pipeline=(<cancel-inverses()>, <merge-rotations()>)
     print_jaxpr(global_wf)
 
     # CHECK: transform.named_sequence @__transform_main
@@ -276,9 +276,9 @@ def test_pipeline_lowering_globloc_override():
         return g(1.2), h(1.2)
 
     # CHECK: quantum_kernel
-    # CHECK: pipeline=(cancel-inverses, merge-rotations)
+    # CHECK: pipeline=(<cancel-inverses()>, <merge-rotations()>)
     # CHECK: quantum_kernel
-    # CHECK: pipeline=(merge-rotations,)
+    # CHECK: pipeline=(<merge-rotations()>,)
     print_jaxpr(global_wf)
 
     # CHECK: transform.named_sequence @__transform_main
@@ -662,9 +662,9 @@ def test_cancel_inverses_tracing_and_lowering():
         return _f, _g, _h
 
     # CHECK: quantum_kernel
-    # CHECK: pipeline=(cancel-inverses,)
+    # CHECK: pipeline=(<cancel-inverses()>,)
     # CHECK: quantum_kernel
-    # CHECK: pipeline=(cancel-inverses,)
+    # CHECK: pipeline=(<cancel-inverses()>,)
     print_jaxpr(test_cancel_inverses_tracing_and_lowering_workflow, 1.1)
 
     # CHECK: module @test_cancel_inverses_tracing_and_lowering_workflow
@@ -700,7 +700,7 @@ def test_cancel_inverses_tracing_and_lowering_outside_qjit():
         return _f
 
     # CHECK: quantum_kernel
-    # CHECK: pipeline=(cancel-inverses,)
+    # CHECK: pipeline=(<cancel-inverses()>,)
     print_jaxpr(test_cancel_inverses_tracing_and_lowering_outside_qjit_workflow, 1.1)
 
     # CHECK: module @test_cancel_inverses_tracing_and_lowering_outside_qjit_workflow
@@ -882,9 +882,9 @@ def test_merge_rotations_tracing_and_lowering():
         return _f, _g, _h
 
     # CHECK: quantum_kernel
-    # CHECK: pipeline=(merge-rotations,)
+    # CHECK: pipeline=(<merge-rotations()>,)
     # CHECK: quantum_kernel
-    # CHECK: pipeline=(merge-rotations,)
+    # CHECK: pipeline=(<merge-rotations()>,)
     # CHECK: quantum_kernel
     print_jaxpr(test_merge_rotations_tracing_and_lowering_workflow, 1.1)
 
