@@ -76,15 +76,15 @@ def create_device_preprocessing_pipeline(
     __mcm_preprocessing(
         pipeline, unsupported_transforms, device, execution_config, shots, capabilities
     )
-    __measurements_preprocessing(
-        pipeline, unsupported_transforms, device, execution_config, shots, capabilities
-    )
-    __operations_preprocessing(
-        pipeline, unsupported_transforms, device, execution_config, shots, capabilities
-    )
-    __gradient_preprocessing(
-        pipeline, unsupported_transforms, device, execution_config, shots, capabilities
-    )
+    # __measurements_preprocessing(
+    #     pipeline, unsupported_transforms, device, execution_config, shots, capabilities
+    # )
+    # __operations_preprocessing(
+    #     pipeline, unsupported_transforms, device, execution_config, shots, capabilities
+    # )
+    # __gradient_preprocessing(
+    #     pipeline, unsupported_transforms, device, execution_config, shots, capabilities
+    # )
 
     if unsupported_transforms and warn:
         warnings.warn(
