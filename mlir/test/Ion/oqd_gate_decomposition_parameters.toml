@@ -52,7 +52,7 @@ detuning = 11.11
 polarization = [12,13,14]
 wavevector = [14,15,16]
 
-# pair (0, 1): beamBaseIndex = 3
+# pair (0, 1): beamBaseIndex = 0
 [[beams2]]
 rabi = 1.23
 detuning = 4.56
@@ -71,7 +71,43 @@ detuning = 100.100
 polarization = [37,42,43]
 wavevector = [-42,-37,-43]
 
-# pair (0, 2): beam,,kl,
+# pair (0, 2): beamBaseIndex = 3
+[[beams2]]
+rabi = 2.0
+detuning = 5.0
+polarization = [10,11,12]
+wavevector = [12,13,14]
+
+[[beams2]]
+rabi = 5.0
+detuning = 9.0
+polarization = [10,11,12]
+wavevector = [-12,-13,-14]
+
+[[beams2]]
+rabi = 10.0
+detuning = 11.0
+polarization = [10,11,12]
+wavevector = [-12,-13,-14]
+
+# pair (1, 2): beamBaseIndex = 6
+[[beams2]]
+rabi = 3.0
+detuning = 6.0
+polarization = [20,21,22]
+wavevector = [22,23,24]
+
+[[beams2]]
+rabi = 6.0
+detuning = 10.0
+polarization = [20,21,22]
+wavevector = [-22,-23,-24]
+
+[[beams2]]
+rabi = 12.0
+detuning = 13.0
+polarization = [20,21,22]
+wavevector = [-22,-23,-24]
 
 
 # Phonon modes
