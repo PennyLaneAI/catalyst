@@ -2272,6 +2272,7 @@ def _cond_lowering(
         # the 'else' blocks of preceding IfOps.
         with ip:
             pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), preds[0], []).result
+            # pylint: disable=unexpected-keyword-arg
             if_op_scf = IfOp(pred_extracted, result_types, hasElse=True)
             true_jaxpr = branch_jaxprs[0]
             if_block = if_op_scf.then_block
@@ -2608,6 +2609,7 @@ def _for_loop_lowering(
         num_iterations = CeilDivSIOp(distance.result, step_val)
         lower_bound, upper_bound, step = zero, num_iterations, one
 
+    # pylint: disable=unexpected-keyword-arg, no-value-for-parameter
     for_op_scf = ForOp(lower_bound, upper_bound, step, iter_args=loop_args)
 
     name_stack = jax_ctx.name_stack.extend("for")
