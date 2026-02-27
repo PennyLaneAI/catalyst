@@ -30,7 +30,7 @@ class QecLogical_Type<string name, string typeMnemonic, list<Trait> traits = []>
 
 
 def LogicalCodeblockType : QecLogical_Type<"Codeblock", "codeblock"> {
-    let summary = "A value-semantic logical codeblock.";
+    let summary = "A value-semantic logical codeblock";
 
     let description = [{
         A logical codeblock type is the fundamental unit of quantum information at the QEC logical
@@ -66,7 +66,7 @@ def LogicalCodeblockType : QecLogical_Type<"Codeblock", "codeblock"> {
 }
 
 def LogicalHyperRegisterType : QecLogical_Type<"HyperRegister", "hyperreg"> {
-    let summary = "A value-semantic logical hyper-register.";
+    let summary = "A value-semantic logical hyper-register";
 
     let description = [{
         A logical hyper-register type is an abstraction that represents a sequence of logical
