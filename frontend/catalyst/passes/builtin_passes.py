@@ -18,8 +18,9 @@ import copy
 import functools
 import json
 
+import pennylane as qml
+
 from catalyst.compiler import _options_to_cli_flags, _quantum_opt
-from catalyst.passes.pass_api import PassPipelineWrapper
 from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=line-too-long, too-many-lines
@@ -136,7 +137,7 @@ def cancel_inverses(qnode):
         %2 = quantum.namedobs %out_qubits[ PauliZ] : !quantum.obs
         %3 = quantum.expval %2 : f64
     """
-    return PassPipelineWrapper(qnode, "cancel-inverses")
+    return qml.transform(pass_name="cancel-inverses")(qnode)
 
 
 def disentangle_cnot(qnode):
@@ -225,7 +226,7 @@ def disentangle_cnot(qnode):
         %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
         %out_qubits_0 = quantum.custom "PauliX"() %2 : !quantum.bit
     """
-    return PassPipelineWrapper(qnode, "disentangle-CNOT")
+    return qml.transform(pass_name="disentangle-CNOT")(qnode)
 
 
 def disentangle_swap(qnode):
@@ -325,7 +326,7 @@ def disentangle_swap(qnode):
         %out_qubits_2:2 = quantum.custom "CNOT"() %out_qubits_1, %out_qubits : !quantum.bit, !quantum.bit
         %out_qubits_3:2 = quantum.custom "CNOT"() %out_qubits_2#1, %out_qubits_2#0 : !quantum.bit, !quantum.bit
     """
-    return PassPipelineWrapper(qnode, "disentangle-SWAP")
+    return qml.transform(pass_name="disentangle-SWAP")(qnode)
 
 
 def merge_rotations(qnode):
@@ -391,7 +392,7 @@ def merge_rotations(qnode):
     >>> circuit(0.54)
     Array(0.5965506257017892, dtype=float64)
     """
-    return PassPipelineWrapper(qnode, "merge-rotations")
+    return qml.transform(pass_name="merge-rotations")(qnode)
 
 
 def decompose_lowering(qnode):
@@ -410,7 +411,7 @@ def decompose_lowering(qnode):
         // TODO: add example here
 
     """
-    return PassPipelineWrapper(qnode, "decompose-lowering")  # pragma: no cover
+    return qml.transform(pass_name="decompose-lowering")(qnode)  # pragma: no cover
 
 
 def ions_decomposition(qnode):  # pragma: nocover
@@ -532,7 +533,7 @@ def ions_decomposition(qnode):  # pragma: nocover
         %out_qubits_8 = quantum.custom "RY"(%cst_2) %out_qubits_6#1 : !quantum.bit
         %out_qubits_9 = quantum.custom "RY"(%cst_2) %out_qubits_7 : !quantum.bit
     """
-    return PassPipelineWrapper(qnode, "ions-decomposition")
+    return qml.transform(pass_name="ions-decomposition")(qnode)
 
 
 def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
@@ -625,8 +626,10 @@ def gridsynth(qnode=None, *, epsilon=1e-4, ppr_basis=False):
     if qnode is None:
         return functools.partial(gridsynth, epsilon=epsilon, ppr_basis=ppr_basis)
 
-    gridsynth_pass = {"gridsynth": {"epsilon": epsilon, "ppr_basis": ppr_basis}}
-    return PassPipelineWrapper(qnode, gridsynth_pass)
+    def setup_inputs(epsilon=epsilon, ppr_basis=ppr_basis):
+        return (), {"epsilon": epsilon, "ppr_basis": ppr_basis}
+
+    return qml.transform(pass_name="gridsynth", setup_inputs=setup_inputs)(qnode)
 
 
 def to_ppr(qnode):
@@ -705,7 +708,7 @@ def to_ppr(qnode):
         %9 = pbc.ppr ["Z"](8) %7 : !quantum.bit
         . . .
     """
-    return PassPipelineWrapper(qnode, "to-ppr")
+    return qml.transform(pass_name="to-ppr")(qnode)
 
 
 def commute_ppr(qnode=None, *, max_pauli_size=0):
@@ -816,8 +819,10 @@ def commute_ppr(qnode=None, *, max_pauli_size=0):
     if qnode is None:
         return functools.partial(commute_ppr, max_pauli_size=max_pauli_size)
 
-    commute_ppr_pass = {"commute_ppr": {"max-pauli-size": max_pauli_size}}
-    return PassPipelineWrapper(qnode, commute_ppr_pass)
+    def setup_inputs(max_pauli_size=max_pauli_size):
+        return (), {"max_pauli_size": max_pauli_size}
+
+    return qml.transform(pass_name="commute-ppr", setup_inputs=setup_inputs)(qnode)
 
 
 def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
@@ -910,8 +915,10 @@ def merge_ppr_ppm(qnode=None, *, max_pauli_size=0):
     if qnode is None:
         return functools.partial(merge_ppr_ppm, max_pauli_size=max_pauli_size)
 
-    merge_ppr_ppm_pass = {"merge_ppr_ppm": {"max-pauli-size": max_pauli_size}}
-    return PassPipelineWrapper(qnode, merge_ppr_ppm_pass)
+    def setup_inputs(max_pauli_size=max_pauli_size):
+        return (), {"max_pauli_size": max_pauli_size}
+
+    return qml.transform(pass_name="merge-ppr-ppm", setup_inputs=setup_inputs)(qnode)
 
 
 def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measure=False):
@@ -987,19 +994,15 @@ def ppr_to_ppm(qnode=None, *, decompose_method="pauli-corrected", avoid_y_measur
         . . .
 
     """
-    passes = {
-        "ppr_to_ppm": {
-            "decompose-method": decompose_method,
-            "avoid-y-measure": avoid_y_measure,
-        },
-    }
-
     if qnode is None:
         return functools.partial(
             ppr_to_ppm, decompose_method=decompose_method, avoid_y_measure=avoid_y_measure
         )
 
-    return PassPipelineWrapper(qnode, passes)
+    def setup_inputs(decompose_method=decompose_method, avoid_y_measure=avoid_y_measure):
+        return (), {"decompose_method": decompose_method, "avoid_y_measure": avoid_y_measure}
+
+    return qml.transform(pass_name="ppr-to-ppm", setup_inputs=setup_inputs)(qnode)
 
 
 def ppm_compilation(
@@ -1136,14 +1139,6 @@ def ppm_compilation(
     . . .
 
     """
-    passes = {
-        "ppm-compilation": {
-            "decompose-method": decompose_method,
-            "avoid-y-measure": avoid_y_measure,
-            "max-pauli-size": max_pauli_size,
-        }
-    }
-
     if qnode is None:
         return functools.partial(
             ppm_compilation,
@@ -1152,7 +1147,18 @@ def ppm_compilation(
             max_pauli_size=max_pauli_size,
         )
 
-    return PassPipelineWrapper(qnode, passes)
+    def setup_inputs(
+        decompose_method=decompose_method,
+        avoid_y_measure=avoid_y_measure,
+        max_pauli_size=max_pauli_size,
+    ):
+        return (), {
+            "decompose_method": decompose_method,
+            "avoid_y_measure": avoid_y_measure,
+            "max_pauli_size": max_pauli_size,
+        }
+
+    return qml.transform(pass_name="ppm-compilation", setup_inputs=setup_inputs)(qnode)
 
 
 def ppm_specs(fn):
@@ -1336,7 +1342,7 @@ def reduce_t_depth(qnode):
     . . .
     """
 
-    return PassPipelineWrapper(qnode, "reduce-t-depth")
+    return qml.transform(pass_name="reduce-t-depth")(qnode)
 
 
 def ppr_to_mbqc(qnode):
@@ -1423,7 +1429,7 @@ def ppr_to_mbqc(qnode):
         ...
 
     """
-    return PassPipelineWrapper(qnode, "ppr-to-mbqc")
+    return qml.transform(pass_name="ppr-to-mbqc")(qnode)
 
 
 # This pass is already covered via applying by pass
@@ -1479,4 +1485,4 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
         %8:3 = pbc.ppr ["X", "X", "Y"](2) %out_qubits#0, %out_qubits#1, %out_qubits#2 cond(%mres_0) : !quantum.bit, !quantum.bit, !quantum.bit
         ...
     """
-    return PassPipelineWrapper(qnode, "decompose-arbitrary-ppr")
+    return qml.transform(pass_name="decompose-arbitrary-ppr")(qnode)
