@@ -276,6 +276,10 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `prepare` operation from the PBC dialect in MLIR now implicitly allocates new qubits
+  rather than requiring existing ones. This better suits our purposes for further lowering
+  the PBC dialect.
+  [(#2520)](https://github.com/PennyLaneAI/catalyst/pull/2520)
 * Standardized the `QJITDevice.preprocess` signature to align with the base PennyLane Device API.
   * Removed the redundant `ctx` (EvaluationContext) argument from the preprocessing and decomposition pipelines. The parameter was unused and its removal simplifies the tracing data flow.
   * Decoupled `shots` from the `QJITDevice.preprocess` signature. Catalyst-specific shot configurations are now handled via `execution_config.device_options` to maintain API compatibility.
