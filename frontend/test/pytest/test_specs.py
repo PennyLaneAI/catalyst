@@ -542,9 +542,9 @@ class TestPassByPassSpecs:
                     "PPR-pi/2-w2": 1,
                     "PPR-Phi-w1": 1,
                 },
-                gate_sizes={1: 4, 2: 1, 3: 1},
+                gate_sizes={0: 1, 1: 3, 2: 1, 3: 1},
                 measurements={},
-                num_allocs=4,
+                num_allocs=3,
             ),
         )
 

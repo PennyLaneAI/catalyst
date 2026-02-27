@@ -150,6 +150,12 @@
 
 <h3>Improvements 🛠</h3>
 
+* The tape transform :func:`~.device.decomposition.catalyst_decompose` now accepts the optional
+  keyword arguments ``target_gates``, ``num_work_wires``, ``fixed_decomps``, and ``alt_decomps``,
+  which all are passed to the used PennyLane decomposition function 
+  ``qml.devices.preprocess.decompose`` and used if the graph-based decomposition system is enabled.
+  [(#2501)](https://github.com/PennyLaneAI/catalyst/pull/2501)
+
 * Catalyst with program capture can now be used with the new `qml.templates.Subroutine` class and the associated
   `qml.capture.subroutine` upstreamed from `catalyst.jax_primitives.subroutine`.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
@@ -226,7 +232,10 @@
 
 <h3>Bug fixes 🐛</h3>
 
-* Fix a bug in the bind call function for `PCPhase` where the signature did not match what was 
+* Fixed a bug where the unified compiler would trigger a passed callback function 1 extra time for the initial pass level.
+  [(#2528)](https://github.com/PennyLaneAI/catalyst/pull/2528)
+
+* Fix a bug in the bind call function for `PCPhase` where the signature did not match what was
   expected in `jax_primitives`. `ctrl_qubits` was missing from positional arguments in previous signature.
   [(#2467)](https://github.com/PennyLaneAI/catalyst/pull/2467)
 
@@ -270,6 +279,46 @@
 
 <h3>Internal changes ⚙️</h3>
 
+* The `prepare` operation from the PBC dialect in MLIR now implicitly allocates new qubits
+  rather than requiring existing ones. This better suits our purposes for further lowering
+  the PBC dialect.
+  [(#2520)](https://github.com/PennyLaneAI/catalyst/pull/2520)
+* Standardized the `QJITDevice.preprocess` signature to align with the base PennyLane Device API.
+  * Removed the redundant `ctx` (EvaluationContext) argument from the preprocessing and decomposition pipelines. The parameter was unused and its removal simplifies the tracing data flow.
+  * Decoupled `shots` from the `QJITDevice.preprocess` signature. Catalyst-specific shot configurations are now handled via `execution_config.device_options` to maintain API compatibility.
+  [(#2524)](https://github.com/PennyLaneAI/catalyst/pull/2524)
+
+* A new AI policy document is now applied across the PennyLaneAI organization for all AI contributions.
+  [(#2488)](https://github.com/PennyLaneAI/catalyst/pull/2488)
+
+* A new dialect `QRef` was created. This dialect is very similar to the existing `Quantum` dialect,
+  but it is in reference semantics, whereas the existing `Quantum` dialect is in value semantics.
+  [(#2320)](https://github.com/PennyLaneAI/catalyst/pull/2320)
+
+  Unlike qubit (or qreg) SSA values in the `Quantum` dialect, a qubit (or qreg) reference SSA value
+  in the `QRef` dialect is allowed to be used multiple times. The operands of gates and observables
+  will be these qubit (or qreg) reference values.
+
+  For example, in the following circuit, gates and observable ops take in the qubit reference
+  they're acting on, and do not produce new qubit values.
+
+  ```mlir
+  func.func @expval_circuit() -> f64 {
+      %a = qref.alloc(2) : !qref.reg<2>
+      %q0 = qref.get %a[0] : !qref.reg<2> -> !qref.bit
+      %q1 = qref.get %a[1] : !qref.reg<2> -> !qref.bit
+      qref.custom "Hadamard"() %q0 : !qref.bit
+      qref.custom "CNOT"() %q0, %q1 : !qref.bit, !qref.bit
+      qref.custom "Hadamard"() %q0 : !qref.bit
+      %obs = qref.namedobs %q1 [ PauliX] : !quantum.obs
+      %expval = quantum.expval %obs : f64
+      qref.dealloc %a : !qref.reg<2>
+      return %expval : f64
+  }
+  ```
+
+  Notice that qubit reference values are reusable.
+
 * Removed the `condition` operand from `pbc.ppm` (Pauli Product Measurement) operations.
   Conditional PPR decompositions in the `decompose-clifford-ppr` pass now emit the
   measurement logic inside an `scf.if` region rather than propagating the condition
@@ -278,7 +327,7 @@
 
 * Update `mlir_specs` to account for new `marker` functionality in PennyLane.
   [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
-  
+
 * The QEC (Quantum Error Correction) dialect has been renamed to PBC (Pauli-Based Computation)
   across the entire codebase. This includes the MLIR dialect (`pbc.*` -> `pbc.*`), C++ namespaces
   (`catalyst::pbc` -> `catalyst::pbc`), Python bindings, compiler passes (e.g.,
@@ -346,7 +395,7 @@
 * The upstream MLIR `Test` dialect is now available via the `catalyst` command line tool.
   [(#2417)](https://github.com/PennyLaneAI/catalyst/pull/2417)
 
-* Removing some previously-added guardrails that were in place due to a bug in dynamic allocation 
+* Removing some previously added guardrails that were in place due to a bug in dynamic allocation
   that is now fixed.
   [(#2427)](https://github.com/PennyLaneAI/catalyst/pull/2427)
 
@@ -518,5 +567,6 @@ Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,
 Paul Haochen Wang,
+David Wierichs,
 Jake Zaia,
 Hongsheng Zheng.

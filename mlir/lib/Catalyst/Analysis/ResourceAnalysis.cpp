@@ -120,7 +120,7 @@ static int getPBCQubitCount(Operation *op)
     // if the operation is one of these operations, it will return the number of qubits in the input
     return llvm::TypeSwitch<Operation *, int>(op)
         .Case<pbc::PPRotationOp, pbc::PPRotationArbitraryOp, pbc::PPMeasurementOp,
-              pbc::SelectPPMeasurementOp, pbc::PrepareStateOp>(
+              pbc::SelectPPMeasurementOp>(
             [](auto typedOp) { return static_cast<int>(typedOp.getInQubits().size()); })
         .Default(0);
 }
