@@ -150,6 +150,12 @@
 
 <h3>Improvements 🛠</h3>
 
+* The tape transform :func:`~.device.decomposition.catalyst_decompose` now accepts the optional
+  keyword arguments ``target_gates``, ``num_work_wires``, ``fixed_decomps``, and ``alt_decomps``,
+  which all are passed to the used PennyLane decomposition function 
+  ``qml.devices.preprocess.decompose`` and used if the graph-based decomposition system is enabled.
+  [(#2501)](https://github.com/PennyLaneAI/catalyst/pull/2501)
+
 * Catalyst with program capture can now be used with the new `qml.templates.Subroutine` class and the associated
   `qml.capture.subroutine` upstreamed from `catalyst.jax_primitives.subroutine`.
   [(#2396)](https://github.com/PennyLaneAI/catalyst/pull/2396)
@@ -274,6 +280,10 @@
   rather than requiring existing ones. This better suits our purposes for further lowering
   the PBC dialect.
   [(#2520)](https://github.com/PennyLaneAI/catalyst/pull/2520)
+* Standardized the `QJITDevice.preprocess` signature to align with the base PennyLane Device API.
+  * Removed the redundant `ctx` (EvaluationContext) argument from the preprocessing and decomposition pipelines. The parameter was unused and its removal simplifies the tracing data flow.
+  * Decoupled `shots` from the `QJITDevice.preprocess` signature. Catalyst-specific shot configurations are now handled via `execution_config.device_options` to maintain API compatibility.
+  [(#2524)](https://github.com/PennyLaneAI/catalyst/pull/2524)
 
 * A new AI policy document is now applied across the PennyLaneAI organization for all AI contributions.
   [(#2488)](https://github.com/PennyLaneAI/catalyst/pull/2488)
@@ -554,5 +564,6 @@ Mudit Pandey,
 Andrija Paurevic,
 David D.W. Ren,
 Paul Haochen Wang,
+David Wierichs,
 Jake Zaia,
 Hongsheng Zheng.
