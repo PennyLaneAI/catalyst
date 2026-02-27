@@ -54,11 +54,13 @@ set(LIBS
 )
 
 add_mlir_library(CatalystCompilerDriver
+    Main.cpp
     CompilerDriver.cpp
     CatalystLLVMTarget.cpp
+    PassInstrumentation.cpp
     Pipelines.cpp
+    LineUtils.cpp
     HighResolutionOutputStrategy.cpp
-
     LINK_LIBS PRIVATE
     ${LIBS}
     MLIRSupport
