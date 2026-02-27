@@ -56,7 +56,8 @@ from catalyst.python_interface.dialects.quantum import (
 )
 from catalyst.python_interface.pass_api import compiler_transform
 
-_default_supported_obs = {"PauliZ", "Identity"}
+_default_supported_obs = ("PauliZ", "Identity")
+_obs_allowed_diagonalization = {"PauliX", "PauliY", "PauliZ", "Hadamard", "Identity"}
 
 
 def _generate_mapping():
@@ -166,9 +167,26 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
     name = "diagonalize-final-measurements"
 
     def __init__(self, **options):
-        self.supported_base_obs = tuple(
-            set(options.get("supported-base-obs", _default_supported_obs) + _default_supported_obs)
-        )
+
+        self.supported_base_obs = options.get("supported-base-obs")
+
+        if self.supported_base_obs is None:
+            self.supported_base_obs = _default_supported_obs
+        if (
+            isinstance(self.supported_base_obs, str)
+            and self.supported_base_obs in _obs_allowed_diagonalization
+        ):
+            self.supported_base_obs = set(_default_supported_obs + (self.supported_base_obs,))
+        elif isinstance(self.supported_base_obs, tuple) and all(
+            x in _obs_allowed_diagonalization for x in self.supported_base_obs
+        ):
+            self.supported_base_obs = set(_default_supported_obs + self.supported_base_obs)
+        else:
+            raise ValueError(
+                f"{self.supported_base_obs} is not supported. Please ensure all the supported_base_obs is a subset of PauliX, PauliY, PauliZ, Hadamard and Identity"
+            )
+
+        print(self.supported_base_obs)
 
         if options.get("to-eigvals", False) is not False:
             raise ValueError("Only to_eigvals = False is supported.")
