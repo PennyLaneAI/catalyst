@@ -330,7 +330,9 @@ class TestTransformInterpreterPass:
 
         num_calls = 0
 
-        def callback(previous_pass, module, next_pass, pass_level=None): # pylint: disable=unused-argument
+        def callback(
+            previous_pass, module, next_pass, pass_level=None
+        ):  # pylint: disable=unused-argument
             """Mock implementation of the callback function"""
             nonlocal num_calls
             num_calls += 1
