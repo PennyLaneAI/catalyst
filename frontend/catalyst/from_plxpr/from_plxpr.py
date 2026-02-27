@@ -133,11 +133,14 @@ def _get_device_kwargs(device) -> dict:
 
 # code example has long lines
 # pylint: disable=line-too-long
-def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
+def from_plxpr(plxpr: ClosedJaxpr, skip_preprocess: bool = False) -> Callable[..., Jaxpr]:
     """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
 
     Args:
         jaxpr (ClosedJaxpr): PennyLane variant jaxpr
+        skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.
+            If ``True``, transforms used to preprocess and validate the user program before
+            executing on a quantum backend will not be used. ``False`` by default.
 
     Returns:
         Callable: A function that accepts the same arguments as the plxpr and returns catalyst
@@ -195,7 +198,9 @@ def from_plxpr(plxpr: ClosedJaxpr) -> Callable[..., Jaxpr]:
 
     """
 
-    original_fn = partial(WorkflowInterpreter().eval, plxpr.jaxpr, plxpr.consts)
+    original_fn = partial(
+        WorkflowInterpreter(skip_preprocess=skip_preprocess).eval, plxpr.jaxpr, plxpr.consts
+    )
 
     # pylint: disable=import-outside-toplevel
     from jax._src.interpreters.partial_eval import DynamicJaxprTrace
@@ -220,9 +225,10 @@ class WorkflowInterpreter(PlxprInterpreter):
         new_version.decompose_tkwargs = copy(self.decompose_tkwargs)
         return new_version
 
-    def __init__(self):
+    def __init__(self, skip_preprocess=False):
         self._pass_pipeline = []
         self.init_qreg = None
+        self._skip_preprocess = skip_preprocess
 
         # Compiler options for the new decomposition system
         self.requires_decompose_lowering = False
@@ -361,15 +367,16 @@ def handle_qnode(
         gateset = [_get_operator_name(op) for op in self.decompose_tkwargs.get("gate_set", [])]
         setattr(qnode, "decompose_gatesets", [gateset])
 
-    device_pipeline = create_device_preprocessing_pipeline(
-        qnode.device, execution_config, shots, warn=True
+    device_pipeline = (
+        []
+        if self._skip_preprocess
+        else create_device_preprocessing_pipeline(qnode.device, execution_config, shots, warn=True)
     )
     return quantum_kernel_p.bind(
         wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
         *non_const_args,
         qnode=qnode,
-        pipeline=tuple(self._pass_pipeline),
-        device_pipeline=tuple(device_pipeline),
+        pipeline=tuple(self._pass_pipeline + device_pipeline),
     )
 
 
@@ -500,7 +507,14 @@ def handle_transform(
 
 # pylint: disable=too-many-positional-arguments
 def trace_from_pennylane(
-    fn, static_argnums, dynamic_args, abstracted_axes, sig, kwargs, debug_info=None
+    fn,
+    static_argnums,
+    dynamic_args,
+    abstracted_axes,
+    sig,
+    kwargs,
+    skip_preprocess=False,
+    debug_info=None,
 ):
     """Capture the JAX program representation (JAXPR) of the wrapped function, using
     PL capure module.
@@ -520,6 +534,9 @@ def trace_from_pennylane(
             are indicated with their literal values, and dynamic arguments are indicated by abstract
             values.
         kwargs(Dict[str, Any]): keyword argumemts to the function.
+        skip_preprocess (bool): Controls whether or not to skip quantum device preprocessing.
+            If ``True``, transforms used to preprocess and validate the user program before
+            executing on a quantum backend will not be used. ``False`` by default.
         debug_info(jax.api_util.debug_info): a source debug information object required by jaxprs.
 
     Returns:
