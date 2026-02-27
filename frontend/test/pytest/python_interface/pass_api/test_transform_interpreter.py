@@ -325,12 +325,12 @@ class TestTransformInterpreterPass:
         # We check that there is a space after the pass name to check that no options were specified
         assert "--mlir-pass2 " in captured_cmds[1]
 
-    def test_callback_count(self, mocker, capsys):
+    def test_callback_count(self):
         """Test that the apply function calls the callback the correct number of times."""
 
         num_calls = 0
 
-        def callback(previous_pass, module, next_pass, pass_level=None):
+        def callback(previous_pass, module, next_pass, pass_level=None): # pylint: disable=unused-argument
             """Mock implementation of the callback function"""
             nonlocal num_calls
             num_calls += 1
