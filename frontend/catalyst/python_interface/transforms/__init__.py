@@ -30,14 +30,12 @@ from .quantum import (
     MeasurementsFromSamplesPass,
     MergeRotationsPass,
     ParitySynthPass,
-    SplitNonCommutingPass,
     combine_global_phases_pass,
     diagonalize_final_measurements_pass,
     iterative_cancel_inverses_pass,
     measurements_from_samples_pass,
     merge_rotations_pass,
     parity_synth_pass,
-    split_non_commuting_pass,
 )
 
 __all__ = [
@@ -54,8 +52,6 @@ __all__ = [
     "MergeRotationsPass",
     "ParitySynthPass",
     "parity_synth_pass",
-    "split_non_commuting_pass",
-    "SplitNonCommutingPass",
     # MBQC
     "convert_to_mbqc_formalism_pass",
     "ConvertToMBQCFormalismPass",
