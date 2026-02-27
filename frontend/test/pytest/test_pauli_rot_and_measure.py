@@ -1,4 +1,4 @@
-# Copyright 2025 Xanadu Quantum Technologies Inc.
+# Copyright 2025-2026 Xanadu Quantum Technologies Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,11 +45,9 @@ def test_pauli_rot_lowering(capture_mode):
     assert "quantum.paulirot" in optimized_ir
 
 
-# capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
-# fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
-@pytest.mark.capture_todo
-def test_pauli_rot_lowering_with_ctrl_qubits(capture_mode):
-    """Test that Pauli rotation with control qubits is converted to pbc.ppr.
+@pytest.mark.usefixtures("use_capture")
+def test_pauli_rot_lowering_with_ctrl_qubits():
+    """Test that Pauli rotation with control qubits is converted to quantum.paulirot.
     Note that control PauliRot is currently not supported by the to_ppr pass.
     """
     if not capture_mode:

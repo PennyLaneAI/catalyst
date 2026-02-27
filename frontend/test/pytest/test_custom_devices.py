@@ -183,5 +183,6 @@ def test_error_raised_no_unitary_support_for_matrix_ops():
         CompileError,
         match="The device that specifies to_matrix_ops must support QubitUnitary.",
     ):
-        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
-            QJITDevice(CustomDevice(wires=2)).preprocess(ctx)
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
+            config = qml.devices.ExecutionConfig()
+            QJITDevice(CustomDevice(wires=2)).preprocess(config)

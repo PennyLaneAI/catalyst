@@ -124,14 +124,10 @@ LogicalResult applyTransformsWithSubpassTracking(Operation *payload,
 
             DiagnosedSilenceableFailure result = state.applyTransform(transformInterface);
 
-            if (result.isDefiniteFailure()) {
-                // hook after pass failed
+            // Reports the error whether definite or silenceable
+            if (failed(result.checkAndReport())) {
                 passInstrumentor->runAfterPassFailed(subPass.get(), payload);
                 return failure();
-            }
-
-            if (result.isSilenceableFailure()) {
-                (void)result.silence();
             }
 
             // hook after pass

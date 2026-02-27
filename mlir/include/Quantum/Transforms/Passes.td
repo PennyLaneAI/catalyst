@@ -66,7 +66,13 @@ def SplitMultipleTapesPass : Pass<"split-multiple-tapes"> {
     let summary = "Given a qnode containing multiple tapes, split each tape into its own function.";
 }
 
-def SplitToSingleTermsPass : Pass<"split-to-single-terms"> {
+def SplitNonCommutingPass : Pass<"split-non-commuting", "mlir::ModuleOp"> {
+    let summary = "Split quantum functions non-commuting observables into multiple executions.";
+
+    let dependentDialects = ["arith::ArithDialect"];
+}
+
+def SplitToSingleTermsPass : Pass<"split-to-single-terms", "mlir::ModuleOp"> {
     let summary = "Split quantum functions into single-term observables.";
 }
 
@@ -137,6 +143,18 @@ def DisentangleSWAPPass : Pass<"disentangle-SWAP"> {
 def LoopBoundaryOptimizationPass : Pass<"loop-boundary"> {
     let summary = "Perform loop boundary optimization to eliminate the redundancy of operations on loop boundary.";
 }
+
+def DynamicOneShotPass : Pass<"dynamic-one-shot"> {
+    let summary = "Apply the dynamic one-shot transform.";
+
+    let dependentDialects = [
+        "index::IndexDialect",
+        "tensor::TensorDialect",
+        "scf::SCFDialect",
+        "stablehlo::StablehloDialect"
+    ];
+}
+
 // ----- Quantum circuit transformation passes end ----- //
 
 #endif // QUANTUM_PASSES
