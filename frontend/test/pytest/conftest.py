@@ -107,7 +107,11 @@ def capture_mode(request):
         if "old_frontend" in request.keywords:
             pytest.skip("Test is specific to the old frontend and should not run with capture.")
         if "capture_todo" in request.keywords:
-            pytest.xfail("Not expected to work yet with program capture.")
+            request.node.add_marker(
+                pytest.mark.xfail(
+                    reason="Not expected to work yet with program capture.", strict=True
+                )
+            )
     return request.param
 
 

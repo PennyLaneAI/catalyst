@@ -24,11 +24,14 @@ from catalyst import qjit
 class TestShotVector:
     """Test shot-vector"""
 
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     @pytest.mark.parametrize("shots", [((3, 4),), (3,) * 4, (3, 3, 3, 3), [3, 3, 3, 3]])
-    def test_return_format_and_shape(self, shots):
+    def test_return_format_and_shape(self, shots, capture_mode):
         """Test shot-vector as parameter with single sample measurment"""
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.set_shots(shots)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit():
@@ -39,14 +42,17 @@ class TestShotVector:
         assert len(circuit()) == 4
         assert jnp.array(circuit()).shape == (4, 3, 1)
 
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
     @pytest.mark.parametrize("shots", [((3, 4),), (3,) * 4, (3, 3, 3, 3), [3, 3, 3, 3]])
-    def test_multiple_sample_measurement(self, shots, mcm_method):
+    def test_multiple_sample_measurement(self, shots, mcm_method, capture_mode):
         """Test shot-vector with mulitple samples measurment"""
 
         dev = qml.device("lightning.qubit", wires=1)
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.set_shots(shots)
         @qml.qnode(dev, mcm_method=mcm_method)
         def circuit_list():
@@ -57,7 +63,7 @@ class TestShotVector:
         assert jnp.array(circuit_list()[0]).shape == (4, 3, 1)
         assert jnp.array(circuit_list()[1]).shape == (4, 3, 1)
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.set_shots(shots)
         @qml.qnode(dev, mcm_method=mcm_method)
         def circuit_dict():
@@ -68,14 +74,17 @@ class TestShotVector:
         assert jnp.array(circuit_dict()["first"]).shape == (4, 3, 1)
         assert jnp.array(circuit_dict()["second"]).shape == (4, 3, 1)
 
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
-    def test_shot_vector_with_mixes_shots_and_without_copies(self, mcm_method):
+    def test_shot_vector_with_mixes_shots_and_without_copies(self, mcm_method, capture_mode):
         # pylint: disable=unsubscriptable-object
         """Test shot-vector with mixes shots and without copies"""
 
         dev = qml.device("lightning.qubit", wires=1)
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.set_shots(((20, 5), 100, (101, 2)))
         @qml.qnode(dev, mcm_method=mcm_method)
         def circuit():
@@ -99,8 +108,11 @@ class TestShotVector:
             (lambda wires: qml.probs(wires=wires), "ProbabilityMP"),
         ],
     )
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     @pytest.mark.parametrize("mcm_method", ["single-branch-statistics", "one-shot"])
-    def test_shot_vector_with_different_measurement(self, measurement, mcm_method):
+    def test_shot_vector_with_different_measurement(self, measurement, mcm_method, capture_mode):
         """Test a NotImplementedError is raised when using a shot-vector with a measurement that is not qml.sample()"""
 
         dev = qml.device("lightning.qubit", wires=1)
@@ -115,19 +127,22 @@ class TestShotVector:
             with pytest.raises(
                 NotImplementedError, match=r"qml.var\(\) cannot be used on observables"
             ):
-                qjit(circuit)()
+                qjit(circuit, capture=capture_mode)()
         else:
             with pytest.raises(
                 NotImplementedError, match="measurement process does not support shot-vectors"
             ):
-                qjit(circuit)()
+                qjit(circuit, capture=capture_mode)()
 
-    def test_shot_vector_with_complex_container_sample(self):
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
+    def test_shot_vector_with_complex_container_sample(self, capture_mode):
         """Test shot-vector with complex container sample"""
 
         dev = qml.device("lightning.qubit", wires=1)
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.set_shots(((3, 4),))
         @qml.qnode(dev, mcm_method="single-branch-statistics")
         def circuit():
