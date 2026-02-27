@@ -89,8 +89,9 @@ def create_device_preprocessing_pipeline(
     if unsupported_transforms and warn:
         warnings.warn(
             "The following device-preprocessing transforms are currently not supported with "
-            f"'qml.qjit(capture=True)': {unsupported_transforms}. They will be substituted "
-            "with identity transforms.",
+            "'qml.qjit(capture=True)':\n"
+            f"{unsupported_transforms}.\n"
+            "They will be substituted with identity transforms.",
             UserWarning,
         )
 
