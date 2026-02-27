@@ -103,6 +103,8 @@ std::optional<SmallVector<Value>> convertIonQubitsToQuantumBits(mlir::PatternRew
     return qubits;
 }
 
+static std::optional<int64_t> walkBackSingleQubitSSA(mlir::Value qubit);
+
 /**
  * @brief Walk back the qubit SSA until we reach an ExtractOp that has an idxAttr set, or until we
  *        reach the root of the SSA.
@@ -117,34 +119,9 @@ std::optional<SmallVector<Value>> convertIonQubitsToQuantumBits(mlir::PatternRew
 std::optional<int64_t> walkBackQubitSSA(quantum::CustomOp gate, int64_t position)
 {
     // TODO (backlog): make that function able to cross control flow op (for, while, ...)
-    auto qubit = gate.getInQubits()[position];
-    auto definingOp = qubit.getDefiningOp();
-
-    if (auto extractOp = dyn_cast<quantum::ExtractOp>(definingOp)) {
-        if (extractOp.getIdxAttr().has_value()) {
-            return extractOp.getIdxAttr().value();
-        }
-        return std::nullopt;
-    }
-    else {
-        // TODO (backlog): if a pass on one operation fails, there may be a mixture of quantum ops
-        // and parallel protocol ops in the IR. Since MLIR will continue processing other ops after
-        // a failure, we may end up in a situation in which we attempt to cast a parallel protocol
-        // op to a quantum op, which will raise an incompatible-type assertion error. It would be
-        // best if we can immediately and gracefully exit after an emitError() call before this
-        // happens, or modify this function to handle this case.
-        auto customOp = cast<quantum::CustomOp>(definingOp);
-        auto outQubits = customOp.getOutQubits();
-        int64_t index = 0;
-        for (const auto &outQubit : outQubits) {
-            if (qubit == outQubit) {
-                position = index;
-                break;
-            }
-            ++index;
-        }
-        return walkBackQubitSSA(customOp, position);
-    }
+    // Delegate to the general single-qubit SSA walk, which handles all op types including
+    // ion.parallelprotocol, ion.readout_bit, unrealized_cast, quantum.measure, and quantum.custom.
+    return walkBackSingleQubitSSA(gate.getInQubits()[position]);
 }
 
 /**
@@ -329,8 +306,7 @@ mlir::LogicalResult oneQubitGateToPulse(CustomOp op, mlir::PatternRewriter &rewr
 };
 
 mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
-                                  const std::vector<Beam> &beams2,
-                                  const std::vector<Phonon> &phonons)
+                                  const std::vector<Beam> &beams2)
 {
     auto qnode = op->getParentOfType<func::FuncOp>();
     MLIRContext *ctx = op.getContext();
@@ -348,57 +324,36 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
         auto qubitIndex1Value = qubitIndex1.value();
         auto nQubits = allocOp.getNqubitsAttr();
         if (nQubits.has_value()) {
-            if (static_cast<size_t>(qubitIndex0Value) * 3 >= phonons.size()) {
-                op.emitError() << "Missing phonon parameters for qubit " << qubitIndex0Value
-                               << " used as input to MS gate; there are only " << phonons.size()
-                               << " phonon parameters in the database."
-                               << " Ensure that the database contains all necessary parameters for "
-                                  "the circuit.";
-                return failure();
-            }
-
-            if (static_cast<size_t>(qubitIndex1Value) * 3 >= phonons.size()) {
-                op.emitError() << "Missing phonon parameters for qubit " << qubitIndex1Value
-                               << " used as input to MS gate; there are only " << phonons.size()
-                               << " phonon parameters in the database."
-                               << " Ensure that the database contains all necessary parameters for "
-                                  "the circuit.";
-                return failure();
-            }
-
-            const Phonon &phonon0ComX = phonons[qubitIndex0Value * 3];
-            const Phonon &phonon1ComX = phonons[qubitIndex1Value * 3];
-
             auto twoQubitComboIndex =
                 getTwoQubitCombinationIndex(nQubits.value(), qubitIndex0Value, qubitIndex1Value);
 
-            if (static_cast<size_t>(twoQubitComboIndex) >= beams2.size()) {
+            // Each qubit pair combination uses 3 beams in the database:
+            //   beams2[combo*3 + 0]: global beam (DOWN_E transition)
+            //   beams2[combo*3 + 1]: individual red-sideband beam (UP_E, lower detuning)
+            //   beams2[combo*3 + 2]: individual blue-sideband beam (UP_E, higher detuning)
+            size_t beamBaseIndex = static_cast<size_t>(twoQubitComboIndex) * 3;
+            if (beamBaseIndex + 2 >= beams2.size()) {
                 op.emitError()
                     << "Missing two-qubit beam parameters for qubits "
                     << "(" << qubitIndex0Value << ", " << qubitIndex1Value << ") "
-                    << "used as input to MS gate. Expected beam parameters for two-qubit "
-                    << "combinatorial index " << twoQubitComboIndex << " but there are only "
-                    << beams2.size() << " beam parameters in the database."
+                    << "used as input to MS gate. Expected 3 beam entries starting at index "
+                    << beamBaseIndex << " but there are only " << beams2.size()
+                    << " beam parameters in the database."
                     << " Ensure that the database contains all necessary parameters for the "
                        "circuit.";
                 return failure();
             }
 
-            const Beam &beam = beams2[twoQubitComboIndex];
+            const Beam &globalBeam = beams2[beamBaseIndex];
+            const Beam &redSidebandBeam = beams2[beamBaseIndex + 1];
+            const Beam &blueSidebandBeam = beams2[beamBaseIndex + 2];
 
             auto loc = op.getLoc();
             auto qubits = op.getInQubits();
 
             auto angle = op.getParams().front();
-            auto time = computePulseDuration(rewriter, loc, angle, beam.rabi, beam.detuning);
-
-            // Helper function to flip the sign of each element in a vector,
-            // e.g. [a, b, c] -> [-a, -b, -c]
-            auto flipSign = [](const std::vector<int64_t> &v) -> std::vector<int64_t> {
-                std::vector<int64_t> result(v.size());
-                std::transform(v.begin(), v.end(), result.begin(), [](int64_t x) { return -x; });
-                return result;
-            };
+            auto time =
+                computePulseDuration(rewriter, loc, angle, globalBeam.rabi, globalBeam.detuning);
 
             // Convert quantum.bit to ion.ionqubit
             auto ionQubits = convertQuantumBitsToIonQubits(rewriter, loc, qubits);
@@ -420,133 +375,63 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     // provides it.
                     // Rabi and phase may become SSA values and not attributes.
 
-                    // Pulse1(
-                    //     transition=Transition(level1=0,level2=e),
-                    //     rabi=float from calibration db(~100 KHz-MHz),
-                    //     detuning=float from calibration db,
-                    //     phase=0,
-                    //     polarization=Int array from from calibration db,
-                    //     wavevector=Int array from from calibration db,
-                    //     target=qubit0,
-                    //     time=ms_angle/rabi
-                    // )
+                    // Pulse1: global beam on qubit0 (DOWN_E transition)
                     auto beam1Attr =
                         BeamAttr::get(ctx, rewriter.getI64IntegerAttr(LevelTransition::DOWN_E),
-                                      rewriter.getF64FloatAttr(beam.rabi),
-                                      rewriter.getF64FloatAttr(beam.detuning),
-                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
-                                      rewriter.getDenseI64ArrayAttr(beam.wavevector));
+                                      rewriter.getF64FloatAttr(globalBeam.rabi),
+                                      rewriter.getF64FloatAttr(globalBeam.detuning),
+                                      rewriter.getDenseI64ArrayAttr(globalBeam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(globalBeam.wavevector));
                     ion::PulseOp::create(builder, loc, PulseType::get(ctx), time, qubit0, beam1Attr,
                                          phase0Attr);
 
-                    // Pulse2(
-                    //     transition=Transition(level1=1,level2=e),
-                    //     rabi=float from calibration db(~100 KHz-MHz),
-                    //     detuning=Delta(from database) + omega_0 (COMx phonon frequency) + mu(from
-                    //       database),
-                    //     phase=0,
-                    //     polarization=Int array from from calibration db,
-                    //     wavevector=-Int array from from calibration db,
-                    //     target=qubit0,
-                    //     time=ms_angle/rabi
-                    // )
-
-                    // TODO: Also need delta and mu (waiting on OQD to provide them)
+                    // Pulse2: blue-sideband individual beam on qubit0 (UP_E transition)
                     auto beam2Attr =
                         BeamAttr::get(ctx, rewriter.getI64IntegerAttr(LevelTransition::UP_E),
-                                      rewriter.getF64FloatAttr(beam.rabi),
-                                      // TODO: fill in formula with delta and mu once available
-                                      rewriter.getF64FloatAttr(beam.detuning + phonon0ComX.energy),
-                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
-                                      rewriter.getDenseI64ArrayAttr(flipSign(beam.wavevector)));
+                                      rewriter.getF64FloatAttr(blueSidebandBeam.rabi),
+                                      rewriter.getF64FloatAttr(blueSidebandBeam.detuning),
+                                      rewriter.getDenseI64ArrayAttr(blueSidebandBeam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(blueSidebandBeam.wavevector));
                     ion::PulseOp::create(builder, loc, PulseType::get(ctx), time, qubit0, beam2Attr,
                                          phase0Attr);
 
-                    // Pulse3(
-                    //     transition=Transition(level1=1,level2=e),
-                    //     rabi=float from calibration db(~100 KHz-MHz),
-                    //     detuning=Delta(from database) - omega_0 - mu(from database),
-                    //     phase=0,
-                    //     polarization=Int array from from calibration db,
-                    //     wavevector=-Int array from from calibration db,
-                    //     target=qubit0,
-                    //     time=ms_angle/rabi
-                    // )
-
-                    // TODO: Also need delta and mu (waiting on OQD to provide them)
+                    // Pulse3: red-sideband individual beam on qubit0 (UP_E transition)
                     auto beam3Attr =
                         BeamAttr::get(ctx, rewriter.getI64IntegerAttr(LevelTransition::UP_E),
-                                      rewriter.getF64FloatAttr(beam.rabi),
-                                      // TODO: fill in formula with delta and mu once available
-                                      rewriter.getF64FloatAttr(beam.detuning - phonon0ComX.energy),
-                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
-                                      rewriter.getDenseI64ArrayAttr(flipSign(beam.wavevector)));
+                                      rewriter.getF64FloatAttr(redSidebandBeam.rabi),
+                                      rewriter.getF64FloatAttr(redSidebandBeam.detuning),
+                                      rewriter.getDenseI64ArrayAttr(redSidebandBeam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(redSidebandBeam.wavevector));
                     ion::PulseOp::create(builder, loc, PulseType::get(ctx), time, qubit0, beam3Attr,
                                          phase0Attr);
 
-                    // Pulse4(
-                    //     transition=Transition(level1=0,level2=e),
-                    //     rabi=float from calibration db(~100 KHz-MHz),
-                    //     detuning=float from calibration db,
-                    //     phase=0,
-                    //     polarization=Int array from from calibration db,
-                    //     wavevector=Int array from from calibration db,
-                    //     target=qubit1,
-                    //     time=ms_angle/rabi
-                    // )
-
+                    // Pulse4: global beam on qubit1 (DOWN_E transition)
                     auto beam4Attr =
                         BeamAttr::get(ctx, rewriter.getI64IntegerAttr(LevelTransition::DOWN_E),
-                                      rewriter.getF64FloatAttr(beam.rabi),
-                                      rewriter.getF64FloatAttr(beam.detuning),
-                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
-                                      rewriter.getDenseI64ArrayAttr(beam.wavevector));
+                                      rewriter.getF64FloatAttr(globalBeam.rabi),
+                                      rewriter.getF64FloatAttr(globalBeam.detuning),
+                                      rewriter.getDenseI64ArrayAttr(globalBeam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(globalBeam.wavevector));
                     ion::PulseOp::create(builder, loc, PulseType::get(ctx), time, qubit1, beam4Attr,
                                          phase0Attr);
 
-                    // Pulse5(
-                    //     transition=Transition(level1=1,level2=e),
-                    //     rabi=float from calibration db(~100 KHz-MHz),
-                    //     detuning=Delta(from database) + omega_0 (COMx phonon frequency) + mu(from
-                    //       database),
-                    //     phase=0,
-                    //     polarization=Int array from from calibration db,
-                    //     wavevector=-Int array from from calibration db,
-                    //     target=qubit1,
-                    //     time=ms_angle/rabi
-                    // )
-
-                    // TODO: Also need delta and mu (waiting on OQD to provide them)
+                    // Pulse5: blue-sideband individual beam on qubit1 (UP_E transition)
                     auto beam5Attr =
                         BeamAttr::get(ctx, rewriter.getI64IntegerAttr(LevelTransition::UP_E),
-                                      rewriter.getF64FloatAttr(beam.rabi),
-                                      // TODO: fill in formula with delta and mu once available
-                                      rewriter.getF64FloatAttr(beam.detuning + phonon1ComX.energy),
-                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
-                                      rewriter.getDenseI64ArrayAttr(flipSign(beam.wavevector)));
+                                      rewriter.getF64FloatAttr(blueSidebandBeam.rabi),
+                                      rewriter.getF64FloatAttr(blueSidebandBeam.detuning),
+                                      rewriter.getDenseI64ArrayAttr(blueSidebandBeam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(blueSidebandBeam.wavevector));
                     ion::PulseOp::create(builder, loc, PulseType::get(ctx), time, qubit1, beam5Attr,
                                          phase0Attr);
 
-                    // Pulse6(
-                    //     transition=Transition(level1=1,level2=e),
-                    //     rabi=float from calibration db(~100 KHz-MHz),
-                    //     detuning=Delta(from database) - omega_0 (COMx phonon frequency) - mu(from
-                    //       database),
-                    //     phase=0,
-                    //     polarization=Int array from from calibration db,
-                    //     wavevector=-Int array from from calibration db,
-                    //     target=qubit1,
-                    //     time=ms_angle/rabi
-                    // )
-
-                    // TODO: Also need delta and mu (waiting on OQD to provide them)
+                    // Pulse6: red-sideband individual beam on qubit1 (UP_E transition)
                     auto beam6Attr =
                         BeamAttr::get(ctx, rewriter.getI64IntegerAttr(LevelTransition::UP_E),
-                                      rewriter.getF64FloatAttr(beam.rabi),
-                                      // TODO: fill in formula with delta and mu once available
-                                      rewriter.getF64FloatAttr(beam.detuning - phonon1ComX.energy),
-                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
-                                      rewriter.getDenseI64ArrayAttr(flipSign(beam.wavevector)));
+                                      rewriter.getF64FloatAttr(redSidebandBeam.rabi),
+                                      rewriter.getF64FloatAttr(redSidebandBeam.detuning),
+                                      rewriter.getDenseI64ArrayAttr(redSidebandBeam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(redSidebandBeam.wavevector));
                     ion::PulseOp::create(builder, loc, PulseType::get(ctx), time, qubit1, beam6Attr,
                                          phase0Attr);
                 });
@@ -576,14 +461,12 @@ struct GatesToPulsesRewritePattern : public mlir::OpConversionPattern<CustomOp> 
 
     std::vector<Beam> beams1;
     std::vector<Beam> beams2;
-    std::vector<Phonon> phonons;
 
     GatesToPulsesRewritePattern(mlir::MLIRContext *ctx, const OQDDatabaseManager &dataManager)
         : mlir::OpConversionPattern<CustomOp>::OpConversionPattern(ctx)
     {
         beams1 = dataManager.getBeams1Params();
         beams2 = dataManager.getBeams2Params();
-        phonons = dataManager.getPhononParams();
     }
 
     LogicalResult matchAndRewrite(CustomOp op, OpAdaptor adaptor,
@@ -603,10 +486,129 @@ struct GatesToPulsesRewritePattern : public mlir::OpConversionPattern<CustomOp> 
         }
         // MS case -> PP(P1, P2, P3, P4, P5, P6)
         else if (op.getGateName() == "MS") {
-            auto result = MSGateToPulse(op, rewriter, beams2, phonons);
+            auto result = MSGateToPulse(op, rewriter, beams2);
             return result;
         }
         return failure();
+    }
+};
+
+// Helper to walk back a qubit SSA value (single-value version) to find its original wire index.
+static std::optional<int64_t> walkBackSingleQubitSSA(Value qubit)
+{
+    auto definingOp = qubit.getDefiningOp();
+    if (!definingOp) {
+        return std::nullopt;
+    }
+    if (auto extractOp = dyn_cast<quantum::ExtractOp>(definingOp)) {
+        if (extractOp.getIdxAttr().has_value()) {
+            return extractOp.getIdxAttr().value();
+        }
+        return std::nullopt;
+    }
+    if (auto customOp = dyn_cast<CustomOp>(definingOp)) {
+        auto outQubits = customOp.getOutQubits();
+        for (size_t i = 0; i < outQubits.size(); i++) {
+            if (qubit == outQubits[i]) {
+                return walkBackSingleQubitSSA(customOp.getInQubits()[i]);
+            }
+        }
+        return std::nullopt;
+    }
+    if (auto ppOp = dyn_cast<ion::ParallelProtocolOp>(definingOp)) {
+        auto results = ppOp.getResults();
+        for (size_t i = 0; i < results.size(); i++) {
+            if (qubit == results[i]) {
+                return walkBackSingleQubitSSA(ppOp.getInQubits()[i]);
+            }
+        }
+        return std::nullopt;
+    }
+    if (auto measureOp = dyn_cast<quantum::MeasureOp>(definingOp)) {
+        return walkBackSingleQubitSSA(measureOp.getInQubit());
+    }
+    if (auto readoutOp = dyn_cast<ion::ReadoutBitOp>(definingOp)) {
+        return walkBackSingleQubitSSA(readoutOp.getInQubit());
+    }
+    if (auto castOp = dyn_cast<mlir::UnrealizedConversionCastOp>(definingOp)) {
+        if (castOp.getInputs().size() == 1) {
+            return walkBackSingleQubitSSA(castOp.getInputs()[0]);
+        }
+        return std::nullopt;
+    }
+    return std::nullopt;
+}
+
+struct MeasureOpToMeasurePulsePattern : public mlir::OpRewritePattern<MeasureOp> {
+    std::vector<DetectionBeam> detectionBeams;
+    double measurementDuration;
+
+    MeasureOpToMeasurePulsePattern(mlir::MLIRContext *ctx, const OQDDatabaseManager &dataManager)
+        : mlir::OpRewritePattern<MeasureOp>(ctx)
+    {
+        detectionBeams = dataManager.getDetectionBeamParams();
+        measurementDuration = dataManager.getMeasurementDuration();
+    }
+
+    LogicalResult matchAndRewrite(MeasureOp op, PatternRewriter &rewriter) const override
+    {
+        if (detectionBeams.empty()) {
+            return failure();
+        }
+
+        auto qubitIndex = walkBackSingleQubitSSA(op.getInQubit());
+        if (!qubitIndex.has_value()) {
+            return failure();
+        }
+
+        size_t idx = static_cast<size_t>(qubitIndex.value());
+        // Single detection beam: use for all qubits. Multiple: use one per qubit.
+        size_t beamIdx = (detectionBeams.size() == 1) ? 0 : idx;
+        if (beamIdx >= detectionBeams.size()) {
+            op.emitError() << "No detection beam for qubit " << idx << "; detection_beam has only "
+                           << detectionBeams.size() << " entries.";
+            return failure();
+        }
+
+        const DetectionBeam &beam = detectionBeams[beamIdx];
+        auto loc = op.getLoc();
+        MLIRContext *ctx = op.getContext();
+
+        auto beamAttr = BeamAttr::get(ctx, rewriter.getI64IntegerAttr(beam.transition_index),
+                                      rewriter.getF64FloatAttr(beam.rabi),
+                                      rewriter.getF64FloatAttr(beam.detuning),
+                                      rewriter.getDenseI64ArrayAttr(beam.polarization),
+                                      rewriter.getDenseI64ArrayAttr(beam.wavevector));
+
+        // duration is a compile-time constant emitted as an arith.constant Value
+        mlir::Value durationValue =
+            arith::ConstantOp::create(rewriter, loc, rewriter.getF64FloatAttr(measurementDuration));
+        auto phaseAttr = rewriter.getF64FloatAttr(0.0);
+
+        auto ionQubits = convertQuantumBitsToIonQubits(rewriter, loc, op.getInQubit());
+        if (!ionQubits.has_value()) {
+            return failure();
+        }
+
+        auto ppOp = ion::ParallelProtocolOp::create(
+            rewriter, loc, ionQubits.value(),
+            [&](OpBuilder &builder, Location loc, ValueRange qubits) {
+                ion::MeasurePulseOp::create(builder, loc, PulseType::get(ctx), durationValue,
+                                            qubits.front(), beamAttr, phaseAttr);
+            });
+
+        // Create a readout bit op to read out the classical measurement result
+        // and thread the qubit wire through.
+        auto readoutOp = ion::ReadoutBitOp::create(rewriter, loc, rewriter.getI1Type(),
+                                                   ion::QubitType::get(ctx), ppOp.getResults()[0]);
+
+        auto qubitResults = convertIonQubitsToQuantumBits(rewriter, loc, readoutOp.getOutQubit());
+        if (!qubitResults.has_value()) {
+            return failure();
+        }
+
+        rewriter.replaceOp(op, {readoutOp.getMres(), qubitResults.value()[0]});
+        return success();
     }
 };
 
@@ -614,6 +616,12 @@ void populateGatesToPulsesPatterns(RewritePatternSet &patterns,
                                    const OQDDatabaseManager &dataManager)
 {
     patterns.add<GatesToPulsesRewritePattern>(patterns.getContext(), dataManager);
+}
+
+void populateMeasureToPulsesPatterns(RewritePatternSet &patterns,
+                                     const OQDDatabaseManager &dataManager)
+{
+    patterns.add<MeasureOpToMeasurePulsePattern>(patterns.getContext(), dataManager);
 }
 
 } // namespace ion

@@ -53,7 +53,8 @@ runtime_code_generation = true
 # The methods of handling mid-circuit measurements that the device supports, e.g.,
 # "one-shot", "device", "tree-traversal", etc. An empty list indicates that the device
 # does not support mid-circuit measurements.
-supported_mcm_methods = [ ]
+# OQD supports "device" for mid-circuit measurement via OpenAPL MeasurePulse.
+supported_mcm_methods = [ "device" ]
 # Whether the device supports dynamic qubit allocation/deallocation.
 dynamic_qubit_management = false
 # Whether simultaneous measurements of non-commuting observables is supported.

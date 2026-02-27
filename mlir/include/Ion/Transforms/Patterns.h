@@ -25,6 +25,7 @@ namespace catalyst {
 namespace ion {
 // Gates to pulses conversion patterns
 void populateGatesToPulsesPatterns(mlir::RewritePatternSet &, const OQDDatabaseManager &);
+void populateMeasureToPulsesPatterns(mlir::RewritePatternSet &, const OQDDatabaseManager &);
 void populateConversionPatterns(mlir::LLVMTypeConverter &typeConverter,
                                 mlir::RewritePatternSet &patterns);
 
