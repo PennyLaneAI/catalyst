@@ -218,7 +218,7 @@ class WorkflowInterpreter(PlxprInterpreter):
     """An interpreter that converts a qnode primitive from a plxpr variant to a catalyst jaxpr variant."""
 
     def __copy__(self):
-        new_version = WorkflowInterpreter()
+        new_version = WorkflowInterpreter(skip_preprocess=self._skip_preprocess)
         new_version._pass_pipeline = copy(self._pass_pipeline)
         new_version.init_qreg = self.init_qreg
         new_version.requires_decompose_lowering = self.requires_decompose_lowering
@@ -593,7 +593,7 @@ def trace_from_pennylane(
             fn.static_argnums = static_argnums
 
         plxpr, out_type, out_treedef = make_jaxpr2(fn, **make_jaxpr_kwargs)(*args, **kwargs)
-        jaxpr = from_plxpr(plxpr)(*plxpr.in_avals)
+        jaxpr = from_plxpr(plxpr, skip_preprocess=skip_preprocess)(*plxpr.in_avals)
 
     return jaxpr, out_type, out_treedef, sig
 
