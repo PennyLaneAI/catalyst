@@ -52,7 +52,7 @@ detuning = 11.11
 polarization = [12,13,14]
 wavevector = [14,15,16]
 
-
+# pair (0, 1): beamBaseIndex = 3
 [[beams2]]
 rabi = 1.23
 detuning = 4.56
@@ -70,6 +70,8 @@ rabi = 99.99
 detuning = 100.100
 polarization = [37,42,43]
 wavevector = [-42,-37,-43]
+
+# pair (0, 2): beam,,kl,
 
 
 # Phonon modes

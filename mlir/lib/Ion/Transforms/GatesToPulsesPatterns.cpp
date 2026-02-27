@@ -337,8 +337,8 @@ mlir::LogicalResult MSGateToPulse(CustomOp op, mlir::PatternRewriter &rewriter,
                     << "Missing two-qubit beam parameters for qubits "
                     << "(" << qubitIndex0Value << ", " << qubitIndex1Value << ") "
                     << "used as input to MS gate. Expected 3 beam entries starting at index "
-                    << beamBaseIndex << " but there are only "
-                    << beams2.size() << " beam parameters in the database."
+                    << beamBaseIndex << " but there are only " << beams2.size()
+                    << " beam parameters in the database."
                     << " Ensure that the database contains all necessary parameters for the "
                        "circuit.";
                 return failure();
