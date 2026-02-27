@@ -568,7 +568,7 @@ def _quantum_kernel_def_impl(*args, call_jaxpr, qnode, pipeline=None):  # pragma
     raise NotImplementedError()
 
 
-def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode, pipeline=None):
+def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode, pipeline=None, device_pipeline=None):
     """Lower's qnodes to moduleOp
 
     Args:
@@ -581,9 +581,11 @@ def _quantum_kernel_lowering(ctx, *args, call_jaxpr, qnode, pipeline=None):
     """
     assert isinstance(qnode, qml.QNode), "This function expects qnodes"
     if pipeline is None:
-        pipeline = tuple()
+        pipeline = ()
+    if device_pipeline is None:
+        device_pipeline = ()
 
-    func_op = lower_callable(ctx, qnode, call_jaxpr, pipeline)
+    func_op = lower_callable(ctx, qnode, call_jaxpr, pipeline, device_pipeline)
     call_op = create_call_op(ctx, func_op, *args)
     return call_op.results
 

@@ -368,7 +368,8 @@ def handle_qnode(
         wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
         *non_const_args,
         qnode=qnode,
-        pipeline=tuple(self._pass_pipeline + device_pipeline),
+        pipeline=tuple(self._pass_pipeline),
+        device_pipeline=tuple(device_pipeline),
     )
 
 
