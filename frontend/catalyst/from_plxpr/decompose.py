@@ -345,6 +345,7 @@ def _create_decomposition_rule(
     # Set custom attributes for the decomposition rule
     # These attributes are used in the MLIR decomposition pass
     # to identify the target gate and the number of wires
+    setattr(func_cp, "decomposition_rule", True)
     setattr(func_cp, "target_gate", op_name)
     setattr(func_cp, "num_wires", num_wires)
 
