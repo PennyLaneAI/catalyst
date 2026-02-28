@@ -22,7 +22,7 @@ config.name = "Frontend Tests"
 config.test_format = lit.formats.ShTest(True)
 
 # Define the file extensions to treat as test files (with the exception of this file).
-config.suffixes = [".py"]
+config.suffixes = [".py", ".mlir"]
 config.excludes = ["lit.cfg.py", "utils.py"]
 
 # Define the root path of where to look for tests.
