@@ -33,6 +33,7 @@ set(LIBS
     MLIRCatalyst
     catalyst-transforms
     MLIRQRef
+    qref-transforms
     MLIRQuantum
     quantum-transforms
     MLIRPBC
