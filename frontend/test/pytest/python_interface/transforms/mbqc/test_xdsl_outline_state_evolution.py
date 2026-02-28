@@ -74,7 +74,7 @@ class TestOutlineStateEvolutionPass:
         """Test outline state evolution pass would be applied to a func with a qnode attribute."""
         program = """
             module @module_circuit {
-                func.func public @circuit() -> tensor<f64> attributes {qnode} {
+                func.func public @circuit() -> tensor<f64> attributes {quantum.node} {
                     %0 = arith.constant 0 : i64
                     quantum.device shots(%0) ["", "", ""]
                     %1 = quantum.alloc( 50) : !quantum.reg
@@ -101,7 +101,7 @@ class TestOutlineStateEvolutionPass:
         """Test outline state evolution pass would be applied to a func with a qnode attribute."""
         program = """
             module @module_circuit {
-                func.func public @circuit1() -> tensor<f64> attributes {qnode} {
+                func.func public @circuit1() -> tensor<f64> attributes {quantum.node} {
                     %0 = arith.constant 0 : i64
                     quantum.device shots(%0) ["", "", ""]
                     %1 = quantum.alloc( 50) : !quantum.reg
@@ -116,7 +116,7 @@ class TestOutlineStateEvolutionPass:
                     quantum.device_release
                     return %from_elements : tensor<f64>
                 }
-                func.func public @circuit2() -> tensor<f64> attributes {qnode} {
+                func.func public @circuit2() -> tensor<f64> attributes {quantum.node} {
                     %0 = arith.constant 0 : i64
                     quantum.device shots(%0) ["", "", ""]
                     %1 = quantum.alloc( 50) : !quantum.reg

@@ -413,7 +413,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
         // Collect qnode functions to process
         SmallVector<func::FuncOp> funcsToProcess;
         moduleOp.walk([&](func::FuncOp funcOp) {
-            if (funcOp->hasAttrOfType<UnitAttr>("qnode")) {
+            if (funcOp->hasAttrOfType<UnitAttr>("quantum.node")) {
                 funcsToProcess.push_back(funcOp);
             }
         });
@@ -444,7 +444,7 @@ struct SplitNonCommutingPass : public impl::SplitNonCommutingPassBase<SplitNonCo
 
             // Replace original function body with calls to group functions
             replaceOriginalWithCalls(funcOp, groupFunctions, groupReturnPositions);
-            funcOp->removeAttr("qnode");
+            funcOp->removeAttr("quantum.node");
         }
     }
 };

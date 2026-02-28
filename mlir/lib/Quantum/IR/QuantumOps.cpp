@@ -16,6 +16,7 @@
 #include <type_traits>
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 #include "llvm/ADT/StringSet.h"
@@ -332,6 +333,25 @@ LogicalResult QubitUnitaryOp::verify()
 
 // ----- measurements
 
+static LogicalResult verifyInQNodeFunction(Operation *op)
+{
+    auto parentModule = op->getParentOfType<ModuleOp>();
+    auto rootModule = parentModule->getParentOfType<ModuleOp>();
+    bool inQuantumKernel = parentModule && rootModule;
+    if (!inQuantumKernel) {
+        return success(); // strict verification only for quantum kernels
+    }
+
+    auto parentFunc = op->getParentOfType<func::FuncOp>();
+    if (!parentFunc) {
+        return op->emitOpError("must be nested inside a 'func.func' operation");
+    }
+    if (!parentFunc->hasAttrOfType<UnitAttr>("quantum.node")) {
+        return op->emitOpError("requires parent function to carry 'quantum.node' attribute");
+    }
+    return success();
+}
+
 template <typename T>
 static LogicalResult verifyMeasurementOpDynamism(T *op, bool hasObs, bool hasDynShape,
                                                  bool hasBufferIn, bool hasOutTensor)
@@ -400,6 +420,10 @@ LogicalResult HermitianOp::verify()
 
 LogicalResult SampleOp::verify()
 {
+    if (failed(verifyInQNodeFunction(getOperation()))) {
+        return failure();
+    }
+
     std::optional<size_t> numQubits = 0;
 
     if (failed(verifyObservable(getObs(), numQubits))) {
@@ -420,6 +444,10 @@ LogicalResult SampleOp::verify()
 
 LogicalResult CountsOp::verify()
 {
+    if (failed(verifyInQNodeFunction(getOperation()))) {
+        return failure();
+    }
+
     std::optional<size_t> numQubits = 0;
 
     if (failed(verifyObservable(getObs(), numQubits))) {
@@ -473,6 +501,10 @@ LogicalResult CountsOp::verify()
 
 LogicalResult ProbsOp::verify()
 {
+    if (failed(verifyInQNodeFunction(getOperation()))) {
+        return failure();
+    }
+
     std::optional<size_t> numQubits;
     if (failed(verifyObservable(getObs(), numQubits))) {
         return emitOpError("observable must be locally defined");
@@ -492,6 +524,10 @@ LogicalResult ProbsOp::verify()
 
 LogicalResult StateOp::verify()
 {
+    if (failed(verifyInQNodeFunction(getOperation()))) {
+        return failure();
+    }
+
     std::optional<size_t> numQubits;
     if (failed(verifyObservable(getObs(), numQubits))) {
         return emitOpError("observable must be locally defined");
@@ -507,6 +543,24 @@ LogicalResult StateOp::verify()
     bool hasOutTensor = (bool)getState();
     return verifyMeasurementOpDynamism<StateOp>(this, hasObs, hasDynShape, hasStateIn,
                                                 hasOutTensor);
+}
+
+LogicalResult ExpvalOp::verify()
+{
+    if (failed(verifyInQNodeFunction(getOperation()))) {
+        return failure();
+    }
+
+    return success();
+}
+
+LogicalResult VarianceOp::verify()
+{
+    if (failed(verifyInQNodeFunction(getOperation()))) {
+        return failure();
+    }
+
+    return success();
 }
 
 LogicalResult AdjointOp::verify()

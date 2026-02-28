@@ -488,7 +488,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
         removeDeadOpsBeforeOp(origFunc, callOp.getOperation(), /*reserveDeviceOps=*/false);
 
         // Remove qnode attribute
-        origFunc->removeAttr("qnode");
+        origFunc->removeAttr("quantum.node");
 
         return success();
     }
@@ -517,7 +517,7 @@ struct SplitToSingleTermsPass : public impl::SplitToSingleTermsPassBase<SplitToS
         // Find all qnode functions with Hamiltonian expvals
         SmallVector<func::FuncOp> funcsToProcess;
         moduleOp.walk([&](func::FuncOp funcOp) {
-            if (!funcOp->hasAttr("qnode")) {
+            if (!funcOp->hasAttrOfType<UnitAttr>("quantum.node")) {
                 return;
             }
 

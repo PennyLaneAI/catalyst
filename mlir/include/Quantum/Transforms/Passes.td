@@ -144,7 +144,7 @@ def LoopBoundaryOptimizationPass : Pass<"loop-boundary"> {
     let summary = "Perform loop boundary optimization to eliminate the redundancy of operations on loop boundary.";
 }
 
-def DynamicOneShotPass : Pass<"dynamic-one-shot"> {
+def DynamicOneShotPass : Pass<"dynamic-one-shot", "mlir::ModuleOp"> {
     let summary = "Apply the dynamic one-shot transform.";
 
     let dependentDialects = [

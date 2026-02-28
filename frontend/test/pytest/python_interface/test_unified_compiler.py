@@ -120,7 +120,7 @@ def test_generic_catalyst_program(as_mod):
               "quantum.dealloc"(%5) : (!quantum.reg) -> ()
               "quantum.device_release"() : () -> ()
               "func.return"(%7) : (tensor<2xcomplex<f64>>) -> ()
-            }) {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} : () -> ()
+            }) {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, quantum.node} : () -> ()
           }) : () -> ()
           "func.func"() <{function_type = () -> (), sym_name = "setup"}> ({
             "quantum.init"() : () -> ()
