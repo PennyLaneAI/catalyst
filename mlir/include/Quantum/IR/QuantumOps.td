@@ -16,6 +16,7 @@
 #define QUANTUM_OPS
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
@@ -1324,6 +1325,89 @@ def StateOp : Measurement_Op<"state", [AttrSizedOperandSegments]> {
     }];
 
     let hasVerifier = 1;
+}
+
+// -----
+
+def ExecutionOp : Quantum_Op<"execution", [
+    NoMemoryEffect,
+    SingleBlockImplicitTerminator<"ExecYieldOp">,
+    Symbol
+]> {
+    let summary = "Define a quantum execution as a top-level symbol";
+    let description = [{
+        The `quantum.execution` operation defines a quantum program execution with four
+        distinct phases as a top-level symbol that can be called by `quantum.call_execution`.
+        It acts like a function definition that can be invoked multiple times.
+
+        The four phases are:
+        1. **Init region**: Device initialization and quantum register allocation
+        2. **Evolution region**: Quantum state evolution
+        3. **Measurement region**: Observables and measurements
+        4. **Teardown region**: Resource cleanup
+
+        Each region can accept unlimited operands through block arguments and pass data
+        to subsequent regions via `quantum.exec_yield` operations.
+    }];
+
+    let arguments = (ins
+        SymbolNameAttr:$sym_name,
+        TypeAttr:$function_type
+    );
+
+    let results = (outs);
+
+    let regions = (region
+        SizedRegion<1>:$init_region,
+        SizedRegion<1>:$state_evolution_region,
+        SizedRegion<1>:$measurement_region,
+        SizedRegion<1>:$teardown_region
+    );
+
+    let assemblyFormat = [{
+        `(` `)` attr-dict
+        `(` `init` $init_region `,` `evolution` $state_evolution_region `,` `measurement` $measurement_region `,` `teardown` $teardown_region `)`
+    }];
+}
+
+def CallExecutionOp : Quantum_Op<"call_execution", [NoMemoryEffect]> {
+    let summary = "Call a quantum execution symbol";
+    let description = [{
+        The `quantum.call_execution` operation invokes a previously defined `quantum.execution`
+        symbol by name, passing the specified arguments and returning the computed results.
+
+        This operation actually performs the quantum computation defined by the
+        execution symbol, similar to how func.call invokes func.func.
+    }];
+
+    let arguments = (ins
+        FlatSymbolRefAttr:$callee,
+        Variadic<AnyType>:$operands
+    );
+
+    let results = (outs
+        Variadic<AnyType>:$results
+    );
+
+    let assemblyFormat = [{
+        `(` $operands `)` attr-dict `:` functional-type($operands, $results)
+    }];
+}
+
+def ExecYieldOp : Quantum_Op<"exec_yield", [Pure, ReturnLike, Terminator, ParentOneOf<["ExecutionOp"]>]> {
+    let summary = "Return results from quantum execution regions";
+
+    let arguments = (ins
+        Variadic<AnyType>:$retvals
+    );
+
+    let assemblyFormat = [{
+        attr-dict ($retvals ^ `:` type($retvals))?
+    }];
+
+    let builders = [
+        OpBuilder<(ins), [{ /* nothing to do */ }]>
+    ];
 }
 
 
