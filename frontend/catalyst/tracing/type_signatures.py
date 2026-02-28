@@ -228,7 +228,7 @@ def get_decomposed_signature(args, static_argnums):
     """
     dynamic_args, static_args = split_static_args(args, static_argnums)
     flat_dynamic_args, treedef = tree_flatten(dynamic_args)
-    flat_signature = get_abstract_signature(flat_dynamic_args)
+    flat_signature = [shaped_abstractify(arg) for arg in flat_dynamic_args]
 
     return flat_signature, treedef, static_args
 
