@@ -40,10 +40,13 @@ def assert_array_and_dtype_equal(a, b):
     assert a.dtype == b.dtype
 
 
-def test_qjit_abstracted_axes():
+# Capture gap: AssertionError in from_plxpr/jaxpr conversion on dynamic abstracted axes.
+# Classification: Catalyst integration gap. Fix: align dynamic aval conversion and from_plxpr lowering.
+@pytest.mark.capture_todo
+def test_qjit_abstracted_axes(capture_mode):
     """Test that qjit accepts dynamical arguments."""
 
-    @qjit(abstracted_axes={0: "n"})
+    @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
     def identity(a):
         return a
 
@@ -53,14 +56,17 @@ def test_qjit_abstracted_axes():
     assert "tensor<?xi64>" in identity.mlir, identity.mlir
 
 
-def test_qnode_abstracted_axis():
+# Capture gap: ValueError "Only Measurement Processes can be returned from QNode's" for classical returns.
+# Classification: missing PL capture feature. Fix: support classical QNode returns or rewrite to measurement-process outputs.
+@pytest.mark.capture_todo
+def test_qnode_abstracted_axis(capture_mode):
     """Test that qnode accepts dynamical arguments."""
 
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def circuit(a):
         return a
 
-    @qjit(abstracted_axes={0: "n"})
+    @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
     def identity(a):
         return circuit(a)
 
@@ -71,14 +77,17 @@ def test_qnode_abstracted_axis():
     assert "tensor<?xi64>" in identity.mlir, identity.mlir
 
 
-def test_qnode_dynamic_structured_args():
+# Capture gap: ValueError "Only Measurement Processes can be returned from QNode's" for classical returns.
+# Classification: missing PL capture feature. Fix: support classical QNode returns or rewrite to measurement-process outputs.
+@pytest.mark.capture_todo
+def test_qnode_dynamic_structured_args(capture_mode):
     """Test that qnode accepts dynamically-shaped structured args"""
 
     @qml.qnode(qml.device("lightning.qubit", wires=1))
     def circuit(a_b):
         return a_b[0] + a_b[1]
 
-    @qjit(abstracted_axes={0: "n"})
+    @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
     def func(a_b):
         return circuit(a_b)
 
@@ -88,7 +97,10 @@ def test_qnode_dynamic_structured_args():
     assert "tensor<?xi64>" in func.mlir, func.mlir
 
 
-def test_qnode_dynamic_structured_results():
+# Capture gap: ValueError "Only Measurement Processes can be returned from QNode's" for classical returns.
+# Classification: missing PL capture feature. Fix: support classical QNode returns or rewrite to measurement-process outputs.
+@pytest.mark.capture_todo
+def test_qnode_dynamic_structured_results(capture_mode):
     """Test that qnode returns dynamically-shaped results"""
 
     @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -100,7 +112,7 @@ def test_qnode_dynamic_structured_results():
             ),
         )
 
-    @qjit
+    @qjit(capture=capture_mode)
     def func(a):
         return circuit(a)
 
@@ -112,23 +124,25 @@ def test_qnode_dynamic_structured_results():
 
 @pytest.mark.parametrize("dtype", DTYPES)
 @pytest.mark.parametrize("shape", SHAPES)
-def test_classical_tracing_init(shape, dtype):
+def test_classical_tracing_init(shape, dtype, capture_mode):
     """Test that tensor primitive work in the classical tracing mode"""
 
     assert_array_and_dtype_equal(
-        qjit(lambda: jnp.zeros(shape, dtype))(), jnp.zeros(shape, dtype=dtype)
+        qjit(lambda: jnp.zeros(shape, dtype), capture=capture_mode)(), jnp.zeros(shape, dtype=dtype)
     )
     assert_array_and_dtype_equal(
-        qjit(lambda: jnp.ones(shape, dtype))(), jnp.ones(shape, dtype=dtype)
+        qjit(lambda: jnp.ones(shape, dtype), capture=capture_mode)(), jnp.ones(shape, dtype=dtype)
     )
     assert_array_and_dtype_equal(
-        qjit(lambda s: jnp.ones(s, dtype))(shape), jnp.ones(shape, dtype=dtype)
+        qjit(lambda s: jnp.ones(s, dtype), capture=capture_mode)(shape),
+        jnp.ones(shape, dtype=dtype),
     )
     assert_array_and_dtype_equal(
-        qjit(lambda s: jnp.zeros(s, dtype))(shape), jnp.zeros(shape, dtype=dtype)
+        qjit(lambda s: jnp.zeros(s, dtype), capture=capture_mode)(shape),
+        jnp.zeros(shape, dtype=dtype),
     )
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(s):
         res = jnp.empty(shape=s, dtype=dtype)
         return res
@@ -146,13 +160,13 @@ def test_classical_tracing_init(shape, dtype):
         jnp.abs,
     ],
 )
-def test_classical_tracing_unary_ops(op):
+def test_classical_tracing_unary_ops(op, capture_mode):
     """Test that tensor primitives work with basic unary operations"""
 
     shape = (3, 4)
     dtype = complex
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(s):
         return op(jnp.ones(s, dtype))
 
@@ -168,20 +182,20 @@ def test_classical_tracing_unary_ops(op):
         (lambda x, y: x / y),
     ],
 )
-def test_classical_tracing_binary_ops(op):
+def test_classical_tracing_binary_ops(op, capture_mode):
     """Test that tensor primitives work with basic binary operations"""
 
     shape = (3, 4)
     dtype = complex
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(s):
         return op(jnp.ones(s, dtype), jnp.ones(s, dtype))
 
     assert_array_and_dtype_equal(f(shape), op(jnp.ones(shape, dtype), jnp.ones(shape, dtype)))
 
 
-def test_classical_tracing_binary_ops_3D():
+def test_classical_tracing_binary_ops_3D(capture_mode):
     """Test that tensor primitives work with basic binary operations on 3D arrays"""
     # TODO: Merge with the binary operations test after fixing
     # pylint: disable=unnecessary-lambda-assignment
@@ -190,7 +204,7 @@ def test_classical_tracing_binary_ops_3D():
     dtype = complex
     op = lambda a, b: a + b
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(s):
         return op(jnp.ones(s, dtype), jnp.ones(s, dtype))
 
@@ -198,12 +212,12 @@ def test_classical_tracing_binary_ops_3D():
 
 
 @pytest.mark.parametrize("shape,idx", [((1, 2, 3), (0, 1, 2)), ((3,), (2,))])
-def test_access_dynamic_array_static_index(shape, idx):
+def test_access_dynamic_array_static_index(shape, idx, capture_mode):
     """Test accessing dynamic array elements using static indices"""
 
     dtype = complex
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(s):
         return jnp.ones(s, dtype)[idx]
 
@@ -213,12 +227,12 @@ def test_access_dynamic_array_static_index(shape, idx):
 
 
 @pytest.mark.parametrize("shape,idx", [((1, 2, 3), (0, 1, -2)), ((3,), (2,))])
-def test_access_dynamic_array_dynamic_index(shape, idx):
+def test_access_dynamic_array_dynamic_index(shape, idx, capture_mode):
     """Test accessing dynamic array elements using dynamic indices"""
 
     dtype = complex
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(s, i):
         return jnp.ones(s, dtype)[i]
 
@@ -229,12 +243,12 @@ def test_access_dynamic_array_dynamic_index(shape, idx):
 
 @pytest.mark.xfail(reason="MLIR is incompatible with our pipeline")
 @pytest.mark.parametrize("shape,idx,val", [((1, 2, 3), (0, 1, 2), 1j), ((3,), (2,), 0)])
-def test_modify_dynamic_array_dynamic_index(shape, idx, val):
+def test_modify_dynamic_array_dynamic_index(shape, idx, val, capture_mode):
     """Test dynamic array modification using dynamic indices"""
 
     dtype = complex
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(s, i):
         return jnp.ones(s, dtype).at[i].set(val)
 
@@ -244,13 +258,13 @@ def test_modify_dynamic_array_dynamic_index(shape, idx, val):
 
 
 @pytest.mark.xfail(reason="Slicing is not supported by JAX?")
-def test_slice_dynamic_array_dynamic_index():
+def test_slice_dynamic_array_dynamic_index(capture_mode):
     """Test dynamic array modification using dynamic indices"""
 
     shape = (1, 2, 3)
     dtype = complex
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(s):
         return jnp.ones(s, dtype)[0, 1, 0:1]
 
@@ -258,26 +272,31 @@ def test_slice_dynamic_array_dynamic_index():
     assert f"tensor<{'x'.join(['?']*len(shape))}xcomplex<f64>>" in f.mlir
 
 
-def test_classical_tracing_2():
+def test_classical_tracing_2(capture_mode):
     """Test that tensor primitive work in the classical tracing mode, the traced dimension case"""
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(x):
         return jnp.ones(shape=[1, x], dtype=int)
 
     assert_array_and_dtype_equal(f(3), jnp.ones((1, 3), dtype=int))
 
 
-def test_quantum_tracing_1():
+# Capture gap: ValueError "Only Measurement Processes can be returned from QNode's" for classical returns.
+# Classification: missing PL capture feature. Fix: support classical QNode returns or rewrite to measurement-process outputs.
+@pytest.mark.capture_todo
+def test_quantum_tracing_1(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
 
-    @qjit
+    while_loop_prim = qml.while_loop if capture_mode else while_loop
+
+    @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(shape):
         i = 0
         a = jnp.ones(shape, dtype=float)
 
-        @while_loop(lambda _, i: i < 3)
+        @while_loop_prim(lambda _, i: i < 3)
         def loop(_, i):
             qml.PauliX(wires=0)
             b = jnp.ones(shape, dtype=float)
@@ -292,16 +311,21 @@ def test_quantum_tracing_1():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_quantum_tracing_2():
+# Capture gap: ValueError "Only Measurement Processes can be returned from QNode's" for classical returns.
+# Classification: missing PL capture feature. Fix: support classical QNode returns or rewrite to measurement-process outputs.
+@pytest.mark.capture_todo
+def test_quantum_tracing_2(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum tracing mode"""
 
-    @qjit
+    while_loop_prim = qml.while_loop if capture_mode else while_loop
+
+    @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(x, y):
         i = 0
         a = jnp.ones((x, y + 1), dtype=float)
 
-        @while_loop(lambda _, i: i < 3, allow_array_resizing=True)
+        @while_loop_prim(lambda _, i: i < 3, allow_array_resizing=True)
         def loop(_, i):
             qml.PauliX(wires=0)
             b = jnp.ones((x, y + 1), dtype=float)
@@ -324,18 +348,18 @@ def test_quantum_tracing_2():
         [1, jnp.array(2, dtype=float)],
     ],
 )
-def test_invalid_shapes(bad_shape):
+def test_invalid_shapes(bad_shape, capture_mode):
     """Test the unsupported shape formats"""
 
     def f():
         return jnp.empty(shape=bad_shape, dtype=int)
 
     with pytest.raises(TypeError, match="Shapes must be 1D sequences of integer scalars"):
-        qjit(f)
+        qjit(f, capture=capture_mode)
 
 
 @pytest.mark.skip("Jax does not detect error in this use-case")
-def test_invalid_shapes_2():
+def test_invalid_shapes_2(capture_mode):
     """Test the unsupported shape formats"""
     bad_shape = jnp.array([[3, 2]], dtype=int)
 
@@ -343,13 +367,13 @@ def test_invalid_shapes_2():
         return jnp.empty(shape=bad_shape, dtype=int)
 
     with pytest.raises(TypeError):
-        qjit(f)
+        qjit(f, capture=capture_mode)
 
 
-def test_accessing_shapes():
+def test_accessing_shapes(capture_mode):
     """Test that dynamic tensor shapes are available for calculations"""
 
-    @qjit
+    @qjit(capture=capture_mode)
     def f(sz):
         a = jnp.ones((sz, sz))
         sa = jnp.array(a.shape)
@@ -358,11 +382,14 @@ def test_accessing_shapes():
     assert f(3) == 6
 
 
-def test_no_recompilation():
+# Capture gap: AssertionError in from_plxpr/jaxpr conversion on dynamic abstracted axes.
+# Classification: Catalyst integration gap. Fix: align dynamic aval conversion and from_plxpr lowering.
+@pytest.mark.capture_todo
+def test_no_recompilation(capture_mode):
     """Test that the function is not recompiled when changing the argument shape across
     invocations."""
 
-    @qjit(abstracted_axes={0: "n"})
+    @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
     def i(x):
         return x
 
@@ -373,10 +400,10 @@ def test_no_recompilation():
     assert _id0 == _id1
 
 
-def test_array_indexing():
+def test_array_indexing(capture_mode):
     """Test the support of indexing of dynamically-shaped arrays"""
 
-    @qjit
+    @qjit(capture=capture_mode)
     def fun(sz, idx):
         r = jnp.ones((sz, 3, sz + 1), dtype=int)
         return r[idx, 2, idx]
@@ -385,10 +412,10 @@ def test_array_indexing():
     assert res == 1
 
 
-def test_array_assignment():
+def test_array_assignment(capture_mode):
     """Test the support of assigning a value to a dynamically-shaped array"""
 
-    @qjit
+    @qjit(capture=capture_mode)
     def fun(sz, idx, val):
         r = jnp.ones((sz, 3, sz), dtype=int)
         r = r.at[idx, 0, idx].set(val)
@@ -399,14 +426,19 @@ def test_array_assignment():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_qjit_forloop_identity():
+# Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
+# Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr conversion.
+@pytest.mark.capture_todo
+def test_qjit_forloop_identity(capture_mode):
     """Test simple for-loop primitive vs dynamic dimensions"""
 
-    @qjit
+    for_loop_prim = qml.for_loop if capture_mode else for_loop
+
+    @qjit(capture=capture_mode)
     def f(sz):
         a = jnp.ones([sz], dtype=float)
 
-        @for_loop(0, 10, 2)
+        @for_loop_prim(0, 10, 2)
         def loop(_, a):
             return a
 
@@ -418,14 +450,16 @@ def test_qjit_forloop_identity():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_qjit_forloop_capture():
+def test_qjit_forloop_capture(capture_mode):
     """Test simple for-loop primitive vs dynamic dimensions"""
 
-    @qjit
+    for_loop_prim = qml.for_loop if capture_mode else for_loop
+
+    @qjit(capture=capture_mode)
     def f(sz):
         x = jnp.ones([sz], dtype=float)
 
-        @for_loop(0, 3, 1)
+        @for_loop_prim(0, 3, 1)
         def loop(_, a):
             return a + x
 
@@ -437,15 +471,20 @@ def test_qjit_forloop_capture():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_qjit_forloop_shared_indbidx():
+# Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
+# Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr conversion.
+@pytest.mark.capture_todo
+def test_qjit_forloop_shared_indbidx(capture_mode):
     """Test for-loops with shared dynamic input dimensions in classical tracing mode"""
 
-    @qjit
+    for_loop_prim = qml.for_loop if capture_mode else for_loop
+
+    @qjit(capture=capture_mode)
     def f(sz):
         a = jnp.ones([sz], dtype=float)
         b = jnp.ones([sz], dtype=float)
 
-        @for_loop(0, 10, 2)
+        @for_loop_prim(0, 10, 2)
         def loop(_, a, b):
             return (a, b)
 
@@ -457,15 +496,19 @@ def test_qjit_forloop_shared_indbidx():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_qjit_forloop_indbidx_outdbidx():
+@pytest.mark.capture_todo  # PL capture gap: dynamic output resizing in qml.for_loop fails in from_plxpr (zip invars mismatch).
+# Fix direction: align qml.for_loop dynamic-shape jaxpr outputs with Catalyst from_plxpr conversion.
+def test_qjit_forloop_indbidx_outdbidx(capture_mode):
     """Test for-loops with shared dynamic output dimensions in classical tracing mode"""
 
-    @qjit
+    for_loop_prim = qml.for_loop if capture_mode else for_loop
+
+    @qjit(capture=capture_mode)
     def f(sz):
         a = jnp.ones([sz, 3], dtype=float)
         b = jnp.ones([sz, 3], dtype=float)
 
-        @for_loop(0, 10, 2, allow_array_resizing=True)
+        @for_loop_prim(0, 10, 2, allow_array_resizing=True)
         def loop(_i, a, _b):
             b = jnp.ones([sz + 1, 3], dtype=float)
             return (a, b)
@@ -479,14 +522,19 @@ def test_qjit_forloop_indbidx_outdbidx():
     assert_array_and_dtype_equal(res_b, jnp.ones([4, 3]))
 
 
-def test_qjit_forloop_index_indbidx():
+# Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
+# Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr conversion.
+@pytest.mark.capture_todo
+def test_qjit_forloop_index_indbidx(capture_mode):
     """Test for-loops referring loop return new dimension variable."""
 
-    @qjit
+    for_loop_prim = qml.for_loop if capture_mode else for_loop
+
+    @qjit(capture=capture_mode)
     def f(sz):
         a0 = jnp.ones([sz], dtype=float)
 
-        @for_loop(0, 10, 1, allow_array_resizing=True)
+        @for_loop_prim(0, 10, 1, allow_array_resizing=True)
         def loop(i, _):
             return jnp.ones([i], dtype=float)
 
@@ -498,14 +546,19 @@ def test_qjit_forloop_index_indbidx():
     assert_array_and_dtype_equal(res_a, jnp.ones(9))
 
 
-def test_qjit_forloop_indbidx_const():
+# Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
+# Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr conversion.
+@pytest.mark.capture_todo
+def test_qjit_forloop_indbidx_const(capture_mode):
     """Test for-loops preserve type information in the presence of a constant."""
 
-    @qjit
+    for_loop_prim = qml.for_loop if capture_mode else for_loop
+
+    @qjit(capture=capture_mode)
     def f(sz):
         a0 = jnp.ones([sz], dtype=float)
 
-        @for_loop(0, 3, 1)
+        @for_loop_prim(0, 3, 1)
         def loop(_i, a):
             return a * sz
 
@@ -517,15 +570,20 @@ def test_qjit_forloop_indbidx_const():
     assert_array_and_dtype_equal(res_a, jnp.ones(3) * (3**3))
 
 
-def test_qjit_forloop_shared_dimensions():
+# Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
+# Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr conversion.
+@pytest.mark.capture_todo
+def test_qjit_forloop_shared_dimensions(capture_mode):
     """Test catalyst for-loop primitive's experimental_preserve_dimensions option"""
 
-    @qjit
+    for_loop_prim = qml.for_loop if capture_mode else for_loop
+
+    @qjit(capture=capture_mode)
     def f(sz: int):
         input_a = jnp.ones([sz + 1], dtype=float)
         input_b = jnp.ones([sz + 2], dtype=float)
 
-        @for_loop(0, 10, 1, allow_array_resizing=True)
+        @for_loop_prim(0, 10, 1, allow_array_resizing=True)
         def loop(_i, _a, _b):
             return (input_a, input_a)
 
@@ -539,15 +597,20 @@ def test_qjit_forloop_shared_dimensions():
     assert_array_and_dtype_equal(result[1], expected[1])
 
 
-def test_qnode_forloop_identity():
+# Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
+# Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr conversion.
+@pytest.mark.capture_todo
+def test_qnode_forloop_identity(capture_mode):
     """Test simple for-loops with dynamic dimensions while doing quantum tracing."""
 
-    @qjit
+    for_loop_prim = qml.for_loop if capture_mode else for_loop
+
+    @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
         a = jnp.ones([sz], dtype=float)
 
-        @for_loop(0, 10, 2)
+        @for_loop_prim(0, 10, 2)
         def loop(_, a):
             return a
 
@@ -559,15 +622,20 @@ def test_qnode_forloop_identity():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_qnode_forloop_capture():
+# Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
+# Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr conversion.
+@pytest.mark.capture_todo
+def test_qnode_forloop_capture(capture_mode):
     """Test simple for-loops with dynamic dimensions while doing quantum tracing."""
 
-    @qjit
+    for_loop_prim = qml.for_loop if capture_mode else for_loop
+
+    @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
         x = jnp.ones([sz], dtype=float)
 
-        @for_loop(0, 3, 1)
+        @for_loop_prim(0, 3, 1)
         def loop(_, a):
             return a + x
 
@@ -579,16 +647,21 @@ def test_qnode_forloop_capture():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_qnode_forloop_shared_indbidx():
+# Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
+# Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr conversion.
+@pytest.mark.capture_todo
+def test_qnode_forloop_shared_indbidx(capture_mode):
     """Tests that for-loops preserve equality of output dynamic dimensions."""
 
-    @qjit
+    for_loop_prim = qml.for_loop if capture_mode else for_loop
+
+    @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
         a = jnp.ones([sz], dtype=float)
         b = jnp.ones([sz], dtype=float)
 
-        @for_loop(0, 10, 2)
+        @for_loop_prim(0, 10, 2)
         def loop(_, a, b):
             return (a, b)
 
@@ -600,16 +673,21 @@ def test_qnode_forloop_shared_indbidx():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_qnode_forloop_indbidx_outdbidx():
+# Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
+# Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr conversion.
+@pytest.mark.capture_todo
+def test_qnode_forloop_indbidx_outdbidx(capture_mode):
     """Test for-loops with mixed input and output dimension variables during the quantum tracing."""
 
-    @qjit
+    for_loop_prim = qml.for_loop if capture_mode else for_loop
+
+    @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
         a = jnp.ones([sz], dtype=float)
         b = jnp.ones([sz], dtype=float)
 
-        @for_loop(0, 10, 2, allow_array_resizing=True)
+        @for_loop_prim(0, 10, 2, allow_array_resizing=True)
         def loop(_i, a, _b):
             b = jnp.ones([sz + 1], dtype=float)
             return (a, b)
@@ -622,14 +700,19 @@ def test_qnode_forloop_indbidx_outdbidx():
     assert_array_and_dtype_equal(res_b, jnp.ones(4))
 
 
-def test_qnode_forloop_abstracted_axes():
+# Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
+# Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr conversion.
+@pytest.mark.capture_todo
+def test_qnode_forloop_abstracted_axes(capture_mode):
     """Test for-loops with mixed input and output dimension variables during the quantum tracing.
     Use abstracted_axes as the source of dynamism."""
 
-    @qjit(abstracted_axes={0: "n"})
+    for_loop_prim = qml.for_loop if capture_mode else for_loop
+
+    @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(a, b):
-        @for_loop(0, 10, 2, allow_array_resizing=True)
+        @for_loop_prim(0, 10, 2, allow_array_resizing=True)
         def loop(_i, a, _b):
             b = jnp.ones([a.shape[0] + 1], dtype=float)
             return (a, b)
@@ -644,15 +727,20 @@ def test_qnode_forloop_abstracted_axes():
     assert_array_and_dtype_equal(res_b, jnp.ones(4))
 
 
-def test_qnode_forloop_index_indbidx():
+# Capture gap: qml.for_loop path fails on dynamic resizing/shape tracing under capture.
+# Classification: PL/Catalyst integration gap. Fix: reconcile dynamic for-loop outputs in from_plxpr conversion.
+@pytest.mark.capture_todo
+def test_qnode_forloop_index_indbidx(capture_mode):
     """Test for-loops referring loop index as a dimension during the quantum tracing."""
 
-    @qjit
+    for_loop_prim = qml.for_loop if capture_mode else for_loop
+
+    @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
         a = jnp.ones([sz, 3], dtype=float)
 
-        @for_loop(0, 10, 1, allow_array_resizing=True)
+        @for_loop_prim(0, 10, 1, allow_array_resizing=True)
         def loop(i, _):
             b = jnp.ones([i, 3], dtype=float)
             return b
@@ -664,15 +752,20 @@ def test_qnode_forloop_index_indbidx():
     assert_array_and_dtype_equal(res_a, jnp.ones([9, 3]))
 
 
-def test_qnode_whileloop_1():
+# Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
+# Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop abstract-axis handling.
+@pytest.mark.capture_todo
+def test_qnode_whileloop_1(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
-    @qjit
+    while_loop_prim = qml.while_loop if capture_mode else while_loop
+
+    @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
         a0 = jnp.ones([sz + 1], dtype=float)
 
-        @while_loop(lambda _, i: i < 3)
+        @while_loop_prim(lambda _, i: i < 3)
         def loop(a, i):
             i += 1
             return (a, i)
@@ -685,15 +778,20 @@ def test_qnode_whileloop_1():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_qnode_whileloop_2():
+# Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
+# Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop abstract-axis handling.
+@pytest.mark.capture_todo
+def test_qnode_whileloop_2(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
-    @qjit
+    while_loop_prim = qml.while_loop if capture_mode else while_loop
+
+    @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
         a = jnp.ones([sz + 1], dtype=float)
 
-        @while_loop(lambda _, i: i < 3, allow_array_resizing=True)
+        @while_loop_prim(lambda _, i: i < 3, allow_array_resizing=True)
         def loop(_, i):
             b = jnp.ones([sz + 1], dtype=float)
             i += 1
@@ -707,15 +805,20 @@ def test_qnode_whileloop_2():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_qnode_whileloop_capture():
+# Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
+# Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop abstract-axis handling.
+@pytest.mark.capture_todo
+def test_qnode_whileloop_capture(capture_mode):
     """Tests that while-loop primitive can capture variables from the outer scope"""
 
-    @qjit
+    while_loop_prim = qml.while_loop if capture_mode else while_loop
+
+    @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
         x = jnp.ones([sz], dtype=float)
 
-        @while_loop(lambda i, _: i < 3)
+        @while_loop_prim(lambda i, _: i < 3)
         def loop(i, a):
             return i + 1, a + x
 
@@ -727,14 +830,19 @@ def test_qnode_whileloop_capture():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_qnode_whileloop_abstracted_axes():
+# Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
+# Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop abstract-axis handling.
+@pytest.mark.capture_todo
+def test_qnode_whileloop_abstracted_axes(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while. Use abstracted_axes as
     the source of dynamism."""
 
-    @qjit(abstracted_axes={0: "n"})
+    while_loop_prim = qml.while_loop if capture_mode else while_loop
+
+    @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(a, b):
-        @while_loop(lambda _a, _b, i: i < 3)
+        @while_loop_prim(lambda _a, _b, i: i < 3)
         def loop(a, b, i):
             i += 1
             return (a, b, i)
@@ -749,16 +857,21 @@ def test_qnode_whileloop_abstracted_axes():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_qnode_whileloop_shared_indbidx():
+# Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
+# Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop abstract-axis handling.
+@pytest.mark.capture_todo
+def test_qnode_whileloop_shared_indbidx(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
-    @qjit
+    while_loop_prim = qml.while_loop if capture_mode else while_loop
+
+    @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
         a = jnp.ones([sz], dtype=float)
         b = jnp.ones([sz], dtype=float)
 
-        @while_loop(lambda _a, _b, i: i < 3)
+        @while_loop_prim(lambda _a, _b, i: i < 3)
         def loop(a, b, i):
             i += 1
             return (a, b, i)
@@ -771,16 +884,21 @@ def test_qnode_whileloop_shared_indbidx():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_qnode_whileloop_indbidx_outdbidx():
+# Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
+# Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop abstract-axis handling.
+@pytest.mark.capture_todo
+def test_qnode_whileloop_indbidx_outdbidx(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
-    @qjit
+    while_loop_prim = qml.while_loop if capture_mode else while_loop
+
+    @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
         a = jnp.ones([sz], dtype=float)
         b = jnp.ones([sz], dtype=float)
 
-        @while_loop(lambda _a, _b, i: i < 3, allow_array_resizing=True)
+        @while_loop_prim(lambda _a, _b, i: i < 3, allow_array_resizing=True)
         def loop(a, _, i):
             b = jnp.ones([sz + 1], dtype=float)
             i += 1
@@ -794,15 +912,20 @@ def test_qnode_whileloop_indbidx_outdbidx():
     assert_array_and_dtype_equal(res_b, jnp.ones(4))
 
 
-def test_qnode_whileloop_outer():
+# Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
+# Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop abstract-axis handling.
+@pytest.mark.capture_todo
+def test_qnode_whileloop_outer(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
-    @qjit
+    while_loop_prim = qml.while_loop if capture_mode else while_loop
+
+    @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(sz):
         a0 = jnp.ones([sz], dtype=float)
 
-        @while_loop(lambda _a, i: i < 3)
+        @while_loop_prim(lambda _a, i: i < 3)
         def loop(_a, i):
             i += 1
             return (a0, i)
@@ -814,14 +937,19 @@ def test_qnode_whileloop_outer():
     assert_array_and_dtype_equal(res_a, 2 * jnp.ones(3))
 
 
-def test_qjit_whileloop_1():
+# Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
+# Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop abstract-axis handling.
+@pytest.mark.capture_todo
+def test_qjit_whileloop_1(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
-    @qjit
+    while_loop_prim = qml.while_loop if capture_mode else while_loop
+
+    @qjit(capture=capture_mode)
     def f(sz):
         a = jnp.ones([sz + 1], dtype=float)
 
-        @while_loop(lambda _, i: i < 3, allow_array_resizing=True)
+        @while_loop_prim(lambda _, i: i < 3, allow_array_resizing=True)
         def loop(_, i):
             b = jnp.ones([sz + 1], dtype=float)
             i += 1
@@ -835,14 +963,19 @@ def test_qjit_whileloop_1():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_qjit_whileloop_2():
+# Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
+# Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop abstract-axis handling.
+@pytest.mark.capture_todo
+def test_qjit_whileloop_2(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
-    @qjit
+    while_loop_prim = qml.while_loop if capture_mode else while_loop
+
+    @qjit(capture=capture_mode)
     def f(sz):
         a = jnp.ones([sz + 1], dtype=float)
 
-        @while_loop(lambda _, i: i < 3, allow_array_resizing=True)
+        @while_loop_prim(lambda _, i: i < 3, allow_array_resizing=True)
         def loop(_, i):
             b = jnp.ones([sz + 1], dtype=float)
             i += 1
@@ -856,15 +989,19 @@ def test_qjit_whileloop_2():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_qjit_whileloop_shared_dimensions():
+@pytest.mark.capture_todo  # PL capture gap: qml.while_loop abstract-axes path rejects scalar bool loop state.
+# Fix direction: support scalar loop-carried states in loop abstract-axis handling.
+def test_qjit_whileloop_shared_dimensions(capture_mode):
     """Test catalyst while loop primitive's preserve dimensions option"""
 
-    @qjit
+    while_loop_prim = qml.while_loop if capture_mode else while_loop
+
+    @qjit(capture=capture_mode)
     def f(sz: int):
         input_a = jnp.ones([sz + 1], dtype=float)
         input_b = jnp.ones([sz + 2], dtype=float)
 
-        @while_loop(lambda _a, _b, c: c, allow_array_resizing=False)
+        @while_loop_prim(lambda _a, _b, c: c, allow_array_resizing=False)
         def loop(_a, _b, _c):
             return (input_a, input_a, False)
 
@@ -878,15 +1015,20 @@ def test_qjit_whileloop_shared_dimensions():
     assert_array_and_dtype_equal(result[1], expected[1])
 
 
-def test_qjit_whileloop_shared_indbidx():
+# Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
+# Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop abstract-axis handling.
+@pytest.mark.capture_todo
+def test_qjit_whileloop_shared_indbidx(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
-    @qjit
+    while_loop_prim = qml.while_loop if capture_mode else while_loop
+
+    @qjit(capture=capture_mode)
     def f(sz):
         a = jnp.ones([sz], dtype=float)
         b = jnp.ones([sz], dtype=float)
 
-        @while_loop(lambda _a, _b, i: i < 3)
+        @while_loop_prim(lambda _a, _b, i: i < 3)
         def loop(a, b, i):
             i += 1
             return (a, b, i)
@@ -899,15 +1041,19 @@ def test_qjit_whileloop_shared_indbidx():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_qjit_whileloop_indbidx_outdbidx():
+@pytest.mark.capture_todo  # PL capture gap: qml.while_loop abstract-axes path rejects scalar int loop state.
+# Fix direction: handle scalar loop indices in _loop_abstract_axes/get_dummy_arg.
+def test_qjit_whileloop_indbidx_outdbidx(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
-    @qjit
+    while_loop_prim = qml.while_loop if capture_mode else while_loop
+
+    @qjit(capture=capture_mode)
     def f(sz):
         a0 = jnp.ones([sz], dtype=float)
         b0 = jnp.ones([sz], dtype=float)
 
-        @while_loop(lambda _a, _b, i: i < 3, allow_array_resizing=True)
+        @while_loop_prim(lambda _a, _b, i: i < 3, allow_array_resizing=True)
         def loop(a, _, i):
             b = jnp.ones([sz + 1], dtype=float)
             i += 1
@@ -921,14 +1067,19 @@ def test_qjit_whileloop_indbidx_outdbidx():
     assert_array_and_dtype_equal(res_b, jnp.ones(4))
 
 
-def test_qjit_whileloop_outer():
+# Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
+# Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop abstract-axis handling.
+@pytest.mark.capture_todo
+def test_qjit_whileloop_outer(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum while"""
 
-    @qjit
+    while_loop_prim = qml.while_loop if capture_mode else while_loop
+
+    @qjit(capture=capture_mode)
     def f(sz):
         a0 = jnp.ones([sz], dtype=float)
 
-        @while_loop(lambda _a, i: i < 3)
+        @while_loop_prim(lambda _a, i: i < 3)
         def loop(_a, i):
             i += 1
             return (a0, i)
@@ -941,14 +1092,19 @@ def test_qjit_whileloop_outer():
     assert_array_and_dtype_equal(res_a, jnp.ones(3))
 
 
-def test_qjit_whileloop_capture():
+# Capture gap: qml.while_loop path fails on dynamic loop-carried state conversion/abstract axes.
+# Classification: PL/Catalyst integration gap. Fix: support dynamic loop-state conversion in loop abstract-axis handling.
+@pytest.mark.capture_todo
+def test_qjit_whileloop_capture(capture_mode):
     """Tests that while-loop primitive can capture variables from the outer scope"""
 
-    @qjit
+    while_loop_prim = qml.while_loop if capture_mode else while_loop
+
+    @qjit(capture=capture_mode)
     def f(sz):
         x = jnp.ones([sz], dtype=float)
 
-        @while_loop(lambda i, _: i < 3)
+        @while_loop_prim(lambda i, _: i < 3)
         def loop(i, a):
             return i + 1, a + x
 
@@ -960,16 +1116,21 @@ def test_qjit_whileloop_capture():
     assert_array_and_dtype_equal(result, expected)
 
 
-def test_qnode_cond_identity():
+# Capture gap: cond path hits tracer/shape conversion failures (e.g., AssertionError, zip() output mismatch).
+# Classification: PL/Catalyst integration gap. Fix: stabilize qml.cond dynamic-shape lowering in from_plxpr.
+@pytest.mark.capture_todo
+def test_qnode_cond_identity(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
-    @qjit
+    cond_prim = qml.cond if capture_mode else cond
+
+    @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(flag, sz):
         a = jnp.ones([sz], dtype=float)
         b = jnp.zeros([sz], dtype=float)
 
-        @cond(flag)
+        @cond_prim(flag)
         def case():
             return a
 
@@ -986,15 +1147,20 @@ def test_qnode_cond_identity():
     assert_array_and_dtype_equal(f(False, 3), jnp.zeros(3))
 
 
-def test_qnode_cond_abstracted_axes():
+# Capture gap: cond path hits tracer/shape conversion failures (e.g., AssertionError, zip() output mismatch).
+# Classification: PL/Catalyst integration gap. Fix: stabilize qml.cond dynamic-shape lowering in from_plxpr.
+@pytest.mark.capture_todo
+def test_qnode_cond_abstracted_axes(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum conditional. Use
     abstracted_axes as the source of dynamism."""
 
     def f(flag, a, b):
-        @qjit(abstracted_axes={0: "n"})
+        cond_prim = qml.cond if capture_mode else cond
+
+        @qjit(abstracted_axes={0: "n"}, capture=capture_mode)
         @qml.qnode(qml.device("lightning.qubit", wires=4))
         def _f(a, b):
-            @cond(flag)
+            @cond_prim(flag)
             def case():
                 return a
 
@@ -1015,15 +1181,20 @@ def test_qnode_cond_abstracted_axes():
     assert_array_and_dtype_equal(f(False, a, b), jnp.zeros(3))
 
 
-def test_qnode_cond_capture():
+# Capture gap: cond path hits tracer/shape conversion failures (e.g., AssertionError, zip() output mismatch).
+# Classification: PL/Catalyst integration gap. Fix: stabilize qml.cond dynamic-shape lowering in from_plxpr.
+@pytest.mark.capture_todo
+def test_qnode_cond_capture(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
-    @qjit
+    cond_prim = qml.cond if capture_mode else cond
+
+    @qjit(capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=4))
     def f(flag, sz):
         a = jnp.ones([sz, 3], dtype=float)
 
-        @cond(flag)
+        @cond_prim(flag)
         def case():
             b = jnp.ones([sz, 3], dtype=float)
             return a + b
@@ -1040,15 +1211,20 @@ def test_qnode_cond_capture():
     assert_array_and_dtype_equal(f(False, 3), 2 * jnp.ones([3, 3]))
 
 
-def test_qjit_cond_identity():
+# Capture gap: cond path hits tracer/shape conversion failures (e.g., AssertionError, zip() output mismatch).
+# Classification: PL/Catalyst integration gap. Fix: stabilize qml.cond dynamic-shape lowering in from_plxpr.
+@pytest.mark.capture_todo
+def test_qjit_cond_identity(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
-    @qjit
+    cond_prim = qml.cond if capture_mode else cond
+
+    @qjit(capture=capture_mode)
     def f(flag, sz):
         a = jnp.ones([sz, 3], dtype=float)
         b = jnp.zeros([sz, 3], dtype=float)
 
-        @cond(flag)
+        @cond_prim(flag)
         def case():
             return a
 
@@ -1065,12 +1241,17 @@ def test_qjit_cond_identity():
     assert_array_and_dtype_equal(f(False, 3), jnp.zeros([3, 3]))
 
 
-def test_qjit_cond_outdbidx():
+# Capture gap: cond path hits tracer/shape conversion failures (e.g., AssertionError, zip() output mismatch).
+# Classification: PL/Catalyst integration gap. Fix: stabilize qml.cond dynamic-shape lowering in from_plxpr.
+@pytest.mark.capture_todo
+def test_qjit_cond_outdbidx(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
-    @qjit
+    cond_prim = qml.cond if capture_mode else cond
+
+    @qjit(capture=capture_mode)
     def f(flag, sz):
-        @cond(flag)
+        @cond_prim(flag)
         def case():
             return jnp.ones([sz + 1, 3], dtype=float)
 
@@ -1084,14 +1265,19 @@ def test_qjit_cond_outdbidx():
     assert_array_and_dtype_equal(f(False, 3), jnp.zeros([4, 3]))
 
 
-def test_qjit_cond_capture():
+# Capture gap: cond path hits tracer/shape conversion failures (e.g., AssertionError, zip() output mismatch).
+# Classification: PL/Catalyst integration gap. Fix: stabilize qml.cond dynamic-shape lowering in from_plxpr.
+@pytest.mark.capture_todo
+def test_qjit_cond_capture(capture_mode):
     """Test that catalyst tensor primitive is compatible with quantum conditional"""
 
-    @qjit
+    cond_prim = qml.cond if capture_mode else cond
+
+    @qjit(capture=capture_mode)
     def f(flag, sz):
         a = jnp.ones([sz, 3], dtype=float)
 
-        @cond(flag)
+        @cond_prim(flag)
         def case():
             b = jnp.ones([sz, 3], dtype=float)
             return a + b
@@ -1108,13 +1294,13 @@ def test_qjit_cond_capture():
     assert_array_and_dtype_equal(f(False, 3), 2 * jnp.ones([3, 3]))
 
 
-def test_trace_to_jaxpr():
+def test_trace_to_jaxpr(capture_mode):
     """Test our Jax tracing workaround. The idiomatic Jax would do `jaxpr, tracers, consts =
     trace.frame.to_jaxpr2([r])` which fails with `KeyError` for the below case.
     """
     # pylint: disable=protected-access,unused-variable
 
-    @qjit
+    @qjit(capture=capture_mode)
     def circuit(sz):
         mode = EvaluationContext.get_evaluation_mode()
 
@@ -1144,10 +1330,13 @@ def test_trace_to_jaxpr():
     assert r == 3
 
 
-def test_abstracted_axis_no_recompilation():
+# Capture gap: AssertionError in from_plxpr/jaxpr conversion on dynamic abstracted axes.
+# Classification: Catalyst integration gap. Fix: align dynamic aval conversion and from_plxpr lowering.
+@pytest.mark.capture_todo
+def test_abstracted_axis_no_recompilation(capture_mode):
     """Test that a function that does not need recompilation can be executed a second time"""
 
-    @qjit(abstracted_axes=(("n",), ()))
+    @qjit(abstracted_axes=(("n",), ()), capture=capture_mode)
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def circuit(x1, x2):
 
