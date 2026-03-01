@@ -16,6 +16,8 @@
 #define QUANTUM_PASSES
 
 include "mlir/Pass/PassBase.td"
+include "mlir/IR/BuiltinOps.td"
+include "mlir/IR/OpBase.td"
 
 def QuantumConversionPass : Pass<"convert-quantum-to-llvm"> {
     let summary = "Perform a dialect conversion from Quantum to LLVM (QIR).";
@@ -153,6 +155,10 @@ def DynamicOneShotPass : Pass<"dynamic-one-shot"> {
         "scf::SCFDialect",
         "stablehlo::StablehloDialect"
     ];
+}
+
+def InsertDecompRulesPass : Pass<"insert-decomp-rules", "mlir::ModuleOp"> {
+    let summary = "Load and insert selected AOT compiled decomposition rules.";
 }
 
 // ----- Quantum circuit transformation passes end ----- //
