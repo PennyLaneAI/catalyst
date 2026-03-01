@@ -25,7 +25,7 @@ from catalyst import grad, qjit
 class TestExamplesFromWebsite:
     """Test the easiest examples from the website"""
 
-    def test_state_prep(self, backend):
+    def test_state_prep(self, capture_mode, backend):
         """Test example from
         https://docs.pennylane.ai/en/stable/code/api/pennylane.StatePrep.html
         as of July 31st 2024.
@@ -39,10 +39,10 @@ class TestExamplesFromWebsite:
             return qml.state()
 
         expected = example_circuit()
-        observed = qjit(example_circuit)()
+        observed = qjit(example_circuit, capture=capture_mode)()
         assert jnp.allclose(expected, observed)
 
-    def test_state_prep_recycled_device(self, backend):
+    def test_state_prep_recycled_device(self, capture_mode, backend):
         """The same test as above but two qnodes using the same device"""
         dev = qml.device(backend, wires=2)
 
@@ -60,10 +60,10 @@ class TestExamplesFromWebsite:
             return example_circuit(), example_circuit_doppelganger()
 
         expected = jnp.array(main())
-        observed = jnp.array(qjit(main)())
+        observed = jnp.array(qjit(main, capture=capture_mode)())
         assert jnp.allclose(expected, observed)
 
-    def test_state_prep_i32_array(self, backend):
+    def test_state_prep_i32_array(self, capture_mode, backend):
         """
         Test state prep when the state array is type i32 instead of i64.
         """
@@ -75,10 +75,10 @@ class TestExamplesFromWebsite:
             return qml.state()
 
         expected = example_circuit()
-        observed = qjit(example_circuit)()
+        observed = qjit(example_circuit, capture=capture_mode)()
         assert jnp.allclose(expected, observed)
 
-    def test_basis_state(self, backend):
+    def test_basis_state(self, capture_mode, backend):
         """Test example from
         https://docs.pennylane.ai/en/stable/code/api/pennylane.BasisState.html
         as of July 31st 2024.
@@ -92,10 +92,10 @@ class TestExamplesFromWebsite:
             return qml.state()
 
         expected = example_circuit()
-        observed = qjit(example_circuit)()
+        observed = qjit(example_circuit, capture=capture_mode)()
         assert jnp.allclose(expected, observed)
 
-    def test_basis_state_recycled_device(self, backend):
+    def test_basis_state_recycled_device(self, capture_mode, backend):
         """The same test as above but two qnodes using the same device"""
         dev = qml.device(backend, wires=2)
 
@@ -113,10 +113,10 @@ class TestExamplesFromWebsite:
             return example_circuit(), example_circuit_doppelganger()
 
         expected = jnp.array(main())
-        observed = jnp.array(qjit(main)())
+        observed = jnp.array(qjit(main, capture=capture_mode)())
         assert jnp.allclose(expected, observed)
 
-    def test_basis_state_i32_array(self, backend):
+    def test_basis_state_i32_array(self, capture_mode, backend):
         """
         Test basis state when the state array is type i32 instead of i64.
         """
@@ -128,11 +128,11 @@ class TestExamplesFromWebsite:
             return qml.state()
 
         expected = example_circuit()
-        observed = qjit(example_circuit)()
+        observed = qjit(example_circuit, capture=capture_mode)()
         assert jnp.allclose(expected, observed)
 
     @pytest.mark.parametrize("wires", [(0), (1), (2)])
-    def test_array_less_than_size_state_prep(self, wires, backend):
+    def test_array_less_than_size_state_prep(self, capture_mode, wires, backend):
         """Test what happens when the array is less than the size required.
         This is the same error as reported by pennylane
         """
@@ -143,10 +143,10 @@ class TestExamplesFromWebsite:
             return qml.state()
 
         expected = example_circuit()
-        observed = qjit(example_circuit)()
+        observed = qjit(example_circuit, capture=capture_mode)()
         assert jnp.allclose(expected, observed)
 
-    def test_wires_with_less_than_all_basis_state(self, backend):
+    def test_wires_with_less_than_all_basis_state(self, capture_mode, backend):
         """Test what happens when not all wires are included.
 
         This is not the same behaviour as PennyLane, but for expediency,
@@ -159,15 +159,18 @@ class TestExamplesFromWebsite:
             return qml.state()
 
         expected = example_circuit()
-        observed = qjit(example_circuit)()
+        observed = qjit(example_circuit, capture=capture_mode)()
         assert jnp.allclose(expected, observed)
 
 
 class TestDynamicWires:
     """Test dynamic wires"""
 
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
     @pytest.mark.parametrize("inp", [(0), (1)])
-    def test_state_prep(self, inp):
+    def test_state_prep(self, capture_mode, inp):
         """Test example from
         https://docs.pennylane.ai/en/stable/code/api/pennylane.StatePrep.html
         as of July 31st 2024.
@@ -179,18 +182,18 @@ class TestDynamicWires:
         and this optimization does not yet work for it.
         """
 
-        @qjit
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device("lightning.qubit", wires=3))
         def example_circuit(a: int):
             qml.StatePrep(jnp.array([0, 1, 0, 0]), wires=[a, a + 1])
             return qml.state()
 
         expected = example_circuit(inp)
-        observed = qjit(example_circuit)(inp)
+        observed = qjit(example_circuit, capture=capture_mode)(inp)
         assert jnp.allclose(expected, observed)
 
     @pytest.mark.parametrize("inp", [(0), (1)])
-    def test_basis_state(self, inp, backend):
+    def test_basis_state(self, capture_mode, inp, backend):
         """Test example from
         https://docs.pennylane.ai/en/stable/code/api/pennylane.BasisState.html
         as of July 31st 2024.
@@ -205,21 +208,24 @@ class TestDynamicWires:
             return qml.state()
 
         expected = example_circuit(inp)
-        observed = qjit(example_circuit)(inp)
+        observed = qjit(example_circuit, capture=capture_mode)(inp)
         assert jnp.allclose(expected, observed)
 
 
 class TestPossibleErrors:
     """What happens when there is bad user input?"""
 
-    def test_array_less_than_size_basis_state(self):
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
+    def test_array_less_than_size_basis_state(self, capture_mode):
         """Test what happens when the array is less than the size required.
         In PennyLane the error raised is a ValueError.
         """
 
         with pytest.raises(ValueError, match="State must be of length 2; got length 1"):
 
-            @qjit
+            @qjit(capture=capture_mode)
             @qml.qnode(qml.device("lightning.qubit", wires=2))
             def example_circuit():
                 qml.BasisState(jnp.array([1]), wires=range(2))
@@ -227,11 +233,14 @@ class TestPossibleErrors:
 
             example_circuit()
 
-    def test_different_shape_state_prep(self):
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
+    def test_different_shape_state_prep(self, capture_mode):
         """Test that the same error is raised"""
         with pytest.raises(ValueError, match="State must be of length 2; got length 1"):
 
-            @qjit
+            @qjit(capture=capture_mode)
             @qml.qnode(qml.device("lightning.qubit", wires=2))
             def example_circuit():
                 qml.StatePrep(jnp.array([0]), wires=[0])
@@ -240,7 +249,7 @@ class TestPossibleErrors:
             example_circuit()
 
     @pytest.mark.skip(reason="error check removed in hotfix #1073")
-    def test_domain_invalid_basis_state(self):
+    def test_domain_invalid_basis_state(self, capture_mode):
         """Test what happens when BasisState operand is not between {0, 1}.
         This is the same error message, but different error class.
         In PennyLane the error raised is a ValueError, but all errors
@@ -249,7 +258,7 @@ class TestPossibleErrors:
         msg = "BasisState parameter must consist of 0 or 1 integers"
         with pytest.raises(RuntimeError, match=msg):
 
-            @qjit
+            @qjit(capture=capture_mode)
             @qml.qnode(qml.device("lightning.qubit", wires=2))
             def example_circuit():
                 qml.BasisState(jnp.array([0, 2]), wires=range(2))
@@ -261,12 +270,15 @@ class TestPossibleErrors:
 class TestGrad:
     """What happens if grad?"""
 
-    def test_state_prep_grad(self, backend):
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
+    def test_state_prep_grad(self, capture_mode, backend):
         """Test error happens with gradient"""
 
         with pytest.raises(DiffErr):
 
-            @qjit
+            @qjit(capture=capture_mode)
             @grad
             @qml.qnode(qml.device(backend, wires=2))
             def example_circuit(a: float):
@@ -276,12 +288,15 @@ class TestGrad:
 
             example_circuit(0.0)
 
-    def test_basis_state_grad(self, backend):
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
+    def test_basis_state_grad(self, capture_mode, backend):
         """Test error happens with gradient"""
 
         with pytest.raises(DiffErr):
 
-            @qjit
+            @qjit(capture=capture_mode)
             @grad
             @qml.qnode(qml.device(backend, wires=2))
             def example_circuit(a: float):
@@ -295,7 +310,10 @@ class TestGrad:
 class TestControlled:
     """What happens if ctrl?"""
 
-    def test_state_prep_ctrl(self):
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
+    def test_state_prep_ctrl(self, capture_mode):
         """Test state prep with ctrl"""
 
         @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -305,10 +323,13 @@ class TestControlled:
             return qml.state()
 
         expected = example_circuit()
-        observed = qjit(example_circuit)()
+        observed = qjit(example_circuit, capture=capture_mode)()
         assert jnp.allclose(expected, observed)
 
-    def test_basis_state_ctrl(self):
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
+    def test_basis_state_ctrl(self, capture_mode):
         """Test basis state with ctrl"""
 
         @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -318,14 +339,17 @@ class TestControlled:
             return qml.state()
 
         expected = example_circuit()
-        observed = qjit(example_circuit)()
+        observed = qjit(example_circuit, capture=capture_mode)()
         assert jnp.allclose(expected, observed)
 
 
 class TestAdjoint:
     """What happens if adjoint?"""
 
-    def test_state_prep_ctrl(self, backend):
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
+    def test_state_prep_ctrl(self, capture_mode, backend):
         """Test state prep with adjoint"""
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -335,10 +359,13 @@ class TestAdjoint:
             return qml.state()
 
         expected = example_circuit()
-        observed = qjit(example_circuit)()
+        observed = qjit(example_circuit, capture=capture_mode)()
         assert jnp.allclose(expected, observed)
 
-    def test_basis_state_ctrl(self, backend):
+    # capture gap: capture=True fails in measurement lowering/interpreter pathway for this scenario.
+    # fix direction: close capture measurement gap in from_plxpr/qfunc_interpreter and normalize behavior with legacy execution.
+    @pytest.mark.capture_todo
+    def test_basis_state_ctrl(self, capture_mode, backend):
         """Test basis state with adjoint"""
 
         @qml.qnode(qml.device(backend, wires=2))
@@ -348,5 +375,5 @@ class TestAdjoint:
             return qml.state()
 
         expected = example_circuit()
-        observed = qjit(example_circuit)()
+        observed = qjit(example_circuit, capture=capture_mode)()
         assert jnp.allclose(expected, observed)
