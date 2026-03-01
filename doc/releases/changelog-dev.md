@@ -541,6 +541,10 @@
   }
   ```
 
+* An experimental *QEC Physical* MLIR dialect has been added. An equivalent xDSL dialect has also
+  been added for compatibility with the Python interface to Catalyst.
+  [(#2519)](https://github.com/PennyLaneAI/catalyst/pull/2519)
+
 
 <h3>Documentation 📝</h3>
 

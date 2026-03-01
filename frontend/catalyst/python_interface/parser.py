@@ -27,7 +27,7 @@ from xdsl.dialects import transform as xtransform
 from xdsl.ir import Dialect as xDialect
 from xdsl.parser import Parser as xParser
 
-from catalyst.python_interface.dialects import MBQC, PBC, Catalyst, Quantum, StableHLO
+from catalyst.python_interface.dialects import MBQC, PBC, Catalyst, QecPhysical, Quantum, StableHLO
 
 
 class QuantumParser(xParser):  # pylint: disable=abstract-method
@@ -55,6 +55,7 @@ class QuantumParser(xParser):  # pylint: disable=abstract-method
         MBQC,
         Catalyst,
         PBC,
+        QecPhysical,
     )
 
     # pylint: disable=redefined-builtin
