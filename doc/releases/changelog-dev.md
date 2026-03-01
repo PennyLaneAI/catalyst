@@ -218,6 +218,9 @@
   * The Enzyme version has been updated to
   [v0.0.238](https://github.com/EnzymeAD/Enzyme/releases/tag/v0.0.238).
 
+* The version of `scipy-openblas32` used by Catalyst has been updated to the latest version (v0.3.31).
+  [(#2505)](https://github.com/PennyLaneAI/catalyst/pull/2505)
+
 * When an integer argnums is provided to `catalyst.vjp`, a singleton dimension is now squeezed
   out. This brings the behaviour in line with that of `grad` and `jacobian`.
   [(#2279)](https://github.com/PennyLaneAI/catalyst/pull/2279)
