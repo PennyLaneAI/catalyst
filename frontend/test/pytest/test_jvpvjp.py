@@ -159,9 +159,8 @@ def test_jvp_outside_qjit_tuple_tuple():
     assert_allclose(expected, result)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_jvp_against_jax_full_argnum_case_S_SS(diff_method):
+def test_jvp_against_jax_full_argnum_case_S_SS(capture_mode, diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     x, t = (
@@ -169,7 +168,7 @@ def test_jvp_against_jax_full_argnum_case_S_SS(diff_method):
         [0.1, 0.33],
     )
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflow():
         f = qml.QNode(circuit_rx, device=qml.device("lightning.qubit", wires=1))
         return qml.jvp(f, x, t, method=diff_method, argnums=list(range(len(x))))
@@ -187,9 +186,8 @@ def test_jvp_against_jax_full_argnum_case_S_SS(diff_method):
     assert_allclose(res_jax, res_cat, atol=5e-7)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_jvp_against_jax_full_argnum_case_T_T(diff_method):
+def test_jvp_against_jax_full_argnum_case_T_T(capture_mode, diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     def f(x):
@@ -200,7 +198,7 @@ def test_jvp_against_jax_full_argnum_case_T_T(diff_method):
         [jnp.ones([4], dtype=float)],
     )
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflow():
         return qml.jvp(f, x, t, method=diff_method, argnums=list(range(len(x))))
 
@@ -216,9 +214,8 @@ def test_jvp_against_jax_full_argnum_case_T_T(diff_method):
     assert_allclose(res_jax, res_cat)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_jvp_against_jax_full_argnum_case_TT_T(diff_method):
+def test_jvp_against_jax_full_argnum_case_TT_T(capture_mode, diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     def f(x1, x2):
@@ -234,7 +231,7 @@ def test_jvp_against_jax_full_argnum_case_TT_T(diff_method):
         [jnp.ones([3, 2], dtype=float), jnp.ones([2, 3], dtype=float)],
     )
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflow():
         return qml.jvp(f, x, t, method=diff_method, argnums=list(range(len(x))))
 
@@ -250,9 +247,8 @@ def test_jvp_against_jax_full_argnum_case_TT_T(diff_method):
     assert_allclose(res_jax, res_cat)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_jvp_against_jax_full_argnum_case_T_TT(diff_method):
+def test_jvp_against_jax_full_argnum_case_T_TT(capture_mode, diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     def f(x):
@@ -263,7 +259,7 @@ def test_jvp_against_jax_full_argnum_case_T_TT(diff_method):
         [jnp.ones([4], dtype=float)],
     )
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflow():
         return qml.jvp(f, x, t, method=diff_method, argnums=list(range(len(x))))
 
@@ -281,9 +277,8 @@ def test_jvp_against_jax_full_argnum_case_T_TT(diff_method):
         assert_allclose(r_j, r_c)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_jvp_against_jax_full_argnum_case_TT_TT(diff_method):
+def test_jvp_against_jax_full_argnum_case_TT_TT(capture_mode, diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     def f(x1, x2):
@@ -302,7 +297,7 @@ def test_jvp_against_jax_full_argnum_case_TT_TT(diff_method):
         [jnp.ones([3, 2], dtype=float), jnp.ones([2, 3], dtype=float)],
     )
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflow():
         return qml.jvp(f, x, t, method=diff_method, argnums=list(range(len(x))))
 
@@ -320,15 +315,14 @@ def test_jvp_against_jax_full_argnum_case_TT_TT(diff_method):
         assert_allclose(r_j, r_c)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_jvp_pytrees_return(diff_method):
+def test_jvp_pytrees_return(capture_mode, diff_method):
     """Test that a JVP with pytrees as return."""
 
     def f(x, y):
         return [x, {"res": y}, x + y]
 
-    @qjit
+    @qjit(capture=capture_mode)
     def workflow():
         return qml.jvp(f, [0.1, 0.2], [1.0, 1.0], method=diff_method, argnums=[0, 1])
 
@@ -341,15 +335,14 @@ def test_jvp_pytrees_return(diff_method):
     assert_allclose(catalyst_res_flatten, jax_res_flatten)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_jvp_pytrees_args(diff_method):
+def test_jvp_pytrees_args(capture_mode, diff_method):
     """Test that a JVP with pytrees as args."""
 
     def f(x, y):
         return x["res1"] + y * x["res2"]
 
-    @qjit
+    @qjit(capture=capture_mode)
     def workflow():
         return qml.jvp(
             f,
@@ -368,15 +361,14 @@ def test_jvp_pytrees_args(diff_method):
     assert_allclose(catalyst_res_flatten, jax_res_flatten)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_jvp_pytrees_args_and_return(diff_method):
+def test_jvp_pytrees_args_and_return(capture_mode, diff_method):
     """Test that a JVP with pytrees as args."""
 
     def f(x, y):
         return [x["res1"] + y * x["res2"], {"res": y}, x["res1"]]
 
-    @qjit
+    @qjit(capture=capture_mode)
     def workflow():
         return qml.jvp(
             f,
@@ -395,15 +387,14 @@ def test_jvp_pytrees_args_and_return(diff_method):
     assert_allclose(catalyst_res_flatten, jax_res_flatten)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_jvp_multi_returns(diff_method):
+def test_jvp_multi_returns(capture_mode, diff_method):
     """Test that a JVP with multiple arg as return."""
 
     def f(x):
         return x, x**2, x**4
 
-    @qjit
+    @qjit(capture=capture_mode)
     def workflow():
         return qml.jvp(f, [0.3], [1.1], method=diff_method, argnums=[0])
 
@@ -416,9 +407,8 @@ def test_jvp_multi_returns(diff_method):
     assert_allclose(catalyst_res_flatten, jax_res_flatten, rtol=1e-6, atol=5e-6)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_vjp_against_jax_full_argnum_case_S_SS(diff_method):
+def test_vjp_against_jax_full_argnum_case_S_SS(capture_mode, diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     x, ct = (
@@ -426,7 +416,7 @@ def test_vjp_against_jax_full_argnum_case_S_SS(diff_method):
         [0.111],
     )
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflow():
         f = qml.QNode(circuit_rx, device=qml.device("lightning.qubit", wires=1))
         return qml.vjp(f, x, ct, method=diff_method, argnums=list(range(len(x))))
@@ -446,9 +436,8 @@ def test_vjp_against_jax_full_argnum_case_S_SS(diff_method):
     assert_allclose(res_jax, res_cat, atol=5e-7)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_vjp_against_jax_full_argnum_case_T_T(diff_method):
+def test_vjp_against_jax_full_argnum_case_T_T(capture_mode, diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     def f(x):
@@ -459,7 +448,7 @@ def test_vjp_against_jax_full_argnum_case_T_T(diff_method):
         [jnp.ones([3, 4], dtype=float)],
     )
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflow():
         return qml.vjp(f, x, ct, method=diff_method, argnums=list(range(len(x))))
 
@@ -478,9 +467,8 @@ def test_vjp_against_jax_full_argnum_case_T_T(diff_method):
         assert_allclose(r_j, r_c)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_vjp_against_jax_full_argnum_case_TT_T(diff_method):
+def test_vjp_against_jax_full_argnum_case_TT_T(capture_mode, diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     def f(x1, x2):
@@ -496,7 +484,7 @@ def test_vjp_against_jax_full_argnum_case_TT_T(diff_method):
         [jnp.ones([2, 6], dtype=float)],
     )
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflow():
         return qml.vjp(f, x, ct, method=diff_method, argnums=list(range(len(x))))
 
@@ -515,9 +503,8 @@ def test_vjp_against_jax_full_argnum_case_TT_T(diff_method):
         assert_allclose(r_j, r_c)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_vjp_against_jax_full_argnum_case_T_TT(diff_method):
+def test_vjp_against_jax_full_argnum_case_T_TT(capture_mode, diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     def f(x):
@@ -528,7 +515,7 @@ def test_vjp_against_jax_full_argnum_case_T_TT(diff_method):
         [jnp.ones([4], dtype=float), jnp.ones([3, 4], dtype=float)],
     )
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflow():
         return qml.vjp(f, x, ct, method=diff_method, argnums=list(range(len(x))))
 
@@ -547,9 +534,8 @@ def test_vjp_against_jax_full_argnum_case_T_TT(diff_method):
         assert_allclose(r_j, r_c)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_vjp_against_jax_full_argnum_case_TT_TT(diff_method):
+def test_vjp_against_jax_full_argnum_case_TT_TT(capture_mode, diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     def f(x1, x2):
@@ -568,7 +554,7 @@ def test_vjp_against_jax_full_argnum_case_TT_TT(diff_method):
         [jnp.ones([6], dtype=float), jnp.ones([2, 6], dtype=float)],
     )
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflow():
         return qml.vjp(f, x, ct, method=diff_method, argnums=list(range(len(x))))
 
@@ -587,9 +573,8 @@ def test_vjp_against_jax_full_argnum_case_TT_TT(diff_method):
         assert_allclose(r_j, r_c)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_jvpvjp_argument_checks(diff_method):
+def test_jvpvjp_argument_checks(capture_mode, diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     def f(x1, x2):
@@ -606,11 +591,11 @@ def test_jvpvjp_argument_checks(diff_method):
         [jnp.ones([2, 6], dtype=float)],
     )
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflow1():
         return qml.jvp(f, x, tuple(t), method=diff_method, argnums=list(range(len(x))))
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflow2():
         return qml.jvp(f, tuple(x), t, method=diff_method, argnums=tuple(range(len(x))))
 
@@ -624,26 +609,25 @@ def test_jvpvjp_argument_checks(diff_method):
 
     with pytest.raises(ValueError, match="must be a Sequence"):
 
-        @qjit
+        @qjit(capture=capture_mode)
         def C_workflow_bad1():
             return qml.jvp(f, 33, tuple(t), argnums=list(range(len(x))))
 
     with pytest.raises(TypeError, match="function output params and cotangents arguments"):
 
-        @qjit
+        @qjit(capture=capture_mode)
         def C_workflow_bad2():
             return qml.vjp(f, list(x), 33, argnums=list(range(len(x))))
 
     with pytest.raises(ValueError, match="argnums should be an integer or a Sequence of integers"):
 
-        @qjit
+        @qjit(capture=capture_mode)
         def C_workflow_bad3():
             return qml.vjp(f, x, ct, argnums="invalid")
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_jvp_against_jax_argnum0_case_TT_TT(diff_method):
+def test_jvp_against_jax_argnum0_case_TT_TT(capture_mode, diff_method):
     """Numerically tests Catalyst's jvp against the JAX version, in case of empty or singular
     argnums argument."""
 
@@ -663,11 +647,11 @@ def test_jvp_against_jax_argnum0_case_TT_TT(diff_method):
         [jnp.ones([3, 2], dtype=float), jnp.ones([2, 3], dtype=float)],
     )
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflowA():
         return qml.jvp(f, x, t[0:1], method=diff_method)
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflowB():
         return qml.jvp(f, x, t[0:1], method=diff_method, argnums=[0])
 
@@ -696,9 +680,8 @@ def test_jvp_against_jax_argnum0_case_TT_TT(diff_method):
         assert_allclose(r_j, r_c)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_vjp_against_jax_argnum0_case_TT_TT(diff_method):
+def test_vjp_against_jax_argnum0_case_TT_TT(capture_mode, diff_method):
     """Numerically tests Catalyst's vjp against the JAX version, in case of empty or singular
     argnums argument."""
 
@@ -718,11 +701,11 @@ def test_vjp_against_jax_argnum0_case_TT_TT(diff_method):
         [jnp.ones([6], dtype=float), jnp.ones([2, 6], dtype=float)],
     )
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflowA():
         return qml.vjp(f, x, ct, method=diff_method)
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflowB():
         return qml.vjp(f, x, ct, method=diff_method, argnums=[0])
 
@@ -755,15 +738,14 @@ def test_vjp_against_jax_argnum0_case_TT_TT(diff_method):
         assert_allclose(r_j, r_c)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_vjp_pytrees_return(diff_method):
+def test_vjp_pytrees_return(capture_mode, diff_method):
     """Test VJP with pytree return."""
 
     def f(x, y):
         return [x, {"res": y}, x + y]
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflowA():
         ct2 = [1.0, {"res": 1.0}, 1.0]
         return qml.vjp(f, [0.1, 0.2], ct2, method=diff_method, argnums=[0, 1])
@@ -783,15 +765,14 @@ def test_vjp_pytrees_return(diff_method):
         assert_allclose(r_j, r_c)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_vjp_pytrees_args(diff_method):
+def test_vjp_pytrees_args(capture_mode, diff_method):
     """Test VJP with pytree args."""
 
     def f(x, y):
         return x["res1"] + y * x["res2"], y
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflowA():
         ct2 = [1.0, 1.0]
         return qml.vjp(
@@ -813,15 +794,14 @@ def test_vjp_pytrees_args(diff_method):
         assert_allclose(r_j, r_c)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_VJP_pytrees_args_and_return(diff_method):
+def test_VJP_pytrees_args_and_return(capture_mode, diff_method):
     """Test that a VJP with pytrees as args."""
 
     def f(x, y):
         return [x["res1"] + y * x["res2"], {"res": y}, x["res1"]]
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflowA():
         ct2 = [1.0, {"res": 1.0}, 1.0]
         return qml.vjp(
@@ -843,15 +823,14 @@ def test_VJP_pytrees_args_and_return(diff_method):
         assert_allclose(r_j, r_c)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_vjp_multi_return(diff_method):
+def test_vjp_multi_return(capture_mode, diff_method):
     """Test VJP with multiple returns."""
 
     def f(x):
         return x, x**2
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflowA():
         return qml.vjp(f, [0.1], [1.0, 1.0], method=diff_method, argnums=[0])
 
@@ -869,27 +848,25 @@ def test_vjp_multi_return(diff_method):
         assert_allclose(r_j, r_c, atol=2e-6)
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_jvp_argument_type_checks_correct_inputs(diff_method):
+def test_jvp_argument_type_checks_correct_inputs(capture_mode, diff_method):
     """Test that Catalyst's jvp can JIT compile when given the correct types."""
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflow_f():
         x = (1.0,)
         tangents = (1.0,)
         return qml.jvp(f_R1_to_R2, x, tangents, method=diff_method, argnums=[0])
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflow_g():
         x = jnp.array([2.0, 3.0, 4.0])
         tangents = jnp.ones([3], dtype=float)
         return qml.jvp(g_R3_to_R2, [1, x], [tangents], method=diff_method, argnums=[1])
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_jvp_argument_type_checks_incompatible_n_inputs(diff_method):
+def test_jvp_argument_type_checks_incompatible_n_inputs(capture_mode, diff_method):
     """Tests error handling of Catalyst's jvp when the number of differentiable params
     and tangent arguments are incompatible.
     """
@@ -899,7 +876,7 @@ def test_jvp_argument_type_checks_incompatible_n_inputs(diff_method):
         match=("number of tangents and number of differentiable parameters in"),
     ):
 
-        @qjit
+        @qjit(capture=capture_mode)
         def C_workflow():
             # If `f` takes 1 differentiable param (argnums=[0]), then `tangents` must have length 1
             x = (1.0,)
@@ -907,16 +884,15 @@ def test_jvp_argument_type_checks_incompatible_n_inputs(diff_method):
             return qml.jvp(f_R1_to_R2, x, tangents, method=diff_method, argnums=[0])
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_jvp_argument_type_checks_incompatible_input_types(diff_method):
+def test_jvp_argument_type_checks_incompatible_input_types(capture_mode, diff_method):
     """Tests error handling of Catalyst's jvp when the types of the differentiable
     params and tangent arguments are incompatible.
     """
 
     with pytest.raises(TypeError, match="function params and tangents arguments to "):
 
-        @qjit
+        @qjit(capture=capture_mode)
         def C_workflow():
             # If `x` has type float, then `tangents` should also have type float
             x = (1.0,)
@@ -924,9 +900,8 @@ def test_jvp_argument_type_checks_incompatible_input_types(diff_method):
             return qml.jvp(f_R1_to_R2, x, tangents, method=diff_method, argnums=[0])
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_jvp_argument_type_checks_incompatible_input_shapes(diff_method):
+def test_jvp_argument_type_checks_incompatible_input_shapes(capture_mode, diff_method):
     """Tests error handling of Catalyst's jvp when the shapes of the differentiable
     params and tangent arguments are incompatible.
     """
@@ -935,7 +910,7 @@ def test_jvp_argument_type_checks_incompatible_input_shapes(diff_method):
         ValueError, match="jvp called with different function params and tangent shapes"
     ):
 
-        @qjit
+        @qjit(capture=capture_mode)
         def C_workflow():
             # If `x` has shape (3,), then `tangents` must also have shape (3,),
             # but it has shape (4,)
@@ -944,19 +919,18 @@ def test_jvp_argument_type_checks_incompatible_input_shapes(diff_method):
             return qml.jvp(g_R3_to_R2, [1, x], [tangents], method=diff_method, argnums=[1])
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
 @pytest.mark.parametrize("vjp_fn", (qml.vjp, C_vjp))
-def test_vjp_argument_type_checks_correct_inputs(diff_method, vjp_fn):
+def test_vjp_argument_type_checks_correct_inputs(capture_mode, diff_method, vjp_fn):
     """Test that Catalyst's vjp can JIT compile when given the correct types."""
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflow_f():
         x = (1.0,)
         cotangents = (1.0, 1.0)
         return vjp_fn(f_R1_to_R2, x, cotangents, method=diff_method, argnums=[0])
 
-    @qjit
+    @qjit(capture=capture_mode)
     def C_workflow_g():
         x = jnp.array([2.0, 3.0, 4.0])
         cotangents = jnp.ones([2], dtype=float)
@@ -964,7 +938,7 @@ def test_vjp_argument_type_checks_correct_inputs(diff_method, vjp_fn):
 
 
 @pytest.mark.parametrize("diff_method", diff_methods)
-def test_vjp_argument_type_checks_incompatible_n_inputs(diff_method):
+def test_vjp_argument_type_checks_incompatible_n_inputs(capture_mode, diff_method):
     """Tests error handling of Catalyst's vjp when the number of function output params
     and cotangent arguments are incompatible.
     """
@@ -974,7 +948,7 @@ def test_vjp_argument_type_checks_incompatible_n_inputs(diff_method):
         match=("number of cotangent and number of function output parameters in"),
     ):
 
-        @qjit
+        @qjit(capture=capture_mode)
         def C_workflow():
             # If `f` returns two outputs, then `cotangents` must have length 2
             x = (1.0,)
@@ -982,10 +956,9 @@ def test_vjp_argument_type_checks_incompatible_n_inputs(diff_method):
             return C_vjp(f_R1_to_R2, x, cotangents, method=diff_method, argnums=[0])
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
 @pytest.mark.parametrize("vjp_fn", (qml.vjp, C_vjp))
-def test_vjp_argument_type_checks_incompatible_input_types(diff_method, vjp_fn):
+def test_vjp_argument_type_checks_incompatible_input_types(capture_mode, diff_method, vjp_fn):
     """Tests error handling of Catalyst's vjp when the types of the function output params
     and cotangent arguments are incompatible.
     """
@@ -995,7 +968,7 @@ def test_vjp_argument_type_checks_incompatible_input_types(diff_method, vjp_fn):
         match="function output params and cotangents arguments to ",
     ):
 
-        @qjit
+        @qjit(capture=capture_mode)
         def C_workflow():
             # If `x` has type float, then `cotangents` should also have type float
             x = (1.0,)
@@ -1003,10 +976,9 @@ def test_vjp_argument_type_checks_incompatible_input_types(diff_method, vjp_fn):
             return vjp_fn(f_R1_to_R2, x, cotangents, method=diff_method, argnums=[0])
 
 
-@pytest.mark.usefixtures("use_both_frontend")
 @pytest.mark.parametrize("diff_method", diff_methods)
 @pytest.mark.parametrize("vjp_fn", (qml.vjp, C_vjp))
-def test_vjp_argument_type_checks_incompatible_input_shapes(diff_method, vjp_fn):
+def test_vjp_argument_type_checks_incompatible_input_shapes(capture_mode, diff_method, vjp_fn):
     """Tests error handling of Catalyst's vjp when the shapes of the function output params
     and cotangent arguments are incompatible.
     """
@@ -1015,7 +987,7 @@ def test_vjp_argument_type_checks_incompatible_input_shapes(diff_method, vjp_fn)
         match="vjp called with different function output params and cotangent shapes",
     ):
 
-        @qjit
+        @qjit(capture=capture_mode)
         def C_workflow():
             # If `f` returns object with shape (2,), then `cotangents` must also have
             # shape (2,), but it has shape (3,)
