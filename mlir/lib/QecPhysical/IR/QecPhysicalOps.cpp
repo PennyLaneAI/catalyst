@@ -13,7 +13,9 @@
 // limitations under the License.
 
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/PatternMatch.h"
 
+#include "QecPhysical/IR/QecPhysicalAttrDefs.h"
 #include "QecPhysical/IR/QecPhysicalDialect.h"
 #include "QecPhysical/IR/QecPhysicalOps.h"
 
@@ -26,3 +28,298 @@ using namespace catalyst::qecp;
 
 #define GET_OP_CLASSES
 #include "QecPhysical/IR/QecPhysicalOps.cpp.inc"
+
+//===----------------------------------------------------------------------===//
+// QecPhysical op verifiers.
+//===----------------------------------------------------------------------===//
+
+LogicalResult ExtractCodeblockOp::verify()
+{
+    if (!(getIdx() || getIdxAttr().has_value())) {
+        return emitOpError() << "expected to have a non-null index";
+    }
+
+    const auto hyperRegType = getHyperReg().getType();
+    const auto codeblockType = getCodeblock().getType();
+
+    if (hyperRegType.getK() != codeblockType.getK()) {
+        return emitOpError()
+               << "expected hyper-register and codeblock types to have same value of k, "
+                  "but got hyper-register with k = "
+               << hyperRegType.getK() << " and codeblock with k = " << codeblockType.getK();
+    }
+
+    if (hyperRegType.getN() != codeblockType.getN()) {
+        return emitOpError()
+               << "expected hyper-register and codeblock types to have same value of n, "
+                  "but got hyper-register with n = "
+               << hyperRegType.getN() << " and codeblock with n = " << codeblockType.getN();
+    }
+
+    if (getIdxAttr().has_value()) {
+        auto idx = getIdxAttr()->getSExtValue();
+        if (idx < 0 || idx >= hyperRegType.getWidth()) {
+            return emitOpError() << "has out-of-bounds index attribute: extracting from index "
+                                 << idx << " but hyper-register has width "
+                                 << hyperRegType.getWidth();
+        }
+    }
+
+    return success();
+}
+
+LogicalResult InsertCodeblockOp::verify()
+{
+    if (!(getIdx() || getIdxAttr().has_value())) {
+        return emitOpError() << "expected to have a non-null index";
+    }
+
+    // In and out hyper-register types are already constrained to be the same
+    const auto hyperRegType = getInHyperReg().getType();
+    const auto codeblockType = getCodeblock().getType();
+
+    if (hyperRegType.getK() != codeblockType.getK()) {
+        return emitOpError()
+               << "expected hyper-register and codeblock types to have same value of k, "
+                  "but got hyper-register with k = "
+               << hyperRegType.getK() << " and codeblock with k = " << codeblockType.getK();
+    }
+
+    if (hyperRegType.getN() != codeblockType.getN()) {
+        return emitOpError()
+               << "expected hyper-register and codeblock types to have same value of n, "
+                  "but got hyper-register with n = "
+               << hyperRegType.getN() << " and codeblock with n = " << codeblockType.getN();
+    }
+
+    if (getIdxAttr().has_value()) {
+        auto idx = getIdxAttr()->getSExtValue();
+        if (idx < 0 || idx >= hyperRegType.getWidth()) {
+            return emitOpError() << "has out-of-bounds index attribute: inserting at index " << idx
+                                 << " but hyper-register has width " << hyperRegType.getWidth();
+        }
+    }
+
+    return success();
+}
+
+LogicalResult AllocAuxQubitOp::verify()
+{
+    const auto qubitRole = getQubit().getType().getRole();
+    if (qubitRole != QecPhysicalQubitRole::Auxiliary) {
+        return emitOpError() << "expected a QEC physical qubit with role '"
+                             << stringifyQecPhysicalQubitRole(QecPhysicalQubitRole::Auxiliary)
+                             << "', but got '" << stringifyQecPhysicalQubitRole(qubitRole) << "'";
+    }
+    return success();
+}
+
+LogicalResult DeallocAuxQubitOp::verify()
+{
+    const auto qubitRole = getQubit().getType().getRole();
+    if (qubitRole != QecPhysicalQubitRole::Auxiliary) {
+        return emitOpError() << "expected a QEC physical qubit with role '"
+                             << stringifyQecPhysicalQubitRole(QecPhysicalQubitRole::Auxiliary)
+                             << "', but got '" << stringifyQecPhysicalQubitRole(qubitRole) << "'";
+    }
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// QecPhysical op canonicalizers.
+//===----------------------------------------------------------------------===//
+
+/**
+ * @brief Canonicalize physical hyper-register allocation op.
+ *
+ * Erase alloc op if it has no uses.
+ */
+LogicalResult AllocOp::canonicalize(AllocOp alloc, mlir::PatternRewriter &rewriter)
+{
+    if (alloc->use_empty()) {
+        rewriter.eraseOp(alloc);
+        return success();
+    }
+
+    return failure();
+}
+
+/**
+ * @brief Canonicalize physical hyper-register deallocation op.
+ *
+ * Erase alloc/dealloc op pairs if allocated hyper-register is immediately deallocated.
+ */
+LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter)
+{
+    const auto hyperReg = dealloc.getHyperReg();
+    if (auto alloc = dyn_cast_if_present<AllocOp>(hyperReg.getDefiningOp())) {
+        if (hyperReg.hasOneUse()) {
+            rewriter.eraseOp(dealloc);
+            rewriter.eraseOp(alloc);
+            return success();
+        }
+    }
+
+    return failure();
+}
+
+/**
+ * @brief Canonicalize extract-codeblock op.
+ *
+ * Removes sequential insert-extract op pairs acting on the same index, e.g. handles the pattern:
+ *
+ *   %r0 = ... : !qecp.hyperreg<3 x 1>
+ *   %b0 = ... : !qecp.codeblock<1>
+ *   %r1 = insert_block %r0[0], %b0
+ *   %b1 = extract_block %r1[0]
+ *   %r2 = test.op %r1
+ *   %b2 = test.op %b1
+ *
+ * and converts to:
+ *
+ *   %r0 = ... : !qecp.hyperreg<3 x 1>
+ *   %b0 = ... : !qecp.codeblock<1>
+ *   %r2 = test.op %r0
+ *   %b2 = test.op %b0
+ */
+LogicalResult ExtractCodeblockOp::canonicalize(ExtractCodeblockOp extract,
+                                               mlir::PatternRewriter &rewriter)
+{
+    if (auto insert =
+            dyn_cast_if_present<InsertCodeblockOp>(extract.getHyperReg().getDefiningOp())) {
+        bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
+        bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
+
+        bool staticallyEqual = bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
+        bool dynamicallyEqual = bothDynamic && extract.getIdx() == insert.getIdx();
+
+        bool inSameBlock = extract->getBlock() == insert->getBlock();
+
+        if ((staticallyEqual || dynamicallyEqual) && inSameBlock) {
+            rewriter.replaceOp(extract, insert.getCodeblock());
+            rewriter.replaceOp(insert, insert.getInHyperReg());
+            return success();
+        }
+    }
+    return failure();
+}
+
+/**
+ * @brief Canonicalize insert-codeblock op.
+ *
+ * Removes sequential extract-insert op pairs acting on the same index, e.g. handles the pattern:
+ *
+ *   %r0 = ... : !qecl.hyperreg<3 x 1>
+ *   %b0 = extract_block %r0[0]
+ *   %r1 = insert_block %r1[0], %b0
+ *   %r2 = test.op %r1
+ *
+ * and converts to:
+ *
+ *   %r0 = ... : !qecl.hyperreg<3 x 1>
+ *   %r2 = test.op %r0
+ */
+LogicalResult InsertCodeblockOp::canonicalize(InsertCodeblockOp insert,
+                                              mlir::PatternRewriter &rewriter)
+{
+    if (auto extract =
+            dyn_cast_if_present<ExtractCodeblockOp>(insert.getCodeblock().getDefiningOp())) {
+        bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
+        bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
+
+        bool staticallyEqual = bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
+        bool dynamicallyEqual = bothDynamic && extract.getIdx() == insert.getIdx();
+
+        bool sameHyperReg = extract.getHyperReg() == insert.getInHyperReg();
+        bool oneUse = extract.getResult().hasOneUse();
+
+        if ((staticallyEqual || dynamicallyEqual) && oneUse && sameHyperReg) {
+            rewriter.replaceOp(insert, insert.getInHyperReg());
+            rewriter.eraseOp(extract);
+            return success();
+        }
+    }
+
+    return failure();
+}
+
+/**
+ * @brief Canonicalize aux qubit allocation op.
+ *
+ * Erase alloc_aux op if it has no uses.
+ */
+LogicalResult AllocAuxQubitOp::canonicalize(AllocAuxQubitOp alloc, mlir::PatternRewriter &rewriter)
+{
+    if (alloc->use_empty()) {
+        rewriter.eraseOp(alloc);
+        return success();
+    }
+
+    return failure();
+}
+
+/**
+ * @brief Canonicalize aux qubit deallocation op.
+ *
+ * Erase alloc/dealloc op pairs if allocated aux qubit is immediately deallocated.
+ */
+LogicalResult DeallocAuxQubitOp::canonicalize(DeallocAuxQubitOp dealloc,
+                                              mlir::PatternRewriter &rewriter)
+{
+    const auto qubit = dealloc.getQubit();
+    if (auto alloc = dyn_cast_if_present<AllocAuxQubitOp>(qubit.getDefiningOp())) {
+        if (qubit.hasOneUse()) {
+            rewriter.eraseOp(dealloc);
+            rewriter.eraseOp(alloc);
+            return success();
+        }
+    }
+
+    return failure();
+}
+
+//===----------------------------------------------------------------------===//
+// QecPhysical op folders.
+//===----------------------------------------------------------------------===//
+
+/**
+ * @brief Prefer using an attribute when the index is constant.
+ */
+template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx)
+{
+    bool hasNoIdxAttr = !op.getIdxAttr().has_value();
+    bool isConstantIdx = isa_and_nonnull<IntegerAttr>(idx);
+    if (hasNoIdxAttr && isConstantIdx) {
+        auto constantIdx = cast<IntegerAttr>(idx);
+        op.setIdxAttr(constantIdx.getValue());
+
+        // Remove the dynamic Value
+        op.getIdxMutable().clear();
+        return success();
+    }
+    return failure();
+}
+
+/**
+ * @brief Fold method for extract-codeblock op.
+ */
+OpFoldResult ExtractCodeblockOp::fold(FoldAdaptor adaptor)
+{
+    if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
+        return getResult();
+    }
+    // Returning nullptr tells the caller the op was unchanged.
+    return nullptr;
+}
+
+/**
+ * @brief Fold method for insert-codeblock op.
+ */
+OpFoldResult InsertCodeblockOp::fold(FoldAdaptor adaptor)
+{
+    if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
+        return getResult();
+    }
+    // Returning nullptr tells the caller the op was unchanged.
+    return nullptr;
+}
