@@ -594,9 +594,70 @@ class TestGradientPreprocessing:
 class TestIntegration:
     """Integration tests for device preprocessing with program capture."""
 
-    @pytest.mark.parametrize("skip_preprocess", [True, False])
-    def test_qjit_preprocessing(self, skip_preprocess):
-        """Device preprocessing is added to the pass pipeline if requested."""
+    @pytest.mark.parametrize("skip_preprocess", [True, False, None])
+    def test_qjit_skip_preprocess(self, skip_preprocess, recwarn):
+        """Test that device preprocessing is added to the pass pipeline only if requested."""
+        qjit_args = {"target": "mlir", "capture": True}
+        if skip_preprocess is not None:
+            qjit_args["skip_preprocess"] = skip_preprocess
+
+        dev = qml.device("null.qubit", wires=4)
+
+        @qml.transforms.merge_rotations
+        @qml.qnode(dev, shots=1, mcm_method="one-shot", diff_method="parameter-shift")
+        def f1():
+            _ = qml.measure(0)
+            return qml.expval(qml.Z(0))
+
+        @qml.transforms.cancel_inverses
+        @qml.qnode(dev, shots=None, diff_method="adjoint")
+        def f2():
+            return qml.expval(qml.Z(0))
+
+        @qml.qjit(**qjit_args)
+        def workflow():
+            return f1() + f2()
+
+        cjaxpr = workflow.jaxpr
+        f1_pipeline = None
+        f2_pipeline = None
+        for eqn in cjaxpr.eqns:
+            if eqn.primitive == quantum_kernel_p:
+                if eqn.params["qnode"].__name__ == "f1":
+                    f1_pipeline = eqn.params["pipeline"]
+                elif eqn.params["qnode"].__name__ == "f2":
+                    f2_pipeline = eqn.params["pipeline"]
+
+        assert f1_pipeline
+        assert f2_pipeline
+
+        assert f1_pipeline[0].pass_name == "merge-rotations"
+        assert f2_pipeline[0].pass_name == "cancel-inverses"
+
+        if skip_preprocess:
+            assert len(f1_pipeline) == 1
+            assert len(f2_pipeline) == 1
+            assert len(recwarn) == 0
+        else:
+            assert len(f1_pipeline) > 1
+            assert len(f2_pipeline) > 1
+
+            assert any(t.pass_name == "dynamic-one-shot" for t in f1_pipeline)
+            assert any(t.pass_name == "verify-no-state-variance-returns" for t in f1_pipeline)
+            assert any(t.pass_name == "validate-observables-parameter-shift" for t in f1_pipeline)
+
+            assert any(t.pass_name == "verify-no-state-variance-returns" for t in f2_pipeline)
+            assert any(t.pass_name == "validate-observables-adjoint-diff" for t in f2_pipeline)
+
+            # 2 warnings for 2 QNodes
+            assert len(recwarn) == 2
+            for _ in range(2):
+                w = recwarn.pop()
+                assert w.category == UserWarning
+                assert (
+                    "The following device-preprocessing transforms are currently not supported"
+                    in str(w.message)
+                )
 
 
 if __name__ == "__main__":
