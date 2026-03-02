@@ -74,7 +74,7 @@ Value applyStatePreparationGates(Location loc, PatternRewriter &rewriter, Value 
 }
 
 /// Template pattern to lower PBC init ops (PrepareStateOp, FabricateOp) to alloc + gates
-/// - PrepareStateOp: uses existing input qubits
+/// - PrepareStateOp: allocates new qubits via AllocQubitOp
 /// - FabricateOp: allocates new qubits via AllocQubitOp
 template <typename OpType> struct LowerPBCInitOpPattern : public OpRewritePattern<OpType> {
     using OpRewritePattern<OpType>::OpRewritePattern;
@@ -88,16 +88,8 @@ template <typename OpType> struct LowerPBCInitOpPattern : public OpRewritePatter
 
         size_t numQubits = op.getOutQubits().size();
         for (size_t i = 0; i < numQubits; ++i) {
-            Value qubit;
-            if constexpr (std::is_same_v<OpType, PrepareStateOp>) {
-                // PrepareStateOp: use existing input qubits
-                qubit = op.getInQubits()[i];
-            }
-            else {
-                // FabricateOp: allocate a new qubit
-                auto allocOp = AllocQubitOp::create(rewriter, loc);
-                qubit = allocOp.getResult();
-            }
+            auto allocOp = AllocQubitOp::create(rewriter, loc);
+            Value qubit = allocOp.getResult();
 
             // Apply the appropriate gates to prepare the desired state
             Value resultQubit = applyStatePreparationGates(loc, rewriter, qubit, initState);
