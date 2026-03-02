@@ -480,7 +480,7 @@ jobs:
     # TODO: Remove this before merging
     - name: Install PennyLane branch
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@feature/tabular-specs
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@chore/simplify-pbp-specs
 
     - name: Verify Graphviz installation
       run: |
@@ -573,7 +573,7 @@ jobs:
     # TODO: Remove this before merging
     - name: Install PennyLane branch
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@feature/tabular-specs
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@chore/simplify-pbp-specs
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -641,7 +641,7 @@ jobs:
     # TODO: Remove this before merging
     - name: Install PennyLane branch
       run: |
-        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@feature/tabular-specs
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@chore/simplify-pbp-specs
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build

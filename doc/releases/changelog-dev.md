@@ -152,7 +152,7 @@
 
 * The tape transform :func:`~.device.decomposition.catalyst_decompose` now accepts the optional
   keyword arguments ``target_gates``, ``num_work_wires``, ``fixed_decomps``, and ``alt_decomps``,
-  which all are passed to the used PennyLane decomposition function 
+  which all are passed to the used PennyLane decomposition function
   ``qml.devices.preprocess.decompose`` and used if the graph-based decomposition system is enabled.
   [(#2501)](https://github.com/PennyLaneAI/catalyst/pull/2501)
 
@@ -279,8 +279,9 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Updated integration tests to match changes to the PennyLane `qml.specs` frontend made in https://github.com/PennyLaneAI/pennylane/pull/9088.
+* Updated integration tests to match changes to the PennyLane `qml.specs` frontend made in https://github.com/PennyLaneAI/pennylane/pull/9088 and https://github.com/PennyLaneAI/pennylane/pull/9091.
   [(#2513)](https://github.com/PennyLaneAI/catalyst/pull/2513)
+  [(#2533)](https://github.com/PennyLaneAI/catalyst/pull/2533)
 
 * The `prepare` operation from the PBC dialect in MLIR now implicitly allocates new qubits
   rather than requiring existing ones. This better suits our purposes for further lowering
