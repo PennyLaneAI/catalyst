@@ -340,10 +340,10 @@ class PassPlugin(Pass):
 def dict_to_compile_pipeline(
     pass_pipeline: PipelineDict | str | CompilePipeline | None, *flags, **valued_options
 ) -> CompilePipeline:
-    """Convert dictionary of passes or single pass name into list of passes.
+    """Convert dictionary of passes or single pass name into a compilation pipeline.
 
     Args:
-        pass_pipeline: Either a dictionary of pass configurations or a single pass name.
+        pass_pipeline (dict | str | None): Either a dictionary of pass configurations or a single pass name.
         *flags: Optional flags for single pass
         **valued_options: Optional valued options for single pass
     """
@@ -357,9 +357,11 @@ def dict_to_compile_pipeline(
 
     if isinstance(pass_pipeline, dict):
         passes = []
+        # Pass names must be kebab-case
         filtered_pass_pipeline = {k.replace("_", "-"): v for k, v in pass_pipeline.items()}
         for name, pass_options in filtered_pass_pipeline.items():
             t = transform(pass_name=name)
+            # Pass options must be snake-case
             pass_options = {k.replace("-", "_"): v for k, v in pass_options.items()}
             bound_t = BoundTransform(t, **pass_options)
             passes.append(bound_t)
