@@ -99,7 +99,7 @@ def pipeline(pass_pipeline: PipelineDict) -> CompilePipeline:
             If not specified, the default pass pipeline will be applied.
 
     Returns:
-        CompilePipeline: A compilation pipeline that can be applied to a qnode.
+        callable : A decorator that can be applied to a qnode.
 
     For a list of available passes, please see the :doc:`catalyst.passes module <code/passes>`.
 
@@ -171,8 +171,14 @@ def pipeline(pass_pipeline: PipelineDict) -> CompilePipeline:
     Global and local (via ``@pipeline``) configurations can coexist, however local pass pipelines
     will always take precedence over global pass pipelines.
     """
+    pipeline = dict_to_compile_pipeline(pass_pipeline)
 
-    return dict_to_compile_pipeline(pass_pipeline)
+    def _decorator(qnode):
+        qnode._compile_pipeline = pipeline 
+        return qnode
+
+    return _decorator
+
 
 
 def apply_pass(pass_name: str, *flags, **valued_options):
