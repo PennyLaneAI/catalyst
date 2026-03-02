@@ -92,7 +92,9 @@ class TransformFunctionsExt(TransformFunctions):
         # ---- xDSL path ----
         if pass_name in self.passes:
             pass_class = self.passes[pass_name]()
-            options = get_pyval_from_xdsl_attr(op.options)
+            options = {
+                k.replace("-", "_"): v for k, v in get_pyval_from_xdsl_attr(op.options).items()
+            }
             pass_instance = pass_class(**options)
             pipeline = PassPipeline((pass_instance,))
             self._pre_pass_callback(pass_instance, module)
