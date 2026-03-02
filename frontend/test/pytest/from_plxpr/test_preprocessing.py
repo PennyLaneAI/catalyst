@@ -44,15 +44,19 @@ class CapabilitiesDevice(NullQubit):
 
     @property
     def capabilities(self) -> DeviceCapabilities:
+        """Capabilities."""
         return self._capabilities
 
     @capabilities.setter
     def capabilities(self, obj: DeviceCapabilities):
+        """Capabilities setter."""
         self._capabilities = obj
         self._capabilities.qjit_compatible = True
 
     @property
     def qjit_capabilities(self):
+        """qjit_capabilities alias to capabilities. Used to override Catalyst behaviour
+        where it prioritizes the TOML file over device.capabilities."""
         return self._capabilities
 
 
