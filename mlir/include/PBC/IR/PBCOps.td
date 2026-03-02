@@ -45,55 +45,39 @@ def RotationKindConstraint : AttrConstraint<
     "whose value is ±1, ±2, ±4, or ±8">;
 
 def PrepareStateOp : PBC_Op<"prepare"> {
-    let summary = "Initialize existing qubits into a given state.";
+    let summary = "Prepare auxiliary qubits in a given state.";
     let description = [{
-        Prepares non-magic states of logical qubits in a specific initial quantum state, 
-        such as |0⟩, |1⟩, |+⟩, |-⟩, |Y⟩, |-Y⟩. 
-        The input state of qubits can be any state, not necessarily |0⟩.
-        
-        By default, when allocating a qubit using `quantum.alloc_qb` or `quantum.alloc`, 
-        it is prepared in the |0⟩ state.
+        Prepares simple (non-magic) states in new qubits, such as |0⟩, |1⟩, |+⟩, |-⟩, |Y⟩, |-Y⟩.
 
-        Based on PBC scheme, |Y⟩ (plus_i) and |-Y⟩ (minus_i) can be prepared as transversal 
-        operations. Otherwise, if those states are fabricated, `FabricateOp` should be used.
+        This operation is typically used for auxiliary qubits introduced by compilation passes
+        lower in the stack, "algorithmic"-level allocations would typically use `quantum.alloc`
+        or `quantum.alloc_qb` instead. However, those are limited to the |0⟩ state only.
 
-        Magic state such as |m⟩ (magic) and |m̅⟩ (magic_conj) cannot be prepared 
-        by this operation, use `FabricateOp` instead.
+        Based on PBC scheme, |Y⟩ (plus_i) and |-Y⟩ (minus_i) can be prepared as transversal
+        operations. Otherwise, if those states require expesive preparations in factories,
+        `pbc.fabricate` should be used.
+
+        Magic state such as |m⟩ (magic) and |m̅⟩ (magic_conj) cannot be prepared
+        by this operation, use `pbc.fabricate` instead.
 
         Example:
         ```mlir
-        %0 = pbc.prepare zero %q0 : !quantum.bit
-        %1 = pbc.prepare one %q1 : !quantum.bit
-        %2 = pbc.prepare plus %q2 : !quantum.bit
-        %3 = pbc.prepare minus %q3 : !quantum.bit
-        %4 = pbc.prepare plus_i %q4 : !quantum.bit
+        %0 = pbc.prepare zero : !quantum.bit
+        %1 = pbc.prepare minus : !quantum.bit
+        %2 = pbc.prepare plus_i : !quantum.bit
         ```
-        These prepares the logical qubit in the |0⟩ state and the |m⟩ state respectively.
     }];
 
     let arguments = (ins
-        LogicalInit:$init_state,
-        Variadic<QubitType>:$in_qubits
+        LogicalInit:$init_state
     );
 
     let results = (outs
         Variadic<QubitType>:$out_qubits
     );
 
-    let builders = [
-        OpBuilder<(ins
-            "::catalyst::pbc::LogicalInitKind":$init_state,
-            "::mlir::ValueRange":$in_qubits
-        ),[{
-            PrepareStateOp::build($_builder, $_state,
-            /*out_qubits=*/ mlir::TypeRange(in_qubits),
-            /*init_state=*/ init_state,
-            /*in_qubits=*/ in_qubits);
-        }]>
-    ];
-
     let assemblyFormat = [{
-      $init_state $in_qubits attr-dict `:` type($out_qubits)
+        $init_state attr-dict `:` type($out_qubits)
     }];
 
     let hasVerifier = 1;
@@ -107,7 +91,6 @@ def FabricateOp : PBC_Op<"fabricate"> {
         FabricateOp is used to prepare states not normally available in an error correction scheme,
         such as magic states |m⟩ (magic) and |m̅⟩ (magic_conj), or |Y⟩ (plus_i), and |-Y⟩ (minus_i)
         in some instances. For states constructible within the scheme, use `PrepareStateOp` instead.
-        Contrary to `PrepareStateOp`, this operation does not operate on existing qubits.
 
         Example:
         ```mlir
@@ -168,15 +151,15 @@ def PPRotationOp : PBC_Op<"ppr", [PBCOpInterface, AttrSizedOperandSegments]> {
         It applies a rotation of the form exp(-iθP) where:
         - P is a Pauli product (specified by pauli_product)
         - θ is the rotation angle (specified by rotation_kind in fractions of π)
-        
+
         The operation is characterized by:
         1. A Pauli product (e.g., ["X", "I", "Z"]) specifying which Pauli operators to apply
         2. A rotation kind (in fractions of π) specifying the angle
         3. A list of input qubits to apply the rotation to
         4. A condition (optional) for the operation to be applied only if the condition is true.
-        
+
         The operation returns the same number of qubits as input.
-        
+
         Example:
         ```mlir
         %c0 = arith.constant true : i1
@@ -315,7 +298,7 @@ def PPRotationArbitraryOp : PBC_Op<"ppr.arbitrary", [PBCOpInterface, AttrSizedOp
         It applies a rotation of the form exp(-iθP) to a set of qubits, where:
         - P is a Pauli product (specified by pauli_product)
         - θ is the rotation angle (specified by arbitrary_angle in radians)
-        
+
         The operation is characterized by:
         1. A Pauli product (e.g., ["X", "I", "Z"]) specifying which Pauli operators to apply
         2. A rotation angle (specified by arbitrary_angle in radians)
@@ -416,15 +399,15 @@ def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface]> {
     let description = [{
         The PPMeasurementOp represents a Pauli product measurement operation.
         It measures a set of qubits in the basis specified by a Pauli product.
-        
+
         The operation is characterized by:
         1. A Pauli product (e.g., ["X", "I", "Z"]) specifying the measurement basis
         2. A list of input qubits to measure
-        
+
         The operation returns:
         1. A measurement result (1-bit classical value)
         2. The post-measurement state of the qubits
-        
+
         Example:
         ```mlir
         %result, %q0:3 = pbc.ppm ["X", "I", "Z"] %q0, %q1, %q2 : i1, !quantum.bit, !quantum.bit, !quantum.bit
@@ -434,7 +417,7 @@ def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface]> {
 
     let arguments = (ins
         PauliWord:$pauli_product,  // The Pauli product specifying the measurement basis
-        DefaultValuedAttr<I16Attr, "1">:$rotation_sign, 
+        DefaultValuedAttr<I16Attr, "1">:$rotation_sign,
         Variadic<QubitType>:$in_qubits  // The qubits to measure
     );
 
@@ -452,7 +435,7 @@ def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface]> {
             PPMeasurementOp::build($_builder, $_state,
             /*mres=*/ $_builder.getI1Type(),
             /*out_qubits=*/ mlir::TypeRange(in_qubits),
-            /*pauli_product=*/ pauli_product, 
+            /*pauli_product=*/ pauli_product,
             /*rotation_sign=*/ 1,
             /*in_qubits=*/ in_qubits);
         }]>,
@@ -474,7 +457,7 @@ def PPMeasurementOp : PBC_Op<"ppm", [PBCOpInterface]> {
             PPMeasurementOp::build($_builder, $_state,
             /*mres=*/ $_builder.getI1Type(),
             /*out_qubits=*/ mlir::TypeRange(in_qubits),
-            /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product), 
+            /*pauli_product=*/ $_builder.getStrArrayAttr(pauli_product),
             /*rotation_sign=*/ rotation_sign,
             /*in_qubits=*/ in_qubits);
         }]>,
@@ -501,9 +484,9 @@ def SelectPPMeasurementOp : PBC_Op<"select.ppm"> {
     let summary = "Multiplexed Pauli product measurement.";
 
     let description = [{
-    Based on the boolean `select_switch` (type `i1`), this op selects between two Pauli product strings:  
-    - If `select_switch` is 1, applies and measures using `pauli_product_0`.  
-    - If `select_switch` is 0, uses `pauli_product_1`.  
+    Based on the boolean `select_switch` (type `i1`), this op selects between two Pauli product strings:
+    - If `select_switch` is 1, applies and measures using `pauli_product_0`.
+    - If `select_switch` is 0, uses `pauli_product_1`.
 
     The operation returns:
     - `mres`: the result of the Pauli product measurement (`i1`)
@@ -559,13 +542,13 @@ def SelectPPMeasurementOp : PBC_Op<"select.ppm"> {
             /*pauli_product_1=*/ $_builder.getStrArrayAttr(pauli_product_1),
             /*in_qubits=*/ in_qubits);
         }]>
-        
+
     ];
 
     let assemblyFormat = [{
       `(` $select_switch `,` $pauli_product_0 `,` $pauli_product_1 `)` $in_qubits attr-dict `:` type(results)
     }];
-    
+
     let hasVerifier = 1;
 }
 
@@ -575,7 +558,7 @@ def LayerOp : PBC_Op<"layer", [SingleBlockImplicitTerminator<"YieldOp">]> {
     let description = [{
     The `pbc.layer` operation represents a group of PPR/PPM operations that are
     either mutually commutative within the group or act on different qubits.
-    
+
     `pbc.layer` operates on carried variables and returns the final values after termination.
 
     The body region must contain exactly one block that terminates with `pbc.yield`.
@@ -632,4 +615,3 @@ def YieldOp : PBC_Op<"yield", [ Pure, ReturnLike, Terminator, ParentOneOf<["Laye
 }
 
 #endif // PBC_OPS
-
