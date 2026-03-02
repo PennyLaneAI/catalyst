@@ -133,7 +133,9 @@ def _get_device_kwargs(device) -> dict:
 
 # code example has long lines
 # pylint: disable=line-too-long
-def from_plxpr(plxpr: ClosedJaxpr, skip_preprocess: bool = False) -> Callable[..., Jaxpr]:
+def from_plxpr(
+    plxpr: ClosedJaxpr, skip_preprocess: bool = False, _preprocess_warn: bool = True
+) -> Callable[..., Jaxpr]:
     """Convert PennyLane variant jaxpr to Catalyst variant jaxpr.
 
     Args:
@@ -199,7 +201,11 @@ def from_plxpr(plxpr: ClosedJaxpr, skip_preprocess: bool = False) -> Callable[..
     """
 
     original_fn = partial(
-        WorkflowInterpreter(skip_preprocess=skip_preprocess).eval, plxpr.jaxpr, plxpr.consts
+        WorkflowInterpreter(
+            skip_preprocess=skip_preprocess, _preprocess_warn=_preprocess_warn
+        ).eval,
+        plxpr.jaxpr,
+        plxpr.consts,
     )
 
     # pylint: disable=import-outside-toplevel
@@ -218,17 +224,20 @@ class WorkflowInterpreter(PlxprInterpreter):
     """An interpreter that converts a qnode primitive from a plxpr variant to a catalyst jaxpr variant."""
 
     def __copy__(self):
-        new_version = WorkflowInterpreter(skip_preprocess=self._skip_preprocess)
+        new_version = WorkflowInterpreter(
+            skip_preprocess=self._skip_preprocess, _preprocess_warn=self._preprocess_warn
+        )
         new_version._pass_pipeline = copy(self._pass_pipeline)
         new_version.init_qreg = self.init_qreg
         new_version.requires_decompose_lowering = self.requires_decompose_lowering
         new_version.decompose_tkwargs = copy(self.decompose_tkwargs)
         return new_version
 
-    def __init__(self, skip_preprocess=False):
+    def __init__(self, skip_preprocess=False, _preprocess_warn=True):
         self._pass_pipeline = []
         self.init_qreg = None
         self._skip_preprocess = skip_preprocess
+        self._preprocess_warn = _preprocess_warn
 
         # Compiler options for the new decomposition system
         self.requires_decompose_lowering = False
@@ -370,7 +379,9 @@ def handle_qnode(
     device_pipeline = (
         []
         if self._skip_preprocess
-        else create_device_preprocessing_pipeline(qnode.device, execution_config, shots, warn=True)
+        else create_device_preprocessing_pipeline(
+            qnode.device, execution_config, shots, warn=self._preprocess_warn
+        )
     )
     return quantum_kernel_p.bind(
         wrap_init(calling_convention, debug_info=qfunc_jaxpr.debug_info),
