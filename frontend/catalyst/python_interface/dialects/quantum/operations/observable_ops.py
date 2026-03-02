@@ -15,7 +15,7 @@
 This file contains the definition of operations that represent observables
 in the Quantum dialect.
 """
-from xdsl.dialects.builtin import ComplexType, Float64Type
+from xdsl.dialects.builtin import ComplexType, Float64Type, I1
 from xdsl.ir import Operation
 from xdsl.irdl import (
     AttrSizedOperandSegments,
@@ -130,3 +130,14 @@ class TensorOp(ObservableOp):
     assembly_format = "$terms attr-dict `:` type(results)"
 
     terms = var_operand_def(ObservableType)
+
+
+@irdl_op_definition
+class MCMObsOp(ObservableOp):
+    """Define a pseudo-observable of mid-circuit measurements for use in measurements"""
+
+    name = "quantum.mcmobs"
+
+    assembly_format = "$mcms attr-dict `:` type(results)"
+
+    mcms = var_operand_def(I1)
