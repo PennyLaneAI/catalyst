@@ -1094,8 +1094,8 @@ class TestTransformValidity:
         """Test verification for transforms that are non-batching but modify tape measurements
         while returning classical values."""
 
-        def inject_device_transforms(self, ctx, execution_config=None, shots=None):
-            program, config = original_preprocess(self, ctx, execution_config, shots=shots)
+        def inject_device_transforms(self, execution_config=None):
+            program, config = original_preprocess(self, execution_config)
 
             program.add_transform(transform, self.wires)
 
@@ -1127,8 +1127,8 @@ class TestTransformValidity:
         """Test verification for transforms that are non-batching and in-principle can modify tape
         measurements but don't, while returning classical values."""
 
-        def inject_device_transforms(self, ctx, execution_config=None, shots=None):
-            program, config = original_preprocess(self, ctx, execution_config, shots=shots)
+        def inject_device_transforms(self, execution_config=None):
+            program, config = original_preprocess(self, execution_config)
 
             program.add_transform(transform, self.wires)
 

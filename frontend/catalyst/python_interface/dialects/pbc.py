@@ -199,17 +199,15 @@ class PPRotationOp(IRDLOperation):
 
 @irdl_op_definition
 class PrepareStateOp(IRDLOperation):
-    """Initialize existing qubits into a given state."""
+    """Initialize new qubits into a given state."""
 
     name = "pbc.prepare"
 
     assembly_format = """
-        $init_state $in_qubits attr-dict `:` type($out_qubits)
+        $init_state attr-dict `:` type($out_qubits)
     """
 
     init_state = prop_def(LogicalInit)
-
-    in_qubits = var_operand_def(QubitType)
 
     out_qubits = var_result_def(QubitType)
 
