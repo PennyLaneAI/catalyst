@@ -180,14 +180,13 @@ struct ApplyTransformSequencePass
         transformer->walk([&](transform::NamedSequenceOp op) {
             if (PassInstrumentor *passInstrumentor = getAnalysisManager().getPassInstrumentor()) {
                 // Manually execute the transform sequence with individual subpass tracking
-                if (failed(applyTransformsWithSubpassTracking(payload, op,
-                                                            passInstrumentor))) {
+                if (failed(applyTransformsWithSubpassTracking(payload, op, passInstrumentor))) {
                     return signalPassFailure();
                 }
             }
             else {
                 if (failed(transform::applyTransforms(payload, op, {},
-                                                    transform::TransformOptions(), false))) {
+                                                      transform::TransformOptions(), false))) {
                     return signalPassFailure();
                 }
             }
