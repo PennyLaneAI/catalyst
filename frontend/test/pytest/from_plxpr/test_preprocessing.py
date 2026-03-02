@@ -495,24 +495,104 @@ class TestOperationPreprocessing:
 class TestGradientPreprocessing:
     """Tests for preprocessing related to gradients."""
 
-    def test_gradient_obs_validation(self):
+    @pytest.mark.parametrize("diff_method", ["adjoint", "parameter-shift", None])
+    def test_gradient_obs_validation(self, diff_method):
         """Test that a transform for validating return types is added to the pipeline
         if gradients are requested."""
+        dev = qml.device("lightning.qubit", wires=4)
 
-    def test_adjoint_with_shots_error(self):
+        @qml.qnode(dev, diff_method=diff_method)
+        def f():
+            return qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(f)()
+        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
+
+        pipeline = None
+        for eqn in cjaxpr.eqns:
+            if eqn.primitive == quantum_kernel_p:
+                pipeline = eqn.params.get("pipeline", None)
+                break
+
+        assert pipeline
+        if diff_method is not None:
+            assert any(t.pass_name == "verify-no-state-variance-returns" for t in pipeline)
+        else:
+            assert not any(t.pass_name == "verify-no-state-variance-returns" for t in pipeline)
+
+    @pytest.mark.parametrize("diff_method", ["adjoint", "parameter-shift", None])
+    def test_adjoint_with_shots_error(self, diff_method):
         """Test that an error is raised if diff_method="adjoint" with finite shots."""
+        dev = qml.device("lightning.qubit", wires=4)
 
-    def test_parameter_shift_validation(self):
+        @qml.qnode(dev, diff_method=diff_method, shots=1)
+        def f():
+            return qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(f)()
+        interpreter = from_plxpr_no_warn(jaxpr, skip_preprocess=False)
+
+        if diff_method == "adjoint":
+            with pytest.raises(
+                CompileError, match="Cannot use diff_method='adjoint' with finite shots"
+            ):
+                _ = interpreter()
+        else:
+            _ = interpreter()
+
+    @pytest.mark.parametrize("diff_method", ["adjoint", "parameter-shift", None])
+    def test_parameter_shift_validation(self, diff_method):
         """Test that a transform for validating observables is added to the pipeline
         if diff_method="parameter-shift"."""
+        dev = qml.device("lightning.qubit", wires=4)
+
+        @qml.qnode(dev, diff_method=diff_method)
+        def f():
+            return qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(f)()
+        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
+
+        pipeline = None
+        for eqn in cjaxpr.eqns:
+            if eqn.primitive == quantum_kernel_p:
+                pipeline = eqn.params.get("pipeline", None)
+                break
+
+        assert pipeline
+        if diff_method == "adjoint":
+            assert any(t.pass_name == "validate-observables-adjoint-diff" for t in pipeline)
+        else:
+            assert not any(t.pass_name == "validate-observables-adjoint-diff" for t in pipeline)
+
+    @pytest.mark.parametrize("diff_method", ["adjoint", "parameter-shift", None])
+    def test_adjoint_validation(self, diff_method):
+        """Test that a transform for validating observables is added to the pipeline
+        if diff_method="adjoint"."""
+        dev = qml.device("lightning.qubit", wires=4)
+
+        @qml.qnode(dev, diff_method=diff_method)
+        def f():
+            return qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(f)()
+        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
+
+        pipeline = None
+        for eqn in cjaxpr.eqns:
+            if eqn.primitive == quantum_kernel_p:
+                pipeline = eqn.params.get("pipeline", None)
+                break
+
+        assert pipeline
+        if diff_method == "parameter-shift":
+            assert any(t.pass_name == "validate-observables-parameter-shift" for t in pipeline)
+        else:
+            assert not any(t.pass_name == "validate-observables-parameter-shift" for t in pipeline)
 
 
 class TestIntegration:
     """Integration tests for device preprocessing with program capture."""
-
-    @pytest.mark.parametrize("skip_preprocess", [True, False])
-    def test_from_plxpr_preprocessing(self, skip_preprocess):
-        """Device preprocessing is added to the pass pipeline if requested."""
 
     @pytest.mark.parametrize("skip_preprocess", [True, False])
     def test_qjit_preprocessing(self, skip_preprocess):
