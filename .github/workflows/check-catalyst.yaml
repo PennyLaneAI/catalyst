@@ -481,6 +481,11 @@ jobs:
       run: |
         pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@remove-pass-pipeline-wrapper
 
+    - name: Verify Graphviz installation
+      run: |
+        dot -V 
+        dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
+
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v4
