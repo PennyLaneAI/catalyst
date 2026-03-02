@@ -212,39 +212,61 @@ class TestMeasurementPreprocessing:
     """Tests for preprocessing related to terminal measurements."""
 
     @pytest.mark.parametrize(
-        "capabilities",
+        "capabilities,transform_needed",
         [
-            # Non-commuting observables unsupported
-            DeviceCapabilities(
-                non_commuting_observables=False,
-                measurement_processes={"SampleMP": [], "CountsMP": []},
+            (
+                # Non-commuting observables unsupported
+                DeviceCapabilities(
+                    non_commuting_observables=False,
+                    measurement_processes={"SampleMP": [], "CountsMP": []},
+                ),
+                True,
             ),
-            # No observables supported
-            DeviceCapabilities(
-                non_commuting_observables=True,
-                observables={},
-                measurement_processes={"SampleMP": [], "CountsMP": []},
+            (  # No observables supported
+                DeviceCapabilities(
+                    non_commuting_observables=True,
+                    observables={},
+                    measurement_processes={"SampleMP": [], "CountsMP": []},
+                ),
+                True,
             ),
-            # No non-sample/counts observables supported
-            DeviceCapabilities(
-                non_commuting_observables=True,
-                observables={
-                    "PauliX": OperatorProperties(),
-                    "PauliY": OperatorProperties(),
-                    "PauliZ": OperatorProperties(),
-                    "Hadamard": OperatorProperties(),
-                },
-                measurement_processes={"SampleMP": [], "CountsMP": []},
+            (  # No non-sample/counts observables supported
+                DeviceCapabilities(
+                    non_commuting_observables=True,
+                    observables={
+                        "PauliX": OperatorProperties(),
+                        "PauliY": OperatorProperties(),
+                        "PauliZ": OperatorProperties(),
+                        "Hadamard": OperatorProperties(),
+                    },
+                    measurement_processes={"SampleMP": [], "CountsMP": []},
+                ),
+                True,
             ),
-            # Not all named observables supported
-            DeviceCapabilities(
-                non_commuting_observables=True,
-                observables={"PauliZ": OperatorProperties()},
-                measurement_processes={"ExpectationMP": [], "SampleMP": [], "CountsMP": []},
+            (  # Not all named observables supported
+                DeviceCapabilities(
+                    non_commuting_observables=True,
+                    observables={"PauliZ": OperatorProperties()},
+                    measurement_processes={"ExpectationMP": [], "SampleMP": [], "CountsMP": []},
+                ),
+                True,
+            ),
+            (
+                DeviceCapabilities(
+                    non_commuting_observables=True,
+                    observables={
+                        "PauliX": OperatorProperties(),
+                        "PauliY": OperatorProperties(),
+                        "PauliZ": OperatorProperties(),
+                        "Hadamard": OperatorProperties(),
+                    },
+                    measurement_processes={"ExpectationMP": [], "SampleMP": []},
+                ),
+                False,
             ),
         ],
     )
-    def test_split_non_commuting(self, capabilities):
+    def test_split_non_commuting(self, capabilities, transform_needed):
         """Test that split_non_commuting is added to the pipeline when needed."""
         dev = CapabilitiesDevice(wires=4)
         dev.capabilities = capabilities
@@ -263,14 +285,17 @@ class TestMeasurementPreprocessing:
                 break
 
         assert pipeline
-        assert any(t.pass_name == "split-non-commuting" for t in pipeline)
+        if transform_needed:
+            assert any(t.pass_name == "split-non-commuting" for t in pipeline)
+        else:
+            assert not any(t.pass_name == "split-non-commuting" for t in pipeline)
 
     @pytest.mark.parametrize(
-        "split_non_commuting_needed,sum_supported,split_to_single_terms_needed",
+        "split_non_commuting_needed,sum_supported,transform_needed",
         [(True, False, False), (True, True, False), (False, True, False), (False, False, True)],
     )
     def test_split_to_single_terms(
-        self, split_non_commuting_needed, sum_supported, split_to_single_terms_needed
+        self, split_non_commuting_needed, sum_supported, transform_needed
     ):
         """Test that split_to_single_terms is added to the pipeline when needed."""
         observables = {
@@ -282,14 +307,12 @@ class TestMeasurementPreprocessing:
         if sum_supported:
             observables["Sum"] = OperatorProperties()
 
-        capabilities = DeviceCapabilities(
+        dev = CapabilitiesDevice(wires=4)
+        dev.capabilities = DeviceCapabilities(
             non_commuting_observables=not split_non_commuting_needed,
             observables=observables,
             measurement_processes={"ExpectationMP": [], "SampleMP": [], "CountsMP": []},
         )
-
-        dev = CapabilitiesDevice(wires=4)
-        dev.capabilities = capabilities
 
         @qml.qnode(dev, shots=1)
         def f():
@@ -305,23 +328,142 @@ class TestMeasurementPreprocessing:
                 break
 
         assert pipeline
-        if split_to_single_terms_needed:
+        if transform_needed:
             assert any(t.pass_name == "split-to-single-terms" for t in pipeline)
         else:
             assert not any(t.pass_name == "split-to-single-terms" for t in pipeline)
 
-    def test_measurements_from_samples(self):
+    @pytest.mark.parametrize(
+        "non_sample_supported,transform_needed", [(True, False), (False, True)]
+    )
+    def test_measurements_from_samples(self, non_sample_supported, transform_needed):
         """Test that measurements_from_samples is added to the pipeline when needed."""
+        measurements = {"SampleMP": []}
+        if non_sample_supported:
+            measurements["ExpectationMP"] = []
 
-    def test_measurments_from_counts(self):
+        dev = CapabilitiesDevice(wires=4)
+        dev.capabilities = DeviceCapabilities(
+            observables={
+                "PauliX": OperatorProperties(),
+                "PauliY": OperatorProperties(),
+                "PauliZ": OperatorProperties(),
+                "Hadamard": OperatorProperties(),
+            },
+            measurement_processes=measurements,
+        )
+
+        @qml.qnode(dev, shots=1)
+        def f():
+            qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(f)()
+        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
+
+        pipeline = None
+        for eqn in cjaxpr.eqns:
+            if eqn.primitive == quantum_kernel_p:
+                pipeline = eqn.params.get("pipeline", None)
+                break
+
+        assert pipeline
+        if transform_needed:
+            assert any(t.pass_name == "measurements-from-samples" for t in pipeline)
+        else:
+            assert not any(t.pass_name == "measurements-from-samples" for t in pipeline)
+
+    @pytest.mark.parametrize(
+        "non_counts_supported,transform_needed", [(True, False), (False, True)]
+    )
+    def test_measurments_from_counts(self, non_counts_supported, transform_needed):
         """Test that measurements_from_counts is added to the pipeline when needed."""
+        measurements = {"CountsMP": []}
+        if non_counts_supported:
+            measurements["SampleMP"] = []
+
+        dev = CapabilitiesDevice(wires=4)
+        dev.capabilities = DeviceCapabilities(
+            observables={
+                "PauliX": OperatorProperties(),
+                "PauliY": OperatorProperties(),
+                "PauliZ": OperatorProperties(),
+                "Hadamard": OperatorProperties(),
+            },
+            measurement_processes=measurements,
+        )
+
+        @qml.qnode(dev, shots=1)
+        def f():
+            qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(f)()
+        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
+
+        pipeline = None
+        for eqn in cjaxpr.eqns:
+            if eqn.primitive == quantum_kernel_p:
+                pipeline = eqn.params.get("pipeline", None)
+                break
+
+        assert pipeline
+        if transform_needed:
+            assert any(t.pass_name == "measurements-from-counts" for t in pipeline)
+        else:
+            assert not any(t.pass_name == "measurements-from-counts" for t in pipeline)
 
     def test_unsupported_samples_counts_observables_error(self):
         """Test that an error is raised if a device doesn't support any observables,
         samples, or counts."""
 
-    def test_diagonalize_measurements(self):
+        dev = CapabilitiesDevice(wires=4)
+        dev.capabilities = DeviceCapabilities(observables={}, measurement_processes={})
+
+        @qml.qnode(dev, shots=1)
+        def f():
+            qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(f)()
+        interpreter = from_plxpr_no_warn(jaxpr, skip_preprocess=False)
+
+        with pytest.raises(CompileError, match="does not support observables or samples/counts"):
+            _ = interpreter()
+
+    @pytest.mark.parametrize(
+        "supported_obs,transform_needed",
+        [
+            (["PauliZ", "Prod"], True),
+            (["PauliX", "PauliY", "Hadamard"], True),
+            (["PauliX", "PauliY", "PauliZ", "Hadamard"], False),
+            (["PauliX", "PauliY", "PauliZ", "Hadamard", "Sum"], False),
+        ],
+    )
+    def test_diagonalize_measurements(self, supported_obs, transform_needed):
         """Test that diagonalize_measurements is added to the pipeline when needed."""
+
+        dev = CapabilitiesDevice(wires=4)
+        dev.capabilities = DeviceCapabilities(
+            observables={obs: OperatorProperties() for obs in supported_obs},
+            measurement_processes={"ExpectationMP": [], "SampleMP": []},
+        )
+
+        @qml.qnode(dev, shots=1)
+        def f():
+            qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(f)()
+        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
+
+        pipeline = None
+        for eqn in cjaxpr.eqns:
+            if eqn.primitive == quantum_kernel_p:
+                pipeline = eqn.params.get("pipeline", None)
+                break
+
+        assert pipeline
+        if transform_needed:
+            assert any(t.pass_name == "diagonalize-measurements" for t in pipeline)
+        else:
+            assert not any(t.pass_name == "diagonalize-measurements" for t in pipeline)
 
 
 class TestOperationPreprocessing:

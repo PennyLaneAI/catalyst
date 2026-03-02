@@ -177,7 +177,7 @@ def _measurements_preprocessing(
                 )
             )
         else:
-            raise CompileError(f"{device.name} does not support observables or sample/counts.")
+            raise CompileError(f"{device.name} does not support observables or samples/counts.")
 
     else:
         supported_named_obs = set(_named_obs_dict.keys()).intersection(capabilities.observables)
