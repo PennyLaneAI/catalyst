@@ -80,25 +80,16 @@ def lower_jaxpr(ctx, jaxpr, metadata=None, fn=None):
     if fn is None or isinstance(fn, qml.QNode):
         equation = get_call_equation(jaxpr)
         call_jaxpr = equation.params["call_jaxpr"]
-        pipeline = equation.params.get("pipeline")
-        device_pipeline = equation.params.get("device_pipeline", ())
+        pipelines = equation.params.get("pipelines")
         callable_ = equation.params.get("fn")
         if callable_ is None:
             callable_ = equation.params.get("qnode", None)
     else:
         call_jaxpr = jaxpr
-        pipeline = ()
-        device_pipeline = None
+        pipelines = ()
         callable_ = fn
 
-    return lower_callable(
-        ctx,
-        callable_,
-        call_jaxpr,
-        pipeline=pipeline,
-        device_pipeline=device_pipeline,
-        metadata=metadata,
-    )
+    return lower_callable(ctx, callable_, call_jaxpr, pipelines=pipelines, metadata=metadata)
 
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments
