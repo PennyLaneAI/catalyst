@@ -22,16 +22,33 @@ For a complete description of this dialect, please see
     mlir/include/QecPhysical/IR/QecPhysicalDialect.td
 """
 
-from xdsl.dialects.builtin import I64, IntegerAttr
+from collections.abc import Set as AbstractSet
+from typing import TypeAlias
+
+from xdsl.dialects.builtin import I64, IndexType, IntegerAttr, IntegerType
 from xdsl.ir import (
+    Attribute,
     Dialect,
     EnumAttribute,
+    Operation,
     ParametrizedAttribute,
     SpacedOpaqueSyntaxAttribute,
+    SSAValue,
     StrEnum,
     TypeAttribute,
 )
-from xdsl.irdl import irdl_attr_definition
+from xdsl.irdl import (
+    AtLeast,
+    AttrConstraint,
+    IRDLOperation,
+    irdl_attr_definition,
+    irdl_op_definition,
+    operand_def,
+    opt_operand_def,
+    opt_prop_def,
+    result_def,
+)
+from xdsl.irdl.constraints import ConstraintContext
 from xdsl.parser import Parser
 from xdsl.printer import Printer
 
@@ -151,10 +168,184 @@ class PhysicalHyperRegisterType(ParametrizedAttribute, TypeAttribute):
         return [IntegerAttr(width, 64), IntegerAttr(k, 64), IntegerAttr(n, 64)]
 
 
+PhysicalCodeBlockSSAValue: TypeAlias = SSAValue[PhysicalCodeblockType]
+PhysicalHyperRegisterSSAValue: TypeAlias = SSAValue[PhysicalHyperRegisterType]
+
+
+class PhysicalHyperRegisterTypeConstraint(AttrConstraint):
+    """Constraint to make PhysicalHyperRegisterType inferrable during IRDL declaration."""
+
+    # This is a bit of a hack for ops that both consume and return a LogicalHyperRegisterType.
+    # See comment for LogicalHyperRegisterTypeConstraint for an explanation of what's happening.
+
+    def verify(self, attr: Attribute, constraint_context: ConstraintContext) -> None:
+        """Verify the constraint and add resolved values to the ConstraintContext."""
+        constraint_context.set_attr_variable("hyper_reg_type", attr)
+
+    def can_infer(self, var_constraint_names: AbstractSet[str]) -> bool:
+        """Check if there is enough information to infer the attribute given the constraint
+        variables that are already set.
+        """
+        # Assume we can always infer
+        return True
+
+    def infer(self, context: ConstraintContext) -> PhysicalHyperRegisterType:
+        """Infer the attribute given the the values for all variables."""
+        hyper_reg_type = context.get_variable("hyper_reg_type")
+        assert isinstance(
+            hyper_reg_type, PhysicalHyperRegisterType
+        ), f"Expected a PhysicalHyperRegisterType from constraint context, but got {hyper_reg_type}"
+        return hyper_reg_type
+
+    def mapping_type_vars(self, type_var_mapping):
+        """A helper function to make type vars used in attribute definitions concrete when creating
+        constraints for new attributes or operations.
+        """
+        return self
+
+
+@irdl_op_definition
+class AllocOp(IRDLOperation):
+    """Allocate a physical hyper-register containing a sequence of physical codeblocks."""
+
+    name = "qecp.alloc"
+
+    assembly_format = """
+            `(` `)` attr-dict `:` type($hyper_reg)
+        """
+
+    hyper_reg = result_def(PhysicalHyperRegisterType)
+
+
+@irdl_op_definition
+class DeallocOp(IRDLOperation):
+    """Deallocate a physical hyper-register."""
+
+    name = "qecp.dealloc"
+
+    assembly_format = """
+            $hyper_reg attr-dict `:` type($hyper_reg)
+        """
+
+    hyper_reg = operand_def(PhysicalHyperRegisterType)
+
+
+@irdl_op_definition
+class ExtractCodeblockOp(IRDLOperation):
+    """Extract a physical codeblock value from a hyper-register."""
+
+    name = "qecp.extract_block"
+
+    assembly_format = """
+            $hyper_reg `[` ($idx^):($idx_attr)? `]` attr-dict `:` type($hyper_reg) `->` type($codeblock)
+        """
+
+    hyper_reg = operand_def(PhysicalHyperRegisterType)
+
+    idx = opt_operand_def(IndexType)
+
+    idx_attr = opt_prop_def(IntegerAttr.constr(type=IndexType, value=AtLeast(0)))
+
+    codeblock = result_def(PhysicalCodeblockType)
+
+    def __init__(
+        self,
+        hyper_reg: PhysicalHyperRegisterType | Operation,
+        idx: int | SSAValue[IntegerType] | Operation | IntegerAttr,
+    ):
+        if isinstance(idx, int):
+            idx = IntegerAttr.from_int_and_width(idx, 64)
+
+        if isinstance(idx, IntegerAttr):
+            operands = (hyper_reg, None)
+            properties = {"idx_attr": idx}
+        else:
+            operands = (hyper_reg, idx)
+            properties = {}
+
+        super().__init__(
+            operands=operands,
+            result_types=(PhysicalCodeblockType(k=hyper_reg.k, n=hyper_reg.n),),
+            properties=properties,
+        )
+
+
+@irdl_op_definition
+class InsertCodeblockOp(IRDLOperation):
+    """Update the physical codeblock value of a hyper-register."""
+
+    name = "qecp.insert_block"
+
+    assembly_format = """
+            $in_hyper_reg `[` ($idx^):($idx_attr)? `]` `,` $codeblock attr-dict `:` type($in_hyper_reg) `,` type($codeblock)
+        """
+
+    in_hyper_reg = operand_def(PhysicalHyperRegisterTypeConstraint())
+
+    idx = opt_operand_def(IndexType)
+
+    idx_attr = opt_prop_def(IntegerAttr.constr(type=IndexType, value=AtLeast(0)))
+
+    codeblock = operand_def(PhysicalCodeblockType)
+
+    out_hyper_reg = result_def(PhysicalHyperRegisterTypeConstraint())
+
+    def __init__(
+        self,
+        in_hyper_reg: PhysicalCodeBlockSSAValue | Operation,
+        idx: SSAValue[IntegerType] | Operation | int | IntegerAttr,
+        codeblock: PhysicalCodeBlockSSAValue | Operation,
+    ):
+        if isinstance(idx, int):
+            idx = IntegerAttr.from_int_and_width(idx, 64)
+
+        if isinstance(idx, IntegerAttr):
+            operands = (in_hyper_reg, None, codeblock)
+            properties = {"idx_attr": idx}
+        else:
+            operands = (in_hyper_reg, idx, codeblock)
+            properties = {}
+
+        super().__init__(
+            operands=operands, properties=properties, result_types=(in_hyper_reg.type,)
+        )
+
+
+@irdl_op_definition
+class AllocAuxQubitOp(IRDLOperation):
+    """Allocate a single auxiliary QEC physical qubit."""
+
+    name = "qecp.alloc_aux"
+
+    assembly_format = """
+            attr-dict `:` type($qubit)
+        """
+
+    qubit = result_def(QecPhysicalQubitType(role=QecPhysicalQubitRole.Aux))
+
+
+@irdl_op_definition
+class DeallocAuxQubitOp(IRDLOperation):
+    """Deallocate a single auxiliary QEC physical qubit."""
+
+    name = "qecp.dealloc_aux"
+
+    assembly_format = """
+            $qubit attr-dict `:` type($qubit)
+        """
+
+    qubit = operand_def(QecPhysicalQubitType(role=QecPhysicalQubitRole.Aux))
+
+
 QecPhysical = Dialect(
     "qecp",
     [
-        # Ops
+        AllocOp,
+        DeallocOp,
+        ExtractCodeblockOp,
+        InsertCodeblockOp,
+        AllocAuxQubitOp,
+        DeallocAuxQubitOp,
     ],
     [
         QecPhysicalQubitRoleAttr,

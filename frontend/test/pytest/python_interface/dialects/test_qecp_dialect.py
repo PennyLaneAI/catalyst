@@ -33,7 +33,14 @@ def create_ssa_value(t: AttributeCovT) -> OpResult[AttributeCovT]:
 all_ops = list(qecp.QecPhysical.operations)
 all_attrs = list(qecp.QecPhysical.attributes)
 
-expected_ops_names = {}
+expected_ops_names = {
+    "AllocOp": "qecp.alloc",
+    "DeallocOp": "qecp.dealloc",
+    "ExtractCodeblockOp": "qecp.extract_block",
+    "InsertCodeblockOp": "qecp.insert_block",
+    "AllocAuxQubitOp": "qecp.alloc_aux",
+    "DeallocAuxQubitOp": "qecp.dealloc_aux",
+}
 
 expected_attrs_names = {
     "QecPhysicalQubitRoleAttr": "qecp.qubit_role",
@@ -93,6 +100,24 @@ def test_assembly_format(run_filecheck, pretty_print):
 
     // CHECK: [[hyperreg:%.+]] = "test.op"() : () -> !qecp.hyperreg<3 x 1 x 7>
     %hyperreg = "test.op"() : () -> !qecp.hyperreg<3 x 1 x 7>
+
+    // CHECK: [[hreg0:%.+]] = qecp.alloc() : !qecp.hyperreg<3 x 1 x 7>
+    %hreg0 = qecp.alloc() : !qecp.hyperreg<3 x 1 x 7>
+
+    // CHECK: qecp.dealloc [[hreg0]] : !qecp.hyperreg<3 x 1 x 7>
+    qecp.dealloc %hreg0 : !qecp.hyperreg<3 x 1 x 7>
+
+    // CHECK: [[block0:%.+]] = qecp.extract_block [[hyperreg]][{{\s*}}0] : !qecp.hyperreg<3 x 1 x 7> -> !qecp.codeblock<1 x 7>
+    %block0 = qecp.extract_block %hyperreg[ 0] : !qecp.hyperreg<3 x 1 x 7> -> !qecp.codeblock<1 x 7>
+
+    // CHECK: qecp.insert_block [[hyperreg]][{{\s*}}0], [[block0]] : !qecp.hyperreg<3 x 1 x 7>, !qecp.codeblock<1 x 7>
+    %hreg1 = qecp.insert_block %hyperreg[ 0], %block0 : !qecp.hyperreg<3 x 1 x 7>, !qecp.codeblock<1 x 7>
+
+    // CHECK: [[q_aux1:%.+]] = qecp.alloc_aux : !qecp.qubit<aux>
+    %q_aux1 = qecp.alloc_aux : !qecp.qubit<aux>
+
+    // CHECK: qecp.dealloc_aux [[q_aux1]] : !qecp.qubit<aux>
+    qecp.dealloc_aux %q_aux1 : !qecp.qubit<aux>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
