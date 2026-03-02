@@ -23,14 +23,75 @@ TODOs:
 
 import numpy as np
 import pennylane as qml
-import pytest
+from typing import Any
 
+import pytest
+from xdsl.context import Context
+from xdsl.dialects import builtin, test, transform
+from xdsl.interpreter import Interpreter
+from xdsl.ir import Attribute, Block, Region, SSAValue
+
+from catalyst.python_interface import QuantumParser
+from catalyst.python_interface.pass_api.transform_interpreter import (
+    TransformFunctionsExt,
+)
 from catalyst.python_interface.transforms import (
     DiagonalizeFinalMeasurementsPass,
     diagonalize_final_measurements_pass,
 )
 
 pytestmark = pytest.mark.xdsl
+
+
+def _get_xdsl_attr_from_pyval(val) -> Attribute:
+    """Get an xDSL attribute corresponding to a Python value."""
+    attr = None
+
+    match val:
+        case bool():
+            attr = builtin.IntegerAttr(int(val), 1)
+        case int():
+            attr = builtin.IntegerAttr(val, 64)
+        case float():
+            attr = builtin.FloatAttr(val, 64)
+        case str():
+            attr = builtin.StringAttr(val)
+        case list() | tuple():
+            attr = builtin.ArrayAttr(tuple(_get_xdsl_attr_from_pyval(elt) for elt in val))
+        case dict():
+            attr = builtin.DictionaryAttr({k: _get_xdsl_attr_from_pyval(v) for k, v in val.items()})
+        case _:
+            raise ValueError(f"Invalid type {val}")
+
+    return attr
+
+
+def create_apply_registered_pass_op(
+    pass_name,
+    options: dict[str, Any] | None = None,
+    in_mod: SSAValue[transform.OperationType] | None = None,
+) -> transform.ApplyRegisteredPassOp:
+    """Create an ApplyRegisteredPassOp using the provided pass name and
+    pass options."""
+    options = options or {}
+    in_mod = (
+        in_mod or test.TestOp(result_types=(transform.OperationType("builtin.module"),)).results[0]
+    )
+
+    lowered_options = {}
+    for arg, value in options.items():
+        option_key = str(arg).replace("_", "-")
+        lowered_options[option_key] = _get_xdsl_attr_from_pyval(value)
+
+    pass_op = transform.ApplyRegisteredPassOp.create(
+        properties={
+            "pass_name": builtin.StringAttr(pass_name),
+            "options": builtin.DictionaryAttr(lowered_options),
+        },
+        operands=(in_mod,),
+        result_types=(transform.OperationType("builtin.module"),),
+    )
+    return pass_op
 
 
 class TestDiagonalizeFinalMeasurementsPass:
@@ -96,6 +157,68 @@ class TestDiagonalizeFinalMeasurementsPass:
 
         pipeline = (DiagonalizeFinalMeasurementsPass(),)
         run_filecheck(program, pipeline)
+
+    @pytest.mark.parametrize("pass_module", [DiagonalizeFinalMeasurementsPass])
+    @pytest.mark.parametrize("pass_name", ["diagonalize-final-measurements"])
+    @pytest.mark.parametrize("pass_options", [{"to-eigvals": True}])
+    def test_xdsl_pass(self, pass_module, pass_name, pass_options, capsys):
+        """Test that interpreting an xDSL pass works correctly."""
+        ctx = Context()
+        ctx.load_dialect(builtin.Builtin)
+        ctx.load_dialect(transform.Transform)
+
+        fns = TransformFunctionsExt(ctx, passes={pass_name: lambda: pass_module})
+
+        pass_op = create_apply_registered_pass_op(pass_name=pass_name, options=pass_options)
+
+        program_str = """
+            func.func @test_func() {
+                // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
+                %0 = "test.op"() : () -> !quantum.bit
+
+                // CHECK: [[q0_1:%.*]] = quantum.custom "Hadamard"() [[q0]]
+                // CHECK-NEXT: [[q0_2:%.*]] =  quantum.namedobs [[q0_1]][PauliZ]
+                // CHECK-NOT: quantum.namedobs [[q:%.+]][PauliX]
+                %1 = quantum.namedobs %0[PauliX] : !quantum.obs
+
+                // CHECK: quantum.expval [[q0_2]]
+                %2 = quantum.expval %1 : f64
+                return
+            }
+            """
+
+        mod = QuantumParser(ctx, program_str, extra_dialects=(test.Test,)).parse_module()
+        with pytest.raises(ValueError, match="Only to_eigvals = False is supported."):
+            _ = fns.run_apply_registered_pass_op(Interpreter(module=mod), pass_op, (mod,))
+        # outs = fns.run_apply_registered_pass_op(Interpreter(module=mod), pass_op, (mod,))
+        # assert outs.values[0] is mod
+        # captured = capsys.readouterr()
+        # assert captured.out.strip() == f"Applying options-pass with options {pass_options}"
+
+    @pytest.mark.xfail(reason="we couldn't pass options as args to passes")
+    def test_with_to_eigvals_raise_errors(self, run_filecheck):
+        """Test that when diagonalizing a PauliX observable, the expected diagonalizing
+        gates are inserted and the observable becomes PauliZ."""
+
+        program = """
+            func.func @test_func() {
+                // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
+                %0 = "test.op"() : () -> !quantum.bit
+
+                // CHECK: [[q0_1:%.*]] = quantum.custom "Hadamard"() [[q0]]
+                // CHECK-NEXT: [[q0_2:%.*]] =  quantum.namedobs [[q0_1]][PauliZ]
+                // CHECK-NOT: quantum.namedobs [[q:%.+]][PauliX]
+                %1 = quantum.namedobs %0[PauliX] : !quantum.obs
+
+                // CHECK: quantum.expval [[q0_2]]
+                %2 = quantum.expval %1 : f64
+                return
+            }
+            """
+
+        pipeline = (DiagonalizeFinalMeasurementsPass(to_eigvals=True),)
+        with pytest.raises(ValueError, match="Only to_eigvals = False is supported."):
+            run_filecheck(program, pipeline)
 
     def test_with_pauli_y(self, run_filecheck):
         """Test that when diagonalizing a PauliY observable, the expected diagonalizing

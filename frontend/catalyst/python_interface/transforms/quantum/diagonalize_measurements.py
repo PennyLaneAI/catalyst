@@ -193,9 +193,6 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
             raise ValueError(
                 f"{self.supported_base_obs} is not supported. Please ensure all the supported_base_obs is a subset of PauliX, PauliY, PauliZ, Hadamard and Identity"
             )
-
-        print(self.supported_base_obs)
-
         if options.get("to-eigvals", False) is not False:
             raise ValueError("Only to_eigvals = False is supported.")
 
