@@ -78,7 +78,9 @@ _gate_map, _params_map = _generate_mapping()
 
 def _diagonalize(obs: NamedObsOp, supported_base_obs) -> bool:
     """Whether to diagonalize a given observable."""
-    _obs_set_to_diagonalize = _obs_allowed_diagonalization - supported_base_obs
+    _obs_set_to_diagonalize = (
+        obs for obs in _obs_allowed_diagonalization if obs not in supported_base_obs
+    )
     if obs.type.data in supported_base_obs:
         return False
     if obs.type.data in _obs_set_to_diagonalize:
@@ -104,8 +106,8 @@ class DiagonalizeFinalMeasurementsPattern(
         """Replace non-diagonalized observables with their diagonalizing gates and PauliZ."""
         """
         NON-COMMUTING CHECK TODO:
-        1: Add HermitianObs to check if it's used for multiple times.
-        2: Check if there is quantum.compbasis obs applied to qreg.
+        1: If there is a quantum.compbasis accepting qreg and there is any other obs in the circuit, the circuit is non-commuting.
+        2. If all obs (including quantum.compbasis) accept qubits and any of those qubits used more than once, the circuit is non-commuting.
         """
 
         if _diagonalize(observable, self.supported_base_obs):
