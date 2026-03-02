@@ -195,7 +195,7 @@
 
 <h3>Breaking changes 💔</h3>
 
-* Remove `register_transforms` as a way to access MLIR passes from Python in favour of the new unified transforms API.
+* `catalyst.from_plxpr.register_transforms` as a way to access MLIR passes from Python has been removed in favour of the new unified transforms API.
   [(#2509)](https://github.com/PennyLaneAI/catalyst/pull/2509)
 
 * `catalyst.jax_primitives.subroutine` has been moved to `qml.capture.subroutine`.
