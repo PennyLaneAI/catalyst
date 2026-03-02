@@ -13,7 +13,8 @@
 # limitations under the License.
 
 """
-This module contains the experimental QEC physical dialect for the xDSL Python interface to Catalyst.
+This module contains the experimental QEC physical dialect for the xDSL Python interface to
+Catalyst.
 
 This dialect is a mirror of the ``qecp`` MLIR dialect, which should be taken as the source of truth.
 For a complete description of this dialect, please see
