@@ -22,6 +22,8 @@ import warnings
 
 import jax
 import pennylane as qp
+from jax._src.interpreters import mlir
+from jax._src.lib.mlir import ir
 from pennylane.operation import Operation
 
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION
@@ -79,6 +81,25 @@ def get_dummy_args(op_class: Operation) -> list:
     return dummy_args
 
 
+def get_func_from_circuit(module) -> str | None:
+    """
+    Return the string representation of FuncOp named `rule_wrapper` from mlir_circuit.
+    """
+
+    decompFuncOp = None
+
+    def find_condition(op):
+        nonlocal decompFuncOp
+        if op.name == "func.func":
+            if ir.StringAttr(op.attributes["sym_name"]).value == "rule_wrapper":
+                decompFuncOp = op
+                return ir.WalkResult.INTERRUPT
+        return ir.WalkResult.ADVANCE
+
+    module.operation.walk(find_condition)
+    return str(decompFuncOp) if decompFuncOp else ""
+
+
 def compile_decomps_via_dummy_circuit(op_class: Operation) -> dict[str, str] | None:
     """
     Compile all decomposition rules for op_class. Returns a dictionary of decomposition rule names
@@ -133,7 +154,8 @@ def compile_decomps_via_dummy_circuit(op_class: Operation) -> dict[str, str] | N
 
         try:
             circuit()
-            mlir_modules[rule_name] = circuit.mlir
+            # TODO get the module with QJIT.mlir_module, (which is parser), then extract function
+            mlir_modules[rule_name] = get_func_from_circuit(circuit.mlir_module)
 
         except CompileError:
             warnings.warn(f"failed to compile {rule_name}")
@@ -156,4 +178,4 @@ if __name__ == "__main__":
             if results:
                 for name, circuit_mlir in results.items():
                     mlir_file.write(circuit_mlir.replace("rule_wrapper", name))
-                    mlir_file.write("// -----\n")  # for splitting input file to quantum-opt
+                    mlir_file.write("\n// -----\n")  # for splitting input file to quantum-opt
