@@ -22,7 +22,6 @@ import warnings
 
 import jax
 import pennylane as qp
-from jax._src.interpreters import mlir
 from jax._src.lib.mlir import ir
 from pennylane.operation import Operation
 
