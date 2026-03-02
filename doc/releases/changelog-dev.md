@@ -279,7 +279,7 @@
 
 <h3>Internal changes ⚙️</h3>
 
-* Updated integration tests to match changes to the PennyLane `qml.specs` frontend
+* Updated integration tests to match changes to the PennyLane `qml.specs` frontend made in https://github.com/PennyLaneAI/pennylane/pull/9088.
   [(#2513)](https://github.com/PennyLaneAI/catalyst/pull/2513)
 
 * The `prepare` operation from the PBC dialect in MLIR now implicitly allocates new qubits
@@ -328,7 +328,7 @@
   measurement logic inside an `scf.if` region rather than propagating the condition
   to inner PPM ops.
   [(#2511)](https://github.com/PennyLaneAI/catalyst/pull/2511)
->>>>>>> main
+
 
 * Update `mlir_specs` to account for new `marker` functionality in PennyLane.
   [(#2464)](https://github.com/PennyLaneAI/catalyst/pull/2464)
