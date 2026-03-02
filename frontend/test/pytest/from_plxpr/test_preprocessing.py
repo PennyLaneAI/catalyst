@@ -20,7 +20,12 @@ from functools import partial
 import jax
 import pennylane as qml
 import pytest
-from pennylane.devices.capabilities import DeviceCapabilities
+from pennylane.devices import NullQubit
+from pennylane.devices.capabilities import (
+    DeviceCapabilities,
+    ExecutionCondition,
+    OperatorProperties,
+)
 
 from catalyst.from_plxpr import from_plxpr
 from catalyst.jax_primitives import quantum_kernel_p
@@ -28,6 +33,95 @@ from catalyst.utils.exceptions import CompileError
 
 pytestmark = pytest.mark.usefixtures("use_capture")
 from_plxpr_no_warn = partial(from_plxpr, _preprocess_warn=False)
+
+
+class CapabilitiesDevice(NullQubit):
+    """Device class that allows setting capabilities on a per-instance basis."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._capabilities = super().capabilities
+
+    @property
+    def capabilities(self) -> DeviceCapabilities:
+        return self._capabilities
+
+    @capabilities.setter
+    def capabilities(self, obj: DeviceCapabilities):
+        self._capabilities = obj
+        self._capabilities.qjit_compatible = True
+
+    @property
+    def qjit_capabilities(self):
+        return self._capabilities
+
+
+class TestGeneralPreprocessing:
+    """Tests for general preprocessing."""
+
+    def test_skip_preprocess(self):
+        """Test that skip_preprocess=True causes device preprocessing to be skipped."""
+        dev = qml.device("null.qubit", wires=4)
+
+        # mcm_method="one-shot" should trigger at least one device preprocessing transform,
+        # which is qml.transform(pass_name="dynamic-one-shot")
+        @qml.qnode(dev, shots=1, mcm_method="one-shot")
+        def f():
+            _ = qml.measure(0)
+            return qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(f)()
+        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=True)()
+
+        pipeline = None
+        for eqn in cjaxpr.eqns:
+            if eqn.primitive == quantum_kernel_p:
+                pipeline = eqn.params.get("pipeline", None)
+                break
+
+        assert pipeline is not None
+        assert len(pipeline) == 0
+
+    def test_finite_shots_only(self):
+        """Test that an error is raised if trying to do an analytic execution with
+        a finite-shots-only device."""
+        dev = CapabilitiesDevice(wires=4)
+        dev.capabilities = DeviceCapabilities(
+            observables={"PauliZ": OperatorProperties()},
+            measurement_processes={
+                "ExpectationMP": [ExecutionCondition.FINITE_SHOTS_ONLY],
+                "SampleMP": [ExecutionCondition.FINITE_SHOTS_ONLY],
+                "CountsMP": [ExecutionCondition.FINITE_SHOTS_ONLY],
+            },
+        )
+
+        @qml.qnode(dev, shots=None)
+        def f():
+            return qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(f)()
+        interpreter = from_plxpr_no_warn(jaxpr, skip_preprocess=False)
+
+        with pytest.raises(CompileError, match="only supports finite shot measurements"):
+            _ = interpreter()
+
+    def test_unimplemented_transforms_warning(self):
+        """Test that a warning is raised if device preprocessing requires transforms that
+        are not yet available as MLIR/xDSL transforms."""
+        dev = qml.device("null.qubit", wires=4)
+
+        @qml.qnode(dev)
+        def f():
+            return qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(f)()
+        interpreter = from_plxpr(jaxpr, skip_preprocess=False)
+
+        with pytest.warns(
+            UserWarning,
+            match="The following device-preprocessing transforms are currently not supported",
+        ):
+            _ = interpreter()
 
 
 class TestMCMPreprocessing:
@@ -117,11 +211,104 @@ class TestMCMPreprocessing:
 class TestMeasurementPreprocessing:
     """Tests for preprocessing related to terminal measurements."""
 
-    def test_split_non_commuting(self):
+    @pytest.mark.parametrize(
+        "capabilities",
+        [
+            # Non-commuting observables unsupported
+            DeviceCapabilities(
+                non_commuting_observables=False,
+                measurement_processes={"SampleMP": [], "CountsMP": []},
+            ),
+            # No observables supported
+            DeviceCapabilities(
+                non_commuting_observables=True,
+                observables={},
+                measurement_processes={"SampleMP": [], "CountsMP": []},
+            ),
+            # No non-sample/counts observables supported
+            DeviceCapabilities(
+                non_commuting_observables=True,
+                observables={
+                    "PauliX": OperatorProperties(),
+                    "PauliY": OperatorProperties(),
+                    "PauliZ": OperatorProperties(),
+                    "Hadamard": OperatorProperties(),
+                },
+                measurement_processes={"SampleMP": [], "CountsMP": []},
+            ),
+            # Not all named observables supported
+            DeviceCapabilities(
+                non_commuting_observables=True,
+                observables={"PauliZ": OperatorProperties()},
+                measurement_processes={"ExpectationMP": [], "SampleMP": [], "CountsMP": []},
+            ),
+        ],
+    )
+    def test_split_non_commuting(self, capabilities):
         """Test that split_non_commuting is added to the pipeline when needed."""
+        dev = CapabilitiesDevice(wires=4)
+        dev.capabilities = capabilities
 
-    def test_split_to_single_terms(self):
+        @qml.qnode(dev, shots=1)
+        def f():
+            qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(f)()
+        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
+
+        pipeline = None
+        for eqn in cjaxpr.eqns:
+            if eqn.primitive == quantum_kernel_p:
+                pipeline = eqn.params.get("pipeline", None)
+                break
+
+        assert pipeline
+        assert any(t.pass_name == "split-non-commuting" for t in pipeline)
+
+    @pytest.mark.parametrize(
+        "split_non_commuting_needed,sum_supported,split_to_single_terms_needed",
+        [(True, False, False), (True, True, False), (False, True, False), (False, False, True)],
+    )
+    def test_split_to_single_terms(
+        self, split_non_commuting_needed, sum_supported, split_to_single_terms_needed
+    ):
         """Test that split_to_single_terms is added to the pipeline when needed."""
+        observables = {
+            "PauliX": OperatorProperties(),
+            "PauliY": OperatorProperties(),
+            "PauliZ": OperatorProperties(),
+            "Hadamard": OperatorProperties(),
+        }
+        if sum_supported:
+            observables["Sum"] = OperatorProperties()
+
+        capabilities = DeviceCapabilities(
+            non_commuting_observables=not split_non_commuting_needed,
+            observables=observables,
+            measurement_processes={"ExpectationMP": [], "SampleMP": [], "CountsMP": []},
+        )
+
+        dev = CapabilitiesDevice(wires=4)
+        dev.capabilities = capabilities
+
+        @qml.qnode(dev, shots=1)
+        def f():
+            qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(f)()
+        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
+
+        pipeline = None
+        for eqn in cjaxpr.eqns:
+            if eqn.primitive == quantum_kernel_p:
+                pipeline = eqn.params.get("pipeline", None)
+                break
+
+        assert pipeline
+        if split_to_single_terms_needed:
+            assert any(t.pass_name == "split-to-single-terms" for t in pipeline)
+        else:
+            assert not any(t.pass_name == "split-to-single-terms" for t in pipeline)
 
     def test_measurements_from_samples(self):
         """Test that measurements_from_samples is added to the pipeline when needed."""
@@ -170,3 +357,7 @@ class TestIntegration:
     @pytest.mark.parametrize("skip_preprocess", [True, False])
     def test_qjit_preprocessing(self, skip_preprocess):
         """Device preprocessing is added to the pass pipeline if requested."""
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])
