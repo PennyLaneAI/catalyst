@@ -78,13 +78,6 @@ class CatalystTransformer(PyToPy):
         if isinstance(obj, qml.QNode):
             new_obj = copy.copy(obj)
             new_obj.func = new_fn
-        elif isinstance(obj, CompilePipeline):
-            new_qnode = copy.copy(obj.original_qnode)
-            new_qnode.func = new_fn
-            data.reverse()
-            for _pass, flags, kwopts in data:
-                new_qnode = qml.transform(pass_name=_pass)(new_qnode, *flags, **kwopts)
-            new_obj = new_qnode
 
         return new_obj, module, source_map
 
