@@ -472,6 +472,24 @@ class TestOperationPreprocessing:
     def test_validation_transforms(self):
         """Test that transforms for validating operations and measurements are
         added to the pipeline."""
+        dev = qml.device("null.qubit", wires=4)
+
+        @qml.qnode(dev)
+        def f():
+            return qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(f)()
+        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
+
+        pipeline = None
+        for eqn in cjaxpr.eqns:
+            if eqn.primitive == quantum_kernel_p:
+                pipeline = eqn.params.get("pipeline", None)
+                break
+
+        assert pipeline
+        assert any(t.pass_name == "verify-operations" for t in pipeline)
+        assert any(t.pass_name == "validate-measurements" for t in pipeline)
 
 
 class TestGradientPreprocessing:
