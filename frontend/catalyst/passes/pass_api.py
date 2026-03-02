@@ -57,33 +57,6 @@ class QNodeWrapper:
         return self.qnode(*args, **kwargs)
 
 
-class PassPipelineWrapper(QNodeWrapper):
-    """A QNodeWrapper subclass that adds passes to the pipeline when called.
-
-    This class can handle both single passes and multiple passes in a pipeline.
-    For single passes, it takes a pass name and optional flags/options.
-    For multiple passes, it takes a dictionary of pass configurations.
-    """
-
-    def __init__(self, qnode, pass_name_or_pipeline, *flags, **valued_options):
-        super().__init__(qnode)
-        self.pass_name_or_pipeline = pass_name_or_pipeline
-        self.flags = flags
-        self.valued_options = valued_options
-
-    def __call__(self, *args, **kwargs):
-        if EvaluationContext.is_tracing():
-            pass_pipeline = CompilePipeline(kwargs.pop("pass_pipeline", []))
-            pass_pipeline = (
-                dict_to_compile_pipeline(
-                    self.pass_name_or_pipeline, *self.flags, **self.valued_options
-                )
-                + pass_pipeline
-            )
-            kwargs["pass_pipeline"] = pass_pipeline
-        return super().__call__(*args, **kwargs)
-
-
 def pipeline(pass_pipeline: PipelineDict):
     """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode
     within a qjit-compiled program.
