@@ -12,8 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+This module provides the utilities necessary to AOT compile PennyLane's decomposition rules to MLIR
+Bytecode.
+"""
+
 import inspect
-import subprocess
 import warnings
 
 import jax
@@ -27,7 +31,7 @@ from catalyst.utils.exceptions import CompileError
 # TODO document this directory + functionality
 
 # NOTE: paths are relative to catalyst root, not mlir directory
-DECOMP_RULE_DIR = "./mlir/decomposition-rules/"
+DECOMP_RULE_DIR = "./decomposition-rules/"
 DECOMPS_FILE = DECOMP_RULE_DIR + "decompositions.mlir"
 MLIRBC_DECOMPS_FILE = DECOMP_RULE_DIR + "decompositions.mlirbc"
 
@@ -57,7 +61,7 @@ def get_compiler_ops() -> list[Operation]:
     return compiler_op_classes
 
 
-def get_dummy_args(op_class: Operation) -> list[str | int | float]:
+def get_dummy_args(op_class: Operation) -> list:
     """
     Return a list of dummy args to allow compilation of op_class
     """
@@ -100,7 +104,7 @@ def compile_decomps_via_dummy_circuit(op_class: Operation) -> dict[str, str] | N
     abstract_args = [type(arg) for arg in args]
 
     for rule in op_decomp_rules:
-        rule_name = rule._impl.__name__
+        rule_name = rule._impl.__name__  # pylint: disable=protected-access
 
         try:
             qp.capture.enable()
@@ -120,7 +124,7 @@ def compile_decomps_via_dummy_circuit(op_class: Operation) -> dict[str, str] | N
                 op_class(*args, wires=op_wires)
                 return qp.probs()
 
-        except CompileError:
+        except CompileError, TypeError:  # type error to include failed dummy-args
             warnings.warn(f"failed to qjit {rule_name}")
             return None
         except Exception as e:
@@ -153,8 +157,3 @@ if __name__ == "__main__":
                 for name, circuit_mlir in results.items():
                     mlir_file.write(circuit_mlir.replace("rule_wrapper", name))
                     mlir_file.write("// -----\n")  # for splitting input file to quantum-opt
-
-    subprocess.run(
-        f"quantum-opt --emit-bytecode --split-input-file {DECOMPS_FILE} -o {MLIRBC_DECOMPS_FILE}",
-        shell=True,
-    )

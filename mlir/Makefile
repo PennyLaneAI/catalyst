@@ -54,7 +54,13 @@ help:
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
-all: llvm stablehlo enzyme dialects dialect-docs plugin
+all: llvm stablehlo enzyme dialects dialect-docs plugin decomp-rules
+
+.PHONY: decomp-rules
+decomp-rules:
+	@echo "compile decomposition rules"
+	$(PYTHON) decomposition-rules/pre-compile.py
+	quantum-opt --emit-bytecode --split-input-file decomposition-rules/decompositions.mlir -o decomposition-rules/decompositions.mlirbc
 
 .PHONY: llvm
 llvm:
