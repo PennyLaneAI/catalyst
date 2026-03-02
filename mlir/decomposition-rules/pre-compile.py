@@ -1,5 +1,5 @@
 import inspect
-import pathlib
+import subprocess
 import warnings
 
 import jax
@@ -8,10 +8,12 @@ import pennylane as qp
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION
 from catalyst.jax_primitives import decomposition_rule
 
-# TODO merge into one file
-# TODO update ADR to reflect that we chose one file
+# TODO document this directory + functionality
 
-DECOMP_RULE_DIR = "./mlir/decomposition-rules/compiled-decomp-rules/"
+# NOTE: paths are relative to catalyst root, not mlir directory
+DECOMP_RULE_DIR = "./mlir/decomposition-rules/"
+DECOMPS_FILE = DECOMP_RULE_DIR + "decompositions.mlir"
+MLIRBC_DECOMPS_FILE = DECOMP_RULE_DIR + "decompositions.mlirbc"
 
 
 def get_compiler_ops():
@@ -63,8 +65,7 @@ def compile_decomps_via_dummy_circuit(op_class):
         op_num_wires = op_class.num_wires if op_class.num_wires else 2
         op_wires = [i for i in range(op_num_wires)]
         dev = qp.device("lightning.qubit", wires=op_num_wires)
-    except Exception as e:
-        # print(f"error getting num_wires from {op_class}: {e}")
+    except Exception:
         return
 
     # naively assume all inputs are floats
@@ -78,6 +79,8 @@ def compile_decomps_via_dummy_circuit(op_class):
             qp.capture.enable()
             qp.decomposition.enable_graph()
 
+            # WARNING: do not rename this function, we use it to extract the rule from the compiled
+            # circuit
             @decomposition_rule(is_qreg=True, op_type=op_class.__name__)
             def rule_wrapper(*args, wires, **_):
                 return rule(*args, wires, **_)
@@ -90,7 +93,7 @@ def compile_decomps_via_dummy_circuit(op_class):
                 op_class(*args, wires=op_wires)
                 return qp.probs()
 
-        except Exception as e:
+        except Exception:
             print(f"failed to qjit {op_class}")
             # print(f"failed to qjit: {e}")
             return
@@ -99,9 +102,8 @@ def compile_decomps_via_dummy_circuit(op_class):
             circuit()
             mlir_modules[rule_name] = circuit.mlir
 
-        except Exception as e:
+        except Exception:
             print(f"failed to compile {op_class}")
-            # print(f"Compilation Failed: {e}")
             pass
         finally:
             qp.capture.disable()
@@ -112,11 +114,15 @@ def compile_decomps_via_dummy_circuit(op_class):
 if __name__ == "__main__":
     target_ops = get_compiler_ops()
 
-    pathlib.Path(DECOMP_RULE_DIR).mkdir(exist_ok=True)
+    with open(DECOMPS_FILE, "w") as mlir_file:
+        for op_class in target_ops:
+            results = compile_decomps_via_dummy_circuit(op_class)
+            if results:
+                for name, circuit_mlir in results.items():
+                    mlir_file.write(circuit_mlir.replace("rule_wrapper", name))
+                    mlir_file.write("// -----\n")  # for splitting input file to quantum-opt
 
-    for op_class in target_ops:
-        results = compile_decomps_via_dummy_circuit(op_class)
-        if results:
-            for name, mlir in results.items():
-                with open(DECOMP_RULE_DIR + f"{name}.mlir", "w") as mlir_file:
-                    mlir_file.write(mlir)
+    subprocess.run(
+        f"quantum-opt --emit-bytecode --split-input-file {DECOMPS_FILE} -o {MLIRBC_DECOMPS_FILE}",
+        shell=True,
+    )
