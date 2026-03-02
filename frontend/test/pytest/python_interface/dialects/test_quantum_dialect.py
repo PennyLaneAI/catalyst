@@ -180,7 +180,7 @@ expected_ops_init_kwargs = {
     ],
     "MCMObsOp": [
         {"operands": (bool_ssa,), "result_types": (obs,)},
-        {"operands": ((bool_ssa, bool_ssa, bool_ssa),), "result_types": (obs,)}
+        {"operands": ((bool_ssa, bool_ssa, bool_ssa),), "result_types": (obs,)},
     ],
     "MeasureOp": [
         {"in_qubit": q0, "postselect": int_ssa},
