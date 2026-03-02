@@ -30,7 +30,7 @@ from xdsl.printer import Printer
 
 @irdl_attr_definition
 class LogicalCodeblockType(ParametrizedAttribute, TypeAttribute):
-    """A value-semantic logical codeblock."""
+    """A value-semantic logical codeblock"""
 
     name = "qecl.codeblock"
 
@@ -56,22 +56,22 @@ class LogicalCodeblockType(ParametrizedAttribute, TypeAttribute):
 
 @irdl_attr_definition
 class LogicalHyperRegisterType(ParametrizedAttribute, TypeAttribute):
-    """A value-semantic logical hyper-register."""
+    """A value-semantic logical hyper-register"""
 
     name = "qecl.hyperreg"
 
-    a: IntegerAttr[I64]
+    width: IntegerAttr[I64]
     k: IntegerAttr[I64]
 
-    def __init__(self, a: int | IntegerAttr[I64], k: int | IntegerAttr[I64]):
-        a_attr = IntegerAttr(a, 64) if isinstance(a, int) else a
+    def __init__(self, width: int | IntegerAttr[I64], k: int | IntegerAttr[I64]):
+        width_attr = IntegerAttr(width, 64) if isinstance(width, int) else width
         k_attr = IntegerAttr(k, 64) if isinstance(k, int) else k
-        super().__init__(a_attr, k_attr)
+        super().__init__(width_attr, k_attr)
 
     def print_parameters(self, printer: Printer) -> None:
         """Print the attribute parameters."""
         with printer.in_angle_brackets():
-            printer.print_int(self.a.value.data)
+            printer.print_int(self.width.value.data)
             # TODO: We need to print with whitespace around 'x' for compatibility with MLIR parser
             printer.print_string(" x ")
             printer.print_int(self.k.value.data)
