@@ -178,7 +178,10 @@ expected_ops_init_kwargs = {
         {"in_qreg": qreg, "idx": int_attr, "qubit": q1},
         {"in_qreg": qreg, "idx": 0, "qubit": q1},
     ],
-    "MCMObsOp": [{"operands": (bool_ssa,), "result_types": (obs,)}],
+    "MCMObsOp": [
+        {"operands": (bool_ssa,), "result_types": (obs,)},
+        {"operands": ((bool_ssa, bool_ssa, bool_ssa),), "result_types": (obs,)}
+    ],
     "MeasureOp": [
         {"in_qubit": q0, "postselect": int_ssa},
         {"in_qubit": q0},
