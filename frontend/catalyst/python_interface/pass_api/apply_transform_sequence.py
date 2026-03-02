@@ -13,15 +13,27 @@
 # limitations under the License.
 """This file contains the pass that applies all passes present in the program representation."""
 
-
+import io
 from dataclasses import dataclass
 
 from pennylane.typing import Callable
 from xdsl.context import Context
-from xdsl.dialects import builtin
+from xdsl.dialects import builtin, transform
+from xdsl.parser import Parser
 from xdsl.passes import ModulePass, PassPipeline
+from xdsl.pattern_rewriter import (
+    PatternRewriter,
+    PatternRewriteWalker,
+    RewritePattern,
+    op_type_rewrite_pattern,
+)
+from xdsl.printer import Printer
+from xdsl.rewriter import InsertPoint
 
-from .transform_interpreter import TransformInterpreterPass
+from catalyst.compiler import _quantum_opt
+from catalyst.python_interface.utils import get_pyval_from_xdsl_attr
+
+from .transform_interpreter import TransformInterpreterPass, _create_schedule
 
 available_passes = {}
 
@@ -68,23 +80,97 @@ class ApplyTransformSequence(ModulePass):
     def apply(self, ctx: Context, op: builtin.ModuleOp) -> None:
         """Applies the transformation"""
         nested_modules = []
-        for region in op.regions:
-            for block in region.blocks:
-                for operation in block.ops:
-                    if isinstance(operation, builtin.ModuleOp):
-                        nested_modules.append(operation)
-
-        pipeline = PassPipeline(
-            (TransformInterpreterPass(passes=available_passes, callback=self.callback),)
-        )
-        for operation in nested_modules:
-            pipeline.apply(ctx, operation)
+        for _op in op.ops:
+            if isinstance(_op, builtin.ModuleOp):
+                nested_modules.append(_op)
 
         for mod in nested_modules:
-            for region in mod.regions:
-                for block in region.blocks:
-                    for operation in block.ops:
-                        if isinstance(operation, builtin.ModuleOp) and operation.get_attr_or_prop(
-                            "transform.with_named_sequence"
-                        ):
-                            block.erase_op(operation)  # pragma: no cover
+            pattern = ApplyTransformSequencePattern(ctx, available_passes, self.callback)
+            transformer = next(_op for _op in mod.ops if isinstance(_op, builtin.ModuleOp))
+            rewriter = PatternRewriter(transformer)
+            pattern.match_and_rewrite(transformer, rewriter)
+
+
+class ApplyTransformSequencePattern(RewritePattern):
+    """RewritePattern for applying transform sequences."""
+
+    def __init__(
+        self,
+        ctx: Context,
+        passes: dict[str, Callable[[], type[ModulePass]]],
+        callback: Callable | None = None,
+    ):
+        self.ctx = ctx
+        self.passes = passes
+        self.callback = callback
+        self.pass_level = 0
+
+    @op_type_rewrite_pattern
+    def match_and_rewrite(self, transformer: builtin.ModuleOp, rewriter: PatternRewriter):
+        """Rewrite modules containing transform.named_sequences."""
+        if not transformer.get_attr_or_prop("transform.with_named_sequence"):
+            return
+
+        payload: builtin.ModuleOp = transformer.parent_op()
+        cur_payload = payload
+        rewriter.erase_op(transformer)
+
+        for ns in transformer.ops:
+            for pass_op in ns.body.walk():
+                if isinstance(pass_op, transform.ApplyRegisteredPassOp):
+                    next_payload = self.interpret_apply_registered_pass_op(
+                        pass_op, cur_payload, rewriter
+                    )
+
+                    if next_payload != cur_payload:
+                        rewriter.replace_op(cur_payload, next_payload)
+                    cur_payload = next_payload
+
+    def _pre_pass_callback(self, compilation_pass, module):
+        """Callback wrapper to run the callback function before a pass."""
+        if not self.callback:
+            return
+        if self.pass_level == 0:
+            # Since this is the first pass, there is no previous pass
+            self.callback(None, module, compilation_pass, pass_level=0)
+
+    def _post_pass_callback(self, compilation_pass, module):
+        """Increment level and run callback if defined."""
+        if not self.callback:
+            return
+        self.pass_level += 1
+        self.callback(compilation_pass, module, None, pass_level=self.pass_level)
+
+    def interpret_apply_registered_pass_op(
+        self,
+        op: transform.ApplyRegisteredPassOp,
+        module: builtin.ModuleOp,
+        rewriter: PatternRewriter,
+    ):
+        """Interpret the transform.apply_registered_pass."""
+
+        pass_name = op.pass_name.data
+
+        # ---- xDSL path ----
+        if pass_name in self.passes:
+            pass_class = self.passes[pass_name]()
+            options = {
+                k.replace("-", "_"): v for k, v in get_pyval_from_xdsl_attr(op.options).items()
+            }
+            pass_instance = pass_class(**options)
+            pipeline = PassPipeline((pass_instance,))
+            self._pre_pass_callback(pass_instance, module)
+            pipeline.apply(self.ctx, module)
+            self._post_pass_callback(pass_instance, module)
+            return module
+
+        # ---- Catalyst path ----
+        buffer = io.StringIO()
+        Printer(stream=buffer, print_generic_format=True).print_op(module)
+        schedule = _create_schedule([op])
+        self._pre_pass_callback(pass_name, module)
+        modified = _quantum_opt(*schedule, "-mlir-print-op-generic", stdin=buffer.getvalue())
+
+        data = Parser(self.ctx, modified).parse_module()
+        self._post_pass_callback(pass_name, data)
+        return data
