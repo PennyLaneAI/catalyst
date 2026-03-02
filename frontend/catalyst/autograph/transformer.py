@@ -28,7 +28,6 @@ from contextlib import ContextDecorator
 import pennylane as qml
 from malt.core import ag_ctx, config, converter
 from malt.impl.api import PyToPy
-from pennylane.transforms.core import CompilePipeline
 
 import catalyst
 from catalyst.autograph import ag_primitives, operator_update
