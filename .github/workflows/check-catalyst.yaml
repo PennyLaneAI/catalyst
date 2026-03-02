@@ -477,10 +477,9 @@ jobs:
         sudo apt-get install -y graphviz
         make frontend
 
-    - name: Verify Graphviz installation
+    - name: Install PennyLane branch
       run: |
-        dot -V 
-        dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@remove-pass-pipeline-wrapper
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -565,6 +564,10 @@ jobs:
         python3 -m pip install -r requirements.txt
         make frontend
 
+    - name: Install PennyLane branch
+      run: |
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@remove-pass-pipeline-wrapper
+
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v4
@@ -627,6 +630,10 @@ jobs:
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
+
+    - name: Install PennyLane branch
+      run: |
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@remove-pass-pipeline-wrapper
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
