@@ -1,12 +1,28 @@
+# Copyright 2026 Xanadu Quantum Technologies Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import inspect
 import subprocess
 import warnings
 
 import jax
 import pennylane as qp
+from pennylane.operation import Operation
 
 from catalyst.from_plxpr.decompose import COMPILER_OPS_FOR_DECOMPOSITION
 from catalyst.jax_primitives import decomposition_rule
+from catalyst.utils.exceptions import CompileError
 
 # TODO document this directory + functionality
 
@@ -16,14 +32,14 @@ DECOMPS_FILE = DECOMP_RULE_DIR + "decompositions.mlir"
 MLIRBC_DECOMPS_FILE = DECOMP_RULE_DIR + "decompositions.mlirbc"
 
 
-def get_compiler_ops():
+def get_compiler_ops() -> list[Operation]:
     """
     Extracts all ops from pennylane that have decompositions in catalyst
     """
     pl_op_classes = [
         obj
         for _, obj in inspect.getmembers(qp)
-        if inspect.isclass(obj) and issubclass(obj, qp.operation.Operation)
+        if inspect.isclass(obj) and issubclass(obj, Operation)
     ]
 
     compiler_op_classes = [
@@ -41,32 +57,43 @@ def get_compiler_ops():
     return compiler_op_classes
 
 
-def get_dummy_args(op_class):
+def get_dummy_args(op_class: Operation) -> list[str | int | float]:
+    """
+    Return a list of dummy args to allow compilation of op_class
+    """
     op_class_sig = inspect.signature(op_class)
     # print(f"{op_class} has signature {op_class_sig}")
     dummy_args = []
     for param in op_class_sig.parameters.values():
-        if param.name == "wires":
+        if param.name == "wires":  # wires are handled separately
             continue
         elif param.name == "pauli_word":
             dummy_args.append("XX")  # we default to two wires
-        elif param.default == inspect.Parameter.empty:  # assume float
+        elif param.default == inspect.Parameter.empty:  # assume float/int
             dummy_args.append(0)
 
     return dummy_args
 
 
-def compile_decomps_via_dummy_circuit(op_class):
+def compile_decomps_via_dummy_circuit(op_class: Operation) -> dict[str, str] | None:
+    """
+    Compile all decomposition rules for op_class. Returns a dictionary of decomposition rule names
+    to compiled mlir modules.
+
+    Note: the modules include the full circuit IR.
+
+    TODO: remove circuit IR, return only the func.func decomposition rules.
+    """
     op_decomp_rules = qp.decomposition.decomposition_graph.list_decomps(op_class)
 
     mlir_modules = {}
 
     try:
         op_num_wires = op_class.num_wires if op_class.num_wires else 2
-        op_wires = [i for i in range(op_num_wires)]
+        op_wires = list(range(op_num_wires))
         dev = qp.device("lightning.qubit", wires=op_num_wires)
     except Exception:
-        return
+        return None
 
     # naively assume all inputs are floats
     args = get_dummy_args(op_class)
@@ -93,18 +120,23 @@ def compile_decomps_via_dummy_circuit(op_class):
                 op_class(*args, wires=op_wires)
                 return qp.probs()
 
-        except Exception:
-            print(f"failed to qjit {op_class}")
-            # print(f"failed to qjit: {e}")
-            return
+        except CompileError:
+            warnings.warn(f"failed to qjit {rule_name}")
+            return None
+        except Exception as e:
+            warnings.warn(f"Unexpected error while trying to qjit {rule_name}:")
+            raise e
 
         try:
             circuit()
             mlir_modules[rule_name] = circuit.mlir
 
-        except Exception:
-            print(f"failed to compile {op_class}")
-            pass
+        except CompileError:
+            warnings.warn(f"failed to compile {rule_name}")
+            return None
+        except Exception as e:
+            warnings.warn(f"Unexpected error while trying to compile {rule_name}:")
+            raise e
         finally:
             qp.capture.disable()
 
