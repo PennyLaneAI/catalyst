@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import functools
+from copy import copy
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import TypeAlias
@@ -144,7 +145,15 @@ def pipeline(pass_pipeline: PipelineDict):
     Global and local (via ``@pipeline``) configurations can coexist, however local pass pipelines
     will always take precedence over global pass pipelines.
     """
-    return lambda obj: dict_to_compile_pipeline(pass_pipeline)(obj)
+    new_pipeline: CompilePipeline = dict_to_compile_pipeline(pass_pipeline)
+
+    def _decorator(qnode):
+        new_qnode = copy(qnode)
+        # pylint: disable=protected-access
+        new_qnode._compile_pipeline = new_pipeline
+        return new_qnode
+
+    return _decorator
 
 
 def apply_pass(pass_name: str, *flags, **valued_options):
