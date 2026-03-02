@@ -477,9 +477,14 @@ jobs:
         sudo apt-get install -y graphviz
         make frontend
 
+    # TODO: Remove this before merging
+    - name: Install PennyLane branch
+      run: |
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@chore/simplify-pbp-specs
+
     - name: Verify Graphviz installation
       run: |
-        dot -V 
+        dot -V
         dot -Tpng -o test.png <<<'digraph { a -> b }' # Verify a png can be rendered
 
     - name: Get Cached LLVM Build
@@ -565,6 +570,11 @@ jobs:
         python3 -m pip install -r requirements.txt
         make frontend
 
+    # TODO: Remove this before merging
+    - name: Install PennyLane branch
+      run: |
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@chore/simplify-pbp-specs
+
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v4
@@ -627,6 +637,11 @@ jobs:
         python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         make frontend
+
+    # TODO: Remove this before merging
+    - name: Install PennyLane branch
+      run: |
+        pip install --no-deps --force git+https://github.com/PennyLaneAI/pennylane@chore/simplify-pbp-specs
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
