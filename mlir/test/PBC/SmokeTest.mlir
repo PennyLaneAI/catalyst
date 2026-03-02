@@ -20,12 +20,12 @@ func.func @foo(%q1 : !quantum.bit, %q2 : !quantum.bit) {
 }
 
 func.func @boo(%q1 : !quantum.bit) {
-    %0 = pbc.prepare zero %q1 : !quantum.bit
-    %1 = pbc.prepare one %0 : !quantum.bit
-    %2 = pbc.prepare plus %1 : !quantum.bit
-    %3 = pbc.prepare minus %2 : !quantum.bit
-    %4 = pbc.prepare plus_i %3 : !quantum.bit
-    %5 = pbc.prepare minus_i %4 : !quantum.bit
+    %0 = pbc.prepare zero : !quantum.bit
+    %1 = pbc.prepare one : !quantum.bit
+    %2 = pbc.prepare plus : !quantum.bit
+    %3 = pbc.prepare minus : !quantum.bit
+    %4 = pbc.prepare plus_i : !quantum.bit
+    %5 = pbc.prepare minus_i : !quantum.bit
     func.return
 }
 
