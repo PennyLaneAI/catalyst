@@ -99,6 +99,7 @@ def create_device_preprocessing_pipeline(
     return pipeline
 
 
+# pylint: disable=unused-argument
 def _mcm_preprocessing(
     pipeline: list[BoundTransform],
     unsupported_transforms: list[str],
@@ -109,26 +110,23 @@ def _mcm_preprocessing(
 ) -> list[BoundTransform]:
     """Preprocess mid-circuit measurements."""
     mcm_config = execution_config.mcm_config
+
+    if mcm_config.postselect_mode not in (POSTSELECT_MODE.FILL_SHOTS, None):
+        raise CompileError(
+            f"postselect_mode='{mcm_config.postselect_mode.value} is not supported with "
+            f"'qml.qjit(capture=True)'. Currently, only 'fill_shots' or None are supported."
+        )
+
     if mcm_config.mcm_method == MCM_METHOD.ONE_SHOT:
         if not shots:
             raise CompileError("Cannot use mcm_method='one-shot' with analytic mode.")
-        if mcm_config.postselect_mode not in (POSTSELECT_MODE.FILL_SHOTS, None):
-            raise CompileError(
-                f"postselect_mode='{mcm_config.postselect_mode.value} is not supported with "
-                f"'qml.qjit(capture=True)' and mcm_method='{mcm_config.mcm_method.value}'. "
-                # "Currently, only 'fill_shots' or None are supported."
-            )
         pipeline.append(
             _safe_create_bound_transform(
                 Transform(pass_name="dynamic-one-shot"), unsupported_transforms
             )
         )
 
-    elif mcm_config.mcm_method not in (
-        MCM_METHOD.SINGLE_BRANCH_STATISTICS,
-        *capabilities.supported_mcm_methods,
-        None,
-    ):
+    elif mcm_config.mcm_method not in (MCM_METHOD.SINGLE_BRANCH_STATISTICS, None):
         raise CompileError(
             f"mcm_method='{mcm_config.mcm_method.value}' is not supported with {device.name}"
             "when using 'qml.qjit(capture=True)'."
@@ -203,11 +201,11 @@ def _operations_preprocessing(
     capabilities: DeviceCapabilities,
 ) -> list[BoundTransform]:
     """Preprocess operations."""
-    pipeline.append(
-        _safe_create_bound_transform(
-            Transform(pass_name="decompose-lowering"), unsupported_transforms
-        )
-    )
+    # pipeline.append(
+    #     _safe_create_bound_transform(
+    #         Transform(pass_name="decompose-lowering"), unsupported_transforms
+    #     )
+    # )
     pipeline.append(
         _safe_create_bound_transform(
             verify_operations,
@@ -266,21 +264,30 @@ def _safe_create_bound_transform(
     """Create a bound transform safely. If the transform is not supported at the MLIR/xDSL
     layer, an identity xDSL transform is inserted for it."""
     if not transform.pass_name:
-        identity_transform = _create_identity_xdsl_transform(transform)
+        xdsl_transform, is_dummy_transform = _get_xdsl_transform(transform)
         unsupported_transforms.append(transform.tape_transform.__name__)
-        return BoundTransform(identity_transform, kwargs={"dummy_transform": True})
+        bound_transform = (
+            BoundTransform(xdsl_transform, kwargs={"dummy_transform": True})
+            if is_dummy_transform
+            else BoundTransform(xdsl_transform)
+        )
+        return bound_transform
 
     return BoundTransform(transform, args, kwargs)
 
 
 @lru_cache
-def _create_identity_xdsl_transform(original_transform: Transform | BoundTransform) -> Transform:
-    """Create an xDSL transform to insert into the compile pipeline."""
+def _get_xdsl_transform(original_transform: Transform | BoundTransform) -> tuple[Transform, bool]:
+    """Create an xDSL transform to insert into the compile pipeline. A boolean indicating
+    whether the transform is a dummy transform is also returned."""
     # pylint: disable=import-outside-toplevel
-    from catalyst.python_interface import compiler_transform
+    from catalyst.python_interface.pass_api import compiler_transform, is_xdsl_pass
 
     # Force kebab-case for the transform name
     pass_name = original_transform.tape_transform.__name__.replace("_", "-")
+
+    if is_xdsl_pass(pass_name):
+        return Transform(pass_name=pass_name), False
 
     class NullPass(ModulePass):
         """Empty ModulePass to handle transforms with no MLIR/xDSL implementations."""
@@ -295,4 +302,4 @@ def _create_identity_xdsl_transform(original_transform: Transform | BoundTransfo
         def apply(self, ctx, op):
             """Apply the pass (do nothing)."""
 
-    return compiler_transform(NullPass)
+    return compiler_transform(NullPass), True
