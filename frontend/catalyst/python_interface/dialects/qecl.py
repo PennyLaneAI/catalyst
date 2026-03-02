@@ -80,11 +80,11 @@ class LogicalHyperRegisterType(ParametrizedAttribute, TypeAttribute):
     def parse_parameters(cls, parser: Parser) -> list[IntegerAttr]:
         """Parse the attribute parameters."""
         with parser.in_angle_brackets():
-            a = parser.parse_integer()
+            width = parser.parse_integer()
             parser.parse_characters("x")
             k = parser.parse_integer()
 
-        return [IntegerAttr(a, 64), IntegerAttr(k, 64)]
+        return [IntegerAttr(width, 64), IntegerAttr(k, 64)]
 
 
 QecLogical = Dialect(
