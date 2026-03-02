@@ -17,16 +17,17 @@ Test suite for device preprocessing with program capture.
 
 from functools import partial
 
+import jax
 import pennylane as qml
 import pytest
 from pennylane.devices.capabilities import DeviceCapabilities
 
 from catalyst.from_plxpr import from_plxpr
-from catalyst.from_plxpr.device_utils import create_device_preprocessing_pipeline
+from catalyst.jax_primitives import quantum_kernel_p
+from catalyst.utils.exceptions import CompileError
 
-create_device_preprocessing_pipeline_no_warn = partial(
-    create_device_preprocessing_pipeline, warn=False
-)
+pytestmark = pytest.mark.usefixtures("use_capture")
+from_plxpr_no_warn = partial(from_plxpr, _preprocess_warn=False)
 
 
 class TestMCMPreprocessing:
@@ -36,18 +37,81 @@ class TestMCMPreprocessing:
         """Test than an error is raised if trying to use mcm_method="one-shot"
         with shots=None."""
 
+        dev = qml.device("null.qubit", wires=4)
+
+        @qml.qnode(dev, shots=None, mcm_method="one-shot")
+        def f():
+            _ = qml.measure(0)
+            return qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(f)()
+        interpreter = from_plxpr_no_warn(jaxpr, skip_preprocess=False)
+
+        with pytest.raises(
+            CompileError, match="Cannot use mcm_method='one-shot' with analytic mode"
+        ):
+            _ = interpreter()
+
     @pytest.mark.parametrize("mcm_method", ["deferred", "tree-traversal"])
     def test_unusupported_mcm_method_error(self, mcm_method):
         """Test that an error is raised if an unsupported mcm_method is used."""
 
+        dev = qml.device("null.qubit", wires=4)
+
+        @qml.qnode(dev, shots=None, mcm_method=mcm_method)
+        def f():
+            _ = qml.measure(0)
+            return qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(f)()
+        interpreter = from_plxpr_no_warn(jaxpr, skip_preprocess=False)
+
+        with pytest.raises(CompileError, match=f"mcm_method='{mcm_method}' is not supported"):
+            _ = interpreter()
+
     @pytest.mark.parametrize("postselect_mode", ["hw-like", "pad-invalid-samples"])
-    def test_invalid_postselect_mode_error(self, postselect_mode):
+    @pytest.mark.parametrize("mcm_method", ["one-shot", "single-branch-statistics", None])
+    def test_invalid_postselect_mode_error(self, postselect_mode, mcm_method):
         """Test that an error is raised if postselect_mode other than "fill-shots" or
         None is used."""
+
+        dev = qml.device("null.qubit", wires=4)
+
+        @qml.qnode(dev, shots=1, mcm_method=mcm_method, postselect_mode=postselect_mode)
+        def f():
+            _ = qml.measure(0)
+            return qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(f)()
+        interpreter = from_plxpr_no_warn(jaxpr, skip_preprocess=False)
+
+        with pytest.raises(
+            CompileError, match=f"postselect_mode='{postselect_mode} is not supported"
+        ):
+            _ = interpreter()
 
     def test_dynamic_one_shot(self):
         """Test that the MLIR dynamic-one-shot transform is added to the pipeline if
         mcm_method="one-shot"."""
+
+        dev = qml.device("null.qubit", wires=4)
+
+        @qml.qnode(dev, shots=1, mcm_method="one-shot")
+        def f():
+            _ = qml.measure(0)
+            return qml.expval(qml.Z(0))
+
+        jaxpr = jax.make_jaxpr(f)()
+        cjaxpr = from_plxpr_no_warn(jaxpr, skip_preprocess=False)()
+
+        pipeline = None
+        for eqn in cjaxpr.eqns:
+            if eqn.primitive == quantum_kernel_p:
+                pipeline = eqn.params.get("pipeline", None)
+                break
+
+        assert pipeline
+        assert any(t.pass_name == "dynamic-one-shot" for t in pipeline)
 
 
 class TestMeasurementPreprocessing:
@@ -96,7 +160,7 @@ class TestGradientPreprocessing:
         if diff_method="parameter-shift"."""
 
 
-class TestFromIntegration:
+class TestIntegration:
     """Integration tests for device preprocessing with program capture."""
 
     @pytest.mark.parametrize("skip_preprocess", [True, False])
