@@ -13,6 +13,14 @@
 # limitations under the License.
 """Unit test module for the xDSL implementation of the diagonalize_final_measurements pass"""
 
+"""
+TODOs:
+- Add tests for `to_eigvals=True`, error raised
+- Add tests for `supported_base_obs`, supported base obs not decomposed
+- Add integration tests with split-non-commuting pass
+- Add unit tests to check non-commuting pass raises errors (xfail for the current PR)
+"""
+
 import numpy as np
 import pennylane as qml
 import pytest
@@ -563,29 +571,35 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             _ = circuit(1.23)
 
     @pytest.mark.xfail(reason="for now, assume split_non_commuting is always applied")
-    @pytest.mark.parametrize("obs", [
-                                    # non-commuting NamedObs
-                                    (qml.X(0), qml.Y(0)), 
-                                    (qml.X(1), qml.Z(1)),
-                                    (qml.Z(2), qml.H(2)),
-                                    (qml.X(0), qml.Identity(0)),
-                                    # non-commuting NamedObs + Hermitian
-                                    (qml.X(0), qml.Hermitian(np.eye(2), wires=0)),
-                                    (qml.X(0), qml.Hermitian(np.eye(4), wires=[0,1])),
-                                    # non-commuting tensorobs
-                                    (qml.X(0)@qml.Y(1), qml.Z(1)),
-                                    (qml.X(0)@qml.Y(1), qml.Z(1)@qml.Hadamard(2)),
-                                    (qml.X(0)@qml.Y(1), qml.Z(0)@qml.Hadamard(2)),
-                                    (qml.X(0)@qml.Y(1), qml.Z(0)@qml.Hadamard(1)),
-                                    (qml.X(0)@qml.Y(1), qml.Hermitian(np.eye(2), wires=0)@qml.Y(2)),
-                                    # Hamiltonian obs
-                                    (qml.Hamiltonian([1., 1.], [qml.Z(0), qml.Z(1)]), qml.X(1)@qml.X(2)),
-                                    (qml.Hamiltonian([1.], [qml.Z(0)]), qml.X(1)@qml.X(2)),
-                                    (qml.Hamiltonian([1.], [qml.Z(0)]), qml.Hamiltonian([1., 1.], [qml.X(0), qml.Y(1)])),
-                                ])
-    @pytest.mark.parametrize("measurements", [
-                                     (qml.expval, qml.var),
-                                ])
+    @pytest.mark.parametrize(
+        "obs",
+        [
+            # non-commuting NamedObs
+            (qml.X(0), qml.Y(0)),
+            (qml.X(1), qml.Z(1)),
+            (qml.Z(2), qml.H(2)),
+            (qml.X(0), qml.Identity(0)),
+            # non-commuting NamedObs + Hermitian
+            (qml.X(0), qml.Hermitian(np.eye(2), wires=0)),
+            (qml.X(0), qml.Hermitian(np.eye(4), wires=[0, 1])),
+            # non-commuting tensorobs
+            (qml.X(0) @ qml.Y(1), qml.Z(1)),
+            (qml.X(0) @ qml.Y(1), qml.Z(1) @ qml.Hadamard(2)),
+            (qml.X(0) @ qml.Y(1), qml.Z(0) @ qml.Hadamard(2)),
+            (qml.X(0) @ qml.Y(1), qml.Z(0) @ qml.Hadamard(1)),
+            (qml.X(0) @ qml.Y(1), qml.Hermitian(np.eye(2), wires=0) @ qml.Y(2)),
+            # Hamiltonian obs
+            (qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.Z(1)]), qml.X(1) @ qml.X(2)),
+            (qml.Hamiltonian([1.0], [qml.Z(0)]), qml.X(1) @ qml.X(2)),
+            (qml.Hamiltonian([1.0], [qml.Z(0)]), qml.Hamiltonian([1.0, 1.0], [qml.X(0), qml.Y(1)])),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "measurements",
+        [
+            (qml.expval, qml.var),
+        ],
+    )
     def test_qwc_non_commuting_observables_raise_error_non_compbasis(self, obs, measurements):
         """Check that an error is raised if we try to diagonalize a circuit that contains
         non-commuting observables."""
@@ -596,38 +610,43 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         @qml.qnode(dev)
         def circuit(x):
             qml.RX(x, 0)
-            return measurements[0](obs[0]),measurements[1](obs[1])
+            return measurements[0](obs[0]), measurements[1](obs[1])
 
         with pytest.raises(
             RuntimeError, match="cannot diagonalize circuit with non-commuting observables"
         ):
             _ = circuit(0.7)
 
-
     @pytest.mark.xfail(reason="for now, assume split_non_commuting is always applied")
-    @pytest.mark.parametrize("obs", [
-                                    # non-commuting NamedObs
-                                    (qml.X(0), qml.Y(0)), 
-                                    (qml.X(1), qml.Z(1)),
-                                    (qml.Z(2), qml.H(2)),
-                                    (qml.X(0), qml.Identity(0)),
-                                    # non-commuting NamedObs + Hermitian
-                                    (qml.X(0), qml.Hermitian(np.eye(2), wires=0)),
-                                    (qml.X(0), qml.Hermitian(np.eye(4), wires=[0,1])),
-                                    # non-commuting tensorobs
-                                    (qml.X(0)@qml.Y(1), qml.Z(1)),
-                                    (qml.X(0)@qml.Y(1), qml.Z(1)@qml.Hadamard(2)),
-                                    (qml.X(0)@qml.Y(1), qml.Z(0)@qml.Hadamard(2)),
-                                    (qml.X(0)@qml.Y(1), qml.Z(0)@qml.Hadamard(1)),
-                                    (qml.X(0)@qml.Y(1), qml.Hermitian(np.eye(2), wires=0)@qml.Y(2)),
-                                    # Hamiltonian obs
-                                    (qml.Hamiltonian([1., 1.], [qml.Z(0), qml.Z(1)]), qml.X(1)@qml.X(2)),
-                                    (qml.Hamiltonian([1.], [qml.Z(0)]), qml.X(1)@qml.X(2)),
-                                    (qml.Hamiltonian([1.], [qml.Z(0)]), qml.Hamiltonian([1., 1.], [qml.X(0), qml.Y(1)])),
-                                ])
-    @pytest.mark.parametrize("measurements", [
-                                     (qml.sample, qml.var),
-                                ])
+    @pytest.mark.parametrize(
+        "obs",
+        [
+            # non-commuting NamedObs
+            (qml.X(0), qml.Y(0)),
+            (qml.X(1), qml.Z(1)),
+            (qml.Z(2), qml.H(2)),
+            (qml.X(0), qml.Identity(0)),
+            # non-commuting NamedObs + Hermitian
+            (qml.X(0), qml.Hermitian(np.eye(2), wires=0)),
+            (qml.X(0), qml.Hermitian(np.eye(4), wires=[0, 1])),
+            # non-commuting tensorobs
+            (qml.X(0) @ qml.Y(1), qml.Z(1)),
+            (qml.X(0) @ qml.Y(1), qml.Z(1) @ qml.Hadamard(2)),
+            (qml.X(0) @ qml.Y(1), qml.Z(0) @ qml.Hadamard(2)),
+            (qml.X(0) @ qml.Y(1), qml.Z(0) @ qml.Hadamard(1)),
+            (qml.X(0) @ qml.Y(1), qml.Hermitian(np.eye(2), wires=0) @ qml.Y(2)),
+            # Hamiltonian obs
+            (qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.Z(1)]), qml.X(1) @ qml.X(2)),
+            (qml.Hamiltonian([1.0], [qml.Z(0)]), qml.X(1) @ qml.X(2)),
+            (qml.Hamiltonian([1.0], [qml.Z(0)]), qml.Hamiltonian([1.0, 1.0], [qml.X(0), qml.Y(1)])),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "measurements",
+        [
+            (qml.sample, qml.var),
+        ],
+    )
     def test_qwc_non_commuting_observables_raise_error_with_compbasis(self, obs, measurements):
         """Check that an error is raised if we try to diagonalize a circuit that contains
         non-commuting observables."""
@@ -640,23 +659,24 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         @qml.qnode(dev)
         def circuit(x):
             qml.RX(x, 0)
-            return measurements[0](wires=obs[0].wires),measurements[1](obs[1])
+            return measurements[0](wires=obs[0].wires), measurements[1](obs[1])
 
         with pytest.raises(
             RuntimeError, match="cannot diagonalize circuit with non-commuting observables"
         ):
             _ = circuit(0.7)
-    
+
     @pytest.mark.xfail(reason="for now, assume split_non_commuting is always applied")
-    @pytest.mark.parametrize("obs", [
-                                    # non-commuting NamedObs
-                                    (qml.Y(0)), 
-                                    ])
-    @pytest.mark.parametrize("measurements", [
-                                    (qml.sample, qml.expval),
-                                    (qml.counts, qml.var),
-                                    (qml.probs, qml.var)
-                            ])
+    @pytest.mark.parametrize(
+        "obs",
+        [
+            # non-commuting NamedObs
+            (qml.Y(0)),
+        ],
+    )
+    @pytest.mark.parametrize(
+        "measurements", [(qml.sample, qml.expval), (qml.counts, qml.var), (qml.probs, qml.var)]
+    )
     def test_qreg_non_commuting_observables_raise_error(self, obs, measurements):
         """Check that an error is raised if we try to diagonalize a circuit that contains
         non-commuting observables.
