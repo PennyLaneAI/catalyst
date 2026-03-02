@@ -51,7 +51,7 @@ class QecPhysicalQubitRoleAttr(EnumAttribute[QecPhysicalQubitRole], SpacedOpaque
 
 @irdl_attr_definition
 class QecPhysicalQubitType(ParametrizedAttribute, TypeAttribute):
-    """A value-semantic QEC physical qubit."""
+    """A value-semantic QEC physical qubit"""
 
     name = "qecp.qubit"
 
@@ -79,7 +79,7 @@ class QecPhysicalQubitType(ParametrizedAttribute, TypeAttribute):
 
 @irdl_attr_definition
 class PhysicalCodeblockType(ParametrizedAttribute, TypeAttribute):
-    """A value-semantic physical codeblock."""
+    """A value-semantic physical codeblock"""
 
     name = "qecp.codeblock"
 
@@ -115,22 +115,22 @@ class PhysicalHyperRegisterType(ParametrizedAttribute, TypeAttribute):
 
     name = "qecp.hyperreg"
 
-    a: IntegerAttr[I64]
+    width: IntegerAttr[I64]
     k: IntegerAttr[I64]
     n: IntegerAttr[I64]
 
     def __init__(
-        self, a: int | IntegerAttr[I64], k: int | IntegerAttr[I64], n: int | IntegerAttr[I64]
+        self, width: int | IntegerAttr[I64], k: int | IntegerAttr[I64], n: int | IntegerAttr[I64]
     ):
-        a_attr = IntegerAttr(a, 64) if isinstance(a, int) else a
+        width_attr = IntegerAttr(width, 64) if isinstance(width, int) else width
         k_attr = IntegerAttr(k, 64) if isinstance(k, int) else k
         n_attr = IntegerAttr(n, 64) if isinstance(n, int) else n
-        super().__init__(a_attr, k_attr, n_attr)
+        super().__init__(width_attr, k_attr, n_attr)
 
     def print_parameters(self, printer: Printer) -> None:
         """Print the attribute parameters."""
         with printer.in_angle_brackets():
-            printer.print_int(self.a.value.data)
+            printer.print_int(self.width.value.data)
             # TODO: We need to print with whitespace around 'x' for compatibility with MLIR parser
             printer.print_string(" x ")
             printer.print_int(self.k.value.data)
@@ -141,13 +141,13 @@ class PhysicalHyperRegisterType(ParametrizedAttribute, TypeAttribute):
     def parse_parameters(cls, parser: Parser) -> list[IntegerAttr]:
         """Parse the attribute parameters."""
         with parser.in_angle_brackets():
-            a = parser.parse_integer()
+            width = parser.parse_integer()
             parser.parse_characters("x")
             k = parser.parse_integer()
             parser.parse_characters("x")
             n = parser.parse_integer()
 
-        return [IntegerAttr(a, 64), IntegerAttr(k, 64), IntegerAttr(n, 64)]
+        return [IntegerAttr(width, 64), IntegerAttr(k, 64), IntegerAttr(n, 64)]
 
 
 QecPhysical = Dialect(
