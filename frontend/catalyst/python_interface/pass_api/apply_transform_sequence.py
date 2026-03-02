@@ -115,7 +115,13 @@ class ApplyTransformSequencePattern(RewritePattern):
         cur_payload = payload
         rewriter.erase_op(transformer)
 
-        for ns in transformer.ops:
+        for i, ns in enumerate(transformer.ops):
+            if len(ns.body.ops) == 1:
+                if i == 0:
+                    self._pre_pass_callback(None, cur_payload)
+                    self.pass_level += 1
+                continue
+
             for pass_op in ns.body.walk():
                 if isinstance(pass_op, transform.ApplyRegisteredPassOp):
                     next_payload = self.interpret_apply_registered_pass_op(
