@@ -51,6 +51,7 @@ from .observable_ops import (
     NamedObsOp,
     ObservableOp,
     TensorOp,
+    MCMObsOp,
 )
 from .qubit_ops import AllocOp, AllocQubitOp, DeallocOp, DeallocQubitOp, ExtractOp, InsertOp
 
@@ -75,6 +76,7 @@ __all__ = [
     "HermitianOp",
     "NamedObsOp",
     "TensorOp",
+    "MCMObsOp",
     # Mid-circuit measurements
     "MeasureOp",
     # Terminal measurements
