@@ -107,7 +107,7 @@ class DiagonalizeFinalMeasurementsPattern(
         """
         NON-COMMUTING CHECK TODO:
         1: If there is a quantum.compbasis accepting qreg and there is any other obs in the circuit, the circuit is non-commuting.
-        2. If all obs (including quantum.compbasis) accept qubits and any of those qubits used more than once, the circuit is non-commuting.
+        2. If all obs (including quantum.compbasis) accept qubits (note not the output qubits ) and any of those qubits used more than once, the circuit is non-commuting.
         """
 
         if _diagonalize(observable, self.supported_base_obs):
