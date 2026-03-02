@@ -15,11 +15,11 @@
 
 """
 TODOs:
-- Add tests for `to_eigvals=True`, error raised
-- Add tests for `supported_base_obs`, supported base obs not decomposed
 - Add integration tests with split-non-commuting pass
 - Add unit tests to check non-commuting pass raises errors (xfail for the current PR)
 """
+
+import re
 
 import numpy as np
 import pennylane as qml
@@ -35,6 +35,31 @@ pytestmark = pytest.mark.xdsl
 
 class TestDiagonalizeFinalMeasurementsPass:
     """Unit tests for the diagonalize-final-measurements pass."""
+
+    @pytest.mark.parametrize(
+        "supported_base_obs",
+        ["PauliX", ("PauliX",), ("PauliX", "PauliY"), ("Identity", "Hadamard")],
+    )
+    @pytest.mark.parametrize("to_eigvals", [1, 0, True, "False"])
+    def test_with_to_eigvals_raise_errors(self, supported_base_obs, to_eigvals):
+        """Test if an ValueError is raised if to_eigvals is not set as False."""
+        expected_msg = "Only to_eigvals = False is supported."
+        with pytest.raises(ValueError, match=expected_msg):
+            _ = DiagonalizeFinalMeasurementsPass(
+                supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
+            )
+
+    @pytest.mark.parametrize(
+        "supported_base_obs", ["pauliz", ("paulix",), ("paulix", "pauliy"), ("I", "Z")]
+    )
+    @pytest.mark.parametrize("to_eigvals", [1, 0, True, "False"])
+    def test_with_supported_base_obs_raise_errors(self, supported_base_obs, to_eigvals):
+        """Test if an ValueError is raised if supported_base_obs is a subset of {Identity,PauliX, PauliY, PauliZ, Hadamard}."""
+        expected_msg = f"{supported_base_obs} is not supported. Please ensure all the supported_base_obs is a subset of PauliX, PauliY, PauliZ, Hadamard and Identity"
+        with pytest.raises(ValueError, match=re.escape(expected_msg)):
+            _ = DiagonalizeFinalMeasurementsPass(
+                supported_base_obs=supported_base_obs, to_eigvals=to_eigvals
+            )
 
     def test_with_pauli_z(self, run_filecheck):
         """Test that a PauliZ observable is not affected by diagonalization"""
@@ -53,6 +78,27 @@ class TestDiagonalizeFinalMeasurementsPass:
             """
 
         pipeline = (DiagonalizeFinalMeasurementsPass(),)
+        run_filecheck(program, pipeline)
+
+    @pytest.mark.parametrize(
+        "supported_base_obs",
+        ["PauliX", ("PauliX",), ("PauliX", "PauliY")],
+    )
+    def test_with_supported_base_obs(self, supported_base_obs, run_filecheck):
+        program = """
+            func.func @test_func() {
+                // CHECK: [[q0:%.*]] = "test.op"() : () -> !quantum.bit
+                %0 = "test.op"() : () -> !quantum.bit
+
+                // CHECK: quantum.namedobs %0[PauliX] : !quantum.obs
+                %1 = quantum.namedobs %0[PauliX] : !quantum.obs
+
+                // CHECK: quantum.var %1 : f64
+                %2 = quantum.var %1 : f64
+                return
+            }
+            """
+        pipeline = (DiagonalizeFinalMeasurementsPass(supported_base_obs=supported_base_obs),)
         run_filecheck(program, pipeline)
 
     def test_with_identity(self, run_filecheck):
