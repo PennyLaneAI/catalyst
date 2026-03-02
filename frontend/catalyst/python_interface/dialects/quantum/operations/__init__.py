@@ -48,10 +48,10 @@ from .observable_ops import (
     ComputationalBasisOp,
     HamiltonianOp,
     HermitianOp,
+    MCMObsOp,
     NamedObsOp,
     ObservableOp,
     TensorOp,
-    MCMObsOp,
 )
 from .qubit_ops import AllocOp, AllocQubitOp, DeallocOp, DeallocQubitOp, ExtractOp, InsertOp
 
