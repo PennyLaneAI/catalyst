@@ -33,7 +33,12 @@ def create_ssa_value(t: AttributeCovT) -> OpResult[AttributeCovT]:
 all_ops = list(qecl.QecLogical.operations)
 all_attrs = list(qecl.QecLogical.attributes)
 
-expected_ops_names = {}
+expected_ops_names = {
+    "AllocOp": "qecl.alloc",
+    "DeallocOp": "qecl.dealloc",
+    "ExtractCodeblockOp": "qecl.extract_block",
+    "InsertCodeblockOp": "qecl.insert_block",
+}
 
 expected_attrs_names = {
     "LogicalCodeblockType": "qecl.codeblock",
@@ -83,6 +88,18 @@ def test_assembly_format(run_filecheck, pretty_print):
 
     // CHECK: [[hyperreg:%.+]] = "test.op"() : () -> !qecl.hyperreg<3 x 1>
     %hyperreg = "test.op"() : () -> !qecl.hyperreg<3 x 1>
+
+    // CHECK: [[hreg0:%.+]] = qecl.alloc() : !qecl.hyperreg<3 x 1>
+    %hreg0 = qecl.alloc() : !qecl.hyperreg<3 x 1>
+
+    // CHECK: qecl.dealloc [[hreg0]] : !qecl.hyperreg<3 x 1>
+    qecl.dealloc %hreg0 : !qecl.hyperreg<3 x 1>
+
+    // CHECK: [[block0:%.+]] = qecl.extract_block [[hyperreg]][{{\s*}}0] : !qecl.hyperreg<3 x 1> -> !qecl.codeblock<1>
+    %block0 = qecl.extract_block %hyperreg[ 0] : !qecl.hyperreg<3 x 1> -> !qecl.codeblock<1>
+
+    // CHECK: qecl.insert_block [[hyperreg]][{{\s*}}0], [[block0]] : !qecl.hyperreg<3 x 1>, !qecl.codeblock<1>
+    %hreg1 = qecl.insert_block %hyperreg[ 0], %block0 : !qecl.hyperreg<3 x 1>, !qecl.codeblock<1>
     """
 
     run_filecheck(program, roundtrip=True, verify=True, pretty_print=pretty_print)
