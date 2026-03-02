@@ -14,6 +14,7 @@
 """
 This submodule defines utilities for device preprocessing for from_plxpr.
 """
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 import warnings
 from functools import lru_cache
 
@@ -134,6 +135,7 @@ def _mcm_preprocessing(
         )
 
 
+# pylint: disable=unused-argument
 def _measurements_preprocessing(
     pipeline: list[BoundTransform],
     unsupported_transforms: list[str],
@@ -223,6 +225,7 @@ def _operations_preprocessing(
     )
 
 
+# pylint: disable=unused-argument
 def _gradient_preprocessing(
     pipeline: list[BoundTransform],
     unsupported_transforms: list[str],
@@ -238,7 +241,7 @@ def _gradient_preprocessing(
         )
     if execution_config.gradient_method == "adjoint":
         if shots:
-            raise CompileError(f"Cannot use diff_method='adjoint' with finite shots.")
+            raise CompileError("Cannot use diff_method='adjoint' with finite shots.")
         # qjit_device should technically be an instance of QJITDevice,
         # but we'll ignore it for now.
         pipeline.append(
@@ -273,6 +276,7 @@ def _safe_create_bound_transform(
 @lru_cache
 def _create_identity_xdsl_transform(original_transform: Transform | BoundTransform) -> Transform:
     """Create an xDSL transform to insert into the compile pipeline."""
+    # pylint: disable=import-outside-toplevel
     from catalyst.python_interface import compiler_transform
 
     # Force kebab-case for the transform name
@@ -287,6 +291,7 @@ def _create_identity_xdsl_transform(original_transform: Transform | BoundTransfo
         def __init__(self, dummy_transform):
             self.dummy_transform = dummy_transform
 
+        # pylint: disable=unused-argument
         def apply(self, ctx, op):
             """Apply the pass (do nothing)."""
 
