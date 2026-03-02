@@ -144,13 +144,7 @@ def pipeline(pass_pipeline: PipelineDict):
     Global and local (via ``@pipeline``) configurations can coexist, however local pass pipelines
     will always take precedence over global pass pipelines.
     """
-    pipeline = dict_to_compile_pipeline(pass_pipeline)
-
-    def _decorator(qnode):
-        qnode._compile_pipeline = pipeline
-        return qnode
-
-    return _decorator
+    return lambda obj: dict_to_compile_pipeline(pass_pipeline)(obj)
 
 
 def apply_pass(pass_name: str, *flags, **valued_options):
