@@ -84,7 +84,7 @@ class PassPipelineWrapper(QNodeWrapper):
         return super().__call__(*args, **kwargs)
 
 
-def pipeline(pass_pipeline: PipelineDict) -> CompilePipeline:
+def pipeline(pass_pipeline: PipelineDict):
     """Configures the Catalyst MLIR pass pipeline for quantum circuit transformations for a QNode
     within a qjit-compiled program.
 
