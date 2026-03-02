@@ -1552,7 +1552,7 @@ def decompose_arbitrary_ppr(qnode):  # pragma: nocover
     Level: 3
     <BLANKLINE>
     Resource specifications:
-      Total wire allocations: 4
+      Total wire allocations: 3
       Total gates: 6
       Circuit depth: Not computed
     <BLANKLINE>
