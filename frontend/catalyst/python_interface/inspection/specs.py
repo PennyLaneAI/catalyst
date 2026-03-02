@@ -88,11 +88,10 @@ def mlir_specs(
         # Always prioritize marker label if it exists
         if m := level_to_markers.get(pass_level):
             pass_name = ", ".join(m if not isinstance(m, str) else [m])
+        elif pass_level == 0:
+            pass_name = "Before MLIR Passes (MLIR-0)"
 
-        cache[pass_level] = (
-            result,
-            pass_name if pass_level else "Before MLIR Passes (MLIR-0)",
-        )
+        cache[pass_level] = (result, pass_name)
 
         if max_level is not None and pass_level >= max_level:
             raise StopCompilation("Stopping compilation after reaching max specs level.")
