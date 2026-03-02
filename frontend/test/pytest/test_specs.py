@@ -244,7 +244,7 @@ class TestPassByPassSpecs:
                         "merge-rotations (MLIR-2)",
                     )
                 )
-            },
+            ),
             resources={
                 "Before MLIR Passes (MLIR-0)": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
@@ -308,7 +308,7 @@ class TestPassByPassSpecs:
                         "merge-rotations (MLIR-2)",
                     )
                 )
-            ),
+            },
             resources={
                 "Before transforms": SpecsResources(
                     gate_types={"RX": 2, "RZ": 2, "Hadamard": 2, "CNOT": 2},
