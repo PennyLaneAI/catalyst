@@ -150,6 +150,10 @@
 
 <h3>Improvements 🛠</h3>
 
+* `mlir_specs` now supports MLIR passes which create multiple qnode entry points, such as `split-non-commuting` pass.
+  When such passes are present, `mlir_specs` will return a list of resources with 1 per entrypoint.
+  [(#2534)](https://github.com/PennyLaneAI/catalyst/pull/2534)
+
 * The tape transform :func:`~.device.decomposition.catalyst_decompose` now accepts the optional
   keyword arguments ``target_gates``, ``num_work_wires``, ``fixed_decomps``, and ``alt_decomps``,
   which all are passed to the used PennyLane decomposition function
