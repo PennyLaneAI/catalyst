@@ -174,11 +174,10 @@ def pipeline(pass_pipeline: PipelineDict) -> CompilePipeline:
     pipeline = dict_to_compile_pipeline(pass_pipeline)
 
     def _decorator(qnode):
-        qnode._compile_pipeline = pipeline 
+        qnode._compile_pipeline = pipeline
         return qnode
 
     return _decorator
-
 
 
 def apply_pass(pass_name: str, *flags, **valued_options):
