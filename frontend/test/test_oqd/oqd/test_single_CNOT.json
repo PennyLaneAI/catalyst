@@ -196,7 +196,7 @@
               "class_": "Beam",
               "detuning": {
                 "class_": "MathNum",
-                "value": 208570342555011.7
+                "value": 208570342617843.53
               },
               "phase": {
                 "class_": "MathNum",
@@ -209,7 +209,7 @@
               ],
               "rabi": {
                 "class_": "MathNum",
-                "value": 8885765876.316732
+                "value": 6283185307.179586
               },
               "target": 0,
               "transition": {
@@ -256,7 +256,7 @@
               "class_": "Beam",
               "detuning": {
                 "class_": "MathNum",
-                "value": 208570329988641.06
+                "value": 208570329925809.22
               },
               "phase": {
                 "class_": "MathNum",
@@ -269,7 +269,7 @@
               ],
               "rabi": {
                 "class_": "MathNum",
-                "value": 8885765876.316732
+                "value": 6283185307.179586
               },
               "target": 0,
               "transition": {
@@ -376,7 +376,7 @@
               "class_": "Beam",
               "detuning": {
                 "class_": "MathNum",
-                "value": 208570341926693.16
+                "value": 208570342617843.53
               },
               "phase": {
                 "class_": "MathNum",
@@ -389,7 +389,7 @@
               ],
               "rabi": {
                 "class_": "MathNum",
-                "value": 8885765876.316732
+                "value": 6283185307.179586
               },
               "target": 1,
               "transition": {
@@ -436,7 +436,7 @@
               "class_": "Beam",
               "detuning": {
                 "class_": "MathNum",
-                "value": 208570330616959.6
+                "value": 208570329925809.22
               },
               "phase": {
                 "class_": "MathNum",
@@ -449,7 +449,7 @@
               ],
               "rabi": {
                 "class_": "MathNum",
-                "value": 8885765876.316732
+                "value": 6283185307.179586
               },
               "target": 1,
               "transition": {
