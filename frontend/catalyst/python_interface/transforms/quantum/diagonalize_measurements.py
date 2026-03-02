@@ -176,7 +176,7 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
 
     def __init__(self, **options):
 
-        self.supported_base_obs = options.get("supported-base-obs")
+        self.supported_base_obs = options.get("supported_base_obs")
 
         if self.supported_base_obs is None:
             self.supported_base_obs = _default_supported_obs
@@ -193,10 +193,10 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
             raise ValueError(
                 f"{self.supported_base_obs} is not supported. Please ensure all the supported_base_obs is a subset of PauliX, PauliY, PauliZ, Hadamard and Identity"
             )
-        if options.get("to-eigvals", False) is not False:
+        if options.get("to_eigvals", False) is not False:
             raise ValueError("Only to_eigvals = False is supported.")
 
-        self.to_eigvals = options.get("to-eigvals", False)
+        self.to_eigvals = options.get("to_eigvals", False)
 
     def apply(self, _ctx: context.Context, op: builtin.ModuleOp) -> None:
         """Apply the diagonalize final measurements pass."""
