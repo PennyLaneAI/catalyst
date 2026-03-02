@@ -267,6 +267,64 @@ class TestMLIRSpecs:
         ):
             mlir_specs(simple_circuit, level=[0, 3])
 
+    def test_splitting_pass(self):
+        """Test that when passes are applied, the circuit resources are updated accordingly."""
+
+        @qml.qjit
+        @qml.transforms.cancel_inverses
+        @qml.transform(pass_name="split-non-commuting")
+        @qml.qnode(qml.device("null.qubit", wires=2))
+        def circuit():
+            qml.Hadamard(wires=0)
+            qml.Hadamard(wires=0)
+            return qml.expval(qml.PauliX(0)), qml.expval(qml.PauliY(0)), qml.expval(qml.PauliZ(0))
+
+        expected = {
+            "split-non-commuting (MLIR-1)": [
+                make_static_resources(
+                    operations={"Hadamard": {1: 2}},
+                    measurements={"expval(PauliX)": 1},
+                    num_allocs=2,
+                ),
+                make_static_resources(
+                    operations={"Hadamard": {1: 2}},
+                    measurements={"expval(PauliY)": 1},
+                    num_allocs=2,
+                ),
+                make_static_resources(
+                    operations={"Hadamard": {1: 2}},
+                    measurements={"expval(PauliZ)": 1},
+                    num_allocs=2,
+                ),
+            ],
+            "cancel-inverses (MLIR-2)": [
+                make_static_resources(
+                    measurements={"expval(PauliX)": 1},
+                    num_allocs=2,
+                ),
+                make_static_resources(
+                    measurements={"expval(PauliY)": 1},
+                    num_allocs=2,
+                ),
+                make_static_resources(
+                    measurements={"expval(PauliZ)": 1},
+                    num_allocs=2,
+                ),
+            ],
+        }
+
+        res = mlir_specs(circuit, level=[1, 2])
+
+        assert isinstance(res, dict)
+        assert len(res) == len(expected)
+
+        for lvl, expected_res in expected.items():
+            assert lvl in res.keys()
+            assert isinstance(res[lvl], list)
+            assert len(res[lvl]) == len(expected_res)
+            for r, er in zip(res[lvl], expected_res):
+                assert resources_equal(r, er)
+
     def test_not_qnode(self):
         """Test that a malformed QNode raises an error."""
 

@@ -455,11 +455,11 @@ class TestPassByPassSpecs:
             "sample(all wires)": 1,
         }
 
-    def test_split_non_commuting(self):
+    def test_split_non_commuting_tape(self):
         """Test that qml.transforms.split_non_commuting works as expected"""
 
         @qml.transforms.cancel_inverses
-        @qml.transforms.split_non_commuting
+        @qml.transforms.split_non_commuting  # Applies as tape transform
         @qml.qnode(qml.device("null.qubit", wires=3))
         def circuit():
             qml.H(0)
@@ -493,6 +493,70 @@ class TestPassByPassSpecs:
                     num_allocs=1,
                 ),
             ],
+        )
+
+        check_specs_same(actual, expected)
+
+    def test_split_non_commuting_mlir(self):
+        """Test that qml.transforms.split_non_commuting works as expected"""
+
+        @qml.transforms.cancel_inverses
+        @qml.transform(pass_name="split-non-commuting")  # Applies as MLIR pass
+        @qml.qnode(qml.device("null.qubit", wires=3))
+        def circuit():
+            qml.H(0)
+            qml.X(0)
+            qml.X(0)
+            return qml.expval(qml.X(0)), qml.expval(qml.Y(0)), qml.expval(qml.Z(0))
+
+        actual = qml.specs(qjit(circuit), level=[1, 2])()
+        expected = CircuitSpecs(
+            device_name="null.qubit",
+            num_device_wires=3,
+            shots=Shots(None),
+            level={1: "split-non-commuting (MLIR-1)", 2: "cancel-inverses (MLIR-2)"},
+            resources={
+                "split-non-commuting (MLIR-1)": [
+                    SpecsResources(
+                        gate_types={"Hadamard": 1, "PauliX": 2},
+                        gate_sizes={1: 3},
+                        measurements={"expval(PauliX)": 1},
+                        num_allocs=3,
+                    ),
+                    SpecsResources(
+                        gate_types={"Hadamard": 1, "PauliX": 2},
+                        gate_sizes={1: 3},
+                        measurements={"expval(PauliY)": 1},
+                        num_allocs=3,
+                    ),
+                    SpecsResources(
+                        gate_types={"Hadamard": 1, "PauliX": 2},
+                        gate_sizes={1: 3},
+                        measurements={"expval(PauliZ)": 1},
+                        num_allocs=3,
+                    ),
+                ],
+                "cancel-inverses (MLIR-2)": [  # The split should remain throughout subsequent passes
+                    SpecsResources(
+                        gate_types={"Hadamard": 1},
+                        gate_sizes={1: 1},
+                        measurements={"expval(PauliX)": 1},
+                        num_allocs=3,
+                    ),
+                    SpecsResources(
+                        gate_types={"Hadamard": 1},
+                        gate_sizes={1: 1},
+                        measurements={"expval(PauliY)": 1},
+                        num_allocs=3,
+                    ),
+                    SpecsResources(
+                        gate_types={"Hadamard": 1},
+                        gate_sizes={1: 1},
+                        measurements={"expval(PauliZ)": 1},
+                        num_allocs=3,
+                    ),
+                ],
+            },
         )
 
         check_specs_same(actual, expected)
