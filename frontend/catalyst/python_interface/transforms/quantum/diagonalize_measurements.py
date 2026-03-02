@@ -57,7 +57,7 @@ from catalyst.python_interface.dialects.quantum import (
 from catalyst.python_interface.pass_api import compiler_transform
 
 _default_supported_obs = ("PauliZ", "Identity")
-_obs_allowed_diagonalization = {"PauliX", "PauliY", "PauliZ", "Hadamard", "Identity"}
+_obs_allowed_diagonalization = ("PauliX", "PauliY", "PauliZ", "Hadamard", "Identity")
 
 
 def _generate_mapping():
@@ -78,9 +78,10 @@ _gate_map, _params_map = _generate_mapping()
 
 def _diagonalize(obs: NamedObsOp, supported_base_obs) -> bool:
     """Whether to diagonalize a given observable."""
+    _obs_set_to_diagonalize = _obs_allowed_diagonalization - supported_base_obs
     if obs.type.data in supported_base_obs:
         return False
-    if obs.type.data in _gate_map:
+    if obs.type.data in _obs_set_to_diagonalize:
         return True
     raise NotImplementedError(
         f"Observable {obs.type.data} is not supported for diagonalization"
@@ -101,6 +102,11 @@ class DiagonalizeFinalMeasurementsPattern(
         self, observable: NamedObsOp, rewriter: pattern_rewriter.PatternRewriter, /
     ):
         """Replace non-diagonalized observables with their diagonalizing gates and PauliZ."""
+        """
+        NON-COMMUTING CHECK TODO:
+        1: Add HermitianObs to check if it's used for multiple times.
+        2: Check if there is quantum.compbasis obs applied to qreg.
+        """
 
         if _diagonalize(observable, self.supported_base_obs):
 
@@ -176,11 +182,11 @@ class DiagonalizeFinalMeasurementsPass(passes.ModulePass):
             isinstance(self.supported_base_obs, str)
             and self.supported_base_obs in _obs_allowed_diagonalization
         ):
-            self.supported_base_obs = set(_default_supported_obs + (self.supported_base_obs,))
+            self.supported_base_obs = _default_supported_obs + (self.supported_base_obs,)
         elif isinstance(self.supported_base_obs, tuple) and all(
             x in _obs_allowed_diagonalization for x in self.supported_base_obs
         ):
-            self.supported_base_obs = set(_default_supported_obs + self.supported_base_obs)
+            self.supported_base_obs = _default_supported_obs + self.supported_base_obs
         else:
             raise ValueError(
                 f"{self.supported_base_obs} is not supported. Please ensure all the supported_base_obs is a subset of PauliX, PauliY, PauliZ, Hadamard and Identity"
