@@ -22,7 +22,6 @@ from functools import wraps
 from shutil import which
 
 from pennylane.tape import QuantumScript
-from pennylane.transforms.core import CompilePipeline
 from pennylane.workflow.qnode import QNode
 from xdsl.dialects.builtin import ModuleOp
 
@@ -330,13 +329,7 @@ def draw_graph(qnode: QJIT, *, level: int | None = None) -> Callable:
     if isinstance(level, int):
         max_level = level
 
-    if not isinstance(qnode, QJIT) or (
-        not isinstance(qnode.original_function, QNode)
-        and not (
-            isinstance(qnode.original_function, CompilePipeline)
-            and isinstance(qnode.original_qnode, QNode)
-        )
-    ):
+    if not isinstance(qnode, QJIT) or (not isinstance(qnode.original_function, QNode)):
         raise TypeError(
             "The circuit must be a qjit-compiled qnode. "
             "Please apply the 'qml.qjit' function to your qnode."

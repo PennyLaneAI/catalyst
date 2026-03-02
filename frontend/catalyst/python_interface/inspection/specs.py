@@ -19,7 +19,6 @@ from __future__ import annotations
 import warnings
 from typing import Literal
 
-from pennylane.transforms.core import CompilePipeline
 from pennylane.workflow.qnode import QNode
 
 from catalyst.jit import QJIT
@@ -58,13 +57,7 @@ def mlir_specs(
     cache: dict[int, tuple[ResourcesResult, str]] = {}
     level_to_markers: dict[int, list[str]] = level_to_markers or {}
 
-    if not isinstance(qnode, QJIT) or (
-        not isinstance(qnode.original_function, QNode)
-        and not (
-            isinstance(qnode.original_function, CompilePipeline)
-            and isinstance(qnode.original_qnode, QNode)
-        )
-    ):
+    if not isinstance(qnode, QJIT) or (not isinstance(qnode.original_function, QNode)):
         raise ValueError(
             "The provided `qnode` argument does not appear to be a valid QJIT compiled QNode."
         )
