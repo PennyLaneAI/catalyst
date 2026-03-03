@@ -95,8 +95,6 @@ def test_op_constructors():
     hyper_reg = create_ssa_value(qecl.LogicalHyperRegisterType(3, 1))
     codeblock = create_ssa_value(qecl.LogicalCodeblockType(1))
 
-    breakpoint()
-
     # alloc
     alloc_op = qecl.AllocOp(result_types=(qecl.LogicalHyperRegisterType(3, 1),))
     assert len(alloc_op.result_types) == 1
