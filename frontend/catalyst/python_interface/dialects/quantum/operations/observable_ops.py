@@ -15,7 +15,7 @@
 This file contains the definition of operations that represent observables
 in the Quantum dialect.
 """
-from xdsl.dialects.builtin import i1, ComplexType, Float64Type
+from xdsl.dialects.builtin import ComplexType, Float64Type, i1
 from xdsl.ir import Operation
 from xdsl.irdl import (
     AttrSizedOperandSegments,
