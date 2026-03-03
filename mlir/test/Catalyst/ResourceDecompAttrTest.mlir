@@ -12,21 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --pass-pipeline="builtin.module(resource-tracker{output-json=true})" --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --pass-pipeline="builtin.module(resource-tracker{decomp-attr=true})" --split-input-file %s | FileCheck %s
 
+// Basic decomposition rule
 
-// Basic gate counting
-
-// CHECK-LABEL: "basic_gates"
-// CHECK:   "num_alloc_qubits": 2
-// CHECK:   "num_arg_qubits": 0
-// CHECK:   "num_qubits": 2
-// CHECK:   "operations"
-// CHECK-DAG: "Hadamard(1)": 1
-// CHECK-DAG: "CNOT(2)": 1
-// CHECK-DAG: "T(1)": 1
-// CHECK-DAG: "S(1)": 1
-func.func @basic_gates() {
+// CHECK: @basic_gates() attributes {resources = {measurements = {}, num_alloc_qubits = 2 : i64, operations = {"CNOT(2)" = 1 : i64, "Hadamard(1)" = 1 : i64, "S(1)" = 1 : i64, "T(1)" = 1 : i64}}, target_gate = "basic"}
+func.func @basic_gates() attributes {target_gate="basic"}  {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -42,17 +33,10 @@ func.func @basic_gates() {
 
 // -----
 
-// PBC operations (PPR and PPM)
+// Rule with PBC ops
 
-// CHECK-LABEL: "pbc_operations"
-// CHECK:   "num_alloc_qubits": 2
-// CHECK:   "num_arg_qubits": 0
-// CHECK:   "num_qubits": 2
-// CHECK:   "operations"
-// CHECK-DAG: "PPR-pi/4(1)": 3
-// CHECK-DAG: "PPR-pi/8(1)": 1
-// CHECK-DAG: "PPM(1)": 2
-func.func @pbc_operations() {
+// CHECK: func.func @pbc_operations() attributes {resources = {measurements = {}, num_alloc_qubits = 2 : i64, operations = {"PPM(1)" = 2 : i64, "PPR-pi/4(1)" = 3 : i64, "PPR-pi/8(1)" = 1 : i64}}, target_gate = "pbc"}
+func.func @pbc_operations() attributes {target_gate="pbc"} {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -70,125 +54,10 @@ func.func @pbc_operations() {
 
 // -----
 
-// Static for loop
+// Rule with measure
 
-// CHECK-LABEL: "static_for_loop"
-// CHECK: "operations"
-// CHECK-DAG: "Hadamard(1)": 5
-func.func @static_for_loop(%arg0: !quantum.bit) -> !quantum.bit {
-    %c5 = arith.constant 5 : index
-    %c0 = arith.constant 0 : index
-    %c1 = arith.constant 1 : index
-
-    %q = scf.for %iter = %c0 to %c5 step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
-        %out = quantum.custom "Hadamard"() %arg1 : !quantum.bit
-        scf.yield %out : !quantum.bit
-    }
-
-    return %q : !quantum.bit
-}
-
-// -----
-
-// Dynamic for loop (counted as 1 iteration)
-
-// CHECK-LABEL: "dynamic_for_loop"
-// CHECK: "operations"
-// CHECK-DAG: "PauliX(1)": 1
-func.func @dynamic_for_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
-    %c0 = arith.constant 0 : index
-    %c1 = arith.constant 1 : index
-
-    %q = scf.for %iter = %c0 to %n step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
-        %out = quantum.custom "PauliX"() %arg1 : !quantum.bit
-        scf.yield %out : !quantum.bit
-    }
-
-    return %q : !quantum.bit
-}
-
-// -----
-
-// Dynamic for loop with estimated_iterations
-
-// CHECK-LABEL: "estimated_iterations_loop"
-// CHECK: "operations"
-// CHECK-DAG: "PauliZ(1)": 10
-func.func @estimated_iterations_loop(%arg0: !quantum.bit, %n: index) -> !quantum.bit {
-    %c0 = arith.constant 0 : index
-    %c1 = arith.constant 1 : index
-
-    %q = scf.for %iter = %c0 to %n step %c1 iter_args(%arg1 = %arg0) -> (!quantum.bit) {
-        %out = quantum.custom "PauliZ"() %arg1 : !quantum.bit
-        scf.yield %out : !quantum.bit
-    } {estimated_iterations = 10 : i16}
-
-    return %q : !quantum.bit
-}
-
-// -----
-
-// If-else branching (take max per op)
-
-// CHECK-LABEL: "if_else_branching"
-// CHECK: "operations"
-// CHECK-DAG: "Hadamard(1)": 3
-// CHECK-DAG: "PauliX(1)": 2
-func.func @if_else_branching(%arg0: !quantum.bit, %cond: i1) -> !quantum.bit {
-    %q = scf.if %cond -> !quantum.bit {
-        // True branch: 2 Hadamard, 1 PauliX
-        %t1 = quantum.custom "Hadamard"() %arg0 : !quantum.bit
-        %t2 = quantum.custom "Hadamard"() %t1 : !quantum.bit
-        %t3 = quantum.custom "PauliX"() %t2 : !quantum.bit
-        scf.yield %t3 : !quantum.bit
-    } else {
-        // False branch: 3 Hadamard, 2 PauliX -> max(2,3)=3 Hadamard, max(1,2)=2 PauliX
-        %f1 = quantum.custom "Hadamard"() %arg0 : !quantum.bit
-        %f2 = quantum.custom "Hadamard"() %f1 : !quantum.bit
-        %f3 = quantum.custom "Hadamard"() %f2 : !quantum.bit
-        %f4 = quantum.custom "PauliX"() %f3 : !quantum.bit
-        %f5 = quantum.custom "PauliX"() %f4 : !quantum.bit
-        scf.yield %f5 : !quantum.bit
-    }
-
-    return %q : !quantum.bit
-}
-
-// -----
-
-// Nested static for loops
-
-// CHECK-LABEL: "nested_static_for"
-// CHECK: "operations"
-// CHECK-DAG: "PauliX(1)": 15
-func.func @nested_static_for(%arg0: !quantum.bit) -> !quantum.bit {
-    %c3 = arith.constant 3 : index
-    %c5 = arith.constant 5 : index
-    %c0 = arith.constant 0 : index
-    %c1 = arith.constant 1 : index
-
-    %q = scf.for %i = %c0 to %c3 step %c1 iter_args(%a = %arg0) -> (!quantum.bit) {
-        %q2 = scf.for %j = %c0 to %c5 step %c1 iter_args(%b = %a) -> (!quantum.bit) {
-            %out = quantum.custom "PauliX"() %b : !quantum.bit
-            scf.yield %out : !quantum.bit
-        }
-        scf.yield %q2 : !quantum.bit
-    }
-
-    return %q : !quantum.bit
-}
-
-// -----
-
-// Measurements
-
-// CHECK-LABEL: "measurement_ops"
-// CHECK: "measurements"
-// CHECK-DAG: "MidCircuitMeasure": 1
-// CHECK: "num_alloc_qubits": 1
-// CHECK: "num_arg_qubits": 0
-// CHECK: "num_qubits": 1
-func.func @measurement_ops() {
+// CHECK: @rule_mcm() attributes {resources = {measurements = {MidCircuitMeasure = 1 : i64}, num_alloc_qubits = 1 : i64, operations = {"Hadamard(1)" = 1 : i64}}, target_gate = "gate"}
+func.func @rule_mcm() attributes {target_gate="gate"} {
     %0 = quantum.alloc( 1) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.custom "Hadamard"() %1 : !quantum.bit
@@ -200,175 +69,17 @@ func.func @measurement_ops() {
 
 // -----
 
-// Function call resolution
+// Rule depends on helper functions
 
-// CHECK-LABEL: "caller_func"
-// CHECK: "operations"
-// CHECK-DAG: "Hadamard(1)": 2
-func.func @caller_func(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode} {
-    %r1 = func.call @helper_func(%arg0) : (!quantum.bit) -> !quantum.bit
-    %r2 = func.call @helper_func(%r1) : (!quantum.bit) -> !quantum.bit
-    return %r2 : !quantum.bit
-}
-
+// CHECK: @helper_func(%arg0: !quantum.bit) -> !quantum.bit
 func.func private @helper_func(%arg0: !quantum.bit) -> !quantum.bit {
     %out = quantum.custom "Hadamard"() %arg0 : !quantum.bit
     return %out : !quantum.bit
 }
 
-
-// -----
-
-// Function call resolution with nested calls
-
-// CHECK-LABEL: "nested_caller_func"
-// CHECK: "operations"
-// CHECK-DAG: "PauliX(1)": 60
-
-func.func @nested_caller_func(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode} {
-    %r1 = func.call @nested_helper_func(%arg0) : (!quantum.bit) -> !quantum.bit
-    %r2 = func.call @nested_helper_func(%r1) : (!quantum.bit) -> !quantum.bit
-    return %r2 : !quantum.bit
-}
-
-func.func private @helper_func(%arg0: !quantum.bit) -> !quantum.bit {
-    %c3 = arith.constant 3 : index
-    %c5 = arith.constant 5 : index
-    %c0 = arith.constant 0 : index
-    %c1 = arith.constant 1 : index
-
-    // for (i = 0; i < 3; i++) {
-    %q = scf.for %i = %c0 to %c3 step %c1 iter_args(%a = %arg0) -> (!quantum.bit) {
-        // for (j = 0; j < 5; j++) {
-        %q2 = scf.for %j = %c0 to %c5 step %c1 iter_args(%b = %a) -> (!quantum.bit) {
-            %out = quantum.custom "PauliX"() %b : !quantum.bit
-            scf.yield %out : !quantum.bit
-        }
-        scf.yield %q2 : !quantum.bit
-    }
-    return %q : !quantum.bit
-}
-
-func.func private @nested_helper_func(%arg0: !quantum.bit) -> !quantum.bit {
-    // total: 15 PauliX operations
+// CHECK: rule(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode, resources =
+func.func @rule(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode, target_gate="rule"} {
     %r1 = func.call @helper_func(%arg0) : (!quantum.bit) -> !quantum.bit
-    // total: 15 PauliX operations
     %r2 = func.call @helper_func(%r1) : (!quantum.bit) -> !quantum.bit
     return %r2 : !quantum.bit
-}
-
-// -----
-
-// Mixed quantum and PBC ops
-
-// CHECK-LABEL: "mixed_ops"
-// CHECK: "num_alloc_qubits": 2
-// CHECK: "num_arg_qubits": 0
-// CHECK: "num_qubits": 2
-// CHECK: "operations"
-// CHECK-DAG: "Hadamard(1)": 1
-// CHECK-DAG: "PPR-pi/4(1)": 1
-// CHECK-DAG: "PPM(1)": 1
-func.func @mixed_ops() {
-    %0 = quantum.alloc( 2) : !quantum.reg
-    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-    %3 = quantum.custom "Hadamard"() %1 : !quantum.bit
-    %4 = pbc.ppr ["Z"](4) %2 : !quantum.bit
-    %mres, %out = pbc.ppm ["Z"] %4 : i1, !quantum.bit
-    %5 = quantum.insert %0[ 0], %3 : !quantum.reg, !quantum.bit
-    %6 = quantum.insert %5[ 1], %out : !quantum.reg, !quantum.bit
-    quantum.dealloc %6 : !quantum.reg
-    return
-}
-
-
-// -----
-
-// Qubit arguments on the entry function are counted toward num_qubits.
-
-// CHECK-LABEL: "multi_qubit_args"
-// CHECK: "num_alloc_qubits": 0
-// CHECK: "num_arg_qubits": 2
-// CHECK: "num_qubits": 2
-// CHECK: "operations"
-// CHECK-DAG: "CNOT(2)": 1
-func.func @multi_qubit_args(%q0: !quantum.bit, %q1: !quantum.bit) -> (!quantum.bit, !quantum.bit) {
-    %0:2 = quantum.custom "CNOT"() %q0, %q1 : !quantum.bit, !quantum.bit
-    return %0#0, %0#1 : !quantum.bit, !quantum.bit
-}
-
-// -----
-
-// Mixed: both allocated qubits and argument qubits contribute to num_qubits.
-
-// CHECK-LABEL: "mixed_alloc_and_arg_qubits"
-// CHECK: "num_alloc_qubits": 2
-// CHECK: "num_arg_qubits": 1
-// CHECK: "num_qubits": 3
-// CHECK: "operations"
-// CHECK-DAG: "Hadamard(1)": 1
-// CHECK-DAG: "CNOT(2)": 1
-func.func @mixed_alloc_and_arg_qubits(%q0: !quantum.bit) -> !quantum.bit {
-    %0 = quantum.alloc( 2) : !quantum.reg
-    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
-    %3 = quantum.custom "Hadamard"() %1 : !quantum.bit
-    %4:2 = quantum.custom "CNOT"() %q0, %3 : !quantum.bit, !quantum.bit
-    %5 = quantum.insert %0[ 0], %4#1 : !quantum.reg, !quantum.bit
-    %6 = quantum.insert %5[ 1], %2 : !quantum.reg, !quantum.bit
-    quantum.dealloc %6 : !quantum.reg
-    return %4#0 : !quantum.bit
-}
-
-// -----
-
-// Pass statistics output
-
-// RUN: quantum-opt --pass-pipeline="builtin.module(resource-tracker)" -mlir-pass-statistics -mlir-pass-statistics-display=list --split-input-file %s 2>&1 | FileCheck %s --check-prefix=STATS
-
-// STATS: ResourceTrackerPass
-// STATS: 2 total-alloc-qubits
-// STATS: 0 total-arg-qubits
-// STATS: 1 total-classical-ops
-// STATS: 1 total-gates
-// STATS: 1 total-measurements
-// STATS: 2 total-qubits
-func.func @stats_test() {
-    %0 = quantum.alloc( 2) : !quantum.reg
-    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
-    %2 = quantum.custom "Hadamard"() %1 : !quantum.bit
-    %mres, %out = quantum.measure %2 : i1, !quantum.bit
-    %3 = quantum.insert %0[ 0], %out : !quantum.reg, !quantum.bit
-    quantum.dealloc %3 : !quantum.reg
-    return
-}
-
-// -----
-
-// Multiple qnode functions: the first qnode is the entry function.
-
-// STATS: ResourceTrackerPass
-// STATS: 0 total-alloc-qubits
-// STATS: 1 total-arg-qubits
-// STATS: 4 total-function-calls
-// STATS: 4 total-gates
-// STATS: 1 total-qubits
-func.func @first_qnode(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode} {
-    %r1 = func.call @shared_helper(%arg0) : (!quantum.bit) -> !quantum.bit
-    %r2 = func.call @shared_helper(%r1) : (!quantum.bit) -> !quantum.bit
-    %r3 = func.call @second_qnode(%r2) : (!quantum.bit) -> !quantum.bit
-    return %r3 : !quantum.bit
-}
-
-func.func private @shared_helper(%arg0: !quantum.bit) -> !quantum.bit {
-    %out = quantum.custom "Hadamard"() %arg0 : !quantum.bit
-    return %out : !quantum.bit
-}
-
-
-func.func @second_qnode(%arg0: !quantum.bit) -> !quantum.bit attributes {qnode} {
-    %r1 = func.call @shared_helper(%arg0) : (!quantum.bit) -> !quantum.bit
-    %out = quantum.custom "PauliX"() %r1 : !quantum.bit
-    return %out : !quantum.bit
 }
