@@ -15,7 +15,7 @@
 This file contains the definition of operations that represent observables
 in the Quantum dialect.
 """
-from xdsl.dialects.builtin import I1, ComplexType, Float64Type
+from xdsl.dialects.builtin import i1, ComplexType, Float64Type
 from xdsl.ir import Operation
 from xdsl.irdl import (
     AttrSizedOperandSegments,
@@ -140,4 +140,4 @@ class MCMObsOp(ObservableOp):
 
     assembly_format = "$mcms attr-dict `:` type(results)"
 
-    mcms = var_operand_def(I1)
+    mcms = var_operand_def(i1)
