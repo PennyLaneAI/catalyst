@@ -787,12 +787,14 @@ void handleFor(IRRewriter &builder, scf::ForOp forOp, QubitValueTracker &tracker
         // argument
         for (auto [i, j] :
              llvm::zip_equal(extractor.getQRegOperandIndices(), extractor.getQRegResultIndices())) {
-            tracker.setCurrentVQreg(rValuesUsedByRegion[i - 1], newLoop->getResult(j));
+            tracker.setCurrentVQreg(rValuesUsedByRegion[i - 1 - forOp->getNumResults()],
+                                    newLoop->getResult(j));
         }
 
         for (auto [i, j] : llvm::zip_equal(extractor.getRootQubitOperandIndices(),
                                            extractor.getRootQubitResultIndices())) {
-            tracker.setCurrentVQubit(rValuesUsedByRegion[i - 1], newLoop->getResult(j));
+            tracker.setCurrentVQubit(rValuesUsedByRegion[i - 1 - forOp->getNumResults()],
+                                     newLoop->getResult(j));
         }
     }
 
