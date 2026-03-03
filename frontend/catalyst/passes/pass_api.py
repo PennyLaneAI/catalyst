@@ -150,7 +150,7 @@ def pipeline(pass_pipeline: PipelineDict):
     def _decorator(qnode):
         new_qnode = copy(qnode)
         # pylint: disable=protected-access
-        new_qnode._compile_pipeline = new_pipeline
+        new_qnode._compile_pipeline = qnode._compile_pipeline + new_pipeline
         return new_qnode
 
     return _decorator
