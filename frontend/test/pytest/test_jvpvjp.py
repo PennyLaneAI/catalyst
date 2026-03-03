@@ -937,6 +937,7 @@ def test_vjp_argument_type_checks_correct_inputs(capture_mode, diff_method, vjp_
         return vjp_fn(g_R3_to_R2, [1, x], [cotangents], method=diff_method, argnums=[1])
 
 
+@pytest.mark.old_frontend
 @pytest.mark.parametrize("diff_method", diff_methods)
 def test_vjp_argument_type_checks_incompatible_n_inputs(capture_mode, diff_method):
     """Tests error handling of Catalyst's vjp when the number of function output params

@@ -39,7 +39,7 @@ def test_scalar_scalar(capture_mode, backend, diff_method):
 
     @qjit(capture=capture_mode)
     def jac_postprocess(x):
-        return grad(postprocess, method="auto")(x)
+        return qml.grad(postprocess, method="auto")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
     catalyst_jacobian = jac_postprocess(0.5)
@@ -61,7 +61,7 @@ def test_one_to_many(capture_mode, backend, diff_method):
 
     @qjit(capture=capture_mode)
     def jac_postprocess(x):
-        return jacobian(postprocess, method="auto")(x)
+        return qml.jacobian(postprocess, method="auto")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
     catalyst_jacobian = jac_postprocess(0.5)
@@ -86,7 +86,7 @@ def test_many_to_one(capture_mode, backend, diff_method):
 
     @qjit(capture=capture_mode)
     def jac_postprocess(x):
-        return grad(postprocess, method="auto")(x)
+        return qml.grad(postprocess, method="auto")(x)
 
     x = jnp.array([0.5, 0.4, 0.3, 0.2])
     jax_jacobian = jax.jacobian(postprocess)(x)
@@ -109,7 +109,7 @@ def test_tensor_measure(capture_mode, backend):
 
     @qjit(capture=capture_mode)
     def jac_postprocess(x):
-        return jacobian(postprocess, method="auto")(x)
+        return qml.jacobian(postprocess, method="auto")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
     catalyst_jacobian = jac_postprocess(0.5)
@@ -130,7 +130,7 @@ def test_multi_measure(capture_mode, backend):
 
     @qjit(capture=capture_mode)
     def jac_postprocess(x):
-        return grad(postprocess, method="auto")(x)
+        return qml.grad(postprocess, method="auto")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
     catalyst_jacobian = jac_postprocess(0.5)
@@ -145,7 +145,7 @@ def test_purely_classical(capture_mode):
 
     @qjit(capture=capture_mode)
     def classical_grad(x):
-        return grad(postprocess, method="auto")(x)
+        return qml.grad(postprocess, method="auto")(x)
 
     assert classical_grad(4.5) == 9
 
@@ -168,7 +168,7 @@ def test_jacobian(capture_mode, backend, diff_method):
 
     @qjit(capture=capture_mode)
     def jac_postprocess(x):
-        return jacobian(postprocess, method="auto")(x)
+        return qml.jacobian(postprocess, method="auto")(x)
 
     x = jnp.array([0.5, 0.4, 0.3, 0.2])
     assert jac_postprocess(x) == pytest.approx(jax.jacobian(postprocess)(x))
@@ -189,7 +189,7 @@ def test_multi_result(capture_mode, backend, diff_method):
 
     @qjit(capture=capture_mode)
     def jac_postprocess(x):
-        return jacobian(postprocess, method="auto")(x)
+        return qml.jacobian(postprocess, method="auto")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
     catalyst_jacobian = jac_postprocess(0.5)
@@ -213,7 +213,7 @@ def test_multi_arg_multi_result(capture_mode, backend, diff_method):
 
     @qjit(capture=capture_mode)
     def jac_postprocess(x, y):
-        return jacobian(postprocess, argnums=[0, 1], method="auto")(x, y)
+        return qml.jacobian(postprocess, argnums=[0, 1], method="auto")(x, y)
 
     args = (jnp.array([0.5, 0, 0]), 0.4)
     jax_jacobian = jax.jacobian(postprocess, argnums=[0, 1])(*args)
@@ -246,7 +246,7 @@ def test_multi_qnode(capture_mode, backend):
 
     @qjit(capture=capture_mode)
     def grad_workflow(x):
-        return grad(postprocess, method="auto")(x)
+        return qml.grad(postprocess, method="auto")(x)
 
     x = jnp.array([0.1, 0.2, 0.3])
     assert grad_workflow(x) == pytest.approx(jax.jacobian(postprocess)(x))
@@ -272,12 +272,13 @@ def test_qnode_different_returns(capture_mode, backend):
 
     @qjit(capture=capture_mode)
     def grad_loss(theta):
-        return grad(loss, method="auto")(theta)
+        return qml.grad(loss, method="auto")(theta)
 
     x = jnp.array([1.0, 2.0])
     assert grad_loss(x) == pytest.approx(jax.jacobian(loss)(x))
 
 
+@pytest.mark.old_frontend
 def test_no_nested_grad_without_fd(capture_mode):
     """Test input validation for higher order derivatives where outer grad ops don't have
     method='fd'.
@@ -293,7 +294,7 @@ def test_no_nested_grad_without_fd(capture_mode):
 
         @qjit(capture=capture_mode)
         def outer(x: float):
-            return grad(middle, method="auto")(x)
+            return qml.grad(middle, method="auto")(x)
 
         outer(9.0)
 

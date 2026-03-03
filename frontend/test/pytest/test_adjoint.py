@@ -29,8 +29,6 @@ import catalyst
 from catalyst import measure
 from catalyst.utils.exceptions import CompileError
 
-
-
 # pylint: disable=too-many-lines,missing-class-docstring,missing-function-docstring,too-many-public-methods
 
 
@@ -76,7 +74,7 @@ class TestCatalyst:
 
         device = qml.device(backend, wires=2)
 
-        @qjit(capture = capture_mode)
+        @qjit(capture=capture_mode)
         @qml.qnode(device)
         def C_workflow():
             qml.PauliX(wires=0)
@@ -100,7 +98,7 @@ class TestCatalyst:
         """Ensures that catalyst.adjoint accepts single PennyLane operators classes as argument."""
         device = qml.device(backend, wires=2)
 
-        @qjit(capture = capture_mode)
+        @qjit(capture=capture_mode)
         @qml.qnode(device)
         def C_workflow(theta, val):
             adjoint(qml.RY)(jnp.pi, val)
@@ -123,7 +121,7 @@ class TestCatalyst:
 
         device = qml.device(backend, wires=3)
 
-        @qjit(capture = capture_mode)
+        @qjit(capture=capture_mode)
         @qml.qnode(device)
         def C_workflow(theta, val):
             adjoint(qml.RX(jnp.pi, val))
@@ -153,7 +151,7 @@ class TestCatalyst:
 
         device = qml.device(backend, wires=2)
 
-        @qjit(capture = capture_mode)
+        @qjit(capture=capture_mode)
         @qml.qnode(device)
         def C_workflow(w, theta):
             qml.PauliX(wires=0)
@@ -182,7 +180,7 @@ class TestCatalyst:
                 I = I + 1
                 A(partial(func, A=A, I=I))()
 
-        @qjit(capture = capture_mode)
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=2))
         def C_workflow():
             qml.RX(np.pi / 2, wires=0)
@@ -277,7 +275,7 @@ class TestCatalyst:
         )
         with pytest.raises(expected_error, match=expected_msg):
 
-            @qjit(capture = capture_mode)
+            @qjit(capture=capture_mode)
             @qml.qnode(qml.device("lightning.qubit", wires=2))
             def C_workflow():
                 adjoint(func)()
@@ -290,7 +288,7 @@ class TestCatalyst:
         expected_msg = "not callable" if capture_mode else "Expected a callable"
         with pytest.raises(ValueError, match=expected_msg):
 
-            @qjit(capture = capture_mode)
+            @qjit(capture=capture_mode)
             @qml.qnode(qml.device("lightning.qubit", wires=2))
             def C_workflow():
                 adjoint(33)()
@@ -435,7 +433,7 @@ class TestCatalyst:
 
         dev = qml.device(backend, wires=1)
 
-        @qjit(capture = capture_mode)
+        @qjit(capture=capture_mode)
         @qml.qnode(dev)
         def catalyst_workflow(*args):
             adjoint(c_quantum_func)(*args)
@@ -489,7 +487,7 @@ class TestCatalyst:
     def test_adjoint_wires(self, backend, capture_mode):
         """Test the wires property of Adjoint"""
 
-        @qjit(capture = capture_mode)
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(theta):
             def func(theta):
@@ -509,7 +507,7 @@ class TestCatalyst:
     def test_adjoint_wires_qubitunitary(self, backend, capture_mode):
         """Test the wires property of nested Adjoint with QubitUnitary"""
 
-        @qjit(capture = capture_mode)
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=3))
         def circuit():
             def func():
@@ -542,7 +540,7 @@ class TestCatalyst:
             qml.RY(theta / 2, wires=w1)
             qml.RZ(theta, wires=2)
 
-        @qjit(capture = capture_mode)
+        @qjit(capture=capture_mode)
         @qml.qnode(device)
         def C_workflow(w0, w1, theta):
             qml.PauliX(wires=0)
@@ -561,7 +559,7 @@ class TestCatalyst:
     def test_adjoint_wires_controlflow(self, backend, capture_mode):
         """Test the wires property of Adjoint  in a conditional branch"""
 
-        @qjit(capture = capture_mode)
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=3))
         def circuit():
             def func(pred, theta):
@@ -596,7 +594,7 @@ class TestCatalyst:
             return qml.probs(wires=dev.wires)
 
         expected = circuit()
-        observed = qjit(circuit, capture = capture_mode)()
+        observed = qjit(circuit, capture=capture_mode)()
         assert_allclose(expected, observed)
 
     # capture=True raises RuntimeError("No queuing context available to append operation to.") in qml.apply.
@@ -607,7 +605,7 @@ class TestCatalyst:
 
         adj_op = adjoint(qml.RY(np.pi / 2, wires=0))
 
-        @qjit(capture = capture_mode)
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device(backend, wires=1))
         def circuit():
             qml.Hadamard(0)
@@ -1651,7 +1649,7 @@ class TestMidCircuitMeasurementAfterAdjoint:
         def subroutine():
             qml.Hadamard(wires=1)
 
-        @qjit(capture = capture_mode)
+        @qjit(capture=capture_mode)
         @qml.qnode(qml.device("lightning.qubit", wires=2), shots=1)
         def circuit():
             # Comment/uncomment to toggle bug
