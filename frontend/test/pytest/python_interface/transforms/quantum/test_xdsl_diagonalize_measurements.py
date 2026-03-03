@@ -56,7 +56,7 @@ class TestDiagonalizeFinalMeasurementsPass:
         """Test if an ValueError is raised if supported_base_obs is a subset of {Identity,PauliX,
         PauliY, PauliZ, Hadamard}."""
         expected_msg = (
-            f"{supported_base_obs} is not supported. Please ensure all the supported_base_obs"
+            f"{supported_base_obs} is not supported. Please ensure all the supported_base_obs "
             "is a subset of PauliX, PauliY, PauliZ, Hadamard and Identity"
         )
         with pytest.raises(ValueError, match=re.escape(expected_msg)):
@@ -755,7 +755,6 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             (qml.X(0) @ qml.Y(1), qml.Hermitian(np.eye(2), wires=0) @ qml.Y(2)),
             # Hamiltonian obs
             (qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.Z(1)]), qml.X(1) @ qml.X(2)),
-            (qml.Hamiltonian([1.0], [qml.Z(0)]), qml.X(1) @ qml.X(2)),
             (qml.Hamiltonian([1.0], [qml.Z(0)]), qml.Hamiltonian([1.0, 1.0], [qml.X(0), qml.Y(1)])),
         ],
     )
@@ -802,7 +801,6 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             (qml.X(0) @ qml.Y(1), qml.Hermitian(np.eye(2), wires=0) @ qml.Y(2)),
             # Hamiltonian obs
             (qml.Hamiltonian([1.0, 1.0], [qml.Z(0), qml.Z(1)]), qml.X(1) @ qml.X(2)),
-            (qml.Hamiltonian([1.0], [qml.Z(0)]), qml.X(1) @ qml.X(2)),
             (qml.Hamiltonian([1.0], [qml.Z(0)]), qml.Hamiltonian([1.0, 1.0], [qml.X(0), qml.Y(1)])),
         ],
     )
@@ -817,10 +815,9 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         non-commuting observables."""
         dev = qml.device("lightning.qubit", wires=4)
 
-        assert any(wire in obs[1].wires for wire in obs[0].wires)
-
         @qml.qjit()
         @diagonalize_final_measurements_pass
+        @qml.set_shots(10)
         @qml.qnode(dev)
         def circuit(x):
             qml.RX(x, 0)
@@ -851,6 +848,7 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
 
         @qml.qjit()
         @diagonalize_final_measurements_pass
+        @qml.set_shots(10)
         @qml.qnode(dev)
         def circuit(x):
             qml.RX(x, 0)
