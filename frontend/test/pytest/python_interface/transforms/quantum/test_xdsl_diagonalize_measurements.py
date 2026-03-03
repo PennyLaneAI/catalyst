@@ -569,14 +569,17 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
         )
 
         assert np.allclose(expected_res(phi, theta), circuit_compiled(phi, theta))
-    
+
     def test_with_split_non_commuting(self):
-        def diagonalize_measurements_setup_inputs(to_eigvals: bool = False, supported_base_obs: list[str] = "PauliZ"):
+        def diagonalize_measurements_setup_inputs(
+            to_eigvals: bool = False, supported_base_obs: list[str] = "PauliZ"
+        ):
             "Docstring for my_transform."
             return (), {"to_eigvals": to_eigvals, "supported_base_obs": supported_base_obs}
 
         diagonalize_measurements = qml.transform(
-            pass_name="diagonalize-final-measurements", setup_inputs=diagonalize_measurements_setup_inputs
+            pass_name="diagonalize-final-measurements",
+            setup_inputs=diagonalize_measurements_setup_inputs,
         )
 
         dev = qml.device("lightning.qubit", wires=10)
@@ -595,8 +598,8 @@ class TestDiagonalizeFinalMeasurementsCatalystFrontend:
             i = i + 1
             return i
 
-        @qml.qjit
-        @diagonalize_measurements(supported_base_obs=("PauliX", "PauliY", "PauliZ"), to_eigvals=False)
+        @qml.qjit(keep_intermediate=True)
+        @diagonalize_measurements(supported_base_obs=("PauliX", "PauliY"), to_eigvals=False)
         @qml.transform(pass_name="split-non-commuting")
         @qml.qnode(dev)
         def circuit():
