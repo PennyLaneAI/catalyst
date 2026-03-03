@@ -142,11 +142,24 @@
   operations across the `quantum`, `qec`, and `mbqc` dialects. The analysis is implemented as a
   cacheable MLIR analysis class (`ResourceAnalysis`) that other transformation passes can query
   via `getAnalysis<ResourceAnalysis>()`, avoiding redundant recomputation.
+  [(#2479)](https://github.com/PennyLaneAI/catalyst/pull/2479)
+  [(#2539)](https://github.com/PennyLaneAI/catalyst/pull/2539)
+
 
   ```bash
   quantum-opt --resource-tracker='output-json=true' input.mlir
   quantum-opt --resource-tracker -mlir-pass-statistics input.mlir
   ```
+  Optionally, the following output formats are supported:
+      - `output-json`: Serializes the resource data into a structured JSON file.
+      - `update-attr`: Injects a `DictionaryAttr` named `resources` into the attributes
+          of analyzed `func.func` operations.
+
+  There is one more option that is specificlly designed for the graph
+  decomposition system in MLIR. When `decomp-attr` enabled, the pass
+  restricts its annotations solely to functions marked with the `target_gate`
+  attribute, effectively filtering for decomposition rules.
+
 
 <h3>Improvements 🛠</h3>
 
